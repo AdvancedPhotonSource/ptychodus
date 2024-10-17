@@ -49,7 +49,7 @@ class AnalysisCore:
         self._fluorescenceSettings = FluorescenceSettings(settingsRegistry)
         self.fluorescenceEnhancer = FluorescenceEnhancer(
             self._fluorescenceSettings,
-            dataMatcher,
+            productRepository,
             upscalingStrategyChooser,
             deconvolutionStrategyChooser,
             fluorescenceFileReaderChooser,

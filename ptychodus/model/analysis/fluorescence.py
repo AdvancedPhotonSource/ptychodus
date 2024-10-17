@@ -22,7 +22,7 @@ from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product
 from ptychodus.api.typing import RealArrayType
 
-from ..reconstructor import DiffractionPatternPositionMatcher
+from ..product import ProductRepository
 from .settings import FluorescenceSettings
 
 logger = logging.getLogger(__name__)
@@ -63,7 +63,7 @@ def get_axis_weights_and_indexes(
 
 
 class VSPILinearOperator(LinearOperator):
-    def __init__(self, product: Product, xrf_nchannels: int) -> None:
+    def __init__(self, product: Product) -> None:
         """
         M: number of XRF positions
         N: number of ptychography object pixels
@@ -71,11 +71,11 @@ class VSPILinearOperator(LinearOperator):
 
         A[M,N] * X[N,P] = B[M,P]
         """
-        super().__init__(float, (len(product.scan), xrf_nchannels))
+        super().__init__(float, (len(product.scan), len(product.scan)))
         self._product = product
 
-    def matmat(self, X: RealArrayType) -> RealArrayType:
-        AX = numpy.zeros(self.shape, dtype=self.dtype)
+    def _matvec(self, X: RealArrayType) -> RealArrayType:
+        AX = numpy.zeros(X.shape, dtype=self.dtype)
 
         probeGeometry = self._product.probe.getGeometry()
         dx_p_m = probeGeometry.pixelWidthInMeters
@@ -103,7 +103,7 @@ class VSPILinearOperator(LinearOperator):
             i_nz = numpy.ravel_multi_index(list(zip(IY.flat, IX.flat)), objectShape)
             X_nz = X.take(i_nz, axis=0)
 
-            AX[index, :] = numpy.matmul(numpy.outer(wy, wx).ravel(), X_nz)
+            AX[index] = numpy.matmul(numpy.outer(wy, wx).ravel(), X_nz)
 
         return AX
 
@@ -115,7 +115,7 @@ class FluorescenceEnhancer(Observable, Observer):
     def __init__(
         self,
         settings: FluorescenceSettings,
-        dataMatcher: DiffractionPatternPositionMatcher,  # FIXME match XRF too
+        productRepository: ProductRepository,
         upscalingStrategyChooser: PluginChooser[UpscalingStrategy],
         deconvolutionStrategyChooser: PluginChooser[DeconvolutionStrategy],
         fileReaderChooser: PluginChooser[FluorescenceFileReader],
@@ -124,7 +124,7 @@ class FluorescenceEnhancer(Observable, Observer):
     ) -> None:
         super().__init__()
         self._settings = settings
-        self._dataMatcher = dataMatcher
+        self._productRepository = productRepository
         self._upscalingStrategyChooser = upscalingStrategyChooser
         self._deconvolutionStrategyChooser = deconvolutionStrategyChooser
         self._fileReaderChooser = fileReaderChooser
@@ -152,7 +152,7 @@ class FluorescenceEnhancer(Observable, Observer):
             self.notifyObservers()
 
     def getProductName(self) -> str:
-        return self._dataMatcher.getProductName(self._productIndex)
+        return self._productRepository[self._productIndex].getName()
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()
@@ -222,14 +222,12 @@ class FluorescenceEnhancer(Observable, Observer):
         if self._measured is None:
             raise ValueError('Fluorescence dataset not loaded!')
 
-        reconstructInput = self._dataMatcher.matchDiffractionPatternsWithPositions(
-            self._productIndex
-        )
+        product = self._productRepository[self._productIndex].getProduct()
         element_maps: list[ElementMap] = list()
 
         if self._settings.useVSPI.getValue():
             measured_emaps = self._measured.element_maps
-            A = VSPILinearOperator(reconstructInput.product, len(measured_emaps))
+            A = VSPILinearOperator(product)
             B = numpy.stack([b.counts_per_second.flatten() for b in measured_emaps]).T
             X, info = gmres(A, B, atol=1e-5)  # TODO expose atol
 
@@ -246,8 +244,8 @@ class FluorescenceEnhancer(Observable, Observer):
 
             for emap in self._measured.element_maps:
                 logger.info(f'Enhancing "{emap.name}"')
-                emap_upscaled = upscaler(emap, reconstructInput.product)
-                emap_enhanced = deconvolver(emap_upscaled, reconstructInput.product)
+                emap_upscaled = upscaler(emap, product)
+                emap_enhanced = deconvolver(emap_upscaled, product)
                 element_maps.append(emap_enhanced)
 
         self._enhanced = FluorescenceDataset(
@@ -258,7 +256,7 @@ class FluorescenceEnhancer(Observable, Observer):
         self.notifyObservers()
 
     def getPixelGeometry(self) -> PixelGeometry:
-        return self._dataMatcher.getObjectPlanePixelGeometry(self._productIndex)
+        return self._productRepository[self._productIndex].getGeometry().getPixelGeometry()
 
     def getEnhancedElementMap(self, channelIndex: int) -> ElementMap:
         if self._enhanced is None:

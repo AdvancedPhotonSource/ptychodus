@@ -1,13 +1,14 @@
 import numpy
 
-from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider
 from ptychodus.api.constants import (
     ELECTRON_VOLT_J,
     LIGHT_SPEED_M_PER_S,
     PLANCK_CONSTANT_J_PER_HZ,
 )
+from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider
 
 from ..patterns import PatternSizer
 from .metadata import MetadataRepositoryItem
@@ -62,6 +63,12 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
     @property
     def objectPlanePixelHeightInMeters(self) -> float:
         return self._lambdaZInSquareMeters / self._patternSizer.getHeightInMeters()
+
+    def getPixelGeometry(self) -> PixelGeometry:
+        return PixelGeometry(
+            widthInMeters=self.objectPlanePixelWidthInMeters,
+            heightInMeters=self.objectPlanePixelHeightInMeters,
+        )
 
     @property
     def fresnelNumber(self) -> float:
