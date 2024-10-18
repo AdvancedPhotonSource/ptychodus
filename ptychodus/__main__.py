@@ -103,10 +103,10 @@ def main() -> int:
             fluorescenceInputFilePath: Path | None = None
             fluorescenceOutputFilePath: Path | None = None
 
-            if parsedArgs.flourescence_input is not None:
+            if parsedArgs.fluorescence_input is not None:
                 fluorescenceInputFilePath = Path(parsedArgs.fluorescence_input.name)
 
-            if parsedArgs.flourescence_output is not None:
+            if parsedArgs.fluorescence_output is not None:
                 fluorescenceOutputFilePath = Path(parsedArgs.fluorescence_output.name)
 
             return model.batchModeExecute(
