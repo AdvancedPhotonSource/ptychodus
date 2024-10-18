@@ -37,12 +37,16 @@ class ReconstructorAPI:
             inputProductIndex, indexFilter
         )
 
+        outputProductIndex = self._productRepository.insertNewProduct(likeIndex=inputProductIndex)
+        outputProduct = self._productRepository[outputProductIndex]
+
         tic = time.perf_counter()
         result = reconstructor.reconstruct(parameters)
         toc = time.perf_counter()
         logger.info(f'Reconstruction time {toc - tic:.4f} seconds. (code={result.result})')
 
-        outputProductIndex = self._productRepository.insertProduct(result.product)
+        outputProduct.assign(result.product)
+
         return outputProductIndex
 
     def reconstructSplit(self, inputProductIndex: int, outputProductName: str) -> tuple[int, int]:

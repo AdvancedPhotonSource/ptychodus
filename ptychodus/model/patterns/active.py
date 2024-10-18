@@ -10,6 +10,7 @@ import numpy.typing
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.patterns import (
+    BooleanArrayType,
     DiffractionDataset,
     DiffractionMetadata,
     DiffractionPatternArray,
@@ -140,6 +141,15 @@ class ActiveDiffractionDataset(DiffractionDataset):
             self._arrayList.sort(key=lambda arr: arr.getIndex())
 
         self._changedEvent.set()
+
+    def getGoodPixelMask(self) -> BooleanArrayType:  # FIXME
+        return numpy.full(
+            (
+                self._diffractionPatternSizer.getHeightInPixels(),
+                self._diffractionPatternSizer.getWidthInPixels(),
+            ),
+            True,
+        )
 
     def getAssembledIndexes(self) -> Sequence[int]:
         indexes: list[int] = list()

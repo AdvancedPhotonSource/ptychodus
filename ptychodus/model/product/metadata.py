@@ -68,13 +68,21 @@ class MetadataRepositoryItem(ParameterGroup):
 
         self._index = -1
 
-    def assign(self, item: MetadataRepositoryItem) -> None:
+    def assignItem(self, item: MetadataRepositoryItem, *, notify: bool = True) -> None:
         self.setName(item.getName())
         self.comments.setValue(item.comments.getValue())
         self.detectorDistanceInMeters.setValue(item.detectorDistanceInMeters.getValue())
         self.probeEnergyInElectronVolts.setValue(item.probeEnergyInElectronVolts.getValue())
         self.probePhotonsPerSecond.setValue(item.probePhotonsPerSecond.getValue())
         self.exposureTimeInSeconds.setValue(item.exposureTimeInSeconds.getValue())
+
+    def assign(self, metadata: ProductMetadata) -> None:
+        self.setName(metadata.name)
+        self.comments.setValue(metadata.comments)
+        self.detectorDistanceInMeters.setValue(metadata.detectorDistanceInMeters)
+        self.probeEnergyInElectronVolts.setValue(metadata.probeEnergyInElectronVolts)
+        self.probePhotonsPerSecond.setValue(metadata.probePhotonsPerSecond)
+        self.exposureTimeInSeconds.setValue(metadata.exposureTimeInSeconds)
 
     def syncToSettings(self) -> None:
         for parameter in self.parameters().values():

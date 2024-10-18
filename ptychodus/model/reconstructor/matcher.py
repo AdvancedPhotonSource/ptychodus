@@ -52,6 +52,8 @@ class DiffractionPatternPositionMatcher:
     def matchDiffractionPatternsWithPositions(
         self, inputProductIndex: int, indexFilter: ScanIndexFilter = ScanIndexFilter.ALL
     ) -> ReconstructInput:
+        goodPixelMask = self._diffractionDataset.getGoodPixelMask()
+
         inputProductItem = self._productRepository[inputProductIndex]
         inputProduct = inputProductItem.getProduct()
         dataIndexes = self._diffractionDataset.getAssembledIndexes()
@@ -85,4 +87,4 @@ class DiffractionPatternPositionMatcher:
             costs=inputProduct.costs,
         )
 
-        return ReconstructInput(patterns, product)
+        return ReconstructInput(patterns, goodPixelMask, product)

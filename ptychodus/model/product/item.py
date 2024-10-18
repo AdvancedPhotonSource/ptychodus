@@ -66,6 +66,24 @@ class ProductRepositoryItem(ParameterGroup):
         self._addGroup('probe', self._probe, observe=True)
         self._addGroup('object', self._object, observe=True)
 
+    def assignItem(self, item: ProductRepositoryItem, *, notify: bool = True) -> None:
+        self._metadata.assignItem(item.getMetadata())
+        self._scan.assignItem(item.getScan())
+        self._probe.assignItem(item.getProbe())
+        self._object.assignItem(item.getObject())
+        self._costs = list(item.getCosts())
+
+        if notify:
+            self._parent.handleCostsChanged(self)
+
+    def assign(self, product: Product) -> None:
+        self._metadata.assign(product.metadata)
+        self._scan.assign(product.scan)
+        self._probe.assign(product.probe)
+        self._object.assign(product.object_)
+        self._costs = list(product.costs)
+        self._parent.handleCostsChanged(self)
+
     def syncToSettings(self) -> None:
         self._metadata.syncToSettings()
         self._scan.syncToSettings()
