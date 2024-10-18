@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Final
 import logging
 
-from scipy.sparse.linalg import gmres, LinearOperator
+from scipy.sparse.linalg import lsqr, LinearOperator
 import math
 import numpy
 
@@ -71,11 +71,13 @@ class VSPILinearOperator(LinearOperator):
 
         A[M,N] * X[N,P] = B[M,P]
         """
-        super().__init__(float, (len(product.scan), len(product.scan)))
+        num_positions = len(product.scan)
+        num_pixels = product.object_.heightInPixels * product.object_.widthInPixels
+        super().__init__(float, (num_positions, num_pixels))
         self._product = product
 
     def _matvec(self, X: RealArrayType) -> RealArrayType:
-        AX = numpy.zeros(X.shape, dtype=self.dtype)
+        AX = numpy.zeros(len(self._product.scan), dtype=self.dtype)
 
         probeGeometry = self._product.probe.getGeometry()
         dx_p_m = probeGeometry.pixelWidthInMeters
@@ -226,18 +228,16 @@ class FluorescenceEnhancer(Observable, Observer):
         element_maps: list[ElementMap] = list()
 
         if self._settings.useVSPI.getValue():
-            measured_emaps = self._measured.element_maps
             A = VSPILinearOperator(product)
-            B = numpy.stack([b.counts_per_second.flatten() for b in measured_emaps]).T
-            X, info = gmres(A, B, atol=1e-5)  # TODO expose atol
 
-            if info != 0:
-                logger.warning(f'Convergence to tolerance not achieved! {info=}')
-
-            for m_emap, e_cps in zip(measured_emaps, X.T):
-                e_emap = ElementMap(m_emap.name, e_cps.reshape(m_emap.counts_per_second.shape))
-                element_maps.append(e_emap)
-
+            for emap in self._measured.element_maps:
+                logger.info(f'Enhancing "{emap.name}"')
+                m_cps = emap.counts_per_second
+                result = lsqr(A, m_cps.flatten())  # TODO expose parameters
+                logger.debug(result)
+                e_cps = result[0].reshape(m_cps.shape)
+                emap_enhanced = ElementMap(emap.name, e_cps)
+                element_maps.append(emap_enhanced)
         else:
             upscaler = self._upscalingStrategyChooser.currentPlugin.strategy
             deconvolver = self._deconvolutionStrategyChooser.currentPlugin.strategy
