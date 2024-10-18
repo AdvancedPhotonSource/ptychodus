@@ -9,7 +9,7 @@ from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.scan import Scan, ScanBoundingBox, ScanPoint
 
 from .boundingBox import ScanBoundingBoxBuilder
-from .builder import ScanBuilder
+from .builder import FromMemoryScanBuilder, ScanBuilder
 from .settings import ScanSettings
 from .transform import ScanPointTransform
 
@@ -24,6 +24,7 @@ class ScanRepositoryItem(ParameterGroup):
         transform: ScanPointTransform,
     ) -> None:
         super().__init__()
+        self._settings = settings
         self._builder = builder
         self._transform = transform
 
@@ -60,7 +61,7 @@ class ScanRepositoryItem(ParameterGroup):
 
         self._rebuild()
 
-    def assign(self, item: ScanRepositoryItem) -> None:
+    def assignItem(self, item: ScanRepositoryItem) -> None:
         self._removeGroup('transform')
         self._transform.removeObserver(self)
         self._transform = item.getTransform().copy()
@@ -68,6 +69,10 @@ class ScanRepositoryItem(ParameterGroup):
         self._addGroup('transform', self._transform)
 
         self.setBuilder(item.getBuilder().copy())
+
+    def assign(self, scan: Scan) -> None:
+        builder = FromMemoryScanBuilder(self._settings, scan)
+        self.setBuilder(builder)
 
     def syncToSettings(self) -> None:
         for parameter in self.parameters().values():

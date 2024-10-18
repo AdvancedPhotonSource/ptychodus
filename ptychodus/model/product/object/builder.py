@@ -63,8 +63,10 @@ class FromFileObjectBuilder(ObjectBuilder):
         super().__init__(settings, 'from_file')
         self._settings = settings
         self.filePath = settings.filePath.copy()
+        self.filePath.setValue(filePath)
         self._addParameter('file_path', self.filePath)
         self.fileType = settings.fileType.copy()
+        self.fileType.setValue(fileType)
         self._addParameter('file_type', self.fileType)
         self._fileReader = fileReader
 

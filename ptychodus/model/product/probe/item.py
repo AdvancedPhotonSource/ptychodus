@@ -5,8 +5,9 @@ from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 
-from .builder import ProbeBuilder
+from .builder import FromMemoryProbeBuilder, ProbeBuilder
 from .multimodal import MultimodalProbeBuilder
+from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)
 
@@ -15,11 +16,13 @@ class ProbeRepositoryItem(ParameterGroup):
     def __init__(
         self,
         geometryProvider: ProbeGeometryProvider,
+        settings: ProbeSettings,
         builder: ProbeBuilder,
         additionalModesBuilder: MultimodalProbeBuilder,
     ) -> None:
         super().__init__()
         self._geometryProvider = geometryProvider
+        self._settings = settings
         self._builder = builder
         self._additionalModesBuilder = additionalModesBuilder
         self._probe = Probe()
@@ -29,7 +32,7 @@ class ProbeRepositoryItem(ParameterGroup):
 
         self._rebuild()
 
-    def assign(self, item: ProbeRepositoryItem) -> None:
+    def assignItem(self, item: ProbeRepositoryItem) -> None:
         self._removeGroup('additional_modes')
         self._additionalModesBuilder.removeObserver(self)
         self._additionalModesBuilder = item.getAdditionalModesBuilder().copy()
@@ -37,6 +40,11 @@ class ProbeRepositoryItem(ParameterGroup):
         self._addGroup('additional_modes', self._additionalModesBuilder, observe=True)
 
         self.setBuilder(item.getBuilder().copy())
+        self._rebuild()
+
+    def assign(self, probe: Probe) -> None:
+        builder = FromMemoryProbeBuilder(self._settings, probe)
+        self.setBuilder(builder)
 
     def syncToSettings(self) -> None:
         for parameter in self.parameters().values():
@@ -57,7 +65,6 @@ class ProbeRepositoryItem(ParameterGroup):
         self._builder = builder
         self._builder.addObserver(self)
         self._addGroup('builder', self._builder, observe=True)
-        self._rebuild()
 
     def _rebuild(self) -> None:
         try:

@@ -33,7 +33,7 @@ class ProbeRepositoryItemFactory:
             else FromMemoryProbeBuilder(self._settings, probe)
         )
         multimodalBuilder = MultimodalProbeBuilder(self._rng, self._settings)
-        return ProbeRepositoryItem(geometryProvider, builder, multimodalBuilder)
+        return ProbeRepositoryItem(geometryProvider, self._settings, builder, multimodalBuilder)
 
     def createFromSettings(self, geometryProvider: ProbeGeometryProvider) -> ProbeRepositoryItem:
         try:
@@ -43,4 +43,4 @@ class ProbeRepositoryItemFactory:
             builder = self._builderFactory.createDefault()
 
         multimodalBuilder = MultimodalProbeBuilder(self._rng, self._settings)
-        return ProbeRepositoryItem(geometryProvider, builder, multimodalBuilder)
+        return ProbeRepositoryItem(geometryProvider, self._settings, builder, multimodalBuilder)
