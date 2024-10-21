@@ -84,7 +84,10 @@ class VSPILinearOperator(LinearOperator):
 
         A[M,N] * X[N,P] = B[M,P]
         """
-        super().__init__(float, (len(product.scan), len(product.scan)))
+        objectGeometry = product.object_.getGeometry()
+        M = len(product.scan)
+        N = objectGeometry.heightInPixels * objectGeometry.widthInPixels
+        super().__init__(float, (M, N))
         self._product = product
 
     def _get_psf(self, index: int) -> RealArrayType:
@@ -104,7 +107,7 @@ class VSPILinearOperator(LinearOperator):
 
         return AX
 
-    def _rmatvec(self, X: RealArrayType) -> RealArrayType:
+    def _adjoint(self, X: RealArrayType) -> RealArrayType:
         objectGeometry = self._product.object_.getGeometry()
         objectArray = numpy.zeros((objectGeometry.heightInPixels, objectGeometry.widthInPixels))
 
