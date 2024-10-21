@@ -3,8 +3,9 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Final
 import logging
+import time
 
-from scipy.sparse.linalg import lsqr, LinearOperator
+from scipy.sparse.linalg import lsmr, LinearOperator
 import numpy
 
 from ptychodus.api.fluorescence import (
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 class ArrayPatchInterpolator:
-    def __init__(self, array: RealArrayType, point: ObjectPoint, shape: tuple[int, int]) -> None:
+    def __init__(self, array: RealArrayType, point: ObjectPoint, shape: tuple[int, ...]) -> None:
         # top left corner of object support
         xmin = point.positionXInPixels - shape[-1] / 2
         ymin = point.positionYInPixels - shape[-2] / 2
@@ -84,40 +85,42 @@ class VSPILinearOperator(LinearOperator):
 
         A[M,N] * X[N,P] = B[M,P]
         """
-        objectGeometry = product.object_.getGeometry()
+        object_geometry = product.object_.getGeometry()
         M = len(product.scan)
-        N = objectGeometry.heightInPixels * objectGeometry.widthInPixels
+        N = object_geometry.heightInPixels * object_geometry.widthInPixels
         super().__init__(float, (M, N))
         self._product = product
 
-    def _get_psf(self, index: int) -> RealArrayType:
+    def _get_psf(self) -> RealArrayType:
         intensity = self._product.probe.getIntensity()
-        return intensity / numpy.sqrt(intensity.sum())  # FIXME verify
+        return intensity / intensity.sum()
 
     def _matvec(self, X: RealArrayType) -> RealArrayType:
-        objectGeometry = self._product.object_.getGeometry()
-        objectArray = X.reshape((objectGeometry.heightInPixels, objectGeometry.widthInPixels))
+        object_geometry = self._product.object_.getGeometry()
+        object_array = X.reshape((object_geometry.heightInPixels, object_geometry.widthInPixels))
+        psf = self._get_psf()
         AX = numpy.zeros(len(self._product.scan))
 
-        for index, scanPoint in enumerate(self._product.scan):
-            objectPoint = objectGeometry.mapScanPointToObjectPoint(scanPoint)
-            psf = self._get_psf(index)
-            interpolator = ArrayPatchInterpolator(objectArray, objectPoint, psf.shape)
+        for index, scan_point in enumerate(self._product.scan):
+            object_point = object_geometry.mapScanPointToObjectPoint(scan_point)
+            interpolator = ArrayPatchInterpolator(object_array, object_point, psf.shape)
             AX[index] = numpy.sum(psf * interpolator.get_patch())
 
         return AX
 
-    def _adjoint(self, X: RealArrayType) -> RealArrayType:
-        objectGeometry = self._product.object_.getGeometry()
-        objectArray = numpy.zeros((objectGeometry.heightInPixels, objectGeometry.widthInPixels))
+    def _rmatvec(self, X: RealArrayType) -> RealArrayType:
+        object_geometry = self._product.object_.getGeometry()
+        object_array = numpy.zeros((object_geometry.heightInPixels, object_geometry.widthInPixels))
+        psf = self._get_psf()
 
-        for index, scanPoint in enumerate(self._product.scan):
-            objectPoint = objectGeometry.mapScanPointToObjectPoint(scanPoint)
-            psf = self._get_psf(index)
-            interpolator = ArrayPatchInterpolator(objectArray, objectPoint, psf.shape)
+        for index, scan_point in enumerate(self._product.scan):
+            object_point = object_geometry.mapScanPointToObjectPoint(scan_point)
+            interpolator = ArrayPatchInterpolator(object_array, object_point, psf.shape)
             interpolator.accumulate_patch(X[index] * psf)
 
-        return objectArray.flatten()
+        HX = object_array.flatten()
+
+        return HX
 
 
 class FluorescenceEnhancer(Observable, Observer):
@@ -235,27 +238,37 @@ class FluorescenceEnhancer(Observable, Observer):
             raise ValueError('Fluorescence dataset not loaded!')
 
         product = self._productRepository[self._productIndex].getProduct()
+        object_geometry = product.object_.getGeometry()
+        e_cps_shape = object_geometry.heightInPixels, object_geometry.widthInPixels
         element_maps: list[ElementMap] = list()
 
         if self._settings.useVSPI.getValue():
             A = VSPILinearOperator(product)
 
             for emap in self._measured.element_maps:
-                logger.info(f'Enhancing "{emap.name}"')
+                logger.info(f'Enhancing "{emap.name}"...')
+                tic = time.perf_counter()
                 m_cps = emap.counts_per_second
-                result = lsqr(A, m_cps.flatten())  # TODO expose parameters
+                result = lsmr(A, m_cps.flatten(), maxiter=100, show=True)  # TODO expose parameters
                 logger.debug(result)
-                e_cps = result[0].reshape(m_cps.shape)
+                e_cps = result[0].reshape(e_cps_shape)
                 emap_enhanced = ElementMap(emap.name, e_cps)
+                toc = time.perf_counter()
+                logger.info(f'Enhanced "{emap.name}" in {toc - tic:.4f} seconds.')
+
                 element_maps.append(emap_enhanced)
         else:
             upscaler = self._upscalingStrategyChooser.currentPlugin.strategy
             deconvolver = self._deconvolutionStrategyChooser.currentPlugin.strategy
 
             for emap in self._measured.element_maps:
-                logger.info(f'Enhancing "{emap.name}"')
+                logger.info(f'Enhancing "{emap.name}"...')
+                tic = time.perf_counter()
                 emap_upscaled = upscaler(emap, product)
                 emap_enhanced = deconvolver(emap_upscaled, product)
+                toc = time.perf_counter()
+                logger.info(f'Enhanced "{emap.name}" in {toc - tic:.4f} seconds.')
+
                 element_maps.append(emap_enhanced)
 
         self._enhanced = FluorescenceDataset(
