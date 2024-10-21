@@ -5,7 +5,6 @@ from typing import Final
 import logging
 
 from scipy.sparse.linalg import gmres, LinearOperator
-import math
 import numpy
 
 from ptychodus.api.fluorescence import (
@@ -17,6 +16,7 @@ from ptychodus.api.fluorescence import (
     UpscalingStrategy,
 )
 from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.object import ObjectPoint
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product
@@ -28,38 +28,51 @@ from .settings import FluorescenceSettings
 logger = logging.getLogger(__name__)
 
 
-def get_axis_weights_and_indexes(
-    xmin_o: float, dx_o: float, xmin_p: float, dx_p: float, N_p: int
-) -> tuple[Sequence[float], Sequence[int]]:
-    weight: list[float] = []
-    index: list[int] = []
+class ArrayPatchInterpolator:
+    def __init__(self, array: RealArrayType, point: ObjectPoint, shape: tuple[int, int]) -> None:
+        # top left corner of object support
+        xmin = point.positionXInPixels - shape[-1] / 2
+        ymin = point.positionYInPixels - shape[-2] / 2
 
-    x_l = xmin_p
-    n_o = math.ceil((x_l - xmin_o) / dx_o)
+        # whole components (pixel indexes)
+        xmin_wh = int(xmin)
+        ymin_wh = int(ymin)
 
-    for n_p in range(N_p):
-        x_p = xmin_p + (n_p + 1) * dx_p
+        # fractional (subpixel) components
+        xmin_fr = xmin - xmin_wh
+        ymin_fr = ymin - ymin_wh
 
-        while True:
-            x_o = xmin_o + n_o + dx_o
+        # bottom right corner of object patch support
+        xmax_wh = xmin_wh + shape[-1] + 1
+        ymax_wh = ymin_wh + shape[-2] + 1
 
-            if x_o >= x_p:
-                break
+        # reused quantities
+        xmin_fr_c = 1.0 - xmin_fr
+        ymin_fr_c = 1.0 - ymin_fr
 
-            weight.append((x_o - x_l) / dx_p)
-            index.append(n_o)
+        # barycentric interpolant weights
+        self._weight00 = ymin_fr_c * xmin_fr_c
+        self._weight01 = ymin_fr_c * xmin_fr
+        self._weight10 = ymin_fr * xmin_fr_c
+        self._weight11 = ymin_fr * xmin_fr
 
-            n_o += 1
-            x_l = x_o
+        # extract patch support region from full object
+        self._support = array[ymin_wh:ymax_wh, xmin_wh:xmax_wh]
 
-        weight.append((x_p - x_l) / dx_p)
-        index.append(n_o)
-        x_l = x_p
+    def get_patch(self) -> RealArrayType:
+        """interpolate array support to extract patch"""
+        patch = self._weight00 * self._support[:-1, :-1]
+        patch += self._weight01 * self._support[:-1, 1:]
+        patch += self._weight10 * self._support[1:, :-1]
+        patch += self._weight11 * self._support[1:, 1:]
+        return patch
 
-        if x_o == x_p:
-            n_o += 1
-
-    return weight, index
+    def accumulate_patch(self, patch: RealArrayType) -> None:
+        """add patch update to array support"""
+        self._support[:-1, :-1] += self._weight00 * patch
+        self._support[:-1, 1:] += self._weight01 * patch
+        self._support[1:, :-1] += self._weight10 * patch
+        self._support[1:, 1:] += self._weight11 * patch
 
 
 class VSPILinearOperator(LinearOperator):
@@ -74,38 +87,34 @@ class VSPILinearOperator(LinearOperator):
         super().__init__(float, (len(product.scan), len(product.scan)))
         self._product = product
 
+    def _get_psf(self, index: int) -> RealArrayType:
+        intensity = self._product.probe.getIntensity()
+        return intensity / numpy.sqrt(intensity.sum())  # FIXME verify
+
     def _matvec(self, X: RealArrayType) -> RealArrayType:
-        AX = numpy.zeros(X.shape, dtype=self.dtype)
-
-        probeGeometry = self._product.probe.getGeometry()
-        dx_p_m = probeGeometry.pixelWidthInMeters
-        dy_p_m = probeGeometry.pixelHeightInMeters
-
         objectGeometry = self._product.object_.getGeometry()
-        objectShape = objectGeometry.heightInPixels, objectGeometry.widthInPixels
-        xmin_o_m = objectGeometry.minimumXInMeters
-        ymin_o_m = objectGeometry.minimumYInMeters
-        dx_o_m = objectGeometry.pixelWidthInMeters
-        dy_o_m = objectGeometry.pixelHeightInMeters
+        objectArray = X.reshape((objectGeometry.heightInPixels, objectGeometry.widthInPixels))
+        AX = numpy.zeros(len(self._product.scan))
 
-        for index, point in enumerate(self._product.scan):
-            xmin_p_m = point.positionXInMeters - probeGeometry.widthInMeters / 2
-            ymin_p_m = point.positionYInMeters - probeGeometry.heightInMeters / 2
-
-            wx, ix = get_axis_weights_and_indexes(
-                xmin_o_m, dx_o_m, xmin_p_m, dx_p_m, probeGeometry.widthInPixels
-            )
-            wy, iy = get_axis_weights_and_indexes(
-                ymin_o_m, dy_o_m, ymin_p_m, dy_p_m, probeGeometry.heightInPixels
-            )
-
-            IY, IX = numpy.meshgrid(iy, ix)
-            i_nz = numpy.ravel_multi_index(list(zip(IY.flat, IX.flat)), objectShape)
-            X_nz = X.take(i_nz, axis=0)
-
-            AX[index] = numpy.matmul(numpy.outer(wy, wx).ravel(), X_nz)
+        for index, scanPoint in enumerate(self._product.scan):
+            objectPoint = objectGeometry.mapScanPointToObjectPoint(scanPoint)
+            psf = self._get_psf(index)
+            interpolator = ArrayPatchInterpolator(objectArray, objectPoint, psf.shape)
+            AX[index] = numpy.sum(psf * interpolator.get_patch())
 
         return AX
+
+    def _rmatvec(self, X: RealArrayType) -> RealArrayType:
+        objectGeometry = self._product.object_.getGeometry()
+        objectArray = numpy.zeros((objectGeometry.heightInPixels, objectGeometry.widthInPixels))
+
+        for index, scanPoint in enumerate(self._product.scan):
+            objectPoint = objectGeometry.mapScanPointToObjectPoint(scanPoint)
+            psf = self._get_psf(index)
+            interpolator = ArrayPatchInterpolator(objectArray, objectPoint, psf.shape)
+            interpolator.accumulate_patch(X[index] * psf)
+
+        return objectArray.flatten()
 
 
 class FluorescenceEnhancer(Observable, Observer):
