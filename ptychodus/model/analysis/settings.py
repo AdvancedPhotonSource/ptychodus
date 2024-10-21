@@ -34,6 +34,12 @@ class FluorescenceSettings(Observable, Observer):
         )
         self.fileType = self._settingsGroup.createStringParameter('FileType', 'XRF-Maps')
         self.useVSPI = self._settingsGroup.createBooleanParameter('UseVSPI', True)
+        self.vspiDampingFactor = self._settingsGroup.createRealParameter(
+            'VSPIDampingFactor', 0.0, minimum=0.0
+        )
+        self.vspiMaximumIterations = self._settingsGroup.createIntegerParameter(
+            'VSPIMaximumIterations', 100, minimum=1
+        )
         self.upscalingStrategy = self._settingsGroup.createStringParameter(
             'UpscalingStrategy', 'Linear'
         )

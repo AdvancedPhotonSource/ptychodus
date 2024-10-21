@@ -249,7 +249,13 @@ class FluorescenceEnhancer(Observable, Observer):
                 logger.info(f'Enhancing "{emap.name}"...')
                 tic = time.perf_counter()
                 m_cps = emap.counts_per_second
-                result = lsmr(A, m_cps.flatten(), maxiter=100, show=True)  # TODO expose parameters
+                result = lsmr(
+                    A,
+                    m_cps.flatten(),
+                    damp=self._settings.vspiDampingFactor.getValue(),
+                    maxiter=self._settings.vspiMaximumIterations.getValue(),
+                    show=True,
+                )
                 logger.debug(result)
                 e_cps = result[0].reshape(e_cps_shape)
                 emap_enhanced = ElementMap(emap.name, e_cps)

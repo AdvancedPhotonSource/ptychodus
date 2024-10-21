@@ -47,6 +47,8 @@ class FluorescenceViewController(Observer):
         self._dialog = FluorescenceDialog()
         self._enhancementModel = QStringListModel()
         self._enhancementModel.setStringList(self._enhancer.getEnhancementStrategyList())
+        # FIXME add vspiDampingFactor
+        # FIXME add vspiMaxIterations
         self._upscalingModel = QStringListModel()
         self._upscalingModel.setStringList(self._enhancer.getUpscalingStrategyList())
         self._deconvolutionModel = QStringListModel()

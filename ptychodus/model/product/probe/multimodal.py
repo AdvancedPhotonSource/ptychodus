@@ -120,6 +120,7 @@ class MultimodalProbeBuilder(ParameterGroup):
         if self.numberOfModes.getValue() <= 1:
             return probe
         elif self.numberOfModes.getValue() == probe.numberOfModes:
+            # FIXME accomplish this differently
             return probe
 
         array = self._initializeModes(probe.array)
