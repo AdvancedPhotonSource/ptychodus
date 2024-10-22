@@ -108,8 +108,6 @@ class ViewCore(QMainWindow):
             action.setData(index)
             view.navigationActionGroup.addAction(action)
 
-        view.settingsAction.setChecked(True)
-
         # maintain same order as navigationToolBar buttons
         view.parametersWidget.addWidget(view.settingsView)
         view.parametersWidget.addWidget(view.patternsView)

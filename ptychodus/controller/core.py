@@ -136,8 +136,11 @@ class ControllerCore:
         self._refreshDataTimer.timeout.connect(model.refreshActiveDataset)
         self._refreshDataTimer.start(1000)  # TODO make configurable
 
-        view.navigationActionGroup.triggered.connect(lambda action: self.swapCentralWidgets(action))
         view.workflowAction.setVisible(model.areWorkflowsSupported)
+
+        self.swapCentralWidgets(view.patternsAction)
+        view.patternsAction.setChecked(True)
+        view.navigationActionGroup.triggered.connect(lambda action: self.swapCentralWidgets(action))
 
     def showMainWindow(self, windowTitle: str) -> None:
         self.view.setWindowTitle(windowTitle)

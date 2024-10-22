@@ -65,16 +65,18 @@ class OpenDatasetWizardFilesPage(OpenDatasetWizardPage):
         super().__init__(parent)
         self.directoryComboBox = QComboBox()
         self.fileSystemTableView = QTableView()
+        self.fileTypeLabel = QLabel('Choose File Type:')
         self.fileTypeComboBox = QComboBox()
 
     @classmethod
     def createInstance(cls, parent: QWidget | None = None) -> OpenDatasetWizardFilesPage:
         view = cls(parent)
-        view.setTitle('Choose File(s)')
+        view.setTitle('Choose Dataset File(s)')
 
         layout = QVBoxLayout()
         layout.addWidget(view.directoryComboBox)
         layout.addWidget(view.fileSystemTableView)
+        layout.addWidget(view.fileTypeLabel)
         layout.addWidget(view.fileTypeComboBox)
         view.setLayout(layout)
 
