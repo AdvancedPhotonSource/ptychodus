@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QSlider,
     QSpinBox,
+    QStackedWidget,
     QStatusBar,
     QVBoxLayout,
     QWidget,
@@ -171,23 +172,49 @@ class ExposureDialog(QDialog):
         self.setLayout(layout)
 
 
-class FluorescenceParametersView(QGroupBox):
+class FluorescenceVSPIParametersView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Parameters', parent)
-        self.openButton = QPushButton('Open')
-        self.enhancementStrategyComboBox = QComboBox()
-        self.upscalingStrategyComboBox = QComboBox()
-        self.deconvolutionStrategyComboBox = QComboBox()
-        self.enhanceButton = QPushButton('Enhance')
-        self.saveButton = QPushButton('Save')
+        super().__init__(parent)
+        self.dampingFactorLineEdit = DecimalLineEdit.createInstance()
+        self.maxIterationsSpinBox = QSpinBox()
 
         layout = QFormLayout()
-        layout.addRow('Measured Dataset:', self.openButton)
-        layout.addRow('Enhancement Strategy:', self.enhancementStrategyComboBox)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addRow('Damping Factor:', self.dampingFactorLineEdit)
+        layout.addRow('Max Iterations:', self.maxIterationsSpinBox)
+        self.setLayout(layout)
+
+
+class FluorescenceTwoStepParametersView(QWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.upscalingStrategyComboBox = QComboBox()
+        self.deconvolutionStrategyComboBox = QComboBox()
+
+        layout = QFormLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addRow('Upscaling Strategy:', self.upscalingStrategyComboBox)
         layout.addRow('Deconvolution Strategy:', self.deconvolutionStrategyComboBox)
+        self.setLayout(layout)
+
+
+class FluorescenceParametersView(QGroupBox):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__('Enhancement Strategy', parent)
+        self.openButton = QPushButton('Open Measured Dataset')
+        self.algorithmComboBox = QComboBox()
+        self.stackedWidget = QStackedWidget()
+        self.enhanceButton = QPushButton('Enhance')
+        self.saveButton = QPushButton('Save Enhanced Dataset')
+
+        self.stackedWidget.layout().setContentsMargins(0, 0, 0, 0)
+
+        layout = QFormLayout()
+        layout.addRow(self.openButton)
+        layout.addRow('Algorithm:', self.algorithmComboBox)
+        layout.addRow(self.stackedWidget)
         layout.addRow(self.enhanceButton)
-        layout.addRow('Enhanced Dataset:', self.saveButton)
+        layout.addRow(self.saveButton)
         self.setLayout(layout)
 
 

@@ -1,6 +1,5 @@
 from .core import AnalysisCore
 from .exposure import ExposureAnalyzer, ExposureMap
-from .fluorescence import FluorescenceEnhancer
 from .frc import FourierRingCorrelator
 from .objectInterpolator import ObjectLinearInterpolator
 from .objectStitcher import ObjectStitcher
@@ -12,7 +11,6 @@ __all__ = [
     'AnalysisCore',
     'ExposureAnalyzer',
     'ExposureMap',
-    'FluorescenceEnhancer',
     'FourierRingCorrelator',
     'ObjectLinearInterpolator',
     'ObjectStitcher',

@@ -1,13 +1,23 @@
-from typing import Any
+from decimal import Decimal
+from typing import Any, Final
 import logging
 
 from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QStringListModel
+from PyQt5.QtWidgets import QWidget
 
 from ptychodus.api.observer import Observable, Observer
 
-from ...model.analysis import FluorescenceEnhancer
+from ...model.fluorescence import (
+    FluorescenceEnhancer,
+    TwoStepFluorescenceEnhancingAlgorithm,
+    VSPIFluorescenceEnhancingAlgorithm,
+)
 from ...model.visualization import VisualizationEngine
-from ...view.probe import FluorescenceDialog
+from ...view.probe import (
+    FluorescenceDialog,
+    FluorescenceTwoStepParametersView,
+    FluorescenceVSPIParametersView,
+)
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..visualization import (
@@ -33,6 +43,71 @@ class FluorescenceChannelListModel(QAbstractListModel):
         return self._enhancer.getNumberOfChannels()
 
 
+class FluorescenceTwoStepViewController(Observer):
+    def __init__(self, algorithm: TwoStepFluorescenceEnhancingAlgorithm) -> None:
+        super().__init__()
+        self._algorithm = algorithm
+        self._view = FluorescenceTwoStepParametersView()
+
+        self._upscalingModel = QStringListModel()
+        self._upscalingModel.setStringList(self._algorithm.getUpscalingStrategyList())
+        self._view.upscalingStrategyComboBox.setModel(self._upscalingModel)
+        self._view.upscalingStrategyComboBox.textActivated.connect(algorithm.setUpscalingStrategy)
+
+        self._deconvolutionModel = QStringListModel()
+        self._deconvolutionModel.setStringList(self._algorithm.getDeconvolutionStrategyList())
+        self._view.deconvolutionStrategyComboBox.setModel(self._deconvolutionModel)
+        self._view.deconvolutionStrategyComboBox.textActivated.connect(
+            algorithm.setDeconvolutionStrategy
+        )
+
+        self._syncModelToView()
+        algorithm.addObserver(self)
+
+    def getWidget(self) -> QWidget:
+        return self._view
+
+    def _syncModelToView(self) -> None:
+        self._view.upscalingStrategyComboBox.setCurrentText(self._algorithm.getUpscalingStrategy())
+        self._view.deconvolutionStrategyComboBox.setCurrentText(
+            self._algorithm.getDeconvolutionStrategy()
+        )
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._algorithm:
+            self._syncModelToView()
+
+
+class FluorescenceVSPIViewController(Observer):
+    MAX_INT: Final[int] = 0x7FFFFFFF
+
+    def __init__(self, algorithm: VSPIFluorescenceEnhancingAlgorithm) -> None:
+        super().__init__()
+        self._algorithm = algorithm
+        self._view = FluorescenceVSPIParametersView()
+
+        self._view.dampingFactorLineEdit.valueChanged.connect(self._syncDampingFactorToModel)
+        self._view.maxIterationsSpinBox.setRange(1, self.MAX_INT)
+        self._view.maxIterationsSpinBox.valueChanged.connect(algorithm.setMaxIterations)
+
+        algorithm.addObserver(self)
+        self._syncModelToView()
+
+    def getWidget(self) -> QWidget:
+        return self._view
+
+    def _syncDampingFactorToModel(self, value: Decimal) -> None:
+        self._algorithm.setDampingFactor(float(value))
+
+    def _syncModelToView(self) -> None:
+        self._view.dampingFactorLineEdit.setValue(Decimal(repr(self._algorithm.getDampingFactor())))
+        self._view.maxIterationsSpinBox.setValue(self._algorithm.getMaxIterations())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._algorithm:
+            self._syncModelToView()
+
+
 class FluorescenceViewController(Observer):
     def __init__(
         self,
@@ -46,41 +121,42 @@ class FluorescenceViewController(Observer):
         self._fileDialogFactory = fileDialogFactory
         self._dialog = FluorescenceDialog()
         self._enhancementModel = QStringListModel()
-        self._enhancementModel.setStringList(self._enhancer.getEnhancementStrategyList())
-        self._upscalingModel = QStringListModel()
-        self._upscalingModel.setStringList(self._enhancer.getUpscalingStrategyList())
-        self._deconvolutionModel = QStringListModel()
-        self._deconvolutionModel.setStringList(self._enhancer.getDeconvolutionStrategyList())
+        self._enhancementModel.setStringList(self._enhancer.getAlgorithmList())
         self._channelListModel = FluorescenceChannelListModel(enhancer)
 
         self._dialog.fluorescenceParametersView.openButton.clicked.connect(
             self._openMeasuredDataset
         )
 
-        self._dialog.fluorescenceParametersView.enhancementStrategyComboBox.setModel(
-            self._enhancementModel
+        twoStepViewController = FluorescenceTwoStepViewController(
+            enhancer.twoStepEnhancingAlgorithm
         )
-        self._dialog.fluorescenceParametersView.enhancementStrategyComboBox.textActivated.connect(
-            enhancer.setEnhancementStrategy
+        self._dialog.fluorescenceParametersView.algorithmComboBox.addItem(
+            TwoStepFluorescenceEnhancingAlgorithm.DISPLAY_NAME,
+            self._dialog.fluorescenceParametersView.algorithmComboBox.count(),
         )
-
-        self._dialog.fluorescenceParametersView.upscalingStrategyComboBox.setModel(
-            self._upscalingModel
-        )
-        self._dialog.fluorescenceParametersView.upscalingStrategyComboBox.textActivated.connect(
-            enhancer.setUpscalingStrategy
+        self._dialog.fluorescenceParametersView.stackedWidget.addWidget(
+            twoStepViewController.getWidget()
         )
 
-        self._dialog.fluorescenceParametersView.deconvolutionStrategyComboBox.setModel(
-            self._deconvolutionModel
+        vspiViewController = FluorescenceVSPIViewController(enhancer.vspiEnhancingAlgorithm)
+        self._dialog.fluorescenceParametersView.algorithmComboBox.addItem(
+            VSPIFluorescenceEnhancingAlgorithm.DISPLAY_NAME,
+            self._dialog.fluorescenceParametersView.algorithmComboBox.count(),
         )
-        self._dialog.fluorescenceParametersView.deconvolutionStrategyComboBox.textActivated.connect(
-            enhancer.setDeconvolutionStrategy
+        self._dialog.fluorescenceParametersView.stackedWidget.addWidget(
+            vspiViewController.getWidget()
         )
 
-        self._dialog.fluorescenceChannelListView.setModel(self._channelListModel)
-        self._dialog.fluorescenceChannelListView.selectionModel().currentChanged.connect(
-            self._updateView
+        self._dialog.fluorescenceParametersView.algorithmComboBox.textActivated.connect(
+            enhancer.setAlgorithm
+        )
+        self._dialog.fluorescenceParametersView.algorithmComboBox.currentIndexChanged.connect(
+            self._dialog.fluorescenceParametersView.stackedWidget.setCurrentIndex
+        )
+        self._dialog.fluorescenceParametersView.algorithmComboBox.setModel(self._enhancementModel)
+        self._dialog.fluorescenceParametersView.algorithmComboBox.textActivated.connect(
+            enhancer.setAlgorithm
         )
 
         self._dialog.fluorescenceParametersView.enhanceButton.clicked.connect(
@@ -88,6 +164,11 @@ class FluorescenceViewController(Observer):
         )
         self._dialog.fluorescenceParametersView.saveButton.clicked.connect(
             self._saveEnhancedDataset
+        )
+
+        self._dialog.fluorescenceChannelListView.setModel(self._channelListModel)
+        self._dialog.fluorescenceChannelListView.selectionModel().currentChanged.connect(
+            self._updateView
         )
 
         self._measuredWidgetController = VisualizationWidgetController(
@@ -160,16 +241,9 @@ class FluorescenceViewController(Observer):
                 ExceptionDialog.showException(title, err)
 
     def _syncModelToView(self) -> None:
-        self._dialog.fluorescenceParametersView.enhancementStrategyComboBox.setCurrentText(
-            self._enhancer.getEnhancementStrategy()
+        self._dialog.fluorescenceParametersView.algorithmComboBox.setCurrentText(
+            self._enhancer.getAlgorithm()
         )
-        self._dialog.fluorescenceParametersView.upscalingStrategyComboBox.setCurrentText(
-            self._enhancer.getUpscalingStrategy()
-        )
-        self._dialog.fluorescenceParametersView.deconvolutionStrategyComboBox.setCurrentText(
-            self._enhancer.getDeconvolutionStrategy()
-        )
-
         self._channelListModel.beginResetModel()
         self._channelListModel.endResetModel()
 

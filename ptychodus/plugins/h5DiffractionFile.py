@@ -191,8 +191,8 @@ class H5DiffractionFileWriter(DiffractionFileWriter):
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.diffractionFileReaders.registerPlugin(
         H5DiffractionFileReader(dataPath='/entry/data/data'),
-        simpleName='HDF5',
-        displayName='Hierarchical Data Format 5 Files (*.h5 *.hdf5)',
+        simpleName='APS_HXN',
+        displayName='CNM/APS HXN Diffraction Files (*.h5 *.hdf5)',
     )
     registry.diffractionFileReaders.registerPlugin(
         H5DiffractionFileReader(dataPath='/entry/measurement/Eiger/data'),

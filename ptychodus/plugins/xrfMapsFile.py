@@ -16,7 +16,7 @@ from ptychodus.api.fluorescence import (
 
 class XRFMapsFileIO(FluorescenceFileReader, FluorescenceFileWriter):
     SIMPLE_NAME: Final[str] = 'XRF-Maps'
-    DISPLAY_NAME: Final[str] = 'XRF-Maps Fluorescence Dataset (*.h5 *.hdf5)'
+    DISPLAY_NAME: Final[str] = 'XRF-Maps Fluorescence Dataset (*.h5 *.h5*)'
 
     @staticmethod
     def _split_path(data_path: str) -> tuple[str, str]:
