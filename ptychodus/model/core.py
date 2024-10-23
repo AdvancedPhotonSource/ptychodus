@@ -24,7 +24,6 @@ from ptychodus.api.workflow import WorkflowAPI
 from .analysis import (
     AnalysisCore,
     ExposureAnalyzer,
-    FluorescenceEnhancer,
     FourierRingCorrelator,
     ProbePropagator,
     STXMSimulator,
@@ -35,6 +34,7 @@ from .automation import (
     AutomationPresenter,
     AutomationProcessingPresenter,
 )
+from .fluorescence import FluorescenceCore, FluorescenceEnhancer
 from .memory import MemoryPresenter
 from .patterns import (
     Detector,
@@ -142,15 +142,19 @@ class ModelCore:
                 self.ptychonnReconstructorLibrary,
             ],
         )
+        self._fluorescenceCore = FluorescenceCore(
+            self.settingsRegistry,
+            self._productCore.productRepository,
+            self._pluginRegistry.upscalingStrategies,
+            self._pluginRegistry.deconvolutionStrategies,
+            self._pluginRegistry.fluorescenceFileReaders,
+            self._pluginRegistry.fluorescenceFileWriters,
+        )
         self._analysisCore = AnalysisCore(
             self.settingsRegistry,
             self._reconstructorCore.dataMatcher,
             self._productCore.productRepository,
             self._productCore.objectRepository,
-            self._pluginRegistry.upscalingStrategies,
-            self._pluginRegistry.deconvolutionStrategies,
-            self._pluginRegistry.fluorescenceFileReaders,
-            self._pluginRegistry.fluorescenceFileWriters,
         )
         self._workflowCore = WorkflowCore(
             self.settingsRegistry,
@@ -307,7 +311,7 @@ class ModelCore:
             )
 
             if fluorescenceInputFilePath is not None and fluorescenceOutputFilePath is not None:
-                self._analysisCore.enhanceFluorescence(
+                self._fluorescenceCore.enhanceFluorescence(
                     outputProductIndex,
                     fluorescenceInputFilePath,
                     fluorescenceOutputFilePath,
@@ -361,11 +365,11 @@ class ModelCore:
 
     @property
     def fluorescenceEnhancer(self) -> FluorescenceEnhancer:
-        return self._analysisCore.fluorescenceEnhancer
+        return self._fluorescenceCore.enhancer
 
     @property
     def fluorescenceVisualizationEngine(self) -> VisualizationEngine:
-        return self._analysisCore.fluorescenceVisualizationEngine
+        return self._fluorescenceCore.visualizationEngine
 
     @property
     def xmcdAnalyzer(self) -> XMCDAnalyzer:

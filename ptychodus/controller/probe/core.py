@@ -8,10 +8,10 @@ from ptychodus.api.observer import SequenceObserver
 
 from ...model.analysis import (
     ExposureAnalyzer,
-    FluorescenceEnhancer,
     ProbePropagator,
     STXMSimulator,
 )
+from ...model.fluorescence import FluorescenceEnhancer
 from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
 from ...model.visualization import VisualizationEngine

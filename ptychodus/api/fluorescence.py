@@ -24,6 +24,12 @@ class FluorescenceDataset:
     # scan_indexes: IntegerArray
 
 
+class FluorescenceEnhancingAlgorithm(ABC):
+    @abstractmethod
+    def enhance(self, dataset: FluorescenceDataset, product: Product) -> FluorescenceDataset:
+        pass
+
+
 class FluorescenceFileReader(ABC):
     @abstractmethod
     def read(self, filePath: Path) -> FluorescenceDataset:
