@@ -1,10 +1,33 @@
 [build-system]
-requires = [
-    "setuptools >=46.4.0",
-    "setuptools_scm[toml] >=7",
-    "wheel",
-]
+requires = ["setuptools>=64", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "ptychodus"
+description = "Ptychodus is a ptychography data analysis application."
+readme = "README.rst"
+requires-python = ">=3.10"
+license = {file = "LICENSE.txt"}
+dependencies = [
+    "h5py",
+    "matplotlib",
+    "numpy",
+    "psutil",
+    "scikit-image",
+    "scipy",
+    "tifffile",
+    "watchdog",
+]
+dynamic = ["version"]
+
+[project.scripts]
+ptychodus = "ptychodus.__main__:main"
+
+[project.optional-dependencies]
+globus = ["gladier", "gladier-tools"]
+gui = ["PyQt5"]
+ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
+tike = ["tike==0.25.*,>=0.25.3"]
 
 [tool.setuptools_scm]
 
@@ -33,6 +56,14 @@ ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 100
+target-version = "py310"
 
 [tool.ruff.format]
 quote-style = "single"
+
+[tool.setuptools.package-data]
+"ptychodus" = ["py.typed"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
