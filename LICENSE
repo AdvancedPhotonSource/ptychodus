@@ -1,6 +1,6 @@
-Copyright (c) UChicago Argonne, LLC. All rights reserved.
+Copyright (c) 2024, UChicago Argonne, LLC. All rights reserved.
 
-Copyright UChicago Argonne, LLC. This software was produced
+Copyright 2024. UChicago Argonne, LLC. This software was produced
 under U.S. Government contract DE-AC02-06CH11357 for Argonne National
 Laboratory (ANL), which is operated by UChicago Argonne, LLC for the
 U.S. Department of Energy. The U.S. Government has rights to use,
@@ -29,7 +29,7 @@ conditions are met:
       from this software without specific prior written permission.
 
 THIS SOFTWARE IS PROVIDED BY UChicago Argonne, LLC AND CONTRIBUTORS
-AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
 FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL UChicago
 Argonne, LLC OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
