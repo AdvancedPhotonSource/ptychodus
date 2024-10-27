@@ -2,7 +2,7 @@ import logging
 
 import numpy
 
-from ptychointerim.api import (
+from ptychi.api import (
     AutodiffPtychographyOPRModeWeightsOptions,
     AutodiffPtychographyObjectOptions,
     AutodiffPtychographyOptions,
@@ -18,7 +18,7 @@ from ptychointerim.api import (
     OrthogonalizationMethods,
     PtychographyDataOptions,
 )
-from ptychointerim.api.task import PtychographyTask
+from ptychi.api.task import PtychographyTask
 
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Reconstructor

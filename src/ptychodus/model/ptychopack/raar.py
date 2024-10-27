@@ -1,6 +1,6 @@
 import numpy
 
-from ptychointerim.ptychopack import (
+from ptychi.ptychopack import (
     CorrectionPlan,
     CorrectionPlanElement,
     DataProduct,
