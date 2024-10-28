@@ -127,7 +127,7 @@ class PIEReconstructor(Reconstructor):
             optimization_plan=object_optimization_plan,
             optimizer=object_optimizer,
             step_size=self._objectSettings.stepSize.getValue(),
-            initial_guess=object_in.array,  # FIXME
+            initial_guess=object_in.array,
             slice_spacings_m=None,  # TODO Optional[ndarray]
             pixel_size_m=pixel_size_m,
             l1_norm_constraint_weight=self._objectSettings.l1NormConstraintWeight.getValue(),
@@ -211,22 +211,21 @@ class PIEReconstructor(Reconstructor):
         object_out_array = task.get_data_to_cpu('object', as_numpy=True)
         # TODO opr_mode_weights = task.get_data_to_cpu('opr_mode_weights', as_numpy=True)
 
-        # FIXME BEGIN
         corrected_scan_points: list[ScanPoint] = list()
 
-        for uncorrected_point, xy in zip(scan_in, result.scan):
-            object_point = ObjectPoint(uncorrected_point.index, xy[1] - ux, xy[0] - uy)
+        for uncorrected_point, xy in zip(scan_in, probe_out_array):
+            object_point = ObjectPoint(uncorrected_point.index, xy[-1], xy[-2])
             scan_point = object_geometry.mapObjectPointToScanPoint(object_point)
             corrected_scan_points.append(scan_point)
 
         scan_out = Scan(corrected_scan_points)
         probe_out = Probe(
-            array=probe_out_array,
-            pixelWidthInMeters=probe_in.pixelWidthInMeters,  # TODO verify optimized?
-            pixelHeightInMeters=probe_in.pixelHeightInMeters,  # TODO verify optimized?
+            array=numpy.array(probe_out_array),
+            pixelWidthInMeters=probe_in.pixelWidthInMeters,
+            pixelHeightInMeters=probe_in.pixelHeightInMeters,
         )
         object_out = Object(
-            array=object_out_array,
+            array=numpy.array(object_out_array),
             layerDistanceInMeters=object_in.layerDistanceInMeters,  # TODO verify optimized?
             pixelWidthInMeters=object_in.pixelWidthInMeters,
             pixelHeightInMeters=object_in.pixelHeightInMeters,
@@ -234,7 +233,6 @@ class PIEReconstructor(Reconstructor):
             centerYInMeters=object_in.centerYInMeters,
         )
         costs: list[float] = list()  # TODO populate
-        # FIXME END
 
         product = Product(
             metadata=parameters.product.metadata,

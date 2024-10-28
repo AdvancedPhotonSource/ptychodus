@@ -12,7 +12,6 @@ from ptychi.api import (
     Devices,
     Dtypes,
     LossFunctions,
-    ObjectTypes,
     OptimizationPlan,
     Optimizers,
     OrthogonalizationMethods,
@@ -20,8 +19,11 @@ from ptychi.api import (
 )
 from ptychi.api.task import PtychographyTask
 
+from ptychodus.api.object import Object, ObjectPoint
+from ptychodus.api.probe import Probe
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Reconstructor
+from ptychodus.api.scan import Scan, ScanPoint
 
 from ..patterns import Detector
 from .settings import (
@@ -100,16 +102,19 @@ class AutodiffReconstructor(Reconstructor):
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         metadata = parameters.product.metadata
-        objectInput = parameters.product.object_.array
-        probeInput = parameters.product.probe.array
+        object_in = parameters.product.object_
+        object_geometry = object_in.getGeometry()
+        probe_in = parameters.product.probe
         pixel_size_m = parameters.product.object_.pixelWidthInMeters
+        scan_in = parameters.product.scan
+        position_in_px_list: list[float] = list()
 
-        position_x_m: list[float] = list()
-        position_y_m: list[float] = list()
+        for scan_point in scan_in:
+            object_point = object_geometry.mapScanPointToObjectPoint(scan_point)
+            position_in_px_list.append(object_point.positionYInPixels)
+            position_in_px_list.append(object_point.positionXInPixels)
 
-        for scanPoint in parameters.product.scan:
-            position_x_m.append(scanPoint.positionXInMeters)
-            position_y_m.append(scanPoint.positionYInMeters)
+        position_in_px = numpy.reshape(position_in_px_list, shape=(len(scan_in), 2))
 
         data_options = PtychographyDataOptions(
             data=parameters.patterns,
@@ -129,7 +134,7 @@ class AutodiffReconstructor(Reconstructor):
             gpu_indices=(),  # TODO Sequence[int]
             default_dtype=default_dtype,
             random_seed=None,  # TODO
-            metric_function=None,  # TODO
+            displayed_loss_function=None,  # TODO
             log_level=logging.INFO,  # TODO
             loss_function=LossFunctions.MSE_SQRT,  # TODO
         )
@@ -144,8 +149,7 @@ class AutodiffReconstructor(Reconstructor):
             optimization_plan=object_optimization_plan,
             optimizer=object_optimizer,
             step_size=self._objectSettings.stepSize.getValue(),
-            initial_guess=objectInput,
-            type=ObjectTypes.TWO_D,  # TODO
+            initial_guess=object_in.array,
             slice_spacings_m=None,  # TODO Optional[ndarray]
             pixel_size_m=pixel_size_m,
             l1_norm_constraint_weight=self._objectSettings.l1NormConstraintWeight.getValue(),
@@ -169,7 +173,7 @@ class AutodiffReconstructor(Reconstructor):
             optimization_plan=probe_optimization_plan,
             optimizer=probe_optimizer,
             step_size=self._probeSettings.stepSize.getValue(),
-            initial_guess=probeInput,
+            initial_guess=probe_in.array,
             probe_power=self._probeSettings.probePower.getValue(),
             probe_power_constraint_stride=self._probeSettings.probePowerConstraintStride.getValue(),
             orthogonalize_incoherent_modes=self._probeSettings.orthogonalizeIncoherentModes.getValue(),
@@ -191,9 +195,8 @@ class AutodiffReconstructor(Reconstructor):
             optimization_plan=probe_position_optimization_plan,
             optimizer=probe_position_optimizer,
             step_size=self._probePositionSettings.stepSize.getValue(),
-            position_x_m=numpy.array(position_x_m),
-            position_y_m=numpy.array(position_y_m),
-            pixel_size_m=pixel_size_m,
+            position_x_px=position_in_px[:, -1],
+            position_y_px=position_in_px[:, -2],
             update_magnitude_limit=None,  # TODO Optional[float]
         )
         opr_optimization_plan = self._create_optimization_plan(
@@ -225,17 +228,39 @@ class AutodiffReconstructor(Reconstructor):
         # TODO task.iterate(n_epochs)
         task.run()
 
-        scanOutput = task.get_data_to_cpu('probe_positions', as_numpy=True)  # FIXME units?
-        probeOutput = task.get_data_to_cpu('probe', as_numpy=True)
-        objectOutput = task.get_data_to_cpu('object', as_numpy=True)
+        position_out_px = task.get_data_to_cpu('probe_positions', as_numpy=True)  # FIXME units?
+        probe_out_array = task.get_data_to_cpu('probe', as_numpy=True)
+        object_out_array = task.get_data_to_cpu('object', as_numpy=True)
         # TODO opr_mode_weights = task.get_data_to_cpu('opr_mode_weights', as_numpy=True)
-        costs: list[float] = list()  # TODO
+
+        corrected_scan_points: list[ScanPoint] = list()
+
+        for uncorrected_point, xy in zip(scan_in, probe_out_array):
+            object_point = ObjectPoint(uncorrected_point.index, xy[-1], xy[-2])
+            scan_point = object_geometry.mapObjectPointToScanPoint(object_point)
+            corrected_scan_points.append(scan_point)
+
+        scan_out = Scan(corrected_scan_points)
+        probe_out = Probe(
+            array=numpy.array(probe_out_array),
+            pixelWidthInMeters=probe_in.pixelWidthInMeters,
+            pixelHeightInMeters=probe_in.pixelHeightInMeters,
+        )
+        object_out = Object(
+            array=numpy.array(object_out_array),
+            layerDistanceInMeters=object_in.layerDistanceInMeters,  # TODO verify optimized?
+            pixelWidthInMeters=object_in.pixelWidthInMeters,
+            pixelHeightInMeters=object_in.pixelHeightInMeters,
+            centerXInMeters=object_in.centerXInMeters,
+            centerYInMeters=object_in.centerYInMeters,
+        )
+        costs: list[float] = list()  # TODO populate
 
         product = Product(
             metadata=parameters.product.metadata,
-            scan=scanOutput,
-            probe=probeOutput,
-            object_=objectOutput,
+            scan=scan_out,
+            probe=probe_out,
+            object_=object_out,
             costs=costs,
         )
         return ReconstructOutput(product, 0)
