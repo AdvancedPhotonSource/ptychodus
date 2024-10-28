@@ -26,11 +26,11 @@ from ptychodus.api.scan import Scan, ScanPoint
 
 from ..patterns import Detector
 from .settings import (
-    PtychoInterimOPRSettings,
-    PtychoInterimObjectSettings,
-    PtychoInterimProbePositionSettings,
-    PtychoInterimProbeSettings,
-    PtychoInterimSettings,
+    PtyChiOPRSettings,
+    PtyChiObjectSettings,
+    PtyChiProbePositionSettings,
+    PtyChiProbeSettings,
+    PtyChiSettings,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,11 +39,11 @@ logger = logging.getLogger(__name__)
 class PIEReconstructor(Reconstructor):
     def __init__(
         self,
-        settings: PtychoInterimSettings,
-        objectSettings: PtychoInterimObjectSettings,
-        probeSettings: PtychoInterimProbeSettings,
-        probePositionSettings: PtychoInterimProbePositionSettings,
-        oprSettings: PtychoInterimOPRSettings,
+        settings: PtyChiSettings,
+        objectSettings: PtyChiObjectSettings,
+        probeSettings: PtyChiProbeSettings,
+        probePositionSettings: PtyChiProbePositionSettings,
+        oprSettings: PtyChiOPRSettings,
         detector: Detector,
     ) -> None:
         super().__init__()
@@ -213,7 +213,7 @@ class PIEReconstructor(Reconstructor):
 
         corrected_scan_points: list[ScanPoint] = list()
 
-        for uncorrected_point, xy in zip(scan_in, probe_out_array):
+        for uncorrected_point, xy in zip(scan_in, position_out_px):
             object_point = ObjectPoint(uncorrected_point.index, xy[-1], xy[-2])
             scan_point = object_geometry.mapObjectPointToScanPoint(object_point)
             corrected_scan_points.append(scan_point)

@@ -2,10 +2,10 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
 
-class PtychoInterimSettings(Observable, Observer):
+class PtyChiSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = registry.createGroup('PtychoInterim')
+        self._settingsGroup = registry.createGroup('PtyChi')
         self._settingsGroup.addObserver(self)
 
         self.useGPU = self._settingsGroup.createBooleanParameter('UseGPU', True)
@@ -20,10 +20,10 @@ class PtychoInterimSettings(Observable, Observer):
             self.notifyObservers()
 
 
-class PtychoInterimObjectSettings(Observable, Observer):
+class PtyChiObjectSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = registry.createGroup('PtychoInterimObject')
+        self._settingsGroup = registry.createGroup('PtyChiObject')
         self._settingsGroup.addObserver(self)
 
         self.isOptimizable = self._settingsGroup.createBooleanParameter('IsOptimizable', True)
@@ -63,10 +63,10 @@ class PtychoInterimObjectSettings(Observable, Observer):
             self.notifyObservers()
 
 
-class PtychoInterimProbeSettings(Observable, Observer):
+class PtyChiProbeSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = registry.createGroup('PtychoInterimProbe')
+        self._settingsGroup = registry.createGroup('PtyChiProbe')
         self._settingsGroup.addObserver(self)
 
         self.isOptimizable = self._settingsGroup.createBooleanParameter('IsOptimizable', True)
@@ -107,10 +107,10 @@ class PtychoInterimProbeSettings(Observable, Observer):
             self.notifyObservers()
 
 
-class PtychoInterimProbePositionSettings(Observable, Observer):
+class PtyChiProbePositionSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = registry.createGroup('PtychoInterimProbePosition')
+        self._settingsGroup = registry.createGroup('PtyChiProbePosition')
         self._settingsGroup.addObserver(self)
 
         self.isOptimizable = self._settingsGroup.createBooleanParameter('IsOptimizable', False)
@@ -131,10 +131,10 @@ class PtychoInterimProbePositionSettings(Observable, Observer):
             self.notifyObservers()
 
 
-class PtychoInterimOPRSettings(Observable, Observer):
+class PtyChiOPRSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = registry.createGroup('PtychoInterimOPR')
+        self._settingsGroup = registry.createGroup('PtyChiOPR')
         self._settingsGroup.addObserver(self)
 
         self.isOptimizable = self._settingsGroup.createBooleanParameter('IsOptimizable', False)
