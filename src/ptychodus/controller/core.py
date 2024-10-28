@@ -13,6 +13,7 @@ from .object import ObjectController
 from .patterns import PatternsController
 from .probe import ProbeController
 from .product import ProductController
+from .pty_chi import PtyChiViewControllerFactory
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopack import PtychoPackViewControllerFactory
 from .reconstructor import ReconstructorController
@@ -30,6 +31,9 @@ class ControllerCore:
         self._fileDialogFactory = FileDialogFactory()
         self._ptychoPackViewControllerFactory = PtychoPackViewControllerFactory(
             model.ptychoPackReconstructorLibrary
+        )
+        self._ptyChiViewControllerFactory = PtyChiViewControllerFactory(
+            model.ptyChiReconstructorLibrary
         )
         self._ptychonnViewControllerFactory = PtychoNNViewControllerFactory(
             model.ptychonnReconstructorLibrary, self._fileDialogFactory
@@ -116,6 +120,7 @@ class ControllerCore:
             self._productController.tableModel,
             [
                 self._ptychoPackViewControllerFactory,
+                self._ptyChiViewControllerFactory,
                 self._ptychonnViewControllerFactory,
                 self._tikeViewControllerFactory,
             ],

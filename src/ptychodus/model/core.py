@@ -55,6 +55,7 @@ from .product import (
     ScanAPI,
     ScanRepository,
 )
+from .pty_chi import PtyChiReconstructorLibrary
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopack import PtychoPackReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
@@ -131,6 +132,9 @@ class ModelCore:
         self.ptychoPackReconstructorLibrary = PtychoPackReconstructorLibrary(
             self.settingsRegistry, isDeveloperModeEnabled
         )
+        self.ptyChiReconstructorLibrary = PtyChiReconstructorLibrary(
+            self.settingsRegistry, self.detector, isDeveloperModeEnabled
+        )
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, isDeveloperModeEnabled
         )
@@ -143,6 +147,7 @@ class ModelCore:
             self._productCore.productRepository,
             [
                 self.ptychoPackReconstructorLibrary,
+                self.ptyChiReconstructorLibrary,
                 self.tikeReconstructorLibrary,
                 self.ptychonnReconstructorLibrary,
             ],
