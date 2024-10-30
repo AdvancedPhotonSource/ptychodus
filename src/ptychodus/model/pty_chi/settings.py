@@ -2,7 +2,7 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
 
-class PtyChiSettings(Observable, Observer):
+class PtyChiReconstructorSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
         self._settingsGroup = registry.createGroup('PtyChi')

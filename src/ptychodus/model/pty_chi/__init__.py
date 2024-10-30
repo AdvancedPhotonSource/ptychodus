@@ -4,7 +4,7 @@ from .settings import (
     PtyChiObjectSettings,
     PtyChiProbePositionSettings,
     PtyChiProbeSettings,
-    PtyChiSettings,
+    PtyChiReconstructorSettings,
 )
 
 __all__ = [
@@ -13,5 +13,5 @@ __all__ = [
     'PtyChiProbePositionSettings',
     'PtyChiProbeSettings',
     'PtyChiReconstructorLibrary',
-    'PtyChiSettings',
+    'PtyChiReconstructorSettings',
 ]

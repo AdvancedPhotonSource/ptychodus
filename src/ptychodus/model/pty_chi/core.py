@@ -14,7 +14,7 @@ from .settings import (
     PtyChiObjectSettings,
     PtyChiProbePositionSettings,
     PtyChiProbeSettings,
-    PtyChiSettings,
+    PtyChiReconstructorSettings,
 )
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         self, settingsRegistry: SettingsRegistry, detector: Detector, isDeveloperModeEnabled: bool
     ) -> None:
         super().__init__()
-        self.settings = PtyChiSettings(settingsRegistry)
+        self.reconstructorSettings = PtyChiReconstructorSettings(settingsRegistry)
         self.objectSettings = PtyChiObjectSettings(settingsRegistry)
         self.probeSettings = PtyChiProbeSettings(settingsRegistry)
         self.probePositionSettings = PtyChiProbePositionSettings(settingsRegistry)
@@ -46,7 +46,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         else:
             self.reconstructor_list.append(
                 PIEReconstructor(
-                    self.settings,
+                    self.reconstructorSettings,
                     self.objectSettings,
                     self.probeSettings,
                     self.probePositionSettings,
@@ -56,7 +56,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
             )
             self.reconstructor_list.append(
                 LSQMLReconstructor(
-                    self.settings,
+                    self.reconstructorSettings,
                     self.objectSettings,
                     self.probeSettings,
                     self.probePositionSettings,
@@ -66,7 +66,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
             )
             self.reconstructor_list.append(
                 AutodiffReconstructor(
-                    self.settings,
+                    self.reconstructorSettings,
                     self.objectSettings,
                     self.probeSettings,
                     self.probePositionSettings,

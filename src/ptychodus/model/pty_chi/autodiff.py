@@ -31,7 +31,7 @@ from .settings import (
     PtyChiObjectSettings,
     PtyChiProbePositionSettings,
     PtyChiProbeSettings,
-    PtyChiSettings,
+    PtyChiReconstructorSettings,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 class AutodiffReconstructor(Reconstructor):
     def __init__(
         self,
-        settings: PtyChiSettings,
+        reconstructorSettings: PtyChiReconstructorSettings,
         objectSettings: PtyChiObjectSettings,
         probeSettings: PtyChiProbeSettings,
         probePositionSettings: PtyChiProbePositionSettings,
@@ -68,7 +68,7 @@ class AutodiffReconstructor(Reconstructor):
         detector: Detector,
     ) -> None:
         super().__init__()
-        self._settings = settings
+        self._reconstructorSettings = reconstructorSettings
         self._objectSettings = objectSettings
         self._probeSettings = probeSettings
         self._probePositionSettings = probePositionSettings
@@ -123,13 +123,17 @@ class AutodiffReconstructor(Reconstructor):
             detector_pixel_size_m=self._detector.pixelWidthInMeters.getValue(),
             valid_pixel_mask=parameters.goodPixelMask,
         )
-        default_device = Devices.GPU if self._settings.useGPU.getValue() else Devices.CPU
+        default_device = (
+            Devices.GPU if self._reconstructorSettings.useGPU.getValue() else Devices.CPU
+        )
         default_dtype = (
-            Dtypes.FLOAT64 if self._settings.useDoublePrecision.getValue() else Dtypes.FLOAT32
+            Dtypes.FLOAT64
+            if self._reconstructorSettings.useDoublePrecision.getValue()
+            else Dtypes.FLOAT32
         )
         reconstructor_options = AutodiffPtychographyReconstructorOptions(
-            num_epochs=self._settings.numEpochs.getValue(),
-            batch_size=self._settings.batchSize.getValue(),
+            num_epochs=self._reconstructorSettings.numEpochs.getValue(),
+            batch_size=self._reconstructorSettings.batchSize.getValue(),
             default_device=default_device,
             gpu_indices=(),  # TODO Sequence[int]
             default_dtype=default_dtype,

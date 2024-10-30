@@ -1,9 +1,4 @@
-from __future__ import annotations
-
-from PyQt5.QtWidgets import (
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt5.QtWidgets import QVBoxLayout, QWidget
 
 from ...model.tike import TikeReconstructorLibrary
 from ..reconstructor import ReconstructorViewControllerFactory
@@ -49,7 +44,6 @@ class TikeViewControllerFactory(ReconstructorViewControllerFactory):
     def __init__(self, model: TikeReconstructorLibrary) -> None:
         super().__init__()
         self._model = model
-        self._controllerList: list[TikeViewController] = list()
 
     @property
     def backendName(self) -> str:
@@ -61,5 +55,4 @@ class TikeViewControllerFactory(ReconstructorViewControllerFactory):
         else:
             viewController = TikeViewController(self._model, showAlpha=False)
 
-        self._controllerList.append(viewController)
         return viewController
