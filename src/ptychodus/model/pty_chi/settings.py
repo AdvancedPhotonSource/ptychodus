@@ -8,13 +8,13 @@ class PtyChiReconstructorSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('PtyChi')
         self._settingsGroup.addObserver(self)
 
-        self.useGPU = self._settingsGroup.createBooleanParameter('UseGPU', True)
+        self.numEpochs = self._settingsGroup.createIntegerParameter('NumEpochs', 100, minimum=1)
+        self.batchSize = self._settingsGroup.createIntegerParameter('BatchSize', 1, minimum=1)
+        self.useDevices = self._settingsGroup.createBooleanParameter('UseDevices', True)
+        self.devices = self._settingsGroup.createIntegerSequenceParameter('Devices', ())
         self.useDoublePrecision = self._settingsGroup.createBooleanParameter(
             'UseDoublePrecision', False
         )
-        self.numEpochs = self._settingsGroup.createIntegerParameter('NumEpochs', 100, minimum=1)
-        self.batchSize = self._settingsGroup.createIntegerParameter('BatchSize', 1, minimum=1)
-        self.devices = self._settingsGroup.createIntegerSequenceParameter('Devices', [])
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:

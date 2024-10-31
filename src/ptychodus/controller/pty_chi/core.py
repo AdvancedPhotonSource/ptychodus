@@ -19,7 +19,7 @@ class PtyChiViewController(QWidget):
     def __init__(self, model: PtyChiReconstructorLibrary, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._reconstructorViewController = PtyChiReconstructorViewController(
-            model.reconstructorSettings
+            model.reconstructorSettings, model.deviceRepository
         )
         self._objectViewController = PtyChiObjectViewController(model.objectSettings)
         self._probeViewController = PtyChiProbeViewController(model.probeSettings)

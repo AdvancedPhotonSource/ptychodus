@@ -103,7 +103,7 @@ class PIEReconstructor(Reconstructor):
             valid_pixel_mask=parameters.goodPixelMask,
         )
         default_device = (
-            Devices.GPU if self._reconstructorSettings.useGPU.getValue() else Devices.CPU
+            Devices.GPU if self._reconstructorSettings.useDevices.getValue() else Devices.CPU
         )
         default_dtype = (
             Dtypes.FLOAT64
@@ -113,12 +113,15 @@ class PIEReconstructor(Reconstructor):
         reconstructor_options = PIEReconstructorOptions(
             num_epochs=self._reconstructorSettings.numEpochs.getValue(),
             batch_size=self._reconstructorSettings.batchSize.getValue(),
+            # TODO batching_mode
+            # TODO compact_mode_update_clustering
+            # TODO compact_mode_update_clustering_stride
             default_device=default_device,
-            gpu_indices=(),  # TODO Sequence[int]
+            gpu_indices=self._reconstructorSettings.devices.getValue(),
             default_dtype=default_dtype,
-            random_seed=None,  # TODO
-            displayed_loss_function=None,  # TODO
-            log_level=logging.INFO,  # TODO
+            # TODO random_seed
+            # TODO displayed_loss_function
+            # TODO log_level
         )
         object_optimization_plan = self._create_optimization_plan(
             self._objectSettings.optimizationPlanStart.getValue(),

@@ -10,7 +10,7 @@ class PatternSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('Patterns')
         self._settingsGroup.addObserver(self)
 
-        self.fileType = self._settingsGroup.createStringParameter('FileType', 'HDF5')
+        self.fileType = self._settingsGroup.createStringParameter('FileType', 'NeXus')
         self.filePath = self._settingsGroup.createPathParameter(
             'FilePath', Path('/path/to/data.h5')
         )

@@ -9,6 +9,7 @@ from ptychodus.api.reconstructor import (
 from ptychodus.api.settings import SettingsRegistry
 
 from ..patterns import Detector
+from .device import PtyChiDeviceRepository
 from .settings import (
     PtyChiOPRSettings,
     PtyChiObjectSettings,
@@ -30,6 +31,9 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         self.probeSettings = PtyChiProbeSettings(settingsRegistry)
         self.probePositionSettings = PtyChiProbePositionSettings(settingsRegistry)
         self.oprSettings = PtyChiOPRSettings(settingsRegistry)
+        self.deviceRepository = PtyChiDeviceRepository(
+            isDeveloperModeEnabled=isDeveloperModeEnabled
+        )
         self.reconstructor_list: list[Reconstructor] = list()
 
         try:
@@ -40,9 +44,8 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
             logger.info('pty-chi not found.')
 
             if isDeveloperModeEnabled:
-                self.reconstructor_list.append(NullReconstructor('PIE'))
-                self.reconstructor_list.append(NullReconstructor('LSQML'))
-                self.reconstructor_list.append(NullReconstructor('Autodiff'))
+                for reconstructor in ('PIE', 'ePIE', 'rPIE', 'LSQML', 'Autodiff'):
+                    self.reconstructor_list.append(NullReconstructor(reconstructor))
         else:
             self.reconstructor_list.append(
                 PIEReconstructor(

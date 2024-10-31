@@ -3,18 +3,14 @@ from typing import Any
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import BooleanParameter, IntegerSequenceParameter
 
-from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject, QStringListModel
+from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject
 from PyQt5.QtWidgets import (
     QButtonGroup,
-    QDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QListView,
-    QMessageBox,
     QRadioButton,
-    QSpinBox,
-    QTableView,
     QWidget,
 )
 
@@ -77,41 +73,49 @@ class PtyChiDeviceListModel(QAbstractListModel):
 class PtyChiDeviceParameterViewController(ParameterViewController, Observer):
     def __init__(
         self,
-        parameter: IntegerSequenceParameter,
+        useDevices: BooleanParameter,
+        devices: IntegerSequenceParameter,
         repository: PtyChiDeviceRepository,
         *,
         tool_tip: str = '',
     ) -> None:
         super().__init__()
-        # FIXME tool_tip
-        self._parameter = parameter
+        self._useDevices = useDevices
+        self._devices = devices
         self._repository = repository
+        self._listModel = PtyChiDeviceListModel(repository)
         self._widget = QListView()
-        # FIXME gpu/cpu; gpu indices
+        self._widget.setModel(self._listModel)
+
+        if tool_tip:
+            self._widget.setToolTip(tool_tip)
 
         self._syncModelToView()
-        parameter.addObserver(self)
+        useDevices.addObserver(self)
+        devices.addObserver(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
 
     def _syncModelToView(self) -> None:
-        pass  # FIXME update checked indexes
+        pass  # FIXME update checked indexes, etc.
 
     def update(self, observable: Observable) -> None:
-        if observable is self._parameter:
+        if observable in (self._useDevices, self._devices):
             self._syncModelToView()
 
 
 class PtyChiPrecisionParameterViewController(ParameterViewController, Observer):
     def __init__(self, useDoublePrecision: BooleanParameter, *, tool_tip: str = '') -> None:
         super().__init__()
-        # FIXME tool_tip
         self._useDoublePrecision = useDoublePrecision
         self._singlePrecisionButton = QRadioButton('Single')
         self._doublePrecisionButton = QRadioButton('Double')
         self._buttonGroup = QButtonGroup()
         self._widget = QWidget()
+
+        if tool_tip:
+            self._widget.setToolTip(tool_tip)
 
         self._buttonGroup.addButton(self._singlePrecisionButton, 1)
         self._buttonGroup.addButton(self._doublePrecisionButton, 2)
@@ -122,6 +126,7 @@ class PtyChiPrecisionParameterViewController(ParameterViewController, Observer):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._singlePrecisionButton)
         layout.addWidget(self._doublePrecisionButton)
+        layout.addStretch()
         self._widget.setLayout(layout)
 
         self._syncModelToView()
@@ -156,7 +161,10 @@ class PtyChiReconstructorViewController(ParameterViewController):
             tool_tip='The number of probe positions to process in each minibatch.',
         )
         self._deviceViewController = PtyChiDeviceParameterViewController(
-            settings.devices, repository, tool_tip='The devices to use for computation.'
+            settings.useDevices,
+            settings.devices,
+            repository,
+            tool_tip='The devices to use for computation.',
         )
         self._precisionViewController = PtyChiPrecisionParameterViewController(
             settings.useDoublePrecision,
@@ -165,12 +173,12 @@ class PtyChiReconstructorViewController(ParameterViewController):
         # TODO random_seed
         # TODO displayed_loss_function
         # TODO log_level
-        self._widget = QGroupBox('Pty-Chi Parameters')
+        self._widget = QGroupBox('Reconstructor')
 
         layout = QFormLayout()
         layout.addRow('Number of Epochs:', self._numEpochsViewController.getWidget())
         layout.addRow('Batch Size:', self._batchSizeViewController.getWidget())
-        layout.addRow(self._deviceViewController.getWidget())
+        layout.addRow('Devices:', self._deviceViewController.getWidget())
         layout.addRow('Precision:', self._precisionViewController.getWidget())
         self._widget.setLayout(layout)
 
@@ -178,23 +186,11 @@ class PtyChiReconstructorViewController(ParameterViewController):
         return self._widget
 
 
-# reconstructor_options = PIEReconstructorOptions(
-#     num_epochs=self._settings.numEpochs.getValue(),
-#     batch_size=self._settings.batchSize.getValue(),
-#     default_device=default_device,
-#     gpu_indices=(),  # TODO Sequence[int]
-#     default_dtype=default_dtype,
-#     random_seed=None,  # TODO
-#     displayed_loss_function=None,  # TODO
-#     log_level=logging.INFO,  # TODO
-# )
-
-
 class PtyChiObjectViewController(ParameterViewController, Observer):
     def __init__(self, settings: PtyChiObjectSettings) -> None:
         super().__init__()
         self._settings = settings
-        self._widget = QGroupBox('FIXME')
+        self._widget = QGroupBox('Object')
 
         layout = QFormLayout()
         self._widget.setLayout(layout)
@@ -235,7 +231,7 @@ class PtyChiProbeViewController(ParameterViewController, Observer):
     def __init__(self, settings: PtyChiProbeSettings) -> None:
         super().__init__()
         self._settings = settings
-        self._widget = QGroupBox('FIXME')
+        self._widget = QGroupBox('Probe')
 
         layout = QFormLayout()
         self._widget.setLayout(layout)
@@ -283,7 +279,7 @@ class PtyChiProbePositionViewController(ParameterViewController, Observer):
     def __init__(self, settings: PtyChiProbePositionSettings) -> None:
         super().__init__()
         self._settings = settings
-        self._widget = QGroupBox('FIXME')
+        self._widget = QGroupBox('Probe Positions')
 
         layout = QFormLayout()
         self._widget.setLayout(layout)
@@ -325,7 +321,7 @@ class PtyChiOPRViewController(ParameterViewController, Observer):
     def __init__(self, settings: PtyChiOPRSettings) -> None:
         super().__init__()
         self._settings = settings
-        self._widget = QGroupBox('FIXME')
+        self._widget = QGroupBox('OPR')
 
         layout = QFormLayout()
         self._widget.setLayout(layout)

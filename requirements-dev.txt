@@ -16,4 +16,3 @@ setuptools_scm>=8
 tifffile
 toml
 watchdog
-wheel

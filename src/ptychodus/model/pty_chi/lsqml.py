@@ -103,7 +103,7 @@ class LSQMLReconstructor(Reconstructor):
             valid_pixel_mask=parameters.goodPixelMask,
         )
         default_device = (
-            Devices.GPU if self._reconstructorSettings.useGPU.getValue() else Devices.CPU
+            Devices.GPU if self._reconstructorSettings.useDevices.getValue() else Devices.CPU
         )
         default_dtype = (
             Dtypes.FLOAT64

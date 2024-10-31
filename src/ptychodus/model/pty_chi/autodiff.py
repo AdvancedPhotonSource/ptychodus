@@ -38,7 +38,6 @@ logger = logging.getLogger(__name__)
 
 # FEEDBACK
 # change = None options to required arguments, rest have default values
-# accept probe positions in pixel units
 # remove positions/object pixel sizes
 # switch parameters with strides to "correction plans"
 # remove orthogonalize_incoherent_modes: enable whenever stride >= 1
@@ -46,9 +45,7 @@ logger = logging.getLogger(__name__)
 # remove num_epochs from reconstructor options and run() method; just use iterate(n_epochs)
 # remove log_level; just document that logging is used in a standard way
 # better name for l1_norm_constraint?
-# remove object type; require leading dimension on object array
 # enum for get_data_to_cpu
-# merge epie and rpie into one algorithm
 # expand optimization mode GS; stabilize?
 # remove update_magnitude_limit?
 # remove optimizable in favor of OptimizationPlan | None
@@ -124,7 +121,7 @@ class AutodiffReconstructor(Reconstructor):
             valid_pixel_mask=parameters.goodPixelMask,
         )
         default_device = (
-            Devices.GPU if self._reconstructorSettings.useGPU.getValue() else Devices.CPU
+            Devices.GPU if self._reconstructorSettings.useDevices.getValue() else Devices.CPU
         )
         default_dtype = (
             Dtypes.FLOAT64
