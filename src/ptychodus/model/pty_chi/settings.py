@@ -14,6 +14,7 @@ class PtyChiReconstructorSettings(Observable, Observer):
         )
         self.numEpochs = self._settingsGroup.createIntegerParameter('NumEpochs', 100, minimum=1)
         self.batchSize = self._settingsGroup.createIntegerParameter('BatchSize', 1, minimum=1)
+        self.devices = self._settingsGroup.createIntegerSequenceParameter('Devices', [])
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:

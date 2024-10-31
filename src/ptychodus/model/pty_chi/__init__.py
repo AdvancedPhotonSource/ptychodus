@@ -1,4 +1,5 @@
 from .core import PtyChiReconstructorLibrary
+from .device import PtyChiDeviceRepository
 from .settings import (
     PtyChiOPRSettings,
     PtyChiObjectSettings,
@@ -8,6 +9,7 @@ from .settings import (
 )
 
 __all__ = [
+    'PtyChiDeviceRepository',
     'PtyChiOPRSettings',
     'PtyChiObjectSettings',
     'PtyChiProbePositionSettings',

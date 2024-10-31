@@ -220,6 +220,49 @@ class RealParameter(ParameterBase[float]):
         )
 
 
+class IntegerSequenceParameter(ParameterBase[MutableSequence[int]]):
+    def __init__(self, value: Sequence[int], parent: IntegerSequenceParameter | None) -> None:
+        super().__init__(list(value), parent)
+
+    def __iter__(self) -> Iterator[int]:
+        return iter(self._value)
+
+    def __getitem__(self, index: int) -> int:
+        return self._value[index]
+
+    def __setitem__(self, index: int, value: int) -> None:
+        if self._value[index] != value:
+            self._value[index] = value
+            self.notifyObservers()
+
+    def __delitem__(self, index: int) -> None:
+        del self._value[index]
+        self.notifyObservers()
+
+    def insert(self, index: int, value: int) -> None:
+        self._value.insert(index, value)
+        self.notifyObservers()
+
+    def __len__(self) -> int:
+        return len(self._value)
+
+    def setValue(self, value: Sequence[int], *, notify: bool = True) -> None:
+        if self._value != value:
+            self._value = list(value)
+
+            if notify:
+                self.notifyObservers()
+
+    def getValueAsString(self) -> str:
+        return ','.join(repr(value) for value in self)
+
+    def setValueFromString(self, value: str) -> None:
+        self.setValue([int(xstr) for xstr in value.split(',')])
+
+    def copy(self) -> IntegerSequenceParameter:
+        return IntegerSequenceParameter(self.getValue(), self)
+
+
 class RealArrayParameter(ParameterBase[MutableSequence[float]]):
     def __init__(self, value: Sequence[float], parent: RealArrayParameter | None) -> None:
         super().__init__(list(value), parent)
@@ -365,6 +408,13 @@ class ParameterGroup(Observable, Observer):
         self, name: str, value: int, *, minimum: int | None = None, maximum: int | None = None
     ) -> IntegerParameter:
         parameter = IntegerParameter(value, parent=None, minimum=minimum, maximum=maximum)
+        self._addParameter(name, parameter)
+        return parameter
+
+    def createIntegerSequenceParameter(
+        self, name: str, value: Sequence[int]
+    ) -> IntegerSequenceParameter:
+        parameter = IntegerSequenceParameter(value, parent=None)
         self._addParameter(name, parameter)
         return parameter
 
