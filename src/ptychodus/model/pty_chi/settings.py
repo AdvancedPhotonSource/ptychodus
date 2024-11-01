@@ -58,6 +58,38 @@ class PtyChiObjectSettings(Observable, Observer):
         self.totalVaritionStride = self._settingsGroup.createIntegerParameter(
             'TotalVaritionStride', 1, minimum=1
         )
+        self.removeGridArtifacts = self._settingsGroup.createBooleanParameter(
+            'RemoveGridArtifacts', False
+        )
+        self.removeGridArtifactsPeriodXInMeters = self._settingsGroup.createRealParameter(
+            'RemoveGridArtifactsPeriodXInMeters', 1e-7
+        )
+        self.removeGridArtifactsPeriodYInMeters = self._settingsGroup.createRealParameter(
+            'RemoveGridArtifactsPeriodYInMeters', 1e-7
+        )
+        self.removeGridArtifactsWindowSizeInPixels = self._settingsGroup.createIntegerParameter(
+            'RemoveGridArtifactsWindowSizeInPixels', 5
+        )
+        self.removeGridArtifactsDirection = self._settingsGroup.createStringParameter(
+            'RemoveGridArtifactsDirection', 'XY'
+        )
+        self.removeGridArtifactsStride = self._settingsGroup.createIntegerParameter(
+            'RemoveGridArtifactsStride', 1
+        )
+        self.multisliceRegularizationWeight = self._settingsGroup.createRealParameter(
+            'MultisliceRegularizationWeight', 0.0
+        )
+        self.multisliceRegularizationUnwrapPhase = self._settingsGroup.createBooleanParameter(
+            'MultisliceRegularizationUnwrapPhase', True
+        )
+        self.multisliceRegularizationUnwrapImageGradMethod = (
+            self._settingsGroup.createStringParameter(
+                'MultisliceRegularizationUnwrapImageGradMethod', 'FOURIER_SHIFT'
+            )
+        )
+        self.multisliceRegularizationStride = self._settingsGroup.createIntegerParameter(
+            'MultisliceRegularizationStride', 1
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:
@@ -129,6 +161,9 @@ class PtyChiProbePositionSettings(Observable, Observer):
 
         self.updateMagnitudeLimit = self._settingsGroup.createRealParameter(
             'UpdateMagnitudeLimit', 0.0, minimum=0.0
+        )
+        self.constrainPositionMean = self._settingsGroup.createBooleanParameter(
+            'ConstrainPositionMean', False
         )
 
     def update(self, observable: Observable) -> None:

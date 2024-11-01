@@ -135,7 +135,7 @@ class LSQMLReconstructor(Reconstructor):
             optimizer=object_optimizer,
             step_size=self._objectSettings.stepSize.getValue(),
             initial_guess=object_in.array,
-            slice_spacings_m=None,  # TODO Optional[ndarray]
+            slice_spacings_m=None,  # FIXME Optional[ndarray]
             pixel_size_m=pixel_size_m,
             l1_norm_constraint_weight=self._objectSettings.l1NormConstraintWeight.getValue(),
             l1_norm_constraint_stride=self._objectSettings.l1NormConstraintStride.getValue(),
@@ -143,6 +143,16 @@ class LSQMLReconstructor(Reconstructor):
             smoothness_constraint_stride=self._objectSettings.smoothnessConstraintStride.getValue(),
             total_variation_weight=self._objectSettings.totalVariationWeight.getValue(),
             total_variation_stride=self._objectSettings.totalVaritionStride.getValue(),
+            remove_grid_artifacts=self._objectSettings.removeGridArtifacts.getValue(),
+            remove_grid_artifacts_period_x_m=self._objectSettings.removeGridArtifactsPeriodXInMeters.getValue(),
+            remove_grid_artifacts_period_y_m=self._objectSettings.removeGridArtifactsPeriodYInMeters.getValue(),
+            remove_grid_artifacts_window_size=self._objectSettings.removeGridArtifactsWindowSizeInPixels.getValue(),
+            # FIXME remove_grid_artifacts_direction=self._objectSettings.removeGridArtifactsDirection.getValue(),
+            remove_grid_artifacts_stride=self._objectSettings.removeGridArtifactsStride.getValue(),
+            multislice_regularization_weight=self._objectSettings.multisliceRegularizationWeight.getValue(),
+            multislice_regularization_unwrap_phase=self._objectSettings.multisliceRegularizationUnwrapPhase.getValue(),
+            # FIXME multislice_regularization_unwrap_image_grad_method=self._objectSettings.multisliceRegularizationUnwrapImageGradMethod.getValue(),
+            multislice_regularization_stride=self._objectSettings.multisliceRegularizationStride.getValue(),
         )
         probe_optimization_plan = self._create_optimization_plan(
             self._probeSettings.optimizationPlanStart.getValue(),
@@ -167,6 +177,7 @@ class LSQMLReconstructor(Reconstructor):
             orthogonalize_opr_modes=self._probeSettings.orthogonalizeOPRModes.getValue(),
             orthogonalize_opr_modes_stride=self._probeSettings.orthogonalizeOPRModesStride.getValue(),
         )
+
         probe_position_optimization_plan = self._create_optimization_plan(
             self._probePositionSettings.optimizationPlanStart.getValue(),
             self._probePositionSettings.optimizationPlanStop.getValue(),
@@ -176,7 +187,6 @@ class LSQMLReconstructor(Reconstructor):
             self._probePositionSettings.optimizer.getValue()
         )
         update_magnitude_limit = self._probePositionSettings.updateMagnitudeLimit.getValue()
-
         probe_position_options = LSQMLProbePositionOptions(
             optimizable=self._probePositionSettings.isOptimizable.getValue(),
             optimization_plan=probe_position_optimization_plan,
@@ -185,6 +195,7 @@ class LSQMLReconstructor(Reconstructor):
             position_x_px=position_in_px[:, -1],
             position_y_px=position_in_px[:, -2],
             update_magnitude_limit=update_magnitude_limit if update_magnitude_limit > 0.0 else None,
+            constrain_position_mean=self._probePositionSettings.constrainPositionMean.getValue(),
         )
         opr_optimization_plan = self._create_optimization_plan(
             self._oprSettings.optimizationPlanStart.getValue(),
