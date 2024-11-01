@@ -127,6 +127,10 @@ class PtyChiProbePositionSettings(Observable, Observer):
         self.optimizer = self._settingsGroup.createStringParameter('Optimizer', 'SGD')
         self.stepSize = self._settingsGroup.createRealParameter('StepSize', 1.0, minimum=0.0)
 
+        self.updateMagnitudeLimit = self._settingsGroup.createRealParameter(
+            'UpdateMagnitudeLimit', 0.0, minimum=0.0
+        )
+
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:
             self.notifyObservers()
@@ -151,8 +155,8 @@ class PtyChiOPRSettings(Observable, Observer):
         self.optimizer = self._settingsGroup.createStringParameter('Optimizer', 'SGD')
         self.stepSize = self._settingsGroup.createRealParameter('StepSize', 1.0, minimum=0.0)
 
-        self.optimizeIntensityVariation = self._settingsGroup.createBooleanParameter(
-            'OptimizeIntensityVariation', False
+        self.optimizeIntensities = self._settingsGroup.createBooleanParameter(
+            'OptimizeIntensities', False
         )
         self.optimizeEigenmodeWeights = self._settingsGroup.createBooleanParameter(
             'OptimizeEigenmodeWeigts', True

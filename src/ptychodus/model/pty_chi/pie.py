@@ -175,6 +175,8 @@ class PIEReconstructor(Reconstructor):
         probe_position_optimizer = self._create_optimizer(
             self._probePositionSettings.optimizer.getValue()
         )
+        update_magnitude_limit = self._probePositionSettings.updateMagnitudeLimit.getValue()
+
         probe_position_options = PIEProbePositionOptions(
             optimizable=self._probePositionSettings.isOptimizable.getValue(),
             optimization_plan=probe_position_optimization_plan,
@@ -182,7 +184,7 @@ class PIEReconstructor(Reconstructor):
             step_size=self._probePositionSettings.stepSize.getValue(),
             position_x_px=position_in_px[:, -1],
             position_y_px=position_in_px[:, -2],
-            update_magnitude_limit=None,  # TODO Optional[float]
+            update_magnitude_limit=update_magnitude_limit if update_magnitude_limit > 0.0 else None,
         )
         opr_optimization_plan = self._create_optimization_plan(
             self._oprSettings.optimizationPlanStart.getValue(),
@@ -198,7 +200,7 @@ class PIEReconstructor(Reconstructor):
             step_size=self._oprSettings.stepSize.getValue(),
             initial_weights=opr_weights,
             optimize_eigenmode_weights=self._oprSettings.optimizeEigenmodeWeights.getValue(),
-            optimize_intensity_variation=self._oprSettings.optimizeIntensityVariation.getValue(),
+            optimize_intensity_variation=self._oprSettings.optimizeIntensities.getValue(),
         )
         task_options = PIEOptions(
             data_options,

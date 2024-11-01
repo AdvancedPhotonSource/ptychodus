@@ -131,12 +131,15 @@ class AutodiffReconstructor(Reconstructor):
         reconstructor_options = AutodiffPtychographyReconstructorOptions(
             num_epochs=self._reconstructorSettings.numEpochs.getValue(),
             batch_size=self._reconstructorSettings.batchSize.getValue(),
+            # TODO batching_mode
+            # TODO compact_mode_update_clustering
+            # TODO compact_mode_update_clustering_stride
             default_device=default_device,
-            gpu_indices=(),  # TODO Sequence[int]
+            gpu_indices=self._reconstructorSettings.devices.getValue(),
             default_dtype=default_dtype,
-            random_seed=None,  # TODO
-            displayed_loss_function=None,  # TODO
-            log_level=logging.INFO,  # TODO
+            # TODO random_seed
+            # TODO displayed_loss_function
+            # TODO log_level
             loss_function=LossFunctions.MSE_SQRT,  # TODO
         )
         object_optimization_plan = self._create_optimization_plan(
@@ -191,6 +194,8 @@ class AutodiffReconstructor(Reconstructor):
         probe_position_optimizer = self._create_optimizer(
             self._probePositionSettings.optimizer.getValue()
         )
+        update_magnitude_limit = self._probePositionSettings.updateMagnitudeLimit.getValue()
+
         probe_position_options = AutodiffPtychographyProbePositionOptions(
             optimizable=self._probePositionSettings.isOptimizable.getValue(),
             optimization_plan=probe_position_optimization_plan,
@@ -198,7 +203,7 @@ class AutodiffReconstructor(Reconstructor):
             step_size=self._probePositionSettings.stepSize.getValue(),
             position_x_px=position_in_px[:, -1],
             position_y_px=position_in_px[:, -2],
-            update_magnitude_limit=None,  # TODO Optional[float]
+            update_magnitude_limit=update_magnitude_limit if update_magnitude_limit > 0.0 else None,
         )
         opr_optimization_plan = self._create_optimization_plan(
             self._oprSettings.optimizationPlanStart.getValue(),
@@ -214,7 +219,7 @@ class AutodiffReconstructor(Reconstructor):
             step_size=self._oprSettings.stepSize.getValue(),
             initial_weights=opr_weights,
             optimize_eigenmode_weights=self._oprSettings.optimizeEigenmodeWeights.getValue(),
-            optimize_intensity_variation=self._oprSettings.optimizeIntensityVariation.getValue(),
+            optimize_intensity_variation=self._oprSettings.optimizeIntensities.getValue(),
         )
         task_options = AutodiffPtychographyOptions(
             data_options,
