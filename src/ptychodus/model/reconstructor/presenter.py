@@ -50,16 +50,14 @@ class ReconstructorPresenter(Observable, Observer):
     def _syncToSettings(self) -> None:
         self._settings.algorithm.setValue(self._reconstructorChooser.currentPlugin.simpleName)
 
-    def reconstruct(
-        self,
-        inputProductIndex: int,
-        outputProductName: str,
-        indexFilter: ScanIndexFilter = ScanIndexFilter.ALL,
-    ) -> int:
-        return self._reconstructorAPI.reconstruct(inputProductIndex, outputProductName, indexFilter)
+    def reconstruct(self, inputProductIndex: int) -> int:
+        return self._reconstructorAPI.reconstruct(inputProductIndex)
 
-    def reconstructSplit(self, inputProductIndex: int, outputProductName: str) -> tuple[int, int]:
-        return self._reconstructorAPI.reconstructSplit(inputProductIndex, outputProductName)
+    def reconstructSplit(self, inputProductIndex: int) -> tuple[int, int]:
+        return self._reconstructorAPI.reconstructSplit(inputProductIndex)
+
+    def processResults(self, *, block: bool) -> None:
+        self._reconstructorAPI.processResults(block=block)
 
     @property
     def isTrainable(self) -> bool:

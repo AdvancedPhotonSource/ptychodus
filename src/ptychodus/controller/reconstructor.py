@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 import logging
 
-from PyQt5.QtCore import Qt, QAbstractItemModel
+from PyQt5.QtCore import Qt, QAbstractItemModel, QTimer
 from PyQt5.QtWidgets import QLabel, QWidget
 
 from ptychodus.api.observer import Observable, Observer
@@ -55,6 +55,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._viewControllerFactoryDict: dict[str, ReconstructorViewControllerFactory] = {
             vcf.backendName: vcf for vcf in viewControllerFactoryList
         }
+        self._timer = QTimer()
+        self._timer.timeout.connect(self._processResults)
+        self._timer.start(5 * 1000)  # TODO customize (in milliseconds)
 
     @classmethod
     def createInstance(
@@ -125,6 +128,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
         return controller
 
+    def _processResults(self) -> None:
+        self._presenter.processResults(block=False)
+
     def _addReconstructor(self, name: str) -> None:
         backendName, reconstructorName = name.split('/')  # TODO REDO
         self._view.reconstructorView.algorithmComboBox.addItem(
@@ -141,28 +147,26 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._view.stackedWidget.addWidget(widget)
 
     def _reconstruct(self) -> None:
-        outputProductName = self._presenter.getReconstructor()
         inputProductIndex = self._view.reconstructorView.productComboBox.currentIndex()
 
         if inputProductIndex < 0:
             return
 
         try:
-            self._presenter.reconstruct(inputProductIndex, outputProductName)
-        except Exception as err:
+            self._presenter.reconstruct(inputProductIndex)
+        except Exception as err:  # FIXME
             logger.exception(err)
             ExceptionDialog.showException('Reconstructor', err)
 
     def _reconstructSplit(self) -> None:
-        outputProductName = self._presenter.getReconstructor()
         inputProductIndex = self._view.reconstructorView.productComboBox.currentIndex()
 
         if inputProductIndex < 0:
             return
 
         try:
-            self._presenter.reconstructSplit(inputProductIndex, outputProductName)
-        except Exception as err:
+            self._presenter.reconstructSplit(inputProductIndex)
+        except Exception as err:  # FIXME
             logger.exception(err)
             ExceptionDialog.showException('Split Reconstructor', err)
 

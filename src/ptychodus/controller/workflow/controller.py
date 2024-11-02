@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from PyQt5.QtCore import QAbstractItemModel, QTimer
 from PyQt5.QtWidgets import QTableView
 
@@ -33,7 +31,7 @@ class WorkflowController:
         self._authorizationController = WorkflowAuthorizationController.createInstance(
             authorizationPresenter, parametersView.authorizationDialog
         )
-        self._statusController = WorkflowStatusController.createInstance(
+        self._statusController = WorkflowStatusController(
             statusPresenter, parametersView.statusView, tableView
         )
         self._executionController = WorkflowExecutionController.createInstance(
@@ -43,32 +41,8 @@ class WorkflowController:
             productItemModel,
         )
         self._timer = QTimer()
-
-    @classmethod
-    def createInstance(
-        cls,
-        parametersPresenter: WorkflowParametersPresenter,
-        authorizationPresenter: WorkflowAuthorizationPresenter,
-        statusPresenter: WorkflowStatusPresenter,
-        executionPresenter: WorkflowExecutionPresenter,
-        parametersView: WorkflowParametersView,
-        tableView: QTableView,
-        productItemModel: QAbstractItemModel,
-    ) -> WorkflowController:
-        controller = cls(
-            parametersPresenter,
-            authorizationPresenter,
-            statusPresenter,
-            executionPresenter,
-            parametersView,
-            tableView,
-            productItemModel,
-        )
-
-        controller._timer.timeout.connect(controller._processEvents)
-        controller._timer.start(1000)  # TODO customize
-
-        return controller
+        self._timer.timeout.connect(self._processEvents)
+        self._timer.start(5 * 1000)  # TODO customize
 
     def _processEvents(self) -> None:
         self._authorizationController.startAuthorizationIfNeeded()

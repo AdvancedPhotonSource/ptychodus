@@ -148,7 +148,7 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
             inputProductAPI.buildProbe()
             inputProductAPI.buildObject()
             # TODO would prefer to write instructions and submit to queue
-            outputProductAPI = inputProductAPI.reconstructLocal(f'{productName}_out')
+            outputProductAPI = inputProductAPI.reconstructLocal()
             outputProductAPI.saveProduct(
                 experimentDir / 'ptychodus' / f'{productName}.h5', fileType='HDF5'
             )

@@ -1,9 +1,10 @@
-from __future__ import annotations
 import logging
 
 from PyQt5.QtCore import Qt, QModelIndex, QSortFilterProxyModel, QTimer
 from PyQt5.QtWidgets import QAbstractItemView, QTableView
 from PyQt5.QtGui import QDesktopServices
+
+from ptychodus.api.observer import Observable, Observer
 
 from ...model.workflow import WorkflowStatusPresenter
 from ...view.workflow import WorkflowStatusView
@@ -12,48 +13,39 @@ from .tableModel import WorkflowTableModel
 logger = logging.getLogger(__name__)
 
 
-class WorkflowStatusController:
+class WorkflowStatusController(Observer):
     def __init__(
         self,
         presenter: WorkflowStatusPresenter,
         view: WorkflowStatusView,
         tableView: QTableView,
     ) -> None:
+        super().__init__()
         self._presenter = presenter
         self._view = view
         self._tableView = tableView
         self._tableModel = WorkflowTableModel(presenter)
         self._proxyModel = QSortFilterProxyModel()
+        self._proxyModel.setSourceModel(self._tableModel)
         self._timer = QTimer()
+        self._timer.timeout.connect(presenter.refreshStatus)
 
-    @classmethod
-    def createInstance(
-        cls,
-        presenter: WorkflowStatusPresenter,
-        view: WorkflowStatusView,
-        tableView: QTableView,
-    ) -> WorkflowStatusController:
-        controller = cls(presenter, view, tableView)
-
-        controller._proxyModel.setSourceModel(controller._tableModel)
-        tableView.setModel(controller._proxyModel)
+        tableView.setModel(self._proxyModel)
         tableView.setSortingEnabled(True)
         tableView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        tableView.clicked.connect(controller._handleTableViewClick)
+        tableView.clicked.connect(self._handleTableViewClick)
 
-        controller._timer.timeout.connect(presenter.refreshStatus)
-        view.autoRefreshCheckBox.toggled.connect(controller._autoRefreshStatus)
+        view.autoRefreshCheckBox.toggled.connect(self._autoRefreshStatus)
         view.autoRefreshSpinBox.valueChanged.connect(presenter.setRefreshIntervalInSeconds)
         view.refreshButton.clicked.connect(presenter.refreshStatus)
 
-        controller._syncModelToView()
-
-        return controller
+        self._syncModelToView()
+        presenter.addObserver(self)
 
     def _handleTableViewClick(self, index: QModelIndex) -> None:
         if index.column() == 5:
             url = index.data(Qt.ItemDataRole.UserRole)
-            logger.debug(f'Opening URL: "{url.toString()}"')
+            logger.info(f'Opening URL: "{url.toString()}"')
             QDesktopServices.openUrl(url)
 
     def _autoRefreshStatus(self) -> None:
@@ -80,3 +72,7 @@ class WorkflowStatusController:
         )
         self._view.autoRefreshSpinBox.setValue(self._presenter.getRefreshIntervalInSeconds())
         self._view.autoRefreshSpinBox.blockSignals(False)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._presenter:
+            self._syncModelToView()

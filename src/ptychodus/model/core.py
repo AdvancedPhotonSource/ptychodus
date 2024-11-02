@@ -186,6 +186,7 @@ class ModelCore:
 
     def __enter__(self) -> ModelCore:
         self._patternsCore.start()
+        self._reconstructorCore.start()
         self._workflowCore.start()
         self._automationCore.start()
         return self
@@ -209,6 +210,7 @@ class ModelCore:
     ) -> None:
         self._automationCore.stop()
         self._workflowCore.stop()
+        self._reconstructorCore.stop()
         self._patternsCore.stop()
 
     @property
@@ -296,28 +298,29 @@ class ModelCore:
         inputFilePath: Path,
         outputFilePath: Path,
         *,
+        productFileType: str = 'NPZ',
         fluorescenceInputFilePath: Path | None = None,
         fluorescenceOutputFilePath: Path | None = None,
     ) -> int:
         # TODO add enum for actions; implement using workflow API
-        inputProductIndex = self._productCore.productAPI.openProduct(inputFilePath, fileType='NPZ')
+        inputProductIndex = self._productCore.productAPI.openProduct(
+            inputFilePath, fileType=productFileType
+        )
 
         if inputProductIndex < 0:
-            logger.error(f'Failed to open product "{inputFilePath}"')
+            logger.error(f'Failed to open product "{inputFilePath}"!')
             return -1
 
         if action.lower() == 'reconstruct':
-            outputProductName = self._productCore.productAPI.getItemName(inputProductIndex)
+            logger.info(f'Reconstructing...')
             outputProductIndex = self._reconstructorCore.reconstructorAPI.reconstruct(
-                inputProductIndex, outputProductName
+                inputProductIndex
             )
-
-            if outputProductIndex < 0:
-                logger.error(f'Failed to reconstruct product index="{inputProductIndex}"')
-                return -1
+            self._reconstructorCore.reconstructorAPI.processResults(block=True)
+            logger.info('Reconstruction complete.')
 
             self._productCore.productAPI.saveProduct(
-                outputProductIndex, outputFilePath, fileType='NPZ'
+                outputProductIndex, outputFilePath, fileType=productFileType
             )
 
             if fluorescenceInputFilePath is not None and fluorescenceOutputFilePath is not None:

@@ -125,7 +125,7 @@ class ControllerCore:
                 self._tikeViewControllerFactory,
             ],
         )
-        self._workflowController = WorkflowController.createInstance(
+        self._workflowController = WorkflowController(
             model.workflowParametersPresenter,
             model.workflowAuthorizationPresenter,
             model.workflowStatusPresenter,

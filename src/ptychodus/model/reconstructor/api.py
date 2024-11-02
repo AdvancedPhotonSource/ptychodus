@@ -11,6 +11,7 @@ from ptychodus.api.reconstructor import (
 
 from ..product import ProductRepository
 from .matcher import DiffractionPatternPositionMatcher, ScanIndexFilter
+from .queue import ReconstructionQueue
 
 logger = logging.getLogger(__name__)
 
@@ -18,47 +19,55 @@ logger = logging.getLogger(__name__)
 class ReconstructorAPI:
     def __init__(
         self,
+        reconstructionQueue: ReconstructionQueue,
         dataMatcher: DiffractionPatternPositionMatcher,
         productRepository: ProductRepository,
         reconstructorChooser: PluginChooser[Reconstructor],
     ) -> None:
+        self._reconstructionQueue = reconstructionQueue
         self._dataMatcher = dataMatcher
         self._productRepository = productRepository
         self._reconstructorChooser = reconstructorChooser
 
+    def processResults(self, *, block: bool) -> None:
+        self._reconstructionQueue.processResults(block=block)
+
     def reconstruct(
         self,
         inputProductIndex: int,
-        outputProductName: str,
+        *,
+        outputProductSuffix: str = '',
         indexFilter: ScanIndexFilter = ScanIndexFilter.ALL,
     ) -> int:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
         parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(
             inputProductIndex, indexFilter
         )
-
         outputProductIndex = self._productRepository.insertNewProduct(likeIndex=inputProductIndex)
         outputProduct = self._productRepository[outputProductIndex]
 
-        tic = time.perf_counter()
-        result = reconstructor.reconstruct(parameters)
-        toc = time.perf_counter()
-        logger.info(f'Reconstruction time {toc - tic:.4f} seconds. (code={result.result})')
+        outputProductName = (
+            self._dataMatcher.getProductName(inputProductIndex)
+            + f'_{self._reconstructorChooser.currentPlugin.simpleName}'
+        )
 
-        outputProduct.assign(result.product)
+        if outputProductSuffix:
+            outputProductName += outputProductSuffix
 
+        outputProduct.setName(outputProductName)
+        self._reconstructionQueue.put(reconstructor, parameters, outputProduct)
         return outputProductIndex
 
-    def reconstructSplit(self, inputProductIndex: int, outputProductName: str) -> tuple[int, int]:
+    def reconstructSplit(self, inputProductIndex: int) -> tuple[int, int]:
         outputProductIndexOdd = self.reconstruct(
             inputProductIndex,
-            f'{outputProductName}_odd',
-            ScanIndexFilter.ODD,
+            outputProductSuffix='odd',
+            indexFilter=ScanIndexFilter.ODD,
         )
         outputProductIndexEven = self.reconstruct(
             inputProductIndex,
-            f'{outputProductName}_even',
-            ScanIndexFilter.EVEN,
+            outputProductSuffix='even',
+            indexFilter=ScanIndexFilter.EVEN,
         )
 
         return outputProductIndexOdd, outputProductIndexEven

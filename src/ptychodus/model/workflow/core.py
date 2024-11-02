@@ -1,4 +1,3 @@
-from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
@@ -38,20 +37,10 @@ class WorkflowParametersPresenter(Observable, Observer):
         self._computeDataLocator = computeDataLocator
         self._outputDataLocator = outputDataLocator
 
-    @classmethod
-    def createInstance(
-        cls,
-        settings: WorkflowSettings,
-        inputDataLocator: DataLocator,
-        computeDataLocator: DataLocator,
-        outputDataLocator: OutputDataLocator,
-    ) -> WorkflowParametersPresenter:
-        presenter = cls(settings, inputDataLocator, computeDataLocator, outputDataLocator)
-        settings.addObserver(presenter)
-        inputDataLocator.addObserver(presenter)
-        computeDataLocator.addObserver(presenter)
-        outputDataLocator.addObserver(presenter)
-        return presenter
+        settings.addObserver(self)
+        inputDataLocator.addObserver(self)
+        computeDataLocator.addObserver(self)
+        outputDataLocator.addObserver(self)
 
     def setInputDataEndpointID(self, endpointID: UUID) -> None:
         self._inputDataLocator.setEndpointID(endpointID)
@@ -122,11 +111,11 @@ class WorkflowParametersPresenter(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
             self.notifyObservers()
-        elif observable is self._inputDataLocator:
-            self.notifyObservers()
-        elif observable is self._computeDataLocator:
-            self.notifyObservers()
-        elif observable is self._outputDataLocator:
+        elif observable in (
+            self._inputDataLocator,
+            self._computeDataLocator,
+            self._outputDataLocator,
+        ):
             self.notifyObservers()
 
 
@@ -145,12 +134,15 @@ class WorkflowAuthorizationPresenter:
         self._authorizer.setCodeFromAuthorizeURL(code)
 
 
-class WorkflowStatusPresenter:
+class WorkflowStatusPresenter(Observable, Observer):
     def __init__(
         self, settings: WorkflowSettings, statusRepository: WorkflowStatusRepository
     ) -> None:
+        super().__init__()
         self._settings = settings
         self._statusRepository = statusRepository
+
+        settings.addObserver(self)
 
     def getRefreshIntervalLimitsInSeconds(self) -> Interval[int]:
         return Interval[int](10, 86400)
@@ -179,6 +171,10 @@ class WorkflowStatusPresenter:
 
     def refreshStatus(self) -> None:
         self._statusRepository.refreshStatus()
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settings:
+            self.notifyObservers()
 
 
 class WorkflowExecutionPresenter:
@@ -238,7 +234,7 @@ class WorkflowCore:
                 self._authorizer, self._statusRepository, self._executor
             )
 
-        self.parametersPresenter = WorkflowParametersPresenter.createInstance(
+        self.parametersPresenter = WorkflowParametersPresenter(
             self._settings,
             self._inputDataLocator,
             self._computeDataLocator,

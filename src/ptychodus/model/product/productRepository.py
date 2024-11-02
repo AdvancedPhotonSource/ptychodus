@@ -103,10 +103,12 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             costs=list(),
         )
 
+        index = self._insertProduct(item)
+
         if likeIndex >= 0:
             item.assignItem(self._itemList[likeIndex], notify=False)
 
-        return self._insertProduct(item)
+        return index
 
     def insertProductFromSettings(self) -> int:
         # TODO add mechanism to sync product state to settings

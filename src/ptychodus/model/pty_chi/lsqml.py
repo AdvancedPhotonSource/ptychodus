@@ -135,7 +135,7 @@ class LSQMLReconstructor(Reconstructor):
             optimizer=object_optimizer,
             step_size=self._objectSettings.stepSize.getValue(),
             initial_guess=object_in.array,
-            slice_spacings_m=None,  # FIXME Optional[ndarray]
+            slice_spacings_m=numpy.array(object_in.layerDistanceInMeters),
             pixel_size_m=pixel_size_m,
             l1_norm_constraint_weight=self._objectSettings.l1NormConstraintWeight.getValue(),
             l1_norm_constraint_stride=self._objectSettings.l1NormConstraintStride.getValue(),
