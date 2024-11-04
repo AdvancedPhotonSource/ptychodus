@@ -18,7 +18,7 @@ from ..model.product.object import ObjectRepositoryItem
 from ..model.product.probe import ProbeRepositoryItem
 from ..model.product.scan import ScanRepositoryItem
 from ..model.reconstructor import ReconstructorPresenter
-from ..view.reconstructor import ReconstructorParametersView, ReconstructorPlotView
+from ..view.reconstructor import ReconstructorView, ReconstructorPlotView
 from ..view.widgets import ExceptionDialog
 from .data import FileDialogFactory
 
@@ -41,7 +41,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self,
         presenter: ReconstructorPresenter,
         productRepository: ProductRepository,
-        view: ReconstructorParametersView,
+        view: ReconstructorView,
         plotView: ReconstructorPlotView,
         fileDialogFactory: FileDialogFactory,
         viewControllerFactoryList: Iterable[ReconstructorViewControllerFactory],
@@ -55,16 +55,16 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._viewControllerFactoryDict: dict[str, ReconstructorViewControllerFactory] = {
             vcf.backendName: vcf for vcf in viewControllerFactoryList
         }
-        self._timer = QTimer()
-        self._timer.timeout.connect(self._processResults)
-        self._timer.start(5 * 1000)  # TODO customize (in milliseconds)
+        self._progressTimer = QTimer()
+        self._progressTimer.timeout.connect(self._updateProgress)
+        self._progressTimer.start(5 * 1000)  # TODO customize (in milliseconds)
 
     @classmethod
     def createInstance(
         cls,
         presenter: ReconstructorPresenter,
         productRepository: ProductRepository,
-        view: ReconstructorParametersView,
+        view: ReconstructorView,
         plotView: ReconstructorPlotView,
         fileDialogFactory: FileDialogFactory,
         productTableModel: QAbstractItemModel,
@@ -80,61 +80,66 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         )
         presenter.addObserver(controller)
         productRepository.addObserver(controller)
+        view.progressDialog.textEdit.setReadOnly(True)
 
         for name in presenter.getReconstructorList():
             controller._addReconstructor(name)
 
-        view.reconstructorView.algorithmComboBox.textActivated.connect(presenter.setReconstructor)
-        view.reconstructorView.algorithmComboBox.currentIndexChanged.connect(
+        view.parametersView.algorithmComboBox.textActivated.connect(presenter.setReconstructor)
+        view.parametersView.algorithmComboBox.currentIndexChanged.connect(
             view.stackedWidget.setCurrentIndex
         )
 
-        view.reconstructorView.productComboBox.textActivated.connect(controller._redrawPlot)
-        view.reconstructorView.productComboBox.setModel(productTableModel)
+        view.parametersView.productComboBox.textActivated.connect(controller._redrawPlot)
+        view.parametersView.productComboBox.setModel(productTableModel)
 
-        openModelAction = view.reconstructorView.modelMenu.addAction('Open...')
+        openModelAction = view.parametersView.modelMenu.addAction('Open...')
         openModelAction.triggered.connect(controller._openModel)
-        saveModelAction = view.reconstructorView.modelMenu.addAction('Save...')
+        saveModelAction = view.parametersView.modelMenu.addAction('Save...')
         saveModelAction.triggered.connect(controller._saveModel)
 
-        openTrainingDataAction = view.reconstructorView.trainerMenu.addAction(
-            'Open Training Data...'
-        )
+        openTrainingDataAction = view.parametersView.trainerMenu.addAction('Open Training Data...')
         openTrainingDataAction.triggered.connect(controller._openTrainingData)
-        saveTrainingDataAction = view.reconstructorView.trainerMenu.addAction(
-            'Save Training Data...'
-        )
+        saveTrainingDataAction = view.parametersView.trainerMenu.addAction('Save Training Data...')
         saveTrainingDataAction.triggered.connect(controller._saveTrainingData)
-        ingestTrainingDataAction = view.reconstructorView.trainerMenu.addAction(
-            'Ingest Training Data'
-        )
+        ingestTrainingDataAction = view.parametersView.trainerMenu.addAction('Ingest Training Data')
         ingestTrainingDataAction.triggered.connect(controller._ingestTrainingData)
-        clearTrainingDataAction = view.reconstructorView.trainerMenu.addAction(
-            'Clear Training Data'
-        )
+        clearTrainingDataAction = view.parametersView.trainerMenu.addAction('Clear Training Data')
         clearTrainingDataAction.triggered.connect(controller._clearTrainingData)
-        view.reconstructorView.trainerMenu.addSeparator()
-        trainAction = view.reconstructorView.trainerMenu.addAction('Train')
+        view.parametersView.trainerMenu.addSeparator()
+        trainAction = view.parametersView.trainerMenu.addAction('Train')
         trainAction.triggered.connect(controller._train)
 
-        reconstructSplitAction = view.reconstructorView.reconstructorMenu.addAction(
+        reconstructSplitAction = view.parametersView.reconstructorMenu.addAction(
             'Reconstruct Odd/Even Split'
         )
         reconstructSplitAction.triggered.connect(controller._reconstructSplit)
-        reconstructAction = view.reconstructorView.reconstructorMenu.addAction('Reconstruct')
+        reconstructAction = view.parametersView.reconstructorMenu.addAction('Reconstruct')
         reconstructAction.triggered.connect(controller._reconstruct)
+
+        view.progressDialog.setModal(True)
+        view.progressDialog.setWindowModality(Qt.ApplicationModal)
+        view.progressDialog.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.CustomizeWindowHint)
 
         controller._syncAlgorithmToView()
 
         return controller
 
-    def _processResults(self) -> None:
+    def _updateProgress(self) -> None:
+        isReconstructing = self._presenter.isReconstructing
+
+        for button in self._view.progressDialog.buttonBox.buttons():
+            button.setEnabled(not isReconstructing)
+
+        for text in self._presenter.flushLog():
+            self._view.progressDialog.textEdit.appendPlainText(text)
+
         self._presenter.processResults(block=False)
 
     def _addReconstructor(self, name: str) -> None:
         backendName, reconstructorName = name.split('/')  # TODO REDO
-        self._view.reconstructorView.algorithmComboBox.addItem(
-            name, self._view.reconstructorView.algorithmComboBox.count()
+        self._view.parametersView.algorithmComboBox.addItem(
+            name, self._view.parametersView.algorithmComboBox.count()
         )
 
         if backendName in self._viewControllerFactoryDict:
@@ -147,7 +152,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._view.stackedWidget.addWidget(widget)
 
     def _reconstruct(self) -> None:
-        inputProductIndex = self._view.reconstructorView.productComboBox.currentIndex()
+        inputProductIndex = self._view.parametersView.productComboBox.currentIndex()
 
         if inputProductIndex < 0:
             return
@@ -158,8 +163,10 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             logger.exception(err)
             ExceptionDialog.showException('Reconstructor', err)
 
+        self._view.progressDialog.show()
+
     def _reconstructSplit(self) -> None:
-        inputProductIndex = self._view.reconstructorView.productComboBox.currentIndex()
+        inputProductIndex = self._view.parametersView.productComboBox.currentIndex()
 
         if inputProductIndex < 0:
             return
@@ -169,6 +176,8 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Split Reconstructor', err)
+
+        self._view.progressDialog.show()
 
     def _openModel(self) -> None:
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
@@ -231,7 +240,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
                 ExceptionDialog.showException('Training Data Writer', err)
 
     def _ingestTrainingData(self) -> None:
-        inputProductIndex = self._view.reconstructorView.productComboBox.currentIndex()
+        inputProductIndex = self._view.parametersView.productComboBox.currentIndex()
 
         if inputProductIndex < 0:
             return
@@ -257,7 +266,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             ExceptionDialog.showException('Trainer', err)
 
     def _redrawPlot(self) -> None:
-        productIndex = self._view.reconstructorView.productComboBox.currentIndex()
+        productIndex = self._view.parametersView.productComboBox.currentIndex()
 
         if productIndex < 0:
             self._plotView.axes.clear()
@@ -278,13 +287,13 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._plotView.figureCanvas.draw()
 
     def _syncAlgorithmToView(self) -> None:
-        self._view.reconstructorView.algorithmComboBox.setCurrentText(
+        self._view.parametersView.algorithmComboBox.setCurrentText(
             self._presenter.getReconstructor()
         )
 
         isTrainable = self._presenter.isTrainable
-        self._view.reconstructorView.modelButton.setVisible(isTrainable)
-        self._view.reconstructorView.trainerButton.setVisible(isTrainable)
+        self._view.parametersView.modelButton.setVisible(isTrainable)
+        self._view.parametersView.trainerButton.setVisible(isTrainable)
 
         self._redrawPlot()
 
@@ -304,7 +313,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         pass
 
     def handleCostsChanged(self, index: int, costs: Sequence[float]) -> None:
-        currentIndex = self._view.reconstructorView.productComboBox.currentIndex()
+        currentIndex = self._view.parametersView.productComboBox.currentIndex()
 
         if index == currentIndex:
             self._redrawPlot()

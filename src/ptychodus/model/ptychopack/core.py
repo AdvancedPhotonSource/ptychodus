@@ -81,5 +81,9 @@ class PtychoPackReconstructorLibrary(ReconstructorLibrary):
     def name(self) -> str:
         return 'PtychoPack'
 
+    @property
+    def logger_name(self) -> str:
+        return 'ptychopack'
+
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self.reconstructor_list)

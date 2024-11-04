@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 import logging
 
@@ -11,6 +11,7 @@ from ptychodus.api.reconstructor import (
 )
 
 from .api import ReconstructorAPI
+from .log import ReconstructorLogHandler
 from .settings import ReconstructorSettings
 
 logger = logging.getLogger(__name__)
@@ -21,12 +22,14 @@ class ReconstructorPresenter(Observable, Observer):
         self,
         settings: ReconstructorSettings,
         reconstructorChooser: PluginChooser[Reconstructor],
+        logHandler: ReconstructorLogHandler,
         reconstructorAPI: ReconstructorAPI,
         reinitObservable: Observable,
     ) -> None:
         super().__init__()
         self._settings = settings
         self._reconstructorChooser = reconstructorChooser
+        self._logHandler = logHandler
         self._reconstructorAPI = reconstructorAPI
         self._reinitObservable = reinitObservable
 
@@ -54,6 +57,14 @@ class ReconstructorPresenter(Observable, Observer):
 
     def reconstructSplit(self, inputProductIndex: int) -> tuple[int, int]:
         return self._reconstructorAPI.reconstructSplit(inputProductIndex)
+
+    @property
+    def isReconstructing(self) -> bool:
+        return self._reconstructorAPI.isReconstructing
+
+    def flushLog(self) -> Iterator[str]:
+        for text in self._logHandler.messages():
+            yield text
 
     def processResults(self, *, block: bool) -> None:
         self._reconstructorAPI.processResults(block=block)

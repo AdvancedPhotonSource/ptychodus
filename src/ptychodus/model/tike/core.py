@@ -64,5 +64,9 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
     def name(self) -> str:
         return 'Tike'
 
+    @property
+    def logger_name(self) -> str:
+        return 'tike'
+
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self.reconstructorList)

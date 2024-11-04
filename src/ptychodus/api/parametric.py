@@ -257,7 +257,13 @@ class IntegerSequenceParameter(ParameterBase[MutableSequence[int]]):
         return ','.join(repr(value) for value in self)
 
     def setValueFromString(self, value: str) -> None:
-        self.setValue([int(xstr) for xstr in value.split(',')])
+        newValue: list[int] = list()
+
+        for xstr in value.split(','):
+            if xstr:
+                newValue.append(int(xstr))
+
+        self.setValue(newValue)
 
     def copy(self) -> IntegerSequenceParameter:
         return IntegerSequenceParameter(self.getValue(), self)

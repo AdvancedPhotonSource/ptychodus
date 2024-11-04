@@ -111,10 +111,10 @@ class ControllerCore:
             view.objectView,
             self._fileDialogFactory,
         )
-        self._reconstructorParametersController = ReconstructorController.createInstance(
+        self._reconstructorController = ReconstructorController.createInstance(
             model.reconstructorPresenter,
             model.productRepository,
-            view.reconstructorParametersView,
+            view.reconstructorView,
             view.reconstructorPlotView,
             self._fileDialogFactory,
             self._productController.tableModel,

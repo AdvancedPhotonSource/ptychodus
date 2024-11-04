@@ -82,5 +82,9 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
     def name(self) -> str:
         return 'pty-chi'
 
+    @property
+    def logger_name(self) -> str:
+        return 'ptychi'
+
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self.reconstructor_list)

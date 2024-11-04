@@ -180,5 +180,9 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
     def name(self) -> str:
         return 'PtychoNN'
 
+    @property
+    def logger_name(self) -> str:
+        return 'ptychonn'
+
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self._reconstructors)

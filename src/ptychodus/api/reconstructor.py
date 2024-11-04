@@ -163,3 +163,8 @@ class ReconstructorLibrary(Iterable[Reconstructor]):
     @abstractmethod
     def name(self) -> str:
         pass
+
+    @property
+    @abstractmethod
+    def logger_name(self) -> str:
+        pass

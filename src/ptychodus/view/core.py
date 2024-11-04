@@ -21,7 +21,7 @@ from .automation import AutomationView
 from .image import ImageView
 from .patterns import PatternsView
 from .product import ProductView
-from .reconstructor import ReconstructorParametersView, ReconstructorPlotView
+from .reconstructor import ReconstructorView, ReconstructorPlotView
 from .repository import RepositoryTableView, RepositoryTreeView
 from .scan import ScanPlotView
 from .settings import SettingsView
@@ -73,8 +73,8 @@ class ViewCore(QMainWindow):
         self.reconstructorAction = self.navigationToolBar.addAction(
             QIcon(':/icons/reconstructor'), 'Reconstructor'
         )
-        self.reconstructorParametersView = ReconstructorParametersView.createInstance()
-        self.reconstructorPlotView = ReconstructorPlotView.createInstance()
+        self.reconstructorView = ReconstructorView()
+        self.reconstructorPlotView = ReconstructorPlotView()
 
         self.workflowAction = self.navigationToolBar.addAction(
             QIcon(':/icons/workflow'), 'Workflow'
@@ -115,7 +115,7 @@ class ViewCore(QMainWindow):
         view.parametersWidget.addWidget(view.scanView)
         view.parametersWidget.addWidget(view.probeView)
         view.parametersWidget.addWidget(view.objectView)
-        view.parametersWidget.addWidget(view.reconstructorParametersView)
+        view.parametersWidget.addWidget(view.reconstructorView)
         view.parametersWidget.addWidget(view.workflowParametersView)
         view.parametersWidget.addWidget(view.automationView)
         view.parametersWidget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)

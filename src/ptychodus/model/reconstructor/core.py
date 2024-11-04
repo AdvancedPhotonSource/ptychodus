@@ -12,12 +12,11 @@ from ptychodus.api.settings import SettingsRegistry
 from ..patterns import ActiveDiffractionDataset
 from ..product import ProductRepository
 from .api import ReconstructorAPI
+from .log import ReconstructorLogHandler
 from .matcher import DiffractionPatternPositionMatcher
 from .presenter import ReconstructorPresenter
 from .queue import ReconstructionQueue
 from .settings import ReconstructorSettings
-
-logger = logging.getLogger(__name__)
 
 
 class ReconstructorCore:
@@ -30,6 +29,10 @@ class ReconstructorCore:
     ) -> None:
         self.settings = ReconstructorSettings(settingsRegistry)
         self._pluginChooser = PluginChooser[Reconstructor]()
+        self._logHandler = ReconstructorLogHandler()
+        self._logHandler.setFormatter(
+            logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s')
+        )
 
         for library in librarySeq:
             for reconstructor in library:
@@ -38,6 +41,9 @@ class ReconstructorCore:
                     simpleName=f'{library.name}_{reconstructor.name}',
                     displayName=f'{library.name}/{reconstructor.name}',
                 )
+
+            libraryLogger = logging.getLogger(library.logger_name)
+            libraryLogger.addHandler(self._logHandler)
 
         if not self._pluginChooser:
             self._pluginChooser.registerPlugin(NullReconstructor('None'), displayName='None/None')
@@ -48,7 +54,11 @@ class ReconstructorCore:
             self._reconstructionQueue, self.dataMatcher, productRepository, self._pluginChooser
         )
         self.presenter = ReconstructorPresenter(
-            self.settings, self._pluginChooser, self.reconstructorAPI, settingsRegistry
+            self.settings,
+            self._pluginChooser,
+            self._logHandler,
+            self.reconstructorAPI,
+            settingsRegistry,
         )
 
     def start(self) -> None:

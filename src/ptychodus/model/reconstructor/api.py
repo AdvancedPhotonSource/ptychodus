@@ -29,6 +29,10 @@ class ReconstructorAPI:
         self._productRepository = productRepository
         self._reconstructorChooser = reconstructorChooser
 
+    @property
+    def isReconstructing(self) -> bool:
+        return self._reconstructionQueue.isReconstructing
+
     def processResults(self, *, block: bool) -> None:
         self._reconstructionQueue.processResults(block=block)
 
