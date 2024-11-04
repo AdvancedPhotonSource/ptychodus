@@ -34,7 +34,7 @@ class ActiveDiffractionDatasetBuilder:
 
     @property
     def isAssembling(self) -> bool:
-        return len(self._workers) > 0
+        return self._arrayQueue.unfinished_tasks > 0
 
     def _getArrayAndAssemble(self) -> None:
         while not self._stopWorkEvent.is_set():

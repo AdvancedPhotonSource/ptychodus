@@ -72,7 +72,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
     def reconstructLocal(self) -> WorkflowProductAPI:
         logger.debug(f'Reconstruct: index={self._productIndex}')
         outputProductIndex = self._reconstructorAPI.reconstruct(self._productIndex)
-        # FIXME block
+
         return ConcreteWorkflowProductAPI(
             self._productAPI,
             self._scanAPI,

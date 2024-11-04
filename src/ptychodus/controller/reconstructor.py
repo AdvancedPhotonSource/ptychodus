@@ -154,7 +154,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
         try:
             self._presenter.reconstruct(inputProductIndex)
-        except Exception as err:  # FIXME
+        except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Reconstructor', err)
 
@@ -166,7 +166,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
         try:
             self._presenter.reconstructSplit(inputProductIndex)
-        except Exception as err:  # FIXME
+        except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Split Reconstructor', err)
 

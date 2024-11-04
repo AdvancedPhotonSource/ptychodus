@@ -57,6 +57,10 @@ class ReconstructionQueue:
         self._stopWorkEvent = threading.Event()
         self._worker = threading.Thread(target=self._reconstruct)
 
+    @property
+    def isReconstructing(self) -> bool:
+        return self._inputQueue.unfinished_tasks > 0
+
     def _reconstruct(self) -> None:
         while not self._stopWorkEvent.is_set():
             try:

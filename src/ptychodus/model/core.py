@@ -312,7 +312,7 @@ class ModelCore:
             return -1
 
         if action.lower() == 'reconstruct':
-            logger.info(f'Reconstructing...')
+            logger.info('Reconstructing...')
             outputProductIndex = self._reconstructorCore.reconstructorAPI.reconstruct(
                 inputProductIndex
             )

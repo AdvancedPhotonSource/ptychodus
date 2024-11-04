@@ -58,7 +58,7 @@ class ViewCore(QMainWindow):
         self.productView = ProductView()
         self.productDiagramView = QWidget()
 
-        self.scanAction = self.navigationToolBar.addAction(QIcon(':/icons/scan'), 'Scan')
+        self.scanAction = self.navigationToolBar.addAction(QIcon(':/icons/scan'), 'Positions')
         self.scanView = RepositoryTableView()
         self.scanPlotView = ScanPlotView.createInstance()
 

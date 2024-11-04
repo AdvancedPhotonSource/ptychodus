@@ -11,7 +11,6 @@ from ptychodus.api.reconstructor import (
 )
 
 from .api import ReconstructorAPI
-from .matcher import ScanIndexFilter
 from .settings import ReconstructorSettings
 
 logger = logging.getLogger(__name__)
