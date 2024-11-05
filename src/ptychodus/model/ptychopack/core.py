@@ -55,21 +55,16 @@ class PtychoPackReconstructorLibrary(ReconstructorLibrary):
 
         try:
             from .dm import DifferenceMapReconstructor
-            from .pie import PtychographicIterativeEngineReconstructor
             from .raar import RelaxedAveragedAlternatingReflectionsReconstructor
             from .real_device import RealPtychoPackDevice
         except ModuleNotFoundError:
             logger.info('PtychoPack not found.')
 
             if isDeveloperModeEnabled:
-                self.reconstructor_list.append(NullReconstructor('PIE'))
                 self.reconstructor_list.append(NullReconstructor('DM'))
                 self.reconstructor_list.append(NullReconstructor('RAAR'))
         else:
             self._device = RealPtychoPackDevice()
-            self.reconstructor_list.append(
-                PtychographicIterativeEngineReconstructor(self.settings, self._device)
-            )
             self.reconstructor_list.append(DifferenceMapReconstructor(self.settings, self._device))
             self.reconstructor_list.append(
                 RelaxedAveragedAlternatingReflectionsReconstructor(self.settings, self._device)

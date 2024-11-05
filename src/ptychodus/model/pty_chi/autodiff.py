@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 import logging
 
 import numpy
@@ -42,19 +43,15 @@ logger = logging.getLogger(__name__)
 # FEEDBACK
 # change = None options to required arguments, rest have default values
 # remove positions/object pixel sizes
-# switch parameters with strides to "correction plans"
 # remove orthogonalize_incoherent_modes: enable whenever stride >= 1
 # remove orthogonalize_opr_modes: enable whenever stride >= 1
 # remove num_epochs from reconstructor options and run() method; just use iterate(n_epochs)
-# remove log_level; just document that logging is used in a standard way
 # better name for l1_norm_constraint?
 # enum for get_data_to_cpu
 # expand optimization mode GS; stabilize?
-# remove update_magnitude_limit?
 # remove optimizable in favor of OptimizationPlan | None
 # add optimizer and step size to OptimizationPlan
 # add additional enum value to avoid optional enum
-# return loss function values
 
 
 class AutodiffReconstructor(Reconstructor):
@@ -108,8 +105,10 @@ class AutodiffReconstructor(Reconstructor):
             batching_mode=batching_mode,
             compact_mode_update_clustering=self._reconstructorSettings.compactModeUpdateClustering.getValue(),
             compact_mode_update_clustering_stride=self._reconstructorSettings.compactModeUpdateClusteringStride.getValue(),
-            # TODO default_device=Devices.GPU if self._reconstructorSettings.useDevices.getValue() else Devices.CPU,
-            # TODO gpu_indices=self._reconstructorSettings.devices.getValue(),
+            default_device=Devices.GPU
+            if self._reconstructorSettings.useDevices.getValue()
+            else Devices.CPU,
+            gpu_indices=self._reconstructorSettings.devices.getValue(),
             default_dtype=(
                 Dtypes.FLOAT64
                 if self._reconstructorSettings.useDoublePrecision.getValue()
@@ -225,10 +224,11 @@ class AutodiffReconstructor(Reconstructor):
             initial_guess=probe.array[numpy.newaxis, ...],  # TODO opr
             probe_power=self._probeSettings.probePower.getValue(),
             probe_power_constraint_stride=self._probeSettings.probePowerConstraintStride.getValue(),
-            orthogonalize_incoherent_modes=self._probeSettings.orthogonalizeIncoherentModes.getValue(),
+            orthogonalize_incoherent_modes=self._probeSettings.orthogonalizeIncoherentModesStride.getValue()
+            > 0,
             orthogonalize_incoherent_modes_stride=self._probeSettings.orthogonalizeIncoherentModesStride.getValue(),
             orthogonalize_incoherent_modes_method=orthogonalize_incoherent_modes_method,
-            orthogonalize_opr_modes=self._probeSettings.orthogonalizeOPRModes.getValue(),
+            orthogonalize_opr_modes=self._probeSettings.orthogonalizeOPRModesStride.getValue() > 0,
             orthogonalize_opr_modes_stride=self._probeSettings.orthogonalizeOPRModesStride.getValue(),
         )
 
@@ -310,7 +310,7 @@ class AutodiffReconstructor(Reconstructor):
         object_in = parameters.product.object_
         object_out = Object(
             array=numpy.array(object_out_array),
-            layerDistanceInMeters=object_in.layerDistanceInMeters,  # TODO verify optimized?
+            layerDistanceInMeters=object_in.layerDistanceInMeters,  # FIXME re-add sentinel; optimized?
             pixelWidthInMeters=object_in.pixelWidthInMeters,
             pixelHeightInMeters=object_in.pixelHeightInMeters,
             centerXInMeters=object_in.centerXInMeters,
@@ -335,7 +335,14 @@ class AutodiffReconstructor(Reconstructor):
 
         scan_out = Scan(corrected_scan_points)
 
-        costs: list[float] = list()  # TODO populate
+        costs: Sequence[float] = list()
+        task_reconstructor = task.reconstructor
+
+        if task_reconstructor is not None:
+            loss_tracker = task_reconstructor.loss_tracker
+            # TODO epoch = loss_tracker.table["epoch"].to_numpy()
+            loss = loss_tracker.table['loss'].to_numpy()
+            costs = loss  # TODO update api to include epoch and loss
 
         product = Product(
             metadata=parameters.product.metadata,

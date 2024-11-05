@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 import logging
 
 import numpy
@@ -91,8 +92,10 @@ class PIEReconstructor(Reconstructor):
             batching_mode=batching_mode,
             compact_mode_update_clustering=self._reconstructorSettings.compactModeUpdateClustering.getValue(),
             compact_mode_update_clustering_stride=self._reconstructorSettings.compactModeUpdateClusteringStride.getValue(),
-            # TODO default_device=Devices.GPU if self._reconstructorSettings.useDevices.getValue() else Devices.CPU,
-            # TODO gpu_indices=self._reconstructorSettings.devices.getValue(),
+            default_device=Devices.GPU
+            if self._reconstructorSettings.useDevices.getValue()
+            else Devices.CPU,
+            gpu_indices=self._reconstructorSettings.devices.getValue(),
             default_dtype=(
                 Dtypes.FLOAT64
                 if self._reconstructorSettings.useDoublePrecision.getValue()
@@ -208,10 +211,11 @@ class PIEReconstructor(Reconstructor):
             initial_guess=probe.array[numpy.newaxis, ...],  # TODO opr
             probe_power=self._probeSettings.probePower.getValue(),
             probe_power_constraint_stride=self._probeSettings.probePowerConstraintStride.getValue(),
-            orthogonalize_incoherent_modes=self._probeSettings.orthogonalizeIncoherentModes.getValue(),
+            orthogonalize_incoherent_modes=self._probeSettings.orthogonalizeIncoherentModesStride.getValue()
+            > 0,
             orthogonalize_incoherent_modes_stride=self._probeSettings.orthogonalizeIncoherentModesStride.getValue(),
             orthogonalize_incoherent_modes_method=orthogonalize_incoherent_modes_method,
-            orthogonalize_opr_modes=self._probeSettings.orthogonalizeOPRModes.getValue(),
+            orthogonalize_opr_modes=self._probeSettings.orthogonalizeOPRModesStride.getValue() > 0,
             orthogonalize_opr_modes_stride=self._probeSettings.orthogonalizeOPRModesStride.getValue(),
         )
 
@@ -293,7 +297,7 @@ class PIEReconstructor(Reconstructor):
         object_in = parameters.product.object_
         object_out = Object(
             array=numpy.array(object_out_array),
-            layerDistanceInMeters=object_in.layerDistanceInMeters,  # TODO verify optimized?
+            layerDistanceInMeters=object_in.layerDistanceInMeters,  # FIXME re-add sentinel; optimized?
             pixelWidthInMeters=object_in.pixelWidthInMeters,
             pixelHeightInMeters=object_in.pixelHeightInMeters,
             centerXInMeters=object_in.centerXInMeters,
@@ -318,7 +322,14 @@ class PIEReconstructor(Reconstructor):
 
         scan_out = Scan(corrected_scan_points)
 
-        costs: list[float] = list()  # TODO populate
+        costs: Sequence[float] = list()
+        task_reconstructor = task.reconstructor
+
+        if task_reconstructor is not None:
+            loss_tracker = task_reconstructor.loss_tracker
+            # TODO epoch = loss_tracker.table["epoch"].to_numpy()
+            loss = loss_tracker.table['loss'].to_numpy()
+            costs = loss  # TODO update api to include epoch and loss
 
         product = Product(
             metadata=parameters.product.metadata,

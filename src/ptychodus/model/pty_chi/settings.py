@@ -129,17 +129,11 @@ class PtyChiProbeSettings(Observable, Observer):
         self.probePowerConstraintStride = self._settingsGroup.createIntegerParameter(
             'ProbePowerConstraintStride', 1, minimum=1
         )
-        self.orthogonalizeIncoherentModes = self._settingsGroup.createBooleanParameter(
-            'OrthogonalizeIncoherentModes', False
-        )
         self.orthogonalizeIncoherentModesStride = self._settingsGroup.createIntegerParameter(
-            'OrthogonalizeIncoherentModesStride', 1, minimum=1
-        )
-        self.orthogonalizeOPRModes = self._settingsGroup.createBooleanParameter(
-            'OrthogonalizeOPRModes', False
+            'OrthogonalizeIncoherentModesStride', 1, minimum=0
         )
         self.orthogonalizeOPRModesStride = self._settingsGroup.createIntegerParameter(
-            'OrthogonalizeOPRModesStride', 1, minimum=1
+            'OrthogonalizeOPRModesStride', 1, minimum=0
         )
 
     def update(self, observable: Observable) -> None:
