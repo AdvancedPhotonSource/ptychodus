@@ -302,7 +302,7 @@ class LSQMLReconstructor(Reconstructor):
 
         probe_in = parameters.product.probe
         probe_out = Probe(
-            array=numpy.array(probe_out_array),
+            array=numpy.array(probe_out_array[0]),
             pixelWidthInMeters=probe_in.pixelWidthInMeters,
             pixelHeightInMeters=probe_in.pixelHeightInMeters,
         )
