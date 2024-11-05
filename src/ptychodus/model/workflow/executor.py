@@ -77,9 +77,9 @@ class WorkflowExecutor:
         )
 
         flowInput = {
-            'input_data_transfer_source_endpoint_id': str(self._inputDataLocator.getEndpointID()),
+            'input_data_transfer_source_endpoint': str(self._inputDataLocator.getEndpointID()),
             'input_data_transfer_source_path': inputDataGlobusPath,
-            'input_data_transfer_destination_endpoint_id': str(
+            'input_data_transfer_destination_endpoint': str(
                 self._computeDataLocator.getEndpointID()
             ),
             'input_data_transfer_destination_path': computeDataGlobusPath,
@@ -91,11 +91,9 @@ class WorkflowExecutor:
             'ptychodus_patterns_file': str(computeDataPosixPath / patternsFile),
             'ptychodus_input_file': str(computeDataPosixPath / inputFile),
             'ptychodus_output_file': str(computeDataPosixPath / outputFile),
-            'output_data_transfer_source_endpoint_id': str(
-                self._computeDataLocator.getEndpointID()
-            ),
+            'output_data_transfer_source_endpoint': str(self._computeDataLocator.getEndpointID()),
             'output_data_transfer_source_path': f'{computeDataGlobusPath}/{outputFile}',
-            'output_data_transfer_destination_endpoint_id': str(
+            'output_data_transfer_destination_endpoint': str(
                 self._outputDataLocator.getEndpointID()
             ),
             'output_data_transfer_destination_path': f'{outputDataGlobusPath}/{outputFile}',
