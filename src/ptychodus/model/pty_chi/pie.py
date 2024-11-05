@@ -91,10 +91,8 @@ class PIEReconstructor(Reconstructor):
             batching_mode=batching_mode,
             compact_mode_update_clustering=self._reconstructorSettings.compactModeUpdateClustering.getValue(),
             compact_mode_update_clustering_stride=self._reconstructorSettings.compactModeUpdateClusteringStride.getValue(),
-            default_device=(
-                Devices.GPU if self._reconstructorSettings.useDevices.getValue() else Devices.CPU
-            ),
-            gpu_indices=self._reconstructorSettings.devices.getValue(),
+            # TODO default_device=Devices.GPU if self._reconstructorSettings.useDevices.getValue() else Devices.CPU,
+            # TODO gpu_indices=self._reconstructorSettings.devices.getValue(),
             default_dtype=(
                 Dtypes.FLOAT64
                 if self._reconstructorSettings.useDoublePrecision.getValue()
@@ -162,7 +160,7 @@ class PIEReconstructor(Reconstructor):
             optimizer=optimizer,
             step_size=self._objectSettings.stepSize.getValue(),
             initial_guess=object_.array,
-            slice_spacings_m=numpy.array(object_.layerDistanceInMeters),
+            slice_spacings_m=numpy.array(object_.layerDistanceInMeters[:-1]),
             l1_norm_constraint_weight=self._objectSettings.l1NormConstraintWeight.getValue(),
             l1_norm_constraint_stride=self._objectSettings.l1NormConstraintStride.getValue(),
             smoothness_constraint_alpha=self._objectSettings.smoothnessConstraintAlpha.getValue(),
@@ -207,7 +205,7 @@ class PIEReconstructor(Reconstructor):
             optimization_plan=optimization_plan,
             optimizer=optimizer,
             step_size=self._probeSettings.stepSize.getValue(),
-            initial_guess=probe.array,
+            initial_guess=probe.array[numpy.newaxis, ...],  # TODO opr
             probe_power=self._probeSettings.probePower.getValue(),
             probe_power_constraint_stride=self._probeSettings.probePowerConstraintStride.getValue(),
             orthogonalize_incoherent_modes=self._probeSettings.orthogonalizeIncoherentModes.getValue(),
