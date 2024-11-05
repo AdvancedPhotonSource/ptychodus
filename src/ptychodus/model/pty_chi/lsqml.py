@@ -3,8 +3,11 @@ import logging
 import numpy
 
 from ptychi.api import (
+    BatchingModes,
     Devices,
+    Directions,
     Dtypes,
+    ImageGradientMethods,
     LSQMLOPRModeWeightsOptions,
     LSQMLObjectOptions,
     LSQMLOptions,
@@ -18,9 +21,10 @@ from ptychi.api import (
 )
 from ptychi.api.task import PtychographyTask
 
-from ptychodus.api.object import Object, ObjectPoint
+from ptychodus.api.object import Object, ObjectGeometry, ObjectPoint
+from ptychodus.api.patterns import BooleanArrayType, DiffractionPatternArrayType
 from ptychodus.api.probe import Probe
-from ptychodus.api.product import Product
+from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Reconstructor
 from ptychodus.api.scan import Scan, ScanPoint
 
@@ -58,6 +62,48 @@ class LSQMLReconstructor(Reconstructor):
     def name(self) -> str:
         return 'LSQML'
 
+    def _create_data_options(
+        self,
+        patterns: DiffractionPatternArrayType,
+        goodPixelMask: BooleanArrayType,
+        metadata: ProductMetadata,
+    ) -> PtychographyDataOptions:
+        return PtychographyDataOptions(
+            data=patterns,
+            propagation_distance_m=metadata.detectorDistanceInMeters,
+            wavelength_m=metadata.probeWavelengthInMeters,
+            detector_pixel_size_m=self._detector.pixelWidthInMeters.getValue(),
+            valid_pixel_mask=goodPixelMask,
+        )
+
+    def _create_reconstructor_options(self) -> LSQMLReconstructorOptions:
+        batching_mode_str = self._reconstructorSettings.batchingMode.getValue()
+
+        try:
+            batching_mode = BatchingModes[batching_mode_str.upper()]
+        except KeyError:
+            logger.warning('Failed to parse batching mode "{batching_mode_str}"!')
+            batching_mode = BatchingModes.RANDOM
+
+        return LSQMLReconstructorOptions(
+            num_epochs=self._reconstructorSettings.numEpochs.getValue(),
+            batch_size=self._reconstructorSettings.batchSize.getValue(),
+            batching_mode=batching_mode,
+            compact_mode_update_clustering=self._reconstructorSettings.compactModeUpdateClustering.getValue(),
+            compact_mode_update_clustering_stride=self._reconstructorSettings.compactModeUpdateClusteringStride.getValue(),
+            default_device=(
+                Devices.GPU if self._reconstructorSettings.useDevices.getValue() else Devices.CPU
+            ),
+            gpu_indices=self._reconstructorSettings.devices.getValue(),
+            default_dtype=(
+                Dtypes.FLOAT64
+                if self._reconstructorSettings.useDoublePrecision.getValue()
+                else Dtypes.FLOAT32
+            ),
+            # TODO random_seed
+            # TODO displayed_loss_function
+        )
+
     def _create_optimization_plan(self, start: int, stop: int, stride: int) -> OptimizationPlan:
         return OptimizationPlan(start, None if stop < 0 else stop, stride)
 
@@ -70,73 +116,53 @@ class LSQMLReconstructor(Reconstructor):
 
         return optimizer
 
-    def _create_orthogonalization_method(self, text: str) -> OrthogonalizationMethods:
-        try:
-            method = OrthogonalizationMethods[text.upper()]
-        except KeyError:
-            logger.warning('Failed to parse orthogonalization method "{text}"!')
-            method = OrthogonalizationMethods.GS
-
-        return method
-
-    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        metadata = parameters.product.metadata
-        object_in = parameters.product.object_
-        object_geometry = object_in.getGeometry()
-        probe_in = parameters.product.probe
-        pixel_size_m = parameters.product.object_.pixelWidthInMeters
-        scan_in = parameters.product.scan
-        position_in_px_list: list[float] = list()
-
-        for scan_point in scan_in:
-            object_point = object_geometry.mapScanPointToObjectPoint(scan_point)
-            position_in_px_list.append(object_point.positionYInPixels)
-            position_in_px_list.append(object_point.positionXInPixels)
-
-        position_in_px = numpy.reshape(position_in_px_list, shape=(len(scan_in), 2))
-
-        data_options = PtychographyDataOptions(
-            data=parameters.patterns,
-            propagation_distance_m=metadata.detectorDistanceInMeters,
-            wavelength_m=metadata.probeWavelengthInMeters,
-            detector_pixel_size_m=self._detector.pixelWidthInMeters.getValue(),
-            valid_pixel_mask=parameters.goodPixelMask,
-        )
-        default_device = (
-            Devices.GPU if self._reconstructorSettings.useDevices.getValue() else Devices.CPU
-        )
-        default_dtype = (
-            Dtypes.FLOAT64
-            if self._reconstructorSettings.useDoublePrecision.getValue()
-            else Dtypes.FLOAT32
-        )
-        reconstructor_options = LSQMLReconstructorOptions(
-            num_epochs=self._reconstructorSettings.numEpochs.getValue(),
-            batch_size=self._reconstructorSettings.batchSize.getValue(),
-            # TODO batching_mode
-            # TODO compact_mode_update_clustering
-            # TODO compact_mode_update_clustering_stride
-            default_device=default_device,
-            gpu_indices=self._reconstructorSettings.devices.getValue(),
-            default_dtype=default_dtype,
-            # TODO random_seed
-            # TODO displayed_loss_function
-            # TODO log_level
-        )
-        object_optimization_plan = self._create_optimization_plan(
+    def _create_object_options(self, object_: Object) -> LSQMLObjectOptions:
+        optimization_plan = self._create_optimization_plan(
             self._objectSettings.optimizationPlanStart.getValue(),
             self._objectSettings.optimizationPlanStop.getValue(),
             self._objectSettings.optimizationPlanStride.getValue(),
         )
-        object_optimizer = self._create_optimizer(self._objectSettings.optimizer.getValue())
-        object_options = LSQMLObjectOptions(
+        optimizer = self._create_optimizer(self._objectSettings.optimizer.getValue())
+
+        ####
+
+        remove_grid_artifacts_direction_str = (
+            self._objectSettings.removeGridArtifactsDirection.getValue()
+        )
+
+        try:
+            remove_grid_artifacts_direction = Directions[
+                remove_grid_artifacts_direction_str.upper()
+            ]
+        except KeyError:
+            logger.warning('Failed to parse direction "{remove_grid_artifacts_direction_str}"!')
+            remove_grid_artifacts_direction = Directions.XY
+
+        ####
+
+        multislice_regularization_unwrap_image_grad_method_str = (
+            self._objectSettings.multisliceRegularizationUnwrapImageGradMethod.getValue()
+        )
+
+        try:
+            multislice_regularization_unwrap_image_grad_method = ImageGradientMethods[
+                multislice_regularization_unwrap_image_grad_method_str.upper()
+            ]
+        except KeyError:
+            logger.warning(
+                'Failed to parse image gradient method "{multislice_regularization_unwrap_image_grad_method_str}"!'
+            )
+            multislice_regularization_unwrap_image_grad_method = ImageGradientMethods.FOURIER_SHIFT
+
+        ####
+
+        return LSQMLObjectOptions(
             optimizable=self._objectSettings.isOptimizable.getValue(),  # TODO optimizer_params
-            optimization_plan=object_optimization_plan,
-            optimizer=object_optimizer,
+            optimization_plan=optimization_plan,
+            optimizer=optimizer,
             step_size=self._objectSettings.stepSize.getValue(),
-            initial_guess=object_in.array,
-            slice_spacings_m=numpy.array(object_in.layerDistanceInMeters),
-            pixel_size_m=pixel_size_m,
+            initial_guess=object_.array,
+            slice_spacings_m=numpy.array(object_.layerDistanceInMeters),
             l1_norm_constraint_weight=self._objectSettings.l1NormConstraintWeight.getValue(),
             l1_norm_constraint_stride=self._objectSettings.l1NormConstraintStride.getValue(),
             smoothness_constraint_alpha=self._objectSettings.smoothnessConstraintAlpha.getValue(),
@@ -147,36 +173,61 @@ class LSQMLReconstructor(Reconstructor):
             remove_grid_artifacts_period_x_m=self._objectSettings.removeGridArtifactsPeriodXInMeters.getValue(),
             remove_grid_artifacts_period_y_m=self._objectSettings.removeGridArtifactsPeriodYInMeters.getValue(),
             remove_grid_artifacts_window_size=self._objectSettings.removeGridArtifactsWindowSizeInPixels.getValue(),
-            # FIXME remove_grid_artifacts_direction=self._objectSettings.removeGridArtifactsDirection.getValue(),
+            remove_grid_artifacts_direction=remove_grid_artifacts_direction,
             remove_grid_artifacts_stride=self._objectSettings.removeGridArtifactsStride.getValue(),
             multislice_regularization_weight=self._objectSettings.multisliceRegularizationWeight.getValue(),
             multislice_regularization_unwrap_phase=self._objectSettings.multisliceRegularizationUnwrapPhase.getValue(),
-            # FIXME multislice_regularization_unwrap_image_grad_method=self._objectSettings.multisliceRegularizationUnwrapImageGradMethod.getValue(),
+            multislice_regularization_unwrap_image_grad_method=multislice_regularization_unwrap_image_grad_method,
             multislice_regularization_stride=self._objectSettings.multisliceRegularizationStride.getValue(),
         )
-        probe_optimization_plan = self._create_optimization_plan(
+
+    def _create_probe_options(self, probe: Probe) -> LSQMLProbeOptions:
+        optimization_plan = self._create_optimization_plan(
             self._probeSettings.optimizationPlanStart.getValue(),
             self._probeSettings.optimizationPlanStop.getValue(),
             self._probeSettings.optimizationPlanStride.getValue(),
         )
-        probe_optimizer = self._create_optimizer(self._probeSettings.optimizer.getValue())
-        probe_orthogonalize_incoherent_modes_method = self._create_orthogonalization_method(
+        optimizer = self._create_optimizer(self._probeSettings.optimizer.getValue())
+        orthogonalize_incoherent_modes_method_str = (
             self._probeSettings.orthogonalizeIncoherentModesMethod.getValue()
         )
-        probe_options = LSQMLProbeOptions(
+
+        try:
+            orthogonalize_incoherent_modes_method = OrthogonalizationMethods[
+                orthogonalize_incoherent_modes_method_str.upper()
+            ]
+        except KeyError:
+            logger.warning(
+                'Failed to parse batching mode "{orthogonalize_incoherent_modes_method_str}"!'
+            )
+            orthogonalize_incoherent_modes_method = OrthogonalizationMethods.GS
+
+        return LSQMLProbeOptions(
             optimizable=self._probeSettings.isOptimizable.getValue(),  # TODO optimizer_params
-            optimization_plan=probe_optimization_plan,
-            optimizer=probe_optimizer,
+            optimization_plan=optimization_plan,
+            optimizer=optimizer,
             step_size=self._probeSettings.stepSize.getValue(),
-            initial_guess=probe_in.array,
+            initial_guess=probe.array,
             probe_power=self._probeSettings.probePower.getValue(),
             probe_power_constraint_stride=self._probeSettings.probePowerConstraintStride.getValue(),
             orthogonalize_incoherent_modes=self._probeSettings.orthogonalizeIncoherentModes.getValue(),
             orthogonalize_incoherent_modes_stride=self._probeSettings.orthogonalizeIncoherentModesStride.getValue(),
-            orthogonalize_incoherent_modes_method=probe_orthogonalize_incoherent_modes_method,
+            orthogonalize_incoherent_modes_method=orthogonalize_incoherent_modes_method,
             orthogonalize_opr_modes=self._probeSettings.orthogonalizeOPRModes.getValue(),
             orthogonalize_opr_modes_stride=self._probeSettings.orthogonalizeOPRModesStride.getValue(),
         )
+
+    def _create_probe_position_options(
+        self, scan: Scan, object_geometry: ObjectGeometry
+    ) -> LSQMLProbePositionOptions:
+        position_in_px_list: list[float] = list()
+
+        for scan_point in scan:
+            object_point = object_geometry.mapScanPointToObjectPoint(scan_point)
+            position_in_px_list.append(object_point.positionYInPixels)
+            position_in_px_list.append(object_point.positionXInPixels)
+
+        position_in_px = numpy.reshape(position_in_px_list, shape=(len(scan), 2))
 
         probe_position_optimization_plan = self._create_optimization_plan(
             self._probePositionSettings.optimizationPlanStart.getValue(),
@@ -188,7 +239,7 @@ class LSQMLReconstructor(Reconstructor):
         )
         update_magnitude_limit = self._probePositionSettings.updateMagnitudeLimit.getValue()
 
-        probe_position_options = LSQMLProbePositionOptions(
+        return LSQMLProbePositionOptions(
             optimizable=self._probePositionSettings.isOptimizable.getValue(),
             optimization_plan=probe_position_optimization_plan,
             optimizer=probe_position_optimizer,
@@ -198,32 +249,41 @@ class LSQMLReconstructor(Reconstructor):
             update_magnitude_limit=update_magnitude_limit if update_magnitude_limit > 0.0 else None,
             constrain_position_mean=self._probePositionSettings.constrainPositionMean.getValue(),
         )
+
+    def _create_opr_mode_weight_options(self) -> LSQMLOPRModeWeightsOptions:
         opr_optimization_plan = self._create_optimization_plan(
             self._oprSettings.optimizationPlanStart.getValue(),
             self._oprSettings.optimizationPlanStop.getValue(),
             self._oprSettings.optimizationPlanStride.getValue(),
         )
         opr_optimizer = self._create_optimizer(self._oprSettings.optimizer.getValue())
-        opr_weights = numpy.array([0.0])  # FIXME
-        opr_mode_weight_options = LSQMLOPRModeWeightsOptions(
+        return LSQMLOPRModeWeightsOptions(
             optimizable=self._oprSettings.isOptimizable.getValue(),
             optimization_plan=opr_optimization_plan,
             optimizer=opr_optimizer,
             step_size=self._oprSettings.stepSize.getValue(),
-            initial_weights=opr_weights,
+            initial_weights=numpy.array([0.0]),  # FIXME
             optimize_eigenmode_weights=self._oprSettings.optimizeEigenmodeWeights.getValue(),
             optimize_intensity_variation=self._oprSettings.optimizeIntensities.getValue(),
         )
-        task_options = LSQMLOptions(
-            data_options,
-            reconstructor_options,
-            object_options,
-            probe_options,
-            probe_position_options,
-            opr_mode_weight_options,
+
+    def _create_task_options(self, parameters: ReconstructInput) -> LSQMLOptions:
+        product = parameters.product
+        return LSQMLOptions(
+            data_options=self._create_data_options(
+                parameters.patterns, parameters.goodPixelMask, product.metadata
+            ),
+            reconstructor_options=self._create_reconstructor_options(),
+            object_options=self._create_object_options(product.object_),
+            probe_options=self._create_probe_options(product.probe),
+            probe_position_options=self._create_probe_position_options(
+                product.scan, product.object_.getGeometry()
+            ),
+            opr_mode_weight_options=self._create_opr_mode_weight_options(),
         )
 
-        task = PtychographyTask(task_options)
+    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
+        task = PtychographyTask(self._create_task_options(parameters))
         # TODO task.iterate(n_epochs)
         task.run()
 
@@ -232,19 +292,7 @@ class LSQMLReconstructor(Reconstructor):
         object_out_array = task.get_data_to_cpu('object', as_numpy=True)
         # TODO opr_mode_weights = task.get_data_to_cpu('opr_mode_weights', as_numpy=True)
 
-        corrected_scan_points: list[ScanPoint] = list()
-
-        for uncorrected_point, xy in zip(scan_in, position_out_px):
-            object_point = ObjectPoint(uncorrected_point.index, xy[-1], xy[-2])
-            scan_point = object_geometry.mapObjectPointToScanPoint(object_point)
-            corrected_scan_points.append(scan_point)
-
-        scan_out = Scan(corrected_scan_points)
-        probe_out = Probe(
-            array=numpy.array(probe_out_array),
-            pixelWidthInMeters=probe_in.pixelWidthInMeters,
-            pixelHeightInMeters=probe_in.pixelHeightInMeters,
-        )
+        object_in = parameters.product.object_
         object_out = Object(
             array=numpy.array(object_out_array),
             layerDistanceInMeters=object_in.layerDistanceInMeters,  # TODO verify optimized?
@@ -253,6 +301,25 @@ class LSQMLReconstructor(Reconstructor):
             centerXInMeters=object_in.centerXInMeters,
             centerYInMeters=object_in.centerYInMeters,
         )
+
+        probe_in = parameters.product.probe
+        probe_out = Probe(
+            array=numpy.array(probe_out_array),
+            pixelWidthInMeters=probe_in.pixelWidthInMeters,
+            pixelHeightInMeters=probe_in.pixelHeightInMeters,
+        )
+
+        scan_in = parameters.product.scan
+        corrected_scan_points: list[ScanPoint] = list()
+        object_geometry = object_in.getGeometry()
+
+        for uncorrected_point, xy in zip(scan_in, position_out_px):
+            object_point = ObjectPoint(uncorrected_point.index, xy[-1], xy[-2])
+            scan_point = object_geometry.mapObjectPointToScanPoint(object_point)
+            corrected_scan_points.append(scan_point)
+
+        scan_out = Scan(corrected_scan_points)
+
         costs: list[float] = list()  # TODO populate
 
         product = Product(
@@ -262,4 +329,5 @@ class LSQMLReconstructor(Reconstructor):
             object_=object_out,
             costs=costs,
         )
+
         return ReconstructOutput(product, 0)
