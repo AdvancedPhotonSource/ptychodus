@@ -187,6 +187,7 @@ class LSQMLReconstructor(Reconstructor):
             self._probePositionSettings.optimizer.getValue()
         )
         update_magnitude_limit = self._probePositionSettings.updateMagnitudeLimit.getValue()
+
         probe_position_options = LSQMLProbePositionOptions(
             optimizable=self._probePositionSettings.isOptimizable.getValue(),
             optimization_plan=probe_position_optimization_plan,

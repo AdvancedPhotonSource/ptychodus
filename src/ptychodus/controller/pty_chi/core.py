@@ -1,6 +1,4 @@
-from PyQt5.QtWidgets import QWidget
-
-from PyQt5.QtWidgets import QVBoxLayout
+from PyQt5.QtWidgets import QVBoxLayout, QWidget
 
 from ...model.pty_chi import PtyChiReconstructorLibrary
 from ..reconstructor import ReconstructorViewControllerFactory
@@ -19,12 +17,16 @@ class PtyChiViewController(QWidget):
         self._reconstructorViewController = PtyChiReconstructorViewController(
             model.reconstructorSettings, model.deviceRepository
         )
-        self._objectViewController = PtyChiObjectViewController(model.objectSettings)
-        self._probeViewController = PtyChiProbeViewController(model.probeSettings)
-        self._probePositionsViewController = PtyChiProbePositionsViewController(
-            model.probePositionSettings
+        self._objectViewController = PtyChiObjectViewController(
+            model.objectSettings, model.enumerators
         )
-        self._oprViewController = PtyChiOPRViewController(model.oprSettings)
+        self._probeViewController = PtyChiProbeViewController(
+            model.probeSettings, model.enumerators
+        )
+        self._probePositionsViewController = PtyChiProbePositionsViewController(
+            model.probePositionSettings, model.enumerators
+        )
+        self._oprViewController = PtyChiOPRViewController(model.oprSettings, model.enumerators)
 
         layout = QVBoxLayout()
         layout.addWidget(self._reconstructorViewController.getWidget())

@@ -1,16 +1,10 @@
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import (
-    IntegerParameter,
-    StringParameter,
-)
+from PyQt5.QtWidgets import QHBoxLayout, QWidget
 
-from PyQt5.QtWidgets import (
-    QComboBox,
-    QHBoxLayout,
-    QWidget,
-)
+from ptychodus.api.parametric import IntegerParameter, StringParameter
 
+from ...model.pty_chi import PtyChiEnumerators
 from ..parametric import (
+    ComboBoxParameterViewController,
     IntegerLineEditParameterViewController,
     ParameterViewController,
 )
@@ -43,21 +37,6 @@ class PtyChiOptimizationPlanViewController(ParameterViewController):
         return self._widget
 
 
-class PtyChiOptimizerParameterViewController(ParameterViewController, Observer):
-    def __init__(self, parameter: StringParameter) -> None:
-        super().__init__()
-        self._parameter = parameter
-        self._widget = QComboBox()
-
-        self._syncModelToView()
-        parameter.addObserver(self)
-
-    def getWidget(self) -> QWidget:
-        return self._widget
-
-    def _syncModelToView(self) -> None:
-        pass  # FIXME
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._parameter:
-            self._syncModelToView()
+class PtyChiOptimizerParameterViewController(ComboBoxParameterViewController):
+    def __init__(self, parameter: StringParameter, enumerators: PtyChiEnumerators) -> None:
+        super().__init__(parameter, enumerators.optimizers())

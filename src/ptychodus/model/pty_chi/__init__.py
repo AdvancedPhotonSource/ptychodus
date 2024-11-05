@@ -1,5 +1,6 @@
 from .core import PtyChiReconstructorLibrary
 from .device import PtyChiDeviceRepository
+from .enums import PtyChiEnumerators
 from .settings import (
     PtyChiOPRSettings,
     PtyChiObjectSettings,
@@ -10,6 +11,7 @@ from .settings import (
 
 __all__ = [
     'PtyChiDeviceRepository',
+    'PtyChiEnumerators',
     'PtyChiOPRSettings',
     'PtyChiObjectSettings',
     'PtyChiProbePositionSettings',

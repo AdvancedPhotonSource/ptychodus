@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from decimal import Decimal
 from typing import Final
 import logging
@@ -110,7 +110,7 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
 
 class ComboBoxParameterViewController(ParameterViewController, Observer):
     def __init__(
-        self, parameter: StringParameter, items: Sequence[str], *, tool_tip: str = ''
+        self, parameter: StringParameter, items: Iterable[str], *, tool_tip: str = ''
     ) -> None:
         super().__init__()
         self._parameter = parameter

@@ -10,6 +10,7 @@ from ptychodus.api.settings import SettingsRegistry
 
 from ..patterns import Detector
 from .device import PtyChiDeviceRepository
+from .enums import PtyChiEnumerators
 from .settings import (
     PtyChiOPRSettings,
     PtyChiObjectSettings,
@@ -31,6 +32,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         self.probeSettings = PtyChiProbeSettings(settingsRegistry)
         self.probePositionSettings = PtyChiProbePositionSettings(settingsRegistry)
         self.oprSettings = PtyChiOPRSettings(settingsRegistry)
+        self.enumerators = PtyChiEnumerators()
         self.deviceRepository = PtyChiDeviceRepository(
             isDeveloperModeEnabled=isDeveloperModeEnabled
         )
