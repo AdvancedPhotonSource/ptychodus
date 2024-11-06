@@ -96,7 +96,7 @@ class PtyChiObjectSettings(Observable, Observer):
             )
         )
         self.multisliceRegularizationStride = self._settingsGroup.createIntegerParameter(
-            'MultisliceRegularizationStride', 1
+            'MultisliceRegularizationStride', 1, minimum=1
         )
 
     def update(self, observable: Observable) -> None:

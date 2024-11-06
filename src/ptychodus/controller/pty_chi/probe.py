@@ -1,10 +1,74 @@
 from PyQt5.QtWidgets import QFormLayout, QGroupBox, QWidget
 
 from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.parametric import (
+    IntegerParameter,
+    RealParameter,
+    StringParameter,
+)
 
 from ...model.pty_chi import PtyChiEnumerators, PtyChiProbeSettings
-from ..parametric import DecimalLineEditParameterViewController, ParameterViewController
+from ..parametric import (
+    ComboBoxParameterViewController,
+    DecimalLineEditParameterViewController,
+    ParameterViewController,
+    SpinBoxParameterViewController,
+)
 from .optimizer import PtyChiOptimizationPlanViewController, PtyChiOptimizerParameterViewController
+
+
+class ProbePowerConstraintViewController(ParameterViewController):
+    def __init__(
+        self,
+        power: RealParameter,
+        stride: IntegerParameter,
+    ) -> None:
+        super().__init__()
+        self._powerViewController = DecimalLineEditParameterViewController(power)
+        self._strideViewController = SpinBoxParameterViewController(stride)
+        self._widget = QGroupBox('Power Constraint')
+
+        layout = QFormLayout()
+        layout.addRow('Power:', self._powerViewController.getWidget())
+        layout.addRow('Stride:', self._strideViewController.getWidget())
+        self._widget.setLayout(layout)
+
+    def getWidget(self) -> QWidget:
+        return self._widget
+
+
+class OrthogonalizationViewController(ParameterViewController):
+    def __init__(
+        self,
+        incoherentModesMethod: StringParameter,
+        incoherentModesStride: IntegerParameter,
+        coherentModesStride: IntegerParameter,
+        enumerators: PtyChiEnumerators,
+    ) -> None:
+        super().__init__()
+        self._incoherentModesMethodViewController = ComboBoxParameterViewController(
+            incoherentModesMethod, enumerators.orthogonalizationMethods()
+        )
+        self._incoherentModesStrideViewController = SpinBoxParameterViewController(
+            incoherentModesStride
+        )
+        self._coherentModesStrideViewController = SpinBoxParameterViewController(
+            coherentModesStride
+        )
+        self._widget = QGroupBox('Orthogonalization')
+
+        layout = QFormLayout()
+        layout.addRow(
+            'Incoherent Modes Method:', self._incoherentModesMethodViewController.getWidget()
+        )
+        layout.addRow(
+            'Incoherent Modes Stride:', self._incoherentModesStrideViewController.getWidget()
+        )
+        layout.addRow('Coherent Modes Stride:', self._coherentModesStrideViewController.getWidget())
+        self._widget.setLayout(layout)
+
+    def getWidget(self) -> QWidget:
+        return self._widget
 
 
 class PtyChiProbeViewController(ParameterViewController, Observer):
@@ -22,6 +86,15 @@ class PtyChiProbeViewController(ParameterViewController, Observer):
         self._stepSizeViewController = DecimalLineEditParameterViewController(
             settings.stepSize, tool_tip='Optimizer step size'
         )
+        self._powerConstraintViewController = ProbePowerConstraintViewController(
+            settings.probePower, settings.probePowerConstraintStride
+        )
+        self._orthogonalizationViewController = OrthogonalizationViewController(
+            settings.orthogonalizeIncoherentModesMethod,
+            settings.orthogonalizeIncoherentModesStride,
+            settings.orthogonalizeOPRModesStride,
+            enumerators,
+        )
         self._widget = QGroupBox('Optimize Probe')
         self._widget.setCheckable(True)
 
@@ -29,6 +102,8 @@ class PtyChiProbeViewController(ParameterViewController, Observer):
         layout.addRow('Plan:', self._optimizationPlanViewController.getWidget())
         layout.addRow('Optimizer:', self._optimizerViewController.getWidget())
         layout.addRow('Step Size:', self._stepSizeViewController.getWidget())
+        layout.addRow(self._powerConstraintViewController.getWidget())
+        layout.addRow(self._orthogonalizationViewController.getWidget())
         self._widget.setLayout(layout)
 
         self._syncModelToView()
@@ -44,13 +119,3 @@ class PtyChiProbeViewController(ParameterViewController, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._isOptimizable:
             self._syncModelToView()
-
-
-# FIXME probe_orthogonalize_incoherent_modes_method
-# FIXME probe_power
-# FIXME probe_power_constraint_stride
-# FIXME orthogonalize_incoherent_modes
-# FIXME orthogonalize_incoherent_modes_stride
-# FIXME orthogonalize_incoherent_modes_method
-# FIXME orthogonalize_opr_modes
-# FIXME orthogonalize_opr_modes_stride
