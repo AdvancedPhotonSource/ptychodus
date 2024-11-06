@@ -12,7 +12,7 @@ class RealPtychoPackDevice(PtychoPackDevice):
     def __init__(self) -> None:
         super().__init__()
         self._available_devices = ptychi.list_available_devices()
-        self._device = self._available_devices[0]
+        self._device = ptychi.Device('cpu', 0, 'CPU:0')
 
     def get_available_devices(self) -> Iterator[str]:
         for device in self._available_devices:
