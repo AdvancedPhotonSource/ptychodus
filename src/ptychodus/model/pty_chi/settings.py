@@ -61,36 +61,38 @@ class PtyChiObjectSettings(Observable, Observer):
         self.totalVariationWeight = self._settingsGroup.createRealParameter(
             'TotalVariationWeight', 0.0, minimum=0.0
         )
-        self.totalVaritionStride = self._settingsGroup.createIntegerParameter(
-            'TotalVaritionStride', 1, minimum=1
+        self.totalVariationStride = self._settingsGroup.createIntegerParameter(
+            'TotalVariationStride', 1, minimum=1
         )
         self.removeGridArtifacts = self._settingsGroup.createBooleanParameter(
             'RemoveGridArtifacts', False
         )
         self.removeGridArtifactsPeriodXInMeters = self._settingsGroup.createRealParameter(
-            'RemoveGridArtifactsPeriodXInMeters', 1e-7
+            'RemoveGridArtifactsPeriodXInMeters', 1e-7, minimum=0.0
         )
         self.removeGridArtifactsPeriodYInMeters = self._settingsGroup.createRealParameter(
-            'RemoveGridArtifactsPeriodYInMeters', 1e-7
+            'RemoveGridArtifactsPeriodYInMeters', 1e-7, minimum=0.0
         )
         self.removeGridArtifactsWindowSizeInPixels = self._settingsGroup.createIntegerParameter(
-            'RemoveGridArtifactsWindowSizeInPixels', 5
+            'RemoveGridArtifactsWindowSizeInPixels',
+            5,
+            minimum=1,
         )
         self.removeGridArtifactsDirection = self._settingsGroup.createStringParameter(
             'RemoveGridArtifactsDirection', 'XY'
         )
         self.removeGridArtifactsStride = self._settingsGroup.createIntegerParameter(
-            'RemoveGridArtifactsStride', 1
+            'RemoveGridArtifactsStride', 1, minimum=1
         )
         self.multisliceRegularizationWeight = self._settingsGroup.createRealParameter(
-            'MultisliceRegularizationWeight', 0.0
+            'MultisliceRegularizationWeight', 0.0, minimum=0.0
         )
         self.multisliceRegularizationUnwrapPhase = self._settingsGroup.createBooleanParameter(
             'MultisliceRegularizationUnwrapPhase', True
         )
-        self.multisliceRegularizationUnwrapImageGradMethod = (
+        self.multisliceRegularizationUnwrapPhaseImageGradientMethod = (
             self._settingsGroup.createStringParameter(
-                'MultisliceRegularizationUnwrapImageGradMethod', 'FOURIER_SHIFT'
+                'MultisliceRegularizationUnwrapPhaseImageGradientMethod', 'FOURIER_SHIFT'
             )
         )
         self.multisliceRegularizationStride = self._settingsGroup.createIntegerParameter(

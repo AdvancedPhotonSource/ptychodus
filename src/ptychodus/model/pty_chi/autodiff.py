@@ -156,7 +156,7 @@ class AutodiffReconstructor(Reconstructor):
         ####
 
         multislice_regularization_unwrap_image_grad_method_str = (
-            self._objectSettings.multisliceRegularizationUnwrapImageGradMethod.getValue()
+            self._objectSettings.multisliceRegularizationUnwrapPhaseImageGradientMethod.getValue()
         )
 
         try:
@@ -183,7 +183,7 @@ class AutodiffReconstructor(Reconstructor):
             smoothness_constraint_alpha=self._objectSettings.smoothnessConstraintAlpha.getValue(),
             smoothness_constraint_stride=self._objectSettings.smoothnessConstraintStride.getValue(),
             total_variation_weight=self._objectSettings.totalVariationWeight.getValue(),
-            total_variation_stride=self._objectSettings.totalVaritionStride.getValue(),
+            total_variation_stride=self._objectSettings.totalVariationStride.getValue(),
             remove_grid_artifacts=self._objectSettings.removeGridArtifacts.getValue(),
             remove_grid_artifacts_period_x_m=self._objectSettings.removeGridArtifactsPeriodXInMeters.getValue(),
             remove_grid_artifacts_period_y_m=self._objectSettings.removeGridArtifactsPeriodYInMeters.getValue(),
