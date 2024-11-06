@@ -164,8 +164,8 @@ class PtyChiProbePositionSettings(Observable, Observer):
         self.updateMagnitudeLimit = self._settingsGroup.createRealParameter(
             'UpdateMagnitudeLimit', 0.0, minimum=0.0
         )
-        self.constrainPositionMean = self._settingsGroup.createBooleanParameter(
-            'ConstrainPositionMean', False
+        self.constrainCentroid = self._settingsGroup.createBooleanParameter(
+            'ConstrainCentroid', False
         )
 
     def update(self, observable: Observable) -> None:

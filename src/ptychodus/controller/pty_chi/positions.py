@@ -3,7 +3,11 @@ from PyQt5.QtWidgets import QFormLayout, QGroupBox, QWidget
 from ptychodus.api.observer import Observable, Observer
 
 from ...model.pty_chi import PtyChiEnumerators, PtyChiProbePositionSettings
-from ..parametric import DecimalLineEditParameterViewController, ParameterViewController
+from ..parametric import (
+    CheckBoxParameterViewController,
+    DecimalLineEditParameterViewController,
+    ParameterViewController,
+)
 from .optimizer import PtyChiOptimizationPlanViewController, PtyChiOptimizerParameterViewController
 
 
@@ -28,6 +32,9 @@ class PtyChiProbePositionsViewController(ParameterViewController, Observer):
             settings.updateMagnitudeLimit,
             tool_tip='When set to a positive number, limit update magnitudes to this value.',
         )
+        self._constrainCentroidViewController = CheckBoxParameterViewController(
+            settings.constrainCentroid, 'Constrain Centroid'
+        )
         self._widget = QGroupBox('Optimize Probe Positions')
         self._widget.setCheckable(True)
 
@@ -38,6 +45,7 @@ class PtyChiProbePositionsViewController(ParameterViewController, Observer):
         layout.addRow(
             'Update Magnitude Limit:', self._updateMagnitudeLimitViewController.getWidget()
         )
+        layout.addRow(self._constrainCentroidViewController.getWidget())
         self._widget.setLayout(layout)
 
         self._syncModelToView()

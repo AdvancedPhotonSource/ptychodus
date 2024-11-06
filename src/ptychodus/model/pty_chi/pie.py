@@ -250,7 +250,7 @@ class PIEReconstructor(Reconstructor):
             position_x_px=position_in_px[:, -1],
             position_y_px=position_in_px[:, -2],
             update_magnitude_limit=update_magnitude_limit if update_magnitude_limit > 0.0 else None,
-            constrain_position_mean=self._probePositionSettings.constrainPositionMean.getValue(),
+            constrain_position_mean=self._probePositionSettings.constrainCentroid.getValue(),
         )
 
     def _create_opr_mode_weight_options(self) -> PIEOPRModeWeightsOptions:
