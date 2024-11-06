@@ -56,7 +56,7 @@ class ReconstructorAPI:
         )
 
         if outputProductSuffix:
-            outputProductName += outputProductSuffix
+            outputProductName += f'_{outputProductSuffix}'
 
         outputProduct.setName(outputProductName)
         self._reconstructionQueue.put(reconstructor, parameters, outputProduct)

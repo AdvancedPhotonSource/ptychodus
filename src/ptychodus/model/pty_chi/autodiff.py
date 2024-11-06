@@ -239,11 +239,18 @@ class AutodiffReconstructor(Reconstructor):
         position_in_px_list: list[float] = list()
 
         for scan_point in scan:
-            object_point = object_geometry.mapScanPointToObjectPoint(scan_point)
-            position_in_px_list.append(object_point.positionYInPixels)
-            position_in_px_list.append(object_point.positionXInPixels)
+            # FIXME object_point = object_geometry.mapScanPointToObjectPoint(scan_point)
+            # FIXME position_in_px_list.append(object_point.positionYInPixels)
+            # FIXME position_in_px_list.append(object_point.positionXInPixels)
+            position_in_px_list.append(
+                scan_point.positionXInMeters / object_geometry.pixelWidthInMeters
+            )
+            position_in_px_list.append(
+                scan_point.positionYInMeters / object_geometry.pixelHeightInMeters
+            )
 
         position_in_px = numpy.reshape(position_in_px_list, shape=(len(scan), 2))
+        position_in_px -= position_in_px.mean(axis=0)  # FIXME
 
         probe_position_optimization_plan = self._create_optimization_plan(
             self._probePositionSettings.optimizationPlanStart.getValue(),
