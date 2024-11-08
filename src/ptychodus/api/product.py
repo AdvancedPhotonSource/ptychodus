@@ -33,6 +33,10 @@ class ProductMetadata:
             return 0.0
 
     @property
+    def probePhotons(self) -> float:
+        return self.probePhotonsPerSecond * self.exposureTimeInSeconds
+
+    @property
     def sizeInBytes(self) -> int:
         sz = getsizeof(self.name)
         sz += getsizeof(self.comments)
