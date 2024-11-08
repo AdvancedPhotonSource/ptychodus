@@ -8,9 +8,12 @@ from ..data import FileDialogFactory
 
 
 class PtychoPINNModelParametersController(Observer):
-
-    def __init__(self, presenter: PtychoPINNModelPresenter, view: PtychoPINNModelParametersView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self,
+        presenter: PtychoPINNModelPresenter,
+        view: PtychoPINNModelParametersView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
@@ -18,8 +21,11 @@ class PtychoPINNModelParametersController(Observer):
 
     @classmethod
     def createInstance(
-            cls, presenter: PtychoPINNModelPresenter, view: PtychoPINNModelParametersView,
-            fileDialogFactory: FileDialogFactory) -> PtychoPINNModelParametersController:
+        cls,
+        presenter: PtychoPINNModelPresenter,
+        view: PtychoPINNModelParametersView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> PtychoPINNModelParametersController:
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
@@ -46,7 +52,8 @@ class PtychoPINNModelParametersController(Observer):
             self._view,
             'Open Model State',
             nameFilters=self._presenter.getStateFileFilterList(),
-            selectedNameFilter=self._presenter.getStateFileFilter())
+            selectedNameFilter=self._presenter.getStateFileFilter(),
+        )
 
         if filePath:
             self._presenter.setStateFilePath(filePath)
@@ -54,16 +61,17 @@ class PtychoPINNModelParametersController(Observer):
     def _syncModelToView(self) -> None:
         # FIXME modelStateFilePath = self._presenter.getStateFilePath()
 
-        #if modelStateFilePath:
+        # if modelStateFilePath:
         #    self._view.modelStateLineEdit.setText(str(modelStateFilePath))
-        #else:
+        # else:
         #    self._view.modelStateLineEdit.clear()
 
         self._view.gridSizeSpinBox.setValue(self._presenter.getGridsize())
         self._view.nFiltersScaleSpinBox.setValue(self._presenter.getNFiltersScale())
         self._view.probeTrainableCheckBox.setChecked(self._presenter.isProbeTrainable())
         self._view.intensityScaleTrainableCheckBox.setChecked(
-            self._presenter.isIntensityScaleTrainable())
+            self._presenter.isIntensityScaleTrainable()
+        )
         self._view.objectBigCheckBox.setChecked(self._presenter.isObjectBig())
         self._view.probeBigCheckBox.setChecked(self._presenter.isProbeBig())
         self._view.probeScaleLineEdit.setValue(self._presenter.getProbeScale())

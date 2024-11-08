@@ -1,5 +1,8 @@
-from .core import (PtychoPINNModelPresenter, PtychoPINNReconstructorLibrary,
-                   PtychoPINNTrainingPresenter)
+from .core import (
+    PtychoPINNModelPresenter,
+    PtychoPINNReconstructorLibrary,
+    PtychoPINNTrainingPresenter,
+)
 
 __all__ = [
     'PtychoPINNModelPresenter',

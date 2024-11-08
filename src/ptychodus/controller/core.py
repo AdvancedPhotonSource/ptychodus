@@ -32,7 +32,8 @@ class ControllerCore:
             model.ptychonnReconstructorLibrary, self._fileDialogFactory
         )
         self._ptychopinnViewCOntrollerFactory = PtychoPinnViewCOntrollerFactory(
-                model.ptychopinnReconstructorLibrary, self._fileDialogFactory)
+            model.ptychopinnReconstructorLibrary, self._fileDialogFactory
+        )
         self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeReconstructorLibrary)
         self._settingsController = SettingsController(
             model.settingsRegistry,

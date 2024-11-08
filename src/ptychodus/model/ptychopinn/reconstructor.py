@@ -13,8 +13,12 @@ from ptycho.loader import PtychoDataContainer
 
 from ptychodus.api.geometry import Point2D
 from ptychodus.api.product import Product
-from ptychodus.api.reconstructor import (ReconstructInput, ReconstructOutput,
-                                         TrainableReconstructor, TrainOutput)
+from ptychodus.api.reconstructor import (
+    ReconstructInput,
+    ReconstructOutput,
+    TrainableReconstructor,
+    TrainOutput,
+)
 
 from ..analysis import ObjectStitcher
 from .settings import PtychoPINNModelSettings, PtychoPINNTrainingSettings
@@ -31,11 +35,11 @@ def createPtychoDataContainer(parameters: ReconstructInput) -> PtychoDataContain
     probeGuess = parameters.product.probe.array[0, :, :]
     objectGuess = parameters.product.object_.array[0, :, :]
 
-    logger.debug("createPtychoDataContainer pre-condition sizes:")
-    logger.debug(f"diffractionPatterns: {diff3d.shape}")
-    logger.debug(f"probeGuess: {probeGuess.shape}")
-    logger.debug(f"objectGuess: {objectGuess.shape}")
-    logger.debug(f"scanCoordinates: {len(parameters.product.scan)}")
+    logger.debug('createPtychoDataContainer pre-condition sizes:')
+    logger.debug(f'diffractionPatterns: {diff3d.shape}')
+    logger.debug(f'probeGuess: {probeGuess.shape}')
+    logger.debug(f'objectGuess: {objectGuess.shape}')
+    logger.debug(f'scanCoordinates: {len(parameters.product.scan)}')
 
     if objectGuess is not None:
         objectGuess = objectGuess[0, :, :]
@@ -47,13 +51,14 @@ def createPtychoDataContainer(parameters: ReconstructInput) -> PtychoDataContain
         probeGuess=probeGuess,
         # Assuming all patches are from the same object
         scan_index=numpy.zeros(len(diff3d)),  # FIXME
-        objectGuess=objectGuess)
+        objectGuess=objectGuess,
+    )
 
 
 class PtychoPINNTrainableReconstructor(TrainableReconstructor):
-
-    def __init__(self, modelSettings: PtychoPINNModelSettings,
-                 trainingSettings: PtychoPINNTrainingSettings) -> None:
+    def __init__(
+        self, modelSettings: PtychoPINNModelSettings, trainingSettings: PtychoPINNTrainingSettings
+    ) -> None:
         super().__init__()
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
@@ -110,7 +115,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         return self._trainingDataFileFilterList[0]
 
     def openTrainingData(self, filePath: Path) -> None:
-        raise NotImplementedError(f'Open training data from \"{filePath}\"')  # FIXME
+        raise NotImplementedError(f'Open training data from "{filePath}"')  # FIXME
 
     def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
         return self._trainingDataFileFilterList
@@ -119,7 +124,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         return self._trainingDataFileFilterList[0]
 
     def saveTrainingData(self, filePath: Path) -> None:
-        raise NotImplementedError(f'Save training data to \"{filePath}\"')  # FIXME
+        raise NotImplementedError(f'Save training data to "{filePath}"')  # FIXME
 
     def train(self) -> TrainOutput:
         parameters = self._trainingData
@@ -150,7 +155,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         return self._modelFileFilterList[0]
 
     def openModel(self, filePath: Path) -> None:
-        raise NotImplementedError(f'Open model to \"{filePath}\"')  # FIXME
+        raise NotImplementedError(f'Open model to "{filePath}"')  # FIXME
 
     def getSaveModelFileFilterList(self) -> Sequence[str]:
         return self._modelFileFilterList
@@ -159,7 +164,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         return self._modelFileFilterList[0]
 
     def saveModel(self, filePath: Path) -> None:
-        raise NotImplementedError(f'Save trained model to \"{filePath}\"')  # FIXME
+        raise NotImplementedError(f'Save trained model to "{filePath}"')  # FIXME
 
     def _syncSettingsToPtycho(self, *, nphotons: int) -> None:
         N = self._modelSettings.N.value
@@ -186,7 +191,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             'output_suffix': self._trainingSettings.outputSuffix.value,
             'big_gridsize': 10,
             'max_position_jitter': max_position_jitter,
-            'sim_jitter_scale': 0.,
+            'sim_jitter_scale': 0.0,
             'default_probe_scale': 0.7,
             'mae_weight': float(self._trainingSettings.maeWeight.value),
             'nll_weight': float(self._trainingSettings.nllWeight.value),
@@ -200,8 +205,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             'intensity_scale.trainable': self._modelSettings.intensityScaleTrainable.value,
             'positions.provided': False,
             'object.big': self._modelSettings.objectBig.value,
-            'probe.big': self._modelSettings.probeBig.
-            value,  # if True, increase the real space solution from 32x32 to 64x64
+            'probe.big': self._modelSettings.probeBig.value,  # if True, increase the real space solution from 32x32 to 64x64
             'probe_scale': float(self._modelSettings.probeScale.value),
             'set_phi': False,
             'probe.mask': self._modelSettings.probeMask.value,
@@ -223,13 +227,22 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
     def validate(self) -> bool:  # FIXME
         valid_data_sources = [
-            'lines', 'grf', 'experimental', 'points', 'testimg', 'diagonals', 'xpp', 'V', 'generic'
+            'lines',
+            'grf',
+            'experimental',
+            'points',
+            'testimg',
+            'diagonals',
+            'xpp',
+            'V',
+            'generic',
         ]
         # FIXME asserts
-        assert cfg['data_source'] in valid_data_sources, \
-            f"Invalid data source: {cfg['data_source']}. Must be one of {valid_data_sources}."
+        assert (
+            cfg['data_source'] in valid_data_sources
+        ), f"Invalid data source: {cfg['data_source']}. Must be one of {valid_data_sources}."
 
-        if cfg['realspace_mae_weight'] > 0.:
+        if cfg['realspace_mae_weight'] > 0.0:
             assert cfg['realspace_weight'] > 0
 
         assert cfg['bigoffset'] % 4 == 0  # TODO

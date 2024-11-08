@@ -9,9 +9,9 @@ from .controller import PtychoPINNParametersController
 
 
 class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
-
-    def __init__(self, model: PtychoPINNReconstructorLibrary,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self, model: PtychoPINNReconstructorLibrary, fileDialogFactory: FileDialogFactory
+    ) -> None:
         super().__init__()
         self._model = model
         self._fileDialogFactory = fileDialogFactory
@@ -24,9 +24,9 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
     def createViewController(self, reconstructorName: str) -> QWidget:
         view = PtychoPINNParametersView.createInstance()
 
-        controller = PtychoPINNParametersController.createInstance(self._model.modelPresenter,
-                                                                   self._model.trainingPresenter,
-                                                                   view, self._fileDialogFactory)
+        controller = PtychoPINNParametersController.createInstance(
+            self._model.modelPresenter, self._model.trainingPresenter, view, self._fileDialogFactory
+        )
         self._controllerList.append(controller)
 
         return view

@@ -5,7 +5,6 @@ from ptychodus.api.settings import SettingsRegistry
 
 
 class PtychoPINNModelSettings(Observable, Observer):
-
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
         self._settingsGroup = registry.createGroup('PtychoPINN')
@@ -19,7 +18,8 @@ class PtychoPINNModelSettings(Observable, Observer):
         self.nFiltersScale = self._settingsGroup.createIntegerEntry('NFiltersScale', 2)
         self.probeTrainable = self._settingsGroup.createBooleanEntry('ProbeTrainable', False)
         self.intensityScaleTrainable = self._settingsGroup.createBooleanEntry(
-            'IntensityScaleTrainable', False)
+            'IntensityScaleTrainable', False
+        )
         self.objectBig = self._settingsGroup.createBooleanEntry('ObjectBig', True)
         self.probeBig = self._settingsGroup.createBooleanEntry('ProbeBig', False)
         self.probeScale = self._settingsGroup.createRealEntry('ProbeScale', '10.')
@@ -34,7 +34,6 @@ class PtychoPINNModelSettings(Observable, Observer):
 
 
 class PtychoPINNTrainingSettings(Observable, Observer):
-
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
         self._settingsGroup = registry.createGroup('PtychoPINNTraining')
@@ -48,20 +47,25 @@ class PtychoPINNTrainingSettings(Observable, Observer):
 
         # generic settings shared with ptychonn
         self.maximumTrainingDatasetSize = self._settingsGroup.createIntegerEntry(
-            'MaximumTrainingDatasetSize', 100000)
+            'MaximumTrainingDatasetSize', 100000
+        )
         self.validationSetFractionalSize = self._settingsGroup.createRealEntry(
-            'ValidationSetFractionalSize', '0.1')
+            'ValidationSetFractionalSize', '0.1'
+        )
         self.optimizationEpochsPerHalfCycle = self._settingsGroup.createIntegerEntry(
-            'OptimizationEpochsPerHalfCycle', 6)
+            'OptimizationEpochsPerHalfCycle', 6
+        )
         self.maximumLearningRate = self._settingsGroup.createRealEntry(
-            'MaximumLearningRate', '1e-3')
+            'MaximumLearningRate', '1e-3'
+        )
         self.minimumLearningRate = self._settingsGroup.createRealEntry(
-            'MinimumLearningRate', '1e-4')
+            'MinimumLearningRate', '1e-4'
+        )
         self.trainingEpochs = self._settingsGroup.createIntegerEntry('TrainingEpochs', 50)
         self.saveTrainingArtifacts = self._settingsGroup.createBooleanEntry(
-            'SaveTrainingArtifacts', False)
-        self.outputPath = self._settingsGroup.createPathEntry('OutputPath',
-                                                              Path('/path/to/output'))
+            'SaveTrainingArtifacts', False
+        )
+        self.outputPath = self._settingsGroup.createPathEntry('OutputPath', Path('/path/to/output'))
         self.outputSuffix = self._settingsGroup.createStringEntry('OutputSuffix', 'suffix')
 
     def update(self, observable: Observable) -> None:

@@ -12,10 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoPINNOutputParametersController(Observer):
-
-    def __init__(self, presenter: PtychoPINNTrainingPresenter,
-                 view: PtychoPINNOutputParametersView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self,
+        presenter: PtychoPINNTrainingPresenter,
+        view: PtychoPINNOutputParametersView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
@@ -23,8 +25,11 @@ class PtychoPINNOutputParametersController(Observer):
 
     @classmethod
     def createInstance(
-            cls, presenter: PtychoPINNTrainingPresenter, view: PtychoPINNOutputParametersView,
-            fileDialogFactory: FileDialogFactory) -> PtychoPINNOutputParametersController:
+        cls,
+        presenter: PtychoPINNTrainingPresenter,
+        view: PtychoPINNOutputParametersView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> PtychoPINNOutputParametersController:
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
@@ -44,7 +49,8 @@ class PtychoPINNOutputParametersController(Observer):
 
     def _browseOutputPath(self) -> None:
         dirPath = self._fileDialogFactory.getExistingDirectoryPath(
-            self._view, 'Choose Training Output Data Directory')
+            self._view, 'Choose Training Output Data Directory'
+        )
 
         if dirPath:
             self._presenter.setOutputPath(dirPath)
@@ -74,25 +80,32 @@ class PtychoPINNOutputParametersController(Observer):
 
 
 class PtychoPINNTrainingParametersController(Observer):
-
-    def __init__(self, presenter: PtychoPINNTrainingPresenter,
-                 view: PtychoPINNTrainingParametersView,
-                 fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(
+        self,
+        presenter: PtychoPINNTrainingPresenter,
+        view: PtychoPINNTrainingParametersView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
         self._outputParametersController = PtychoPINNOutputParametersController.createInstance(
-            presenter, view.outputParametersView, fileDialogFactory)
+            presenter, view.outputParametersView, fileDialogFactory
+        )
 
     @classmethod
     def createInstance(
-            cls, presenter: PtychoPINNTrainingPresenter, view: PtychoPINNTrainingParametersView,
-            fileDialogFactory: FileDialogFactory) -> PtychoPINNTrainingParametersController:
+        cls,
+        presenter: PtychoPINNTrainingPresenter,
+        view: PtychoPINNTrainingParametersView,
+        fileDialogFactory: FileDialogFactory,
+    ) -> PtychoPINNTrainingParametersController:
         controller = cls(presenter, view, fileDialogFactory)
         presenter.addObserver(controller)
 
         view.validationSetFractionalSizeSlider.valueChanged.connect(
-            presenter.setValidationSetFractionalSize)
+            presenter.setValidationSetFractionalSize
+        )
         view.maximumLearningRateLineEdit.valueChanged.connect(presenter.setMaximumLearningRate)
         view.minimumLearningRateLineEdit.valueChanged.connect(presenter.setMinimumLearningRate)
         view.trainingEpochsSpinBox.valueChanged.connect(presenter.setTrainingEpochs)
@@ -109,7 +122,8 @@ class PtychoPINNTrainingParametersController(Observer):
         self._view.validationSetFractionalSizeSlider.setValueAndRange(
             self._presenter.getValidationSetFractionalSize(),
             self._presenter.getValidationSetFractionalSizeLimits(),
-            blockValueChangedSignal=True)
+            blockValueChangedSignal=True,
+        )
 
         self._view.maximumLearningRateLineEdit.setMinimum(Decimal())
         self._view.maximumLearningRateLineEdit.setValue(self._presenter.getMaximumLearningRate())
@@ -118,8 +132,10 @@ class PtychoPINNTrainingParametersController(Observer):
         self._view.minimumLearningRateLineEdit.setValue(self._presenter.getMinimumLearningRate())
 
         self._view.trainingEpochsSpinBox.blockSignals(True)
-        self._view.trainingEpochsSpinBox.setRange(self._presenter.getTrainingEpochsLimits().lower,
-                                                  self._presenter.getTrainingEpochsLimits().upper)
+        self._view.trainingEpochsSpinBox.setRange(
+            self._presenter.getTrainingEpochsLimits().lower,
+            self._presenter.getTrainingEpochsLimits().upper,
+        )
         self._view.trainingEpochsSpinBox.setValue(self._presenter.getTrainingEpochs())
         self._view.trainingEpochsSpinBox.blockSignals(False)
 

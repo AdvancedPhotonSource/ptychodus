@@ -2,14 +2,23 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QCheckBox, QFormLayout, QGridLayout, QGroupBox, QLabel, QLineEdit,
-                             QPushButton, QSpinBox, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (
+    QCheckBox,
+    QFormLayout,
+    QGridLayout,
+    QGroupBox,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from .widgets import DecimalLineEdit, DecimalSlider
 
 
 class PtychoPINNModelParametersView(QGroupBox):
-
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Model Parameters', parent)
         # Assuming similar widgets are needed, adjust as per PtychoPINN specifics
@@ -58,7 +67,6 @@ class PtychoPINNModelParametersView(QGroupBox):
 
 
 class PtychoPINNOutputParametersView(QGroupBox):
-
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Save Training Artifacts', parent)
         self.pathLabel = QLabel('Path:')
@@ -69,8 +77,7 @@ class PtychoPINNOutputParametersView(QGroupBox):
         self.suffixLineEdit = QLineEdit()
 
     @classmethod
-    def createInstance(cls, parent: Optional[QWidget] = None) -> \
-            PtychoPINNOutputParametersView:
+    def createInstance(cls, parent: Optional[QWidget] = None) -> PtychoPINNOutputParametersView:
         view = cls(parent)
 
         layout = QGridLayout()
@@ -86,7 +93,6 @@ class PtychoPINNOutputParametersView(QGroupBox):
 
 
 class PtychoPINNTrainingParametersView(QGroupBox):
-
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__('Training Parameters', parent)
         self.maximumTrainingDatasetSizeLabel = QLabel('Maximum Training Dataset Size:')
@@ -132,7 +138,6 @@ class PtychoPINNTrainingParametersView(QGroupBox):
 
 
 class PtychoPINNParametersView(QWidget):
-
     def __init__(self, parent: Optional[QWidget]) -> None:
         super().__init__(parent)
         self.modelParametersView = PtychoPINNModelParametersView.createInstance()

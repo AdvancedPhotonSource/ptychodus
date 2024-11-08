@@ -7,8 +7,12 @@ import logging
 
 from ...api.geometry import Interval
 from ...api.observer import Observable, Observer
-from ...api.reconstructor import (NullReconstructor, Reconstructor, ReconstructorLibrary,
-                                  TrainableReconstructor)
+from ...api.reconstructor import (
+    NullReconstructor,
+    Reconstructor,
+    ReconstructorLibrary,
+    TrainableReconstructor,
+)
 from ...api.settings import SettingsRegistry
 from .settings import PtychoPINNModelSettings, PtychoPINNTrainingSettings
 
@@ -249,10 +253,12 @@ class PtychoPINNTrainingPresenter(Observable, Observer):
 
 
 class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
-
-    def __init__(self, modelSettings: PtychoPINNModelSettings,
-                 trainingSettings: PtychoPINNTrainingSettings,
-                 reconstructors: Sequence[Reconstructor]) -> None:
+    def __init__(
+        self,
+        modelSettings: PtychoPINNModelSettings,
+        trainingSettings: PtychoPINNTrainingSettings,
+        reconstructors: Sequence[Reconstructor],
+    ) -> None:
         super().__init__()
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
@@ -261,8 +267,9 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
         self._reconstructors = reconstructors
 
     @classmethod
-    def createInstance(cls, settingsRegistry: SettingsRegistry,
-                       isDeveloperModeEnabled: bool) -> PtychoPINNReconstructorLibrary:
+    def createInstance(
+        cls, settingsRegistry: SettingsRegistry, isDeveloperModeEnabled: bool
+    ) -> PtychoPINNReconstructorLibrary:
         modelSettings = PtychoPINNModelSettings(settingsRegistry)
         trainingSettings = PtychoPINNTrainingSettings(settingsRegistry)
         ptychoPINNReconstructor: TrainableReconstructor = NullReconstructor('PtychoPINN')
@@ -277,7 +284,8 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
                 reconstructors.append(ptychoPINNReconstructor)
         else:
             ptychoPINNReconstructor = PtychoPINNTrainableReconstructor(
-                modelSettings, trainingSettings)
+                modelSettings, trainingSettings
+            )
             reconstructors.append(ptychoPINNReconstructor)
 
         return cls(modelSettings, trainingSettings, reconstructors)
