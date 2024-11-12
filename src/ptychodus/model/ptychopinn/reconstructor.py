@@ -11,7 +11,6 @@ import numpy.typing
 from ptycho import params as ptycho_params, train_pinn
 from ptycho.loader import PtychoDataContainer
 
-from ptychodus.api.geometry import Point2D
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import (
     ReconstructInput,
@@ -57,11 +56,11 @@ def createPtychoDataContainer(parameters: ReconstructInput) -> PtychoDataContain
 
 class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     def __init__(
-        self, modelSettings: PtychoPINNModelSettings, trainingSettings: PtychoPINNTrainingSettings
+        self, model_settings: PtychoPINNModelSettings, training_settings: PtychoPINNTrainingSettings
     ) -> None:
         super().__init__()
-        self._modelSettings = modelSettings
-        self._trainingSettings = trainingSettings
+        self._model_settings = model_settings
+        self._training_settings = training_settings
         self._trainingDataFileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
         self._modelFileFilterList: list[str] = list()  # TODO
 
@@ -167,52 +166,50 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         raise NotImplementedError(f'Save trained model to "{filePath}"')  # FIXME
 
     def _syncSettingsToPtycho(self, *, nphotons: int) -> None:
-        N = self._modelSettings.N.value
-        gridsize = self._modelSettings.gridsize.value
-        offset = self._modelSettings.offset.value
+        N = self._model_settings.N.getValue()
+        gridsize = self._model_settings.gridsize.getValue()
+        offset = self._model_settings.offset.getValue()
         bigN = N + (gridsize - 1) * offset
         max_position_jitter = 10
         buffer = max_position_jitter
 
-        # TODO naming convention for different types of parameters
-        # TODO what default value and initialization for the probe scale?
         cfg: dict[str, Any] = {
-            'learning_rate': float(self._modelSettings.learningRate.value),
+            'learning_rate': self._model_settings.learning_rate.getValue(),
             'N': N,
             'offset': offset,
             'gridsize': gridsize,
             'outer_offset_train': None,
             'outer_offset_test': None,
-            'batch_size': self._modelSettings.batchSize.value,
+            'batch_size': self._model_settings.batch_size.getValue(),
             'nepochs': 60,
-            'n_filters_scale': self._modelSettings.nFiltersScale.value,
-            'output_path': self._trainingSettings.outputPath.value,
-            'output_prefix': 'outputs',
-            'output_suffix': self._trainingSettings.outputSuffix.value,
+            'n_filters_scale': self._model_settings.n_filters_scale.getValue(),
+            'output_path': self._training_settings.output_path.getValue(),
+            'output_prefix': self._training_settings.output_prefix.getValue(),
+            'output_suffix': self._training_settings.output_suffix.getValue(),
             'big_gridsize': 10,
             'max_position_jitter': max_position_jitter,
             'sim_jitter_scale': 0.0,
             'default_probe_scale': 0.7,
-            'mae_weight': float(self._trainingSettings.maeWeight.value),
-            'nll_weight': float(self._trainingSettings.nllWeight.value),
-            'tv_weight': float(self._trainingSettings.tvWeight.value),
-            'realspace_mae_weight': float(self._trainingSettings.realspaceMAEWeight.value),
-            'realspace_weight': float(self._trainingSettings.realspaceWeight.value),
+            'mae_weight': self._training_settings.mae_weight.getValue(),
+            'nll_weight': self._training_settings.nll_weight.getValue(),
+            'tv_weight': self._training_settings.tv_weight.getValue(),
+            'realspace_mae_weight': self._training_settings.realspace_mae_weight.getValue(),
+            'realspace_weight': self._training_settings.realspace_weight.getValue(),
             'nimgs_train': 9,
             'nimgs_test': 3,
             'data_source': 'generic',
-            'probe.trainable': self._modelSettings.probeTrainable.value,
-            'intensity_scale.trainable': self._modelSettings.intensityScaleTrainable.value,
+            'probe.trainable': self._model_settings.is_probe_trainable.getValue(),
+            'intensity_scale.trainable': self._model_settings.intensity_scale_trainable.getValue(),
             'positions.provided': False,
-            'object.big': self._modelSettings.objectBig.value,
-            'probe.big': self._modelSettings.probeBig.value,  # if True, increase the real space solution from 32x32 to 64x64
-            'probe_scale': float(self._modelSettings.probeScale.value),
+            'object.big': self._model_settings.object_big.getValue(),
+            'probe.big': self._model_settings.probe_big.getValue(),  # if True, increase the real space solution from 32x32 to 64x64
+            'probe_scale': self._model_settings.probe_scale.getValue(),
             'set_phi': False,
-            'probe.mask': self._modelSettings.probeMask.value,
-            'model_type': self._modelSettings.modelType.value,
+            'probe.mask': self._model_settings.probe_mask.getValue(),
+            'model_type': self._model_settings.model_type.getValue(),
             'label': '',
-            'size': self._modelSettings.size.value,
-            'amp_activation': self._modelSettings.ampActivation.value,
+            'size': self._model_settings.size.getValue(),
+            'amp_activation': self._model_settings.amp_activation.getValue(),
             # derived values
             'bigN': bigN,
             'padded_size': bigN + buffer,
@@ -224,27 +221,3 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
         # sync current settings to ptycho's configuration
         ptycho_params.cfg.update(cfg)
-
-    def validate(self) -> bool:  # FIXME
-        valid_data_sources = [
-            'lines',
-            'grf',
-            'experimental',
-            'points',
-            'testimg',
-            'diagonals',
-            'xpp',
-            'V',
-            'generic',
-        ]
-        # FIXME asserts
-        assert (
-            cfg['data_source'] in valid_data_sources
-        ), f"Invalid data source: {cfg['data_source']}. Must be one of {valid_data_sources}."
-
-        if cfg['realspace_mae_weight'] > 0.0:
-            assert cfg['realspace_weight'] > 0
-
-        assert cfg['bigoffset'] % 4 == 0  # TODO
-
-        return True

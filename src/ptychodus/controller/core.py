@@ -14,7 +14,7 @@ from .patterns import PatternsController
 from .probe import ProbeController
 from .product import ProductController
 from .ptychonn import PtychoNNViewControllerFactory
-from .ptychopinn import PtychoPINNViewCOntrollerFactory
+from .ptychopinn import PtychoPINNViewControllerFactory
 from .reconstructor import ReconstructorController
 from .scan import ScanController
 from .settings import SettingsController
@@ -31,7 +31,7 @@ class ControllerCore:
         self._ptychonnViewControllerFactory = PtychoNNViewControllerFactory(
             model.ptychonnReconstructorLibrary, self._fileDialogFactory
         )
-        self._ptychopinnViewCOntrollerFactory = PtychoPinnViewCOntrollerFactory(
+        self._ptychopinnViewControllerFactory = PtychoPINNViewControllerFactory(
             model.ptychopinnReconstructorLibrary, self._fileDialogFactory
         )
         self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeReconstructorLibrary)
