@@ -11,15 +11,11 @@ class PtyChiReconstructorSettings(Observable, Observer):
         self.numEpochs = self._settingsGroup.createIntegerParameter('NumEpochs', 100, minimum=1)
         self.batchSize = self._settingsGroup.createIntegerParameter('BatchSize', 100, minimum=1)
         self.batchingMode = self._settingsGroup.createStringParameter('BatchingMode', 'random')
-        self.compactModeUpdateClusteringStride = self._settingsGroup.createIntegerParameter(
-            'CompactModeUpdateClusteringStride',
-            1,
-            minimum=0,
-        )
-        self.useDevices = self._settingsGroup.createBooleanParameter('UseDevices', True)
+        self.batchStride = self._settingsGroup.createIntegerParameter('BatchStride', 1, minimum=1)
         self.useDoublePrecision = self._settingsGroup.createBooleanParameter(
             'UseDoublePrecision', False
         )
+        self.useDevices = self._settingsGroup.createBooleanParameter('UseDevices', True)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:
@@ -159,6 +155,21 @@ class PtyChiProbePositionSettings(Observable, Observer):
         )
         self.optimizer = self._settingsGroup.createStringParameter('Optimizer', 'SGD')
         self.stepSize = self._settingsGroup.createRealParameter('StepSize', 1.0, minimum=0.0)
+
+        # vvv FIXME vvv
+        self.positionCorrectionType = self._settingsGroup.createStringParameter(
+            'PositionCorrectionType', 'Gradient'
+        )
+        self.crossCorrelationScale = self._settingsGroup.createIntegerParameter(
+            'CrossCorrelationScale', 20000, minimum=1
+        )
+        self.crossCorrelationRealSpaceWidth = self._settingsGroup.createRealParameter(
+            'CrossCorrelationRealSpaceWidth', 0.01
+        )
+        self.crossCorrelationProbeThreshold = self._settingsGroup.createRealParameter(
+            'CrossCorrelationProbeThreshold', 0.1
+        )
+        # ^^^ FIXME ^^^
 
         self.updateMagnitudeLimit = self._settingsGroup.createRealParameter(
             'UpdateMagnitudeLimit', 0.0, minimum=0.0

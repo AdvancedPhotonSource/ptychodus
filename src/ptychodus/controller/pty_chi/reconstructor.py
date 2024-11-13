@@ -111,9 +111,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
         self._batchingModeViewController = ComboBoxParameterViewController(
             settings.batchingMode, enumerators.batchingModes()
         )
-        self._compactModeUpdateClusteringStride = SpinBoxParameterViewController(
-            settings.compactModeUpdateClusteringStride
-        )
+        self._batchStride = SpinBoxParameterViewController(settings.batchStride)
         self._deviceViewController = PtyChiDeviceViewController(
             settings.useDevices,
             repository,
@@ -128,11 +126,9 @@ class PtyChiReconstructorViewController(ParameterViewController):
         layout.addRow('Number of Epochs:', self._numEpochsViewController.getWidget())
         layout.addRow('Batch Size:', self._batchSizeViewController.getWidget())
         layout.addRow('Batch Mode:', self._batchingModeViewController.getWidget())
-        layout.addRow(
-            'Batch Clustering Stride:', self._compactModeUpdateClusteringStride.getWidget()
-        )
-        layout.addRow('Devices:', self._deviceViewController.getWidget())
+        layout.addRow('Batch Stride:', self._batchStride.getWidget())
         layout.addRow('Precision:', self._precisionViewController.getWidget())
+        layout.addRow(self._deviceViewController.getWidget())
         self._widget.setLayout(layout)
 
     def getWidget(self) -> QWidget:

@@ -27,6 +27,7 @@ class ProbePowerConstraintViewController(ParameterViewController):
         self._powerViewController = DecimalLineEditParameterViewController(power)
         self._strideViewController = SpinBoxParameterViewController(stride)
         self._widget = QGroupBox('Power Constraint')
+        self._widget.setCheckable(True)  # FIXME
 
         layout = QFormLayout()
         layout.addRow('Power:', self._powerViewController.getWidget())
@@ -42,7 +43,7 @@ class OrthogonalizationViewController(ParameterViewController):
         self,
         incoherentModesMethod: StringParameter,
         incoherentModesStride: IntegerParameter,
-        coherentModesStride: IntegerParameter,
+        oprModesStride: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
         super().__init__()
@@ -52,10 +53,9 @@ class OrthogonalizationViewController(ParameterViewController):
         self._incoherentModesStrideViewController = SpinBoxParameterViewController(
             incoherentModesStride
         )
-        self._coherentModesStrideViewController = SpinBoxParameterViewController(
-            coherentModesStride
-        )
+        self._oprModesStrideViewController = SpinBoxParameterViewController(oprModesStride)
         self._widget = QGroupBox('Orthogonalization')
+        # FIXME enable/disable orthogonalize incoherent/opr separately
 
         layout = QFormLayout()
         layout.addRow(
@@ -64,7 +64,7 @@ class OrthogonalizationViewController(ParameterViewController):
         layout.addRow(
             'Incoherent Modes Stride:', self._incoherentModesStrideViewController.getWidget()
         )
-        layout.addRow('Coherent Modes Stride:', self._coherentModesStrideViewController.getWidget())
+        layout.addRow('OPR Modes Stride:', self._oprModesStrideViewController.getWidget())
         self._widget.setLayout(layout)
 
     def getWidget(self) -> QWidget:
@@ -72,13 +72,19 @@ class OrthogonalizationViewController(ParameterViewController):
 
 
 class PtyChiProbeViewController(ParameterViewController, Observer):
-    def __init__(self, settings: PtyChiProbeSettings, enumerators: PtyChiEnumerators) -> None:
+    def __init__(
+        self,
+        settings: PtyChiProbeSettings,
+        num_epochs: IntegerParameter,
+        enumerators: PtyChiEnumerators,
+    ) -> None:
         super().__init__()
         self._isOptimizable = settings.isOptimizable
         self._optimizationPlanViewController = PtyChiOptimizationPlanViewController(
             settings.optimizationPlanStart,
             settings.optimizationPlanStop,
             settings.optimizationPlanStride,
+            num_epochs,
         )
         self._optimizerViewController = PtyChiOptimizerParameterViewController(
             settings.optimizer, enumerators

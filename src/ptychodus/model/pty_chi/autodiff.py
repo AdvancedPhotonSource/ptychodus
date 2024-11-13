@@ -103,9 +103,8 @@ class AutodiffReconstructor(Reconstructor):
             num_epochs=self._reconstructorSettings.numEpochs.getValue(),
             batch_size=self._reconstructorSettings.batchSize.getValue(),
             batching_mode=batching_mode,
-            compact_mode_update_clustering=self._reconstructorSettings.compactModeUpdateClusteringStride.getValue()
-            > 0,
-            compact_mode_update_clustering_stride=self._reconstructorSettings.compactModeUpdateClusteringStride.getValue(),
+            compact_mode_update_clustering=self._reconstructorSettings.batchStride.getValue() > 0,
+            compact_mode_update_clustering_stride=self._reconstructorSettings.batchStride.getValue(),
             default_device=Devices.GPU
             if self._reconstructorSettings.useDevices.getValue()
             else Devices.CPU,

@@ -18,15 +18,17 @@ class PtyChiViewController(QWidget):
             model.reconstructorSettings, model.enumerators, model.deviceRepository
         )
         self._objectViewController = PtyChiObjectViewController(
-            model.objectSettings, model.enumerators
+            model.objectSettings, model.reconstructorSettings.numEpochs, model.enumerators
         )
         self._probeViewController = PtyChiProbeViewController(
-            model.probeSettings, model.enumerators
+            model.probeSettings, model.reconstructorSettings.numEpochs, model.enumerators
         )
         self._probePositionsViewController = PtyChiProbePositionsViewController(
-            model.probePositionSettings, model.enumerators
+            model.probePositionSettings, model.reconstructorSettings.numEpochs, model.enumerators
         )
-        self._oprViewController = PtyChiOPRViewController(model.oprSettings, model.enumerators)
+        self._oprViewController = PtyChiOPRViewController(
+            model.oprSettings, model.reconstructorSettings.numEpochs, model.enumerators
+        )
 
         layout = QVBoxLayout()
         layout.addWidget(self._reconstructorViewController.getWidget())

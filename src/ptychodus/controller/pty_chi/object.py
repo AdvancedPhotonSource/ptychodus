@@ -31,6 +31,7 @@ class L1NormConstraintViewController(ParameterViewController):
         self._weightViewController = DecimalLineEditParameterViewController(weight)
         self._strideViewController = SpinBoxParameterViewController(stride)
         self._widget = QGroupBox('L\u2081 Norm Constraint')
+        self._widget.setCheckable(True)  # FIXME
 
         layout = QFormLayout()
         layout.addRow('Weight:', self._weightViewController.getWidget())
@@ -51,6 +52,7 @@ class SmoothnessConstraintViewController(ParameterViewController):
         self._alphaViewController = DecimalSliderParameterViewController(alpha)
         self._strideViewController = SpinBoxParameterViewController(stride)
         self._widget = QGroupBox('Smoothness Constraint')
+        self._widget.setCheckable(True)  # FIXME
 
         layout = QFormLayout()
         layout.addRow('Alpha:', self._alphaViewController.getWidget())
@@ -71,6 +73,7 @@ class TotalVariationViewController(ParameterViewController):
         self._weightViewController = DecimalLineEditParameterViewController(weight)
         self._strideViewController = SpinBoxParameterViewController(stride)
         self._widget = QGroupBox('Total Variation')
+        self._widget.setCheckable(True)  # FIXME
 
         layout = QFormLayout()
         layout.addRow('Weight:', self._weightViewController.getWidget())
@@ -146,6 +149,7 @@ class MultisliceRegularizationViewController(ParameterViewController):
             gradientMethod, enumerators.imageGradientMethods()
         )
         self._widget = QGroupBox('Multislice Regularization')
+        self._widget.setCheckable(True)  # FIXME
 
         layout = QFormLayout()
         layout.addRow('Weight:', self._weightViewController.getWidget())
@@ -159,13 +163,19 @@ class MultisliceRegularizationViewController(ParameterViewController):
 
 
 class PtyChiObjectViewController(ParameterViewController, Observer):
-    def __init__(self, settings: PtyChiObjectSettings, enumerators: PtyChiEnumerators) -> None:
+    def __init__(
+        self,
+        settings: PtyChiObjectSettings,
+        num_epochs: IntegerParameter,
+        enumerators: PtyChiEnumerators,
+    ) -> None:
         super().__init__()
         self._isOptimizable = settings.isOptimizable
         self._optimizationPlanViewController = PtyChiOptimizationPlanViewController(
             settings.optimizationPlanStart,
             settings.optimizationPlanStop,
             settings.optimizationPlanStride,
+            num_epochs,
         )
         self._optimizerViewController = PtyChiOptimizerParameterViewController(
             settings.optimizer, enumerators
