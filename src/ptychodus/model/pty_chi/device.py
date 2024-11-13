@@ -19,6 +19,9 @@ class PtyChiDeviceRepository(Sequence[str]):
                 logger.info(device)
                 self._devices.append(f'{device.name} ({device.torch_device})')
 
+        if not self._devices:
+            logger.info('No devices found!')
+
     @overload
     def __getitem__(self, index: int) -> str: ...
 

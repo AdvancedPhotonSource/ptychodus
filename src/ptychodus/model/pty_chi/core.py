@@ -40,6 +40,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
 
         try:
             from .autodiff import AutodiffReconstructor
+            from .dm import DMReconstructor
             from .epie import EPIEReconstructor
             from .lsqml import LSQMLReconstructor
             from .pie import PIEReconstructor
@@ -48,9 +49,19 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
             logger.info('pty-chi not found.')
 
             if isDeveloperModeEnabled:
-                for reconstructor in ('PIE', 'ePIE', 'rPIE', 'LSQML', 'Autodiff'):
+                for reconstructor in ('DM', 'PIE', 'ePIE', 'rPIE', 'LSQML', 'Autodiff'):
                     self.reconstructor_list.append(NullReconstructor(reconstructor))
         else:
+            self.reconstructor_list.append(
+                DMReconstructor(
+                    self.reconstructorSettings,
+                    self.objectSettings,
+                    self.probeSettings,
+                    self.probePositionSettings,
+                    self.oprSettings,
+                    detector,
+                )
+            )
             self.reconstructor_list.append(
                 PIEReconstructor(
                     self.reconstructorSettings,

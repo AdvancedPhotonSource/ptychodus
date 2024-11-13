@@ -65,6 +65,7 @@ class ProbeRepositoryItem(ParameterGroup):
         self._builder = builder
         self._builder.addObserver(self)
         self._addGroup('builder', self._builder, observe=True)
+        self._rebuild()
 
     def _rebuild(self) -> None:
         try:

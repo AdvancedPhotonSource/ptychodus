@@ -96,7 +96,6 @@ class LSQMLReconstructor(Reconstructor):
             default_device=Devices.GPU
             if self._reconstructorSettings.useDevices.getValue()
             else Devices.CPU,
-            gpu_indices=self._reconstructorSettings.devices.getValue(),
             default_dtype=(
                 Dtypes.FLOAT64
                 if self._reconstructorSettings.useDoublePrecision.getValue()

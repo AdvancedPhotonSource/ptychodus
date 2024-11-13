@@ -17,7 +17,6 @@ class PtyChiReconstructorSettings(Observable, Observer):
             minimum=0,
         )
         self.useDevices = self._settingsGroup.createBooleanParameter('UseDevices', True)
-        self.devices = self._settingsGroup.createIntegerSequenceParameter('Devices', ())
         self.useDoublePrecision = self._settingsGroup.createBooleanParameter(
             'UseDoublePrecision', False
         )

@@ -1,19 +1,16 @@
-from collections.abc import Sequence
-from typing import Any
-
-from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject
 from PyQt5.QtWidgets import (
     QButtonGroup,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
-    QListView,
+    QLabel,
     QRadioButton,
+    QVBoxLayout,
     QWidget,
 )
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import BooleanParameter, IntegerSequenceParameter
+from ptychodus.api.parametric import BooleanParameter
 
 from ...model.pty_chi import PtyChiDeviceRepository, PtyChiEnumerators, PtyChiReconstructorSettings
 from ..parametric import (
@@ -23,116 +20,33 @@ from ..parametric import (
 )
 
 
-class PtyChiDeviceListModel(QAbstractListModel):
-    def __init__(self, repository: PtyChiDeviceRepository, parent: QObject | None = None) -> None:
-        super().__init__(parent)
-        self._repository = repository
-        self._checkedDevices: set[int] = set()
-
-    def setCheckedDevices(self, devices: set[int]) -> None:
-        if self._checkedDevices != devices:
-            self.beginResetModel()
-            self._checkedDevices = devices
-            self.endResetModel()
-
-    def getCheckedDevices(self) -> set[int]:
-        return self._checkedDevices
-
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
-        if index.isValid():
-            if role == Qt.ItemDataRole.DisplayRole:
-                return self._repository[index.row()]
-            elif role == Qt.ItemDataRole.CheckStateRole:
-                return (
-                    Qt.CheckState.Checked
-                    if index.row() in self._checkedDevices
-                    else Qt.CheckState.Unchecked
-                )
-
-    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
-        value = super().flags(index)
-
-        if index.isValid():
-            value |= Qt.ItemFlag.ItemIsUserCheckable
-
-        return value
-
-    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
-        if index.isValid() and role == Qt.ItemDataRole.CheckStateRole:
-            if value == Qt.CheckState.Checked:
-                self._checkedDevices.add(index.row())
-            else:
-                self._checkedDevices.discard(index.row())
-
-            self.dataChanged.emit(index, index)
-
-            return True
-
-        return False
-
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return len(self._repository)
-
-
 class PtyChiDeviceViewController(ParameterViewController, Observer):
-    def __init__(
-        self,
-        useDevices: BooleanParameter,
-        devices: IntegerSequenceParameter,
-        repository: PtyChiDeviceRepository,
-        *,
-        tool_tip: str = '',
-    ) -> None:
+    def __init__(self, useDevices: BooleanParameter, repository: PtyChiDeviceRepository) -> None:
         super().__init__()
         self._useDevices = useDevices
-        self._devices = devices
-        self._repository = repository
-        self._listModel = PtyChiDeviceListModel(repository)
-        self._listModel.dataChanged.connect(self._syncViewToModel)
-        self._widget = QListView()
-        self._widget.setModel(self._listModel)
+        self._widget = QGroupBox('Use Devices')
+        self._widget.setCheckable(True)
 
-        if tool_tip:
-            self._widget.setToolTip(tool_tip)
+        layout = QVBoxLayout()
+
+        for device in repository:
+            deviceLabel = QLabel(device)
+            layout.addWidget(deviceLabel)
+
+        self._widget.setLayout(layout)
 
         self._syncModelToView()
+        self._widget.toggled.connect(useDevices.setValue)
         useDevices.addObserver(self)
-        devices.addObserver(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
 
-    def _syncViewToModel(
-        self, topLeft: QModelIndex, bottomRight: QModelIndex, roles: Sequence[int]
-    ) -> None:
-        checkedDevices = self._listModel.getCheckedDevices()
-
-        if checkedDevices:
-            self._useDevices.setValue(True)
-
-            if len(checkedDevices) == len(self._repository):
-                self._devices.setValue(())
-            else:
-                self._devices.setValue(sorted(checkedDevices))
-        else:
-            self._useDevices.setValue(False)
-            self._devices.setValue(())
-
     def _syncModelToView(self) -> None:
-        checkedDevices = set()
-
-        if self._useDevices.getValue():
-            devices = set(self._devices.getValue())
-
-            if devices:
-                checkedDevices.update(devices)
-            else:
-                checkedDevices.update(range(len(self._repository)))
-
-        self._listModel.setCheckedDevices(checkedDevices)
+        self._widget.setChecked(self._useDevices.getValue())
 
     def update(self, observable: Observable) -> None:
-        if observable in (self._useDevices, self._devices):
+        if observable is self._useDevices:
             self._syncModelToView()
 
 
@@ -202,9 +116,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
         )
         self._deviceViewController = PtyChiDeviceViewController(
             settings.useDevices,
-            settings.devices,
             repository,
-            tool_tip='The devices to use for computation.',
         )
         self._precisionViewController = PtyChiPrecisionParameterViewController(
             settings.useDoublePrecision,

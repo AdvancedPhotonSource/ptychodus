@@ -12,12 +12,12 @@ from ptychi.api import (
     OptimizationPlan,
     Optimizers,
     OrthogonalizationMethods,
-    PIEOPRModeWeightsOptions,
-    PIEObjectOptions,
-    PIEOptions,
-    PIEProbeOptions,
-    PIEProbePositionOptions,
-    PIEReconstructorOptions,
+    DMOPRModeWeightsOptions,
+    DMObjectOptions,
+    DMOptions,
+    DMProbeOptions,
+    DMProbePositionOptions,
+    DMReconstructorOptions,
     PtychographyDataOptions,
 )
 from ptychi.api.task import PtychographyTask
@@ -41,7 +41,7 @@ from .settings import (
 logger = logging.getLogger(__name__)
 
 
-class PIEReconstructor(Reconstructor):
+class DMReconstructor(Reconstructor):
     def __init__(
         self,
         reconstructorSettings: PtyChiReconstructorSettings,
@@ -61,7 +61,7 @@ class PIEReconstructor(Reconstructor):
 
     @property
     def name(self) -> str:
-        return 'PIE'
+        return 'DM'
 
     def _create_data_options(
         self,
@@ -77,7 +77,7 @@ class PIEReconstructor(Reconstructor):
             valid_pixel_mask=goodPixelMask,
         )
 
-    def _create_reconstructor_options(self) -> PIEReconstructorOptions:
+    def _create_reconstructor_options(self) -> DMReconstructorOptions:
         batching_mode_str = self._reconstructorSettings.batchingMode.getValue()
 
         try:
@@ -86,7 +86,7 @@ class PIEReconstructor(Reconstructor):
             logger.warning('Failed to parse batching mode "{batching_mode_str}"!')
             batching_mode = BatchingModes.RANDOM
 
-        return PIEReconstructorOptions(
+        return DMReconstructorOptions(
             num_epochs=self._reconstructorSettings.numEpochs.getValue(),
             batch_size=self._reconstructorSettings.batchSize.getValue(),
             batching_mode=batching_mode,
@@ -117,7 +117,7 @@ class PIEReconstructor(Reconstructor):
 
         return optimizer
 
-    def _create_object_options(self, object_: Object) -> PIEObjectOptions:
+    def _create_object_options(self, object_: Object) -> DMObjectOptions:
         optimization_plan = self._create_optimization_plan(
             self._objectSettings.optimizationPlanStart.getValue(),
             self._objectSettings.optimizationPlanStop.getValue(),
@@ -157,7 +157,7 @@ class PIEReconstructor(Reconstructor):
 
         ####
 
-        return PIEObjectOptions(
+        return DMObjectOptions(
             optimizable=self._objectSettings.isOptimizable.getValue(),  # TODO optimizer_params
             optimization_plan=optimization_plan,
             optimizer=optimizer,
@@ -182,7 +182,7 @@ class PIEReconstructor(Reconstructor):
             multislice_regularization_stride=self._objectSettings.multisliceRegularizationStride.getValue(),
         )
 
-    def _create_probe_options(self, probe: Probe) -> PIEProbeOptions:
+    def _create_probe_options(self, probe: Probe) -> DMProbeOptions:
         optimization_plan = self._create_optimization_plan(
             self._probeSettings.optimizationPlanStart.getValue(),
             self._probeSettings.optimizationPlanStop.getValue(),
@@ -203,7 +203,7 @@ class PIEReconstructor(Reconstructor):
             )
             orthogonalize_incoherent_modes_method = OrthogonalizationMethods.GS
 
-        return PIEProbeOptions(
+        return DMProbeOptions(
             optimizable=self._probeSettings.isOptimizable.getValue(),  # TODO optimizer_params
             optimization_plan=optimization_plan,
             optimizer=optimizer,
@@ -221,7 +221,7 @@ class PIEReconstructor(Reconstructor):
 
     def _create_probe_position_options(
         self, scan: Scan, object_geometry: ObjectGeometry
-    ) -> PIEProbePositionOptions:
+    ) -> DMProbePositionOptions:
         position_in_px_list: list[float] = list()
 
         for scan_point in scan:
@@ -248,7 +248,7 @@ class PIEReconstructor(Reconstructor):
         )
         update_magnitude_limit = self._probePositionSettings.updateMagnitudeLimit.getValue()
 
-        return PIEProbePositionOptions(
+        return DMProbePositionOptions(
             optimizable=self._probePositionSettings.isOptimizable.getValue(),
             optimization_plan=probe_position_optimization_plan,
             optimizer=probe_position_optimizer,
@@ -259,14 +259,14 @@ class PIEReconstructor(Reconstructor):
             constrain_position_mean=self._probePositionSettings.constrainCentroid.getValue(),
         )
 
-    def _create_opr_mode_weight_options(self) -> PIEOPRModeWeightsOptions:
+    def _create_opr_mode_weight_options(self) -> DMOPRModeWeightsOptions:
         opr_optimization_plan = self._create_optimization_plan(
             self._oprSettings.optimizationPlanStart.getValue(),
             self._oprSettings.optimizationPlanStop.getValue(),
             self._oprSettings.optimizationPlanStride.getValue(),
         )
         opr_optimizer = self._create_optimizer(self._oprSettings.optimizer.getValue())
-        return PIEOPRModeWeightsOptions(
+        return DMOPRModeWeightsOptions(
             optimizable=self._oprSettings.isOptimizable.getValue(),
             optimization_plan=opr_optimization_plan,
             optimizer=opr_optimizer,
@@ -276,9 +276,9 @@ class PIEReconstructor(Reconstructor):
             optimize_intensity_variation=self._oprSettings.optimizeIntensities.getValue(),
         )
 
-    def _create_task_options(self, parameters: ReconstructInput) -> PIEOptions:
+    def _create_task_options(self, parameters: ReconstructInput) -> DMOptions:
         product = parameters.product
-        return PIEOptions(
+        return DMOptions(
             data_options=self._create_data_options(
                 parameters.patterns, parameters.goodPixelMask, product.metadata
             ),
