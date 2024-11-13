@@ -57,7 +57,6 @@ from .product import (
 )
 from .pty_chi import PtyChiReconstructorLibrary
 from .ptychonn import PtychoNNReconstructorLibrary
-from .ptychopack import PtychoPackReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
 from .tike import TikeReconstructorLibrary
 from .visualization import VisualizationEngine
@@ -129,9 +128,6 @@ class ModelCore:
         self.probeVisualizationEngine = VisualizationEngine(isComplex=True)
         self.objectVisualizationEngine = VisualizationEngine(isComplex=True)
 
-        self.ptychoPackReconstructorLibrary = PtychoPackReconstructorLibrary(
-            self.settingsRegistry, isDeveloperModeEnabled
-        )
         self.ptyChiReconstructorLibrary = PtyChiReconstructorLibrary(
             self.settingsRegistry, self.detector, isDeveloperModeEnabled
         )
@@ -146,7 +142,6 @@ class ModelCore:
             self._patternsCore.dataset,
             self._productCore.productRepository,
             [
-                self.ptychoPackReconstructorLibrary,
                 self.ptyChiReconstructorLibrary,
                 self.tikeReconstructorLibrary,
                 self.ptychonnReconstructorLibrary,
