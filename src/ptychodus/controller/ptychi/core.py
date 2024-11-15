@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QVBoxLayout, QWidget
 
-from ...model.pty_chi import PtyChiReconstructorLibrary
+from ...model.ptychi import PtyChiReconstructorLibrary
 from ..reconstructor import ReconstructorViewControllerFactory
 from .object import PtyChiObjectViewController
 from .opr import PtyChiOPRViewController

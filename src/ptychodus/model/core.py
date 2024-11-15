@@ -55,7 +55,7 @@ from .product import (
     ScanAPI,
     ScanRepository,
 )
-from .pty_chi import PtyChiReconstructorLibrary
+from .ptychi import PtyChiReconstructorLibrary
 from .ptychonn import PtychoNNReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
 from .tike import TikeReconstructorLibrary

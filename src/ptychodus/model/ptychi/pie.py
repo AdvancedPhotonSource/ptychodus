@@ -4,12 +4,6 @@ import logging
 import numpy
 
 from ptychi.api import (
-    AutodiffPtychographyOPRModeWeightsOptions,
-    AutodiffPtychographyObjectOptions,
-    AutodiffPtychographyOptions,
-    AutodiffPtychographyProbeOptions,
-    AutodiffPtychographyProbePositionOptions,
-    AutodiffPtychographyReconstructorOptions,
     BatchingModes,
     Devices,
     Directions,
@@ -18,6 +12,13 @@ from ptychi.api import (
     OptimizationPlan,
     Optimizers,
     OrthogonalizationMethods,
+    PIEOPRModeWeightsOptions,
+    PIEObjectOptions,
+    PIEOptions,
+    PIEProbeOptions,
+    PIEProbePositionOptions,
+    PIEReconstructorOptions,
+    PatchInterpolationMethods,
     PtychographyDataOptions,
 )
 from ptychi.api.task import PtychographyTask
@@ -40,21 +41,8 @@ from .settings import (
 
 logger = logging.getLogger(__name__)
 
-# FEEDBACK
-# change = None options to required arguments, rest have default values
-# remove positions/object pixel sizes
-# remove orthogonalize_incoherent_modes: enable whenever stride >= 1
-# remove orthogonalize_opr_modes: enable whenever stride >= 1
-# remove num_epochs from reconstructor options and run() method; just use iterate(n_epochs)
-# better name for l1_norm_constraint?
-# enum for get_data_to_cpu
-# expand optimization mode GS; stabilize?
-# remove optimizable in favor of OptimizationPlan | None
-# add optimizer and step size to OptimizationPlan
-# add additional enum value to avoid optional enum
 
-
-class AutodiffReconstructor(Reconstructor):
+class PIEReconstructor(Reconstructor):
     def __init__(
         self,
         reconstructorSettings: PtyChiReconstructorSettings,
@@ -74,7 +62,7 @@ class AutodiffReconstructor(Reconstructor):
 
     @property
     def name(self) -> str:
-        return 'Autodiff'
+        return 'PIE'
 
     def _create_data_options(
         self,
@@ -90,7 +78,7 @@ class AutodiffReconstructor(Reconstructor):
             valid_pixel_mask=goodPixelMask,
         )
 
-    def _create_reconstructor_options(self) -> AutodiffPtychographyReconstructorOptions:
+    def _create_reconstructor_options(self) -> PIEReconstructorOptions:
         batching_mode_str = self._reconstructorSettings.batchingMode.getValue()
 
         try:
@@ -99,7 +87,7 @@ class AutodiffReconstructor(Reconstructor):
             logger.warning('Failed to parse batching mode "{batching_mode_str}"!')
             batching_mode = BatchingModes.RANDOM
 
-        return AutodiffPtychographyReconstructorOptions(
+        return PIEReconstructorOptions(
             num_epochs=self._reconstructorSettings.numEpochs.getValue(),
             batch_size=self._reconstructorSettings.batchSize.getValue(),
             batching_mode=batching_mode,
@@ -129,13 +117,31 @@ class AutodiffReconstructor(Reconstructor):
 
         return optimizer
 
-    def _create_object_options(self, object_: Object) -> AutodiffPtychographyObjectOptions:
+    def _create_object_options(self, object_: Object) -> PIEObjectOptions:
         optimization_plan = self._create_optimization_plan(
             self._objectSettings.optimizationPlanStart.getValue(),
             self._objectSettings.optimizationPlanStop.getValue(),
             self._objectSettings.optimizationPlanStride.getValue(),
         )
         optimizer = self._create_optimizer(self._objectSettings.optimizer.getValue())
+
+        ####
+
+        l1_norm_constraint_weight = (
+            self._objectSettings.constrainL1NormWeight.getValue()
+            if self._objectSettings.constrainL1Norm.getValue()
+            else 0.0
+        )
+        smoothness_constraint_alpha = (
+            self._objectSettings.constrainSmoothnessAlpha.getValue()
+            if self._objectSettings.constrainSmoothness.getValue()
+            else 0.0
+        )
+        total_variation_weight = (
+            self._objectSettings.constrainTotalVariationWeight.getValue()
+            if self._objectSettings.constrainTotalVariation.getValue()
+            else 0.0
+        )
 
         ####
 
@@ -153,8 +159,16 @@ class AutodiffReconstructor(Reconstructor):
 
         ####
 
+        multislice_regularization_weight = (
+            self._objectSettings.regularizeMultisliceWeight.getValue()
+            if self._objectSettings.regularizeMultislice.getValue()
+            else 0.0
+        )
+
+        ####
+
         multislice_regularization_unwrap_image_grad_method_str = (
-            self._objectSettings.multisliceRegularizationUnwrapPhaseImageGradientMethod.getValue()
+            self._objectSettings.regularizeMultisliceUnwrapPhaseImageGradientMethod.getValue()
         )
 
         try:
@@ -169,38 +183,60 @@ class AutodiffReconstructor(Reconstructor):
 
         ####
 
-        return AutodiffPtychographyObjectOptions(
+        patch_interpolation_method_str = self._objectSettings.patchInterpolator.getValue()
+
+        try:
+            patch_interpolation_method = PatchInterpolationMethods[
+                patch_interpolation_method_str.upper()
+            ]
+        except KeyError:
+            logger.warning(
+                'Failed to parse patch interpolation method "{patch_interpolation_method_str}"!'
+            )
+            patch_interpolation_method = PatchInterpolationMethods.FOURIER
+
+        ####
+
+        return PIEObjectOptions(
             optimizable=self._objectSettings.isOptimizable.getValue(),  # TODO optimizer_params
             optimization_plan=optimization_plan,
             optimizer=optimizer,
             step_size=self._objectSettings.stepSize.getValue(),
             initial_guess=object_.array,
             slice_spacings_m=numpy.array(object_.layerDistanceInMeters[:-1]),
-            l1_norm_constraint_weight=self._objectSettings.l1NormConstraintWeight.getValue(),
-            l1_norm_constraint_stride=self._objectSettings.l1NormConstraintStride.getValue(),
-            smoothness_constraint_alpha=self._objectSettings.smoothnessConstraintAlpha.getValue(),
-            smoothness_constraint_stride=self._objectSettings.smoothnessConstraintStride.getValue(),
-            total_variation_weight=self._objectSettings.totalVariationWeight.getValue(),
-            total_variation_stride=self._objectSettings.totalVariationStride.getValue(),
+            l1_norm_constraint_weight=l1_norm_constraint_weight,
+            l1_norm_constraint_stride=self._objectSettings.constrainL1NormStride.getValue(),
+            smoothness_constraint_alpha=smoothness_constraint_alpha,
+            smoothness_constraint_stride=self._objectSettings.constrainSmoothnessStride.getValue(),
+            total_variation_weight=total_variation_weight,
+            total_variation_stride=self._objectSettings.constrainTotalVariationStride.getValue(),
             remove_grid_artifacts=self._objectSettings.removeGridArtifacts.getValue(),
             remove_grid_artifacts_period_x_m=self._objectSettings.removeGridArtifactsPeriodXInMeters.getValue(),
             remove_grid_artifacts_period_y_m=self._objectSettings.removeGridArtifactsPeriodYInMeters.getValue(),
             remove_grid_artifacts_window_size=self._objectSettings.removeGridArtifactsWindowSizeInPixels.getValue(),
             remove_grid_artifacts_direction=remove_grid_artifacts_direction,
             remove_grid_artifacts_stride=self._objectSettings.removeGridArtifactsStride.getValue(),
-            multislice_regularization_weight=self._objectSettings.multisliceRegularizationWeight.getValue(),
-            multislice_regularization_unwrap_phase=self._objectSettings.multisliceRegularizationUnwrapPhase.getValue(),
+            multislice_regularization_weight=multislice_regularization_weight,
+            multislice_regularization_unwrap_phase=self._objectSettings.regularizeMultisliceUnwrapPhase.getValue(),
             multislice_regularization_unwrap_image_grad_method=multislice_regularization_unwrap_image_grad_method,
-            multislice_regularization_stride=self._objectSettings.multisliceRegularizationStride.getValue(),
+            multislice_regularization_stride=self._objectSettings.regularizeMultisliceStride.getValue(),
+            patch_interpolation_method=patch_interpolation_method,
         )
 
-    def _create_probe_options(self, probe: Probe) -> AutodiffPtychographyProbeOptions:
+    def _create_probe_options(self, probe: Probe) -> PIEProbeOptions:
         optimization_plan = self._create_optimization_plan(
             self._probeSettings.optimizationPlanStart.getValue(),
             self._probeSettings.optimizationPlanStop.getValue(),
             self._probeSettings.optimizationPlanStride.getValue(),
         )
         optimizer = self._create_optimizer(self._probeSettings.optimizer.getValue())
+
+        probe_power = (
+            self._probeSettings.probePower.getValue()
+            if self._probeSettings.constrainProbePower.getValue()
+            else 0.0
+        )
+
         orthogonalize_incoherent_modes_method_str = (
             self._probeSettings.orthogonalizeIncoherentModesMethod.getValue()
         )
@@ -215,25 +251,24 @@ class AutodiffReconstructor(Reconstructor):
             )
             orthogonalize_incoherent_modes_method = OrthogonalizationMethods.GS
 
-        return AutodiffPtychographyProbeOptions(
+        return PIEProbeOptions(
             optimizable=self._probeSettings.isOptimizable.getValue(),  # TODO optimizer_params
             optimization_plan=optimization_plan,
             optimizer=optimizer,
             step_size=self._probeSettings.stepSize.getValue(),
             initial_guess=probe.array[numpy.newaxis, ...],  # TODO opr
-            probe_power=self._probeSettings.probePower.getValue(),
-            probe_power_constraint_stride=self._probeSettings.probePowerConstraintStride.getValue(),
-            orthogonalize_incoherent_modes=self._probeSettings.orthogonalizeIncoherentModesStride.getValue()
-            > 0,
-            orthogonalize_incoherent_modes_stride=self._probeSettings.orthogonalizeIncoherentModesStride.getValue(),
+            probe_power=probe_power,
+            probe_power_constraint_stride=self._probeSettings.constrainProbePowerStride.getValue(),
+            orthogonalize_incoherent_modes=self._probeSettings.orthogonalizeIncoherentModes.getValue(),
             orthogonalize_incoherent_modes_method=orthogonalize_incoherent_modes_method,
-            orthogonalize_opr_modes=self._probeSettings.orthogonalizeOPRModesStride.getValue() > 0,
+            orthogonalize_incoherent_modes_stride=self._probeSettings.orthogonalizeIncoherentModesStride.getValue(),
+            orthogonalize_opr_modes=self._probeSettings.orthogonalizeOPRModes.getValue(),
             orthogonalize_opr_modes_stride=self._probeSettings.orthogonalizeOPRModesStride.getValue(),
         )
 
     def _create_probe_position_options(
         self, scan: Scan, object_geometry: ObjectGeometry
-    ) -> AutodiffPtychographyProbePositionOptions:
+    ) -> PIEProbePositionOptions:
         position_in_px_list: list[float] = list()
 
         for scan_point in scan:
@@ -258,9 +293,13 @@ class AutodiffReconstructor(Reconstructor):
         probe_position_optimizer = self._create_optimizer(
             self._probePositionSettings.optimizer.getValue()
         )
-        update_magnitude_limit = self._probePositionSettings.updateMagnitudeLimit.getValue()
+        update_magnitude_limit = (
+            self._probePositionSettings.magnitudeUpdateLimit.getValue()
+            if self._probePositionSettings.limitMagnitudeUpdate.getValue()
+            else 0.0
+        )
 
-        return AutodiffPtychographyProbePositionOptions(
+        return PIEProbePositionOptions(
             optimizable=self._probePositionSettings.isOptimizable.getValue(),
             optimization_plan=probe_position_optimization_plan,
             optimizer=probe_position_optimizer,
@@ -271,14 +310,14 @@ class AutodiffReconstructor(Reconstructor):
             constrain_position_mean=self._probePositionSettings.constrainCentroid.getValue(),
         )
 
-    def _create_opr_mode_weight_options(self) -> AutodiffPtychographyOPRModeWeightsOptions:
+    def _create_opr_mode_weight_options(self) -> PIEOPRModeWeightsOptions:
         opr_optimization_plan = self._create_optimization_plan(
             self._oprSettings.optimizationPlanStart.getValue(),
             self._oprSettings.optimizationPlanStop.getValue(),
             self._oprSettings.optimizationPlanStride.getValue(),
         )
         opr_optimizer = self._create_optimizer(self._oprSettings.optimizer.getValue())
-        return AutodiffPtychographyOPRModeWeightsOptions(
+        return PIEOPRModeWeightsOptions(
             optimizable=self._oprSettings.isOptimizable.getValue(),
             optimization_plan=opr_optimization_plan,
             optimizer=opr_optimizer,
@@ -288,9 +327,9 @@ class AutodiffReconstructor(Reconstructor):
             optimize_intensity_variation=self._oprSettings.optimizeIntensities.getValue(),
         )
 
-    def _create_task_options(self, parameters: ReconstructInput) -> AutodiffPtychographyOptions:
+    def _create_task_options(self, parameters: ReconstructInput) -> PIEOptions:
         product = parameters.product
-        return AutodiffPtychographyOptions(
+        return PIEOptions(
             data_options=self._create_data_options(
                 parameters.patterns, parameters.goodPixelMask, product.metadata
             ),

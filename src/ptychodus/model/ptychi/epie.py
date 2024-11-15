@@ -8,16 +8,17 @@ from ptychi.api import (
     Devices,
     Directions,
     Dtypes,
+    EPIEOptions,
+    EPIEReconstructorOptions,
     ImageGradientMethods,
     OptimizationPlan,
     Optimizers,
     OrthogonalizationMethods,
     PIEOPRModeWeightsOptions,
     PIEObjectOptions,
-    PIEOptions,
     PIEProbeOptions,
     PIEProbePositionOptions,
-    PIEReconstructorOptions,
+    PatchInterpolationMethods,
     PtychographyDataOptions,
 )
 from ptychi.api.task import PtychographyTask
@@ -41,7 +42,7 @@ from .settings import (
 logger = logging.getLogger(__name__)
 
 
-class PIEReconstructor(Reconstructor):
+class EPIEReconstructor(Reconstructor):
     def __init__(
         self,
         reconstructorSettings: PtyChiReconstructorSettings,
@@ -61,7 +62,7 @@ class PIEReconstructor(Reconstructor):
 
     @property
     def name(self) -> str:
-        return 'PIE'
+        return 'ePIE'
 
     def _create_data_options(
         self,
@@ -77,7 +78,7 @@ class PIEReconstructor(Reconstructor):
             valid_pixel_mask=goodPixelMask,
         )
 
-    def _create_reconstructor_options(self) -> PIEReconstructorOptions:
+    def _create_reconstructor_options(self) -> EPIEReconstructorOptions:
         batching_mode_str = self._reconstructorSettings.batchingMode.getValue()
 
         try:
@@ -86,7 +87,7 @@ class PIEReconstructor(Reconstructor):
             logger.warning('Failed to parse batching mode "{batching_mode_str}"!')
             batching_mode = BatchingModes.RANDOM
 
-        return PIEReconstructorOptions(
+        return EPIEReconstructorOptions(
             num_epochs=self._reconstructorSettings.numEpochs.getValue(),
             batch_size=self._reconstructorSettings.batchSize.getValue(),
             batching_mode=batching_mode,
@@ -126,6 +127,24 @@ class PIEReconstructor(Reconstructor):
 
         ####
 
+        l1_norm_constraint_weight = (
+            self._objectSettings.constrainL1NormWeight.getValue()
+            if self._objectSettings.constrainL1Norm.getValue()
+            else 0.0
+        )
+        smoothness_constraint_alpha = (
+            self._objectSettings.constrainSmoothnessAlpha.getValue()
+            if self._objectSettings.constrainSmoothness.getValue()
+            else 0.0
+        )
+        total_variation_weight = (
+            self._objectSettings.constrainTotalVariationWeight.getValue()
+            if self._objectSettings.constrainTotalVariation.getValue()
+            else 0.0
+        )
+
+        ####
+
         remove_grid_artifacts_direction_str = (
             self._objectSettings.removeGridArtifactsDirection.getValue()
         )
@@ -140,8 +159,16 @@ class PIEReconstructor(Reconstructor):
 
         ####
 
+        multislice_regularization_weight = (
+            self._objectSettings.regularizeMultisliceWeight.getValue()
+            if self._objectSettings.regularizeMultislice.getValue()
+            else 0.0
+        )
+
+        ####
+
         multislice_regularization_unwrap_image_grad_method_str = (
-            self._objectSettings.multisliceRegularizationUnwrapPhaseImageGradientMethod.getValue()
+            self._objectSettings.regularizeMultisliceUnwrapPhaseImageGradientMethod.getValue()
         )
 
         try:
@@ -156,6 +183,20 @@ class PIEReconstructor(Reconstructor):
 
         ####
 
+        patch_interpolation_method_str = self._objectSettings.patchInterpolator.getValue()
+
+        try:
+            patch_interpolation_method = PatchInterpolationMethods[
+                patch_interpolation_method_str.upper()
+            ]
+        except KeyError:
+            logger.warning(
+                'Failed to parse patch interpolation method "{patch_interpolation_method_str}"!'
+            )
+            patch_interpolation_method = PatchInterpolationMethods.FOURIER
+
+        ####
+
         return PIEObjectOptions(
             optimizable=self._objectSettings.isOptimizable.getValue(),  # TODO optimizer_params
             optimization_plan=optimization_plan,
@@ -163,22 +204,23 @@ class PIEReconstructor(Reconstructor):
             step_size=self._objectSettings.stepSize.getValue(),
             initial_guess=object_.array,
             slice_spacings_m=numpy.array(object_.layerDistanceInMeters[:-1]),
-            l1_norm_constraint_weight=self._objectSettings.l1NormConstraintWeight.getValue(),
-            l1_norm_constraint_stride=self._objectSettings.l1NormConstraintStride.getValue(),
-            smoothness_constraint_alpha=self._objectSettings.smoothnessConstraintAlpha.getValue(),
-            smoothness_constraint_stride=self._objectSettings.smoothnessConstraintStride.getValue(),
-            total_variation_weight=self._objectSettings.totalVariationWeight.getValue(),
-            total_variation_stride=self._objectSettings.totalVariationStride.getValue(),
+            l1_norm_constraint_weight=l1_norm_constraint_weight,
+            l1_norm_constraint_stride=self._objectSettings.constrainL1NormStride.getValue(),
+            smoothness_constraint_alpha=smoothness_constraint_alpha,
+            smoothness_constraint_stride=self._objectSettings.constrainSmoothnessStride.getValue(),
+            total_variation_weight=total_variation_weight,
+            total_variation_stride=self._objectSettings.constrainTotalVariationStride.getValue(),
             remove_grid_artifacts=self._objectSettings.removeGridArtifacts.getValue(),
             remove_grid_artifacts_period_x_m=self._objectSettings.removeGridArtifactsPeriodXInMeters.getValue(),
             remove_grid_artifacts_period_y_m=self._objectSettings.removeGridArtifactsPeriodYInMeters.getValue(),
             remove_grid_artifacts_window_size=self._objectSettings.removeGridArtifactsWindowSizeInPixels.getValue(),
             remove_grid_artifacts_direction=remove_grid_artifacts_direction,
             remove_grid_artifacts_stride=self._objectSettings.removeGridArtifactsStride.getValue(),
-            multislice_regularization_weight=self._objectSettings.multisliceRegularizationWeight.getValue(),
-            multislice_regularization_unwrap_phase=self._objectSettings.multisliceRegularizationUnwrapPhase.getValue(),
+            multislice_regularization_weight=multislice_regularization_weight,
+            multislice_regularization_unwrap_phase=self._objectSettings.regularizeMultisliceUnwrapPhase.getValue(),
             multislice_regularization_unwrap_image_grad_method=multislice_regularization_unwrap_image_grad_method,
-            multislice_regularization_stride=self._objectSettings.multisliceRegularizationStride.getValue(),
+            multislice_regularization_stride=self._objectSettings.regularizeMultisliceStride.getValue(),
+            patch_interpolation_method=patch_interpolation_method,
         )
 
     def _create_probe_options(self, probe: Probe) -> PIEProbeOptions:
@@ -188,6 +230,13 @@ class PIEReconstructor(Reconstructor):
             self._probeSettings.optimizationPlanStride.getValue(),
         )
         optimizer = self._create_optimizer(self._probeSettings.optimizer.getValue())
+
+        probe_power = (
+            self._probeSettings.probePower.getValue()
+            if self._probeSettings.constrainProbePower.getValue()
+            else 0.0
+        )
+
         orthogonalize_incoherent_modes_method_str = (
             self._probeSettings.orthogonalizeIncoherentModesMethod.getValue()
         )
@@ -208,13 +257,12 @@ class PIEReconstructor(Reconstructor):
             optimizer=optimizer,
             step_size=self._probeSettings.stepSize.getValue(),
             initial_guess=probe.array[numpy.newaxis, ...],  # TODO opr
-            probe_power=self._probeSettings.probePower.getValue(),
-            probe_power_constraint_stride=self._probeSettings.probePowerConstraintStride.getValue(),
-            orthogonalize_incoherent_modes=self._probeSettings.orthogonalizeIncoherentModesStride.getValue()
-            > 0,
-            orthogonalize_incoherent_modes_stride=self._probeSettings.orthogonalizeIncoherentModesStride.getValue(),
+            probe_power=probe_power,
+            probe_power_constraint_stride=self._probeSettings.constrainProbePowerStride.getValue(),
+            orthogonalize_incoherent_modes=self._probeSettings.orthogonalizeIncoherentModes.getValue(),
             orthogonalize_incoherent_modes_method=orthogonalize_incoherent_modes_method,
-            orthogonalize_opr_modes=self._probeSettings.orthogonalizeOPRModesStride.getValue() > 0,
+            orthogonalize_incoherent_modes_stride=self._probeSettings.orthogonalizeIncoherentModesStride.getValue(),
+            orthogonalize_opr_modes=self._probeSettings.orthogonalizeOPRModes.getValue(),
             orthogonalize_opr_modes_stride=self._probeSettings.orthogonalizeOPRModesStride.getValue(),
         )
 
@@ -245,7 +293,11 @@ class PIEReconstructor(Reconstructor):
         probe_position_optimizer = self._create_optimizer(
             self._probePositionSettings.optimizer.getValue()
         )
-        update_magnitude_limit = self._probePositionSettings.updateMagnitudeLimit.getValue()
+        update_magnitude_limit = (
+            self._probePositionSettings.magnitudeUpdateLimit.getValue()
+            if self._probePositionSettings.limitMagnitudeUpdate.getValue()
+            else 0.0
+        )
 
         return PIEProbePositionOptions(
             optimizable=self._probePositionSettings.isOptimizable.getValue(),
@@ -275,9 +327,9 @@ class PIEReconstructor(Reconstructor):
             optimize_intensity_variation=self._oprSettings.optimizeIntensities.getValue(),
         )
 
-    def _create_task_options(self, parameters: ReconstructInput) -> PIEOptions:
+    def _create_task_options(self, parameters: ReconstructInput) -> EPIEOptions:
         product = parameters.product
-        return PIEOptions(
+        return EPIEOptions(
             data_options=self._create_data_options(
                 parameters.patterns, parameters.goodPixelMask, product.metadata
             ),

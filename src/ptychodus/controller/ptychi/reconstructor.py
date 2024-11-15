@@ -12,42 +12,25 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import BooleanParameter
 
-from ...model.pty_chi import PtyChiDeviceRepository, PtyChiEnumerators, PtyChiReconstructorSettings
+from ...model.ptychi import PtyChiDeviceRepository, PtyChiEnumerators, PtyChiReconstructorSettings
 from ..parametric import (
+    CheckableGroupBoxParameterViewController,
     ComboBoxParameterViewController,
     ParameterViewController,
     SpinBoxParameterViewController,
 )
 
 
-class PtyChiDeviceViewController(ParameterViewController, Observer):
+class PtyChiDeviceViewController(CheckableGroupBoxParameterViewController):
     def __init__(self, useDevices: BooleanParameter, repository: PtyChiDeviceRepository) -> None:
-        super().__init__()
-        self._useDevices = useDevices
-        self._widget = QGroupBox('Use Devices')
-        self._widget.setCheckable(True)
-
+        super().__init__(useDevices, 'Use Devices')
         layout = QVBoxLayout()
 
         for device in repository:
             deviceLabel = QLabel(device)
             layout.addWidget(deviceLabel)
 
-        self._widget.setLayout(layout)
-
-        self._syncModelToView()
-        self._widget.toggled.connect(useDevices.setValue)
-        useDevices.addObserver(self)
-
-    def getWidget(self) -> QWidget:
-        return self._widget
-
-    def _syncModelToView(self) -> None:
-        self._widget.setChecked(self._useDevices.getValue())
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._useDevices:
-            self._syncModelToView()
+        self.getWidget().setLayout(layout)
 
 
 class PtyChiPrecisionParameterViewController(ParameterViewController, Observer):
@@ -128,7 +111,10 @@ class PtyChiReconstructorViewController(ParameterViewController):
         layout.addRow('Batch Mode:', self._batchingModeViewController.getWidget())
         layout.addRow('Batch Stride:', self._batchStride.getWidget())
         layout.addRow('Precision:', self._precisionViewController.getWidget())
-        layout.addRow(self._deviceViewController.getWidget())
+
+        if repository:
+            layout.addRow(self._deviceViewController.getWidget())
+
         self._widget.setLayout(layout)
 
     def getWidget(self) -> QWidget:

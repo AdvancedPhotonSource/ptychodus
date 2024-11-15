@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import QHBoxLayout, QSpinBox, QWidget
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import IntegerParameter, StringParameter
 
-from ...model.pty_chi import PtyChiEnumerators
+from ...model.ptychi import PtyChiEnumerators
 from ..parametric import (
     ComboBoxParameterViewController,
     SpinBoxParameterViewController,

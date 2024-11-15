@@ -5,13 +5,11 @@ from PyQt5.QtWidgets import (
     QDialog,
     QFormLayout,
     QGridLayout,
-    QGroupBox,
     QLabel,
     QMessageBox,
     QWidget,
 )
 
-from ptychodus.api.observer import Observable, Observer
 
 from ...model.product.scan import (
     CartesianScanBuilder,
@@ -24,6 +22,7 @@ from ...model.product.scan import (
     SpiralScanBuilder,
 )
 from ..parametric import (
+    CheckableGroupBoxParameterViewController,
     DecimalLineEditParameterViewController,
     LengthWidgetParameterViewController,
     ParameterViewBuilder,
@@ -102,13 +101,9 @@ class ScanTransformViewController(ParameterViewController):
         return self._widget
 
 
-class ScanBoundingBoxViewController(ParameterViewController, Observer):
+class ScanBoundingBoxViewController(CheckableGroupBoxParameterViewController):
     def __init__(self, item: ScanRepositoryItem) -> None:
-        super().__init__()
-        self._parameter = item.expandBoundingBox
-        self._widget = QGroupBox('Expand Bounding Box')
-        self._widget.setCheckable(True)
-
+        super().__init__(item.expandBoundingBox, 'Expand Bounding Box')
         self._minimumXController = LengthWidgetParameterViewController(
             item.expandedBoundingBoxMinimumXInMeters, is_signed=True
         )
@@ -127,21 +122,7 @@ class ScanBoundingBoxViewController(ParameterViewController, Observer):
         layout.addRow('Maximum X:', self._maximumXController.getWidget())
         layout.addRow('Minimum Y:', self._minimumYController.getWidget())
         layout.addRow('Maximum Y:', self._maximumYController.getWidget())
-        self._widget.setLayout(layout)
-
-        self._syncModelToView()
-        self._widget.toggled.connect(self._parameter.setValue)
-        self._parameter.addObserver(self)
-
-    def getWidget(self) -> QWidget:
-        return self._widget
-
-    def _syncModelToView(self) -> None:
-        self._widget.setChecked(self._parameter.getValue())
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._parameter:
-            self._syncModelToView()
+        self.getWidget().setLayout(layout)
 
 
 class ScanEditorViewControllerFactory:

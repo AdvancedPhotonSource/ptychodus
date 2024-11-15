@@ -11,6 +11,7 @@ class PtyChiEnumerators:
                 LossFunctions,
                 Optimizers,
                 OrthogonalizationMethods,
+                PatchInterpolationMethods,
                 PositionCorrectionTypes,
             )
         except ModuleNotFoundError:
@@ -20,6 +21,7 @@ class PtyChiEnumerators:
             self._lossFunctions: Sequence[str] = list()
             self._optimizers: Sequence[str] = list()
             self._orthogonalizationMethods: Sequence[str] = list()
+            self._patchInterpolationMethods: Sequence[str] = list()
             self._positionCorrectionTypes: Sequence[str] = list()
         else:
             self._batchingModes = [member.name for member in BatchingModes]
@@ -28,6 +30,7 @@ class PtyChiEnumerators:
             self._lossFunctions = [member.name for member in LossFunctions]
             self._optimizers = [member.name for member in Optimizers]
             self._orthogonalizationMethods = [member.name for member in OrthogonalizationMethods]
+            self._patchInterpolationMethods = [member.name for member in PatchInterpolationMethods]
             self._positionCorrectionTypes = [member.name for member in PositionCorrectionTypes]
 
     def optimizers(self) -> Iterator[str]:
@@ -50,3 +53,6 @@ class PtyChiEnumerators:
 
     def lossFunctions(self) -> Iterator[str]:
         return iter(self._lossFunctions)
+
+    def patchInterpolationMethods(self) -> Iterator[str]:
+        return iter(self._patchInterpolationMethods)

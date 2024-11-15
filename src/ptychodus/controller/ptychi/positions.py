@@ -1,48 +1,42 @@
-from PyQt5.QtWidgets import QFormLayout, QGroupBox, QWidget
+from PyQt5.QtWidgets import QFormLayout
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import IntegerParameter, RealParameter
+from ptychodus.api.parametric import BooleanParameter, IntegerParameter, RealParameter
 
-from ...model.pty_chi import PtyChiEnumerators, PtyChiProbePositionSettings
+from ...model.ptychi import PtyChiEnumerators, PtyChiProbePositionSettings
 from ..parametric import (
     CheckBoxParameterViewController,
+    CheckableGroupBoxParameterViewController,
     ComboBoxParameterViewController,
     DecimalLineEditParameterViewController,
-    ParameterViewController,
 )
 from .optimizer import PtyChiOptimizationPlanViewController, PtyChiOptimizerParameterViewController
 
 
-class UpdateMagnitudeLimitViewController(ParameterViewController):
+class UpdateMagnitudeLimitViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
-        updateMagnitudeLimit: RealParameter,
+        limitMagnitudeUpdate: BooleanParameter,
+        magnitudeUpdateLimit: RealParameter,
     ) -> None:
-        super().__init__()
+        super().__init__(limitMagnitudeUpdate, 'Limit Update Magnitude')
         self._viewController = DecimalLineEditParameterViewController(
-            updateMagnitudeLimit,
-            tool_tip='When set to a positive number, limit update magnitudes to this value.',
+            magnitudeUpdateLimit,
+            tool_tip='Limit update magnitudes to this value.',
         )
-        self._widget = QGroupBox('Limit Update Magnitude')
-        self._widget.setCheckable(True)  # FIXME
 
         layout = QFormLayout()
         layout.addRow('Limit:', self._viewController.getWidget())
-        self._widget.setLayout(layout)
-
-    def getWidget(self) -> QWidget:
-        return self._widget
+        self.getWidget().setLayout(layout)
 
 
-class PtyChiProbePositionsViewController(ParameterViewController, Observer):
+class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
         settings: PtyChiProbePositionSettings,
         num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
-        super().__init__()
-        self._isOptimizable = settings.isOptimizable
+        super().__init__(settings.isOptimizable, 'Optimize Probe Positions')
         self._optimizationPlanViewController = PtyChiOptimizationPlanViewController(
             settings.optimizationPlanStart,
             settings.optimizationPlanStop,
@@ -58,34 +52,19 @@ class PtyChiProbePositionsViewController(ParameterViewController, Observer):
         self._algorithmViewController = ComboBoxParameterViewController(
             settings.positionCorrectionType, enumerators.positionCorrectionTypes()
         )
-        self._updateMagnitudeLimitViewController = UpdateMagnitudeLimitViewController(
-            settings.updateMagnitudeLimit,
+        self._magnitudeUpdateLimitViewController = UpdateMagnitudeLimitViewController(
+            settings.limitMagnitudeUpdate,
+            settings.magnitudeUpdateLimit,
         )
         self._constrainCentroidViewController = CheckBoxParameterViewController(
             settings.constrainCentroid, 'Constrain Centroid'
         )
-        self._widget = QGroupBox('Optimize Probe Positions')
-        self._widget.setCheckable(True)
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._optimizationPlanViewController.getWidget())
         layout.addRow('Optimizer:', self._optimizerViewController.getWidget())
         layout.addRow('Step Size:', self._stepSizeViewController.getWidget())
         layout.addRow('Algorithm:', self._algorithmViewController.getWidget())
-        layout.addRow(self._updateMagnitudeLimitViewController.getWidget())
+        layout.addRow(self._magnitudeUpdateLimitViewController.getWidget())
         layout.addRow(self._constrainCentroidViewController.getWidget())
-        self._widget.setLayout(layout)
-
-        self._syncModelToView()
-        self._widget.toggled.connect(self._isOptimizable.setValue)
-        self._isOptimizable.addObserver(self)
-
-    def getWidget(self) -> QWidget:
-        return self._widget
-
-    def _syncModelToView(self) -> None:
-        self._widget.setChecked(self._isOptimizable.getValue())
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._isOptimizable:
-            self._syncModelToView()
+        self.getWidget().setLayout(layout)

@@ -1,6 +1,5 @@
-from PyQt5.QtWidgets import QFormLayout, QGroupBox, QWidget
+from PyQt5.QtWidgets import QFormLayout
 
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import (
     BooleanParameter,
     IntegerParameter,
@@ -8,86 +7,74 @@ from ptychodus.api.parametric import (
     StringParameter,
 )
 
-from ...model.pty_chi import PtyChiEnumerators, PtyChiObjectSettings
+from ...model.ptychi import PtyChiEnumerators, PtyChiObjectSettings
 from ..parametric import (
     CheckBoxParameterViewController,
+    CheckableGroupBoxParameterViewController,
     ComboBoxParameterViewController,
     DecimalLineEditParameterViewController,
     DecimalSliderParameterViewController,
     LengthWidgetParameterViewController,
-    ParameterViewController,
     SpinBoxParameterViewController,
 )
 from .optimizer import PtyChiOptimizationPlanViewController, PtyChiOptimizerParameterViewController
 
 
-class L1NormConstraintViewController(ParameterViewController):
+class ConstrainL1NormViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
+        constrainL1Norm: BooleanParameter,
         weight: RealParameter,
         stride: IntegerParameter,
     ) -> None:
-        super().__init__()
+        super().__init__(constrainL1Norm, 'Constrain L\u2081 Norm')
         self._weightViewController = DecimalLineEditParameterViewController(weight)
         self._strideViewController = SpinBoxParameterViewController(stride)
-        self._widget = QGroupBox('L\u2081 Norm Constraint')
-        self._widget.setCheckable(True)  # FIXME
 
         layout = QFormLayout()
         layout.addRow('Weight:', self._weightViewController.getWidget())
         layout.addRow('Stride:', self._strideViewController.getWidget())
-        self._widget.setLayout(layout)
-
-    def getWidget(self) -> QWidget:
-        return self._widget
+        self.getWidget().setLayout(layout)
 
 
-class SmoothnessConstraintViewController(ParameterViewController):
+class ConstrainSmoothnessViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
+        constrainSmoothness: BooleanParameter,
         alpha: RealParameter,
         stride: IntegerParameter,
     ) -> None:
-        super().__init__()
+        super().__init__(constrainSmoothness, 'Constrain Smoothness')
         self._alphaViewController = DecimalSliderParameterViewController(alpha)
         self._strideViewController = SpinBoxParameterViewController(stride)
-        self._widget = QGroupBox('Smoothness Constraint')
-        self._widget.setCheckable(True)  # FIXME
 
         layout = QFormLayout()
         layout.addRow('Alpha:', self._alphaViewController.getWidget())
         layout.addRow('Stride:', self._strideViewController.getWidget())
-        self._widget.setLayout(layout)
-
-    def getWidget(self) -> QWidget:
-        return self._widget
+        self.getWidget().setLayout(layout)
 
 
-class TotalVariationViewController(ParameterViewController):
+class ConstrainTotalVariationViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
+        constrainTotalVariation: BooleanParameter,
         weight: RealParameter,
         stride: IntegerParameter,
     ) -> None:
-        super().__init__()
+        super().__init__(constrainTotalVariation, 'Constrain Total Variation')
         self._weightViewController = DecimalLineEditParameterViewController(weight)
         self._strideViewController = SpinBoxParameterViewController(stride)
-        self._widget = QGroupBox('Total Variation')
-        self._widget.setCheckable(True)  # FIXME
 
         layout = QFormLayout()
         layout.addRow('Weight:', self._weightViewController.getWidget())
         layout.addRow('Stride:', self._strideViewController.getWidget())
-        self._widget.setLayout(layout)
-
-    def getWidget(self) -> QWidget:
-        return self._widget
+        self.getWidget().setLayout(layout)
 
 
-class RemoveGridArtifactsViewController(ParameterViewController, Observer):
+class RemoveGridArtifactsViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
-        isEnabled: BooleanParameter,
+        removeGridArtifacts: BooleanParameter,
         periodXInMeters: RealParameter,
         periodYInMeters: RealParameter,
         windowSizeInPixels: IntegerParameter,
@@ -95,8 +82,7 @@ class RemoveGridArtifactsViewController(ParameterViewController, Observer):
         stride: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
-        super().__init__()
-        self._isEnabled = isEnabled
+        super().__init__(removeGridArtifacts, 'Remove Grid Artifacts')
         self._periodXViewController = LengthWidgetParameterViewController(periodXInMeters)
         self._periodYViewController = LengthWidgetParameterViewController(periodYInMeters)
         self._windowSizeViewController = SpinBoxParameterViewController(windowSizeInPixels)
@@ -104,8 +90,6 @@ class RemoveGridArtifactsViewController(ParameterViewController, Observer):
             direction, enumerators.directions()
         )
         self._strideViewController = SpinBoxParameterViewController(stride)
-        self._widget = QGroupBox('Remove Grid Artifacts')
-        self._widget.setCheckable(True)
 
         layout = QFormLayout()
         layout.addRow('Period X:', self._periodXViewController.getWidget())
@@ -113,33 +97,20 @@ class RemoveGridArtifactsViewController(ParameterViewController, Observer):
         layout.addRow('Window Size [px]:', self._windowSizeViewController.getWidget())
         layout.addRow('Direction:', self._directionViewController.getWidget())
         layout.addRow('Stride:', self._strideViewController.getWidget())
-        self._widget.setLayout(layout)
-
-        self._syncModelToView()
-        self._widget.toggled.connect(isEnabled.setValue)
-        self._isEnabled.addObserver(self)
-
-    def getWidget(self) -> QWidget:
-        return self._widget
-
-    def _syncModelToView(self) -> None:
-        self._widget.setChecked(self._isEnabled.getValue())
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._isEnabled:
-            self._syncModelToView()
+        self.getWidget().setLayout(layout)
 
 
-class MultisliceRegularizationViewController(ParameterViewController):
+class RegularizeMultisliceViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
+        regularizeMultislice: BooleanParameter,
         weight: RealParameter,
         unwrapPhase: BooleanParameter,
         gradientMethod: StringParameter,
         stride: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
-        super().__init__()
+        super().__init__(regularizeMultislice, 'Regularize Multislice')
         self._weightViewController = DecimalLineEditParameterViewController(weight)
         self._strideViewController = SpinBoxParameterViewController(stride)
         self._unwrapPhaseViewController = CheckBoxParameterViewController(
@@ -148,29 +119,23 @@ class MultisliceRegularizationViewController(ParameterViewController):
         self._gradientMethodViewController = ComboBoxParameterViewController(
             gradientMethod, enumerators.imageGradientMethods()
         )
-        self._widget = QGroupBox('Multislice Regularization')
-        self._widget.setCheckable(True)  # FIXME
 
         layout = QFormLayout()
         layout.addRow('Weight:', self._weightViewController.getWidget())
         layout.addRow('Stride:', self._strideViewController.getWidget())
         layout.addRow(self._unwrapPhaseViewController.getWidget())
         layout.addRow('Gradient Method:', self._gradientMethodViewController.getWidget())
-        self._widget.setLayout(layout)
-
-    def getWidget(self) -> QWidget:
-        return self._widget
+        self.getWidget().setLayout(layout)
 
 
-class PtyChiObjectViewController(ParameterViewController, Observer):
+class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
         settings: PtyChiObjectSettings,
         num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
-        super().__init__()
-        self._isOptimizable = settings.isOptimizable
+        super().__init__(settings.isOptimizable, 'Optimize Object')
         self._optimizationPlanViewController = PtyChiOptimizationPlanViewController(
             settings.optimizationPlanStart,
             settings.optimizationPlanStop,
@@ -183,14 +148,21 @@ class PtyChiObjectViewController(ParameterViewController, Observer):
         self._stepSizeViewController = DecimalLineEditParameterViewController(
             settings.stepSize, tool_tip='Optimizer step size'
         )
-        self._l1NormConstraintViewController = L1NormConstraintViewController(
-            settings.l1NormConstraintWeight, settings.l1NormConstraintStride
+        self._patchInterpolatorViewController = ComboBoxParameterViewController(
+            settings.patchInterpolator, enumerators.patchInterpolationMethods()
         )
-        self._smoothnessConstraintViewController = SmoothnessConstraintViewController(
-            settings.smoothnessConstraintAlpha, settings.smoothnessConstraintStride
+        self._constrainL1NormViewController = ConstrainL1NormViewController(
+            settings.constrainL1Norm, settings.constrainL1NormWeight, settings.constrainL1NormStride
         )
-        self._totalVariationViewController = TotalVariationViewController(
-            settings.totalVariationWeight, settings.totalVariationStride
+        self._constrainSmoothnessViewController = ConstrainSmoothnessViewController(
+            settings.constrainSmoothness,
+            settings.constrainSmoothnessAlpha,
+            settings.constrainSmoothnessStride,
+        )
+        self._constrainTotalVariationViewController = ConstrainTotalVariationViewController(
+            settings.constrainTotalVariation,
+            settings.constrainTotalVariationWeight,
+            settings.constrainTotalVariationStride,
         )
         self._removeGridArtifactsViewController = RemoveGridArtifactsViewController(
             settings.removeGridArtifacts,
@@ -201,37 +173,23 @@ class PtyChiObjectViewController(ParameterViewController, Observer):
             settings.removeGridArtifactsStride,
             enumerators,
         )
-        self._multisliceRegularizationViewController = MultisliceRegularizationViewController(
-            settings.multisliceRegularizationWeight,
-            settings.multisliceRegularizationUnwrapPhase,
-            settings.multisliceRegularizationUnwrapPhaseImageGradientMethod,
-            settings.multisliceRegularizationStride,
+        self._regularizeMultisliceViewController = RegularizeMultisliceViewController(
+            settings.regularizeMultislice,
+            settings.regularizeMultisliceWeight,
+            settings.regularizeMultisliceUnwrapPhase,
+            settings.regularizeMultisliceUnwrapPhaseImageGradientMethod,
+            settings.regularizeMultisliceStride,
             enumerators,
         )
-        self._widget = QGroupBox('Optimize Object')
-        self._widget.setCheckable(True)
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._optimizationPlanViewController.getWidget())
         layout.addRow('Optimizer:', self._optimizerViewController.getWidget())
         layout.addRow('Step Size:', self._stepSizeViewController.getWidget())
-        layout.addRow(self._l1NormConstraintViewController.getWidget())
-        layout.addRow(self._smoothnessConstraintViewController.getWidget())
-        layout.addRow(self._totalVariationViewController.getWidget())
+        layout.addRow('Patch Interpolator:', self._patchInterpolatorViewController.getWidget())
+        layout.addRow(self._constrainL1NormViewController.getWidget())
+        layout.addRow(self._constrainSmoothnessViewController.getWidget())
+        layout.addRow(self._constrainTotalVariationViewController.getWidget())
         layout.addRow(self._removeGridArtifactsViewController.getWidget())
-        layout.addRow(self._multisliceRegularizationViewController.getWidget())
-        self._widget.setLayout(layout)
-
-        self._syncModelToView()
-        self._widget.toggled.connect(self._isOptimizable.setValue)
-        self._isOptimizable.addObserver(self)
-
-    def getWidget(self) -> QWidget:
-        return self._widget
-
-    def _syncModelToView(self) -> None:
-        self._widget.setChecked(self._isOptimizable.getValue())
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._isOptimizable:
-            self._syncModelToView()
+        layout.addRow(self._regularizeMultisliceViewController.getWidget())
+        self.getWidget().setLayout(layout)

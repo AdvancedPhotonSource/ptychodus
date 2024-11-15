@@ -33,15 +33,33 @@ from ..view.widgets import AngleWidget, DecimalLineEdit, DecimalSlider, LengthWi
 
 logger = logging.getLogger(__name__)
 
-__all__ = [
-    'ParameterViewBuilder',
-]
-
 
 class ParameterViewController(ABC):
     @abstractmethod
     def getWidget(self) -> QWidget:
         pass
+
+
+class CheckableGroupBoxParameterViewController(ParameterViewController, Observer):
+    def __init__(self, parameter: BooleanParameter, title: str) -> None:
+        super().__init__()
+        self._parameter = parameter
+        self._widget = QGroupBox(title)
+        self._widget.setCheckable(True)
+
+        self._syncModelToView()
+        self._widget.toggled.connect(parameter.setValue)
+        self._parameter.addObserver(self)
+
+    def getWidget(self) -> QWidget:
+        return self._widget
+
+    def _syncModelToView(self) -> None:
+        self._widget.setChecked(self._parameter.getValue())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self._syncModelToView()
 
 
 class CheckBoxParameterViewController(ParameterViewController, Observer):

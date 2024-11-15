@@ -13,7 +13,7 @@ from .object import ObjectController
 from .patterns import PatternsController
 from .probe import ProbeController
 from .product import ProductController
-from .pty_chi import PtyChiViewControllerFactory
+from .ptychi import PtyChiViewControllerFactory
 from .ptychonn import PtychoNNViewControllerFactory
 from .reconstructor import ReconstructorController
 from .scan import ScanController

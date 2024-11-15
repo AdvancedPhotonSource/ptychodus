@@ -41,23 +41,36 @@ class PtyChiObjectSettings(Observable, Observer):
         self.optimizer = self._settingsGroup.createStringParameter('Optimizer', 'SGD')
         self.stepSize = self._settingsGroup.createRealParameter('StepSize', 1.0, minimum=0.0)
 
-        self.l1NormConstraintWeight = self._settingsGroup.createRealParameter(
-            'L1NormConstraintWeight', 0.0, minimum=0.0
+        self.patchInterpolator = self._settingsGroup.createStringParameter(
+            'PatchInterpolator', 'FOURIER'
         )
-        self.l1NormConstraintStride = self._settingsGroup.createIntegerParameter(
-            'L1NormConstraintStride', 1, minimum=1
+
+        self.constrainL1Norm = self._settingsGroup.createBooleanParameter('ConstrainL1Norm', False)
+        self.constrainL1NormWeight = self._settingsGroup.createRealParameter(
+            'ConstrainL1NormWeight', 0.0, minimum=0.0
         )
-        self.smoothnessConstraintAlpha = self._settingsGroup.createRealParameter(
-            'SmoothnessConstraintAlpha', 0.0, minimum=0.0, maximum=1.0 / 8
+        self.constrainL1NormStride = self._settingsGroup.createIntegerParameter(
+            'ConstrainL1NormStride', 1, minimum=1
         )
-        self.smoothnessConstraintStride = self._settingsGroup.createIntegerParameter(
-            'SmoothnessConstraintStride', 1, minimum=1
+
+        self.constrainSmoothness = self._settingsGroup.createBooleanParameter(
+            'ConstrainSmoothness', False
         )
-        self.totalVariationWeight = self._settingsGroup.createRealParameter(
-            'TotalVariationWeight', 0.0, minimum=0.0
+        self.constrainSmoothnessAlpha = self._settingsGroup.createRealParameter(
+            'ConstrainSmoothnessAlpha', 0.0, minimum=0.0, maximum=1.0 / 8
         )
-        self.totalVariationStride = self._settingsGroup.createIntegerParameter(
-            'TotalVariationStride', 1, minimum=1
+        self.constrainSmoothnessStride = self._settingsGroup.createIntegerParameter(
+            'ConstrainSmoothnessStride', 1, minimum=1
+        )
+
+        self.constrainTotalVariation = self._settingsGroup.createBooleanParameter(
+            'ConstrainTotalVariation', False
+        )
+        self.constrainTotalVariationWeight = self._settingsGroup.createRealParameter(
+            'ConstrainTotalVariationWeight', 0.0, minimum=0.0
+        )
+        self.constrainTotalVariationStride = self._settingsGroup.createIntegerParameter(
+            'ConstrainTotalVariationStride', 1, minimum=1
         )
         self.removeGridArtifacts = self._settingsGroup.createBooleanParameter(
             'RemoveGridArtifacts', False
@@ -79,19 +92,22 @@ class PtyChiObjectSettings(Observable, Observer):
         self.removeGridArtifactsStride = self._settingsGroup.createIntegerParameter(
             'RemoveGridArtifactsStride', 1, minimum=1
         )
-        self.multisliceRegularizationWeight = self._settingsGroup.createRealParameter(
-            'MultisliceRegularizationWeight', 0.0, minimum=0.0
+        self.regularizeMultislice = self._settingsGroup.createBooleanParameter(
+            'RegularizeMultislice', False
         )
-        self.multisliceRegularizationUnwrapPhase = self._settingsGroup.createBooleanParameter(
-            'MultisliceRegularizationUnwrapPhase', True
+        self.regularizeMultisliceWeight = self._settingsGroup.createRealParameter(
+            'RegularizeMultisliceWeight', 0.0, minimum=0.0
         )
-        self.multisliceRegularizationUnwrapPhaseImageGradientMethod = (
+        self.regularizeMultisliceUnwrapPhase = self._settingsGroup.createBooleanParameter(
+            'RegularizeMultisliceUnwrapPhase', True
+        )
+        self.regularizeMultisliceUnwrapPhaseImageGradientMethod = (
             self._settingsGroup.createStringParameter(
-                'MultisliceRegularizationUnwrapPhaseImageGradientMethod', 'FOURIER_SHIFT'
+                'RegularizeMultisliceUnwrapPhaseImageGradientMethod', 'FOURIER_SHIFT'
             )
         )
-        self.multisliceRegularizationStride = self._settingsGroup.createIntegerParameter(
-            'MultisliceRegularizationStride', 1, minimum=1
+        self.regularizeMultisliceStride = self._settingsGroup.createIntegerParameter(
+            'RegularizeMultisliceStride', 1, minimum=1
         )
 
     def update(self, observable: Observable) -> None:
@@ -118,18 +134,29 @@ class PtyChiProbeSettings(Observable, Observer):
         self.optimizer = self._settingsGroup.createStringParameter('Optimizer', 'SGD')
         self.stepSize = self._settingsGroup.createRealParameter('StepSize', 1.0, minimum=0.0)
 
+        self.constrainProbePower = self._settingsGroup.createBooleanParameter(
+            'ConstrainProbePower', False
+        )
+        self.probePower = self._settingsGroup.createRealParameter('ProbePower', 0.0, minimum=0.0)
+        self.constrainProbePowerStride = self._settingsGroup.createIntegerParameter(
+            'ConstrainProbePowerStride', 1, minimum=1
+        )
+
+        self.orthogonalizeIncoherentModes = self._settingsGroup.createBooleanParameter(
+            'OrthogonalizeIncoherentModes', True
+        )
         self.orthogonalizeIncoherentModesMethod = self._settingsGroup.createStringParameter(
             'OrthogonalizeIncoherentModesMethod', 'GS'
         )
-        self.probePower = self._settingsGroup.createRealParameter('ProbePower', 0.0, minimum=0.0)
-        self.probePowerConstraintStride = self._settingsGroup.createIntegerParameter(
-            'ProbePowerConstraintStride', 1, minimum=1
-        )
         self.orthogonalizeIncoherentModesStride = self._settingsGroup.createIntegerParameter(
-            'OrthogonalizeIncoherentModesStride', 1, minimum=0
+            'OrthogonalizeIncoherentModesStride', 1, minimum=1
+        )
+
+        self.orthogonalizeOPRModes = self._settingsGroup.createBooleanParameter(
+            'OrthogonalizeOPRModes', True
         )
         self.orthogonalizeOPRModesStride = self._settingsGroup.createIntegerParameter(
-            'OrthogonalizeOPRModesStride', 1, minimum=0
+            'OrthogonalizeOPRModesStride', 1, minimum=1
         )
 
     def update(self, observable: Observable) -> None:
@@ -164,15 +191,18 @@ class PtyChiProbePositionSettings(Observable, Observer):
             'CrossCorrelationScale', 20000, minimum=1
         )
         self.crossCorrelationRealSpaceWidth = self._settingsGroup.createRealParameter(
-            'CrossCorrelationRealSpaceWidth', 0.01
+            'CrossCorrelationRealSpaceWidth', 0.01, minimum=0.0
         )
         self.crossCorrelationProbeThreshold = self._settingsGroup.createRealParameter(
-            'CrossCorrelationProbeThreshold', 0.1
+            'CrossCorrelationProbeThreshold', 0.1, minimum=0.0
         )
         # ^^^ FIXME ^^^
 
-        self.updateMagnitudeLimit = self._settingsGroup.createRealParameter(
-            'UpdateMagnitudeLimit', 0.0, minimum=0.0
+        self.limitMagnitudeUpdate = self._settingsGroup.createBooleanParameter(
+            'LimitMagnitudeUpdate', False
+        )
+        self.magnitudeUpdateLimit = self._settingsGroup.createRealParameter(
+            'MagnitudeUpdateLimit', 0.0, minimum=0.0
         )
         self.constrainCentroid = self._settingsGroup.createBooleanParameter(
             'ConstrainCentroid', False

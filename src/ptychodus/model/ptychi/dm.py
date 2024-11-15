@@ -5,6 +5,12 @@ import numpy
 
 from ptychi.api import (
     BatchingModes,
+    DMOPRModeWeightsOptions,
+    DMObjectOptions,
+    DMOptions,
+    DMProbeOptions,
+    DMProbePositionOptions,
+    DMReconstructorOptions,
     Devices,
     Directions,
     Dtypes,
@@ -12,13 +18,8 @@ from ptychi.api import (
     OptimizationPlan,
     Optimizers,
     OrthogonalizationMethods,
-    PIEOPRModeWeightsOptions,
-    PIEObjectOptions,
-    PIEProbeOptions,
-    PIEProbePositionOptions,
+    PatchInterpolationMethods,
     PtychographyDataOptions,
-    RPIEOptions,
-    RPIEReconstructorOptions,
 )
 from ptychi.api.task import PtychographyTask
 
@@ -41,7 +42,7 @@ from .settings import (
 logger = logging.getLogger(__name__)
 
 
-class RPIEReconstructor(Reconstructor):
+class DMReconstructor(Reconstructor):
     def __init__(
         self,
         reconstructorSettings: PtyChiReconstructorSettings,
@@ -61,7 +62,7 @@ class RPIEReconstructor(Reconstructor):
 
     @property
     def name(self) -> str:
-        return 'rPIE'
+        return 'DM'
 
     def _create_data_options(
         self,
@@ -77,7 +78,7 @@ class RPIEReconstructor(Reconstructor):
             valid_pixel_mask=goodPixelMask,
         )
 
-    def _create_reconstructor_options(self) -> RPIEReconstructorOptions:
+    def _create_reconstructor_options(self) -> DMReconstructorOptions:
         batching_mode_str = self._reconstructorSettings.batchingMode.getValue()
 
         try:
@@ -86,7 +87,7 @@ class RPIEReconstructor(Reconstructor):
             logger.warning('Failed to parse batching mode "{batching_mode_str}"!')
             batching_mode = BatchingModes.RANDOM
 
-        return RPIEReconstructorOptions(
+        return DMReconstructorOptions(
             num_epochs=self._reconstructorSettings.numEpochs.getValue(),
             batch_size=self._reconstructorSettings.batchSize.getValue(),
             batching_mode=batching_mode,
@@ -116,13 +117,31 @@ class RPIEReconstructor(Reconstructor):
 
         return optimizer
 
-    def _create_object_options(self, object_: Object) -> PIEObjectOptions:
+    def _create_object_options(self, object_: Object) -> DMObjectOptions:
         optimization_plan = self._create_optimization_plan(
             self._objectSettings.optimizationPlanStart.getValue(),
             self._objectSettings.optimizationPlanStop.getValue(),
             self._objectSettings.optimizationPlanStride.getValue(),
         )
         optimizer = self._create_optimizer(self._objectSettings.optimizer.getValue())
+
+        ####
+
+        l1_norm_constraint_weight = (
+            self._objectSettings.constrainL1NormWeight.getValue()
+            if self._objectSettings.constrainL1Norm.getValue()
+            else 0.0
+        )
+        smoothness_constraint_alpha = (
+            self._objectSettings.constrainSmoothnessAlpha.getValue()
+            if self._objectSettings.constrainSmoothness.getValue()
+            else 0.0
+        )
+        total_variation_weight = (
+            self._objectSettings.constrainTotalVariationWeight.getValue()
+            if self._objectSettings.constrainTotalVariation.getValue()
+            else 0.0
+        )
 
         ####
 
@@ -140,8 +159,16 @@ class RPIEReconstructor(Reconstructor):
 
         ####
 
+        multislice_regularization_weight = (
+            self._objectSettings.regularizeMultisliceWeight.getValue()
+            if self._objectSettings.regularizeMultislice.getValue()
+            else 0.0
+        )
+
+        ####
+
         multislice_regularization_unwrap_image_grad_method_str = (
-            self._objectSettings.multisliceRegularizationUnwrapPhaseImageGradientMethod.getValue()
+            self._objectSettings.regularizeMultisliceUnwrapPhaseImageGradientMethod.getValue()
         )
 
         try:
@@ -156,38 +183,60 @@ class RPIEReconstructor(Reconstructor):
 
         ####
 
-        return PIEObjectOptions(
+        patch_interpolation_method_str = self._objectSettings.patchInterpolator.getValue()
+
+        try:
+            patch_interpolation_method = PatchInterpolationMethods[
+                patch_interpolation_method_str.upper()
+            ]
+        except KeyError:
+            logger.warning(
+                'Failed to parse patch interpolation method "{patch_interpolation_method_str}"!'
+            )
+            patch_interpolation_method = PatchInterpolationMethods.FOURIER
+
+        ####
+
+        return DMObjectOptions(
             optimizable=self._objectSettings.isOptimizable.getValue(),  # TODO optimizer_params
             optimization_plan=optimization_plan,
             optimizer=optimizer,
             step_size=self._objectSettings.stepSize.getValue(),
             initial_guess=object_.array,
             slice_spacings_m=numpy.array(object_.layerDistanceInMeters[:-1]),
-            l1_norm_constraint_weight=self._objectSettings.l1NormConstraintWeight.getValue(),
-            l1_norm_constraint_stride=self._objectSettings.l1NormConstraintStride.getValue(),
-            smoothness_constraint_alpha=self._objectSettings.smoothnessConstraintAlpha.getValue(),
-            smoothness_constraint_stride=self._objectSettings.smoothnessConstraintStride.getValue(),
-            total_variation_weight=self._objectSettings.totalVariationWeight.getValue(),
-            total_variation_stride=self._objectSettings.totalVariationStride.getValue(),
+            l1_norm_constraint_weight=l1_norm_constraint_weight,
+            l1_norm_constraint_stride=self._objectSettings.constrainL1NormStride.getValue(),
+            smoothness_constraint_alpha=smoothness_constraint_alpha,
+            smoothness_constraint_stride=self._objectSettings.constrainSmoothnessStride.getValue(),
+            total_variation_weight=total_variation_weight,
+            total_variation_stride=self._objectSettings.constrainTotalVariationStride.getValue(),
             remove_grid_artifacts=self._objectSettings.removeGridArtifacts.getValue(),
             remove_grid_artifacts_period_x_m=self._objectSettings.removeGridArtifactsPeriodXInMeters.getValue(),
             remove_grid_artifacts_period_y_m=self._objectSettings.removeGridArtifactsPeriodYInMeters.getValue(),
             remove_grid_artifacts_window_size=self._objectSettings.removeGridArtifactsWindowSizeInPixels.getValue(),
             remove_grid_artifacts_direction=remove_grid_artifacts_direction,
             remove_grid_artifacts_stride=self._objectSettings.removeGridArtifactsStride.getValue(),
-            multislice_regularization_weight=self._objectSettings.multisliceRegularizationWeight.getValue(),
-            multislice_regularization_unwrap_phase=self._objectSettings.multisliceRegularizationUnwrapPhase.getValue(),
+            multislice_regularization_weight=multislice_regularization_weight,
+            multislice_regularization_unwrap_phase=self._objectSettings.regularizeMultisliceUnwrapPhase.getValue(),
             multislice_regularization_unwrap_image_grad_method=multislice_regularization_unwrap_image_grad_method,
-            multislice_regularization_stride=self._objectSettings.multisliceRegularizationStride.getValue(),
+            multislice_regularization_stride=self._objectSettings.regularizeMultisliceStride.getValue(),
+            patch_interpolation_method=patch_interpolation_method,
         )
 
-    def _create_probe_options(self, probe: Probe) -> PIEProbeOptions:
+    def _create_probe_options(self, probe: Probe) -> DMProbeOptions:
         optimization_plan = self._create_optimization_plan(
             self._probeSettings.optimizationPlanStart.getValue(),
             self._probeSettings.optimizationPlanStop.getValue(),
             self._probeSettings.optimizationPlanStride.getValue(),
         )
         optimizer = self._create_optimizer(self._probeSettings.optimizer.getValue())
+
+        probe_power = (
+            self._probeSettings.probePower.getValue()
+            if self._probeSettings.constrainProbePower.getValue()
+            else 0.0
+        )
+
         orthogonalize_incoherent_modes_method_str = (
             self._probeSettings.orthogonalizeIncoherentModesMethod.getValue()
         )
@@ -202,25 +251,24 @@ class RPIEReconstructor(Reconstructor):
             )
             orthogonalize_incoherent_modes_method = OrthogonalizationMethods.GS
 
-        return PIEProbeOptions(
+        return DMProbeOptions(
             optimizable=self._probeSettings.isOptimizable.getValue(),  # TODO optimizer_params
             optimization_plan=optimization_plan,
             optimizer=optimizer,
             step_size=self._probeSettings.stepSize.getValue(),
             initial_guess=probe.array[numpy.newaxis, ...],  # TODO opr
-            probe_power=self._probeSettings.probePower.getValue(),
-            probe_power_constraint_stride=self._probeSettings.probePowerConstraintStride.getValue(),
-            orthogonalize_incoherent_modes=self._probeSettings.orthogonalizeIncoherentModesStride.getValue()
-            > 0,
-            orthogonalize_incoherent_modes_stride=self._probeSettings.orthogonalizeIncoherentModesStride.getValue(),
+            probe_power=probe_power,
+            probe_power_constraint_stride=self._probeSettings.constrainProbePowerStride.getValue(),
+            orthogonalize_incoherent_modes=self._probeSettings.orthogonalizeIncoherentModes.getValue(),
             orthogonalize_incoherent_modes_method=orthogonalize_incoherent_modes_method,
-            orthogonalize_opr_modes=self._probeSettings.orthogonalizeOPRModesStride.getValue() > 0,
+            orthogonalize_incoherent_modes_stride=self._probeSettings.orthogonalizeIncoherentModesStride.getValue(),
+            orthogonalize_opr_modes=self._probeSettings.orthogonalizeOPRModes.getValue(),
             orthogonalize_opr_modes_stride=self._probeSettings.orthogonalizeOPRModesStride.getValue(),
         )
 
     def _create_probe_position_options(
         self, scan: Scan, object_geometry: ObjectGeometry
-    ) -> PIEProbePositionOptions:
+    ) -> DMProbePositionOptions:
         position_in_px_list: list[float] = list()
 
         for scan_point in scan:
@@ -245,9 +293,13 @@ class RPIEReconstructor(Reconstructor):
         probe_position_optimizer = self._create_optimizer(
             self._probePositionSettings.optimizer.getValue()
         )
-        update_magnitude_limit = self._probePositionSettings.updateMagnitudeLimit.getValue()
+        update_magnitude_limit = (
+            self._probePositionSettings.magnitudeUpdateLimit.getValue()
+            if self._probePositionSettings.limitMagnitudeUpdate.getValue()
+            else 0.0
+        )
 
-        return PIEProbePositionOptions(
+        return DMProbePositionOptions(
             optimizable=self._probePositionSettings.isOptimizable.getValue(),
             optimization_plan=probe_position_optimization_plan,
             optimizer=probe_position_optimizer,
@@ -258,14 +310,14 @@ class RPIEReconstructor(Reconstructor):
             constrain_position_mean=self._probePositionSettings.constrainCentroid.getValue(),
         )
 
-    def _create_opr_mode_weight_options(self) -> PIEOPRModeWeightsOptions:
+    def _create_opr_mode_weight_options(self) -> DMOPRModeWeightsOptions:
         opr_optimization_plan = self._create_optimization_plan(
             self._oprSettings.optimizationPlanStart.getValue(),
             self._oprSettings.optimizationPlanStop.getValue(),
             self._oprSettings.optimizationPlanStride.getValue(),
         )
         opr_optimizer = self._create_optimizer(self._oprSettings.optimizer.getValue())
-        return PIEOPRModeWeightsOptions(
+        return DMOPRModeWeightsOptions(
             optimizable=self._oprSettings.isOptimizable.getValue(),
             optimization_plan=opr_optimization_plan,
             optimizer=opr_optimizer,
@@ -275,9 +327,9 @@ class RPIEReconstructor(Reconstructor):
             optimize_intensity_variation=self._oprSettings.optimizeIntensities.getValue(),
         )
 
-    def _create_task_options(self, parameters: ReconstructInput) -> RPIEOptions:
+    def _create_task_options(self, parameters: ReconstructInput) -> DMOptions:
         product = parameters.product
-        return RPIEOptions(
+        return DMOptions(
             data_options=self._create_data_options(
                 parameters.patterns, parameters.goodPixelMask, product.metadata
             ),
