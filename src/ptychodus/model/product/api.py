@@ -365,7 +365,7 @@ class ProductAPI:
         comments: str = '',
         detectorDistanceInMeters: float | None = None,
         probeEnergyInElectronVolts: float | None = None,
-        probePhotonsPerSecond: float | None = None,
+        probePhotonCount: float | None = None,
         exposureTimeInSeconds: float | None = None,
         likeIndex: int = -1,
     ) -> int:
@@ -374,7 +374,7 @@ class ProductAPI:
             comments=comments,
             detectorDistanceInMeters=detectorDistanceInMeters,
             probeEnergyInElectronVolts=probeEnergyInElectronVolts,
-            probePhotonsPerSecond=probePhotonsPerSecond,
+            probePhotonCount=probePhotonCount,
             exposureTimeInSeconds=exposureTimeInSeconds,
             likeIndex=likeIndex,
         )

@@ -125,9 +125,9 @@ def main() -> int:
         type=float,
     )
     parser.add_argument(
-        '--probe_photon_flux_Hz',
-        metavar='FLUX',
-        help='probe number of photons per second',
+        '--probe_photon_count',
+        metavar='NUMBER',
+        help='probe number of photons',
         type=float,
     )
     parser.add_argument(
@@ -211,7 +211,7 @@ def main() -> int:
             comments=args.comment,
             detectorDistanceInMeters=args.detector_distance_m,
             probeEnergyInElectronVolts=args.probe_energy_eV,
-            probePhotonsPerSecond=args.probe_photon_flux_Hz,
+            probePhotonCount=args.probe_photon_count,
             exposureTimeInSeconds=args.exposure_time_s,
         )
         workflowProductAPI.openScan(Path(args.scan_file_path.name))

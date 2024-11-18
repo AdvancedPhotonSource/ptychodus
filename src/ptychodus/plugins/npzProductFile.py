@@ -23,7 +23,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
     COMMENTS: Final[str] = 'comments'
     DETECTOR_OBJECT_DISTANCE: Final[str] = 'detector_object_distance_m'
     PROBE_ENERGY: Final[str] = 'probe_energy_eV'
-    PROBE_PHOTON_FLUX: Final[str] = 'probe_photons_per_s'
+    PROBE_PHOTON_COUNT: Final[str] = 'probe_photon_count'
     EXPOSURE_TIME: Final[str] = 'exposure_time_s'
 
     PROBE_ARRAY: Final[str] = 'probe'
@@ -49,7 +49,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
                 comments=str(npzFile[self.COMMENTS]),
                 detectorDistanceInMeters=float(npzFile[self.DETECTOR_OBJECT_DISTANCE]),
                 probeEnergyInElectronVolts=float(npzFile[self.PROBE_ENERGY]),
-                probePhotonsPerSecond=float(npzFile[self.PROBE_PHOTON_FLUX]),
+                probePhotonCount=float(npzFile[self.PROBE_PHOTON_COUNT]),
                 exposureTimeInSeconds=float(npzFile[self.EXPOSURE_TIME]),
             )
 
@@ -104,7 +104,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
         contents[self.COMMENTS] = metadata.comments
         contents[self.DETECTOR_OBJECT_DISTANCE] = metadata.detectorDistanceInMeters
         contents[self.PROBE_ENERGY] = metadata.probeEnergyInElectronVolts
-        contents[self.PROBE_PHOTON_FLUX] = metadata.probePhotonsPerSecond
+        contents[self.PROBE_PHOTON_COUNT] = metadata.probePhotonCount
         contents[self.EXPOSURE_TIME] = metadata.exposureTimeInSeconds
 
         contents[self.PROBE_POSITION_INDEXES] = scanIndexes

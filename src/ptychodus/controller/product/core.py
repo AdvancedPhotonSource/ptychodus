@@ -38,7 +38,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
             'Name',
             'Detector-Object\nDistance [m]',
             'Probe Energy\n[keV]',
-            'Probe Photon\nFlux [ph/s]',
+            'Probe Photon\nCount',
             'Exposure\nTime [s]',
             'Pixel Width\n[nm]',
             'Pixel Height\n[nm]',
@@ -81,7 +81,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 elif index.column() == 2:
                     return f'{metadata.probeEnergyInElectronVolts.getValue() / 1e3:.4g}'
                 elif index.column() == 3:
-                    return f'{metadata.probePhotonsPerSecond.getValue():.4g}'
+                    return f'{metadata.probePhotonCount.getValue():.4g}'
                 elif index.column() == 4:
                     return f'{metadata.exposureTimeInSeconds.getValue():.4g}'
                 elif index.column() == 5:
@@ -123,11 +123,11 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 return True
             elif index.column() == 3:
                 try:
-                    photonsPerSecond = float(value)
+                    photonCount = float(value)
                 except ValueError:
                     return False
 
-                metadata.probePhotonsPerSecond.setValue(photonsPerSecond)
+                metadata.probePhotonCount.setValue(photonCount)
                 return True
             elif index.column() == 4:
                 try:

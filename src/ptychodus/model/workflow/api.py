@@ -155,7 +155,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         comments: str = '',
         detectorDistanceInMeters: float | None = None,
         probeEnergyInElectronVolts: float | None = None,
-        probePhotonsPerSecond: float | None = None,
+        probePhotonCount: float | None = None,
         exposureTimeInSeconds: float | None = None,
     ) -> WorkflowProductAPI:
         productIndex = self._productAPI.insertNewProduct(
@@ -163,7 +163,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             comments=comments,
             detectorDistanceInMeters=detectorDistanceInMeters,
             probeEnergyInElectronVolts=probeEnergyInElectronVolts,
-            probePhotonsPerSecond=probePhotonsPerSecond,
+            probePhotonCount=probePhotonCount,
             exposureTimeInSeconds=exposureTimeInSeconds,
         )
         return self._createProductAPI(productIndex)

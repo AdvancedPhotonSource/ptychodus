@@ -3,7 +3,6 @@ import logging
 
 import h5py
 
-from ptychodus.api.constants import ELECTRON_VOLT_J
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.patterns import (
     DiffractionDataset,
@@ -11,6 +10,7 @@ from ptychodus.api.patterns import (
     DiffractionMetadata,
     SimpleDiffractionDataset,
 )
+from ptychodus.api.product import ELECTRON_VOLT_J
 from ptychodus.api.plugins import PluginRegistry
 
 from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder

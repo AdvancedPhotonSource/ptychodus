@@ -26,7 +26,7 @@ class MetadataRepositoryItem(ParameterGroup):
         comments: str = '',
         detectorDistanceInMeters: float | None = None,
         probeEnergyInElectronVolts: float | None = None,
-        probePhotonsPerSecond: float | None = None,
+        probePhotonCount: float | None = None,
         exposureTimeInSeconds: float | None = None,
     ) -> None:
         super().__init__()
@@ -52,12 +52,12 @@ class MetadataRepositoryItem(ParameterGroup):
 
         self._addParameter('probe_energy_eV', self.probeEnergyInElectronVolts)
 
-        self.probePhotonsPerSecond = settings.probePhotonsPerSecond.copy()
+        self.probePhotonCount = settings.probePhotonCount.copy()
 
-        if probePhotonsPerSecond is not None:
-            self.probePhotonsPerSecond.setValue(probePhotonsPerSecond)
+        if probePhotonCount is not None:
+            self.probePhotonCount.setValue(probePhotonCount)
 
-        self._addParameter('probe_photons_per_second', self.probePhotonsPerSecond)
+        self._addParameter('probe_photon_count', self.probePhotonCount)
 
         self.exposureTimeInSeconds = settings.exposureTimeInSeconds.copy()
 
@@ -73,7 +73,7 @@ class MetadataRepositoryItem(ParameterGroup):
         self.comments.setValue(item.comments.getValue())
         self.detectorDistanceInMeters.setValue(item.detectorDistanceInMeters.getValue())
         self.probeEnergyInElectronVolts.setValue(item.probeEnergyInElectronVolts.getValue())
-        self.probePhotonsPerSecond.setValue(item.probePhotonsPerSecond.getValue())
+        self.probePhotonCount.setValue(item.probePhotonCount.getValue())
         self.exposureTimeInSeconds.setValue(item.exposureTimeInSeconds.getValue())
 
     def assign(self, metadata: ProductMetadata) -> None:
@@ -81,7 +81,7 @@ class MetadataRepositoryItem(ParameterGroup):
         self.comments.setValue(metadata.comments)
         self.detectorDistanceInMeters.setValue(metadata.detectorDistanceInMeters)
         self.probeEnergyInElectronVolts.setValue(metadata.probeEnergyInElectronVolts)
-        self.probePhotonsPerSecond.setValue(metadata.probePhotonsPerSecond)
+        self.probePhotonCount.setValue(metadata.probePhotonCount)
         self.exposureTimeInSeconds.setValue(metadata.exposureTimeInSeconds)
 
     def syncToSettings(self) -> None:
@@ -110,6 +110,6 @@ class MetadataRepositoryItem(ParameterGroup):
             comments=self.comments.getValue(),
             detectorDistanceInMeters=self.detectorDistanceInMeters.getValue(),
             probeEnergyInElectronVolts=self.probeEnergyInElectronVolts.getValue(),
-            probePhotonsPerSecond=self.probePhotonsPerSecond.getValue(),
+            probePhotonCount=self.probePhotonCount.getValue(),
             exposureTimeInSeconds=self.exposureTimeInSeconds.getValue(),
         )

@@ -1,13 +1,18 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from typing import Final
 from dataclasses import dataclass
 from pathlib import Path
 from sys import getsizeof
 
-from .constants import ELECTRON_VOLT_J, LIGHT_SPEED_M_PER_S, PLANCK_CONSTANT_J_PER_HZ
 from .object import Object
 from .probe import Probe
 from .scan import Scan
+
+# Source: https://physics.nist.gov/cuu/Constants/index.html
+ELECTRON_VOLT_J: Final[float] = 1.602176634e-19
+LIGHT_SPEED_M_PER_S: Final[float] = 299792458
+PLANCK_CONSTANT_J_PER_HZ: Final[float] = 6.62607015e-34
 
 
 @dataclass(frozen=True)
@@ -16,7 +21,7 @@ class ProductMetadata:
     comments: str
     detectorDistanceInMeters: float
     probeEnergyInElectronVolts: float
-    probePhotonsPerSecond: float
+    probePhotonCount: float
     exposureTimeInSeconds: float
 
     @property
@@ -38,7 +43,7 @@ class ProductMetadata:
         sz += getsizeof(self.comments)
         sz += getsizeof(self.detectorDistanceInMeters)
         sz += getsizeof(self.probeEnergyInElectronVolts)
-        sz += getsizeof(self.probePhotonsPerSecond)
+        sz += getsizeof(self.probePhotonCount)
         sz += getsizeof(self.exposureTimeInSeconds)
         return sz
 

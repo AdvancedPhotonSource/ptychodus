@@ -28,7 +28,7 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
             comments=metadata.comments,
             detectorDistanceInMeters=metadata.detectorDistanceInMeters,
             probeEnergyInElectronVolts=metadata.probeEnergyInElectronVolts,
-            probePhotonsPerSecond=metadata.probePhotonsPerSecond,
+            probePhotonCount=metadata.probePhotonCount,
             exposureTimeInSeconds=metadata.exposureTimeInSeconds,
         )
 
@@ -39,7 +39,7 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
         comments: str = '',
         detectorDistanceInMeters: float | None = None,
         probeEnergyInElectronVolts: float | None = None,
-        probePhotonsPerSecond: float | None = None,
+        probePhotonCount: float | None = None,
         exposureTimeInSeconds: float | None = None,
     ) -> MetadataRepositoryItem:
         return MetadataRepositoryItem(
@@ -49,7 +49,7 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
             comments=comments,
             detectorDistanceInMeters=detectorDistanceInMeters,
             probeEnergyInElectronVolts=probeEnergyInElectronVolts,
-            probePhotonsPerSecond=probePhotonsPerSecond,
+            probePhotonCount=probePhotonCount,
             exposureTimeInSeconds=exposureTimeInSeconds,
         )
 

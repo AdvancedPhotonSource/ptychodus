@@ -16,13 +16,9 @@ class PatternSizer(Observable, Observer):
         self._sliceX = slice(0)
         self._sliceY = slice(0)
 
-    @classmethod
-    def createInstance(cls, settings: PatternSettings, detector: Detector) -> PatternSizer:
-        sizer = cls(settings, detector)
-        sizer._updateSlicesAndNotifyObservers()
-        settings.addObserver(sizer)
-        detector.addObserver(sizer)
-        return sizer
+        self._updateSlicesAndNotifyObservers()
+        settings.addObserver(self)
+        detector.addObserver(self)
 
     def isCropEnabled(self) -> bool:
         return self._settings.cropEnabled.getValue()

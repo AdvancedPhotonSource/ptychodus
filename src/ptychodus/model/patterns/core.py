@@ -149,7 +149,7 @@ class PatternsCore:
         fileWriterChooser.setCurrentPluginByName(self.patternSettings.fileType.getValue())
         # TODO ^^^^^^^^^^^^^^^^
 
-        self.patternSizer = PatternSizer.createInstance(self.patternSettings, self.detector)
+        self.patternSizer = PatternSizer(self.patternSettings, self.detector)
         self.patternPresenter = DiffractionPatternPresenter.createInstance(
             self.patternSettings, self.patternSizer
         )

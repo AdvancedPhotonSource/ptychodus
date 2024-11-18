@@ -89,7 +89,7 @@ class WorkflowAPI(ABC):
         comments: str = '',
         detectorDistanceInMeters: float | None = None,
         probeEnergyInElectronVolts: float | None = None,
-        probePhotonsPerSecond: float | None = None,
+        probePhotonCount: float | None = None,
         exposureTimeInSeconds: float | None = None,
     ) -> WorkflowProductAPI:
         """creates a new product"""

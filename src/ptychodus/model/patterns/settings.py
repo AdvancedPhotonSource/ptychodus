@@ -63,8 +63,8 @@ class ProductSettings(Observable, Observer):
         self.probeEnergyInElectronVolts = self._settingsGroup.createRealParameter(
             'ProbeEnergyInElectronVolts', 10000.0, minimum=0.0
         )
-        self.probePhotonsPerSecond = self._settingsGroup.createRealParameter(
-            'ProbePhotonsPerSecond', 0.0, minimum=0.0
+        self.probePhotonCount = self._settingsGroup.createRealParameter(
+            'ProbePhotonCount', 0.0, minimum=0.0
         )
         self.exposureTimeInSeconds = self._settingsGroup.createRealParameter(
             'ExposureTimeInSeconds', 0.0, minimum=0.0

@@ -3,15 +3,17 @@ from typing import Final, Sequence
 
 import scipy.io
 
-from ptychodus.api.constants import (
-    ELECTRON_VOLT_J,
-    LIGHT_SPEED_M_PER_S,
-    PLANCK_CONSTANT_J_PER_HZ,
-)
 from ptychodus.api.object import Object, ObjectArrayType, ObjectFileWriter
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe, ProbeFileWriter
-from ptychodus.api.product import Product, ProductFileReader, ProductMetadata
+from ptychodus.api.product import (
+    ELECTRON_VOLT_J,
+    LIGHT_SPEED_M_PER_S,
+    PLANCK_CONSTANT_J_PER_HZ,
+    Product,
+    ProductFileReader,
+    ProductMetadata,
+)
 from ptychodus.api.propagator import WavefieldArrayType
 from ptychodus.api.scan import Scan, ScanPoint
 
@@ -52,7 +54,7 @@ class MATProductFileReader(ProductFileReader):
             comments='',
             detectorDistanceInMeters=0.0,  # not included in file
             probeEnergyInElectronVolts=probe_energy_eV,
-            probePhotonsPerSecond=0.0,  # not included in file
+            probePhotonCount=0.0,  # not included in file
             exposureTimeInSeconds=0.0,  # not included in file
         )
 

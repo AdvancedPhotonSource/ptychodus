@@ -1,14 +1,14 @@
 import numpy
 
-from ptychodus.api.constants import (
-    ELECTRON_VOLT_J,
-    LIGHT_SPEED_M_PER_S,
-    PLANCK_CONSTANT_J_PER_HZ,
-)
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider
+from ptychodus.api.product import (
+    ELECTRON_VOLT_J,
+    LIGHT_SPEED_M_PER_S,
+    PLANCK_CONSTANT_J_PER_HZ,
+)
 
 from ..patterns import PatternSizer
 from .metadata import MetadataRepositoryItem
@@ -32,6 +32,10 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         self._scan.addObserver(self)
 
     @property
+    def probePhotonCount(self) -> float:
+        return self._metadata.probePhotonCount.getValue()
+
+    @property
     def probeEnergyInJoules(self) -> float:
         return self._metadata.probeEnergyInElectronVolts.getValue() * ELECTRON_VOLT_J
 
@@ -45,12 +49,19 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
             return 0.0
 
     @property
-    def detectorDistanceInMeters(self) -> float:
-        return self._metadata.detectorDistanceInMeters.getValue()
+    def probePhotonsPerSecond(self) -> float:
+        try:
+            return self.probePhotonCount / self._metadata.exposureTimeInSeconds.getValue()
+        except ZeroDivisionError:
+            return 0.0
 
     @property
     def probePowerInWatts(self) -> float:
-        return self.probeEnergyInJoules * self._metadata.probePhotonsPerSecond.getValue()
+        return self.probeEnergyInJoules * self.probePhotonsPerSecond
+
+    @property
+    def detectorDistanceInMeters(self) -> float:
+        return self._metadata.detectorDistanceInMeters.getValue()
 
     @property
     def _lambdaZInSquareMeters(self) -> float:
@@ -74,8 +85,8 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
     def fresnelNumber(self) -> float:
         widthInMeters = self._patternSizer.getWidthInMeters()
         heightInMeters = self._patternSizer.getHeightInMeters()
-        sizeInMeters = max(widthInMeters, heightInMeters)
-        return sizeInMeters**2 / self._lambdaZInSquareMeters
+        areaInSquareMeters = widthInMeters * heightInMeters
+        return areaInSquareMeters / self._lambdaZInSquareMeters
 
     def getProbeGeometry(self) -> ProbeGeometry:
         extent = self._patternSizer.getImageExtent()

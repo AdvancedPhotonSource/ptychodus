@@ -75,7 +75,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         comments: str = '',
         detectorDistanceInMeters: float | None = None,
         probeEnergyInElectronVolts: float | None = None,
-        probePhotonsPerSecond: float | None = None,
+        probePhotonCount: float | None = None,
         exposureTimeInSeconds: float | None = None,
         likeIndex: int,
     ) -> int:
@@ -84,7 +84,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             comments=comments,
             detectorDistanceInMeters=detectorDistanceInMeters,
             probeEnergyInElectronVolts=probeEnergyInElectronVolts,
-            probePhotonsPerSecond=probePhotonsPerSecond,
+            probePhotonCount=probePhotonCount,
             exposureTimeInSeconds=exposureTimeInSeconds,
         )
         scanItem = self._scanRepositoryItemFactory.create()

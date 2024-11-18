@@ -22,6 +22,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
         self._header = ['Property', 'Value']
         self._properties = [
             'Probe Wavelength [nm]',
+            'Probe Photon Flux [ph/s]',
             'Probe Power [W]',
             'Object Plane Pixel Width [nm]',
             'Object Plane Pixel Height [nm]',
@@ -39,21 +40,25 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
-            if index.column() == 0:
-                return self._properties[index.row()]
-            elif index.column() == 1:
-                geometry = self._product.getGeometry()
+            match index.column():
+                case 0:
+                    return self._properties[index.row()]
+                case 1:
+                    geometry = self._product.getGeometry()
 
-                if index.row() == 0:
-                    return f'{geometry.probeWavelengthInMeters * 1e9:.4g}'
-                elif index.row() == 1:
-                    return f'{geometry.probePowerInWatts:.4g}'
-                elif index.row() == 2:
-                    return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
-                elif index.row() == 3:
-                    return f'{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}'
-                elif index.row() == 4:
-                    return f'{geometry.fresnelNumber:.4g}'
+                    match index.row():
+                        case 0:
+                            return f'{geometry.probeWavelengthInMeters * 1e9:.4g}'
+                        case 1:
+                            return f'{geometry.probePhotonsPerSecond:.4g}'
+                        case 2:
+                            return f'{geometry.probePowerInWatts:.4g}'
+                        case 3:
+                            return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
+                        case 4:
+                            return f'{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}'
+                        case 5:
+                            return f'{geometry.fresnelNumber:.4g}'
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._properties)

@@ -26,22 +26,22 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
     COMMENTS: Final[str] = 'comments'
     DETECTOR_OBJECT_DISTANCE: Final[str] = 'detector_object_distance_m'
     PROBE_ENERGY: Final[str] = 'probe_energy_eV'
-    PROBE_PHOTON_FLUX: Final[str] = 'probe_photons_per_s'
+    PROBE_PHOTON_COUNT: Final[str] = 'probe_photon_count'
     EXPOSURE_TIME: Final[str] = 'exposure_time_s'
 
     PROBE_ARRAY: Final[str] = 'probe'
-    PROBE_PIXEL_HEIGHT: Final[str] = 'pixel_height_m'
-    PROBE_PIXEL_WIDTH: Final[str] = 'pixel_width_m'
+    PROBE_PIXEL_HEIGHT: Final[str] = 'probe_pixel_height_m'
+    PROBE_PIXEL_WIDTH: Final[str] = 'probe_pixel_width_m'
     PROBE_POSITION_INDEXES: Final[str] = 'probe_position_indexes'
     PROBE_POSITION_X: Final[str] = 'probe_position_x_m'
     PROBE_POSITION_Y: Final[str] = 'probe_position_y_m'
 
     OBJECT_ARRAY: Final[str] = 'object'
-    OBJECT_CENTER_X: Final[str] = 'center_x_m'
-    OBJECT_CENTER_Y: Final[str] = 'center_y_m'
+    OBJECT_CENTER_X: Final[str] = 'object_center_x_m'
+    OBJECT_CENTER_Y: Final[str] = 'object_center_y_m'
     OBJECT_LAYER_DISTANCE: Final[str] = 'object_layer_distance_m'
-    OBJECT_PIXEL_HEIGHT: Final[str] = 'pixel_height_m'
-    OBJECT_PIXEL_WIDTH: Final[str] = 'pixel_width_m'
+    OBJECT_PIXEL_HEIGHT: Final[str] = 'object_pixel_height_m'
+    OBJECT_PIXEL_WIDTH: Final[str] = 'object_pixel_width_m'
 
     COSTS_ARRAY: Final[str] = 'costs'
 
@@ -54,7 +54,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
                 comments=str(h5File.attrs[self.COMMENTS]),
                 detectorDistanceInMeters=float(h5File.attrs[self.DETECTOR_OBJECT_DISTANCE]),
                 probeEnergyInElectronVolts=float(h5File.attrs[self.PROBE_ENERGY]),
-                probePhotonsPerSecond=float(h5File.attrs[self.PROBE_PHOTON_FLUX]),
+                probePhotonCount=float(h5File.attrs[self.PROBE_PHOTON_COUNT]),
                 exposureTimeInSeconds=float(h5File.attrs[self.EXPOSURE_TIME]),
             )
 
@@ -111,7 +111,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             h5File.attrs[self.COMMENTS] = metadata.comments
             h5File.attrs[self.DETECTOR_OBJECT_DISTANCE] = metadata.detectorDistanceInMeters
             h5File.attrs[self.PROBE_ENERGY] = metadata.probeEnergyInElectronVolts
-            h5File.attrs[self.PROBE_PHOTON_FLUX] = metadata.probePhotonsPerSecond
+            h5File.attrs[self.PROBE_PHOTON_COUNT] = metadata.probePhotonCount
             h5File.attrs[self.EXPOSURE_TIME] = metadata.exposureTimeInSeconds
 
             h5File.create_dataset(self.PROBE_POSITION_INDEXES, data=scanIndexes)
