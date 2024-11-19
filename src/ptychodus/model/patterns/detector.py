@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry

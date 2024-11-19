@@ -150,9 +150,7 @@ class PatternsCore:
         # TODO ^^^^^^^^^^^^^^^^
 
         self.patternSizer = PatternSizer(self.patternSettings, self.detector)
-        self.patternPresenter = DiffractionPatternPresenter.createInstance(
-            self.patternSettings, self.patternSizer
-        )
+        self.patternPresenter = DiffractionPatternPresenter(self.patternSettings, self.patternSizer)
 
         self.dataset = ActiveDiffractionDataset(self.patternSettings, self.patternSizer)
         self._builder = ActiveDiffractionDatasetBuilder(self.patternSettings, self.dataset)

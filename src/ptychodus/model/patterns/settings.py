@@ -19,30 +19,37 @@ class PatternSettings(Observable, Observer):
             'ScratchDirectory', Path.home() / '.ptychodus'
         )
         self.numberOfDataThreads = self._settingsGroup.createIntegerParameter(
-            'NumberOfDataThreads', 8
+            'NumberOfDataThreads', 8, minimum=1
         )
 
         self.cropEnabled = self._settingsGroup.createBooleanParameter('CropEnabled', True)
         self.cropCenterXInPixels = self._settingsGroup.createIntegerParameter(
-            'CropCenterXInPixels', 32
+            'CropCenterXInPixels', 32, minimum=0
         )
         self.cropCenterYInPixels = self._settingsGroup.createIntegerParameter(
-            'CropCenterYInPixels', 32
+            'CropCenterYInPixels', 32, minimum=0
         )
-        self.cropWidthInPixels = self._settingsGroup.createIntegerParameter('CropWidthInPixels', 64)
+        self.cropWidthInPixels = self._settingsGroup.createIntegerParameter(
+            'CropWidthInPixels', 64, minimum=1
+        )
         self.cropHeightInPixels = self._settingsGroup.createIntegerParameter(
-            'CropHeightInPixels', 64
+            'CropHeightInPixels', 64, minimum=1
         )
+        # TODO ExtraPaddingXY
         self.flipXEnabled = self._settingsGroup.createBooleanParameter('FlipXEnabled', False)
         self.flipYEnabled = self._settingsGroup.createBooleanParameter('FlipYEnabled', False)
         self.valueLowerBoundEnabled = self._settingsGroup.createBooleanParameter(
             'ValueLowerBoundEnabled', False
         )
-        self.valueLowerBound = self._settingsGroup.createIntegerParameter('ValueLowerBound', 0)
+        self.valueLowerBound = self._settingsGroup.createIntegerParameter(
+            'ValueLowerBound', 0, minimum=0
+        )
         self.valueUpperBoundEnabled = self._settingsGroup.createBooleanParameter(
             'ValueUpperBoundEnabled', False
         )
-        self.valueUpperBound = self._settingsGroup.createIntegerParameter('ValueUpperBound', 65535)
+        self.valueUpperBound = self._settingsGroup.createIntegerParameter(
+            'ValueUpperBound', 65535, minimum=0
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:
