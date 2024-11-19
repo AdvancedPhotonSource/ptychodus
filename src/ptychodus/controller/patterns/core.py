@@ -1,8 +1,7 @@
-from __future__ import annotations
 import logging
 
 from PyQt5.QtCore import QModelIndex
-from PyQt5.QtWidgets import QAbstractItemView, QMessageBox
+from PyQt5.QtWidgets import QAbstractItemView, QFormLayout, QMessageBox
 
 from ptychodus.api.observer import Observable, Observer
 
@@ -13,16 +12,37 @@ from ...model.patterns import (
     DiffractionMetadataPresenter,
     DiffractionPatternPresenter,
 )
-from ...view.patterns import PatternsView
+from ...view.patterns import DetectorView, PatternsView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..image import ImageController
-from .detector import DetectorController
+from ..parametric import LengthWidgetParameterViewController, SpinBoxParameterViewController
+from .dataset import DatasetTreeModel, DatasetTreeNode
 from .info import PatternsInfoViewController
-from .treeModel import DatasetTreeModel, DatasetTreeNode
 from .wizard import OpenDatasetWizardController
 
 logger = logging.getLogger(__name__)
+
+
+class DetectorController:
+    def __init__(self, detector: Detector, view: DetectorView) -> None:
+        self._widthInPixelsViewController = SpinBoxParameterViewController(detector.widthInPixels)
+        self._heightInPixelsViewController = SpinBoxParameterViewController(detector.heightInPixels)
+        self._pixelWidthViewController = LengthWidgetParameterViewController(
+            detector.pixelWidthInMeters
+        )
+        self._pixelHeightViewController = LengthWidgetParameterViewController(
+            detector.pixelHeightInMeters
+        )
+        self._bitDepthViewController = SpinBoxParameterViewController(detector.bitDepth)
+
+        layout = QFormLayout()
+        layout.addRow('Detector Width [px]:', self._widthInPixelsViewController.getWidget())
+        layout.addRow('Detector Height [px]:', self._heightInPixelsViewController.getWidget())
+        layout.addRow('Pixel Width:', self._pixelWidthViewController.getWidget())
+        layout.addRow('Pixel Height:', self._pixelHeightViewController.getWidget())
+        layout.addRow('Bit Depth:', self._bitDepthViewController.getWidget())
+        view.setLayout(layout)
 
 
 class PatternsController(Observer):
@@ -55,44 +75,19 @@ class PatternsController(Observer):
         )
         self._treeModel = DatasetTreeModel()
 
-    @classmethod
-    def createInstance(
-        cls,
-        detector: Detector,
-        ioPresenter: DiffractionDatasetInputOutputPresenter,
-        metadataPresenter: DiffractionMetadataPresenter,
-        datasetPresenter: DiffractionDatasetPresenter,
-        patternPresenter: DiffractionPatternPresenter,
-        imageController: ImageController,
-        view: PatternsView,
-        fileDialogFactory: FileDialogFactory,
-    ) -> PatternsController:
-        controller = cls(
-            detector,
-            ioPresenter,
-            metadataPresenter,
-            datasetPresenter,
-            patternPresenter,
-            imageController,
-            view,
-            fileDialogFactory,
-        )
-
-        view.treeView.setModel(controller._treeModel)
+        view.treeView.setModel(self._treeModel)
         view.treeView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        view.treeView.selectionModel().currentChanged.connect(controller._updateView)
-        controller._updateView(QModelIndex(), QModelIndex())
+        view.treeView.selectionModel().currentChanged.connect(self._updateView)
+        self._updateView(QModelIndex(), QModelIndex())
 
-        view.buttonBox.openButton.clicked.connect(controller._wizardController.openDataset)
-        view.buttonBox.saveButton.clicked.connect(controller._saveDataset)
-        view.buttonBox.infoButton.clicked.connect(controller._openPatternsInfo)
-        view.buttonBox.closeButton.clicked.connect(controller._closeDataset)
+        view.buttonBox.openButton.clicked.connect(self._wizardController.openDataset)
+        view.buttonBox.saveButton.clicked.connect(self._saveDataset)
+        view.buttonBox.infoButton.clicked.connect(self._openPatternsInfo)
+        view.buttonBox.closeButton.clicked.connect(self._closeDataset)
         view.buttonBox.closeButton.setEnabled(False)  # TODO
-        datasetPresenter.addObserver(controller)
+        datasetPresenter.addObserver(self)
 
-        controller._syncModelToView()
-
-        return controller
+        self._syncModelToView()
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         if current.isValid():

@@ -139,12 +139,13 @@ class DatasetTreeModel(QAbstractItemModel):
             node = index.internalPointer()
 
             if role == Qt.ItemDataRole.DisplayRole:
-                if index.column() == 0:
-                    return node.label
-                elif index.column() == 1:
-                    return node.numberOfFrames
-                elif index.column() == 2:
-                    return f'{node.sizeInBytes / (1024 * 1024):.2f}'
+                match index.column():
+                    case 0:
+                        return node.label
+                    case 1:
+                        return node.numberOfFrames
+                    case 2:
+                        return f'{node.sizeInBytes / (1024 * 1024):.2f}'
             elif role == Qt.ItemDataRole.FontRole:
                 font = QFont()
                 font.setItalic(node.state == DiffractionPatternState.FOUND)

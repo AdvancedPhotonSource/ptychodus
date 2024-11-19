@@ -47,7 +47,7 @@ class ControllerCore:
             view.statusBar(),
             self._fileDialogFactory,
         )
-        self._patternsController = PatternsController.createInstance(
+        self._patternsController = PatternsController(
             model.detector,
             model.diffractionDatasetInputOutputPresenter,
             model.diffractionMetadataPresenter,
