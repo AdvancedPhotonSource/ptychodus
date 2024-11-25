@@ -91,64 +91,52 @@ class ObjectGeometryProvider(ABC):
 class Object:
     def __init__(
         self,
-        array: ObjectArrayType | None = None,
-        layerDistanceInMeters: Sequence[float] | None = None,
+        array: ObjectArrayType | None,
+        pixelGeometry: PixelGeometry | None,
+        layerDistanceInMeters: Sequence[float] = [],
         *,
-        pixelWidthInMeters: float = 0.0,
-        pixelHeightInMeters: float = 0.0,
         centerXInMeters: float = 0.0,
         centerYInMeters: float = 0.0,
     ) -> None:
         if array is None:
             self._array = numpy.zeros((1, 0, 0), dtype=complex)
-        else:
-            if numpy.iscomplexobj(array):
-                if array.ndim == 2:
-                    self._array = array[numpy.newaxis, :, :]
-                elif array.ndim == 3:
+        elif numpy.iscomplexobj(array):
+            match array.ndim:
+                case 2:
+                    self._array = array[numpy.newaxis, ...]
+                case 3:
                     self._array = array
-                else:
+                case _:
                     raise ValueError('Object must be 2- or 3-dimensional ndarray.')
-            else:
-                raise TypeError('Object must be a complex-valued ndarray')
-
-        if layerDistanceInMeters is None:
-            self._layerDistanceInMeters: Sequence[float] = [numpy.inf]
         else:
-            self._layerDistanceInMeters = layerDistanceInMeters
+            raise TypeError('Object must be a complex-valued ndarray')
 
-        expectedLayers = self.numberOfLayers
-        actualLayers = len(self._layerDistanceInMeters)
-
-        if actualLayers < expectedLayers:
-            raise ValueError(f'Expected {expectedLayers} layer distances; got {actualLayers}!')
-
-        self._pixelWidthInMeters = pixelWidthInMeters
-        self._pixelHeightInMeters = pixelHeightInMeters
+        self._pixelGeometry = pixelGeometry
+        self._layerDistanceInMeters = layerDistanceInMeters
         self._centerXInMeters = centerXInMeters
         self._centerYInMeters = centerYInMeters
 
+        expectedLayers = self._array.shape[-3]
+        actualLayers = len(layerDistanceInMeters) + 1
+
+        if actualLayers != expectedLayers:
+            raise ValueError(f'Expected {expectedLayers} layer distances; got {actualLayers}!')
+
     def copy(self) -> Object:
         return Object(
-            array=numpy.array(self._array),
+            array=self._array.copy(),
+            pixelGeometry=None if self._pixelGeometry is None else self._pixelGeometry.copy(),
             layerDistanceInMeters=list(self._layerDistanceInMeters),
-            pixelWidthInMeters=float(self._pixelWidthInMeters),
-            pixelHeightInMeters=float(self._pixelHeightInMeters),
             centerXInMeters=float(self._centerXInMeters),
             centerYInMeters=float(self._centerYInMeters),
         )
 
-    @property
-    def array(self) -> ObjectArrayType:
+    def getArray(self) -> ObjectArrayType:
         return self._array
 
     @property
     def dataType(self) -> numpy.dtype:
         return self._array.dtype
-
-    @property
-    def numberOfLayers(self) -> int:
-        return self._array.shape[-3]
 
     @property
     def sizeInBytes(self) -> int:
@@ -163,12 +151,11 @@ class Object:
         return self._array.shape[-2]
 
     @property
-    def pixelWidthInMeters(self) -> float:
-        return self._pixelWidthInMeters
+    def numberOfLayers(self) -> int:
+        return self._array.shape[-3]
 
-    @property
-    def pixelHeightInMeters(self) -> float:
-        return self._pixelHeightInMeters
+    def getPixelGeometry(self) -> PixelGeometry | None:
+        return self._pixelGeometry
 
     @property
     def centerXInMeters(self) -> float:
@@ -179,19 +166,20 @@ class Object:
         return self._centerYInMeters
 
     def getGeometry(self) -> ObjectGeometry:
+        pixelWidthInMeters = 0.0
+        pixelHeightInMeters = 0.0
+
+        if self._pixelGeometry is not None:
+            pixelWidthInMeters = self._pixelGeometry.widthInMeters
+            pixelHeightInMeters = self._pixelGeometry.heightInMeters
+
         return ObjectGeometry(
             widthInPixels=self.widthInPixels,
             heightInPixels=self.heightInPixels,
-            pixelWidthInMeters=self._pixelWidthInMeters,
-            pixelHeightInMeters=self._pixelHeightInMeters,
+            pixelWidthInMeters=pixelWidthInMeters,
+            pixelHeightInMeters=pixelHeightInMeters,
             centerXInMeters=self._centerXInMeters,
             centerYInMeters=self._centerYInMeters,
-        )
-
-    def getPixelGeometry(self) -> PixelGeometry:
-        return PixelGeometry(
-            widthInMeters=self._pixelWidthInMeters,
-            heightInMeters=self._pixelHeightInMeters,
         )
 
     def getLayer(self, number: int) -> ObjectArrayType:
@@ -204,11 +192,8 @@ class Object:
     def layerDistanceInMeters(self) -> Sequence[float]:
         return self._layerDistanceInMeters
 
-    def getLayerDistanceInMeters(self, number: int) -> float:
-        return self._layerDistanceInMeters[number]
-
     def getTotalLayerDistanceInMeters(self) -> float:
-        return sum(self._layerDistanceInMeters[:-1])
+        return sum(self._layerDistanceInMeters)
 
 
 class ObjectInterpolator(ABC):

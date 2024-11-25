@@ -16,17 +16,20 @@ class ProbeSettings(Observable, Observer):
         )
         self.fileType = self._settingsGroup.createStringParameter('FileType', 'NPY')
 
-        self.numberOfModes = self._settingsGroup.createIntegerParameter(
-            'NumberOfModes', 1, minimum=1
+        self.numberOfCoherentModes = self._settingsGroup.createIntegerParameter(
+            'NumberOfCoherentModes', 1, minimum=1
         )
-        self.isOrthogonalizeModesEnabled = self._settingsGroup.createBooleanParameter(
-            'OrthogonalizeModesEnabled', True
+        self.numberOfIncoherentModes = self._settingsGroup.createIntegerParameter(
+            'NumberOfIncoherentModes', 1, minimum=1
         )
-        self.modeDecayType = self._settingsGroup.createStringParameter(
-            'ModeDecayType', 'Polynomial'
+        self.orthogonalizeIncoherentModes = self._settingsGroup.createBooleanParameter(
+            'OrthogonalizeIncoherentModes', True
         )
-        self.modeDecayRatio = self._settingsGroup.createRealParameter(
-            'ModeDecayRatio', 1.0, minimum=0.0, maximum=1.0
+        self.incoherentModeDecayType = self._settingsGroup.createStringParameter(
+            'IncoherentModeDecayType', 'Polynomial'
+        )
+        self.incoherentModeDecayRatio = self._settingsGroup.createRealParameter(
+            'IncoherentModeDecayRatio', 1.0, minimum=0.0, maximum=1.0
         )
 
         self.diskDiameterInMeters = self._settingsGroup.createRealParameter(

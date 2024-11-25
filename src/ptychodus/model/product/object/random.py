@@ -60,8 +60,7 @@ class RandomObjectBuilder(ObjectBuilder):
         return Object(
             array=numpy.clip(amplitude, 0.0, 1.0) * numpy.exp(1j * phase),
             layerDistanceInMeters=layerDistanceInMeters,
-            pixelWidthInMeters=geometry.pixelWidthInMeters,
-            pixelHeightInMeters=geometry.pixelHeightInMeters,
+            pixelGeometry=geometry.getPixelGeometry(),
             centerXInMeters=geometry.centerXInMeters,
             centerYInMeters=geometry.centerYInMeters,
         )

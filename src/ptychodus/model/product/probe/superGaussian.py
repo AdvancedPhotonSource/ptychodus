@@ -41,6 +41,5 @@ class SuperGaussianProbeBuilder(ProbeBuilder):
 
         return Probe(
             array=self.normalize(numpy.exp(-numpy.log(2) * ZP) + 0j),
-            pixelWidthInMeters=geometry.pixelWidthInMeters,
-            pixelHeightInMeters=geometry.pixelHeightInMeters,
+            pixelGeometry=geometry.getPixelGeometry(),
         )

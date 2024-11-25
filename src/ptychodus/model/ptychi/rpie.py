@@ -202,7 +202,7 @@ class RPIEReconstructor(Reconstructor):
             optimization_plan=optimization_plan,
             optimizer=optimizer,
             step_size=self._objectSettings.stepSize.getValue(),
-            initial_guess=object_.array,
+            initial_guess=object_.getArray(),
             slice_spacings_m=numpy.array(object_.layerDistanceInMeters[:-1]),
             l1_norm_constraint_weight=l1_norm_constraint_weight,
             l1_norm_constraint_stride=self._objectSettings.constrainL1NormStride.getValue(),
@@ -256,7 +256,7 @@ class RPIEReconstructor(Reconstructor):
             optimization_plan=optimization_plan,
             optimizer=optimizer,
             step_size=self._probeSettings.stepSize.getValue(),
-            initial_guess=probe.array[numpy.newaxis, ...],  # TODO opr
+            initial_guess=probe.getArray(),
             probe_power=probe_power,
             probe_power_constraint_stride=self._probeSettings.constrainProbePowerStride.getValue(),
             orthogonalize_incoherent_modes=self._probeSettings.orthogonalizeIncoherentModes.getValue(),
@@ -355,9 +355,8 @@ class RPIEReconstructor(Reconstructor):
         object_in = parameters.product.object_
         object_out = Object(
             array=numpy.array(object_out_array),
-            layerDistanceInMeters=object_in.layerDistanceInMeters,  # FIXME re-add sentinel; optimized?
-            pixelWidthInMeters=object_in.pixelWidthInMeters,
-            pixelHeightInMeters=object_in.pixelHeightInMeters,
+            layerDistanceInMeters=object_in.layerDistanceInMeters,
+            pixelGeometry=object_in.getPixelGeometry(),
             centerXInMeters=object_in.centerXInMeters,
             centerYInMeters=object_in.centerYInMeters,
         )
@@ -365,8 +364,7 @@ class RPIEReconstructor(Reconstructor):
         probe_in = parameters.product.probe
         probe_out = Probe(
             array=numpy.array(probe_out_array[0]),
-            pixelWidthInMeters=probe_in.pixelWidthInMeters,
-            pixelHeightInMeters=probe_in.pixelHeightInMeters,
+            pixelGeometry=probe_in.getPixelGeometry(),
         )
 
         scan_in = parameters.product.scan

@@ -109,8 +109,15 @@ class FromFileProbeBuilder(ProbeBuilder):
         logger.debug(f'Reading "{filePath}" as "{fileType}"')
 
         try:
-            probe = self._fileReader.read(filePath)
+            probeFromFile = self._fileReader.read(filePath)
         except Exception as exc:
             raise RuntimeError(f'Failed to read "{filePath}"') from exc
 
-        return probe
+        pixelGeometryFromFile = probeFromFile.getPixelGeometry()
+        pixelGeometryFromProvider = geometryProvider.getProbeGeometry().getPixelGeometry()
+
+        if pixelGeometryFromFile is None:
+            return Probe(probeFromFile.getArray(), pixelGeometryFromProvider)
+
+        # TODO remap probe from pixelGeometryFromFile to pixelGeometryFromProvider
+        return probeFromFile

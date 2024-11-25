@@ -72,9 +72,12 @@ class ProbePropagationViewController(Observer):
             logger.exception(err)
             ExceptionDialog.showException('Update Current Coordinate', err)
         else:
-            self._xyVisualizationWidgetController.setArray(
-                xyProjection, self._propagator.getPixelGeometry()
-            )
+            pixelGeometry = self._propagator.getPixelGeometry()
+
+            if pixelGeometry is None:
+                logger.warning('Missing propagator pixel geometry!')
+            else:
+                self._xyVisualizationWidgetController.setArray(xyProjection, pixelGeometry)
 
         # TODO auto-units
         lerpValue *= 1e6
@@ -142,13 +145,18 @@ class ProbePropagationViewController(Observer):
             self._dialog.coordinateSlider.setValue(0)
 
         self._updateCurrentCoordinate(self._dialog.coordinateSlider.value())
+        pixelGeometry = self._propagator.getPixelGeometry()
+
+        if pixelGeometry is None:
+            logger.warning('Missing propagator pixel geometry!')
+            return
 
         try:
             self._zxVisualizationWidgetController.setArray(
-                self._propagator.getZXProjection(), self._propagator.getPixelGeometry()
+                self._propagator.getZXProjection(), pixelGeometry
             )
             self._zyVisualizationWidgetController.setArray(
-                self._propagator.getZYProjection(), self._propagator.getPixelGeometry()
+                self._propagator.getZYProjection(), pixelGeometry
             )
         except ValueError:
             self._zxVisualizationWidgetController.clearArray()

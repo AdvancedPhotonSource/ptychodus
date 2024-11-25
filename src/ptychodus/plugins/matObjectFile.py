@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy
@@ -10,28 +11,28 @@ from ptychodus.api.plugins import PluginRegistry
 class MATObjectFileReader(ObjectFileReader):
     def read(self, filePath: Path) -> Object:
         matDict = scipy.io.loadmat(filePath)
-        array = matDict['object']
 
-        if array.ndim == 3:
-            # array[width, height, num_layers]
-            array = array.transpose(2, 0, 1)
+        # array[width, height, num_layers]
+        array = matDict['object']
+        layerDistanceInMeters: Sequence[float] = list()
 
         try:
             p = matDict['p'][0, 0]
             multi_slice_param = p['multi_slice_param'][0, 0]
             layerDistanceInMeters = numpy.squeeze(multi_slice_param['z_distance'])
         except ValueError:
-            object_ = Object(array)
-        else:
-            object_ = Object(array, layerDistanceInMeters)
+            pass
 
-        return object_
+        # FIXME test & add pixel geometry
+        return Object(
+            array=array.transpose(), pixelGeometry=None, layerDistanceInMeters=layerDistanceInMeters
+        )
 
 
 class MATObjectFileWriter(ObjectFileWriter):
     def write(self, filePath: Path, object_: Object) -> None:
-        array = object_.array
-        matDict = {'object': array.transpose(1, 2, 0)}
+        array = object_.getArray()
+        matDict = {'object': array.transpose()}
         # TODO layer distance to p.z_distance
         scipy.io.savemat(filePath, matDict)
 

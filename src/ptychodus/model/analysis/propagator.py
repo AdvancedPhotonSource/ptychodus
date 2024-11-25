@@ -1,6 +1,7 @@
 from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 import logging
 
 import numpy
@@ -49,15 +50,17 @@ class ProbePropagator(Observable):
         beginCoordinateInMeters: float,
         endCoordinateInMeters: float,
         numberOfSteps: int,
-    ) -> None:
+    ) -> None:  # FIXME OPR
         item = self._repository[self._productIndex]
         probe = item.getProbe().getProbe()
         wavelengthInMeters = item.getGeometry().probeWavelengthInMeters
         propagatedWavefield = numpy.zeros(
-            (numberOfSteps, *probe.array.shape),
-            dtype=probe.array.dtype,
+            (numberOfSteps, probe.heightInPixels, probe.widthInPixels),
+            dtype=probe.dataType,
         )
-        propagatedIntensity = numpy.zeros((numberOfSteps, *probe.array.shape[-2:]))
+        propagatedIntensity = numpy.zeros(
+            (numberOfSteps, probe.heightInPixels, probe.widthInPixels)
+        )
         distanceInMeters = numpy.linspace(
             beginCoordinateInMeters, endCoordinateInMeters, numberOfSteps
         )
@@ -66,16 +69,16 @@ class ProbePropagator(Observable):
         for idx, zInMeters in enumerate(distanceInMeters):
             propagatorParameters = PropagatorParameters(
                 wavelength_m=wavelengthInMeters,
-                width_px=probe.array.shape[-1],
-                height_px=probe.array.shape[-2],
+                width_px=probe.widthInPixels,
+                height_px=probe.heightInPixels,
                 pixel_width_m=pixelGeometry.widthInMeters,
                 pixel_height_m=pixelGeometry.heightInMeters,
                 propagation_distance_m=zInMeters,
             )
             propagator = AngularSpectrumPropagator(propagatorParameters)
 
-            for mode in range(probe.array.shape[-3]):
-                wf = propagator.propagate(probe.array[mode])
+            for mode in range(probe.numberOfIncoherentModes):
+                wf = propagator.propagate(probe.getIncoherentMode(mode))
                 propagatedWavefield[idx, mode, :, :] = wf
                 propagatedIntensity[idx, :, :] += intensity(wf)
 
@@ -95,7 +98,7 @@ class ProbePropagator(Observable):
         item = self._repository[self._productIndex]
         return item.getProbe().getProbe()
 
-    def getPixelGeometry(self) -> PixelGeometry:
+    def getPixelGeometry(self) -> PixelGeometry | None:
         probe = self._getProbe()
         return probe.getPixelGeometry()
 
@@ -139,19 +142,17 @@ class ProbePropagator(Observable):
         if self._propagatedWavefield is None or self._propagatedIntensity is None:
             raise ValueError('No propagated wavefield!')
 
-        pixelGeometry = self.getPixelGeometry()
-        numpy.savez(
-            filePath,
-            'begin_coordinate_m',
-            float(self.getBeginCoordinateInMeters()),
-            'end_coordinate_m',
-            float(self.getEndCoordinateInMeters()),
-            'pixel_height_m',
-            pixelGeometry.heightInMeters,
-            'pixel_width_m',
-            pixelGeometry.widthInMeters,
-            'wavefield',
-            self._propagatedWavefield,
-            'intensity',
-            self._propagatedIntensity,
-        )
+        contents: dict[str, Any] = {
+            'begin_coordinate_m': self.getBeginCoordinateInMeters(),
+            'end_coordinate_m': self.getEndCoordinateInMeters(),
+            'wavefield': self._propagatedWavefield,
+            'intensity': self._propagatedIntensity,
+        }
+
+        pixel_geometry = self.getPixelGeometry()
+
+        if pixel_geometry is not None:
+            contents['pixel_height_m'] = pixel_geometry.heightInMeters
+            contents['pixel_width_m'] = pixel_geometry.widthInMeters
+
+        numpy.savez(filePath, **contents)

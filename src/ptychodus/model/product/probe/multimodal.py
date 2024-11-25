@@ -27,17 +27,17 @@ class MultimodalProbeBuilder(ParameterGroup):
         self._rng = rng
         self._settings = settings
 
-        self.numberOfModes = settings.numberOfModes.copy()
-        self._addParameter('number_of_modes', self.numberOfModes)
+        self.numberOfIncoherentModes = settings.numberOfIncoherentModes.copy()
+        self._addParameter('number_of_incoherent_modes', self.numberOfIncoherentModes)
 
-        self.modeDecayType = settings.modeDecayType.copy()
-        self._addParameter('mode_decay_type', self.modeDecayType)
+        self.incoherentModeDecayType = settings.incoherentModeDecayType.copy()
+        self._addParameter('incoherent_mode_decay_type', self.incoherentModeDecayType)
 
-        self.modeDecayRatio = settings.modeDecayRatio.copy()
-        self._addParameter('mode_decay_ratio', self.modeDecayRatio)
+        self.incoherentModeDecayRatio = settings.incoherentModeDecayRatio.copy()
+        self._addParameter('incoherent_mode_decay_ratio', self.incoherentModeDecayRatio)
 
-        self.isOrthogonalizeModesEnabled = settings.isOrthogonalizeModesEnabled.copy()
-        self._addParameter('orthogonalize_modes', self.isOrthogonalizeModesEnabled)
+        self.orthogonalizeIncoherentModes = settings.orthogonalizeIncoherentModes.copy()
+        self._addParameter('orthogonalize_incoherent_modes', self.orthogonalizeIncoherentModes)
 
     def syncToSettings(self) -> None:
         for parameter in self.parameters().values():
@@ -67,7 +67,7 @@ class MultimodalProbeBuilder(ParameterGroup):
         else:
             raise ValueError('Probe array must contain at least two dimensions.')
 
-        for mode in range(self.numberOfModes.getValue() - 1):
+        for mode in range(self.numberOfIncoherentModes.getValue() - 1):
             # randomly shift the first mode
             pw = probe.shape[-1]  # TODO clean up
             variate1 = self._rng.uniform(size=(2, 1)) - 0.5
@@ -79,7 +79,7 @@ class MultimodalProbeBuilder(ParameterGroup):
 
         return numpy.stack(modeList)
 
-    def _orthogonalizeModes(self, probe: WavefieldArrayType) -> WavefieldArrayType:
+    def _orthogonalizeIncoherentModes(self, probe: WavefieldArrayType) -> WavefieldArrayType:
         probeModesAsRows = probe.reshape(probe.shape[-3], -1)
         probeModesAsCols = probeModesAsRows.T
         probeModesAsOrthoCols = scipy.linalg.orth(probeModesAsCols)
@@ -87,20 +87,20 @@ class MultimodalProbeBuilder(ParameterGroup):
         return probeModesAsOrthoRows.reshape(*probe.shape)
 
     def _getModeWeights(self, totalNumberOfModes: int) -> Sequence[float]:
-        modeDecayTypeText = self.modeDecayType.getValue()
-        modeDecayRatio = self.modeDecayRatio.getValue()
+        incoherentModeDecayTypeText = self.incoherentModeDecayType.getValue()
+        incoherentModeDecayRatio = self.incoherentModeDecayRatio.getValue()
 
-        if modeDecayRatio > 0.0:
+        if incoherentModeDecayRatio > 0.0:
             try:
-                modeDecayType = ProbeModeDecayType[modeDecayTypeText.upper()]
+                incoherentModeDecayType = ProbeModeDecayType[incoherentModeDecayTypeText.upper()]
             except KeyError:
-                modeDecayType = ProbeModeDecayType.POLYNOMIAL
+                incoherentModeDecayType = ProbeModeDecayType.POLYNOMIAL
 
-            if modeDecayType == ProbeModeDecayType.EXPONENTIAL:
-                b = 1.0 + (1.0 - modeDecayRatio) / modeDecayRatio
+            if incoherentModeDecayType == ProbeModeDecayType.EXPONENTIAL:
+                b = 1.0 + (1.0 - incoherentModeDecayRatio) / incoherentModeDecayRatio
                 return [b**-n for n in range(totalNumberOfModes)]
             else:
-                b = numpy.log(modeDecayRatio) / numpy.log(2.0)
+                b = numpy.log(incoherentModeDecayRatio) / numpy.log(2.0)
                 return [(n + 1) ** b for n in range(totalNumberOfModes)]
 
         return [1.0] + [0.0] * (totalNumberOfModes - 1)
@@ -117,18 +117,17 @@ class MultimodalProbeBuilder(ParameterGroup):
         return adjustedProbe
 
     def build(self, probe: Probe) -> Probe:
-        if self.numberOfModes.getValue() <= 1:
+        if self.numberOfIncoherentModes.getValue() <= 1:
             return probe
 
-        array = self._initializeModes(probe.array)
+        array = self._initializeModes(probe.getArray())
 
-        if self.isOrthogonalizeModesEnabled.getValue():
-            array = self._orthogonalizeModes(array)
+        if self.orthogonalizeIncoherentModes.getValue():
+            array = self._orthogonalizeIncoherentModes(array)
 
         array = self._adjustRelativePower(array)
 
         return Probe(
             array,
-            pixelWidthInMeters=probe.pixelWidthInMeters,
-            pixelHeightInMeters=probe.pixelHeightInMeters,
+            pixelGeometry=probe.getPixelGeometry(),
         )

@@ -3,7 +3,8 @@ from typing import Final, Sequence
 
 import scipy.io
 
-from ptychodus.api.object import Object, ObjectArrayType, ObjectFileWriter
+from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.object import Object, ObjectFileWriter
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe, ProbeFileWriter
 from ptychodus.api.product import (
@@ -14,32 +15,12 @@ from ptychodus.api.product import (
     ProductFileReader,
     ProductMetadata,
 )
-from ptychodus.api.propagator import WavefieldArrayType
 from ptychodus.api.scan import Scan, ScanPoint
 
 
 class MATProductFileReader(ProductFileReader):
     SIMPLE_NAME: Final[str] = 'PtychoShelves'
     DISPLAY_NAME: Final[str] = 'PtychoShelves Files (*.mat)'
-
-    def _load_probe_array(self, probeMatrix: WavefieldArrayType) -> WavefieldArrayType:
-        if probeMatrix.ndim == 4:
-            # probeMatrix[width, height, num_shared_modes, num_varying_modes]
-            # TODO support spatially varying probe modes
-            probeMatrix = probeMatrix[..., 0]
-
-        if probeMatrix.ndim == 3:
-            # probeMatrix[width, height, num_shared_modes]
-            probeMatrix = probeMatrix
-
-        return probeMatrix.transpose(2, 0, 1)
-
-    def _load_object_array(self, objectMatrix: ObjectArrayType) -> ObjectArrayType:
-        if objectMatrix.ndim == 3:
-            # objectMatrix[width, height, num_layers]
-            objectMatrix = objectMatrix.transpose(2, 0, 1)
-
-        return objectMatrix
 
     def read(self, filePath: Path) -> Product:
         scanPointList: list[ScanPoint] = list()
@@ -61,6 +42,7 @@ class MATProductFileReader(ProductFileReader):
         dx_spec = p_struct['dx_spec']
         pixel_width_m = dx_spec[0]
         pixel_height_m = dx_spec[1]
+        pixel_geometry = PixelGeometry(widthInMeters=pixel_width_m, heightInMeters=pixel_height_m)
 
         outputs_struct = matDict['outputs']
         probe_positions = outputs_struct['probe_positions']
@@ -74,12 +56,12 @@ class MATProductFileReader(ProductFileReader):
             scanPointList.append(point)
 
         probe = Probe(
-            self._load_probe_array(matDict['probe']),
-            pixelWidthInMeters=pixel_width_m,
-            pixelHeightInMeters=pixel_height_m,
+            # probeMatrix[width, height, num_shared_modes, num_varying_modes]
+            matDict['probe'].transpose(),
+            pixel_geometry,
         )
 
-        layer_distance_m: Sequence[float] | None = None
+        layer_distance_m: Sequence[float] = list()
 
         try:
             multi_slice_param = p_struct['multi_slice_param']
@@ -94,10 +76,10 @@ class MATProductFileReader(ProductFileReader):
                 layer_distance_m = z_distance.tolist()
 
         object_ = Object(
-            self._load_object_array(matDict['object']),
+            # object[width, height, num_layers]
+            matDict['object'].transpose(),
+            pixel_geometry,
             layer_distance_m,
-            pixelWidthInMeters=pixel_width_m,
-            pixelHeightInMeters=pixel_height_m,
         )
         costs = outputs_struct['fourier_error_out']
 
@@ -112,16 +94,16 @@ class MATProductFileReader(ProductFileReader):
 
 class MATObjectFileWriter(ObjectFileWriter):
     def write(self, filePath: Path, object_: Object) -> None:
-        array = object_.array
-        matDict = {'object': array.transpose(1, 2, 0)}
+        array = object_.getArray()
+        matDict = {'object': array.transpose()}
         # TODO layer distance to p.z_distance
         scipy.io.savemat(filePath, matDict)
 
 
 class MATProbeFileWriter(ProbeFileWriter):
     def write(self, filePath: Path, probe: Probe) -> None:
-        array = probe.array
-        matDict = {'probe': array.transpose(1, 2, 0)}
+        array = probe.getArray()
+        matDict = {'probe': array.transpose()}
         scipy.io.savemat(filePath, matDict)
 
 

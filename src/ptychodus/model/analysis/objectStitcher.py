@@ -55,8 +55,7 @@ class ObjectStitcher:
     def build(self) -> Object:
         return Object(
             array=self._array,
-            pixelWidthInMeters=self._geometry.pixelWidthInMeters,
-            pixelHeightInMeters=self._geometry.pixelHeightInMeters,
+            pixelGeometry=self._geometry.getPixelGeometry(),
             centerXInMeters=self._geometry.centerXInMeters,
             centerYInMeters=self._geometry.centerYInMeters,
         )

@@ -66,16 +66,21 @@ class XMCDViewController:
             return
 
         self._result = result
-        self._differenceVisualizationWidgetController.setArray(
-            result.polar_difference[0, :, :], result.pixel_geometry
-        )
-        self._sumVisualizationWidgetController.setArray(
-            result.polar_sum[0, :, :], result.pixel_geometry
-        )
-        # TODO support multi-layer objects
-        self._ratioVisualizationWidgetController.setArray(
-            result.polar_ratio[0, :, :], result.pixel_geometry
-        )
+        pixel_geometry = result.pixel_geometry
+
+        if pixel_geometry is None:
+            logger.warning('Missing XMCD pixel geometry!')
+        else:
+            self._differenceVisualizationWidgetController.setArray(
+                result.polar_difference[0, :, :], pixel_geometry
+            )
+            self._sumVisualizationWidgetController.setArray(
+                result.polar_sum[0, :, :], pixel_geometry
+            )
+            # TODO support multi-layer objects
+            self._ratioVisualizationWidgetController.setArray(
+                result.polar_ratio[0, :, :], pixel_geometry
+            )
 
     def analyze(self, lcircItemIndex: int, rcircItemIndex: int) -> None:
         self._dialog.parametersView.lcircComboBox.setCurrentIndex(lcircItemIndex)

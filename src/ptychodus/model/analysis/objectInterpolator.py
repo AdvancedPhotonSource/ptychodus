@@ -42,16 +42,16 @@ class ObjectLinearInterpolator(ObjectInterpolator):
         w10 = xiC * eta
         w11 = xi * eta
 
-        patch = w00 * self._object.array[:, iySlice0, ixSlice0]
-        patch += w01 * self._object.array[:, iySlice0, ixSlice1]
-        patch += w10 * self._object.array[:, iySlice1, ixSlice0]
-        patch += w11 * self._object.array[:, iySlice1, ixSlice1]
+        objectArray = self._object.getArray()
+        patch = w00 * objectArray[:, iySlice0, ixSlice0]
+        patch += w01 * objectArray[:, iySlice0, ixSlice1]
+        patch += w10 * objectArray[:, iySlice1, ixSlice0]
+        patch += w11 * objectArray[:, iySlice1, ixSlice1]
 
         return Object(
             array=patch,
             layerDistanceInMeters=self._object.layerDistanceInMeters,
-            pixelWidthInMeters=geometry.pixelWidthInMeters,
-            pixelHeightInMeters=geometry.pixelHeightInMeters,
+            pixelGeometry=geometry.getPixelGeometry(),
             centerXInMeters=geometry.centerXInMeters,
             centerYInMeters=geometry.centerYInMeters,
         )

@@ -2,17 +2,17 @@ from pathlib import Path
 import logging
 
 import h5py
-import numpy
 
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe, ProbeFileReader
+from ptychodus.api.propagator import WavefieldArrayType
 
 logger = logging.getLogger(__name__)
 
 
 class CXIProbeFileReader(ProbeFileReader):
     def read(self, filePath: Path) -> Probe:
-        array = numpy.zeros((0, 0, 0), dtype=complex)
+        array: WavefieldArrayType | None = None
 
         with h5py.File(filePath, 'r') as h5File:
             try:
@@ -20,7 +20,7 @@ class CXIProbeFileReader(ProbeFileReader):
             except KeyError:
                 logger.warning('Unable to load probe.')
 
-        return Probe(array)
+        return Probe(array=array, pixelGeometry=None)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

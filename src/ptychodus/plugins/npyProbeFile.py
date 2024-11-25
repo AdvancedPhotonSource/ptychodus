@@ -9,12 +9,12 @@ from ptychodus.api.probe import Probe, ProbeFileReader, ProbeFileWriter
 class NPYProbeFileReader(ProbeFileReader):
     def read(self, filePath: Path) -> Probe:
         array = numpy.load(filePath)
-        return Probe(array)
+        return Probe(array=array, pixelGeometry=None)
 
 
 class NPYProbeFileWriter(ProbeFileWriter):
     def write(self, filePath: Path, probe: Probe) -> None:
-        array = probe.array
+        array = probe.getArray()
         numpy.save(filePath, array)
 
 

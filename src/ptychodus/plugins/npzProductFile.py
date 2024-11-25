@@ -3,6 +3,7 @@ from typing import Any, Final
 
 import numpy
 
+from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectFileReader
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe, ProbeFileReader
@@ -57,17 +58,20 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
             scanXInMeters = npzFile[self.PROBE_POSITION_X]
             scanYInMeters = npzFile[self.PROBE_POSITION_Y]
 
-            probe = Probe(
-                array=npzFile[self.PROBE_ARRAY],
-                pixelWidthInMeters=float(npzFile[self.PROBE_PIXEL_WIDTH]),
-                pixelHeightInMeters=float(npzFile[self.PROBE_PIXEL_HEIGHT]),
+            probePixelGeometry = PixelGeometry(
+                widthInMeters=float(npzFile[self.PROBE_PIXEL_WIDTH]),
+                heightInMeters=float(npzFile[self.PROBE_PIXEL_HEIGHT]),
             )
+            probe = Probe(array=npzFile[self.PROBE_ARRAY], pixelGeometry=probePixelGeometry)
 
+            objectPixelGeometry = PixelGeometry(
+                widthInMeters=float(npzFile[self.OBJECT_PIXEL_WIDTH]),
+                heightInMeters=float(npzFile[self.OBJECT_PIXEL_HEIGHT]),
+            )
             object_ = Object(
                 array=npzFile[self.OBJECT_ARRAY],
+                pixelGeometry=objectPixelGeometry,
                 layerDistanceInMeters=npzFile[self.OBJECT_LAYER_DISTANCE],
-                pixelWidthInMeters=float(npzFile[self.OBJECT_PIXEL_WIDTH]),
-                pixelHeightInMeters=float(npzFile[self.OBJECT_PIXEL_HEIGHT]),
                 centerXInMeters=float(npzFile[self.OBJECT_CENTER_X]),
                 centerYInMeters=float(npzFile[self.OBJECT_CENTER_Y]),
             )
@@ -113,13 +117,13 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
 
         probe = product.probe
         probeGeometry = probe.getGeometry()
-        contents[self.PROBE_ARRAY] = probe.array
+        contents[self.PROBE_ARRAY] = probe.getArray()
         contents[self.PROBE_PIXEL_WIDTH] = probeGeometry.pixelWidthInMeters
         contents[self.PROBE_PIXEL_HEIGHT] = probeGeometry.pixelHeightInMeters
 
         object_ = product.object_
         objectGeometry = object_.getGeometry()
-        contents[self.OBJECT_ARRAY] = object_.array
+        contents[self.OBJECT_ARRAY] = object_.getArray()
         contents[self.OBJECT_CENTER_X] = objectGeometry.centerXInMeters
         contents[self.OBJECT_CENTER_Y] = objectGeometry.centerYInMeters
         contents[self.OBJECT_PIXEL_WIDTH] = objectGeometry.pixelWidthInMeters
@@ -150,21 +154,24 @@ class NPZScanFileReader(ScanFileReader):
 class NPZProbeFileReader(ProbeFileReader):
     def read(self, filePath: Path) -> Probe:
         with numpy.load(filePath) as npzFile:
-            return Probe(
-                array=npzFile[NPZProductFileIO.PROBE_ARRAY],
-                pixelWidthInMeters=float(npzFile[NPZProductFileIO.PROBE_PIXEL_WIDTH]),
-                pixelHeightInMeters=float(npzFile[NPZProductFileIO.PROBE_PIXEL_HEIGHT]),
+            pixelGeometry = PixelGeometry(
+                widthInMeters=float(npzFile[NPZProductFileIO.PROBE_PIXEL_WIDTH]),
+                heightInMeters=float(npzFile[NPZProductFileIO.PROBE_PIXEL_HEIGHT]),
             )
+            return Probe(array=npzFile[NPZProductFileIO.PROBE_ARRAY], pixelGeometry=pixelGeometry)
 
 
 class NPZObjectFileReader(ObjectFileReader):
     def read(self, filePath: Path) -> Object:
         with numpy.load(filePath) as npzFile:
+            pixelGeometry = PixelGeometry(
+                widthInMeters=float(npzFile[NPZProductFileIO.OBJECT_PIXEL_WIDTH]),
+                heightInMeters=float(npzFile[NPZProductFileIO.OBJECT_PIXEL_HEIGHT]),
+            )
             return Object(
                 array=npzFile[NPZProductFileIO.OBJECT_ARRAY],
+                pixelGeometry=pixelGeometry,
                 layerDistanceInMeters=npzFile[NPZProductFileIO.OBJECT_LAYER_DISTANCE],
-                pixelWidthInMeters=float(npzFile[NPZProductFileIO.OBJECT_PIXEL_WIDTH]),
-                pixelHeightInMeters=float(npzFile[NPZProductFileIO.OBJECT_PIXEL_HEIGHT]),
                 centerXInMeters=float(npzFile[NPZProductFileIO.OBJECT_CENTER_X]),
                 centerYInMeters=float(npzFile[NPZProductFileIO.OBJECT_CENTER_Y]),
             )

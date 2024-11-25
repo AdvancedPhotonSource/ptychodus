@@ -294,11 +294,16 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             else:
                 probe = item.getProbe()
                 array = (
-                    probe.getMode(current.row())
+                    probe.getIncoherentMode(current.row())
                     if current.parent().isValid()
-                    else probe.getModesFlattened()
+                    else probe.getIncoherentModesFlattened()
                 )
-                self._imageController.setArray(array, probe.getPixelGeometry())
+                pixelGeometry = probe.getPixelGeometry()
+
+                if pixelGeometry is None:
+                    logger.warning('Missing probe pixel geometry!')
+                else:
+                    self._imageController.setArray(array, pixelGeometry)
 
     def handleItemInserted(self, index: int, item: ProbeRepositoryItem) -> None:
         self._treeModel.insertItem(index, item)

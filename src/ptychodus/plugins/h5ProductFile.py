@@ -4,6 +4,7 @@ import logging
 
 import h5py
 
+from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe
@@ -30,18 +31,18 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
     EXPOSURE_TIME: Final[str] = 'exposure_time_s'
 
     PROBE_ARRAY: Final[str] = 'probe'
-    PROBE_PIXEL_HEIGHT: Final[str] = 'probe_pixel_height_m'
-    PROBE_PIXEL_WIDTH: Final[str] = 'probe_pixel_width_m'
+    PROBE_PIXEL_HEIGHT: Final[str] = 'pixel_height_m'
+    PROBE_PIXEL_WIDTH: Final[str] = 'pixel_width_m'
     PROBE_POSITION_INDEXES: Final[str] = 'probe_position_indexes'
     PROBE_POSITION_X: Final[str] = 'probe_position_x_m'
     PROBE_POSITION_Y: Final[str] = 'probe_position_y_m'
 
     OBJECT_ARRAY: Final[str] = 'object'
-    OBJECT_CENTER_X: Final[str] = 'object_center_x_m'
-    OBJECT_CENTER_Y: Final[str] = 'object_center_y_m'
+    OBJECT_CENTER_X: Final[str] = 'center_x_m'
+    OBJECT_CENTER_Y: Final[str] = 'center_y_m'
     OBJECT_LAYER_DISTANCE: Final[str] = 'object_layer_distance_m'
-    OBJECT_PIXEL_HEIGHT: Final[str] = 'object_pixel_height_m'
-    OBJECT_PIXEL_WIDTH: Final[str] = 'object_pixel_width_m'
+    OBJECT_PIXEL_HEIGHT: Final[str] = 'pixel_height_m'
+    OBJECT_PIXEL_WIDTH: Final[str] = 'pixel_width_m'
 
     COSTS_ARRAY: Final[str] = 'costs'
 
@@ -67,19 +68,25 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
                 scanPointList.append(point)
 
             h5Probe = h5File[self.PROBE_ARRAY]
+            probePixelGeometry = PixelGeometry(
+                widthInMeters=float(h5Probe.attrs[self.PROBE_PIXEL_WIDTH]),
+                heightInMeters=float(h5Probe.attrs[self.PROBE_PIXEL_HEIGHT]),
+            )
             probe = Probe(
                 array=h5Probe[()],
-                pixelWidthInMeters=float(h5Probe.attrs[self.PROBE_PIXEL_WIDTH]),
-                pixelHeightInMeters=float(h5Probe.attrs[self.PROBE_PIXEL_HEIGHT]),
+                pixelGeometry=probePixelGeometry,
             )
 
             h5Object = h5File[self.OBJECT_ARRAY]
+            objectPixelGeometry = PixelGeometry(
+                widthInMeters=float(h5Object.attrs[self.OBJECT_PIXEL_WIDTH]),
+                heightInMeters=float(h5Object.attrs[self.OBJECT_PIXEL_HEIGHT]),
+            )
             h5ObjectLayerDistance = h5File[self.OBJECT_LAYER_DISTANCE]
             object_ = Object(
                 array=h5Object[()],
                 layerDistanceInMeters=h5ObjectLayerDistance[()],
-                pixelWidthInMeters=float(h5Object.attrs[self.OBJECT_PIXEL_WIDTH]),
-                pixelHeightInMeters=float(h5Object.attrs[self.OBJECT_PIXEL_HEIGHT]),
+                pixelGeometry=objectPixelGeometry,
                 centerXInMeters=float(h5Object.attrs[self.OBJECT_CENTER_X]),
                 centerYInMeters=float(h5Object.attrs[self.OBJECT_CENTER_Y]),
             )
@@ -120,13 +127,13 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
 
             probe = product.probe
             probeGeometry = probe.getGeometry()
-            h5Probe = h5File.create_dataset(self.PROBE_ARRAY, data=probe.array)
+            h5Probe = h5File.create_dataset(self.PROBE_ARRAY, data=probe.getArray())
             h5Probe.attrs[self.PROBE_PIXEL_WIDTH] = probeGeometry.pixelWidthInMeters
             h5Probe.attrs[self.PROBE_PIXEL_HEIGHT] = probeGeometry.pixelHeightInMeters
 
             object_ = product.object_
             objectGeometry = object_.getGeometry()
-            h5Object = h5File.create_dataset(self.OBJECT_ARRAY, data=object_.array)
+            h5Object = h5File.create_dataset(self.OBJECT_ARRAY, data=object_.getArray())
             h5Object.attrs[self.OBJECT_CENTER_X] = objectGeometry.centerXInMeters
             h5Object.attrs[self.OBJECT_CENTER_Y] = objectGeometry.centerYInMeters
             h5Object.attrs[self.OBJECT_PIXEL_WIDTH] = objectGeometry.pixelWidthInMeters

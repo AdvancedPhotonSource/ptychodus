@@ -25,7 +25,7 @@ class ProbeRepositoryItem(ParameterGroup):
         self._settings = settings
         self._builder = builder
         self._additionalModesBuilder = additionalModesBuilder
-        self._probe = Probe()
+        self._probe = Probe(array=None, pixelGeometry=None)
 
         self._addGroup('builder', builder, observe=True)
         self._addGroup('additional_modes', additionalModesBuilder, observe=True)

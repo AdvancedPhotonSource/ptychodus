@@ -116,7 +116,10 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
         interpolator = ObjectLinearInterpolator(parameters.product.object_)
-        probeExtent = parameters.product.probe.getExtent()
+        probeExtent = ImageExtent(
+            widthInPixels=parameters.product.probe.widthInPixels,
+            heightInPixels=parameters.product.probe.heightInPixels,
+        )
 
         if self._patternBuffer.isZeroSized:
             patternExtent = ImageExtent(
@@ -131,7 +134,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
         for scanPoint in parameters.product.scan:
             objectPatch = interpolator.getPatch(scanPoint, probeExtent)
-            self._objectPatchBuffer.append(objectPatch.array)
+            self._objectPatchBuffer.append(objectPatch.getArray())
 
         for pattern in parameters.patterns.astype(numpy.float32):
             self._patternBuffer.append(pattern)

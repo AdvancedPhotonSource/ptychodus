@@ -49,9 +49,9 @@ class ProbeTreeModel(QAbstractItemModel):
 
     @staticmethod
     def _appendModes(node: ProbeTreeNode, item: ProbeRepositoryItem) -> None:
-        object_ = item.getProbe()
+        probe = item.getProbe()
 
-        for layer in range(object_.numberOfModes):
+        for layer in range(probe.numberOfIncoherentModes):
             node.insertNode()
 
     def insertItem(self, index: int, item: ProbeRepositoryItem) -> None:
@@ -66,7 +66,7 @@ class ProbeTreeModel(QAbstractItemModel):
 
         node = self._treeRoot.children[index]
         numModesOld = len(node.children)
-        numModesNew = item.getProbe().numberOfModes
+        numModesNew = item.getProbe().numberOfIncoherentModes
 
         if numModesOld < numModesNew:
             self.beginInsertRows(topLeft, numModesOld, numModesNew)
@@ -148,7 +148,7 @@ class ProbeTreeModel(QAbstractItemModel):
                 probe = item.getProbe()
 
                 try:
-                    relativePower = probe.getModeRelativePower(index.row())
+                    relativePower = probe.getIncoherentModeRelativePower(index.row())
                 except IndexError:
                     return -1
 

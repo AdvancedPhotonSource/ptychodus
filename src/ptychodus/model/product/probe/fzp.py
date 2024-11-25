@@ -100,6 +100,5 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
 
         return Probe(
             array=self.normalize(array),
-            pixelWidthInMeters=samplePlaneGeometry.pixelWidthInMeters,
-            pixelHeightInMeters=samplePlaneGeometry.pixelHeightInMeters,
+            pixelGeometry=samplePlaneGeometry.getPixelGeometry(),
         )

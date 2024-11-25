@@ -85,8 +85,21 @@ class FromFileObjectBuilder(ObjectBuilder):
         logger.debug(f'Reading "{filePath}" as "{fileType}"')
 
         try:
-            object_ = self._fileReader.read(filePath)
+            objectFromFile = self._fileReader.read(filePath)
         except Exception as exc:
             raise RuntimeError(f'Failed to read "{filePath}"') from exc
 
-        return object_
+        pixelGeometryFromFile = objectFromFile.getPixelGeometry()
+        pixelGeometryFromProvider = geometryProvider.getObjectGeometry().getPixelGeometry()
+
+        if pixelGeometryFromFile is None:
+            return Object(
+                objectFromFile.getArray(),
+                pixelGeometryFromProvider,
+                objectFromFile.layerDistanceInMeters,
+                centerXInMeters=objectFromFile.centerXInMeters,
+                centerYInMeters=objectFromFile.centerYInMeters,
+            )
+
+        # TODO remap object from pixelGeometryFromFile to pixelGeometryFromProvider
+        return objectFromFile

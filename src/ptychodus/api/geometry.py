@@ -11,6 +11,12 @@ class PixelGeometry:
     widthInMeters: float
     heightInMeters: float
 
+    def copy(self) -> PixelGeometry:
+        return PixelGeometry(
+            widthInMeters=float(self.widthInMeters),
+            heightInMeters=float(self.heightInMeters),
+        )
+
     def __repr__(self) -> str:
         return f'{type(self).__name__}({self.widthInMeters}, {self.heightInMeters})'
 

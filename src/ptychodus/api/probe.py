@@ -1,12 +1,11 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy
 
-from .geometry import ImageExtent, PixelGeometry
+from .geometry import PixelGeometry
 from .propagator import WavefieldArrayType, intensity
 from .typing import RealArrayType
 
@@ -40,19 +39,11 @@ class ProbeGeometry:
     def heightInMeters(self) -> float:
         return self.heightInPixels * self.pixelHeightInMeters
 
-    def _asTuple(self) -> tuple[int, int, float, float]:
-        return (
-            self.widthInPixels,
-            self.heightInPixels,
-            self.pixelWidthInMeters,
-            self.pixelHeightInMeters,
+    def getPixelGeometry(self) -> PixelGeometry:
+        return PixelGeometry(
+            widthInMeters=self.pixelWidthInMeters,
+            heightInMeters=self.pixelHeightInMeters,
         )
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, ProbeGeometry):
-            return self._asTuple() == other._asTuple()
-
-        return False
 
 
 class ProbeGeometryProvider(ABC):
@@ -77,58 +68,48 @@ class ProbeGeometryProvider(ABC):
 
 
 class Probe:
-    @staticmethod
-    def _calculateModeRelativePower(array: WavefieldArrayType) -> Sequence[float]:
-        power = numpy.sum(intensity(array), axis=(-2, -1))
+    def __init__(
+        self,
+        array: WavefieldArrayType | None,
+        pixelGeometry: PixelGeometry | None,
+    ) -> None:
+        if array is None:
+            self._array = numpy.zeros((1, 1, 0, 0), dtype=complex)
+        elif numpy.iscomplexobj(array):
+            match array.ndim:
+                case 2:
+                    self._array = array[numpy.newaxis, numpy.newaxis, ...]
+                case 3:
+                    self._array = array[numpy.newaxis, ...]
+                case 4:
+                    self._array = array
+                case _:
+                    raise ValueError('Probe must be 2-, 3-, or 4-dimensional ndarray.')
+        else:
+            raise TypeError('Probe must be a complex-valued ndarray')
+
+        self._pixelGeometry = pixelGeometry
+
+        power = numpy.sum(intensity(self._array[0]), axis=(-2, -1))
         powersum = numpy.sum(power)
 
         if powersum > 0.0:
             power /= powersum
 
-        return power.tolist()
-
-    def __init__(
-        self,
-        array: WavefieldArrayType | None = None,
-        *,
-        pixelWidthInMeters: float = 0.0,
-        pixelHeightInMeters: float = 0.0,
-    ) -> None:
-        if array is None:
-            self._array = numpy.zeros((1, 0, 0), dtype=complex)
-        else:
-            if numpy.iscomplexobj(array):
-                if array.ndim == 2:
-                    self._array = array[numpy.newaxis, :, :]
-                elif array.ndim == 3:
-                    self._array = array
-                else:
-                    raise ValueError('Probe must be 2- or 3-dimensional ndarray.')
-            else:
-                raise TypeError('Probe must be a complex-valued ndarray')
-
-        self._modeRelativePower = Probe._calculateModeRelativePower(self._array)
-        self._pixelWidthInMeters = pixelWidthInMeters
-        self._pixelHeightInMeters = pixelHeightInMeters
+        self._modeRelativePower = power.tolist()
 
     def copy(self) -> Probe:
         return Probe(
-            array=numpy.array(self._array),
-            pixelWidthInMeters=float(self._pixelWidthInMeters),
-            pixelHeightInMeters=float(self._pixelHeightInMeters),
+            array=self._array.copy(),
+            pixelGeometry=None if self._pixelGeometry is None else self._pixelGeometry.copy(),
         )
 
-    @property
-    def array(self) -> WavefieldArrayType:
+    def getArray(self) -> WavefieldArrayType:
         return self._array
 
     @property
     def dataType(self) -> numpy.dtype:
         return self._array.dtype
-
-    @property
-    def numberOfModes(self) -> int:
-        return self._array.shape[-3]
 
     @property
     def sizeInBytes(self) -> int:
@@ -143,50 +124,50 @@ class Probe:
         return self._array.shape[-2]
 
     @property
-    def pixelWidthInMeters(self) -> float:
-        return self._pixelWidthInMeters
+    def numberOfIncoherentModes(self) -> int:
+        return self._array.shape[-3]
 
     @property
-    def pixelHeightInMeters(self) -> float:
-        return self._pixelHeightInMeters
+    def numberOfCoherentModes(self) -> int:
+        return self._array.shape[-4]
+
+    def getPixelGeometry(self) -> PixelGeometry | None:
+        return self._pixelGeometry
 
     def getGeometry(self) -> ProbeGeometry:
+        pixelWidthInMeters = 0.0
+        pixelHeightInMeters = 0.0
+
+        if self._pixelGeometry is not None:
+            pixelWidthInMeters = self._pixelGeometry.widthInMeters
+            pixelHeightInMeters = self._pixelGeometry.heightInMeters
+
         return ProbeGeometry(
             widthInPixels=self.widthInPixels,
             heightInPixels=self.heightInPixels,
-            pixelWidthInMeters=self._pixelWidthInMeters,
-            pixelHeightInMeters=self._pixelHeightInMeters,
+            pixelWidthInMeters=pixelWidthInMeters,
+            pixelHeightInMeters=pixelHeightInMeters,
         )
 
-    def getPixelGeometry(self) -> PixelGeometry:
-        return PixelGeometry(
-            widthInMeters=self._pixelWidthInMeters,
-            heightInMeters=self._pixelHeightInMeters,
-        )
+    def getIncoherentMode(self, number: int) -> WavefieldArrayType:
+        return self._array[0, number, :, :]
 
-    def getExtent(self) -> ImageExtent:
-        return ImageExtent(
-            widthInPixels=self.widthInPixels,
-            heightInPixels=self.heightInPixels,
-        )
+    def getIncoherentModesFlattened(self) -> WavefieldArrayType:
+        modes = self._array[0]
+        return modes.transpose((1, 0, 2)).reshape(modes.shape[-2], -1)
 
-    def getMode(self, number: int) -> WavefieldArrayType:
-        return self._array[number, :, :]
-
-    def getModesFlattened(self) -> WavefieldArrayType:
-        if self._array.size > 0:
-            return self._array.transpose((1, 0, 2)).reshape(self._array.shape[-2], -1)
-        else:
-            return self._array
-
-    def getModeRelativePower(self, number: int) -> float:
+    def getIncoherentModeRelativePower(self, number: int) -> float:
         return self._modeRelativePower[number]
 
     def getCoherence(self) -> float:
         return numpy.sqrt(numpy.sum(numpy.square(self._modeRelativePower)))
 
+    def getCoherentMode(self, number: int) -> WavefieldArrayType:
+        return self._array[number, 0, :, :]
+
     def getIntensity(self) -> RealArrayType:
-        return numpy.sum(intensity(self._array), axis=-3)
+        array_no_opr = self._array[0]  # TODO OPR
+        return numpy.sum(intensity(array_no_opr), axis=-3)
 
 
 class ProbeFileReader(ABC):

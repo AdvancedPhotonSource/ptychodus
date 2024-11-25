@@ -24,17 +24,18 @@ class ObjectRepositoryItem(ParameterGroup):
         self._geometryProvider = geometryProvider
         self._settings = settings
         self._builder = builder
-        self._object = Object()
+        self._object = Object(array=None, pixelGeometry=None)
 
         self._addGroup('builder', builder, observe=True)
         # TODO sync layer distance to/from settings
-        self.layerDistanceInMeters = self.createRealArrayParameter('layer_distance_m', [numpy.inf])
+        self.layerDistanceInMeters = self.createRealArrayParameter('layer_distance_m', [])
 
         self._rebuild()
 
     def assignItem(self, item: ObjectRepositoryItem) -> None:
         self.layerDistanceInMeters.setValue(item.layerDistanceInMeters.getValue(), notify=False)
         self.setBuilder(item.getBuilder().copy())
+        self._rebuild()
 
     def assign(self, object_: Object) -> None:
         builder = FromMemoryObjectBuilder(self._settings, object_)

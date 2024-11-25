@@ -173,24 +173,24 @@ class ProbeEditorViewControllerFactory:
         dialogBuilder: ParameterViewBuilder,
         modesBuilder: MultimodalProbeBuilder,
     ) -> None:
-        additionalModesGroup = 'Additional Modes'
+        additionalModesGroup = 'Additional Modes'  # FIXME OPR
         dialogBuilder.addSpinBox(
-            modesBuilder.numberOfModes,
+            modesBuilder.numberOfIncoherentModes,
             'Number of Modes:',
             group=additionalModesGroup,
         )
         dialogBuilder.addCheckBox(
-            modesBuilder.isOrthogonalizeModesEnabled,
+            modesBuilder.orthogonalizeIncoherentModes,
             'Orthogonalize Modes:',
             group=additionalModesGroup,
         )
         dialogBuilder.addViewController(
-            DecayTypeParameterViewController(modesBuilder.modeDecayType),
+            DecayTypeParameterViewController(modesBuilder.incoherentModeDecayType),
             'Decay Type:',
             group=additionalModesGroup,
         )
         dialogBuilder.addDecimalSlider(
-            modesBuilder.modeDecayRatio,
+            modesBuilder.incoherentModeDecayRatio,
             'Decay Ratio:',
             group=additionalModesGroup,
         )

@@ -129,11 +129,16 @@ class TikeReconstructor:
 
         objectInput = parameters.product.object_
         objectGeometry = objectInput.getGeometry()
-        # TODO change array[0] -> array when multislice is available
-        objectInputArray = objectInput.array[0].astype('complex64')
+        objectInputArray = objectInput.getArray().astype('complex64')
+        numberOfLayers = objectInput.numberOfLayers
+
+        if numberOfLayers == 1:
+            objectInputArray = objectInputArray[0]
+        else:
+            raise ValueError(f'Tike does not support multislice (layers={numberOfLayers})!')
 
         probeInput = parameters.product.probe
-        probeInputArray = probeInput.array[numpy.newaxis, numpy.newaxis, ...].astype('complex64')
+        probeInputArray = probeInput.getArray().astype('complex64')
 
         scanInput = parameters.product.scan
         scanInputCoords: list[float] = list()
@@ -163,8 +168,7 @@ class TikeReconstructor:
         logger.debug(f'num_gpu={numGpus}')
 
         exitwave_options = tike.ptycho.ExitWaveOptions(
-            # TODO: Use a user supplied `measured_pixels` instead
-            measured_pixels=numpy.ones(probeInputArray.shape[-2:], dtype=numpy.bool_),
+            measured_pixels=parameters.goodPixelMask,
             noise_model=self._settings.noiseModel.getValue(),
         )
 
@@ -211,11 +215,7 @@ class TikeReconstructor:
         scanOutput = Scan(scanOutputPoints)
 
         if self._probeCorrectionSettings.useProbeCorrection.getValue():
-            probeOutput = Probe(
-                array=result.probe[0, 0],
-                pixelWidthInMeters=probeInput.pixelWidthInMeters,
-                pixelHeightInMeters=probeInput.pixelHeightInMeters,
-            )
+            probeOutput = Probe(array=result.probe, pixelGeometry=probeInput.getPixelGeometry())
         else:
             probeOutput = probeInput.copy()
 
@@ -223,8 +223,7 @@ class TikeReconstructor:
             objectOutput = Object(
                 array=result.psi,
                 layerDistanceInMeters=objectInput.layerDistanceInMeters,
-                pixelWidthInMeters=objectInput.pixelWidthInMeters,
-                pixelHeightInMeters=objectInput.pixelHeightInMeters,
+                pixelGeometry=objectInput.getPixelGeometry(),
                 centerXInMeters=objectInput.centerXInMeters,
                 centerYInMeters=objectInput.centerYInMeters,
             )

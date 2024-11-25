@@ -2,6 +2,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 import logging
 
 import numpy
@@ -16,15 +17,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ExposureMap:
-    pixel_width_m: float
-    pixel_height_m: float
+    pixel_geometry: PixelGeometry | None
     center_x_m: float
     center_y_m: float
     counts: RealArrayType
-
-    @property
-    def pixel_geometry(self) -> PixelGeometry:
-        return PixelGeometry(self.pixel_width_m, self.pixel_height_m)
 
 
 class ExposureAnalyzer:
@@ -36,11 +32,10 @@ class ExposureAnalyzer:
         objectItem = item.getObject()
         object_ = objectItem.getObject()
 
-        counts = numpy.zeros_like(object_.array, dtype=float)  # FIXME
+        counts = numpy.zeros_like(object_.getArray(), dtype=float)  # FIXME
 
         return ExposureMap(
-            pixel_width_m=object_.pixelWidthInMeters,
-            pixel_height_m=object_.pixelHeightInMeters,
+            pixel_geometry=object_.getPixelGeometry(),
             center_x_m=object_.centerXInMeters,
             center_y_m=object_.centerYInMeters,
             counts=counts,
@@ -52,17 +47,17 @@ class ExposureAnalyzer:
     def getSaveFileFilter(self) -> str:
         return 'NumPy Zipped Archive (*.npz)'
 
-    def saveResult(self, filePath: Path, result: ExposureMap) -> None:
-        numpy.savez(
-            filePath,
-            'pixel_height_m',
-            result.pixel_height_m,
-            'pixel_width_m',
-            result.pixel_width_m,
-            'center_x_m',
-            result.center_x_m,
-            'center_y_m',
-            result.center_y_m,
-            'counts',
-            result.counts,
-        )
+    def saveResult(self, file_path: Path, result: ExposureMap) -> None:
+        contents: dict[str, Any] = {
+            'center_x_m': result.center_x_m,
+            'center_y_m': result.center_y_m,
+            'counts': result.counts,
+        }
+
+        pixel_geometry = result.pixel_geometry
+
+        if pixel_geometry is not None:
+            contents['pixel_height_m'] = pixel_geometry.heightInMeters
+            contents['pixel_width_m'] = pixel_geometry.widthInMeters
+
+        numpy.savez(file_path, **contents)

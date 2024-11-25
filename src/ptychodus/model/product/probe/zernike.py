@@ -150,6 +150,5 @@ class ZernikeProbeBuilder(ProbeBuilder):
 
         return Probe(
             array=self.normalize(array),
-            pixelWidthInMeters=geometry.pixelWidthInMeters,
-            pixelHeightInMeters=geometry.pixelHeightInMeters,
+            pixelGeometry=geometry.getPixelGeometry(),
         )
