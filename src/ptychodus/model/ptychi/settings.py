@@ -183,7 +183,6 @@ class PtyChiProbePositionSettings(Observable, Observer):
         self.optimizer = self._settingsGroup.createStringParameter('Optimizer', 'SGD')
         self.stepSize = self._settingsGroup.createRealParameter('StepSize', 1.0, minimum=0.0)
 
-        # vvv FIXME vvv
         self.positionCorrectionType = self._settingsGroup.createStringParameter(
             'PositionCorrectionType', 'Gradient'
         )
@@ -194,9 +193,8 @@ class PtyChiProbePositionSettings(Observable, Observer):
             'CrossCorrelationRealSpaceWidth', 0.01, minimum=0.0
         )
         self.crossCorrelationProbeThreshold = self._settingsGroup.createRealParameter(
-            'CrossCorrelationProbeThreshold', 0.1, minimum=0.0
+            'CrossCorrelationProbeThreshold', 0.1, minimum=0.0, maximum=1.0
         )
-        # ^^^ FIXME ^^^
 
         self.limitMagnitudeUpdate = self._settingsGroup.createBooleanParameter(
             'LimitMagnitudeUpdate', False

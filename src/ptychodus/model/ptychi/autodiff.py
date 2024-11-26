@@ -19,8 +19,10 @@ from ptychi.api import (
     Optimizers,
     OrthogonalizationMethods,
     PatchInterpolationMethods,
+    PositionCorrectionTypes,
     PtychographyDataOptions,
 )
+from ptychi.api.options.base import PositionCorrectionOptions
 from ptychi.api.task import PtychographyTask
 
 from ptychodus.api.object import Object, ObjectGeometry, ObjectPoint
@@ -40,19 +42,6 @@ from .settings import (
 )
 
 logger = logging.getLogger(__name__)
-
-# FIXME FEEDBACK
-# change = None options to required arguments, rest have default values
-# remove positions/object pixel sizes
-# remove orthogonalize_incoherent_modes: enable whenever stride >= 1
-# remove orthogonalize_opr_modes: enable whenever stride >= 1
-# remove num_epochs from reconstructor options and run() method; just use iterate(n_epochs)
-# better name for l1_norm_constraint?
-# enum for get_data_to_cpu
-# expand optimization mode GS; stabilize?
-# remove optimizable in favor of OptimizationPlan | None
-# add optimizer and step size to OptimizationPlan
-# add additional enum value to avoid optional enum
 
 
 class AutodiffReconstructor(Reconstructor):
@@ -312,6 +301,21 @@ class AutodiffReconstructor(Reconstructor):
             else 0.0
         )
 
+        correction_type_str = self._probePositionSettings.positionCorrectionType.getValue()
+
+        try:
+            correction_type = PositionCorrectionTypes[correction_type_str.upper()]
+        except KeyError:
+            logger.warning('Failed to parse batching mode "{correction_type_str}"!')
+            correction_type = PositionCorrectionTypes.GRADIENT
+
+        correction_options = PositionCorrectionOptions(
+            correction_type=correction_type,
+            cross_correlation_scale=self._probePositionSettings.crossCorrelationScale.getValue(),
+            cross_correlation_real_space_width=self._probePositionSettings.crossCorrelationRealSpaceWidth.getValue(),
+            cross_correlation_probe_threshold=self._probePositionSettings.crossCorrelationProbeThreshold.getValue(),
+        )
+
         return AutodiffPtychographyProbePositionOptions(
             optimizable=self._probePositionSettings.isOptimizable.getValue(),
             optimization_plan=probe_position_optimization_plan,
@@ -321,6 +325,7 @@ class AutodiffReconstructor(Reconstructor):
             position_y_px=position_in_px[:, -2],
             update_magnitude_limit=update_magnitude_limit if update_magnitude_limit > 0.0 else None,
             constrain_position_mean=self._probePositionSettings.constrainCentroid.getValue(),
+            correction_options=correction_options,
         )
 
     def _create_opr_mode_weight_options(self) -> AutodiffPtychographyOPRModeWeightsOptions:
