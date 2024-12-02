@@ -309,12 +309,13 @@ class RealSequenceParameter(ParameterBase[MutableSequence[float]]):
         tmp: list[float] = list()
 
         for xstr in value.split(','):
-            try:
-                x = float(xstr)
-            except ValueError:
-                x = float('nan')
+            if xstr:
+                try:
+                    x = float(xstr)
+                except ValueError:
+                    x = float('nan')
 
-            tmp.append(x)
+                tmp.append(x)
 
         self.setValue(tmp)
 
@@ -362,12 +363,13 @@ class ComplexSequenceParameter(ParameterBase[MutableSequence[complex]]):
         tmp: list[complex] = list()
 
         for xstr in value.split(','):
-            try:
-                x = complex(xstr)
-            except ValueError:
-                x = float('nan') * 1j
+            if xstr:
+                try:
+                    x = complex(xstr)
+                except ValueError:
+                    x = float('nan') * 1j
 
-            tmp.append(x)
+                tmp.append(x)
 
         self.setValue(tmp)
 
