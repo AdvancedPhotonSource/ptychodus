@@ -131,6 +131,7 @@ class VSPIFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Observa
         settings.vspiMaxIterations.addObserver(self)
 
     def enhance(self, dataset: FluorescenceDataset, product: Product) -> FluorescenceDataset:
+        # FIXME OPR
         object_geometry = product.object_.getGeometry()
         e_cps_shape = object_geometry.heightInPixels, object_geometry.widthInPixels
         element_maps: list[ElementMap] = list()

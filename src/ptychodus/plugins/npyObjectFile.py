@@ -9,7 +9,7 @@ from ptychodus.api.plugins import PluginRegistry
 class NPYObjectFileReader(ObjectFileReader):
     def read(self, filePath: Path) -> Object:
         array = numpy.load(filePath)
-        return Object(array=array, pixelGeometry=None)
+        return Object(array=array, pixelGeometry=None, center=None)
 
 
 class NPYObjectFileWriter(ObjectFileWriter):

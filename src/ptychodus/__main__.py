@@ -2,10 +2,13 @@
 
 from pathlib import Path
 import argparse
+import logging
 import sys
 
 from ptychodus.model import ModelCore
 import ptychodus
+
+logger = logging.getLogger(__name__)
 
 
 def versionString() -> str:
@@ -120,6 +123,7 @@ def main() -> int:
         try:
             from PyQt5.QtWidgets import QApplication
         except ModuleNotFoundError:
+            logger.warning('PyQt5 not found.')
             return 0
 
         # QApplication expects the first argument to be the program name

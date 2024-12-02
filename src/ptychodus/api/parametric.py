@@ -269,8 +269,8 @@ class IntegerSequenceParameter(ParameterBase[MutableSequence[int]]):
         return IntegerSequenceParameter(self.getValue(), self)
 
 
-class RealArrayParameter(ParameterBase[MutableSequence[float]]):
-    def __init__(self, value: Sequence[float], parent: RealArrayParameter | None) -> None:
+class RealSequenceParameter(ParameterBase[MutableSequence[float]]):
+    def __init__(self, value: Sequence[float], parent: RealSequenceParameter | None) -> None:
         super().__init__(list(value), parent)
 
     def __iter__(self) -> Iterator[float]:
@@ -318,12 +318,12 @@ class RealArrayParameter(ParameterBase[MutableSequence[float]]):
 
         self.setValue(tmp)
 
-    def copy(self) -> RealArrayParameter:
-        return RealArrayParameter(self.getValue(), self)
+    def copy(self) -> RealSequenceParameter:
+        return RealSequenceParameter(self.getValue(), self)
 
 
-class ComplexArrayParameter(ParameterBase[MutableSequence[complex]]):
-    def __init__(self, value: Sequence[complex], parent: ComplexArrayParameter | None) -> None:
+class ComplexSequenceParameter(ParameterBase[MutableSequence[complex]]):
+    def __init__(self, value: Sequence[complex], parent: ComplexSequenceParameter | None) -> None:
         super().__init__(list(value), parent)
 
     def __iter__(self) -> Iterator[complex]:
@@ -371,8 +371,8 @@ class ComplexArrayParameter(ParameterBase[MutableSequence[complex]]):
 
         self.setValue(tmp)
 
-    def copy(self) -> ComplexArrayParameter:
-        return ComplexArrayParameter(self.getValue(), self)
+    def copy(self) -> ComplexSequenceParameter:
+        return ComplexSequenceParameter(self.getValue(), self)
 
 
 class ParameterGroup(Observable, Observer):
@@ -431,15 +431,17 @@ class ParameterGroup(Observable, Observer):
         self._addParameter(name, parameter)
         return parameter
 
-    def createRealArrayParameter(self, name: str, value: Sequence[float]) -> RealArrayParameter:
-        parameter = RealArrayParameter(value, parent=None)
+    def createRealSequenceParameter(
+        self, name: str, value: Sequence[float]
+    ) -> RealSequenceParameter:
+        parameter = RealSequenceParameter(value, parent=None)
         self._addParameter(name, parameter)
         return parameter
 
-    def createComplexArrayParameter(
+    def createComplexSequenceParameter(
         self, name: str, value: Sequence[complex]
-    ) -> ComplexArrayParameter:
-        parameter = ComplexArrayParameter(value, parent=None)
+    ) -> ComplexSequenceParameter:
+        parameter = ComplexSequenceParameter(value, parent=None)
         self._addParameter(name, parameter)
         return parameter
 

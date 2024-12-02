@@ -84,7 +84,7 @@ class ZernikeProbeBuilder(ProbeBuilder):
         self._addParameter('diameter_m', self.diameterInMeters)
 
         # TODO init zernike coefficients from settings
-        self.coefficients = self.createComplexArrayParameter('coefficients', [1 + 0j])
+        self.coefficients = self.createComplexSequenceParameter('coefficients', [1 + 0j])
 
         self.setOrder(1)
 

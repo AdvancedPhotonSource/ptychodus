@@ -52,10 +52,9 @@ class ObjectStitcher:
         self._addPatchPart(ixSlice0, iySlice1, xiC * eta, patchArray)
         self._addPatchPart(ixSlice1, iySlice1, xi * eta, patchArray)
 
-    def build(self) -> Object:
+    def build(self) -> Object:  # FIXME multilayer objects?
         return Object(
             array=self._array,
             pixelGeometry=self._geometry.getPixelGeometry(),
-            centerXInMeters=self._geometry.centerXInMeters,
-            centerYInMeters=self._geometry.centerYInMeters,
+            center=self._geometry.getCenter(),
         )

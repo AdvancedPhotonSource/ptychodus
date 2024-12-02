@@ -150,7 +150,7 @@ class ObjectTreeModel(QAbstractItemModel):
                     try:
                         return item.layerDistanceInMeters[index.row()]
                     except IndexError:
-                        return float('NaN')
+                        return float('inf')
         else:
             item = self._repository[index.row()]
             object_ = item.getObject()

@@ -44,7 +44,7 @@ class RandomObjectBuilder(ObjectBuilder):
         geometry = geometryProvider.getObjectGeometry()
         heightInPixels = geometry.heightInPixels + 2 * self.extraPaddingY.getValue()
         widthInPixels = geometry.widthInPixels + 2 * self.extraPaddingX.getValue()
-        objectShape = (len(layerDistanceInMeters), heightInPixels, widthInPixels)
+        objectShape = (1 + len(layerDistanceInMeters), heightInPixels, widthInPixels)
 
         amplitude = self._rng.normal(
             self.amplitudeMean.getValue(),
@@ -61,6 +61,5 @@ class RandomObjectBuilder(ObjectBuilder):
             array=numpy.clip(amplitude, 0.0, 1.0) * numpy.exp(1j * phase),
             layerDistanceInMeters=layerDistanceInMeters,
             pixelGeometry=geometry.getPixelGeometry(),
-            centerXInMeters=geometry.centerXInMeters,
-            centerYInMeters=geometry.centerYInMeters,
+            center=geometry.getCenter(),
         )

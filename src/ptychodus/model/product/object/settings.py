@@ -18,8 +18,8 @@ class ObjectSettings(Observable, Observer):
         )
         self.fileType = self._settingsGroup.createStringParameter('FileType', 'NPY')
 
-        self.objectLayerDistanceInMeters = self._settingsGroup.createRealParameter(
-            'ObjectLayerDistanceInMeters', 1e-7
+        self.objectLayerDistanceInMeters = self._settingsGroup.createRealSequenceParameter(
+            'ObjectLayerDistanceInMeters', []
         )
 
         self.extraPaddingX = self._settingsGroup.createIntegerParameter(

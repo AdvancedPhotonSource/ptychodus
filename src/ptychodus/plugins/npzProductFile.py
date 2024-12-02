@@ -4,7 +4,7 @@ from typing import Any, Final
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.object import Object, ObjectFileReader
+from ptychodus.api.object import Object, ObjectCenter, ObjectFileReader
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe, ProbeFileReader
 from ptychodus.api.product import (
@@ -68,12 +68,15 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
                 widthInMeters=float(npzFile[self.OBJECT_PIXEL_WIDTH]),
                 heightInMeters=float(npzFile[self.OBJECT_PIXEL_HEIGHT]),
             )
+            objectCenter = ObjectCenter(
+                positionXInMeters=float(npzFile[self.OBJECT_CENTER_X]),
+                positionYInMeters=float(npzFile[self.OBJECT_CENTER_Y]),
+            )
             object_ = Object(
                 array=npzFile[self.OBJECT_ARRAY],
                 pixelGeometry=objectPixelGeometry,
+                center=objectCenter,
                 layerDistanceInMeters=npzFile[self.OBJECT_LAYER_DISTANCE],
-                centerXInMeters=float(npzFile[self.OBJECT_CENTER_X]),
-                centerYInMeters=float(npzFile[self.OBJECT_CENTER_Y]),
             )
 
             costs = npzFile[self.COSTS_ARRAY]
@@ -168,12 +171,15 @@ class NPZObjectFileReader(ObjectFileReader):
                 widthInMeters=float(npzFile[NPZProductFileIO.OBJECT_PIXEL_WIDTH]),
                 heightInMeters=float(npzFile[NPZProductFileIO.OBJECT_PIXEL_HEIGHT]),
             )
+            center = ObjectCenter(
+                positionXInMeters=float(npzFile[NPZProductFileIO.OBJECT_CENTER_X]),
+                positionYInMeters=float(npzFile[NPZProductFileIO.OBJECT_CENTER_Y]),
+            )
             return Object(
                 array=npzFile[NPZProductFileIO.OBJECT_ARRAY],
                 pixelGeometry=pixelGeometry,
+                center=center,
                 layerDistanceInMeters=npzFile[NPZProductFileIO.OBJECT_LAYER_DISTANCE],
-                centerXInMeters=float(npzFile[NPZProductFileIO.OBJECT_CENTER_X]),
-                centerYInMeters=float(npzFile[NPZProductFileIO.OBJECT_CENTER_Y]),
             )
 
 

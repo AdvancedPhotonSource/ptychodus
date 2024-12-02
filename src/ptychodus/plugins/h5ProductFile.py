@@ -5,7 +5,7 @@ import logging
 import h5py
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.object import Object
+from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import Probe
 from ptychodus.api.product import (
@@ -82,13 +82,16 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
                 widthInMeters=float(h5Object.attrs[self.OBJECT_PIXEL_WIDTH]),
                 heightInMeters=float(h5Object.attrs[self.OBJECT_PIXEL_HEIGHT]),
             )
+            objectCenter = ObjectCenter(
+                positionXInMeters=float(h5Object.attrs[self.OBJECT_CENTER_X]),
+                positionYInMeters=float(h5Object.attrs[self.OBJECT_CENTER_Y]),
+            )
             h5ObjectLayerDistance = h5File[self.OBJECT_LAYER_DISTANCE]
             object_ = Object(
                 array=h5Object[()],
-                layerDistanceInMeters=h5ObjectLayerDistance[()],
                 pixelGeometry=objectPixelGeometry,
-                centerXInMeters=float(h5Object.attrs[self.OBJECT_CENTER_X]),
-                centerYInMeters=float(h5Object.attrs[self.OBJECT_CENTER_Y]),
+                center=objectCenter,
+                layerDistanceInMeters=h5ObjectLayerDistance[()],
             )
 
             h5Costs = h5File[self.COSTS_ARRAY]

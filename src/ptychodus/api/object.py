@@ -15,6 +15,21 @@ ObjectArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any
 
 
 @dataclass(frozen=True)
+class ObjectCenter:
+    positionXInMeters: float
+    positionYInMeters: float
+
+    def copy(self) -> ObjectCenter:
+        return ObjectCenter(
+            positionXInMeters=float(self.positionXInMeters),
+            positionYInMeters=float(self.positionYInMeters),
+        )
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.positionXInMeters}, {self.positionYInMeters})'
+
+
+@dataclass(frozen=True)
 class ObjectPoint:
     index: int
     positionXInPixels: float
@@ -50,6 +65,12 @@ class ObjectGeometry:
         return PixelGeometry(
             widthInMeters=self.pixelWidthInMeters,
             heightInMeters=self.pixelHeightInMeters,
+        )
+
+    def getCenter(self) -> ObjectCenter:
+        return ObjectCenter(
+            positionXInMeters=self.centerXInMeters,
+            positionYInMeters=self.centerYInMeters,
         )
 
     def mapObjectPointToScanPoint(self, point: ObjectPoint) -> ScanPoint:
@@ -93,10 +114,8 @@ class Object:
         self,
         array: ObjectArrayType | None,
         pixelGeometry: PixelGeometry | None,
+        center: ObjectCenter | None,
         layerDistanceInMeters: Sequence[float] = [],
-        *,
-        centerXInMeters: float = 0.0,
-        centerYInMeters: float = 0.0,
     ) -> None:
         if array is None:
             self._array = numpy.zeros((1, 0, 0), dtype=complex)
@@ -112,23 +131,21 @@ class Object:
             raise TypeError('Object must be a complex-valued ndarray')
 
         self._pixelGeometry = pixelGeometry
+        self._center = center
         self._layerDistanceInMeters = layerDistanceInMeters
-        self._centerXInMeters = centerXInMeters
-        self._centerYInMeters = centerYInMeters
 
-        expectedLayers = self._array.shape[-3]
-        actualLayers = len(layerDistanceInMeters) + 1
+        expectedSpaces = self._array.shape[-3] - 1
+        actualSpaces = len(layerDistanceInMeters)
 
-        if actualLayers != expectedLayers:
-            raise ValueError(f'Expected {expectedLayers} layer distances; got {actualLayers}!')
+        if actualSpaces != expectedSpaces:
+            raise ValueError(f'Expected {expectedSpaces} layer distances; got {actualSpaces}!')
 
     def copy(self) -> Object:
         return Object(
             array=self._array.copy(),
             pixelGeometry=None if self._pixelGeometry is None else self._pixelGeometry.copy(),
+            center=None if self._center is None else self._center.copy(),
             layerDistanceInMeters=list(self._layerDistanceInMeters),
-            centerXInMeters=float(self._centerXInMeters),
-            centerYInMeters=float(self._centerYInMeters),
         )
 
     def getArray(self) -> ObjectArrayType:
@@ -157,13 +174,8 @@ class Object:
     def getPixelGeometry(self) -> PixelGeometry | None:
         return self._pixelGeometry
 
-    @property
-    def centerXInMeters(self) -> float:
-        return self._centerXInMeters
-
-    @property
-    def centerYInMeters(self) -> float:
-        return self._centerYInMeters
+    def getCenter(self) -> ObjectCenter | None:
+        return self._center
 
     def getGeometry(self) -> ObjectGeometry:
         pixelWidthInMeters = 0.0
@@ -173,13 +185,20 @@ class Object:
             pixelWidthInMeters = self._pixelGeometry.widthInMeters
             pixelHeightInMeters = self._pixelGeometry.heightInMeters
 
+        centerXInMeters = 0.0
+        centerYInMeters = 0.0
+
+        if self._center is not None:
+            centerXInMeters = self._center.positionXInMeters
+            centerYInMeters = self._center.positionYInMeters
+
         return ObjectGeometry(
             widthInPixels=self.widthInPixels,
             heightInPixels=self.heightInPixels,
             pixelWidthInMeters=pixelWidthInMeters,
             pixelHeightInMeters=pixelHeightInMeters,
-            centerXInMeters=self._centerXInMeters,
-            centerYInMeters=self._centerYInMeters,
+            centerXInMeters=centerXInMeters,
+            centerYInMeters=centerYInMeters,
         )
 
     def getLayer(self, number: int) -> ObjectArrayType:

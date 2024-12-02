@@ -9,7 +9,7 @@ from ptychodus.api.plugins import PluginRegistry
 class CSVObjectFileReader(ObjectFileReader):
     def read(self, filePath: Path) -> Object:
         array = numpy.genfromtxt(filePath, delimiter=',', dtype='complex')
-        return Object(array=array, pixelGeometry=None)
+        return Object(array=array, pixelGeometry=None, center=None)
 
 
 class CSVObjectFileWriter(ObjectFileWriter):

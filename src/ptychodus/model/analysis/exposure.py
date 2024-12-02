@@ -8,6 +8,7 @@ import logging
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.object import ObjectCenter
 from ptychodus.api.visualization import RealArrayType
 
 from ..product import ProductRepository
@@ -18,8 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class ExposureMap:
     pixel_geometry: PixelGeometry | None
-    center_x_m: float
-    center_y_m: float
+    center: ObjectCenter | None
     counts: RealArrayType
 
 
@@ -36,8 +36,7 @@ class ExposureAnalyzer:
 
         return ExposureMap(
             pixel_geometry=object_.getPixelGeometry(),
-            center_x_m=object_.centerXInMeters,
-            center_y_m=object_.centerYInMeters,
+            center=object_.getCenter(),
             counts=counts,
         )
 
@@ -49,8 +48,6 @@ class ExposureAnalyzer:
 
     def saveResult(self, file_path: Path, result: ExposureMap) -> None:
         contents: dict[str, Any] = {
-            'center_x_m': result.center_x_m,
-            'center_y_m': result.center_y_m,
             'counts': result.counts,
         }
 
@@ -59,5 +56,11 @@ class ExposureAnalyzer:
         if pixel_geometry is not None:
             contents['pixel_height_m'] = pixel_geometry.heightInMeters
             contents['pixel_width_m'] = pixel_geometry.widthInMeters
+
+        center = result.center
+
+        if center is not None:
+            contents['center_x_m'] = center.positionXInMeters
+            contents['center_y_m'] = center.positionYInMeters
 
         numpy.savez(file_path, **contents)

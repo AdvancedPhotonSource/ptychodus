@@ -79,6 +79,7 @@ class MATProductFileReader(ProductFileReader):
             # object[width, height, num_layers]
             matDict['object'].transpose(),
             pixel_geometry,
+            None,
             layer_distance_m,
         )
         costs = outputs_struct['fourier_error_out']

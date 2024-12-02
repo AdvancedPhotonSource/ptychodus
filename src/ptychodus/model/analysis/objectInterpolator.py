@@ -48,10 +48,9 @@ class ObjectLinearInterpolator(ObjectInterpolator):
         patch += w10 * objectArray[:, iySlice1, ixSlice0]
         patch += w11 * objectArray[:, iySlice1, ixSlice1]
 
-        return Object(
+        return Object(  # FIXME multilayer objects
             array=patch,
             layerDistanceInMeters=self._object.layerDistanceInMeters,
             pixelGeometry=geometry.getPixelGeometry(),
-            centerXInMeters=geometry.centerXInMeters,
-            centerYInMeters=geometry.centerYInMeters,
+            center=geometry.getCenter(),
         )

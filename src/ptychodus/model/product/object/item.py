@@ -1,7 +1,6 @@
 from __future__ import annotations
 import logging
 
-import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.observer import Observable
@@ -24,12 +23,12 @@ class ObjectRepositoryItem(ParameterGroup):
         self._geometryProvider = geometryProvider
         self._settings = settings
         self._builder = builder
-        self._object = Object(array=None, pixelGeometry=None)
+        self._object = Object(array=None, pixelGeometry=None, center=None)
+
+        self.layerDistanceInMeters = settings.objectLayerDistanceInMeters.copy()
+        self._addParameter('layer_distance_m', self.layerDistanceInMeters)
 
         self._addGroup('builder', builder, observe=True)
-        # TODO sync layer distance to/from settings
-        self.layerDistanceInMeters = self.createRealArrayParameter('layer_distance_m', [])
-
         self._rebuild()
 
     def assignItem(self, item: ObjectRepositoryItem) -> None:
@@ -48,23 +47,23 @@ class ObjectRepositoryItem(ParameterGroup):
         self._builder.syncToSettings()
 
     def getNumberOfLayers(self) -> int:
-        return len(self.layerDistanceInMeters)
+        return len(self.layerDistanceInMeters) + 1
 
-    def setNumberOfLayers(self, number: int) -> None:
-        numRequested = max(1, number)
+    def setNumberOfLayers(self, numberOfLayers: int) -> None:
+        numberOfSpaces = max(0, numberOfLayers - 1)
         distanceInMeters = list(self.layerDistanceInMeters.getValue())
-        numExisting = len(distanceInMeters)
-        defaultDistanceInMeters = float(self._settings.objectLayerDistanceInMeters.getValue())
 
-        if numExisting < 2:
-            distanceInMeters = [defaultDistanceInMeters] * numRequested
-        elif numExisting < numRequested:
-            distanceInMeters[-1] = distanceInMeters[-2]  # overwrite inf
-            distanceInMeters.extend(distanceInMeters[-1:] * (numRequested - numExisting))
-        elif numExisting > numRequested:
-            distanceInMeters = distanceInMeters[:numRequested]
+        try:
+            defaultDistanceInMeters = distanceInMeters[-1]
+        except IndexError:
+            defaultDistanceInMeters = 0.0
 
-        distanceInMeters[-1] = numpy.inf
+        while len(distanceInMeters) < numberOfSpaces:
+            distanceInMeters.append(defaultDistanceInMeters)
+
+        if len(distanceInMeters) > numberOfSpaces:
+            distanceInMeters = distanceInMeters[:numberOfSpaces]
+
         self.layerDistanceInMeters.setValue(distanceInMeters)
         self._rebuild()
 
@@ -83,13 +82,10 @@ class ObjectRepositoryItem(ParameterGroup):
         self._rebuild()
 
     def _rebuild(self) -> None:
-        layerDistanceInMeters = list(self.layerDistanceInMeters.getValue())
-
-        if len(layerDistanceInMeters) < 1:
-            layerDistanceInMeters.append(numpy.inf)
-
         try:
-            object_ = self._builder.build(self._geometryProvider, layerDistanceInMeters)
+            object_ = self._builder.build(
+                self._geometryProvider, self.layerDistanceInMeters.getValue()
+            )
         except Exception as exc:
             logger.error(''.join(exc.args))
             return

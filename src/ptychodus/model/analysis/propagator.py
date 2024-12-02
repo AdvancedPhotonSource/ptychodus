@@ -99,8 +99,12 @@ class ProbePropagator(Observable):
         return item.getProbe().getProbe()
 
     def getPixelGeometry(self) -> PixelGeometry | None:
-        probe = self._getProbe()
-        return probe.getPixelGeometry()
+        try:
+            probe = self._getProbe()
+        except IndexError:
+            return None
+        else:
+            return probe.getPixelGeometry()
 
     def getNumberOfSteps(self) -> int:
         if self._propagatedIntensity is None:

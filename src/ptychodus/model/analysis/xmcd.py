@@ -8,7 +8,7 @@ import logging
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.object import ObjectArrayType
+from ptychodus.api.object import ObjectArrayType, ObjectCenter
 
 from ..product import ObjectRepository
 
@@ -18,8 +18,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class XMCDResult:
     pixel_geometry: PixelGeometry | None
-    center_x_m: float
-    center_y_m: float
+    center: ObjectCenter | None
     polar_difference: ObjectArrayType
     polar_sum: ObjectArrayType
     polar_ratio: ObjectArrayType
@@ -53,7 +52,7 @@ class XMCDAnalyzer:
 
         # TODO align lcircArray/rcircArray
 
-        # FIXME handle OPR
+        # FIXME OPR
         lcircAmp = numpy.absolute(lcircObject.getArray())
         rcircAmp = numpy.absolute(rcircObject.getArray())
 
@@ -71,8 +70,7 @@ class XMCDAnalyzer:
 
         return XMCDResult(
             pixel_geometry=rcircObject.getPixelGeometry(),
-            center_x_m=rcircObject.centerXInMeters,
-            center_y_m=rcircObject.centerYInMeters,
+            center=rcircObject.getCenter(),
             polar_difference=polar_difference,
             polar_sum=polar_sum,
             polar_ratio=polar_ratio,
@@ -86,8 +84,6 @@ class XMCDAnalyzer:
 
     def saveResult(self, file_path: Path, result: XMCDResult) -> None:
         contents: dict[str, Any] = {
-            'center_x_m': result.center_x_m,
-            'center_y_m': result.center_y_m,
             'polar_difference': result.polar_difference,
             'polar_sum': result.polar_sum,
             'polar_ratio': result.polar_ratio,
@@ -98,5 +94,11 @@ class XMCDAnalyzer:
         if pixel_geometry is not None:
             contents['pixel_height_m'] = pixel_geometry.heightInMeters
             contents['pixel_width_m'] = pixel_geometry.widthInMeters
+
+        center = result.center
+
+        if center is not None:
+            contents['center_x_m'] = center.positionXInMeters
+            contents['center_y_m'] = center.positionYInMeters
 
         numpy.savez(file_path, **contents)

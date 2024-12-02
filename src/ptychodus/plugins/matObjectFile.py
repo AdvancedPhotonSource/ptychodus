@@ -25,7 +25,10 @@ class MATObjectFileReader(ObjectFileReader):
 
         # FIXME test & add pixel geometry
         return Object(
-            array=array.transpose(), pixelGeometry=None, layerDistanceInMeters=layerDistanceInMeters
+            array=array.transpose(),
+            pixelGeometry=None,
+            center=None,
+            layerDistanceInMeters=layerDistanceInMeters,
         )
 
 

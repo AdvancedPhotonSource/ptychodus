@@ -89,17 +89,20 @@ class FromFileObjectBuilder(ObjectBuilder):
         except Exception as exc:
             raise RuntimeError(f'Failed to read "{filePath}"') from exc
 
-        pixelGeometryFromFile = objectFromFile.getPixelGeometry()
-        pixelGeometryFromProvider = geometryProvider.getObjectGeometry().getPixelGeometry()
+        objectGeometry = geometryProvider.getObjectGeometry()
+        pixelGeometry = objectFromFile.getPixelGeometry()
+        center = objectFromFile.getCenter()
 
-        if pixelGeometryFromFile is None:
-            return Object(
-                objectFromFile.getArray(),
-                pixelGeometryFromProvider,
-                objectFromFile.layerDistanceInMeters,
-                centerXInMeters=objectFromFile.centerXInMeters,
-                centerYInMeters=objectFromFile.centerYInMeters,
-            )
+        if pixelGeometry is None:
+            pixelGeometry = objectGeometry.getPixelGeometry()
+
+        if center is None:
+            center = objectGeometry.getCenter()
 
         # TODO remap object from pixelGeometryFromFile to pixelGeometryFromProvider
-        return objectFromFile
+        return Object(
+            objectFromFile.getArray(),
+            pixelGeometry,
+            center,
+            objectFromFile.layerDistanceInMeters,
+        )

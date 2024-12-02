@@ -375,8 +375,7 @@ class EPIEReconstructor(Reconstructor):
             array=numpy.array(object_out_array),
             layerDistanceInMeters=object_in.layerDistanceInMeters,
             pixelGeometry=object_in.getPixelGeometry(),
-            centerXInMeters=object_in.centerXInMeters,
-            centerYInMeters=object_in.centerYInMeters,
+            center=object_in.getCenter(),
         )
 
         probe_in = parameters.product.probe

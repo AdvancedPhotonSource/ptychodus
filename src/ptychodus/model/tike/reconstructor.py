@@ -224,8 +224,7 @@ class TikeReconstructor:
                 array=result.psi,
                 layerDistanceInMeters=objectInput.layerDistanceInMeters,
                 pixelGeometry=objectInput.getPixelGeometry(),
-                centerXInMeters=objectInput.centerXInMeters,
-                centerYInMeters=objectInput.centerYInMeters,
+                center=objectInput.getCenter(),
             )
         else:
             objectOutput = objectInput.copy()
