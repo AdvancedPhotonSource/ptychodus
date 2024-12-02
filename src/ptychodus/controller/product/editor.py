@@ -58,7 +58,10 @@ class ProductPropertyTableModel(QAbstractTableModel):
                         case 4:
                             return f'{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}'
                         case 5:
-                            return f'{geometry.fresnelNumber:.4g}'
+                            try:
+                                return f'{geometry.fresnelNumber:.4g}'
+                            except ZeroDivisionError:
+                                return 'inf'
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._properties)

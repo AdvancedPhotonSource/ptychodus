@@ -1,8 +1,10 @@
 from pathlib import Path
+from typing import Final
 import logging
 
 import h5py
 
+from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.patterns import (
     DiffractionDataset,
@@ -10,10 +12,11 @@ from ptychodus.api.patterns import (
     DiffractionMetadata,
     SimpleDiffractionDataset,
 )
-from ptychodus.api.product import ELECTRON_VOLT_J
 from ptychodus.api.plugins import PluginRegistry
-
-from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
+from ptychodus.api.probe import Probe, ProbeFileReader
+from ptychodus.api.product import ELECTRON_VOLT_J
+from ptychodus.api.propagator import WavefieldArrayType
+from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +51,9 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                     probeEnergyInJoules = float(h5File['/entry_1/instrument_1/source_1/energy'][()])
                     probeEnergyInElectronVolts = probeEnergyInJoules / ELECTRON_VOLT_J
 
+                    # TODO load detector mask; zeros are good pixels
+                    # /entry_1/instrument_1/detector_1/mask Dataset {512, 512}
+
                     metadata = DiffractionMetadata(
                         numberOfPatternsPerArray=numberOfPatterns,
                         numberOfPatternsTotal=numberOfPatterns,
@@ -73,9 +79,46 @@ class CXIDiffractionFileReader(DiffractionFileReader):
         return dataset
 
 
+class CXIScanFileReader(ScanFileReader):
+    def read(self, filePath: Path) -> Scan:
+        scanPointList: list[ScanPoint] = list()
+
+        with h5py.File(filePath, 'r') as h5File:
+            xyz_m = h5File['/entry_1/data_1/translation'][()]
+
+            for idx, (x, y, z) in enumerate(xyz_m):
+                point = ScanPoint(idx, x, y)
+                scanPointList.append(point)
+
+        return Scan(scanPointList)
+
+
+class CXIProbeFileReader(ProbeFileReader):
+    def read(self, filePath: Path) -> Probe:
+        array: WavefieldArrayType | None = None
+
+        with h5py.File(filePath, 'r') as h5File:
+            array = h5File['/entry_1/instrument_1/source_1/illumination'][()]
+
+        return Probe(array=array, pixelGeometry=None)
+
+
 def registerPlugins(registry: PluginRegistry) -> None:
+    SIMPLE_NAME: Final[str] = 'CXI'
+    DISPLAY_NAME: Final[str] = 'Coherent X-ray Imaging Files (*.cxi)'
+
     registry.diffractionFileReaders.registerPlugin(
         CXIDiffractionFileReader(),
-        simpleName='CXI',
-        displayName='Coherent X-ray Imaging Files (*.cxi)',
+        simpleName=SIMPLE_NAME,
+        displayName=DISPLAY_NAME,
+    )
+    registry.scanFileReaders.registerPlugin(
+        CXIScanFileReader(),
+        simpleName=SIMPLE_NAME,
+        displayName=DISPLAY_NAME,
+    )
+    registry.probeFileReaders.registerPlugin(
+        CXIProbeFileReader(),
+        simpleName=SIMPLE_NAME,
+        displayName=DISPLAY_NAME,
     )
