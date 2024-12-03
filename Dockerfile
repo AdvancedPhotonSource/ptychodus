@@ -20,4 +20,4 @@ RUN python3 -m pip install --no-cache-dir .
 ENV DISPLAY=:0
 
 # Run ptychodus when the container launches
-ENTRYPOINT ["python", "-m", "ptychodus"]
+ENTRYPOINT ["python3", "-m", "ptychodus"]

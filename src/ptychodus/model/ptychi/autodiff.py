@@ -272,20 +272,15 @@ class AutodiffReconstructor(Reconstructor):
         self, scan: Scan, object_geometry: ObjectGeometry
     ) -> AutodiffPtychographyProbePositionOptions:
         position_in_px_list: list[float] = list()
+        rx_px = object_geometry.widthInPixels / 2
+        ry_px = object_geometry.heightInPixels / 2
 
         for scan_point in scan:
-            # FIXME object_point = object_geometry.mapScanPointToObjectPoint(scan_point)
-            # FIXME position_in_px_list.append(object_point.positionYInPixels)
-            # FIXME position_in_px_list.append(object_point.positionXInPixels)
-            position_in_px_list.append(
-                scan_point.positionXInMeters / object_geometry.pixelWidthInMeters
-            )
-            position_in_px_list.append(
-                scan_point.positionYInMeters / object_geometry.pixelHeightInMeters
-            )
+            object_point = object_geometry.mapScanPointToObjectPoint(scan_point)
+            position_in_px_list.append(object_point.positionYInPixels - ry_px)
+            position_in_px_list.append(object_point.positionXInPixels - rx_px)
 
-        position_in_px = numpy.reshape(position_in_px_list, shape=(len(scan), 2))
-        position_in_px -= position_in_px.mean(axis=0)  # FIXME
+        position_in_px = numpy.reshape(position_in_px_list, shape=(-1, 2))
 
         probe_position_optimization_plan = self._create_optimization_plan(
             self._probePositionSettings.optimizationPlanStart.getValue(),
@@ -365,7 +360,8 @@ class AutodiffReconstructor(Reconstructor):
         # TODO task.iterate(n_epochs)
         task.run()
 
-        position_out_px = task.get_data_to_cpu('probe_positions', as_numpy=True)  # FIXME units?
+        # TODO rename to position_x_px and position_y_px
+        position_out_px = task.get_data_to_cpu('probe_positions', as_numpy=True)
         probe_out_array = task.get_data_to_cpu('probe', as_numpy=True)
         object_out_array = task.get_data_to_cpu('object', as_numpy=True)
         # TODO opr_mode_weights = task.get_data_to_cpu('opr_mode_weights', as_numpy=True)
@@ -387,9 +383,15 @@ class AutodiffReconstructor(Reconstructor):
         scan_in = parameters.product.scan
         corrected_scan_points: list[ScanPoint] = list()
         object_geometry = object_in.getGeometry()
+        rx_px = object_geometry.widthInPixels / 2
+        ry_px = object_geometry.heightInPixels / 2
 
         for uncorrected_point, xy in zip(scan_in, position_out_px):
-            object_point = ObjectPoint(uncorrected_point.index, xy[-1], xy[-2])
+            object_point = ObjectPoint(
+                index=uncorrected_point.index,
+                positionXInPixels=xy[-1] + rx_px,
+                positionYInPixels=xy[-2] + ry_px,
+            )
             scan_point = object_geometry.mapObjectPointToScanPoint(object_point)
             corrected_scan_points.append(scan_point)
 
