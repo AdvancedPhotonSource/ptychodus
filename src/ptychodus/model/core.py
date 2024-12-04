@@ -133,7 +133,7 @@ class ModelCore:
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
             self.settingsRegistry, isDeveloperModeEnabled
         )
-        self.ptychopinnReconstructorLibrary = PtychoPINNReconstructorLibrary.createInstance(
+        self.ptychopinnReconstructorLibrary = PtychoPINNReconstructorLibrary(
             self.settingsRegistry, isDeveloperModeEnabled
         )
         self._reconstructorCore = ReconstructorCore(

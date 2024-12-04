@@ -1,9 +1,5 @@
-from .core import (
-    PtychoPINNPresenter,
-    PtychoPINNReconstructorLibrary,
-)
+from .core import PtychoPINNReconstructorLibrary
 
 __all__ = [
-    'PtychoPINNPresenter',
     'PtychoPINNReconstructorLibrary',
 ]

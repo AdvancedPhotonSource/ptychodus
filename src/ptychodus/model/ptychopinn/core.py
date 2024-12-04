@@ -9,7 +9,12 @@ from ...api.reconstructor import (
     TrainableReconstructor,
 )
 from ...api.settings import SettingsRegistry
-from .settings import PtychoPINNModelSettings, PtychoPINNTrainingSettings
+from .enums import PtychoPINNEnumerators
+from .settings import (
+    PtychoPINNInferenceSettings,
+    PtychoPINNModelSettings,
+    PtychoPINNTrainingSettings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,26 +31,13 @@ class PtychoPINNPresenter:
 
 
 class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
-    def __init__(
-        self,
-        modelSettings: PtychoPINNModelSettings,
-        trainingSettings: PtychoPINNTrainingSettings,
-        reconstructors: Sequence[Reconstructor],
-    ) -> None:
+    def __init__(self, settingsRegistry: SettingsRegistry, isDeveloperModeEnabled: bool) -> None:
         super().__init__()
-        self._modelSettings = modelSettings
-        self._trainingSettings = trainingSettings
-        self.presenter = PtychoPINNPresenter()
-        self._reconstructors = reconstructors
-
-    @classmethod
-    def createInstance(
-        cls, settingsRegistry: SettingsRegistry, isDeveloperModeEnabled: bool
-    ) -> PtychoPINNReconstructorLibrary:
-        modelSettings = PtychoPINNModelSettings(settingsRegistry)
-        trainingSettings = PtychoPINNTrainingSettings(settingsRegistry)
-        ptychoPINNReconstructor: TrainableReconstructor = NullReconstructor('PtychoPINN')
-        reconstructors: list[TrainableReconstructor] = list()
+        self.model_settings = PtychoPINNModelSettings(settingsRegistry)
+        self.training_settings = PtychoPINNTrainingSettings(settingsRegistry)
+        self.inference_settings = PtychoPINNInferenceSettings(settingsRegistry)
+        self.enumerators = PtychoPINNEnumerators()
+        self._reconstructors: list[TrainableReconstructor] = list()
 
         try:
             from .reconstructor import PtychoPINNTrainableReconstructor
@@ -53,14 +45,13 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
             logger.info('PtychoPINN not found.')
 
             if isDeveloperModeEnabled:
-                reconstructors.append(ptychoPINNReconstructor)
+                reconstructor: TrainableReconstructor = NullReconstructor('PtychoPINN')
+                self._reconstructors.append(reconstructor)
         else:
-            ptychoPINNReconstructor = PtychoPINNTrainableReconstructor(
-                modelSettings, trainingSettings
+            reconstructor = PtychoPINNTrainableReconstructor(
+                self.model_settings, self.training_settings, self.inference_settings
             )
-            reconstructors.append(ptychoPINNReconstructor)
-
-        return cls(modelSettings, trainingSettings, reconstructors)
+            self._reconstructors.append(reconstructor)
 
     @property
     def name(self) -> str:

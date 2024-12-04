@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from decimal import Decimal
 from typing import Final
 import logging
@@ -25,6 +25,7 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import (
     BooleanParameter,
     IntegerParameter,
+    PathParameter,
     RealParameter,
     StringParameter,
 )
@@ -110,7 +111,7 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
 
 class ComboBoxParameterViewController(ParameterViewController, Observer):
     def __init__(
-        self, parameter: StringParameter, items: Sequence[str], *, tool_tip: str = ''
+        self, parameter: StringParameter, items: Iterable[str], *, tool_tip: str = ''
     ) -> None:
         super().__init__()
         self._parameter = parameter
@@ -375,6 +376,28 @@ class ParameterViewBuilder:
         viewController = CheckBoxParameterViewController(parameter, '')
         self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
 
+    def addComboBox(
+        self,
+        parameter: StringParameter,
+        items: Iterable[str],
+        label: str,
+        *,
+        tool_tip: str = '',
+        group: str = '',
+    ) -> None:
+        viewController = ComboBoxParameterViewController(parameter, items)
+        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+
+    def addFileChooser(
+        self, parameter: PathParameter, label: str, *, tool_tip: str = '', group: str = ''
+    ) -> None:
+        pass  # FIXME
+
+    def addDirectoryChooser(
+        self, parameter: PathParameter, label: str, *, tool_tip: str = '', group: str = ''
+    ) -> None:
+        pass  # FIXME
+
     def addSpinBox(
         self,
         parameter: IntegerParameter,
@@ -384,6 +407,17 @@ class ParameterViewBuilder:
         group: str = '',
     ) -> None:
         viewController = SpinBoxParameterViewController(parameter)
+        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+
+    def addIntegerLineEdit(
+        self,
+        parameter: IntegerParameter,
+        label: str,
+        *,
+        tool_tip: str = '',
+        group: str = '',
+    ) -> None:
+        viewController = IntegerLineEditParameterViewController(parameter)
         self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
 
     def addDecimalLineEdit(

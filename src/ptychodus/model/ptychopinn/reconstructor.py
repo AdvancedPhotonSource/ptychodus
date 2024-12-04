@@ -2,13 +2,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any
 import logging
 
 import numpy
 import numpy.typing
 
-from ptycho import params as ptycho_params, train_pinn
+from ptycho import train_pinn
 from ptycho.loader import PtychoDataContainer
 
 from ptychodus.api.product import Product
@@ -20,7 +19,11 @@ from ptychodus.api.reconstructor import (
 )
 
 from ..analysis import ObjectStitcher
-from .settings import PtychoPINNModelSettings, PtychoPINNTrainingSettings
+from .settings import (
+    PtychoPINNInferenceSettings,
+    PtychoPINNModelSettings,
+    PtychoPINNTrainingSettings,
+)
 
 __all__ = [
     'PtychoPINNTrainableReconstructor',
@@ -56,22 +59,23 @@ def createPtychoDataContainer(parameters: ReconstructInput) -> PtychoDataContain
 
 class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     def __init__(
-        self, model_settings: PtychoPINNModelSettings, training_settings: PtychoPINNTrainingSettings
+        self,
+        model_settings: PtychoPINNModelSettings,
+        training_settings: PtychoPINNTrainingSettings,
+        inference_settings: PtychoPINNInferenceSettings,
     ) -> None:
         super().__init__()
         self._model_settings = model_settings
         self._training_settings = training_settings
         self._trainingDataFileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
-        self._modelFileFilterList: list[str] = list()  # TODO
+        self._modelFileFilterList: list[str] = list()  # FIXME
 
         self._trainingData: ReconstructInput | None = None
-        self._modelInstance = modelInstance  # FIXME
-        self._history = history  # FIXME
+        # FIXME self._modelInstance = modelInstance
+        # FIXME self._history = history
 
         ptychopinnVersion = version('ptychopinn')
         logger.info(f'\tPtychoPINN {ptychopinnVersion}')
-
-        self._syncSettingsToPtycho(nphotons=-1)
 
     @property
     def name(self) -> str:
@@ -132,7 +136,6 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             raise ValueError('No training dataset!')
 
         ptychoDataContainer = createPtychoDataContainer(parameters)
-        self._syncSettingsToPtycho(nphotons=int(parameters.product.metadata.probePhotons))
         intensity_scale = train_pinn.calculate_intensity_scale(ptychoDataContainer)
         modelInstance, history = train_pinn.train(ptychoDataContainer, intensity_scale)
         self._modelInstance = modelInstance  # FIXME
@@ -164,60 +167,3 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
     def saveModel(self, filePath: Path) -> None:
         raise NotImplementedError(f'Save trained model to "{filePath}"')  # FIXME
-
-    def _syncSettingsToPtycho(self, *, nphotons: int) -> None:
-        N = self._model_settings.N.getValue()
-        gridsize = self._model_settings.gridsize.getValue()
-        offset = self._model_settings.offset.getValue()
-        bigN = N + (gridsize - 1) * offset
-        max_position_jitter = 10
-        buffer = max_position_jitter
-
-        cfg: dict[str, Any] = {
-            'learning_rate': self._model_settings.learning_rate.getValue(),
-            'N': N,
-            'offset': offset,
-            'gridsize': gridsize,
-            'outer_offset_train': None,
-            'outer_offset_test': None,
-            'batch_size': self._model_settings.batch_size.getValue(),
-            'nepochs': 60,
-            'n_filters_scale': self._model_settings.n_filters_scale.getValue(),
-            'output_path': self._training_settings.output_path.getValue(),
-            'output_prefix': self._training_settings.output_prefix.getValue(),
-            'output_suffix': self._training_settings.output_suffix.getValue(),
-            'big_gridsize': 10,
-            'max_position_jitter': max_position_jitter,
-            'sim_jitter_scale': 0.0,
-            'default_probe_scale': 0.7,
-            'mae_weight': self._training_settings.mae_weight.getValue(),
-            'nll_weight': self._training_settings.nll_weight.getValue(),
-            'tv_weight': self._training_settings.tv_weight.getValue(),
-            'realspace_mae_weight': self._training_settings.realspace_mae_weight.getValue(),
-            'realspace_weight': self._training_settings.realspace_weight.getValue(),
-            'nimgs_train': 9,
-            'nimgs_test': 3,
-            'data_source': 'generic',
-            'probe.trainable': self._model_settings.is_probe_trainable.getValue(),
-            'intensity_scale.trainable': self._model_settings.intensity_scale_trainable.getValue(),
-            'positions.provided': False,
-            'object.big': self._model_settings.object_big.getValue(),
-            'probe.big': self._model_settings.probe_big.getValue(),  # if True, increase the real space solution from 32x32 to 64x64
-            'probe_scale': self._model_settings.probe_scale.getValue(),
-            'set_phi': False,
-            'probe.mask': self._model_settings.probe_mask.getValue(),
-            'model_type': self._model_settings.model_type.getValue(),
-            'label': '',
-            'size': self._model_settings.size.getValue(),
-            'amp_activation': self._model_settings.amp_activation.getValue(),
-            # derived values
-            'bigN': bigN,
-            'padded_size': bigN + buffer,
-            'padding_size': (gridsize - 1) * offset + buffer,
-        }
-
-        if nphotons > 0:
-            cfg['nphotons'] = nphotons
-
-        # sync current settings to ptycho's configuration
-        ptycho_params.cfg.update(cfg)
