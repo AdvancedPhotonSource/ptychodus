@@ -7,10 +7,8 @@ import logging
 import numpy
 import numpy.typing
 
-from ptycho import train_pinn
 from ptycho.loader import PtychoDataContainer
 
-from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import (
     ReconstructInput,
     ReconstructOutput,
@@ -18,7 +16,6 @@ from ptychodus.api.reconstructor import (
     TrainOutput,
 )
 
-from ..analysis import ObjectStitcher
 from .settings import (
     PtychoPINNInferenceSettings,
     PtychoPINNModelSettings,
@@ -67,12 +64,9 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         super().__init__()
         self._model_settings = model_settings
         self._training_settings = training_settings
-        self._trainingDataFileFilterList: list[str] = ['NumPy Zipped Archive (*.npz)']
-        self._modelFileFilterList: list[str] = list()  # FIXME
+        self._inference_settings = inference_settings
 
-        self._trainingData: ReconstructInput | None = None
-        # FIXME self._modelInstance = modelInstance
-        # FIXME self._history = history
+        # Note the model parameter 'N' is the diffraction pattern size in pixels (power of two)
 
         ptychopinnVersion = version('ptychopinn')
         logger.info(f'\tPtychoPINN {ptychopinnVersion}')
@@ -82,88 +76,49 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         return 'PtychoPINN'
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        if self._history is None:
-            raise ValueError('No history!')
-
-        if self._modelInstance is None:
-            raise ValueError('No model instance!')
-
-        testData = createPtychoDataContainer(parameters)
-        evalResults = train_pinn.eval(testData, self._history, self._modelInstance)
-        objectPatches = evalResults['reconstructed_obj'][:, :, :, 0]
-
-        logger.debug('Stitching...')
-        stitcher = ObjectStitcher(parameters.product.object_.getGeometry())
-
-        for scanPoint, patchArray in zip(parameters.product.scan, objectPatches):
-            stitcher.addPatch(scanPoint, patchArray)
-
-        product = Product(
-            metadata=parameters.product.metadata,
-            scan=parameters.product.scan,
-            probe=parameters.product.probe,
-            object_=stitcher.build(),
-            costs=list(),  # TODO put something here?
-        )
-
-        return ReconstructOutput(product, 0)
+        return ReconstructOutput(parameters.product, 0)  # TODO
 
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
-        self._trainingData = parameters
+        pass  # TODO
 
     def getOpenTrainingDataFileFilterList(self) -> Sequence[str]:
-        return self._trainingDataFileFilterList
+        return list()  # TODO
 
     def getOpenTrainingDataFileFilter(self) -> str:
-        return self._trainingDataFileFilterList[0]
+        return str()  # TODO
 
     def openTrainingData(self, filePath: Path) -> None:
-        raise NotImplementedError(f'Open training data from "{filePath}"')  # FIXME
+        pass  # TODO
 
     def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
-        return self._trainingDataFileFilterList
+        return list()  # TODO
 
     def getSaveTrainingDataFileFilter(self) -> str:
-        return self._trainingDataFileFilterList[0]
+        return str()  # TODO
 
     def saveTrainingData(self, filePath: Path) -> None:
-        raise NotImplementedError(f'Save training data to "{filePath}"')  # FIXME
+        pass  # TODO
 
     def train(self) -> TrainOutput:
-        parameters = self._trainingData
-
-        if parameters is None:
-            raise ValueError('No training dataset!')
-
-        ptychoDataContainer = createPtychoDataContainer(parameters)
-        intensity_scale = train_pinn.calculate_intensity_scale(ptychoDataContainer)
-        modelInstance, history = train_pinn.train(ptychoDataContainer, intensity_scale)
-        self._modelInstance = modelInstance  # FIXME
-        self._history = history  # FIXME
-
-        return TrainOutput(
-            trainingLoss=history.history['loss'],
-            validationLoss=history.history['val_loss'],  # TODO replace with actual values
-            result=0,
-        )
+        return TrainOutput([], [], 0)  # TODO
 
     def clearTrainingData(self) -> None:
-        self._trainingData = None
+        pass  # TODO
 
     def getOpenModelFileFilterList(self) -> Sequence[str]:
-        return self._modelFileFilterList
+        return list()  # TODO
 
     def getOpenModelFileFilter(self) -> str:
-        return self._modelFileFilterList[0]
+        return str()  # TODO
 
     def openModel(self, filePath: Path) -> None:
-        raise NotImplementedError(f'Open model to "{filePath}"')  # FIXME
+        pass  # TODO
 
     def getSaveModelFileFilterList(self) -> Sequence[str]:
-        return self._modelFileFilterList
+        return list()  # TODO
 
     def getSaveModelFileFilter(self) -> str:
-        return self._modelFileFilterList[0]
+        return str()  # TODO
 
     def saveModel(self, filePath: Path) -> None:
-        raise NotImplementedError(f'Save trained model to "{filePath}"')  # FIXME
+        pass  # TODO

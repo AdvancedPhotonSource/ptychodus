@@ -1,6 +1,8 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from decimal import Decimal
+from pathlib import Path
 from typing import Final
 import logging
 
@@ -14,7 +16,9 @@ from PyQt5.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QGroupBox,
+    QHBoxLayout,
     QLineEdit,
+    QPushButton,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -31,6 +35,7 @@ from ptychodus.api.parametric import (
 )
 
 from ..view.widgets import AngleWidget, DecimalLineEdit, DecimalSlider, LengthWidget
+from .data import FileDialogFactory
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +97,7 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
         maximum = self._parameter.getMaximum()
 
         if minimum is None:
-            logger.error('Minimum not provided!')
+            raise ValueError('Minimum not provided!')
         else:
             self._widget.blockSignals(True)
 
@@ -164,6 +169,92 @@ class LineEditParameterViewController(ParameterViewController, Observer):
 
     def _syncModelToView(self) -> None:
         self._widget.setText(self._parameter.getValue())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self._syncModelToView()
+
+
+class PathParameterViewController(ParameterViewController, Observer):
+    def __init__(
+        self, parameter: PathParameter, fileDialogFactory: FileDialogFactory, *, tool_tip: str
+    ) -> None:
+        super().__init__()
+        self._parameter = parameter
+        self._fileDialogFactory = fileDialogFactory
+        self._lineEdit = QLineEdit()
+        self._browseButton = QPushButton('Browse')
+        self._widget = QWidget()
+
+        if tool_tip:
+            self._lineEdit.setToolTip(tool_tip)
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._lineEdit)
+        layout.addWidget(self._browseButton)
+        self._widget.setLayout(layout)
+
+        self._syncModelToView()
+        parameter.addObserver(self)
+        self._lineEdit.editingFinished.connect(self._syncPathToModel)
+
+    @classmethod
+    def createFileOpener(
+        cls, parameter: PathParameter, fileDialogFactory: FileDialogFactory, *, tool_tip: str = ''
+    ) -> PathParameterViewController:
+        viewController = cls(parameter, fileDialogFactory, tool_tip=tool_tip)
+        viewController._browseButton.clicked.connect(viewController._chooseFileToOpen)
+        return viewController
+
+    @classmethod
+    def createFileSaver(
+        cls, parameter: PathParameter, fileDialogFactory: FileDialogFactory, *, tool_tip: str = ''
+    ) -> PathParameterViewController:
+        viewController = cls(parameter, fileDialogFactory, tool_tip=tool_tip)
+        viewController._browseButton.clicked.connect(viewController._chooseFileToSave)
+        return viewController
+
+    @classmethod
+    def createDirectoryChooser(
+        cls, parameter: PathParameter, fileDialogFactory: FileDialogFactory, *, tool_tip: str = ''
+    ) -> PathParameterViewController:
+        viewController = cls(parameter, fileDialogFactory, tool_tip=tool_tip)
+        viewController._browseButton.clicked.connect(viewController._chooseDirectory)
+        return viewController
+
+    def getWidget(self) -> QWidget:
+        return self._widget
+
+    def _syncPathToModel(self) -> None:
+        path = Path(self._lineEdit.text())
+        self._parameter.setValue(path)
+
+    def _chooseFileToOpen(self) -> None:
+        path, _ = self._fileDialogFactory.getOpenFilePath(
+            self._widget, 'Open File'
+        )  # FIXME filters
+
+        if path:
+            self._parameter.setValue(path)
+
+    def _chooseFileToSave(self) -> None:
+        path, _ = self._fileDialogFactory.getSaveFilePath(
+            self._widget, 'Save File'
+        )  # FIXME filters
+
+        if path:
+            self._parameter.setValue(path)
+
+    def _chooseDirectory(self) -> None:
+        path = self._fileDialogFactory.getExistingDirectoryPath(self._widget, 'Choose Directory')
+
+        if path:
+            self._parameter.setValue(path)
+
+    def _syncModelToView(self) -> None:
+        path = self._parameter.getValue()
+        self._lineEdit.setText(str(path))
 
     def update(self, observable: Observable) -> None:
         if observable is self._parameter:
@@ -269,7 +360,7 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
         maximum = self._parameter.getMaximum()
 
         if minimum is None or maximum is None:
-            logger.error('Range not provided!')
+            raise ValueError('Range not provided!')
         else:
             value = Decimal(repr(self._parameter.getValue()))
             range_ = Interval[Decimal](Decimal(repr(minimum)), Decimal(repr(maximum)))
@@ -360,7 +451,8 @@ class ParameterDialog(QDialog):
 
 
 class ParameterViewBuilder:
-    def __init__(self) -> None:
+    def __init__(self, fileDialogFactory: FileDialogFactory | None = None) -> None:
+        self._fileDialogFactory = fileDialogFactory
         self._viewControllersTop: list[ParameterViewController] = list()
         self._viewControllers: dict[tuple[str, str], ParameterViewController] = dict()
         self._viewControllersBottom: list[ParameterViewController] = list()
@@ -391,12 +483,24 @@ class ParameterViewBuilder:
     def addFileChooser(
         self, parameter: PathParameter, label: str, *, tool_tip: str = '', group: str = ''
     ) -> None:
-        pass  # FIXME
+        if self._fileDialogFactory is None:
+            raise ValueError('Cannot add file chooser without FileDialogFactory!')
+        else:
+            viewController = PathParameterViewController(
+                parameter, self._fileDialogFactory, tool_tip=''
+            )  # FIXME open or save
+            self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
 
     def addDirectoryChooser(
         self, parameter: PathParameter, label: str, *, tool_tip: str = '', group: str = ''
     ) -> None:
-        pass  # FIXME
+        if self._fileDialogFactory is None:
+            raise ValueError('Cannot add directory chooser without FileDialogFactory!')
+        else:
+            viewController = PathParameterViewController.createDirectoryChooser(
+                parameter, self._fileDialogFactory
+            )
+            self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
 
     def addSpinBox(
         self,
