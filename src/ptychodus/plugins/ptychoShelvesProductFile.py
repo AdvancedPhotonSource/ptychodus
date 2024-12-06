@@ -5,9 +5,9 @@ import numpy
 import scipy.io
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.object import Object, ObjectFileReader, ObjectFileWriter
+from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import Probe, ProbeFileReader, ProbeFileWriter
+from ptychodus.api.probe import Probe
 from ptychodus.api.product import (
     ELECTRON_VOLT_J,
     LIGHT_SPEED_M_PER_S,
@@ -19,7 +19,7 @@ from ptychodus.api.product import (
 from ptychodus.api.scan import Scan, ScanPoint
 
 
-class PtychoShelvesProductFileIO(ProductFileReader):
+class PtychoShelvesProductFileReader(ProductFileReader):
     SIMPLE_NAME: Final[str] = 'PtychoShelves'
     DISPLAY_NAME: Final[str] = 'PtychoShelves Files (*.mat)'
 
@@ -56,13 +56,23 @@ class PtychoShelvesProductFileIO(ProductFileReader):
             )
             scanPointList.append(point)
 
-        probe = Probe(
-            # probeMatrix[width, height, num_shared_modes, num_varying_modes]
-            matDict['probe'].transpose(),
-            pixel_geometry,
-        )
+        probe_array = matDict['probe']
 
-        object_array = matDict['object'].transpose()
+        if probe_array.ndim == 3:
+            # probe_array[height, width, num_shared_modes]
+            probe_array = probe_array.transpose(2, 0, 1)
+        elif probe_array.ndim == 4:
+            # probe_array[height, width, num_shared_modes, num_varying_modes]
+            probe_array = probe_array.transpose(3, 2, 0, 1)
+
+        probe = Probe(array=probe_array, pixelGeometry=pixel_geometry)
+
+        object_array = matDict['object']
+
+        if object_array.ndim == 3:
+            # object_array[height, width, num_layers]
+            object_array = object_array.transpose(2, 0, 1)
+
         layer_distance_m: Sequence[float] = list()
 
         try:
@@ -75,7 +85,6 @@ class PtychoShelvesProductFileIO(ProductFileReader):
             layer_distance_m = numpy.squeeze(z_distance)[:num_spaces]
 
         object_ = Object(
-            # object[width, height, num_layers]
             array=object_array,
             pixelGeometry=pixel_geometry,
             center=None,
@@ -92,91 +101,9 @@ class PtychoShelvesProductFileIO(ProductFileReader):
         )
 
 
-class PtychoShelvesProbeFileReader(ProbeFileReader):
-    def read(self, filePath: Path) -> Probe:
-        matDict = scipy.io.loadmat(filePath)
-
-        # array[width, height, num_shared_modes, num_varying_modes]
-        array = matDict['probe']
-        p_struct = matDict['p']
-        dx_spec = p_struct['dx_spec']
-        pixel_width_m = dx_spec[0]
-        pixel_height_m = dx_spec[1]
-        pixel_geometry = PixelGeometry(widthInMeters=pixel_width_m, heightInMeters=pixel_height_m)
-
-        return Probe(array=array.transpose(), pixelGeometry=pixel_geometry)
-
-
-class PtychoShelvesProbeFileWriter(ProbeFileWriter):
-    def write(self, filePath: Path, probe: Probe) -> None:
-        array = probe.getArray()
-        matDict = {'probe': array.transpose()}
-        scipy.io.savemat(filePath, matDict)
-
-
-class PtychoShelvesObjectFileReader(ObjectFileReader):
-    def read(self, filePath: Path) -> Object:
-        matDict = scipy.io.loadmat(filePath)
-
-        # array[width, height, num_layers]
-        p_struct = matDict['p']
-        dx_spec = p_struct['dx_spec']
-        pixel_width_m = dx_spec[0]
-        pixel_height_m = dx_spec[1]
-        pixel_geometry = PixelGeometry(widthInMeters=pixel_width_m, heightInMeters=pixel_height_m)
-
-        object_array = matDict['object'].transpose()
-        layer_distance_m: Sequence[float] = list()
-
-        try:
-            multi_slice_param = p_struct['multi_slice_param']
-            z_distance = multi_slice_param['z_distance']
-        except KeyError:
-            pass
-        else:
-            num_spaces = object_array.shape[-3] - 1
-            layer_distance_m = numpy.squeeze(z_distance)[:num_spaces]
-
-        return Object(
-            # object[width, height, num_layers]
-            array=object_array,
-            pixelGeometry=pixel_geometry,
-            center=None,
-            layerDistanceInMeters=layer_distance_m,
-        )
-
-
-class PtychoShelvesObjectFileWriter(ObjectFileWriter):
-    def write(self, filePath: Path, object_: Object) -> None:
-        array = object_.getArray()
-        matDict = {'object': array.transpose()}
-        # TODO layer distance to p.z_distance
-        scipy.io.savemat(filePath, matDict)
-
-
 def registerPlugins(registry: PluginRegistry) -> None:
     registry.productFileReaders.registerPlugin(
-        PtychoShelvesProductFileIO(),
-        simpleName=PtychoShelvesProductFileIO.SIMPLE_NAME,
-        displayName=PtychoShelvesProductFileIO.DISPLAY_NAME,
-    )
-    registry.probeFileReaders.registerPlugin(
-        PtychoShelvesProbeFileReader(),
-        simpleName=PtychoShelvesProductFileIO.SIMPLE_NAME,
-        displayName=PtychoShelvesProductFileIO.DISPLAY_NAME,
-    )
-    registry.probeFileWriters.registerPlugin(
-        PtychoShelvesProbeFileWriter(),
-        simpleName=PtychoShelvesProductFileIO.SIMPLE_NAME,
-        displayName=PtychoShelvesProductFileIO.DISPLAY_NAME,
-    )
-    registry.objectFileReaders.registerPlugin(
-        PtychoShelvesObjectFileReader(),
-        simpleName=PtychoShelvesProductFileIO.SIMPLE_NAME,
-        displayName=PtychoShelvesProductFileIO.DISPLAY_NAME,
-    )
-    registry.objectFileWriters.registerPlugin(
-        PtychoShelvesObjectFileWriter(),
-        simpleName=PtychoShelvesProductFileIO.SIMPLE_NAME,
-        displayName=PtychoShelvesProductFileIO.DISPLAY_NAME,
+        PtychoShelvesProductFileReader(),
+        simpleName=PtychoShelvesProductFileReader.SIMPLE_NAME,
+        displayName=PtychoShelvesProductFileReader.DISPLAY_NAME,
     )

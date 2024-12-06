@@ -9,7 +9,7 @@ readme = "README.rst"
 requires-python = ">=3.10"
 license = {file = "LICENSE.txt"}
 dependencies = [
-    "h5py",
+    "h5py>=3",
     "hdf5plugin",
     "matplotlib",
     "numpy",

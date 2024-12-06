@@ -10,24 +10,18 @@ class Detector(Observable, Observer):
         self._settingsGroup.addObserver(self)
 
         self.widthInPixels = self._settingsGroup.createIntegerParameter(
-            'WidthInPixels', 1024, minimum=0
+            'WidthInPixels', 1024, minimum=1
         )
         self.pixelWidthInMeters = self._settingsGroup.createRealParameter(
             'PixelWidthInMeters', 75e-6, minimum=0.0
         )
         self.heightInPixels = self._settingsGroup.createIntegerParameter(
-            'HeightInPixels', 1024, minimum=0
+            'HeightInPixels', 1024, minimum=1
         )
         self.pixelHeightInMeters = self._settingsGroup.createRealParameter(
             'PixelHeightInMeters', 75e-6, minimum=0.0
         )
         self.bitDepth = self._settingsGroup.createIntegerParameter('BitDepth', 8, minimum=1)
-
-    def getImageExtent(self) -> ImageExtent:
-        return ImageExtent(
-            widthInPixels=self.widthInPixels.getValue(),
-            heightInPixels=self.heightInPixels.getValue(),
-        )
 
     def setImageExtent(self, imageExtent: ImageExtent) -> None:
         self.widthInPixels.setValue(imageExtent.widthInPixels)

@@ -67,13 +67,15 @@ class H5DiffractionFileTreeBuilder:
                 itemDetails = f'STRING = "{value}"'
             elif isinstance(value, h5py.Empty):
                 logger.debug(f'Skipping empty attribute {name}.')
+            elif isinstance(value, numpy.ndarray):
+                itemDetails = f'ARRAY = {value}'
             else:
                 stringInfo = h5py.check_string_dtype(value.dtype)
-                itemDetails = (
-                    f'STRING = "{value.decode(stringInfo.encoding)}"'
-                    if stringInfo
-                    else f'SCALAR {value.dtype} = {value}'
-                )
+
+                if stringInfo:
+                    itemDetails = f'STRING = "{value.decode(stringInfo.encoding)}"'
+                else:
+                    itemDetails = f'SCALAR {value.dtype} = {value}'
 
             treeNode.createChild([str(name), 'Attribute', itemDetails])
 
@@ -112,13 +114,18 @@ class H5DiffractionFileTreeBuilder:
 
                             if isinstance(value, bytes):
                                 itemDetails = value.decode()
+                            elif isinstance(value, numpy.ndarray):
+                                itemDetails = f'STRING = {h5Item.asstr()}'
                             else:
                                 stringInfo = h5py.check_string_dtype(value.dtype)
-                                itemDetails = (
-                                    f'STRING = "{value.decode(stringInfo.encoding)}"'
-                                    if stringInfo
-                                    else f'SCALAR {value.dtype} = {value}'
-                                )
+
+                                if stringInfo:
+                                    itemDetails = f'STRING = "{value.decode(stringInfo.encoding)}"'
+                                else:
+                                    itemDetails = f'SCALAR {value.dtype} = {value}'
+                        elif h5Item.size == 1:
+                            value = h5Item[()]
+                            itemDetails = f'DATASET {value.dtype} = {value}'
                         else:
                             itemDetails = f'{h5Item.shape} {h5Item.dtype}'
                 elif isinstance(h5Item, h5py.SoftLink):
@@ -195,9 +202,14 @@ def registerPlugins(registry: PluginRegistry) -> None:
         displayName='CNM/APS HXN Diffraction Files (*.h5 *.hdf5)',
     )
     registry.diffractionFileReaders.registerPlugin(
+        H5DiffractionFileReader(dataPath='/entry/data/data'),
+        simpleName='SLS_cSAXS',
+        displayName='SLS cSAXS Diffraction Files (*.h5 *.hdf5)',
+    )
+    registry.diffractionFileReaders.registerPlugin(
         H5DiffractionFileReader(dataPath='/entry/measurement/Eiger/data'),
-        simpleName='NanoMax',
-        displayName='NanoMax Diffraction Files (*.h5 *.hdf5)',
+        simpleName='MAX_IV_NanoMax',
+        displayName='MAX IV NanoMax Diffraction Files (*.h5 *.hdf5)',
     )
     registry.diffractionFileReaders.registerPlugin(
         H5DiffractionFileReader(dataPath='/dp'),
