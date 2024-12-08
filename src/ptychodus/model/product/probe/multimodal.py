@@ -117,17 +117,16 @@ class MultimodalProbeBuilder(ParameterGroup):
         return adjustedProbe
 
     def build(self, probe: Probe) -> Probe:
-        if self.numberOfIncoherentModes.getValue() <= 1:
-            return probe
+        num_requested_modes = self.numberOfIncoherentModes.getValue()
+        num_existing_modes = probe.numberOfIncoherentModes
+        array = probe.getArray()
 
-        array = self._initializeModes(probe.getArray())
+        if num_requested_modes > num_existing_modes:
+            array = self._initializeModes(array)
 
-        if self.orthogonalizeIncoherentModes.getValue():
-            array = self._orthogonalizeIncoherentModes(array)
+            if self.orthogonalizeIncoherentModes.getValue():
+                array = self._orthogonalizeIncoherentModes(array)
 
-        array = self._adjustRelativePower(array)
+            array = self._adjustRelativePower(array)
 
-        return Probe(
-            array,
-            pixelGeometry=probe.getPixelGeometry(),
-        )
+        return Probe(array, probe.getPixelGeometry())
