@@ -49,6 +49,16 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
             return 0.0
 
     @property
+    def probeWavelengthsPerMeter(self) -> float:
+        """wavenumber"""
+        return 1.0 / self.probeWavelengthInMeters
+
+    @property
+    def probeRadiansPerMeter(self) -> float:
+        """angular wavenumber"""
+        return 2.0 * numpy.pi / self.probeWavelengthInMeters
+
+    @property
     def probePhotonsPerSecond(self) -> float:
         try:
             return self.probePhotonCount / self._metadata.exposureTimeInSeconds.getValue()

@@ -22,6 +22,8 @@ class ProductPropertyTableModel(QAbstractTableModel):
         self._header = ['Property', 'Value']
         self._properties = [
             'Probe Wavelength [nm]',
+            'Probe Wavenumber [1/nm]',
+            'Probe Angular Wavenumber [rad/nm]',
             'Probe Photon Flux [ph/s]',
             'Probe Power [W]',
             'Object Plane Pixel Width [nm]',
@@ -50,14 +52,18 @@ class ProductPropertyTableModel(QAbstractTableModel):
                         case 0:
                             return f'{geometry.probeWavelengthInMeters * 1e9:.4g}'
                         case 1:
-                            return f'{geometry.probePhotonsPerSecond:.4g}'
+                            return f'{geometry.probeWavelengthsPerMeter * 1e-9:.4g}'
                         case 2:
-                            return f'{geometry.probePowerInWatts:.4g}'
+                            return f'{geometry.probeRadiansPerMeter * 1e-9:.4g}'
                         case 3:
-                            return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
+                            return f'{geometry.probePhotonsPerSecond:.4g}'
                         case 4:
-                            return f'{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}'
+                            return f'{geometry.probePowerInWatts:.4g}'
                         case 5:
+                            return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
+                        case 6:
+                            return f'{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}'
+                        case 7:
                             try:
                                 return f'{geometry.fresnelNumber:.4g}'
                             except ZeroDivisionError:
