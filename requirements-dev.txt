@@ -1,3 +1,4 @@
+build
 h5py>=3
 hdf5plugin
 matplotlib

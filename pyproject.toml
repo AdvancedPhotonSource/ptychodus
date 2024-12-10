@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64", "setuptools_scm>=8"]
+requires = ["setuptools>=64", "setuptools_scm[toml]>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -30,6 +30,12 @@ globus = ["gladier", "gladier-tools>=0.5.4"]
 gui = ["PyQt5"]
 ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
 tike = ["tike==0.25.*,>=0.25.3"]
+
+[tool.setuptools.package-data]
+"ptychodus" = ["py.typed"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.setuptools_scm]
 
@@ -62,10 +68,3 @@ target-version = "py310"
 
 [tool.ruff.format]
 quote-style = "single"
-
-[tool.setuptools.package-data]
-"ptychodus" = ["py.typed"]
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
