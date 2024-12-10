@@ -7,7 +7,7 @@ name = "ptychodus"
 description = "Ptychodus is a ptychography data analysis application."
 readme = "README.rst"
 requires-python = ">=3.10"
-license = {file = "LICENSE.txt"}
+license = {file = "LICENSE"}
 dependencies = [
     "h5py>=3",
     "hdf5plugin",
