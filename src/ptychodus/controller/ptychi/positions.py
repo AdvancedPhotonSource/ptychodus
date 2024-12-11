@@ -20,8 +20,10 @@ from ..parametric import (
 )
 from .optimizer import PtyChiOptimizationPlanViewController, PtyChiOptimizerParameterViewController
 
+__all__ = ['PtyChiProbePositionsViewController']
 
-class CrossCorrelationViewController(ParameterViewController, Observer):
+
+class PtyChiCrossCorrelationViewController(ParameterViewController, Observer):
     def __init__(
         self,
         algorithm: StringParameter,
@@ -31,9 +33,15 @@ class CrossCorrelationViewController(ParameterViewController, Observer):
     ) -> None:
         super().__init__()
         self._algorithm = algorithm
-        self._scaleViewController = SpinBoxParameterViewController(scale)
-        self._realSpaceWidthViewController = DecimalLineEditParameterViewController(realSpaceWidth)
-        self._probeThresholdViewController = DecimalSliderParameterViewController(probeThreshold)
+        self._scaleViewController = SpinBoxParameterViewController(
+            scale, tool_tip='Upsampling factor of the cross-correlation in real space.'
+        )
+        self._realSpaceWidthViewController = DecimalLineEditParameterViewController(
+            realSpaceWidth, tool_tip='Width of the cross-correlation in real-space'
+        )
+        self._probeThresholdViewController = DecimalSliderParameterViewController(
+            probeThreshold, tool_tip='Probe intensity threshold used to calculate the probe mask.'
+        )
         self._widget = QFrame()
         self._widget.setFrameShape(QFrame.StyledPanel)
 
@@ -57,16 +65,20 @@ class CrossCorrelationViewController(ParameterViewController, Observer):
             self._syncModelToView()
 
 
-class UpdateMagnitudeLimitViewController(CheckableGroupBoxParameterViewController):
+class PtyChiUpdateMagnitudeLimitViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
         limitMagnitudeUpdate: BooleanParameter,
         magnitudeUpdateLimit: RealParameter,
     ) -> None:
-        super().__init__(limitMagnitudeUpdate, 'Limit Update Magnitude')
+        super().__init__(
+            limitMagnitudeUpdate,
+            'Limit Update Magnitude',
+            tool_tip='Limit the magnitude of the probe update.',
+        )
         self._viewController = DecimalLineEditParameterViewController(
             magnitudeUpdateLimit,
-            tool_tip='Limit update magnitudes to this value.',
+            tool_tip='Magnitude limit of the probe update.',
         )
 
         layout = QFormLayout()
@@ -81,7 +93,11 @@ class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewControlle
         num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
-        super().__init__(settings.isOptimizable, 'Optimize Probe Positions')
+        super().__init__(
+            settings.isOptimizable,
+            'Optimize Probe Positions',
+            tool_tip='Whether the probe positions are optimizable.',
+        )
         self._optimizationPlanViewController = PtyChiOptimizationPlanViewController(
             settings.optimizationPlanStart,
             settings.optimizationPlanStop,
@@ -95,20 +111,24 @@ class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewControlle
             settings.stepSize, tool_tip='Optimizer step size'
         )
         self._algorithmViewController = ComboBoxParameterViewController(
-            settings.positionCorrectionType, enumerators.positionCorrectionTypes()
+            settings.positionCorrectionType,
+            enumerators.positionCorrectionTypes(),
+            tool_tip='Algorithm used to calculate the position correction update.',
         )
-        self._crossCorrelationViewController = CrossCorrelationViewController(
+        self._crossCorrelationViewController = PtyChiCrossCorrelationViewController(
             settings.positionCorrectionType,
             settings.crossCorrelationScale,
             settings.crossCorrelationRealSpaceWidth,
             settings.crossCorrelationProbeThreshold,
         )
-        self._magnitudeUpdateLimitViewController = UpdateMagnitudeLimitViewController(
+        self._magnitudeUpdateLimitViewController = PtyChiUpdateMagnitudeLimitViewController(
             settings.limitMagnitudeUpdate,
             settings.magnitudeUpdateLimit,
         )
         self._constrainCentroidViewController = CheckBoxParameterViewController(
-            settings.constrainCentroid, 'Constrain Centroid'
+            settings.constrainCentroid,
+            'Constrain Centroid',
+            tool_tip='Whether to subtract the mean from positions after updating positions.',
         )
 
         layout = QFormLayout()

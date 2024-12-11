@@ -18,7 +18,11 @@ class PtyChiOPRViewController(CheckableGroupBoxParameterViewController):
         num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
-        super().__init__(settings.isOptimizable, 'Orthogonal Probe Relaxation')
+        super().__init__(
+            settings.isOptimizable,
+            'Orthogonal Probe Relaxation',
+            tool_tip='Whether OPR modes are optimizable.',
+        )
         self._optimizationPlanViewController = PtyChiOptimizationPlanViewController(
             settings.optimizationPlanStart,
             settings.optimizationPlanStop,
@@ -34,10 +38,12 @@ class PtyChiOPRViewController(CheckableGroupBoxParameterViewController):
         self._optimizeIntensitiesViewController = CheckBoxParameterViewController(
             settings.optimizeIntensities,
             'Optimize Intensities',
+            tool_tip='Whether to optimize intensity variation (i.e., the weight of the first OPR mode).',
         )
         self._optimizeEigenmodeWeightsViewController = CheckBoxParameterViewController(
             settings.optimizeEigenmodeWeights,
             'Optimize Eigenmode Weights',
+            tool_tip='Whether to optimize eigenmode weights (i.e., the weights of the second and following OPR modes).',
         )
 
         layout = QFormLayout()

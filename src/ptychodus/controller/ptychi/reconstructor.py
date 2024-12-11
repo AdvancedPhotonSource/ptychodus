@@ -20,10 +20,18 @@ from ..parametric import (
     SpinBoxParameterViewController,
 )
 
+__all__ = ['PtyChiReconstructorViewController']
+
 
 class PtyChiDeviceViewController(CheckableGroupBoxParameterViewController):
-    def __init__(self, useDevices: BooleanParameter, repository: PtyChiDeviceRepository) -> None:
-        super().__init__(useDevices, 'Use Devices')
+    def __init__(
+        self,
+        useDevices: BooleanParameter,
+        repository: PtyChiDeviceRepository,
+        *,
+        tool_tip: str = '',
+    ) -> None:
+        super().__init__(useDevices, 'Use Devices', tool_tip=tool_tip)
         layout = QVBoxLayout()
 
         for device in repository:
@@ -41,6 +49,9 @@ class PtyChiPrecisionParameterViewController(ParameterViewController, Observer):
         self._doublePrecisionButton = QRadioButton('Double')
         self._buttonGroup = QButtonGroup()
         self._widget = QWidget()
+
+        self._singlePrecisionButton.setToolTip('Compute using single precision.')
+        self._doublePrecisionButton.setToolTip('Compute using double precision.')
 
         if tool_tip:
             self._widget.setToolTip(tool_tip)
@@ -85,23 +96,23 @@ class PtyChiReconstructorViewController(ParameterViewController):
     ) -> None:
         super().__init__()
         self._numEpochsViewController = SpinBoxParameterViewController(
-            settings.numEpochs, tool_tip='The number of epochs to run.'
+            settings.numEpochs, tool_tip='Number of epochs to run.'
         )
         self._batchSizeViewController = SpinBoxParameterViewController(
-            settings.batchSize,
-            tool_tip='The number of probe positions to process in each minibatch.',
+            settings.batchSize, tool_tip='Number of data to process in each minibatch.'
         )
         self._batchingModeViewController = ComboBoxParameterViewController(
-            settings.batchingMode, enumerators.batchingModes()
+            settings.batchingMode, enumerators.batchingModes(), tool_tip='Batching mode to use.'
         )
-        self._batchStride = SpinBoxParameterViewController(settings.batchStride)
+        self._batchStride = SpinBoxParameterViewController(
+            settings.batchStride, tool_tip='Number of epochs between updating clusters.'
+        )
         self._deviceViewController = PtyChiDeviceViewController(
-            settings.useDevices,
-            repository,
+            settings.useDevices, repository, tool_tip='Default device to use for computation.'
         )
         self._precisionViewController = PtyChiPrecisionParameterViewController(
             settings.useDoublePrecision,
-            tool_tip='The floating point precision to use for computation.',
+            tool_tip='Floating point precision to use for computation.',
         )
         self._widget = QGroupBox('Reconstructor')
 

@@ -106,6 +106,11 @@ class PtyChiObjectSettings(Observable, Observer):
                 'RegularizeMultisliceUnwrapPhaseImageGradientMethod', 'FOURIER_SHIFT'
             )
         )
+        self.regularizeMultisliceUnwrapPhaseImageIntegrationMethod = (
+            self._settingsGroup.createStringParameter(
+                'RegularizeMultisliceUnwrapPhaseImageIntegrationMethod', 'DECONVOLUTION'
+            )
+        )
         self.regularizeMultisliceStride = self._settingsGroup.createIntegerParameter(
             'RegularizeMultisliceStride', 1, minimum=1
         )
@@ -137,7 +142,6 @@ class PtyChiProbeSettings(Observable, Observer):
         self.constrainProbePower = self._settingsGroup.createBooleanParameter(
             'ConstrainProbePower', False
         )
-        self.probePower = self._settingsGroup.createRealParameter('ProbePower', 0.0, minimum=0.0)
         self.constrainProbePowerStride = self._settingsGroup.createIntegerParameter(
             'ConstrainProbePowerStride', 1, minimum=1
         )
@@ -157,6 +161,17 @@ class PtyChiProbeSettings(Observable, Observer):
         )
         self.orthogonalizeOPRModesStride = self._settingsGroup.createIntegerParameter(
             'OrthogonalizeOPRModesStride', 1, minimum=1
+        )
+
+        self.constrainSupport = self._settingsGroup.createBooleanParameter(
+            'ConstrainSupport',
+            False,
+        )
+        self.constrainSupportThreshold = self._settingsGroup.createRealParameter(
+            'ConstrainSupportThreshold', 0.005, minimum=0.0
+        )
+        self.constrainSupportStride = self._settingsGroup.createIntegerParameter(
+            'ConstrainSupportStride', 1, minimum=1
         )
 
     def update(self, observable: Observable) -> None:

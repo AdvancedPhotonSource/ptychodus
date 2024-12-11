@@ -41,11 +41,14 @@ class ParameterViewController(ABC):
 
 
 class CheckableGroupBoxParameterViewController(ParameterViewController, Observer):
-    def __init__(self, parameter: BooleanParameter, title: str) -> None:
+    def __init__(self, parameter: BooleanParameter, title: str, *, tool_tip: str = '') -> None:
         super().__init__()
         self._parameter = parameter
         self._widget = QGroupBox(title)
         self._widget.setCheckable(True)
+
+        if tool_tip:
+            self._widget.setToolTip(tool_tip)
 
         self._syncModelToView()
         self._widget.toggled.connect(parameter.setValue)
@@ -298,10 +301,15 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
 
 
 class LengthWidgetParameterViewController(ParameterViewController, Observer):
-    def __init__(self, parameter: RealParameter, *, is_signed: bool = False) -> None:
+    def __init__(
+        self, parameter: RealParameter, *, is_signed: bool = False, tool_tip: str = ''
+    ) -> None:
         super().__init__()
         self._parameter = parameter
         self._widget = LengthWidget.createInstance(isSigned=is_signed)
+
+        if tool_tip:
+            self._widget.setToolTip(tool_tip)
 
         self._syncModelToView()
         self._widget.lengthChanged.connect(self._syncViewToModel)

@@ -10,8 +10,13 @@ from ..parametric import (
     ParameterViewController,
 )
 
+__all__ = [
+    'PtyChiOptimizationPlanViewController',
+    'PtyChiOptimizerParameterViewController',
+]
 
-class StopSpinBoxParameterViewController(ParameterViewController, Observer):
+
+class PtyChiStopSpinBoxParameterViewController(ParameterViewController, Observer):
     def __init__(
         self, stop: IntegerParameter, num_epochs: IntegerParameter, *, tool_tip: str = ''
     ) -> None:
@@ -61,7 +66,7 @@ class PtyChiOptimizationPlanViewController(ParameterViewController):
         self._startViewController = SpinBoxParameterViewController(
             start, tool_tip='Iteration to start optimizing'
         )
-        self._stopViewController = StopSpinBoxParameterViewController(
+        self._stopViewController = PtyChiStopSpinBoxParameterViewController(
             stop, num_epochs, tool_tip='Iteration to stop optimizing'
         )
         self._strideViewController = SpinBoxParameterViewController(
@@ -82,4 +87,4 @@ class PtyChiOptimizationPlanViewController(ParameterViewController):
 
 class PtyChiOptimizerParameterViewController(ComboBoxParameterViewController):
     def __init__(self, parameter: StringParameter, enumerators: PtyChiEnumerators) -> None:
-        super().__init__(parameter, enumerators.optimizers())
+        super().__init__(parameter, enumerators.optimizers(), tool_tip='Name of the optimizer.')

@@ -16,25 +16,53 @@ from ..parametric import (
 )
 from .optimizer import PtyChiOptimizationPlanViewController, PtyChiOptimizerParameterViewController
 
+__all__ = ['PtyChiProbeViewController']
 
-class ConstrainProbePowerViewController(CheckableGroupBoxParameterViewController):
+
+class PtyChiConstrainProbePowerViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
         constrainPower: BooleanParameter,
-        power: RealParameter,
         stride: IntegerParameter,
     ) -> None:
-        super().__init__(constrainPower, 'Constrain Power')
-        self._powerViewController = DecimalLineEditParameterViewController(power)
-        self._strideViewController = SpinBoxParameterViewController(stride)
+        super().__init__(
+            constrainPower, 'Constrain Power', tool_tip='Whether to constrain probe power.'
+        )
+        self._strideViewController = SpinBoxParameterViewController(
+            stride, tool_tip='Number of epochs between probe power constraint updates.'
+        )
 
         layout = QFormLayout()
-        layout.addRow('Power:', self._powerViewController.getWidget())
         layout.addRow('Stride:', self._strideViewController.getWidget())
         self.getWidget().setLayout(layout)
 
 
-class OrthogonalizeIncoherentModesViewController(CheckableGroupBoxParameterViewController):
+class PtyChiConstrainSupportViewController(CheckableGroupBoxParameterViewController):
+    def __init__(
+        self,
+        constrainSupport: BooleanParameter,
+        threshold: RealParameter,
+        stride: IntegerParameter,
+    ) -> None:
+        super().__init__(
+            constrainSupport,
+            'Constrain Support',
+            tool_tip='When enabled, the probe will be shrinkwrapped so that small values are set to zero.',
+        )
+        self._thresholdViewController = DecimalLineEditParameterViewController(
+            threshold, tool_tip='Threshold for the probe support constraint.'
+        )
+        self._strideViewController = SpinBoxParameterViewController(
+            stride, tool_tip='Number of epochs between probe support constraint updates.'
+        )
+
+        layout = QFormLayout()
+        layout.addRow('Threshold:', self._thresholdViewController.getWidget())
+        layout.addRow('Stride:', self._strideViewController.getWidget())
+        self.getWidget().setLayout(layout)
+
+
+class PtyChiOrthogonalizeIncoherentModesViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
         orthogonalizeModes: BooleanParameter,
@@ -42,11 +70,20 @@ class OrthogonalizeIncoherentModesViewController(CheckableGroupBoxParameterViewC
         stride: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
-        super().__init__(orthogonalizeModes, 'Orthogonalize Incoherent Modes')
-        self._methodViewController = ComboBoxParameterViewController(
-            method, enumerators.orthogonalizationMethods()
+        super().__init__(
+            orthogonalizeModes,
+            'Orthogonalize Incoherent Modes',
+            tool_tip='Whether to orthogonalize incoherent probe modes.',
         )
-        self._strideViewController = SpinBoxParameterViewController(stride)
+        self._methodViewController = ComboBoxParameterViewController(
+            method,
+            enumerators.orthogonalizationMethods(),
+            tool_tip='Method to use for incoherent mode orthogonalization.',
+        )
+        self._strideViewController = SpinBoxParameterViewController(
+            stride,
+            tool_tip='Number of epochs between orthogonalizing the incoherent probe modes.',
+        )
 
         layout = QFormLayout()
         layout.addRow('Method:', self._methodViewController.getWidget())
@@ -54,15 +91,20 @@ class OrthogonalizeIncoherentModesViewController(CheckableGroupBoxParameterViewC
         self.getWidget().setLayout(layout)
 
 
-class OrthogonalizeOPRModesViewController(CheckableGroupBoxParameterViewController):
+class PtyChiOrthogonalizeOPRModesViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
         orthogonalizeModes: BooleanParameter,
         stride: IntegerParameter,
     ) -> None:
-        super().__init__(orthogonalizeModes, 'Orthogonalize OPR Modes')
-        self._orthogonalizeModes = orthogonalizeModes
-        self._strideViewController = SpinBoxParameterViewController(stride)
+        super().__init__(
+            orthogonalizeModes,
+            'Orthogonalize OPR Modes',
+            tool_tip='Whether to orthogonalize OPR modes.',
+        )
+        self._strideViewController = SpinBoxParameterViewController(
+            stride, tool_tip='Number of epochs between orthogonalizing the OPR modes.'
+        )
 
         layout = QFormLayout()
         layout.addRow('Stride:', self._strideViewController.getWidget())
@@ -76,7 +118,9 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
         num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
-        super().__init__(settings.isOptimizable, 'Optimize Probe')
+        super().__init__(
+            settings.isOptimizable, 'Optimize Probe', tool_tip='Whether the probe is optimizable.'
+        )
         self._optimizationPlanViewController = PtyChiOptimizationPlanViewController(
             settings.optimizationPlanStart,
             settings.optimizationPlanStop,
@@ -89,18 +133,23 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
         self._stepSizeViewController = DecimalLineEditParameterViewController(
             settings.stepSize, tool_tip='Optimizer step size'
         )
-        self._constrainPowerViewController = ConstrainProbePowerViewController(
-            settings.constrainProbePower, settings.probePower, settings.constrainProbePowerStride
+        self._constrainPowerViewController = PtyChiConstrainProbePowerViewController(
+            settings.constrainProbePower, settings.constrainProbePowerStride
+        )
+        self._constrainSupportViewController = PtyChiConstrainSupportViewController(
+            settings.constrainSupport,
+            settings.constrainSupportThreshold,
+            settings.constrainSupportStride,
         )
         self._orthogonalizeIncoherentModesViewController = (
-            OrthogonalizeIncoherentModesViewController(
+            PtyChiOrthogonalizeIncoherentModesViewController(
                 settings.orthogonalizeIncoherentModes,
                 settings.orthogonalizeIncoherentModesMethod,
                 settings.orthogonalizeIncoherentModesStride,
                 enumerators,
             )
         )
-        self._orthogonalizeOPRModesViewController = OrthogonalizeOPRModesViewController(
+        self._orthogonalizeOPRModesViewController = PtyChiOrthogonalizeOPRModesViewController(
             settings.orthogonalizeOPRModes,
             settings.orthogonalizeOPRModesStride,
         )

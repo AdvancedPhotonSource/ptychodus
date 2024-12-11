@@ -9,6 +9,7 @@ from ptychi.api import (
     Directions,
     Dtypes,
     ImageGradientMethods,
+    ImageIntegrationMethods,
     OptimizationPlan,
     Optimizers,
     OrthogonalizationMethods,
@@ -105,6 +106,7 @@ class PIEReconstructor(Reconstructor):
             ),
             # TODO random_seed
             # TODO displayed_loss_function
+            # TODO use_low_memory_forward_model
         )
 
     def _create_optimization_plan(self, start: int, stop: int, stride: int) -> OptimizationPlan:
@@ -185,6 +187,24 @@ class PIEReconstructor(Reconstructor):
 
         ####
 
+        multislice_regularization_unwrap_image_integration_method_str = (
+            self._objectSettings.regularizeMultisliceUnwrapPhaseImageIntegrationMethod.getValue()
+        )
+
+        try:
+            multislice_regularization_unwrap_image_integration_method = ImageIntegrationMethods[
+                multislice_regularization_unwrap_image_integration_method_str.upper()
+            ]
+        except KeyError:
+            logger.warning(
+                'Failed to parse image integrationient method "{multislice_regularization_unwrap_image_integration_method_str}"!'
+            )
+            multislice_regularization_unwrap_image_integration_method = (
+                ImageIntegrationMethods.DECONVOLUTION
+            )
+
+        ####
+
         patch_interpolation_method_str = self._objectSettings.patchInterpolator.getValue()
 
         try:
@@ -199,6 +219,16 @@ class PIEReconstructor(Reconstructor):
 
         ####
 
+        pixel_geometry = object_.getPixelGeometry()
+        pixel_size_m = 1.0
+
+        if pixel_geometry is None:
+            logger.error('Missing object pixel geometry!')
+        else:
+            pixel_size_m = pixel_geometry.widthInMeters
+
+        ####
+
         return PIEObjectOptions(
             optimizable=self._objectSettings.isOptimizable.getValue(),  # TODO optimizer_params
             optimization_plan=optimization_plan,
@@ -206,6 +236,7 @@ class PIEReconstructor(Reconstructor):
             step_size=self._objectSettings.stepSize.getValue(),
             initial_guess=object_.getArray(),
             slice_spacings_m=numpy.array(object_.layerDistanceInMeters[:-1]),
+            pixel_size_m=pixel_size_m,
             l1_norm_constraint_weight=l1_norm_constraint_weight,
             l1_norm_constraint_stride=self._objectSettings.constrainL1NormStride.getValue(),
             smoothness_constraint_alpha=smoothness_constraint_alpha,
@@ -221,23 +252,22 @@ class PIEReconstructor(Reconstructor):
             multislice_regularization_weight=multislice_regularization_weight,
             multislice_regularization_unwrap_phase=self._objectSettings.regularizeMultisliceUnwrapPhase.getValue(),
             multislice_regularization_unwrap_image_grad_method=multislice_regularization_unwrap_image_grad_method,
+            multislice_regularization_unwrap_image_integration_method=multislice_regularization_unwrap_image_integration_method,
             multislice_regularization_stride=self._objectSettings.regularizeMultisliceStride.getValue(),
             patch_interpolation_method=patch_interpolation_method,
         )
 
-    def _create_probe_options(self, probe: Probe) -> PIEProbeOptions:
+    def _create_probe_options(self, probe: Probe, metadata: ProductMetadata) -> PIEProbeOptions:
         optimization_plan = self._create_optimization_plan(
             self._probeSettings.optimizationPlanStart.getValue(),
             self._probeSettings.optimizationPlanStop.getValue(),
             self._probeSettings.optimizationPlanStride.getValue(),
         )
         optimizer = self._create_optimizer(self._probeSettings.optimizer.getValue())
+        probe_power = 0.0
 
-        probe_power = (
-            self._probeSettings.probePower.getValue()
-            if self._probeSettings.constrainProbePower.getValue()
-            else 0.0
-        )
+        if self._probeSettings.constrainProbePower.getValue():
+            probe_power = metadata.probePhotonCount
 
         orthogonalize_incoherent_modes_method_str = (
             self._probeSettings.orthogonalizeIncoherentModesMethod.getValue()
@@ -266,6 +296,9 @@ class PIEReconstructor(Reconstructor):
             orthogonalize_incoherent_modes_stride=self._probeSettings.orthogonalizeIncoherentModesStride.getValue(),
             orthogonalize_opr_modes=self._probeSettings.orthogonalizeOPRModes.getValue(),
             orthogonalize_opr_modes_stride=self._probeSettings.orthogonalizeOPRModesStride.getValue(),
+            support_constraint=self._probeSettings.constrainSupport.getValue(),
+            support_constraint_threshold=self._probeSettings.constrainSupportThreshold.getValue(),
+            support_constraint_stride=self._probeSettings.constrainSupportStride.getValue(),
         )
 
     def _create_probe_position_options(
@@ -348,7 +381,7 @@ class PIEReconstructor(Reconstructor):
             ),
             reconstructor_options=self._create_reconstructor_options(),
             object_options=self._create_object_options(product.object_),
-            probe_options=self._create_probe_options(product.probe),
+            probe_options=self._create_probe_options(product.probe, product.metadata),
             probe_position_options=self._create_probe_position_options(
                 product.scan, product.object_.getGeometry()
             ),
