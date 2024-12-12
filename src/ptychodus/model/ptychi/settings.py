@@ -16,6 +16,9 @@ class PtyChiReconstructorSettings(Observable, Observer):
             'UseDoublePrecision', False
         )
         self.useDevices = self._settingsGroup.createBooleanParameter('UseDevices', True)
+        self.useLowMemoryForwardModel = self._settingsGroup.createBooleanParameter(
+            'UseLowMemoryForwardModel', False
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:
@@ -250,6 +253,88 @@ class PtyChiOPRSettings(Observable, Observer):
         )
         self.optimizeEigenmodeWeights = self._settingsGroup.createBooleanParameter(
             'OptimizeEigenmodeWeigts', True
+        )
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settingsGroup:
+            self.notifyObservers()
+
+
+class PtyChiDMSettings(Observable, Observer):  # FIXME to view
+    def __init__(self, registry: SettingsRegistry) -> None:
+        super().__init__()
+        self._settingsGroup = registry.createGroup('PtyChiDM')
+        self._settingsGroup.addObserver(self)
+
+        self.exitWaveUpdateRelaxation = self._settingsGroup.createRealParameter(
+            'ExitWaveUpdateRelaxation', 1.0, minimum=0.0, maximum=1.0
+        )
+        self.chunkLength = self._settingsGroup.createIntegerParameter('ChunkLength', 1, minimum=1)
+        self.objectAmplitudeClampLimit = self._settingsGroup.createRealParameter(
+            'ObjectAmplitudeClampLimit', 1000, minimum=0.0
+        )
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settingsGroup:
+            self.notifyObservers()
+
+
+class PtyChiPIESettings(Observable, Observer):  # FIXME to view
+    def __init__(self, registry: SettingsRegistry) -> None:
+        super().__init__()
+        self._settingsGroup = registry.createGroup('PtyChiPIE')
+        self._settingsGroup.addObserver(self)
+
+        self.probeAlpha = self._settingsGroup.createRealParameter(
+            'ProbeAlpha', 0.1, minimum=0.0, maximum=1.0
+        )
+        self.objectAlpha = self._settingsGroup.createRealParameter(
+            'ObjectAlpha', 0.1, minimum=0.0, maximum=1.0
+        )
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settingsGroup:
+            self.notifyObservers()
+
+
+class PtyChiLSQMLSettings(Observable, Observer):  # FIXME to view
+    def __init__(self, registry: SettingsRegistry) -> None:
+        super().__init__()
+        self._settingsGroup = registry.createGroup('PtyChiLSQML')
+        self._settingsGroup.addObserver(self)
+
+        self.noiseModel = self._settingsGroup.createStringParameter('NoiseModel', 'GAUSSIAN')
+        self.gaussianNoiseDeviation = self._settingsGroup.createRealParameter(
+            'GaussianNoiseDeviation', 0.5
+        )
+        self.solveObjectProbeStepSizeJointlyForFirstSliceInMultislice = (
+            self._settingsGroup.createBooleanParameter(
+                'SolveObjectProbeStepSizeJointlyForFirstSliceInMultislice', False
+            )
+        )
+        self.solveStepSizesOnlyUsingFirstProbeMode = self._settingsGroup.createBooleanParameter(
+            'SolveStepSizesOnlyUsingFirstProbeMode', False
+        )
+        self.momentumAccelerationGain = self._settingsGroup.createRealParameter(
+            'MomentumAccelerationGain', 0.0, minimum=0.0
+        )
+
+        self.objectOptimalStepSizeScaler = self._settingsGroup.createRealParameter(
+            'ObjectOptimalStepSizeScaler', 0.9, minimum=0.0
+        )
+        self.objectMultimodalUpdate = self._settingsGroup.createBooleanParameter(
+            'ObjectMultimodalUpdate', True
+        )
+
+        self.probeEigenmodeUpdateRelaxation = self._settingsGroup.createRealParameter(
+            'ProbeEigenmodeUpdateRelaxation', 1.0
+        )
+        self.probeOptimalStepSizeScaler = self._settingsGroup.createRealParameter(
+            'ProbeOptimalStepSizeScaler', 0.9
+        )
+
+        self.oprModesUpdateRelaxation = self._settingsGroup.createRealParameter(
+            'OPRModesUpdateRelaxation', 0.1
         )
 
     def update(self, observable: Observable) -> None:

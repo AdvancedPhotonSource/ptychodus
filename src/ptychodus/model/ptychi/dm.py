@@ -35,6 +35,7 @@ from ptychodus.api.scan import Scan, ScanPoint
 
 from ..patterns import Detector
 from .settings import (
+    PtyChiDMSettings,
     PtyChiOPRSettings,
     PtyChiObjectSettings,
     PtyChiProbePositionSettings,
@@ -53,6 +54,7 @@ class DMReconstructor(Reconstructor):
         probeSettings: PtyChiProbeSettings,
         probePositionSettings: PtyChiProbePositionSettings,
         oprSettings: PtyChiOPRSettings,
+        dmSettings: PtyChiDMSettings,
         detector: Detector,
     ) -> None:
         super().__init__()
@@ -61,6 +63,7 @@ class DMReconstructor(Reconstructor):
         self._probeSettings = probeSettings
         self._probePositionSettings = probePositionSettings
         self._oprSettings = oprSettings
+        self._dmSettings = dmSettings
         self._detector = detector
 
     @property
@@ -106,7 +109,9 @@ class DMReconstructor(Reconstructor):
             ),
             # TODO random_seed
             # TODO displayed_loss_function
-            # TODO use_low_memory_forward_model
+            use_low_memory_forward_model=self._reconstructorSettings.useLowMemoryForwardModel.getValue(),
+            exit_wave_update_relaxation=self._dmSettings.exitWaveUpdateRelaxation.getValue(),
+            chunk_length=self._dmSettings.chunkLength.getValue(),
         )
 
     def _create_optimization_plan(self, start: int, stop: int, stride: int) -> OptimizationPlan:
@@ -255,6 +260,7 @@ class DMReconstructor(Reconstructor):
             multislice_regularization_unwrap_image_integration_method=multislice_regularization_unwrap_image_integration_method,
             multislice_regularization_stride=self._objectSettings.regularizeMultisliceStride.getValue(),
             patch_interpolation_method=patch_interpolation_method,
+            # FIXME amplitude_clamp_limit=self._dmSettings.objectAmplitudeClampLimit.getValue()
         )
 
     def _create_probe_options(self, probe: Probe, metadata: ProductMetadata) -> DMProbeOptions:

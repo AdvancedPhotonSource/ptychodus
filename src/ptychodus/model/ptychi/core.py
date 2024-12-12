@@ -12,8 +12,11 @@ from ..patterns import Detector
 from .device import PtyChiDeviceRepository
 from .enums import PtyChiEnumerators
 from .settings import (
+    PtyChiDMSettings,
+    PtyChiLSQMLSettings,
     PtyChiOPRSettings,
     PtyChiObjectSettings,
+    PtyChiPIESettings,
     PtyChiProbePositionSettings,
     PtyChiProbeSettings,
     PtyChiReconstructorSettings,
@@ -32,6 +35,9 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         self.probeSettings = PtyChiProbeSettings(settingsRegistry)
         self.probePositionSettings = PtyChiProbePositionSettings(settingsRegistry)
         self.oprSettings = PtyChiOPRSettings(settingsRegistry)
+        self.dmSettings = PtyChiDMSettings(settingsRegistry)
+        self.pieSettings = PtyChiPIESettings(settingsRegistry)
+        self.lsqmlSettings = PtyChiLSQMLSettings(settingsRegistry)
         self.enumerators = PtyChiEnumerators()
         self.deviceRepository = PtyChiDeviceRepository(
             isDeveloperModeEnabled=isDeveloperModeEnabled
@@ -59,6 +65,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
                     self.probeSettings,
                     self.probePositionSettings,
                     self.oprSettings,
+                    self.dmSettings,
                     detector,
                 )
             )
@@ -69,6 +76,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
                     self.probeSettings,
                     self.probePositionSettings,
                     self.oprSettings,
+                    self.pieSettings,
                     detector,
                 )
             )
@@ -79,6 +87,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
                     self.probeSettings,
                     self.probePositionSettings,
                     self.oprSettings,
+                    self.pieSettings,
                     detector,
                 )
             )
@@ -89,6 +98,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
                     self.probeSettings,
                     self.probePositionSettings,
                     self.oprSettings,
+                    self.pieSettings,
                     detector,
                 )
             )
@@ -99,6 +109,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
                     self.probeSettings,
                     self.probePositionSettings,
                     self.oprSettings,
+                    self.lsqmlSettings,
                     detector,
                 )
             )

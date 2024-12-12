@@ -106,7 +106,7 @@ class AutodiffReconstructor(Reconstructor):
             ),
             # TODO random_seed
             # TODO displayed_loss_function
-            # TODO use_low_memory_forward_model
+            use_low_memory_forward_model=self._reconstructorSettings.useLowMemoryForwardModel.getValue(),
         )
 
     def _create_optimization_plan(self, start: int, stop: int, stride: int) -> OptimizationPlan:

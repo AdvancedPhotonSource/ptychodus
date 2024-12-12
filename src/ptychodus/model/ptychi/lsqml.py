@@ -16,6 +16,7 @@ from ptychi.api import (
     LSQMLProbeOptions,
     LSQMLProbePositionOptions,
     LSQMLReconstructorOptions,
+    NoiseModels,
     OptimizationPlan,
     Optimizers,
     OrthogonalizationMethods,
@@ -35,6 +36,7 @@ from ptychodus.api.scan import Scan, ScanPoint
 
 from ..patterns import Detector
 from .settings import (
+    PtyChiLSQMLSettings,
     PtyChiOPRSettings,
     PtyChiObjectSettings,
     PtyChiProbePositionSettings,
@@ -53,6 +55,7 @@ class LSQMLReconstructor(Reconstructor):
         probeSettings: PtyChiProbeSettings,
         probePositionSettings: PtyChiProbePositionSettings,
         oprSettings: PtyChiOPRSettings,
+        lsqmlSettings: PtyChiLSQMLSettings,
         detector: Detector,
     ) -> None:
         super().__init__()
@@ -61,6 +64,7 @@ class LSQMLReconstructor(Reconstructor):
         self._probeSettings = probeSettings
         self._probePositionSettings = probePositionSettings
         self._oprSettings = oprSettings
+        self._lsqmlSettings = lsqmlSettings
         self._detector = detector
 
     @property
@@ -90,6 +94,18 @@ class LSQMLReconstructor(Reconstructor):
             logger.warning('Failed to parse batching mode "{batching_mode_str}"!')
             batching_mode = BatchingModes.RANDOM
 
+        ####
+
+        noise_model_str = self._lsqmlSettings.noiseModel.getValue()
+
+        try:
+            noise_model = NoiseModels[noise_model_str.upper()]
+        except KeyError:
+            logger.warning('Failed to parse batching mode "{noise_model_str}"!')
+            noise_model = NoiseModels.GAUSSIAN
+
+        ####
+
         return LSQMLReconstructorOptions(
             num_epochs=self._reconstructorSettings.numEpochs.getValue(),
             batch_size=self._reconstructorSettings.batchSize.getValue(),
@@ -106,7 +122,12 @@ class LSQMLReconstructor(Reconstructor):
             ),
             # TODO random_seed
             # TODO displayed_loss_function
-            # TODO use_low_memory_forward_model
+            use_low_memory_forward_model=self._reconstructorSettings.useLowMemoryForwardModel.getValue(),
+            noise_model=noise_model,
+            gaussian_noise_std=self._lsqmlSettings.gaussianNoiseDeviation.getValue(),
+            solve_obj_prb_step_size_jointly_for_first_slice_in_multislice=self._lsqmlSettings.solveObjectProbeStepSizeJointlyForFirstSliceInMultislice.getValue(),
+            solve_step_sizes_only_using_first_probe_mode=self._lsqmlSettings.solveStepSizesOnlyUsingFirstProbeMode.getValue(),
+            momentum_acceleration_gain=self._lsqmlSettings.momentumAccelerationGain.getValue(),
         )
 
     def _create_optimization_plan(self, start: int, stop: int, stride: int) -> OptimizationPlan:
@@ -255,6 +276,8 @@ class LSQMLReconstructor(Reconstructor):
             multislice_regularization_unwrap_image_integration_method=multislice_regularization_unwrap_image_integration_method,
             multislice_regularization_stride=self._objectSettings.regularizeMultisliceStride.getValue(),
             patch_interpolation_method=patch_interpolation_method,
+            optimal_step_size_scaler=self._lsqmlSettings.objectOptimalStepSizeScaler.getValue(),
+            multimodal_update=self._lsqmlSettings.objectMultimodalUpdate.getValue(),
         )
 
     def _create_probe_options(self, probe: Probe, metadata: ProductMetadata) -> LSQMLProbeOptions:
@@ -299,6 +322,8 @@ class LSQMLReconstructor(Reconstructor):
             support_constraint=self._probeSettings.constrainSupport.getValue(),
             support_constraint_threshold=self._probeSettings.constrainSupportThreshold.getValue(),
             support_constraint_stride=self._probeSettings.constrainSupportStride.getValue(),
+            eigenmode_update_relaxation=self._lsqmlSettings.probeEigenmodeUpdateRelaxation.getValue(),
+            optimal_step_size_scaler=self._lsqmlSettings.probeOptimalStepSizeScaler.getValue(),
         )
 
     def _create_probe_position_options(
@@ -371,6 +396,7 @@ class LSQMLReconstructor(Reconstructor):
             initial_weights=numpy.array([0.0]),  # FIXME
             optimize_eigenmode_weights=self._oprSettings.optimizeEigenmodeWeights.getValue(),
             optimize_intensity_variation=self._oprSettings.optimizeIntensities.getValue(),
+            update_relaxation=self._lsqmlSettings.oprModesUpdateRelaxation.getValue(),
         )
 
     def _create_task_options(self, parameters: ReconstructInput) -> LSQMLOptions:

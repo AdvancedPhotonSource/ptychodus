@@ -37,6 +37,7 @@ from ..patterns import Detector
 from .settings import (
     PtyChiOPRSettings,
     PtyChiObjectSettings,
+    PtyChiPIESettings,
     PtyChiProbePositionSettings,
     PtyChiProbeSettings,
     PtyChiReconstructorSettings,
@@ -53,6 +54,7 @@ class EPIEReconstructor(Reconstructor):
         probeSettings: PtyChiProbeSettings,
         probePositionSettings: PtyChiProbePositionSettings,
         oprSettings: PtyChiOPRSettings,
+        pieSettings: PtyChiPIESettings,
         detector: Detector,
     ) -> None:
         super().__init__()
@@ -61,6 +63,7 @@ class EPIEReconstructor(Reconstructor):
         self._probeSettings = probeSettings
         self._probePositionSettings = probePositionSettings
         self._oprSettings = oprSettings
+        self._pieSettings = pieSettings
         self._detector = detector
 
     @property
@@ -106,7 +109,7 @@ class EPIEReconstructor(Reconstructor):
             ),
             # TODO random_seed
             # TODO displayed_loss_function
-            # TODO use_low_memory_forward_model
+            use_low_memory_forward_model=self._reconstructorSettings.useLowMemoryForwardModel.getValue(),
         )
 
     def _create_optimization_plan(self, start: int, stop: int, stride: int) -> OptimizationPlan:
@@ -255,6 +258,7 @@ class EPIEReconstructor(Reconstructor):
             multislice_regularization_unwrap_image_integration_method=multislice_regularization_unwrap_image_integration_method,
             multislice_regularization_stride=self._objectSettings.regularizeMultisliceStride.getValue(),
             patch_interpolation_method=patch_interpolation_method,
+            alpha=self._pieSettings.objectAlpha.getValue(),
         )
 
     def _create_probe_options(self, probe: Probe, metadata: ProductMetadata) -> PIEProbeOptions:
@@ -299,6 +303,7 @@ class EPIEReconstructor(Reconstructor):
             support_constraint=self._probeSettings.constrainSupport.getValue(),
             support_constraint_threshold=self._probeSettings.constrainSupportThreshold.getValue(),
             support_constraint_stride=self._probeSettings.constrainSupportStride.getValue(),
+            alpha=self._pieSettings.probeAlpha.getValue(),
         )
 
     def _create_probe_position_options(

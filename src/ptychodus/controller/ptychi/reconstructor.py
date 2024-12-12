@@ -14,6 +14,7 @@ from ptychodus.api.parametric import BooleanParameter
 
 from ...model.ptychi import PtyChiDeviceRepository, PtyChiEnumerators, PtyChiReconstructorSettings
 from ..parametric import (
+    CheckBoxParameterViewController,
     CheckableGroupBoxParameterViewController,
     ComboBoxParameterViewController,
     ParameterViewController,
@@ -114,6 +115,11 @@ class PtyChiReconstructorViewController(ParameterViewController):
             settings.useDoublePrecision,
             tool_tip='Floating point precision to use for computation.',
         )
+        self._useLowMemoryViewController = CheckBoxParameterViewController(
+            settings.useLowMemoryForwardModel,
+            'Use Low Memory Forward Model',
+            tool_tip='When checked, forward propagation of ptychography will be done using less vectorized code. This reduces the speed, but also lowers memory usage.',
+        )
         self._widget = QGroupBox('Reconstructor')
 
         layout = QFormLayout()
@@ -122,6 +128,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
         layout.addRow('Batch Mode:', self._batchingModeViewController.getWidget())
         layout.addRow('Batch Stride:', self._batchStride.getWidget())
         layout.addRow('Precision:', self._precisionViewController.getWidget())
+        layout.addRow(self._useLowMemoryViewController.getWidget())
 
         if repository:
             layout.addRow(self._deviceViewController.getWidget())
