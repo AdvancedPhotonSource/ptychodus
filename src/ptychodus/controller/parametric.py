@@ -177,11 +177,23 @@ class LineEditParameterViewController(ParameterViewController, Observer):
 
 class PathParameterViewController(ParameterViewController, Observer):
     def __init__(
-        self, parameter: PathParameter, fileDialogFactory: FileDialogFactory, *, tool_tip: str
+        self,
+        parameter: PathParameter,
+        fileDialogFactory: FileDialogFactory,
+        *,
+        caption: str,
+        nameFilters: Sequence[str] | None,
+        mimeTypeFilters: Sequence[str] | None,
+        selectedNameFilter: str | None,
+        tool_tip: str,
     ) -> None:
         super().__init__()
         self._parameter = parameter
         self._fileDialogFactory = fileDialogFactory
+        self._caption = caption
+        self._nameFilters = nameFilters
+        self._mimeTypeFilters = mimeTypeFilters
+        self._selectedNameFilter = selectedNameFilter
         self._lineEdit = QLineEdit()
         self._browseButton = QPushButton('Browse')
         self._widget = QWidget()
@@ -201,25 +213,70 @@ class PathParameterViewController(ParameterViewController, Observer):
 
     @classmethod
     def createFileOpener(
-        cls, parameter: PathParameter, fileDialogFactory: FileDialogFactory, *, tool_tip: str = ''
+        cls,
+        parameter: PathParameter,
+        fileDialogFactory: FileDialogFactory,
+        *,
+        caption: str = 'Open File',
+        nameFilters: Sequence[str] | None = None,
+        mimeTypeFilters: Sequence[str] | None = None,
+        selectedNameFilter: str | None = None,
+        tool_tip: str = '',
     ) -> PathParameterViewController:
-        viewController = cls(parameter, fileDialogFactory, tool_tip=tool_tip)
+        viewController = cls(
+            parameter,
+            fileDialogFactory,
+            caption=caption,
+            nameFilters=nameFilters,
+            mimeTypeFilters=mimeTypeFilters,
+            selectedNameFilter=selectedNameFilter,
+            tool_tip=tool_tip,
+        )
         viewController._browseButton.clicked.connect(viewController._chooseFileToOpen)
         return viewController
 
     @classmethod
     def createFileSaver(
-        cls, parameter: PathParameter, fileDialogFactory: FileDialogFactory, *, tool_tip: str = ''
+        cls,
+        parameter: PathParameter,
+        fileDialogFactory: FileDialogFactory,
+        *,
+        caption: str = 'Save File',
+        nameFilters: Sequence[str] | None = None,
+        mimeTypeFilters: Sequence[str] | None = None,
+        selectedNameFilter: str | None = None,
+        tool_tip: str = '',
     ) -> PathParameterViewController:
-        viewController = cls(parameter, fileDialogFactory, tool_tip=tool_tip)
+        viewController = cls(
+            parameter,
+            fileDialogFactory,
+            caption=caption,
+            nameFilters=nameFilters,
+            mimeTypeFilters=mimeTypeFilters,
+            selectedNameFilter=selectedNameFilter,
+            tool_tip=tool_tip,
+        )
         viewController._browseButton.clicked.connect(viewController._chooseFileToSave)
         return viewController
 
     @classmethod
     def createDirectoryChooser(
-        cls, parameter: PathParameter, fileDialogFactory: FileDialogFactory, *, tool_tip: str = ''
+        cls,
+        parameter: PathParameter,
+        fileDialogFactory: FileDialogFactory,
+        *,
+        caption: str = 'Choose Directory',
+        tool_tip: str = '',
     ) -> PathParameterViewController:
-        viewController = cls(parameter, fileDialogFactory, tool_tip=tool_tip)
+        viewController = cls(
+            parameter,
+            fileDialogFactory,
+            caption=caption,
+            nameFilters=None,
+            mimeTypeFilters=None,
+            selectedNameFilter=None,
+            tool_tip=tool_tip,
+        )
         viewController._browseButton.clicked.connect(viewController._chooseDirectory)
         return viewController
 
@@ -232,22 +289,30 @@ class PathParameterViewController(ParameterViewController, Observer):
 
     def _chooseFileToOpen(self) -> None:
         path, _ = self._fileDialogFactory.getOpenFilePath(
-            self._widget, 'Open File'
-        )  # FIXME filters
+            self._widget,
+            self._caption,
+            self._nameFilters,
+            self._mimeTypeFilters,
+            self._selectedNameFilter,
+        )
 
         if path:
             self._parameter.setValue(path)
 
     def _chooseFileToSave(self) -> None:
         path, _ = self._fileDialogFactory.getSaveFilePath(
-            self._widget, 'Save File'
-        )  # FIXME filters
+            self._widget,
+            self._caption,
+            self._nameFilters,
+            self._mimeTypeFilters,
+            self._selectedNameFilter,
+        )
 
         if path:
             self._parameter.setValue(path)
 
     def _chooseDirectory(self) -> None:
-        path = self._fileDialogFactory.getExistingDirectoryPath(self._widget, 'Choose Directory')
+        path = self._fileDialogFactory.getExistingDirectoryPath(self._widget, self._caption)
 
         if path:
             self._parameter.setValue(path)
@@ -480,15 +545,54 @@ class ParameterViewBuilder:
         viewController = ComboBoxParameterViewController(parameter, items)
         self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
 
-    def addFileChooser(
-        self, parameter: PathParameter, label: str, *, tool_tip: str = '', group: str = ''
+    def addFileOpener(
+        self,
+        parameter: PathParameter,
+        label: str,
+        *,
+        caption: str = 'Open File',
+        nameFilters: Sequence[str] | None = None,
+        mimeTypeFilters: Sequence[str] | None = None,
+        selectedNameFilter: str | None = None,
+        tool_tip: str = '',
+        group: str = '',
     ) -> None:
         if self._fileDialogFactory is None:
             raise ValueError('Cannot add file chooser without FileDialogFactory!')
         else:
-            viewController = PathParameterViewController(
-                parameter, self._fileDialogFactory, tool_tip=''
-            )  # FIXME open or save
+            viewController = PathParameterViewController.createFileOpener(
+                parameter,
+                self._fileDialogFactory,
+                caption=caption,
+                nameFilters=nameFilters,
+                mimeTypeFilters=mimeTypeFilters,
+                selectedNameFilter=selectedNameFilter,
+            )
+            self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+
+    def addFileSaver(
+        self,
+        parameter: PathParameter,
+        label: str,
+        *,
+        caption: str = 'Save File',
+        nameFilters: Sequence[str] | None = None,
+        mimeTypeFilters: Sequence[str] | None = None,
+        selectedNameFilter: str | None = None,
+        tool_tip: str = '',
+        group: str = '',
+    ) -> None:
+        if self._fileDialogFactory is None:
+            raise ValueError('Cannot add file chooser without FileDialogFactory!')
+        else:
+            viewController = PathParameterViewController.createFileSaver(
+                parameter,
+                self._fileDialogFactory,
+                caption=caption,
+                nameFilters=nameFilters,
+                mimeTypeFilters=mimeTypeFilters,
+                selectedNameFilter=selectedNameFilter,
+            )
             self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
 
     def addDirectoryChooser(
