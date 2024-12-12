@@ -50,12 +50,19 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
         scanPointList: list[ScanPoint] = list()
 
         with h5py.File(filePath, 'r') as h5File:
+            probePhotonCount = 0.0
+
+            try:
+                probePhotonCount = float(h5File.attrs[self.PROBE_PHOTON_COUNT])
+            except KeyError:
+                logger.debug('Probe photon count not found.')
+
             metadata = ProductMetadata(
                 name=str(h5File.attrs[self.NAME]),
                 comments=str(h5File.attrs[self.COMMENTS]),
                 detectorDistanceInMeters=float(h5File.attrs[self.DETECTOR_OBJECT_DISTANCE]),
                 probeEnergyInElectronVolts=float(h5File.attrs[self.PROBE_ENERGY]),
-                probePhotonCount=float(h5File.attrs[self.PROBE_PHOTON_COUNT]),
+                probePhotonCount=probePhotonCount,
                 exposureTimeInSeconds=float(h5File.attrs[self.EXPOSURE_TIME]),
             )
 

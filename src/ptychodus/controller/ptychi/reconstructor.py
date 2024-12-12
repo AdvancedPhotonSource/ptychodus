@@ -127,11 +127,12 @@ class PtyChiReconstructorViewController(ParameterViewController):
         layout.addRow('Batch Size:', self._batchSizeViewController.getWidget())
         layout.addRow('Batch Mode:', self._batchingModeViewController.getWidget())
         layout.addRow('Batch Stride:', self._batchStride.getWidget())
-        layout.addRow('Precision:', self._precisionViewController.getWidget())
-        layout.addRow(self._useLowMemoryViewController.getWidget())
 
         if repository:
             layout.addRow(self._deviceViewController.getWidget())
+
+        layout.addRow('Precision:', self._precisionViewController.getWidget())
+        layout.addRow(self._useLowMemoryViewController.getWidget())
 
         self._widget.setLayout(layout)
 

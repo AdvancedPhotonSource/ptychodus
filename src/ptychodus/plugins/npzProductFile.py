@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, Final
+import logging
 
 import numpy
 
@@ -14,6 +15,8 @@ from ptychodus.api.product import (
     ProductMetadata,
 )
 from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint
+
+logger = logging.getLogger(__name__)
 
 
 class NPZProductFileIO(ProductFileReader, ProductFileWriter):
@@ -45,12 +48,19 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
 
     def read(self, filePath: Path) -> Product:
         with numpy.load(filePath) as npzFile:
+            probePhotonCount = 0.0
+
+            try:
+                probePhotonCount = float(npzFile[self.PROBE_PHOTON_COUNT])
+            except KeyError:
+                logger.debug('Probe photon count not found.')
+
             metadata = ProductMetadata(
                 name=str(npzFile[self.NAME]),
                 comments=str(npzFile[self.COMMENTS]),
                 detectorDistanceInMeters=float(npzFile[self.DETECTOR_OBJECT_DISTANCE]),
                 probeEnergyInElectronVolts=float(npzFile[self.PROBE_ENERGY]),
-                probePhotonCount=float(npzFile[self.PROBE_PHOTON_COUNT]),
+                probePhotonCount=probePhotonCount,
                 exposureTimeInSeconds=float(npzFile[self.EXPOSURE_TIME]),
             )
 

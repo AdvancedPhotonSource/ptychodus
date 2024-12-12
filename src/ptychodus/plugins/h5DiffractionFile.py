@@ -202,11 +202,6 @@ def registerPlugins(registry: PluginRegistry) -> None:
         displayName='CNM/APS HXN Diffraction Files (*.h5 *.hdf5)',
     )
     registry.diffractionFileReaders.registerPlugin(
-        H5DiffractionFileReader(dataPath='/entry/data/data'),
-        simpleName='SLS_cSAXS',
-        displayName='SLS cSAXS Diffraction Files (*.h5 *.hdf5)',
-    )
-    registry.diffractionFileReaders.registerPlugin(
         H5DiffractionFileReader(dataPath='/entry/measurement/Eiger/data'),
         simpleName='MAX_IV_NanoMax',
         displayName='MAX IV NanoMax Diffraction Files (*.h5 *.hdf5)',

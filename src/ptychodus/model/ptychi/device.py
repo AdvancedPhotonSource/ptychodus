@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from importlib.metadata import version
 from typing import overload
 import logging
 
@@ -15,6 +16,9 @@ class PtyChiDeviceRepository(Sequence[str]):
             if isDeveloperModeEnabled:
                 self._devices.extend(f'gpu:{n}' for n in range(4))
         else:
+            ptychiVersion = version('ptychi')
+            logger.info(f'\tPty-Chi {ptychiVersion}')
+
             for device in ptychi.list_available_devices():
                 logger.info(device)
                 self._devices.append(f'{device.name} ({device.torch_device})')
