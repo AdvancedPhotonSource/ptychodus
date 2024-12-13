@@ -57,23 +57,26 @@ def createPtychoDataContainer(parameters: ReconstructInput) -> PtychoDataContain
 class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     def __init__(
         self,
+        name: str,
         model_settings: PtychoPINNModelSettings,
         training_settings: PtychoPINNTrainingSettings,
         inference_settings: PtychoPINNInferenceSettings,
     ) -> None:
         super().__init__()
+        self._name = name
         self._model_settings = model_settings
         self._training_settings = training_settings
         self._inference_settings = inference_settings
 
         # Note the model parameter 'N' is the diffraction pattern size in pixels (power of two)
+        # FIXME model path to/from settings
 
         ptychopinnVersion = version('ptychopinn')
         logger.info(f'\tPtychoPINN {ptychopinnVersion}')
 
     @property
     def name(self) -> str:
-        return 'PtychoPINN'
+        return self._name
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         return ReconstructOutput(parameters.product, 0)  # TODO

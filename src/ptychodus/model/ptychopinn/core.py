@@ -19,17 +19,6 @@ from .settings import (
 logger = logging.getLogger(__name__)
 
 
-class PtychoPINNPresenter:
-    def __init__(self) -> None:
-        self._fileFilterList: list[str] = ['PyTorch Model State Files (*.pt *.pth)']
-
-    def getStateFileFilterList(self) -> Sequence[str]:
-        return self._fileFilterList
-
-    def getStateFileFilter(self) -> str:
-        return self._fileFilterList[0]
-
-
 class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
     def __init__(self, settingsRegistry: SettingsRegistry, isDeveloperModeEnabled: bool) -> None:
         super().__init__()
@@ -45,13 +34,22 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
             logger.info('PtychoPINN not found.')
 
             if isDeveloperModeEnabled:
-                reconstructor: TrainableReconstructor = NullReconstructor('PtychoPINN')
-                self._reconstructors.append(reconstructor)
+                self._reconstructors.append(NullReconstructor('PINN'))
+                self._reconstructors.append(NullReconstructor('Supervised'))
         else:
-            reconstructor = PtychoPINNTrainableReconstructor(
-                self.model_settings, self.training_settings, self.inference_settings
+            self._reconstructors.append(
+                PtychoPINNTrainableReconstructor(
+                    'PINN', self.model_settings, self.training_settings, self.inference_settings
+                )
             )
-            self._reconstructors.append(reconstructor)
+            self._reconstructors.append(
+                PtychoPINNTrainableReconstructor(
+                    'Supervised',
+                    self.model_settings,
+                    self.training_settings,
+                    self.inference_settings,
+                )
+            )
 
     @property
     def name(self) -> str:

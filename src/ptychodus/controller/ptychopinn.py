@@ -89,45 +89,89 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
 
         model_group = 'Model'
         model_settings = self._model.model_settings
-        builder.addIntegerLineEdit(
+        builder.addSpinBox(
             model_settings.gridsize,
             'Grid Size for Model:',
             tool_tip='Controls number of images processed per solution region (e.g., gridsize=2 means 2^2=4 images at a time)',
             group=model_group,
         )
-        builder.addIntegerLineEdit(
+        builder.addSpinBox(
             model_settings.n_filters_scale,
             'Num. Filters Scale Factor:',
             tool_tip='Scale factor for number of filters',
             group=model_group,
         )
         builder.addComboBox(
-            model_settings.model_type,
-            enumerators.get_model_types(),
-            'Model Type:',
-            group=model_group,
-        )
-        builder.addComboBox(
             model_settings.amp_activation,
             enumerators.get_amp_activations(),
-            'Activation Function:',
+            'Amplitude Activation Function:',
             group=model_group,
         )
-        builder.addCheckBox(model_settings.object_big, 'Object Big', group=model_group)
-        builder.addCheckBox(model_settings.probe_big, 'Probe Big', group=model_group)
-        builder.addCheckBox(model_settings.probe_mask, 'Probe Mask', group=model_group)
-        builder.addCheckBox(model_settings.pad_object, 'Pad Object', group=model_group)
+        builder.addCheckBox(
+            model_settings.object_big,
+            'Object Big',
+            group=model_group,
+            tool_tip='Enables a separate real-space reconstruction for each input diffraction image '
+            'and an averaging / overlap constraint step. If False, no explicit averaging is performed '
+            'and the decoders return a single real space image instead of `gridsize**2` images. '
+            'Typically left True.',
+        )
+        builder.addCheckBox(
+            model_settings.probe_big,
+            'Probe Big',
+            group=model_group,
+            tool_tip='If True, enables a low-resolution reconstruction of the outer region of the NxN real-space grid. '
+            'This technically violates the zero-padding / oversampling condition, '
+            'but may be needed if the probe illumination has wide tails. '
+            'Has no effect unless pad_object is True.',
+        )
+        builder.addCheckBox(
+            model_settings.probe_mask,
+            'Probe Mask',
+            group=model_group,
+            tool_tip='Whether to apply circular mask to the probe function. '
+            "If toggling this changes the reconstruction, it's likely that there are edge / real space truncation artifacts. "
+            'Should be used with pad_object = False.',
+        )
+        builder.addCheckBox(
+            model_settings.pad_object,
+            'Pad Object',
+            group=model_group,
+            tool_tip='Whether to reconstruct the full real space grid (False) or restrict to N/2 x N/2 (True). '
+            'True strictly enforces the necessary reciprocal space oversampling, '
+            'but may cause truncation issues for probe amplitudes with long tails. '
+            'This truncation can be mitigated by setting probe_big, '
+            'which uses a small number of CNN filters to generate a low-resolution reconstruction of the outer region. '
+            'Typically left True.',
+        )
         builder.addDecimalLineEdit(
-            model_settings.probe_scale, 'Probe Scale Factor:', group=model_group
+            model_settings.probe_scale,
+            'Probe Scale Factor:',
+            group=model_group,
+            tool_tip='Scaling factor for the probe amplitude. ',
+        )
+        builder.addDecimalLineEdit(
+            model_settings.gaussian_smoothing_sigma,
+            'Gaussian Smoothing Sigma:',
+            group=model_group,
+            tool_tip='Standard deviation for Gaussian smoothing of probe illumination.  '
+            'Increase from 0 to reduce noise / artifacts at cost of resolution.  '
+            'Beware that abusing this can cause convergence issues.',
         )
 
         training_group = 'Training'
         training_settings = self._model.training_settings
-        builder.addFileChooser(
-            training_settings.train_data_file, 'Train Data File:', group=training_group
+        builder.addFileOpener(
+            training_settings.train_data_file,
+            'Train Data File:',
+            # FIXME parameters
+            group=training_group,
         )
-        builder.addFileChooser(
-            training_settings.test_data_file, 'Test Data File:', group=training_group
+        builder.addFileOpener(
+            training_settings.test_data_file,
+            'Test Data File:',
+            # FIXME parameters
+            group=training_group,
         )
         builder.addViewController(
             PowerTwoSpinBoxParameterViewController(training_settings.batch_size),
@@ -147,19 +191,23 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
         builder.addDecimalSlider(
             training_settings.realspace_weight, 'Realspace Weight:', group=training_group
         )
-        builder.addComboBox(
-            training_settings.data_source,
-            enumerators.get_data_sources(),
-            'Data Source:',
+        builder.addCheckBox(
+            training_settings.positions_provided,
+            'Positions Provided',
             group=training_group,
         )
         builder.addCheckBox(
-            training_settings.probe_trainable, 'Probe Trainable', group=training_group
+            training_settings.probe_trainable,
+            'Probe Trainable',
+            group=training_group,
+            tool_tip='Optimizes the probe function during training. Experimental feature.',
         )
         builder.addCheckBox(
             training_settings.intensity_scale_trainable,
             'Intensity Scale Trainable',
             group=training_group,
+            tool_tip="Optimize the model's internal amplitude scaling factor during training. "
+            'Typically left True.',
         )
         builder.addDirectoryChooser(
             training_settings.output_directory, 'Output Directory:', group=training_group
@@ -167,12 +215,6 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
 
         inference_group = 'Inference'
         inference_settings = self._model.inference_settings
-        builder.addFileChooser(inference_settings.model_path, 'Model Path:', group=inference_group)
-        builder.addDecimalLineEdit(
-            inference_settings.gaussian_smoothing_sigma,
-            'Gaussian Smoothing Sigma:',
-            group=inference_group,
-        )
         builder.addDirectoryChooser(
             inference_settings.output_directory, 'Output Directory:', group=inference_group
         )
