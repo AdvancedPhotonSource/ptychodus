@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator
 import logging
 
 from ...api.reconstructor import (
@@ -54,6 +54,10 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
     @property
     def name(self) -> str:
         return 'PtychoPINN'
+
+    @property
+    def logger_name(self) -> str:
+        return 'ptychopinn'
 
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self._reconstructors)

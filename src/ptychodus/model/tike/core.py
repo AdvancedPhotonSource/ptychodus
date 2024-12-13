@@ -1,5 +1,6 @@
 from __future__ import annotations
 from collections.abc import Iterator
+from importlib.metadata import version
 import logging
 
 from ptychodus.api.reconstructor import (
@@ -48,6 +49,9 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
                 core.reconstructorList.append(NullReconstructor('rpie'))
                 core.reconstructorList.append(NullReconstructor('lstsq_grad'))
         else:
+            tikeVersion = version('tike')
+            logger.info(f'Tike {tikeVersion}')
+
             tikeReconstructor = TikeReconstructor(
                 core.settings,
                 core.multigridSettings,

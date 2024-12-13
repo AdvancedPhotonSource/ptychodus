@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 
 def createPtychoDataContainer(parameters: ReconstructInput) -> PtychoDataContainer:
     diff3d = parameters.patterns
-    probeGuess = parameters.product.probe.array[0, :, :]
-    objectGuess = parameters.product.object_.array[0, :, :]
+    probeGuess = parameters.product.probe.getIncoherentMode(0)
+    objectGuess = parameters.product.object_.getLayer(0)
 
     logger.debug('createPtychoDataContainer pre-condition sizes:')
     logger.debug(f'diffractionPatterns: {diff3d.shape}')

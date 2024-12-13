@@ -1,4 +1,3 @@
-from importlib.metadata import version
 from typing import Any
 import logging
 import pprint
@@ -43,9 +42,6 @@ class TikeReconstructor:
         self._positionCorrectionSettings = positionCorrectionSettings
         self._probeCorrectionSettings = probeCorrectionSettings
         self._objectCorrectionSettings = objectCorrectionSettings
-
-        tikeVersion = version('tike')
-        logger.info(f'\tTike {tikeVersion}')
 
     def getObjectOptions(self) -> tike.ptycho.ObjectOptions:
         settings = self._objectCorrectionSettings
