@@ -57,6 +57,7 @@ from .product import (
 )
 from .ptychi import PtyChiReconstructorLibrary
 from .ptychonn import PtychoNNReconstructorLibrary
+from .ptychopinn import PtychoPINNReconstructorLibrary
 from .reconstructor import ReconstructorCore, ReconstructorPresenter
 from .tike import TikeReconstructorLibrary
 from .visualization import VisualizationEngine
@@ -79,7 +80,6 @@ def configureLogger(isDeveloperModeEnabled: bool) -> None:
         level=logging.DEBUG if isDeveloperModeEnabled else logging.INFO,
     )
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
-    logging.getLogger('tike').setLevel(logging.WARNING)
 
     logger.info(f'Ptychodus {version("ptychodus")}')
     logger.info(f'NumPy {version("numpy")}')
@@ -137,6 +137,9 @@ class ModelCore:
         self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
             self.settingsRegistry, isDeveloperModeEnabled
         )
+        self.ptychopinnReconstructorLibrary = PtychoPINNReconstructorLibrary(
+            self.settingsRegistry, isDeveloperModeEnabled
+        )
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
             self._patternsCore.dataset,
@@ -145,6 +148,7 @@ class ModelCore:
                 self.ptyChiReconstructorLibrary,
                 self.tikeReconstructorLibrary,
                 self.ptychonnReconstructorLibrary,
+                self.ptychopinnReconstructorLibrary,
             ],
         )
         self._fluorescenceCore = FluorescenceCore(
