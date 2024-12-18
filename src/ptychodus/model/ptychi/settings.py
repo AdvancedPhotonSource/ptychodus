@@ -254,6 +254,13 @@ class PtyChiOPRSettings(Observable, Observer):
         self.optimizeEigenmodeWeights = self._settingsGroup.createBooleanParameter(
             'OptimizeEigenmodeWeigts', True
         )
+        self.smoothModeWeights = self._settingsGroup.createBooleanParameter(
+            'SmoothModeWeights', False
+        )
+        self.smoothingMethod = self._settingsGroup.createStringParameter('SmoothingMethod', '')
+        self.polynomialSmoothingDegree = self._settingsGroup.createIntegerParameter(
+            'PolynomialSmoothingDegree', 4, minimum=0, maximum=10
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:

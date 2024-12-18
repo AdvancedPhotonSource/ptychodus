@@ -74,7 +74,7 @@ class ProbeRepositoryItem(ParameterGroup):
             logger.error(''.join(exc.args))
             return
 
-        self._probe = self._additionalModesBuilder.build(probe)
+        self._probe = self._additionalModesBuilder.build(probe, self._geometryProvider)
         self.notifyObservers()
 
     def getAdditionalModesBuilder(self) -> MultimodalProbeBuilder:

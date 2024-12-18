@@ -54,6 +54,11 @@ class ProbeGeometryProvider(ABC):
 
     @property
     @abstractmethod
+    def probePhotonCount(self) -> float:
+        pass
+
+    @property
+    @abstractmethod
     def probeWavelengthInMeters(self) -> float:
         pass
 

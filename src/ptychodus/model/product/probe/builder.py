@@ -53,7 +53,7 @@ class ProbeBuilder(ParameterGroup):
         )
 
     def normalize(self, array: WavefieldArrayType) -> WavefieldArrayType:
-        return array / numpy.sqrt(numpy.sum(numpy.abs(array) ** 2))
+        return array / numpy.sqrt(numpy.sum(numpy.square(numpy.abs(array))))
 
     def getName(self) -> str:
         return self._name.getValue()

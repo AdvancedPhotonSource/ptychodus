@@ -17,6 +17,7 @@ from ptychi.api import (
     LSQMLProbePositionOptions,
     LSQMLReconstructorOptions,
     NoiseModels,
+    OPRWeightSmoothingMethods,
     OptimizationPlan,
     Optimizers,
     OrthogonalizationMethods,
@@ -388,6 +389,23 @@ class LSQMLReconstructor(Reconstructor):
             self._oprSettings.optimizationPlanStride.getValue(),
         )
         opr_optimizer = self._create_optimizer(self._oprSettings.optimizer.getValue())
+
+        ####
+
+        smoothing_method: OPRWeightSmoothingMethods | None = None
+
+        if self._oprSettings.smoothModeWeights.getValue():
+            smoothing_method_str = self._oprSettings.smoothingMethod.getValue()
+
+            try:
+                smoothing_method = OPRWeightSmoothingMethods[smoothing_method_str.upper()]
+            except KeyError:
+                logger.warning(
+                    'Failed to parse OPR weight smoothing method "{smoothing_method_str}"!'
+                )
+
+        ####
+
         return LSQMLOPRModeWeightsOptions(
             optimizable=self._oprSettings.isOptimizable.getValue(),
             optimization_plan=opr_optimization_plan,
@@ -396,6 +414,8 @@ class LSQMLReconstructor(Reconstructor):
             initial_weights=numpy.array([0.0]),  # FIXME
             optimize_eigenmode_weights=self._oprSettings.optimizeEigenmodeWeights.getValue(),
             optimize_intensity_variation=self._oprSettings.optimizeIntensities.getValue(),
+            smoothing_method=smoothing_method,
+            polynomial_smoothing_degree=self._oprSettings.polynomialSmoothingDegree.getValue(),
             update_relaxation=self._lsqmlSettings.oprModesUpdateRelaxation.getValue(),
         )
 
