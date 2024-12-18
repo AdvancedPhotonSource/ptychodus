@@ -63,9 +63,6 @@ class CSAXSDiffractionFileReader(DiffractionFileReader):
                         filePath=filePath,
                     )
 
-                    print(metadata.detectorDistanceInMeters)  # FIXME
-                    print(repr(metadata))  # FIXME
-
                     array = H5DiffractionPatternArray(
                         label=filePath.stem,
                         index=0,

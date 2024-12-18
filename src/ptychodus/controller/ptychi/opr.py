@@ -1,14 +1,47 @@
 from PyQt5.QtWidgets import QFormLayout
 
-from ptychodus.api.parametric import IntegerParameter
+from ptychodus.api.parametric import BooleanParameter, IntegerParameter, StringParameter
 
 from ...model.ptychi import PtyChiEnumerators, PtyChiOPRSettings
 from ..parametric import (
     CheckBoxParameterViewController,
     CheckableGroupBoxParameterViewController,
+    ComboBoxParameterViewController,
     DecimalLineEditParameterViewController,
+    SpinBoxParameterViewController,
 )
 from .optimizer import PtyChiOptimizationPlanViewController, PtyChiOptimizerParameterViewController
+
+
+class PtyChiSmoothOPRModeWeightsViewController(CheckableGroupBoxParameterViewController):
+    def __init__(
+        self,
+        smoothModeWeights: BooleanParameter,
+        smoothingMethod: StringParameter,
+        polynomialSmoothingDegree: IntegerParameter,
+        enumerators: PtyChiEnumerators,
+    ) -> None:
+        super().__init__(
+            smoothModeWeights,
+            'Smooth OPR Mode Weights',
+            tool_tip='Smooth the OPR mode weights.',
+        )
+        self._smoothingMethodViewController = ComboBoxParameterViewController(
+            smoothingMethod,
+            enumerators.oprWeightSmoothingMethods(),
+            tool_tip='The method for smoothing OPR mode weights.',
+        )
+        self._polynomialSmoothingDegreeViewController = SpinBoxParameterViewController(
+            polynomialSmoothingDegree,
+            tool_tip='The degree of the polynomial used for smoothing OPR mode weights.',
+        )
+
+        layout = QFormLayout()
+        layout.addRow('Smoothing Method:', self._smoothingMethodViewController.getWidget())
+        layout.addRow(
+            'Polynomial Degree:', self._polynomialSmoothingDegreeViewController.getWidget()
+        )
+        self.getWidget().setLayout(layout)
 
 
 class PtyChiOPRViewController(CheckableGroupBoxParameterViewController):
@@ -45,6 +78,12 @@ class PtyChiOPRViewController(CheckableGroupBoxParameterViewController):
             'Optimize Eigenmode Weights',
             tool_tip='Whether to optimize eigenmode weights (i.e., the weights of the second and following OPR modes).',
         )
+        self._smoothModeWeightsViewController = PtyChiSmoothOPRModeWeightsViewController(
+            settings.smoothModeWeights,
+            settings.smoothingMethod,
+            settings.polynomialSmoothingDegree,
+            enumerators,
+        )
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._optimizationPlanViewController.getWidget())
@@ -52,4 +91,5 @@ class PtyChiOPRViewController(CheckableGroupBoxParameterViewController):
         layout.addRow('Step Size:', self._stepSizeViewController.getWidget())
         layout.addRow(self._optimizeIntensitiesViewController.getWidget())
         layout.addRow(self._optimizeEigenmodeWeightsViewController.getWidget())
+        layout.addRow(self._smoothModeWeightsViewController.getWidget())
         self.getWidget().setLayout(layout)

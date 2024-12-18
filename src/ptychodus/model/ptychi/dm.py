@@ -16,6 +16,7 @@ from ptychi.api import (
     Dtypes,
     ImageGradientMethods,
     ImageIntegrationMethods,
+    OPRWeightSmoothingMethods,
     OptimizationPlan,
     Optimizers,
     OrthogonalizationMethods,
@@ -260,7 +261,7 @@ class DMReconstructor(Reconstructor):
             multislice_regularization_unwrap_image_integration_method=multislice_regularization_unwrap_image_integration_method,
             multislice_regularization_stride=self._objectSettings.regularizeMultisliceStride.getValue(),
             patch_interpolation_method=patch_interpolation_method,
-            # FIXME amplitude_clamp_limit=self._dmSettings.objectAmplitudeClampLimit.getValue()
+            amplitude_clamp_limit=self._dmSettings.objectAmplitudeClampLimit.getValue(),
         )
 
     def _create_probe_options(self, probe: Probe, metadata: ProductMetadata) -> DMProbeOptions:
@@ -369,6 +370,23 @@ class DMReconstructor(Reconstructor):
             self._oprSettings.optimizationPlanStride.getValue(),
         )
         opr_optimizer = self._create_optimizer(self._oprSettings.optimizer.getValue())
+
+        ####
+
+        smoothing_method: OPRWeightSmoothingMethods | None = None
+
+        if self._oprSettings.smoothModeWeights.getValue():
+            smoothing_method_str = self._oprSettings.smoothingMethod.getValue()
+
+            try:
+                smoothing_method = OPRWeightSmoothingMethods[smoothing_method_str.upper()]
+            except KeyError:
+                logger.warning(
+                    'Failed to parse OPR weight smoothing method "{smoothing_method_str}"!'
+                )
+
+        ####
+
         return DMOPRModeWeightsOptions(
             optimizable=self._oprSettings.isOptimizable.getValue(),
             optimization_plan=opr_optimization_plan,
@@ -377,6 +395,8 @@ class DMReconstructor(Reconstructor):
             initial_weights=numpy.array([0.0]),  # FIXME
             optimize_eigenmode_weights=self._oprSettings.optimizeEigenmodeWeights.getValue(),
             optimize_intensity_variation=self._oprSettings.optimizeIntensities.getValue(),
+            smoothing_method=smoothing_method,
+            polynomial_smoothing_degree=self._oprSettings.polynomialSmoothingDegree.getValue(),
         )
 
     def _create_task_options(self, parameters: ReconstructInput) -> DMOptions:
