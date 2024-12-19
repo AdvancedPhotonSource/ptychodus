@@ -7,8 +7,14 @@ import logging
 import numpy
 import numpy.typing
 
-from ptycho.loader import PtychoDataContainer
+import ptycho.loader
+import ptycho.model_manager
+import ptycho.params
+import ptycho.raw_data
 
+
+from ptychodus.api.object import Object, ObjectArrayType
+from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import (
     ReconstructInput,
     ReconstructOutput,
@@ -29,27 +35,30 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-def createPtychoDataContainer(parameters: ReconstructInput) -> PtychoDataContainer:
-    diff3d = parameters.patterns
-    probeGuess = parameters.product.probe.getIncoherentMode(0)
-    objectGuess = parameters.product.object_.getLayer(0)
+def create_raw_data(
+    parameters: ReconstructInput, *, use_object_guess: bool
+) -> ptycho.raw_data.RawData:
+    object_geometry = parameters.product.object_.getGeometry()
+    position_x_px: list[float] = list()
+    position_y_px: list[float] = list()
 
-    logger.debug('createPtychoDataContainer pre-condition sizes:')
-    logger.debug(f'diffractionPatterns: {diff3d.shape}')
-    logger.debug(f'probeGuess: {probeGuess.shape}')
-    logger.debug(f'objectGuess: {objectGuess.shape}')
-    logger.debug(f'scanCoordinates: {len(parameters.product.scan)}')
+    for scan_point in parameters.product.scan:
+        object_point = object_geometry.mapScanPointToObjectPoint(scan_point)
+        position_x_px.append(object_point.positionXInPixels)
+        position_y_px.append(object_point.positionYInPixels)
 
-    if objectGuess is not None:
-        objectGuess = objectGuess[0, :, :]
+    objectGuess: ObjectArrayType | None = None
 
-    return PtychoDataContainer.from_raw_data_without_pc(
-        xcoords=numpy.array([p.positionXInMeters for p in parameters.product.scan]),
-        ycoords=numpy.array([p.positionYInMeters for p in parameters.product.scan]),
-        diff3d=diff3d,
-        probeGuess=probeGuess,
+    if use_object_guess:
+        objectGuess = parameters.product.object_.getLayer(0)
+
+    return ptycho.raw_data.RawData.from_coords_without_pc(
+        xcoords=numpy.array(position_x_px),
+        ycoords=numpy.array(position_y_px),
+        diff3d=parameters.patterns,
+        probeGuess=parameters.product.probe.getIncoherentMode(0),
         # Assuming all patches are from the same object
-        scan_index=numpy.zeros(len(diff3d)),  # FIXME
+        scan_index=numpy.zeros(len(parameters.product.scan)),  # FIXME
         objectGuess=objectGuess,
     )
 
@@ -68,8 +77,10 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         self._training_settings = training_settings
         self._inference_settings = inference_settings
 
-        # Note the model parameter 'N' is the diffraction pattern size in pixels (power of two)
-        # FIXME model path to/from settings
+        self._training_data_file_filters = ['NumPy Zipped Archive (*.npz)']
+        self._model_file_filters = ['Zipped Archive (*.zip)']
+        self._model_dict: dict | None = None
+        self._model_config: dict | None = None
 
         ptychopinnVersion = version('ptychopinn')
         logger.info(f'\tPtychoPINN {ptychopinnVersion}')
@@ -79,49 +90,120 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         return self._name
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        return ReconstructOutput(parameters.product, 0)  # TODO
+        solution_region_size = self._model_config['N']
+        num_nearest_neighbors = 7
+        num_samples = 1
+
+        # FIXME use_object_guess?
+        raw_data = create_raw_data(parameters, use_object_guess=False)
+        raw_dataset = raw_data.generate_grouped_data(
+            solution_region_size, K=num_nearest_neighbors, nsamples=num_samples
+        )
+        ptycho_data_container = ptycho.loader.load(
+            lambda: raw_dataset, raw_data.probeGuess, which=None, create_split=False
+        )
+        diffraction_to_obj = self._model_dict['diffraction_to_obj']
+
+        # Perform reconstruction
+        from ptycho.nbutils import reconstruct_image  # FIXME redo?
+
+        obj_tensor_full, global_offsets = reconstruct_image(
+            ptycho_data_container, diffraction_to_obj=diffraction_to_obj
+        )
+
+        # Process the reconstructed image
+        from ptycho.tf_helper import reassemble_position  # FIXME redo?
+
+        object_out_array = reassemble_position(obj_tensor_full, global_offsets, M=20)
+
+        object_in = parameters.product.object_
+        object_out = Object(
+            array=numpy.array(object_out_array),
+            layerDistanceInMeters=object_in.layerDistanceInMeters,
+            pixelGeometry=object_in.getPixelGeometry(),
+            center=object_in.getCenter(),
+        )
+        costs: Sequence[float] = list()
+
+        product = Product(
+            metadata=parameters.product.metadata,
+            scan=parameters.product.scan,
+            probe=parameters.product.probe,
+            object_=object_out,
+            costs=costs,
+        )
+
+        return ReconstructOutput(product, 0)
 
     def ingestTrainingData(self, parameters: ReconstructInput) -> None:
-        pass  # TODO
+        pass  # FIXME
 
     def getOpenTrainingDataFileFilterList(self) -> Sequence[str]:
-        return list()  # TODO
+        return self._training_data_file_filters
 
     def getOpenTrainingDataFileFilter(self) -> str:
-        return str()  # TODO
+        return self._training_data_file_filters[0]
 
     def openTrainingData(self, filePath: Path) -> None:
-        pass  # TODO
+        pass  # FIXME
 
     def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
-        return list()  # TODO
+        return self._training_data_file_filters
 
     def getSaveTrainingDataFileFilter(self) -> str:
-        return str()  # TODO
+        return self._training_data_file_filters[0]
 
     def saveTrainingData(self, filePath: Path) -> None:
-        pass  # TODO
+        pass  # FIXME
 
     def train(self) -> TrainOutput:
-        return TrainOutput([], [], 0)  # TODO
+        from ptycho.workflows.components import (
+            setup_configuration,
+            load_data,
+            run_cdi_example,
+            save_outputs,
+        )
+        from ptycho.config.config import TrainingConfig, update_legacy_dict
+
+        config = setup_configuration(args, args.config)
+
+        # Update global params with new-style config at entry point
+        update_legacy_dict(ptycho.params.cfg, config)
+
+        # ptycho_data, ptycho_data_train, obj = load_and_prepare_data(config['train_data_file_path'])
+        ptycho_data = load_data(str(config.train_data_file), n_images=512)
+
+        test_data = None
+
+        if config.test_data_file:
+            test_data = load_data(str(config.test_data_file))
+
+        recon_amp, recon_phase, results = run_cdi_example(ptycho_data, test_data, config)
+        ptycho.model_manager.save(str(config.output_dir))
+        save_outputs(recon_amp, recon_phase, results, str(config.output_dir))
+
+        return TrainOutput([], [], 0)  # FIXME
 
     def clearTrainingData(self) -> None:
-        pass  # TODO
+        pass  # FIXME
 
     def getOpenModelFileFilterList(self) -> Sequence[str]:
-        return list()  # TODO
+        return self._model_file_filters
 
     def getOpenModelFileFilter(self) -> str:
-        return str()  # TODO
+        return self._model_file_filters[0]
 
     def openModel(self, filePath: Path) -> None:
-        pass  # TODO
+        # ModelManager updates global config when loading
+        self._model_dict = ptycho.model_manager.ModelManager.load_multiple_models(filePath)
+        self._model_config = ptycho.params.cfg
+        # FIXME model path to/from settings
 
     def getSaveModelFileFilterList(self) -> Sequence[str]:
-        return list()  # TODO
+        return self._model_file_filters
 
     def getSaveModelFileFilter(self) -> str:
-        return str()  # TODO
+        return self._model_file_filters[0]
 
     def saveModel(self, filePath: Path) -> None:
-        pass  # TODO
+        ptycho.model_manager.save(filePath)
