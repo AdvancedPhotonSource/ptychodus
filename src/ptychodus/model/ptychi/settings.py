@@ -49,34 +49,62 @@ class PtyChiObjectSettings(Observable, Observer):
         )
 
         self.constrainL1Norm = self._settingsGroup.createBooleanParameter('ConstrainL1Norm', False)
-        self.constrainL1NormWeight = self._settingsGroup.createRealParameter(
-            'ConstrainL1NormWeight', 0.0, minimum=0.0
+        self.constrainL1NormStart = self._settingsGroup.createIntegerParameter(
+            'ConstrainL1NormStart', 0, minimum=0
+        )
+        self.constrainL1NormStop = self._settingsGroup.createIntegerParameter(
+            'ConstrainL1NormStop', -1
         )
         self.constrainL1NormStride = self._settingsGroup.createIntegerParameter(
             'ConstrainL1NormStride', 1, minimum=1
+        )
+        self.constrainL1NormWeight = self._settingsGroup.createRealParameter(
+            'ConstrainL1NormWeight', 0.0, minimum=0.0
         )
 
         self.constrainSmoothness = self._settingsGroup.createBooleanParameter(
             'ConstrainSmoothness', False
         )
-        self.constrainSmoothnessAlpha = self._settingsGroup.createRealParameter(
-            'ConstrainSmoothnessAlpha', 0.0, minimum=0.0, maximum=1.0 / 8
+        self.constrainSmoothnessStart = self._settingsGroup.createIntegerParameter(
+            'ConstrainSmoothnessStart', 0, minimum=0
+        )
+        self.constrainSmoothnessStop = self._settingsGroup.createIntegerParameter(
+            'ConstrainSmoothnessStop', -1
         )
         self.constrainSmoothnessStride = self._settingsGroup.createIntegerParameter(
             'ConstrainSmoothnessStride', 1, minimum=1
+        )
+        self.constrainSmoothnessAlpha = self._settingsGroup.createRealParameter(
+            'ConstrainSmoothnessAlpha', 0.0, minimum=0.0, maximum=1.0 / 8
         )
 
         self.constrainTotalVariation = self._settingsGroup.createBooleanParameter(
             'ConstrainTotalVariation', False
         )
-        self.constrainTotalVariationWeight = self._settingsGroup.createRealParameter(
-            'ConstrainTotalVariationWeight', 0.0, minimum=0.0
+        self.constrainTotalVariationStart = self._settingsGroup.createIntegerParameter(
+            'ConstrainTotalVariationStart', 0, minimum=0
+        )
+        self.constrainTotalVariationStop = self._settingsGroup.createIntegerParameter(
+            'ConstrainTotalVariationStop', -1
         )
         self.constrainTotalVariationStride = self._settingsGroup.createIntegerParameter(
             'ConstrainTotalVariationStride', 1, minimum=1
         )
+        self.constrainTotalVariationWeight = self._settingsGroup.createRealParameter(
+            'ConstrainTotalVariationWeight', 0.0, minimum=0.0
+        )
+
         self.removeGridArtifacts = self._settingsGroup.createBooleanParameter(
             'RemoveGridArtifacts', False
+        )
+        self.removeGridArtifactsStart = self._settingsGroup.createIntegerParameter(
+            'RemoveGridArtifactsStart', 0, minimum=0
+        )
+        self.removeGridArtifactsStop = self._settingsGroup.createIntegerParameter(
+            'RemoveGridArtifactsStop', -1
+        )
+        self.removeGridArtifactsStride = self._settingsGroup.createIntegerParameter(
+            'RemoveGridArtifactsStride', 1, minimum=1
         )
         self.removeGridArtifactsPeriodXInMeters = self._settingsGroup.createRealParameter(
             'RemoveGridArtifactsPeriodXInMeters', 1e-7, minimum=0.0
@@ -92,11 +120,18 @@ class PtyChiObjectSettings(Observable, Observer):
         self.removeGridArtifactsDirection = self._settingsGroup.createStringParameter(
             'RemoveGridArtifactsDirection', 'XY'
         )
-        self.removeGridArtifactsStride = self._settingsGroup.createIntegerParameter(
-            'RemoveGridArtifactsStride', 1, minimum=1
-        )
+
         self.regularizeMultislice = self._settingsGroup.createBooleanParameter(
             'RegularizeMultislice', False
+        )
+        self.regularizeMultisliceStart = self._settingsGroup.createIntegerParameter(
+            'RegularizeMultisliceStart', 0, minimum=0
+        )
+        self.regularizeMultisliceStop = self._settingsGroup.createIntegerParameter(
+            'RegularizeMultisliceStop', -1
+        )
+        self.regularizeMultisliceStride = self._settingsGroup.createIntegerParameter(
+            'RegularizeMultisliceStride', 1, minimum=1
         )
         self.regularizeMultisliceWeight = self._settingsGroup.createRealParameter(
             'RegularizeMultisliceWeight', 0.0, minimum=0.0
@@ -113,9 +148,6 @@ class PtyChiObjectSettings(Observable, Observer):
             self._settingsGroup.createStringParameter(
                 'RegularizeMultisliceUnwrapPhaseImageIntegrationMethod', 'DECONVOLUTION'
             )
-        )
-        self.regularizeMultisliceStride = self._settingsGroup.createIntegerParameter(
-            'RegularizeMultisliceStride', 1, minimum=1
         )
 
     def update(self, observable: Observable) -> None:
@@ -145,6 +177,12 @@ class PtyChiProbeSettings(Observable, Observer):
         self.constrainProbePower = self._settingsGroup.createBooleanParameter(
             'ConstrainProbePower', False
         )
+        self.constrainProbePowerStart = self._settingsGroup.createIntegerParameter(
+            'ConstrainProbePowerStart', 0, minimum=0
+        )
+        self.constrainProbePowerStop = self._settingsGroup.createIntegerParameter(
+            'ConstrainProbePowerStop', -1
+        )
         self.constrainProbePowerStride = self._settingsGroup.createIntegerParameter(
             'ConstrainProbePowerStride', 1, minimum=1
         )
@@ -152,29 +190,61 @@ class PtyChiProbeSettings(Observable, Observer):
         self.orthogonalizeIncoherentModes = self._settingsGroup.createBooleanParameter(
             'OrthogonalizeIncoherentModes', True
         )
-        self.orthogonalizeIncoherentModesMethod = self._settingsGroup.createStringParameter(
-            'OrthogonalizeIncoherentModesMethod', 'GS'
+        self.orthogonalizeIncoherentModesStart = self._settingsGroup.createIntegerParameter(
+            'OrthogonalizeIncoherentModesStart', 0, minimum=0
+        )
+        self.orthogonalizeIncoherentModesStop = self._settingsGroup.createIntegerParameter(
+            'OrthogonalizeIncoherentModesStop', -1
         )
         self.orthogonalizeIncoherentModesStride = self._settingsGroup.createIntegerParameter(
             'OrthogonalizeIncoherentModesStride', 1, minimum=1
         )
+        self.orthogonalizeIncoherentModesMethod = self._settingsGroup.createStringParameter(
+            'OrthogonalizeIncoherentModesMethod', 'GS'
+        )
 
         self.orthogonalizeOPRModes = self._settingsGroup.createBooleanParameter(
             'OrthogonalizeOPRModes', True
+        )
+        self.orthogonalizeOPRModesStart = self._settingsGroup.createIntegerParameter(
+            'OrthogonalizeOPRModesStart', 0, minimum=0
+        )
+        self.orthogonalizeOPRModesStop = self._settingsGroup.createIntegerParameter(
+            'OrthogonalizeOPRModesStop', -1
         )
         self.orthogonalizeOPRModesStride = self._settingsGroup.createIntegerParameter(
             'OrthogonalizeOPRModesStride', 1, minimum=1
         )
 
         self.constrainSupport = self._settingsGroup.createBooleanParameter(
-            'ConstrainSupport',
-            False,
+            'ConstrainSupport', False
+        )
+        self.constrainSupportStart = self._settingsGroup.createIntegerParameter(
+            'ConstrainSupportStart', 0, minimum=0
+        )
+        self.constrainSupportStop = self._settingsGroup.createIntegerParameter(
+            'ConstrainSupportStop', -1
+        )
+        self.constrainSupportStride = self._settingsGroup.createIntegerParameter(
+            'ConstrainSupportStride', 1, minimum=1
         )
         self.constrainSupportThreshold = self._settingsGroup.createRealParameter(
             'ConstrainSupportThreshold', 0.005, minimum=0.0
         )
-        self.constrainSupportStride = self._settingsGroup.createIntegerParameter(
-            'ConstrainSupportStride', 1, minimum=1
+
+        self.constrainCenter = self._settingsGroup.createBooleanParameter('ConstrainCenter', False)
+        self.constrainCenterStart = self._settingsGroup.createIntegerParameter(
+            'ConstrainCenterStart', 0, minimum=0
+        )
+        self.constrainCenterStop = self._settingsGroup.createIntegerParameter(
+            'ConstrainCenterStop', -1
+        )
+        self.constrainCenterStride = self._settingsGroup.createIntegerParameter(
+            'ConstrainCenterStride', 1, minimum=1
+        )
+
+        self.relaxEigenmodeUpdate = self._settingsGroup.createRealParameter(
+            'RelaxEigenmodeUpdate', 1.0, minimum=0.0, maximum=1.0
         )
 
     def update(self, observable: Observable) -> None:
@@ -217,9 +287,19 @@ class PtyChiProbePositionSettings(Observable, Observer):
         self.limitMagnitudeUpdate = self._settingsGroup.createBooleanParameter(
             'LimitMagnitudeUpdate', False
         )
+        self.limitMagnitudeUpdateStart = self._settingsGroup.createIntegerParameter(
+            'LimitMagnitudeUpdateStart', 0, minimum=0
+        )
+        self.limitMagnitudeUpdateStop = self._settingsGroup.createIntegerParameter(
+            'LimitMagnitudeUpdateStop', -1
+        )
+        self.limitMagnitudeUpdateStride = self._settingsGroup.createIntegerParameter(
+            'LimitMagnitudeUpdateStride', 1, minimum=1
+        )
         self.magnitudeUpdateLimit = self._settingsGroup.createRealParameter(
             'MagnitudeUpdateLimit', 0.0, minimum=0.0
         )
+
         self.constrainCentroid = self._settingsGroup.createBooleanParameter(
             'ConstrainCentroid', False
         )
@@ -254,12 +334,26 @@ class PtyChiOPRSettings(Observable, Observer):
         self.optimizeEigenmodeWeights = self._settingsGroup.createBooleanParameter(
             'OptimizeEigenmodeWeigts', True
         )
+
         self.smoothModeWeights = self._settingsGroup.createBooleanParameter(
             'SmoothModeWeights', False
+        )
+        self.smoothModeWeightsStart = self._settingsGroup.createIntegerParameter(
+            'SmoothModeWeightsStart', 0, minimum=0
+        )
+        self.smoothModeWeightsStop = self._settingsGroup.createIntegerParameter(
+            'SmoothModeWeightsStop', -1
+        )
+        self.smoothModeWeightsStride = self._settingsGroup.createIntegerParameter(
+            'SmoothModeWeightsStride', 1, minimum=1
         )
         self.smoothingMethod = self._settingsGroup.createStringParameter('SmoothingMethod', '')
         self.polynomialSmoothingDegree = self._settingsGroup.createIntegerParameter(
             'PolynomialSmoothingDegree', 4, minimum=0, maximum=10
+        )
+
+        self.relaxUpdate = self._settingsGroup.createRealParameter(
+            'RelaxUpdate', 1.0, minimum=0.0, maximum=1.0
         )
 
     def update(self, observable: Observable) -> None:
@@ -338,10 +432,6 @@ class PtyChiLSQMLSettings(Observable, Observer):  # FIXME to view
         )
         self.probeOptimalStepSizeScaler = self._settingsGroup.createRealParameter(
             'ProbeOptimalStepSizeScaler', 0.9
-        )
-
-        self.oprModesUpdateRelaxation = self._settingsGroup.createRealParameter(
-            'OPRModesUpdateRelaxation', 0.1
         )
 
     def update(self, observable: Observable) -> None:
