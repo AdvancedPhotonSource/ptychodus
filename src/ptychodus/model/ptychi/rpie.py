@@ -24,7 +24,21 @@ from ptychi.api import (
     RPIEOptions,
     RPIEReconstructorOptions,
 )
-from ptychi.api.options.base import PositionCorrectionOptions
+from ptychi.api.options.base import (
+    ObjectL1NormConstraintOptions,
+    ObjectMultisliceRegularizationOptions,
+    ObjectSmoothnessConstraintOptions,
+    ObjectTotalVariationOptions,
+    OPRModeWeightsSmoothingOptions,
+    PositionCorrectionOptions,
+    ProbeCenterConstraintOptions,
+    ProbeOrthogonalizeIncoherentModesOptions,
+    ProbeOrthogonalizeOPRModesOptions,
+    ProbePositionMagnitudeLimitOptions,
+    ProbePowerConstraintOptions,
+    ProbeSupportConstraintOptions,
+    RemoveGridArtifactsOptions,
+)
 from ptychi.api.task import PtychographyTask
 
 from ptychodus.api.object import Object, ObjectGeometry, ObjectPoint
@@ -79,7 +93,7 @@ class RPIEReconstructor(Reconstructor):
     ) -> PtychographyDataOptions:
         return PtychographyDataOptions(
             data=patterns,
-            propagation_distance_m=metadata.detectorDistanceInMeters,
+            free_space_propagation_distance_m=metadata.detectorDistanceInMeters,
             wavelength_m=metadata.probeWavelengthInMeters,
             detector_pixel_size_m=self._detector.pixelWidthInMeters.getValue(),
             valid_pixel_mask=goodPixelMask,
@@ -135,20 +149,41 @@ class RPIEReconstructor(Reconstructor):
 
         ####
 
-        l1_norm_constraint_weight = (
-            self._objectSettings.constrainL1NormWeight.getValue()
-            if self._objectSettings.constrainL1Norm.getValue()
-            else 0.0
+        l1_norm_constraint_optimization_plan = self._create_optimization_plan(
+            self._objectSettings.constrainL1NormStart.getValue(),
+            self._objectSettings.constrainL1NormStop.getValue(),
+            self._objectSettings.constrainL1NormStride.getValue(),
         )
-        smoothness_constraint_alpha = (
-            self._objectSettings.constrainSmoothnessAlpha.getValue()
-            if self._objectSettings.constrainSmoothness.getValue()
-            else 0.0
+        l1_norm_constraint = ObjectL1NormConstraintOptions(
+            enabled=self._objectSettings.constrainL1Norm.getValue(),
+            optimization_plan=l1_norm_constraint_optimization_plan,
+            weight=self._objectSettings.constrainL1NormWeight.getValue(),
         )
-        total_variation_weight = (
-            self._objectSettings.constrainTotalVariationWeight.getValue()
-            if self._objectSettings.constrainTotalVariation.getValue()
-            else 0.0
+
+        ####
+
+        smoothness_constraint_optimization_plan = self._create_optimization_plan(
+            self._objectSettings.constrainSmoothnessStart.getValue(),
+            self._objectSettings.constrainSmoothnessStop.getValue(),
+            self._objectSettings.constrainSmoothnessStride.getValue(),
+        )
+        smoothness_constraint = ObjectSmoothnessConstraintOptions(
+            enabled=self._objectSettings.constrainSmoothness.getValue(),
+            optimization_plan=smoothness_constraint_optimization_plan,
+            alpha=self._objectSettings.constrainSmoothnessAlpha.getValue(),
+        )
+
+        ####
+
+        total_variation_optimization_plan = self._create_optimization_plan(
+            self._objectSettings.constrainTotalVariationStart.getValue(),
+            self._objectSettings.constrainTotalVariationStop.getValue(),
+            self._objectSettings.constrainTotalVariationStride.getValue(),
+        )
+        total_variation = ObjectTotalVariationOptions(
+            enabled=self._objectSettings.constrainTotalVariation.getValue(),
+            optimization_plan=total_variation_optimization_plan,
+            weight=self._objectSettings.constrainTotalVariationWeight.getValue(),
         )
 
         ####
@@ -165,12 +200,18 @@ class RPIEReconstructor(Reconstructor):
             logger.warning('Failed to parse direction "{remove_grid_artifacts_direction_str}"!')
             remove_grid_artifacts_direction = Directions.XY
 
-        ####
-
-        multislice_regularization_weight = (
-            self._objectSettings.regularizeMultisliceWeight.getValue()
-            if self._objectSettings.regularizeMultislice.getValue()
-            else 0.0
+        remove_grid_artifacts_optimization_plan = self._create_optimization_plan(
+            self._objectSettings.removeGridArtifactsStart.getValue(),
+            self._objectSettings.removeGridArtifactsStop.getValue(),
+            self._objectSettings.removeGridArtifactsStride.getValue(),
+        )
+        remove_grid_artifacts = RemoveGridArtifactsOptions(
+            enabled=self._objectSettings.removeGridArtifacts.getValue(),
+            optimization_plan=remove_grid_artifacts_optimization_plan,
+            period_x_m=self._objectSettings.removeGridArtifactsPeriodXInMeters.getValue(),
+            period_y_m=self._objectSettings.removeGridArtifactsPeriodYInMeters.getValue(),
+            window_size=self._objectSettings.removeGridArtifactsWindowSizeInPixels.getValue(),
+            direction=remove_grid_artifacts_direction,
         )
 
         ####
@@ -207,6 +248,20 @@ class RPIEReconstructor(Reconstructor):
                 ImageIntegrationMethods.DECONVOLUTION
             )
 
+        multislice_regularization_optimization_plan = self._create_optimization_plan(
+            self._objectSettings.regularizeMultisliceStart.getValue(),
+            self._objectSettings.regularizeMultisliceStop.getValue(),
+            self._objectSettings.regularizeMultisliceStride.getValue(),
+        )
+        multislice_regularization = ObjectMultisliceRegularizationOptions(
+            enabled=self._objectSettings.regularizeMultislice.getValue(),
+            optimization_plan=multislice_regularization_optimization_plan,
+            weight=self._objectSettings.regularizeMultisliceWeight.getValue(),
+            unwrap_phase=self._objectSettings.regularizeMultisliceUnwrapPhase.getValue(),
+            unwrap_image_grad_method=multislice_regularization_unwrap_image_grad_method,
+            unwrap_image_integration_method=multislice_regularization_unwrap_image_integration_method,
+        )
+
         ####
 
         patch_interpolation_method_str = self._objectSettings.patchInterpolator.getValue()
@@ -241,23 +296,11 @@ class RPIEReconstructor(Reconstructor):
             initial_guess=object_.getArray(),
             slice_spacings_m=numpy.array(object_.layerDistanceInMeters[:-1]),
             pixel_size_m=pixel_size_m,
-            l1_norm_constraint_weight=l1_norm_constraint_weight,
-            l1_norm_constraint_stride=self._objectSettings.constrainL1NormStride.getValue(),
-            smoothness_constraint_alpha=smoothness_constraint_alpha,
-            smoothness_constraint_stride=self._objectSettings.constrainSmoothnessStride.getValue(),
-            total_variation_weight=total_variation_weight,
-            total_variation_stride=self._objectSettings.constrainTotalVariationStride.getValue(),
-            remove_grid_artifacts=self._objectSettings.removeGridArtifacts.getValue(),
-            remove_grid_artifacts_period_x_m=self._objectSettings.removeGridArtifactsPeriodXInMeters.getValue(),
-            remove_grid_artifacts_period_y_m=self._objectSettings.removeGridArtifactsPeriodYInMeters.getValue(),
-            remove_grid_artifacts_window_size=self._objectSettings.removeGridArtifactsWindowSizeInPixels.getValue(),
-            remove_grid_artifacts_direction=remove_grid_artifacts_direction,
-            remove_grid_artifacts_stride=self._objectSettings.removeGridArtifactsStride.getValue(),
-            multislice_regularization_weight=multislice_regularization_weight,
-            multislice_regularization_unwrap_phase=self._objectSettings.regularizeMultisliceUnwrapPhase.getValue(),
-            multislice_regularization_unwrap_image_grad_method=multislice_regularization_unwrap_image_grad_method,
-            multislice_regularization_unwrap_image_integration_method=multislice_regularization_unwrap_image_integration_method,
-            multislice_regularization_stride=self._objectSettings.regularizeMultisliceStride.getValue(),
+            l1_norm_constraint=l1_norm_constraint,
+            smoothness_constraint=smoothness_constraint,
+            total_variation=total_variation,
+            remove_grid_artifacts=remove_grid_artifacts,
+            multislice_regularization=multislice_regularization,
             patch_interpolation_method=patch_interpolation_method,
             alpha=self._pieSettings.objectAlpha.getValue(),
         )
@@ -269,10 +312,21 @@ class RPIEReconstructor(Reconstructor):
             self._probeSettings.optimizationPlanStride.getValue(),
         )
         optimizer = self._create_optimizer(self._probeSettings.optimizer.getValue())
-        probe_power = 0.0
 
-        if self._probeSettings.constrainProbePower.getValue():
-            probe_power = metadata.probePhotonCount
+        ####
+
+        power_constraint_optimization_plan = self._create_optimization_plan(
+            self._probeSettings.constrainProbePowerStart.getValue(),
+            self._probeSettings.constrainProbePowerStop.getValue(),
+            self._probeSettings.constrainProbePowerStride.getValue(),
+        )
+        power_constraint = ProbePowerConstraintOptions(
+            enabled=self._probeSettings.constrainProbePower.getValue(),
+            optimization_plan=power_constraint_optimization_plan,
+            probe_power=metadata.probePhotonCount,
+        )
+
+        ####
 
         orthogonalize_incoherent_modes_method_str = (
             self._probeSettings.orthogonalizeIncoherentModesMethod.getValue()
@@ -288,28 +342,85 @@ class RPIEReconstructor(Reconstructor):
             )
             orthogonalize_incoherent_modes_method = OrthogonalizationMethods.GS
 
+        orthogonalize_incoherent_modes_optimization_plan = self._create_optimization_plan(
+            self._probeSettings.orthogonalizeIncoherentModesStart.getValue(),
+            self._probeSettings.orthogonalizeIncoherentModesStop.getValue(),
+            self._probeSettings.orthogonalizeIncoherentModesStride.getValue(),
+        )
+        orthogonalize_incoherent_modes = ProbeOrthogonalizeIncoherentModesOptions(
+            enabled=self._probeSettings.orthogonalizeIncoherentModes.getValue(),
+            optimization_plan=orthogonalize_incoherent_modes_optimization_plan,
+            method=orthogonalize_incoherent_modes_method,
+        )
+
+        ####
+
+        orthogonalize_opr_modes_optimization_plan = self._create_optimization_plan(
+            self._probeSettings.orthogonalizeOPRModesStart.getValue(),
+            self._probeSettings.orthogonalizeOPRModesStop.getValue(),
+            self._probeSettings.orthogonalizeOPRModesStride.getValue(),
+        )
+        orthogonalize_opr_modes = ProbeOrthogonalizeOPRModesOptions(
+            enabled=self._probeSettings.orthogonalizeOPRModes.getValue(),
+            optimization_plan=orthogonalize_opr_modes_optimization_plan,
+        )
+
+        ####
+
+        support_constraint_optimization_plan = self._create_optimization_plan(
+            self._probeSettings.constrainSupportStart.getValue(),
+            self._probeSettings.constrainSupportStop.getValue(),
+            self._probeSettings.constrainSupportStride.getValue(),
+        )
+        support_constraint = ProbeSupportConstraintOptions(
+            enabled=self._probeSettings.constrainSupport.getValue(),
+            optimization_plan=support_constraint_optimization_plan,
+            threshold=self._probeSettings.constrainSupportThreshold.getValue(),
+        )
+
+        ####
+
+        center_constraint_optimization_plan = self._create_optimization_plan(
+            self._probeSettings.constrainCenterStart.getValue(),
+            self._probeSettings.constrainCenterStop.getValue(),
+            self._probeSettings.constrainCenterStride.getValue(),
+        )
+        center_constraint = ProbeCenterConstraintOptions(
+            enabled=self._probeSettings.constrainCenter.getValue(),
+            optimization_plan=center_constraint_optimization_plan,
+        )
+
+        ####
+
         return PIEProbeOptions(
             optimizable=self._probeSettings.isOptimizable.getValue(),  # TODO optimizer_params
             optimization_plan=optimization_plan,
             optimizer=optimizer,
             step_size=self._probeSettings.stepSize.getValue(),
             initial_guess=probe.getArray(),
-            probe_power=probe_power,
-            probe_power_constraint_stride=self._probeSettings.constrainProbePowerStride.getValue(),
-            orthogonalize_incoherent_modes=self._probeSettings.orthogonalizeIncoherentModes.getValue(),
-            orthogonalize_incoherent_modes_method=orthogonalize_incoherent_modes_method,
-            orthogonalize_incoherent_modes_stride=self._probeSettings.orthogonalizeIncoherentModesStride.getValue(),
-            orthogonalize_opr_modes=self._probeSettings.orthogonalizeOPRModes.getValue(),
-            orthogonalize_opr_modes_stride=self._probeSettings.orthogonalizeOPRModesStride.getValue(),
-            support_constraint=self._probeSettings.constrainSupport.getValue(),
-            support_constraint_threshold=self._probeSettings.constrainSupportThreshold.getValue(),
-            support_constraint_stride=self._probeSettings.constrainSupportStride.getValue(),
+            power_constraint=power_constraint,
+            orthogonalize_incoherent_modes=orthogonalize_incoherent_modes,
+            orthogonalize_opr_modes=orthogonalize_opr_modes,
+            support_constraint=support_constraint,
+            center_constraint=center_constraint,
+            eigenmode_update_relaxation=self._probeSettings.relaxEigenmodeUpdate.getValue(),
             alpha=self._pieSettings.probeAlpha.getValue(),
         )
 
     def _create_probe_position_options(
         self, scan: Scan, object_geometry: ObjectGeometry
     ) -> PIEProbePositionOptions:
+        probe_position_optimization_plan = self._create_optimization_plan(
+            self._probePositionSettings.optimizationPlanStart.getValue(),
+            self._probePositionSettings.optimizationPlanStop.getValue(),
+            self._probePositionSettings.optimizationPlanStride.getValue(),
+        )
+        probe_position_optimizer = self._create_optimizer(
+            self._probePositionSettings.optimizer.getValue()
+        )
+
+        ####
+
         position_in_px_list: list[float] = list()
         rx_px = object_geometry.widthInPixels / 2
         ry_px = object_geometry.heightInPixels / 2
@@ -321,19 +432,20 @@ class RPIEReconstructor(Reconstructor):
 
         position_in_px = numpy.reshape(position_in_px_list, shape=(-1, 2))
 
-        probe_position_optimization_plan = self._create_optimization_plan(
-            self._probePositionSettings.optimizationPlanStart.getValue(),
-            self._probePositionSettings.optimizationPlanStop.getValue(),
-            self._probePositionSettings.optimizationPlanStride.getValue(),
+        ####
+
+        magnitude_limit_optimization_plan = self._create_optimization_plan(
+            self._probePositionSettings.limitMagnitudeUpdateStart.getValue(),
+            self._probePositionSettings.limitMagnitudeUpdateStop.getValue(),
+            self._probePositionSettings.limitMagnitudeUpdateStride.getValue(),
         )
-        probe_position_optimizer = self._create_optimizer(
-            self._probePositionSettings.optimizer.getValue()
+        magnitude_limit = ProbePositionMagnitudeLimitOptions(
+            enabled=self._probePositionSettings.limitMagnitudeUpdate.getValue(),
+            optimization_plan=magnitude_limit_optimization_plan,
+            limit=self._probePositionSettings.magnitudeUpdateLimit.getValue(),
         )
-        update_magnitude_limit = (
-            self._probePositionSettings.magnitudeUpdateLimit.getValue()
-            if self._probePositionSettings.limitMagnitudeUpdate.getValue()
-            else 0.0
-        )
+
+        ####
 
         correction_type_str = self._probePositionSettings.positionCorrectionType.getValue()
 
@@ -350,6 +462,8 @@ class RPIEReconstructor(Reconstructor):
             cross_correlation_probe_threshold=self._probePositionSettings.crossCorrelationProbeThreshold.getValue(),
         )
 
+        ####
+
         return PIEProbePositionOptions(
             optimizable=self._probePositionSettings.isOptimizable.getValue(),
             optimization_plan=probe_position_optimization_plan,
@@ -357,7 +471,7 @@ class RPIEReconstructor(Reconstructor):
             step_size=self._probePositionSettings.stepSize.getValue(),
             position_x_px=position_in_px[:, -1],
             position_y_px=position_in_px[:, -2],
-            update_magnitude_limit=update_magnitude_limit if update_magnitude_limit > 0.0 else None,
+            magnitude_limit=magnitude_limit,
             constrain_position_mean=self._probePositionSettings.constrainCentroid.getValue(),
             correction_options=correction_options,
         )
@@ -372,17 +486,28 @@ class RPIEReconstructor(Reconstructor):
 
         ####
 
-        smoothing_method: OPRWeightSmoothingMethods | None = None
+        smoothing_optimization_plan = self._create_optimization_plan(
+            self._oprSettings.smoothModeWeightsStart.getValue(),
+            self._oprSettings.smoothModeWeightsStop.getValue(),
+            self._oprSettings.smoothModeWeightsStride.getValue(),
+        )
 
-        if self._oprSettings.smoothModeWeights.getValue():
-            smoothing_method_str = self._oprSettings.smoothingMethod.getValue()
+        smoothing_method_str = self._oprSettings.smoothingMethod.getValue()
 
-            try:
-                smoothing_method = OPRWeightSmoothingMethods[smoothing_method_str.upper()]
-            except KeyError:
-                logger.warning(
-                    'Failed to parse OPR weight smoothing method "{smoothing_method_str}"!'
-                )
+        try:
+            smoothing_method: OPRWeightSmoothingMethods | None = OPRWeightSmoothingMethods[
+                smoothing_method_str.upper()
+            ]
+        except KeyError:
+            smoothing_method = None
+            logger.warning('Failed to parse OPR weight smoothing method "{smoothing_method_str}"!')
+
+        smoothing = OPRModeWeightsSmoothingOptions(
+            enabled=self._oprSettings.smoothModeWeights.getValue(),
+            optimization_plan=smoothing_optimization_plan,
+            method=smoothing_method,
+            polynomial_degree=self._oprSettings.polynomialSmoothingDegree.getValue(),
+        )
 
         ####
 
@@ -394,8 +519,8 @@ class RPIEReconstructor(Reconstructor):
             initial_weights=numpy.array([0.0]),  # FIXME
             optimize_eigenmode_weights=self._oprSettings.optimizeEigenmodeWeights.getValue(),
             optimize_intensity_variation=self._oprSettings.optimizeIntensities.getValue(),
-            smoothing_method=smoothing_method,
-            polynomial_smoothing_degree=self._oprSettings.polynomialSmoothingDegree.getValue(),
+            smoothing=smoothing,
+            update_relaxation=self._oprSettings.relaxUpdate.getValue(),
         )
 
     def _create_task_options(self, parameters: ReconstructInput) -> RPIEOptions:
