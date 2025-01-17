@@ -55,8 +55,7 @@ class ScanAPI:
                 parameter = builder.parameters()[parameterName]
             except KeyError:
                 logger.warning(
-                    f'Scan builder "{builder.getName()}" does not have'
-                    f' parameter "{parameterName}"!'
+                    f'Scan builder "{builder.getName()}" does not have parameter "{parameterName}"!'
                 )
             else:
                 parameter.setValue(parameterValue)
