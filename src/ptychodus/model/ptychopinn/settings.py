@@ -39,12 +39,6 @@ class PtychoPINNTrainingSettings(Observable, Observer):
         self._settings_group = registry.createGroup('PtychoPINNTraining')
         self._settings_group.addObserver(self)
 
-        self.train_data_file = self._settings_group.createPathParameter(
-            'train_data_file', Path('/path/to/train_data')
-        )
-        self.test_data_file = self._settings_group.createPathParameter(
-            'test_data_file', Path('/path/to/test_data')
-        )
         self.batch_size = self._settings_group.createIntegerParameter(
             'batch_size', 16, minimum=1, maximum=1 << 30
         )  # must be positive powers of two
@@ -68,9 +62,6 @@ class PtychoPINNTrainingSettings(Observable, Observer):
         self.intensity_scale_trainable = self._settings_group.createBooleanParameter(
             'intensity_scale_trainable', True
         )
-        self.output_directory = self._settings_group.createPathParameter(
-            'output_directory', Path('/path/to/training_outputs')
-        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings_group:
@@ -84,11 +75,12 @@ class PtychoPINNInferenceSettings(Observable, Observer):
         self._settings_group.addObserver(self)
 
         self.model_path = self._settings_group.createPathParameter(
-            'model_path', Path('/path/to/model')
+            'model_path', Path('/path/to/model.zip')
         )
-        self.output_directory = self._settings_group.createPathParameter(
-            'output_directory', Path('/path/to/inference_outputs')
+        self.n_nearest_neighbors = self._settings_group.createIntegerParameter(
+            'n_nearest_neighbors', 7, minimum=0
         )
+        self.n_samples = self._settings_group.createIntegerParameter('n_samples', 1, minimum=1)
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings_group:

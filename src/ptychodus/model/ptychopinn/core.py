@@ -39,15 +39,15 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
         else:
             self._reconstructors.append(
                 PtychoPINNTrainableReconstructor(
-                    'PINN', self.model_settings, self.training_settings, self.inference_settings
+                    'PINN', self.model_settings, self.inference_settings, self.training_settings
                 )
             )
             self._reconstructors.append(
                 PtychoPINNTrainableReconstructor(
                     'Supervised',
                     self.model_settings,
-                    self.training_settings,
                     self.inference_settings,
+                    self.training_settings,
                 )
             )
 

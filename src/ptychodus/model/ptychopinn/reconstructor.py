@@ -2,17 +2,17 @@ from __future__ import annotations
 from collections.abc import Sequence
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 import logging
 
 import numpy
 import numpy.typing
 
-import ptycho.config
+from ptycho.config.config import InferenceConfig, ModelConfig, TrainingConfig, update_legacy_dict
+from ptycho.raw_data import RawData
 import ptycho.loader
 import ptycho.model_manager
 import ptycho.params
-import ptycho.raw_data
 
 from ptychodus.api.object import Object, ObjectArrayType
 from ptychodus.api.product import Product
@@ -36,9 +36,7 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-def create_raw_data(
-    parameters: ReconstructInput, *, use_object_guess: bool
-) -> ptycho.raw_data.RawData:
+def create_raw_data(parameters: ReconstructInput, *, use_object_guess: bool) -> RawData:
     object_geometry = parameters.product.object_.getGeometry()
     position_x_px: list[float] = list()
     position_y_px: list[float] = list()
@@ -53,90 +51,116 @@ def create_raw_data(
     if use_object_guess:
         objectGuess = parameters.product.object_.getLayer(0)
 
-    return ptycho.raw_data.RawData.from_coords_without_pc(
+    return RawData.from_coords_without_pc(
         xcoords=numpy.array(position_x_px),
         ycoords=numpy.array(position_y_px),
         diff3d=parameters.patterns,
         probeGuess=parameters.product.probe.getIncoherentMode(0),
-        # Assuming all patches are from the same object
-        scan_index=numpy.zeros(len(parameters.product.scan)),  # FIXME
+        # assume that all patches are from the same object
+        scan_index=numpy.zeros(len(parameters.product.scan), dtype=int),
         objectGuess=objectGuess,
     )
 
 
 class PtychoPINNTrainableReconstructor(TrainableReconstructor):
+    MODEL_FILE_FILTER: Final[str] = 'Zipped Archive (*.zip)'
+    TRAINING_DATA_FILE_FILTER: Final[str] = 'NumPy Zipped Archive (*.npz)'
+
     def __init__(
         self,
         name: str,
         model_settings: PtychoPINNModelSettings,
-        training_settings: PtychoPINNTrainingSettings,
         inference_settings: PtychoPINNInferenceSettings,
+        training_settings: PtychoPINNTrainingSettings,
+        *in_developer_mode: bool,
     ) -> None:
         super().__init__()
         self._name = name
         self._model_settings = model_settings
-        self._training_settings = training_settings
         self._inference_settings = inference_settings
-
-        self._training_data_file_filters = ['NumPy Zipped Archive (*.npz)']
-        self._model_file_filters = ['Zipped Archive (*.zip)']
+        self._training_settings = training_settings
         self._model_dict: dict[str, Any] | None = None
+        self._in_developer_mode = in_developer_mode
 
         ptychopinnVersion = version('ptychopinn')
         logger.info(f'\tPtychoPINN {ptychopinnVersion}')
+
+    def _create_model_config(self, model_size: int) -> ModelConfig:
+        return ModelConfig(
+            N=model_size,
+            gridsize=self._model_settings.gridsize.getValue(),
+            n_filters_scale=self._model_settings.n_filters_scale.getValue(),
+            model_type=self._name.lower(),
+            amp_activation=self._model_settings.amp_activation.getValue(),
+            object_big=self._model_settings.object_big.getValue(),
+            probe_big=self._model_settings.probe_big.getValue(),
+            probe_mask=self._model_settings.probe_mask.getValue(),
+            pad_object=self._model_settings.pad_object.getValue(),
+            probe_scale=self._model_settings.probe_scale.getValue(),
+            gaussian_smoothing_sigma=self._model_settings.gaussian_smoothing_sigma.getValue(),
+        )
 
     @property
     def name(self) -> str:
         return self._name
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        solution_region_size = self._model_config['N']  # FIXME ptycho.params.cfg or settings
-        num_nearest_neighbors = 7
-        num_samples = 1
-
-        # xpp dataset
-        # "u" dataset
-        # ALS dataset
-        # normalize data in preprocessing step (see note in slack)
-        # coords in pixel units
-        # origin is CoM coords of solution regions; origin doesn't matter
-        # ptychodus stitches
-        # supervised parameters are subset of PINN
+        # TODO datasets for testing: xpp, "u", ALS
+        # TODO normalize data in preprocessing step (see note in slack)
+        # TODO ptychodus stitches
+        # TODO supervised parameters are subset of PINN
         #   - hide all except #filt
         #   - all losses out; positions provided/trainable, intensity
         #   - just batch size and n# epocs in training
-        # tool tips not working
+        # TODO tool tips not working
+        model_size = parameters.patterns.shape[-1]
 
-        # ModelConfig -> InferenceConfig
-        inferenceConfig = ptycho.config.config.InferenceConfig(modelConfig)  # FIXME where used?
+        if parameters.patterns.shape[-2] != model_size:
+            raise ValueError('Model requires square diffraction patterns!')
+
+        if self._model_dict is None:
+            raise ValueError('Model not loaded.')
+
+        model_config = self._create_model_config(model_size)
+        inference_config = InferenceConfig(
+            model=model_config,
+            model_path=Path(),  # not used
+            test_data_file=Path(),  # not used
+            debug=self._in_developer_mode,
+            output_dir=Path(),  # not used
+        )
 
         # Update global params with new-style config
-        ptycho.config.config.update_legacy_dict(
-            ptycho.params.cfg, inferenceConfig
-        )  # FIXME investigate
-
-        ptycho.probe.set_probe_guess(None, test_data.probeGuess)  # FIXME ???
+        update_legacy_dict(ptycho.params.cfg, inference_config)
 
         # Create RawData
-        test_data = create_raw_data(parameters, use_object_guess=False)
-        test_dataset = test_data.generate_grouped_data(
-            solution_region_size, K=num_nearest_neighbors, nsamples=num_samples
+        test_raw_data = create_raw_data(parameters, use_object_guess=False)
+        ptycho.probe.set_probe_guess(None, test_raw_data.probeGuess)
+
+        # Group overlapping scan positions
+        test_dataset = test_raw_data.generate_grouped_data(
+            model_config.N,
+            K=self._inference_settings.n_nearest_neighbors.getValue(),
+            nsamples=self._inference_settings.n_samples.getValue(),
         )
 
         # Create PtychoDataContainer
         test_data_container = ptycho.loader.load(
-            lambda: test_dataset, test_data.probeGuess, which=None, create_split=False
+            lambda: test_dataset, test_raw_data.probeGuess, which=None, create_split=False
         )
 
         # Perform reconstruction
-        model = self._model_dict['diffraction_to_obj']  # tf.keras.Model
-        obj_tensor_full = model.predict(
-            [test_data.X * model.params()['intensity_scale'], test_data.local_offsets]
+        diffraction_to_obj = self._model_dict['diffraction_to_obj']  # tf.keras.Model
+        obj_tensor_full = diffraction_to_obj.predict(
+            [
+                test_data_container.X * diffraction_to_obj.params()['intensity_scale'],
+                test_data_container.local_offsets,
+            ]
         )
 
         # Process the reconstructed image
         object_out_array = ptycho.tf_helper.reassemble_position(
-            obj_tensor_full, test_data.global_offsets, M=20
+            obj_tensor_full, test_raw_data.global_offsets, M=20
         )
 
         object_in = parameters.product.object_
@@ -158,74 +182,67 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
         return ReconstructOutput(product, 0)
 
-    def ingestTrainingData(self, parameters: ReconstructInput) -> None:
-        pass  # FIXME
-
-    def getOpenTrainingDataFileFilterList(self) -> Sequence[str]:
-        return self._training_data_file_filters
-
-    def getOpenTrainingDataFileFilter(self) -> str:
-        return self._training_data_file_filters[0]
-
-    def openTrainingData(self, filePath: Path) -> None:
-        pass  # FIXME
-
-    def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
-        return self._training_data_file_filters
-
-    def getSaveTrainingDataFileFilter(self) -> str:
-        return self._training_data_file_filters[0]
-
-    def saveTrainingData(self, filePath: Path) -> None:
-        pass  # FIXME
-
-    def train(self) -> TrainOutput:
-        from ptycho.workflows.components import (
-            setup_configuration,
-            load_data,
-            run_cdi_example,
-            save_outputs,
-        )
-        from ptycho.config.config import TrainingConfig, update_legacy_dict
-
-        config = setup_configuration(args, args.config)
-
-        # Update global params with new-style config at entry point
-        ptycho.config.config.update_legacy_dict(ptycho.params.cfg, config)
-
-        # ptycho_data, ptycho_data_train, obj = load_and_prepare_data(config['train_data_file_path'])
-        ptycho_data = load_data(str(config.train_data_file), n_images=512)
-
-        test_data = None
-
-        if config.test_data_file:
-            test_data = load_data(str(config.test_data_file))
-
-        recon_amp, recon_phase, results = run_cdi_example(ptycho_data, test_data, config)
-        ptycho.model_manager.save(str(config.output_dir))
-        save_outputs(recon_amp, recon_phase, results, str(config.output_dir))
-
-        return TrainOutput([], [], 0)  # FIXME
-
-    def clearTrainingData(self) -> None:
-        pass  # FIXME
-
-    def getOpenModelFileFilterList(self) -> Sequence[str]:
-        return self._model_file_filters
-
-    def getOpenModelFileFilter(self) -> str:
-        return self._model_file_filters[0]
+    def getModelFileFilter(self) -> str:
+        return self.MODEL_FILE_FILTER
 
     def openModel(self, filePath: Path) -> None:
+        # FIXME model path to/from settings
+        self._inference_settings.model_path.setValue(filePath)
         # ModelManager updates global config (ptycho.params.cfg) when loading
         self._model_dict = ptycho.model_manager.ModelManager.load_multiple_models(filePath)
-        # FIXME model path to/from settings
-
-    def getSaveModelFileFilterList(self) -> Sequence[str]:
-        return self._model_file_filters
-
-    def getSaveModelFileFilter(self) -> str:
-        return self._model_file_filters[0]
+        # FIXME update settings from ptycho.params.cfg after loading
 
     def saveModel(self, filePath: Path) -> None:
         ptycho.model_manager.save(filePath)
+
+    def getTrainingDataFileFilter(self) -> str:
+        return self.TRAINING_DATA_FILE_FILTER
+
+    def exportTrainingData(self, filePath: Path, parameters: ReconstructInput) -> None:
+        raw_data = create_raw_data(parameters, use_object_guess=False)
+        raw_data.to_file(filePath)
+
+    def train(self, dataPath: Path) -> TrainOutput:
+        test_raw_data = RawData.from_file(dataPath / 'test_data.npz')
+        train_raw_data = RawData.from_file(dataPath / 'train_data.npz')
+
+        model_size = train_raw_data.diff3d.shape[-1]
+
+        if train_raw_data.diff3d.shape[-2] != model_size:
+            raise ValueError('Model requires square diffraction patterns!')
+
+        model_config = self._create_model_config(model_size)
+        training_config = TrainingConfig(
+            model=model_config,
+            train_data_file=Path(),  # not used
+            test_data_file=None,  # not used
+            batch_size=self._training_settings.batch_size.getValue(),
+            nepochs=self._training_settings.nepochs.getValue(),
+            mae_weight=self._training_settings.mae_weight.getValue(),
+            nll_weight=self._training_settings.nll_weight.getValue(),
+            realspace_mae_weight=self._training_settings.realspace_mae_weight.getValue(),
+            realspace_weight=self._training_settings.realspace_weight.getValue(),
+            nphotons=self._training_settings.nphotons.getValue(),  # FIXME
+            positions_provided=self._training_settings.positions_provided.getValue(),
+            probe_trainable=self._training_settings.probe_trainable.getValue(),
+            intensity_scale_trainable=self._training_settings.intensity_scale_trainable.getValue(),
+            output_dir=Path(),  # not used
+        )
+
+        # Update global params with new-style config
+        update_legacy_dict(ptycho.params.cfg, training_config)
+
+        from ptycho.workflows.components import (
+            run_cdi_example,
+            save_outputs,
+        )
+
+        recon_amp, recon_phase, results = run_cdi_example(
+            train_raw_data, test_raw_data, training_config
+        )  # FIXME verify inputs
+        self.saveModel(dataPath / 'model.zip')  # FIXME update self._model_dict instead?
+        save_outputs(
+            recon_amp, recon_phase, results, str(training_config.output_dir)
+        )  # FIXME remove?
+
+        return TrainOutput([], [], 0)  # FIXME

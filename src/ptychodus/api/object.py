@@ -217,7 +217,7 @@ class Object:
 
 class ObjectInterpolator(ABC):
     @abstractmethod
-    def getPatch(self, patchCenter: ScanPoint, patchExtent: ImageExtent) -> Object:
+    def get_patch(self, patch_center: ScanPoint, patch_extent: ImageExtent) -> Object:
         """returns an interpolated patch from the object array"""
         pass
 

@@ -74,76 +74,11 @@ class ReconstructorPresenter(Observable, Observer):
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
         return isinstance(reconstructor, TrainableReconstructor)
 
-    def ingestTrainingData(self, inputProductIndex: int) -> None:
-        return self._reconstructorAPI.ingestTrainingData(inputProductIndex)
-
-    def getOpenTrainingDataFileFilterList(self) -> Sequence[str]:
+    def getModelFileFilter(self) -> str:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getOpenTrainingDataFileFilterList()
-        else:
-            logger.warning('Reconstructor is not trainable!')
-
-        return list()
-
-    def getOpenTrainingDataFileFilter(self) -> str:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getOpenTrainingDataFileFilter()
-        else:
-            logger.warning('Reconstructor is not trainable!')
-
-        return str()
-
-    def openTrainingData(self, filePath: Path) -> None:
-        return self._reconstructorAPI.openTrainingData(filePath)
-
-    def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getSaveTrainingDataFileFilterList()
-        else:
-            logger.warning('Reconstructor is not trainable!')
-
-        return list()
-
-    def getSaveTrainingDataFileFilter(self) -> str:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getSaveTrainingDataFileFilter()
-        else:
-            logger.warning('Reconstructor is not trainable!')
-
-        return str()
-
-    def saveTrainingData(self, filePath: Path) -> None:
-        return self._reconstructorAPI.saveTrainingData(filePath)
-
-    def train(self) -> TrainOutput:
-        return self._reconstructorAPI.train()
-
-    def clearTrainingData(self) -> None:
-        self._reconstructorAPI.clearTrainingData()
-
-    def getOpenModelFileFilterList(self) -> Sequence[str]:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getOpenModelFileFilterList()
-        else:
-            logger.warning('Reconstructor is not trainable!')
-
-        return list()
-
-    def getOpenModelFileFilter(self) -> str:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getOpenModelFileFilter()
+            return reconstructor.getModelFileFilter()
         else:
             logger.warning('Reconstructor is not trainable!')
 
@@ -152,28 +87,24 @@ class ReconstructorPresenter(Observable, Observer):
     def openModel(self, filePath: Path) -> None:
         return self._reconstructorAPI.openModel(filePath)
 
-    def getSaveModelFileFilterList(self) -> Sequence[str]:
+    def saveModel(self, filePath: Path) -> None:
+        return self._reconstructorAPI.saveModel(filePath)
+
+    def getTrainingDataFileFilter(self) -> str:
         reconstructor = self._reconstructorChooser.currentPlugin.strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getSaveModelFileFilterList()
-        else:
-            logger.warning('Reconstructor is not trainable!')
-
-        return list()
-
-    def getSaveModelFileFilter(self) -> str:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getSaveModelFileFilter()
+            return reconstructor.getTrainingDataFileFilter()
         else:
             logger.warning('Reconstructor is not trainable!')
 
         return str()
 
-    def saveModel(self, filePath: Path) -> None:
-        return self._reconstructorAPI.saveModel(filePath)
+    def exportTrainingData(self, filePath: Path, inputProductIndex: int) -> None:
+        return self._reconstructorAPI.exportTrainingData(filePath, inputProductIndex)
+
+    def train(self, dataPath: Path) -> TrainOutput:
+        return self._reconstructorAPI.train(dataPath)
 
     def update(self, observable: Observable) -> None:
         if observable is self._reconstructorChooser:

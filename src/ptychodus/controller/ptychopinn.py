@@ -161,18 +161,6 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
 
         training_group = 'Training'
         training_settings = self._model.training_settings
-        builder.addFileOpener(
-            training_settings.train_data_file,
-            'Train Data File:',
-            # FIXME parameters
-            group=training_group,
-        )
-        builder.addFileOpener(
-            training_settings.test_data_file,
-            'Test Data File:',
-            # FIXME parameters
-            group=training_group,
-        )
         builder.addViewController(
             PowerTwoSpinBoxParameterViewController(training_settings.batch_size),
             'Batch Size:',
@@ -209,14 +197,14 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
             tool_tip="Optimize the model's internal amplitude scaling factor during training. "
             'Typically left True.',
         )
-        builder.addDirectoryChooser(
-            training_settings.output_directory, 'Output Directory:', group=training_group
-        )
 
         inference_group = 'Inference'
         inference_settings = self._model.inference_settings
-        builder.addDirectoryChooser(
-            inference_settings.output_directory, 'Output Directory:', group=inference_group
+        builder.addSpinBox(
+            inference_settings.n_nearest_neighbors, 'Number of Neighbors:', group=inference_group
+        )
+        builder.addSpinBox(
+            inference_settings.n_samples, 'Number of Samples:', group=inference_group
         )
 
         return builder.buildWidget()

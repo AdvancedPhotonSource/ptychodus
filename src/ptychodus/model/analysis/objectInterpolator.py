@@ -7,12 +7,12 @@ class ObjectLinearInterpolator(ObjectInterpolator):
     def __init__(self, object_: Object) -> None:
         self._object = object_
 
-    def getPatch(self, patchCenter: ScanPoint, patchExtent: ImageExtent) -> Object:
+    def get_patch(self, patch_center: ScanPoint, patch_extent: ImageExtent) -> Object:
         geometry = self._object.getGeometry()
 
-        patchWidth = patchExtent.widthInPixels
+        patchWidth = patch_extent.widthInPixels
         patchRadiusXInMeters = geometry.pixelWidthInMeters * patchWidth / 2
-        patchMinimumXInMeters = patchCenter.positionXInMeters - patchRadiusXInMeters
+        patchMinimumXInMeters = patch_center.positionXInMeters - patchRadiusXInMeters
         ixBeginF, xi = divmod(
             patchMinimumXInMeters - geometry.minimumXInMeters,
             geometry.pixelWidthInMeters,
@@ -22,9 +22,9 @@ class ObjectLinearInterpolator(ObjectInterpolator):
         ixSlice0 = slice(ixBegin, ixEnd)
         ixSlice1 = slice(ixBegin + 1, ixEnd + 1)
 
-        patchHeight = patchExtent.heightInPixels
+        patchHeight = patch_extent.heightInPixels
         patchRadiusYInMeters = geometry.pixelHeightInMeters * patchHeight / 2
-        patchMinimumYInMeters = patchCenter.positionYInMeters - patchRadiusYInMeters
+        patchMinimumYInMeters = patch_center.positionYInMeters - patchRadiusYInMeters
         iyBeginF, eta = divmod(
             patchMinimumYInMeters - geometry.minimumYInMeters,
             geometry.pixelHeightInMeters,
