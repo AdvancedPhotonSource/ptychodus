@@ -66,6 +66,10 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     MODEL_FILE_FILTER: Final[str] = 'Zipped Archive (*.zip)'
     TRAINING_DATA_FILE_FILTER: Final[str] = 'NumPy Zipped Archive (*.npz)'
 
+    # FIXME datasets for testing: xpp, "u", ALS
+    # FIXME normalize data in preprocessing step (see note in slack)
+    # FIXME ptychodus stitches
+
     def __init__(
         self,
         name: str,
@@ -105,14 +109,6 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         return self._name
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        # TODO datasets for testing: xpp, "u", ALS
-        # TODO normalize data in preprocessing step (see note in slack)
-        # TODO ptychodus stitches
-        # TODO supervised parameters are subset of PINN
-        #   - hide all except #filt
-        #   - all losses out; positions provided/trainable, intensity
-        #   - just batch size and n# epocs in training
-        # TODO tool tips not working
         model_size = parameters.patterns.shape[-1]
 
         if parameters.patterns.shape[-2] != model_size:
@@ -232,17 +228,11 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         # Update global params with new-style config
         update_legacy_dict(ptycho.params.cfg, training_config)
 
-        from ptycho.workflows.components import (
-            run_cdi_example,
-            save_outputs,
-        )
+        from ptycho.workflows.components import run_cdi_example
 
         recon_amp, recon_phase, results = run_cdi_example(
             train_raw_data, test_raw_data, training_config
         )  # FIXME verify inputs
-        self.saveModel(dataPath / 'model.zip')  # FIXME update self._model_dict instead?
-        save_outputs(
-            recon_amp, recon_phase, results, str(training_config.output_dir)
-        )  # FIXME remove?
+        # FIXME update self._model_dict
 
         return TrainOutput([], [], 0)  # FIXME

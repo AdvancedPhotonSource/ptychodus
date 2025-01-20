@@ -59,6 +59,26 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._progressTimer.timeout.connect(self._updateProgress)
         self._progressTimer.start(5 * 1000)  # TODO customize (in milliseconds)
 
+        self._openModelAction = view.parametersView.reconstructorMenu.addAction('Open Model...')
+        self._openModelAction.triggered.connect(self._openModel)
+        self._saveModelAction = view.parametersView.reconstructorMenu.addAction('Save Model...')
+        self._saveModelAction.triggered.connect(self._saveModel)
+        self._modelSeparatorAction = view.parametersView.reconstructorMenu.addSeparator()
+
+        self._reconstructSplitAction = view.parametersView.reconstructorMenu.addAction(
+            'Reconstruct Odd/Even Split'
+        )
+        self._reconstructSplitAction.triggered.connect(self._reconstructSplit)
+        self._reconstructAction = view.parametersView.reconstructorMenu.addAction('Reconstruct')
+        self._reconstructAction.triggered.connect(self._reconstruct)
+
+        self._exportTrainingDataAction = view.parametersView.trainerMenu.addAction(
+            'Export Training Data...'
+        )
+        self._exportTrainingDataAction.triggered.connect(self._exportTrainingData)
+        self._trainAction = view.parametersView.trainerMenu.addAction('Train')
+        self._trainAction.triggered.connect(self._train)
+
     @classmethod
     def createInstance(
         cls,
@@ -92,30 +112,6 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
         view.parametersView.productComboBox.textActivated.connect(controller._redrawPlot)
         view.parametersView.productComboBox.setModel(productTableModel)
-
-        openModelAction = view.parametersView.modelMenu.addAction('Open...')
-        openModelAction.triggered.connect(controller._openModel)
-        saveModelAction = view.parametersView.modelMenu.addAction('Save...')
-        saveModelAction.triggered.connect(controller._saveModel)
-
-        openTrainingDataAction = view.parametersView.trainerMenu.addAction('Open Training Data...')
-        openTrainingDataAction.triggered.connect(controller._openTrainingData)
-        saveTrainingDataAction = view.parametersView.trainerMenu.addAction('Save Training Data...')
-        saveTrainingDataAction.triggered.connect(controller._saveTrainingData)
-        ingestTrainingDataAction = view.parametersView.trainerMenu.addAction('Ingest Training Data')
-        ingestTrainingDataAction.triggered.connect(controller._ingestTrainingData)
-        clearTrainingDataAction = view.parametersView.trainerMenu.addAction('Clear Training Data')
-        clearTrainingDataAction.triggered.connect(controller._clearTrainingData)
-        view.parametersView.trainerMenu.addSeparator()
-        trainAction = view.parametersView.trainerMenu.addAction('Train')
-        trainAction.triggered.connect(controller._train)
-
-        reconstructSplitAction = view.parametersView.reconstructorMenu.addAction(
-            'Reconstruct Odd/Even Split'
-        )
-        reconstructSplitAction.triggered.connect(controller._reconstructSplit)
-        reconstructAction = view.parametersView.reconstructorMenu.addAction('Reconstruct')
-        reconstructAction.triggered.connect(controller._reconstruct)
 
         view.progressDialog.setModal(True)
         view.progressDialog.setWindowModality(Qt.ApplicationModal)
@@ -180,11 +176,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._view.progressDialog.show()
 
     def _openModel(self) -> None:
+        nameFilter = self._presenter.getModelFileFilter()
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view,
-            'Open Model',
-            nameFilters=self._presenter.getOpenModelFileFilterList(),
-            selectedNameFilter=self._presenter.getOpenModelFileFilter(),
+            self._view, 'Open Model', nameFilters=[nameFilter], selectedNameFilter=nameFilter
         )
 
         if filePath:
@@ -195,11 +189,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
                 ExceptionDialog.showException('Model Reader', err)
 
     def _saveModel(self) -> None:
+        nameFilter = self._presenter.getModelFileFilter()
         filePath, _ = self._fileDialogFactory.getSaveFilePath(
-            self._view,
-            'Save Model',
-            nameFilters=self._presenter.getSaveModelFileFilterList(),
-            selectedNameFilter=self._presenter.getSaveModelFileFilter(),
+            self._view, 'Save Model', nameFilters=[nameFilter], selectedNameFilter=nameFilter
         )
 
         if filePath:
@@ -209,61 +201,38 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
                 logger.exception(err)
                 ExceptionDialog.showException('Model Writer', err)
 
-    def _openTrainingData(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view,
-            'Open Training Data',
-            nameFilters=self._presenter.getOpenTrainingDataFileFilterList(),
-            selectedNameFilter=self._presenter.getOpenTrainingDataFileFilter(),
-        )
-
-        if filePath:
-            try:
-                self._presenter.openTrainingData(filePath)
-            except Exception as err:
-                logger.exception(err)
-                ExceptionDialog.showException('Training Data Reader', err)
-
-    def _saveTrainingData(self) -> None:
-        filePath, _ = self._fileDialogFactory.getSaveFilePath(
-            self._view,
-            'Save Training Data',
-            nameFilters=self._presenter.getSaveTrainingDataFileFilterList(),
-            selectedNameFilter=self._presenter.getSaveTrainingDataFileFilter(),
-        )
-
-        if filePath:
-            try:
-                self._presenter.saveTrainingData(filePath)
-            except Exception as err:
-                logger.exception(err)
-                ExceptionDialog.showException('Training Data Writer', err)
-
-    def _ingestTrainingData(self) -> None:
+    def _exportTrainingData(self) -> None:
         inputProductIndex = self._view.parametersView.productComboBox.currentIndex()
 
         if inputProductIndex < 0:
             return
 
-        try:
-            self._presenter.ingestTrainingData(inputProductIndex)
-        except Exception as err:
-            logger.exception(err)
-            ExceptionDialog.showException('Ingester', err)
+        nameFilter = self._presenter.getTrainingDataFileFilter()
+        filePath, _ = self._fileDialogFactory.getSaveFilePath(
+            self._view,
+            'Export Training Data',
+            nameFilters=[nameFilter],
+            selectedNameFilter=nameFilter,
+        )
 
-    def _clearTrainingData(self) -> None:
-        try:
-            self._presenter.clearTrainingData()
-        except Exception as err:
-            logger.exception(err)
-            ExceptionDialog.showException('Clear', err)
+        if filePath:
+            try:
+                self._presenter.exportTrainingData(filePath, inputProductIndex)
+            except Exception as err:
+                logger.exception(err)
+                ExceptionDialog.showException('Training Data Writer', err)
 
     def _train(self) -> None:
-        try:
-            self._presenter.train()
-        except Exception as err:
-            logger.exception(err)
-            ExceptionDialog.showException('Trainer', err)
+        dataPath = self._fileDialogFactory.getExistingDirectoryPath(
+            self._view, 'Choose Training Data Directory'
+        )
+
+        if dataPath:
+            try:
+                self._presenter.train(dataPath)
+            except Exception as err:
+                logger.exception(err)
+                ExceptionDialog.showException('Trainer', err)
 
     def _redrawPlot(self) -> None:
         productIndex = self._view.parametersView.productComboBox.currentIndex()
@@ -292,7 +261,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         )
 
         isTrainable = self._presenter.isTrainable
-        self._view.parametersView.modelButton.setVisible(isTrainable)
+        self._openModelAction.setVisible(isTrainable)
+        self._saveModelAction.setVisible(isTrainable)
+        self._modelSeparatorAction.setVisible(isTrainable)
         self._view.parametersView.trainerButton.setVisible(isTrainable)
 
         self._redrawPlot()
