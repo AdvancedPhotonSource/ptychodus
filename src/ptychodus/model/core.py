@@ -79,7 +79,6 @@ def configureLogger(isDeveloperModeEnabled: bool) -> None:
         level=logging.DEBUG if isDeveloperModeEnabled else logging.INFO,
     )
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
-    logging.getLogger('tike').setLevel(logging.WARNING)
 
     logger.info(f'Ptychodus {version("ptychodus")}')
     logger.info(f'NumPy {version("numpy")}')
@@ -290,20 +289,25 @@ class ModelCore:
     def batchModeExecute(
         self,
         action: str,
-        inputFilePath: Path,
-        outputFilePath: Path,
+        inputPath: Path,
+        outputPath: Path,
         *,
         productFileType: str = 'NPZ',
         fluorescenceInputFilePath: Path | None = None,
         fluorescenceOutputFilePath: Path | None = None,
     ) -> int:
         # TODO add enum for actions; implement using workflow API
+        if action.lower() == 'train':
+            output = self._reconstructorCore.reconstructorAPI.train(inputPath)
+            self._reconstructorCore.reconstructorAPI.saveModel(outputPath)
+            return output.result
+
         inputProductIndex = self._productCore.productAPI.openProduct(
-            inputFilePath, fileType=productFileType
+            inputPath, fileType=productFileType
         )
 
         if inputProductIndex < 0:
-            logger.error(f'Failed to open product "{inputFilePath}"!')
+            logger.error(f'Failed to open product "{inputPath}"!')
             return -1
 
         if action.lower() == 'reconstruct':
@@ -315,7 +319,7 @@ class ModelCore:
             logger.info('Reconstruction complete.')
 
             self._productCore.productAPI.saveProduct(
-                outputProductIndex, outputFilePath, fileType=productFileType
+                outputProductIndex, outputPath, fileType=productFileType
             )
 
             if fluorescenceInputFilePath is not None and fluorescenceOutputFilePath is not None:
@@ -324,11 +328,10 @@ class ModelCore:
                     fluorescenceInputFilePath,
                     fluorescenceOutputFilePath,
                 )
-
-        elif action.lower() == 'train':
-            self._reconstructorCore.reconstructorAPI.ingestTrainingData(inputProductIndex)
-            _ = self._reconstructorCore.reconstructorAPI.train()
-            self._reconstructorCore.reconstructorAPI.saveModel(outputFilePath)
+        elif action.lower() == 'prepare_training_data':
+            self._reconstructorCore.reconstructorAPI.exportTrainingData(
+                outputPath, inputProductIndex
+            )
         else:
             logger.error(f'Unknown batch mode action "{action}"!')
             return -1

@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from importlib.metadata import version
 from pathlib import Path
 from typing import Final
@@ -18,7 +17,6 @@ from ptychodus.api.reconstructor import (
 )
 
 from ..analysis import ObjectLinearInterpolator, ObjectStitcher
-from .buffers import ObjectPatchCircularBuffer, PatternCircularBuffer
 from .model import PtychoNNModelProvider
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 
@@ -40,8 +38,6 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         self._modelSettings = modelSettings
         self._trainingSettings = trainingSettings
         self._modelProvider = modelProvider
-        self._patternBuffer = PatternCircularBuffer.createZeroSized()
-        self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
 
         ptychonnVersion = version('ptychonn')
         logger.info(f'\tPtychoNN {ptychonnVersion}')
@@ -114,58 +110,49 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
         return ReconstructOutput(product, 0)
 
-    def ingestTrainingData(self, parameters: ReconstructInput) -> None:
+    def getModelFileFilter(self) -> str:
+        return self.MODEL_FILE_FILTER
+
+    def openModel(self, filePath: Path) -> None:
+        self._modelProvider.openModel(filePath)
+
+    def saveModel(self, filePath: Path) -> None:
+        self._modelProvider.saveModel(filePath)
+
+    def getTrainingDataFileFilter(self) -> str:
+        return self.TRAINING_DATA_FILE_FILTER
+
+    def exportTrainingData(self, filePath: Path, parameters: ReconstructInput) -> None:
         interpolator = ObjectLinearInterpolator(parameters.product.object_)
-        probeExtent = ImageExtent(
+        num_channels = self._modelProvider.getNumberOfChannels()
+        probe_extent = ImageExtent(
             widthInPixels=parameters.product.probe.widthInPixels,
             heightInPixels=parameters.product.probe.heightInPixels,
         )
+        patches = numpy.zeros(
+            (len(parameters.product.scan), num_channels, *probe_extent.shape), dtype=numpy.float32
+        )
 
-        if self._patternBuffer.isZeroSized:
-            patternExtent = ImageExtent(
-                widthInPixels=parameters.patterns.shape[-1],
-                heightInPixels=parameters.patterns.shape[-2],
-            )
-            maximumSize = max(1, self._trainingSettings.maximumTrainingDatasetSize.getValue())
-            self._patternBuffer = PatternCircularBuffer(patternExtent, maximumSize)
-            self._objectPatchBuffer = ObjectPatchCircularBuffer(
-                patternExtent, self._modelProvider.getNumberOfChannels(), maximumSize
-            )
+        for index, scan_point in enumerate(parameters.product.scan):
+            patch = interpolator.get_patch(scan_point, probe_extent).getArray()
+            patches[index, 0, :, :] = numpy.angle(patch)
 
-        for scanPoint in parameters.product.scan:
-            objectPatch = interpolator.getPatch(scanPoint, probeExtent)
-            self._objectPatchBuffer.append(objectPatch.getArray())
+            if num_channels > 1:
+                patches[index, 1, :, :] = numpy.absolute(patch)
 
-        for pattern in parameters.patterns.astype(numpy.float32):
-            self._patternBuffer.append(pattern)
-
-    def getOpenTrainingDataFileFilterList(self) -> Sequence[str]:
-        return [self.getOpenTrainingDataFileFilter()]
-
-    def getOpenTrainingDataFileFilter(self) -> str:
-        return self.TRAINING_DATA_FILE_FILTER
-
-    def openTrainingData(self, filePath: Path) -> None:
-        logger.debug(f'Reading "{filePath}" as "NPZ"')
-        trainingData = numpy.load(filePath)
-        self._patternBuffer.setBuffer(trainingData[self.PATTERNS_KW])
-        self._objectPatchBuffer.setBuffer(trainingData[self.PATCHES_KW])
-
-    def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
-        return [self.getSaveTrainingDataFileFilter()]
-
-    def getSaveTrainingDataFileFilter(self) -> str:
-        return self.TRAINING_DATA_FILE_FILTER
-
-    def saveTrainingData(self, filePath: Path) -> None:
         logger.debug(f'Writing "{filePath}" as "NPZ"')
         trainingData = {
-            self.PATTERNS_KW: self._patternBuffer.getBuffer(),
-            self.PATCHES_KW: self._objectPatchBuffer.getBuffer(),
+            self.PATTERNS_KW: parameters.patterns.astype(numpy.float32),
+            self.PATCHES_KW: patches,
         }
         numpy.savez_compressed(filePath, **trainingData)
 
-    def train(self) -> TrainOutput:
+    def train(self, dataPath: Path) -> TrainOutput:
+        logger.debug(f'Reading "{dataPath}" as "NPZ"')
+        trainingData = numpy.load(dataPath)
+
+        # FIXME phase centering?
+
         model = self._modelProvider.getModel()
         logger.debug('Training...')
         trainingSetFractionalSize = (
@@ -175,8 +162,8 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             model=model,
             batch_size=self._modelSettings.batchSize.getValue(),
             out_dir=None,
-            X_train=self._patternBuffer.getBuffer(),
-            Y_train=self._objectPatchBuffer.getBuffer(),
+            X_train=trainingData[self.PATTERNS_KW],
+            Y_train=trainingData[self.PATCHES_KW],
             epochs=self._trainingSettings.trainingEpochs.getValue(),
             training_fraction=float(trainingSetFractionalSize),
             log_frequency=self._trainingSettings.statusIntervalInEpochs.getValue(),
@@ -202,25 +189,3 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             validationLoss=validationLoss,
             result=0,
         )
-
-    def clearTrainingData(self) -> None:
-        self._patternBuffer = PatternCircularBuffer.createZeroSized()
-        self._objectPatchBuffer = ObjectPatchCircularBuffer.createZeroSized()
-
-    def getOpenModelFileFilterList(self) -> Sequence[str]:
-        return [self.getOpenModelFileFilter()]
-
-    def getOpenModelFileFilter(self) -> str:
-        return self.MODEL_FILE_FILTER
-
-    def openModel(self, filePath: Path) -> None:
-        self._modelProvider.openModel(filePath)
-
-    def getSaveModelFileFilterList(self) -> Sequence[str]:
-        return [self.getSaveModelFileFilter()]
-
-    def getSaveModelFileFilter(self) -> str:
-        return self.MODEL_FILE_FILTER
-
-    def saveModel(self, filePath: Path) -> None:
-        self._modelProvider.saveModel(filePath)

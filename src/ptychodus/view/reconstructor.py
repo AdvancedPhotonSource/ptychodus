@@ -26,23 +26,18 @@ class ReconstructorParametersView(QGroupBox):
         self.algorithmComboBox = QComboBox()
         self.productComboBox = QComboBox()
 
-        self.modelMenu = QMenu()
-        self.modelButton = QPushButton('Model')
-        self.modelButton.setMenu(self.modelMenu)
+        self.reconstructorMenu = QMenu()
+        self.reconstructorButton = QPushButton('Reconstructor')
+        self.reconstructorButton.setMenu(self.reconstructorMenu)
 
         self.trainerMenu = QMenu()
         self.trainerButton = QPushButton('Trainer')
         self.trainerButton.setMenu(self.trainerMenu)
 
-        self.reconstructorMenu = QMenu()
-        self.reconstructorButton = QPushButton('Reconstructor')
-        self.reconstructorButton.setMenu(self.reconstructorMenu)
-
         actionLayout = QHBoxLayout()
         actionLayout.setContentsMargins(0, 0, 0, 0)
-        actionLayout.addWidget(self.modelButton)
-        actionLayout.addWidget(self.trainerButton)
         actionLayout.addWidget(self.reconstructorButton)
+        actionLayout.addWidget(self.trainerButton)
 
         layout = QFormLayout()
         layout.addRow('Algorithm:', self.algorithmComboBox)

@@ -69,13 +69,13 @@ class RandomObjectBuilder(ObjectBuilder):
 class UserObjectBuilder(ObjectBuilder):
     def __init__(self, object: Object, settings: ObjectSettings) -> None:
         """Create an object from an existing object with a potentially
-        different number of slices. 
-        
+        different number of slices.
+
         If the new object is supposed to be a multislice object with a
         different number of slices than the existing object, the object is
-        created as 
+        created as
         `abs(o) ** (1 / nSlices) * exp(i * unwrapPhase(o) / nSlices)`.
-        Otherwise, the object is copied as is. 
+        Otherwise, the object is copied as is.
 
         Parameters
         ----------
@@ -86,7 +86,7 @@ class UserObjectBuilder(ObjectBuilder):
         """
         super().__init__(settings, 'user')
         self._existingObject = object
-        
+
     def copy(self) -> UserObjectBuilder:
         builder = UserObjectBuilder(self._existingObject, self._settings)
 
@@ -94,13 +94,10 @@ class UserObjectBuilder(ObjectBuilder):
             builder.parameters()[key].setValue(value.getValue())
 
         return builder
-    
-    def build(
-        self,
-        layerDistanceInMeters: Sequence[float]
-    ) -> Object:
+
+    def build(self, layerDistanceInMeters: Sequence[float]) -> Object:
         geometry = self._existingObject.getGeometry()
-        
+
         exitingObjectArr = self._existingObject.getArray()
         nSlices = len(layerDistanceInMeters) + 1
         if nSlices > 1 and nSlices != exitingObjectArr.shape[0]:

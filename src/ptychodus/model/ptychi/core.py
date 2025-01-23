@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from importlib.metadata import version
 import logging
 
 from ptychodus.api.reconstructor import (
@@ -58,6 +59,9 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
                 for reconstructor in ('DM', 'PIE', 'ePIE', 'rPIE', 'LSQML', 'Autodiff'):
                     self.reconstructor_list.append(NullReconstructor(reconstructor))
         else:
+            ptychiVersion = version('ptychi')
+            logger.info(f'Pty-Chi {ptychiVersion}')
+
             self.reconstructor_list.append(
                 DMReconstructor(
                     self.reconstructorSettings,

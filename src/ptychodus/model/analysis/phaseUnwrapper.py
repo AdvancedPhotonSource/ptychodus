@@ -11,9 +11,7 @@ class PhaseUnwrapper:
         image_grad_method: Literal[
             'fourier_shift', 'fourier_differentiation', 'nearest'
         ] = 'fourier_differentiation',
-        image_integration_method: Literal[
-            'fourier', 'discrete', 'deconvolution'
-        ] = 'fourier',
+        image_integration_method: Literal['fourier', 'discrete', 'deconvolution'] = 'fourier',
         weight_map: Optional[NDArray] = None,
         eps: float = 1e-9,
     ) -> None:
@@ -76,7 +74,9 @@ class PhaseUnwrapper:
             img = vignett(img, margin=10, sigma=2.5)
 
         gy, gx = get_phase_gradient(
-            img, fourier_shift_step=self.fourier_shift_step, image_grad_method=self.image_grad_method
+            img,
+            fourier_shift_step=self.fourier_shift_step,
+            image_grad_method=self.image_grad_method,
         )
 
         if self.image_integration_method == 'discrete' and any(np.array(padding) > 0):
@@ -106,7 +106,7 @@ def vignett(img: NDArray, margin: int = 20, sigma: float = 1.0) -> NDArray:
     generated and convolved with a Gaussian kernel of size
     `margin` and standard deviation `sigma`. The blurred mask is cropped and
     multiplied to the near-edge regions of the image.
-    
+
     Parameters
     ----------
     img : Tensor
@@ -120,20 +120,23 @@ def vignett(img: NDArray, margin: int = 20, sigma: float = 1.0) -> NDArray:
     for i_dim in range(img.ndim):
         if img.shape[i_dim] <= 2 * margin:
             continue
-            
-        mask_shape = [img.shape[i] for i in range(i_dim)] + [2 * margin] + \
-                     [img.shape[i] for i in range(i_dim + 1, img.ndim)]
+
+        mask_shape = (
+            [img.shape[i] for i in range(i_dim)]
+            + [2 * margin]
+            + [img.shape[i] for i in range(i_dim + 1, img.ndim)]
+        )
         mask = np.zeros(mask_shape)
         mask_slicer = [slice(None)] * i_dim + [slice(margin, None)]
         mask[tuple(mask_slicer)] = 1.0
-        
+
         gauss_win = signal.windows.gaussian(margin // 2, std=sigma)
         gauss_win = gauss_win / np.sum(gauss_win)
         mask = ndimage.convolve1d(mask, gauss_win, axis=i_dim, mode='constant')
         mask_final_slicer = [slice(None)] * i_dim + [slice(len(gauss_win), len(gauss_win) + margin)]
         mask = mask[*mask_final_slicer]
         mask = np.where(mask < 1e-3, 0, mask)
-        
+
         slicer = tuple([slice(None)] * i_dim + [slice(0, margin)])
         img[slicer] = img[slicer] * mask
 
@@ -143,7 +146,7 @@ def vignett(img: NDArray, margin: int = 20, sigma: float = 1.0) -> NDArray:
 
 
 def nearest_neighbor_gradient(
-    image: NDArray, direction: Literal["forward", "backward"], dim: Tuple[int, ...] = (0, 1)
+    image: NDArray, direction: Literal['forward', 'backward'], dim: Tuple[int, ...] = (0, 1)
 ) -> Tuple[NDArray, NDArray]:
     """
     Calculate the nearest neighbor gradient of a 2D image.
@@ -162,16 +165,16 @@ def nearest_neighbor_gradient(
     tuple of NDArray
         a tuple of 2 images with the gradient in y and x directions.
     """
-    if not hasattr(dim, "__len__"):
+    if not hasattr(dim, '__len__'):
         dim = (dim,)
     grad_x = None
     grad_y = None
-    if direction == "forward":
+    if direction == 'forward':
         if 1 in dim:
             grad_x = np.concatenate([image[:, 1:], image[:, -1:]], axis=1) - image
         if 0 in dim:
             grad_y = np.concatenate([image[1:, :], image[-1:, :]], axis=0) - image
-    elif direction == "backward":
+    elif direction == 'backward':
         if 1 in dim:
             grad_x = image - np.concatenate([image[:, :1], image[:, :-1]], axis=1)
         if 0 in dim:
@@ -198,7 +201,7 @@ def gaussian_gradient(image: NDArray, sigma: float = 1.0, kernel_size=5) -> Tupl
         A tuple of 2 images with the gradient in y and x directions.
     """
     r = np.arange(kernel_size) - (kernel_size - 1) / 2.0
-    kernel = -r / (np.sqrt(2 * np.pi) * sigma ** 3) * np.exp(-(r ** 2) / (2 * sigma ** 2))
+    kernel = -r / (np.sqrt(2 * np.pi) * sigma**3) * np.exp(-(r**2) / (2 * sigma**2))
     grad_y = ndimage.convolve(image, kernel.reshape(-1, 1), mode='nearest')
     grad_x = ndimage.convolve(image, kernel.reshape(1, -1), mode='nearest')
 
@@ -207,7 +210,7 @@ def gaussian_gradient(image: NDArray, sigma: float = 1.0, kernel_size=5) -> Tupl
     for i, g in enumerate(grads):
         m = np.logical_and(np.abs(grad_y) < 1e-6, np.abs(grad_y) != 0)
         if np.count_nonzero(m) > 0:
-            print("Gradient magnitudes between 0 and 1e-6 are set to 0.")
+            print('Gradient magnitudes between 0 and 1e-6 are set to 0.')
             g = g * np.logical_not(m)
             grads[i] = g
     grad_y, grad_x = grads
@@ -218,11 +221,11 @@ def fourier_gradient(image: NDArray) -> Tuple[NDArray, NDArray]:
     """Calculate gradient using NumPy FFT operations"""
     u = np.fft.fftfreq(image.shape[0])
     v = np.fft.fftfreq(image.shape[1])
-    u, v = np.meshgrid(u, v, indexing="ij")
-    
+    u, v = np.meshgrid(u, v, indexing='ij')
+
     grad_y = np.fft.ifft(np.fft.fft(image, axis=-2) * (2j * np.pi * u), axis=-2)
     grad_x = np.fft.ifft(np.fft.fft(image, axis=-1) * (2j * np.pi * v), axis=-1)
-    
+
     return grad_y, grad_x
 
 
@@ -230,8 +233,8 @@ def get_phase_gradient(
     img: NDArray,
     fourier_shift_step: float = 0,
     image_grad_method: Literal[
-        "fourier_shift", "fourier_differentiation", "nearest"
-    ] = "fourier_shift",
+        'fourier_shift', 'fourier_differentiation', 'nearest'
+    ] = 'fourier_shift',
     eps: float = 1e-6,
 ) -> Tuple[NDArray, NDArray]:
     """
@@ -261,10 +264,10 @@ def get_phase_gradient(
     Tuple[NDArray, NDArray]
         A tuple of 2 images with the gradient in y and x directions.
     """
-    if fourier_shift_step <= 0 and image_grad_method == "fourier_shift":
-        raise ValueError("Step must be positive.")
+    if fourier_shift_step <= 0 and image_grad_method == 'fourier_shift':
+        raise ValueError('Step must be positive.')
 
-    if image_grad_method == "fourier_differentiation":
+    if image_grad_method == 'fourier_differentiation':
         gy, gx = fourier_gradient(img)
         gy = np.imag(np.conj(img) * gy)
         gx = np.imag(np.conj(img) * gx)
@@ -277,16 +280,16 @@ def get_phase_gradient(
 
         sy1 = np.array([[-fourier_shift_step, 0]]).repeat(img.shape[0], axis=0)
         sy2 = np.array([[fourier_shift_step, 0]]).repeat(img.shape[0], axis=0)
-        if image_grad_method == "fourier_shift":
+        if image_grad_method == 'fourier_shift':
             # If the image contains zero-valued pixels, Fourier shift can result in small
             # non-zero values that dangles around 0. This can cause the phase
             # of the shifted image to dangle between pi and -pi. In that case, use
             # `finite_diff_method="nearest" instead`, or use `step=1`.
             complex_prod = fourier_shift(img, sy1) * fourier_shift(img, sy2).conj()
-        elif image_grad_method == "nearest":
+        elif image_grad_method == 'nearest':
             complex_prod = img * np.concatenate([img[:, :1, :], img[:, :-1, :]], axis=1).conj()
         else:
-            raise ValueError(f"Unknown finite-difference method: {image_grad_method}")
+            raise ValueError(f'Unknown finite-difference method: {image_grad_method}')
         complex_prod = np.where(
             np.abs(complex_prod) < np.abs(complex_prod).max() * 1e-6, 0, complex_prod
         )
@@ -295,9 +298,9 @@ def get_phase_gradient(
 
         sx1 = np.array([[0, -fourier_shift_step]]).repeat(img.shape[0], axis=0)
         sx2 = np.array([[0, fourier_shift_step]]).repeat(img.shape[0], axis=0)
-        if image_grad_method == "fourier_shift":
+        if image_grad_method == 'fourier_shift':
             complex_prod = fourier_shift(img, sx1) * fourier_shift(img, sx2).conj()
-        elif image_grad_method == "nearest":
+        elif image_grad_method == 'nearest':
             complex_prod = img * np.concatenate([img[:, :, :1], img[:, :, :-1]], axis=2).conj()
         complex_prod = np.where(
             np.abs(complex_prod) < np.abs(complex_prod).max() * 1e-6, 0, complex_prod
@@ -347,9 +350,9 @@ def integrate_image_2d_deconvolution(
     Integrate an image with the gradient in y and x directions by deconvolving
     the differentiation kernel, whose transfer function is assumed to be a
     ramp function.
-    
-    Adapted from Tripathi, A., McNulty, I., Munson, T., & Wild, S. M. (2016). 
-    Single-view phase retrieval of an extended sample by exploiting edge detection 
+
+    Adapted from Tripathi, A., McNulty, I., Munson, T., & Wild, S. M. (2016).
+    Single-view phase retrieval of an extended sample by exploiting edge detection
     and sparsity. Optics Express, 24(21), 24719–24738. doi:10.1364/OE.24.024719
 
     Parameters
@@ -369,7 +372,7 @@ def integrate_image_2d_deconvolution(
         The integrated image.
     """
     u, v = np.fft.fftfreq(grad_x.shape[0]), np.fft.fftfreq(grad_x.shape[1])
-    u, v = np.meshgrid(u, v, indexing="ij")
+    u, v = np.meshgrid(u, v, indexing='ij')
     if tf_y is None or tf_x is None:
         tf_y = 2j * np.pi * u
         tf_x = 2j * np.pi * v
@@ -405,7 +408,9 @@ def integrate_image_2d(grad_y: NDArray, grad_x: NDArray, bc_center: float = 0) -
     return int_img
 
 
-def fourier_shift(images: NDArray, shifts: NDArray, strictly_preserve_zeros: bool = False) -> NDArray:
+def fourier_shift(
+    images: NDArray, shifts: NDArray, strictly_preserve_zeros: bool = False
+) -> NDArray:
     """
     Apply Fourier shift to a batch of images.
 
@@ -433,7 +438,7 @@ def fourier_shift(images: NDArray, shifts: NDArray, strictly_preserve_zeros: boo
         zero_mask_shifted = fourier_shift(zero_mask, shifts, strictly_preserve_zeros=False)
     ft_images = np.fft.fft2(images)
     freq_y, freq_x = np.meshgrid(
-        np.fft.fftfreq(images.shape[-2]), np.fft.fftfreq(images.shape[-1]), indexing="ij"
+        np.fft.fftfreq(images.shape[-2]), np.fft.fftfreq(images.shape[-1]), indexing='ij'
     )
     freq_x = freq_x.repeat(images.shape[0], axis=0)
     freq_y = freq_y.repeat(images.shape[0], axis=0)

@@ -27,9 +27,6 @@ class PtychoNNTrainingSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('PtychoNNTraining')
         self._settingsGroup.addObserver(self)
 
-        self.maximumTrainingDatasetSize = self._settingsGroup.createIntegerParameter(
-            'MaximumTrainingDatasetSize', 100000
-        )
         self.validationSetFractionalSize = self._settingsGroup.createRealParameter(
             'ValidationSetFractionalSize', 0.1
         )

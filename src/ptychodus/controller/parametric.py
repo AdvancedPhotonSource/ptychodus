@@ -1,6 +1,8 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from decimal import Decimal
+from pathlib import Path
 from typing import Final
 import logging
 
@@ -14,7 +16,9 @@ from PyQt5.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QGroupBox,
+    QHBoxLayout,
     QLineEdit,
+    QPushButton,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -25,11 +29,13 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import (
     BooleanParameter,
     IntegerParameter,
+    PathParameter,
     RealParameter,
     StringParameter,
 )
 
 from ..view.widgets import AngleWidget, DecimalLineEdit, DecimalSlider, LengthWidget
+from .data import FileDialogFactory
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +118,7 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
         maximum = self._parameter.getMaximum()
 
         if minimum is None:
-            logger.error('Minimum not provided!')
+            raise ValueError('Minimum not provided!')
         else:
             self._widget.blockSignals(True)
 
@@ -184,6 +190,157 @@ class LineEditParameterViewController(ParameterViewController, Observer):
 
     def _syncModelToView(self) -> None:
         self._widget.setText(self._parameter.getValue())
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self._syncModelToView()
+
+
+class PathParameterViewController(ParameterViewController, Observer):
+    def __init__(
+        self,
+        parameter: PathParameter,
+        fileDialogFactory: FileDialogFactory,
+        *,
+        caption: str,
+        nameFilters: Sequence[str] | None,
+        mimeTypeFilters: Sequence[str] | None,
+        selectedNameFilter: str | None,
+        tool_tip: str,
+    ) -> None:
+        super().__init__()
+        self._parameter = parameter
+        self._fileDialogFactory = fileDialogFactory
+        self._caption = caption
+        self._nameFilters = nameFilters
+        self._mimeTypeFilters = mimeTypeFilters
+        self._selectedNameFilter = selectedNameFilter
+        self._lineEdit = QLineEdit()
+        self._browseButton = QPushButton('Browse')
+        self._widget = QWidget()
+
+        if tool_tip:
+            self._lineEdit.setToolTip(tool_tip)
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._lineEdit)
+        layout.addWidget(self._browseButton)
+        self._widget.setLayout(layout)
+
+        self._syncModelToView()
+        parameter.addObserver(self)
+        self._lineEdit.editingFinished.connect(self._syncPathToModel)
+
+    @classmethod
+    def createFileOpener(
+        cls,
+        parameter: PathParameter,
+        fileDialogFactory: FileDialogFactory,
+        *,
+        caption: str = 'Open File',
+        nameFilters: Sequence[str] | None = None,
+        mimeTypeFilters: Sequence[str] | None = None,
+        selectedNameFilter: str | None = None,
+        tool_tip: str = '',
+    ) -> PathParameterViewController:
+        viewController = cls(
+            parameter,
+            fileDialogFactory,
+            caption=caption,
+            nameFilters=nameFilters,
+            mimeTypeFilters=mimeTypeFilters,
+            selectedNameFilter=selectedNameFilter,
+            tool_tip=tool_tip,
+        )
+        viewController._browseButton.clicked.connect(viewController._chooseFileToOpen)
+        return viewController
+
+    @classmethod
+    def createFileSaver(
+        cls,
+        parameter: PathParameter,
+        fileDialogFactory: FileDialogFactory,
+        *,
+        caption: str = 'Save File',
+        nameFilters: Sequence[str] | None = None,
+        mimeTypeFilters: Sequence[str] | None = None,
+        selectedNameFilter: str | None = None,
+        tool_tip: str = '',
+    ) -> PathParameterViewController:
+        viewController = cls(
+            parameter,
+            fileDialogFactory,
+            caption=caption,
+            nameFilters=nameFilters,
+            mimeTypeFilters=mimeTypeFilters,
+            selectedNameFilter=selectedNameFilter,
+            tool_tip=tool_tip,
+        )
+        viewController._browseButton.clicked.connect(viewController._chooseFileToSave)
+        return viewController
+
+    @classmethod
+    def createDirectoryChooser(
+        cls,
+        parameter: PathParameter,
+        fileDialogFactory: FileDialogFactory,
+        *,
+        caption: str = 'Choose Directory',
+        tool_tip: str = '',
+    ) -> PathParameterViewController:
+        viewController = cls(
+            parameter,
+            fileDialogFactory,
+            caption=caption,
+            nameFilters=None,
+            mimeTypeFilters=None,
+            selectedNameFilter=None,
+            tool_tip=tool_tip,
+        )
+        viewController._browseButton.clicked.connect(viewController._chooseDirectory)
+        return viewController
+
+    def getWidget(self) -> QWidget:
+        return self._widget
+
+    def _syncPathToModel(self) -> None:
+        path = Path(self._lineEdit.text())
+        self._parameter.setValue(path)
+
+    def _chooseFileToOpen(self) -> None:
+        path, _ = self._fileDialogFactory.getOpenFilePath(
+            self._widget,
+            self._caption,
+            self._nameFilters,
+            self._mimeTypeFilters,
+            self._selectedNameFilter,
+        )
+
+        if path:
+            self._parameter.setValue(path)
+
+    def _chooseFileToSave(self) -> None:
+        path, _ = self._fileDialogFactory.getSaveFilePath(
+            self._widget,
+            self._caption,
+            self._nameFilters,
+            self._mimeTypeFilters,
+            self._selectedNameFilter,
+        )
+
+        if path:
+            self._parameter.setValue(path)
+
+    def _chooseDirectory(self) -> None:
+        path = self._fileDialogFactory.getExistingDirectoryPath(self._widget, self._caption)
+
+        if path:
+            self._parameter.setValue(path)
+
+    def _syncModelToView(self) -> None:
+        path = self._parameter.getValue()
+        self._lineEdit.setText(str(path))
 
     def update(self, observable: Observable) -> None:
         if observable is self._parameter:
@@ -289,7 +446,7 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
         maximum = self._parameter.getMaximum()
 
         if minimum is None or maximum is None:
-            logger.error('Range not provided!')
+            raise ValueError('Range not provided!')
         else:
             value = Decimal(repr(self._parameter.getValue()))
             range_ = Interval[Decimal](Decimal(repr(minimum)), Decimal(repr(maximum)))
@@ -330,10 +487,13 @@ class LengthWidgetParameterViewController(ParameterViewController, Observer):
 
 
 class AngleWidgetParameterViewController(ParameterViewController, Observer):
-    def __init__(self, parameter: RealParameter) -> None:
+    def __init__(self, parameter: RealParameter, tool_tip: str = '') -> None:
         super().__init__()
         self._parameter = parameter
         self._widget = AngleWidget.createInstance()
+
+        if tool_tip:
+            self._widget.setToolTip(tool_tip)
 
         self._syncModelToView()
         self._widget.angleChanged.connect(self._syncViewToModel)
@@ -385,7 +545,8 @@ class ParameterDialog(QDialog):
 
 
 class ParameterViewBuilder:
-    def __init__(self) -> None:
+    def __init__(self, fileDialogFactory: FileDialogFactory | None = None) -> None:
+        self._fileDialogFactory = fileDialogFactory
         self._viewControllersTop: list[ParameterViewController] = list()
         self._viewControllers: dict[tuple[str, str], ParameterViewController] = dict()
         self._viewControllersBottom: list[ParameterViewController] = list()
@@ -398,8 +559,85 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = CheckBoxParameterViewController(parameter, '')
-        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+        viewController = CheckBoxParameterViewController(parameter, '', tool_tip=tool_tip)
+        self.addViewController(viewController, label, group=group)
+
+    def addComboBox(
+        self,
+        parameter: StringParameter,
+        items: Iterable[str],
+        label: str,
+        *,
+        tool_tip: str = '',
+        group: str = '',
+    ) -> None:
+        viewController = ComboBoxParameterViewController(parameter, items, tool_tip=tool_tip)
+        self.addViewController(viewController, label, group=group)
+
+    def addFileOpener(
+        self,
+        parameter: PathParameter,
+        label: str,
+        *,
+        caption: str = 'Open File',
+        nameFilters: Sequence[str] | None = None,
+        mimeTypeFilters: Sequence[str] | None = None,
+        selectedNameFilter: str | None = None,
+        tool_tip: str = '',
+        group: str = '',
+    ) -> None:
+        if self._fileDialogFactory is None:
+            raise ValueError('Cannot add file chooser without FileDialogFactory!')
+        else:
+            viewController = PathParameterViewController.createFileOpener(
+                parameter,
+                self._fileDialogFactory,
+                caption=caption,
+                nameFilters=nameFilters,
+                mimeTypeFilters=mimeTypeFilters,
+                selectedNameFilter=selectedNameFilter,
+                tool_tip=tool_tip,
+            )
+            self.addViewController(viewController, label, group=group)
+
+    def addFileSaver(
+        self,
+        parameter: PathParameter,
+        label: str,
+        *,
+        caption: str = 'Save File',
+        nameFilters: Sequence[str] | None = None,
+        mimeTypeFilters: Sequence[str] | None = None,
+        selectedNameFilter: str | None = None,
+        tool_tip: str = '',
+        group: str = '',
+    ) -> None:
+        if self._fileDialogFactory is None:
+            raise ValueError('Cannot add file chooser without FileDialogFactory!')
+        else:
+            viewController = PathParameterViewController.createFileSaver(
+                parameter,
+                self._fileDialogFactory,
+                caption=caption,
+                nameFilters=nameFilters,
+                mimeTypeFilters=mimeTypeFilters,
+                selectedNameFilter=selectedNameFilter,
+                tool_tip=tool_tip,
+            )
+            self.addViewController(viewController, label, group=group)
+
+    def addDirectoryChooser(
+        self, parameter: PathParameter, label: str, *, tool_tip: str = '', group: str = ''
+    ) -> None:
+        if self._fileDialogFactory is None:
+            raise ValueError('Cannot add directory chooser without FileDialogFactory!')
+        else:
+            viewController = PathParameterViewController.createDirectoryChooser(
+                parameter,
+                self._fileDialogFactory,
+                tool_tip=tool_tip,
+            )
+            self.addViewController(viewController, label, group=group)
 
     def addSpinBox(
         self,
@@ -409,8 +647,19 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = SpinBoxParameterViewController(parameter)
-        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+        viewController = SpinBoxParameterViewController(parameter, tool_tip=tool_tip)
+        self.addViewController(viewController, label, group=group)
+
+    def addIntegerLineEdit(
+        self,
+        parameter: IntegerParameter,
+        label: str,
+        *,
+        tool_tip: str = '',
+        group: str = '',
+    ) -> None:
+        viewController = IntegerLineEditParameterViewController(parameter, tool_tip=tool_tip)
+        self.addViewController(viewController, label, group=group)
 
     def addDecimalLineEdit(
         self,
@@ -420,8 +669,8 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = DecimalLineEditParameterViewController(parameter)
-        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+        viewController = DecimalLineEditParameterViewController(parameter, tool_tip=tool_tip)
+        self.addViewController(viewController, label, group=group)
 
     def addDecimalSlider(
         self,
@@ -431,8 +680,8 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = DecimalSliderParameterViewController(parameter)
-        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+        viewController = DecimalSliderParameterViewController(parameter, tool_tip=tool_tip)
+        self.addViewController(viewController, label, group=group)
 
     def addLengthWidget(
         self,
@@ -442,8 +691,8 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = LengthWidgetParameterViewController(parameter)
-        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+        viewController = LengthWidgetParameterViewController(parameter, tool_tip=tool_tip)
+        self.addViewController(viewController, label, group=group)
 
     def addAngleWidget(
         self,
@@ -453,8 +702,8 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = AngleWidgetParameterViewController(parameter)
-        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+        viewController = AngleWidgetParameterViewController(parameter, tool_tip=tool_tip)
+        self.addViewController(viewController, label, group=group)
 
     def addViewControllerToTop(self, viewController: ParameterViewController) -> None:
         self._viewControllersTop.append(viewController)
@@ -464,7 +713,6 @@ class ParameterViewBuilder:
         viewController: ParameterViewController,
         label: str,
         *,
-        tool_tip: str = '',
         group: str = '',
     ) -> None:
         self._viewControllers[group, label] = viewController

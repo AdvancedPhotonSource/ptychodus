@@ -107,13 +107,13 @@ class ControllerCore:
             view.objectView,
             self._fileDialogFactory,
         )
-        self._reconstructorController = ReconstructorController.createInstance(
+        self._reconstructorController = ReconstructorController(
             model.reconstructorPresenter,
             model.productRepository,
             view.reconstructorView,
             view.reconstructorPlotView,
-            self._fileDialogFactory,
             self._productController.tableModel,
+            self._fileDialogFactory,
             [
                 self._ptyChiViewControllerFactory,
                 self._ptychonnViewControllerFactory,

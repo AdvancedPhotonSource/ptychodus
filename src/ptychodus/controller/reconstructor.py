@@ -4,7 +4,7 @@ from collections.abc import Iterable, Sequence
 import logging
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QTimer
-from PyQt5.QtWidgets import QLabel, QWidget
+from PyQt5.QtWidgets import QActionGroup, QLabel, QWidget
 
 from ptychodus.api.observer import Observable, Observer
 
@@ -43,6 +43,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         productRepository: ProductRepository,
         view: ReconstructorView,
         plotView: ReconstructorPlotView,
+        productTableModel: QAbstractItemModel,
         fileDialogFactory: FileDialogFactory,
         viewControllerFactoryList: Iterable[ReconstructorViewControllerFactory],
     ) -> None:
@@ -55,75 +56,55 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._viewControllerFactoryDict: dict[str, ReconstructorViewControllerFactory] = {
             vcf.backendName: vcf for vcf in viewControllerFactoryList
         }
-        self._progressTimer = QTimer()
-        self._progressTimer.timeout.connect(self._updateProgress)
-        self._progressTimer.start(5 * 1000)  # TODO customize (in milliseconds)
-
-    @classmethod
-    def createInstance(
-        cls,
-        presenter: ReconstructorPresenter,
-        productRepository: ProductRepository,
-        view: ReconstructorView,
-        plotView: ReconstructorPlotView,
-        fileDialogFactory: FileDialogFactory,
-        productTableModel: QAbstractItemModel,
-        viewControllerFactoryList: list[ReconstructorViewControllerFactory],
-    ) -> ReconstructorController:
-        controller = cls(
-            presenter,
-            productRepository,
-            view,
-            plotView,
-            fileDialogFactory,
-            viewControllerFactoryList,
-        )
-        presenter.addObserver(controller)
-        productRepository.addObserver(controller)
-        view.progressDialog.textEdit.setReadOnly(True)
 
         for name in presenter.getReconstructorList():
-            controller._addReconstructor(name)
+            self._addReconstructor(name)
 
         view.parametersView.algorithmComboBox.textActivated.connect(presenter.setReconstructor)
         view.parametersView.algorithmComboBox.currentIndexChanged.connect(
             view.stackedWidget.setCurrentIndex
         )
 
-        view.parametersView.productComboBox.textActivated.connect(controller._redrawPlot)
+        view.parametersView.productComboBox.textActivated.connect(self._redrawPlot)
         view.parametersView.productComboBox.setModel(productTableModel)
 
-        openModelAction = view.parametersView.modelMenu.addAction('Open...')
-        openModelAction.triggered.connect(controller._openModel)
-        saveModelAction = view.parametersView.modelMenu.addAction('Save...')
-        saveModelAction.triggered.connect(controller._saveModel)
-
-        openTrainingDataAction = view.parametersView.trainerMenu.addAction('Open Training Data...')
-        openTrainingDataAction.triggered.connect(controller._openTrainingData)
-        saveTrainingDataAction = view.parametersView.trainerMenu.addAction('Save Training Data...')
-        saveTrainingDataAction.triggered.connect(controller._saveTrainingData)
-        ingestTrainingDataAction = view.parametersView.trainerMenu.addAction('Ingest Training Data')
-        ingestTrainingDataAction.triggered.connect(controller._ingestTrainingData)
-        clearTrainingDataAction = view.parametersView.trainerMenu.addAction('Clear Training Data')
-        clearTrainingDataAction.triggered.connect(controller._clearTrainingData)
-        view.parametersView.trainerMenu.addSeparator()
-        trainAction = view.parametersView.trainerMenu.addAction('Train')
-        trainAction.triggered.connect(controller._train)
-
-        reconstructSplitAction = view.parametersView.reconstructorMenu.addAction(
-            'Reconstruct Odd/Even Split'
-        )
-        reconstructSplitAction.triggered.connect(controller._reconstructSplit)
-        reconstructAction = view.parametersView.reconstructorMenu.addAction('Reconstruct')
-        reconstructAction.triggered.connect(controller._reconstruct)
+        self._progressTimer = QTimer()
+        self._progressTimer.timeout.connect(self._updateProgress)
+        self._progressTimer.start(5 * 1000)  # TODO customize (in milliseconds)
 
         view.progressDialog.setModal(True)
         view.progressDialog.setWindowModality(Qt.ApplicationModal)
         view.progressDialog.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.CustomizeWindowHint)
+        view.progressDialog.textEdit.setReadOnly(True)
 
-        controller._syncAlgorithmToView()
+        openModelAction = view.parametersView.reconstructorMenu.addAction('Open Model...')
+        openModelAction.triggered.connect(self._openModel)
+        saveModelAction = view.parametersView.reconstructorMenu.addAction('Save Model...')
+        saveModelAction.triggered.connect(self._saveModel)
 
-        return controller
+        self._modelActionGroup = QActionGroup(view.parametersView.reconstructorMenu)
+        self._modelActionGroup.setExclusive(False)
+        self._modelActionGroup.addAction(openModelAction)
+        self._modelActionGroup.addAction(saveModelAction)
+        self._modelActionGroup.addAction(view.parametersView.reconstructorMenu.addSeparator())
+
+        reconstructSplitAction = view.parametersView.reconstructorMenu.addAction(
+            'Reconstruct Odd/Even Split'
+        )
+        reconstructSplitAction.triggered.connect(self._reconstructSplit)
+        reconstructAction = view.parametersView.reconstructorMenu.addAction('Reconstruct')
+        reconstructAction.triggered.connect(self._reconstruct)
+
+        exportTrainingDataAction = view.parametersView.trainerMenu.addAction(
+            'Export Training Data...'
+        )
+        exportTrainingDataAction.triggered.connect(self._exportTrainingData)
+        trainAction = view.parametersView.trainerMenu.addAction('Train')
+        trainAction.triggered.connect(self._train)
+
+        presenter.addObserver(self)
+        productRepository.addObserver(self)
+        self._syncModelToView()
 
     def _updateProgress(self) -> None:
         isReconstructing = self._presenter.isReconstructing
@@ -180,11 +161,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._view.progressDialog.show()
 
     def _openModel(self) -> None:
+        nameFilter = self._presenter.getModelFileFilter()
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view,
-            'Open Model',
-            nameFilters=self._presenter.getOpenModelFileFilterList(),
-            selectedNameFilter=self._presenter.getOpenModelFileFilter(),
+            self._view, 'Open Model', nameFilters=[nameFilter], selectedNameFilter=nameFilter
         )
 
         if filePath:
@@ -195,11 +174,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
                 ExceptionDialog.showException('Model Reader', err)
 
     def _saveModel(self) -> None:
+        nameFilter = self._presenter.getModelFileFilter()
         filePath, _ = self._fileDialogFactory.getSaveFilePath(
-            self._view,
-            'Save Model',
-            nameFilters=self._presenter.getSaveModelFileFilterList(),
-            selectedNameFilter=self._presenter.getSaveModelFileFilter(),
+            self._view, 'Save Model', nameFilters=[nameFilter], selectedNameFilter=nameFilter
         )
 
         if filePath:
@@ -209,61 +186,38 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
                 logger.exception(err)
                 ExceptionDialog.showException('Model Writer', err)
 
-    def _openTrainingData(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view,
-            'Open Training Data',
-            nameFilters=self._presenter.getOpenTrainingDataFileFilterList(),
-            selectedNameFilter=self._presenter.getOpenTrainingDataFileFilter(),
-        )
-
-        if filePath:
-            try:
-                self._presenter.openTrainingData(filePath)
-            except Exception as err:
-                logger.exception(err)
-                ExceptionDialog.showException('Training Data Reader', err)
-
-    def _saveTrainingData(self) -> None:
-        filePath, _ = self._fileDialogFactory.getSaveFilePath(
-            self._view,
-            'Save Training Data',
-            nameFilters=self._presenter.getSaveTrainingDataFileFilterList(),
-            selectedNameFilter=self._presenter.getSaveTrainingDataFileFilter(),
-        )
-
-        if filePath:
-            try:
-                self._presenter.saveTrainingData(filePath)
-            except Exception as err:
-                logger.exception(err)
-                ExceptionDialog.showException('Training Data Writer', err)
-
-    def _ingestTrainingData(self) -> None:
+    def _exportTrainingData(self) -> None:
         inputProductIndex = self._view.parametersView.productComboBox.currentIndex()
 
         if inputProductIndex < 0:
             return
 
-        try:
-            self._presenter.ingestTrainingData(inputProductIndex)
-        except Exception as err:
-            logger.exception(err)
-            ExceptionDialog.showException('Ingester', err)
+        nameFilter = self._presenter.getTrainingDataFileFilter()
+        filePath, _ = self._fileDialogFactory.getSaveFilePath(
+            self._view,
+            'Export Training Data',
+            nameFilters=[nameFilter],
+            selectedNameFilter=nameFilter,
+        )
 
-    def _clearTrainingData(self) -> None:
-        try:
-            self._presenter.clearTrainingData()
-        except Exception as err:
-            logger.exception(err)
-            ExceptionDialog.showException('Clear', err)
+        if filePath:
+            try:
+                self._presenter.exportTrainingData(filePath, inputProductIndex)
+            except Exception as err:
+                logger.exception(err)
+                ExceptionDialog.showException('Training Data Writer', err)
 
     def _train(self) -> None:
-        try:
-            self._presenter.train()
-        except Exception as err:
-            logger.exception(err)
-            ExceptionDialog.showException('Trainer', err)
+        dataPath = self._fileDialogFactory.getExistingDirectoryPath(
+            self._view, 'Choose Training Data Directory'
+        )
+
+        if dataPath:
+            try:
+                self._presenter.train(dataPath)
+            except Exception as err:
+                logger.exception(err)
+                ExceptionDialog.showException('Trainer', err)
 
     def _redrawPlot(self) -> None:
         productIndex = self._view.parametersView.productComboBox.currentIndex()
@@ -286,13 +240,13 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         ax.plot(item.getCosts(), '.-', label='Cost', linewidth=1.5)
         self._plotView.figureCanvas.draw()
 
-    def _syncAlgorithmToView(self) -> None:
+    def _syncModelToView(self) -> None:
         self._view.parametersView.algorithmComboBox.setCurrentText(
             self._presenter.getReconstructor()
         )
 
         isTrainable = self._presenter.isTrainable
-        self._view.parametersView.modelButton.setVisible(isTrainable)
+        self._modelActionGroup.setVisible(isTrainable)
         self._view.parametersView.trainerButton.setVisible(isTrainable)
 
         self._redrawPlot()
@@ -323,4 +277,4 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncAlgorithmToView()
+            self._syncModelToView()
