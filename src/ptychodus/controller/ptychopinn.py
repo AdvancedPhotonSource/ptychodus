@@ -214,4 +214,4 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
                 'Typically left True.',
             )
 
-        return builder.buildWidget()  # FIXME tooltips not working?
+        return builder.buildWidget()

@@ -487,10 +487,13 @@ class LengthWidgetParameterViewController(ParameterViewController, Observer):
 
 
 class AngleWidgetParameterViewController(ParameterViewController, Observer):
-    def __init__(self, parameter: RealParameter) -> None:
+    def __init__(self, parameter: RealParameter, tool_tip: str = '') -> None:
         super().__init__()
         self._parameter = parameter
         self._widget = AngleWidget.createInstance()
+
+        if tool_tip:
+            self._widget.setToolTip(tool_tip)
 
         self._syncModelToView()
         self._widget.angleChanged.connect(self._syncViewToModel)
@@ -556,8 +559,8 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = CheckBoxParameterViewController(parameter, '')
-        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+        viewController = CheckBoxParameterViewController(parameter, '', tool_tip=tool_tip)
+        self.addViewController(viewController, label, group=group)
 
     def addComboBox(
         self,
@@ -568,8 +571,8 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = ComboBoxParameterViewController(parameter, items)
-        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+        viewController = ComboBoxParameterViewController(parameter, items, tool_tip=tool_tip)
+        self.addViewController(viewController, label, group=group)
 
     def addFileOpener(
         self,
@@ -593,8 +596,9 @@ class ParameterViewBuilder:
                 nameFilters=nameFilters,
                 mimeTypeFilters=mimeTypeFilters,
                 selectedNameFilter=selectedNameFilter,
+                tool_tip=tool_tip,
             )
-            self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+            self.addViewController(viewController, label, group=group)
 
     def addFileSaver(
         self,
@@ -618,8 +622,9 @@ class ParameterViewBuilder:
                 nameFilters=nameFilters,
                 mimeTypeFilters=mimeTypeFilters,
                 selectedNameFilter=selectedNameFilter,
+                tool_tip=tool_tip,
             )
-            self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+            self.addViewController(viewController, label, group=group)
 
     def addDirectoryChooser(
         self, parameter: PathParameter, label: str, *, tool_tip: str = '', group: str = ''
@@ -628,9 +633,11 @@ class ParameterViewBuilder:
             raise ValueError('Cannot add directory chooser without FileDialogFactory!')
         else:
             viewController = PathParameterViewController.createDirectoryChooser(
-                parameter, self._fileDialogFactory
+                parameter,
+                self._fileDialogFactory,
+                tool_tip=tool_tip,
             )
-            self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+            self.addViewController(viewController, label, group=group)
 
     def addSpinBox(
         self,
@@ -640,8 +647,8 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = SpinBoxParameterViewController(parameter)
-        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+        viewController = SpinBoxParameterViewController(parameter, tool_tip=tool_tip)
+        self.addViewController(viewController, label, group=group)
 
     def addIntegerLineEdit(
         self,
@@ -651,8 +658,8 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = IntegerLineEditParameterViewController(parameter)
-        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+        viewController = IntegerLineEditParameterViewController(parameter, tool_tip=tool_tip)
+        self.addViewController(viewController, label, group=group)
 
     def addDecimalLineEdit(
         self,
@@ -662,8 +669,8 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = DecimalLineEditParameterViewController(parameter)
-        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+        viewController = DecimalLineEditParameterViewController(parameter, tool_tip=tool_tip)
+        self.addViewController(viewController, label, group=group)
 
     def addDecimalSlider(
         self,
@@ -673,8 +680,8 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = DecimalSliderParameterViewController(parameter)
-        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+        viewController = DecimalSliderParameterViewController(parameter, tool_tip=tool_tip)
+        self.addViewController(viewController, label, group=group)
 
     def addLengthWidget(
         self,
@@ -684,8 +691,8 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = LengthWidgetParameterViewController(parameter)
-        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+        viewController = LengthWidgetParameterViewController(parameter, tool_tip=tool_tip)
+        self.addViewController(viewController, label, group=group)
 
     def addAngleWidget(
         self,
@@ -695,8 +702,8 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = AngleWidgetParameterViewController(parameter)
-        self.addViewController(viewController, label, tool_tip=tool_tip, group=group)
+        viewController = AngleWidgetParameterViewController(parameter, tool_tip=tool_tip)
+        self.addViewController(viewController, label, group=group)
 
     def addViewControllerToTop(self, viewController: ParameterViewController) -> None:
         self._viewControllersTop.append(viewController)
@@ -706,7 +713,6 @@ class ParameterViewBuilder:
         viewController: ParameterViewController,
         label: str,
         *,
-        tool_tip: str = '',
         group: str = '',
     ) -> None:
         self._viewControllers[group, label] = viewController

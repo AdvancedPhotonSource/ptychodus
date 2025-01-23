@@ -4,7 +4,7 @@ from collections.abc import Iterable, Sequence
 import logging
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QTimer
-from PyQt5.QtWidgets import QLabel, QWidget
+from PyQt5.QtWidgets import QActionGroup, QLabel, QWidget
 
 from ptychodus.api.observer import Observable, Observer
 
@@ -43,6 +43,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         productRepository: ProductRepository,
         view: ReconstructorView,
         plotView: ReconstructorPlotView,
+        productTableModel: QAbstractItemModel,
         fileDialogFactory: FileDialogFactory,
         viewControllerFactoryList: Iterable[ReconstructorViewControllerFactory],
     ) -> None:
@@ -55,71 +56,55 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._viewControllerFactoryDict: dict[str, ReconstructorViewControllerFactory] = {
             vcf.backendName: vcf for vcf in viewControllerFactoryList
         }
-        self._progressTimer = QTimer()
-        self._progressTimer.timeout.connect(self._updateProgress)
-        self._progressTimer.start(5 * 1000)  # TODO customize (in milliseconds)
-
-        self._openModelAction = view.parametersView.reconstructorMenu.addAction('Open Model...')
-        self._openModelAction.triggered.connect(self._openModel)
-        self._saveModelAction = view.parametersView.reconstructorMenu.addAction('Save Model...')
-        self._saveModelAction.triggered.connect(self._saveModel)
-        self._modelSeparatorAction = view.parametersView.reconstructorMenu.addSeparator()
-
-        self._reconstructSplitAction = view.parametersView.reconstructorMenu.addAction(
-            'Reconstruct Odd/Even Split'
-        )
-        self._reconstructSplitAction.triggered.connect(self._reconstructSplit)
-        self._reconstructAction = view.parametersView.reconstructorMenu.addAction('Reconstruct')
-        self._reconstructAction.triggered.connect(self._reconstruct)
-
-        self._exportTrainingDataAction = view.parametersView.trainerMenu.addAction(
-            'Export Training Data...'
-        )
-        self._exportTrainingDataAction.triggered.connect(self._exportTrainingData)
-        self._trainAction = view.parametersView.trainerMenu.addAction('Train')
-        self._trainAction.triggered.connect(self._train)
-
-    @classmethod
-    def createInstance(
-        cls,
-        presenter: ReconstructorPresenter,
-        productRepository: ProductRepository,
-        view: ReconstructorView,
-        plotView: ReconstructorPlotView,
-        fileDialogFactory: FileDialogFactory,
-        productTableModel: QAbstractItemModel,
-        viewControllerFactoryList: list[ReconstructorViewControllerFactory],
-    ) -> ReconstructorController:
-        controller = cls(
-            presenter,
-            productRepository,
-            view,
-            plotView,
-            fileDialogFactory,
-            viewControllerFactoryList,
-        )
-        presenter.addObserver(controller)
-        productRepository.addObserver(controller)
-        view.progressDialog.textEdit.setReadOnly(True)
 
         for name in presenter.getReconstructorList():
-            controller._addReconstructor(name)
+            self._addReconstructor(name)
 
         view.parametersView.algorithmComboBox.textActivated.connect(presenter.setReconstructor)
         view.parametersView.algorithmComboBox.currentIndexChanged.connect(
             view.stackedWidget.setCurrentIndex
         )
 
-        view.parametersView.productComboBox.textActivated.connect(controller._redrawPlot)
+        view.parametersView.productComboBox.textActivated.connect(self._redrawPlot)
         view.parametersView.productComboBox.setModel(productTableModel)
+
+        self._progressTimer = QTimer()
+        self._progressTimer.timeout.connect(self._updateProgress)
+        self._progressTimer.start(5 * 1000)  # TODO customize (in milliseconds)
 
         view.progressDialog.setModal(True)
         view.progressDialog.setWindowModality(Qt.ApplicationModal)
         view.progressDialog.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.CustomizeWindowHint)
+        view.progressDialog.textEdit.setReadOnly(True)
 
-        controller._syncAlgorithmToView()
+        openModelAction = view.parametersView.reconstructorMenu.addAction('Open Model...')
+        openModelAction.triggered.connect(self._openModel)
+        saveModelAction = view.parametersView.reconstructorMenu.addAction('Save Model...')
+        saveModelAction.triggered.connect(self._saveModel)
 
-        return controller
+        self._modelActionGroup = QActionGroup(view.parametersView.reconstructorMenu)
+        self._modelActionGroup.setExclusive(False)
+        self._modelActionGroup.addAction(openModelAction)
+        self._modelActionGroup.addAction(saveModelAction)
+        self._modelActionGroup.addAction(view.parametersView.reconstructorMenu.addSeparator())
+
+        reconstructSplitAction = view.parametersView.reconstructorMenu.addAction(
+            'Reconstruct Odd/Even Split'
+        )
+        reconstructSplitAction.triggered.connect(self._reconstructSplit)
+        reconstructAction = view.parametersView.reconstructorMenu.addAction('Reconstruct')
+        reconstructAction.triggered.connect(self._reconstruct)
+
+        exportTrainingDataAction = view.parametersView.trainerMenu.addAction(
+            'Export Training Data...'
+        )
+        exportTrainingDataAction.triggered.connect(self._exportTrainingData)
+        trainAction = view.parametersView.trainerMenu.addAction('Train')
+        trainAction.triggered.connect(self._train)
+
+        presenter.addObserver(self)
+        productRepository.addObserver(self)
+        self._syncModelToView()
 
     def _updateProgress(self) -> None:
         isReconstructing = self._presenter.isReconstructing
@@ -255,15 +240,13 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         ax.plot(item.getCosts(), '.-', label='Cost', linewidth=1.5)
         self._plotView.figureCanvas.draw()
 
-    def _syncAlgorithmToView(self) -> None:
+    def _syncModelToView(self) -> None:
         self._view.parametersView.algorithmComboBox.setCurrentText(
             self._presenter.getReconstructor()
         )
 
         isTrainable = self._presenter.isTrainable
-        self._openModelAction.setVisible(isTrainable)
-        self._saveModelAction.setVisible(isTrainable)
-        self._modelSeparatorAction.setVisible(isTrainable)
+        self._modelActionGroup.setVisible(isTrainable)
         self._view.parametersView.trainerButton.setVisible(isTrainable)
 
         self._redrawPlot()
@@ -294,4 +277,4 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncAlgorithmToView()
+            self._syncModelToView()
