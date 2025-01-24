@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import QAction
 
 from ..model import ModelCore
 from ..view import ViewCore
+from .agent import AgentChatController, AgentController
 from .automation import AutomationController
 from .data import FileDialogFactory
 from .image import ImageController
@@ -136,6 +137,10 @@ class ControllerCore:
             view.automationView,
             self._fileDialogFactory,
         )
+        self._agentController = AgentController(
+            model.argoSettings, model.agentPresenter, view.agentView
+        )
+        self._agentChatController = AgentChatController(model.agentPresenter, view.agentChatView)
 
         self._refreshDataTimer = QTimer()
         self._refreshDataTimer.timeout.connect(model.refreshActiveDataset)

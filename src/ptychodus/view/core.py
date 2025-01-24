@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import (
 )
 
 from . import resources  # noqa
+from .agent import AgentView, AgentChatView
 from .automation import AutomationView
 from .image import ImageView
 from .patterns import PatternsView
@@ -88,6 +89,13 @@ class ViewCore(QMainWindow):
         self.automationView = AutomationView.createInstance()
         self.automationWidget = QWidget()
 
+        self.agentAction = self.navigationToolBar.addAction(
+            QIcon(':/icons/sparkles'),
+            'Agent',
+        )
+        self.agentView = AgentView()
+        self.agentChatView = AgentChatView()
+
     @classmethod
     def createInstance(
         cls, isDeveloperModeEnabled: bool, parent: QWidget | None = None
@@ -118,6 +126,7 @@ class ViewCore(QMainWindow):
         view.parametersWidget.addWidget(view.reconstructorView)
         view.parametersWidget.addWidget(view.workflowParametersView)
         view.parametersWidget.addWidget(view.automationView)
+        view.parametersWidget.addWidget(view.agentView)
         view.parametersWidget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         view.splitter.addWidget(view.parametersWidget)
 
@@ -131,6 +140,7 @@ class ViewCore(QMainWindow):
         view.contentsWidget.addWidget(view.reconstructorPlotView)
         view.contentsWidget.addWidget(view.workflowTableView)
         view.contentsWidget.addWidget(view.automationWidget)
+        view.contentsWidget.addWidget(view.agentChatView)
         view.contentsWidget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         view.splitter.addWidget(view.contentsWidget)
 

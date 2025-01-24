@@ -21,6 +21,7 @@ from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.workflow import WorkflowAPI
 
+from .agent import AgentCore, AgentPresenter, ArgoSettings
 from .analysis import (
     AnalysisCore,
     ExposureAnalyzer,
@@ -174,6 +175,7 @@ class ModelCore:
             self._workflowCore.workflowAPI,
             self._pluginRegistry.fileBasedWorkflows,
         )
+        self._agentCore = AgentCore(self.settingsRegistry)
 
         if settingsFile:
             self.settingsRegistry.openSettings(settingsFile)
@@ -421,3 +423,11 @@ class ModelCore:
     @property
     def automationProcessingPresenter(self) -> AutomationProcessingPresenter:
         return self._automationCore.processingPresenter
+
+    @property
+    def agentPresenter(self) -> AgentPresenter:
+        return self._agentCore.presenter
+
+    @property
+    def argoSettings(self) -> ArgoSettings:
+        return self._agentCore.argoSettings
