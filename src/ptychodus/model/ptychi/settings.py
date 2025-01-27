@@ -19,6 +19,9 @@ class PtyChiReconstructorSettings(Observable, Observer):
         self.useLowMemoryForwardModel = self._settingsGroup.createBooleanParameter(
             'UseLowMemoryForwardModel', False
         )
+        self.saveDataOnDevice = self._settingsGroup.createBooleanParameter(
+            'SaveDataOnDevice', False
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:
@@ -418,6 +421,14 @@ class PtyChiLSQMLSettings(Observable, Observer):  # FIXME to view
         )
         self.momentumAccelerationGain = self._settingsGroup.createRealParameter(
             'MomentumAccelerationGain', 0.0, minimum=0.0
+        )
+        self.useMomentumAccelerationGradientMixingFactor = (
+            self._settingsGroup.createBooleanParameter(
+                'UseMomentumAccelerationGradientMixingFactor', False
+            )
+        )
+        self.momentumAccelerationGradientMixingFactor = self._settingsGroup.createRealParameter(
+            'MomentumAccelerationGradientMixingFactor', 1.0
         )
 
         self.objectOptimalStepSizeScaler = self._settingsGroup.createRealParameter(
