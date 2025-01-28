@@ -364,6 +364,22 @@ class PtyChiOPRSettings(Observable, Observer):
             self.notifyObservers()
 
 
+class PtyChiAutodiffSettings(Observable, Observer):  # FIXME to view
+    def __init__(self, registry: SettingsRegistry) -> None:
+        super().__init__()
+        self._settingsGroup = registry.createGroup('PtyChiAutodiff')
+        self._settingsGroup.addObserver(self)
+
+        self.lossFunction = self._settingsGroup.createStringParameter('LossFunction', 'MSE_SQRT')
+        self.forwardModelClass = self._settingsGroup.createStringParameter(
+            'ForwardModelClass', 'PLANAR_PTYCHOGRAPHY'
+        )
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settingsGroup:
+            self.notifyObservers()
+
+
 class PtyChiDMSettings(Observable, Observer):  # FIXME to view
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
@@ -376,24 +392,6 @@ class PtyChiDMSettings(Observable, Observer):  # FIXME to view
         self.chunkLength = self._settingsGroup.createIntegerParameter('ChunkLength', 1, minimum=1)
         self.objectAmplitudeClampLimit = self._settingsGroup.createRealParameter(
             'ObjectAmplitudeClampLimit', 1000, minimum=0.0
-        )
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._settingsGroup:
-            self.notifyObservers()
-
-
-class PtyChiPIESettings(Observable, Observer):  # FIXME to view
-    def __init__(self, registry: SettingsRegistry) -> None:
-        super().__init__()
-        self._settingsGroup = registry.createGroup('PtyChiPIE')
-        self._settingsGroup.addObserver(self)
-
-        self.probeAlpha = self._settingsGroup.createRealParameter(
-            'ProbeAlpha', 0.1, minimum=0.0, maximum=1.0
-        )
-        self.objectAlpha = self._settingsGroup.createRealParameter(
-            'ObjectAlpha', 0.1, minimum=0.0, maximum=1.0
         )
 
     def update(self, observable: Observable) -> None:
@@ -431,6 +429,9 @@ class PtyChiLSQMLSettings(Observable, Observer):  # FIXME to view
             'MomentumAccelerationGradientMixingFactor', 1.0
         )
 
+        self.probeOptimalStepSizeScaler = self._settingsGroup.createRealParameter(
+            'ProbeOptimalStepSizeScaler', 0.9
+        )
         self.objectOptimalStepSizeScaler = self._settingsGroup.createRealParameter(
             'ObjectOptimalStepSizeScaler', 0.9, minimum=0.0
         )
@@ -438,11 +439,22 @@ class PtyChiLSQMLSettings(Observable, Observer):  # FIXME to view
             'ObjectMultimodalUpdate', True
         )
 
-        self.probeEigenmodeUpdateRelaxation = self._settingsGroup.createRealParameter(
-            'ProbeEigenmodeUpdateRelaxation', 1.0
+    def update(self, observable: Observable) -> None:
+        if observable is self._settingsGroup:
+            self.notifyObservers()
+
+
+class PtyChiPIESettings(Observable, Observer):  # FIXME to view
+    def __init__(self, registry: SettingsRegistry) -> None:
+        super().__init__()
+        self._settingsGroup = registry.createGroup('PtyChiPIE')
+        self._settingsGroup.addObserver(self)
+
+        self.probeAlpha = self._settingsGroup.createRealParameter(
+            'ProbeAlpha', 0.1, minimum=0.0, maximum=1.0
         )
-        self.probeOptimalStepSizeScaler = self._settingsGroup.createRealParameter(
-            'ProbeOptimalStepSizeScaler', 0.9
+        self.objectAlpha = self._settingsGroup.createRealParameter(
+            'ObjectAlpha', 0.1, minimum=0.0, maximum=1.0
         )
 
     def update(self, observable: Observable) -> None:

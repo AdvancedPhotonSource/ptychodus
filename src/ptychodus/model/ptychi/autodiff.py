@@ -9,6 +9,8 @@ from ptychi.api import (
     AutodiffPtychographyProbeOptions,
     AutodiffPtychographyProbePositionOptions,
     AutodiffPtychographyReconstructorOptions,
+    ForwardModels,
+    LossFunctions,
 )
 from ptychi.api.task import PtychographyTask
 
@@ -34,6 +36,29 @@ class AutodiffReconstructor(Reconstructor):
 
     def _create_reconstructor_options(self) -> AutodiffPtychographyReconstructorOptions:
         helper = self._options_helper.reconstructor_helper
+
+        ####
+
+        loss_function_str = self._autodiffSettings.lossFunction.getValue()
+
+        try:
+            loss_function = LossFunctions[loss_function_str.upper()]
+        except KeyError:
+            logger.warning('Failed to parse loss function "{loss_function_str}"!')
+            loss_function = LossFunctions.MSE_SQRT
+
+        ####
+
+        forward_model_class_str = self._autodiffSettings.forwardModelClass.getValue()
+
+        try:
+            forward_model_class = ForwardModels[forward_model_class_str.upper()]
+        except KeyError:
+            logger.warning('Failed to parse forward model class "{forward_model_class_str}"!')
+            forward_model_class = ForwardModels.PLANAR_PTYCHOGRAPHY
+
+        ####
+
         return AutodiffPtychographyReconstructorOptions(
             num_epochs=helper.num_epochs,
             batch_size=helper.batch_size,
@@ -45,6 +70,9 @@ class AutodiffReconstructor(Reconstructor):
             random_seed=helper.random_seed,
             displayed_loss_function=helper.displayed_loss_function,
             use_low_memory_forward_model=helper.use_low_memory_forward_model,
+            loss_function=loss_function,
+            forward_model_class=forward_model_class,
+            forward_model_params=None,
         )
 
     def _create_object_options(self, object_: Object) -> AutodiffPtychographyObjectOptions:
