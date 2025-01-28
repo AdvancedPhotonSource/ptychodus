@@ -1,5 +1,7 @@
+from collections.abc import Sequence
 import logging
 
+from torch import Tensor
 import numpy
 
 from ptychi.api import (
@@ -10,11 +12,8 @@ from ptychi.api import (
     ImageGradientMethods,
     ImageIntegrationMethods,
     LossFunctions,
-    NoiseModels,
     OPRWeightSmoothingMethods,
     OptimizationPlan,
-    OptimizationPlan,
-    Optimizers,
     Optimizers,
     OrthogonalizationMethods,
     PatchInterpolationMethods,
@@ -22,11 +21,11 @@ from ptychi.api import (
     PtychographyDataOptions,
 )
 from ptychi.api.options.base import (
+    OPRModeWeightsSmoothingOptions,
     ObjectL1NormConstraintOptions,
     ObjectMultisliceRegularizationOptions,
     ObjectSmoothnessConstraintOptions,
     ObjectTotalVariationOptions,
-    OPRModeWeightsSmoothingOptions,
     PositionCorrectionOptions,
     ProbeCenterConstraintOptions,
     ProbeOrthogonalizeIncoherentModesOptions,
@@ -37,11 +36,12 @@ from ptychi.api.options.base import (
     RemoveGridArtifactsOptions,
 )
 
-from ptychodus.api.object import Object
-from ptychodus.api.probe import Probe
-from ptychodus.api.product import ProductMetadata
+from ptychodus.api.object import Object, ObjectArrayType, ObjectGeometry, ObjectPoint
+from ptychodus.api.probe import Probe, WavefieldArrayType
+from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput
-from ptychodus.api.typing import ComplexArrayType, RealArrayType
+from ptychodus.api.scan import Scan, ScanPoint
+from ptychodus.api.typing import RealArrayType
 
 from ..patterns import Detector
 from .settings import (
@@ -261,7 +261,7 @@ class PtyChiObjectOptionsHelper:
             logger.warning('Failed to parse patch interpolation method "{method_str}"!')
             return PatchInterpolationMethods.FOURIER
 
-    def get_initial_guess(self, object_: Object) -> ComplexArrayType:
+    def get_initial_guess(self, object_: Object) -> ObjectArrayType:
         return object_.getArray()
 
     def get_slice_spacings_m(self, object_: Object) -> RealArrayType:
@@ -363,7 +363,7 @@ class PtyChiProbeOptionsHelper:
     def eigenmode_update_relaxation(self) -> float:
         return self._settings.relaxEigenmodeUpdate.getValue()
 
-    def get_initial_guess(self, probe: Probe) -> ComplexArrayType:
+    def get_initial_guess(self, probe: Probe) -> WavefieldArrayType:
         return probe.getArray()
 
     def get_power_constraint(self, metadata: ProductMetadata) -> ProbePowerConstraintOptions:
@@ -406,6 +406,54 @@ class PtyChiProbePositionOptionsHelper:
     def optimizer_params(self) -> dict:  # TODO
         return dict()
 
+    @property
+    def magnitude_limit(self) -> ProbePositionMagnitudeLimitOptions:
+        return ProbePositionMagnitudeLimitOptions(
+            enabled=self._settings.limitMagnitudeUpdate.getValue(),
+            optimization_plan=create_optimization_plan(
+                self._settings.limitMagnitudeUpdateStart.getValue(),
+                self._settings.limitMagnitudeUpdateStop.getValue(),
+                self._settings.limitMagnitudeUpdateStride.getValue(),
+            ),
+            limit=self._settings.magnitudeUpdateLimit.getValue(),
+        )
+
+    @property
+    def constrain_position_mean(self) -> bool:
+        return self._settings.constrainCentroid.getValue()
+
+    @property
+    def correction_options(self) -> PositionCorrectionOptions:
+        correction_type_str = self._settings.positionCorrectionType.getValue()
+
+        try:
+            correction_type = PositionCorrectionTypes[correction_type_str.upper()]
+        except KeyError:
+            logger.warning('Failed to parse batching mode "{correction_type_str}"!')
+            correction_type = PositionCorrectionTypes.GRADIENT
+
+        return PositionCorrectionOptions(
+            correction_type=correction_type,
+            cross_correlation_scale=self._settings.crossCorrelationScale.getValue(),
+            cross_correlation_real_space_width=self._settings.crossCorrelationRealSpaceWidth.getValue(),
+            cross_correlation_probe_threshold=self._settings.crossCorrelationProbeThreshold.getValue(),
+        )
+
+    def get_positions_px(
+        self, scan: Scan, object_geometry: ObjectGeometry
+    ) -> tuple[RealArrayType, RealArrayType]:
+        position_x_px: list[float] = list()
+        position_y_px: list[float] = list()
+        rx_px = object_geometry.widthInPixels / 2
+        ry_px = object_geometry.heightInPixels / 2
+
+        for scan_point in scan:
+            object_point = object_geometry.mapScanPointToObjectPoint(scan_point)
+            position_x_px.append(object_point.positionXInPixels - rx_px)
+            position_y_px.append(object_point.positionYInPixels - ry_px)
+
+        return numpy.array(position_x_px), numpy.array(position_y_px)
+
 
 class PtyChiOPROptionsHelper:
     def __init__(self, settings: PtyChiOPRSettings) -> None:
@@ -434,6 +482,42 @@ class PtyChiOPROptionsHelper:
     @property
     def optimizer_params(self) -> dict:  # TODO
         return dict()
+
+    @property
+    def smoothing(self) -> OPRModeWeightsSmoothingOptions:
+        method_str = self._settings.smoothingMethod.getValue()
+
+        try:
+            method: OPRWeightSmoothingMethods | None = OPRWeightSmoothingMethods[method_str.upper()]
+        except KeyError:
+            method = None
+            logger.warning('Failed to parse OPR weight smoothing method "{method_str}"!')
+
+        return OPRModeWeightsSmoothingOptions(
+            enabled=self._settings.smoothModeWeights.getValue(),
+            optimization_plan=create_optimization_plan(
+                self._settings.smoothModeWeightsStart.getValue(),
+                self._settings.smoothModeWeightsStop.getValue(),
+                self._settings.smoothModeWeightsStride.getValue(),
+            ),
+            method=method,
+            polynomial_degree=self._settings.polynomialSmoothingDegree.getValue(),
+        )
+
+    @property
+    def optimize_eigenmode_weights(self) -> bool:
+        return self._settings.optimizeEigenmodeWeights.getValue()
+
+    @property
+    def optimize_intensity_variation(self) -> bool:
+        return self._settings.optimizeIntensities.getValue()
+
+    @property
+    def update_relaxation(self) -> float:
+        return self._settings.relaxUpdate.getValue()
+
+    def get_initial_weights(self) -> RealArrayType:
+        return numpy.array([0.0])  # FIXME
 
 
 class PtyChiOptionsHelper:
@@ -464,4 +548,54 @@ class PtyChiOptionsHelper:
             detector_pixel_size_m=self._detector.pixelWidthInMeters.getValue(),
             valid_pixel_mask=parameters.goodPixelMask,
             save_data_on_device=self._reconstructor_settings.saveDataOnDevice.getValue(),
+        )
+
+    def create_product(
+        self,
+        product: Product,
+        position_x_px: Tensor | numpy.ndarray,
+        position_y_px: Tensor | numpy.ndarray,
+        probe_array: Tensor | numpy.ndarray,
+        object_array: Tensor | numpy.ndarray,
+        opr_mode_weights: Tensor | numpy.ndarray,
+        costs: Sequence[float],
+    ) -> Product:
+        object_in = product.object_
+        object_out = Object(
+            array=numpy.array(object_array),
+            layerDistanceInMeters=object_in.layerDistanceInMeters,
+            pixelGeometry=object_in.getPixelGeometry(),
+            center=object_in.getCenter(),
+        )
+
+        # TODO OPR
+        probe_out = Probe(
+            array=numpy.array(probe_array[0]),
+            pixelGeometry=product.probe.getPixelGeometry(),
+        )
+
+        corrected_scan_points: list[ScanPoint] = list()
+        object_geometry = object_in.getGeometry()
+        rx_px = object_geometry.widthInPixels / 2
+        ry_px = object_geometry.heightInPixels / 2
+
+        for uncorrected_point, pos_x_px, pos_y_px in zip(
+            product.scan, position_x_px, position_y_px
+        ):
+            object_point = ObjectPoint(
+                index=uncorrected_point.index,
+                positionXInPixels=pos_x_px + rx_px,
+                positionYInPixels=pos_y_px + ry_px,
+            )
+            scan_point = object_geometry.mapObjectPointToScanPoint(object_point)
+            corrected_scan_points.append(scan_point)
+
+        scan_out = Scan(corrected_scan_points)
+
+        return Product(
+            metadata=product.metadata,
+            scan=scan_out,
+            probe=probe_out,
+            object_=object_out,
+            costs=costs,
         )
