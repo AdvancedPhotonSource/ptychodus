@@ -21,14 +21,18 @@ from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Rec
 from ptychodus.api.scan import Scan
 
 from .helper import PtyChiOptionsHelper
+from .settings import PtyChiAutodiffSettings
 
 logger = logging.getLogger(__name__)
 
 
 class AutodiffReconstructor(Reconstructor):
-    def __init__(self, options_helper: PtyChiOptionsHelper) -> None:
+    def __init__(
+        self, options_helper: PtyChiOptionsHelper, settings: PtyChiAutodiffSettings
+    ) -> None:
         super().__init__()
         self._options_helper = options_helper
+        self._settings = settings
 
     @property
     def name(self) -> str:
@@ -39,7 +43,7 @@ class AutodiffReconstructor(Reconstructor):
 
         ####
 
-        loss_function_str = self._autodiffSettings.lossFunction.getValue()
+        loss_function_str = self._settings.lossFunction.getValue()
 
         try:
             loss_function = LossFunctions[loss_function_str.upper()]
@@ -49,7 +53,7 @@ class AutodiffReconstructor(Reconstructor):
 
         ####
 
-        forward_model_class_str = self._autodiffSettings.forwardModelClass.getValue()
+        forward_model_class_str = self._settings.forwardModelClass.getValue()
 
         try:
             forward_model_class = ForwardModels[forward_model_class_str.upper()]

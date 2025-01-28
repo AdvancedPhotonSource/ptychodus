@@ -25,14 +25,10 @@ logger = logging.getLogger(__name__)
 
 
 class PIEReconstructor(Reconstructor):
-    def __init__(
-        self,
-        options_helper: PtyChiOptionsHelper,
-        pieSettings: PtyChiPIESettings,
-    ) -> None:
+    def __init__(self, options_helper: PtyChiOptionsHelper, settings: PtyChiPIESettings) -> None:
         super().__init__()
         self._options_helper = options_helper
-        self._pieSettings = pieSettings
+        self._settings = settings
 
     @property
     def name(self) -> str:
@@ -70,7 +66,7 @@ class PIEReconstructor(Reconstructor):
             remove_grid_artifacts=helper.remove_grid_artifacts,
             multislice_regularization=helper.multislice_regularization,
             patch_interpolation_method=helper.patch_interpolation_method,
-            alpha=self._pieSettings.objectAlpha.getValue(),
+            alpha=self._settings.objectAlpha.getValue(),
         )
 
     def _create_probe_options(self, probe: Probe, metadata: ProductMetadata) -> PIEProbeOptions:
@@ -88,7 +84,7 @@ class PIEReconstructor(Reconstructor):
             support_constraint=helper.support_constraint,
             center_constraint=helper.center_constraint,
             eigenmode_update_relaxation=helper.eigenmode_update_relaxation,
-            alpha=self._pieSettings.probeAlpha.getValue(),
+            alpha=self._settings.probeAlpha.getValue(),
         )
 
     def _create_probe_position_options(
