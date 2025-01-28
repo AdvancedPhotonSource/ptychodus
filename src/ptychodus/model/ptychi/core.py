@@ -13,6 +13,7 @@ from ..patterns import Detector
 from .device import PtyChiDeviceRepository
 from .enums import PtyChiEnumerators
 from .settings import (
+    PtyChiAutodiffSettings,
     PtyChiDMSettings,
     PtyChiLSQMLSettings,
     PtyChiOPRSettings,
@@ -31,14 +32,15 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         self, settingsRegistry: SettingsRegistry, detector: Detector, isDeveloperModeEnabled: bool
     ) -> None:
         super().__init__()
-        self.reconstructorSettings = PtyChiReconstructorSettings(settingsRegistry)
-        self.objectSettings = PtyChiObjectSettings(settingsRegistry)
-        self.probeSettings = PtyChiProbeSettings(settingsRegistry)
-        self.probePositionSettings = PtyChiProbePositionSettings(settingsRegistry)
-        self.oprSettings = PtyChiOPRSettings(settingsRegistry)
+        self.autodiffSettings = PtyChiAutodiffSettings(settingsRegistry)
         self.dmSettings = PtyChiDMSettings(settingsRegistry)
-        self.pieSettings = PtyChiPIESettings(settingsRegistry)
         self.lsqmlSettings = PtyChiLSQMLSettings(settingsRegistry)
+        self.objectSettings = PtyChiObjectSettings(settingsRegistry)
+        self.oprSettings = PtyChiOPRSettings(settingsRegistry)
+        self.pieSettings = PtyChiPIESettings(settingsRegistry)
+        self.probePositionSettings = PtyChiProbePositionSettings(settingsRegistry)
+        self.probeSettings = PtyChiProbeSettings(settingsRegistry)
+        self.reconstructorSettings = PtyChiReconstructorSettings(settingsRegistry)
 
         self.enumerators = PtyChiEnumerators()
         self.deviceRepository = PtyChiDeviceRepository(
@@ -77,7 +79,9 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
             self.reconstructor_list.append(EPIEReconstructor(optionsHelper, self.pieSettings))
             self.reconstructor_list.append(RPIEReconstructor(optionsHelper, self.pieSettings))
             self.reconstructor_list.append(LSQMLReconstructor(optionsHelper, self.lsqmlSettings))
-            self.reconstructor_list.append(AutodiffReconstructor(optionsHelper))
+            self.reconstructor_list.append(
+                AutodiffReconstructor(optionsHelper, self.autodiffSettings)
+            )
 
     @property
     def name(self) -> str:

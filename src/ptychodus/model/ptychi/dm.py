@@ -25,14 +25,10 @@ logger = logging.getLogger(__name__)
 
 
 class DMReconstructor(Reconstructor):
-    def __init__(
-        self,
-        options_helper: PtyChiOptionsHelper,
-        dmSettings: PtyChiDMSettings,
-    ) -> None:
+    def __init__(self, options_helper: PtyChiOptionsHelper, settings: PtyChiDMSettings) -> None:
         super().__init__()
         self._options_helper = options_helper
-        self._dmSettings = dmSettings
+        self._settings = settings
 
     @property
     def name(self) -> str:
@@ -51,8 +47,8 @@ class DMReconstructor(Reconstructor):
             random_seed=helper.random_seed,
             displayed_loss_function=helper.displayed_loss_function,
             use_low_memory_forward_model=helper.use_low_memory_forward_model,
-            exit_wave_update_relaxation=self._dmSettings.exitWaveUpdateRelaxation.getValue(),
-            chunk_length=self._dmSettings.chunkLength.getValue(),
+            exit_wave_update_relaxation=self._settings.exitWaveUpdateRelaxation.getValue(),
+            chunk_length=self._settings.chunkLength.getValue(),
         )
 
     def _create_object_options(self, object_: Object) -> DMObjectOptions:
@@ -72,7 +68,7 @@ class DMReconstructor(Reconstructor):
             remove_grid_artifacts=helper.remove_grid_artifacts,
             multislice_regularization=helper.multislice_regularization,
             patch_interpolation_method=helper.patch_interpolation_method,
-            amplitude_clamp_limit=self._dmSettings.objectAmplitudeClampLimit.getValue(),
+            amplitude_clamp_limit=self._settings.objectAmplitudeClampLimit.getValue(),
         )
 
     def _create_probe_options(self, probe: Probe, metadata: ProductMetadata) -> DMProbeOptions:
