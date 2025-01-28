@@ -66,6 +66,9 @@ class ProbePropagator(Observable):
         )
         pixelGeometry = probe.getPixelGeometry()
 
+        if pixelGeometry is None:
+            raise ValueError('No pixel geometry!')
+
         for idx, zInMeters in enumerate(distanceInMeters):
             propagatorParameters = PropagatorParameters(
                 wavelength_m=wavelengthInMeters,
@@ -73,7 +76,7 @@ class ProbePropagator(Observable):
                 height_px=probe.heightInPixels,
                 pixel_width_m=pixelGeometry.widthInMeters,
                 pixel_height_m=pixelGeometry.heightInMeters,
-                propagation_distance_m=zInMeters,
+                propagation_distance_m=float(zInMeters),
             )
             propagator = AngularSpectrumPropagator(propagatorParameters)
 

@@ -7,6 +7,7 @@ class PtyChiEnumerators:
             from ptychi.api import (
                 BatchingModes,
                 Directions,
+                ForwardModels,
                 ImageGradientMethods,
                 ImageIntegrationMethods,
                 LossFunctions,
@@ -19,6 +20,7 @@ class PtyChiEnumerators:
         except ModuleNotFoundError:
             self._batchingModes: Sequence[str] = list()
             self._directions: Sequence[str] = list()
+            self._forwardModels: Sequence[str] = list()
             self._imageGradientMethods: Sequence[str] = list()
             self._imageIntegrationMethods: Sequence[str] = list()
             self._lossFunctions: Sequence[str] = list()
@@ -30,6 +32,7 @@ class PtyChiEnumerators:
         else:
             self._batchingModes = [member.name for member in BatchingModes]
             self._directions = [member.name for member in Directions]
+            self._forwardModels = [member.name for member in ForwardModels]
             self._imageGradientMethods = [member.name for member in ImageGradientMethods]
             self._imageIntegrationMethods = [member.name for member in ImageIntegrationMethods]
             self._lossFunctions = [member.name for member in LossFunctions]
@@ -44,6 +47,9 @@ class PtyChiEnumerators:
 
     def directions(self) -> Iterator[str]:
         return iter(self._directions)
+
+    def forwardModels(self) -> Iterator[str]:
+        return iter(self._forwardModels)
 
     def imageGradientMethods(self) -> Iterator[str]:
         return iter(self._imageGradientMethods)

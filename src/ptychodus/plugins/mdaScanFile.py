@@ -460,8 +460,8 @@ class MDAScanFileReader(ScanFileReader):
             for x in xarray:
                 point = ScanPoint(
                     index=len(pointList),
-                    positionXInMeters=x * self.MICRONS_TO_METERS,
-                    positionYInMeters=y * self.MICRONS_TO_METERS,
+                    positionXInMeters=float(x) * self.MICRONS_TO_METERS,
+                    positionYInMeters=float(y) * self.MICRONS_TO_METERS,
                 )
                 pointList.append(point)
 
@@ -482,8 +482,8 @@ class HXNScanFileReader(ScanFileReader):
         for idx, (x, y) in enumerate(zip(xarray, yarray)):
             point = ScanPoint(
                 index=idx,
-                positionXInMeters=x * self.MICRONS_TO_METERS,
-                positionYInMeters=y * self.MICRONS_TO_METERS,
+                positionXInMeters=float(x) * self.MICRONS_TO_METERS,
+                positionYInMeters=float(y) * self.MICRONS_TO_METERS,
             )
             pointList.append(point)
 

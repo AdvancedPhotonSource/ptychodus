@@ -53,6 +53,7 @@ module = [
     "hdf5plugin",
     "lightning.*",
     "parsl.*",
+    "ptychi.*",
     "ptychonn.*",
     "pvaccess",
     "pvapy.*",

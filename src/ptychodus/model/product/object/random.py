@@ -66,8 +66,8 @@ class RandomObjectBuilder(ObjectBuilder):
         )
 
 
-class UserObjectBuilder(ObjectBuilder):
-    def __init__(self, object: Object, settings: ObjectSettings) -> None:
+class UserObjectBuilder(ObjectBuilder):  # FIXME use
+    def __init__(self, object_: Object, settings: ObjectSettings) -> None:
         """Create an object from an existing object with a potentially
         different number of slices.
 
@@ -76,16 +76,10 @@ class UserObjectBuilder(ObjectBuilder):
         created as
         `abs(o) ** (1 / nSlices) * exp(i * unwrapPhase(o) / nSlices)`.
         Otherwise, the object is copied as is.
-
-        Parameters
-        ----------
-        object : Object
-            The existing object.
-        settings : ObjectSettings
-            The settings for the new object.
         """
         super().__init__(settings, 'user')
-        self._existingObject = object
+        self._existingObject = object_
+        self._settings = settings
 
     def copy(self) -> UserObjectBuilder:
         builder = UserObjectBuilder(self._existingObject, self._settings)
@@ -95,11 +89,15 @@ class UserObjectBuilder(ObjectBuilder):
 
         return builder
 
-    def build(self, layerDistanceInMeters: Sequence[float]) -> Object:
+    def build(
+        self,
+        geometryProvider: ObjectGeometryProvider,
+        layerDistanceInMeters: Sequence[float],
+    ) -> Object:
         geometry = self._existingObject.getGeometry()
-
         exitingObjectArr = self._existingObject.getArray()
         nSlices = len(layerDistanceInMeters) + 1
+
         if nSlices > 1 and nSlices != exitingObjectArr.shape[0]:
             amplitude = numpy.abs(exitingObjectArr[0:1]) ** (1.0 / nSlices)
             amplitude = amplitude.repeat(nSlices, axis=0)
@@ -108,6 +106,7 @@ class UserObjectBuilder(ObjectBuilder):
             data = numpy.clip(amplitude, 0.0, 1.0) * numpy.exp(1j * phase)
         else:
             data = exitingObjectArr
+
         return Object(
             array=data,
             layerDistanceInMeters=layerDistanceInMeters,
