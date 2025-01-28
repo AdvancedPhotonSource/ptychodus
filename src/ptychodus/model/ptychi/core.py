@@ -12,7 +12,6 @@ from ptychodus.api.settings import SettingsRegistry
 from ..patterns import Detector
 from .device import PtyChiDeviceRepository
 from .enums import PtyChiEnumerators
-from .helper import PtyChiOptionsHelper
 from .settings import (
     PtyChiDMSettings,
     PtyChiLSQMLSettings,
@@ -45,20 +44,13 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         self.deviceRepository = PtyChiDeviceRepository(
             isDeveloperModeEnabled=isDeveloperModeEnabled
         )
-        self.optionsHelper = PtyChiOptionsHelper(
-            self.reconstructorSettings,
-            self.objectSettings,
-            self.probeSettings,
-            self.probePositionSettings,
-            self.oprSettings,
-            detector,
-        )
         self.reconstructor_list: list[Reconstructor] = list()
 
         try:
             from .autodiff import AutodiffReconstructor
             from .dm import DMReconstructor
             from .epie import EPIEReconstructor
+            from .helper import PtyChiOptionsHelper
             from .lsqml import LSQMLReconstructor
             from .pie import PIEReconstructor
             from .rpie import RPIEReconstructor
@@ -72,14 +64,20 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
             ptychiVersion = version('ptychi')
             logger.info(f'Pty-Chi {ptychiVersion}')
 
-            self.reconstructor_list.append(DMReconstructor(self.optionsHelper, self.dmSettings))
-            self.reconstructor_list.append(PIEReconstructor(self.optionsHelper, self.pieSettings))
-            self.reconstructor_list.append(EPIEReconstructor(self.optionsHelper, self.pieSettings))
-            self.reconstructor_list.append(RPIEReconstructor(self.optionsHelper, self.pieSettings))
-            self.reconstructor_list.append(
-                LSQMLReconstructor(self.optionsHelper, self.lsqmlSettings)
+            optionsHelper = PtyChiOptionsHelper(
+                self.reconstructorSettings,
+                self.objectSettings,
+                self.probeSettings,
+                self.probePositionSettings,
+                self.oprSettings,
+                detector,
             )
-            self.reconstructor_list.append(AutodiffReconstructor(self.optionsHelper))
+            self.reconstructor_list.append(DMReconstructor(optionsHelper, self.dmSettings))
+            self.reconstructor_list.append(PIEReconstructor(optionsHelper, self.pieSettings))
+            self.reconstructor_list.append(EPIEReconstructor(optionsHelper, self.pieSettings))
+            self.reconstructor_list.append(RPIEReconstructor(optionsHelper, self.pieSettings))
+            self.reconstructor_list.append(LSQMLReconstructor(optionsHelper, self.lsqmlSettings))
+            self.reconstructor_list.append(AutodiffReconstructor(optionsHelper))
 
     @property
     def name(self) -> str:
