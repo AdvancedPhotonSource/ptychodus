@@ -76,6 +76,9 @@ class FourierRingCorrelator:
         # TODO verify compatible pixel geometry
         pixelGeometry = object2.getPixelGeometry()
 
+        if pixelGeometry is None:
+            raise ValueError('No pixel geometry!')
+
         # TODO subpixel image registration: skimage.registration.phase_cross_correlation
         # TODO remove phase offset and ramp
         # TODO apply soft-edged mask

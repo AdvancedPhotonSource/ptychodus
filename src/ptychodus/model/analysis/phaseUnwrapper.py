@@ -1,4 +1,4 @@
-import numpy as np
+import numpy
 from numpy.typing import NDArray
 from scipy import signal, ndimage
 from typing import Literal, Optional, Tuple
@@ -56,21 +56,23 @@ class PhaseUnwrapper:
         NDArray
             A 2D real array giving the unwrapped phase of the input image.
         """
-        if not np.iscomplexobj(img):
+        if not numpy.iscomplexobj(img):
             raise ValueError('Input array must be complex.')
 
         if self.weight_map is not None:
-            weight_map = np.clip(self.weight_map, 0.0, 1.0)
+            weight_map = float(numpy.clip(self.weight_map, 0.0, 1.0))
         else:
-            weight_map = 1
+            weight_map = 1.0
 
-        img = weight_map * img / (np.abs(img) + self.eps)
-        bc_center = np.angle(img[img.shape[0] // 2, img.shape[1] // 2])
+        img = weight_map * img / (numpy.abs(img) + self.eps)
+        bc_center = numpy.angle(img[img.shape[0] // 2, img.shape[1] // 2])
 
         # Pad image to avoid FFT boundary artifacts.
         padding = [64, 64]
-        if any(np.array(padding) > 0):
-            img = np.pad(img, ((padding[0], padding[0]), (padding[1], padding[1])), mode='reflect')
+        if any(numpy.array(padding) > 0):
+            img = numpy.pad(
+                img, ((padding[0], padding[0]), (padding[1], padding[1])), mode='reflect'
+            )
             img = vignett(img, margin=10, sigma=2.5)
 
         gy, gx = get_phase_gradient(
@@ -79,19 +81,19 @@ class PhaseUnwrapper:
             image_grad_method=self.image_grad_method,
         )
 
-        if self.image_integration_method == 'discrete' and any(np.array(padding) > 0):
+        if self.image_integration_method == 'discrete' and any(numpy.array(padding) > 0):
             gy = gy[padding[0] : -padding[0], padding[1] : -padding[1]]
             gx = gx[padding[0] : -padding[0], padding[1] : -padding[1]]
         if self.image_integration_method == 'discrete':
-            phase = np.real(integrate_image_2d(gy, gx, bc_center=bc_center))
+            phase = numpy.real(integrate_image_2d(gy, gx, bc_center=bc_center))
         elif self.image_integration_method == 'fourier':
-            phase = np.real(integrate_image_2d_fourier(gy, gx))
+            phase = numpy.real(integrate_image_2d_fourier(gy, gx))
         elif self.image_integration_method == 'deconvolution':
-            phase = np.real(integrate_image_2d_deconvolution(gy, gx, bc_center=bc_center))
+            phase = numpy.real(integrate_image_2d_deconvolution(gy, gx, bc_center=bc_center))
         else:
             raise ValueError(f'Unknown integration method: {self.image_integration_method}')
 
-        if self.image_integration_method != 'discrete' and any(np.array(padding) > 0):
+        if self.image_integration_method != 'discrete' and any(numpy.array(padding) > 0):
             gy = gy[padding[0] : -padding[0], padding[1] : -padding[1]]
             gx = gx[padding[0] : -padding[0], padding[1] : -padding[1]]
             phase = phase[padding[0] : -padding[0], padding[1] : -padding[1]]
@@ -126,22 +128,22 @@ def vignett(img: NDArray, margin: int = 20, sigma: float = 1.0) -> NDArray:
             + [2 * margin]
             + [img.shape[i] for i in range(i_dim + 1, img.ndim)]
         )
-        mask = np.zeros(mask_shape)
+        mask = numpy.zeros(mask_shape)
         mask_slicer = [slice(None)] * i_dim + [slice(margin, None)]
         mask[tuple(mask_slicer)] = 1.0
 
         gauss_win = signal.windows.gaussian(margin // 2, std=sigma)
-        gauss_win = gauss_win / np.sum(gauss_win)
+        gauss_win = gauss_win / numpy.sum(gauss_win)
         mask = ndimage.convolve1d(mask, gauss_win, axis=i_dim, mode='constant')
         mask_final_slicer = [slice(None)] * i_dim + [slice(len(gauss_win), len(gauss_win) + margin)]
         mask = mask[*mask_final_slicer]
-        mask = np.where(mask < 1e-3, 0, mask)
+        mask = numpy.where(mask < 1e-3, 0, mask)
 
         slicer = tuple([slice(None)] * i_dim + [slice(0, margin)])
         img[slicer] = img[slicer] * mask
 
         slicer = tuple([slice(None)] * i_dim + [slice(-margin, None)])
-        img[slicer] = img[slicer] * np.flip(mask, axis=i_dim)
+        img[slicer] = img[slicer] * numpy.flip(mask, axis=i_dim)
     return img
 
 
@@ -171,14 +173,14 @@ def nearest_neighbor_gradient(
     grad_y = None
     if direction == 'forward':
         if 1 in dim:
-            grad_x = np.concatenate([image[:, 1:], image[:, -1:]], axis=1) - image
+            grad_x = numpy.concatenate([image[:, 1:], image[:, -1:]], axis=1) - image
         if 0 in dim:
-            grad_y = np.concatenate([image[1:, :], image[-1:, :]], axis=0) - image
+            grad_y = numpy.concatenate([image[1:, :], image[-1:, :]], axis=0) - image
     elif direction == 'backward':
         if 1 in dim:
-            grad_x = image - np.concatenate([image[:, :1], image[:, :-1]], axis=1)
+            grad_x = image - numpy.concatenate([image[:, :1], image[:, :-1]], axis=1)
         if 0 in dim:
-            grad_y = image - np.concatenate([image[:1, :], image[:-1, :]], axis=0)
+            grad_y = image - numpy.concatenate([image[:1, :], image[:-1, :]], axis=0)
     else:
         raise ValueError("direction must be 'forward' or 'backward'")
     return grad_y, grad_x
@@ -200,18 +202,18 @@ def gaussian_gradient(image: NDArray, sigma: float = 1.0, kernel_size=5) -> Tupl
     tuple of NDArray
         A tuple of 2 images with the gradient in y and x directions.
     """
-    r = np.arange(kernel_size) - (kernel_size - 1) / 2.0
-    kernel = -r / (np.sqrt(2 * np.pi) * sigma**3) * np.exp(-(r**2) / (2 * sigma**2))
+    r = numpy.arange(kernel_size) - (kernel_size - 1) / 2.0
+    kernel = -r / (numpy.sqrt(2 * numpy.pi) * sigma**3) * numpy.exp(-(r**2) / (2 * sigma**2))
     grad_y = ndimage.convolve(image, kernel.reshape(-1, 1), mode='nearest')
     grad_x = ndimage.convolve(image, kernel.reshape(1, -1), mode='nearest')
 
     # Gate the gradients
     grads = [grad_y, grad_x]
     for i, g in enumerate(grads):
-        m = np.logical_and(np.abs(grad_y) < 1e-6, np.abs(grad_y) != 0)
-        if np.count_nonzero(m) > 0:
+        m = numpy.logical_and(numpy.abs(grad_y) < 1e-6, numpy.abs(grad_y) != 0)
+        if numpy.count_nonzero(m) > 0:
             print('Gradient magnitudes between 0 and 1e-6 are set to 0.')
-            g = g * np.logical_not(m)
+            g = g * numpy.logical_not(m)
             grads[i] = g
     grad_y, grad_x = grads
     return grad_y, grad_x
@@ -219,12 +221,12 @@ def gaussian_gradient(image: NDArray, sigma: float = 1.0, kernel_size=5) -> Tupl
 
 def fourier_gradient(image: NDArray) -> Tuple[NDArray, NDArray]:
     """Calculate gradient using NumPy FFT operations"""
-    u = np.fft.fftfreq(image.shape[0])
-    v = np.fft.fftfreq(image.shape[1])
-    u, v = np.meshgrid(u, v, indexing='ij')
+    u = numpy.fft.fftfreq(image.shape[0])
+    v = numpy.fft.fftfreq(image.shape[1])
+    u, v = numpy.meshgrid(u, v, indexing='ij')
 
-    grad_y = np.fft.ifft(np.fft.fft(image, axis=-2) * (2j * np.pi * u), axis=-2)
-    grad_x = np.fft.ifft(np.fft.fft(image, axis=-1) * (2j * np.pi * v), axis=-1)
+    grad_y = numpy.fft.ifft(numpy.fft.fft(image, axis=-2) * (2j * numpy.pi * u), axis=-2)
+    grad_x = numpy.fft.ifft(numpy.fft.fft(image, axis=-1) * (2j * numpy.pi * v), axis=-1)
 
     return grad_y, grad_x
 
@@ -269,17 +271,17 @@ def get_phase_gradient(
 
     if image_grad_method == 'fourier_differentiation':
         gy, gx = fourier_gradient(img)
-        gy = np.imag(np.conj(img) * gy)
-        gx = np.imag(np.conj(img) * gx)
+        gy = numpy.imag(numpy.conj(img) * gy)
+        gx = numpy.imag(numpy.conj(img) * gx)
     else:
         # Use finite difference.
         if img.ndim == 2:
             img = img[None, ...]
-        pad = int(np.ceil(fourier_shift_step)) + 1
-        img = np.pad(img, ((0, 0), (pad, pad), (pad, pad)), mode='reflect')
+        pad = int(numpy.ceil(fourier_shift_step)) + 1
+        img = numpy.pad(img, ((0, 0), (pad, pad), (pad, pad)), mode='reflect')
 
-        sy1 = np.array([[-fourier_shift_step, 0]]).repeat(img.shape[0], axis=0)
-        sy2 = np.array([[fourier_shift_step, 0]]).repeat(img.shape[0], axis=0)
+        sy1 = numpy.array([[-fourier_shift_step, 0]]).repeat(img.shape[0], axis=0)
+        sy2 = numpy.array([[fourier_shift_step, 0]]).repeat(img.shape[0], axis=0)
         if image_grad_method == 'fourier_shift':
             # If the image contains zero-valued pixels, Fourier shift can result in small
             # non-zero values that dangles around 0. This can cause the phase
@@ -287,25 +289,25 @@ def get_phase_gradient(
             # `finite_diff_method="nearest" instead`, or use `step=1`.
             complex_prod = fourier_shift(img, sy1) * fourier_shift(img, sy2).conj()
         elif image_grad_method == 'nearest':
-            complex_prod = img * np.concatenate([img[:, :1, :], img[:, :-1, :]], axis=1).conj()
+            complex_prod = img * numpy.concatenate([img[:, :1, :], img[:, :-1, :]], axis=1).conj()
         else:
             raise ValueError(f'Unknown finite-difference method: {image_grad_method}')
-        complex_prod = np.where(
-            np.abs(complex_prod) < np.abs(complex_prod).max() * 1e-6, 0, complex_prod
+        complex_prod = numpy.where(
+            numpy.abs(complex_prod) < numpy.abs(complex_prod).max() * 1e-6, 0, complex_prod
         )
-        gy = np.angle(complex_prod) / (2 * fourier_shift_step)
+        gy = numpy.angle(complex_prod) / (2 * fourier_shift_step)
         gy = gy[0, pad:-pad, pad:-pad]
 
-        sx1 = np.array([[0, -fourier_shift_step]]).repeat(img.shape[0], axis=0)
-        sx2 = np.array([[0, fourier_shift_step]]).repeat(img.shape[0], axis=0)
+        sx1 = numpy.array([[0, -fourier_shift_step]]).repeat(img.shape[0], axis=0)
+        sx2 = numpy.array([[0, fourier_shift_step]]).repeat(img.shape[0], axis=0)
         if image_grad_method == 'fourier_shift':
             complex_prod = fourier_shift(img, sx1) * fourier_shift(img, sx2).conj()
         elif image_grad_method == 'nearest':
-            complex_prod = img * np.concatenate([img[:, :, :1], img[:, :, :-1]], axis=2).conj()
-        complex_prod = np.where(
-            np.abs(complex_prod) < np.abs(complex_prod).max() * 1e-6, 0, complex_prod
+            complex_prod = img * numpy.concatenate([img[:, :, :1], img[:, :, :-1]], axis=2).conj()
+        complex_prod = numpy.where(
+            numpy.abs(complex_prod) < numpy.abs(complex_prod).max() * 1e-6, 0, complex_prod
         )
-        gx = np.angle(complex_prod) / (2 * fourier_shift_step)
+        gx = numpy.angle(complex_prod) / (2 * fourier_shift_step)
         gx = gx[0, pad:-pad, pad:-pad]
     return gy, gx
 
@@ -326,15 +328,15 @@ def integrate_image_2d_fourier(grad_y: NDArray, grad_x: NDArray) -> NDArray:
         The integrated image.
     """
     shape = grad_y.shape
-    f = np.fft.fft2(grad_x + 1j * grad_y)
-    y, x = np.fft.fftfreq(shape[0]), np.fft.fftfreq(shape[1])
+    f = numpy.fft.fft2(grad_x + 1j * grad_y)
+    y, x = numpy.fft.fftfreq(shape[0]), numpy.fft.fftfreq(shape[1])
 
-    r = np.exp(2j * np.pi * (x + y[:, None]))
-    r = r / (2j * np.pi * (x + 1j * y[:, None]))
+    r = numpy.exp(2j * numpy.pi * (x + y[:, None]))
+    r = r / (2j * numpy.pi * (x + 1j * y[:, None]))
     r[0, 0] = 0
     integrated_image = f * r
-    integrated_image = np.fft.ifft2(integrated_image)
-    if not np.iscomplexobj(grad_x):
+    integrated_image = numpy.fft.ifft2(integrated_image)
+    if not numpy.iscomplexobj(grad_x):
         integrated_image = integrated_image.real
     return integrated_image
 
@@ -371,15 +373,15 @@ def integrate_image_2d_deconvolution(
     NDArray
         The integrated image.
     """
-    u, v = np.fft.fftfreq(grad_x.shape[0]), np.fft.fftfreq(grad_x.shape[1])
-    u, v = np.meshgrid(u, v, indexing='ij')
+    u, v = numpy.fft.fftfreq(grad_x.shape[0]), numpy.fft.fftfreq(grad_x.shape[1])
+    u, v = numpy.meshgrid(u, v, indexing='ij')
     if tf_y is None or tf_x is None:
-        tf_y = 2j * np.pi * u
-        tf_x = 2j * np.pi * v
-    f_grad_y = np.fft.fft2(grad_y)
-    f_grad_x = np.fft.fft2(grad_x)
-    img = (f_grad_y * tf_y + f_grad_x * tf_x) / (np.abs(tf_y) ** 2 + np.abs(tf_x) ** 2 + 1e-5)
-    img = -np.fft.ifft2(img)
+        tf_y = 2j * numpy.pi * u
+        tf_x = 2j * numpy.pi * v
+    f_grad_y = numpy.fft.fft2(grad_y)
+    f_grad_x = numpy.fft.fft2(grad_x)
+    img = (f_grad_y * tf_y + f_grad_x * tf_x) / (numpy.abs(tf_y) ** 2 + numpy.abs(tf_x) ** 2 + 1e-5)
+    img = -numpy.fft.ifft2(img)
     img = img + bc_center - img[img.shape[0] // 2, img.shape[1] // 2]
     return img
 
@@ -402,8 +404,8 @@ def integrate_image_2d(grad_y: NDArray, grad_x: NDArray, bc_center: float = 0) -
     NDArray
         The integrated image.
     """
-    left_boundary = np.cumsum(grad_y[:, 0], axis=0)
-    int_img = np.cumsum(grad_x, axis=1) + left_boundary[:, None]
+    left_boundary = numpy.cumsum(grad_y[:, 0], axis=0)
+    int_img = numpy.cumsum(grad_x, axis=1) + left_boundary[:, None]
     int_img = int_img + bc_center - int_img[int_img.shape[0] // 2, int_img.shape[1] // 2]
     return int_img
 
@@ -436,21 +438,21 @@ def fourier_shift(
         zero_mask = images == 0
         zero_mask = zero_mask.float()
         zero_mask_shifted = fourier_shift(zero_mask, shifts, strictly_preserve_zeros=False)
-    ft_images = np.fft.fft2(images)
-    freq_y, freq_x = np.meshgrid(
-        np.fft.fftfreq(images.shape[-2]), np.fft.fftfreq(images.shape[-1]), indexing='ij'
+    ft_images = numpy.fft.fft2(images)
+    freq_y, freq_x = numpy.meshgrid(
+        numpy.fft.fftfreq(images.shape[-2]), numpy.fft.fftfreq(images.shape[-1]), indexing='ij'
     )
     freq_x = freq_x.repeat(images.shape[0], axis=0)
     freq_y = freq_y.repeat(images.shape[0], axis=0)
-    mult = np.exp(
+    mult = numpy.exp(
         1j
         * -2
-        * np.pi
+        * numpy.pi
         * (freq_x * shifts[:, 1].reshape([-1, 1, 1]) + freq_y * shifts[:, 0].reshape([-1, 1, 1]))
     )
     ft_images = ft_images * mult
-    shifted_images = np.fft.ifft2(ft_images)
-    if not np.iscomplexobj(images):
+    shifted_images = numpy.fft.ifft2(ft_images)
+    if not numpy.iscomplexobj(images):
         shifted_images = shifted_images.real
     if strictly_preserve_zeros:
         shifted_images[zero_mask_shifted > 0] = 0
