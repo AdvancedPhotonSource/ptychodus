@@ -108,17 +108,22 @@ class PtyChiReconstructorViewController(ParameterViewController):
         self._batchStride = SpinBoxParameterViewController(
             settings.batchStride, tool_tip='Number of epochs between updating clusters.'
         )
-        self._deviceViewController = PtyChiDeviceViewController(
-            settings.useDevices, repository, tool_tip='Default device to use for computation.'
-        )
         self._precisionViewController = PtyChiPrecisionParameterViewController(
             settings.useDoublePrecision,
             tool_tip='Floating point precision to use for computation.',
+        )
+        self._deviceViewController = PtyChiDeviceViewController(
+            settings.useDevices, repository, tool_tip='Default device to use for computation.'
         )
         self._useLowMemoryViewController = CheckBoxParameterViewController(
             settings.useLowMemoryForwardModel,
             'Use Low Memory Forward Model',
             tool_tip='When checked, forward propagation of ptychography will be done using less vectorized code. This reduces the speed, but also lowers memory usage.',
+        )
+        self._saveDataOnDeviceViewController = CheckBoxParameterViewController(
+            settings.saveDataOnDevice,
+            'Save Data on Device',
+            tool_tip='When checked, diffraction data will be saved on the device.',
         )
         self._widget = QGroupBox('Reconstructor')
 

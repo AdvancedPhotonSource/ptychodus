@@ -8,6 +8,7 @@ from ..parametric import (
     CheckableGroupBoxParameterViewController,
     ComboBoxParameterViewController,
     DecimalLineEditParameterViewController,
+    DecimalSliderParameterViewController,
     SpinBoxParameterViewController,
 )
 from .optimizer import PtyChiOptimizationPlanViewController, PtyChiOptimizerParameterViewController
@@ -17,14 +18,21 @@ class PtyChiSmoothOPRModeWeightsViewController(CheckableGroupBoxParameterViewCon
     def __init__(
         self,
         smoothModeWeights: BooleanParameter,
+        start: IntegerParameter,
+        stop: IntegerParameter,
+        stride: IntegerParameter,
         smoothingMethod: StringParameter,
         polynomialSmoothingDegree: IntegerParameter,
+        num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
         super().__init__(
             smoothModeWeights,
             'Smooth OPR Mode Weights',
             tool_tip='Smooth the OPR mode weights.',
+        )
+        self._planViewController = PtyChiOptimizationPlanViewController(
+            start, stop, stride, num_epochs
         )
         self._smoothingMethodViewController = ComboBoxParameterViewController(
             smoothingMethod,
@@ -37,6 +45,7 @@ class PtyChiSmoothOPRModeWeightsViewController(CheckableGroupBoxParameterViewCon
         )
 
         layout = QFormLayout()
+        layout.addRow('Plan:', self._planViewController.getWidget())
         layout.addRow('Smoothing Method:', self._smoothingMethodViewController.getWidget())
         layout.addRow(
             'Polynomial Degree:', self._polynomialSmoothingDegreeViewController.getWidget()
@@ -80,9 +89,17 @@ class PtyChiOPRViewController(CheckableGroupBoxParameterViewController):
         )
         self._smoothModeWeightsViewController = PtyChiSmoothOPRModeWeightsViewController(
             settings.smoothModeWeights,
+            settings.smoothModeWeightsStart,
+            settings.smoothModeWeightsStop,
+            settings.smoothModeWeightsStride,
             settings.smoothingMethod,
             settings.polynomialSmoothingDegree,
+            num_epochs,
             enumerators,
+        )
+        self._relaxUpdateViewController = DecimalSliderParameterViewController(
+            settings.relaxUpdate,
+            tool_tip='Whether to relax the update of the OPR mode weights.',
         )
 
         layout = QFormLayout()
