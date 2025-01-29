@@ -27,6 +27,7 @@ dynamic = ["version"]
 ptychodus = "ptychodus.__main__:main"
 
 [project.optional-dependencies]
+ai = ["langchain", "requests"]
 globus = ["gladier", "gladier-tools>=0.5.4"]
 gui = ["PyQt5"]
 ptychonn = ["ptychonn==0.3.*,>=0.3.7"]

@@ -12,6 +12,10 @@ class Argo:
     def __init__(self, settings: ArgoSettings):
         self._settings = settings
 
+    @property
+    def model(self) -> str:
+        return self._settings.model.getValue()
+
     def invoke(self, prompt: Sequence[str], system: str, stop: Sequence[str] = []) -> str:
         # Data to be sent as a POST in JSON format
         data = {
@@ -37,5 +41,6 @@ class Argo:
         logger.debug('Status Code:', response.status_code)
         response_json = response.json()
         logger.debug('JSON Response:', response_json)
+        response.raise_for_status()
 
         return response_json['response']
