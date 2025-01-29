@@ -12,11 +12,20 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import BooleanParameter
 
-from ...model.ptychi import PtyChiDeviceRepository, PtyChiEnumerators, PtyChiReconstructorSettings
+from ...model.ptychi import (
+    PtyChiAutodiffSettings,
+    PtyChiDMSettings,
+    PtyChiDeviceRepository,
+    PtyChiEnumerators,
+    PtyChiLSQMLSettings,
+    PtyChiReconstructorSettings,
+)
 from ..parametric import (
     CheckBoxParameterViewController,
     CheckableGroupBoxParameterViewController,
     ComboBoxParameterViewController,
+    DecimalLineEditParameterViewController,
+    DecimalSliderParameterViewController,
     ParameterViewController,
     SpinBoxParameterViewController,
 )
@@ -94,6 +103,9 @@ class PtyChiReconstructorViewController(ParameterViewController):
         settings: PtyChiReconstructorSettings,
         enumerators: PtyChiEnumerators,
         repository: PtyChiDeviceRepository,
+        autodiffSettings: PtyChiAutodiffSettings | None = None,
+        dmSettings: PtyChiDMSettings | None = None,
+        lsqmlSettings: PtyChiLSQMLSettings | None = None,
     ) -> None:
         super().__init__()
         self._numEpochsViewController = SpinBoxParameterViewController(
@@ -138,6 +150,46 @@ class PtyChiReconstructorViewController(ParameterViewController):
 
         layout.addRow('Precision:', self._precisionViewController.getWidget())
         layout.addRow(self._useLowMemoryViewController.getWidget())
+
+        if autodiffSettings is not None:
+            self._lossFunctionViewController = ComboBoxParameterViewController(
+                autodiffSettings.lossFunction, enumerators.lossFunctions()
+            )
+            self._forwardModelClassViewController = ComboBoxParameterViewController(
+                autodiffSettings.forwardModelClass, enumerators.forwardModels()
+            )
+
+        if dmSettings is not None:
+            self._exitWaveUpdateRelaxationViewController = DecimalSliderParameterViewController(
+                dmSettings.exitWaveUpdateRelaxation
+            )
+            self._chunkLengthViewController = SpinBoxParameterViewController(dmSettings.chunkLength)
+
+        if lsqmlSettings is not None:
+            self._noiseModelViewController = ComboBoxParameterViewController(
+                lsqmlSettings.noiseModel, enumerators.noiseModels()
+            )
+            self._gaussianNoiseDeviationViewController = DecimalLineEditParameterViewController(
+                lsqmlSettings.gaussianNoiseDeviation
+            )
+            self._solveObjectProbeStepSizeJointlyForFirstSliceInMultisliceViewController = (
+                CheckBoxParameterViewController(
+                    lsqmlSettings.solveObjectProbeStepSizeJointlyForFirstSliceInMultislice,
+                    'SolveObjectProbeStepSizeJointlyForFirstSliceInMultislice',
+                )
+            )
+            self._solveStepSizesOnlyUsingFirstProbeModeViewController = (
+                CheckBoxParameterViewController(
+                    lsqmlSettings.solveStepSizesOnlyUsingFirstProbeMode,
+                    'SolveStepSizesOnlyUsingFirstProbeMode',
+                )
+            )
+            self._momentumAccelerationGainViewController = DecimalLineEditParameterViewController(
+                lsqmlSettings.momentumAccelerationGain
+            )
+            # FIXME custom view controller
+            # FIXME self.useMomentumAccelerationGradientMixingFactor = (
+            # FIXME self.momentumAccelerationGradientMixingFactor = self._settingsGroup.createRealParameter(
 
         self._widget.setLayout(layout)
 

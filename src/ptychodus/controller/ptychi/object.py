@@ -7,7 +7,13 @@ from ptychodus.api.parametric import (
     StringParameter,
 )
 
-from ...model.ptychi import PtyChiEnumerators, PtyChiObjectSettings
+from ...model.ptychi import (
+    PtyChiDMSettings,
+    PtyChiEnumerators,
+    PtyChiLSQMLSettings,
+    PtyChiObjectSettings,
+    PtyChiPIESettings,
+)
 from ..parametric import (
     CheckBoxParameterViewController,
     CheckableGroupBoxParameterViewController,
@@ -209,6 +215,9 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
         settings: PtyChiObjectSettings,
         num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
+        dmSettings: PtyChiDMSettings | None = None,
+        lsqmlSettings: PtyChiLSQMLSettings | None = None,
+        pieSettings: PtyChiPIESettings | None = None,
     ) -> None:
         super().__init__(
             settings.isOptimizable, 'Optimize Object', tool_tip='Whether the object is optimizable.'
@@ -289,4 +298,14 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
         layout.addRow(self._constrainTotalVariationViewController.getWidget())
         layout.addRow(self._removeGridArtifactsViewController.getWidget())
         layout.addRow(self._regularizeMultisliceViewController.getWidget())
+
+        if dmSettings is not None:
+            pass  # FIXME
+
+        if lsqmlSettings is not None:
+            pass  # FIXME
+
+        if pieSettings is not None:
+            pass  # FIXME
+
         self.getWidget().setLayout(layout)

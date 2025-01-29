@@ -7,7 +7,12 @@ from ptychodus.api.parametric import (
     StringParameter,
 )
 
-from ...model.ptychi import PtyChiEnumerators, PtyChiProbeSettings
+from ...model.ptychi import (
+    PtyChiEnumerators,
+    PtyChiLSQMLSettings,
+    PtyChiPIESettings,
+    PtyChiProbeSettings,
+)
 from ..parametric import (
     CheckableGroupBoxParameterViewController,
     ComboBoxParameterViewController,
@@ -151,6 +156,8 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
         settings: PtyChiProbeSettings,
         num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
+        lsqmlSettings: PtyChiLSQMLSettings | None = None,
+        pieSettings: PtyChiPIESettings | None = None,
     ) -> None:
         super().__init__(
             settings.isOptimizable, 'Optimize Probe', tool_tip='Whether the probe is optimizable.'
@@ -222,4 +229,11 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
         layout.addRow(self._constrainSupportViewController.getWidget())
         layout.addRow(self._constrainCenterViewController.getWidget())
         layout.addRow(self._relaxEigenmodeUpdateViewController.getWidget())
+
+        if lsqmlSettings is not None:
+            pass  # FIXME
+
+        if pieSettings is not None:
+            pass  # FIXME
+
         self.getWidget().setLayout(layout)

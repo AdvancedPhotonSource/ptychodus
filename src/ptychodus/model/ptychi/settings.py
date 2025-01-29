@@ -364,7 +364,7 @@ class PtyChiOPRSettings(Observable, Observer):
             self.notifyObservers()
 
 
-class PtyChiAutodiffSettings(Observable, Observer):  # FIXME to view
+class PtyChiAutodiffSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
         self._settingsGroup = registry.createGroup('PtyChiAutodiff')
