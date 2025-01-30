@@ -69,12 +69,19 @@ class PtyChiUpdateMagnitudeLimitViewController(CheckableGroupBoxParameterViewCon
     def __init__(
         self,
         limitMagnitudeUpdate: BooleanParameter,
+        start: IntegerParameter,
+        stop: IntegerParameter,
+        stride: IntegerParameter,
         magnitudeUpdateLimit: RealParameter,
+        num_epochs: IntegerParameter,
     ) -> None:
         super().__init__(
             limitMagnitudeUpdate,
             'Limit Update Magnitude',
             tool_tip='Limit the magnitude of the probe update.',
+        )
+        self._planViewController = PtyChiOptimizationPlanViewController(
+            start, stop, stride, num_epochs
         )
         self._viewController = DecimalLineEditParameterViewController(
             magnitudeUpdateLimit,
@@ -82,6 +89,7 @@ class PtyChiUpdateMagnitudeLimitViewController(CheckableGroupBoxParameterViewCon
         )
 
         layout = QFormLayout()
+        layout.addRow('Plan:', self._planViewController.getWidget())
         layout.addRow('Limit:', self._viewController.getWidget())
         self.getWidget().setLayout(layout)
 
@@ -123,7 +131,11 @@ class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewControlle
         )
         self._magnitudeUpdateLimitViewController = PtyChiUpdateMagnitudeLimitViewController(
             settings.limitMagnitudeUpdate,
+            settings.limitMagnitudeUpdateStart,
+            settings.limitMagnitudeUpdateStop,
+            settings.limitMagnitudeUpdateStride,
             settings.magnitudeUpdateLimit,
+            num_epochs,
         )
         self._constrainCentroidViewController = CheckBoxParameterViewController(
             settings.constrainCentroid,
