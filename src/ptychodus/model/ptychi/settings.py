@@ -380,7 +380,7 @@ class PtyChiAutodiffSettings(Observable, Observer):
             self.notifyObservers()
 
 
-class PtyChiDMSettings(Observable, Observer):  # FIXME to view
+class PtyChiDMSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
         self._settingsGroup = registry.createGroup('PtyChiDM')
@@ -399,7 +399,7 @@ class PtyChiDMSettings(Observable, Observer):  # FIXME to view
             self.notifyObservers()
 
 
-class PtyChiLSQMLSettings(Observable, Observer):  # FIXME to view
+class PtyChiLSQMLSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
         self._settingsGroup = registry.createGroup('PtyChiLSQML')
@@ -430,7 +430,7 @@ class PtyChiLSQMLSettings(Observable, Observer):  # FIXME to view
         )
 
         self.probeOptimalStepSizeScaler = self._settingsGroup.createRealParameter(
-            'ProbeOptimalStepSizeScaler', 0.9
+            'ProbeOptimalStepSizeScaler', 0.9, minimum=0.0
         )
         self.objectOptimalStepSizeScaler = self._settingsGroup.createRealParameter(
             'ObjectOptimalStepSizeScaler', 0.9, minimum=0.0
@@ -444,7 +444,7 @@ class PtyChiLSQMLSettings(Observable, Observer):  # FIXME to view
             self.notifyObservers()
 
 
-class PtyChiPIESettings(Observable, Observer):  # FIXME to view
+class PtyChiPIESettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
         self._settingsGroup = registry.createGroup('PtyChiPIE')

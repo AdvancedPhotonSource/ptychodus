@@ -213,11 +213,11 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
         settings: PtyChiObjectSettings,
+        dmSettings: PtyChiDMSettings | None,
+        lsqmlSettings: PtyChiLSQMLSettings | None,
+        pieSettings: PtyChiPIESettings | None,
         num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
-        dmSettings: PtyChiDMSettings | None = None,
-        lsqmlSettings: PtyChiLSQMLSettings | None = None,
-        pieSettings: PtyChiPIESettings | None = None,
     ) -> None:
         super().__init__(
             settings.isOptimizable, 'Optimize Object', tool_tip='Whether the object is optimizable.'
@@ -300,12 +300,33 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
         layout.addRow(self._regularizeMultisliceViewController.getWidget())
 
         if dmSettings is not None:
-            pass  # FIXME
+            self._amplitudeClampLimitViewController = DecimalLineEditParameterViewController(
+                dmSettings.objectAmplitudeClampLimit,
+                tool_tip='Maximum amplitude value for the object.',
+            )
+            layout.addRow(
+                'Amplitude Clamp Limit:', self._amplitudeClampLimitViewController.getWidget()
+            )
 
         if lsqmlSettings is not None:
-            pass  # FIXME
+            self._objectOptimalStepSizeScalerViewController = (
+                DecimalLineEditParameterViewController(lsqmlSettings.objectOptimalStepSizeScaler)
+            )
+            layout.addRow(
+                'Optimal Step Size Scaler:',
+                self._objectOptimalStepSizeScalerViewController.getWidget(),
+            )
+
+            self._objectMultimodalUpdateViewController = CheckBoxParameterViewController(
+                lsqmlSettings.objectMultimodalUpdate,
+                'Multimodal Update',
+            )
+            layout.addRow(self._objectMultimodalUpdateViewController.getWidget())
 
         if pieSettings is not None:
-            pass  # FIXME
+            self._alphaViewController = DecimalSliderParameterViewController(
+                pieSettings.objectAlpha
+            )
+            layout.addRow('Alpha:', self._alphaViewController.getWidget())
 
         self.getWidget().setLayout(layout)

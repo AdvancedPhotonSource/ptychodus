@@ -154,10 +154,10 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
         settings: PtyChiProbeSettings,
+        lsqmlSettings: PtyChiLSQMLSettings | None,
+        pieSettings: PtyChiPIESettings | None,
         num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
-        lsqmlSettings: PtyChiLSQMLSettings | None = None,
-        pieSettings: PtyChiPIESettings | None = None,
     ) -> None:
         super().__init__(
             settings.isOptimizable, 'Optimize Probe', tool_tip='Whether the probe is optimizable.'
@@ -228,12 +228,21 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
         layout.addRow(self._orthogonalizeOPRModesViewController.getWidget())
         layout.addRow(self._constrainSupportViewController.getWidget())
         layout.addRow(self._constrainCenterViewController.getWidget())
-        layout.addRow(self._relaxEigenmodeUpdateViewController.getWidget())
+        layout.addRow(
+            'Relax Eigenmode Update:', self._relaxEigenmodeUpdateViewController.getWidget()
+        )
 
         if lsqmlSettings is not None:
-            pass  # FIXME
+            self._probeOptimalStepSizeScalerViewController = DecimalLineEditParameterViewController(
+                lsqmlSettings.probeOptimalStepSizeScaler
+            )
+            layout.addRow(
+                'Optimal Step Size Scaler:',
+                self._probeOptimalStepSizeScalerViewController.getWidget(),
+            )
 
         if pieSettings is not None:
-            pass  # FIXME
+            self._probeAlpha = DecimalSliderParameterViewController(pieSettings.probeAlpha)
+            layout.addRow('Alpha:', self._probeAlpha.getWidget())
 
         self.getWidget().setLayout(layout)

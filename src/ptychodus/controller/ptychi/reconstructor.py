@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
 )
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import BooleanParameter
+from ptychodus.api.parametric import BooleanParameter, RealParameter
 
 from ...model.ptychi import (
     PtyChiAutodiffSettings,
@@ -97,15 +97,37 @@ class PtyChiPrecisionParameterViewController(ParameterViewController, Observer):
             self._syncModelToView()
 
 
+class PtyChiMomentumAccelerationGradientMixingFactorViewController(
+    CheckableGroupBoxParameterViewController
+):
+    def __init__(
+        self,
+        useGradientMixingFactor: BooleanParameter,
+        gradientMixingFactor: RealParameter,
+    ) -> None:
+        super().__init__(
+            useGradientMixingFactor,
+            'Use Gradient Mixing Factor',
+            tool_tip='Controls how the current gradient is mixed with the accumulated velocity in LSQML momentum acceleration.',
+        )
+        self._gradientMixingFactorViewController = DecimalLineEditParameterViewController(
+            gradientMixingFactor
+        )
+
+        layout = QVBoxLayout()
+        layout.addWidget(self._gradientMixingFactorViewController.getWidget())
+        self.getWidget().setLayout(layout)
+
+
 class PtyChiReconstructorViewController(ParameterViewController):
     def __init__(
         self,
         settings: PtyChiReconstructorSettings,
+        autodiffSettings: PtyChiAutodiffSettings | None,
+        dmSettings: PtyChiDMSettings | None,
+        lsqmlSettings: PtyChiLSQMLSettings | None,
         enumerators: PtyChiEnumerators,
         repository: PtyChiDeviceRepository,
-        autodiffSettings: PtyChiAutodiffSettings | None = None,
-        dmSettings: PtyChiDMSettings | None = None,
-        lsqmlSettings: PtyChiLSQMLSettings | None = None,
     ) -> None:
         super().__init__()
         self._numEpochsViewController = SpinBoxParameterViewController(
@@ -155,41 +177,71 @@ class PtyChiReconstructorViewController(ParameterViewController):
             self._lossFunctionViewController = ComboBoxParameterViewController(
                 autodiffSettings.lossFunction, enumerators.lossFunctions()
             )
+            layout.addRow('Loss Function:', self._lossFunctionViewController.getWidget())
+
             self._forwardModelClassViewController = ComboBoxParameterViewController(
                 autodiffSettings.forwardModelClass, enumerators.forwardModels()
             )
+            layout.addRow('Forward Model:', self._forwardModelClassViewController.getWidget())
 
         if dmSettings is not None:
             self._exitWaveUpdateRelaxationViewController = DecimalSliderParameterViewController(
                 dmSettings.exitWaveUpdateRelaxation
             )
+            layout.addRow(
+                'Exit Wave Update Relaxation:',
+                self._exitWaveUpdateRelaxationViewController.getWidget(),
+            )
+
             self._chunkLengthViewController = SpinBoxParameterViewController(dmSettings.chunkLength)
+            layout.addRow('Chunk Length:', self._chunkLengthViewController.getWidget())
 
         if lsqmlSettings is not None:
             self._noiseModelViewController = ComboBoxParameterViewController(
                 lsqmlSettings.noiseModel, enumerators.noiseModels()
             )
+            layout.addRow('Noise Model:', self._noiseModelViewController.getWidget())
+
             self._gaussianNoiseDeviationViewController = DecimalLineEditParameterViewController(
                 lsqmlSettings.gaussianNoiseDeviation
             )
+            layout.addRow(
+                'Gaussian Noise Deviation:', self._gaussianNoiseDeviationViewController.getWidget()
+            )
+
             self._solveObjectProbeStepSizeJointlyForFirstSliceInMultisliceViewController = (
                 CheckBoxParameterViewController(
                     lsqmlSettings.solveObjectProbeStepSizeJointlyForFirstSliceInMultislice,
                     'SolveObjectProbeStepSizeJointlyForFirstSliceInMultislice',
                 )
             )
+            layout.addRow(
+                self._solveObjectProbeStepSizeJointlyForFirstSliceInMultisliceViewController.getWidget()
+            )
+
             self._solveStepSizesOnlyUsingFirstProbeModeViewController = (
                 CheckBoxParameterViewController(
                     lsqmlSettings.solveStepSizesOnlyUsingFirstProbeMode,
                     'SolveStepSizesOnlyUsingFirstProbeMode',
                 )
             )
+            layout.addRow(self._solveStepSizesOnlyUsingFirstProbeModeViewController.getWidget())
+
             self._momentumAccelerationGainViewController = DecimalLineEditParameterViewController(
                 lsqmlSettings.momentumAccelerationGain
             )
-            # FIXME custom view controller
-            # FIXME self.useMomentumAccelerationGradientMixingFactor = (
-            # FIXME self.momentumAccelerationGradientMixingFactor = self._settingsGroup.createRealParameter(
+            layout.addRow(
+                'Momentum Acceleration Gain:',
+                self._momentumAccelerationGainViewController.getWidget(),
+            )
+
+            self._momentumAccelerationGradientMixingFactorViewController = (
+                PtyChiMomentumAccelerationGradientMixingFactorViewController(
+                    lsqmlSettings.useMomentumAccelerationGradientMixingFactor,
+                    lsqmlSettings.momentumAccelerationGradientMixingFactor,
+                )
+            )
+            layout.addRow(self._momentumAccelerationGradientMixingFactorViewController.getWidget())
 
         self._widget.setLayout(layout)
 
