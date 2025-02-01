@@ -4,15 +4,16 @@ import logging
 from ptychodus.api.settings import SettingsRegistry
 
 from .argo import Argo
+from .repository import ChatMessage, ChatMessageSender, ChatRepository
 from .settings import ArgoSettings
 
 logger = logging.getLogger(__name__)
 
 
 class AgentPresenter:
-    def __init__(self, argo: Argo) -> None:
+    def __init__(self, repository: ChatRepository, argo: Argo) -> None:
+        self._repository = repository
         self._argo = argo
-        self._messages: list[str] = []
 
     def get_available_models(self) -> Iterator[str]:
         for model in [
@@ -26,23 +27,20 @@ class AgentPresenter:
         ]:
             yield model
 
-    def get_message(self, index: int) -> str:
-        return self._messages[index]
-
-    def get_number_of_messages(self) -> int:
-        return len(self._messages)
-
-    def send_message(self, message: str) -> None:
-        if message:
+    def send_message(self, text: str) -> None:
+        if text:
             # FIXME system = 'You are a large language model with the name Argo.'
-            prompt = message.splitlines()
+            prompt = text.splitlines()
             # FIXME self._argo.invoke(prompt, system)
             logger.info(prompt)
-            self._messages.append(message)
+
+            message = ChatMessage(sender=ChatMessageSender.HUMAN, contents=text)
+            self._repository.append(message)
 
 
 class AgentCore:
     def __init__(self, settingsRegistry: SettingsRegistry):
         self.argoSettings = ArgoSettings(settingsRegistry)
+        self.chatRepository = ChatRepository()
         self._argo = Argo(self.argoSettings)
-        self.presenter = AgentPresenter(self._argo)
+        self.presenter = AgentPresenter(self.chatRepository, self._argo)

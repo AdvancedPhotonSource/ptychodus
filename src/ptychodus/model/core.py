@@ -21,7 +21,7 @@ from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.workflow import WorkflowAPI
 
-from .agent import AgentCore, AgentPresenter, ArgoSettings
+from .agent import AgentCore, AgentPresenter, ArgoSettings, ChatRepository
 from .analysis import (
     AnalysisCore,
     ExposureAnalyzer,
@@ -425,9 +425,13 @@ class ModelCore:
         return self._automationCore.processingPresenter
 
     @property
+    def argoSettings(self) -> ArgoSettings:
+        return self._agentCore.argoSettings
+
+    @property
     def agentPresenter(self) -> AgentPresenter:
         return self._agentCore.presenter
 
     @property
-    def argoSettings(self) -> ArgoSettings:
-        return self._agentCore.argoSettings
+    def chatRepository(self) -> ChatRepository:
+        return self._agentCore.chatRepository

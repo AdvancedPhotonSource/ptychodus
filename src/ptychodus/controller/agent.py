@@ -4,7 +4,13 @@ from PyQt5.QtCore import QAbstractListModel, QEvent, QModelIndex, QObject, Qt
 from PyQt5.QtGui import QKeyEvent
 from PyQt5.QtWidgets import QFormLayout, QGroupBox, QVBoxLayout
 
-from ..model.agent import AgentPresenter, ArgoSettings
+from ..model.agent import (
+    AgentPresenter,
+    ArgoSettings,
+    ChatMessage,
+    ChatRepository,
+    ChatRepositoryObserver,
+)
 from ..view.agent import AgentChatView, AgentInputView, AgentView
 from .parametric import (
     ComboBoxParameterViewController,
@@ -17,18 +23,19 @@ __all__ = ['AgentChatController', 'AgentController']
 
 
 class AgentMessageListModel(QAbstractListModel):
-    def __init__(self, presenter: AgentPresenter, parent: QObject | None = None) -> None:
+    def __init__(self, model: ChatRepository, parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._presenter = presenter
+        self._model = model
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
             # FIXME indicate sent vs received
             # FIXME make clearable
-            return self._presenter.get_message(index.row())
+            message = self._model[index.row()]
+            return message.contents
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return self._presenter.get_number_of_messages()
+        return len(self._model)
 
 
 class AgentInputController(QObject):
@@ -47,30 +54,38 @@ class AgentInputController(QObject):
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         if obj == self._view.textEdit and isinstance(event, QKeyEvent):
-            isShiftPressed = event.modifiers() & Qt.KeyboardModifier.ShiftModifier
+            is_shift_pressed = event.modifiers() & Qt.KeyboardModifier.ShiftModifier
 
             # require shift+enter for new line, otherwise send on enter
-            if event.key() in (Qt.Key_Enter, Qt.Key_Return) and not isShiftPressed:
+            if event.key() in (Qt.Key_Enter, Qt.Key_Return) and not is_shift_pressed:
                 self._send_message()
                 return True
 
         return super().eventFilter(obj, event)
 
 
-class AgentChatController:
-    def __init__(self, presenter: AgentPresenter, view: AgentChatView) -> None:
+class AgentChatController(ChatRepositoryObserver):
+    def __init__(
+        self, repository: ChatRepository, presenter: AgentPresenter, view: AgentChatView
+    ) -> None:
+        super().__init__()
+        self._repository = repository
         self._presenter = presenter
         self._view = view
-        self._messageListModel = AgentMessageListModel(presenter)
-        self._inputController = AgentInputController(presenter, view.inputView)
+        self._message_list_model = AgentMessageListModel(repository)
+        self._input_controller = AgentInputController(presenter, view.inputView)
 
-        view.messageListView.setModel(self._messageListModel)
+        view.messageListView.setModel(self._message_list_model)
+        repository.add_observer(self)
 
+    def handle_new_message(self, message: ChatMessage, index: int) -> None:
+        parent = QModelIndex()
+        self._message_list_model.beginInsertRows(parent, index, index)
+        self._message_list_model.endInsertRows()
 
-#     def handleNewMessage(self, index: int, item: ProductRepositoryItem) -> None: # FIXME
-#         parent = QModelIndex()
-#         self._messageListModel.beginInsertRows(parent, index, index)
-#         self._messageListModel.endInsertRows()
+    def handle_chat_cleared(self) -> None:
+        self._message_list_model.beginResetModel()
+        self._message_list_model.endResetModel()
 
 
 class AgentController:
