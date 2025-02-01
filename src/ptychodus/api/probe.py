@@ -79,7 +79,7 @@ class Probe:
         pixelGeometry: PixelGeometry | None,
     ) -> None:
         if array is None:
-            self._array = numpy.zeros((1, 1, 0, 0), dtype=complex)
+            self._array: WavefieldArrayType = numpy.zeros((1, 1, 0, 0), dtype=complex)
         elif numpy.iscomplexobj(array):
             match array.ndim:
                 case 2:

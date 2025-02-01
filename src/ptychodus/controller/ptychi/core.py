@@ -1,6 +1,13 @@
 from PyQt5.QtWidgets import QVBoxLayout, QWidget
 
-from ...model.ptychi import PtyChiReconstructorLibrary
+from ...model.ptychi import (
+    PtyChiAutodiffSettings,
+    PtyChiDMSettings,
+    PtyChiLSQMLSettings,
+    PtyChiPIESettings,
+    PtyChiReconstructorLibrary,
+)
+
 from ..reconstructor import ReconstructorViewControllerFactory
 from .object import PtyChiObjectViewController
 from .opr import PtyChiOPRViewController
@@ -12,16 +19,51 @@ __all__ = ['PtyChiViewControllerFactory']
 
 
 class PtyChiViewController(QWidget):
-    def __init__(self, model: PtyChiReconstructorLibrary, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        model: PtyChiReconstructorLibrary,
+        reconstructorName: str,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
+        autodiffSettings: PtyChiAutodiffSettings | None = None
+        dmSettings: PtyChiDMSettings | None = None
+        lsqmlSettings: PtyChiLSQMLSettings | None = None
+        pieSettings: PtyChiPIESettings | None = None
+
+        match reconstructorName:
+            case 'Autodiff':
+                autodiffSettings = model.autodiffSettings
+            case 'DM':
+                dmSettings = model.dmSettings
+            case 'LSQML':
+                lsqmlSettings = model.lsqmlSettings
+            case 'PIE' | 'ePIE' | 'rPIE':
+                pieSettings = model.pieSettings
+
+        # FIXME verify tooltips
         self._reconstructorViewController = PtyChiReconstructorViewController(
-            model.reconstructorSettings, model.enumerators, model.deviceRepository
+            model.reconstructorSettings,
+            autodiffSettings,
+            dmSettings,
+            lsqmlSettings,
+            model.enumerators,
+            model.deviceRepository,
         )
         self._objectViewController = PtyChiObjectViewController(
-            model.objectSettings, model.reconstructorSettings.numEpochs, model.enumerators
+            model.objectSettings,
+            dmSettings,
+            lsqmlSettings,
+            pieSettings,
+            model.reconstructorSettings.numEpochs,
+            model.enumerators,
         )
         self._probeViewController = PtyChiProbeViewController(
-            model.probeSettings, model.reconstructorSettings.numEpochs, model.enumerators
+            model.probeSettings,
+            lsqmlSettings,
+            pieSettings,
+            model.reconstructorSettings.numEpochs,
+            model.enumerators,
         )
         self._probePositionsViewController = PtyChiProbePositionsViewController(
             model.probePositionSettings, model.reconstructorSettings.numEpochs, model.enumerators
@@ -50,4 +92,4 @@ class PtyChiViewControllerFactory(ReconstructorViewControllerFactory):
         return 'pty-chi'
 
     def createViewController(self, reconstructorName: str) -> QWidget:
-        return PtyChiViewController(self._model)
+        return PtyChiViewController(self._model, reconstructorName)
