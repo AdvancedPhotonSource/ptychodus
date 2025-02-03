@@ -45,5 +45,5 @@ class AgentChatView(QSplitter):
         self.addWidget(self.scrollArea)
         self.addWidget(self.inputView)
 
-        self.setStretchFactor(0, 1)
+        self.setStretchFactor(0, 2)
         self.setStretchFactor(1, 0)

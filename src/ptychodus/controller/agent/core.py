@@ -1,6 +1,6 @@
 from PyQt5.QtCore import QEvent, QModelIndex, QObject, Qt
 from PyQt5.QtGui import QKeyEvent
-from PyQt5.QtWidgets import QFormLayout, QGroupBox, QListView, QVBoxLayout
+from PyQt5.QtWidgets import QAbstractItemView, QFormLayout, QGroupBox, QListView, QVBoxLayout
 
 from ...model.agent import (
     AgentPresenter,
@@ -62,6 +62,7 @@ class AgentChatController(ChatRepositoryObserver):
         view.messageListView.setModel(self._message_list_model)
         view.messageListView.setItemDelegate(ChatBubbleItemDelegate())
         view.messageListView.setResizeMode(QListView.ResizeMode.Adjust)
+        view.messageListView.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
 
         repository.add_observer(self)
 
