@@ -37,6 +37,11 @@ class AgentPresenter:
             message = ChatMessage(sender=ChatMessageSender.HUMAN, contents=text)
             self._repository.append(message)
 
+            # FIXME BEGIN
+            messageAI = ChatMessage(sender=ChatMessageSender.AI, contents=text[::-1])
+            self._repository.append(messageAI)
+            # FIXME END
+
 
 class AgentCore:
     def __init__(self, settingsRegistry: SettingsRegistry):

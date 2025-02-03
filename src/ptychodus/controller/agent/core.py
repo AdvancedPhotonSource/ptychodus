@@ -1,41 +1,25 @@
-from typing import Any
-
-from PyQt5.QtCore import QAbstractListModel, QEvent, QModelIndex, QObject, Qt
+from PyQt5.QtCore import QEvent, QModelIndex, QObject, Qt
 from PyQt5.QtGui import QKeyEvent
-from PyQt5.QtWidgets import QFormLayout, QGroupBox, QVBoxLayout
+from PyQt5.QtWidgets import QFormLayout, QGroupBox, QListView, QVBoxLayout
 
-from ..model.agent import (
+from ...model.agent import (
     AgentPresenter,
     ArgoSettings,
     ChatMessage,
     ChatRepository,
     ChatRepositoryObserver,
 )
-from ..view.agent import AgentChatView, AgentInputView, AgentView
-from .parametric import (
+from ...view.agent import AgentChatView, AgentInputView, AgentView
+from ..parametric import (
     ComboBoxParameterViewController,
     DecimalSliderParameterViewController,
     LineEditParameterViewController,
     SpinBoxParameterViewController,
 )
+from .itemDelegate import ChatBubbleItemDelegate
+from .listModel import AgentMessageListModel
 
 __all__ = ['AgentChatController', 'AgentController']
-
-
-class AgentMessageListModel(QAbstractListModel):
-    def __init__(self, model: ChatRepository, parent: QObject | None = None) -> None:
-        super().__init__(parent)
-        self._model = model
-
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
-        if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
-            # FIXME indicate sent vs received
-            # FIXME make clearable
-            message = self._model[index.row()]
-            return message.contents
-
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return len(self._model)
 
 
 class AgentInputController(QObject):
@@ -76,6 +60,9 @@ class AgentChatController(ChatRepositoryObserver):
         self._input_controller = AgentInputController(presenter, view.inputView)
 
         view.messageListView.setModel(self._message_list_model)
+        view.messageListView.setItemDelegate(ChatBubbleItemDelegate())
+        view.messageListView.setResizeMode(QListView.ResizeMode.Adjust)
+
         repository.add_observer(self)
 
     def handle_new_message(self, message: ChatMessage, index: int) -> None:
