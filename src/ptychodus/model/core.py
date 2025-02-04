@@ -426,7 +426,7 @@ class ModelCore:
 
     @property
     def argoSettings(self) -> ArgoSettings:
-        return self._agentCore.argoSettings
+        return self._agentCore.settings
 
     @property
     def agentPresenter(self) -> AgentPresenter:
@@ -434,4 +434,4 @@ class ModelCore:
 
     @property
     def chatRepository(self) -> ChatRepository:
-        return self._agentCore.chatRepository
+        return self._agentCore.repository

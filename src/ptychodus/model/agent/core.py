@@ -3,7 +3,7 @@ import logging
 
 from ptychodus.api.settings import SettingsRegistry
 
-from .argo import Argo
+from .argo import ChatArgo
 from .repository import ChatMessage, ChatMessageSender, ChatRepository
 from .settings import ArgoSettings
 
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class AgentPresenter:
-    def __init__(self, repository: ChatRepository, argo: Argo) -> None:
+    def __init__(self, repository: ChatRepository, argo: ChatArgo) -> None:
         self._repository = repository
         self._argo = argo
 
@@ -44,8 +44,10 @@ class AgentPresenter:
 
 
 class AgentCore:
-    def __init__(self, settingsRegistry: SettingsRegistry):
-        self.argoSettings = ArgoSettings(settingsRegistry)
-        self.chatRepository = ChatRepository()
-        self._argo = Argo(self.argoSettings)
-        self.presenter = AgentPresenter(self.chatRepository, self._argo)
+    # FIXME langchain-chroma for RAG
+
+    def __init__(self, settings_registry: SettingsRegistry):
+        self.settings = ArgoSettings(settings_registry)
+        self.repository = ChatRepository()
+        self._argo = ChatArgo(settings=self.settings)
+        self.presenter = AgentPresenter(self.repository, self._argo)
