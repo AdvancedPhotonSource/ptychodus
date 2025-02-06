@@ -5,9 +5,9 @@ from PyQt5.QtWidgets import QAbstractItemView, QFormLayout, QGroupBox, QListView
 from ...model.agent import (
     AgentPresenter,
     ArgoSettings,
+    ChatHistory,
     ChatMessage,
-    ChatRepository,
-    ChatRepositoryObserver,
+    ChatObserver,
 )
 from ...view.agent import AgentChatView, AgentInputView, AgentView
 from ..parametric import (
@@ -48,15 +48,15 @@ class AgentInputController(QObject):
         return super().eventFilter(obj, event)
 
 
-class AgentChatController(ChatRepositoryObserver):
+class AgentChatController(ChatObserver):
     def __init__(
-        self, repository: ChatRepository, presenter: AgentPresenter, view: AgentChatView
+        self, history: ChatHistory, presenter: AgentPresenter, view: AgentChatView
     ) -> None:
         super().__init__()
-        self._repository = repository
+        self._history = history
         self._presenter = presenter
         self._view = view
-        self._message_list_model = AgentMessageListModel(repository)
+        self._message_list_model = AgentMessageListModel(history)
         self._input_controller = AgentInputController(presenter, view.inputView)
 
         view.messageListView.setModel(self._message_list_model)
@@ -64,7 +64,7 @@ class AgentChatController(ChatRepositoryObserver):
         view.messageListView.setResizeMode(QListView.ResizeMode.Adjust)
         view.messageListView.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
 
-        repository.add_observer(self)
+        history.add_observer(self)
 
     def handle_new_message(self, message: ChatMessage, index: int) -> None:
         parent = QModelIndex()

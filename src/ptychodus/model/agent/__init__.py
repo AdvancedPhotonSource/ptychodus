@@ -1,13 +1,13 @@
+from .chat import ChatMessage, ChatHistory, ChatObserver, ChatRole
 from .core import AgentCore, AgentPresenter
 from .settings import ArgoSettings
-from .repository import ChatMessage, ChatMessageSender, ChatRepository, ChatRepositoryObserver
 
 __all__ = [
     'AgentCore',
     'AgentPresenter',
     'ArgoSettings',
+    'ChatHistory',
     'ChatMessage',
-    'ChatMessageSender',
-    'ChatRepository',
-    'ChatRepositoryObserver',
+    'ChatObserver',
+    'ChatRole',
 ]

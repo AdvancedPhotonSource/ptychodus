@@ -14,7 +14,6 @@ dependencies = [
     "matplotlib",
     "numpy",
     "psutil",
-    "requests",
     "scikit-image",
     "scipy",
     "tables",

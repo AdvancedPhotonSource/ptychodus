@@ -1,4 +1,5 @@
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, cast
 import json
 import logging
 import requests
@@ -16,6 +17,7 @@ from langchain_core.messages import (
     ToolCall,
     ToolMessage,
 )
+from langchain_core.output_parsers.openai_tools import make_invalid_tool_call, parse_tool_call
 from langchain_core.outputs import ChatGeneration, ChatResult
 
 from .settings import ArgoSettings
@@ -31,6 +33,17 @@ logger = logging.getLogger(__name__)
 # BEGIN COPY
 
 
+def _lc_tool_call_to_openai_tool_call(tool_call: ToolCall) -> dict:
+    return {
+        'type': 'function',
+        'id': tool_call['id'],
+        'function': {
+            'name': tool_call['name'],
+            'arguments': json.dumps(tool_call['args']),
+        },
+    }
+
+
 def _lc_invalid_tool_call_to_openai_tool_call(
     invalid_tool_call: InvalidToolCall,
 ) -> dict:
@@ -44,15 +57,74 @@ def _lc_invalid_tool_call_to_openai_tool_call(
     }
 
 
-def _lc_tool_call_to_openai_tool_call(tool_call: ToolCall) -> dict:
-    return {
-        'type': 'function',
-        'id': tool_call['id'],
-        'function': {
-            'name': tool_call['name'],
-            'arguments': json.dumps(tool_call['args']),
-        },
-    }
+def _convert_dict_to_message(_dict: Mapping[str, Any]) -> BaseMessage:
+    """Convert a dictionary to a LangChain message.
+
+    Args:
+        _dict: The dictionary.
+
+    Returns:
+        The LangChain message.
+    """
+    role = _dict.get('role')
+    name = _dict.get('name')
+    id_ = _dict.get('id')
+    if role == 'user':
+        return HumanMessage(content=_dict.get('content', ''), id=id_, name=name)
+    elif role == 'assistant':
+        # Fix for azure
+        # Also OpenAI returns None for tool invocations
+        content = _dict.get('content', '') or ''
+        additional_kwargs: dict = {}
+        if function_call := _dict.get('function_call'):
+            additional_kwargs['function_call'] = dict(function_call)
+        tool_calls = []
+        invalid_tool_calls = []
+        if raw_tool_calls := _dict.get('tool_calls'):
+            additional_kwargs['tool_calls'] = raw_tool_calls
+            for raw_tool_call in raw_tool_calls:
+                try:
+                    tool_calls.append(parse_tool_call(raw_tool_call, return_id=True))
+                except Exception as e:
+                    invalid_tool_calls.append(make_invalid_tool_call(raw_tool_call, str(e)))
+        if audio := _dict.get('audio'):
+            additional_kwargs['audio'] = audio
+        return AIMessage(
+            content=content,
+            additional_kwargs=additional_kwargs,
+            name=name,
+            id=id_,
+            tool_calls=tool_calls,
+            invalid_tool_calls=invalid_tool_calls,
+        )
+    elif role in ('system', 'developer'):
+        if role == 'developer':
+            additional_kwargs = {'__openai_role__': role}
+        else:
+            additional_kwargs = {}
+        return SystemMessage(
+            content=_dict.get('content', ''),
+            name=name,
+            id=id_,
+            additional_kwargs=additional_kwargs,
+        )
+    elif role == 'function':
+        return FunctionMessage(
+            content=_dict.get('content', ''), name=cast(str, _dict.get('name')), id=id_
+        )
+    elif role == 'tool':
+        additional_kwargs = {}
+        if 'name' in _dict:
+            additional_kwargs['name'] = _dict['name']
+        return ToolMessage(
+            content=_dict.get('content', ''),
+            tool_call_id=cast(str, _dict.get('tool_call_id')),
+            additional_kwargs=additional_kwargs,
+            name=name,
+            id=id_,
+        )
+    else:
+        return ChatMessage(content=_dict.get('content', ''), role=role, id=id_)  # type: ignore[arg-type]
 
 
 def _format_message_content(content: Any) -> Any:
@@ -168,6 +240,7 @@ class ChatArgo(BaseChatModel):
         response.raise_for_status()
 
         content = response_json['response']
+        # FIXME _convert_dict_to_message
         message = AIMessage(content=content)
         generation = ChatGeneration(message=message)
         return ChatResult(generations=[generation])

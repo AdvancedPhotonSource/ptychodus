@@ -5,18 +5,18 @@ from enum import Enum, auto
 from typing import overload
 
 
-class ChatMessageSender(Enum):
+class ChatRole(Enum):
     HUMAN = auto()
     AI = auto()
 
 
 @dataclass(frozen=True)
 class ChatMessage:
-    sender: ChatMessageSender
-    contents: str
+    role: ChatRole
+    content: str
 
 
-class ChatRepositoryObserver(ABC):
+class ChatObserver(ABC):
     @abstractmethod
     def handle_new_message(self, message: ChatMessage, index: int) -> None:
         pass
@@ -26,14 +26,10 @@ class ChatRepositoryObserver(ABC):
         pass
 
 
-class ChatRepository(Sequence[ChatMessage]):
+class ChatHistory(Sequence[ChatMessage]):
     def __init__(self) -> None:
-        self._observers: list[ChatRepositoryObserver] = []
         self._messages: list[ChatMessage] = []
-
-    def add_observer(self, observer: ChatRepositoryObserver) -> None:
-        if observer not in self._observers:
-            self._observers.append(observer)
+        self._observers: list[ChatObserver] = []
 
     @overload
     def __getitem__(self, index: int) -> ChatMessage: ...
@@ -47,7 +43,11 @@ class ChatRepository(Sequence[ChatMessage]):
     def __len__(self) -> int:
         return len(self._messages)
 
-    def append(self, message: ChatMessage) -> None:
+    def add_observer(self, observer: ChatObserver) -> None:
+        if observer not in self._observers:
+            self._observers.append(observer)
+
+    def add_message(self, message: ChatMessage) -> None:
         index = len(self._messages)
         self._messages.append(message)
 

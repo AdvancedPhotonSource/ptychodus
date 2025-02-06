@@ -141,7 +141,7 @@ class ControllerCore:
             model.argoSettings, model.agentPresenter, view.agentView
         )
         self._agentChatController = AgentChatController(
-            model.chatRepository, model.agentPresenter, view.agentChatView
+            model.chatHistory, model.agentPresenter, view.agentChatView
         )
 
         self._refreshDataTimer = QTimer()

@@ -1,19 +1,45 @@
 from collections.abc import Iterator
 import logging
 
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+
 from ptychodus.api.settings import SettingsRegistry
 
 from .argo import ChatArgo
-from .repository import ChatMessage, ChatMessageSender, ChatRepository
+from .chat import ChatHistory, ChatMessage, ChatRole
 from .settings import ArgoSettings
 
 logger = logging.getLogger(__name__)
 
 
+class ChatFacade:
+    def __init__(self, settings: ArgoSettings, history: ChatHistory) -> None:
+        self._argo = ChatArgo(settings=settings)
+        self._history = history
+
+    def send_message(self, content: str) -> None:
+        if content:
+            system = SystemMessage(content='You are a large language model with the name Argo.')
+            messages: list[BaseMessage] = [system]
+
+            for line in content.splitlines():
+                message = HumanMessage(content=line)
+                messages.append(message)
+
+                hmessage = ChatMessage(role=ChatRole.HUMAN, content=str(message.content))
+                self._history.add_message(hmessage)
+
+            logger.debug(f'{messages=}')
+            response = self._argo.invoke(messages)
+            logger.debug(f'{response=}')
+
+            hmessage = ChatMessage(role=ChatRole.AI, content=str(response.content))
+            self._history.add_message(hmessage)
+
+
 class AgentPresenter:
-    def __init__(self, repository: ChatRepository, argo: ChatArgo) -> None:
-        self._repository = repository
-        self._argo = argo
+    def __init__(self, facade: ChatFacade) -> None:
+        self._facade = facade
 
     def get_available_models(self) -> Iterator[str]:
         for model in [
@@ -27,20 +53,8 @@ class AgentPresenter:
         ]:
             yield model
 
-    def send_message(self, text: str) -> None:
-        if text:
-            # FIXME system = 'You are a large language model with the name Argo.'
-            prompt = text.splitlines()
-            # FIXME self._argo.invoke(prompt, system)
-            logger.info(prompt)
-
-            message = ChatMessage(sender=ChatMessageSender.HUMAN, contents=text)
-            self._repository.append(message)
-
-            # FIXME BEGIN
-            messageAI = ChatMessage(sender=ChatMessageSender.AI, contents=text[::-1])
-            self._repository.append(messageAI)
-            # FIXME END
+    def send_message(self, content: str) -> None:
+        self._facade.send_message(content)
 
 
 class AgentCore:
@@ -48,6 +62,6 @@ class AgentCore:
 
     def __init__(self, settings_registry: SettingsRegistry):
         self.settings = ArgoSettings(settings_registry)
-        self.repository = ChatRepository()
-        self._argo = ChatArgo(settings=self.settings)
-        self.presenter = AgentPresenter(self.repository, self._argo)
+        self.history = ChatHistory()
+        self._facade = ChatFacade(self.settings, self.history)
+        self.presenter = AgentPresenter(self._facade)
