@@ -136,7 +136,10 @@ def vignett(img: NDArray, margin: int = 20, sigma: float = 1.0) -> NDArray:
         gauss_win = gauss_win / numpy.sum(gauss_win)
         mask = ndimage.convolve1d(mask, gauss_win, axis=i_dim, mode='constant')
         mask_final_slicer = [slice(None)] * i_dim + [slice(len(gauss_win), len(gauss_win) + margin)]
-        mask = mask[*mask_final_slicer]
+
+        for slicer in mask_final_slicer:
+            mask = mask[slicer]
+
         mask = numpy.where(mask < 1e-3, 0, mask)
 
         slicer = tuple([slice(None)] * i_dim + [slice(0, margin)])
