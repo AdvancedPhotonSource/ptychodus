@@ -36,7 +36,7 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-def create_raw_data(parameters: ReconstructInput, *, use_object_guess: bool) -> RawData:
+def create_raw_data(parameters: ReconstructInput) -> RawData:
     object_geometry = parameters.product.object_.getGeometry()
     position_x_px: list[float] = list()
     position_y_px: list[float] = list()
@@ -46,11 +46,6 @@ def create_raw_data(parameters: ReconstructInput, *, use_object_guess: bool) -> 
         position_x_px.append(object_point.positionXInPixels)
         position_y_px.append(object_point.positionYInPixels)
 
-    objectGuess: ObjectArrayType | None = None
-
-    if use_object_guess:
-        objectGuess = parameters.product.object_.getLayer(0)
-
     return RawData.from_coords_without_pc(
         xcoords=numpy.array(position_x_px),
         ycoords=numpy.array(position_y_px),
@@ -58,7 +53,7 @@ def create_raw_data(parameters: ReconstructInput, *, use_object_guess: bool) -> 
         probeGuess=parameters.product.probe.getIncoherentMode(0),
         # assume that all patches are from the same object
         scan_index=numpy.zeros(len(parameters.product.scan), dtype=int),
-        objectGuess=objectGuess,
+        objectGuess=parameters.product.object_.getLayer(0),
     )
 
 
@@ -130,7 +125,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         update_legacy_dict(ptycho.params.cfg, inference_config)
 
         # Create RawData
-        test_raw_data = create_raw_data(parameters, use_object_guess=False)
+        test_raw_data = create_raw_data(parameters)
         ptycho.probe.set_probe_guess(None, test_raw_data.probeGuess)
 
         # Group overlapping scan positions
@@ -195,10 +190,15 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         return self.TRAINING_DATA_FILE_FILTER
 
     def exportTrainingData(self, filePath: Path, parameters: ReconstructInput) -> None:
-        raw_data = create_raw_data(parameters, use_object_guess=False)
+        raw_data = create_raw_data(parameters)
         raw_data.to_file(filePath)
 
+    def getTrainingDataPath(self):
+        return self._training_settings.data_dir.getValue()
+
     def train(self, dataPath: Path) -> TrainOutput:
+        self._training_settings.data_dir.setValue(dataPath)
+
         test_raw_data = RawData.from_file(dataPath / 'test_data.npz')
         train_raw_data = RawData.from_file(dataPath / 'train_data.npz')
 

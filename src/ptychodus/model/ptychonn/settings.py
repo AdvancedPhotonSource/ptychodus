@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
@@ -27,6 +29,9 @@ class PtychoNNTrainingSettings(Observable, Observer):
         self._settingsGroup = registry.createGroup('PtychoNNTraining')
         self._settingsGroup.addObserver(self)
 
+        self.trainingDataPath = self._settingsGroup.createPathParameter(
+            'TrainingDataPath', Path('/path/to/training_data')
+        )
         self.validationSetFractionalSize = self._settingsGroup.createRealParameter(
             'ValidationSetFractionalSize', 0.1
         )

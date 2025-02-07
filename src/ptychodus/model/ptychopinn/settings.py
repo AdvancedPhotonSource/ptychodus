@@ -39,6 +39,10 @@ class PtychoPINNTrainingSettings(Observable, Observer):
         self._settings_group = registry.createGroup('PtychoPINNTraining')
         self._settings_group.addObserver(self)
 
+        self.nphotons = self._settings_group.createRealParameter('NPhotons', 1e6)  # FIXME remove
+        self.data_dir = self._settings_group.createPathParameter(
+            'data_dir', Path('/path/to/training_data')
+        )
         self.batch_size = self._settings_group.createIntegerParameter(
             'batch_size', 16, minimum=1, maximum=1 << 30
         )  # must be positive powers of two
