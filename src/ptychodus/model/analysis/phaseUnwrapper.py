@@ -334,7 +334,7 @@ def integrate_image_2d_fourier(grad_y: NDArray, grad_x: NDArray) -> NDArray:
     f = numpy.fft.fft2(grad_x + 1j * grad_y)
     y, x = numpy.fft.fftfreq(shape[0]), numpy.fft.fftfreq(shape[1])
 
-    r = numpy.exp(2j * numpy.pi * (x + y[:, None]))
+    r = 1.0
     r = r / (2j * numpy.pi * (x + 1j * y[:, None]))
     r[0, 0] = 0
     integrated_image = f * r
