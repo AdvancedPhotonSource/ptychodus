@@ -136,7 +136,9 @@ def vignett(img: NDArray, margin: int = 20, sigma: float = 1.0) -> NDArray:
         gauss_win = gauss_win / numpy.sum(gauss_win)
         mask = ndimage.convolve1d(mask, gauss_win, axis=i_dim, mode='constant')
         mask_final_slicer = [slice(None)] * i_dim + [slice(len(gauss_win), len(gauss_win) + margin)]
-        mask = mask[*mask_final_slicer]
+
+        mask = mask[tuple(mask_final_slicer)]
+
         mask = numpy.where(mask < 1e-3, 0, mask)
 
         slicer = tuple([slice(None)] * i_dim + [slice(0, margin)])
@@ -331,8 +333,8 @@ def integrate_image_2d_fourier(grad_y: NDArray, grad_x: NDArray) -> NDArray:
     f = numpy.fft.fft2(grad_x + 1j * grad_y)
     y, x = numpy.fft.fftfreq(shape[0]), numpy.fft.fftfreq(shape[1])
 
-    r = numpy.exp(2j * numpy.pi * (x + y[:, None]))
-    r = r / (2j * numpy.pi * (x + 1j * y[:, None]))
+    r = 1.0
+    r = r / (2j * numpy.pi * (x + 1j * y[:, None]) + 1e-15)
     r[0, 0] = 0
     integrated_image = f * r
     integrated_image = numpy.fft.ifft2(integrated_image)
