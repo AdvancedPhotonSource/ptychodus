@@ -1,6 +1,14 @@
 from PyQt5.QtCore import QEvent, QModelIndex, QObject, Qt
 from PyQt5.QtGui import QKeyEvent
-from PyQt5.QtWidgets import QAbstractItemView, QFormLayout, QGroupBox, QListView, QVBoxLayout
+from PyQt5.QtWidgets import (
+    QAbstractItemView,
+    QFormLayout,
+    QGroupBox,
+    QInputDialog,
+    QListView,
+    QPushButton,
+    QVBoxLayout,
+)
 
 from ...model.agent import (
     AgentPresenter,
@@ -78,37 +86,61 @@ class AgentChatController(ChatObserver):
 
 class AgentController:
     def __init__(self, settings: ArgoSettings, presenter: AgentPresenter, view: AgentView) -> None:
-        # FIXME tool_tip
-        self._chatEndpointURLViewController = LineEditParameterViewController(
-            settings.chatEndpointURL
-        )
-        self._embedEndpointURLViewController = LineEditParameterViewController(
-            settings.embedEndpointURL
-        )
+        self._settings = settings
+        self._presenter = presenter
+        self._view = view
+
         self._userViewController = LineEditParameterViewController(settings.user)
-        self._modelViewController = ComboBoxParameterViewController(
-            settings.model, presenter.get_available_models()
+        self._chatEndpointURLViewController = LineEditParameterViewController(
+            settings.chatEndpointURL, tool_tip='The chat endpoint URL.'
         )
-        self._temperatureViewController = DecimalSliderParameterViewController(settings.temperature)
-        self._topPViewController = DecimalSliderParameterViewController(settings.top_p)
-        self._maxTokensViewController = SpinBoxParameterViewController(settings.max_tokens)
+        self._chatModelViewController = ComboBoxParameterViewController(
+            settings.chatModel,
+            presenter.get_available_chat_models(),
+            tool_tip='The chat model to use.',
+        )
+        self._temperatureViewController = DecimalSliderParameterViewController(
+            settings.temperature,
+            tool_tip='What sampling temperature to use, between 0 and 2. Higher values mean the model takes more risks.',
+        )
+        self._topPViewController = DecimalSliderParameterViewController(
+            settings.top_p,
+            tool_tip='An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass.',
+        )
+        self._maxTokensViewController = SpinBoxParameterViewController(
+            settings.max_tokens,
+            tool_tip='The maximum number of tokens that can be generated in the chat completion.',
+        )
         self._maxCompletionTokensViewController = SpinBoxParameterViewController(
-            settings.max_completion_tokens
+            settings.max_completion_tokens,
+            tool_tip='An upper bound for the number of tokens that can be generated for a completion, including visible output tokens and reasoning tokens.',
         )
+        self._embeddingsEndpointURLViewController = LineEditParameterViewController(
+            settings.embeddingsEndpointURL, tool_tip='The embeddings endpoint URL.'
+        )
+        self._embeddingsModelViewController = ComboBoxParameterViewController(
+            settings.embeddingsModel,
+            presenter.get_available_embeddings_models(),
+            tool_tip='The embeddings model to use.',
+        )
+        self._embedButton = QPushButton('Embed Text')
+        self._embedButton.clicked.connect(self._embed_text)
 
         groupBoxLayout = QFormLayout()
-        groupBoxLayout.addRow('Chat Endpoint URL:', self._chatEndpointURLViewController.getWidget())
-        groupBoxLayout.addRow(
-            'Embed Endpoint URL:', self._embedEndpointURLViewController.getWidget()
-        )
         groupBoxLayout.addRow('User:', self._userViewController.getWidget())
-        groupBoxLayout.addRow('Model:', self._modelViewController.getWidget())
+        groupBoxLayout.addRow('Chat Endpoint URL:', self._chatEndpointURLViewController.getWidget())
+        groupBoxLayout.addRow('Chat Model:', self._chatModelViewController.getWidget())
         groupBoxLayout.addRow('Temperature:', self._temperatureViewController.getWidget())
         groupBoxLayout.addRow('Top P:', self._topPViewController.getWidget())
         groupBoxLayout.addRow('Max Tokens:', self._maxTokensViewController.getWidget())
         groupBoxLayout.addRow(
             'Max Completion Tokens:', self._maxCompletionTokensViewController.getWidget()
         )
+        groupBoxLayout.addRow(
+            'Embeddings Endpoint URL:', self._embeddingsEndpointURLViewController.getWidget()
+        )
+        groupBoxLayout.addRow('Embeddings Model:', self._embeddingsModelViewController.getWidget())
+        groupBoxLayout.addRow(self._embedButton)
 
         groupBox = QGroupBox('Argo')
         groupBox.setLayout(groupBoxLayout)
@@ -117,3 +149,11 @@ class AgentController:
         layout.addWidget(groupBox)
         layout.addStretch()
         view.setLayout(layout)
+
+    def _embed_text(self) -> None:
+        title = 'Embed Text'
+        label = 'Enter text to embed:'
+        text, okPressed = QInputDialog.getMultiLineText(self._view, title, label, text='')
+
+        if okPressed:
+            self._presenter.embed_text(text.splitlines())

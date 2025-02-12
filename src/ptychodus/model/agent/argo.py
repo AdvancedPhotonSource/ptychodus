@@ -5,6 +5,7 @@ import logging
 import requests
 
 from langchain_core.callbacks import CallbackManagerForLLMRun
+from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
     AIMessage,
@@ -222,7 +223,7 @@ class ChatArgo(BaseChatModel):
         url = self.settings.chatEndpointURL.getValue()
         payload = {
             'user': self.settings.user.getValue(),
-            'model': self.settings.model.getValue(),
+            'model': self.settings.chatModel.getValue(),
             'messages': [_convert_message_to_dict(m) for m in messages],
             'stop': stop or [],
             'temperature': self.settings.temperature.getValue(),
@@ -248,5 +249,33 @@ class ChatArgo(BaseChatModel):
     @property
     def _llm_type(self) -> str:
         """Uniquely identifies the type of the model. Used for logging."""
-        model = self.settings.model.getValue()
+        model = self.settings.chatModel.getValue()
         return f'argo-{model}'
+
+
+class ArgoEmbeddings(Embeddings):
+    def __init__(self, settings: ArgoSettings) -> None:
+        self._settings = settings
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        """Generates embeddings for a list of strings."""
+        url = self._settings.embeddingsEndpointURL.getValue()
+        payload = {
+            'user': self._settings.user.getValue(),
+            'model': self._settings.embeddingsModel.getValue(),
+            'prompt': texts,
+        }
+        headers = {'Content-Type': 'application/json'}
+        response = requests.post(url, json=payload, headers=headers)
+
+        logger.info(response)
+        logger.info(f'Status Code: {response.status_code}')
+        response_json = response.json()
+        logger.info(f'JSON Response: {response_json}')
+        response.raise_for_status()
+
+        return response_json['embedding']
+
+    def embed_query(self, text: str) -> list[float]:
+        """Generates an embedding for a single text query."""
+        return self.embed_documents([text])[0]

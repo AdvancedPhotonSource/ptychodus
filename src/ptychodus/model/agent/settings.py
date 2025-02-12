@@ -10,14 +10,11 @@ class ArgoSettings(Observable, Observer):
         self._group = registry.createGroup('Argo')
         self._group.addObserver(self)
 
-        self.chatEndpointURL = self._group.createStringParameter(
-            'ChatEndpointURL', 'https;//apps.inside.anl.gov/argoapi/api/v1/resource/chat/'
-        )
-        self.embedEndpointURL = self._group.createStringParameter(
-            'EmbedEndpointURL', 'https://apps.inside.anl.gov/argoapi/api/v1/resource/embed/'
-        )
         self.user = self._group.createStringParameter('User', getpass.getuser())
-        self.model = self._group.createStringParameter('Model', 'gpt35')
+        self.chatEndpointURL = self._group.createStringParameter(
+            'ChatEndpointURL', 'https://apps.inside.anl.gov/argoapi/api/v1/resource/chat/'
+        )
+        self.chatModel = self._group.createStringParameter('ChatModel', 'gpt35')
         self.temperature = self._group.createRealParameter(
             'Temperature', 0.1, minimum=0.0, maximum=2.0
         )
@@ -28,6 +25,10 @@ class ArgoSettings(Observable, Observer):
         self.max_completion_tokens = self._group.createIntegerParameter(
             'MaxCompletionTokens', 1000, minimum=0, maximum=128000
         )
+        self.embeddingsEndpointURL = self._group.createStringParameter(
+            'EmbeddingsEndpointURL', 'https://apps.inside.anl.gov/argoapi/api/v1/resource/embed/'
+        )
+        self.embeddingsModel = self._group.createStringParameter('EmbeddingsModel', 'ada002')
 
     def update(self, observable: Observable) -> None:
         if observable is self._group:
