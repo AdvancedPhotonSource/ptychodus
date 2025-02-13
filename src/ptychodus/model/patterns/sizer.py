@@ -13,10 +13,7 @@ class PatternSizer(Observable, Observer):
         super().__init__()
         self._settings = settings
         self._detector = detector
-        self._sliceX = slice(0)
-        self._sliceY = slice(0)
 
-        self._updateSlicesAndNotifyObservers()
         settings.addObserver(self)
         detector.addObserver(self)
 
@@ -47,7 +44,7 @@ class PatternSizer(Observable, Observer):
             else limitsInPixels.midrange
         )
 
-    def _getSafeCenterXInPixels(self) -> int:
+    def getSafeCenterXInPixels(self) -> int:
         lower = self.getWidthInPixels() // 2
         upper = self._detector.widthInPixels.getValue() - 1 - lower
         limits = Interval[int](lower, upper)
@@ -80,7 +77,7 @@ class PatternSizer(Observable, Observer):
             else limitsInPixels.midrange
         )
 
-    def _getSafeCenterYInPixels(self) -> int:
+    def getSafeCenterYInPixels(self) -> int:
         lower = self.getHeightInPixels() // 2
         upper = self._detector.heightInPixels.getValue() - 1 - lower
         limits = Interval[int](lower, upper)
@@ -98,22 +95,8 @@ class PatternSizer(Observable, Observer):
             heightInPixels=self.getHeightInPixels(),
         )
 
-    def __call__(self, data: DiffractionPatternArrayType) -> DiffractionPatternArrayType:
-        return data[:, self._sliceY, self._sliceX] if self.isCropEnabled() else data
-
-    def _updateSlicesAndNotifyObservers(self) -> None:
-        centerXInPixels = self._getSafeCenterXInPixels()
-        radiusXInPixels = self.getWidthInPixels() // 2
-        self._sliceX = slice(centerXInPixels - radiusXInPixels, centerXInPixels + radiusXInPixels)
-
-        centerYInPixels = self._getSafeCenterYInPixels()
-        radiusYInPixels = self.getHeightInPixels() // 2
-        self._sliceY = slice(centerYInPixels - radiusYInPixels, centerYInPixels + radiusYInPixels)
-
-        self.notifyObservers()
-
     def update(self, observable: Observable) -> None:
         if observable is self._settings:
-            self._updateSlicesAndNotifyObservers()
+            self.notifyObservers()
         elif observable is self._detector:
-            self._updateSlicesAndNotifyObservers()
+            self.notifyObservers()

@@ -21,6 +21,7 @@ from ptychodus.api.patterns import (
 )
 from ptychodus.api.tree import SimpleTreeNode
 
+from .processor import DiffractionPatternProcessor
 from .settings import PatternSettings
 from .sizer import PatternSizer
 
@@ -109,22 +110,31 @@ class ActiveDiffractionDataset(DiffractionDataset):
 
     def insertArray(self, array: DiffractionPatternArray) -> None:
         if array.getState() == DiffractionPatternState.LOADED:
-            data = self._diffractionPatternSizer(array.getData())
+            data = array.getData()
+            bad_pixel_mask = numpy.full((data.shape[-2], data.shape[-1]), False)
 
             if self._settings.valueUpperBoundEnabled.getValue():
-                valueLowerBound = self._settings.valueLowerBound.getValue()
-                valueUpperBound = self._settings.valueUpperBound.getValue()
-                data[data >= valueUpperBound] = 0
+                threshold = self._settings.valueUpperBound.getValue()
+                bad_pixel_mask = numpy.logical_or(
+                    bad_pixel_mask, numpy.any(data >= threshold, axis=-3)
+                )
 
             if self._settings.valueLowerBoundEnabled.getValue():
-                valueLowerBound = self._settings.valueLowerBound.getValue()
-                data[data < valueLowerBound] = 0
+                threshold = self._settings.valueLowerBound.getValue()
+                bad_pixel_mask = numpy.logical_or(
+                    bad_pixel_mask, numpy.any(data < threshold, axis=-3)
+                )
 
-            if self._settings.flipXEnabled.getValue():
-                data = numpy.flip(data, axis=-1)
+            processor = DiffractionPatternProcessor(
+                bad_pixel_mask=bad_pixel_mask,
+                crop=self._sizer.getCrop(),
+                binning=self._sizer.getBinning(),
+                padding=self._sizer.getPadding(),
+                flip_x=self._settings.flipXEnabled.getValue(),
+                flip_y=self._settings.flipYEnabled.getValue(),
+            )
 
-            if self._settings.flipYEnabled.getValue():
-                data = numpy.flip(data, axis=-2)
+            processed_array = processor(array)
 
             offset = self._metadata.numberOfPatternsPerArray * array.getIndex()
             sliceZ = slice(offset, offset + data.shape[0])
