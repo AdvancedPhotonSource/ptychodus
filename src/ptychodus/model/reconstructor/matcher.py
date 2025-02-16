@@ -8,7 +8,7 @@ from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import ReconstructInput
 from ptychodus.api.scan import Scan, ScanPoint
 
-from ..patterns import ActiveDiffractionDataset
+from ..patterns import AssembledDiffractionDataset
 from ..product import ProductRepository
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ class ScanIndexFilter(Enum):
 class DiffractionPatternPositionMatcher:
     def __init__(
         self,
-        diffractionDataset: ActiveDiffractionDataset,
+        diffractionDataset: AssembledDiffractionDataset,
         productRepository: ProductRepository,
     ) -> None:
         self._diffractionDataset = diffractionDataset
@@ -52,16 +52,14 @@ class DiffractionPatternPositionMatcher:
     def matchDiffractionPatternsWithPositions(
         self, inputProductIndex: int, indexFilter: ScanIndexFilter = ScanIndexFilter.ALL
     ) -> ReconstructInput:
-        goodPixelMask = self._diffractionDataset.getGoodPixelMask()
-
         inputProductItem = self._productRepository[inputProductIndex]
         inputProduct = inputProductItem.getProduct()
-        dataIndexes = self._diffractionDataset.getAssembledIndexes()
+        dataIndexes = self._diffractionDataset.get_assembled_indexes()
         scanIndexes = [point.index for point in inputProduct.scan if indexFilter(point.index)]
         commonIndexes = sorted(set(dataIndexes).intersection(scanIndexes))
 
         patterns = numpy.take(
-            self._diffractionDataset.getAssembledData(),
+            self._diffractionDataset.get_assembled_patterns(),
             commonIndexes,
             axis=0,
         )
@@ -87,4 +85,4 @@ class DiffractionPatternPositionMatcher:
             costs=inputProduct.costs,
         )
 
-        return ReconstructInput(patterns, goodPixelMask, product)
+        return ReconstructInput(patterns, self._diffractionDataset.get_bad_pixels(), product)

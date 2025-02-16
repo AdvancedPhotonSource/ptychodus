@@ -104,7 +104,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             numberOfPatternsTotal=int(numberOfPatternsTotal),
             patternDataType=numpy.dtype(patternDataType),
         )
-        self._ptychodus.initializeStreamingWorkflow(metadata)
+        self._ptychodus.initializeStreamingWorkflow(metadata)  # FIXME
 
     def process(self, pvObject: pvaccess.PvObject) -> pvaccess.PvObject:
         """Processes monitor update"""
@@ -124,7 +124,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
                 data=image3d,
                 state=ptychodus.api.patterns.DiffractionPatternState.LOADED,
             )
-            self._ptychodus.assembleDiffractionPattern(array, frameTimeStamp)
+            self._ptychodus.appendDiffractionPatternArray(array, frameTimeStamp)  # FIXME
 
         posXQueue = self.metadataQueueMap[self._posXPV]
 
@@ -165,7 +165,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
 
     def getStats(self) -> dict[str, Any]:
         """Retrieves statistics for user processor"""
-        nFramesQueued = self._ptychodus.getDiffractionPatternAssemblyQueueSize()
+        nFramesQueued = self._ptychodus.getDiffractionPatternQueueSize()  # FIXME
         processedFrameRate = 0.0
 
         if self.processingTime > 0.0:

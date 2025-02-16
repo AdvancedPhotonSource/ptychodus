@@ -5,28 +5,31 @@ import numpy
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 from ptychodus.api.propagator import FresnelTransformPropagator, PropagatorParameters
 
-from ...patterns import ActiveDiffractionDataset, Detector
+from ...patterns import AssembledDiffractionDataset, PatternSizer
 from .builder import ProbeBuilder
 from .settings import ProbeSettings
 
 
 class AveragePatternProbeBuilder(ProbeBuilder):
     def __init__(
-        self, settings: ProbeSettings, detector: Detector, patterns: ActiveDiffractionDataset
+        self,
+        settings: ProbeSettings,
+        patternSizer: PatternSizer,
+        dataset: AssembledDiffractionDataset,
     ) -> None:
         super().__init__(settings, 'average_pattern')
         self._settings = settings
-        self._detector = detector
-        self._patterns = patterns
+        self._patternSizer = patternSizer
+        self._dataset = dataset
 
     def copy(self) -> AveragePatternProbeBuilder:
-        return AveragePatternProbeBuilder(self._settings, self._detector, self._patterns)
+        return AveragePatternProbeBuilder(self._settings, self._patternSizer, self._dataset)
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
         geometry = geometryProvider.getProbeGeometry()
-        detectorIntensity = numpy.average(self._patterns.getAssembledData(), axis=0)
+        detectorIntensity = numpy.average(self._dataset.get_assembled_patterns(), axis=0)
 
-        pixelGeometry = self._detector.getPixelGeometry()
+        pixelGeometry = self._patternSizer.getDetectorPixelGeometry()
         propagatorParameters = PropagatorParameters(
             wavelength_m=geometryProvider.probeWavelengthInMeters,
             width_px=detectorIntensity.shape[-1],

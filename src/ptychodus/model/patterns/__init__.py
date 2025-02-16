@@ -1,28 +1,21 @@
-from .active import ActiveDiffractionDataset
-from .api import PatternsAPI
-from .core import (
-    DiffractionDatasetPresenter,
-    DiffractionPatternArrayPresenter,
-    PatternsCore,
+from .api import PatternsAPI, PatternsStreamingContext
+from .core import PatternsCore
+from .dataset import (
+    AssembledDiffractionDataset,
+    DiffractionDatasetObserver,
+    ObservableDiffractionDataset,
 )
-from .detector import Detector
-from .io import DiffractionDatasetInputOutputPresenter
-from .metadata import DiffractionMetadataPresenter
-from .patterns import DiffractionPatternPresenter
-from .settings import PatternSettings, ProductSettings
+from .settings import DetectorSettings, PatternSettings
 from .sizer import PatternSizer
 
 __all__ = [
-    'ActiveDiffractionDataset',
-    'Detector',
-    'DiffractionDatasetInputOutputPresenter',
-    'DiffractionDatasetPresenter',
-    'DiffractionMetadataPresenter',
-    'DiffractionPatternArrayPresenter',
-    'DiffractionPatternPresenter',
+    'AssembledDiffractionDataset',
+    'DetectorSettings',
+    'DiffractionDatasetObserver',
+    'ObservableDiffractionDataset',
     'PatternSettings',
     'PatternSizer',
     'PatternsAPI',
     'PatternsCore',
-    'ProductSettings',
+    'PatternsStreamingContext',
 ]

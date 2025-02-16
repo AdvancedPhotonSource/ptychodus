@@ -1,6 +1,6 @@
 from ptychodus.api.observer import Observable, Observer
 
-from ..patterns import ActiveDiffractionDataset
+from ..patterns import AssembledDiffractionDataset
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
 from .productGeometry import ProductGeometry
@@ -10,14 +10,14 @@ from .scan import ScanRepositoryItem
 class ProductValidator(Observable, Observer):
     def __init__(
         self,
-        patterns: ActiveDiffractionDataset,
+        dataset: AssembledDiffractionDataset,
         scan: ScanRepositoryItem,
         geometry: ProductGeometry,
         probe: ProbeRepositoryItem,
         object_: ObjectRepositoryItem,
     ) -> None:
         super().__init__()
-        self._patterns = patterns
+        self._dataset = dataset
         self._scan = scan
         self._geometry = geometry
         self._probe = probe
@@ -32,7 +32,7 @@ class ProductValidator(Observable, Observer):
     def _validateScan(self) -> None:
         scan = self._scan.getScan()
         scanIndexes = set(point.index for point in scan)
-        patternIndexes = set(self._patterns.getAssembledIndexes())
+        patternIndexes = set(self._dataset.get_assembled_indexes())
         isScanValidNow = not scanIndexes.isdisjoint(patternIndexes)
 
         if self._isScanValid != isScanValidNow:
@@ -66,7 +66,7 @@ class ProductValidator(Observable, Observer):
             self.notifyObservers()
 
     def update(self, observable: Observable) -> None:
-        if observable is self._patterns:
+        if observable is self._dataset:
             self._validateScan()
         elif observable is self._scan:
             self._validateScan()

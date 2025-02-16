@@ -5,7 +5,7 @@ import logging
 from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.product import ProductMetadata
 
-from ..patterns import ProductSettings
+from ..product import ProductSettings
 
 logger = logging.getLogger(__name__)
 

@@ -9,7 +9,7 @@ from ptychodus.api.reconstructor import (
 )
 from ptychodus.api.settings import SettingsRegistry
 
-from ..patterns import ActiveDiffractionDataset
+from ..patterns import AssembledDiffractionDataset
 from ..product import ProductRepository
 from .api import ReconstructorAPI
 from .log import ReconstructorLogHandler
@@ -23,7 +23,7 @@ class ReconstructorCore:
     def __init__(
         self,
         settingsRegistry: SettingsRegistry,
-        diffractionDataset: ActiveDiffractionDataset,
+        diffractionDataset: AssembledDiffractionDataset,
         productRepository: ProductRepository,
         librarySeq: Sequence[ReconstructorLibrary],
     ) -> None:

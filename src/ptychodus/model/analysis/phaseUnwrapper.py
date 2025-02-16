@@ -1,3 +1,5 @@
+# mypy: ignore-errors
+
 import numpy
 from numpy.typing import NDArray
 from scipy import signal, ndimage

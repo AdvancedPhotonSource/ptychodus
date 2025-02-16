@@ -43,7 +43,7 @@ from ptychodus.api.reconstructor import ReconstructInput
 from ptychodus.api.scan import Scan, ScanPoint
 from ptychodus.api.typing import RealArrayType
 
-from ..patterns import Detector
+from ..patterns import PatternSizer
 from .settings import (
     PtyChiOPRSettings,
     PtyChiObjectSettings,
@@ -528,10 +528,10 @@ class PtyChiOptionsHelper:
         probe_settings: PtyChiProbeSettings,
         probe_position_settings: PtyChiProbePositionSettings,
         opr_settings: PtyChiOPRSettings,
-        detector: Detector,
+        pattern_sizer: PatternSizer,
     ) -> None:
         self._reconstructor_settings = reconstructor_settings
-        self._detector = detector
+        self._pattern_sizer = pattern_sizer
 
         self.reconstructor_helper = PtyChiReconstructorOptionsHelper(reconstructor_settings)
         self.object_helper = PtyChiObjectOptionsHelper(object_settings)
@@ -545,8 +545,8 @@ class PtyChiOptionsHelper:
             data=parameters.patterns,
             free_space_propagation_distance_m=metadata.detectorDistanceInMeters,
             wavelength_m=metadata.probeWavelengthInMeters,
-            detector_pixel_size_m=self._detector.pixelWidthInMeters.getValue(),
-            valid_pixel_mask=parameters.goodPixelMask,
+            detector_pixel_size_m=self._pattern_sizer.getDetectorPixelWidthInMeters(),
+            valid_pixel_mask=numpy.logical_not(parameters.bad_pixels),
             save_data_on_device=self._reconstructor_settings.saveDataOnDevice.getValue(),
         )
 

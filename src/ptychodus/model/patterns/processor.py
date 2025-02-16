@@ -33,20 +33,8 @@ class DiffractionPatternBinning:
     bin_size_y: int
 
     def apply(self, data: DiffractionPatternArrayType) -> DiffractionPatternArrayType:
-        width = data.shape[-1]
-        binned_width = width // self.bin_size_x
-
-        if binned_width * self.bin_size_x != width:
-            raise ValueError(f'Invalid binning size! (bin_size_x={self.bin_size_x}, width={width})')
-
-        height = data.shape[-2]
-        binned_height = height // self.bin_size_y
-
-        if binned_height * self.bin_size_y != height:
-            raise ValueError(
-                f'Invalid binning size! (bin_size_y={self.bin_size_y}, height={height})'
-            )
-
+        binned_width = data.shape[-1] // self.bin_size_x
+        binned_height = data.shape[-2] // self.bin_size_y
         shape = (-1, binned_height, self.bin_size_y, binned_width, self.bin_size_x)
         return numpy.sum(data.reshape(shape), axis=(-3, -1), keepdims=False)
 
@@ -63,7 +51,7 @@ class DiffractionPatternPadding:
 
 @dataclass(frozen=True)
 class DiffractionPatternProcessor:
-    bad_pixel_mask: BooleanArrayType | None
+    bad_pixels: BooleanArrayType | None
     crop: DiffractionPatternCrop | None
     binning: DiffractionPatternBinning | None
     padding: DiffractionPatternPadding | None
@@ -76,8 +64,8 @@ class DiffractionPatternProcessor:
         if data.ndim != 3:
             raise ValueError(f'Invalid diffraction pattern dimensions! (shape={data.shape})')
 
-        if self.bad_pixel_mask is not None:
-            data[:, self.bad_pixel_mask] = 0
+        if self.bad_pixels is not None:
+            data[:, self.bad_pixels] = 0
 
         if self.crop is not None:
             data = self.crop.apply(data)

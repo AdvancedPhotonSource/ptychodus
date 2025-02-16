@@ -11,7 +11,7 @@ from .patterns import BooleanArrayType, DiffractionPatternArrayType
 @dataclass(frozen=True)
 class ReconstructInput:
     patterns: DiffractionPatternArrayType
-    goodPixelMask: BooleanArrayType
+    bad_pixels: BooleanArrayType
     product: Product
 
 

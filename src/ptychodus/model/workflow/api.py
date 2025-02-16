@@ -138,11 +138,11 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             filePath, fileType=fileType, cropCenter=cropCenter, cropExtent=cropExtent
         )
 
-    def importProcessedPatterns(self, filePath: Path) -> None:
-        self._patternsAPI.importProcessedPatterns(filePath)
+    def importAssembledPatterns(self, filePath: Path) -> None:
+        self._patternsAPI.importAssembledPatterns(filePath)
 
-    def exportProcessedPatterns(self, filePath: Path) -> None:
-        self._patternsAPI.exportProcessedPatterns(filePath)
+    def exportAssembledPatterns(self, filePath: Path) -> None:
+        self._patternsAPI.exportAssembledPatterns(filePath)
 
     def openProduct(self, filePath: Path, *, fileType: str | None = None) -> WorkflowProductAPI:
         productIndex = self._productAPI.openProduct(filePath, fileType=fileType)

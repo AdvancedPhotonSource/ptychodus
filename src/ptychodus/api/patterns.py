@@ -10,7 +10,6 @@ import numpy
 import numpy.typing
 
 from .geometry import ImageExtent, PixelGeometry
-from .observer import Observable
 from .tree import SimpleTreeNode
 
 BooleanArrayType: TypeAlias = numpy.typing.NDArray[numpy.bool_]
@@ -31,7 +30,7 @@ class DiffractionPatternState(Enum):
     LOADED = auto()
 
 
-class DiffractionPatternArray(Observable):
+class DiffractionPatternArray:
     @abstractmethod
     def getLabel(self) -> str:
         pass
@@ -103,7 +102,7 @@ class DiffractionMetadata:
         return cls(0, 0, numpy.dtype(numpy.ubyte), filePath=filePath)
 
 
-class DiffractionDataset(Sequence[DiffractionPatternArray], Observable):
+class DiffractionDataset(Sequence[DiffractionPatternArray]):
     @abstractmethod
     def getMetadata(self) -> DiffractionMetadata:
         pass

@@ -164,7 +164,7 @@ class TikeReconstructor:
         logger.debug(f'num_gpu={numGpus}')
 
         exitwave_options = tike.ptycho.ExitWaveOptions(
-            measured_pixels=parameters.goodPixelMask,
+            measured_pixels=numpy.logical_not(parameters.bad_pixels),
             noise_model=self._settings.noiseModel.getValue(),
         )
 
