@@ -61,13 +61,13 @@ class PatternSettings(Observable, Observer):
             'CropHeightInPixels', 64, minimum=1
         )
 
-        self.paddingEnabled = self._settingsGroup.createBooleanParameter('PaddingEnabled', False)
-        self.padX = self._settingsGroup.createIntegerParameter('PadX', 0, minimum=0)
-        self.padY = self._settingsGroup.createIntegerParameter('PadY', 0, minimum=0)
-
         self.binningEnabled = self._settingsGroup.createBooleanParameter('BinningEnabled', False)
         self.binSizeX = self._settingsGroup.createIntegerParameter('BinSizeX', 1, minimum=1)
         self.binSizeY = self._settingsGroup.createIntegerParameter('BinSizeY', 1, minimum=1)
+
+        self.paddingEnabled = self._settingsGroup.createBooleanParameter('PaddingEnabled', False)
+        self.padX = self._settingsGroup.createIntegerParameter('PadX', 0, minimum=0)
+        self.padY = self._settingsGroup.createIntegerParameter('PadY', 0, minimum=0)
 
         self.flipXEnabled = self._settingsGroup.createBooleanParameter('FlipXEnabled', False)
         self.flipYEnabled = self._settingsGroup.createBooleanParameter('FlipYEnabled', False)

@@ -4,27 +4,37 @@ import logging
 import re
 
 from PyQt5.QtCore import Qt, QDir, QFileInfo, QModelIndex, QSortFilterProxyModel
-from PyQt5.QtWidgets import QAbstractItemView, QFileSystemModel, QWizard
+from PyQt5.QtWidgets import (
+    QAbstractItemView,
+    QCheckBox,
+    QFileSystemModel,
+    QFormLayout,
+    QGridLayout,
+    QGroupBox,
+    QLabel,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+    QWizard,
+)
 
 from ptychodus.api.observer import Observable, Observer
 
-from ...model.patterns import (
-    DiffractionDatasetInputOutputPresenter,
-    DiffractionDatasetPresenter,
-    DiffractionMetadataPresenter,
-    DiffractionPatternPresenter,
-)
+from ...model.metadata import MetadataPresenter
+from ...model.patterns import PatternSettings, PatternSizer, PatternsAPI
 from ...view.patterns import (
-    OpenDatasetWizard,
     OpenDatasetWizardFilesPage,
     OpenDatasetWizardMetadataPage,
-    OpenDatasetWizardPatternsPage,
-    OpenDatasetWizardPatternCropView,
-    OpenDatasetWizardPatternLoadView,
-    OpenDatasetWizardPatternMemoryMapView,
-    OpenDatasetWizardPatternTransformView,
+    OpenDatasetWizardPage,
 )
+
 from ..data import FileDialogFactory
+from ..parametric import (
+    CheckableGroupBoxParameterViewController,
+    ParameterViewController,
+    PathParameterViewController,
+    SpinBoxParameterViewController,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -36,63 +46,45 @@ __all__ = [
 class OpenDatasetWizardFilesController(Observer):
     def __init__(
         self,
-        presenter: DiffractionDatasetInputOutputPresenter,
+        api: PatternsAPI,
         page: OpenDatasetWizardFilesPage,
         fileDialogFactory: FileDialogFactory,
-        fileSystemModel: QFileSystemModel,
-        fileSystemProxyModel: QSortFilterProxyModel,
     ) -> None:
         super().__init__()
-        self._presenter = presenter
+        self._api = api
         self._page = page
         self._fileDialogFactory = fileDialogFactory
-        self._fileSystemModel = fileSystemModel
-        self._fileSystemProxyModel = fileSystemProxyModel
 
-    @classmethod
-    def createInstance(
-        cls,
-        presenter: DiffractionDatasetInputOutputPresenter,
-        page: OpenDatasetWizardFilesPage,
-        fileDialogFactory: FileDialogFactory,
-    ) -> OpenDatasetWizardFilesController:
-        fileSystemModel = QFileSystemModel()
-        fileSystemProxyModel = QSortFilterProxyModel()
-        fileSystemModel.setFilter(QDir.Filter.AllEntries | QDir.Filter.AllDirs)
-        fileSystemModel.setNameFilterDisables(False)
-        fileSystemProxyModel.setSourceModel(fileSystemModel)
+        self._fileSystemModel = QFileSystemModel()
+        self._fileSystemModel.setFilter(QDir.Filter.AllEntries | QDir.Filter.AllDirs)
+        self._fileSystemModel.setNameFilterDisables(False)
 
-        controller = cls(presenter, page, fileDialogFactory, fileSystemModel, fileSystemProxyModel)
-        presenter.addObserver(controller)
+        self._fileSystemProxyModel = QSortFilterProxyModel()
+        self._fileSystemProxyModel.setSourceModel(self._fileSystemModel)
 
         page.directoryComboBox.addItem(str(fileDialogFactory.getOpenWorkingDirectory()))
         page.directoryComboBox.addItem(str(Path.home()))
         page.directoryComboBox.setEditable(True)
-        page.directoryComboBox.textActivated.connect(controller._handleDirectoryComboBoxActivated)
+        page.directoryComboBox.textActivated.connect(self._handleDirectoryComboBoxActivated)
 
-        page.fileSystemTableView.setModel(controller._fileSystemProxyModel)
+        page.fileSystemTableView.setModel(self._fileSystemProxyModel)
         page.fileSystemTableView.setSortingEnabled(True)
         page.fileSystemTableView.sortByColumn(0, Qt.SortOrder.AscendingOrder)
         page.fileSystemTableView.verticalHeader().hide()
         page.fileSystemTableView.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
         )
-        page.fileSystemTableView.doubleClicked.connect(
-            controller._handleFileSystemTableDoubleClicked
-        )
-        page.fileSystemTableView.selectionModel().currentChanged.connect(
-            controller._checkIfComplete
-        )
+        page.fileSystemTableView.doubleClicked.connect(self._handleFileSystemTableDoubleClicked)
+        page.fileSystemTableView.selectionModel().currentChanged.connect(self._checkIfComplete)
 
-        for fileFilter in presenter.getOpenFileFilterList():
+        for fileFilter in api.getOpenFileFilterList():
             page.fileTypeComboBox.addItem(fileFilter)
 
-        page.fileTypeComboBox.textActivated.connect(controller._setNameFiltersInFileSystemModel)
+        page.fileTypeComboBox.textActivated.connect(self._setNameFiltersInFileSystemModel)
 
-        controller._setRootPath(fileDialogFactory.getOpenWorkingDirectory())
-        controller._syncModelToView()
-
-        return controller
+        self._setRootPath(fileDialogFactory.getOpenWorkingDirectory())
+        self._syncModelToView()
+        api.addObserver(self)
 
     def _setRootPath(self, rootPath: Path) -> None:
         index = self._fileSystemModel.setRootPath(str(rootPath))
@@ -121,7 +113,7 @@ class OpenDatasetWizardFilesController(Observer):
         self._fileDialogFactory.setOpenWorkingDirectory(filePath.parent)
 
         fileFilter = self._page.fileTypeComboBox.currentText()
-        self._presenter.openDiffractionFile(filePath, fileFilter)
+        self._api.openPatterns(filePath, fileType=fileFilter)
 
     def _checkIfComplete(self, current: QModelIndex, previous: QModelIndex) -> None:
         index = self._fileSystemProxyModel.mapToSource(current)
@@ -137,34 +129,26 @@ class OpenDatasetWizardFilesController(Observer):
             self._fileSystemModel.setNameFilters(nameFilters)
 
     def _syncModelToView(self) -> None:
-        self._page.fileTypeComboBox.setCurrentText(self._presenter.getOpenFileFilter())
+        self._page.fileTypeComboBox.setCurrentText(self._api.getOpenFileFilter())
 
     def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
+        if observable is self._api:
             self._syncModelToView()
 
 
-class OpenDatasetWizardMetadataController(Observer):
+class OpenDatasetWizardMetadataViewController(Observer):
     def __init__(
         self,
-        presenter: DiffractionMetadataPresenter,
+        presenter: MetadataPresenter,
         page: OpenDatasetWizardMetadataPage,
     ) -> None:
         super().__init__()
         self._presenter = presenter
         self._page = page
 
-    @classmethod
-    def createInstance(
-        cls,
-        presenter: DiffractionMetadataPresenter,
-        page: OpenDatasetWizardMetadataPage,
-    ) -> OpenDatasetWizardMetadataController:
-        controller = cls(presenter, page)
-        presenter.addObserver(controller)
-        controller._syncModelToView()
+        presenter.addObserver(self)
+        self._syncModelToView()
         page._setComplete(True)
-        return controller
 
     def importMetadata(self) -> None:
         if self._page.detectorPixelCountCheckBox.isChecked():
@@ -221,172 +205,136 @@ class OpenDatasetWizardMetadataController(Observer):
             self._syncModelToView()
 
 
-class PatternLoadController(Observer):
+class PatternLoadViewController(ParameterViewController):
+    def __init__(self, settings: PatternSettings) -> None:
+        super().__init__()
+        self._viewController = SpinBoxParameterViewController(
+            settings.numberOfDataThreads,
+        )
+        self._widget = QGroupBox('Load')
+
+        layout = QFormLayout()
+        layout.addRow('Number of Data Threads:', self._viewController.getWidget())
+        self._widget.setLayout(layout)
+
+    def getWidget(self) -> QWidget:
+        return self._widget
+
+
+class PatternMemoryMapViewController(CheckableGroupBoxParameterViewController):
+    def __init__(self, settings: PatternSettings, fileDialogFactory: FileDialogFactory) -> None:
+        super().__init__(settings.memmapEnabled, 'Memory Map Diffraction Data')
+        self._viewController = PathParameterViewController.createDirectoryChooser(
+            settings.scratchDirectory, fileDialogFactory
+        )
+
+        layout = QFormLayout()
+        layout.addRow('Scratch Directory:', self._viewController.getWidget())
+        self.getWidget().setLayout(layout)
+
+
+class PatternCropViewController(CheckableGroupBoxParameterViewController, Observer):
     def __init__(
         self,
-        presenter: DiffractionDatasetPresenter,
-        view: OpenDatasetWizardPatternLoadView,
+        settings: PatternSettings,
+        sizer: PatternSizer,
     ) -> None:
-        super().__init__()
-        self._presenter = presenter
-        self._view = view
+        super().__init__(settings.cropEnabled, 'Crop')
+        self._settings = settings
+        self._sizer = sizer
 
-    @classmethod
-    def createInstance(
-        cls,
-        presenter: DiffractionDatasetPresenter,
-        view: OpenDatasetWizardPatternLoadView,
-    ) -> PatternLoadController:
-        controller = cls(presenter, view)
-        presenter.addObserver(controller)
-        view.numberOfThreadsSpinBox.valueChanged.connect(presenter.setNumberOfDataThreads)
-        controller._syncModelToView()
-        return controller
+        self._centerXSpinBox = QSpinBox()
+        self._centerYSpinBox = QSpinBox()
+        self._widthSpinBox = QSpinBox()
+        self._heightSpinBox = QSpinBox()
+
+        layout = QGridLayout()
+        layout.addWidget(QLabel('Center [px]:'), 0, 0)
+        layout.addWidget(self._centerXSpinBox, 0, 1)
+        layout.addWidget(self._centerYSpinBox, 0, 2)
+        layout.addWidget(QLabel('Extent [px]:'), 1, 0)
+        layout.addWidget(self._widthSpinBox, 1, 1)
+        layout.addWidget(self._heightSpinBox, 1, 2)
+        layout.setColumnStretch(1, 1)
+        layout.setColumnStretch(2, 1)
+        self.getWidget().setLayout(layout)
+
+        self._syncModelToView()
+
+        self._centerXSpinBox.valueChanged.connect(settings.cropCenterXInPixels.setValue)
+        self._centerYSpinBox.valueChanged.connect(settings.cropCenterYInPixels.setValue)
+        self._widthSpinBox.valueChanged.connect(settings.cropWidthInPixels.setValue)
+        self._heightSpinBox.valueChanged.connect(settings.cropHeightInPixels.setValue)
+
+        sizer.addObserver(self)
 
     def _syncModelToView(self) -> None:
-        self._view.numberOfThreadsSpinBox.blockSignals(True)
-        self._view.numberOfThreadsSpinBox.setRange(
-            self._presenter.getNumberOfDataThreadsLimits().lower,
-            self._presenter.getNumberOfDataThreadsLimits().upper,
-        )
-        self._view.numberOfThreadsSpinBox.setValue(self._presenter.getNumberOfDataThreads())
-        self._view.numberOfThreadsSpinBox.blockSignals(False)
+        center_x = self._sizer.axis_x.get_crop_center()
+        center_y = self._sizer.axis_y.get_crop_center()
+        width = self._sizer.axis_x.get_crop_size()
+        height = self._sizer.axis_y.get_crop_size()
+
+        center_x_limits = self._sizer.axis_x.get_crop_center_limits()
+        center_y_limits = self._sizer.axis_y.get_crop_center_limits()
+        width_limits = self._sizer.axis_x.get_crop_size_limits()
+        height_limits = self._sizer.axis_y.get_crop_size_limits()
+
+        self._centerXSpinBox.blockSignals(True)
+        self._centerXSpinBox.setRange(center_x_limits.lower, center_x_limits.upper)
+        self._centerXSpinBox.setValue(center_x)
+        self._centerXSpinBox.blockSignals(False)
+
+        self._centerYSpinBox.blockSignals(True)
+        self._centerYSpinBox.setRange(center_y_limits.lower, center_y_limits.upper)
+        self._centerYSpinBox.setValue(center_y)
+        self._centerYSpinBox.blockSignals(False)
+
+        self._widthSpinBox.blockSignals(True)
+        self._widthSpinBox.setRange(width_limits.lower, width_limits.upper)
+        self._widthSpinBox.setValue(width)
+        self._widthSpinBox.blockSignals(False)
+
+        self._heightSpinBox.blockSignals(True)
+        self._heightSpinBox.setRange(height_limits.lower, height_limits.upper)
+        self._heightSpinBox.setValue(height)
+        self._heightSpinBox.blockSignals(False)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
+        if observable is self._sizer:
             self._syncModelToView()
 
 
-class PatternMemoryMapController(Observer):
-    def __init__(
-        self,
-        presenter: DiffractionDatasetPresenter,
-        view: OpenDatasetWizardPatternMemoryMapView,
-        fileDialogFactory: FileDialogFactory,
-    ) -> None:
-        super().__init__()
-        self._presenter = presenter
-        self._view = view
-        self._fileDialogFactory = fileDialogFactory
+class OpenDatasetWizardPatternTransformView(QGroupBox):  # FIXME
+    def __init__(self, parent: QWidget | None) -> None:
+        super().__init__('Transform', parent)
+        self.valueLowerBoundCheckBox = QCheckBox('Value Lower Bound:')
+        self.valueLowerBoundSpinBox = QSpinBox()
+        self.valueUpperBoundCheckBox = QCheckBox('Value Upper Bound:')
+        self.valueUpperBoundSpinBox = QSpinBox()
+        self.axesLabel = QLabel('Axes:')
+        self.flipXCheckBox = QCheckBox('Flip X')
+        self.flipYCheckBox = QCheckBox('Flip Y')
 
     @classmethod
-    def createInstance(
-        cls,
-        presenter: DiffractionDatasetPresenter,
-        view: OpenDatasetWizardPatternMemoryMapView,
-        fileDialogFactory: FileDialogFactory,
-    ) -> PatternMemoryMapController:
-        controller = cls(presenter, view, fileDialogFactory)
-        presenter.addObserver(controller)
+    def createInstance(cls, parent: QWidget | None = None) -> OpenDatasetWizardPatternTransformView:
+        view = cls(parent)
 
-        view.setCheckable(True)
-        controller._syncModelToView()
-        view.toggled.connect(presenter.setMemmapEnabled)
-        view.scratchDirectoryLineEdit.editingFinished.connect(
-            controller._syncScratchDirectoryToModel
-        )
-        view.scratchDirectoryBrowseButton.clicked.connect(controller._browseScratchDirectory)
+        layout = QGridLayout()
+        layout.addWidget(view.valueLowerBoundCheckBox, 0, 0)
+        layout.addWidget(view.valueLowerBoundSpinBox, 0, 1, 1, 2)
+        layout.addWidget(view.valueUpperBoundCheckBox, 1, 0)
+        layout.addWidget(view.valueUpperBoundSpinBox, 1, 1, 1, 2)
+        layout.addWidget(view.axesLabel, 2, 0)
+        layout.addWidget(view.flipXCheckBox, 2, 1, Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(view.flipYCheckBox, 2, 2, Qt.AlignmentFlag.AlignHCenter)
+        layout.setColumnStretch(2, 1)
+        layout.setColumnStretch(3, 1)
+        view.setLayout(layout)
 
-        return controller
-
-    def _syncScratchDirectoryToModel(self) -> None:
-        scratchDirectory = Path(self._view.scratchDirectoryLineEdit.text())
-        self._presenter.setScratchDirectory(scratchDirectory)
-
-    def _browseScratchDirectory(self) -> None:
-        dirPath = self._fileDialogFactory.getExistingDirectoryPath(
-            self._view, 'Choose Scratch ScratchDirectory'
-        )
-
-        if dirPath:
-            self._presenter.setScratchDirectory(dirPath)
-
-    def _syncModelToView(self) -> None:
-        self._view.setChecked(self._presenter.isMemmapEnabled())
-        scratchDirectory = self._presenter.getScratchDirectory()
-
-        if scratchDirectory:
-            self._view.scratchDirectoryLineEdit.setText(str(scratchDirectory))
-        else:
-            self._view.scratchDirectoryLineEdit.clear()
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._syncModelToView()
+        return view
 
 
-class PatternCropController(Observer):
-    def __init__(
-        self,
-        presenter: DiffractionPatternPresenter,
-        view: OpenDatasetWizardPatternCropView,
-    ) -> None:
-        super().__init__()
-        self._presenter = presenter
-        self._view = view
-
-    @classmethod
-    def createInstance(
-        cls,
-        presenter: DiffractionPatternPresenter,
-        view: OpenDatasetWizardPatternCropView,
-    ) -> PatternCropController:
-        controller = cls(presenter, view)
-        presenter.addObserver(controller)
-
-        view.setCheckable(True)
-        view.toggled.connect(presenter.setCropEnabled)
-
-        view.centerXSpinBox.valueChanged.connect(presenter.setCropCenterXInPixels)
-        view.centerYSpinBox.valueChanged.connect(presenter.setCropCenterYInPixels)
-        view.extentXSpinBox.valueChanged.connect(presenter.setCropWidthInPixels)
-        view.extentYSpinBox.valueChanged.connect(presenter.setCropHeightInPixels)
-
-        controller._syncModelToView()
-
-        return controller
-
-    def _syncModelToView(self) -> None:
-        self._view.setChecked(self._presenter.isCropEnabled())
-
-        self._view.centerXSpinBox.blockSignals(True)
-        self._view.centerXSpinBox.setRange(
-            self._presenter.getCropCenterXLimitsInPixels().lower,
-            self._presenter.getCropCenterXLimitsInPixels().upper,
-        )
-        self._view.centerXSpinBox.setValue(self._presenter.getCropCenterXInPixels())
-        self._view.centerXSpinBox.blockSignals(False)
-
-        self._view.centerYSpinBox.blockSignals(True)
-        self._view.centerYSpinBox.setRange(
-            self._presenter.getCropCenterYLimitsInPixels().lower,
-            self._presenter.getCropCenterYLimitsInPixels().upper,
-        )
-        self._view.centerYSpinBox.setValue(self._presenter.getCropCenterYInPixels())
-        self._view.centerYSpinBox.blockSignals(False)
-
-        self._view.extentXSpinBox.blockSignals(True)
-        self._view.extentXSpinBox.setRange(
-            self._presenter.getCropWidthLimitsInPixels().lower,
-            self._presenter.getCropWidthLimitsInPixels().upper,
-        )
-        self._view.extentXSpinBox.setValue(self._presenter.getCropWidthInPixels())
-        self._view.extentXSpinBox.blockSignals(False)
-
-        self._view.extentYSpinBox.blockSignals(True)
-        self._view.extentYSpinBox.setRange(
-            self._presenter.getCropHeightLimitsInPixels().lower,
-            self._presenter.getCropHeightLimitsInPixels().upper,
-        )
-        self._view.extentYSpinBox.setValue(self._presenter.getCropHeightInPixels())
-        self._view.extentYSpinBox.blockSignals(False)
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._syncModelToView()
-
-
-class PatternTransformController(Observer):
+class PatternTransformViewController(Observer):
     def __init__(
         self,
         presenter: DiffractionPatternPresenter,
@@ -444,60 +392,65 @@ class PatternTransformController(Observer):
             self._syncModelToView()
 
 
-class OpenDatasetWizardPatternsController:
-    def __init__(
-        self,
-        datasetPresenter: DiffractionDatasetPresenter,
-        patternPresenter: DiffractionPatternPresenter,
-        page: OpenDatasetWizardPatternsPage,
-        fileDialogFactory: FileDialogFactory,
-    ) -> None:
-        self._datasetPresenter = datasetPresenter
-        self._patternPresenter = patternPresenter
-        self._page = page
-        self._loadController = PatternLoadController.createInstance(datasetPresenter, page.loadView)
-        self._memoryMapController = PatternMemoryMapController.createInstance(
-            datasetPresenter, page.memoryMapView, fileDialogFactory
-        )
-        self._cropController = PatternCropController.createInstance(patternPresenter, page.cropView)
-        self._transformController = PatternTransformController.createInstance(
-            patternPresenter, page.transformView
-        )
+class OpenDatasetWizardPatternsViewController(ParameterViewController):
+    def __init__(self, settings: PatternSettings, sizer: PatternSizer) -> None:
+        self._loadViewController = PatternLoadViewController(settings)
+        self._memoryMapViewController = PatternMemoryMapViewController(settings)
+        self._cropViewController = PatternCropViewController(settings, sizer)
+        self._paddingViewController = PatternPaddingViewController(settings)
+        self._binningViewController = PatternBinningViewController(settings)
+        self._transformViewController = PatternTransformViewController(settings)
 
-    @classmethod
-    def createInstance(
-        cls,
-        ioPresenter: DiffractionDatasetInputOutputPresenter,
-        datasetPresenter: DiffractionDatasetPresenter,
-        patternPresenter: DiffractionPatternPresenter,
-        page: OpenDatasetWizardPatternsPage,
-        fileDialogFactory: FileDialogFactory,
-    ) -> OpenDatasetWizardPatternsController:
-        controller = cls(datasetPresenter, patternPresenter, page, fileDialogFactory)
-        page._setComplete(True)
-        return controller
+        layout = QVBoxLayout()
+        layout.addWidget(self._loadViewController.getWidget())
+        layout.addWidget(self._memoryMapViewController.getWidget())
+        layout.addWidget(self._cropViewController.getWidget())
+        layout.addWidget(self._paddingViewController.getWidget())
+        layout.addWidget(self._binningViewController.getWidget())
+        layout.addStretch()
+
+        self._widget = OpenDatasetWizardPage()
+        self._widget.setTitle('Pattern Processing')
+        self._widget._setComplete(True)  # FIXME ???
+        self._widget.setLayout(layout)
+
+    def getWidget(self) -> QWidget:
+        return self._widget
+
+
+class OpenDatasetWizard(QWizard):
+    def __init__(self, parent: QWidget | None) -> None:
+        super().__init__(parent)
+        self.filesPage = OpenDatasetWizardFilesPage.createInstance()
+        self.metadataPage = OpenDatasetWizardMetadataPage.createInstance()
+        self.patternsPage = OpenDatasetWizardPatternsPage.createInstance()
+
+        self.setWindowTitle('Open Dataset')
+        self.addPage(self.filesPage)
+        self.addPage(self.metadataPage)
+        self.addPage(self.patternsPage)
 
 
 class OpenDatasetWizardController:
     def __init__(
         self,
-        ioPresenter: DiffractionDatasetInputOutputPresenter,
+        api: PatternsAPI,
         metadataPresenter: DiffractionMetadataPresenter,
         datasetPresenter: DiffractionDatasetPresenter,
         patternPresenter: DiffractionPatternPresenter,
         wizard: OpenDatasetWizard,
         fileDialogFactory: FileDialogFactory,
     ) -> None:
-        self._ioPresenter = ioPresenter
+        self._api = api
         self._wizard = wizard
         self._filesController = OpenDatasetWizardFilesController.createInstance(
-            ioPresenter, wizard.filesPage, fileDialogFactory
+            api, wizard.filesPage, fileDialogFactory
         )
         self._metadataController = OpenDatasetWizardMetadataController.createInstance(
             metadataPresenter, wizard.metadataPage
         )
         self._patternsController = OpenDatasetWizardPatternsController.createInstance(
-            ioPresenter,
+            api,
             datasetPresenter,
             patternPresenter,
             wizard.patternsPage,
@@ -507,7 +460,7 @@ class OpenDatasetWizardController:
     @classmethod
     def createInstance(
         cls,
-        ioPresenter: DiffractionDatasetInputOutputPresenter,
+        api: PatternsAPI,
         metadataPresenter: DiffractionMetadataPresenter,
         datasetPresenter: DiffractionDatasetPresenter,
         patternPresenter: DiffractionPatternPresenter,
@@ -515,7 +468,7 @@ class OpenDatasetWizardController:
         fileDialogFactory: FileDialogFactory,
     ) -> OpenDatasetWizardController:
         controller = cls(
-            ioPresenter,
+            api,
             metadataPresenter,
             datasetPresenter,
             patternPresenter,
@@ -539,9 +492,9 @@ class OpenDatasetWizardController:
             self._metadataController.importMetadata()
 
     def _executeFinishButtonAction(self) -> None:
-        self._ioPresenter.startAssemblingDiffractionPatterns()
+        self._api.startAssemblingDiffractionPatterns()
 
     def openDataset(self) -> None:
-        self._ioPresenter.stopAssemblingDiffractionPatterns(finishAssembling=False)
+        self._api.stopAssemblingDiffractionPatterns(finishAssembling=False)
         self._wizard.restart()
         self._wizard.show()

@@ -3,10 +3,9 @@ from typing import Any, overload
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.tree import SimpleTreeNode
 
-from ...model.patterns import DiffractionDatasetPresenter
+from ...model.patterns import AssembledDiffractionDataset, DiffractionDatasetObserver
 from ...view.patterns import PatternsInfoDialog
 
 
@@ -92,32 +91,24 @@ class SimpleTreeModel(QAbstractItemModel):
         return len(node.itemData)
 
 
-class PatternsInfoViewController(Observer):
-    def __init__(self, presenter: DiffractionDatasetPresenter, treeModel: SimpleTreeModel) -> None:
+class PatternsInfoViewController(DiffractionDatasetObserver):
+    def __init__(self, dataset: AssembledDiffractionDataset, treeModel: SimpleTreeModel) -> None:
         super().__init__()
-        self._presenter = presenter
+        self._dataset = dataset
         self._treeModel = treeModel
 
     @classmethod
-    def showInfo(cls, presenter: DiffractionDatasetPresenter, parent: QWidget) -> None:
-        treeModel = SimpleTreeModel(presenter.getContentsTree())
-        controller = cls(presenter, treeModel)
-        presenter.addObserver(controller)
+    def showInfo(cls, dataset: AssembledDiffractionDataset, parent: QWidget) -> None:
+        treeModel = SimpleTreeModel(dataset.getContentsTree())
+        controller = cls(dataset, treeModel)
+        dataset.add_observer(controller)
 
-        dialog = PatternsInfoDialog.createInstance(parent)
+        dialog = PatternsInfoDialog(parent)
         dialog.setWindowTitle('Patterns Info')
         dialog.treeView.setModel(treeModel)
-        dialog.finished.connect(controller._finish)
 
         controller._syncModelToView()
         dialog.open()
 
-    def _finish(self, result: int) -> None:
-        self._presenter.removeObserver(self)
-
     def _syncModelToView(self) -> None:
-        self._treeModel.setRootNode(self._presenter.getContentsTree())
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._syncModelToView()
+        self._treeModel.setRootNode(self._dataset.getContentsTree())

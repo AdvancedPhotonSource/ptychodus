@@ -52,7 +52,6 @@ class ProductCore(Observer):
         self._probeSettings = ProbeSettings(settingsRegistry)
         self._probeBuilderFactory = ProbeBuilderFactory(
             self._probeSettings,
-            patternSizer,
             dataset,
             fresnelZonePlateChooser,
             probeFileReaderChooser,

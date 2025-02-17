@@ -79,13 +79,16 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     @property
     def objectPlanePixelWidthInMeters(self) -> float:
-        return self._lambdaZInSquareMeters / self._patternSizer.getWidthInMeters()
+        return self._lambdaZInSquareMeters / self._patternSizer.get_processed_width_m()
 
     @property
     def objectPlanePixelHeightInMeters(self) -> float:
-        return self._lambdaZInSquareMeters / self._patternSizer.getHeightInMeters()
+        return self._lambdaZInSquareMeters / self._patternSizer.get_processed_height_m()
 
-    def getPixelGeometry(self) -> PixelGeometry:
+    def getDetectorPixelGeometry(self):
+        return self._patternSizer.get_processed_pixel_geometry()
+
+    def getObjectPlanePixelGeometry(self) -> PixelGeometry:
         return PixelGeometry(
             widthInMeters=self.objectPlanePixelWidthInMeters,
             heightInMeters=self.objectPlanePixelHeightInMeters,
@@ -93,13 +96,13 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     @property
     def fresnelNumber(self) -> float:
-        widthInMeters = self._patternSizer.getWidthInMeters()
-        heightInMeters = self._patternSizer.getHeightInMeters()
+        widthInMeters = self._patternSizer.get_processed_width_m()
+        heightInMeters = self._patternSizer.get_processed_height_m()
         areaInSquareMeters = widthInMeters * heightInMeters
         return areaInSquareMeters / self._lambdaZInSquareMeters
 
     def getProbeGeometry(self) -> ProbeGeometry:
-        extent = self._patternSizer.getImageExtent()
+        extent = self._patternSizer.get_processed_image_extent()
         return ProbeGeometry(
             widthInPixels=extent.widthInPixels,
             heightInPixels=extent.heightInPixels,

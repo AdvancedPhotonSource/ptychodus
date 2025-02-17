@@ -1,5 +1,6 @@
 from ptychodus.api.geometry import ImageExtent, Interval, PixelGeometry
 from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.parametric import BooleanParameter, IntegerParameter, RealParameter
 from ptychodus.api.patterns import BooleanArrayType, CropCenter
 
 from .processor import (
@@ -11,180 +12,205 @@ from .processor import (
 from .settings import DetectorSettings, PatternSettings
 
 
+class PatternAxisSizer(Observable, Observer):
+    def __init__(
+        self,
+        detector_size: IntegerParameter,
+        detector_pixel_size_m: RealParameter,
+        crop_enabled: BooleanParameter,
+        crop_size: IntegerParameter,
+        crop_center: IntegerParameter,
+        binning_enabled: BooleanParameter,
+        bin_size: IntegerParameter,
+        padding_enabled: BooleanParameter,
+        pad_size: IntegerParameter,
+    ) -> None:
+        super().__init__()
+        self._detector_size = detector_size
+        self._detector_pixel_size_m = detector_pixel_size_m
+        self._crop_enabled = crop_enabled
+        self._crop_size = crop_size
+        self._crop_center = crop_center
+        self._binning_enabled = binning_enabled
+        self._bin_size = bin_size
+        self._padding_enabled = padding_enabled
+        self._pad_size = pad_size
+
+        detector_size.addObserver(self)
+        detector_pixel_size_m.addObserver(self)
+        crop_enabled.addObserver(self)
+        crop_size.addObserver(self)
+        crop_center.addObserver(self)
+        binning_enabled.addObserver(self)
+        bin_size.addObserver(self)
+        padding_enabled.addObserver(self)
+        pad_size.addObserver(self)
+
+    def get_crop_size_limits(self) -> Interval[int]:
+        return Interval[int](1, self._detector_size.getValue())
+
+    def get_crop_size(self) -> int:
+        if self._crop_enabled.getValue():
+            limits = self.get_crop_size_limits()
+            return limits.clamp(self._crop_size.getValue())
+
+        return self._detector_size.getValue()
+
+    def get_crop_center_limits(self) -> Interval[int]:
+        xmin = (self.get_crop_size() + 1) // 2
+        xmax = self._detector_size.getValue() - 1 - xmin
+        return Interval[int](xmin, xmax)
+
+    def get_crop_center(self) -> int:
+        limits = self.get_crop_center_limits()
+        return limits.clamp(self._crop_center.getValue())
+
+    def get_bin_size_limits(self) -> Interval[int]:
+        return Interval[int](1, self.get_crop_size())
+
+    def get_bin_size(self) -> int:
+        if self._binning_enabled.getValue():
+            limits = self.get_bin_size_limits()
+            return limits.clamp(self._bin_size.getValue())
+
+        return 1
+
+    def validate_bin_size(self) -> None:
+        crop_size = self.get_crop_size()
+        bin_size = self.get_bin_size()
+
+        if crop_size % bin_size != 0:
+            raise ValueError(f'Invalid binning size! ({crop_size=}, {bin_size=})')
+
+    def get_pad_size(self) -> int:
+        if self._padding_enabled.getValue():
+            return self._pad_size.getValue()
+
+        return 0
+
+    def get_processed_size(self) -> int:
+        return self.get_crop_size() // self.get_bin_size() + self.get_pad_size()
+
+    def get_processed_pixel_size_m(self) -> float:
+        return self.get_bin_size() * self._detector_pixel_size_m.getValue()
+
+    def get_processed_size_m(self) -> float:
+        return self.get_processed_size() * self.get_processed_pixel_size_m()
+
+    def update(self, observable: Observable) -> None:
+        if observable in (
+            self._detector_size,
+            self._detector_pixel_size_m,
+            self._crop_enabled,
+            self._crop_size,
+            self._crop_center,
+            self._binning_enabled,
+            self._bin_size,
+            self._padding_enabled,
+            self._pad_size,
+        ):
+            self.notifyObservers()
+
+
 class PatternSizer(Observable, Observer):
     def __init__(
         self, detector_settings: DetectorSettings, pattern_settings: PatternSettings
     ) -> None:
         super().__init__()
-        self._detector_settings = detector_settings
         self._pattern_settings = pattern_settings
-
-        pattern_settings.addObserver(self)
-        detector_settings.addObserver(self)
-
-    @property
-    def _is_crop_enabled(self) -> bool:
-        return self._pattern_settings.cropEnabled.getValue()
-
-    @property
-    def _is_binning_enabled(self) -> bool:
-        # FIXME enable binning
-        return self._pattern_settings.binningEnabled.getValue()
-
-    @property
-    def _is_padding_enabled(self) -> bool:
-        # FIXME enable padding
-        return self._pattern_settings.paddingEnabled.getValue()
-
-    def getCropWidthLimitsInPixels(self) -> Interval[int]:
-        return Interval[int](1, self._detector_settings.widthInPixels.getValue())
-
-    def getWidthInPixels(self) -> int:
-        if self._is_crop_enabled:
-            limits = self.getCropWidthLimitsInPixels()
-            return limits.clamp(self._pattern_settings.cropWidthInPixels.getValue())
-
-        return self._detector_settings.widthInPixels.getValue()
-
-    def getCropCenterXLimitsInPixels(self) -> Interval[int]:
-        return Interval[int](0, self._detector_settings.widthInPixels.getValue())
-
-    def getCropCenterXInPixels(self) -> int:
-        limitsInPixels = self.getCropCenterXLimitsInPixels()
-        return (
-            limitsInPixels.clamp(self._pattern_settings.cropCenterXInPixels.getValue())
-            if self._is_crop_enabled
-            else limitsInPixels.midrange
+        self.axis_x = PatternAxisSizer(
+            detector_settings.widthInPixels,
+            detector_settings.pixelWidthInMeters,
+            pattern_settings.cropEnabled,
+            pattern_settings.cropWidthInPixels,
+            pattern_settings.cropCenterXInPixels,
+            pattern_settings.binningEnabled,
+            pattern_settings.binSizeX,
+            pattern_settings.paddingEnabled,
+            pattern_settings.padX,
+        )
+        self.axis_y = PatternAxisSizer(
+            detector_settings.heightInPixels,
+            detector_settings.pixelHeightInMeters,
+            pattern_settings.cropEnabled,
+            pattern_settings.cropHeightInPixels,
+            pattern_settings.cropCenterYInPixels,
+            pattern_settings.binningEnabled,
+            pattern_settings.binSizeY,
+            pattern_settings.paddingEnabled,
+            pattern_settings.padY,
         )
 
-    def getDetectorPixelWidthInMeters(self) -> float:
-        width_m = self._detector_settings.pixelWidthInMeters.getValue()
+        self.axis_x.addObserver(self)
+        self.axis_y.addObserver(self)
 
-        if self._is_binning_enabled:
-            width_m *= self._pattern_settings.binSizeX.getValue()
+    def get_processed_width_m(self) -> float:
+        return self.axis_x.get_processed_size_m()
 
-        return width_m
+    def get_processed_height_m(self) -> float:
+        return self.axis_y.get_processed_size_m()
 
-    def getWidthInMeters(self) -> float:
-        return self.getWidthInPixels() * self.getDetectorPixelWidthInMeters()
-
-    def getCropHeightLimitsInPixels(self) -> Interval[int]:
-        return Interval[int](1, self._detector_settings.heightInPixels.getValue())
-
-    def getHeightInPixels(self) -> int:
-        if self._is_crop_enabled:
-            limits = self.getCropHeightLimitsInPixels()
-            return limits.clamp(self._pattern_settings.cropHeightInPixels.getValue())
-
-        return self._detector_settings.heightInPixels.getValue()
-
-    def getCropCenterYLimitsInPixels(self) -> Interval[int]:
-        return Interval[int](0, self._detector_settings.heightInPixels.getValue())
-
-    def getCropCenterYInPixels(self) -> int:
-        limitsInPixels = self.getCropCenterYLimitsInPixels()
-        return (
-            limitsInPixels.clamp(self._pattern_settings.cropCenterYInPixels.getValue())
-            if self._is_crop_enabled
-            else limitsInPixels.midrange
-        )
-
-    def getDetectorPixelHeightInMeters(self) -> float:
-        height_m = self._detector_settings.pixelHeightInMeters.getValue()
-
-        if self._is_binning_enabled:
-            height_m *= self._pattern_settings.binSizeY.getValue()
-
-        return height_m
-
-    def getHeightInMeters(self) -> float:
-        return self.getHeightInPixels() * self.getDetectorPixelHeightInMeters()
-
-    def getImageExtent(self) -> ImageExtent:
+    def get_processed_image_extent(self) -> ImageExtent:
         return ImageExtent(
-            widthInPixels=self.getWidthInPixels(),
-            heightInPixels=self.getHeightInPixels(),
+            widthInPixels=self.axis_x.get_processed_size(),
+            heightInPixels=self.axis_y.get_processed_size(),
         )
 
-    def getDetectorPixelGeometry(self) -> PixelGeometry:
+    def get_processed_pixel_geometry(self) -> PixelGeometry:
         return PixelGeometry(
-            widthInMeters=self.getDetectorPixelWidthInMeters(),
-            heightInMeters=self.getDetectorPixelHeightInMeters(),
+            widthInMeters=self.axis_x.get_processed_pixel_size_m(),
+            heightInMeters=self.axis_y.get_processed_pixel_size_m(),
         )
-
-    @staticmethod
-    def _get_safe_position(x: int, w: int, W: int) -> int:
-        xmin = (w + 1) // 2
-        xmax = W - 1 - xmin
-        return min(max(xmin, x), xmax)
 
     def _get_crop(self) -> DiffractionPatternCrop | None:
-        if self._is_crop_enabled:
-            width_px = self.getWidthInPixels()
-            height_px = self.getHeightInPixels()
-
-            position_x_px = self._get_safe_position(
-                self.getCropCenterXInPixels(),
-                width_px,
-                self._detector_settings.widthInPixels.getValue(),
-            )
-            position_y_px = self._get_safe_position(
-                self.getCropCenterYInPixels(),
-                height_px,
-                self._detector_settings.heightInPixels.getValue(),
-            )
-
-            return DiffractionPatternCrop(
-                center=CropCenter(position_x_px, position_y_px),
-                extent=ImageExtent(width_px, height_px),
-            )
-
         return None
 
     def _get_binning(self) -> DiffractionPatternBinning | None:
-        if self._is_binning_enabled:
-            width_px = self.getWidthInPixels()
-            bin_size_x = self._pattern_settings.binSizeX.getValue()
-            binned_width_px = width_px // bin_size_x
-
-            if binned_width_px * bin_size_x != width_px:
-                raise ValueError(f'Invalid binning size! ({bin_size_x=}, {width_px=})')
-
-            height_px = self.getHeightInPixels()
-            bin_size_y = self._pattern_settings.binSizeY.getValue()
-            binned_height_px = height_px // bin_size_y
-
-            if binned_height_px * bin_size_y != height_px:
-                raise ValueError(f'Invalid binning size! ({bin_size_y=}, {height_px=})')
-
-            return DiffractionPatternBinning(
-                bin_size_x=self._pattern_settings.binSizeX.getValue(),
-                bin_size_y=self._pattern_settings.binSizeY.getValue(),
-            )
-
         return None
 
     def _get_padding(self) -> DiffractionPatternPadding | None:
-        if self._is_padding_enabled:
-            return DiffractionPatternPadding(
-                pad_x=self._pattern_settings.padX.getValue(),
-                pad_y=self._pattern_settings.padY.getValue(),
-            )
-
         return None
 
     def get_processor(self, bad_pixels: BooleanArrayType) -> DiffractionPatternProcessor:
+        crop: DiffractionPatternCrop | None = None
+        binning: DiffractionPatternBinning | None = None
+        padding: DiffractionPatternPadding | None = None
+
+        if self._pattern_settings.cropEnabled.getValue():
+            crop = DiffractionPatternCrop(
+                center=CropCenter(
+                    self.axis_x.get_crop_center(),
+                    self.axis_y.get_crop_center(),
+                ),
+                extent=ImageExtent(
+                    self.axis_x.get_crop_size(),
+                    self.axis_y.get_crop_size(),
+                ),
+            )
+
+        if self._pattern_settings.binningEnabled.getValue():
+            self.axis_x.validate_bin_size()
+            self.axis_y.validate_bin_size()
+            binning = DiffractionPatternBinning(
+                bin_size_x=self.axis_x.get_bin_size(),
+                bin_size_y=self.axis_y.get_bin_size(),
+            )
+
+        if self._pattern_settings.paddingEnabled.getValue():
+            padding = DiffractionPatternPadding(
+                pad_x=self.axis_x.get_pad_size(),
+                pad_y=self.axis_y.get_pad_size(),
+            )
+
         return DiffractionPatternProcessor(
             bad_pixels=bad_pixels,
-            crop=self._get_crop(),
-            binning=self._get_binning(),
-            padding=self._get_padding(),
+            crop=crop,
+            binning=binning,
+            padding=padding,
             flip_x=self._pattern_settings.flipXEnabled.getValue(),
             flip_y=self._pattern_settings.flipYEnabled.getValue(),
         )
 
     def update(self, observable: Observable) -> None:
-        if observable is self._pattern_settings:
-            self.notifyObservers()
-        elif observable is self._detector_settings:
+        if observable in (self.axis_x, self.axis_y):
             self.notifyObservers()

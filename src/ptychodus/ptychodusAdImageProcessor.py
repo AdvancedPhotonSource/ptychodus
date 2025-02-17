@@ -39,7 +39,7 @@ class ReconstructionThread(threading.Thread):
         while not self._stopEvent.is_set():
             if self._reconstructEvent.wait(timeout=1.0):
                 logging.debug('ReconstructionThread: Begin assembling scan positions')
-                self._ptychodus.finalizeStreamingWorkflow()
+                self._ptychodus_streaming_context.stop()
                 logging.debug('ReconstructionThread: End assembling scan positions')
                 self._ptychodus.batchModeExecute(
                     'reconstruct', self._inputProductPath, self._outputProductPath
@@ -104,7 +104,8 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             numberOfPatternsTotal=int(numberOfPatternsTotal),
             patternDataType=numpy.dtype(patternDataType),
         )
-        self._ptychodus.initializeStreamingWorkflow(metadata)  # FIXME
+        self._ptychodus_streming_context = self._ptychodus.createStreamingContext(metadata)
+        self._ptychodus_streaming_context.start()  # FIXME
 
     def process(self, pvObject: pvaccess.PvObject) -> pvaccess.PvObject:
         """Processes monitor update"""
@@ -124,7 +125,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
                 data=image3d,
                 state=ptychodus.api.patterns.DiffractionPatternState.LOADED,
             )
-            self._ptychodus.appendDiffractionPatternArray(array, frameTimeStamp)  # FIXME
+            self._ptychodus_streaming_context.append_array(array, frameTimeStamp)
 
         posXQueue = self.metadataQueueMap[self._posXPV]
 
@@ -134,7 +135,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             except pvaccess.QueueEmpty:
                 break
             else:
-                self._ptychodus.assembleScanPositionsX(
+                self._ptychodus_streaming_context.append_positions_x(
                     posX['values'],
                     [TimeUtility.getTimeStampAsFloat(ts) for ts in posX['t']],
                 )
@@ -147,7 +148,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             except pvaccess.QueueEmpty:
                 break
             else:
-                self._ptychodus.assembleScanPositionsY(
+                self._ptychodus_streaming_context.append_positions_y(
                     posY['values'],
                     [TimeUtility.getTimeStampAsFloat(ts) for ts in posY['t']],
                 )
@@ -165,7 +166,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
 
     def getStats(self) -> dict[str, Any]:
         """Retrieves statistics for user processor"""
-        nFramesQueued = self._ptychodus.getDiffractionPatternQueueSize()  # FIXME
+        nFramesQueued = self._ptychodus_streaming_context.get_queue_size()
         processedFrameRate = 0.0
 
         if self.processingTime > 0.0:

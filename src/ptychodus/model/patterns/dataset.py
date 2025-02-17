@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from bisect import bisect
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import overload
@@ -235,13 +234,9 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
 
     def get_bad_pixels(self) -> BooleanArrayType:
         # FIXME support loading from file
-        return numpy.full(
-            (
-                self._sizer.getHeightInPixels(),
-                self._sizer.getWidthInPixels(),
-            ),
-            False,
-        )
+        # FIXME make work with binned and padded data
+        pattern_extent = self._sizer.get_processed_image_extent()
+        return numpy.full(pattern_extent.shape, False)
 
     @overload
     def __getitem__(self, index: int) -> DiffractionPatternArray: ...
@@ -286,11 +281,8 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
         self._patterns = numpy.zeros((), dtype=int)
         self._arrays.clear()
 
-        patterns_shape = (
-            self._indexes.size,
-            self._sizer.getHeightInPixels(),
-            self._sizer.getWidthInPixels(),
-        )
+        pattern_extent = self._sizer.get_processed_image_extent()
+        patterns_shape = self._indexes.size, *pattern_extent.shape
         patterns_dtype = self._metadata.patternDataType
 
         if self._settings.memmapEnabled.getValue():

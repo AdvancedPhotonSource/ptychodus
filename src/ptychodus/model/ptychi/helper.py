@@ -541,11 +541,12 @@ class PtyChiOptionsHelper:
 
     def create_data_options(self, parameters: ReconstructInput) -> PtychographyDataOptions:
         metadata = parameters.product.metadata
+        pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry()
         return PtychographyDataOptions(
             data=parameters.patterns,
             free_space_propagation_distance_m=metadata.detectorDistanceInMeters,
             wavelength_m=metadata.probeWavelengthInMeters,
-            detector_pixel_size_m=self._pattern_sizer.getDetectorPixelWidthInMeters(),
+            detector_pixel_size_m=pixel_geometry.widthInMeters,
             valid_pixel_mask=numpy.logical_not(parameters.bad_pixels),
             save_data_on_device=self._reconstructor_settings.saveDataOnDevice.getValue(),
         )
