@@ -1,5 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
+from typing import Final
 import logging
 import re
 
@@ -16,6 +17,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QWizard,
+    QWizardPage,
 )
 
 from ptychodus.api.observer import Observable, Observer
@@ -30,6 +32,7 @@ from ...view.patterns import (
 
 from ..data import FileDialogFactory
 from ..parametric import (
+    CheckBoxParameterViewController,
     CheckableGroupBoxParameterViewController,
     ParameterViewController,
     PathParameterViewController,
@@ -43,17 +46,12 @@ __all__ = [
 ]
 
 
-class OpenDatasetWizardFilesController(Observer):
-    def __init__(
-        self,
-        api: PatternsAPI,
-        page: OpenDatasetWizardFilesPage,
-        fileDialogFactory: FileDialogFactory,
-    ) -> None:
+class OpenDatasetWizardFilesViewController(Observer):
+    def __init__(self, api: PatternsAPI, file_dialog_factory: FileDialogFactory) -> None:
         super().__init__()
         self._api = api
-        self._page = page
-        self._fileDialogFactory = fileDialogFactory
+        self._page = OpenDatasetWizardFilesPage()
+        self._file_dialog_factory = file_dialog_factory
 
         self._fileSystemModel = QFileSystemModel()
         self._fileSystemModel.setFilter(QDir.Filter.AllEntries | QDir.Filter.AllDirs)
@@ -62,28 +60,32 @@ class OpenDatasetWizardFilesController(Observer):
         self._fileSystemProxyModel = QSortFilterProxyModel()
         self._fileSystemProxyModel.setSourceModel(self._fileSystemModel)
 
-        page.directoryComboBox.addItem(str(fileDialogFactory.getOpenWorkingDirectory()))
-        page.directoryComboBox.addItem(str(Path.home()))
-        page.directoryComboBox.setEditable(True)
-        page.directoryComboBox.textActivated.connect(self._handleDirectoryComboBoxActivated)
+        self._page.directoryComboBox.addItem(str(file_dialog_factory.getOpenWorkingDirectory()))
+        self._page.directoryComboBox.addItem(str(Path.home()))
+        self._page.directoryComboBox.setEditable(True)
+        self._page.directoryComboBox.textActivated.connect(self._handleDirectoryComboBoxActivated)
 
-        page.fileSystemTableView.setModel(self._fileSystemProxyModel)
-        page.fileSystemTableView.setSortingEnabled(True)
-        page.fileSystemTableView.sortByColumn(0, Qt.SortOrder.AscendingOrder)
-        page.fileSystemTableView.verticalHeader().hide()
-        page.fileSystemTableView.setSelectionBehavior(
+        self._page.fileSystemTableView.setModel(self._fileSystemProxyModel)
+        self._page.fileSystemTableView.setSortingEnabled(True)
+        self._page.fileSystemTableView.sortByColumn(0, Qt.SortOrder.AscendingOrder)
+        self._page.fileSystemTableView.verticalHeader().hide()
+        self._page.fileSystemTableView.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
         )
-        page.fileSystemTableView.doubleClicked.connect(self._handleFileSystemTableDoubleClicked)
-        page.fileSystemTableView.selectionModel().currentChanged.connect(self._checkIfComplete)
+        self._page.fileSystemTableView.doubleClicked.connect(
+            self._handleFileSystemTableDoubleClicked
+        )
+        self._page.fileSystemTableView.selectionModel().currentChanged.connect(
+            self._checkIfComplete
+        )
 
         for fileFilter in api.getOpenFileFilterList():
-            page.fileTypeComboBox.addItem(fileFilter)
+            self._page.fileTypeComboBox.addItem(fileFilter)
 
-        page.fileTypeComboBox.textActivated.connect(self._setNameFiltersInFileSystemModel)
+        self._page.fileTypeComboBox.textActivated.connect(self._setNameFiltersInFileSystemModel)
 
-        self._setRootPath(fileDialogFactory.getOpenWorkingDirectory())
-        self._syncModelToView()
+        self._setRootPath(file_dialog_factory.getOpenWorkingDirectory())
+        self._sync_model_to_view()
         api.addObserver(self)
 
     def _setRootPath(self, rootPath: Path) -> None:
@@ -91,7 +93,7 @@ class OpenDatasetWizardFilesController(Observer):
         proxyIndex = self._fileSystemProxyModel.mapFromSource(index)
         self._page.fileSystemTableView.setRootIndex(proxyIndex)
         self._page.directoryComboBox.setCurrentText(str(rootPath))
-        self._fileDialogFactory.setOpenWorkingDirectory(rootPath)
+        self._file_dialog_factory.setOpenWorkingDirectory(rootPath)
 
     def _handleDirectoryComboBoxActivated(self, text: str) -> None:
         fileInfo = QFileInfo(text)
@@ -110,7 +112,7 @@ class OpenDatasetWizardFilesController(Observer):
         proxyIndex = self._page.fileSystemTableView.currentIndex()
         index = self._fileSystemProxyModel.mapToSource(proxyIndex)
         filePath = Path(self._fileSystemModel.filePath(index))
-        self._fileDialogFactory.setOpenWorkingDirectory(filePath.parent)
+        self._file_dialog_factory.setOpenWorkingDirectory(filePath.parent)
 
         fileFilter = self._page.fileTypeComboBox.currentText()
         self._api.openPatterns(filePath, fileType=fileFilter)
@@ -128,27 +130,26 @@ class OpenDatasetWizardFilesController(Observer):
             logger.debug(f'Dataset File Name Filters: {nameFilters}')
             self._fileSystemModel.setNameFilters(nameFilters)
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._page.fileTypeComboBox.setCurrentText(self._api.getOpenFileFilter())
 
     def update(self, observable: Observable) -> None:
         if observable is self._api:
-            self._syncModelToView()
+            self._sync_model_to_view()
+
+    def getWidget(self) -> QWizardPage:
+        return self._page
 
 
 class OpenDatasetWizardMetadataViewController(Observer):
-    def __init__(
-        self,
-        presenter: MetadataPresenter,
-        page: OpenDatasetWizardMetadataPage,
-    ) -> None:
+    def __init__(self, presenter: MetadataPresenter) -> None:
         super().__init__()
         self._presenter = presenter
-        self._page = page
+        self._page = OpenDatasetWizardMetadataPage()
 
         presenter.addObserver(self)
-        self._syncModelToView()
-        page._setComplete(True)
+        self._sync_model_to_view()
+        self._page._setComplete(True)
 
     def importMetadata(self) -> None:
         if self._page.detectorPixelCountCheckBox.isChecked():
@@ -171,7 +172,7 @@ class OpenDatasetWizardMetadataViewController(Observer):
         if self._page.probeEnergyCheckBox.isChecked():
             self._presenter.syncProbeEnergy()
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         canSyncDetectorPixelCount = self._presenter.canSyncDetectorPixelCount()
         self._page.detectorPixelCountCheckBox.setVisible(canSyncDetectorPixelCount)
         self._page.detectorPixelCountCheckBox.setChecked(canSyncDetectorPixelCount)
@@ -200,21 +201,24 @@ class OpenDatasetWizardMetadataViewController(Observer):
         self._page.probeEnergyCheckBox.setVisible(canSyncProbeEnergy)
         self._page.probeEnergyCheckBox.setChecked(canSyncProbeEnergy)
 
+    def getWidget(self) -> QWizardPage:
+        return self._page
+
     def update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class PatternLoadViewController(ParameterViewController):
     def __init__(self, settings: PatternSettings) -> None:
         super().__init__()
-        self._viewController = SpinBoxParameterViewController(
+        self._view_controller = SpinBoxParameterViewController(
             settings.numberOfDataThreads,
         )
         self._widget = QGroupBox('Load')
 
         layout = QFormLayout()
-        layout.addRow('Number of Data Threads:', self._viewController.getWidget())
+        layout.addRow('Number of Data Threads:', self._view_controller.getWidget())
         self._widget.setLayout(layout)
 
     def getWidget(self) -> QWidget:
@@ -222,18 +226,18 @@ class PatternLoadViewController(ParameterViewController):
 
 
 class PatternMemoryMapViewController(CheckableGroupBoxParameterViewController):
-    def __init__(self, settings: PatternSettings, fileDialogFactory: FileDialogFactory) -> None:
+    def __init__(self, settings: PatternSettings, file_dialog_factory: FileDialogFactory) -> None:
         super().__init__(settings.memmapEnabled, 'Memory Map Diffraction Data')
-        self._viewController = PathParameterViewController.createDirectoryChooser(
-            settings.scratchDirectory, fileDialogFactory
+        self._view_controller = PathParameterViewController.createDirectoryChooser(
+            settings.scratchDirectory, file_dialog_factory
         )
 
         layout = QFormLayout()
-        layout.addRow('Scratch Directory:', self._viewController.getWidget())
+        layout.addRow('Scratch Directory:', self._view_controller.getWidget())
         self.getWidget().setLayout(layout)
 
 
-class PatternCropViewController(CheckableGroupBoxParameterViewController, Observer):
+class PatternCropViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
         settings: PatternSettings,
@@ -243,32 +247,39 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController, Observ
         self._settings = settings
         self._sizer = sizer
 
-        self._centerXSpinBox = QSpinBox()
-        self._centerYSpinBox = QSpinBox()
-        self._widthSpinBox = QSpinBox()
-        self._heightSpinBox = QSpinBox()
+        self._center_x_spin_box = QSpinBox()
+        self._center_y_spin_box = QSpinBox()
+        self._width_spin_box = QSpinBox()
+        self._height_spin_box = QSpinBox()
+        self._flip_x_check_box = QCheckBox('Flip X')
+        self._flip_y_check_box = QCheckBox('Flip Y')
 
         layout = QGridLayout()
-        layout.addWidget(QLabel('Center [px]:'), 0, 0)
-        layout.addWidget(self._centerXSpinBox, 0, 1)
-        layout.addWidget(self._centerYSpinBox, 0, 2)
-        layout.addWidget(QLabel('Extent [px]:'), 1, 0)
-        layout.addWidget(self._widthSpinBox, 1, 1)
-        layout.addWidget(self._heightSpinBox, 1, 2)
+        layout.addWidget(QLabel('Center:'), 0, 0)
+        layout.addWidget(self._center_x_spin_box, 0, 1)
+        layout.addWidget(self._center_y_spin_box, 0, 2)
+        layout.addWidget(QLabel('Extent:'), 1, 0)
+        layout.addWidget(self._width_spin_box, 1, 1)
+        layout.addWidget(self._height_spin_box, 1, 2)
+        layout.addWidget(QLabel('Axes:'), 2, 0)
+        layout.addWidget(self._flip_x_check_box, 2, 1, Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(self._flip_y_check_box, 2, 2, Qt.AlignmentFlag.AlignHCenter)
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
         self.getWidget().setLayout(layout)
 
-        self._syncModelToView()
+        self._sync_model_to_view()
 
-        self._centerXSpinBox.valueChanged.connect(settings.cropCenterXInPixels.setValue)
-        self._centerYSpinBox.valueChanged.connect(settings.cropCenterYInPixels.setValue)
-        self._widthSpinBox.valueChanged.connect(settings.cropWidthInPixels.setValue)
-        self._heightSpinBox.valueChanged.connect(settings.cropHeightInPixels.setValue)
+        self._center_x_spin_box.valueChanged.connect(settings.cropCenterXInPixels.setValue)
+        self._center_y_spin_box.valueChanged.connect(settings.cropCenterYInPixels.setValue)
+        self._width_spin_box.valueChanged.connect(settings.cropWidthInPixels.setValue)
+        self._height_spin_box.valueChanged.connect(settings.cropHeightInPixels.setValue)
+        self._flip_x_check_box.toggled.connect(settings.flipXEnabled.setValue)
+        self._flip_y_check_box.toggled.connect(settings.flipYEnabled.setValue)
 
         sizer.addObserver(self)
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         center_x = self._sizer.axis_x.get_crop_center()
         center_y = self._sizer.axis_y.get_crop_center()
         width = self._sizer.axis_x.get_crop_size()
@@ -279,222 +290,239 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController, Observ
         width_limits = self._sizer.axis_x.get_crop_size_limits()
         height_limits = self._sizer.axis_y.get_crop_size_limits()
 
-        self._centerXSpinBox.blockSignals(True)
-        self._centerXSpinBox.setRange(center_x_limits.lower, center_x_limits.upper)
-        self._centerXSpinBox.setValue(center_x)
-        self._centerXSpinBox.blockSignals(False)
+        self._center_x_spin_box.blockSignals(True)
+        self._center_x_spin_box.setRange(center_x_limits.lower, center_x_limits.upper)
+        self._center_x_spin_box.setValue(center_x)
+        self._center_x_spin_box.blockSignals(False)
 
-        self._centerYSpinBox.blockSignals(True)
-        self._centerYSpinBox.setRange(center_y_limits.lower, center_y_limits.upper)
-        self._centerYSpinBox.setValue(center_y)
-        self._centerYSpinBox.blockSignals(False)
+        self._center_y_spin_box.blockSignals(True)
+        self._center_y_spin_box.setRange(center_y_limits.lower, center_y_limits.upper)
+        self._center_y_spin_box.setValue(center_y)
+        self._center_y_spin_box.blockSignals(False)
 
-        self._widthSpinBox.blockSignals(True)
-        self._widthSpinBox.setRange(width_limits.lower, width_limits.upper)
-        self._widthSpinBox.setValue(width)
-        self._widthSpinBox.blockSignals(False)
+        self._width_spin_box.blockSignals(True)
+        self._width_spin_box.setRange(width_limits.lower, width_limits.upper)
+        self._width_spin_box.setValue(width)
+        self._width_spin_box.blockSignals(False)
 
-        self._heightSpinBox.blockSignals(True)
-        self._heightSpinBox.setRange(height_limits.lower, height_limits.upper)
-        self._heightSpinBox.setValue(height)
-        self._heightSpinBox.blockSignals(False)
+        self._height_spin_box.blockSignals(True)
+        self._height_spin_box.setRange(height_limits.lower, height_limits.upper)
+        self._height_spin_box.setValue(height)
+        self._height_spin_box.blockSignals(False)
+
+        self._flip_x_check_box.setChecked(self._settings.flipXEnabled.getValue())
+        self._flip_y_check_box.setChecked(self._settings.flipYEnabled.getValue())
 
     def update(self, observable: Observable) -> None:
         if observable is self._sizer:
-            self._syncModelToView()
+            self._sync_model_to_view()
+        else:
+            super().update(observable)
 
 
-class OpenDatasetWizardPatternTransformView(QGroupBox):  # FIXME
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__('Transform', parent)
-        self.valueLowerBoundCheckBox = QCheckBox('Value Lower Bound:')
-        self.valueLowerBoundSpinBox = QSpinBox()
-        self.valueUpperBoundCheckBox = QCheckBox('Value Upper Bound:')
-        self.valueUpperBoundSpinBox = QSpinBox()
-        self.axesLabel = QLabel('Axes:')
-        self.flipXCheckBox = QCheckBox('Flip X')
-        self.flipYCheckBox = QCheckBox('Flip Y')
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> OpenDatasetWizardPatternTransformView:
-        view = cls(parent)
-
-        layout = QGridLayout()
-        layout.addWidget(view.valueLowerBoundCheckBox, 0, 0)
-        layout.addWidget(view.valueLowerBoundSpinBox, 0, 1, 1, 2)
-        layout.addWidget(view.valueUpperBoundCheckBox, 1, 0)
-        layout.addWidget(view.valueUpperBoundSpinBox, 1, 1, 1, 2)
-        layout.addWidget(view.axesLabel, 2, 0)
-        layout.addWidget(view.flipXCheckBox, 2, 1, Qt.AlignmentFlag.AlignHCenter)
-        layout.addWidget(view.flipYCheckBox, 2, 2, Qt.AlignmentFlag.AlignHCenter)
-        layout.setColumnStretch(2, 1)
-        layout.setColumnStretch(3, 1)
-        view.setLayout(layout)
-
-        return view
-
-
-class PatternTransformViewController(Observer):
+class PatternBinningViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
-        presenter: DiffractionPatternPresenter,
-        view: OpenDatasetWizardPatternTransformView,
+        settings: PatternSettings,
+        sizer: PatternSizer,
     ) -> None:
-        super().__init__()
-        self._presenter = presenter
-        self._view = view
+        super().__init__(settings.binningEnabled, 'Bin Pixels')
+        self._settings = settings
+        self._sizer = sizer
 
-    @classmethod
-    def createInstance(
-        cls,
-        presenter: DiffractionPatternPresenter,
-        view: OpenDatasetWizardPatternTransformView,
-    ) -> PatternTransformController:
-        controller = cls(presenter, view)
-        presenter.addObserver(controller)
+        self._bin_size_x_spin_box = QSpinBox()
+        self._bin_size_y_spin_box = QSpinBox()
 
-        view.valueLowerBoundCheckBox.toggled.connect(presenter.setValueLowerBoundEnabled)
-        view.valueLowerBoundSpinBox.valueChanged.connect(presenter.setValueLowerBound)
-        view.valueUpperBoundCheckBox.toggled.connect(presenter.setValueUpperBoundEnabled)
-        view.valueUpperBoundSpinBox.valueChanged.connect(presenter.setValueUpperBound)
-        view.flipXCheckBox.toggled.connect(presenter.setFlipXEnabled)
-        view.flipYCheckBox.toggled.connect(presenter.setFlipYEnabled)
+        layout = QGridLayout()
+        layout.addWidget(QLabel('Bin Size:'), 0, 0)
+        layout.addWidget(self._bin_size_x_spin_box, 0, 1)
+        layout.addWidget(self._bin_size_y_spin_box, 0, 2)
+        layout.setColumnStretch(1, 1)
+        layout.setColumnStretch(2, 1)
+        self.getWidget().setLayout(layout)
 
-        controller._syncModelToView()
-        return controller
+        self._sync_model_to_view()
 
-    def _syncModelToView(self) -> None:
-        self._view.valueLowerBoundCheckBox.setChecked(self._presenter.isValueLowerBoundEnabled())
+        self._bin_size_x_spin_box.valueChanged.connect(settings.binSizeX.setValue)
+        self._bin_size_y_spin_box.valueChanged.connect(settings.binSizeY.setValue)
 
-        self._view.valueLowerBoundSpinBox.blockSignals(True)
-        self._view.valueLowerBoundSpinBox.setRange(
-            self._presenter.getValueLowerBoundLimits().lower,
-            self._presenter.getValueLowerBoundLimits().upper,
-        )
-        self._view.valueLowerBoundSpinBox.setValue(self._presenter.getValueLowerBound())
-        self._view.valueLowerBoundSpinBox.blockSignals(False)
+        sizer.addObserver(self)
 
-        self._view.valueUpperBoundCheckBox.setChecked(self._presenter.isValueUpperBoundEnabled())
+    def _sync_model_to_view(self) -> None:
+        bin_size_x = self._sizer.axis_x.get_bin_size()
+        bin_size_y = self._sizer.axis_y.get_bin_size()
 
-        self._view.valueUpperBoundSpinBox.blockSignals(True)
-        self._view.valueUpperBoundSpinBox.setRange(
-            self._presenter.getValueUpperBoundLimits().lower,
-            self._presenter.getValueUpperBoundLimits().upper,
-        )
-        self._view.valueUpperBoundSpinBox.setValue(self._presenter.getValueUpperBound())
-        self._view.valueUpperBoundSpinBox.blockSignals(False)
+        bin_size_x_limits = self._sizer.axis_x.get_bin_size_limits()
+        bin_size_y_limits = self._sizer.axis_y.get_bin_size_limits()
 
-        self._view.flipXCheckBox.setChecked(self._presenter.isFlipXEnabled())
-        self._view.flipYCheckBox.setChecked(self._presenter.isFlipYEnabled())
+        self._bin_size_x_spin_box.blockSignals(True)
+        self._bin_size_x_spin_box.setRange(bin_size_x_limits.lower, bin_size_x_limits.upper)
+        self._bin_size_x_spin_box.setValue(bin_size_x)
+        self._bin_size_x_spin_box.blockSignals(False)
+
+        self._bin_size_y_spin_box.blockSignals(True)
+        self._bin_size_y_spin_box.setRange(bin_size_y_limits.lower, bin_size_y_limits.upper)
+        self._bin_size_y_spin_box.setValue(bin_size_y)
+        self._bin_size_y_spin_box.blockSignals(False)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._syncModelToView()
+        if observable is self._sizer:
+            self._sync_model_to_view()
+        else:
+            super().update(observable)
 
 
-class OpenDatasetWizardPatternsViewController(ParameterViewController):
-    def __init__(self, settings: PatternSettings, sizer: PatternSizer) -> None:
-        self._loadViewController = PatternLoadViewController(settings)
-        self._memoryMapViewController = PatternMemoryMapViewController(settings)
-        self._cropViewController = PatternCropViewController(settings, sizer)
-        self._paddingViewController = PatternPaddingViewController(settings)
-        self._binningViewController = PatternBinningViewController(settings)
-        self._transformViewController = PatternTransformViewController(settings)
+class PatternPaddingViewController(CheckableGroupBoxParameterViewController):
+    MAX_INT: Final[int] = 0x7FFFFFFF
 
-        layout = QVBoxLayout()
-        layout.addWidget(self._loadViewController.getWidget())
-        layout.addWidget(self._memoryMapViewController.getWidget())
-        layout.addWidget(self._cropViewController.getWidget())
-        layout.addWidget(self._paddingViewController.getWidget())
-        layout.addWidget(self._binningViewController.getWidget())
-        layout.addStretch()
+    def __init__(
+        self,
+        settings: PatternSettings,
+        sizer: PatternSizer,
+    ) -> None:
+        super().__init__(settings.paddingEnabled, 'Pad')
+        self._settings = settings
+        self._sizer = sizer
 
-        self._widget = OpenDatasetWizardPage()
-        self._widget.setTitle('Pattern Processing')
-        self._widget._setComplete(True)  # FIXME ???
+        self._pad_x_spin_box = QSpinBox()
+        self._pad_y_spin_box = QSpinBox()
+
+        layout = QGridLayout()
+        layout.addWidget(QLabel('Padding:'), 0, 0)
+        layout.addWidget(self._pad_x_spin_box, 0, 1)
+        layout.addWidget(self._pad_y_spin_box, 0, 2)
+        layout.setColumnStretch(1, 1)
+        layout.setColumnStretch(2, 1)
+        self.getWidget().setLayout(layout)
+
+        self._sync_model_to_view()
+
+        self._pad_x_spin_box.valueChanged.connect(settings.padX.setValue)
+        self._pad_y_spin_box.valueChanged.connect(settings.padY.setValue)
+
+        sizer.addObserver(self)
+
+    def _sync_model_to_view(self) -> None:
+        pad_x = self._sizer.axis_x.get_pad_size()
+        pad_y = self._sizer.axis_y.get_pad_size()
+
+        self._pad_x_spin_box.blockSignals(True)
+        self._pad_x_spin_box.setRange(0, self.MAX_INT)
+        self._pad_x_spin_box.setValue(pad_x)
+        self._pad_x_spin_box.blockSignals(False)
+
+        self._pad_y_spin_box.blockSignals(True)
+        self._pad_y_spin_box.setRange(0, self.MAX_INT)
+        self._pad_y_spin_box.setValue(pad_y)
+        self._pad_y_spin_box.blockSignals(False)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._sizer:
+            self._sync_model_to_view()
+        else:
+            super().update(observable)
+
+
+class PatternTransformViewController:
+    def __init__(self, settings: PatternSettings) -> None:
+        self._lower_bound_enabled_view_controller = CheckBoxParameterViewController(
+            settings.valueLowerBoundEnabled, 'Value Lower Bound:'
+        )
+        self._lower_bound_view_controller = SpinBoxParameterViewController(settings.valueLowerBound)
+        self._upper_bound_enabled_view_controller = CheckBoxParameterViewController(
+            settings.valueUpperBoundEnabled, 'Value upper Bound:'
+        )
+        self._upper_bound_view_controller = SpinBoxParameterViewController(settings.valueUpperBound)
+
+        layout = QGridLayout()
+        layout.addWidget(self._lower_bound_enabled_view_controller.getWidget(), 0, 0)
+        layout.addWidget(self._lower_bound_view_controller.getWidget(), 0, 1, 1, 2)
+        layout.addWidget(self._upper_bound_view_controller.getWidget(), 1, 0)
+        layout.addWidget(self._upper_bound_view_controller.getWidget(), 1, 1, 1, 2)
+        layout.setColumnStretch(2, 1)
+        layout.setColumnStretch(3, 1)
+
+        self._widget = QGroupBox('Transform')
         self._widget.setLayout(layout)
 
     def getWidget(self) -> QWidget:
         return self._widget
 
 
-class OpenDatasetWizard(QWizard):
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__(parent)
-        self.filesPage = OpenDatasetWizardFilesPage.createInstance()
-        self.metadataPage = OpenDatasetWizardMetadataPage.createInstance()
-        self.patternsPage = OpenDatasetWizardPatternsPage.createInstance()
+class OpenDatasetWizardPatternsViewController(ParameterViewController):
+    def __init__(
+        self, settings: PatternSettings, sizer: PatternSizer, file_dialog_factory: FileDialogFactory
+    ) -> None:
+        self._loadViewController = PatternLoadViewController(settings)
+        self._memoryMapViewController = PatternMemoryMapViewController(
+            settings, file_dialog_factory
+        )
+        self._cropViewController = PatternCropViewController(settings, sizer)
+        self._binningViewController = PatternBinningViewController(settings, sizer)
+        self._paddingViewController = PatternPaddingViewController(settings, sizer)
+        self._transformViewController = PatternTransformViewController(settings)
 
-        self.setWindowTitle('Open Dataset')
-        self.addPage(self.filesPage)
-        self.addPage(self.metadataPage)
-        self.addPage(self.patternsPage)
+        layout = QVBoxLayout()
+        layout.addWidget(self._loadViewController.getWidget())
+        layout.addWidget(self._memoryMapViewController.getWidget())
+        layout.addWidget(self._cropViewController.getWidget())
+        layout.addWidget(self._binningViewController.getWidget())
+        layout.addWidget(self._paddingViewController.getWidget())
+        layout.addWidget(self._transformViewController.getWidget())
+        layout.addStretch()
+
+        self._page = OpenDatasetWizardPage()
+        self._page.setTitle('Pattern Processing')
+        self._page._setComplete(True)  # FIXME why???
+        self._page.setLayout(layout)
+
+    def getWidget(self) -> QWizardPage:
+        return self._page
 
 
 class OpenDatasetWizardController:
     def __init__(
         self,
+        settings: PatternSettings,
+        sizer: PatternSizer,
         api: PatternsAPI,
-        metadataPresenter: DiffractionMetadataPresenter,
-        datasetPresenter: DiffractionDatasetPresenter,
-        patternPresenter: DiffractionPatternPresenter,
-        wizard: OpenDatasetWizard,
-        fileDialogFactory: FileDialogFactory,
+        metadata_presenter: MetadataPresenter,
+        file_dialog_factory: FileDialogFactory,
     ) -> None:
         self._api = api
-        self._wizard = wizard
-        self._filesController = OpenDatasetWizardFilesController.createInstance(
-            api, wizard.filesPage, fileDialogFactory
+        self._file_view_controller = OpenDatasetWizardFilesViewController(
+            self._api, file_dialog_factory
         )
-        self._metadataController = OpenDatasetWizardMetadataController.createInstance(
-            metadataPresenter, wizard.metadataPage
-        )
-        self._patternsController = OpenDatasetWizardPatternsController.createInstance(
-            api,
-            datasetPresenter,
-            patternPresenter,
-            wizard.patternsPage,
-            fileDialogFactory,
+        self._metadata_view_controller = OpenDatasetWizardMetadataViewController(metadata_presenter)
+        self._patterns_view_controller = OpenDatasetWizardPatternsViewController(
+            settings, sizer, file_dialog_factory
         )
 
-    @classmethod
-    def createInstance(
-        cls,
-        api: PatternsAPI,
-        metadataPresenter: DiffractionMetadataPresenter,
-        datasetPresenter: DiffractionDatasetPresenter,
-        patternPresenter: DiffractionPatternPresenter,
-        wizard: OpenDatasetWizard,
-        fileDialogFactory: FileDialogFactory,
-    ) -> OpenDatasetWizardController:
-        controller = cls(
-            api,
-            metadataPresenter,
-            datasetPresenter,
-            patternPresenter,
-            wizard,
-            fileDialogFactory,
+        self._wizard = QWizard()
+        self._wizard.setWindowTitle('Open Dataset')
+        self._wizard.addPage(self._file_view_controller.getWidget())
+        self._wizard.addPage(self._metadata_view_controller.getWidget())
+        self._wizard.addPage(self._patterns_view_controller.getWidget())
+
+        self._wizard.button(QWizard.WizardButton.NextButton).clicked.connect(
+            self._executeNextButtonAction
         )
-        wizard.button(QWizard.WizardButton.NextButton).clicked.connect(
-            controller._executeNextButtonAction
+        self._wizard.button(QWizard.WizardButton.FinishButton).clicked.connect(
+            self._executeFinishButtonAction
         )
-        wizard.button(QWizard.WizardButton.FinishButton).clicked.connect(
-            controller._executeFinishButtonAction
-        )
-        return controller
 
     def _executeNextButtonAction(self) -> None:
         page = self._wizard.currentPage()
 
-        if page is self._wizard.metadataPage:
-            self._filesController.openDataset()
-        elif page is self._wizard.patternsPage:
-            self._metadataController.importMetadata()
+        if page is self._metadata_view_controller.getWidget():
+            self._file_view_controller.openDataset()
+        elif page is self._patterns_view_controller.getWidget():
+            self._metadata_view_controller.importMetadata()
 
     def _executeFinishButtonAction(self) -> None:
-        self._api.startAssemblingDiffractionPatterns()
+        self._api.startAssemblingDiffractionPatterns()  # FIXME
 
     def openDataset(self) -> None:
-        self._api.stopAssemblingDiffractionPatterns(finishAssembling=False)
+        self._api.stopAssemblingDiffractionPatterns(finishAssembling=False)  # FIXME
         self._wizard.restart()
         self._wizard.show()
