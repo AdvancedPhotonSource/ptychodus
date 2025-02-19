@@ -53,9 +53,9 @@ class OpenDatasetWizardController:
             self._metadata_view_controller.importMetadata()
 
     def _executeFinishButtonAction(self) -> None:
-        self._api.startAssemblingDiffractionPatterns()  # FIXME
+        self._api.startAssemblingDiffractionPatterns()
 
     def openDataset(self) -> None:
-        self._api.stopAssemblingDiffractionPatterns(finishAssembling=False)  # FIXME
+        self._api.finishAssemblingDiffractionPatterns(block=False)
         self._wizard.restart()
         self._wizard.show()

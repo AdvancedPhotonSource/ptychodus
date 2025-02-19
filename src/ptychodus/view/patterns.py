@@ -46,6 +46,10 @@ class OpenDatasetWizardPage(QWizardPage):
         super().__init__(parent)
         self._isComplete = False
 
+    def isComplete(self) -> bool:
+        """Overrides QWizardPage.isComplete()"""
+        return self._isComplete
+
     def _setComplete(self, complete: bool) -> None:
         if self._isComplete != complete:
             self._isComplete = complete

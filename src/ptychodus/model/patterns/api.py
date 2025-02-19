@@ -30,7 +30,8 @@ class PatternsStreamingContext:
     def start(self) -> None:
         contents_tree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         stream_dataset = SimpleDiffractionDataset(self._metadata, contents_tree, [])
-        self._dataset.reload(stream_dataset, start_assembling=True, finish_assembling=False)
+        self._dataset.reload(stream_dataset)
+        self._dataset.start_processing()
 
     def append_array(self, array: DiffractionPatternArray, trigger_counts: Sequence[int]) -> None:
         self._dataset.append_array(array)
@@ -40,7 +41,8 @@ class PatternsStreamingContext:
         return self._dataset.queue_size
 
     def stop(self) -> None:
-        self._dataset.stop(finish_assembling=True)
+        self._dataset.finish_processing(block=True)
+        self._dataset.assemble_patterns()
 
 
 class PatternsAPI:
@@ -62,11 +64,8 @@ class PatternsAPI:
     def createStreamingContext(self, metadata: DiffractionMetadata) -> PatternsStreamingContext:
         return PatternsStreamingContext(self._dataset, metadata)
 
-    def getOpenFileFilterList(self) -> Sequence[str]:
-        return self._fileReaderChooser.getDisplayNameList()
-
-    def getOpenFileFilter(self) -> str:
-        return self._fileReaderChooser.currentPlugin.displayName
+    def getFileReaderChooser(self) -> PluginChooser[DiffractionFileReader]:
+        return self._fileReaderChooser
 
     def openPatterns(
         self,
@@ -76,7 +75,6 @@ class PatternsAPI:
         cropCenter: CropCenter | None = None,
         cropExtent: ImageExtent | None = None,
         detectorExtent: ImageExtent | None = None,
-        assemble: bool = True,
     ) -> int:
         if cropCenter is not None:
             self._patternSettings.cropCenterXInPixels.setValue(cropCenter.positionXInPixels)
@@ -103,18 +101,27 @@ class PatternsAPI:
             except Exception as exc:
                 raise RuntimeError(f'Failed to read "{filePath}"') from exc
             else:
-                self._dataset.reload(dataset, start_assembling=True, finish_assembling=True)
+                self._dataset.reload(dataset)
                 return 0
         else:
             logger.warning(f'Refusing to read invalid file path {filePath}')
 
         return -1
 
-    def getSaveFileFilterList(self) -> Sequence[str]:
-        return self._fileWriterChooser.getDisplayNameList()
+    def startAssemblingDiffractionPatterns(self) -> None:
+        self._dataset.start_processing()
 
-    def getSaveFileFilter(self) -> str:
-        return self._fileWriterChooser.currentPlugin.displayName
+    def finishAssemblingDiffractionPatterns(self, *, block: bool) -> None:
+        self._dataset.finish_processing(block=block)
+
+        if block:
+            self._dataset.assemble_patterns()
+
+    def closePatterns(self) -> None:
+        self._dataset.clear()
+
+    def getFileWriterChooser(self) -> PluginChooser[DiffractionFileWriter]:
+        return self._fileWriterChooser
 
     def savePatterns(self, filePath: Path, fileType: str) -> None:
         self._fileWriterChooser.setCurrentPluginByName(fileType)

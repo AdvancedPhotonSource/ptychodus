@@ -276,7 +276,7 @@ class ModelCore:
         )
 
     def refreshActiveDataset(self) -> None:
-        self.patterns_core.dataset.assemble_arrays()
+        self.patterns_core.dataset.assemble_patterns()
 
     def batchModeExecute(
         self,

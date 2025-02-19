@@ -46,15 +46,15 @@ class PatternsCore(Observer):
         reinitObservable.addObserver(self)
 
     def start(self) -> None:
-        self.dataset.start()
+        pass
 
     def stop(self) -> None:
-        self.dataset.stop(finish_assembling=False)
+        self.dataset.finish_processing(block=False)
 
     def update(self, observable: Observable) -> None:
         if observable is self._reinitObservable:
             self.patternsAPI.openPatterns(
                 filePath=self.patternSettings.filePath.getValue(),
                 fileType=self.patternSettings.fileType.getValue(),
-                assemble=True,
             )
+            self.dataset.start_processing()

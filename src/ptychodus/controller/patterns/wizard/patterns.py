@@ -292,7 +292,7 @@ class OpenDatasetWizardPatternsViewController(ParameterViewController):
 
         self._page = OpenDatasetWizardPage()
         self._page.setTitle('Pattern Processing')
-        self._page._setComplete(True)  # FIXME why???
+        self._page._setComplete(True)
         self._page.setLayout(layout)
 
     def getWidget(self) -> QWizardPage:

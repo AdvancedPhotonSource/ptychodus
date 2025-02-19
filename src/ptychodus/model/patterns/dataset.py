@@ -60,29 +60,29 @@ class AssembledDiffractionPatternArray(DiffractionPatternArray):
         label: str,
         indexes: DiffractionPatternIndexes,
         patterns: DiffractionPatternArrayType,
-        begin: int,
+        start: int,
         end: int,
     ) -> None:
         super().__init__()
         self._label = label
         self._indexes = indexes
         self._patterns = patterns
-        self._begin = begin
+        self._start = start
         self._end = end
 
     def getLabel(self) -> str:
         return self._label
 
     def getIndex(self) -> int:
-        return self._indexes[self._begin]
+        return self._indexes[self._start]
 
     def getData(self) -> DiffractionPatternArrayType:
-        data = self._patterns[self._begin : self._end, :, :]
+        data = self._patterns[self._start : self._end, :, :]
         data.flags.writeable = False
         return data
 
     def getState(self) -> DiffractionPatternState:  # FIXME
-        loaded = any(self._indexes[self._begin, self._end] >= 0)
+        loaded = any(self._indexes[self._start : self._end] >= 0)
         return DiffractionPatternState.LOADED if loaded else DiffractionPatternState.UNKNOWN
 
 
@@ -205,6 +205,12 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
     def queue_size(self) -> int:
         return self._loader.processing_queue_size + self._loader.assembly_queue_size
 
+    def start_processing(self) -> None:
+        self._loader.start()
+
+    def finish_processing(self, *, block: bool = True) -> None:
+        self._loader.stop(finish_loading=block)
+
     def add_observer(self, observer: DiffractionDatasetObserver) -> None:
         if observer not in self._observer_list:
             self._observer_list.append(observer)
@@ -263,7 +269,7 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
             label=array.getLabel(),
             indexes=self._indexes,
             patterns=self._patterns,
-            begin=array_index * array_size,
+            start=array_index * array_size,
             end=(array_index + 1) * array_size,
         )
         # FIXME insert sorted by index
@@ -272,9 +278,15 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
         for observer in self._observer_list:
             observer.handle_array_inserted(len(self._arrays) - 1)
 
-    def reload(
-        self, dataset: DiffractionDataset, *, start_assembling: bool, finish_assembling: bool
-    ) -> None:
+    def clear(self) -> None:
+        # FIXME empty queues
+        self._contents_tree = SimpleTreeNode.createRoot([])
+        self._metadata = DiffractionMetadata.createNullInstance()
+        self._indexes = numpy.zeros((), dtype=int)
+        self._patterns = numpy.zeros((), dtype=int)
+        self._arrays.clear()
+
+    def reload(self, dataset: DiffractionDataset) -> None:
         self._contents_tree = dataset.getContentsTree()
         self._metadata = dataset.getMetadata()
         self._indexes = -numpy.ones(self._metadata.numberOfPatternsTotal, dtype=int)
@@ -302,7 +314,7 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
         for array in dataset:
             self.append_array(array)
 
-    def assemble_arrays(self) -> None:
+    def assemble_patterns(self) -> None:
         for array in self._loader.loaded_arrays():
             # FIXME update self._indexes
             # FIXME update self._patterns
@@ -338,7 +350,7 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
                     label='Imported',
                     indexes=self._indexes,
                     patterns=self._patterns,
-                    begin=0,
+                    start=0,
                     end=numberOfPatterns,
                 )
             ]
@@ -349,7 +361,6 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
             logger.warning(f'Refusing to read invalid file path {filePath}')
 
     def export_assembled_patterns(self, filePath: Path) -> None:
-        # FIXME finish assembling?
         logger.debug(f'Writing processed patterns to "{filePath}"')
         numpy.savez(
             filePath,
@@ -364,9 +375,3 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
         dtype = str(self._patterns.dtype)
         sizeInMB = self._patterns.nbytes / (1024 * 1024)
         return f'{label}: {number} x {width}W x {height}H {dtype} [{sizeInMB:.2f}MB]'
-
-    def start(self) -> None:
-        pass  # FIXME
-
-    def stop(self, *, finish_assembling: bool) -> None:
-        self._loader.stop(finish_loading=finish_assembling)

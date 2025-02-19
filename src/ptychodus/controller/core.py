@@ -52,7 +52,7 @@ class ControllerCore:
             model.patterns_core.patternSettings,
             model.patterns_core.patternSizer,
             model.patterns_core.patternsAPI,
-            model.assembled_diffraction_dataset,
+            model.patterns_core.dataset,
             model.metadataPresenter,
             view.patternsView,
             self._patternsImageController,

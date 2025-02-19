@@ -48,14 +48,16 @@ class OpenDatasetWizardFilesViewController(Observer):
             self._checkIfComplete
         )
 
-        for fileFilter in api.getOpenFileFilterList():
+        self._fileReaderChooser = api.getFileReaderChooser()
+        self._fileReaderChooser.addObserver(self)
+
+        for fileFilter in self._fileReaderChooser.getDisplayNameList():
             self._page.fileTypeComboBox.addItem(fileFilter)
 
         self._page.fileTypeComboBox.textActivated.connect(self._setNameFiltersInFileSystemModel)
 
         self._setRootPath(file_dialog_factory.getOpenWorkingDirectory())
         self._sync_model_to_view()
-        api.addObserver(self)
 
     def _setRootPath(self, rootPath: Path) -> None:
         index = self._fileSystemModel.setRootPath(str(rootPath))
@@ -100,11 +102,13 @@ class OpenDatasetWizardFilesViewController(Observer):
             self._fileSystemModel.setNameFilters(nameFilters)
 
     def _sync_model_to_view(self) -> None:
-        self._page.fileTypeComboBox.setCurrentText(self._api.getOpenFileFilter())
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._api:
-            self._sync_model_to_view()
+        self._page.fileTypeComboBox.setCurrentText(
+            self._fileReaderChooser.currentPlugin.displayName
+        )
 
     def getWidget(self) -> QWizardPage:
         return self._page
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._fileReaderChooser:
+            self._sync_model_to_view()

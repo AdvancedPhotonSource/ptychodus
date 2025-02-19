@@ -3,10 +3,15 @@ import logging
 from PyQt5.QtCore import QModelIndex
 from PyQt5.QtWidgets import QAbstractItemView, QFormLayout, QMessageBox
 
-from ptychodus.api.observer import Observable, Observer
-
 from ...model.metadata import MetadataPresenter
-from ...model.patterns import AssembledDiffractionDataset, DetectorSettings, DiffractionDatasetObserver, PatternSettings, PatternSizer, PatternsAPI
+from ...model.patterns import (
+    AssembledDiffractionDataset,
+    DetectorSettings,
+    DiffractionDatasetObserver,
+    PatternSettings,
+    PatternSizer,
+    PatternsAPI,
+)
 from ...view.patterns import DetectorView, PatternsView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
@@ -56,6 +61,7 @@ class PatternsController(DiffractionDatasetObserver):
         super().__init__()
         self._pattern_sizer = pattern_sizer
         self._patterns_api = patterns_api
+        self._dataset = dataset
         self._view = view
         self._image_controller = image_controller
         self._file_dialog_factory = file_dialog_factory
@@ -79,7 +85,7 @@ class PatternsController(DiffractionDatasetObserver):
         view.buttonBox.infoButton.clicked.connect(self._openPatternsInfo)
         view.buttonBox.closeButton.clicked.connect(self._closeDataset)
         view.buttonBox.closeButton.setEnabled(False)  # TODO
-        dataset.addObserver(self)
+        dataset.add_observer(self)
 
         self._syncModelToView()
 
@@ -92,11 +98,12 @@ class PatternsController(DiffractionDatasetObserver):
             self._image_controller.clearArray()
 
     def _saveDataset(self) -> None:
+        fileWriterChooser = self._patterns_api.getFileWriterChooser()
         filePath, nameFilter = self._file_dialog_factory.getSaveFilePath(
             self._view,
             'Save Diffraction File',
-            nameFilters=self._patterns_api.getSaveFileFilterList(),
-            selectedNameFilter=self._patterns_api.getSaveFileFilter(),
+            nameFilters=fileWriterChooser.getDisplayNameList(),
+            selectedNameFilter=fileWriterChooser.currentPlugin.displayName,
         )
 
         if filePath:
@@ -119,7 +126,7 @@ class PatternsController(DiffractionDatasetObserver):
         if button != QMessageBox.StandardButton.Yes:
             return
 
-        logger.error('Close not implemented!')  # FIXME
+        self._patterns_api.closePatterns()
 
     def _syncModelToView(self) -> None:
         rootNode = DatasetTreeNode.createRoot()
