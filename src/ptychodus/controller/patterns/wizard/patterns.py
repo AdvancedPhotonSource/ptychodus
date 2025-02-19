@@ -1,14 +1,8 @@
-from __future__ import annotations
-from pathlib import Path
 from typing import Final
-import logging
-import re
 
-from PyQt5.QtCore import Qt, QDir, QFileInfo, QModelIndex, QSortFilterProxyModel
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
-    QAbstractItemView,
     QCheckBox,
-    QFileSystemModel,
     QFormLayout,
     QGridLayout,
     QGroupBox,
@@ -16,197 +10,22 @@ from PyQt5.QtWidgets import (
     QSpinBox,
     QVBoxLayout,
     QWidget,
-    QWizard,
     QWizardPage,
 )
 
-from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.observer import Observable
 
-from ...model.metadata import MetadataPresenter
-from ...model.patterns import PatternSettings, PatternSizer, PatternsAPI
-from ...view.patterns import (
-    OpenDatasetWizardFilesPage,
-    OpenDatasetWizardMetadataPage,
-    OpenDatasetWizardPage,
-)
+from ....model.patterns import PatternSettings, PatternSizer
+from ....view.patterns import OpenDatasetWizardPage
 
-from ..data import FileDialogFactory
-from ..parametric import (
+from ...data import FileDialogFactory
+from ...parametric import (
     CheckBoxParameterViewController,
     CheckableGroupBoxParameterViewController,
     ParameterViewController,
     PathParameterViewController,
     SpinBoxParameterViewController,
 )
-
-logger = logging.getLogger(__name__)
-
-__all__ = [
-    'OpenDatasetWizardController',
-]
-
-
-class OpenDatasetWizardFilesViewController(Observer):
-    def __init__(self, api: PatternsAPI, file_dialog_factory: FileDialogFactory) -> None:
-        super().__init__()
-        self._api = api
-        self._page = OpenDatasetWizardFilesPage()
-        self._file_dialog_factory = file_dialog_factory
-
-        self._fileSystemModel = QFileSystemModel()
-        self._fileSystemModel.setFilter(QDir.Filter.AllEntries | QDir.Filter.AllDirs)
-        self._fileSystemModel.setNameFilterDisables(False)
-
-        self._fileSystemProxyModel = QSortFilterProxyModel()
-        self._fileSystemProxyModel.setSourceModel(self._fileSystemModel)
-
-        self._page.directoryComboBox.addItem(str(file_dialog_factory.getOpenWorkingDirectory()))
-        self._page.directoryComboBox.addItem(str(Path.home()))
-        self._page.directoryComboBox.setEditable(True)
-        self._page.directoryComboBox.textActivated.connect(self._handleDirectoryComboBoxActivated)
-
-        self._page.fileSystemTableView.setModel(self._fileSystemProxyModel)
-        self._page.fileSystemTableView.setSortingEnabled(True)
-        self._page.fileSystemTableView.sortByColumn(0, Qt.SortOrder.AscendingOrder)
-        self._page.fileSystemTableView.verticalHeader().hide()
-        self._page.fileSystemTableView.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows
-        )
-        self._page.fileSystemTableView.doubleClicked.connect(
-            self._handleFileSystemTableDoubleClicked
-        )
-        self._page.fileSystemTableView.selectionModel().currentChanged.connect(
-            self._checkIfComplete
-        )
-
-        for fileFilter in api.getOpenFileFilterList():
-            self._page.fileTypeComboBox.addItem(fileFilter)
-
-        self._page.fileTypeComboBox.textActivated.connect(self._setNameFiltersInFileSystemModel)
-
-        self._setRootPath(file_dialog_factory.getOpenWorkingDirectory())
-        self._sync_model_to_view()
-        api.addObserver(self)
-
-    def _setRootPath(self, rootPath: Path) -> None:
-        index = self._fileSystemModel.setRootPath(str(rootPath))
-        proxyIndex = self._fileSystemProxyModel.mapFromSource(index)
-        self._page.fileSystemTableView.setRootIndex(proxyIndex)
-        self._page.directoryComboBox.setCurrentText(str(rootPath))
-        self._file_dialog_factory.setOpenWorkingDirectory(rootPath)
-
-    def _handleDirectoryComboBoxActivated(self, text: str) -> None:
-        fileInfo = QFileInfo(text)
-
-        if fileInfo.isDir():
-            self._setRootPath(Path(fileInfo.canonicalFilePath()))
-
-    def _handleFileSystemTableDoubleClicked(self, proxyIndex: QModelIndex) -> None:
-        index = self._fileSystemProxyModel.mapToSource(proxyIndex)
-        fileInfo = self._fileSystemModel.fileInfo(index)
-
-        if fileInfo.isDir():
-            self._setRootPath(Path(fileInfo.canonicalFilePath()))
-
-    def openDataset(self) -> None:
-        proxyIndex = self._page.fileSystemTableView.currentIndex()
-        index = self._fileSystemProxyModel.mapToSource(proxyIndex)
-        filePath = Path(self._fileSystemModel.filePath(index))
-        self._file_dialog_factory.setOpenWorkingDirectory(filePath.parent)
-
-        fileFilter = self._page.fileTypeComboBox.currentText()
-        self._api.openPatterns(filePath, fileType=fileFilter)
-
-    def _checkIfComplete(self, current: QModelIndex, previous: QModelIndex) -> None:
-        index = self._fileSystemProxyModel.mapToSource(current)
-        fileInfo = self._fileSystemModel.fileInfo(index)
-        self._page._setComplete(fileInfo.isFile())
-
-    def _setNameFiltersInFileSystemModel(self, currentText: str) -> None:
-        z = re.search(r'\((.+)\)', currentText)
-
-        if z:
-            nameFilters = z.group(1).split()
-            logger.debug(f'Dataset File Name Filters: {nameFilters}')
-            self._fileSystemModel.setNameFilters(nameFilters)
-
-    def _sync_model_to_view(self) -> None:
-        self._page.fileTypeComboBox.setCurrentText(self._api.getOpenFileFilter())
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._api:
-            self._sync_model_to_view()
-
-    def getWidget(self) -> QWizardPage:
-        return self._page
-
-
-class OpenDatasetWizardMetadataViewController(Observer):
-    def __init__(self, presenter: MetadataPresenter) -> None:
-        super().__init__()
-        self._presenter = presenter
-        self._page = OpenDatasetWizardMetadataPage()
-
-        presenter.addObserver(self)
-        self._sync_model_to_view()
-        self._page._setComplete(True)
-
-    def importMetadata(self) -> None:
-        if self._page.detectorPixelCountCheckBox.isChecked():
-            self._presenter.syncDetectorPixelCount()
-
-        if self._page.detectorPixelSizeCheckBox.isChecked():
-            self._presenter.syncDetectorPixelSize()
-
-        if self._page.detectorBitDepthCheckBox.isChecked():
-            self._presenter.syncDetectorBitDepth()
-
-        if self._page.detectorDistanceCheckBox.isChecked():
-            self._presenter.syncDetectorDistance()
-
-        self._presenter.syncPatternCrop(
-            syncCenter=self._page.patternCropCenterCheckBox.isChecked(),
-            syncExtent=self._page.patternCropExtentCheckBox.isChecked(),
-        )
-
-        if self._page.probeEnergyCheckBox.isChecked():
-            self._presenter.syncProbeEnergy()
-
-    def _sync_model_to_view(self) -> None:
-        canSyncDetectorPixelCount = self._presenter.canSyncDetectorPixelCount()
-        self._page.detectorPixelCountCheckBox.setVisible(canSyncDetectorPixelCount)
-        self._page.detectorPixelCountCheckBox.setChecked(canSyncDetectorPixelCount)
-
-        canSyncDetectorPixelSize = self._presenter.canSyncDetectorPixelSize()
-        self._page.detectorPixelSizeCheckBox.setVisible(canSyncDetectorPixelSize)
-        self._page.detectorPixelSizeCheckBox.setChecked(canSyncDetectorPixelSize)
-
-        canSyncDetectorBitDepth = self._presenter.canSyncDetectorBitDepth()
-        self._page.detectorBitDepthCheckBox.setVisible(canSyncDetectorBitDepth)
-        self._page.detectorBitDepthCheckBox.setChecked(canSyncDetectorBitDepth)
-
-        canSyncDetectorDistance = self._presenter.canSyncDetectorDistance()
-        self._page.detectorDistanceCheckBox.setVisible(canSyncDetectorDistance)
-        self._page.detectorDistanceCheckBox.setChecked(canSyncDetectorDistance)
-
-        canSyncPatternCropCenter = self._presenter.canSyncPatternCropCenter()
-        self._page.patternCropCenterCheckBox.setVisible(canSyncPatternCropCenter)
-        self._page.patternCropCenterCheckBox.setChecked(canSyncPatternCropCenter)
-
-        canSyncPatternCropExtent = self._presenter.canSyncPatternCropExtent()
-        self._page.patternCropExtentCheckBox.setVisible(canSyncPatternCropExtent)
-        self._page.patternCropExtentCheckBox.setChecked(canSyncPatternCropExtent)
-
-        canSyncProbeEnergy = self._presenter.canSyncProbeEnergy()
-        self._page.probeEnergyCheckBox.setVisible(canSyncProbeEnergy)
-        self._page.probeEnergyCheckBox.setChecked(canSyncProbeEnergy)
-
-    def getWidget(self) -> QWizardPage:
-        return self._page
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._sync_model_to_view()
 
 
 class PatternLoadViewController(ParameterViewController):
@@ -478,51 +297,3 @@ class OpenDatasetWizardPatternsViewController(ParameterViewController):
 
     def getWidget(self) -> QWizardPage:
         return self._page
-
-
-class OpenDatasetWizardController:
-    def __init__(
-        self,
-        settings: PatternSettings,
-        sizer: PatternSizer,
-        api: PatternsAPI,
-        metadata_presenter: MetadataPresenter,
-        file_dialog_factory: FileDialogFactory,
-    ) -> None:
-        self._api = api
-        self._file_view_controller = OpenDatasetWizardFilesViewController(
-            self._api, file_dialog_factory
-        )
-        self._metadata_view_controller = OpenDatasetWizardMetadataViewController(metadata_presenter)
-        self._patterns_view_controller = OpenDatasetWizardPatternsViewController(
-            settings, sizer, file_dialog_factory
-        )
-
-        self._wizard = QWizard()
-        self._wizard.setWindowTitle('Open Dataset')
-        self._wizard.addPage(self._file_view_controller.getWidget())
-        self._wizard.addPage(self._metadata_view_controller.getWidget())
-        self._wizard.addPage(self._patterns_view_controller.getWidget())
-
-        self._wizard.button(QWizard.WizardButton.NextButton).clicked.connect(
-            self._executeNextButtonAction
-        )
-        self._wizard.button(QWizard.WizardButton.FinishButton).clicked.connect(
-            self._executeFinishButtonAction
-        )
-
-    def _executeNextButtonAction(self) -> None:
-        page = self._wizard.currentPage()
-
-        if page is self._metadata_view_controller.getWidget():
-            self._file_view_controller.openDataset()
-        elif page is self._patterns_view_controller.getWidget():
-            self._metadata_view_controller.importMetadata()
-
-    def _executeFinishButtonAction(self) -> None:
-        self._api.startAssemblingDiffractionPatterns()  # FIXME
-
-    def openDataset(self) -> None:
-        self._api.stopAssemblingDiffractionPatterns(finishAssembling=False)  # FIXME
-        self._wizard.restart()
-        self._wizard.show()

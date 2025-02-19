@@ -37,7 +37,7 @@ from .automation import (
 from .fluorescence import FluorescenceCore, FluorescenceEnhancer
 from .memory import MemoryPresenter
 from .metadata import MetadataPresenter
-from .patterns import DetectorSettings, PatternsCore, PatternsStreamingContext
+from .patterns import PatternsCore, PatternsStreamingContext
 from .product import (
     ObjectAPI,
     ObjectRepository,
@@ -124,7 +124,7 @@ class ModelCore:
         self.memoryPresenter = MemoryPresenter()
         self.settingsRegistry = SettingsRegistry()
 
-        self._patternsCore = PatternsCore(
+        self.patterns_core = PatternsCore(
             self.settingsRegistry,
             self._pluginRegistry.diffractionFileReaders,
             self._pluginRegistry.diffractionFileWriters,
@@ -133,8 +133,8 @@ class ModelCore:
         self._productCore = ProductCore(
             self.rng,
             self.settingsRegistry,
-            self._patternsCore.patternSizer,
-            self._patternsCore.dataset,
+            self.patterns_core.patternSizer,
+            self.patterns_core.dataset,
             self._pluginRegistry.scanFileReaders,
             self._pluginRegistry.scanFileWriters,
             self._pluginRegistry.fresnelZonePlates,
@@ -147,9 +147,9 @@ class ModelCore:
             self.settingsRegistry,
         )
         self.metadataPresenter = MetadataPresenter(
-            self._patternsCore.detectorSettings,
-            self._patternsCore.patternSettings,
-            self._patternsCore.dataset,
+            self.patterns_core.detectorSettings,
+            self.patterns_core.patternSettings,
+            self.patterns_core.dataset,
             self._productCore.settings,
         )
 
@@ -158,7 +158,7 @@ class ModelCore:
         self.objectVisualizationEngine = VisualizationEngine(isComplex=True)
 
         self.ptyChiReconstructorLibrary = PtyChiReconstructorLibrary(
-            self.settingsRegistry, self._patternsCore.patternSizer, isDeveloperModeEnabled
+            self.settingsRegistry, self.patterns_core.patternSizer, isDeveloperModeEnabled
         )
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, isDeveloperModeEnabled
@@ -168,7 +168,7 @@ class ModelCore:
         )
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
-            self._patternsCore.dataset,
+            self.patterns_core.dataset,
             self._productCore.productRepository,
             [
                 self.ptyChiReconstructorLibrary,
@@ -192,7 +192,7 @@ class ModelCore:
         )
         self._workflowCore = WorkflowCore(
             self.settingsRegistry,
-            self._patternsCore.patternsAPI,
+            self.patterns_core.patternsAPI,
             self._productCore.productAPI,
             self._productCore.scanAPI,
             self._productCore.probeAPI,
@@ -209,7 +209,7 @@ class ModelCore:
             self.settingsRegistry.openSettings(settingsFile)
 
     def __enter__(self) -> ModelCore:
-        self._patternsCore.start()
+        self.patterns_core.start()
         self._reconstructorCore.start()
         self._workflowCore.start()
         self._automationCore.start()
@@ -235,7 +235,7 @@ class ModelCore:
         self._automationCore.stop()
         self._workflowCore.stop()
         self._reconstructorCore.stop()
-        self._patternsCore.stop()
+        self.patterns_core.stop()
 
     @property
     def productRepository(self) -> ProductRepository:
@@ -272,11 +272,11 @@ class ModelCore:
     def createStreamingContext(self, metadata: DiffractionMetadata) -> PtychodusStreamingContext:
         return PtychodusStreamingContext(
             self._productCore.scanAPI.createStreamingContext(),
-            self._patternsCore.patternsAPI.createStreamingContext(metadata),
+            self.patterns_core.patternsAPI.createStreamingContext(metadata),
         )
 
     def refreshActiveDataset(self) -> None:
-        self._patternsCore.dataset.assemble_arrays()
+        self.patterns_core.dataset.assemble_arrays()
 
     def batchModeExecute(
         self,
@@ -329,10 +329,6 @@ class ModelCore:
             return -1
 
         return 0
-
-    @property
-    def detectorSettings(self) -> DetectorSettings:
-        return self._patternsCore.detectorSettings
 
     @property
     def reconstructorPresenter(self) -> ReconstructorPresenter:
