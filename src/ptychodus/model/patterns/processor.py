@@ -5,12 +5,26 @@ import numpy
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.patterns import (
-    BooleanArrayType,
     CropCenter,
     DiffractionPatternArray,
     DiffractionPatternArrayType,
     SimpleDiffractionPatternArray,
 )
+
+
+@dataclass(frozen=True)
+class DiffractionPatternFilterValues:
+    lower_bound: int | None
+    upper_bound: int | None
+
+    def apply(self, data: DiffractionPatternArrayType) -> DiffractionPatternArrayType:
+        if self.lower_bound is not None:
+            data[data < self.lower_bound] = 0
+
+        if self.upper_bound is not None:
+            data[data >= self.upper_bound] = 0
+
+        return data
 
 
 class DiffractionPatternCrop:
@@ -51,8 +65,8 @@ class DiffractionPatternPadding:
 
 @dataclass(frozen=True)
 class DiffractionPatternProcessor:
-    bad_pixels: BooleanArrayType | None
     crop: DiffractionPatternCrop | None
+    filter_values: DiffractionPatternFilterValues | None
     binning: DiffractionPatternBinning | None
     padding: DiffractionPatternPadding | None
     flip_x: bool
@@ -64,23 +78,24 @@ class DiffractionPatternProcessor:
         if data.ndim != 3:
             raise ValueError(f'Invalid diffraction pattern dimensions! (shape={data.shape})')
 
-        if self.bad_pixels is not None:
-            data[:, self.bad_pixels] = 0
-
         if self.crop is not None:
             data = self.crop.apply(data)
 
+        if self.filter_values is not None:
+            data = self.filter_values.apply(data)
+
         if self.binning is not None:
+            # TODO handle binning with bad pixels
             data = self.binning.apply(data)
 
         if self.padding is not None:
             data = self.padding.apply(data)
 
-        if self.flip_x:
-            data = numpy.flip(data, axis=-1)
-
         if self.flip_y:
             data = numpy.flip(data, axis=-2)
+
+        if self.flip_x:
+            data = numpy.flip(data, axis=-1)
 
         return SimpleDiffractionPatternArray(
             array.getLabel(), array.getIndex(), data, array.getState()

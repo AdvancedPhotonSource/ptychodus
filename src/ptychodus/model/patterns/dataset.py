@@ -81,13 +81,12 @@ class AssembledDiffractionPatternArray(DiffractionPatternArray):
         data.flags.writeable = False
         return data
 
-    def getState(self) -> DiffractionPatternState:  # FIXME
+    def getState(self) -> DiffractionPatternState:
         loaded = any(self._indexes[self._start : self._end] >= 0)
         return DiffractionPatternState.LOADED if loaded else DiffractionPatternState.UNKNOWN
 
 
 class DiffractionPatternArrayLoader:
-    # FIXME handle reload and restart
     def __init__(self, settings: PatternSettings, sizer: PatternSizer) -> None:
         self._settings = settings
         self._sizer = sizer
@@ -95,10 +94,6 @@ class DiffractionPatternArrayLoader:
         self._assembly_queue: queue.Queue[DiffractionPatternArray] = queue.Queue()
         self._workers: list[threading.Thread] = list()
         self._stop_work_event = threading.Event()
-
-    @property
-    def is_loading(self) -> bool:  # FIXME remove if unused
-        return self._processing_queue.unfinished_tasks > 0
 
     @property
     def processing_queue_size(self) -> int:
@@ -112,6 +107,8 @@ class DiffractionPatternArrayLoader:
         self._processing_queue.put(array)
 
     def _load_arrays(self) -> None:
+        processor = self._sizer.get_processor()
+
         while not self._stop_work_event.is_set():
             try:
                 array = self._processing_queue.get(block=True, timeout=1)
@@ -119,19 +116,6 @@ class DiffractionPatternArrayLoader:
                 continue
 
             try:
-                data = array.getData()
-                # FIXME use provided bad_pixels here; threshold in processor
-                bad_pixels = numpy.full((data.shape[-2], data.shape[-1]), False)
-
-                if self._settings.valueUpperBoundEnabled.getValue():
-                    threshold = self._settings.valueUpperBound.getValue()
-                    bad_pixels = numpy.logical_or(bad_pixels, numpy.any(data >= threshold, axis=-3))
-
-                if self._settings.valueLowerBoundEnabled.getValue():
-                    threshold = self._settings.valueLowerBound.getValue()
-                    bad_pixels = numpy.logical_or(bad_pixels, numpy.any(data < threshold, axis=-3))
-
-                processor = self._sizer.get_processor(bad_pixels)
                 processed_array = processor(array)
             except Exception:
                 logger.exception('Error while processing array!')
@@ -155,8 +139,9 @@ class DiffractionPatternArrayLoader:
         logger.info('Starting data loader...')
         self._stop_work_event.clear()
 
+        # clear assembly queue
         for _ in self.loaded_arrays():
-            pass  # clear assembly queue
+            pass
 
         for index in range(self._settings.numberOfDataThreads.getValue()):
             thread = threading.Thread(target=self._load_arrays)
@@ -166,9 +151,16 @@ class DiffractionPatternArrayLoader:
         logger.info('Data loader started.')
 
     def stop(self, *, finish_loading: bool) -> None:
+        if self._stop_work_event.is_set():
+            logger.info('Data loader already stopped.')
+            return
+
+        logger.info('Stopping data loader...')
+
         if finish_loading:
             self._processing_queue.join()
-        else:  # clear processing queue
+        else:
+            # clear processing queue
             while True:
                 try:
                     self._processing_queue.get(block=False)
@@ -177,7 +169,6 @@ class DiffractionPatternArrayLoader:
                 else:
                     self._processing_queue.task_done()
 
-        logger.info('Stopping data loader...')
         self._stop_work_event.set()
 
         while self._workers:
@@ -227,6 +218,12 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
     def getMetadata(self) -> DiffractionMetadata:
         return self._metadata
 
+    def get_processed_bad_pixels(self) -> BooleanArrayType:
+        # TODO support loading from file
+        # TODO keep consist with processed patterns
+        pattern_extent = self._sizer.get_processed_image_extent()
+        return numpy.full(pattern_extent.shape, False)
+
     def get_assembled_indexes(self) -> DiffractionPatternIndexes:
         return self._indexes[self._indexes >= 0]
 
@@ -235,14 +232,8 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
 
     def get_assembled_pattern_counts(self, index: int) -> int:  # FIXME use
         pattern = self._patterns[index]
-        good_pixels = numpy.logical_not(self.get_bad_pixels())
+        good_pixels = numpy.logical_not(self.get_processed_bad_pixels())
         return numpy.sum(pattern[good_pixels])
-
-    def get_bad_pixels(self) -> BooleanArrayType:
-        # FIXME support loading from file
-        # FIXME make work with binned and padded data
-        pattern_extent = self._sizer.get_processed_image_extent()
-        return numpy.full(pattern_extent.shape, False)
 
     @overload
     def __getitem__(self, index: int) -> DiffractionPatternArray: ...
@@ -260,10 +251,10 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
 
     def append_array(self, array: DiffractionPatternArray) -> None:
         """Load a new array into the dataset."""
-        # assumes that arrays arrive in order
         self._loader.load_array(array)
 
-        array_index = len(self._arrays)  # FIXME find index & insert sorted
+        # assumes that arrays arrive in order
+        array_index = len(self._arrays)
         array_size = self._metadata.numberOfPatternsPerArray
         assembled_array = AssembledDiffractionPatternArray(
             label=array.getLabel(),
@@ -272,26 +263,41 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
             start=array_index * array_size,
             end=(array_index + 1) * array_size,
         )
-        # FIXME insert sorted by index
+        # FIXME insert sorted by index?
         self._arrays.append(assembled_array)
 
         for observer in self._observer_list:
             observer.handle_array_inserted(len(self._arrays) - 1)
 
+    def assemble_patterns(self) -> None:
+        for array in self._loader.loaded_arrays():
+            # TODO update self._indexes
+            # TODO update self._patterns
+            # TODO record total intensity
+            index = 0  # FIXME assemble
+
+            for observer in self._observer_list:
+                observer.handle_array_changed(index)
+
     def clear(self) -> None:
-        # FIXME empty queues
+        self._loader.stop(finish_loading=False)
         self._contents_tree = SimpleTreeNode.createRoot([])
         self._metadata = DiffractionMetadata.createNullInstance()
         self._indexes = numpy.zeros((), dtype=int)
         self._patterns = numpy.zeros((0, 0, 0), dtype=int)
         self._arrays.clear()
 
+        for _ in self._loader.loaded_arrays():
+            pass
+
+        for observer in self._observer_list:
+            observer.handle_dataset_reloaded()
+
     def reload(self, dataset: DiffractionDataset) -> None:
+        self.clear()
         self._contents_tree = dataset.getContentsTree()
         self._metadata = dataset.getMetadata()
         self._indexes = -numpy.ones(self._metadata.numberOfPatternsTotal, dtype=int)
-        self._patterns = numpy.zeros((0, 0, 0), dtype=int)
-        self._arrays.clear()
 
         pattern_extent = self._sizer.get_processed_image_extent()
         patterns_shape = self._indexes.size, *pattern_extent.shape
@@ -314,19 +320,9 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
         for array in dataset:
             self.append_array(array)
 
-    def assemble_patterns(self) -> None:
-        for array in self._loader.loaded_arrays():
-            # FIXME update self._indexes
-            # FIXME update self._patterns
-            # FIXME record total intensity
-            index = 0  # FIXME assemble
-
-            for observer in self._observer_list:
-                observer.handle_array_changed(index)
-
     def import_assembled_patterns(self, filePath: Path) -> None:
-        # FIXME start/stop as appropriate
         if filePath.is_file():
+            self.clear()
             logger.debug(f'Reading processed patterns from "{filePath}"')
 
             try:

@@ -85,4 +85,6 @@ class DiffractionPatternPositionMatcher:
             costs=inputProduct.costs,
         )
 
-        return ReconstructInput(patterns, self._diffractionDataset.get_bad_pixels(), product)
+        return ReconstructInput(
+            patterns, self._diffractionDataset.get_processed_bad_pixels(), product
+        )

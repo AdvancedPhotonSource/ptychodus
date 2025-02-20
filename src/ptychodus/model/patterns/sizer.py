@@ -1,11 +1,12 @@
 from ptychodus.api.geometry import ImageExtent, Interval, PixelGeometry
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import BooleanParameter, IntegerParameter, RealParameter
-from ptychodus.api.patterns import BooleanArrayType, CropCenter
+from ptychodus.api.patterns import CropCenter
 
 from .processor import (
     DiffractionPatternBinning,
     DiffractionPatternCrop,
+    DiffractionPatternFilterValues,
     DiffractionPatternPadding,
     DiffractionPatternProcessor,
 )
@@ -46,19 +47,22 @@ class PatternAxisSizer(Observable, Observer):
         padding_enabled.addObserver(self)
         pad_size.addObserver(self)
 
+    def get_detector_size(self) -> int:
+        return self._detector_size.getValue()
+
     def get_crop_size_limits(self) -> Interval[int]:
-        return Interval[int](1, self._detector_size.getValue())
+        return Interval[int](1, self.get_detector_size())
 
     def get_crop_size(self) -> int:
         if self._crop_enabled.getValue():
             limits = self.get_crop_size_limits()
             return limits.clamp(self._crop_size.getValue())
 
-        return self._detector_size.getValue()
+        return self.get_detector_size()
 
     def get_crop_center_limits(self) -> Interval[int]:
         xmin = (self.get_crop_size() + 1) // 2
-        xmax = self._detector_size.getValue() - 1 - xmin
+        xmax = self.get_detector_size() - 1 - xmin
         return Interval[int](xmin, xmax)
 
     def get_crop_center(self) -> int:
@@ -162,19 +166,23 @@ class PatternSizer(Observable, Observer):
             heightInMeters=self.axis_y.get_processed_pixel_size_m(),
         )
 
-    def _get_crop(self) -> DiffractionPatternCrop | None:
-        return None
-
-    def _get_binning(self) -> DiffractionPatternBinning | None:
-        return None
-
-    def _get_padding(self) -> DiffractionPatternPadding | None:
-        return None
-
-    def get_processor(self, bad_pixels: BooleanArrayType) -> DiffractionPatternProcessor:
+    def get_processor(self) -> DiffractionPatternProcessor:
+        value_lower_bound: int | None = None
+        value_upper_bound: int | None = None
         crop: DiffractionPatternCrop | None = None
         binning: DiffractionPatternBinning | None = None
         padding: DiffractionPatternPadding | None = None
+
+        if self._pattern_settings.valueUpperBoundEnabled.getValue():
+            value_lower_bound = self._pattern_settings.valueLowerBound.getValue()
+
+        if self._pattern_settings.valueUpperBoundEnabled.getValue():
+            value_upper_bound = self._pattern_settings.valueUpperBound.getValue()
+
+        filter_values = DiffractionPatternFilterValues(
+            lower_bound=value_lower_bound,
+            upper_bound=value_upper_bound,
+        )
 
         if self._pattern_settings.cropEnabled.getValue():
             crop = DiffractionPatternCrop(
@@ -203,7 +211,7 @@ class PatternSizer(Observable, Observer):
             )
 
         return DiffractionPatternProcessor(
-            bad_pixels=bad_pixels,
+            filter_values=filter_values,
             crop=crop,
             binning=binning,
             padding=padding,
