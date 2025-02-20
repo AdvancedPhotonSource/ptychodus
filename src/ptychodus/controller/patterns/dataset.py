@@ -4,77 +4,80 @@ from typing import Any, overload
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 from PyQt5.QtGui import QFont
 
-from ptychodus.api.patterns import DiffractionPatternArrayType, DiffractionPatternState
-
-from ...model.patterns import DiffractionPatternArrayPresenter
+from ptychodus.api.patterns import (
+    DiffractionPatternArray,
+    DiffractionPatternArrayType,
+    DiffractionPatternState,
+    SimpleDiffractionPatternArray,
+)
 
 
 class DatasetTreeNode:
     def __init__(
         self,
-        parentItem: DatasetTreeNode | None,
-        presenter: DiffractionPatternArrayPresenter,
-        frameIndex: int,
+        parent_node: DatasetTreeNode | None,
+        array: DiffractionPatternArray,
+        frame_index: int,
     ) -> None:
-        self.parentItem = parentItem
-        self._presenter = presenter
-        self._frameIndex = frameIndex
-        self.childItems: list[DatasetTreeNode] = list()
+        self.parent_node = parent_node
+        self._array = array
+        self._frame_index = frame_index
+        self.child_nodes: list[DatasetTreeNode] = list()
 
     @classmethod
     def createRoot(cls) -> DatasetTreeNode:
-        return cls(None, DiffractionPatternArrayPresenter.createNull(), -1)
+        return cls(None, SimpleDiffractionPatternArray.createNullInstance(), -1)
 
-    def createChild(self, presenter: DiffractionPatternArrayPresenter) -> DatasetTreeNode:
-        childItem = DatasetTreeNode(self, presenter, -1)
+    def createChild(self, array: DiffractionPatternArray) -> DatasetTreeNode:
+        childItem = DatasetTreeNode(self, array, -1)
 
-        if presenter.data is not None:
-            for frameIndex in range(presenter.data.shape[0]):
-                grandChildItem = DatasetTreeNode(childItem, presenter, frameIndex)
-                childItem.childItems.append(grandChildItem)
+        if array.getData() is not None:
+            for frame_index in range(array.getData().shape[0]):
+                grandChildItem = DatasetTreeNode(childItem, array, frame_index)
+                childItem.child_nodes.append(grandChildItem)
 
-        self.childItems.append(childItem)
+        self.child_nodes.append(childItem)
         return childItem
 
     @property
     def label(self) -> str:
-        if self._frameIndex < 0:
-            return self._presenter.label
+        if self._frame_index < 0:
+            return self._array.getLabel()
 
-        return f'Frame {self._frameIndex}'
+        return f'Frame {self._frame_index}'
 
     @property
     def state(self) -> DiffractionPatternState:
-        return self._presenter.state
+        return self._array.getState()
 
     @property
     def data(self) -> DiffractionPatternArrayType | None:
-        if self._presenter.data is None:
+        if self._array.getData() is None:
             return None
-        elif self._frameIndex < 0:
-            return self._presenter.data.mean(axis=0)
+        elif self._frame_index < 0:
+            return self._array.getData().mean(axis=0)
 
-        return self._presenter.data[self._frameIndex]
+        return self._array.getData()[self._frame_index]
 
     @property
     def numberOfFrames(self) -> int:
-        if self._frameIndex < 0:
-            return len(self.childItems)
+        if self._frame_index < 0:
+            return len(self.child_nodes)
 
         return 1
 
     @property
     def sizeInBytes(self) -> int:
-        if self._presenter.data is None:
+        if self._array.getData() is None:
             return 0
-        elif self._frameIndex < 0:
-            return self._presenter.data.nbytes
+        elif self._frame_index < 0:
+            return self._array.getData().nbytes
 
-        return self._presenter.data[self._frameIndex].nbytes
+        return self._array.getData()[self._frame_index].nbytes
 
     def row(self) -> int:
-        if self.parentItem:
-            return self.parentItem.childItems.index(self)
+        if self.parent_node:
+            return self.parent_node.child_nodes.index(self)
 
         return 0
 
@@ -104,12 +107,12 @@ class DatasetTreeModel(QAbstractItemModel):
 
             if child.isValid():
                 childItem = child.internalPointer()
-                parentItem = childItem.parentItem
+                parent_node = childItem.parent_node
 
-                if parentItem is self._rootNode:
+                if parent_node is self._rootNode:
                     value = QModelIndex()
                 else:
-                    value = self.createIndex(parentItem.row(), 0, parentItem)
+                    value = self.createIndex(parent_node.row(), 0, parent_node)
 
             return value
 
@@ -155,8 +158,8 @@ class DatasetTreeModel(QAbstractItemModel):
         value = QModelIndex()
 
         if self.hasIndex(row, column, parent):
-            parentItem = parent.internalPointer() if parent.isValid() else self._rootNode
-            childItem = parentItem.childItems[row]
+            parent_node = parent.internalPointer() if parent.isValid() else self._rootNode
+            childItem = parent_node.child_nodes[row]
 
             if childItem:
                 value = self.createIndex(row, column, childItem)
@@ -172,7 +175,7 @@ class DatasetTreeModel(QAbstractItemModel):
         if parent.isValid():
             node = parent.internalPointer()
 
-        return len(node.childItems)
+        return len(node.child_nodes)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._header)

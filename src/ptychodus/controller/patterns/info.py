@@ -112,3 +112,12 @@ class PatternsInfoViewController(DiffractionDatasetObserver):
 
     def _syncModelToView(self) -> None:
         self._treeModel.setRootNode(self._dataset.getContentsTree())
+
+    def handle_array_inserted(self, index: int) -> None:
+        pass
+
+    def handle_array_changed(self, index: int) -> None:
+        pass
+
+    def handle_dataset_reloaded(self) -> None:
+        self._syncModelToView()

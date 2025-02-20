@@ -198,7 +198,7 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
         self._contents_tree = SimpleTreeNode.createRoot([])
         self._metadata = DiffractionMetadata.createNullInstance()
         self._indexes: DiffractionPatternIndexes = numpy.zeros((), dtype=int)
-        self._patterns: DiffractionPatternArrayType = numpy.zeros((), dtype=int)
+        self._patterns: DiffractionPatternArrayType = numpy.zeros((0, 0, 0), dtype=int)
         self._arrays: list[DiffractionPatternArray] = list()
 
     @property
@@ -283,14 +283,14 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
         self._contents_tree = SimpleTreeNode.createRoot([])
         self._metadata = DiffractionMetadata.createNullInstance()
         self._indexes = numpy.zeros((), dtype=int)
-        self._patterns = numpy.zeros((), dtype=int)
+        self._patterns = numpy.zeros((0, 0, 0), dtype=int)
         self._arrays.clear()
 
     def reload(self, dataset: DiffractionDataset) -> None:
         self._contents_tree = dataset.getContentsTree()
         self._metadata = dataset.getMetadata()
         self._indexes = -numpy.ones(self._metadata.numberOfPatternsTotal, dtype=int)
-        self._patterns = numpy.zeros((), dtype=int)
+        self._patterns = numpy.zeros((0, 0, 0), dtype=int)
         self._arrays.clear()
 
         pattern_extent = self._sizer.get_processed_image_extent()

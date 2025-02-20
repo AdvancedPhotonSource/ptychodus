@@ -256,7 +256,7 @@ class PatternTransformViewController:
         layout = QGridLayout()
         layout.addWidget(self._lower_bound_enabled_view_controller.getWidget(), 0, 0)
         layout.addWidget(self._lower_bound_view_controller.getWidget(), 0, 1, 1, 2)
-        layout.addWidget(self._upper_bound_view_controller.getWidget(), 1, 0)
+        layout.addWidget(self._upper_bound_enabled_view_controller.getWidget(), 1, 0)
         layout.addWidget(self._upper_bound_view_controller.getWidget(), 1, 1, 1, 2)
         layout.setColumnStretch(2, 1)
         layout.setColumnStretch(3, 1)

@@ -84,7 +84,6 @@ class PatternsController(DiffractionDatasetObserver):
         view.buttonBox.saveButton.clicked.connect(self._saveDataset)
         view.buttonBox.infoButton.clicked.connect(self._openPatternsInfo)
         view.buttonBox.closeButton.clicked.connect(self._closeDataset)
-        view.buttonBox.closeButton.setEnabled(False)  # TODO
         dataset.add_observer(self)
 
         self._syncModelToView()
@@ -131,8 +130,8 @@ class PatternsController(DiffractionDatasetObserver):
     def _syncModelToView(self) -> None:
         rootNode = DatasetTreeNode.createRoot()
 
-        for arrayPresenter in self._dataset:
-            rootNode.createChild(arrayPresenter)
+        for array in self._dataset:
+            rootNode.createChild(array)
 
         self._treeModel.setRootNode(rootNode)
 
