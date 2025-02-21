@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from pathlib import Path
 import logging
 
@@ -25,7 +24,6 @@ class PatternsStreamingContext:
     def __init__(self, dataset: AssembledDiffractionDataset, metadata: DiffractionMetadata) -> None:
         self._dataset = dataset
         self._metadata = metadata
-        self._trigger_counts: list[int] = []  # FIXME use this
 
     def start(self) -> None:
         contents_tree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
@@ -33,9 +31,8 @@ class PatternsStreamingContext:
         self._dataset.reload(stream_dataset)
         self._dataset.start_processing()
 
-    def append_array(self, array: DiffractionPatternArray, trigger_counts: Sequence[int]) -> None:
+    def append_array(self, array: DiffractionPatternArray) -> None:
         self._dataset.append_array(array)
-        self._trigger_counts.extend(trigger_counts)
 
     def get_queue_size(self) -> int:
         return self._dataset.queue_size

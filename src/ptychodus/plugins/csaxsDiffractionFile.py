@@ -65,7 +65,7 @@ class CSAXSDiffractionFileReader(DiffractionFileReader):
 
                     array = H5DiffractionPatternArray(
                         label=filePath.stem,
-                        index=0,
+                        numberOfPatterns=numberOfPatterns,
                         filePath=filePath,
                         dataPath=self._dataPath,
                     )

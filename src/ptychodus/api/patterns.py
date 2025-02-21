@@ -13,8 +13,8 @@ from .geometry import ImageExtent, PixelGeometry
 from .tree import SimpleTreeNode
 
 BooleanArrayType: TypeAlias = numpy.typing.NDArray[numpy.bool_]
-DiffractionPatternArrayType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
-DiffractionPatternIndexes: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
+PatternDataType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
+PatternIndexesType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
 
 
 @dataclass(frozen=True)
@@ -23,10 +23,9 @@ class CropCenter:
     positionYInPixels: int
 
 
-class DiffractionPatternState(Enum):
+class PatternState(Enum):
     UNKNOWN = auto()
-    MISSING = auto()
-    FOUND = auto()
+    LOADING = auto()
     LOADED = auto()
 
 
@@ -36,52 +35,46 @@ class DiffractionPatternArray:
         pass
 
     @abstractmethod
-    def getIndex(self) -> int:
+    def getIndexes(self) -> PatternIndexesType:
         pass
 
     @abstractmethod
-    def getData(self) -> DiffractionPatternArrayType:
+    def getData(self) -> PatternDataType:
         pass
+
+    def getState(self) -> PatternState:
+        return PatternState.UNKNOWN
 
     def getNumberOfPatterns(self) -> int:
         return self.getData().shape[0]
-
-    @abstractmethod
-    def getState(self) -> DiffractionPatternState:
-        pass
 
 
 class SimpleDiffractionPatternArray(DiffractionPatternArray):
     def __init__(
         self,
         label: str,
-        index: int,
-        data: DiffractionPatternArrayType,
-        state: DiffractionPatternState,
+        indexes: PatternIndexesType,
+        data: PatternDataType,
     ) -> None:
         super().__init__()
         self._label = label
-        self._index = index
+        self._indexes = indexes
         self._data = data
-        self._state = state
 
     @classmethod
     def createNullInstance(cls) -> SimpleDiffractionPatternArray:
+        indexes = numpy.array([0])
         data = numpy.zeros((1, 1, 1), dtype=numpy.uint16)
-        state = DiffractionPatternState.MISSING
-        return cls('Null', 0, data, state)
+        return cls('Null', indexes, data)
 
     def getLabel(self) -> str:
         return self._label
 
-    def getIndex(self) -> int:
-        return self._index
+    def getIndexes(self) -> PatternIndexesType:
+        return self._indexes
 
-    def getData(self) -> DiffractionPatternArrayType:
+    def getData(self) -> PatternDataType:
         return self._data
-
-    def getState(self) -> DiffractionPatternState:
-        return self._state
 
 
 @dataclass(frozen=True)

@@ -6,8 +6,8 @@ from PyQt5.QtGui import QFont
 
 from ptychodus.api.patterns import (
     DiffractionPatternArray,
-    DiffractionPatternArrayType,
-    DiffractionPatternState,
+    PatternDataType,
+    PatternState,
     SimpleDiffractionPatternArray,
 )
 
@@ -47,11 +47,11 @@ class DatasetTreeNode:
         return f'Frame {self._frame_index}'
 
     @property
-    def state(self) -> DiffractionPatternState:
+    def state(self) -> PatternState:
         return self._array.getState()
 
     @property
-    def data(self) -> DiffractionPatternArrayType | None:
+    def data(self) -> PatternDataType | None:
         if self._array.getData() is None:
             return None
         elif self._frame_index < 0:
@@ -131,7 +131,7 @@ class DatasetTreeModel(QAbstractItemModel):
         if index.isValid():
             node = index.internalPointer()
 
-            if node.state != DiffractionPatternState.LOADED:
+            if node.state != PatternState.LOADED:
                 value &= ~Qt.ItemFlag.ItemIsSelectable
                 value &= ~Qt.ItemFlag.ItemIsEnabled
 
@@ -151,7 +151,7 @@ class DatasetTreeModel(QAbstractItemModel):
                         return f'{node.sizeInBytes / (1024 * 1024):.2f}'
             elif role == Qt.ItemDataRole.FontRole:
                 font = QFont()
-                font.setItalic(node.state == DiffractionPatternState.FOUND)
+                font.setItalic(node.state == PatternState.LOADING)
                 return font
 
     def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:

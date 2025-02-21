@@ -16,9 +16,9 @@ from ptychodus.api.patterns import (
     DiffractionDataset,
     DiffractionMetadata,
     DiffractionPatternArray,
-    DiffractionPatternArrayType,
-    DiffractionPatternIndexes,
-    DiffractionPatternState,
+    PatternDataType,
+    PatternIndexesType,
+    PatternState,
 )
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -58,32 +58,32 @@ class AssembledDiffractionPatternArray(DiffractionPatternArray):
     def __init__(
         self,
         label: str,
-        indexes: DiffractionPatternIndexes,
-        patterns: DiffractionPatternArrayType,
+        indexes: PatternIndexesType,
+        data: PatternDataType,
         start: int,
         end: int,
     ) -> None:
         super().__init__()
         self._label = label
         self._indexes = indexes
-        self._patterns = patterns
+        self._data = data
         self._start = start
         self._end = end
 
     def getLabel(self) -> str:
         return self._label
 
-    def getIndex(self) -> int:
-        return self._indexes[self._start]
+    def getIndexes(self) -> PatternIndexesType:
+        return self._indexes[self._start : self._end]
 
-    def getData(self) -> DiffractionPatternArrayType:
-        data = self._patterns[self._start : self._end, :, :]
+    def getData(self) -> PatternDataType:
+        data = self._data[self._start : self._end, :, :]
         data.flags.writeable = False
         return data
 
-    def getState(self) -> DiffractionPatternState:
-        loaded = any(self._indexes[self._start : self._end] >= 0)
-        return DiffractionPatternState.LOADED if loaded else DiffractionPatternState.UNKNOWN
+    def getState(self) -> PatternState:
+        loaded = any(self.getIndexes() >= 0)
+        return PatternState.LOADED if loaded else PatternState.UNKNOWN
 
 
 class DiffractionPatternArrayLoader:
@@ -188,8 +188,8 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
 
         self._contents_tree = SimpleTreeNode.createRoot([])
         self._metadata = DiffractionMetadata.createNullInstance()
-        self._indexes: DiffractionPatternIndexes = numpy.zeros((), dtype=int)
-        self._patterns: DiffractionPatternArrayType = numpy.zeros((0, 0, 0), dtype=int)
+        self._indexes: PatternIndexesType = numpy.zeros((), dtype=int)
+        self._data: PatternDataType = numpy.zeros((0, 0, 0), dtype=int)
         self._arrays: list[DiffractionPatternArray] = list()
 
     @property
@@ -224,14 +224,14 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
         pattern_extent = self._sizer.get_processed_image_extent()
         return numpy.full(pattern_extent.shape, False)
 
-    def get_assembled_indexes(self) -> DiffractionPatternIndexes:
+    def get_assembled_indexes(self) -> PatternIndexesType:
         return self._indexes[self._indexes >= 0]
 
-    def get_assembled_patterns(self) -> DiffractionPatternArrayType:
-        return self._patterns[self._indexes >= 0]
+    def get_assembled_patterns(self) -> PatternDataType:
+        return self._data[self._indexes >= 0]
 
     def get_assembled_pattern_counts(self, index: int) -> int:  # FIXME use
-        pattern = self._patterns[index]
+        pattern = self._data[index]
         good_pixels = numpy.logical_not(self.get_processed_bad_pixels())
         return numpy.sum(pattern[good_pixels])
 
@@ -259,7 +259,7 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
         assembled_array = AssembledDiffractionPatternArray(
             label=array.getLabel(),
             indexes=self._indexes,
-            patterns=self._patterns,
+            data=self._data,
             start=array_index * array_size,
             end=(array_index + 1) * array_size,
         )
@@ -267,12 +267,12 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
         self._arrays.append(assembled_array)
 
         for observer in self._observer_list:
-            observer.handle_array_inserted(len(self._arrays) - 1)
+            observer.handle_array_inserted(array_index)
 
     def assemble_patterns(self) -> None:
         for array in self._loader.loaded_arrays():
             # TODO update self._indexes
-            # TODO update self._patterns
+            # TODO update self._data
             # TODO record total intensity
             index = 0  # FIXME assemble
 
@@ -284,7 +284,7 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
         self._contents_tree = SimpleTreeNode.createRoot([])
         self._metadata = DiffractionMetadata.createNullInstance()
         self._indexes = numpy.zeros((), dtype=int)
-        self._patterns = numpy.zeros((0, 0, 0), dtype=int)
+        self._data = numpy.zeros((0, 0, 0), dtype=int)
         self._arrays.clear()
 
         for _ in self._loader.loaded_arrays():
@@ -300,19 +300,19 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
         self._indexes = -numpy.ones(self._metadata.numberOfPatternsTotal, dtype=int)
 
         pattern_extent = self._sizer.get_processed_image_extent()
-        patterns_shape = self._indexes.size, *pattern_extent.shape
-        patterns_dtype = self._metadata.patternDataType
+        data_shape = self._indexes.size, *pattern_extent.shape
+        data_dtype = self._metadata.patternDataType
 
         if self._settings.memmapEnabled.getValue():
             scratch_dir = self._settings.scratchDirectory.getValue()
             scratch_dir.mkdir(mode=0o755, parents=True, exist_ok=True)
             npy_tmp_file = tempfile.NamedTemporaryFile(dir=scratch_dir, suffix='.npy')
-            logger.debug(f'Scratch data file {npy_tmp_file.name} is {patterns_shape}')
-            self._patterns = numpy.memmap(npy_tmp_file, dtype=patterns_dtype, shape=patterns_shape)
-            self._patterns[:] = 0
+            logger.debug(f'Scratch data file {npy_tmp_file.name} is {data_shape}')
+            self._data = numpy.memmap(npy_tmp_file, dtype=data_dtype, shape=data_shape)
+            self._data[:] = 0
         else:
-            logger.debug(f'Scratch memory is {patterns_shape}')
-            self._patterns = numpy.zeros(patterns_shape, dtype=patterns_dtype)
+            logger.debug(f'Scratch memory is {data_shape}')
+            self._data = numpy.zeros(data_shape, dtype=data_dtype)
 
         for observer in self._observer_list:
             observer.handle_dataset_reloaded()
@@ -331,21 +331,21 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
                 raise RuntimeError(f'Failed to read "{filePath}"') from exc
 
             self._indexes = contents['indexes']
-            self._patterns = contents['patterns']
-            numberOfPatterns, detectorHeight, detectorWidth = self._patterns.shape
+            self._data = contents['patterns']
+            numberOfPatterns, detectorHeight, detectorWidth = self._data.shape
 
             self._contents_tree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
             self._metadata = DiffractionMetadata(
                 numberOfPatternsPerArray=numberOfPatterns,
                 numberOfPatternsTotal=numberOfPatterns,
-                patternDataType=self._patterns.dtype,
+                patternDataType=self._data.dtype,
                 detectorExtent=ImageExtent(detectorWidth, detectorHeight),
             )
             self._arrays = [
                 AssembledDiffractionPatternArray(
                     label='Imported',
                     indexes=self._indexes,
-                    patterns=self._patterns,
+                    data=self._data,
                     start=0,
                     end=numberOfPatterns,
                 )
@@ -367,7 +367,7 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
     def get_info_text(self) -> str:
         file_path = self._metadata.filePath
         label = file_path.stem if file_path else 'None'
-        number, height, width = self._patterns.shape
-        dtype = str(self._patterns.dtype)
-        sizeInMB = self._patterns.nbytes / (1024 * 1024)
+        number, height, width = self._data.shape
+        dtype = str(self._data.dtype)
+        sizeInMB = self._data.nbytes / (1024 * 1024)
         return f'{label}: {number} x {width}W x {height}H {dtype} [{sizeInMB:.2f}MB]'

@@ -102,8 +102,8 @@ class PtychodusStreamingContext:
     def append_positions_y(self, values_m: Sequence[float], trigger_counts: Sequence[int]) -> None:
         self._positions_context.append_positions_y(values_m, trigger_counts)
 
-    def append_array(self, array: DiffractionPatternArray, trigger_counts: Sequence[int]) -> None:
-        self._patterns_context.append_array(array, trigger_counts)
+    def append_array(self, array: DiffractionPatternArray) -> None:
+        self._patterns_context.append_array(array)
 
     def get_queue_size(self) -> int:
         return self._patterns_context.get_queue_size()

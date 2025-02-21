@@ -121,11 +121,10 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             image3d = image[numpy.newaxis, :, :].copy()
             array = ptychodus.api.patterns.SimpleDiffractionPatternArray(
                 label=f'Frame{frameId}',
-                index=frameId,
+                indexes=numpy.array([frameId]),
                 data=image3d,
-                state=ptychodus.api.patterns.DiffractionPatternState.LOADED,
             )
-            self._ptychodus_streaming_context.append_array(array, frameTimeStamp)
+            self._ptychodus_streaming_context.append_array(array)
 
         posXQueue = self.metadataQueueMap[self._posXPV]
 

@@ -10,7 +10,6 @@ from ptychodus.api.patterns import (
     DiffractionFileReader,
     DiffractionFileWriter,
     DiffractionMetadata,
-    DiffractionPatternState,
     SimpleDiffractionDataset,
     SimpleDiffractionPatternArray,
 )
@@ -52,9 +51,8 @@ class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
 
             array = SimpleDiffractionPatternArray(
                 label=filePath.stem,
-                index=0,
+                indexes=numpy.arange(numberOfPatterns),
                 data=data,
-                state=DiffractionPatternState.FOUND,
             )
 
             dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
