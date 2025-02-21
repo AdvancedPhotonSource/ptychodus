@@ -14,7 +14,7 @@ import ptycho.loader
 import ptycho.model_manager
 import ptycho.params
 
-from ptychodus.api.object import Object, ObjectArrayType
+from ptychodus.api.object import Object
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import (
     ReconstructInput,
@@ -103,6 +103,16 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     def name(self) -> str:
         return self._name
 
+    def _reconstruct_image(self, test_data: ptycho.loader.PtychoDataContainer) -> Any:
+        if self._model_dict is None:
+            raise RuntimeError('Model not loaded!')
+
+        import ptycho.model
+
+        diffraction_to_obj = self._model_dict['diffraction_to_obj']  # tf.keras.Model
+        intensity_scale = ptycho.model.params()['intensity_scale']
+        return diffraction_to_obj.predict([test_data.X * intensity_scale, test_data.local_offsets])
+
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         model_size = parameters.patterns.shape[-1]
 
@@ -141,17 +151,11 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         )
 
         # Perform reconstruction
-        diffraction_to_obj = self._model_dict['diffraction_to_obj']  # tf.keras.Model
-        obj_tensor_full = diffraction_to_obj.predict(
-            [
-                test_data_container.X * diffraction_to_obj.params()['intensity_scale'],
-                test_data_container.local_offsets,
-            ]
-        )
+        obj_tensor_full = self._reconstruct_image(test_data_container)
 
         # Process the reconstructed image
         object_out_array = ptycho.tf_helper.reassemble_position(
-            obj_tensor_full, test_raw_data.global_offsets, M=20
+            obj_tensor_full, test_data_container.global_offsets, M=20
         )
 
         object_in = parameters.product.object_
@@ -180,7 +184,9 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         # FIXME model path to/from settings
         self._inference_settings.model_path.setValue(filePath)
         # ModelManager updates global config (ptycho.params.cfg) when loading
-        self._model_dict = ptycho.model_manager.ModelManager.load_multiple_models(filePath)
+        self._model_dict = ptycho.model_manager.ModelManager.load_multiple_models(
+            filePath.parent / filePath.stem
+        )
         # FIXME update settings from ptycho.params.cfg after loading
 
     def saveModel(self, filePath: Path) -> None:
