@@ -66,6 +66,9 @@ class PtychoPINNTrainingSettings(Observable, Observer):
         self.intensity_scale_trainable = self._settings_group.createBooleanParameter(
             'intensity_scale_trainable', True
         )
+        self.output_dir = self._settings_group.createPathParameter(
+            'output_dir', Path('/path/to/output_data')
+        )
 
     def update(self, observable: Observable) -> None:
         if observable is self._settings_group:

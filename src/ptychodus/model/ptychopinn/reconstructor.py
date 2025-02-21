@@ -205,7 +205,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     def train(self, dataPath: Path) -> TrainOutput:
         self._training_settings.data_dir.setValue(dataPath)
 
-        test_raw_data = RawData.from_file(dataPath / 'test_data.npz')
+        test_raw_data = RawData.from_file(dataPath / 'test_data.npz')  # TODO RawData | None
         train_raw_data = RawData.from_file(dataPath / 'train_data.npz')
 
         model_size = train_raw_data.diff3d.shape[-1]
@@ -234,11 +234,16 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         # Update global params with new-style config
         update_legacy_dict(ptycho.params.cfg, training_config)
 
-        from ptycho.workflows.components import run_cdi_example
+        from ptycho.workflows.components import run_cdi_example, save_outputs
 
-        recon_amp, recon_phase, results = run_cdi_example(
+        recon_amp, recon_phase, train_results = run_cdi_example(
             train_raw_data, test_raw_data, training_config
-        )  # FIXME verify inputs
-        # FIXME update self._model_dict
+        )
+        output_dir = self._training_settings.output_dir.getValue()
+        self.saveModel(output_dir)
+        save_outputs(recon_amp, recon_phase, train_results, str(output_dir))
+        print(train_results.keys())  # FIXME remove
+        # dict_keys(['history', 'model_instance', 'reconstructed_obj', 'pred_amp', 'reconstructed_obj_cdi', 'stitched_obj', 'train_container', 'test_container', 'obj_tensor_full', 'global_offsets', 'recon_amp', 'recon_phase'])
+        # FIXME self._model_dict = train_results
 
         return TrainOutput([], [], 0)  # FIXME
