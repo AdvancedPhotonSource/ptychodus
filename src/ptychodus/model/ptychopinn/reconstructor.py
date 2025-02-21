@@ -160,7 +160,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
         object_in = parameters.product.object_
         object_out = Object(
-            array=numpy.array(object_out_array),
+            array=numpy.squeeze(object_out_array),
             layerDistanceInMeters=object_in.layerDistanceInMeters,
             pixelGeometry=object_in.getPixelGeometry(),
             center=object_in.getCenter(),
