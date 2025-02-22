@@ -209,7 +209,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
     def _train(self) -> None:
         dataPath = self._fileDialogFactory.getExistingDirectoryPath(
-            self._view, 'Choose Training Data Directory'
+            self._view,
+            'Choose Training Data Directory',
+            initialDirectory=self._presenter.getTrainingDataPath(),
         )
 
         if dataPath:

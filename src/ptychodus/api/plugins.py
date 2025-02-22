@@ -14,7 +14,7 @@ from .fluorescence import (
     FluorescenceFileWriter,
     UpscalingStrategy,
 )
-from .object import ObjectPhaseCenteringStrategy, ObjectFileReader, ObjectFileWriter
+from .object import ObjectFileReader, ObjectFileWriter
 from .observer import Observable
 from .patterns import DiffractionFileReader, DiffractionFileWriter
 from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter
@@ -107,7 +107,6 @@ class PluginRegistry:
         self.fresnelZonePlates = PluginChooser[FresnelZonePlate]()
         self.probeFileReaders = PluginChooser[ProbeFileReader]()
         self.probeFileWriters = PluginChooser[ProbeFileWriter]()
-        self.objectPhaseCenteringStrategies = PluginChooser[ObjectPhaseCenteringStrategy]()
         self.objectFileReaders = PluginChooser[ObjectFileReader]()
         self.objectFileWriters = PluginChooser[ObjectFileWriter]()
         self.productFileReaders = PluginChooser[ProductFileReader]()

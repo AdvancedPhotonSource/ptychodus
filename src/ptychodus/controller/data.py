@@ -81,13 +81,15 @@ class FileDialogFactory:
 
         return filePath, dialog.selectedNameFilter()
 
-    def getExistingDirectoryPath(self, parent: QWidget, caption: str) -> Path | None:
+    def getExistingDirectoryPath(
+        self, parent: QWidget, caption: str, initialDirectory: Path | None = None
+    ) -> Path | None:
         dirPath = None
 
         dirName = QFileDialog.getExistingDirectory(
             parent,
             caption,
-            str(self.getOpenWorkingDirectory()),
+            str(initialDirectory or self.getOpenWorkingDirectory()),
             QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks,
         )
 
