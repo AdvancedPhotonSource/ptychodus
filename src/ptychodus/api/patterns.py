@@ -43,7 +43,7 @@ class DiffractionPatternArray:
         pass
 
     def getState(self) -> PatternState:
-        return PatternState.UNKNOWN
+        return PatternState.UNKNOWN if numpy.all(self.getIndexes() < 0) else PatternState.LOADED
 
     def getNumberOfPatterns(self) -> int:
         return self.getData().shape[0]

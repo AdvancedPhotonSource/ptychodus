@@ -49,7 +49,7 @@ class PatternsCore(Observer):
         pass
 
     def stop(self) -> None:
-        self.dataset.finish_processing(block=False)
+        self.dataset.finish_loading(block=False)
 
     def update(self, observable: Observable) -> None:
         if observable is self._reinitObservable:
@@ -57,4 +57,4 @@ class PatternsCore(Observer):
                 filePath=self.patternSettings.filePath.getValue(),
                 fileType=self.patternSettings.fileType.getValue(),
             )
-            self.dataset.start_processing()
+            self.dataset.start_loading()

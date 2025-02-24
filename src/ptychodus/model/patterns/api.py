@@ -29,7 +29,7 @@ class PatternsStreamingContext:
         contents_tree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         stream_dataset = SimpleDiffractionDataset(self._metadata, contents_tree, [])
         self._dataset.reload(stream_dataset)
-        self._dataset.start_processing()
+        self._dataset.start_loading()
 
     def append_array(self, array: DiffractionPatternArray) -> None:
         self._dataset.append_array(array)
@@ -38,7 +38,7 @@ class PatternsStreamingContext:
         return self._dataset.queue_size
 
     def stop(self) -> None:
-        self._dataset.finish_processing(block=True)
+        self._dataset.finish_loading(block=True)
         self._dataset.assemble_patterns()
 
 
@@ -106,10 +106,10 @@ class PatternsAPI:
         return -1
 
     def startAssemblingDiffractionPatterns(self) -> None:
-        self._dataset.start_processing()
+        self._dataset.start_loading()
 
     def finishAssemblingDiffractionPatterns(self, *, block: bool) -> None:
-        self._dataset.finish_processing(block=block)
+        self._dataset.finish_loading(block=block)
 
         if block:
             self._dataset.assemble_patterns()

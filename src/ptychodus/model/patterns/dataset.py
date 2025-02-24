@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import overload
 import logging
@@ -18,7 +19,7 @@ from ptychodus.api.patterns import (
     DiffractionPatternArray,
     PatternDataType,
     PatternIndexesType,
-    PatternState,
+    SimpleDiffractionPatternArray,
 )
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -54,93 +55,68 @@ class ObservableDiffractionDataset(DiffractionDataset):
         pass
 
 
-class AssembledDiffractionPatternArray(DiffractionPatternArray):
-    def __init__(
-        self,
-        label: str,
-        indexes: PatternIndexesType,
-        data: PatternDataType,
-        start: int,
-        end: int,
-    ) -> None:
-        super().__init__()
-        self._label = label
-        self._indexes = indexes
-        self._data = data
-        self._start = start
-        self._end = end
-
-    def getLabel(self) -> str:
-        return self._label
-
-    def getIndexes(self) -> PatternIndexesType:
-        return self._indexes[self._start : self._end]
-
-    def getData(self) -> PatternDataType:
-        data = self._data[self._start : self._end, :, :]
-        data.flags.writeable = False
-        return data
-
-    def getState(self) -> PatternState:
-        loaded = any(self.getIndexes() >= 0)
-        return PatternState.LOADED if loaded else PatternState.UNKNOWN
+@dataclass(frozen=True)
+class ArrayLoaderTask:
+    array: DiffractionPatternArray
+    index: int
 
 
-class DiffractionPatternArrayLoader:
+class ArrayLoader:
     def __init__(self, settings: PatternSettings, sizer: PatternSizer) -> None:
         self._settings = settings
         self._sizer = sizer
-        self._processing_queue: queue.Queue[DiffractionPatternArray] = queue.Queue()
-        self._assembly_queue: queue.Queue[DiffractionPatternArray] = queue.Queue()
+        self._input_queue: queue.Queue[ArrayLoaderTask] = queue.Queue()
+        self._output_queue: queue.Queue[ArrayLoaderTask] = queue.Queue()
         self._workers: list[threading.Thread] = list()
         self._stop_work_event = threading.Event()
 
     @property
-    def processing_queue_size(self) -> int:
-        return self._processing_queue.qsize()
+    def input_queue_size(self) -> int:
+        return self._input_queue.qsize()
 
     @property
-    def assembly_queue_size(self) -> int:
-        return self._assembly_queue.qsize()
+    def output_queue_size(self) -> int:
+        return self._output_queue.qsize()
 
-    def load_array(self, array: DiffractionPatternArray) -> None:
-        self._processing_queue.put(array)
+    def submit_task(self, task: ArrayLoaderTask) -> None:
+        self._input_queue.put(task)
 
     def _load_arrays(self) -> None:
         processor = self._sizer.get_processor()
 
         while not self._stop_work_event.is_set():
             try:
-                array = self._processing_queue.get(block=True, timeout=1)
+                task = self._input_queue.get(block=True, timeout=1)
             except queue.Empty:
                 continue
 
             try:
-                processed_array = processor(array)
+                processed_array = processor(task.array)
             except Exception:
-                logger.exception('Error while processing array!')
+                logger.exception('Error while loading array!')
             else:
-                self._assembly_queue.put(processed_array)
+                completed_task = ArrayLoaderTask(processed_array, task.index)
+                self._output_queue.put(completed_task)
             finally:
-                self._processing_queue.task_done()
+                self._input_queue.task_done()
 
-    def loaded_arrays(self) -> Iterator[DiffractionPatternArray]:
+    def completed_tasks(self) -> Iterator[ArrayLoaderTask]:
         while True:
             try:
-                array = self._assembly_queue.get(block=False)
+                task = self._output_queue.get(block=False)
             except queue.Empty:
                 break
             else:
-                self._assembly_queue.task_done()
+                self._output_queue.task_done()
 
-            yield array
+            yield task
 
     def start(self) -> None:
         logger.info('Starting data loader...')
         self._stop_work_event.clear()
 
         # clear assembly queue
-        for _ in self.loaded_arrays():
+        for _ in self.completed_tasks():
             pass
 
         for index in range(self._settings.numberOfDataThreads.getValue()):
@@ -158,16 +134,16 @@ class DiffractionPatternArrayLoader:
         logger.info('Stopping data loader...')
 
         if finish_loading:
-            self._processing_queue.join()
+            self._input_queue.join()
         else:
-            # clear processing queue
+            # clear loading queue
             while True:
                 try:
-                    self._processing_queue.get(block=False)
+                    self._input_queue.get(block=False)
                 except queue.Empty:
                     break
                 else:
-                    self._processing_queue.task_done()
+                    self._input_queue.task_done()
 
         self._stop_work_event.set()
 
@@ -183,7 +159,7 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
         super().__init__()
         self._settings = settings
         self._sizer = sizer
-        self._loader = DiffractionPatternArrayLoader(settings, sizer)
+        self._loader = ArrayLoader(settings, sizer)
         self._observer_list: list[DiffractionDatasetObserver] = []
 
         self._contents_tree = SimpleTreeNode.createRoot([])
@@ -194,12 +170,12 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
 
     @property
     def queue_size(self) -> int:
-        return self._loader.processing_queue_size + self._loader.assembly_queue_size
+        return self._loader.input_queue_size + self._loader.output_queue_size
 
-    def start_processing(self) -> None:
+    def start_loading(self) -> None:
         self._loader.start()
 
-    def finish_processing(self, *, block: bool = True) -> None:
+    def finish_loading(self, *, block: bool = True) -> None:
         self._loader.stop(finish_loading=block)
 
     def add_observer(self, observer: DiffractionDatasetObserver) -> None:
@@ -230,8 +206,8 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
     def get_assembled_patterns(self) -> PatternDataType:
         return self._data[self._indexes >= 0]
 
-    def get_assembled_pattern_counts(self, index: int) -> int:  # FIXME use
-        pattern = self._data[index]
+    def get_assembled_pattern_counts(self, pattern_index: int) -> int:  # FIXME use
+        pattern = self._data[pattern_index]
         good_pixels = numpy.logical_not(self.get_processed_bad_pixels())
         return numpy.sum(pattern[good_pixels])
 
@@ -250,34 +226,44 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
         return len(self._arrays)
 
     def append_array(self, array: DiffractionPatternArray) -> None:
-        """Load a new array into the dataset."""
-        self._loader.load_array(array)
-
-        # assumes that arrays arrive in order
+        """Load a new array into the dataset. Assumes that arrays arrive in order."""
         array_index = len(self._arrays)
         array_size = self._metadata.numberOfPatternsPerArray
-        assembled_array = AssembledDiffractionPatternArray(
-            label=array.getLabel(),
-            indexes=self._indexes,
-            data=self._data,
-            start=array_index * array_size,
-            end=(array_index + 1) * array_size,
+
+        start = array_index * array_size
+        end = (array_index + 1) * array_size
+
+        pattern_indexes = self._indexes[start:end]
+        pattern_indexes.flags.writeable = False
+
+        pattern_data = self._data[start:end, :, :]
+        pattern_data.flags.writeable = False
+
+        assembled_array = SimpleDiffractionPatternArray(
+            label=array.getLabel(), indexes=pattern_indexes, data=pattern_data
         )
-        # FIXME insert sorted by index?
         self._arrays.append(assembled_array)
+
+        task = ArrayLoaderTask(array, array_index)
+        self._loader.submit_task(task)
 
         for observer in self._observer_list:
             observer.handle_array_inserted(array_index)
 
     def assemble_patterns(self) -> None:
-        for array in self._loader.loaded_arrays():
-            # TODO update self._indexes
-            # TODO update self._data
-            # TODO record total intensity
-            index = 0  # FIXME assemble
+        for task in self._loader.completed_tasks():
+            array_index = task.index
+            array_size = self._metadata.numberOfPatternsPerArray
+
+            start = array_index * array_size
+            end = (array_index + 1) * array_size
+
+            loaded_array = task.array
+            self._indexes[start:end] = loaded_array.getIndexes()
+            self._data[start:end, :, :] = loaded_array.getData()
 
             for observer in self._observer_list:
-                observer.handle_array_changed(index)
+                observer.handle_array_changed(array_index)
 
     def clear(self) -> None:
         self._loader.stop(finish_loading=False)
@@ -287,7 +273,7 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
         self._data = numpy.zeros((0, 0, 0), dtype=int)
         self._arrays.clear()
 
-        for _ in self._loader.loaded_arrays():
+        for _ in self._loader.completed_tasks():
             pass
 
         for observer in self._observer_list:
@@ -342,12 +328,10 @@ class AssembledDiffractionDataset(ObservableDiffractionDataset):
                 detectorExtent=ImageExtent(detectorWidth, detectorHeight),
             )
             self._arrays = [
-                AssembledDiffractionPatternArray(
+                SimpleDiffractionPatternArray(
                     label='Imported',
                     indexes=self._indexes,
                     data=self._data,
-                    start=0,
-                    end=numberOfPatterns,
                 )
             ]
 

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Final
+from typing import Final
 import logging
 
 import numpy
@@ -75,17 +75,10 @@ class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
         return SimpleDiffractionDataset(metadata, contentsTree, [array])
 
     def write(self, filePath: Path, dataset: DiffractionDataset) -> None:
-        patterns = list()
-
-        for array in dataset:
-            arrayData = array.getData()
-
-            if arrayData.size > 0:
-                patterns.append(arrayData)
-
-        contents: dict[str, Any] = dict()
-        # FIXME contents[self.INDEXES] = numpy.array(dataset.getAssembledIndexes())
-        contents[self.PATTERNS] = numpy.concatenate(patterns)
+        contents = {
+            self.INDEXES: numpy.concatenate([array.getIndexes() for array in dataset]),
+            self.PATTERNS: numpy.concatenate([array.getData() for array in dataset]),
+        }
         numpy.savez(filePath, **contents)
 
 

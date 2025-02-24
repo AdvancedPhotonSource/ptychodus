@@ -60,16 +60,8 @@ class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
         return dataset
 
     def write(self, filePath: Path, dataset: DiffractionDataset) -> None:
-        patterns = list()
-
-        for array in dataset:
-            arrayData = array.getData()
-
-            if arrayData.size > 0:
-                patterns.append(arrayData)
-
-        data = numpy.concatenate(patterns)
-        numpy.save(filePath, data)
+        patterns = numpy.concatenate([array.getData() for array in dataset])
+        numpy.save(filePath, patterns)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

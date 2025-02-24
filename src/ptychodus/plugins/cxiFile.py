@@ -3,6 +3,7 @@ from typing import Final
 import logging
 
 import h5py
+import numpy
 
 from .h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
@@ -67,7 +68,7 @@ class CXIDiffractionFileReader(DiffractionFileReader):
 
                     array = H5DiffractionPatternArray(
                         label=filePath.stem,
-                        numberOfPatterns=numberOfPatterns,
+                        indexes=numpy.arange(numberOfPatterns),
                         filePath=filePath,
                         dataPath=self._dataPath,
                     )

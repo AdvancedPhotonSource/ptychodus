@@ -22,10 +22,12 @@ logger = logging.getLogger(__name__)
 
 
 class H5DiffractionPatternArray(DiffractionPatternArray):
-    def __init__(self, label: str, numberOfPatterns: int, filePath: Path, dataPath: str) -> None:
+    def __init__(
+        self, label: str, indexes: PatternIndexesType, filePath: Path, dataPath: str
+    ) -> None:
         super().__init__()
         self._label = label
-        self._indexes = numpy.arange(numberOfPatterns)
+        self._indexes = indexes
         self._filePath = filePath
         self._dataPath = dataPath
 
@@ -164,7 +166,7 @@ class H5DiffractionFileReader(DiffractionFileReader):
 
                 array = H5DiffractionPatternArray(
                     label=filePath.stem,
-                    numberOfPatterns=numberOfPatterns,
+                    indexes=numpy.arange(numberOfPatterns),
                     filePath=filePath,
                     dataPath=self._dataPath,
                 )
