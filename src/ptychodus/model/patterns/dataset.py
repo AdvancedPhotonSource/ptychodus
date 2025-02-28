@@ -92,8 +92,10 @@ class ArrayLoader:
 
             try:
                 processed_array = processor(task.array)
+            except FileNotFoundError:
+                logger.warning(f'File not found for array index={task.index}.')
             except Exception:
-                logger.exception('Error while loading array!')
+                logger.exception(f'Error while loading array index={task.index}!')
             else:
                 completed_task = ArrayLoaderTask(processed_array, task.index)
                 self._output_queue.put(completed_task)

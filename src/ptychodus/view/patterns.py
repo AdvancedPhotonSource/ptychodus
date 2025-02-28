@@ -4,14 +4,12 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QAbstractButton,
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QTableView,
     QTreeView,
     QVBoxLayout,
     QWidget,
@@ -54,24 +52,6 @@ class OpenDatasetWizardPage(QWizardPage):
         if self._isComplete != complete:
             self._isComplete = complete
             self.completeChanged.emit()
-
-
-class OpenDatasetWizardFilesPage(OpenDatasetWizardPage):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.directoryComboBox = QComboBox()
-        self.fileSystemTableView = QTableView()
-        self.fileTypeLabel = QLabel('Choose File Type:')
-        self.fileTypeComboBox = QComboBox()
-
-        self.setTitle('Choose Dataset File(s)')
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.directoryComboBox)
-        layout.addWidget(self.fileSystemTableView)
-        layout.addWidget(self.fileTypeLabel)
-        layout.addWidget(self.fileTypeComboBox)
-        self.setLayout(layout)
 
 
 class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
