@@ -24,7 +24,7 @@ class OpenDatasetWizardController:
     ) -> None:
         self._api = api
         self._file_view_controller = OpenDatasetWizardFilesViewController(
-            self._api, file_dialog_factory
+            settings, api, file_dialog_factory
         )
         self._metadata_view_controller = OpenDatasetWizardMetadataViewController(metadata_presenter)
         self._patterns_view_controller = OpenDatasetWizardPatternsViewController(
@@ -48,14 +48,14 @@ class OpenDatasetWizardController:
         page = self._wizard.currentPage()
 
         if page is self._metadata_view_controller.getWidget():
-            self._file_view_controller.openDataset()
+            self._file_view_controller.open_dataset()
         elif page is self._patterns_view_controller.getWidget():
             self._metadata_view_controller.importMetadata()
 
     def _executeFinishButtonAction(self) -> None:
         self._api.startAssemblingDiffractionPatterns()
 
-    def openDataset(self) -> None:
+    def open_dataset(self) -> None:
         self._api.finishAssemblingDiffractionPatterns(block=False)
         self._wizard.restart()
         self._wizard.show()

@@ -3,9 +3,12 @@ from pathlib import Path
 
 from PyQt5.QtWidgets import QDialog, QFileDialog, QWidget
 
+from ptychodus.api.observer import Observable
 
-class FileDialogFactory:
+
+class FileDialogFactory(Observable):
     def __init__(self) -> None:
+        super().__init__()
         self._openWorkingDirectory = Path.cwd()
         self._saveWorkingDirectory = Path.cwd()
 
@@ -13,7 +16,14 @@ class FileDialogFactory:
         return self._openWorkingDirectory
 
     def setOpenWorkingDirectory(self, directory: Path) -> None:
-        self._openWorkingDirectory = directory if directory.is_dir() else directory.parent
+        if not directory.is_dir():
+            directory = directory.parent
+
+        directory = directory.resolve()
+
+        if self._openWorkingDirectory != directory:
+            self._openWorkingDirectory = directory
+            self.notifyObservers()
 
     def getOpenFilePath(
         self,

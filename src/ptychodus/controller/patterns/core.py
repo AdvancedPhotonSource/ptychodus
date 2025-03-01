@@ -80,7 +80,7 @@ class PatternsController(DiffractionDatasetObserver):
         view.treeView.selectionModel().currentChanged.connect(self._updateView)
         self._updateView(QModelIndex(), QModelIndex())
 
-        view.buttonBox.openButton.clicked.connect(self._wizard_controller.openDataset)
+        view.buttonBox.openButton.clicked.connect(self._wizard_controller.open_dataset)
         view.buttonBox.saveButton.clicked.connect(self._saveDataset)
         view.buttonBox.infoButton.clicked.connect(self._openPatternsInfo)
         view.buttonBox.closeButton.clicked.connect(self._closeDataset)
