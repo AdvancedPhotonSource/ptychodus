@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (
     QDialogButtonBox,
     QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QPushButton,
     QTreeView,
@@ -57,23 +58,25 @@ class OpenDatasetWizardPage(QWizardPage):
 class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.detectorPixelCountCheckBox = QCheckBox('Detector Pixel Count')
+        self.detectorExtentCheckBox = QCheckBox('Detector Extent')
         self.detectorPixelSizeCheckBox = QCheckBox('Detector Pixel Size')
         self.detectorBitDepthCheckBox = QCheckBox('Detector Bit Depth')
         self.detectorDistanceCheckBox = QCheckBox('Detector Distance')
         self.patternCropCenterCheckBox = QCheckBox('Pattern Crop Center')
         self.patternCropExtentCheckBox = QCheckBox('Pattern Crop Extent')
+        self.probePhotonCountCheckBox = QCheckBox('Probe Photon Count')
         self.probeEnergyCheckBox = QCheckBox('Probe Energy')
 
         self.setTitle('Import Metadata')
 
         layout = QVBoxLayout()
-        layout.addWidget(self.detectorPixelCountCheckBox)
+        layout.addWidget(self.detectorExtentCheckBox)
         layout.addWidget(self.detectorPixelSizeCheckBox)
         layout.addWidget(self.detectorBitDepthCheckBox)
         layout.addWidget(self.detectorDistanceCheckBox)
         layout.addWidget(self.patternCropCenterCheckBox)
         layout.addWidget(self.patternCropExtentCheckBox)
+        layout.addWidget(self.probePhotonCountCheckBox)
         layout.addWidget(self.probeEnergyCheckBox)
         layout.addStretch()
         self.setLayout(layout)
@@ -85,7 +88,9 @@ class PatternsInfoDialog(QDialog):
         self.treeView = QTreeView()
         self.buttonBox = QDialogButtonBox()
 
-        self.treeView.header().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        treeHeader = self.treeView.header()
+        treeHeader.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        treeHeader.setSectionResizeMode(QHeaderView.ResizeToContents)
 
         self.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
         self.buttonBox.clicked.connect(self._handleButtonBoxClicked)

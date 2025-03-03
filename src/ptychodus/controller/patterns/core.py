@@ -1,5 +1,6 @@
 import logging
 
+
 from PyQt5.QtCore import QModelIndex
 from PyQt5.QtWidgets import QAbstractItemView, QFormLayout, QMessageBox
 
@@ -17,7 +18,7 @@ from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..image import ImageController
 from ..parametric import LengthWidgetParameterViewController, SpinBoxParameterViewController
-from .dataset import DatasetTreeModel, DatasetTreeNode
+from .dataset import DatasetTreeModel
 from .info import PatternsInfoViewController
 from .wizard import OpenDatasetWizardController
 
@@ -91,8 +92,9 @@ class PatternsController(DiffractionDatasetObserver):
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         if current.isValid():
             node = current.internalPointer()
+            data = node.get_data()
             pixelGeometry = self._pattern_sizer.get_processed_pixel_geometry()
-            self._image_controller.setArray(node.data, pixelGeometry)
+            self._image_controller.setArray(data, pixelGeometry)
         else:
             self._image_controller.clearArray()
 
@@ -128,21 +130,19 @@ class PatternsController(DiffractionDatasetObserver):
         self._patterns_api.closePatterns()
 
     def _syncModelToView(self) -> None:
-        rootNode = DatasetTreeNode.createRoot()
+        self._treeModel.clear()
 
-        for array in self._dataset:
-            rootNode.createChild(array)
-
-        self._treeModel.setRootNode(rootNode)
+        for index, array in enumerate(self._dataset):
+            self._treeModel.insert_array(index, array)  # type: ignore
 
         info_text = self._dataset.get_info_text()
         self._view.infoLabel.setText(info_text)
 
     def handle_array_inserted(self, index: int) -> None:
-        pass
+        self._treeModel.insert_array(index, self._dataset[index])
 
     def handle_array_changed(self, index: int) -> None:
-        pass
+        self._treeModel.refresh_array(index)
 
     def handle_dataset_reloaded(self) -> None:
         self._syncModelToView()

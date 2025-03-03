@@ -6,7 +6,7 @@ from ptychodus.api.patterns import DiffractionMetadata
 from .patterns import (
     DetectorSettings,
     DiffractionDatasetObserver,
-    ObservableDiffractionDataset,
+    AssembledDiffractionDataset,
     PatternSettings,
 )
 from .product import ProductSettings
@@ -17,7 +17,7 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
         self,
         detectorSettings: DetectorSettings,
         patternSettings: PatternSettings,
-        diffractionDataset: ObservableDiffractionDataset,
+        diffractionDataset: AssembledDiffractionDataset,
         productSettings: ProductSettings,
     ) -> None:
         super().__init__()
@@ -32,10 +32,10 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
     def _metadata(self) -> DiffractionMetadata:
         return self._diffractionDataset.getMetadata()
 
-    def canSyncDetectorPixelCount(self) -> bool:
+    def canSyncDetectorExtent(self) -> bool:
         return self._metadata.detectorExtent is not None
 
-    def syncDetectorPixelCount(self) -> None:
+    def syncDetectorExtent(self) -> None:
         detectorExtent = self._metadata.detectorExtent
 
         if detectorExtent:
@@ -99,6 +99,15 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
 
             self._patternSettings.cropWidthInPixels.setValue(cropDiameterInPixels)
             self._patternSettings.cropHeightInPixels.setValue(cropDiameterInPixels)
+
+    def canSyncProbePhotonCount(self) -> bool:
+        return self._metadata.probePhotonCount is not None
+
+    def syncProbePhotonCount(self) -> None:
+        photonCount = self._metadata.probePhotonCount
+
+        if photonCount:
+            self._productSettings.probePhotonCount.setValue(photonCount)
 
     def canSyncProbeEnergy(self) -> bool:
         return self._metadata.probeEnergyInElectronVolts is not None

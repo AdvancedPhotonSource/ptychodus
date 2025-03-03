@@ -2,17 +2,17 @@ from .api import PatternsAPI, PatternsStreamingContext
 from .core import PatternsCore
 from .dataset import (
     AssembledDiffractionDataset,
+    AssembledDiffractionPatternArray,
     DiffractionDatasetObserver,
-    ObservableDiffractionDataset,
 )
 from .settings import DetectorSettings, PatternSettings
 from .sizer import PatternSizer
 
 __all__ = [
     'AssembledDiffractionDataset',
+    'AssembledDiffractionPatternArray',
     'DetectorSettings',
     'DiffractionDatasetObserver',
-    'ObservableDiffractionDataset',
     'PatternSettings',
     'PatternSizer',
     'PatternsAPI',

@@ -2,7 +2,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
-from enum import Enum, auto
 from pathlib import Path
 from typing import overload, Any, TypeAlias
 
@@ -23,12 +22,6 @@ class CropCenter:
     positionYInPixels: int
 
 
-class PatternState(Enum):
-    UNKNOWN = auto()
-    LOADING = auto()
-    LOADED = auto()
-
-
 class DiffractionPatternArray:
     @abstractmethod
     def getLabel(self) -> str:
@@ -41,9 +34,6 @@ class DiffractionPatternArray:
     @abstractmethod
     def getData(self) -> PatternDataType:
         pass
-
-    def getState(self) -> PatternState:
-        return PatternState.UNKNOWN if numpy.all(self.getIndexes() < 0) else PatternState.LOADED
 
     def getNumberOfPatterns(self) -> int:
         return self.getData().shape[0]
@@ -60,12 +50,6 @@ class SimpleDiffractionPatternArray(DiffractionPatternArray):
         self._label = label
         self._indexes = indexes
         self._data = data
-
-    @classmethod
-    def createNullInstance(cls) -> SimpleDiffractionPatternArray:
-        indexes = numpy.array([0])
-        data = numpy.zeros((1, 1, 1), dtype=numpy.uint16)
-        return cls('Null', indexes, data)
 
     def getLabel(self) -> str:
         return self._label
@@ -87,6 +71,7 @@ class DiffractionMetadata:
     detectorPixelGeometry: PixelGeometry | None = None
     detectorBitDepth: int | None = None
     cropCenter: CropCenter | None = None
+    probePhotonCount: int | None = None
     probeEnergyInElectronVolts: float | None = None
     filePath: Path | None = None
 

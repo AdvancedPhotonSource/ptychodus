@@ -58,4 +58,5 @@ class OpenDatasetWizardController:
     def open_dataset(self) -> None:
         self._api.finishAssemblingDiffractionPatterns(block=False)
         self._wizard.restart()
+        self._file_view_controller.restart()
         self._wizard.show()

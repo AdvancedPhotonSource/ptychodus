@@ -73,7 +73,7 @@ class AutodiffReconstructor(Reconstructor):
             default_dtype=helper.default_dtype,
             random_seed=helper.random_seed,
             displayed_loss_function=helper.displayed_loss_function,
-            use_low_memory_forward_model=helper.use_low_memory_forward_model,
+            # FIXME use_low_memory_forward_model=helper.use_low_memory_forward_model,
             loss_function=loss_function,
             forward_model_class=forward_model_class,
             forward_model_params=None,

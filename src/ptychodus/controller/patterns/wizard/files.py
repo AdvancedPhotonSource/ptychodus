@@ -218,7 +218,6 @@ class OpenDatasetWizardFilePathViewController(Observer):
 class OpenDatasetWizardFileTypeViewController(Observable, Observer):
     def __init__(self, api: PatternsAPI) -> None:
         super().__init__()
-        # FIXME what syncs file type to/from settings?
         self._file_reader_chooser = api.getFileReaderChooser()
         self._file_reader_chooser.addObserver(self)
         self._combo_box = QComboBox()
@@ -300,6 +299,9 @@ class OpenDatasetWizardFilesViewController(Observer):
     def _check_if_complete(self) -> None:
         file_path = self._settings.filePath.getValue()
         self._page._setComplete(file_path.is_file())
+
+    def restart(self) -> None:
+        self._check_if_complete()
 
     def _handle_file_type_changed(self) -> None:
         name_filters = self._file_type_view_controller.get_name_filters()
