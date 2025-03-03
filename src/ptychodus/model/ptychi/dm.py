@@ -46,7 +46,7 @@ class DMReconstructor(Reconstructor):
             default_dtype=helper.default_dtype,
             random_seed=helper.random_seed,
             displayed_loss_function=helper.displayed_loss_function,
-            # FIXME use_low_memory_forward_model=helper.use_low_memory_forward_model,
+            forward_model_options=helper.forward_model_options,
             exit_wave_update_relaxation=self._settings.exitWaveUpdateRelaxation.getValue(),
             chunk_length=self._settings.chunkLength.getValue(),
         )
@@ -68,6 +68,8 @@ class DMReconstructor(Reconstructor):
             remove_grid_artifacts=helper.remove_grid_artifacts,
             multislice_regularization=helper.multislice_regularization,
             patch_interpolation_method=helper.patch_interpolation_method,
+            remove_object_probe_ambiguity=helper.remove_object_probe_ambiguity,
+            build_preconditioner_with_all_modes=helper.build_preconditioner_with_all_modes,
             amplitude_clamp_limit=self._settings.objectAmplitudeClampLimit.getValue(),
         )
 

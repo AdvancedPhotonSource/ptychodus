@@ -89,7 +89,7 @@ class AssembledDiffractionPatternArray(DiffractionPatternArray):
         pattern = self._data[index]
         return pattern[self._good_pixels].sum()
 
-    def get_average_pattern(self) -> PatternDataType | None:
+    def get_average_pattern(self) -> PatternDataType:
         return self._data.mean(axis=0)
 
     def get_average_pattern_counts(self) -> float:
