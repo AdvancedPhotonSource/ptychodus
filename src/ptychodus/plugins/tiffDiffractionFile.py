@@ -13,8 +13,8 @@ from ptychodus.api.patterns import (
     DiffractionFileReader,
     DiffractionMetadata,
     DiffractionPatternArray,
-    DiffractionPatternArrayType,
-    DiffractionPatternState,
+    PatternDataType,
+    PatternIndexesType,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
@@ -27,28 +27,17 @@ class TiffDiffractionPatternArray(DiffractionPatternArray):
     def __init__(self, filePath: Path, index: int) -> None:
         super().__init__()
         self._filePath = filePath
-        self._index = index
-        self._state = DiffractionPatternState.UNKNOWN
+        self._indexes = numpy.array([index])
 
     def getLabel(self) -> str:
         return self._filePath.stem
 
-    def getIndex(self) -> int:
-        return self._index
+    def getIndexes(self) -> PatternIndexesType:
+        return self._indexes
 
-    def getState(self) -> DiffractionPatternState:
-        return self._state
-
-    def getData(self) -> DiffractionPatternArrayType:
-        self._state = DiffractionPatternState.MISSING
-
+    def getData(self) -> PatternDataType:
         with TiffFile(self._filePath) as tiff:
-            try:
-                data = tiff.asarray()
-            except:
-                raise
-            else:
-                self._state = DiffractionPatternState.FOUND
+            data = tiff.asarray()
 
         if data.ndim == 2:
             data = data[numpy.newaxis, :, :]

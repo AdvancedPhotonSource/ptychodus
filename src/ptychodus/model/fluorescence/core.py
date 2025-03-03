@@ -83,7 +83,7 @@ class FluorescenceEnhancer(Observable, Observer):
         return self._product.getName()
 
     def getPixelGeometry(self) -> PixelGeometry:
-        return self._product.getGeometry().getPixelGeometry()
+        return self._product.getGeometry().getObjectPlanePixelGeometry()
 
     def getOpenFileFilterList(self) -> Sequence[str]:
         return self._fileReaderChooser.getDisplayNameList()

@@ -1,23 +1,24 @@
 import logging
 
+
 from PyQt5.QtCore import QModelIndex
 from PyQt5.QtWidgets import QAbstractItemView, QFormLayout, QMessageBox
 
-from ptychodus.api.observer import Observable, Observer
-
+from ...model.metadata import MetadataPresenter
 from ...model.patterns import (
-    Detector,
-    DiffractionDatasetInputOutputPresenter,
-    DiffractionDatasetPresenter,
-    DiffractionMetadataPresenter,
-    DiffractionPatternPresenter,
+    AssembledDiffractionDataset,
+    DetectorSettings,
+    DiffractionDatasetObserver,
+    PatternSettings,
+    PatternSizer,
+    PatternsAPI,
 )
 from ...view.patterns import DetectorView, PatternsView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..image import ImageController
 from ..parametric import LengthWidgetParameterViewController, SpinBoxParameterViewController
-from .dataset import DatasetTreeModel, DatasetTreeNode
+from .dataset import DatasetTreeModel
 from .info import PatternsInfoViewController
 from .wizard import OpenDatasetWizardController
 
@@ -25,16 +26,16 @@ logger = logging.getLogger(__name__)
 
 
 class DetectorController:
-    def __init__(self, detector: Detector, view: DetectorView) -> None:
-        self._widthInPixelsViewController = SpinBoxParameterViewController(detector.widthInPixels)
-        self._heightInPixelsViewController = SpinBoxParameterViewController(detector.heightInPixels)
+    def __init__(self, settings: DetectorSettings, view: DetectorView) -> None:
+        self._widthInPixelsViewController = SpinBoxParameterViewController(settings.widthInPixels)
+        self._heightInPixelsViewController = SpinBoxParameterViewController(settings.heightInPixels)
         self._pixelWidthViewController = LengthWidgetParameterViewController(
-            detector.pixelWidthInMeters
+            settings.pixelWidthInMeters
         )
         self._pixelHeightViewController = LengthWidgetParameterViewController(
-            detector.pixelHeightInMeters
+            settings.pixelHeightInMeters
         )
-        self._bitDepthViewController = SpinBoxParameterViewController(detector.bitDepth)
+        self._bitDepthViewController = SpinBoxParameterViewController(settings.bitDepth)
 
         layout = QFormLayout()
         layout.addRow('Detector Width [px]:', self._widthInPixelsViewController.getWidget())
@@ -45,33 +46,33 @@ class DetectorController:
         view.setLayout(layout)
 
 
-class PatternsController(Observer):
+class PatternsController(DiffractionDatasetObserver):
     def __init__(
         self,
-        detector: Detector,
-        ioPresenter: DiffractionDatasetInputOutputPresenter,
-        metadataPresenter: DiffractionMetadataPresenter,
-        datasetPresenter: DiffractionDatasetPresenter,
-        patternPresenter: DiffractionPatternPresenter,
-        imageController: ImageController,
+        detector_settings: DetectorSettings,
+        pattern_settings: PatternSettings,
+        pattern_sizer: PatternSizer,
+        patterns_api: PatternsAPI,
+        dataset: AssembledDiffractionDataset,
+        metadata_presenter: MetadataPresenter,
         view: PatternsView,
-        fileDialogFactory: FileDialogFactory,
+        image_controller: ImageController,
+        file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
-        self._detector = detector
-        self._datasetPresenter = datasetPresenter
-        self._ioPresenter = ioPresenter
-        self._imageController = imageController
+        self._pattern_sizer = pattern_sizer
+        self._patterns_api = patterns_api
+        self._dataset = dataset
         self._view = view
-        self._fileDialogFactory = fileDialogFactory
-        self._detectorController = DetectorController(detector, view.detectorView)
-        self._wizardController = OpenDatasetWizardController.createInstance(
-            ioPresenter,
-            metadataPresenter,
-            datasetPresenter,
-            patternPresenter,
-            view.openDatasetWizard,
-            fileDialogFactory,
+        self._image_controller = image_controller
+        self._file_dialog_factory = file_dialog_factory
+        self._detector_controller = DetectorController(detector_settings, view.detectorView)
+        self._wizard_controller = OpenDatasetWizardController(
+            pattern_settings,
+            pattern_sizer,
+            patterns_api,
+            metadata_presenter,
+            file_dialog_factory,
         )
         self._treeModel = DatasetTreeModel()
 
@@ -80,40 +81,41 @@ class PatternsController(Observer):
         view.treeView.selectionModel().currentChanged.connect(self._updateView)
         self._updateView(QModelIndex(), QModelIndex())
 
-        view.buttonBox.openButton.clicked.connect(self._wizardController.openDataset)
+        view.buttonBox.openButton.clicked.connect(self._wizard_controller.open_dataset)
         view.buttonBox.saveButton.clicked.connect(self._saveDataset)
         view.buttonBox.infoButton.clicked.connect(self._openPatternsInfo)
         view.buttonBox.closeButton.clicked.connect(self._closeDataset)
-        view.buttonBox.closeButton.setEnabled(False)  # TODO
-        datasetPresenter.addObserver(self)
+        dataset.add_observer(self)
 
         self._syncModelToView()
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         if current.isValid():
             node = current.internalPointer()
-            pixelGeometry = self._detector.getPixelGeometry()
-            self._imageController.setArray(node.data, pixelGeometry)
+            data = node.get_data()
+            pixelGeometry = self._pattern_sizer.get_processed_pixel_geometry()
+            self._image_controller.setArray(data, pixelGeometry)
         else:
-            self._imageController.clearArray()
+            self._image_controller.clearArray()
 
     def _saveDataset(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+        fileWriterChooser = self._patterns_api.getFileWriterChooser()
+        filePath, nameFilter = self._file_dialog_factory.getSaveFilePath(
             self._view,
             'Save Diffraction File',
-            nameFilters=self._ioPresenter.getSaveFileFilterList(),
-            selectedNameFilter=self._ioPresenter.getSaveFileFilter(),
+            nameFilters=fileWriterChooser.getDisplayNameList(),
+            selectedNameFilter=fileWriterChooser.currentPlugin.displayName,
         )
 
         if filePath:
             try:
-                self._ioPresenter.saveDiffractionFile(filePath, nameFilter)
+                self._patterns_api.savePatterns(filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Writer', err)
 
     def _openPatternsInfo(self) -> None:
-        PatternsInfoViewController.showInfo(self._datasetPresenter, self._view)
+        PatternsInfoViewController.showInfo(self._dataset, self._view)
 
     def _closeDataset(self) -> None:
         button = QMessageBox.question(
@@ -125,19 +127,22 @@ class PatternsController(Observer):
         if button != QMessageBox.StandardButton.Yes:
             return
 
-        logger.error('Close not implemented!')  # TODO
+        self._patterns_api.closePatterns()
 
     def _syncModelToView(self) -> None:
-        rootNode = DatasetTreeNode.createRoot()
+        self._treeModel.clear()
 
-        for arrayPresenter in self._datasetPresenter:
-            rootNode.createChild(arrayPresenter)
+        for index, array in enumerate(self._dataset):
+            self._treeModel.insert_array(index, array)  # type: ignore
 
-        self._treeModel.setRootNode(rootNode)
+        info_text = self._dataset.get_info_text()
+        self._view.infoLabel.setText(info_text)
 
-        infoText = self._datasetPresenter.getInfoText()
-        self._view.infoLabel.setText(infoText)
+    def handle_array_inserted(self, index: int) -> None:
+        self._treeModel.insert_array(index, self._dataset[index])
 
-    def update(self, observable: Observable) -> None:
-        if observable is self._datasetPresenter:
-            self._syncModelToView()
+    def handle_array_changed(self, index: int) -> None:
+        self._treeModel.refresh_array(index)
+
+    def handle_dataset_reloaded(self) -> None:
+        self._syncModelToView()

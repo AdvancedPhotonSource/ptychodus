@@ -221,7 +221,7 @@ def main() -> int:
         stagingDir = args.output_directory
         stagingDir.mkdir(parents=True, exist_ok=True)
         model.workflowAPI.saveSettings(stagingDir / 'settings.ini', changePathPrefix)
-        model.workflowAPI.exportProcessedPatterns(stagingDir / 'patterns.npz')
+        model.workflowAPI.exportAssembledPatterns(stagingDir / 'patterns.npz')
         workflowProductAPI.saveProduct(stagingDir / 'product-in.npz', fileType='NPZ')
 
     return 0

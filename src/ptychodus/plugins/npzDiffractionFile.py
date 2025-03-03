@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Final
+from typing import Final
 import logging
 
 import numpy
@@ -10,7 +10,6 @@ from ptychodus.api.patterns import (
     DiffractionFileReader,
     DiffractionFileWriter,
     DiffractionMetadata,
-    DiffractionPatternState,
     SimpleDiffractionDataset,
     SimpleDiffractionPatternArray,
 )
@@ -24,7 +23,7 @@ class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
     SIMPLE_NAME: Final[str] = 'NPZ'
     DISPLAY_NAME: Final[str] = 'NumPy Zipped Archive (*.npz)'
 
-    INDEXES: Final[str] = 'indexes'  # TODO include indexes
+    INDEXES: Final[str] = 'indexes'
     PATTERNS: Final[str] = 'patterns'
 
     def read(self, filePath: Path) -> DiffractionDataset:
@@ -52,6 +51,12 @@ class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
             filePath=filePath,
         )
 
+        try:
+            indexes = contents[self.INDEXES]
+        except KeyError:
+            logger.warning(f'Failed to read indexes in "{filePath}".')
+            indexes = numpy.arange(numberOfPatterns)
+
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         contentsTree.createChild(
             [
@@ -63,25 +68,17 @@ class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
 
         array = SimpleDiffractionPatternArray(
             label=filePath.stem,
-            index=0,
+            indexes=indexes,
             data=patterns,
-            state=DiffractionPatternState.FOUND,
         )
 
         return SimpleDiffractionDataset(metadata, contentsTree, [array])
 
     def write(self, filePath: Path, dataset: DiffractionDataset) -> None:
-        patterns = list()
-
-        for array in dataset:
-            arrayData = array.getData()
-
-            if arrayData.size > 0:
-                patterns.append(arrayData)
-
-        contents: dict[str, Any] = dict()
-        # TODO contents[self.INDEXES] = numpy.array(dataset.getAssembledIndexes()),
-        contents[self.PATTERNS] = numpy.concatenate(patterns)
+        contents = {
+            self.INDEXES: numpy.concatenate([array.getIndexes() for array in dataset]),
+            self.PATTERNS: numpy.concatenate([array.getData() for array in dataset]),
+        }
         numpy.savez(filePath, **contents)
 
 

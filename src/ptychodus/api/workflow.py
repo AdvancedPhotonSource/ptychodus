@@ -67,13 +67,13 @@ class WorkflowAPI(ABC):
         pass
 
     @abstractmethod
-    def importProcessedPatterns(self, filePath: Path) -> None:
-        """import processed patterns"""
+    def importAssembledPatterns(self, filePath: Path) -> None:
+        """import assembled patterns"""
         pass
 
     @abstractmethod
-    def exportProcessedPatterns(self, filePath: Path) -> None:
-        """export processed patterns"""
+    def exportAssembledPatterns(self, filePath: Path) -> None:
+        """export assembled patterns"""
         pass
 
     @abstractmethod

@@ -46,7 +46,7 @@ class PIEReconstructor(Reconstructor):
             default_dtype=helper.default_dtype,
             random_seed=helper.random_seed,
             displayed_loss_function=helper.displayed_loss_function,
-            use_low_memory_forward_model=helper.use_low_memory_forward_model,
+            # FIXME use_low_memory_forward_model=helper.use_low_memory_forward_model,
         )
 
     def _create_object_options(self, object_: Object) -> PIEObjectOptions:

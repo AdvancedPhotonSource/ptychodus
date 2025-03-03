@@ -6,7 +6,7 @@ import sys
 
 from ptychodus.api.product import Product
 
-from ..patterns import ActiveDiffractionDataset, PatternSizer, ProductSettings
+from ..patterns import AssembledDiffractionDataset, PatternSizer
 from .item import (
     ProductRepositoryItem,
     ProductRepositoryItemObserver,
@@ -18,6 +18,7 @@ from .probe import ProbeRepositoryItemFactory
 from .productGeometry import ProductGeometry
 from .productValidator import ProductValidator
 from .scan import ScanRepositoryItemFactory
+from .settings import ProductSettings
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         self,
         settings: ProductSettings,
         patternSizer: PatternSizer,
-        patterns: ActiveDiffractionDataset,
+        dataset: AssembledDiffractionDataset,
         scanRepositoryItemFactory: ScanRepositoryItemFactory,
         probeRepositoryItemFactory: ProbeRepositoryItemFactory,
         objectRepositoryItemFactory: ObjectRepositoryItemFactory,
@@ -35,7 +36,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         super().__init__()
         self._settings = settings
         self._patternSizer = patternSizer
-        self._patterns = patterns
+        self._dataset = dataset
         self._scanRepositoryItemFactory = scanRepositoryItemFactory
         self._probeRepositoryItemFactory = probeRepositoryItemFactory
         self._objectRepositoryItemFactory = objectRepositoryItemFactory
@@ -99,7 +100,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             geometry=geometry,
             probe=probeItem,
             object_=objectItem,
-            validator=ProductValidator(self._patterns, scanItem, geometry, probeItem, objectItem),
+            validator=ProductValidator(self._dataset, scanItem, geometry, probeItem, objectItem),
             costs=list(),
         )
 
@@ -125,7 +126,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             geometry=geometry,
             probe=probeItem,
             object_=objectItem,
-            validator=ProductValidator(self._patterns, scanItem, geometry, probeItem, objectItem),
+            validator=ProductValidator(self._dataset, scanItem, geometry, probeItem, objectItem),
             costs=list(),
         )
 
@@ -145,7 +146,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             geometry=geometry,
             probe=probeItem,
             object_=objectItem,
-            validator=ProductValidator(self._patterns, scanItem, geometry, probeItem, objectItem),
+            validator=ProductValidator(self._dataset, scanItem, geometry, probeItem, objectItem),
             costs=product.costs,
         )
 

@@ -1,40 +1,46 @@
 from __future__ import annotations
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.patterns import DiffractionDataset, DiffractionMetadata
+from ptychodus.api.observer import Observable
+from ptychodus.api.patterns import DiffractionMetadata
 
-from .detector import Detector
-from .settings import PatternSettings, ProductSettings
+from .patterns import (
+    DetectorSettings,
+    DiffractionDatasetObserver,
+    AssembledDiffractionDataset,
+    PatternSettings,
+)
+from .product import ProductSettings
 
 
-class DiffractionMetadataPresenter(Observable, Observer):
+class MetadataPresenter(Observable, DiffractionDatasetObserver):
     def __init__(
         self,
-        diffractionDataset: DiffractionDataset,
-        detector: Detector,
+        detectorSettings: DetectorSettings,
         patternSettings: PatternSettings,
+        diffractionDataset: AssembledDiffractionDataset,
         productSettings: ProductSettings,
     ) -> None:
         super().__init__()
-        self._diffractionDataset = diffractionDataset
-        self._detector = detector
+        self._detectorSettings = detectorSettings
         self._patternSettings = patternSettings
+        self._diffractionDataset = diffractionDataset
         self._productSettings = productSettings
 
-        diffractionDataset.addObserver(self)
+        diffractionDataset.add_observer(self)
 
     @property
     def _metadata(self) -> DiffractionMetadata:
         return self._diffractionDataset.getMetadata()
 
-    def canSyncDetectorPixelCount(self) -> bool:
+    def canSyncDetectorExtent(self) -> bool:
         return self._metadata.detectorExtent is not None
 
-    def syncDetectorPixelCount(self) -> None:
+    def syncDetectorExtent(self) -> None:
         detectorExtent = self._metadata.detectorExtent
 
         if detectorExtent:
-            self._detector.setImageExtent(detectorExtent)
+            self._detectorSettings.widthInPixels.setValue(detectorExtent.widthInPixels)
+            self._detectorSettings.heightInPixels.setValue(detectorExtent.heightInPixels)
 
     def canSyncDetectorPixelSize(self) -> bool:
         return self._metadata.detectorPixelGeometry is not None
@@ -43,7 +49,8 @@ class DiffractionMetadataPresenter(Observable, Observer):
         pixelGeometry = self._metadata.detectorPixelGeometry
 
         if pixelGeometry:
-            self._detector.setPixelGeometry(pixelGeometry)
+            self._detectorSettings.pixelWidthInMeters.setValue(pixelGeometry.widthInMeters)
+            self._detectorSettings.pixelHeightInMeters.setValue(pixelGeometry.heightInMeters)
 
     def canSyncDetectorBitDepth(self) -> bool:
         return self._metadata.detectorBitDepth is not None
@@ -52,7 +59,7 @@ class DiffractionMetadataPresenter(Observable, Observer):
         bitDepth = self._metadata.detectorBitDepth
 
         if bitDepth:
-            self._detector.bitDepth.setValue(bitDepth)
+            self._detectorSettings.bitDepth.setValue(bitDepth)
 
     def canSyncPatternCropCenter(self) -> bool:
         return self._metadata.cropCenter is not None or self._metadata.detectorExtent is not None
@@ -93,6 +100,15 @@ class DiffractionMetadataPresenter(Observable, Observer):
             self._patternSettings.cropWidthInPixels.setValue(cropDiameterInPixels)
             self._patternSettings.cropHeightInPixels.setValue(cropDiameterInPixels)
 
+    def canSyncProbePhotonCount(self) -> bool:
+        return self._metadata.probePhotonCount is not None
+
+    def syncProbePhotonCount(self) -> None:
+        photonCount = self._metadata.probePhotonCount
+
+        if photonCount:
+            self._productSettings.probePhotonCount.setValue(photonCount)
+
     def canSyncProbeEnergy(self) -> bool:
         return self._metadata.probeEnergyInElectronVolts is not None
 
@@ -111,6 +127,11 @@ class DiffractionMetadataPresenter(Observable, Observer):
         if distanceInMeters:
             self._productSettings.detectorDistanceInMeters.setValue(distanceInMeters)
 
-    def update(self, observable: Observable) -> None:
-        if observable is self._diffractionDataset:
-            self.notifyObservers()
+    def handle_array_inserted(self, index: int) -> None:
+        pass
+
+    def handle_array_changed(self, index: int) -> None:
+        pass
+
+    def handle_dataset_reloaded(self) -> None:
+        self.notifyObservers()

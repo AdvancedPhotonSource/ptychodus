@@ -51,7 +51,7 @@ class ViewCore(QMainWindow):
         self.patternsAction = self.navigationToolBar.addAction(
             QIcon(':/icons/patterns'), 'Patterns'
         )
-        self.patternsView = PatternsView.createInstance()
+        self.patternsView = PatternsView()
         self.patternsImageView = ImageView.createInstance()
 
         self.productAction = self.navigationToolBar.addAction(QIcon(':/icons/products'), 'Products')

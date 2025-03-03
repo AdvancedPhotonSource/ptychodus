@@ -3,12 +3,12 @@ import logging
 
 from ptychodus.api.product import ProductMetadata
 
-from ..patterns import ProductSettings
 from .item import ProductRepositoryItem, ProductRepositoryObserver
 from .metadata import MetadataRepositoryItem, UniqueNameFactory
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
 from .scan import ScanRepositoryItem
+from .settings import ProductSettings
 
 logger = logging.getLogger(__name__)
 

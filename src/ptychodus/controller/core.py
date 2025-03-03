@@ -52,13 +52,14 @@ class ControllerCore:
             self._fileDialogFactory,
         )
         self._patternsController = PatternsController(
-            model.detector,
-            model.diffractionDatasetInputOutputPresenter,
-            model.diffractionMetadataPresenter,
-            model.diffractionDatasetPresenter,
-            model.patternPresenter,
-            self._patternsImageController,
+            model.patterns_core.detectorSettings,
+            model.patterns_core.patternSettings,
+            model.patterns_core.patternSizer,
+            model.patterns_core.patternsAPI,
+            model.patterns_core.dataset,
+            model.metadataPresenter,
             view.patternsView,
+            self._patternsImageController,
             self._fileDialogFactory,
         )
         self._productController = ProductController.createInstance(

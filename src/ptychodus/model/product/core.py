@@ -8,7 +8,7 @@ from ptychodus.api.product import ProductFileReader, ProductFileWriter
 from ptychodus.api.scan import ScanFileReader, ScanFileWriter
 from ptychodus.api.settings import SettingsRegistry
 
-from ..patterns import ActiveDiffractionDataset, Detector, PatternSizer, ProductSettings
+from ..patterns import AssembledDiffractionDataset, PatternSizer
 from .api import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
 from .object import ObjectBuilderFactory, ObjectRepositoryItemFactory, ObjectSettings
 from .objectRepository import ObjectRepository
@@ -17,6 +17,7 @@ from .probeRepository import ProbeRepository
 from .productRepository import ProductRepository
 from .scan import ScanBuilderFactory, ScanRepositoryItemFactory, ScanSettings
 from .scanRepository import ScanRepository
+from .settings import ProductSettings
 
 
 class ProductCore(Observer):
@@ -24,10 +25,8 @@ class ProductCore(Observer):
         self,
         rng: numpy.random.Generator,
         settingsRegistry: SettingsRegistry,
-        detector: Detector,
-        settings: ProductSettings,
         patternSizer: PatternSizer,
-        patterns: ActiveDiffractionDataset,
+        dataset: AssembledDiffractionDataset,
         scanFileReaderChooser: PluginChooser[ScanFileReader],
         scanFileWriterChooser: PluginChooser[ScanFileWriter],
         fresnelZonePlateChooser: PluginChooser[FresnelZonePlate],
@@ -40,6 +39,8 @@ class ProductCore(Observer):
         reinitObservable: Observable,
     ) -> None:
         super().__init__()
+        self.settings = ProductSettings(settingsRegistry)
+
         self._scanSettings = ScanSettings(settingsRegistry)
         self._scanBuilderFactory = ScanBuilderFactory(
             self._scanSettings, scanFileReaderChooser, scanFileWriterChooser
@@ -51,8 +52,7 @@ class ProductCore(Observer):
         self._probeSettings = ProbeSettings(settingsRegistry)
         self._probeBuilderFactory = ProbeBuilderFactory(
             self._probeSettings,
-            detector,
-            patterns,
+            dataset,
             fresnelZonePlateChooser,
             probeFileReaderChooser,
             probeFileWriterChooser,
@@ -70,15 +70,15 @@ class ProductCore(Observer):
         )
 
         self.productRepository = ProductRepository(
-            settings,
+            self.settings,
             patternSizer,
-            patterns,
+            dataset,
             self._scanRepositoryItemFactory,
             self._probeRepositoryItemFactory,
             self._objectRepositoryItemFactory,
         )
         self.productAPI = ProductAPI(
-            settings,
+            self.settings,
             self.productRepository,
             productFileReaderChooser,
             productFileWriterChooser,
@@ -95,8 +95,8 @@ class ProductCore(Observer):
         )
 
         # TODO vvv refactor vvv
-        productFileReaderChooser.setCurrentPluginByName(settings.fileType.getValue())
-        productFileWriterChooser.setCurrentPluginByName(settings.fileType.getValue())
+        productFileReaderChooser.setCurrentPluginByName(self.settings.fileType.getValue())
+        productFileWriterChooser.setCurrentPluginByName(self.settings.fileType.getValue())
         scanFileReaderChooser.setCurrentPluginByName(self._scanSettings.fileType.getValue())
         scanFileWriterChooser.setCurrentPluginByName(self._scanSettings.fileType.getValue())
         probeFileReaderChooser.setCurrentPluginByName(self._probeSettings.fileType.getValue())

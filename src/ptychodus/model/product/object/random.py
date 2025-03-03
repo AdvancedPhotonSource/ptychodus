@@ -4,7 +4,7 @@ from collections.abc import Sequence
 import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
-from ptychodus.model.analysis.phaseUnwrapper import PhaseUnwrapper
+from ptychodus.model.phaseUnwrapper import PhaseUnwrapper
 
 from .builder import ObjectBuilder
 from .settings import ObjectSettings
