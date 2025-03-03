@@ -57,7 +57,7 @@ class NSLSIIDiffractionFileReader(DiffractionFileReader):
 
                     array = H5DiffractionPatternArray(
                         label=filePath.stem,
-                        index=0,
+                        indexes=numpy.arange(numberOfPatterns),
                         filePath=filePath,
                         dataPath=self._dataPath,
                     )

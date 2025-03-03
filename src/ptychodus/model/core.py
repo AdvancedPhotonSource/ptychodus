@@ -36,17 +36,12 @@ from .automation import (
 )
 from .fluorescence import FluorescenceCore, FluorescenceEnhancer
 from .memory import MemoryPresenter
-from .patterns import (
-    Detector,
-    DiffractionDatasetInputOutputPresenter,
-    DiffractionDatasetPresenter,
-    DiffractionMetadataPresenter,
-    DiffractionPatternPresenter,
-    PatternsCore,
-)
+from .metadata import MetadataPresenter
+from .patterns import PatternsCore, PatternsStreamingContext
 from .product import (
     ObjectAPI,
     ObjectRepository,
+    PositionsStreamingContext,
     ProbeAPI,
     ProbeRepository,
     ProductAPI,
@@ -88,6 +83,36 @@ def configureLogger(isDeveloperModeEnabled: bool) -> None:
     logger.info(f'HDF5 {h5py.version.hdf5_version}')
 
 
+class PtychodusStreamingContext:
+    def __init__(
+        self,
+        positions_context: PositionsStreamingContext,
+        patterns_context: PatternsStreamingContext,
+    ) -> None:
+        self._positions_context = positions_context
+        self._patterns_context = patterns_context
+
+    def start(self) -> None:
+        self._positions_context.start()
+        self._patterns_context.start()
+
+    def append_positions_x(self, values_m: Sequence[float], trigger_counts: Sequence[int]) -> None:
+        self._positions_context.append_positions_x(values_m, trigger_counts)
+
+    def append_positions_y(self, values_m: Sequence[float], trigger_counts: Sequence[int]) -> None:
+        self._positions_context.append_positions_y(values_m, trigger_counts)
+
+    def append_array(self, array: DiffractionPatternArray) -> None:
+        self._patterns_context.append_array(array)
+
+    def get_queue_size(self) -> int:
+        return self._patterns_context.get_queue_size()
+
+    def stop(self) -> None:
+        self._patterns_context.stop()
+        self._positions_context.stop()
+
+
 class ModelCore:
     def __init__(
         self, settingsFile: Path | None = None, *, isDeveloperModeEnabled: bool = False
@@ -99,18 +124,17 @@ class ModelCore:
         self.memoryPresenter = MemoryPresenter()
         self.settingsRegistry = SettingsRegistry()
 
-        self._patternsCore = PatternsCore(
+        self.patterns_core = PatternsCore(
             self.settingsRegistry,
             self._pluginRegistry.diffractionFileReaders,
             self._pluginRegistry.diffractionFileWriters,
+            self.settingsRegistry,
         )
         self._productCore = ProductCore(
             self.rng,
             self.settingsRegistry,
-            self._patternsCore.detector,
-            self._patternsCore.productSettings,
-            self._patternsCore.patternSizer,
-            self._patternsCore.dataset,
+            self.patterns_core.patternSizer,
+            self.patterns_core.dataset,
             self._pluginRegistry.scanFileReaders,
             self._pluginRegistry.scanFileWriters,
             self._pluginRegistry.fresnelZonePlates,
@@ -122,13 +146,19 @@ class ModelCore:
             self._pluginRegistry.productFileWriters,
             self.settingsRegistry,
         )
+        self.metadataPresenter = MetadataPresenter(
+            self.patterns_core.detectorSettings,
+            self.patterns_core.patternSettings,
+            self.patterns_core.dataset,
+            self._productCore.settings,
+        )
 
         self.patternVisualizationEngine = VisualizationEngine(isComplex=False)
         self.probeVisualizationEngine = VisualizationEngine(isComplex=True)
         self.objectVisualizationEngine = VisualizationEngine(isComplex=True)
 
         self.ptyChiReconstructorLibrary = PtyChiReconstructorLibrary(
-            self.settingsRegistry, self.detector, isDeveloperModeEnabled
+            self.settingsRegistry, self.patterns_core.patternSizer, isDeveloperModeEnabled
         )
         self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
             self.settingsRegistry, isDeveloperModeEnabled
@@ -138,7 +168,7 @@ class ModelCore:
         )
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
-            self._patternsCore.dataset,
+            self.patterns_core.dataset,
             self._productCore.productRepository,
             [
                 self.ptyChiReconstructorLibrary,
@@ -162,7 +192,7 @@ class ModelCore:
         )
         self._workflowCore = WorkflowCore(
             self.settingsRegistry,
-            self._patternsCore.patternsAPI,
+            self.patterns_core.patternsAPI,
             self._productCore.productAPI,
             self._productCore.scanAPI,
             self._productCore.probeAPI,
@@ -179,7 +209,7 @@ class ModelCore:
             self.settingsRegistry.openSettings(settingsFile)
 
     def __enter__(self) -> ModelCore:
-        self._patternsCore.start()
+        self.patterns_core.start()
         self._reconstructorCore.start()
         self._workflowCore.start()
         self._automationCore.start()
@@ -205,25 +235,7 @@ class ModelCore:
         self._automationCore.stop()
         self._workflowCore.stop()
         self._reconstructorCore.stop()
-        self._patternsCore.stop()
-
-    @property
-    def diffractionDatasetInputOutputPresenter(
-        self,
-    ) -> DiffractionDatasetInputOutputPresenter:
-        return self._patternsCore.datasetInputOutputPresenter
-
-    @property
-    def diffractionMetadataPresenter(self) -> DiffractionMetadataPresenter:
-        return self._patternsCore.metadataPresenter
-
-    @property
-    def diffractionDatasetPresenter(self) -> DiffractionDatasetPresenter:
-        return self._patternsCore.datasetPresenter
-
-    @property
-    def patternPresenter(self) -> DiffractionPatternPresenter:
-        return self._patternsCore.patternPresenter
+        self.patterns_core.stop()
 
     @property
     def productRepository(self) -> ProductRepository:
@@ -257,34 +269,14 @@ class ModelCore:
     def objectAPI(self) -> ObjectAPI:
         return self._productCore.objectAPI
 
-    def initializeStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
-        self._patternsCore.patternsAPI.initializeStreaming(metadata)
-        self._patternsCore.patternsAPI.startAssemblingDiffractionPatterns()
-        self._productCore.scanAPI.initializeStreamingScan()  # FIXME
-
-    def assembleDiffractionPattern(self, array: DiffractionPatternArray, timeStamp: float) -> None:
-        self._patternsCore.patternsAPI.assemble(array)
-        self._productCore.scanAPI.insertArrayTimeStamp(array.getIndex(), timeStamp)  # FIXME
-
-    def assembleScanPositionsX(
-        self, valuesInMeters: Sequence[float], timeStamps: Sequence[float]
-    ) -> None:
-        self._productCore.scanAPI.assembleScanPositionsX(valuesInMeters, timeStamps)  # FIXME
-
-    def assembleScanPositionsY(
-        self, valuesInMeters: Sequence[float], timeStamps: Sequence[float]
-    ) -> None:
-        self._productCore.scanAPI.assembleScanPositionsY(valuesInMeters, timeStamps)  # FIXME
-
-    def finalizeStreamingWorkflow(self) -> None:
-        self._productCore.scanAPI.finalizeStreamingScan()  # FIXME
-        self._patternsCore.patternsAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
-
-    def getDiffractionPatternAssemblyQueueSize(self) -> int:
-        return self._patternsCore.patternsAPI.getAssemblyQueueSize()
+    def createStreamingContext(self, metadata: DiffractionMetadata) -> PtychodusStreamingContext:
+        return PtychodusStreamingContext(
+            self._productCore.scanAPI.createStreamingContext(),
+            self.patterns_core.patternsAPI.createStreamingContext(metadata),
+        )
 
     def refreshActiveDataset(self) -> None:
-        self._patternsCore.dataset.notifyObserversIfDatasetChanged()
+        self.patterns_core.dataset.assemble_patterns()
 
     def batchModeExecute(
         self,
@@ -337,10 +329,6 @@ class ModelCore:
             return -1
 
         return 0
-
-    @property
-    def detector(self) -> Detector:
-        return self._patternsCore.detector
 
     @property
     def reconstructorPresenter(self) -> ReconstructorPresenter:

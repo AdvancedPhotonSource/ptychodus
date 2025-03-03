@@ -6,6 +6,7 @@ from typing import overload
 import logging
 
 import h5py
+import numpy
 
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.patterns import (
@@ -28,18 +29,21 @@ class DataGroup:
     arrayList: list[DiffractionPatternArray] = field(default_factory=list)
 
     @classmethod
-    def read(cls, group: h5py.Group) -> DataGroup:
+    def read(cls, group: h5py.Group, numberOfPatternsPerArray: int) -> DataGroup:
         arrayList: list[DiffractionPatternArray] = list()
         masterFilePath = Path(group.file.filename)
 
-        for name, h5Item in group.items():
+        for name, h5Item in sorted(group.items()):
             h5Item = group.get(name, getlink=True)
 
             if isinstance(h5Item, h5py.ExternalLink):
-                filePath = masterFilePath.parent / h5Item.filename
-                dataPath = str(h5Item.path)
-                # TODO use entry/data/data/image_nr_{low,high}
-                array = H5DiffractionPatternArray(name, len(arrayList), filePath, dataPath)
+                array = H5DiffractionPatternArray(
+                    label=name,
+                    indexes=numpy.arange(numberOfPatternsPerArray)
+                    + len(arrayList) * numberOfPatternsPerArray,
+                    filePath=masterFilePath.parent / h5Item.filename,
+                    dataPath=str(h5Item.path),
+                )
                 arrayList.append(array)
 
         return cls(arrayList)
@@ -174,8 +178,8 @@ class EntryGroup:
     sample: SampleGroup
 
     @classmethod
-    def read(cls, group: h5py.Group) -> EntryGroup:
-        data = DataGroup.read(group['data'])
+    def read(cls, group: h5py.Group, numberOfPatternsPerArray: int) -> EntryGroup:
+        data = DataGroup.read(group['data'], numberOfPatternsPerArray)
         instrument = InstrumentGroup.read(group['instrument'])
         sample = SampleGroup.read(group['sample'])
         return cls(data, instrument, sample)
@@ -228,40 +232,49 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                 contentsTree = self._treeBuilder.build(h5File)
 
                 try:
-                    entry = EntryGroup.read(h5File['entry'])
                     h5Dataset = h5File['/entry/data/data_000001']
                 except KeyError:
-                    logger.warning(f'File {filePath} is not a NeXus data file.')
-                else:
-                    detector = entry.instrument.detector
-                    detectorPixelGeometry = PixelGeometry(
-                        detector.xPixelSizeInMeters,
-                        detector.yPixelSizeInMeters,
-                    )
-                    cropCenter = CropCenter(
-                        detector.beamCenterXInPixels,
-                        detector.beamCenterYInPixels,
-                    )
+                    logger.error(f'File {filePath} is not a NeXus data file.')
+                    raise
 
-                    detectorSpecific = detector.detectorSpecific
-                    detectorExtent = ImageExtent(
-                        detectorSpecific.xPixelsInDetector,
-                        detectorSpecific.yPixelsInDetector,
-                    )
-                    probeEnergyInElectronVolts = detectorSpecific.photonEnergyInElectronVolts
+                numberOfPatternsPerArray = h5Dataset.shape[0]
+                patternDataType = h5Dataset.dtype
 
-                    metadata = DiffractionMetadata(
-                        numberOfPatternsPerArray=h5Dataset.shape[0],
-                        numberOfPatternsTotal=detectorSpecific.numberOfPatternsTotal,
-                        patternDataType=h5Dataset.dtype,
-                        detectorDistanceInMeters=detector.detectorDistanceInMeters,
-                        detectorExtent=detectorExtent,
-                        detectorPixelGeometry=detectorPixelGeometry,
-                        detectorBitDepth=detector.bitDepthReadout,
-                        cropCenter=cropCenter,
-                        probeEnergyInElectronVolts=probeEnergyInElectronVolts,
-                        filePath=filePath,
-                    )
+                try:
+                    entry = EntryGroup.read(h5File['entry'], numberOfPatternsPerArray)
+                except KeyError:
+                    logger.error(f'File {filePath} is not a NeXus data file.')
+                    raise
+
+                detector = entry.instrument.detector
+                detectorPixelGeometry = PixelGeometry(
+                    detector.xPixelSizeInMeters,
+                    detector.yPixelSizeInMeters,
+                )
+                cropCenter = CropCenter(
+                    detector.beamCenterXInPixels,
+                    detector.beamCenterYInPixels,
+                )
+
+                detectorSpecific = detector.detectorSpecific
+                detectorExtent = ImageExtent(
+                    detectorSpecific.xPixelsInDetector,
+                    detectorSpecific.yPixelsInDetector,
+                )
+                probeEnergyInElectronVolts = detectorSpecific.photonEnergyInElectronVolts
+
+                metadata = DiffractionMetadata(
+                    numberOfPatternsPerArray=numberOfPatternsPerArray,
+                    numberOfPatternsTotal=detectorSpecific.numberOfPatternsTotal,
+                    patternDataType=patternDataType,
+                    detectorDistanceInMeters=detector.detectorDistanceInMeters,
+                    detectorExtent=detectorExtent,
+                    detectorPixelGeometry=detectorPixelGeometry,
+                    detectorBitDepth=detector.bitDepthReadout,
+                    cropCenter=cropCenter,
+                    probeEnergyInElectronVolts=probeEnergyInElectronVolts,
+                    filePath=filePath,
+                )
 
                 dataset = NeXusDiffractionDataset(metadata, contentsTree, entry)
 

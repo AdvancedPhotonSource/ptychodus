@@ -6,13 +6,13 @@ import numpy
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.patterns import (
-    DiffractionPatternArrayType,
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionFileWriter,
     DiffractionMetadata,
     DiffractionPatternArray,
-    DiffractionPatternState,
+    PatternDataType,
+    PatternIndexesType,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
@@ -22,35 +22,29 @@ logger = logging.getLogger(__name__)
 
 
 class H5DiffractionPatternArray(DiffractionPatternArray):
-    def __init__(self, label: str, index: int, filePath: Path, dataPath: str) -> None:
+    def __init__(
+        self, label: str, indexes: PatternIndexesType, filePath: Path, dataPath: str
+    ) -> None:
         super().__init__()
         self._label = label
-        self._index = index
-        self._state = DiffractionPatternState.UNKNOWN
+        self._indexes = indexes
         self._filePath = filePath
         self._dataPath = dataPath
 
     def getLabel(self) -> str:
         return self._label
 
-    def getIndex(self) -> int:
-        return self._index
+    def getIndexes(self) -> PatternIndexesType:
+        return self._indexes
 
-    def getState(self) -> DiffractionPatternState:
-        return self._state
-
-    def getData(self) -> DiffractionPatternArrayType:
-        self._state = DiffractionPatternState.MISSING
-
+    def getData(self) -> PatternDataType:
         with h5py.File(self._filePath, 'r') as h5File:
             try:
                 item = h5File[self._dataPath]
             except KeyError:
                 raise ValueError(f'Symlink {self._filePath}:{self._dataPath} is broken!')
             else:
-                if isinstance(item, h5py.Dataset):
-                    self._state = DiffractionPatternState.FOUND
-                else:
+                if not isinstance(item, h5py.Dataset):
                     raise ValueError(f'Symlink {self._filePath}:{self._dataPath} is not a dataset!')
 
             data = item[()]
@@ -172,7 +166,7 @@ class H5DiffractionFileReader(DiffractionFileReader):
 
                 array = H5DiffractionPatternArray(
                     label=filePath.stem,
-                    index=0,
+                    indexes=numpy.arange(numberOfPatterns),
                     filePath=filePath,
                     dataPath=self._dataPath,
                 )

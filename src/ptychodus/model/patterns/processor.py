@@ -5,12 +5,26 @@ import numpy
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.patterns import (
-    BooleanArrayType,
     CropCenter,
     DiffractionPatternArray,
-    DiffractionPatternArrayType,
+    PatternDataType,
     SimpleDiffractionPatternArray,
 )
+
+
+@dataclass(frozen=True)
+class DiffractionPatternFilterValues:
+    lower_bound: int | None
+    upper_bound: int | None
+
+    def apply(self, data: PatternDataType) -> PatternDataType:
+        if self.lower_bound is not None:
+            data[data < self.lower_bound] = 0
+
+        if self.upper_bound is not None:
+            data[data >= self.upper_bound] = 0
+
+        return data
 
 
 class DiffractionPatternCrop:
@@ -23,7 +37,7 @@ class DiffractionPatternCrop:
         radius_y = extent.heightInPixels // 2
         self.slice_y = slice(center_y - radius_y, center_y + radius_y)
 
-    def apply(self, data: DiffractionPatternArrayType) -> DiffractionPatternArrayType:
+    def apply(self, data: PatternDataType) -> PatternDataType:
         return data[:, self.slice_y, self.slice_x]
 
 
@@ -32,21 +46,9 @@ class DiffractionPatternBinning:
     bin_size_x: int
     bin_size_y: int
 
-    def apply(self, data: DiffractionPatternArrayType) -> DiffractionPatternArrayType:
-        width = data.shape[-1]
-        binned_width = width // self.bin_size_x
-
-        if binned_width * self.bin_size_x != width:
-            raise ValueError(f'Invalid binning size! (bin_size_x={self.bin_size_x}, width={width})')
-
-        height = data.shape[-2]
-        binned_height = height // self.bin_size_y
-
-        if binned_height * self.bin_size_y != height:
-            raise ValueError(
-                f'Invalid binning size! (bin_size_y={self.bin_size_y}, height={height})'
-            )
-
+    def apply(self, data: PatternDataType) -> PatternDataType:
+        binned_width = data.shape[-1] // self.bin_size_x
+        binned_height = data.shape[-2] // self.bin_size_y
         shape = (-1, binned_height, self.bin_size_y, binned_width, self.bin_size_x)
         return numpy.sum(data.reshape(shape), axis=(-3, -1), keepdims=False)
 
@@ -56,15 +58,15 @@ class DiffractionPatternPadding:
     pad_x: int
     pad_y: int
 
-    def apply(self, data: DiffractionPatternArrayType) -> DiffractionPatternArrayType:
+    def apply(self, data: PatternDataType) -> PatternDataType:
         pad_width = (0, 0, self.pad_y, self.pad_y, self.pad_x, self.pad_x)
         return numpy.pad(data, pad_width, mode='constant', constant_values=0)
 
 
 @dataclass(frozen=True)
 class DiffractionPatternProcessor:
-    bad_pixel_mask: BooleanArrayType | None
     crop: DiffractionPatternCrop | None
+    filter_values: DiffractionPatternFilterValues | None
     binning: DiffractionPatternBinning | None
     padding: DiffractionPatternPadding | None
     flip_x: bool
@@ -76,24 +78,23 @@ class DiffractionPatternProcessor:
         if data.ndim != 3:
             raise ValueError(f'Invalid diffraction pattern dimensions! (shape={data.shape})')
 
-        if self.bad_pixel_mask is not None:
-            data[:, self.bad_pixel_mask] = 0
-
         if self.crop is not None:
             data = self.crop.apply(data)
 
+        if self.filter_values is not None:
+            data = self.filter_values.apply(data)
+
         if self.binning is not None:
+            # TODO handle binning with bad pixels
             data = self.binning.apply(data)
 
         if self.padding is not None:
             data = self.padding.apply(data)
 
-        if self.flip_x:
-            data = numpy.flip(data, axis=-1)
-
         if self.flip_y:
             data = numpy.flip(data, axis=-2)
 
-        return SimpleDiffractionPatternArray(
-            array.getLabel(), array.getIndex(), data, array.getState()
-        )
+        if self.flip_x:
+            data = numpy.flip(data, axis=-1)
+
+        return SimpleDiffractionPatternArray(array.getLabel(), array.getIndexes(), data)

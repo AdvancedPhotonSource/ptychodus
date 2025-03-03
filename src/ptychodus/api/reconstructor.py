@@ -5,13 +5,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .product import Product
-from .patterns import BooleanArrayType, DiffractionPatternArrayType
+from .patterns import BooleanArrayType, PatternDataType
 
 
 @dataclass(frozen=True)
 class ReconstructInput:
-    patterns: DiffractionPatternArrayType
-    goodPixelMask: BooleanArrayType
+    patterns: PatternDataType
+    bad_pixels: BooleanArrayType
     product: Product
 
 
@@ -61,6 +61,10 @@ class TrainableReconstructor(Reconstructor):
         pass
 
     @abstractmethod
+    def getTrainingDataPath(self) -> Path:
+        pass
+
+    @abstractmethod
     def train(self, dataPath: Path) -> TrainOutput:
         pass
 
@@ -90,6 +94,9 @@ class NullReconstructor(TrainableReconstructor):
 
     def exportTrainingData(self, filePath: Path, parameters: ReconstructInput) -> None:
         pass
+
+    def getTrainingDataPath(self) -> Path:
+        return Path()
 
     def train(self, dataPath: Path) -> TrainOutput:
         return TrainOutput([], [], 0)

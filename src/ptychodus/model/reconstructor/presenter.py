@@ -103,6 +103,16 @@ class ReconstructorPresenter(Observable, Observer):
     def exportTrainingData(self, filePath: Path, inputProductIndex: int) -> None:
         return self._reconstructorAPI.exportTrainingData(filePath, inputProductIndex)
 
+    def getTrainingDataPath(self) -> Path:
+        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            return reconstructor.getTrainingDataPath()
+        else:
+            logger.warning('Reconstructor is not trainable!')
+
+        return Path()
+
     def train(self, dataPath: Path) -> TrainOutput:
         return self._reconstructorAPI.train(dataPath)
 

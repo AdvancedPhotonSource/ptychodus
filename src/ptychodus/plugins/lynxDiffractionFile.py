@@ -2,6 +2,7 @@ from pathlib import Path
 import logging
 
 import h5py
+import numpy
 
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.patterns import (
@@ -48,7 +49,7 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
 
                     array = H5DiffractionPatternArray(
                         label=filePath.stem,
-                        index=0,
+                        indexes=numpy.arange(numberOfPatterns),
                         filePath=filePath,
                         dataPath=self._dataPath,
                     )

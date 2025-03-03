@@ -8,12 +8,12 @@ import tables
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.patterns import (
-    DiffractionPatternArrayType,
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionMetadata,
     DiffractionPatternArray,
-    DiffractionPatternState,
+    PatternDataType,
+    PatternIndexesType,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
@@ -25,35 +25,27 @@ logger = logging.getLogger(__name__)
 
 
 class PyTablesDiffractionPatternArray(DiffractionPatternArray):
-    def __init__(self, label: str, index: int, filePath: Path, dataPath: str) -> None:
+    def __init__(self, label: str, numberOfPatterns: int, filePath: Path, dataPath: str) -> None:
         super().__init__()
         self._label = label
-        self._index = index
-        self._state = DiffractionPatternState.UNKNOWN
+        self._indexes = numpy.arange(numberOfPatterns)
         self._filePath = filePath
         self._dataPath = dataPath
 
     def getLabel(self) -> str:
         return self._label
 
-    def getIndex(self) -> int:
-        return self._index
+    def getIndexes(self) -> PatternIndexesType:
+        return self._indexes
 
-    def getState(self) -> DiffractionPatternState:
-        return self._state
-
-    def getData(self) -> DiffractionPatternArrayType:
-        self._state = DiffractionPatternState.MISSING
-
+    def getData(self) -> PatternDataType:
         with tables.open_file(self._filePath, mode='r') as h5file:
             try:
                 item = h5file.get_node(self._dataPath)
             except tables.NoSuchNodeError:
                 raise ValueError(f'Symlink {self._filePath}:{self._dataPath} is broken!')
             else:
-                if isinstance(item, tables.EArray):
-                    self._state = DiffractionPatternState.FOUND
-                else:
+                if not isinstance(item, tables.EArray):
                     raise ValueError(
                         f'Symlink {self._filePath}:{self._dataPath} is not a tables File!'
                     )
@@ -84,7 +76,7 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
 
                     array = PyTablesDiffractionPatternArray(
                         label=filePath.stem,
-                        index=0,
+                        numberOfPatterns=numberOfPatterns,
                         filePath=filePath,
                         dataPath=self._dataPath,
                     )

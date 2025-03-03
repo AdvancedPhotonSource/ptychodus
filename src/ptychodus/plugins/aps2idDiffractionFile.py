@@ -4,6 +4,7 @@ import logging
 import re
 
 import h5py
+import numpy
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.patterns import (
@@ -39,39 +40,35 @@ class APS2IDDiffractionFileReader(DiffractionFileReader):
         return filePathDict, filePattern
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        dataset = SimpleDiffractionDataset.createNullInstance(filePath)
+        filePathMapping, filePattern = self._getFileSeries(filePath)
         dataPath = '/entry/data/data'
 
-        filePathMapping, filePattern = self._getFileSeries(filePath)
+        with h5py.File(filePath, 'r') as h5File:
+            try:
+                h5data = h5File[dataPath]
+            except KeyError:
+                logger.warning(f'File {filePath} is not an APS 2-ID data file.')
+                return SimpleDiffractionDataset.createNullInstance(filePath)
+            else:
+                numberOfPatternsPerArray, detectorHeight, detectorWidth = h5data.shape
+                metadata = DiffractionMetadata(
+                    numberOfPatternsPerArray=numberOfPatternsPerArray,
+                    numberOfPatternsTotal=numberOfPatternsPerArray * len(filePathMapping),
+                    patternDataType=h5data.dtype,
+                    detectorExtent=ImageExtent(detectorWidth, detectorHeight),
+                    filePath=filePath.parent / filePattern,
+                )
+
         contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
         arrayList: list[DiffractionPatternArray] = list()
 
         for idx, fp in sorted(filePathMapping.items()):
-            array = H5DiffractionPatternArray(fp.stem, idx, fp, dataPath)
+            indexes = numpy.arange(numberOfPatternsPerArray) + idx * numberOfPatternsPerArray
+            array = H5DiffractionPatternArray(fp.stem, indexes, fp, dataPath)
             contentsTree.createChild([array.getLabel(), 'HDF5', str(idx)])
             arrayList.append(array)
 
-        try:
-            with h5py.File(filePath, 'r') as h5File:
-                try:
-                    h5data = h5File[dataPath]
-                except KeyError:
-                    logger.warning(f'File {filePath} is not an APS 2-ID data file.')
-                else:
-                    numberOfPatternsPerArray, detectorHeight, detectorWidth = h5data.shape
-                    metadata = DiffractionMetadata(
-                        numberOfPatternsPerArray=numberOfPatternsPerArray,
-                        numberOfPatternsTotal=numberOfPatternsPerArray * len(arrayList),
-                        patternDataType=h5data.dtype,
-                        detectorExtent=ImageExtent(detectorWidth, detectorHeight),
-                        filePath=filePath.parent / filePattern,
-                    )
-
-                    dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
-        except OSError:
-            logger.warning(f'Unable to read file "{filePath}".')
-
-        return dataset
+        return SimpleDiffractionDataset(metadata, contentsTree, arrayList)
 
 
 def registerPlugins(registry: PluginRegistry) -> None:

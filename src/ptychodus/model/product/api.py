@@ -6,7 +6,6 @@ import logging
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import ProductFileReader, ProductFileWriter
 
-from ..patterns import ProductSettings
 from .object.builderFactory import ObjectBuilderFactory
 from .object.settings import ObjectSettings
 from .objectRepository import ObjectRepository
@@ -17,8 +16,31 @@ from .productRepository import ProductRepository
 from .scan.builderFactory import ScanBuilderFactory
 from .scan.settings import ScanSettings
 from .scanRepository import ScanRepository
+from .settings import ProductSettings
 
 logger = logging.getLogger(__name__)
+
+
+class PositionsStreamingContext:
+    def __init__(self) -> None:
+        self._positions_x_m: list[float] = []
+        self._triggers_x: list[int] = []
+        self._positions_y_m: list[float] = []
+        self._triggers_y: list[int] = []
+
+    def start(self) -> None:
+        pass  # FIXME
+
+    def append_positions_x(self, values_m: Sequence[float], trigger_counts: Sequence[int]) -> None:
+        self._positions_x_m.extend(values_m)
+        self._triggers_x.extend(trigger_counts)
+
+    def append_positions_y(self, values_m: Sequence[float], trigger_counts: Sequence[int]) -> None:
+        self._positions_y_m.extend(values_m)
+        self._triggers_y.extend(trigger_counts)
+
+    def stop(self) -> None:
+        pass  # FIXME
 
 
 class ScanAPI:
@@ -31,6 +53,9 @@ class ScanAPI:
         self._settings = settings
         self._repository = repository
         self._builderFactory = builderFactory
+
+    def createStreamingContext(self) -> PositionsStreamingContext:
+        return PositionsStreamingContext()
 
     def builderNames(self) -> Iterator[str]:
         return iter(self._builderFactory)

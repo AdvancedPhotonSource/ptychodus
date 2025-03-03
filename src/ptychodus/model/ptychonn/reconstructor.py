@@ -8,6 +8,7 @@ import numpy.typing
 import ptychonn
 
 from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.object import ObjectArrayType
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import (
     ReconstructInput,
@@ -21,6 +22,25 @@ from .model import PtychoNNModelProvider
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 
 logger = logging.getLogger(__name__)
+
+
+# FIXME BEGIN
+class CenterBoxMeanPhaseCenteringStrategy:
+    def __call__(self, array: ObjectArrayType) -> ObjectArrayType:
+        oneThirdHeight = array.shape[-2] // 3
+        oneThirdWidth = array.shape[-1] // 3
+
+        amplitude = numpy.absolute(array)
+        phase = numpy.angle(array)
+
+        centerBoxMeanPhase = phase[
+            oneThirdHeight : oneThirdHeight * 2, oneThirdWidth : oneThirdWidth * 2
+        ].mean()
+
+        return amplitude * numpy.exp(1j * (phase - centerBoxMeanPhase))
+
+
+# FIXME END
 
 
 class PtychoNNTrainableReconstructor(TrainableReconstructor):
@@ -147,11 +167,13 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         }
         numpy.savez_compressed(filePath, **trainingData)
 
+    def getTrainingDataPath(self) -> Path:
+        return self._trainingSettings.trainingDataPath.getValue()
+
     def train(self, dataPath: Path) -> TrainOutput:
         logger.debug(f'Reading "{dataPath}" as "NPZ"')
         trainingData = numpy.load(dataPath)
-
-        # FIXME phase centering?
+        self._trainingSettings.trainingDataPath.setValue(dataPath)
 
         model = self._modelProvider.getModel()
         logger.debug('Training...')

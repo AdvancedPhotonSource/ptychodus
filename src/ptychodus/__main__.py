@@ -91,7 +91,7 @@ def main() -> int:
     with ModelCore(settingsFile, isDeveloperModeEnabled=parsedArgs.dev) as model:
         if parsedArgs.patterns is not None:
             patternsFilePath = Path(parsedArgs.patterns.name)
-            model.workflowAPI.importProcessedPatterns(patternsFilePath)
+            model.workflowAPI.importAssembledPatterns(patternsFilePath)
 
         if parsedArgs.batch is not None:
             verifyAllArgumentsParsed(parser, unparsedArgs)

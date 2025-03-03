@@ -4,6 +4,31 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
 
+class DetectorSettings(Observable, Observer):
+    def __init__(self, registry: SettingsRegistry) -> None:
+        super().__init__()
+        self._settingsGroup = registry.createGroup('Detector')
+        self._settingsGroup.addObserver(self)
+
+        self.widthInPixels = self._settingsGroup.createIntegerParameter(
+            'WidthInPixels', 1024, minimum=1
+        )
+        self.pixelWidthInMeters = self._settingsGroup.createRealParameter(
+            'PixelWidthInMeters', 75e-6, minimum=0.0
+        )
+        self.heightInPixels = self._settingsGroup.createIntegerParameter(
+            'HeightInPixels', 1024, minimum=1
+        )
+        self.pixelHeightInMeters = self._settingsGroup.createRealParameter(
+            'PixelHeightInMeters', 75e-6, minimum=0.0
+        )
+        self.bitDepth = self._settingsGroup.createIntegerParameter('BitDepth', 8, minimum=1)
+
+    def update(self, observable: Observable) -> None:
+        if observable is self._settingsGroup:
+            self.notifyObservers()
+
+
 class PatternSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
@@ -19,7 +44,7 @@ class PatternSettings(Observable, Observer):
             'ScratchDirectory', Path.home() / '.ptychodus'
         )
         self.numberOfDataThreads = self._settingsGroup.createIntegerParameter(
-            'NumberOfDataThreads', 8, minimum=1
+            'NumberOfDataThreads', 8, minimum=1, maximum=64
         )
 
         self.cropEnabled = self._settingsGroup.createBooleanParameter('CropEnabled', True)
@@ -35,9 +60,18 @@ class PatternSettings(Observable, Observer):
         self.cropHeightInPixels = self._settingsGroup.createIntegerParameter(
             'CropHeightInPixels', 64, minimum=1
         )
-        # TODO ExtraPaddingXY
+
+        self.binningEnabled = self._settingsGroup.createBooleanParameter('BinningEnabled', False)
+        self.binSizeX = self._settingsGroup.createIntegerParameter('BinSizeX', 1, minimum=1)
+        self.binSizeY = self._settingsGroup.createIntegerParameter('BinSizeY', 1, minimum=1)
+
+        self.paddingEnabled = self._settingsGroup.createBooleanParameter('PaddingEnabled', False)
+        self.padX = self._settingsGroup.createIntegerParameter('PadX', 0, minimum=0)
+        self.padY = self._settingsGroup.createIntegerParameter('PadY', 0, minimum=0)
+
         self.flipXEnabled = self._settingsGroup.createBooleanParameter('FlipXEnabled', False)
         self.flipYEnabled = self._settingsGroup.createBooleanParameter('FlipYEnabled', False)
+
         self.valueLowerBoundEnabled = self._settingsGroup.createBooleanParameter(
             'ValueLowerBoundEnabled', False
         )
@@ -49,32 +83,6 @@ class PatternSettings(Observable, Observer):
         )
         self.valueUpperBound = self._settingsGroup.createIntegerParameter(
             'ValueUpperBound', 65535, minimum=0
-        )
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._settingsGroup:
-            self.notifyObservers()
-
-
-class ProductSettings(Observable, Observer):
-    def __init__(self, registry: SettingsRegistry) -> None:
-        super().__init__()
-        self._settingsGroup = registry.createGroup('Products')
-        self._settingsGroup.addObserver(self)
-
-        self.name = self._settingsGroup.createStringParameter('Name', 'Unnamed')
-        self.fileType = self._settingsGroup.createStringParameter('FileType', 'HDF5')
-        self.detectorDistanceInMeters = self._settingsGroup.createRealParameter(
-            'DetectorDistanceInMeters', 1.0, minimum=0.0
-        )
-        self.probeEnergyInElectronVolts = self._settingsGroup.createRealParameter(
-            'ProbeEnergyInElectronVolts', 10000.0, minimum=0.0
-        )
-        self.probePhotonCount = self._settingsGroup.createRealParameter(
-            'ProbePhotonCount', 0.0, minimum=0.0
-        )
-        self.exposureTimeInSeconds = self._settingsGroup.createRealParameter(
-            'ExposureTimeInSeconds', 0.0, minimum=0.0
         )
 
     def update(self, observable: Observable) -> None:

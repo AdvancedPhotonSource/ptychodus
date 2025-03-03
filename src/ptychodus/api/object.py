@@ -222,13 +222,6 @@ class ObjectInterpolator(ABC):
         pass
 
 
-class ObjectPhaseCenteringStrategy(ABC):
-    @abstractmethod
-    def __call__(self, array: ObjectArrayType) -> ObjectArrayType:
-        """returns the phase-centered array"""
-        pass
-
-
 class ObjectFileReader(ABC):
     @abstractmethod
     def read(self, filePath: Path) -> Object:

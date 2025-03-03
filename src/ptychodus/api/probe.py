@@ -68,6 +68,10 @@ class ProbeGeometryProvider(ABC):
         pass
 
     @abstractmethod
+    def getDetectorPixelGeometry(self) -> PixelGeometry:
+        pass
+
+    @abstractmethod
     def getProbeGeometry(self) -> ProbeGeometry:
         pass
 
