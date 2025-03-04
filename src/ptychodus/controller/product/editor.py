@@ -1,16 +1,17 @@
 from typing import Any
 
 from PyQt5.QtCore import (
-    Qt,
     QAbstractTableModel,
     QModelIndex,
     QObject,
     QSortFilterProxyModel,
+    Qt,
 )
 from PyQt5.QtWidgets import QWidget
 
 from ptychodus.api.observer import Observable, Observer
 
+from ...model.patterns import AssembledDiffractionDataset
 from ...model.product import ProductRepositoryItem
 from ...view.product import ProductEditorDialog
 
@@ -79,17 +80,21 @@ class ProductPropertyTableModel(QAbstractTableModel):
 class ProductEditorViewController(Observer):
     def __init__(
         self,
+        dataset: AssembledDiffractionDataset,
         product: ProductRepositoryItem,
         tableModel: ProductPropertyTableModel,
         dialog: ProductEditorDialog,
     ) -> None:
         super().__init__()
+        self._dataset = dataset
         self._product = product
         self._tableModel = tableModel
         self._dialog = dialog
 
     @classmethod
-    def editProduct(cls, product: ProductRepositoryItem, parent: QWidget) -> None:
+    def editProduct(
+        cls, dataset: AssembledDiffractionDataset, product: ProductRepositoryItem, parent: QWidget
+    ) -> None:
         tableModel = ProductPropertyTableModel(product)
         tableProxyModel = QSortFilterProxyModel()
         tableProxyModel.setSourceModel(tableModel)
@@ -102,11 +107,15 @@ class ProductEditorViewController(Observer):
         dialog.tableView.resizeColumnsToContents()
         dialog.tableView.resizeRowsToContents()
 
-        viewController = cls(product, tableModel, dialog)
+        viewController = cls(dataset, product, tableModel, dialog)
         product.addObserver(viewController)
         dialog.textEdit.textChanged.connect(viewController._syncViewToModel)
 
         viewController._syncModelToView()
+
+        dialog.actionsView.estimateProbePhotonCountButton.clicked.connect(
+            viewController._estimateProbePhotonCount
+        )
         dialog.finished.connect(viewController._finish)
         dialog.open()
         dialog.adjustSize()
@@ -121,6 +130,13 @@ class ProductEditorViewController(Observer):
 
         metadata = self._product.getMetadata()
         self._dialog.textEdit.setPlainText(metadata.comments.getValue())
+
+    def _estimateProbePhotonCount(self) -> None:
+        metadata = self._product.getMetadata()
+        metadata.probePhotonCount.setValue(self._dataset.get_maximum_pattern_counts())
+
+        self._tableModel.beginResetModel()
+        self._tableModel.endResetModel()
 
     def _finish(self, result: int) -> None:
         self._product.removeObserver(self)
