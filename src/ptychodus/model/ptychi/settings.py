@@ -22,6 +22,10 @@ class PtyChiReconstructorSettings(Observable, Observer):
             'UseLowMemoryMode', False
         )
         self.padForShift = self._settingsGroup.createIntegerParameter('PadForShift', 0, minimum=0)
+
+        self.useFarFieldPropagation = self._settingsGroup.createBooleanParameter(
+            'UseFarFieldPropagation', True
+        )
         self.fftShiftDiffractionPatterns = self._settingsGroup.createBooleanParameter(
             'FFTShiftDiffractionPatterns', True
         )

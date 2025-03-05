@@ -36,9 +36,9 @@ class ObjectRepositoryItem(ParameterGroup):
         self.setBuilder(item.getBuilder().copy())
         self._rebuild()
 
-    def assign(self, object_: Object) -> None:
+    def assign(self, object_: Object, *, mutable: bool = True) -> None:
         builder = FromMemoryObjectBuilder(self._settings, object_)
-        self.setBuilder(builder)
+        self.setBuilder(builder, mutable=mutable)
 
     def syncToSettings(self) -> None:
         for parameter in self.parameters().values():
@@ -73,15 +73,15 @@ class ObjectRepositoryItem(ParameterGroup):
     def getBuilder(self) -> ObjectBuilder:
         return self._builder
 
-    def setBuilder(self, builder: ObjectBuilder) -> None:
+    def setBuilder(self, builder: ObjectBuilder, *, mutable: bool = True) -> None:
         self._removeGroup('builder')
         self._builder.removeObserver(self)
         self._builder = builder
         self._builder.addObserver(self)
         self._addGroup('builder', self._builder, observe=True)
-        self._rebuild()
+        self._rebuild(mutable=mutable)
 
-    def _rebuild(self) -> None:
+    def _rebuild(self, *, mutable: bool = True) -> None:
         try:
             object_ = self._builder.build(
                 self._geometryProvider, self.layerDistanceInMeters.getValue()
@@ -90,6 +90,7 @@ class ObjectRepositoryItem(ParameterGroup):
             logger.error(''.join(exc.args))
             return
 
+        # TODO mutable is unused
         self._object = object_
         self.layerDistanceInMeters.setValue(object_.layerDistanceInMeters)
         self.notifyObservers()

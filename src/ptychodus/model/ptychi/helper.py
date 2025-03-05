@@ -562,9 +562,14 @@ class PtyChiOptionsHelper:
     def create_data_options(self, parameters: ReconstructInput) -> PtychographyDataOptions:
         metadata = parameters.product.metadata
         pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry()
+        free_space_propagation_distance_m = (
+            numpy.inf
+            if self._reconstructor_settings.useFarFieldPropagation
+            else metadata.detectorDistanceInMeters
+        )
         return PtychographyDataOptions(
             data=parameters.patterns,
-            free_space_propagation_distance_m=metadata.detectorDistanceInMeters,
+            free_space_propagation_distance_m=free_space_propagation_distance_m,
             wavelength_m=metadata.probeWavelengthInMeters,
             fft_shift=self._reconstructor_settings.fftShiftDiffractionPatterns.getValue(),
             detector_pixel_size_m=pixel_geometry.widthInMeters,

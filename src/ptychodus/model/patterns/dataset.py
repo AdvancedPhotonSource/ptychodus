@@ -140,6 +140,8 @@ class ArrayLoader:
                 processed_array = processor(task.array)
             except FileNotFoundError:
                 logger.warning(f'File not found for array index={task.index}.')
+            except OSError:
+                logger.error(f'OS error while reading array index={task.index}.')
             except Exception:
                 logger.exception(f'Error while loading array index={task.index}!')
             else:
@@ -273,7 +275,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
     def get_assembled_patterns(self) -> PatternDataType:
         return self._data[self._indexes >= 0]
 
-    def get_maximum_pattern_counts(self) -> int:  # FIXME use
+    def get_maximum_pattern_counts(self) -> int:
         patterns = self.get_assembled_patterns()
         good_pixels = numpy.logical_not(self.get_processed_bad_pixels())
         total_counts = numpy.sum(patterns[:, good_pixels], axis=-1)

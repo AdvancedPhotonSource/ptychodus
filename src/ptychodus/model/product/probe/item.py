@@ -42,9 +42,9 @@ class ProbeRepositoryItem(ParameterGroup):
         self.setBuilder(item.getBuilder().copy())
         self._rebuild()
 
-    def assign(self, probe: Probe) -> None:
+    def assign(self, probe: Probe, *, mutable: bool = True) -> None:
         builder = FromMemoryProbeBuilder(self._settings, probe)
-        self.setBuilder(builder)
+        self.setBuilder(builder, mutable=mutable)
 
     def syncToSettings(self) -> None:
         for parameter in self.parameters().values():
@@ -59,22 +59,24 @@ class ProbeRepositoryItem(ParameterGroup):
     def getBuilder(self) -> ProbeBuilder:
         return self._builder
 
-    def setBuilder(self, builder: ProbeBuilder) -> None:
+    def setBuilder(self, builder: ProbeBuilder, *, mutable: bool = True) -> None:
         self._removeGroup('builder')
         self._builder.removeObserver(self)
         self._builder = builder
         self._builder.addObserver(self)
         self._addGroup('builder', self._builder, observe=True)
-        self._rebuild()
+        self._rebuild(mutable=mutable)
 
-    def _rebuild(self) -> None:
+    def _rebuild(self, *, mutable: bool = True) -> None:
         try:
             probe = self._builder.build(self._geometryProvider)
         except Exception as exc:
             logger.error(''.join(exc.args))
             return
 
-        self._probe = self._additionalModesBuilder.build(probe, self._geometryProvider)
+        self._probe = (
+            self._additionalModesBuilder.build(probe, self._geometryProvider) if mutable else probe
+        )
         self.notifyObservers()
 
     def getAdditionalModesBuilder(self) -> MultimodalProbeBuilder:

@@ -76,11 +76,11 @@ class ProductRepositoryItem(ParameterGroup):
         if notify:
             self._parent.handleCostsChanged(self)
 
-    def assign(self, product: Product) -> None:
+    def assign(self, product: Product, *, mutable: bool = True) -> None:
         self._metadata.assign(product.metadata)
-        self._scan.assign(product.scan)
-        self._probe.assign(product.probe)
-        self._object.assign(product.object_)
+        self._scan.assign(product.scan, mutable=mutable)
+        self._probe.assign(product.probe, mutable=mutable)
+        self._object.assign(product.object_, mutable=mutable)
         self._costs = list(product.costs)
         self._parent.handleCostsChanged(self)
 

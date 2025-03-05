@@ -70,9 +70,9 @@ class ScanRepositoryItem(ParameterGroup):
 
         self.setBuilder(item.getBuilder().copy())
 
-    def assign(self, scan: Scan) -> None:
+    def assign(self, scan: Scan, *, mutable: bool = True) -> None:
         builder = FromMemoryScanBuilder(self._settings, scan)
-        self.setBuilder(builder)
+        self.setBuilder(builder, mutable=mutable)
 
     def syncToSettings(self) -> None:
         for parameter in self.parameters().values():
@@ -87,13 +87,13 @@ class ScanRepositoryItem(ParameterGroup):
     def getBuilder(self) -> ScanBuilder:
         return self._builder
 
-    def setBuilder(self, builder: ScanBuilder) -> None:
+    def setBuilder(self, builder: ScanBuilder, *, mutable: bool = True) -> None:
         self._removeGroup('builder')
         self._builder.removeObserver(self)
         self._builder = builder
         self._builder.addObserver(self)
         self._addGroup('builder', self._builder)
-        self._rebuild()
+        self._rebuild(mutable=mutable)
 
     def getBoundingBox(self) -> ScanBoundingBox | None:
         bbox = self._boundingBoxBuilder.getBoundingBox()
@@ -132,14 +132,14 @@ class ScanRepositoryItem(ParameterGroup):
         self._lengthInMeters = lengthInMeters
         self.notifyObservers()
 
-    def _rebuild(self) -> None:
+    def _rebuild(self, *, mutable: bool = True) -> None:
         try:
             scan = self._builder.build()
         except Exception as exc:
             logger.error(''.join(exc.args))
         else:
             self._untransformedScan = scan
-            self._transformScan()
+            self._transformScan()  # FIXME mutable
 
     def getTransform(self) -> ScanPointTransform:
         return self._transform
