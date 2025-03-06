@@ -132,7 +132,7 @@ def main() -> int:
 
         from ptychodus.view import ViewCore
 
-        view = ViewCore.createInstance(parsedArgs.dev)
+        view = ViewCore()
 
         from ptychodus.controller import ControllerCore
 

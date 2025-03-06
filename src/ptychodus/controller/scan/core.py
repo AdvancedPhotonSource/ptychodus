@@ -2,7 +2,7 @@ from __future__ import annotations
 import logging
 
 from PyQt5.QtCore import QModelIndex, QSortFilterProxyModel, QStringListModel
-from PyQt5.QtWidgets import QAbstractItemView, QDialog
+from PyQt5.QtWidgets import QAbstractItemView, QDialog, QMessageBox
 
 from ptychodus.api.observer import SequenceObserver
 
@@ -92,6 +92,9 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         view.copierDialog.finished.connect(controller._finishCopyingScan)
 
         view.buttonBox.editButton.clicked.connect(controller._editCurrentScan)
+
+        estimateTransformAction = view.buttonBox.analyzeMenu.addAction('Estimate Transform...')
+        estimateTransformAction.triggered.connect(controller._estimateTransform)
 
         return controller
 
@@ -202,6 +205,19 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
             self._plotView.axes.legend(loc='best')
 
         self._plotView.figureCanvas.draw()
+
+    def _estimateTransform(self) -> None:  # FIXME
+        itemIndex = self._getCurrentItemIndex()
+
+        if itemIndex < 0:
+            logger.warning('No current item!')
+            return
+
+        _ = QMessageBox.information(
+            self._view,
+            'Not Implemented',
+            'Affine transform estimator is not yet implemented.',
+        )
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()

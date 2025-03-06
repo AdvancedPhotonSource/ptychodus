@@ -46,7 +46,7 @@ class RPIEReconstructor(Reconstructor):
             default_dtype=helper.default_dtype,
             random_seed=helper.random_seed,
             displayed_loss_function=helper.displayed_loss_function,
-            # FIXME use_low_memory_forward_model=helper.use_low_memory_forward_model,
+            forward_model_options=helper.forward_model_options,
         )
 
     def _create_object_options(self, object_: Object) -> PIEObjectOptions:
@@ -66,6 +66,8 @@ class RPIEReconstructor(Reconstructor):
             remove_grid_artifacts=helper.remove_grid_artifacts,
             multislice_regularization=helper.multislice_regularization,
             patch_interpolation_method=helper.patch_interpolation_method,
+            remove_object_probe_ambiguity=helper.remove_object_probe_ambiguity,
+            build_preconditioner_with_all_modes=helper.build_preconditioner_with_all_modes,
             alpha=self._settings.objectAlpha.getValue(),
         )
 

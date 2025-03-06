@@ -27,7 +27,7 @@ class ControllerCore:
     def __init__(self, model: ModelCore, view: ViewCore) -> None:
         self.view = view
 
-        self._memoryController = MemoryController(model.memoryPresenter, view.memoryProgressBar)
+        self._memoryController = MemoryController(model.memoryPresenter, view.memory_progress_bar)
         self._fileDialogFactory = FileDialogFactory()
         self._ptyChiViewControllerFactory = PtyChiViewControllerFactory(
             model.ptyChiReconstructorLibrary
@@ -63,6 +63,7 @@ class ControllerCore:
             self._fileDialogFactory,
         )
         self._productController = ProductController.createInstance(
+            model.patterns_core.dataset,
             model.productRepository,
             model.productAPI,
             view.productView,
@@ -159,5 +160,5 @@ class ControllerCore:
 
     def swapCentralWidgets(self, action: QAction) -> None:
         index = action.data()
-        self.view.parametersWidget.setCurrentIndex(index)
-        self.view.contentsWidget.setCurrentIndex(index)
+        self.view.left_panel.setCurrentIndex(index)
+        self.view.right_panel.setCurrentIndex(index)

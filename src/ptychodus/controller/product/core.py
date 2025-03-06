@@ -18,6 +18,7 @@ from ...model.product import (
     ProductRepositoryItem,
     ProductRepositoryObserver,
 )
+from ...model.patterns import AssembledDiffractionDataset
 from ...model.product.metadata import MetadataRepositoryItem
 from ...model.product.object import ObjectRepositoryItem
 from ...model.product.probe import ProbeRepositoryItem
@@ -150,6 +151,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 class ProductController(ProductRepositoryObserver):
     def __init__(
         self,
+        dataset: AssembledDiffractionDataset,
         repository: ProductRepository,
         api: ProductAPI,
         view: ProductView,
@@ -159,6 +161,7 @@ class ProductController(ProductRepositoryObserver):
         tableProxyModel: QSortFilterProxyModel,
     ) -> None:
         super().__init__()
+        self._dataset = dataset
         self._repository = repository
         self._api = api
         self._view = view
@@ -170,6 +173,7 @@ class ProductController(ProductRepositoryObserver):
     @classmethod
     def createInstance(
         cls,
+        dataset: AssembledDiffractionDataset,
         repository: ProductRepository,
         api: ProductAPI,
         view: ProductView,
@@ -186,6 +190,7 @@ class ProductController(ProductRepositoryObserver):
         tableProxyModel.setSourceModel(tableModel)
 
         controller = cls(
+            dataset,
             repository,
             api,
             view,
@@ -290,7 +295,7 @@ class ProductController(ProductRepositoryObserver):
 
         if current.isValid():
             product = self._repository[current.row()]
-            ProductEditorViewController.editProduct(product, self._view)
+            ProductEditorViewController.editProduct(self._dataset, product, self._view)
         else:
             logger.error('No current item!')
 

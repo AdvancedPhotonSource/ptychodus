@@ -105,12 +105,6 @@ class MultimodalProbeBuilder(ParameterGroup):
         return array
 
     def build(self, probe: Probe, geometryProvider: ProbeGeometryProvider) -> Probe:
-        num_requested_modes = self.numberOfIncoherentModes.getValue()
-        num_existing_modes = probe.numberOfIncoherentModes
-
-        if num_requested_modes <= num_existing_modes:
-            return probe
-
         array = self._init_modes(probe.getArray())
 
         if self.orthogonalizeIncoherentModes.getValue():

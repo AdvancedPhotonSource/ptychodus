@@ -21,6 +21,7 @@ from ptychi.api import (
     PtychographyDataOptions,
 )
 from ptychi.api.options.base import (
+    ForwardModelOptions,
     OPRModeWeightsSmoothingOptions,
     ObjectL1NormConstraintOptions,
     ObjectMultisliceRegularizationOptions,
@@ -34,6 +35,7 @@ from ptychi.api.options.base import (
     ProbePowerConstraintOptions,
     ProbeSupportConstraintOptions,
     RemoveGridArtifactsOptions,
+    RemoveObjectProbeAmbiguityOptions,
 )
 
 from ptychodus.api.object import Object, ObjectArrayType, ObjectGeometry, ObjectPoint
@@ -96,11 +98,11 @@ class PtyChiReconstructorOptionsHelper:
 
     @property
     def compact_mode_update_clustering(self) -> bool:
-        return self._settings.batchStride.getValue() > 0
+        return self._settings.compactModeUpdateClustering.getValue() > 0
 
     @property
     def compact_mode_update_clustering_stride(self) -> int:
-        return self._settings.batchStride.getValue()
+        return self._settings.compactModeUpdateClustering.getValue()
 
     @property
     def default_device(self) -> Devices:
@@ -119,8 +121,11 @@ class PtyChiReconstructorOptionsHelper:
         return LossFunctions.MSE_SQRT  # TODO
 
     @property
-    def use_low_memory_forward_model(self) -> bool:
-        return self._settings.useLowMemoryForwardModel.getValue()
+    def forward_model_options(self) -> ForwardModelOptions:
+        return ForwardModelOptions(
+            low_memory_mode=self._settings.useLowMemoryMode.getValue(),
+            pad_for_shift=self._settings.padForShift.getValue(),
+        )
 
 
 class PtyChiObjectOptionsHelper:
@@ -260,6 +265,21 @@ class PtyChiObjectOptionsHelper:
         except KeyError:
             logger.warning('Failed to parse patch interpolation method "{method_str}"!')
             return PatchInterpolationMethods.FOURIER
+
+    @property
+    def remove_object_probe_ambiguity(self) -> RemoveObjectProbeAmbiguityOptions:
+        return RemoveObjectProbeAmbiguityOptions(
+            enabled=self._settings.removeObjectProbeAmbiguity.getValue(),
+            optimization_plan=create_optimization_plan(
+                self._settings.removeObjectProbeAmbiguityStart.getValue(),
+                self._settings.removeObjectProbeAmbiguityStop.getValue(),
+                self._settings.removeObjectProbeAmbiguityStride.getValue(),
+            ),
+        )
+
+    @property
+    def build_preconditioner_with_all_modes(self) -> bool:
+        return self._settings.buildPreconditionerWithAllModes.getValue()
 
     def get_initial_guess(self, object_: Object) -> ObjectArrayType:
         return object_.getArray()
@@ -542,10 +562,16 @@ class PtyChiOptionsHelper:
     def create_data_options(self, parameters: ReconstructInput) -> PtychographyDataOptions:
         metadata = parameters.product.metadata
         pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry()
+        free_space_propagation_distance_m = (
+            numpy.inf
+            if self._reconstructor_settings.useFarFieldPropagation
+            else metadata.detectorDistanceInMeters
+        )
         return PtychographyDataOptions(
             data=parameters.patterns,
-            free_space_propagation_distance_m=metadata.detectorDistanceInMeters,
+            free_space_propagation_distance_m=free_space_propagation_distance_m,
             wavelength_m=metadata.probeWavelengthInMeters,
+            fft_shift=self._reconstructor_settings.fftShiftDiffractionPatterns.getValue(),
             detector_pixel_size_m=pixel_geometry.widthInMeters,
             valid_pixel_mask=numpy.logical_not(parameters.bad_pixels),
             save_data_on_device=self._reconstructor_settings.saveDataOnDevice.getValue(),

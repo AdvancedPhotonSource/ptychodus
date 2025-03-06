@@ -69,7 +69,7 @@ class LSQMLReconstructor(Reconstructor):
             default_dtype=helper.default_dtype,
             random_seed=helper.random_seed,
             displayed_loss_function=helper.displayed_loss_function,
-            # FIXME use_low_memory_forward_model=helper.use_low_memory_forward_model,
+            forward_model_options=helper.forward_model_options,
             noise_model=noise_model,
             gaussian_noise_std=self._settings.gaussianNoiseDeviation.getValue(),
             solve_obj_prb_step_size_jointly_for_first_slice_in_multislice=self._settings.solveObjectProbeStepSizeJointlyForFirstSliceInMultislice.getValue(),
@@ -95,6 +95,8 @@ class LSQMLReconstructor(Reconstructor):
             remove_grid_artifacts=helper.remove_grid_artifacts,
             multislice_regularization=helper.multislice_regularization,
             patch_interpolation_method=helper.patch_interpolation_method,
+            remove_object_probe_ambiguity=helper.remove_object_probe_ambiguity,
+            build_preconditioner_with_all_modes=helper.build_preconditioner_with_all_modes,
             optimal_step_size_scaler=self._settings.objectOptimalStepSizeScaler.getValue(),
             multimodal_update=self._settings.objectMultimodalUpdate.getValue(),
         )

@@ -9,15 +9,25 @@ class PtyChiReconstructorSettings(Observable, Observer):
         self._settingsGroup.addObserver(self)
 
         self.numEpochs = self._settingsGroup.createIntegerParameter('NumEpochs', 100, minimum=1)
-        self.batchSize = self._settingsGroup.createIntegerParameter('BatchSize', 100, minimum=1)
+        self.batchSize = self._settingsGroup.createIntegerParameter('BatchSize', 1, minimum=1)
         self.batchingMode = self._settingsGroup.createStringParameter('BatchingMode', 'random')
-        self.batchStride = self._settingsGroup.createIntegerParameter('BatchStride', 1, minimum=1)
+        self.compactModeUpdateClustering = self._settingsGroup.createIntegerParameter(
+            'CompactModeUpdateClustering', 1, minimum=0
+        )
         self.useDoublePrecision = self._settingsGroup.createBooleanParameter(
             'UseDoublePrecision', False
         )
         self.useDevices = self._settingsGroup.createBooleanParameter('UseDevices', True)
-        self.useLowMemoryForwardModel = self._settingsGroup.createBooleanParameter(
-            'UseLowMemoryForwardModel', False
+        self.useLowMemoryMode = self._settingsGroup.createBooleanParameter(
+            'UseLowMemoryMode', False
+        )
+        self.padForShift = self._settingsGroup.createIntegerParameter('PadForShift', 0, minimum=0)
+
+        self.useFarFieldPropagation = self._settingsGroup.createBooleanParameter(
+            'UseFarFieldPropagation', True
+        )
+        self.fftShiftDiffractionPatterns = self._settingsGroup.createBooleanParameter(
+            'FFTShiftDiffractionPatterns', True
         )
         self.saveDataOnDevice = self._settingsGroup.createBooleanParameter(
             'SaveDataOnDevice', False
@@ -151,6 +161,21 @@ class PtyChiObjectSettings(Observable, Observer):
             self._settingsGroup.createStringParameter(
                 'RegularizeMultisliceUnwrapPhaseImageIntegrationMethod', 'DECONVOLUTION'
             )
+        )
+        self.removeObjectProbeAmbiguity = self._settingsGroup.createBooleanParameter(
+            'RemoveObjectProbeAmbiguity', True
+        )
+        self.removeObjectProbeAmbiguityStart = self._settingsGroup.createIntegerParameter(
+            'RemoveObjectProbeAmbiguityStart', 0, minimum=0
+        )
+        self.removeObjectProbeAmbiguityStop = self._settingsGroup.createIntegerParameter(
+            'RemoveObjectProbeAmbiguityStop', -1
+        )
+        self.removeObjectProbeAmbiguityStride = self._settingsGroup.createIntegerParameter(
+            'RemoveObjectProbeAmbiguityStride', 10, minimum=1
+        )
+        self.buildPreconditionerWithAllModes = self._settingsGroup.createBooleanParameter(
+            'BuildPreconditionerWithAllModes', False
         )
 
     def update(self, observable: Observable) -> None:

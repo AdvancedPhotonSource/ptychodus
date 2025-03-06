@@ -139,8 +139,9 @@ class PtyChiReconstructorViewController(ParameterViewController):
         self._batchingModeViewController = ComboBoxParameterViewController(
             settings.batchingMode, enumerators.batchingModes(), tool_tip='Batching mode to use.'
         )
-        self._batchStride = SpinBoxParameterViewController(
-            settings.batchStride, tool_tip='Number of epochs between updating clusters.'
+        self._compactModeUpdateClustering = SpinBoxParameterViewController(
+            settings.compactModeUpdateClustering,
+            tool_tip='Number of epochs between updating clusters.',
         )
         self._precisionViewController = PtyChiPrecisionParameterViewController(
             settings.useDoublePrecision,
@@ -150,8 +151,8 @@ class PtyChiReconstructorViewController(ParameterViewController):
             settings.useDevices, repository, tool_tip='Default device to use for computation.'
         )
         self._useLowMemoryViewController = CheckBoxParameterViewController(
-            settings.useLowMemoryForwardModel,
-            'Use Low Memory Forward Model',
+            settings.useLowMemoryMode,
+            'Use Low Memory Mode',
             tool_tip='When checked, forward propagation of ptychography will be done using less vectorized code. This reduces the speed, but also lowers memory usage.',
         )
         self._saveDataOnDeviceViewController = CheckBoxParameterViewController(
@@ -165,7 +166,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
         layout.addRow('Number of Epochs:', self._numEpochsViewController.getWidget())
         layout.addRow('Batch Size:', self._batchSizeViewController.getWidget())
         layout.addRow('Batch Mode:', self._batchingModeViewController.getWidget())
-        layout.addRow('Batch Stride:', self._batchStride.getWidget())
+        layout.addRow('Update Clustering:', self._compactModeUpdateClustering.getWidget())
 
         if repository:
             layout.addRow(self._deviceViewController.getWidget())
