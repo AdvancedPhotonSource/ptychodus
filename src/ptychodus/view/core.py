@@ -6,8 +6,8 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
     QActionGroup,
     QApplication,
+    QLCDNumber,
     QMainWindow,
-    QProgressBar,
     QSizePolicy,
     QSplitter,
     QStackedWidget,
@@ -43,7 +43,7 @@ class ViewCore(QMainWindow):
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.left_panel = QStackedWidget()
         self.right_panel = QStackedWidget()
-        self.memory_progress_bar = QProgressBar()
+        self.memory_widget = QLCDNumber()
 
         self.settingsAction = self.navigationToolBar.addAction(
             QIcon(':/icons/settings'), 'Settings'
@@ -138,4 +138,4 @@ class ViewCore(QMainWindow):
         preferred_width = min(desktop_size.width() * 2 // 3, 2 * preferred_height)
         self.resize(preferred_width, preferred_height)
 
-        self.statusBar().addPermanentWidget(self.memory_progress_bar)
+        self.statusBar().addPermanentWidget(self.memory_widget)

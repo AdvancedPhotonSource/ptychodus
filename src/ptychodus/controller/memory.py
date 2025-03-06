@@ -1,28 +1,30 @@
 from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QProgressBar, QSizePolicy
+from PyQt5.QtWidgets import QFrame, QLCDNumber, QSizePolicy
 
 from ..model.memory import MemoryPresenter
 
 
 class MemoryController:
-    def __init__(self, presenter: MemoryPresenter, progress_bar: QProgressBar) -> None:
+    def __init__(self, presenter: MemoryPresenter, widget: QLCDNumber) -> None:
         self._presenter = presenter
-        self._progress_bar = progress_bar
-        self._progress_bar.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
+        self._widget = widget
+        self._widget.setSegmentStyle(QLCDNumber.SegmentStyle.Flat)
+        self._widget.setFrameStyle(QFrame.Panel | QFrame.Sunken)
+        self._widget.setDigitCount(6)
+        self._widget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
         self._timer = QTimer()
-        self._timer.timeout.connect(self._updateProgressBar)
+        self._timer.timeout.connect(self._update_widget)
 
-        self._updateProgressBar()
+        self._update_widget()
         self._timer.start(10 * 1000)  # TODO customize (in milliseconds)
 
-    def _updateProgressBar(self) -> None:
+    def _update_widget(self) -> None:
         stats = self._presenter.getStatistics()
-        totalMemMB = int(stats.totalMemoryInBytes / 1e6)
-        totalMem = f'Total Memory: {totalMemMB} MB'
+        total_MB = int(stats.total_physical_memory_bytes / 1e6)
+        total_str = f'Total Memory: {total_MB} MB'
 
-        availMemMB = int(stats.availableMemoryInBytes / 1e6)
-        availMem = f'Available Memory: {availMemMB} MB'
+        avail_MB = int(stats.available_memory_bytes / 1e6)
+        avail_str = f'Available Memory: {avail_MB} MB'
 
-        self._progress_bar.setRange(0, 100)
-        self._progress_bar.setValue(int(stats.memoryUsagePercent))
-        self._progress_bar.setToolTip('\n'.join((totalMem, availMem)))
+        self._widget.display(avail_MB)
+        self._widget.setToolTip('\n'.join((total_str, avail_str)))

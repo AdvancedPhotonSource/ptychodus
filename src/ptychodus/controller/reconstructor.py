@@ -139,12 +139,13 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             return
 
         try:
-            self._presenter.reconstruct(inputProductIndex)
+            outputProductIndex = self._presenter.reconstruct(inputProductIndex)
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Reconstructor', err)
-
-        self._view.progressDialog.show()
+        else:
+            self._view.parametersView.productComboBox.setCurrentIndex(outputProductIndex)
+            self._view.progressDialog.show()
 
     def _reconstructSplit(self) -> None:
         inputProductIndex = self._view.parametersView.productComboBox.currentIndex()

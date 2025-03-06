@@ -175,7 +175,7 @@ class LSQMLReconstructor(Reconstructor):
 
         if task_reconstructor is not None:
             loss_tracker = task_reconstructor.loss_tracker
-            # TODO update api to include epoch and loss
+            # FIXME update api to include epoch and loss
             # epoch = loss_tracker.table['epoch'].to_numpy()
             loss = loss_tracker.table['loss'].to_numpy()
             costs = [float(x) for x in loss.flatten()]
