@@ -153,16 +153,16 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             h5File.create_dataset(self.COSTS_ARRAY, data=product.costs)
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
+def register_plugins(registry: PluginRegistry) -> None:
     h5ProductFileIO = H5ProductFileIO()
 
-    registry.productFileReaders.registerPlugin(
+    registry.productFileReaders.register_plugin(
         h5ProductFileIO,
-        simpleName=H5ProductFileIO.SIMPLE_NAME,
-        displayName=H5ProductFileIO.DISPLAY_NAME,
+        simple_name=H5ProductFileIO.SIMPLE_NAME,
+        display_name=H5ProductFileIO.DISPLAY_NAME,
     )
-    registry.productFileWriters.registerPlugin(
+    registry.productFileWriters.register_plugin(
         h5ProductFileIO,
-        simpleName=H5ProductFileIO.SIMPLE_NAME,
-        displayName=H5ProductFileIO.DISPLAY_NAME,
+        simple_name=H5ProductFileIO.SIMPLE_NAME,
+        display_name=H5ProductFileIO.DISPLAY_NAME,
     )

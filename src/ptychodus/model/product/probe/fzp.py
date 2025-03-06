@@ -45,11 +45,12 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
         return builder
 
     def labelsForPresets(self) -> Iterator[str]:
-        for entry in self._fresnelZonePlateChooser:
-            yield entry.displayName
+        for plugin in self._fresnelZonePlateChooser:
+            yield plugin.display_name
 
-    def applyPresets(self, index: int) -> None:
-        fzp = self._fresnelZonePlateChooser[index].strategy
+    def applyPresets(self, display_name: str) -> None:
+        self._fresnelZonePlateChooser.set_current_plugin(display_name)
+        fzp = self._fresnelZonePlateChooser.get_current_plugin().strategy
         self.zonePlateDiameterInMeters.setValue(fzp.zonePlateDiameterInMeters)
         self.outermostZoneWidthInMeters.setValue(fzp.outermostZoneWidthInMeters)
         self.centralBeamstopDiameterInMeters.setValue(fzp.centralBeamstopDiameterInMeters)

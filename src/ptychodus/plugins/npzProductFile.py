@@ -193,31 +193,31 @@ class NPZObjectFileReader(ObjectFileReader):
             )
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
+def register_plugins(registry: PluginRegistry) -> None:
     npzProductFileIO = NPZProductFileIO()
 
-    registry.productFileReaders.registerPlugin(
+    registry.productFileReaders.register_plugin(
         npzProductFileIO,
-        simpleName=NPZProductFileIO.SIMPLE_NAME,
-        displayName=NPZProductFileIO.DISPLAY_NAME,
+        simple_name=NPZProductFileIO.SIMPLE_NAME,
+        display_name=NPZProductFileIO.DISPLAY_NAME,
     )
-    registry.productFileWriters.registerPlugin(
+    registry.productFileWriters.register_plugin(
         npzProductFileIO,
-        simpleName=NPZProductFileIO.SIMPLE_NAME,
-        displayName=NPZProductFileIO.DISPLAY_NAME,
+        simple_name=NPZProductFileIO.SIMPLE_NAME,
+        display_name=NPZProductFileIO.DISPLAY_NAME,
     )
-    registry.scanFileReaders.registerPlugin(
+    registry.scanFileReaders.register_plugin(
         NPZScanFileReader(),
-        simpleName=NPZProductFileIO.SIMPLE_NAME,
-        displayName=NPZProductFileIO.DISPLAY_NAME,
+        simple_name=NPZProductFileIO.SIMPLE_NAME,
+        display_name=NPZProductFileIO.DISPLAY_NAME,
     )
-    registry.probeFileReaders.registerPlugin(
+    registry.probeFileReaders.register_plugin(
         NPZProbeFileReader(),
-        simpleName=NPZProductFileIO.SIMPLE_NAME,
-        displayName=NPZProductFileIO.DISPLAY_NAME,
+        simple_name=NPZProductFileIO.SIMPLE_NAME,
+        display_name=NPZProductFileIO.DISPLAY_NAME,
     )
-    registry.objectFileReaders.registerPlugin(
+    registry.objectFileReaders.register_plugin(
         NPZObjectFileReader(),
-        simpleName=NPZProductFileIO.SIMPLE_NAME,
-        displayName=NPZProductFileIO.DISPLAY_NAME,
+        simple_name=NPZProductFileIO.SIMPLE_NAME,
+        display_name=NPZProductFileIO.DISPLAY_NAME,
     )

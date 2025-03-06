@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Sequence
+from collections.abc import Iterator
 from typing import Final
 import logging
 import time
@@ -33,26 +33,21 @@ class TwoStepFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Obse
         settings: FluorescenceSettings,
         upscalingStrategyChooser: PluginChooser[UpscalingStrategy],
         deconvolutionStrategyChooser: PluginChooser[DeconvolutionStrategy],
-        reinitObservable: Observable,
     ) -> None:
         super().__init__()
-        self._settings = settings
         self._upscalingStrategyChooser = upscalingStrategyChooser
         self._deconvolutionStrategyChooser = deconvolutionStrategyChooser
-        self._reinitObservable = reinitObservable
 
-        self._syncUpscalingStrategyFromSettings()
+        upscalingStrategyChooser.synchronize_with_parameter(settings.upscalingStrategy)
         upscalingStrategyChooser.addObserver(self)
 
-        self._syncDeconvolutionStrategyFromSettings()
+        deconvolutionStrategyChooser.synchronize_with_parameter(settings.deconvolutionStrategy)
         deconvolutionStrategyChooser.addObserver(self)
-
-        reinitObservable.addObserver(self)
 
     def enhance(self, dataset: FluorescenceDataset, product: Product) -> FluorescenceDataset:
         # FIXME OPR
-        upscaler = self._upscalingStrategyChooser.currentPlugin.strategy
-        deconvolver = self._deconvolutionStrategyChooser.currentPlugin.strategy
+        upscaler = self._upscalingStrategyChooser.get_current_plugin().strategy
+        deconvolver = self._deconvolutionStrategyChooser.get_current_plugin().strategy
         element_maps: list[ElementMap] = list()
 
         for emap in dataset.element_maps:
@@ -71,41 +66,28 @@ class TwoStepFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Obse
             channel_names_path=dataset.channel_names_path,
         )
 
-    def getUpscalingStrategyList(self) -> Sequence[str]:
-        return self._upscalingStrategyChooser.getDisplayNameList()
+    def getUpscalingStrategyList(self) -> Iterator[str]:
+        for plugin in self._upscalingStrategyChooser:
+            yield plugin.display_name
 
     def getUpscalingStrategy(self) -> str:
-        return self._upscalingStrategyChooser.currentPlugin.displayName
+        return self._upscalingStrategyChooser.get_current_plugin().display_name
 
     def setUpscalingStrategy(self, name: str) -> None:
-        self._upscalingStrategyChooser.setCurrentPluginByName(name)
-        self._settings.upscalingStrategy.setValue(
-            self._upscalingStrategyChooser.currentPlugin.simpleName
-        )
+        self._upscalingStrategyChooser.set_current_plugin(name)
 
-    def _syncUpscalingStrategyFromSettings(self) -> None:
-        self.setUpscalingStrategy(self._settings.upscalingStrategy.getValue())
-
-    def getDeconvolutionStrategyList(self) -> Sequence[str]:
-        return self._deconvolutionStrategyChooser.getDisplayNameList()
+    def getDeconvolutionStrategyList(self) -> Iterator[str]:
+        for plugin in self._deconvolutionStrategyChooser:
+            yield plugin.display_name
 
     def getDeconvolutionStrategy(self) -> str:
-        return self._deconvolutionStrategyChooser.currentPlugin.displayName
+        return self._deconvolutionStrategyChooser.get_current_plugin().display_name
 
     def setDeconvolutionStrategy(self, name: str) -> None:
-        self._deconvolutionStrategyChooser.setCurrentPluginByName(name)
-        self._settings.deconvolutionStrategy.setValue(
-            self._deconvolutionStrategyChooser.currentPlugin.simpleName
-        )
-
-    def _syncDeconvolutionStrategyFromSettings(self) -> None:
-        self.setDeconvolutionStrategy(self._settings.deconvolutionStrategy.getValue())
+        self._deconvolutionStrategyChooser.set_current_plugin(name)
 
     def update(self, observable: Observable) -> None:
-        if observable is self._reinitObservable:
-            self._syncUpscalingStrategyFromSettings()
-            self._syncDeconvolutionStrategyFromSettings()
-        elif observable is self._upscalingStrategyChooser:
+        if observable is self._upscalingStrategyChooser:
             self.notifyObservers()
         elif observable is self._deconvolutionStrategyChooser:
             self.notifyObservers()

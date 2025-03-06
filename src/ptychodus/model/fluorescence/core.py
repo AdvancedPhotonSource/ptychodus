@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Sequence
+from collections.abc import Iterator
 from pathlib import Path
 import logging
 
@@ -48,25 +48,25 @@ class FluorescenceEnhancer(Observable, Observer):
         self._reinitObservable = reinitObservable
 
         self._algorithmChooser = PluginChooser[FluorescenceEnhancingAlgorithm]()
-        self._algorithmChooser.registerPlugin(
+        self._algorithmChooser.register_plugin(
             twoStepEnhancingAlgorithm,
-            simpleName=TwoStepFluorescenceEnhancingAlgorithm.SIMPLE_NAME,
-            displayName=TwoStepFluorescenceEnhancingAlgorithm.DISPLAY_NAME,
+            simple_name=TwoStepFluorescenceEnhancingAlgorithm.SIMPLE_NAME,
+            display_name=TwoStepFluorescenceEnhancingAlgorithm.DISPLAY_NAME,
         )
-        self._algorithmChooser.registerPlugin(
+        self._algorithmChooser.register_plugin(
             vspiEnhancingAlgorithm,
-            simpleName=VSPIFluorescenceEnhancingAlgorithm.SIMPLE_NAME,
-            displayName=VSPIFluorescenceEnhancingAlgorithm.DISPLAY_NAME,
+            simple_name=VSPIFluorescenceEnhancingAlgorithm.SIMPLE_NAME,
+            display_name=VSPIFluorescenceEnhancingAlgorithm.DISPLAY_NAME,
         )
-        self._syncAlgorithmFromSettings()
+        self._algorithmChooser.synchronize_with_parameter(settings.algorithm)
         self._algorithmChooser.addObserver(self)
 
         self._productIndex = -1
         self._measured: FluorescenceDataset | None = None
         self._enhanced: FluorescenceDataset | None = None
 
-        fileReaderChooser.setCurrentPluginByName(settings.fileType.getValue())
-        fileWriterChooser.setCurrentPluginByName(settings.fileType.getValue())
+        fileReaderChooser.synchronize_with_parameter(settings.fileType)
+        fileWriterChooser.set_current_plugin(settings.fileType.getValue())
         reinitObservable.addObserver(self)
 
     @property
@@ -85,18 +85,19 @@ class FluorescenceEnhancer(Observable, Observer):
     def getPixelGeometry(self) -> PixelGeometry:
         return self._product.getGeometry().getObjectPlanePixelGeometry()
 
-    def getOpenFileFilterList(self) -> Sequence[str]:
-        return self._fileReaderChooser.getDisplayNameList()
+    def getOpenFileFilterList(self) -> Iterator[str]:
+        for plugin in self._fileReaderChooser:
+            yield plugin.display_name
 
     def getOpenFileFilter(self) -> str:
-        return self._fileReaderChooser.currentPlugin.displayName
+        return self._fileReaderChooser.get_current_plugin().display_name
 
     def openMeasuredDataset(self, filePath: Path, fileFilter: str) -> None:
         if filePath.is_file():
-            self._fileReaderChooser.setCurrentPluginByName(fileFilter)
-            fileType = self._fileReaderChooser.currentPlugin.simpleName
+            self._fileReaderChooser.set_current_plugin(fileFilter)
+            fileType = self._fileReaderChooser.get_current_plugin().simple_name
             logger.debug(f'Reading "{filePath}" as "{fileType}"')
-            fileReader = self._fileReaderChooser.currentPlugin.strategy
+            fileReader = self._fileReaderChooser.get_current_plugin().strategy
 
             try:
                 measured = fileReader.read(filePath)
@@ -107,7 +108,6 @@ class FluorescenceEnhancer(Observable, Observer):
                 self._enhanced = None
 
                 self._settings.filePath.setValue(filePath)
-                self._settings.fileType.setValue(fileType)
 
                 self.notifyObservers()
         else:
@@ -122,24 +122,21 @@ class FluorescenceEnhancer(Observable, Observer):
 
         return self._measured.element_maps[channelIndex]
 
-    def getAlgorithmList(self) -> Sequence[str]:
-        return self._algorithmChooser.getDisplayNameList()
+    def getAlgorithmList(self) -> Iterator[str]:
+        for plugin in self._algorithmChooser:
+            yield plugin.display_name
 
     def getAlgorithm(self) -> str:
-        return self._algorithmChooser.currentPlugin.displayName
+        return self._algorithmChooser.get_current_plugin().display_name
 
     def setAlgorithm(self, name: str) -> None:
-        self._algorithmChooser.setCurrentPluginByName(name)
-        self._settings.algorithm.setValue(self._algorithmChooser.currentPlugin.simpleName)
-
-    def _syncAlgorithmFromSettings(self) -> None:
-        self.setAlgorithm(self._settings.algorithm.getValue())
+        self._algorithmChooser.set_current_plugin(name)
 
     def enhanceFluorescence(self) -> None:
         if self._measured is None:
             raise ValueError('Fluorescence dataset not loaded!')
         else:
-            algorithm = self._algorithmChooser.currentPlugin.strategy
+            algorithm = self._algorithmChooser.get_current_plugin().strategy
             product = self._product.getProduct()
             self._enhanced = algorithm.enhance(self._measured, product)
             self.notifyObservers()
@@ -150,20 +147,21 @@ class FluorescenceEnhancer(Observable, Observer):
 
         return self._enhanced.element_maps[channelIndex]
 
-    def getSaveFileFilterList(self) -> Sequence[str]:
-        return self._fileWriterChooser.getDisplayNameList()
+    def getSaveFileFilterList(self) -> Iterator[str]:
+        for plugin in self._fileWriterChooser:
+            yield plugin.display_name
 
     def getSaveFileFilter(self) -> str:
-        return self._fileWriterChooser.currentPlugin.displayName
+        return self._fileWriterChooser.get_current_plugin().display_name
 
     def saveEnhancedDataset(self, filePath: Path, fileFilter: str) -> None:
         if self._enhanced is None:
             raise ValueError('Fluorescence dataset not enhanced!')
 
-        self._fileWriterChooser.setCurrentPluginByName(fileFilter)
-        fileType = self._fileWriterChooser.currentPlugin.simpleName
+        self._fileWriterChooser.set_current_plugin(fileFilter)
+        fileType = self._fileWriterChooser.get_current_plugin().simple_name
         logger.debug(f'Writing "{filePath}" as "{fileType}"')
-        writer = self._fileWriterChooser.currentPlugin.strategy
+        writer = self._fileWriterChooser.get_current_plugin().strategy
         writer.write(filePath, self._enhanced)
 
     def _openFluorescenceFileFromSettings(self) -> None:
@@ -175,7 +173,6 @@ class FluorescenceEnhancer(Observable, Observer):
         if observable is self._algorithmChooser:
             self.notifyObservers()
         elif observable is self._reinitObservable:
-            self._syncAlgorithmFromSettings()
             self._openFluorescenceFileFromSettings()
 
 
@@ -191,7 +188,7 @@ class FluorescenceCore:
     ) -> None:
         self._settings = FluorescenceSettings(settingsRegistry)
         self._twoStepEnhancingAlgorithm = TwoStepFluorescenceEnhancingAlgorithm(
-            self._settings, upscalingStrategyChooser, deconvolutionStrategyChooser, settingsRegistry
+            self._settings, upscalingStrategyChooser, deconvolutionStrategyChooser
         )
         self._vspiEnhancingAlgorithm = VSPIFluorescenceEnhancingAlgorithm(self._settings)
 

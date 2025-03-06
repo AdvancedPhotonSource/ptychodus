@@ -52,48 +52,48 @@ class CylindricalColorModelParameter(Parameter[str], Observer):
     def __init__(self) -> None:
         super().__init__()
         self._chooser = PluginChooser[CylindricalColorModel]()
-        self._chooser.registerPlugin(
+        self._chooser.register_plugin(
             HSVSaturationColorModel(),
-            simpleName='HSV-S',
-            displayName='HSV Saturation',
+            simple_name='HSV-S',
+            display_name='HSV Saturation',
         )
-        self._chooser.registerPlugin(
+        self._chooser.register_plugin(
             HSVValueColorModel(),
-            simpleName='HSV-V',
-            displayName='HSV Value',
+            simple_name='HSV-V',
+            display_name='HSV Value',
         )
-        self._chooser.registerPlugin(
+        self._chooser.register_plugin(
             HSVAlphaColorModel(),
-            simpleName='HSV-A',
-            displayName='HSV Alpha',
+            simple_name='HSV-A',
+            display_name='HSV Alpha',
         )
-        self._chooser.registerPlugin(
+        self._chooser.register_plugin(
             HLSLightnessColorModel(),
-            simpleName='HLS-L',
-            displayName='HLS Lightness',
+            simple_name='HLS-L',
+            display_name='HLS Lightness',
         )
-        self._chooser.registerPlugin(
+        self._chooser.register_plugin(
             HLSSaturationColorModel(),
-            simpleName='HLS-S',
-            displayName='HLS Saturation',
+            simple_name='HLS-S',
+            display_name='HLS Saturation',
         )
-        self._chooser.registerPlugin(
+        self._chooser.register_plugin(
             HLSAlphaColorModel(),
-            simpleName='HLS-A',
-            displayName='HLS Alpha',
+            simple_name='HLS-A',
+            display_name='HLS Alpha',
         )
         self.setValue('HSV-V')
         self._chooser.addObserver(self)
 
     def choices(self) -> Iterator[str]:
-        for name in self._chooser.getDisplayNameList():
-            yield name
+        for plugin in self._chooser:
+            yield plugin.display_name
 
     def getValue(self) -> str:
-        return self._chooser.currentPlugin.displayName
+        return self._chooser.get_current_plugin().display_name
 
     def setValue(self, value: str, *, notify: bool = True) -> None:
-        self._chooser.setCurrentPluginByName(value)
+        self._chooser.set_current_plugin(value)
 
     def getValueAsString(self) -> str:
         return self.getValue()
@@ -107,7 +107,7 @@ class CylindricalColorModelParameter(Parameter[str], Observer):
         return parameter
 
     def getPlugin(self) -> CylindricalColorModel:
-        return self._chooser.currentPlugin.strategy
+        return self._chooser.get_current_plugin().strategy
 
     def update(self, observable: Observable) -> None:
         if observable is self._chooser:

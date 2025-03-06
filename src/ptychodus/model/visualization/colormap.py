@@ -22,20 +22,20 @@ class ColormapParameter(Parameter[str], Observer):
             isCyclicColormap = name in ColormapParameter.CYCLIC_COLORMAPS
 
             if isCyclic == isCyclicColormap:
-                self._chooser.registerPlugin(cmap, displayName=name)
+                self._chooser.register_plugin(cmap, display_name=name)
 
         self.setValue('hsv' if isCyclic else 'gray')
         self._chooser.addObserver(self)
 
     def choices(self) -> Iterator[str]:
-        for name in self._chooser.getDisplayNameList():
-            yield name
+        for plugin in self._chooser:
+            yield plugin.display_name
 
     def getValue(self) -> str:
-        return self._chooser.currentPlugin.displayName
+        return self._chooser.get_current_plugin().display_name
 
     def setValue(self, value: str, *, notify: bool = True) -> None:
-        self._chooser.setCurrentPluginByName(value)
+        self._chooser.set_current_plugin(value)
 
     def getValueAsString(self) -> str:
         return self.getValue()
@@ -49,7 +49,7 @@ class ColormapParameter(Parameter[str], Observer):
         return parameter
 
     def getPlugin(self) -> Colormap:
-        return self._chooser.currentPlugin.strategy
+        return self._chooser.get_current_plugin().strategy
 
     def update(self, observable: Observable) -> None:
         if observable is self._chooser:

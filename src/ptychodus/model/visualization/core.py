@@ -37,14 +37,14 @@ class VisualizationEngine(Observable, Observer):
         self._colorAxis = ColorAxis()
         acyclicColormap = ColormapParameter(isCyclic=False)
 
-        self._rendererChooser.registerPlugin(
+        self._rendererChooser.register_plugin(
             ColormapRenderer(
                 RealArrayComponent(),
                 self._transformation,
                 self._colorAxis,
                 acyclicColormap,
             ),
-            displayName='Real',
+            display_name='Real',
         )
 
         if isComplex:
@@ -52,66 +52,66 @@ class VisualizationEngine(Observable, Observer):
             phaseComponent = PhaseInRadiansArrayComponent()
             cyclicColormap = ColormapParameter(isCyclic=True)
 
-            self._rendererChooser.registerPlugin(
+            self._rendererChooser.register_plugin(
                 ColormapRenderer(
                     ImaginaryArrayComponent(),
                     self._transformation,
                     self._colorAxis,
                     acyclicColormap,
                 ),
-                displayName='Imaginary',
+                display_name='Imaginary',
             )
-            self._rendererChooser.registerPlugin(
+            self._rendererChooser.register_plugin(
                 ColormapRenderer(
                     amplitudeComponent,
                     self._transformation,
                     self._colorAxis,
                     acyclicColormap,
                 ),
-                displayName='Amplitude',
+                display_name='Amplitude',
             )
-            self._rendererChooser.registerPlugin(
+            self._rendererChooser.register_plugin(
                 ColormapRenderer(
                     phaseComponent,
                     self._transformation,
                     self._colorAxis,
                     cyclicColormap,
                 ),
-                displayName='Phase',
+                display_name='Phase',
             )
-            self._rendererChooser.registerPlugin(
+            self._rendererChooser.register_plugin(
                 ColormapRenderer(
                     UnwrappedPhaseInRadiansArrayComponent(),
                     self._transformation,
                     self._colorAxis,
                     acyclicColormap,
                 ),
-                displayName='Phase (Unwrapped)',
+                display_name='Phase (Unwrapped)',
             )
-            self._rendererChooser.registerPlugin(
+            self._rendererChooser.register_plugin(
                 CylindricalColorModelRenderer(
                     amplitudeComponent,
                     phaseComponent,
                     self._transformation,
                     self._colorAxis,
                 ),
-                displayName='Complex',
+                display_name='Complex',
             )
-            self._rendererChooser.setCurrentPluginByName('Complex')
+            self._rendererChooser.set_current_plugin('Complex')
 
         self._rendererChooser.addObserver(self)
-        self._rendererPlugin = self._rendererChooser.currentPlugin
+        self._rendererPlugin = self._rendererChooser.get_current_plugin()
         self._rendererPlugin.strategy.addObserver(self)
 
     def renderers(self) -> Iterator[str]:
         for plugin in self._rendererChooser:
-            yield plugin.displayName
+            yield plugin.display_name
 
     def getRenderer(self) -> str:
-        return self._rendererPlugin.displayName
+        return self._rendererPlugin.display_name
 
     def setRenderer(self, value: str) -> None:
-        self._rendererChooser.setCurrentPluginByName(value)
+        self._rendererChooser.set_current_plugin(value)
 
     def isRendererCyclic(self) -> bool:
         return self._rendererPlugin.strategy.isCyclic()
@@ -166,7 +166,7 @@ class VisualizationEngine(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._rendererChooser:
             self._rendererPlugin.strategy.removeObserver(self)
-            self._rendererPlugin = self._rendererChooser.currentPlugin
+            self._rendererPlugin = self._rendererChooser.get_current_plugin()
             self._rendererPlugin.strategy.addObserver(self)
             self.notifyObservers()
         elif observable is self._rendererPlugin.strategy:

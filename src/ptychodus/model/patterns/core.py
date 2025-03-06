@@ -37,11 +37,8 @@ class PatternsCore(Observer):
             fileWriterChooser,
         )
 
-        # FIXME what syncs filePath and fileType to/from settings?
-        # TODO vvv refactor vvv
-        fileReaderChooser.setCurrentPluginByName(self.patternSettings.fileType.getValue())
-        fileWriterChooser.setCurrentPluginByName(self.patternSettings.fileType.getValue())
-        # TODO ^^^^^^^^^^^^^^^^
+        fileReaderChooser.synchronize_with_parameter(self.patternSettings.fileType)
+        fileWriterChooser.set_current_plugin(self.patternSettings.fileType.getValue())
 
         self._reinitObservable = reinitObservable
         reinitObservable.addObserver(self)

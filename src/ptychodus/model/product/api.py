@@ -102,7 +102,7 @@ class ScanAPI:
 
         item.setBuilder(builder)
 
-    def getOpenFileFilterList(self) -> Sequence[str]:
+    def getOpenFileFilterList(self) -> Iterator[str]:
         return self._builderFactory.getOpenFileFilterList()
 
     def getOpenFileFilter(self) -> str:
@@ -138,7 +138,7 @@ class ScanAPI:
 
         destinationItem.assignItem(sourceItem)
 
-    def getSaveFileFilterList(self) -> Sequence[str]:
+    def getSaveFileFilterList(self) -> Iterator[str]:
         return self._builderFactory.getSaveFileFilterList()
 
     def getSaveFileFilter(self) -> str:
@@ -210,7 +210,7 @@ class ProbeAPI:
 
         item.setBuilder(builder)
 
-    def getOpenFileFilterList(self) -> Sequence[str]:
+    def getOpenFileFilterList(self) -> Iterator[str]:
         return self._builderFactory.getOpenFileFilterList()
 
     def getOpenFileFilter(self) -> str:
@@ -246,7 +246,7 @@ class ProbeAPI:
 
         destinationItem.assignItem(sourceItem)
 
-    def getSaveFileFilterList(self) -> Sequence[str]:
+    def getSaveFileFilterList(self) -> Iterator[str]:
         return self._builderFactory.getSaveFileFilterList()
 
     def getSaveFileFilter(self) -> str:
@@ -318,7 +318,7 @@ class ObjectAPI:
 
         item.setBuilder(builder)
 
-    def getOpenFileFilterList(self) -> Sequence[str]:
+    def getOpenFileFilterList(self) -> Iterator[str]:
         return self._builderFactory.getOpenFileFilterList()
 
     def getOpenFileFilter(self) -> str:
@@ -354,7 +354,7 @@ class ObjectAPI:
 
         destinationItem.assignItem(sourceItem)
 
-    def getSaveFileFilterList(self) -> Sequence[str]:
+    def getSaveFileFilterList(self) -> Iterator[str]:
         return self._builderFactory.getSaveFileFilterList()
 
     def getSaveFileFilter(self) -> str:
@@ -407,20 +407,21 @@ class ProductAPI:
         item = self._repository[productIndex]
         return item.getName()
 
-    def getOpenFileFilterList(self) -> Sequence[str]:
-        return self._fileReaderChooser.getDisplayNameList()
+    def getOpenFileFilterList(self) -> Iterator[str]:
+        for plugin in self._fileReaderChooser:
+            yield plugin.display_name
 
     def getOpenFileFilter(self) -> str:
-        return self._fileReaderChooser.currentPlugin.displayName
+        return self._fileReaderChooser.get_current_plugin().display_name
 
     def openProduct(self, filePath: Path, *, fileType: str | None = None) -> int:
         if filePath.is_file():
-            self._fileReaderChooser.setCurrentPluginByName(
-                self._settings.fileType.getValue() if fileType is None else fileType
-            )
-            fileType = self._fileReaderChooser.currentPlugin.simpleName
+            if fileType is not None:
+                self._fileReaderChooser.set_current_plugin(fileType)
+
+            fileType = self._fileReaderChooser.get_current_plugin().simple_name
             logger.debug(f'Reading "{filePath}" as "{fileType}"')
-            fileReader = self._fileReaderChooser.currentPlugin.strategy
+            fileReader = self._fileReaderChooser.get_current_plugin().strategy
 
             try:
                 product = fileReader.read(filePath)
@@ -433,11 +434,12 @@ class ProductAPI:
 
         return -1
 
-    def getSaveFileFilterList(self) -> Sequence[str]:
-        return self._fileWriterChooser.getDisplayNameList()
+    def getSaveFileFilterList(self) -> Iterator[str]:
+        for plugin in self._fileWriterChooser:
+            yield plugin.display_name
 
     def getSaveFileFilter(self) -> str:
-        return self._fileWriterChooser.currentPlugin.displayName
+        return self._fileWriterChooser.get_current_plugin().display_name
 
     def saveProduct(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
         try:
@@ -446,10 +448,10 @@ class ProductAPI:
             logger.warning(f'Failed to save product {index}!')
             return
 
-        self._fileWriterChooser.setCurrentPluginByName(
-            self._settings.fileType.getValue() if fileType is None else fileType
-        )
-        fileType = self._fileWriterChooser.currentPlugin.simpleName
+        if fileType is not None:
+            self._fileWriterChooser.set_current_plugin(fileType)
+
+        fileType = self._fileWriterChooser.get_current_plugin().simple_name
         logger.debug(f'Writing "{filePath}" as "{fileType}"')
-        writer = self._fileWriterChooser.currentPlugin.strategy
+        writer = self._fileWriterChooser.get_current_plugin().strategy
         writer.write(filePath, item.getProduct())

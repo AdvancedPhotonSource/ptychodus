@@ -82,16 +82,16 @@ class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
         numpy.savez(filePath, **contents)
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
+def register_plugins(registry: PluginRegistry) -> None:
     npzDiffractionFileIO = NPZDiffractionFileIO()
 
-    registry.diffractionFileReaders.registerPlugin(
+    registry.diffractionFileReaders.register_plugin(
         npzDiffractionFileIO,
-        simpleName=NPZDiffractionFileIO.SIMPLE_NAME,
-        displayName=NPZDiffractionFileIO.DISPLAY_NAME,
+        simple_name=NPZDiffractionFileIO.SIMPLE_NAME,
+        display_name=NPZDiffractionFileIO.DISPLAY_NAME,
     )
-    registry.diffractionFileWriters.registerPlugin(
+    registry.diffractionFileWriters.register_plugin(
         npzDiffractionFileIO,
-        simpleName=NPZDiffractionFileIO.SIMPLE_NAME,
-        displayName=NPZDiffractionFileIO.DISPLAY_NAME,
+        simple_name=NPZDiffractionFileIO.SIMPLE_NAME,
+        display_name=NPZDiffractionFileIO.DISPLAY_NAME,
     )

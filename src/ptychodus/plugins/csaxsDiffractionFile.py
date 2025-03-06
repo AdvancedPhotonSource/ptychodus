@@ -78,9 +78,9 @@ class CSAXSDiffractionFileReader(DiffractionFileReader):
         return dataset
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.diffractionFileReaders.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.diffractionFileReaders.register_plugin(
         CSAXSDiffractionFileReader(),
-        simpleName=CSAXSDiffractionFileReader.SIMPLE_NAME,
-        displayName=CSAXSDiffractionFileReader.DISPLAY_NAME,
+        simple_name=CSAXSDiffractionFileReader.SIMPLE_NAME,
+        display_name=CSAXSDiffractionFileReader.DISPLAY_NAME,
     )

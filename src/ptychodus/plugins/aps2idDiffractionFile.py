@@ -71,9 +71,9 @@ class APS2IDDiffractionFileReader(DiffractionFileReader):
         return SimpleDiffractionDataset(metadata, contentsTree, arrayList)
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.diffractionFileReaders.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.diffractionFileReaders.register_plugin(
         APS2IDDiffractionFileReader(),
-        simpleName='APS_2ID',
-        displayName='APS 2-ID Diffraction Files (*.h5 *.hdf5)',
+        simple_name='APS_2ID',
+        display_name='APS 2-ID Diffraction Files (*.h5 *.hdf5)',
     )

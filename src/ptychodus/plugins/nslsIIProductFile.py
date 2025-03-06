@@ -67,9 +67,9 @@ class NSLSIIProductFileReader(ProductFileReader):
         )
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.productFileReaders.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.productFileReaders.register_plugin(
         NSLSIIProductFileReader(),
-        simpleName=NSLSIIProductFileReader.SIMPLE_NAME,
-        displayName=NSLSIIProductFileReader.DISPLAY_NAME,
+        simple_name=NSLSIIProductFileReader.SIMPLE_NAME,
+        display_name=NSLSIIProductFileReader.DISPLAY_NAME,
     )

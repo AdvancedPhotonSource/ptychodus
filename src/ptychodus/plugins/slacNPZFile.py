@@ -85,17 +85,17 @@ class SLACProductFileReader(ProductFileReader):
         )
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
+def register_plugins(registry: PluginRegistry) -> None:
     SIMPLE_NAME: Final[str] = 'SLAC'
     DISPLAY_NAME: Final[str] = 'SLAC NumPy Zipped Archive (*.npz)'
 
-    registry.diffractionFileReaders.registerPlugin(
+    registry.diffractionFileReaders.register_plugin(
         SLACDiffractionFileReader(),
-        simpleName=SIMPLE_NAME,
-        displayName=DISPLAY_NAME,
+        simple_name=SIMPLE_NAME,
+        display_name=DISPLAY_NAME,
     )
-    registry.productFileReaders.registerPlugin(
+    registry.productFileReaders.register_plugin(
         SLACProductFileReader(),
-        simpleName=SIMPLE_NAME,
-        displayName=DISPLAY_NAME,
+        simple_name=SIMPLE_NAME,
+        display_name=DISPLAY_NAME,
     )

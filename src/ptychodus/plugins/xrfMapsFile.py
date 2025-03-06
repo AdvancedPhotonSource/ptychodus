@@ -88,21 +88,21 @@ class NPZFluorescenceFileWriter(FluorescenceFileWriter):
         numpy.savez(filePath, **element_maps)
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
+def register_plugins(registry: PluginRegistry) -> None:
     xrfMapsFileIO = XRFMapsFileIO()
 
-    registry.fluorescenceFileReaders.registerPlugin(
+    registry.fluorescenceFileReaders.register_plugin(
         xrfMapsFileIO,
-        simpleName=XRFMapsFileIO.SIMPLE_NAME,
-        displayName=XRFMapsFileIO.DISPLAY_NAME,
+        simple_name=XRFMapsFileIO.SIMPLE_NAME,
+        display_name=XRFMapsFileIO.DISPLAY_NAME,
     )
-    registry.fluorescenceFileWriters.registerPlugin(
+    registry.fluorescenceFileWriters.register_plugin(
         xrfMapsFileIO,
-        simpleName=XRFMapsFileIO.SIMPLE_NAME,
-        displayName=XRFMapsFileIO.DISPLAY_NAME,
+        simple_name=XRFMapsFileIO.SIMPLE_NAME,
+        display_name=XRFMapsFileIO.DISPLAY_NAME,
     )
-    registry.fluorescenceFileWriters.registerPlugin(
+    registry.fluorescenceFileWriters.register_plugin(
         NPZFluorescenceFileWriter(),
-        simpleName='NPZ',
-        displayName='NumPy Zipped Archive (*.npz)',
+        simple_name='NPZ',
+        display_name='NumPy Zipped Archive (*.npz)',
     )

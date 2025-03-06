@@ -119,7 +119,7 @@ class ModelCore:
     ) -> None:
         configureLogger(isDeveloperModeEnabled)
         self.rng = numpy.random.default_rng()
-        self._pluginRegistry = PluginRegistry.loadPlugins()
+        self._pluginRegistry = PluginRegistry.load_plugins()
 
         self.memoryPresenter = MemoryPresenter()
         self.settingsRegistry = SettingsRegistry()

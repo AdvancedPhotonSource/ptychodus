@@ -18,14 +18,14 @@ class CSVObjectFileWriter(ObjectFileWriter):
         numpy.savetxt(filePath, array, delimiter=',')
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.objectFileReaders.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.objectFileReaders.register_plugin(
         CSVObjectFileReader(),
-        simpleName='CSV',
-        displayName='Comma-Separated Values Files (*.csv)',
+        simple_name='CSV',
+        display_name='Comma-Separated Values Files (*.csv)',
     )
-    registry.objectFileWriters.registerPlugin(
+    registry.objectFileWriters.register_plugin(
         CSVObjectFileWriter(),
-        simpleName='CSV',
-        displayName='Comma-Separated Values Files (*.csv)',
+        simple_name='CSV',
+        display_name='Comma-Separated Values Files (*.csv)',
     )

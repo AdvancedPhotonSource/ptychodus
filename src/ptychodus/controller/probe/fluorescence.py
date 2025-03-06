@@ -194,7 +194,7 @@ class FluorescenceViewController(Observer):
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._dialog,
             title,
-            nameFilters=self._enhancer.getOpenFileFilterList(),
+            nameFilters=[nameFilter for nameFilter in self._enhancer.getOpenFileFilterList()],
             selectedNameFilter=self._enhancer.getOpenFileFilter(),
         )
 
@@ -229,7 +229,7 @@ class FluorescenceViewController(Observer):
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._dialog,
             title,
-            nameFilters=self._enhancer.getSaveFileFilterList(),
+            nameFilters=[nameFilter for nameFilter in self._enhancer.getSaveFileFilterList()],
             selectedNameFilter=self._enhancer.getSaveFileFilter(),
         )
 

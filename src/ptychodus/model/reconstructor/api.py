@@ -43,7 +43,7 @@ class ReconstructorAPI:
         outputProductSuffix: str = '',
         indexFilter: ScanIndexFilter = ScanIndexFilter.ALL,
     ) -> int:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+        reconstructor = self._reconstructorChooser.get_current_plugin().strategy
         parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(
             inputProductIndex, indexFilter
         )
@@ -52,7 +52,7 @@ class ReconstructorAPI:
 
         outputProductName = (
             self._dataMatcher.getProductName(inputProductIndex)
-            + f'_{self._reconstructorChooser.currentPlugin.simpleName}'
+            + f'_{self._reconstructorChooser.get_current_plugin().simple_name}'
         )
 
         if outputProductSuffix:
@@ -77,7 +77,7 @@ class ReconstructorAPI:
         return outputProductIndexOdd, outputProductIndexEven
 
     def openModel(self, filePath: Path) -> None:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+        reconstructor = self._reconstructorChooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Opening model...')
@@ -89,7 +89,7 @@ class ReconstructorAPI:
             logger.warning('Reconstructor is not trainable!')
 
     def saveModel(self, filePath: Path) -> None:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+        reconstructor = self._reconstructorChooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Saving model...')
@@ -101,7 +101,7 @@ class ReconstructorAPI:
             logger.warning('Reconstructor is not trainable!')
 
     def exportTrainingData(self, filePath: Path, inputProductIndex: int) -> None:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+        reconstructor = self._reconstructorChooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Preparing input data...')
@@ -121,7 +121,7 @@ class ReconstructorAPI:
             logger.warning('Reconstructor is not trainable!')
 
     def train(self, dataPath: Path) -> TrainOutput:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+        reconstructor = self._reconstructorChooser.get_current_plugin().strategy
         result = TrainOutput([], [], -1)
 
         if isinstance(reconstructor, TrainableReconstructor):

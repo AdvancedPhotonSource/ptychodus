@@ -86,12 +86,12 @@ class PatternsAPI:
             self._detectorSettings.heightInPixels.setValue(detectorExtent.heightInPixels)
 
         if filePath.is_file():
-            self._fileReaderChooser.setCurrentPluginByName(
-                self._patternSettings.fileType.getValue() if fileType is None else fileType
-            )
-            fileType = self._fileReaderChooser.currentPlugin.simpleName
+            if fileType is not None:
+                self._fileReaderChooser.set_current_plugin(fileType)
+
+            fileType = self._fileReaderChooser.get_current_plugin().simple_name
             logger.debug(f'Reading "{filePath}" as "{fileType}"')
-            fileReader = self._fileReaderChooser.currentPlugin.strategy
+            fileReader = self._fileReaderChooser.get_current_plugin().strategy
 
             try:
                 dataset = fileReader.read(filePath)
@@ -121,10 +121,10 @@ class PatternsAPI:
         return self._fileWriterChooser
 
     def savePatterns(self, filePath: Path, fileType: str) -> None:
-        self._fileWriterChooser.setCurrentPluginByName(fileType)
-        fileType = self._fileWriterChooser.currentPlugin.simpleName
+        self._fileWriterChooser.set_current_plugin(fileType)
+        fileType = self._fileWriterChooser.get_current_plugin().simple_name
         logger.debug(f'Writing "{filePath}" as "{fileType}"')
-        writer = self._fileWriterChooser.currentPlugin.strategy
+        writer = self._fileWriterChooser.get_current_plugin().strategy
         writer.write(filePath, self._dataset)
 
     def importAssembledPatterns(self, filePath: Path) -> None:

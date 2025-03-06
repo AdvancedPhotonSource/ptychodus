@@ -69,9 +69,9 @@ class NSLSIIDiffractionFileReader(DiffractionFileReader):
         return dataset
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.diffractionFileReaders.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.diffractionFileReaders.register_plugin(
         NSLSIIDiffractionFileReader(),
-        simpleName=NSLSIIDiffractionFileReader.SIMPLE_NAME,
-        displayName=NSLSIIDiffractionFileReader.DISPLAY_NAME,
+        simple_name=NSLSIIDiffractionFileReader.SIMPLE_NAME,
+        display_name=NSLSIIDiffractionFileReader.DISPLAY_NAME,
     )

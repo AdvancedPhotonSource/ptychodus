@@ -18,14 +18,14 @@ class NPYObjectFileWriter(ObjectFileWriter):
         numpy.save(filePath, array)
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.objectFileReaders.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.objectFileReaders.register_plugin(
         NPYObjectFileReader(),
-        simpleName='NPY',
-        displayName='NumPy Binary Files (*.npy)',
+        simple_name='NPY',
+        display_name='NumPy Binary Files (*.npy)',
     )
-    registry.objectFileWriters.registerPlugin(
+    registry.objectFileWriters.register_plugin(
         NPYObjectFileWriter(),
-        simpleName='NPY',
-        displayName='NumPy Binary Files (*.npy)',
+        simple_name='NPY',
+        display_name='NumPy Binary Files (*.npy)',
     )

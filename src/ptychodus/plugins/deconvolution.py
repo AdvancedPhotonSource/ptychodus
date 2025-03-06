@@ -35,22 +35,22 @@ class UnsupervisedWienerDeconvolution(DeconvolutionStrategy):
         return ElementMap(emap.name, cps)
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
+def register_plugins(registry: PluginRegistry) -> None:
     # NOTE See https://scikit-image.org/docs/stable/api/skimage.restoration.html
     # TODO Implement method from https://doi.org/10.1364/OE.20.018287
-    registry.deconvolutionStrategies.registerPlugin(
+    registry.deconvolutionStrategies.register_plugin(
         IdentityDeconvolution(),
-        displayName='Identity',
+        display_name='Identity',
     )
-    registry.deconvolutionStrategies.registerPlugin(
+    registry.deconvolutionStrategies.register_plugin(
         RichardsonLucyDeconvolution(),
-        displayName='Richardson-Lucy',
+        display_name='Richardson-Lucy',
     )
-    registry.deconvolutionStrategies.registerPlugin(
+    registry.deconvolutionStrategies.register_plugin(
         WienerDeconvolution(),
-        displayName='Wiener',
+        display_name='Wiener',
     )
-    registry.deconvolutionStrategies.registerPlugin(
+    registry.deconvolutionStrategies.register_plugin(
         UnsupervisedWienerDeconvolution(),
-        displayName='Unsupervised Wiener',
+        display_name='Unsupervised Wiener',
     )

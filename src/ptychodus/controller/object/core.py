@@ -137,7 +137,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Object',
-            nameFilters=self._api.getOpenFileFilterList(),
+            nameFilters=[nameFilter for nameFilter in self._api.getOpenFileFilterList()],
             selectedNameFilter=self._api.getOpenFileFilter(),
         )
 
@@ -181,7 +181,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
             'Save Object',
-            nameFilters=self._api.getSaveFileFilterList(),
+            nameFilters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
             selectedNameFilter=self._api.getSaveFileFilter(),
         )
 

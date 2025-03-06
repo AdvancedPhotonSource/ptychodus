@@ -104,22 +104,22 @@ class CXIProbeFileReader(ProbeFileReader):
         return Probe(array=array, pixelGeometry=None)
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
+def register_plugins(registry: PluginRegistry) -> None:
     SIMPLE_NAME: Final[str] = 'CXI'
     DISPLAY_NAME: Final[str] = 'Coherent X-ray Imaging Files (*.cxi)'
 
-    registry.diffractionFileReaders.registerPlugin(
+    registry.diffractionFileReaders.register_plugin(
         CXIDiffractionFileReader(),
-        simpleName=SIMPLE_NAME,
-        displayName=DISPLAY_NAME,
+        simple_name=SIMPLE_NAME,
+        display_name=DISPLAY_NAME,
     )
-    registry.scanFileReaders.registerPlugin(
+    registry.scanFileReaders.register_plugin(
         CXIScanFileReader(),
-        simpleName=SIMPLE_NAME,
-        displayName=DISPLAY_NAME,
+        simple_name=SIMPLE_NAME,
+        display_name=DISPLAY_NAME,
     )
-    registry.probeFileReaders.registerPlugin(
+    registry.probeFileReaders.register_plugin(
         CXIProbeFileReader(),
-        simpleName=SIMPLE_NAME,
-        displayName=DISPLAY_NAME,
+        simple_name=SIMPLE_NAME,
+        display_name=DISPLAY_NAME,
     )

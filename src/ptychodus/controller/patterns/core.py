@@ -103,8 +103,8 @@ class PatternsController(DiffractionDatasetObserver):
         filePath, nameFilter = self._file_dialog_factory.getSaveFilePath(
             self._view,
             'Save Diffraction File',
-            nameFilters=fileWriterChooser.getDisplayNameList(),
-            selectedNameFilter=fileWriterChooser.currentPlugin.displayName,
+            nameFilters=[plugin.display_name for plugin in fileWriterChooser],
+            selectedNameFilter=fileWriterChooser.get_current_plugin().display_name,
         )
 
         if filePath:

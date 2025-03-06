@@ -27,14 +27,14 @@ class CSVProbeFileWriter(ProbeFileWriter):
         numpy.savetxt(filePath, arrayFlat, delimiter=',')
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.probeFileReaders.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.probeFileReaders.register_plugin(
         CSVProbeFileReader(),
-        simpleName='CSV',
-        displayName='Comma-Separated Values Files (*.csv)',
+        simple_name='CSV',
+        display_name='Comma-Separated Values Files (*.csv)',
     )
-    registry.probeFileWriters.registerPlugin(
+    registry.probeFileWriters.register_plugin(
         CSVProbeFileWriter(),
-        simpleName='CSV',
-        displayName='Comma-Separated Values Files (*.csv)',
+        simple_name='CSV',
+        display_name='Comma-Separated Values Files (*.csv)',
     )

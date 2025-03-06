@@ -43,9 +43,9 @@ class FresnelZonePlateViewController(ParameterViewController):
         super().__init__()
         self._widget = GroupBoxWithPresets(title)
 
-        for index, presetsLabel in enumerate(probeBuilder.labelsForPresets()):
-            action = self._widget.presetsMenu.addAction(presetsLabel)
-            action.triggered.connect(lambda _, index=index: probeBuilder.applyPresets(index))
+        for label in probeBuilder.labelsForPresets():
+            action = self._widget.presetsMenu.addAction(label)
+            action.triggered.connect(lambda _, label=label: probeBuilder.applyPresets(label))
 
         self._zonePlateDiameterViewController = LengthWidgetParameterViewController(
             probeBuilder.zonePlateDiameterInMeters

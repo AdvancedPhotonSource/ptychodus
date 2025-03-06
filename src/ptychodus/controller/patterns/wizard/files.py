@@ -222,8 +222,8 @@ class OpenDatasetWizardFileTypeViewController(Observable, Observer):
         self._file_reader_chooser.addObserver(self)
         self._combo_box = QComboBox()
 
-        for file_type in self._file_reader_chooser.getDisplayNameList():
-            self._combo_box.addItem(file_type)
+        for plugin in self._file_reader_chooser:
+            self._combo_box.addItem(plugin.display_name)
 
         self._sync_model_to_view()
         self._combo_box.textActivated.connect(self._handle_text_activated)
@@ -238,7 +238,7 @@ class OpenDatasetWizardFileTypeViewController(Observable, Observer):
         self.notifyObservers()
 
     def _sync_model_to_view(self) -> None:
-        self._combo_box.setCurrentText(self._file_reader_chooser.currentPlugin.displayName)
+        self._combo_box.setCurrentText(self._file_reader_chooser.get_current_plugin().display_name)
 
     def get_widget(self) -> QWidget:
         return self._combo_box
@@ -284,7 +284,7 @@ class OpenDatasetWizardFilesViewController(Observer):
 
     def open_dataset(self) -> None:
         file_reader_chooser = self._api.getFileReaderChooser()
-        file_type = file_reader_chooser.currentPlugin.simpleName
+        file_type = file_reader_chooser.get_current_plugin().simple_name
         file_path = self._settings.filePath.getValue()
 
         try:

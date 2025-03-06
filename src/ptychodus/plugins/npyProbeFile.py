@@ -18,14 +18,14 @@ class NPYProbeFileWriter(ProbeFileWriter):
         numpy.save(filePath, array)
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.probeFileReaders.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.probeFileReaders.register_plugin(
         NPYProbeFileReader(),
-        simpleName='NPY',
-        displayName='NumPy Binary Files (*.npy)',
+        simple_name='NPY',
+        display_name='NumPy Binary Files (*.npy)',
     )
-    registry.probeFileWriters.registerPlugin(
+    registry.probeFileWriters.register_plugin(
         NPYProbeFileWriter(),
-        simpleName='NPY',
-        displayName='NumPy Binary Files (*.npy)',
+        simple_name='NPY',
+        display_name='NumPy Binary Files (*.npy)',
     )

@@ -98,11 +98,11 @@ class TiffDiffractionFileReader(DiffractionFileReader):
         return dataset
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.diffractionFileReaders.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.diffractionFileReaders.register_plugin(
         TiffDiffractionFileReader(),
-        simpleName='TIFF',
-        displayName='Tagged Image File Format Files (*.tif *.tiff)',
+        simple_name='TIFF',
+        display_name='Tagged Image File Format Files (*.tif *.tiff)',
     )
 
 

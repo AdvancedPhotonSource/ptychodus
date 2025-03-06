@@ -64,16 +64,16 @@ class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
         numpy.save(filePath, patterns)
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
+def register_plugins(registry: PluginRegistry) -> None:
     npyDiffractionFileIO = NPYDiffractionFileIO()
 
-    registry.diffractionFileReaders.registerPlugin(
+    registry.diffractionFileReaders.register_plugin(
         npyDiffractionFileIO,
-        simpleName=NPYDiffractionFileIO.SIMPLE_NAME,
-        displayName=NPYDiffractionFileIO.DISPLAY_NAME,
+        simple_name=NPYDiffractionFileIO.SIMPLE_NAME,
+        display_name=NPYDiffractionFileIO.DISPLAY_NAME,
     )
-    registry.diffractionFileWriters.registerPlugin(
+    registry.diffractionFileWriters.register_plugin(
         npyDiffractionFileIO,
-        simpleName=NPYDiffractionFileIO.SIMPLE_NAME,
-        displayName=NPYDiffractionFileIO.DISPLAY_NAME,
+        simple_name=NPYDiffractionFileIO.SIMPLE_NAME,
+        display_name=NPYDiffractionFileIO.DISPLAY_NAME,
     )

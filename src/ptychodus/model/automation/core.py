@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Sequence
+from collections.abc import Iterator
 from pathlib import Path
 import queue
 
@@ -36,7 +36,7 @@ class AutomationPresenter(Observable, Observer):
         settings.addObserver(self)
         watcher.addObserver(self)
 
-    def getStrategyList(self) -> Sequence[str]:
+    def getStrategyList(self) -> Iterator[str]:
         return self._workflow.getAvailableWorkflows()
 
     def getStrategy(self) -> str:

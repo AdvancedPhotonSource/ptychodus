@@ -117,7 +117,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Scan',
-            nameFilters=self._api.getOpenFileFilterList(),
+            nameFilters=[nameFilter for nameFilter in self._api.getOpenFileFilterList()],
             selectedNameFilter=self._api.getOpenFileFilter(),
         )
 
@@ -161,7 +161,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
             'Save Scan',
-            nameFilters=self._api.getSaveFileFilterList(),
+            nameFilters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
             selectedNameFilter=self._api.getSaveFileFilter(),
         )
 
