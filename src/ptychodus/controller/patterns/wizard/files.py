@@ -234,8 +234,7 @@ class OpenDatasetWizardFileTypeViewController(Observable, Observer):
         return z.group(1).split() if z else []
 
     def _handle_text_activated(self, text: str) -> None:
-        logger.debug(f'File Type: {text}')
-        self.notifyObservers()
+        self._file_reader_chooser.set_current_plugin(text)
 
     def _sync_model_to_view(self) -> None:
         self._combo_box.setCurrentText(self._file_reader_chooser.get_current_plugin().display_name)
@@ -246,6 +245,7 @@ class OpenDatasetWizardFileTypeViewController(Observable, Observer):
     def update(self, observable: Observable) -> None:
         if observable is self._file_reader_chooser:
             self._sync_model_to_view()
+            self.notifyObservers()
 
 
 class OpenDatasetWizardFilesViewController(Observer):
