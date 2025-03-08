@@ -25,7 +25,7 @@ __all__ = [
 ]
 
 
-class ArrayPatchInterpolator:
+class ArrayPatchInterpolator:  # XXX
     def __init__(self, array: RealArrayType, point: ObjectPoint, shape: tuple[int, ...]) -> None:
         # top left corner of object support
         xmin = point.positionXInPixels - shape[-1] / 2

@@ -74,7 +74,6 @@ class Scan(Sequence[ScanPoint]):
 
 class ScanPointParseError(Exception):
     """raised when the scan file cannot be parsed"""
-
     pass
 
 

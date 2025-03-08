@@ -23,7 +23,7 @@ class ExposureMap:
     counts: RealArrayType
 
 
-class ExposureAnalyzer:
+class ExposureAnalyzer:  # XXX
     def __init__(self, repository: ProductRepository) -> None:
         self._repository = repository
 

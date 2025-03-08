@@ -4,7 +4,7 @@ from ptychodus.api.object import Object, ObjectArrayType, ObjectGeometry
 from ptychodus.api.scan import ScanPoint
 
 
-class ObjectStitcher:
+class ObjectStitcher:  # XXX
     def __init__(self, geometry: ObjectGeometry) -> None:
         self._geometry = geometry
         self._weights = numpy.zeros((geometry.heightInPixels, geometry.widthInPixels))

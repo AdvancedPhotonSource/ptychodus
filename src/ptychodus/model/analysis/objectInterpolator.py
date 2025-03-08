@@ -3,7 +3,7 @@ from ptychodus.api.object import Object, ObjectInterpolator
 from ptychodus.api.scan import ScanPoint
 
 
-class ObjectLinearInterpolator(ObjectInterpolator):
+class ObjectLinearInterpolator(ObjectInterpolator):  # XXX
     def __init__(self, object_: Object) -> None:
         self._object = object_
 

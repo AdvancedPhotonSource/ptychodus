@@ -34,7 +34,7 @@ class STXMImage:
         return PixelGeometry(self.pixel_width_m, self.pixel_height_m)
 
 
-class STXMStitcher:
+class STXMStitcher:  # XXX
     def __init__(self, geometry: ObjectGeometry) -> None:
         self._geometry = geometry
         self._weights = numpy.zeros((geometry.heightInPixels, geometry.widthInPixels))
