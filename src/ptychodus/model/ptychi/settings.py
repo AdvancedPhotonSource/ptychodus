@@ -9,7 +9,7 @@ class PtyChiReconstructorSettings(Observable, Observer):
         self._settingsGroup.addObserver(self)
 
         self.numEpochs = self._settingsGroup.createIntegerParameter('NumEpochs', 100, minimum=1)
-        self.batchSize = self._settingsGroup.createIntegerParameter('BatchSize', 1, minimum=1)
+        self.batchSize = self._settingsGroup.createIntegerParameter('BatchSize', 100, minimum=1)
         self.batchingMode = self._settingsGroup.createStringParameter('BatchingMode', 'random')
         self.compactModeUpdateClustering = self._settingsGroup.createIntegerParameter(
             'CompactModeUpdateClustering', 1, minimum=0
