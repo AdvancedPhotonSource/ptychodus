@@ -44,16 +44,16 @@ class PowerTwoSpinBoxParameterViewController(ParameterViewController, Observer):
         if tool_tip:
             self._widget.setToolTip(tool_tip)
 
-        self._syncModelToView()
-        self._widget.valueChanged.connect(parameter.setValue)
-        parameter.addObserver(self)
+        self._sync_model_to_view()
+        self._widget.valueChanged.connect(parameter.set_value)
+        parameter.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
 
-    def _syncModelToView(self) -> None:
-        minimum = self._parameter.getMinimum()
-        maximum = self._parameter.getMaximum()
+    def _sync_model_to_view(self) -> None:
+        minimum = self._parameter.get_minimum()
+        maximum = self._parameter.get_maximum()
 
         if minimum is None:
             raise ValueError('Minimum not provided!')
@@ -63,21 +63,21 @@ class PowerTwoSpinBoxParameterViewController(ParameterViewController, Observer):
 
         self._widget.blockSignals(True)
         self._widget.setRange(minimum, maximum)
-        self._widget.setValue(self._parameter.getValue())
+        self._widget.setValue(self._parameter.get_value())
         self._widget.blockSignals(False)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
     def __init__(
-        self, model: PtychoPINNReconstructorLibrary, fileDialogFactory: FileDialogFactory
+        self, model: PtychoPINNReconstructorLibrary, file_dialog_factory: FileDialogFactory
     ) -> None:
         super().__init__()
         self._model = model
-        self._fileDialogFactory = fileDialogFactory
+        self._file_dialog_factory = file_dialog_factory
 
     @property
     def backendName(self) -> str:
@@ -85,7 +85,7 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
 
     def createViewController(self, reconstructorName: str) -> QWidget:
         is_pinn = reconstructorName.lower() == 'pinn'
-        builder = ParameterViewBuilder(self._fileDialogFactory)
+        builder = ParameterViewBuilder(self._file_dialog_factory)
         enumerators = self._model.enumerators
 
         model_group = 'Model'

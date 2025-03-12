@@ -37,23 +37,23 @@ logger = logging.getLogger(__name__)
 
 
 def create_raw_data(parameters: ReconstructInput) -> RawData:
-    object_geometry = parameters.product.object_.getGeometry()
+    object_geometry = parameters.product.object_.get_geometry()
     position_x_px: list[float] = list()
     position_y_px: list[float] = list()
 
     for scan_point in parameters.product.scan:
-        object_point = object_geometry.mapScanPointToObjectPoint(scan_point)
-        position_x_px.append(object_point.positionXInPixels)
-        position_y_px.append(object_point.positionYInPixels)
+        object_point = object_geometry.map_scan_point_to_object_point(scan_point)
+        position_x_px.append(object_point.position_x_px)
+        position_y_px.append(object_point.position_y_px)
 
     return RawData.from_coords_without_pc(
         xcoords=numpy.array(position_x_px),
         ycoords=numpy.array(position_y_px),
         diff3d=parameters.patterns,
-        probeGuess=parameters.product.probe.getIncoherentMode(0),
+        probeGuess=parameters.product.probe.get_incoherent_mode(0),
         # assume that all patches are from the same object
         scan_index=numpy.zeros(len(parameters.product.scan), dtype=int),
-        objectGuess=parameters.product.object_.getLayer(0),
+        objectGuess=parameters.product.object_.get_layer(0),
     )
 
 
@@ -81,22 +81,22 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         self._model_dict: dict[str, Any] | None = None
         self._in_developer_mode = in_developer_mode
 
-        ptychopinnVersion = version('ptychopinn')
-        logger.info(f'\tPtychoPINN {ptychopinnVersion}')
+        ptychopinn_version = version('ptychopinn')
+        logger.info(f'\tPtychoPINN {ptychopinn_version}')
 
     def _create_model_config(self, model_size: int) -> ModelConfig:
         return ModelConfig(
             N=model_size,
-            gridsize=self._model_settings.gridsize.getValue(),
-            n_filters_scale=self._model_settings.n_filters_scale.getValue(),
+            gridsize=self._model_settings.gridsize.get_value(),
+            n_filters_scale=self._model_settings.n_filters_scale.get_value(),
             model_type=self._name.lower(),
-            amp_activation=self._model_settings.amp_activation.getValue(),
-            object_big=self._model_settings.object_big.getValue(),
-            probe_big=self._model_settings.probe_big.getValue(),
-            probe_mask=self._model_settings.probe_mask.getValue(),
-            pad_object=self._model_settings.pad_object.getValue(),
-            probe_scale=self._model_settings.probe_scale.getValue(),
-            gaussian_smoothing_sigma=self._model_settings.gaussian_smoothing_sigma.getValue(),
+            amp_activation=self._model_settings.amp_activation.get_value(),
+            object_big=self._model_settings.object_big.get_value(),
+            probe_big=self._model_settings.probe_big.get_value(),
+            probe_mask=self._model_settings.probe_mask.get_value(),
+            pad_object=self._model_settings.pad_object.get_value(),
+            probe_scale=self._model_settings.probe_scale.get_value(),
+            gaussian_smoothing_sigma=self._model_settings.gaussian_smoothing_sigma.get_value(),
         )
 
     @property
@@ -141,8 +141,8 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         # Group overlapping scan positions
         test_dataset = test_raw_data.generate_grouped_data(
             model_config.N,
-            K=self._inference_settings.n_nearest_neighbors.getValue(),
-            nsamples=self._inference_settings.n_samples.getValue(),
+            K=self._inference_settings.n_nearest_neighbors.get_value(),
+            nsamples=self._inference_settings.n_samples.get_value(),
         )
 
         # Create PtychoDataContainer
@@ -161,9 +161,9 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         object_in = parameters.product.object_
         object_out = Object(
             array=numpy.squeeze(object_out_array),
-            layerDistanceInMeters=object_in.layerDistanceInMeters,
-            pixelGeometry=object_in.getPixelGeometry(),
-            center=object_in.getCenter(),
+            layer_distance_m=object_in.layer_distance_m,
+            pixel_geometry=object_in.get_pixel_geometry(),
+            center=object_in.get_center(),
         )
         costs: Sequence[float] = list()
 
@@ -177,36 +177,36 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
         return ReconstructOutput(product, 0)
 
-    def getModelFileFilter(self) -> str:
+    def get_model_file_filter(self) -> str:
         return self.MODEL_FILE_FILTER
 
-    def openModel(self, filePath: Path) -> None:
+    def open_model(self, file_path: Path) -> None:
         # FIXME model path to/from settings
-        self._inference_settings.model_path.setValue(filePath)
+        self._inference_settings.model_path.set_value(file_path)
         # ModelManager updates global config (ptycho.params.cfg) when loading
         self._model_dict = ptycho.model_manager.ModelManager.load_multiple_models(
-            filePath.parent / filePath.stem
+            file_path.parent / file_path.stem
         )
         # FIXME update settings from ptycho.params.cfg after loading
 
-    def saveModel(self, filePath: Path) -> None:
-        ptycho.model_manager.save(filePath)
+    def save_model(self, file_path: Path) -> None:
+        ptycho.model_manager.save(file_path)
 
-    def getTrainingDataFileFilter(self) -> str:
+    def get_training_data_file_filter(self) -> str:
         return self.TRAINING_DATA_FILE_FILTER
 
-    def exportTrainingData(self, filePath: Path, parameters: ReconstructInput) -> None:
+    def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
         raw_data = create_raw_data(parameters)
-        raw_data.to_file(filePath)
+        raw_data.to_file(file_path)
 
-    def getTrainingDataPath(self):
-        return self._training_settings.data_dir.getValue()
+    def get_training_data_path(self) -> Path:
+        return self._training_settings.data_dir.get_value()
 
-    def train(self, dataPath: Path) -> TrainOutput:
-        self._training_settings.data_dir.setValue(dataPath)
+    def train(self, data_path: Path) -> TrainOutput:
+        self._training_settings.data_dir.set_value(data_path)
 
-        test_raw_data = RawData.from_file(dataPath / 'test_data.npz')  # TODO RawData | None
-        train_raw_data = RawData.from_file(dataPath / 'train_data.npz')
+        test_raw_data = RawData.from_file(data_path / 'test_data.npz')  # TODO RawData | None
+        train_raw_data = RawData.from_file(data_path / 'train_data.npz')
 
         model_size = train_raw_data.diff3d.shape[-1]
 
@@ -218,16 +218,16 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             model=model_config,
             train_data_file=Path(),  # not used
             test_data_file=None,  # not used
-            batch_size=self._training_settings.batch_size.getValue(),
-            nepochs=self._training_settings.nepochs.getValue(),
-            mae_weight=self._training_settings.mae_weight.getValue(),
-            nll_weight=self._training_settings.nll_weight.getValue(),
-            realspace_mae_weight=self._training_settings.realspace_mae_weight.getValue(),
-            realspace_weight=self._training_settings.realspace_weight.getValue(),
-            nphotons=self._training_settings.nphotons.getValue(),  # FIXME
-            positions_provided=self._training_settings.positions_provided.getValue(),
-            probe_trainable=self._training_settings.probe_trainable.getValue(),
-            intensity_scale_trainable=self._training_settings.intensity_scale_trainable.getValue(),
+            batch_size=self._training_settings.batch_size.get_value(),
+            nepochs=self._training_settings.nepochs.get_value(),
+            mae_weight=self._training_settings.mae_weight.get_value(),
+            nll_weight=self._training_settings.nll_weight.get_value(),
+            realspace_mae_weight=self._training_settings.realspace_mae_weight.get_value(),
+            realspace_weight=self._training_settings.realspace_weight.get_value(),
+            nphotons=self._training_settings.nphotons.get_value(),  # FIXME
+            positions_provided=self._training_settings.positions_provided.get_value(),
+            probe_trainable=self._training_settings.probe_trainable.get_value(),
+            intensity_scale_trainable=self._training_settings.intensity_scale_trainable.get_value(),
             output_dir=Path(),  # not used
         )
 
@@ -239,8 +239,8 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         recon_amp, recon_phase, train_results = run_cdi_example(
             train_raw_data, test_raw_data, training_config
         )
-        output_dir = self._training_settings.output_dir.getValue()
-        self.saveModel(output_dir)
+        output_dir = self._training_settings.output_dir.get_value()
+        self.save_model(output_dir)
         save_outputs(recon_amp, recon_phase, train_results, str(output_dir))
         print(train_results.keys())  # FIXME remove
         # dict_keys(['history', 'model_instance', 'reconstructed_obj', 'pred_amp', 'reconstructed_obj_cdi', 'stitched_obj', 'train_container', 'test_container', 'obj_tensor_full', 'global_offsets', 'recon_amp', 'recon_phase'])

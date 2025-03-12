@@ -20,11 +20,13 @@ logger = logging.getLogger(__name__)
 
 
 class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
-    def __init__(self, settingsRegistry: SettingsRegistry, isDeveloperModeEnabled: bool) -> None:
+    def __init__(
+        self, settings_registry: SettingsRegistry, is_developer_mode_enabled: bool
+    ) -> None:
         super().__init__()
-        self.model_settings = PtychoPINNModelSettings(settingsRegistry)
-        self.training_settings = PtychoPINNTrainingSettings(settingsRegistry)
-        self.inference_settings = PtychoPINNInferenceSettings(settingsRegistry)
+        self.model_settings = PtychoPINNModelSettings(settings_registry)
+        self.training_settings = PtychoPINNTrainingSettings(settings_registry)
+        self.inference_settings = PtychoPINNInferenceSettings(settings_registry)
         self.enumerators = PtychoPINNEnumerators()
         self._reconstructors: list[TrainableReconstructor] = list()
 
@@ -33,7 +35,7 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
         except ModuleNotFoundError:
             logger.info('PtychoPINN not found.')
 
-            if isDeveloperModeEnabled:
+            if is_developer_mode_enabled:
                 self._reconstructors.append(NullReconstructor('PINN'))
                 self._reconstructors.append(NullReconstructor('Supervised'))
         else:
