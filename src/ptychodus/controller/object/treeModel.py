@@ -52,7 +52,7 @@ class ObjectTreeModel(QAbstractItemModel):
     def _appendLayers(node: ObjectTreeNode, item: ObjectRepositoryItem) -> None:
         object_ = item.getObject()
 
-        for layer in range(object_.numberOfLayers):
+        for layer in range(object_.num_layers):
             node.insertNode()
 
     def insertItem(self, index: int, item: ObjectRepositoryItem) -> None:
@@ -67,7 +67,7 @@ class ObjectTreeModel(QAbstractItemModel):
 
         node = self._treeRoot.children[index]
         numLayersOld = len(node.children)
-        numLayersNew = item.getObject().numberOfLayers
+        numLayersNew = item.getObject().num_layers
 
         if numLayersOld < numLayersNew:
             self.beginInsertRows(topLeft, numLayersOld, numLayersNew)
@@ -159,17 +159,17 @@ class ObjectTreeModel(QAbstractItemModel):
                 if index.column() == 0:
                     return self._repository.getName(index.row())
                 elif index.column() == 1:
-                    return object_.getTotalLayerDistanceInMeters()
+                    return object_.get_total_layer_distance_m()
                 elif index.column() == 2:
                     return item.getBuilder().getName()
                 elif index.column() == 3:
-                    return str(object_.dataType)
+                    return str(object_.dtype)
                 elif index.column() == 4:
-                    return object_.widthInPixels
+                    return object_.width_px
                 elif index.column() == 5:
-                    return object_.heightInPixels
+                    return object_.height_px
                 elif index.column() == 6:
-                    return f'{object_.sizeInBytes / (1024 * 1024):.2f}'
+                    return f'{object_.nbytes / (1024 * 1024):.2f}'
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)

@@ -26,10 +26,10 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
             self,
             name=metadata.name,
             comments=metadata.comments,
-            detectorDistanceInMeters=metadata.detectorDistanceInMeters,
-            probeEnergyInElectronVolts=metadata.probeEnergyInElectronVolts,
-            probePhotonCount=metadata.probePhotonCount,
-            exposureTimeInSeconds=metadata.exposureTimeInSeconds,
+            detectorDistanceInMeters=metadata.detector_distance_m,
+            probeEnergyInElectronVolts=metadata.probe_energy_eV,
+            probePhotonCount=metadata.probe_photon_count,
+            exposureTimeInSeconds=metadata.exposure_time_s,
         )
 
     def createDefault(

@@ -11,17 +11,17 @@ class ScanBoundingBoxBuilder:
         self._maximumYInMeters = -numpy.inf
 
     def hull(self, point: ScanPoint) -> None:
-        if point.positionXInMeters < self._minimumXInMeters:
-            self._minimumXInMeters = point.positionXInMeters
+        if point.position_x_m < self._minimumXInMeters:
+            self._minimumXInMeters = point.position_x_m
 
-        if self._maximumXInMeters < point.positionXInMeters:
-            self._maximumXInMeters = point.positionXInMeters
+        if self._maximumXInMeters < point.position_x_m:
+            self._maximumXInMeters = point.position_x_m
 
-        if point.positionYInMeters < self._minimumYInMeters:
-            self._minimumYInMeters = point.positionYInMeters
+        if point.position_y_m < self._minimumYInMeters:
+            self._minimumYInMeters = point.position_y_m
 
-        if self._maximumYInMeters < point.positionYInMeters:
-            self._maximumYInMeters = point.positionYInMeters
+        if self._maximumYInMeters < point.position_y_m:
+            self._maximumYInMeters = point.position_y_m
 
     def getBoundingBox(self) -> ScanBoundingBox | None:
         isEmptyX = self._maximumXInMeters < self._minimumXInMeters
@@ -31,8 +31,8 @@ class ScanBoundingBoxBuilder:
             return None
 
         return ScanBoundingBox(
-            minimumXInMeters=self._minimumXInMeters,
-            maximumXInMeters=self._maximumXInMeters,
-            minimumYInMeters=self._minimumYInMeters,
-            maximumYInMeters=self._maximumYInMeters,
+            minimum_x_m=self._minimumXInMeters,
+            maximum_x_m=self._maximumXInMeters,
+            minimum_y_m=self._minimumYInMeters,
+            maximum_y_m=self._maximumYInMeters,
         )

@@ -58,10 +58,10 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
             metadata = ProductMetadata(
                 name=str(npzFile[self.NAME]),
                 comments=str(npzFile[self.COMMENTS]),
-                detectorDistanceInMeters=float(npzFile[self.DETECTOR_OBJECT_DISTANCE]),
-                probeEnergyInElectronVolts=float(npzFile[self.PROBE_ENERGY]),
-                probePhotonCount=probePhotonCount,
-                exposureTimeInSeconds=float(npzFile[self.EXPOSURE_TIME]),
+                detector_distance_m=float(npzFile[self.DETECTOR_OBJECT_DISTANCE]),
+                probe_energy_eV=float(npzFile[self.PROBE_ENERGY]),
+                probe_photon_count=probePhotonCount,
+                exposure_time_s=float(npzFile[self.EXPOSURE_TIME]),
             )
 
             scanIndexes = npzFile[self.PROBE_POSITION_INDEXES]
@@ -69,24 +69,24 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
             scanYInMeters = npzFile[self.PROBE_POSITION_Y]
 
             probePixelGeometry = PixelGeometry(
-                widthInMeters=float(npzFile[self.PROBE_PIXEL_WIDTH]),
-                heightInMeters=float(npzFile[self.PROBE_PIXEL_HEIGHT]),
+                width_m=float(npzFile[self.PROBE_PIXEL_WIDTH]),
+                height_m=float(npzFile[self.PROBE_PIXEL_HEIGHT]),
             )
-            probe = Probe(array=npzFile[self.PROBE_ARRAY], pixelGeometry=probePixelGeometry)
+            probe = Probe(array=npzFile[self.PROBE_ARRAY], pixel_geometry=probePixelGeometry)
 
             objectPixelGeometry = PixelGeometry(
-                widthInMeters=float(npzFile[self.OBJECT_PIXEL_WIDTH]),
-                heightInMeters=float(npzFile[self.OBJECT_PIXEL_HEIGHT]),
+                width_m=float(npzFile[self.OBJECT_PIXEL_WIDTH]),
+                height_m=float(npzFile[self.OBJECT_PIXEL_HEIGHT]),
             )
             objectCenter = ObjectCenter(
-                positionXInMeters=float(npzFile[self.OBJECT_CENTER_X]),
-                positionYInMeters=float(npzFile[self.OBJECT_CENTER_Y]),
+                position_x_m=float(npzFile[self.OBJECT_CENTER_X]),
+                position_y_m=float(npzFile[self.OBJECT_CENTER_Y]),
             )
             object_ = Object(
                 array=npzFile[self.OBJECT_ARRAY],
-                pixelGeometry=objectPixelGeometry,
+                pixel_geometry=objectPixelGeometry,
                 center=objectCenter,
-                layerDistanceInMeters=npzFile[self.OBJECT_LAYER_DISTANCE],
+                layer_distance_m=npzFile[self.OBJECT_LAYER_DISTANCE],
             )
 
             costs = npzFile[self.COSTS_ARRAY]
@@ -113,35 +113,35 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
 
         for point in product.scan:
             scanIndexes.append(point.index)
-            scanXInMeters.append(point.positionXInMeters)
-            scanYInMeters.append(point.positionYInMeters)
+            scanXInMeters.append(point.position_x_m)
+            scanYInMeters.append(point.position_y_m)
 
         metadata = product.metadata
         contents[self.NAME] = metadata.name
         contents[self.COMMENTS] = metadata.comments
-        contents[self.DETECTOR_OBJECT_DISTANCE] = metadata.detectorDistanceInMeters
-        contents[self.PROBE_ENERGY] = metadata.probeEnergyInElectronVolts
-        contents[self.PROBE_PHOTON_COUNT] = metadata.probePhotonCount
-        contents[self.EXPOSURE_TIME] = metadata.exposureTimeInSeconds
+        contents[self.DETECTOR_OBJECT_DISTANCE] = metadata.detector_distance_m
+        contents[self.PROBE_ENERGY] = metadata.probe_energy_eV
+        contents[self.PROBE_PHOTON_COUNT] = metadata.probe_photon_count
+        contents[self.EXPOSURE_TIME] = metadata.exposure_time_s
 
         contents[self.PROBE_POSITION_INDEXES] = scanIndexes
         contents[self.PROBE_POSITION_X] = scanXInMeters
         contents[self.PROBE_POSITION_Y] = scanYInMeters
 
         probe = product.probe
-        probeGeometry = probe.getGeometry()
-        contents[self.PROBE_ARRAY] = probe.getArray()
-        contents[self.PROBE_PIXEL_WIDTH] = probeGeometry.pixelWidthInMeters
-        contents[self.PROBE_PIXEL_HEIGHT] = probeGeometry.pixelHeightInMeters
+        probeGeometry = probe.get_geometry()
+        contents[self.PROBE_ARRAY] = probe.get_array()
+        contents[self.PROBE_PIXEL_WIDTH] = probeGeometry.pixel_width_m
+        contents[self.PROBE_PIXEL_HEIGHT] = probeGeometry.pixel_height_m
 
         object_ = product.object_
-        objectGeometry = object_.getGeometry()
-        contents[self.OBJECT_ARRAY] = object_.getArray()
-        contents[self.OBJECT_CENTER_X] = objectGeometry.centerXInMeters
-        contents[self.OBJECT_CENTER_Y] = objectGeometry.centerYInMeters
-        contents[self.OBJECT_PIXEL_WIDTH] = objectGeometry.pixelWidthInMeters
-        contents[self.OBJECT_PIXEL_HEIGHT] = objectGeometry.pixelHeightInMeters
-        contents[self.OBJECT_LAYER_DISTANCE] = object_.layerDistanceInMeters
+        objectGeometry = object_.get_geometry()
+        contents[self.OBJECT_ARRAY] = object_.get_array()
+        contents[self.OBJECT_CENTER_X] = objectGeometry.center_x_m
+        contents[self.OBJECT_CENTER_Y] = objectGeometry.center_y_m
+        contents[self.OBJECT_PIXEL_WIDTH] = objectGeometry.pixel_width_m
+        contents[self.OBJECT_PIXEL_HEIGHT] = objectGeometry.pixel_height_m
+        contents[self.OBJECT_LAYER_DISTANCE] = object_.layer_distance_m
 
         contents[self.COSTS_ARRAY] = product.costs
 
@@ -168,28 +168,28 @@ class NPZProbeFileReader(ProbeFileReader):
     def read(self, filePath: Path) -> Probe:
         with numpy.load(filePath) as npzFile:
             pixelGeometry = PixelGeometry(
-                widthInMeters=float(npzFile[NPZProductFileIO.PROBE_PIXEL_WIDTH]),
-                heightInMeters=float(npzFile[NPZProductFileIO.PROBE_PIXEL_HEIGHT]),
+                width_m=float(npzFile[NPZProductFileIO.PROBE_PIXEL_WIDTH]),
+                height_m=float(npzFile[NPZProductFileIO.PROBE_PIXEL_HEIGHT]),
             )
-            return Probe(array=npzFile[NPZProductFileIO.PROBE_ARRAY], pixelGeometry=pixelGeometry)
+            return Probe(array=npzFile[NPZProductFileIO.PROBE_ARRAY], pixel_geometry=pixelGeometry)
 
 
 class NPZObjectFileReader(ObjectFileReader):
     def read(self, filePath: Path) -> Object:
         with numpy.load(filePath) as npzFile:
             pixelGeometry = PixelGeometry(
-                widthInMeters=float(npzFile[NPZProductFileIO.OBJECT_PIXEL_WIDTH]),
-                heightInMeters=float(npzFile[NPZProductFileIO.OBJECT_PIXEL_HEIGHT]),
+                width_m=float(npzFile[NPZProductFileIO.OBJECT_PIXEL_WIDTH]),
+                height_m=float(npzFile[NPZProductFileIO.OBJECT_PIXEL_HEIGHT]),
             )
             center = ObjectCenter(
-                positionXInMeters=float(npzFile[NPZProductFileIO.OBJECT_CENTER_X]),
-                positionYInMeters=float(npzFile[NPZProductFileIO.OBJECT_CENTER_Y]),
+                position_x_m=float(npzFile[NPZProductFileIO.OBJECT_CENTER_X]),
+                position_y_m=float(npzFile[NPZProductFileIO.OBJECT_CENTER_Y]),
             )
             return Object(
                 array=npzFile[NPZProductFileIO.OBJECT_ARRAY],
-                pixelGeometry=pixelGeometry,
+                pixel_geometry=pixelGeometry,
                 center=center,
-                layerDistanceInMeters=npzFile[NPZProductFileIO.OBJECT_LAYER_DISTANCE],
+                layer_distance_m=npzFile[NPZProductFileIO.OBJECT_LAYER_DISTANCE],
             )
 
 

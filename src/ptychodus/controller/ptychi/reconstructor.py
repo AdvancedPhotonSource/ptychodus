@@ -79,20 +79,20 @@ class PtyChiPrecisionParameterViewController(ParameterViewController, Observer):
         self._widget.setLayout(layout)
 
         self._syncModelToView()
-        useDoublePrecision.addObserver(self)
+        useDoublePrecision.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
 
     def _syncViewToModel(self, toolId: int, checked: bool) -> None:
         if toolId == 2:
-            self._useDoublePrecision.setValue(checked)
+            self._useDoublePrecision.set_value(checked)
 
     def _syncModelToView(self) -> None:
-        button = self._buttonGroup.button(2 if self._useDoublePrecision.getValue() else 1)
+        button = self._buttonGroup.button(2 if self._useDoublePrecision.get_value() else 1)
         button.setChecked(True)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._useDoublePrecision:
             self._syncModelToView()
 

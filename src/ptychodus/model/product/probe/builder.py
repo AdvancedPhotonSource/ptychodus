@@ -36,16 +36,16 @@ class ProbeBuilder(ParameterGroup):
     def __init__(self, settings: ProbeSettings, name: str) -> None:
         super().__init__()
         self._name = settings.builder.copy()
-        self._name.setValue(name)
-        self._addParameter('name', self._name)
+        self._name.set_value(name)
+        self._add_parameter('name', self._name)
 
     def getTransverseCoordinates(self, geometry: ProbeGeometry) -> ProbeTransverseCoordinates:
-        Y, X = numpy.mgrid[: geometry.heightInPixels, : geometry.widthInPixels]
-        positionXInPixels = X - (geometry.widthInPixels - 1) / 2
-        positionYInPixels = Y - (geometry.heightInPixels - 1) / 2
+        Y, X = numpy.mgrid[: geometry.height_px, : geometry.width_px]
+        positionXInPixels = X - (geometry.width_px - 1) / 2
+        positionYInPixels = Y - (geometry.height_px - 1) / 2
 
-        positionXInMeters = positionXInPixels * geometry.pixelWidthInMeters
-        positionYInMeters = positionYInPixels * geometry.pixelHeightInMeters
+        positionXInMeters = positionXInPixels * geometry.pixel_width_m
+        positionYInMeters = positionYInPixels * geometry.pixel_height_m
 
         return ProbeTransverseCoordinates(
             positionXInMeters=positionXInMeters,
@@ -56,11 +56,11 @@ class ProbeBuilder(ParameterGroup):
         return array / numpy.sqrt(numpy.sum(numpy.square(numpy.abs(array))))
 
     def getName(self) -> str:
-        return self._name.getValue()
+        return self._name.get_value()
 
     def syncToSettings(self) -> None:
         for parameter in self.parameters().values():
-            parameter.syncValueToParent()
+            parameter.sync_value_to_parent()
 
     @abstractmethod
     def copy(self) -> ProbeBuilder:
@@ -91,21 +91,21 @@ class FromFileProbeBuilder(ProbeBuilder):
         super().__init__(settings, 'from_file')
         self._settings = settings
         self.filePath = settings.filePath.copy()
-        self.filePath.setValue(filePath)
-        self._addParameter('file_path', self.filePath)
+        self.filePath.set_value(filePath)
+        self._add_parameter('file_path', self.filePath)
         self.fileType = settings.fileType.copy()
-        self.fileType.setValue(fileType)
-        self._addParameter('file_type', self.fileType)
+        self.fileType.set_value(fileType)
+        self._add_parameter('file_type', self.fileType)
         self._fileReader = fileReader
 
     def copy(self) -> FromFileProbeBuilder:
         return FromFileProbeBuilder(
-            self._settings, self.filePath.getValue(), self.fileType.getValue(), self._fileReader
+            self._settings, self.filePath.get_value(), self.fileType.get_value(), self._fileReader
         )
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
-        filePath = self.filePath.getValue()
-        fileType = self.fileType.getValue()
+        filePath = self.filePath.get_value()
+        fileType = self.fileType.get_value()
         logger.debug(f'Reading "{filePath}" as "{fileType}"')
 
         try:
@@ -113,11 +113,11 @@ class FromFileProbeBuilder(ProbeBuilder):
         except Exception as exc:
             raise RuntimeError(f'Failed to read "{filePath}"') from exc
 
-        pixelGeometryFromFile = probeFromFile.getPixelGeometry()
-        pixelGeometryFromProvider = geometryProvider.getProbeGeometry().getPixelGeometry()
+        pixelGeometryFromFile = probeFromFile.get_pixel_geometry()
+        pixelGeometryFromProvider = geometryProvider.get_probe_geometry().get_pixel_geometry()
 
         if pixelGeometryFromFile is None:
-            return Probe(probeFromFile.getArray(), pixelGeometryFromProvider)
+            return Probe(probeFromFile.get_array(), pixelGeometryFromProvider)
 
         # TODO remap probe from pixelGeometryFromFile to pixelGeometryFromProvider
         return probeFromFile

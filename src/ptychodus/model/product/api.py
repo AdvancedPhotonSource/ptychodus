@@ -83,7 +83,7 @@ class ScanAPI:
                     f'Scan builder "{builder.getName()}" does not have parameter "{parameterName}"!'
                 )
             else:
-                parameter.setValue(parameterValue)
+                parameter.set_value(parameterValue)
 
         item.setBuilder(builder)
 
@@ -108,10 +108,10 @@ class ScanAPI:
     def getOpenFileFilter(self) -> str:
         return self._builderFactory.getOpenFileFilter()
 
-    def openScan(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
+    def openScan(self, index: int, filePath: Path, *, file_type: str | None = None) -> None:
         builder = self._builderFactory.createScanFromFile(
             filePath,
-            self._settings.fileType.getValue() if fileType is None else fileType,
+            self._settings.fileType.get_value() if file_type is None else file_type,
         )
 
         try:
@@ -191,7 +191,7 @@ class ProbeAPI:
                     f' parameter "{parameterName}"!'
                 )
             else:
-                parameter.setValue(parameterValue)
+                parameter.set_value(parameterValue)
 
         item.setBuilder(builder)
 
@@ -216,10 +216,10 @@ class ProbeAPI:
     def getOpenFileFilter(self) -> str:
         return self._builderFactory.getOpenFileFilter()
 
-    def openProbe(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
+    def openProbe(self, index: int, filePath: Path, *, file_type: str | None = None) -> None:
         builder = self._builderFactory.createProbeFromFile(
             filePath,
-            self._settings.fileType.getValue() if fileType is None else fileType,
+            self._settings.fileType.get_value() if file_type is None else file_type,
         )
 
         try:
@@ -299,7 +299,7 @@ class ObjectAPI:
                     f' parameter "{parameterName}"!'
                 )
             else:
-                parameter.setValue(parameterValue)
+                parameter.set_value(parameterValue)
 
         item.setBuilder(builder)
 
@@ -324,10 +324,10 @@ class ObjectAPI:
     def getOpenFileFilter(self) -> str:
         return self._builderFactory.getOpenFileFilter()
 
-    def openObject(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
+    def openObject(self, index: int, filePath: Path, *, file_type: str | None = None) -> None:
         builder = self._builderFactory.createObjectFromFile(
             filePath,
-            self._settings.fileType.getValue() if fileType is None else fileType,
+            self._settings.fileType.get_value() if file_type is None else file_type,
         )
 
         try:
@@ -414,13 +414,13 @@ class ProductAPI:
     def getOpenFileFilter(self) -> str:
         return self._fileReaderChooser.get_current_plugin().display_name
 
-    def openProduct(self, filePath: Path, *, fileType: str | None = None) -> int:
+    def openProduct(self, filePath: Path, *, file_type: str | None = None) -> int:
         if filePath.is_file():
-            if fileType is not None:
-                self._fileReaderChooser.set_current_plugin(fileType)
+            if file_type is not None:
+                self._fileReaderChooser.set_current_plugin(file_type)
 
-            fileType = self._fileReaderChooser.get_current_plugin().simple_name
-            logger.debug(f'Reading "{filePath}" as "{fileType}"')
+            file_type = self._fileReaderChooser.get_current_plugin().simple_name
+            logger.debug(f'Reading "{filePath}" as "{file_type}"')
             fileReader = self._fileReaderChooser.get_current_plugin().strategy
 
             try:
@@ -441,17 +441,17 @@ class ProductAPI:
     def getSaveFileFilter(self) -> str:
         return self._fileWriterChooser.get_current_plugin().display_name
 
-    def saveProduct(self, index: int, filePath: Path, *, fileType: str | None = None) -> None:
+    def saveProduct(self, index: int, filePath: Path, *, file_type: str | None = None) -> None:
         try:
             item = self._repository[index]
         except IndexError:
             logger.warning(f'Failed to save product {index}!')
             return
 
-        if fileType is not None:
-            self._fileWriterChooser.set_current_plugin(fileType)
+        if file_type is not None:
+            self._fileWriterChooser.set_current_plugin(file_type)
 
-        fileType = self._fileWriterChooser.get_current_plugin().simple_name
-        logger.debug(f'Writing "{filePath}" as "{fileType}"')
+        file_type = self._fileWriterChooser.get_current_plugin().simple_name
+        logger.debug(f'Writing "{filePath}" as "{file_type}"')
         writer = self._fileWriterChooser.get_current_plugin().strategy
         writer.write(filePath, item.getProduct())

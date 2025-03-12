@@ -59,15 +59,15 @@ class FluorescenceEnhancer(Observable, Observer):
             display_name=VSPIFluorescenceEnhancingAlgorithm.DISPLAY_NAME,
         )
         self._algorithmChooser.synchronize_with_parameter(settings.algorithm)
-        self._algorithmChooser.addObserver(self)
+        self._algorithmChooser.add_observer(self)
 
         self._productIndex = -1
         self._measured: FluorescenceDataset | None = None
         self._enhanced: FluorescenceDataset | None = None
 
         fileReaderChooser.synchronize_with_parameter(settings.fileType)
-        fileWriterChooser.set_current_plugin(settings.fileType.getValue())
-        reinitObservable.addObserver(self)
+        fileWriterChooser.set_current_plugin(settings.fileType.get_value())
+        reinitObservable.add_observer(self)
 
     @property
     def _product(self) -> ProductRepositoryItem:
@@ -77,7 +77,7 @@ class FluorescenceEnhancer(Observable, Observer):
         if self._productIndex != productIndex:
             self._productIndex = productIndex
             self._enhanced = None
-            self.notifyObservers()
+            self.notify_observers()
 
     def getProductName(self) -> str:
         return self._product.getName()
@@ -107,9 +107,9 @@ class FluorescenceEnhancer(Observable, Observer):
                 self._measured = measured
                 self._enhanced = None
 
-                self._settings.filePath.setValue(filePath)
+                self._settings.filePath.set_value(filePath)
 
-                self.notifyObservers()
+                self.notify_observers()
         else:
             logger.warning(f'Refusing to load dataset from invalid file path "{filePath}"')
 
@@ -139,7 +139,7 @@ class FluorescenceEnhancer(Observable, Observer):
             algorithm = self._algorithmChooser.get_current_plugin().strategy
             product = self._product.getProduct()
             self._enhanced = algorithm.enhance(self._measured, product)
-            self.notifyObservers()
+            self.notify_observers()
 
     def getEnhancedElementMap(self, channelIndex: int) -> ElementMap:
         if self._enhanced is None:
@@ -166,12 +166,12 @@ class FluorescenceEnhancer(Observable, Observer):
 
     def _openFluorescenceFileFromSettings(self) -> None:
         self.openMeasuredDataset(
-            self._settings.filePath.getValue(), self._settings.fileType.getValue()
+            self._settings.filePath.get_value(), self._settings.fileType.get_value()
         )
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._algorithmChooser:
-            self.notifyObservers()
+            self.notify_observers()
         elif observable is self._reinitObservable:
             self._openFluorescenceFileFromSettings()
 

@@ -15,7 +15,7 @@ class MultisliceViewController(ParameterViewController, Observer):
 
         self._syncModelToView()
         self._widget.valueChanged.connect(self._syncViewToModel)
-        self._parameter.addObserver(self)
+        self._parameter.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
@@ -29,7 +29,7 @@ class MultisliceViewController(ParameterViewController, Observer):
         self._widget.setValue(self._item.getNumberOfLayers())
         self._widget.blockSignals(False)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
             self._syncModelToView()
 

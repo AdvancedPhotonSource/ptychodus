@@ -32,13 +32,13 @@ class PyTablesDiffractionPatternArray(DiffractionPatternArray):
         self._filePath = filePath
         self._dataPath = dataPath
 
-    def getLabel(self) -> str:
+    def get_label(self) -> str:
         return self._label
 
-    def getIndexes(self) -> PatternIndexesType:
+    def get_indexes(self) -> PatternIndexesType:
         return self._indexes
 
-    def getData(self) -> PatternDataType:
+    def get_data(self) -> PatternDataType:
         with tables.open_file(self._filePath, mode='r') as h5file:
             try:
                 item = h5file.get_node(self._dataPath)
@@ -61,8 +61,8 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
         self._treeBuilder = H5DiffractionFileTreeBuilder()
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        dataset = SimpleDiffractionDataset.createNullInstance(filePath)
-        metadata = DiffractionMetadata.createNullInstance(filePath)
+        dataset = SimpleDiffractionDataset.create_null(filePath)
+        metadata = DiffractionMetadata.create_null(filePath)
 
         try:
             with tables.open_file(filePath, mode='r') as h5File:
@@ -81,11 +81,11 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
                         dataPath=self._dataPath,
                     )
                     metadata = DiffractionMetadata(
-                        numberOfPatternsPerArray=numberOfPatterns,
-                        numberOfPatternsTotal=numberOfPatterns,
-                        patternDataType=data.dtype,
-                        detectorExtent=ImageExtent(detectorWidth, detectorHeight),
-                        filePath=filePath,
+                        num_patterns_per_array=numberOfPatterns,
+                        num_patterns_total=numberOfPatterns,
+                        pattern_dtype=data.dtype,
+                        detector_extent=ImageExtent(detectorWidth, detectorHeight),
+                        file_path=filePath,
                     )
 
             with h5py.File(filePath, 'r') as h5File:

@@ -25,19 +25,19 @@ class ProbeRepositoryItem(ParameterGroup):
         self._settings = settings
         self._builder = builder
         self._additionalModesBuilder = additionalModesBuilder
-        self._probe = Probe(array=None, pixelGeometry=None)
+        self._probe = Probe(array=None, pixel_geometry=None)
 
-        self._addGroup('builder', builder, observe=True)
-        self._addGroup('additional_modes', additionalModesBuilder, observe=True)
+        self._add_group('builder', builder, observe=True)
+        self._add_group('additional_modes', additionalModesBuilder, observe=True)
 
         self._rebuild()
 
     def assignItem(self, item: ProbeRepositoryItem) -> None:
-        self._removeGroup('additional_modes')
-        self._additionalModesBuilder.removeObserver(self)
+        self._remove_group('additional_modes')
+        self._additionalModesBuilder.remove_observer(self)
         self._additionalModesBuilder = item.getAdditionalModesBuilder().copy()
-        self._additionalModesBuilder.addObserver(self)
-        self._addGroup('additional_modes', self._additionalModesBuilder, observe=True)
+        self._additionalModesBuilder.add_observer(self)
+        self._add_group('additional_modes', self._additionalModesBuilder, observe=True)
 
         self.setBuilder(item.getBuilder().copy())
         self._rebuild()
@@ -48,7 +48,7 @@ class ProbeRepositoryItem(ParameterGroup):
 
     def syncToSettings(self) -> None:
         for parameter in self.parameters().values():
-            parameter.syncValueToParent()
+            parameter.sync_value_to_parent()
 
         self._builder.syncToSettings()
         self._additionalModesBuilder.syncToSettings()
@@ -60,11 +60,11 @@ class ProbeRepositoryItem(ParameterGroup):
         return self._builder
 
     def setBuilder(self, builder: ProbeBuilder, *, mutable: bool = True) -> None:
-        self._removeGroup('builder')
-        self._builder.removeObserver(self)
+        self._remove_group('builder')
+        self._builder.remove_observer(self)
         self._builder = builder
-        self._builder.addObserver(self)
-        self._addGroup('builder', self._builder, observe=True)
+        self._builder.add_observer(self)
+        self._add_group('builder', self._builder, observe=True)
         self._rebuild(mutable=mutable)
 
     def _rebuild(self, *, mutable: bool = True) -> None:
@@ -77,15 +77,15 @@ class ProbeRepositoryItem(ParameterGroup):
         self._probe = (
             self._additionalModesBuilder.build(probe, self._geometryProvider) if mutable else probe
         )
-        self.notifyObservers()
+        self.notify_observers()
 
     def getAdditionalModesBuilder(self) -> MultimodalProbeBuilder:
         return self._additionalModesBuilder
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._builder:
             self._rebuild()
         elif observable is self._additionalModesBuilder:
             self._rebuild()
         else:
-            super().update(observable)
+            super()._update(observable)

@@ -67,7 +67,7 @@ class SettingsController(Observer):
         self._listModel = QStringListModel()
         self._tableModel = SettingsTableModel()
 
-        settingsRegistry.addObserver(self)
+        settingsRegistry.add_observer(self)
 
         view.listView.setModel(self._listModel)
         view.listView.selectionModel().currentChanged.connect(self._updateView)
@@ -83,23 +83,23 @@ class SettingsController(Observer):
         filePath, _ = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Settings',
-            nameFilters=self._settingsRegistry.getOpenFileFilterList(),
-            selectedNameFilter=self._settingsRegistry.getOpenFileFilter(),
+            nameFilters=self._settingsRegistry.get_open_file_filters(),
+            selectedNameFilter=self._settingsRegistry.get_open_file_filter(),
         )
 
         if filePath:
-            self._settingsRegistry.openSettings(filePath)
+            self._settingsRegistry.open_settings(filePath)
 
     def _saveSettings(self) -> None:
         filePath, _ = self._fileDialogFactory.getSaveFilePath(
             self._view,
             'Save Settings',
-            nameFilters=self._settingsRegistry.getSaveFileFilterList(),
-            selectedNameFilter=self._settingsRegistry.getSaveFileFilter(),
+            nameFilters=self._settingsRegistry.get_save_file_filters(),
+            selectedNameFilter=self._settingsRegistry.get_save_file_filter(),
         )
 
         if filePath:
-            self._settingsRegistry.saveSettings(filePath)
+            self._settingsRegistry.save_settings(filePath)
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         if not current.isValid():
@@ -112,7 +112,7 @@ class SettingsController(Observer):
 
         for parameterName, parameter in group.parameters().items():
             names.append(parameterName)
-            values.append(parameter.getValueAsString())
+            values.append(parameter.get_value_as_string())
 
         self._tableModel.setNamesAndValues(names, values)
 
@@ -122,6 +122,6 @@ class SettingsController(Observer):
         current = self._view.listView.currentIndex()
         self._updateView(current, QModelIndex())
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._settingsRegistry:
             self._syncModelToView()

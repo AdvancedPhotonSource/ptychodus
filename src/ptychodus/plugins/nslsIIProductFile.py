@@ -26,34 +26,32 @@ class NSLSIIProductFileReader(ProductFileReader):
             metadata = ProductMetadata(
                 name=filePath.stem,
                 comments='',
-                detectorDistanceInMeters=detector_distance_m,
-                probeEnergyInElectronVolts=probe_energy_eV,
-                probePhotonCount=0.0,  # not included in file
-                exposureTimeInSeconds=0.0,  # not included in file
+                detector_distance_m=detector_distance_m,
+                probe_energy_eV=probe_energy_eV,
+                probe_photon_count=0.0,  # not included in file
+                exposure_time_s=0.0,  # not included in file
             )
 
             pixel_width_m = h5File['img_pixel_size_x'][()]
             pixel_height_m = h5File['img_pixel_size_y'][()]
-            pixel_geometry = PixelGeometry(
-                widthInMeters=pixel_width_m, heightInMeters=pixel_height_m
-            )
+            pixel_geometry = PixelGeometry(width_m=pixel_width_m, height_m=pixel_height_m)
             positions_m = h5File['pos_xy'][()].T * self.ONE_MICRON_M
 
             for index, _xy in enumerate(positions_m):
                 point = ScanPoint(
                     index=index,
-                    positionXInMeters=_xy[1],
-                    positionYInMeters=_xy[2],
+                    position_x_m=_xy[1],
+                    position_y_m=_xy[2],
                 )
                 point_list.append(point)
 
             probe_array = h5File['prb'][()].astype(complex)
-            probe = Probe(array=probe_array, pixelGeometry=pixel_geometry)
+            probe = Probe(array=probe_array, pixel_geometry=pixel_geometry)
 
             object_array = h5File['obj'][()].astype(complex)
             object_ = Object(
                 array=object_array,
-                pixelGeometry=pixel_geometry,
+                pixel_geometry=pixel_geometry,
                 center=None,
             )
             costs: Sequence[float] = list()

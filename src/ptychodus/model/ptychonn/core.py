@@ -26,37 +26,37 @@ class PtychoNNModelPresenter(Observable, Observer):
         super().__init__()
         self._settings = settings
 
-        settings.addObserver(self)
+        settings.add_observer(self)
 
     def getNumberOfConvolutionKernelsLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getNumberOfConvolutionKernels(self) -> int:
         limits = self.getNumberOfConvolutionKernelsLimits()
-        return limits.clamp(self._settings.numberOfConvolutionKernels.getValue())
+        return limits.clamp(self._settings.numberOfConvolutionKernels.get_value())
 
     def setNumberOfConvolutionKernels(self, value: int) -> None:
-        self._settings.numberOfConvolutionKernels.setValue(value)
+        self._settings.numberOfConvolutionKernels.set_value(value)
 
     def getBatchSizeLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getBatchSize(self) -> int:
         limits = self.getBatchSizeLimits()
-        return limits.clamp(self._settings.batchSize.getValue())
+        return limits.clamp(self._settings.batchSize.get_value())
 
     def setBatchSize(self, value: int) -> None:
-        self._settings.batchSize.setValue(value)
+        self._settings.batchSize.set_value(value)
 
     def isBatchNormalizationEnabled(self) -> bool:
-        return self._settings.useBatchNormalization.getValue()
+        return self._settings.useBatchNormalization.get_value()
 
     def setBatchNormalizationEnabled(self, enabled: bool) -> None:
-        self._settings.useBatchNormalization.setValue(enabled)
+        self._settings.useBatchNormalization.set_value(enabled)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._settings:
-            self.notifyObservers()
+            self.notify_observers()
 
 
 class PtychoNNTrainingPresenter(Observable, Observer):
@@ -66,7 +66,7 @@ class PtychoNNTrainingPresenter(Observable, Observer):
         super().__init__()
         self._settings = settings
 
-        settings.addObserver(self)
+        settings.add_observer(self)
 
     def getValidationSetFractionalSizeLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
@@ -74,55 +74,55 @@ class PtychoNNTrainingPresenter(Observable, Observer):
     def getValidationSetFractionalSize(self) -> Decimal:
         limits = self.getValidationSetFractionalSizeLimits()
         return limits.clamp(
-            Decimal.from_float(self._settings.validationSetFractionalSize.getValue())
+            Decimal.from_float(self._settings.validationSetFractionalSize.get_value())
         )
 
     def setValidationSetFractionalSize(self, value: Decimal) -> None:
-        self._settings.validationSetFractionalSize.setValue(float(value))
+        self._settings.validationSetFractionalSize.set_value(float(value))
 
     def getMaximumLearningRateLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getMaximumLearningRate(self) -> Decimal:
         limits = self.getMaximumLearningRateLimits()
-        return limits.clamp(Decimal.from_float(self._settings.maximumLearningRate.getValue()))
+        return limits.clamp(Decimal.from_float(self._settings.maximumLearningRate.get_value()))
 
     def setMaximumLearningRate(self, value: Decimal) -> None:
-        self._settings.maximumLearningRate.setValue(float(value))
+        self._settings.maximumLearningRate.set_value(float(value))
 
     def getMinimumLearningRateLimits(self) -> Interval[Decimal]:
         return Interval[Decimal](Decimal(0), Decimal(1))
 
     def getMinimumLearningRate(self) -> Decimal:
         limits = self.getMinimumLearningRateLimits()
-        return limits.clamp(Decimal.from_float(self._settings.minimumLearningRate.getValue()))
+        return limits.clamp(Decimal.from_float(self._settings.minimumLearningRate.get_value()))
 
     def setMinimumLearningRate(self, value: Decimal) -> None:
-        self._settings.minimumLearningRate.setValue(float(value))
+        self._settings.minimumLearningRate.set_value(float(value))
 
     def getTrainingEpochsLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getTrainingEpochs(self) -> int:
         limits = self.getTrainingEpochsLimits()
-        return limits.clamp(self._settings.trainingEpochs.getValue())
+        return limits.clamp(self._settings.trainingEpochs.get_value())
 
     def setTrainingEpochs(self, value: int) -> None:
-        self._settings.trainingEpochs.setValue(value)
+        self._settings.trainingEpochs.set_value(value)
 
     def getStatusIntervalInEpochsLimits(self) -> Interval[int]:
         return Interval[int](1, self.MAX_INT)
 
     def getStatusIntervalInEpochs(self) -> int:
         limits = self.getStatusIntervalInEpochsLimits()
-        return limits.clamp(self._settings.statusIntervalInEpochs.getValue())
+        return limits.clamp(self._settings.statusIntervalInEpochs.get_value())
 
     def setStatusIntervalInEpochs(self, value: int) -> None:
-        self._settings.statusIntervalInEpochs.setValue(value)
+        self._settings.statusIntervalInEpochs.set_value(value)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._settings:
-            self.notifyObservers()
+            self.notify_observers()
 
 
 class PtychoNNReconstructorLibrary(ReconstructorLibrary):

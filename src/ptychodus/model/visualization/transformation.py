@@ -97,28 +97,28 @@ class ScalarTransformationParameter(Parameter[str], Observer):
             simple_name='log10',
             display_name='Logarithm (Base 10)',
         )
-        self.setValue('Identity')
-        self._chooser.addObserver(self)
+        self.set_value('Identity')
+        self._chooser.add_observer(self)
 
     def choices(self) -> Iterator[str]:
         for plugin in self._chooser:
             yield plugin.display_name
 
-    def getValue(self) -> str:
+    def get_value(self) -> str:
         return self._chooser.get_current_plugin().display_name
 
-    def setValue(self, value: str, *, notify: bool = True) -> None:
+    def set_value(self, value: str, *, notify: bool = True) -> None:
         self._chooser.set_current_plugin(value)
 
-    def getValueAsString(self) -> str:
-        return self.getValue()
+    def get_value_as_string(self) -> str:
+        return self.get_value()
 
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(value)
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(value)
 
     def copy(self) -> Parameter[str]:
         parameter = ScalarTransformationParameter()
-        parameter.setValue(self.getValue())
+        parameter.set_value(self.get_value())
         return parameter
 
     def decorateText(self, text: str) -> str:
@@ -127,6 +127,6 @@ class ScalarTransformationParameter(Parameter[str], Observer):
     def transform(self, values: RealArrayType) -> RealArrayType:
         return self._chooser.get_current_plugin().strategy(values)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._chooser:
-            self.notifyObservers()
+            self.notify_observers()

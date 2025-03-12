@@ -29,7 +29,7 @@ class DatasetTreeNode:
     def insert_child(self, pos: int, array: AssembledDiffractionPatternArray) -> DatasetTreeNode:
         child = DatasetTreeNode(self, array, -1)
 
-        for frame_index in range(array.getNumberOfPatterns()):
+        for frame_index in range(array.get_num_patterns()):
             grandchild = DatasetTreeNode(child, array, frame_index)
             child.child_nodes.append(grandchild)
 
@@ -37,7 +37,7 @@ class DatasetTreeNode:
         return child
 
     def get_label(self) -> str:
-        return self._array.getLabel() if self._frame_index < 0 else f'Frame {self._frame_index}'
+        return self._array.get_label() if self._frame_index < 0 else f'Frame {self._frame_index}'
 
     def get_data(self) -> PatternDataType:
         return (
@@ -58,7 +58,7 @@ class DatasetTreeNode:
 
     def get_nbytes(self) -> int:
         return (
-            self._array.getData().nbytes
+            self._array.get_data().nbytes
             if self._frame_index < 0
             else self._array.get_pattern(self._frame_index).nbytes
         )

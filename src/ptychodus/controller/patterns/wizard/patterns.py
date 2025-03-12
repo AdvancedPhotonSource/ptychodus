@@ -89,14 +89,14 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
 
         self._sync_model_to_view()
 
-        self._center_x_spin_box.valueChanged.connect(settings.cropCenterXInPixels.setValue)
-        self._center_y_spin_box.valueChanged.connect(settings.cropCenterYInPixels.setValue)
-        self._width_spin_box.valueChanged.connect(settings.cropWidthInPixels.setValue)
-        self._height_spin_box.valueChanged.connect(settings.cropHeightInPixels.setValue)
-        self._flip_x_check_box.toggled.connect(settings.flipXEnabled.setValue)
-        self._flip_y_check_box.toggled.connect(settings.flipYEnabled.setValue)
+        self._center_x_spin_box.valueChanged.connect(settings.cropCenterXInPixels.set_value)
+        self._center_y_spin_box.valueChanged.connect(settings.cropCenterYInPixels.set_value)
+        self._width_spin_box.valueChanged.connect(settings.cropWidthInPixels.set_value)
+        self._height_spin_box.valueChanged.connect(settings.cropHeightInPixels.set_value)
+        self._flip_x_check_box.toggled.connect(settings.flipXEnabled.set_value)
+        self._flip_y_check_box.toggled.connect(settings.flipYEnabled.set_value)
 
-        sizer.addObserver(self)
+        sizer.add_observer(self)
 
     def _sync_model_to_view(self) -> None:
         center_x = self._sizer.axis_x.get_crop_center()
@@ -129,14 +129,14 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
         self._height_spin_box.setValue(height)
         self._height_spin_box.blockSignals(False)
 
-        self._flip_x_check_box.setChecked(self._settings.flipXEnabled.getValue())
-        self._flip_y_check_box.setChecked(self._settings.flipYEnabled.getValue())
+        self._flip_x_check_box.setChecked(self._settings.flipXEnabled.get_value())
+        self._flip_y_check_box.setChecked(self._settings.flipYEnabled.get_value())
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._sizer:
             self._sync_model_to_view()
         else:
-            super().update(observable)
+            super()._update(observable)
 
 
 class PatternBinningViewController(CheckableGroupBoxParameterViewController):
@@ -162,10 +162,10 @@ class PatternBinningViewController(CheckableGroupBoxParameterViewController):
 
         self._sync_model_to_view()
 
-        self._bin_size_x_spin_box.valueChanged.connect(settings.binSizeX.setValue)
-        self._bin_size_y_spin_box.valueChanged.connect(settings.binSizeY.setValue)
+        self._bin_size_x_spin_box.valueChanged.connect(settings.binSizeX.set_value)
+        self._bin_size_y_spin_box.valueChanged.connect(settings.binSizeY.set_value)
 
-        sizer.addObserver(self)
+        sizer.add_observer(self)
 
     def _sync_model_to_view(self) -> None:
         bin_size_x = self._sizer.axis_x.get_bin_size()
@@ -184,11 +184,11 @@ class PatternBinningViewController(CheckableGroupBoxParameterViewController):
         self._bin_size_y_spin_box.setValue(bin_size_y)
         self._bin_size_y_spin_box.blockSignals(False)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._sizer:
             self._sync_model_to_view()
         else:
-            super().update(observable)
+            super()._update(observable)
 
 
 class PatternPaddingViewController(CheckableGroupBoxParameterViewController):
@@ -216,10 +216,10 @@ class PatternPaddingViewController(CheckableGroupBoxParameterViewController):
 
         self._sync_model_to_view()
 
-        self._pad_x_spin_box.valueChanged.connect(settings.padX.setValue)
-        self._pad_y_spin_box.valueChanged.connect(settings.padY.setValue)
+        self._pad_x_spin_box.valueChanged.connect(settings.padX.set_value)
+        self._pad_y_spin_box.valueChanged.connect(settings.padY.set_value)
 
-        sizer.addObserver(self)
+        sizer.add_observer(self)
 
     def _sync_model_to_view(self) -> None:
         pad_x = self._sizer.axis_x.get_pad_size()
@@ -235,11 +235,11 @@ class PatternPaddingViewController(CheckableGroupBoxParameterViewController):
         self._pad_y_spin_box.setValue(pad_y)
         self._pad_y_spin_box.blockSignals(False)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._sizer:
             self._sync_model_to_view()
         else:
-            super().update(observable)
+            super()._update(observable)
 
 
 class PatternTransformViewController:

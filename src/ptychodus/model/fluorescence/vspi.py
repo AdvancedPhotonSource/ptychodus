@@ -28,8 +28,8 @@ __all__ = [
 class ArrayPatchInterpolator:  # XXX
     def __init__(self, array: RealArrayType, point: ObjectPoint, shape: tuple[int, ...]) -> None:
         # top left corner of object support
-        xmin = point.positionXInPixels - shape[-1] / 2
-        ymin = point.positionYInPixels - shape[-2] / 2
+        xmin = point.position_x_px - shape[-1] / 2
+        ymin = point.position_y_px - shape[-2] / 2
 
         # whole components (pixel indexes)
         xmin_wh = int(xmin)
@@ -81,36 +81,36 @@ class VSPILinearOperator(LinearOperator):
 
         A[M,N] * X[N,P] = B[M,P]
         """
-        object_geometry = product.object_.getGeometry()
+        object_geometry = product.object_.get_geometry()
         M = len(product.scan)
-        N = object_geometry.heightInPixels * object_geometry.widthInPixels
+        N = object_geometry.height_px * object_geometry.width_px
         super().__init__(float, (M, N))
         self._product = product
 
     def _get_psf(self) -> RealArrayType:
-        intensity = self._product.probe.getIntensity()
+        intensity = self._product.probe.get_intensity()
         return intensity / intensity.sum()
 
     def _matvec(self, X: RealArrayType) -> RealArrayType:
-        object_geometry = self._product.object_.getGeometry()
-        object_array = X.reshape((object_geometry.heightInPixels, object_geometry.widthInPixels))
+        object_geometry = self._product.object_.get_geometry()
+        object_array = X.reshape((object_geometry.height_px, object_geometry.width_px))
         psf = self._get_psf()
         AX = numpy.zeros(len(self._product.scan))
 
         for index, scan_point in enumerate(self._product.scan):
-            object_point = object_geometry.mapScanPointToObjectPoint(scan_point)
+            object_point = object_geometry.map_scan_point_to_object_point(scan_point)
             interpolator = ArrayPatchInterpolator(object_array, object_point, psf.shape)
             AX[index] = numpy.sum(psf * interpolator.get_patch())
 
         return AX
 
     def _rmatvec(self, X: RealArrayType) -> RealArrayType:
-        object_geometry = self._product.object_.getGeometry()
-        object_array = numpy.zeros((object_geometry.heightInPixels, object_geometry.widthInPixels))
+        object_geometry = self._product.object_.get_geometry()
+        object_array = numpy.zeros((object_geometry.height_px, object_geometry.width_px))
         psf = self._get_psf()
 
         for index, scan_point in enumerate(self._product.scan):
-            object_point = object_geometry.mapScanPointToObjectPoint(scan_point)
+            object_point = object_geometry.map_scan_point_to_object_point(scan_point)
             interpolator = ArrayPatchInterpolator(object_array, object_point, psf.shape)
             interpolator.accumulate_patch(X[index] * psf)
 
@@ -127,13 +127,13 @@ class VSPIFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Observa
         super().__init__()
         self._settings = settings
 
-        settings.vspiDampingFactor.addObserver(self)
-        settings.vspiMaxIterations.addObserver(self)
+        settings.vspiDampingFactor.add_observer(self)
+        settings.vspiMaxIterations.add_observer(self)
 
     def enhance(self, dataset: FluorescenceDataset, product: Product) -> FluorescenceDataset:
         # FIXME OPR
-        object_geometry = product.object_.getGeometry()
-        e_cps_shape = object_geometry.heightInPixels, object_geometry.widthInPixels
+        object_geometry = product.object_.get_geometry()
+        e_cps_shape = object_geometry.height_px, object_geometry.width_px
         element_maps: list[ElementMap] = list()
         A = VSPILinearOperator(product)
 
@@ -144,8 +144,8 @@ class VSPIFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Observa
             result = lsmr(
                 A,
                 m_cps.flatten(),
-                damp=self._settings.vspiDampingFactor.getValue(),
-                maxiter=self._settings.vspiMaxIterations.getValue(),
+                damp=self._settings.vspiDampingFactor.get_value(),
+                maxiter=self._settings.vspiMaxIterations.get_value(),
                 show=True,
             )
             logger.debug(result)
@@ -163,19 +163,19 @@ class VSPIFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Observa
         )
 
     def getDampingFactor(self) -> float:
-        return self._settings.vspiDampingFactor.getValue()
+        return self._settings.vspiDampingFactor.get_value()
 
     def setDampingFactor(self, factor: float) -> None:
-        self._settings.vspiDampingFactor.setValue(factor)
+        self._settings.vspiDampingFactor.set_value(factor)
 
     def getMaxIterations(self) -> int:
-        return self._settings.vspiMaxIterations.getValue()
+        return self._settings.vspiMaxIterations.get_value()
 
     def setMaxIterations(self, number: int) -> None:
-        self._settings.vspiMaxIterations.setValue(number)
+        self._settings.vspiMaxIterations.set_value(number)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._settings.vspiDampingFactor:
-            self.notifyObservers()
+            self.notify_observers()
         elif observable is self._settings.vspiMaxIterations:
-            self.notifyObservers()
+            self.notify_observers()

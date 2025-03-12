@@ -57,16 +57,16 @@ class CheckableGroupBoxParameterViewController(ParameterViewController, Observer
             self._widget.setToolTip(tool_tip)
 
         self._syncModelToView()
-        self._widget.toggled.connect(parameter.setValue)
-        self._parameter.addObserver(self)
+        self._widget.toggled.connect(parameter.set_value)
+        self._parameter.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
 
     def _syncModelToView(self) -> None:
-        self._widget.setChecked(self._parameter.getValue())
+        self._widget.setChecked(self._parameter.get_value())
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
             self._syncModelToView()
 
@@ -81,16 +81,16 @@ class CheckBoxParameterViewController(ParameterViewController, Observer):
             self._widget.setToolTip(tool_tip)
 
         self._syncModelToView()
-        self._widget.toggled.connect(parameter.setValue)
-        parameter.addObserver(self)
+        self._widget.toggled.connect(parameter.set_value)
+        parameter.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
 
     def _syncModelToView(self) -> None:
-        self._widget.setChecked(self._parameter.getValue())
+        self._widget.setChecked(self._parameter.get_value())
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
             self._syncModelToView()
 
@@ -107,15 +107,15 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
             self._widget.setToolTip(tool_tip)
 
         self._syncModelToView()
-        self._widget.valueChanged.connect(parameter.setValue)
-        parameter.addObserver(self)
+        self._widget.valueChanged.connect(parameter.set_value)
+        parameter.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
 
     def _syncModelToView(self) -> None:
-        minimum = self._parameter.getMinimum()
-        maximum = self._parameter.getMaximum()
+        minimum = self._parameter.get_minimum()
+        maximum = self._parameter.get_maximum()
 
         if minimum is None:
             raise ValueError('Minimum not provided!')
@@ -127,10 +127,10 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
             else:
                 self._widget.setRange(minimum, maximum)
 
-            self._widget.setValue(self._parameter.getValue())
+            self._widget.setValue(self._parameter.get_value())
             self._widget.blockSignals(False)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
             self._syncModelToView()
 
@@ -150,16 +150,16 @@ class ComboBoxParameterViewController(ParameterViewController, Observer):
             self._widget.setToolTip(tool_tip)
 
         self._syncModelToView()
-        self._widget.textActivated.connect(parameter.setValue)
-        parameter.addObserver(self)
+        self._widget.textActivated.connect(parameter.set_value)
+        parameter.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
 
     def _syncModelToView(self) -> None:
-        self._widget.setCurrentText(self._parameter.getValue())
+        self._widget.setCurrentText(self._parameter.get_value())
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
             self._syncModelToView()
 
@@ -180,18 +180,18 @@ class LineEditParameterViewController(ParameterViewController, Observer):
 
         self._syncModelToView()
         self._widget.editingFinished.connect(self._syncViewToModel)
-        parameter.addObserver(self)
+        parameter.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
 
     def _syncViewToModel(self) -> None:
-        self._parameter.setValue(self._widget.text())
+        self._parameter.set_value(self._widget.text())
 
     def _syncModelToView(self) -> None:
-        self._widget.setText(self._parameter.getValue())
+        self._widget.setText(self._parameter.get_value())
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
             self._syncModelToView()
 
@@ -229,7 +229,7 @@ class PathParameterViewController(ParameterViewController, Observer):
         self._widget.setLayout(layout)
 
         self._syncModelToView()
-        parameter.addObserver(self)
+        parameter.add_observer(self)
         self._lineEdit.editingFinished.connect(self._syncPathToModel)
 
     @classmethod
@@ -306,7 +306,7 @@ class PathParameterViewController(ParameterViewController, Observer):
 
     def _syncPathToModel(self) -> None:
         path = Path(self._lineEdit.text())
-        self._parameter.setValue(path)
+        self._parameter.set_value(path)
 
     def _chooseFileToOpen(self) -> None:
         path, _ = self._fileDialogFactory.getOpenFilePath(
@@ -318,7 +318,7 @@ class PathParameterViewController(ParameterViewController, Observer):
         )
 
         if path:
-            self._parameter.setValue(path)
+            self._parameter.set_value(path)
 
     def _chooseFileToSave(self) -> None:
         path, _ = self._fileDialogFactory.getSaveFilePath(
@@ -330,19 +330,19 @@ class PathParameterViewController(ParameterViewController, Observer):
         )
 
         if path:
-            self._parameter.setValue(path)
+            self._parameter.set_value(path)
 
     def _chooseDirectory(self) -> None:
         path = self._fileDialogFactory.getExistingDirectoryPath(self._widget, self._caption)
 
         if path:
-            self._parameter.setValue(path)
+            self._parameter.set_value(path)
 
     def _syncModelToView(self) -> None:
-        path = self._parameter.getValue()
+        path = self._parameter.get_value()
         self._lineEdit.setText(str(path))
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
             self._syncModelToView()
 
@@ -357,8 +357,8 @@ class IntegerLineEditParameterViewController(ParameterViewController, Observer):
             self._widget.setToolTip(tool_tip)
 
         validator = QIntValidator()
-        bottom = parameter.getMinimum()
-        top = parameter.getMaximum()
+        bottom = parameter.get_minimum()
+        top = parameter.get_maximum()
 
         if bottom is not None:
             validator.setBottom(bottom)
@@ -370,7 +370,7 @@ class IntegerLineEditParameterViewController(ParameterViewController, Observer):
 
         self._syncModelToView()
         self._widget.editingFinished.connect(self._syncViewToModel)
-        parameter.addObserver(self)
+        parameter.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
@@ -383,12 +383,12 @@ class IntegerLineEditParameterViewController(ParameterViewController, Observer):
         except ValueError:
             logger.warning(f'Failed to convert "{text}" to int!')
         else:
-            self._parameter.setValue(value)
+            self._parameter.set_value(value)
 
     def _syncModelToView(self) -> None:
-        self._widget.setText(str(self._parameter.getValue()))
+        self._widget.setText(str(self._parameter.get_value()))
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
             self._syncModelToView()
 
@@ -406,18 +406,18 @@ class DecimalLineEditParameterViewController(ParameterViewController, Observer):
 
         self._syncModelToView()
         self._widget.valueChanged.connect(self._syncViewToModel)
-        parameter.addObserver(self)
+        parameter.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
 
     def _syncViewToModel(self, value: Decimal) -> None:
-        self._parameter.setValue(float(value))
+        self._parameter.set_value(float(value))
 
     def _syncModelToView(self) -> None:
-        self._widget.setValue(Decimal(repr(self._parameter.getValue())))
+        self._widget.setValue(Decimal(repr(self._parameter.get_value())))
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
             self._syncModelToView()
 
@@ -433,26 +433,26 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
 
         self._syncModelToView()
         self._widget.valueChanged.connect(self._syncViewToModel)
-        parameter.addObserver(self)
+        parameter.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
 
     def _syncViewToModel(self, value: Decimal) -> None:
-        self._parameter.setValue(float(value))
+        self._parameter.set_value(float(value))
 
     def _syncModelToView(self) -> None:
-        minimum = self._parameter.getMinimum()
-        maximum = self._parameter.getMaximum()
+        minimum = self._parameter.get_minimum()
+        maximum = self._parameter.get_maximum()
 
         if minimum is None or maximum is None:
             raise ValueError('Range not provided!')
         else:
-            value = Decimal(repr(self._parameter.getValue()))
+            value = Decimal(repr(self._parameter.get_value()))
             range_ = Interval[Decimal](Decimal(repr(minimum)), Decimal(repr(maximum)))
             self._widget.setValueAndRange(value, range_)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
             self._syncModelToView()
 
@@ -470,18 +470,18 @@ class LengthWidgetParameterViewController(ParameterViewController, Observer):
 
         self._syncModelToView()
         self._widget.lengthChanged.connect(self._syncViewToModel)
-        parameter.addObserver(self)
+        parameter.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
 
     def _syncViewToModel(self, value: Decimal) -> None:
-        self._parameter.setValue(float(value))
+        self._parameter.set_value(float(value))
 
     def _syncModelToView(self) -> None:
-        self._widget.setLengthInMeters(Decimal(repr(self._parameter.getValue())))
+        self._widget.setLengthInMeters(Decimal(repr(self._parameter.get_value())))
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
             self._syncModelToView()
 
@@ -497,18 +497,18 @@ class AngleWidgetParameterViewController(ParameterViewController, Observer):
 
         self._syncModelToView()
         self._widget.angleChanged.connect(self._syncViewToModel)
-        parameter.addObserver(self)
+        parameter.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
 
     def _syncViewToModel(self, value: Decimal) -> None:
-        self._parameter.setValue(float(value))
+        self._parameter.set_value(float(value))
 
     def _syncModelToView(self) -> None:
-        self._widget.setAngleInTurns(Decimal(repr(self._parameter.getValue())))
+        self._widget.setAngleInTurns(Decimal(repr(self._parameter.get_value())))
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
             self._syncModelToView()
 

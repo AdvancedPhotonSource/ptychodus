@@ -37,26 +37,26 @@ class PatternAxisSizer(Observable, Observer):
         self._padding_enabled = padding_enabled
         self._pad_size = pad_size
 
-        detector_size.addObserver(self)
-        detector_pixel_size_m.addObserver(self)
-        crop_enabled.addObserver(self)
-        crop_size.addObserver(self)
-        crop_center.addObserver(self)
-        binning_enabled.addObserver(self)
-        bin_size.addObserver(self)
-        padding_enabled.addObserver(self)
-        pad_size.addObserver(self)
+        detector_size.add_observer(self)
+        detector_pixel_size_m.add_observer(self)
+        crop_enabled.add_observer(self)
+        crop_size.add_observer(self)
+        crop_center.add_observer(self)
+        binning_enabled.add_observer(self)
+        bin_size.add_observer(self)
+        padding_enabled.add_observer(self)
+        pad_size.add_observer(self)
 
     def get_detector_size(self) -> int:
-        return self._detector_size.getValue()
+        return self._detector_size.get_value()
 
     def get_crop_size_limits(self) -> Interval[int]:
         return Interval[int](1, self.get_detector_size())
 
     def get_crop_size(self) -> int:
-        if self._crop_enabled.getValue():
+        if self._crop_enabled.get_value():
             limits = self.get_crop_size_limits()
-            return limits.clamp(self._crop_size.getValue())
+            return limits.clamp(self._crop_size.get_value())
 
         return self.get_detector_size()
 
@@ -67,15 +67,15 @@ class PatternAxisSizer(Observable, Observer):
 
     def get_crop_center(self) -> int:
         limits = self.get_crop_center_limits()
-        return limits.clamp(self._crop_center.getValue())
+        return limits.clamp(self._crop_center.get_value())
 
     def get_bin_size_limits(self) -> Interval[int]:
         return Interval[int](1, self.get_crop_size())
 
     def get_bin_size(self) -> int:
-        if self._binning_enabled.getValue():
+        if self._binning_enabled.get_value():
             limits = self.get_bin_size_limits()
-            return limits.clamp(self._bin_size.getValue())
+            return limits.clamp(self._bin_size.get_value())
 
         return 1
 
@@ -87,8 +87,8 @@ class PatternAxisSizer(Observable, Observer):
             raise ValueError(f'Invalid binning size! ({crop_size=}, {bin_size=})')
 
     def get_pad_size(self) -> int:
-        if self._padding_enabled.getValue():
-            return self._pad_size.getValue()
+        if self._padding_enabled.get_value():
+            return self._pad_size.get_value()
 
         return 0
 
@@ -96,12 +96,12 @@ class PatternAxisSizer(Observable, Observer):
         return self.get_crop_size() // self.get_bin_size() + self.get_pad_size()
 
     def get_processed_pixel_size_m(self) -> float:
-        return self.get_bin_size() * self._detector_pixel_size_m.getValue()
+        return self.get_bin_size() * self._detector_pixel_size_m.get_value()
 
     def get_processed_size_m(self) -> float:
         return self.get_processed_size() * self.get_processed_pixel_size_m()
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable in (
             self._detector_size,
             self._detector_pixel_size_m,
@@ -113,7 +113,7 @@ class PatternAxisSizer(Observable, Observer):
             self._padding_enabled,
             self._pad_size,
         ):
-            self.notifyObservers()
+            self.notify_observers()
 
 
 class PatternSizer(Observable, Observer):
@@ -145,8 +145,8 @@ class PatternSizer(Observable, Observer):
             pattern_settings.padY,
         )
 
-        self.axis_x.addObserver(self)
-        self.axis_y.addObserver(self)
+        self.axis_x.add_observer(self)
+        self.axis_y.add_observer(self)
 
     def get_processed_width_m(self) -> float:
         return self.axis_x.get_processed_size_m()
@@ -156,14 +156,14 @@ class PatternSizer(Observable, Observer):
 
     def get_processed_image_extent(self) -> ImageExtent:
         return ImageExtent(
-            widthInPixels=self.axis_x.get_processed_size(),
-            heightInPixels=self.axis_y.get_processed_size(),
+            width_px=self.axis_x.get_processed_size(),
+            height_px=self.axis_y.get_processed_size(),
         )
 
     def get_processed_pixel_geometry(self) -> PixelGeometry:
         return PixelGeometry(
-            widthInMeters=self.axis_x.get_processed_pixel_size_m(),
-            heightInMeters=self.axis_y.get_processed_pixel_size_m(),
+            width_m=self.axis_x.get_processed_pixel_size_m(),
+            height_m=self.axis_y.get_processed_pixel_size_m(),
         )
 
     def get_processor(self) -> DiffractionPatternProcessor:
@@ -173,18 +173,18 @@ class PatternSizer(Observable, Observer):
         binning: DiffractionPatternBinning | None = None
         padding: DiffractionPatternPadding | None = None
 
-        if self._pattern_settings.valueUpperBoundEnabled.getValue():
-            value_lower_bound = self._pattern_settings.valueLowerBound.getValue()
+        if self._pattern_settings.valueUpperBoundEnabled.get_value():
+            value_lower_bound = self._pattern_settings.valueLowerBound.get_value()
 
-        if self._pattern_settings.valueUpperBoundEnabled.getValue():
-            value_upper_bound = self._pattern_settings.valueUpperBound.getValue()
+        if self._pattern_settings.valueUpperBoundEnabled.get_value():
+            value_upper_bound = self._pattern_settings.valueUpperBound.get_value()
 
         filter_values = DiffractionPatternFilterValues(
             lower_bound=value_lower_bound,
             upper_bound=value_upper_bound,
         )
 
-        if self._pattern_settings.cropEnabled.getValue():
+        if self._pattern_settings.cropEnabled.get_value():
             crop = DiffractionPatternCrop(
                 center=CropCenter(
                     self.axis_x.get_crop_center(),
@@ -196,7 +196,7 @@ class PatternSizer(Observable, Observer):
                 ),
             )
 
-        if self._pattern_settings.binningEnabled.getValue():
+        if self._pattern_settings.binningEnabled.get_value():
             self.axis_x.validate_bin_size()
             self.axis_y.validate_bin_size()
             binning = DiffractionPatternBinning(
@@ -204,7 +204,7 @@ class PatternSizer(Observable, Observer):
                 bin_size_y=self.axis_y.get_bin_size(),
             )
 
-        if self._pattern_settings.paddingEnabled.getValue():
+        if self._pattern_settings.paddingEnabled.get_value():
             padding = DiffractionPatternPadding(
                 pad_x=self.axis_x.get_pad_size(),
                 pad_y=self.axis_y.get_pad_size(),
@@ -215,10 +215,10 @@ class PatternSizer(Observable, Observer):
             crop=crop,
             binning=binning,
             padding=padding,
-            flip_x=self._pattern_settings.flipXEnabled.getValue(),
-            flip_y=self._pattern_settings.flipYEnabled.getValue(),
+            flip_x=self._pattern_settings.flipXEnabled.get_value(),
+            flip_y=self._pattern_settings.flipYEnabled.get_value(),
         )
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable in (self.axis_x, self.axis_y):
-            self.notifyObservers()
+            self.notify_observers()

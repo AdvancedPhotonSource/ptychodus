@@ -102,7 +102,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         trainAction = view.parametersView.trainerMenu.addAction('Train')
         trainAction.triggered.connect(self._train)
 
-        presenter.addObserver(self)
+        presenter.add_observer(self)
         productRepository.addObserver(self)
         self._syncModelToView()
 
@@ -278,6 +278,6 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
     def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
         pass
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._syncModelToView()

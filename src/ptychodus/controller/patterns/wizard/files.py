@@ -44,7 +44,7 @@ class OpenDatasetWizardBreadcrumbsViewController(Observer):
         self._widget.setLayout(layout)
 
         self._sync_model_to_view()
-        file_dialog_factory.addObserver(self)
+        file_dialog_factory.add_observer(self)
 
     def _handle_id_clicked(self, button_id: int) -> None:
         path = self._path_list[button_id]
@@ -103,7 +103,7 @@ class OpenDatasetWizardBreadcrumbsViewController(Observer):
     def get_widget(self) -> QWidget:
         return self._widget
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._file_dialog_factory:
             self._sync_model_to_view()
 
@@ -118,8 +118,8 @@ class OpenDatasetWizardLocationViewController(Observer):
         self._widget.editingFinished.connect(self._handle_editing_finished)
 
         self._sync_model_to_view()
-        file_path.addObserver(self)
-        file_dialog_factory.addObserver(self)
+        file_path.add_observer(self)
+        file_dialog_factory.add_observer(self)
 
     def _handle_editing_finished(self) -> None:
         text = self._widget.text()
@@ -131,10 +131,10 @@ class OpenDatasetWizardLocationViewController(Observer):
         path = path.resolve()
 
         self._file_dialog_factory.setOpenWorkingDirectory(path)
-        self._file_path.setValue(path)
+        self._file_path.set_value(path)
 
     def _sync_model_to_view(self) -> None:
-        file_path = self._file_path.getValue()
+        file_path = self._file_path.get_value()
 
         if file_path.is_file():
             self._widget.setText(file_path.name)
@@ -144,7 +144,7 @@ class OpenDatasetWizardLocationViewController(Observer):
     def get_widget(self) -> QWidget:
         return self._widget
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable in (self._file_path, self._file_dialog_factory):
             self._sync_model_to_view()
 
@@ -172,8 +172,8 @@ class OpenDatasetWizardFilePathViewController(Observer):
         self._widget.selectionModel().currentChanged.connect(self._handle_current_changed)
 
         self._sync_model_to_view()
-        file_path.addObserver(self)
-        file_dialog_factory.addObserver(self)
+        file_path.add_observer(self)
+        file_dialog_factory.add_observer(self)
 
     def set_name_filters(self, name_filters: Sequence[str]) -> None:
         logger.debug(f'Name Filters: {name_filters}')
@@ -190,10 +190,10 @@ class OpenDatasetWizardFilePathViewController(Observer):
     def _handle_current_changed(self, current: QModelIndex, previous: QModelIndex) -> None:
         index = self._proxy_model.mapToSource(current)
         path = Path(self._model.filePath(index))
-        self._file_path.setValue(path)
+        self._file_path.set_value(path)
 
     def _sync_model_to_view(self) -> None:
-        file_path = self._file_path.getValue()
+        file_path = self._file_path.get_value()
         root_path = self._file_dialog_factory.getOpenWorkingDirectory()
 
         index = self._model.setRootPath(str(root_path))
@@ -208,7 +208,7 @@ class OpenDatasetWizardFilePathViewController(Observer):
     def get_widget(self) -> QWidget:
         return self._widget
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._file_path:
             self._sync_model_to_view()
         elif observable is self._file_dialog_factory:
@@ -219,7 +219,7 @@ class OpenDatasetWizardFileTypeViewController(Observable, Observer):
     def __init__(self, api: PatternsAPI) -> None:
         super().__init__()
         self._file_reader_chooser = api.getFileReaderChooser()
-        self._file_reader_chooser.addObserver(self)
+        self._file_reader_chooser.add_observer(self)
         self._combo_box = QComboBox()
 
         for plugin in self._file_reader_chooser:
@@ -242,10 +242,10 @@ class OpenDatasetWizardFileTypeViewController(Observable, Observer):
     def get_widget(self) -> QWidget:
         return self._combo_box
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._file_reader_chooser:
             self._sync_model_to_view()
-            self.notifyObservers()
+            self.notify_observers()
 
 
 class OpenDatasetWizardFilesViewController(Observer):
@@ -267,7 +267,7 @@ class OpenDatasetWizardFilesViewController(Observer):
             settings.filePath, file_dialog_factory
         )
         self._file_type_view_controller = OpenDatasetWizardFileTypeViewController(api)
-        self._file_type_view_controller.addObserver(self)
+        self._file_type_view_controller.add_observer(self)
 
         layout = QFormLayout()
         layout.addRow(self._breadcrumbs_view_controller.get_widget())
@@ -280,15 +280,15 @@ class OpenDatasetWizardFilesViewController(Observer):
         self._page.setLayout(layout)
 
         self._sync_model_to_view()
-        settings.filePath.addObserver(self)
+        settings.filePath.add_observer(self)
 
     def open_dataset(self) -> None:
         file_reader_chooser = self._api.getFileReaderChooser()
         file_type = file_reader_chooser.get_current_plugin().simple_name
-        file_path = self._settings.filePath.getValue()
+        file_path = self._settings.filePath.get_value()
 
         try:
-            self._api.openPatterns(file_path, fileType=file_type)
+            self._api.open_patterns(file_path, file_type=file_type)
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.showException('Open Dataset', err)
@@ -297,7 +297,7 @@ class OpenDatasetWizardFilesViewController(Observer):
         return self._page
 
     def _check_if_complete(self) -> None:
-        file_path = self._settings.filePath.getValue()
+        file_path = self._settings.filePath.get_value()
         self._page._setComplete(file_path.is_file())
 
     def restart(self) -> None:
@@ -308,14 +308,14 @@ class OpenDatasetWizardFilesViewController(Observer):
         self._file_path_view_controller.set_name_filters(name_filters)
 
     def _sync_model_to_view(self) -> None:
-        file_path = self._settings.filePath.getValue()
+        file_path = self._settings.filePath.get_value()
 
         if file_path.exists():
             self._file_dialog_factory.setOpenWorkingDirectory(file_path)
 
         self._handle_file_type_changed()
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._settings.filePath:
             self._check_if_complete()
         elif observable is self._file_type_view_controller:

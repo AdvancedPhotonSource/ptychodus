@@ -28,20 +28,20 @@ class ColormapRenderer(Renderer):
         super().__init__(component.name)
         self._component = component
         self._transformation = transformation
-        self._addParameter('transformation', transformation)
+        self._add_parameter('transformation', transformation)
         self._colorAxis = colorAxis
-        self._addGroup('color_axis', colorAxis, observe=True)
+        self._add_group('color_axis', colorAxis, observe=True)
         self._colormap = colormap
-        self._addParameter('colormap', colormap)
+        self._add_parameter('colormap', colormap)
 
     def variants(self) -> Iterator[str]:
         return self._colormap.choices()
 
     def getVariant(self) -> str:
-        return self._colormap.getValue()
+        return self._colormap.get_value()
 
     def setVariant(self, variant: str) -> None:
-        self._colormap.setValue(variant)
+        self._colormap.set_value(variant)
 
     def isCyclic(self) -> bool:
         return self._component.isCyclic
@@ -74,8 +74,8 @@ class ColormapRenderer(Renderer):
         rgba = self._colorize(valuesTransformed)
 
         return VisualizationProduct(
-            valueLabel=self._transformation.decorateText(self._component.name),
+            value_label=self._transformation.decorateText(self._component.name),
             values=array,
             rgba=rgba,
-            pixelGeometry=pixelGeometry,
+            pixel_geometry=pixelGeometry,
         )

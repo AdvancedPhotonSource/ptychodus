@@ -24,33 +24,33 @@ class ColormapParameter(Parameter[str], Observer):
             if isCyclic == isCyclicColormap:
                 self._chooser.register_plugin(cmap, display_name=name)
 
-        self.setValue('hsv' if isCyclic else 'gray')
-        self._chooser.addObserver(self)
+        self.set_value('hsv' if isCyclic else 'gray')
+        self._chooser.add_observer(self)
 
     def choices(self) -> Iterator[str]:
         for plugin in self._chooser:
             yield plugin.display_name
 
-    def getValue(self) -> str:
+    def get_value(self) -> str:
         return self._chooser.get_current_plugin().display_name
 
-    def setValue(self, value: str, *, notify: bool = True) -> None:
+    def set_value(self, value: str, *, notify: bool = True) -> None:
         self._chooser.set_current_plugin(value)
 
-    def getValueAsString(self) -> str:
-        return self.getValue()
+    def get_value_as_string(self) -> str:
+        return self.get_value()
 
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(value)
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(value)
 
     def copy(self) -> Parameter[str]:
         parameter = ColormapParameter(isCyclic=self._isCyclic)
-        parameter.setValue(self.getValue())
+        parameter.set_value(self.get_value())
         return parameter
 
     def getPlugin(self) -> Colormap:
         return self._chooser.get_current_plugin().strategy
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._chooser:
-            self.notifyObservers()
+            self.notify_observers()

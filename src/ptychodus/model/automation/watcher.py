@@ -26,7 +26,7 @@ class DataDirectoryEventHandler(watchdog.events.FileSystemEventHandler):
         if not event.is_directory:
             srcPath = Path(str(event.src_path))
 
-            if srcPath.match(self._workflow.getWatchFilePattern()):
+            if srcPath.match(self._workflow.get_watch_file_pattern()):
                 self._datasetBuffer.put(srcPath)
 
     def on_created(self, event: watchdog.events.FileSystemEvent) -> None:
@@ -49,8 +49,8 @@ class DataDirectoryWatcher(Observable, Observer):
         self._datasetBuffer = datasetBuffer
         self._observer: watchdog.observers.api.BaseObserver = watchdog.observers.Observer()
 
-        settings.addObserver(self)
-        workflow.addObserver(self)
+        settings.add_observer(self)
+        workflow.add_observer(self)
 
     @property
     def isAlive(self) -> bool:
@@ -58,13 +58,13 @@ class DataDirectoryWatcher(Observable, Observer):
 
     def _updateWatch(self) -> None:
         self._observer.unschedule_all()
-        dataDirectory = self._settings.dataDirectory.getValue()
+        dataDirectory = self._settings.dataDirectory.get_value()
 
         if dataDirectory.exists():
             observedWatch = self._observer.schedule(
                 event_handler=DataDirectoryEventHandler(self._workflow, self._datasetBuffer),
                 path=str(dataDirectory),
-                recursive=self._workflow.isWatchRecursive,
+                recursive=self._workflow.is_watch_recursive,
             )
             logger.debug(observedWatch)
         else:
@@ -77,7 +77,7 @@ class DataDirectoryWatcher(Observable, Observer):
             logger.info('Starting automation watchdog thread...')
             self._observer = (
                 PollingObserver()
-                if self._settings.useWatchdogPollingObserver.getValue()
+                if self._settings.useWatchdogPollingObserver.get_value()
                 else watchdog.observers.Observer()
             )
             self._observer.start()
@@ -91,7 +91,7 @@ class DataDirectoryWatcher(Observable, Observer):
             self._observer.join()
             logger.debug('Automation watchdog thread stopped.')
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._settings:
             self._updateWatch()
         elif observable is self._workflow:

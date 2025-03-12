@@ -69,7 +69,7 @@ class ImageItem(QGraphicsPixmapItem):
         return self._product
 
     def setProduct(self, product: VisualizationProduct) -> None:
-        imageRGBAf = product.getImageRGBA()
+        imageRGBAf = product.get_image_rgba()
         # NOTE .copy() ensures imageRGBAi is not a view
         imageRGBAi = numpy.multiply(imageRGBAf, 255).astype(numpy.uint8).copy()
 
@@ -113,7 +113,7 @@ class ImageItem(QGraphicsPixmapItem):
         pos = event.pos()
 
         if self._product is not None:
-            infoText = self._product.getInfoText(pos.x(), pos.y())
+            infoText = self._product.get_info_text(pos.x(), pos.y())
             self._statusBar.showMessage(infoText)
 
         super().hoverMoveEvent(event)

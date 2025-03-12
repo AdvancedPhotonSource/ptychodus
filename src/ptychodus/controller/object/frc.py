@@ -35,8 +35,8 @@ class FourierRingCorrelationViewController:
 
         frc = self._correlator.correlate(currentIndex1, currentIndex2)
         plot2D = frc.getPlot()
-        axisX = plot2D.axisX
-        axisY = plot2D.axisY
+        axisX = plot2D.axis_x
+        axisY = plot2D.axis_y
 
         ax = self._dialog.axes
         ax.clear()

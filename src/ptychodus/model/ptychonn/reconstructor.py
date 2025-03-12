@@ -108,7 +108,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         )
 
         logger.debug('Stitching...')
-        stitcher = ObjectStitcher(parameters.product.object_.getGeometry())
+        stitcher = ObjectStitcher(parameters.product.object_.get_geometry())
 
         for scanPoint, objectPatchChannels in zip(parameters.product.scan, objectPatches):
             patchArray = numpy.exp(1j * objectPatchChannels[0])
@@ -130,31 +130,31 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
         return ReconstructOutput(product, 0)
 
-    def getModelFileFilter(self) -> str:
+    def get_model_file_filter(self) -> str:
         return self.MODEL_FILE_FILTER
 
-    def openModel(self, filePath: Path) -> None:
+    def open_model(self, filePath: Path) -> None:
         self._modelProvider.openModel(filePath)
 
-    def saveModel(self, filePath: Path) -> None:
+    def save_model(self, filePath: Path) -> None:
         self._modelProvider.saveModel(filePath)
 
-    def getTrainingDataFileFilter(self) -> str:
+    def get_training_data_file_filter(self) -> str:
         return self.TRAINING_DATA_FILE_FILTER
 
-    def exportTrainingData(self, filePath: Path, parameters: ReconstructInput) -> None:
+    def export_training_data(self, filePath: Path, parameters: ReconstructInput) -> None:
         interpolator = ObjectLinearInterpolator(parameters.product.object_)
         num_channels = self._modelProvider.getNumberOfChannels()
         probe_extent = ImageExtent(
-            widthInPixels=parameters.product.probe.widthInPixels,
-            heightInPixels=parameters.product.probe.heightInPixels,
+            width_px=parameters.product.probe.width_px,
+            height_px=parameters.product.probe.height_px,
         )
         patches = numpy.zeros(
             (len(parameters.product.scan), num_channels, *probe_extent.shape), dtype=numpy.float32
         )
 
         for index, scan_point in enumerate(parameters.product.scan):
-            patch = interpolator.get_patch(scan_point, probe_extent).getArray()
+            patch = interpolator.get_patch(scan_point, probe_extent).get_array()
             patches[index, 0, :, :] = numpy.angle(patch)
 
             if num_channels > 1:
@@ -167,28 +167,28 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         }
         numpy.savez_compressed(filePath, **trainingData)
 
-    def getTrainingDataPath(self) -> Path:
-        return self._trainingSettings.trainingDataPath.getValue()
+    def get_training_data_path(self) -> Path:
+        return self._trainingSettings.trainingDataPath.get_value()
 
     def train(self, dataPath: Path) -> TrainOutput:
         logger.debug(f'Reading "{dataPath}" as "NPZ"')
         trainingData = numpy.load(dataPath)
-        self._trainingSettings.trainingDataPath.setValue(dataPath)
+        self._trainingSettings.trainingDataPath.set_value(dataPath)
 
         model = self._modelProvider.getModel()
         logger.debug('Training...')
         trainingSetFractionalSize = (
-            1 - self._trainingSettings.validationSetFractionalSize.getValue()
+            1 - self._trainingSettings.validationSetFractionalSize.get_value()
         )
         trainer, trainerLog = ptychonn.train(
             model=model,
-            batch_size=self._modelSettings.batchSize.getValue(),
+            batch_size=self._modelSettings.batchSize.get_value(),
             out_dir=None,
             X_train=trainingData[self.PATTERNS_KW],
             Y_train=trainingData[self.PATCHES_KW],
-            epochs=self._trainingSettings.trainingEpochs.getValue(),
+            epochs=self._trainingSettings.trainingEpochs.get_value(),
             training_fraction=float(trainingSetFractionalSize),
-            log_frequency=self._trainingSettings.statusIntervalInEpochs.getValue(),
+            log_frequency=self._trainingSettings.statusIntervalInEpochs.get_value(),
             strategy='ddp_notebook',
         )
         self._modelProvider.setTrainer(trainer)
@@ -207,7 +207,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
                 validationLoss.append(vloss)
 
         return TrainOutput(
-            trainingLoss=trainingLoss,
-            validationLoss=validationLoss,
+            training_loss=trainingLoss,
+            validation_loss=validationLoss,
             result=0,
         )

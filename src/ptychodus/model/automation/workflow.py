@@ -18,7 +18,7 @@ class CurrentFileBasedWorkflow(FileBasedWorkflow, Observable, Observer):
         self._workflowChooser = workflowChooser
 
         workflowChooser.synchronize_with_parameter(settings.strategy)
-        workflowChooser.addObserver(self)
+        workflowChooser.add_observer(self)
 
     def getAvailableWorkflows(self) -> Iterator[str]:
         for plugin in self._workflowChooser:
@@ -31,18 +31,18 @@ class CurrentFileBasedWorkflow(FileBasedWorkflow, Observable, Observer):
         self._workflowChooser.set_current_plugin(name)
 
     @property
-    def isWatchRecursive(self) -> bool:
+    def is_watch_recursive(self) -> bool:
         workflow = self._workflowChooser.get_current_plugin().strategy
-        return workflow.isWatchRecursive
+        return workflow.is_watch_recursive
 
-    def getWatchFilePattern(self) -> str:
+    def get_watch_file_pattern(self) -> str:
         workflow = self._workflowChooser.get_current_plugin().strategy
-        return workflow.getWatchFilePattern()
+        return workflow.get_watch_file_pattern()
 
     def execute(self, api: WorkflowAPI, filePath: Path) -> None:
         workflow = self._workflowChooser.get_current_plugin().strategy
         workflow.execute(api, filePath)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._workflowChooser:
-            self.notifyObservers()
+            self.notify_observers()

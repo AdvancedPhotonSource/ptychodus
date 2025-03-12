@@ -47,8 +47,8 @@ class DMReconstructor(Reconstructor):
             random_seed=helper.random_seed,
             displayed_loss_function=helper.displayed_loss_function,
             forward_model_options=helper.forward_model_options,
-            exit_wave_update_relaxation=self._settings.exitWaveUpdateRelaxation.getValue(),
-            chunk_length=self._settings.chunkLength.getValue(),
+            exit_wave_update_relaxation=self._settings.exitWaveUpdateRelaxation.get_value(),
+            chunk_length=self._settings.chunkLength.get_value(),
         )
 
     def _create_object_options(self, object_: Object) -> DMObjectOptions:
@@ -70,7 +70,7 @@ class DMReconstructor(Reconstructor):
             patch_interpolation_method=helper.patch_interpolation_method,
             remove_object_probe_ambiguity=helper.remove_object_probe_ambiguity,
             build_preconditioner_with_all_modes=helper.build_preconditioner_with_all_modes,
-            amplitude_clamp_limit=self._settings.objectAmplitudeClampLimit.getValue(),
+            amplitude_clamp_limit=self._settings.objectAmplitudeClampLimit.get_value(),
         )
 
     def _create_probe_options(self, probe: Probe, metadata: ProductMetadata) -> DMProbeOptions:
@@ -131,7 +131,7 @@ class DMReconstructor(Reconstructor):
             object_options=self._create_object_options(product.object_),
             probe_options=self._create_probe_options(product.probe, product.metadata),
             probe_position_options=self._create_probe_position_options(
-                product.scan, product.object_.getGeometry()
+                product.scan, product.object_.get_geometry()
             ),
             opr_mode_weight_options=self._create_opr_mode_weight_options(),
         )

@@ -51,7 +51,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
                     match index.row():
                         case 0:
-                            return f'{geometry.probeWavelengthInMeters * 1e9:.4g}'
+                            return f'{geometry.probe_wavelength_m * 1e9:.4g}'
                         case 1:
                             return f'{geometry.probeWavelengthsPerMeter * 1e-9:.4g}'
                         case 2:
@@ -59,7 +59,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
                         case 3:
                             return f'{geometry.probePhotonsPerSecond:.4g}'
                         case 4:
-                            return f'{geometry.probePowerInWatts:.4g}'
+                            return f'{geometry.probe_power_W:.4g}'
                         case 5:
                             return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
                         case 6:
@@ -108,7 +108,7 @@ class ProductEditorViewController(Observer):
         dialog.tableView.resizeRowsToContents()
 
         viewController = cls(dataset, product, tableModel, dialog)
-        product.addObserver(viewController)
+        product.add_observer(viewController)
         dialog.textEdit.textChanged.connect(viewController._syncViewToModel)
 
         viewController._syncModelToView()
@@ -122,25 +122,25 @@ class ProductEditorViewController(Observer):
 
     def _syncViewToModel(self) -> None:
         metadata = self._product.getMetadata()
-        metadata.comments.setValue(self._dialog.textEdit.toPlainText())
+        metadata.comments.set_value(self._dialog.textEdit.toPlainText())
 
     def _syncModelToView(self) -> None:
         self._tableModel.beginResetModel()
         self._tableModel.endResetModel()
 
         metadata = self._product.getMetadata()
-        self._dialog.textEdit.setPlainText(metadata.comments.getValue())
+        self._dialog.textEdit.setPlainText(metadata.comments.get_value())
 
     def _estimateProbePhotonCount(self) -> None:
         metadata = self._product.getMetadata()
-        metadata.probePhotonCount.setValue(self._dataset.get_maximum_pattern_counts())
+        metadata.probePhotonCount.set_value(self._dataset.get_maximum_pattern_counts())
 
         self._tableModel.beginResetModel()
         self._tableModel.endResetModel()
 
     def _finish(self, result: int) -> None:
-        self._product.removeObserver(self)
+        self._product.remove_observer(self)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._product:
             self._syncModelToView()

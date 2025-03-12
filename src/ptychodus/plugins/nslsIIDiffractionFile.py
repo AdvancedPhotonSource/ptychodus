@@ -29,7 +29,7 @@ class NSLSIIDiffractionFileReader(DiffractionFileReader):
         self._treeBuilder = H5DiffractionFileTreeBuilder()
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        dataset = SimpleDiffractionDataset.createNullInstance(filePath)
+        dataset = SimpleDiffractionDataset.create_null(filePath)
 
         try:
             with h5py.File(filePath, 'r') as h5File:
@@ -47,12 +47,12 @@ class NSLSIIDiffractionFileReader(DiffractionFileReader):
                     )
 
                     metadata = DiffractionMetadata(
-                        numberOfPatternsPerArray=numberOfPatterns,
-                        numberOfPatternsTotal=numberOfPatterns,
-                        patternDataType=data.dtype,
-                        detectorExtent=ImageExtent(detectorWidth, detectorHeight),
-                        detectorPixelGeometry=PixelGeometry(pixelSizeInMeters, pixelSizeInMeters),
-                        filePath=filePath,
+                        num_patterns_per_array=numberOfPatterns,
+                        num_patterns_total=numberOfPatterns,
+                        pattern_dtype=data.dtype,
+                        detector_extent=ImageExtent(detectorWidth, detectorHeight),
+                        detector_pixel_geometry=PixelGeometry(pixelSizeInMeters, pixelSizeInMeters),
+                        file_path=filePath,
                     )
 
                     array = H5DiffractionPatternArray(

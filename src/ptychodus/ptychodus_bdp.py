@@ -171,24 +171,24 @@ def main() -> int:
 
     if args.local_path_prefix is not None and args.remote_path_prefix is not None:
         changePathPrefix = PathPrefixChange(
-            findPathPrefix=args.local_path_prefix,
-            replacementPathPrefix=args.remote_path_prefix,
+            find_path_prefix=args.local_path_prefix,
+            replacement_path_prefix=args.remote_path_prefix,
         )
     elif bool(args.local_path_prefix) ^ bool(args.remote_path_prefix):
         parser.error('--local_path_prefix and --remote_path_prefix must be given together.')
 
     if args.crop_center_x_px is not None and args.crop_center_y_px is not None:
         cropCenter = CropCenter(
-            positionXInPixels=args.crop_center_x_px,
-            positionYInPixels=args.crop_center_y_px,
+            position_x_px=args.crop_center_x_px,
+            position_y_px=args.crop_center_y_px,
         )
     elif bool(args.crop_center_x_px) ^ bool(args.crop_center_y_px):
         parser.error('--crop_center_x_px and --crop_center_y_px must be given together.')
 
     if args.crop_width_px is not None and args.crop_height_px is not None:
         cropExtent = ImageExtent(
-            widthInPixels=args.crop_width_px,
-            heightInPixels=args.crop_height_px,
+            width_px=args.crop_width_px,
+            height_px=args.crop_height_px,
         )
     elif bool(args.crop_width_px) ^ bool(args.crop_height_px):
         parser.error('--crop_width_px and --crop_height_px must be given together.')
@@ -200,29 +200,29 @@ def main() -> int:
         logger.warning('Number of GPUs is not implemented yet!')  # TODO
 
     with ModelCore(Path(args.settings.name), isDeveloperModeEnabled=args.dev) as model:
-        model.workflowAPI.openPatterns(
+        model.workflowAPI.open_patterns(
             Path(args.patterns_file_path.name),
-            cropCenter=cropCenter,
-            cropExtent=cropExtent,
+            crop_center=cropCenter,
+            crop_extent=cropExtent,
         )
 
-        workflowProductAPI = model.workflowAPI.createProduct(
+        workflowProductAPI = model.workflowAPI.create_product(
             name=args.name,
             comments=args.comment,
-            detectorDistanceInMeters=args.detector_distance_m,
-            probeEnergyInElectronVolts=args.probe_energy_eV,
-            probePhotonCount=args.probe_photon_count,
-            exposureTimeInSeconds=args.exposure_time_s,
+            detector_distance_m=args.detector_distance_m,
+            probe_energy_eV=args.probe_energy_eV,
+            probe_photon_count=args.probe_photon_count,
+            exposure_time_s=args.exposure_time_s,
         )
-        workflowProductAPI.openScan(Path(args.scan_file_path.name))
-        workflowProductAPI.buildProbe()
-        workflowProductAPI.buildObject()
+        workflowProductAPI.open_scan(Path(args.scan_file_path.name))
+        workflowProductAPI.build_probe()
+        workflowProductAPI.build_object()
 
         stagingDir = args.output_directory
         stagingDir.mkdir(parents=True, exist_ok=True)
-        model.workflowAPI.saveSettings(stagingDir / 'settings.ini', changePathPrefix)
-        model.workflowAPI.exportAssembledPatterns(stagingDir / 'patterns.npz')
-        workflowProductAPI.saveProduct(stagingDir / 'product-in.npz', fileType='NPZ')
+        model.workflowAPI.save_settings(stagingDir / 'settings.ini', changePathPrefix)
+        model.workflowAPI.export_assembled_patterns(stagingDir / 'patterns.npz')
+        workflowProductAPI.save_product(stagingDir / 'product-in.npz', file_type='NPZ')
 
     return 0
 

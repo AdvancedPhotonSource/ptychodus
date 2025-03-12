@@ -19,32 +19,32 @@ PLANCK_CONSTANT_J_PER_HZ: Final[float] = 6.62607015e-34
 class ProductMetadata:
     name: str
     comments: str
-    detectorDistanceInMeters: float
-    probeEnergyInElectronVolts: float
-    probePhotonCount: float
-    exposureTimeInSeconds: float
+    detector_distance_m: float
+    probe_energy_eV: float  # noqa: N815
+    probe_photon_count: float
+    exposure_time_s: float
 
     @property
-    def probeEnergyInJoules(self) -> float:
-        return self.probeEnergyInElectronVolts * ELECTRON_VOLT_J
+    def probe_energy_J(self) -> float:  # noqa: N802
+        return self.probe_energy_eV * ELECTRON_VOLT_J
 
     @property
-    def probeWavelengthInMeters(self) -> float:
-        hc_Jm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S
+    def probe_wavelength_m(self) -> float:
+        hc_Jm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S  # noqa: N806
 
         try:
-            return hc_Jm / self.probeEnergyInJoules
+            return hc_Jm / self.probe_energy_J
         except ZeroDivisionError:
             return 0.0
 
     @property
-    def sizeInBytes(self) -> int:
+    def nbytes(self) -> int:
         sz = getsizeof(self.name)
         sz += getsizeof(self.comments)
-        sz += getsizeof(self.detectorDistanceInMeters)
-        sz += getsizeof(self.probeEnergyInElectronVolts)
-        sz += getsizeof(self.probePhotonCount)
-        sz += getsizeof(self.exposureTimeInSeconds)
+        sz += getsizeof(self.detector_distance_m)
+        sz += getsizeof(self.probe_energy_eV)
+        sz += getsizeof(self.probe_photon_count)
+        sz += getsizeof(self.exposure_time_s)
         return sz
 
 
@@ -57,23 +57,23 @@ class Product:
     costs: Sequence[float]
 
     @property
-    def sizeInBytes(self) -> int:
-        sz = self.metadata.sizeInBytes
-        sz += self.scan.sizeInBytes
-        sz += self.probe.sizeInBytes
-        sz += self.object_.sizeInBytes
+    def nbytes(self) -> int:
+        sz = self.metadata.nbytes
+        sz += self.scan.nbytes
+        sz += self.probe.nbytes
+        sz += self.object_.nbytes
         return sz
 
 
 class ProductFileReader(ABC):
     @abstractmethod
-    def read(self, filePath: Path) -> Product:
+    def read(self, file_path: Path) -> Product:
         """reads a product from file"""
         pass
 
 
 class ProductFileWriter(ABC):
     @abstractmethod
-    def write(self, filePath: Path, product: Product) -> None:
+    def write(self, file_path: Path, product: Product) -> None:
         """writes a product to file"""
         pass

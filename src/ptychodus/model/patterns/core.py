@@ -38,10 +38,10 @@ class PatternsCore(Observer):
         )
 
         fileReaderChooser.synchronize_with_parameter(self.patternSettings.fileType)
-        fileWriterChooser.set_current_plugin(self.patternSettings.fileType.getValue())
+        fileWriterChooser.set_current_plugin(self.patternSettings.fileType.get_value())
 
         self._reinitObservable = reinitObservable
-        reinitObservable.addObserver(self)
+        reinitObservable.add_observer(self)
 
     def start(self) -> None:
         pass
@@ -49,10 +49,10 @@ class PatternsCore(Observer):
     def stop(self) -> None:
         self.dataset.finish_loading(block=False)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._reinitObservable:
-            self.patternsAPI.openPatterns(
-                filePath=self.patternSettings.filePath.getValue(),
-                fileType=self.patternSettings.fileType.getValue(),
+            self.patternsAPI.open_patterns(
+                filePath=self.patternSettings.filePath.get_value(),
+                file_type=self.patternSettings.fileType.get_value(),
             )
             self.dataset.start_loading()

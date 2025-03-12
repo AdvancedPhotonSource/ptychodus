@@ -59,7 +59,7 @@ class SimpleTreeModel(QAbstractItemModel):
 
         if self.hasIndex(row, column, parent):
             parentItem = parent.internalPointer() if parent.isValid() else self._rootNode
-            childItem = parentItem.childItems[row]
+            childItem = parentItem.child_items[row]
 
             if childItem:
                 value = self.createIndex(row, column, childItem)
@@ -80,7 +80,7 @@ class SimpleTreeModel(QAbstractItemModel):
         if parent.isValid():
             node = parent.internalPointer()
 
-        return len(node.childItems)
+        return len(node.child_items)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         node = self._rootNode
@@ -88,7 +88,7 @@ class SimpleTreeModel(QAbstractItemModel):
         if parent.isValid():
             node = parent.internalPointer()
 
-        return len(node.itemData)
+        return len(node.item_data)
 
 
 class PatternsInfoViewController(DiffractionDatasetObserver):
@@ -99,7 +99,7 @@ class PatternsInfoViewController(DiffractionDatasetObserver):
 
     @classmethod
     def showInfo(cls, dataset: AssembledDiffractionDataset, parent: QWidget) -> None:
-        treeModel = SimpleTreeModel(dataset.getContentsTree())
+        treeModel = SimpleTreeModel(dataset.get_contents_tree())
         controller = cls(dataset, treeModel)
         dataset.add_observer(controller)
 
@@ -111,7 +111,7 @@ class PatternsInfoViewController(DiffractionDatasetObserver):
         dialog.open()
 
     def _syncModelToView(self) -> None:
-        self._treeModel.setRootNode(self._dataset.getContentsTree())
+        self._treeModel.setRootNode(self._dataset.get_contents_tree())
 
     def handle_array_inserted(self, index: int) -> None:
         pass

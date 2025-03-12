@@ -17,12 +17,12 @@ class CSVProbeFileReader(ProbeFileReader):
         if numberOfModes > 1:
             array = arrayFlat.reshape(numberOfModes, arrayFlat.shape[1], arrayFlat.shape[1])
 
-        return Probe(array=array, pixelGeometry=None)
+        return Probe(array=array, pixel_geometry=None)
 
 
 class CSVProbeFileWriter(ProbeFileWriter):
     def write(self, filePath: Path, probe: Probe) -> None:
-        array = probe.getArray()
+        array = probe.get_array()
         arrayFlat = array.reshape(-1, array.shape[-1])
         numpy.savetxt(filePath, arrayFlat, delimiter=',')
 

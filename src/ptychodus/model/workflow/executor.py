@@ -70,10 +70,10 @@ class WorkflowExecutor:
             return
 
         # TODO use workflow API
-        self._settingsRegistry.saveSettings(inputDataPosixPath / settingsFile)
-        self._patternsAPI.exportAssembledPatterns(inputDataPosixPath / patternsFile)
+        self._settingsRegistry.save_settings(inputDataPosixPath / settingsFile)
+        self._patternsAPI.export_assembled_patterns(inputDataPosixPath / patternsFile)
         self._productAPI.saveProduct(
-            inputProductIndex, inputDataPosixPath / inputFile, fileType='NPZ'
+            inputProductIndex, inputDataPosixPath / inputFile, file_type='NPZ'
         )
 
         flowInput = {
@@ -85,7 +85,7 @@ class WorkflowExecutor:
             'input_data_transfer_destination_path': computeDataGlobusPath,
             'input_data_transfer_recursive': True,
             'input_data_transfer_sync_level': transferSyncLevel,
-            'compute_endpoint': str(self._settings.computeEndpointID.getValue()),
+            'compute_endpoint': str(self._settings.computeEndpointID.get_value()),
             'ptychodus_action': ptychodusAction,
             'ptychodus_settings_file': str(computeDataPosixPath / settingsFile),
             'ptychodus_patterns_file': str(computeDataPosixPath / patternsFile),

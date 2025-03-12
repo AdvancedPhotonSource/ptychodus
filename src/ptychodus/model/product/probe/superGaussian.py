@@ -14,32 +14,32 @@ class SuperGaussianProbeBuilder(ProbeBuilder):
         self._settings = settings
 
         self.annularRadiusInMeters = settings.superGaussianAnnularRadiusInMeters.copy()
-        self._addParameter('annular_radius_m', self.annularRadiusInMeters)
+        self._add_parameter('annular_radius_m', self.annularRadiusInMeters)
 
         self.fwhmInMeters = settings.superGaussianWidthInMeters.copy()
-        self._addParameter('full_width_at_half_maximum_m', self.fwhmInMeters)
+        self._add_parameter('full_width_at_half_maximum_m', self.fwhmInMeters)
 
         self.orderParameter = settings.superGaussianOrderParameter.copy()
-        self._addParameter('order_parameter', self.orderParameter)
+        self._add_parameter('order_parameter', self.orderParameter)
 
     def copy(self) -> SuperGaussianProbeBuilder:
         builder = SuperGaussianProbeBuilder(self._settings)
 
         for key, value in self.parameters().items():
-            builder.parameters()[key].setValue(value.getValue())
+            builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
-        geometry = geometryProvider.getProbeGeometry()
+        geometry = geometryProvider.get_probe_geometry()
         coords = self.getTransverseCoordinates(geometry)
 
         Z = (
-            coords.positionRInMeters - self.annularRadiusInMeters.getValue()
-        ) / self.fwhmInMeters.getValue()
-        ZP = numpy.power(2 * Z, 2 * self.orderParameter.getValue())
+            coords.positionRInMeters - self.annularRadiusInMeters.get_value()
+        ) / self.fwhmInMeters.get_value()
+        ZP = numpy.power(2 * Z, 2 * self.orderParameter.get_value())
 
         return Probe(
             array=self.normalize(numpy.exp(-numpy.log(2) * ZP) + 0j),
-            pixelGeometry=geometry.getPixelGeometry(),
+            pixel_geometry=geometry.get_pixel_geometry(),
         )

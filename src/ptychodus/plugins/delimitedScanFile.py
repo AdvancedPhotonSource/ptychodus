@@ -50,8 +50,8 @@ class DelimitedScanFileWriter(ScanFileWriter):
     def write(self, filePath: Path, scan: Scan) -> None:
         with filePath.open(mode='wt') as csvFile:
             for point in scan:
-                x = point.positionXInMeters
-                y = point.positionYInMeters
+                x = point.position_x_m
+                y = point.position_y_m
                 line = (
                     f'{y}{self._delimiter}{x}\n' if self._swapXY else f'{x}{self._delimiter}{y}\n'
                 )

@@ -100,7 +100,7 @@ class ZernikeViewController(ParameterViewController, Observer):
 
         self._syncModelToView()
         self._orderSpinBox.valueChanged.connect(probeBuilder.setOrder)
-        probeBuilder.addObserver(self)
+        probeBuilder.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
@@ -112,7 +112,7 @@ class ZernikeViewController(ParameterViewController, Observer):
         self._coefficientsTableModel.beginResetModel()  # TODO clean up
         self._coefficientsTableModel.endResetModel()
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._probeBuilder:
             self._syncModelToView()
 
@@ -143,7 +143,7 @@ class DecayTypeParameterViewController(ParameterViewController, Observer):
         self._widget.setLayout(layout)
 
         self._syncModelToView()
-        parameter.addObserver(self)
+        parameter.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
@@ -151,18 +151,18 @@ class DecayTypeParameterViewController(ParameterViewController, Observer):
     def _syncViewToModel(self, toolId: int, checked: bool) -> None:
         if checked:
             decayType = ProbeModeDecayType(toolId)
-            self._parameter.setValue(decayType.name)
+            self._parameter.set_value(decayType.name)
 
     def _syncModelToView(self) -> None:
         try:
-            decayType = ProbeModeDecayType[self._parameter.getValue().upper()]
+            decayType = ProbeModeDecayType[self._parameter.get_value().upper()]
         except KeyError:
             decayType = ProbeModeDecayType.POLYNOMIAL
 
         button = self._buttonGroup.button(decayType.value)
         button.setChecked(True)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
             self._syncModelToView()
 

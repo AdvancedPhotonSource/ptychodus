@@ -81,17 +81,17 @@ class ZernikeProbeBuilder(ProbeBuilder):
         self._order = 0
 
         self.diameterInMeters = settings.diskDiameterInMeters.copy()
-        self._addParameter('diameter_m', self.diameterInMeters)
+        self._add_parameter('diameter_m', self.diameterInMeters)
 
         # TODO init zernike coefficients from settings
-        self.coefficients = self.createComplexSequenceParameter('coefficients', [1 + 0j])
+        self.coefficients = self.create_complex_sequence_parameter('coefficients', [1 + 0j])
 
         self.setOrder(1)
 
     def copy(self) -> ZernikeProbeBuilder:
         builder = ZernikeProbeBuilder(self._settings)
-        builder.diameterInMeters.setValue(self.diameterInMeters.getValue())
-        builder.coefficients.setValue(self.coefficients.getValue())
+        builder.diameterInMeters.set_value(self.diameterInMeters.get_value())
+        builder.coefficients.set_value(self.coefficients.get_value())
         builder.setOrder(self.getOrder())
         return builder
 
@@ -114,12 +114,12 @@ class ZernikeProbeBuilder(ProbeBuilder):
         ncoef = len(self.coefficients)
 
         if ncoef < npoly:
-            coef = list(self.coefficients.getValue())
+            coef = list(self.coefficients.get_value())
             coef += [0j] * (npoly - ncoef)
-            self.coefficients.setValue(coef)
+            self.coefficients.set_value(coef)
 
         self._order = order
-        self.notifyObservers()
+        self.notify_observers()
 
     def getOrder(self) -> int:
         return self._order
@@ -137,10 +137,10 @@ class ZernikeProbeBuilder(ProbeBuilder):
         return min(len(self.coefficients), len(self._polynomials))
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
-        geometry = geometryProvider.getProbeGeometry()
+        geometry = geometryProvider.get_probe_geometry()
         coords = self.getTransverseCoordinates(geometry)
 
-        radius = self.diameterInMeters.getValue() / 2.0
+        radius = self.diameterInMeters.get_value() / 2.0
         distance = numpy.hypot(coords.positionYInMeters, coords.positionXInMeters) / radius
         angle = numpy.arctan2(coords.positionYInMeters, coords.positionXInMeters)
         array = numpy.zeros_like(distance, dtype=complex)
@@ -150,5 +150,5 @@ class ZernikeProbeBuilder(ProbeBuilder):
 
         return Probe(
             array=self.normalize(array),
-            pixelGeometry=geometry.getPixelGeometry(),
+            pixel_geometry=geometry.get_pixel_geometry(),
         )

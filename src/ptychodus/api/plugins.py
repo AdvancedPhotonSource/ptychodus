@@ -53,7 +53,7 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
 
         plugin = Plugin[T](strategy, simple_name, display_name)
         self._registered_plugins.append(plugin)
-        self.notifyObservers()
+        self.notify_observers()
 
     def get_current_plugin(self) -> Plugin[T]:
         return self._registered_plugins[self._current_index]
@@ -67,9 +67,9 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
                     self._current_index = index
 
                     if self._parameter is not None:
-                        self._parameter.setValue(self.get_current_plugin().simple_name)
+                        self._parameter.set_value(self.get_current_plugin().simple_name)
 
-                    self.notifyObservers()
+                    self.notify_observers()
 
                 return
 
@@ -77,8 +77,8 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
 
     def synchronize_with_parameter(self, parameter: StringParameter) -> None:
         self._parameter = parameter
-        self.set_current_plugin(parameter.getValue())
-        self._parameter.addObserver(self)
+        self.set_current_plugin(parameter.get_value())
+        self._parameter.add_observer(self)
 
     def __iter__(self) -> Iterator[Plugin[T]]:
         for plugin in self._registered_plugins:
@@ -87,9 +87,9 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
     def __bool__(self) -> bool:
         return bool(self._registered_plugins)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if self._parameter is not None and observable is self._parameter:
-            self.set_current_plugin(self._parameter.getValue())
+            self.set_current_plugin(self._parameter.get_value())
 
 
 class PluginRegistry:
@@ -123,14 +123,14 @@ class PluginRegistry:
         # returned name an absolute name instead of a relative one. This allows
         # import_module to work without having to do additional modification to
         # the name.
-        for moduleInfo in pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + '.'):
+        for module_info in pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + '.'):
             try:
-                module = importlib.import_module(moduleInfo.name)
+                module = importlib.import_module(module_info.name)
             except ModuleNotFoundError as exc:
-                logger.info(f'Skipping {moduleInfo.name}')
+                logger.info(f'Skipping {module_info.name}')
                 logger.warning(exc)
             else:
-                logger.info(f'Registering {moduleInfo.name}')
+                logger.info(f'Registering {module_info.name}')
                 module.register_plugins(registry)
 
         return registry

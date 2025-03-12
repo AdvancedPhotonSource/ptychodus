@@ -31,13 +31,13 @@ class H5DiffractionPatternArray(DiffractionPatternArray):
         self._filePath = filePath
         self._dataPath = dataPath
 
-    def getLabel(self) -> str:
+    def get_label(self) -> str:
         return self._label
 
-    def getIndexes(self) -> PatternIndexesType:
+    def get_indexes(self) -> PatternIndexesType:
         return self._indexes
 
-    def getData(self) -> PatternDataType:
+    def get_data(self) -> PatternDataType:
         with h5py.File(self._filePath, 'r') as h5File:
             try:
                 item = h5File[self._dataPath]
@@ -71,10 +71,10 @@ class H5DiffractionFileTreeBuilder:
                 else:
                     itemDetails = f'SCALAR {value.dtype} = {value}'
 
-            treeNode.createChild([str(name), 'Attribute', itemDetails])
+            treeNode.create_child([str(name), 'Attribute', itemDetails])
 
     def createRootNode(self) -> SimpleTreeNode:
-        return SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
+        return SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
 
     def build(self, h5File: h5py.File) -> SimpleTreeNode:
         rootNode = self.createRootNode()
@@ -88,7 +88,7 @@ class H5DiffractionFileTreeBuilder:
                 itemDetails = ''
                 h5Item = h5Group.get(itemName, getlink=True)
 
-                treeNode = parentItem.createChild(list())
+                treeNode = parentItem.create_child(list())
 
                 if isinstance(h5Item, h5py.HardLink):
                     itemType = 'Hard Link'
@@ -131,7 +131,7 @@ class H5DiffractionFileTreeBuilder:
                 else:
                     logger.debug(f'Unknown item "{itemName}"')
 
-                treeNode.itemData = [itemName, itemType, itemDetails]
+                treeNode.item_data = [itemName, itemType, itemDetails]
 
         return rootNode
 
@@ -142,11 +142,11 @@ class H5DiffractionFileReader(DiffractionFileReader):
         self._treeBuilder = H5DiffractionFileTreeBuilder()
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        dataset = SimpleDiffractionDataset.createNullInstance(filePath)
+        dataset = SimpleDiffractionDataset.create_null(filePath)
 
         try:
             with h5py.File(filePath, 'r') as h5File:
-                metadata = DiffractionMetadata.createNullInstance(filePath)
+                metadata = DiffractionMetadata.create_null(filePath)
                 contentsTree = self._treeBuilder.build(h5File)
 
                 try:
@@ -157,11 +157,11 @@ class H5DiffractionFileReader(DiffractionFileReader):
                     numberOfPatterns, detectorHeight, detectorWidth = data.shape
 
                     metadata = DiffractionMetadata(
-                        numberOfPatternsPerArray=numberOfPatterns,
-                        numberOfPatternsTotal=numberOfPatterns,
-                        patternDataType=data.dtype,
-                        detectorExtent=ImageExtent(detectorWidth, detectorHeight),
-                        filePath=filePath,
+                        num_patterns_per_array=numberOfPatterns,
+                        num_patterns_total=numberOfPatterns,
+                        pattern_dtype=data.dtype,
+                        detector_extent=ImageExtent(detectorWidth, detectorHeight),
+                        file_path=filePath,
                     )
 
                 array = H5DiffractionPatternArray(
@@ -183,7 +183,7 @@ class H5DiffractionFileWriter(DiffractionFileWriter):
         self._dataPath = dataPath
 
     def write(self, filePath: Path, dataset: DiffractionDataset) -> None:
-        data = numpy.concatenate([array.getData() for array in dataset])
+        data = numpy.concatenate([array.get_data() for array in dataset])
 
         with h5py.File(filePath, 'w') as h5File:
             h5File.create_dataset(self._dataPath, data=data, compression='gzip')

@@ -32,7 +32,7 @@ class ReconstructorPresenter(Observable, Observer):
         self._reconstructorAPI = reconstructorAPI
 
         reconstructorChooser.synchronize_with_parameter(settings.algorithm)
-        reconstructorChooser.addObserver(self)
+        reconstructorChooser.add_observer(self)
 
     def getReconstructorList(self) -> Iterator[str]:
         for plugin in self._reconstructorChooser:
@@ -70,7 +70,7 @@ class ReconstructorPresenter(Observable, Observer):
         reconstructor = self._reconstructorChooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getModelFileFilter()
+            return reconstructor.get_model_file_filter()
         else:
             logger.warning('Reconstructor is not trainable!')
 
@@ -86,7 +86,7 @@ class ReconstructorPresenter(Observable, Observer):
         reconstructor = self._reconstructorChooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getTrainingDataFileFilter()
+            return reconstructor.get_training_data_file_filter()
         else:
             logger.warning('Reconstructor is not trainable!')
 
@@ -99,7 +99,7 @@ class ReconstructorPresenter(Observable, Observer):
         reconstructor = self._reconstructorChooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getTrainingDataPath()
+            return reconstructor.get_training_data_path()
         else:
             logger.warning('Reconstructor is not trainable!')
 
@@ -108,6 +108,6 @@ class ReconstructorPresenter(Observable, Observer):
     def train(self, dataPath: Path) -> TrainOutput:
         return self._reconstructorAPI.train(dataPath)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._reconstructorChooser:
-            self.notifyObservers()
+            self.notify_observers()

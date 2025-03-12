@@ -46,8 +46,8 @@ class DiffractionPatternPositionMatcher:
 
     def getObjectPlanePixelGeometry(self, inputProductIndex: int) -> PixelGeometry:
         inputProductItem = self._productRepository[inputProductIndex]
-        objectGeometry = inputProductItem.getGeometry().getObjectGeometry()
-        return objectGeometry.getPixelGeometry()
+        objectGeometry = inputProductItem.getGeometry().get_object_geometry()
+        return objectGeometry.get_pixel_geometry()
 
     def matchDiffractionPatternsWithPositions(
         self, inputProductIndex: int, indexFilter: ScanIndexFilter = ScanIndexFilter.ALL

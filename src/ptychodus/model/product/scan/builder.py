@@ -16,15 +16,15 @@ class ScanBuilder(ParameterGroup):
     def __init__(self, settings: ScanSettings, name: str) -> None:
         super().__init__()
         self._name = settings.builder.copy()
-        self._name.setValue(name)
-        self._addParameter('name', self._name)
+        self._name.set_value(name)
+        self._add_parameter('name', self._name)
 
     def getName(self) -> str:
-        return self._name.getValue()
+        return self._name.get_value()
 
     def syncToSettings(self) -> None:
         for parameter in self.parameters().values():
-            parameter.syncValueToParent()
+            parameter.sync_value_to_parent()
 
     @abstractmethod
     def copy(self) -> ScanBuilder:
@@ -55,21 +55,21 @@ class FromFileScanBuilder(ScanBuilder):
         super().__init__(settings, 'from_file')
         self._settings = settings
         self.filePath = settings.filePath.copy()
-        self.filePath.setValue(filePath)
-        self._addParameter('file_path', self.filePath)
+        self.filePath.set_value(filePath)
+        self._add_parameter('file_path', self.filePath)
         self.fileType = settings.fileType.copy()
-        self.fileType.setValue(fileType)
-        self._addParameter('file_type', self.fileType)
+        self.fileType.set_value(fileType)
+        self._add_parameter('file_type', self.fileType)
         self._fileReader = fileReader
 
     def copy(self) -> FromFileScanBuilder:
         return FromFileScanBuilder(
-            self._settings, self.filePath.getValue(), self.fileType.getValue(), self._fileReader
+            self._settings, self.filePath.get_value(), self.fileType.get_value(), self._fileReader
         )
 
     def build(self) -> Scan:
-        filePath = self.filePath.getValue()
-        fileType = self.fileType.getValue()
+        filePath = self.filePath.get_value()
+        fileType = self.fileType.get_value()
         logger.debug(f'Reading "{filePath}" as "{fileType}"')
 
         try:

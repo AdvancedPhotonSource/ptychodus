@@ -39,7 +39,7 @@ class STXMViewController(Observer):
             engine, self._dialog.visualizationParametersView
         )
 
-        simulator.addObserver(self)
+        simulator.add_observer(self)
 
     def launch(self, productIndex: int) -> None:
         self._simulator.setProduct(productIndex)
@@ -82,6 +82,6 @@ class STXMViewController(Observer):
         else:
             self._visualizationWidgetController.setArray(image.intensity, image.pixel_geometry)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._simulator:
             self._syncModelToView()

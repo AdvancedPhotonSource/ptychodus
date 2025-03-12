@@ -48,24 +48,24 @@ class APS2IDDiffractionFileReader(DiffractionFileReader):
                 h5data = h5File[dataPath]
             except KeyError:
                 logger.warning(f'File {filePath} is not an APS 2-ID data file.')
-                return SimpleDiffractionDataset.createNullInstance(filePath)
+                return SimpleDiffractionDataset.create_null(filePath)
             else:
                 numberOfPatternsPerArray, detectorHeight, detectorWidth = h5data.shape
                 metadata = DiffractionMetadata(
-                    numberOfPatternsPerArray=numberOfPatternsPerArray,
-                    numberOfPatternsTotal=numberOfPatternsPerArray * len(filePathMapping),
-                    patternDataType=h5data.dtype,
-                    detectorExtent=ImageExtent(detectorWidth, detectorHeight),
-                    filePath=filePath.parent / filePattern,
+                    num_patterns_per_array=numberOfPatternsPerArray,
+                    num_patterns_total=numberOfPatternsPerArray * len(filePathMapping),
+                    pattern_dtype=h5data.dtype,
+                    detector_extent=ImageExtent(detectorWidth, detectorHeight),
+                    file_path=filePath.parent / filePattern,
                 )
 
-        contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
+        contentsTree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
         arrayList: list[DiffractionPatternArray] = list()
 
         for idx, fp in sorted(filePathMapping.items()):
             indexes = numpy.arange(numberOfPatternsPerArray) + idx * numberOfPatternsPerArray
             array = H5DiffractionPatternArray(fp.stem, indexes, fp, dataPath)
-            contentsTree.createChild([array.getLabel(), 'HDF5', str(idx)])
+            contentsTree.create_child([array.get_label(), 'HDF5', str(idx)])
             arrayList.append(array)
 
         return SimpleDiffractionDataset(metadata, contentsTree, arrayList)

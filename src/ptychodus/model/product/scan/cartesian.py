@@ -39,22 +39,22 @@ class CartesianScanBuilder(ScanBuilder):
         self._settings = settings
 
         self.numberOfPointsX = settings.numberOfPointsX.copy()
-        self._addParameter('number_of_points_x', self.numberOfPointsX)
+        self._add_parameter('number_of_points_x', self.numberOfPointsX)
 
         self.numberOfPointsY = settings.numberOfPointsY.copy()
-        self._addParameter('number_of_points_y', self.numberOfPointsY)
+        self._add_parameter('number_of_points_y', self.numberOfPointsY)
 
         self.stepSizeXInMeters = settings.stepSizeXInMeters.copy()
-        self._addParameter('step_size_x_m', self.stepSizeXInMeters)
+        self._add_parameter('step_size_x_m', self.stepSizeXInMeters)
 
         self.stepSizeYInMeters = settings.stepSizeYInMeters.copy()
-        self._addParameter('step_size_y_m', self.stepSizeYInMeters)
+        self._add_parameter('step_size_y_m', self.stepSizeYInMeters)
 
     def copy(self) -> CartesianScanBuilder:
         builder = CartesianScanBuilder(self._variant, self._settings)
 
         for key, value in self.parameters().items():
-            builder.parameters()[key].setValue(value.getValue())
+            builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
@@ -63,9 +63,9 @@ class CartesianScanBuilder(ScanBuilder):
         return self._variant.isEquilateral
 
     def build(self) -> Scan:
-        nx = self.numberOfPointsX.getValue()
-        ny = self.numberOfPointsY.getValue()
-        dx = self.stepSizeXInMeters.getValue()
+        nx = self.numberOfPointsX.get_value()
+        ny = self.numberOfPointsY.get_value()
+        dx = self.stepSizeXInMeters.get_value()
 
         if self._variant.isEquilateral:
             dy = dx
@@ -73,7 +73,7 @@ class CartesianScanBuilder(ScanBuilder):
             if self._variant.isTriangular:
                 dy *= numpy.sqrt(0.75)
         else:
-            dy = self.stepSizeYInMeters.getValue()
+            dy = self.stepSizeYInMeters.get_value()
 
         pointList: list[ScanPoint] = list()
 
@@ -98,8 +98,8 @@ class CartesianScanBuilder(ScanBuilder):
 
             point = ScanPoint(
                 index=index,
-                positionXInMeters=xf,
-                positionYInMeters=yf,
+                position_x_m=xf,
+                position_y_m=yf,
             )
             pointList.append(point)
 

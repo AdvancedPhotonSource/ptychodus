@@ -44,7 +44,7 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductReposito
         return len(self._repository)
 
     def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notifyObserversItemInserted(index, item.getObject())
+        self.notify_observers_item_inserted(index, item.getObject())
 
     def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
         pass
@@ -56,10 +56,10 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductReposito
         pass
 
     def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
-        self.notifyObserversItemChanged(index, item)
+        self.notify_observers_item_changed(index, item)
 
     def handleCostsChanged(self, index: int, costs: Sequence[float]) -> None:
         pass
 
     def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notifyObserversItemRemoved(index, item.getObject())
+        self.notify_observers_item_removed(index, item.getObject())

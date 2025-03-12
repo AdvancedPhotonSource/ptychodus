@@ -37,7 +37,7 @@ class STXMImage:
 class STXMStitcher:  # XXX
     def __init__(self, geometry: ObjectGeometry) -> None:
         self._geometry = geometry
-        self._weights = numpy.zeros((geometry.heightInPixels, geometry.widthInPixels))
+        self._weights = numpy.zeros((geometry.height_px, geometry.width_px))
         self._intensity = numpy.zeros_like(self._weights)
 
     def _addPatchPart(
@@ -57,11 +57,11 @@ class STXMStitcher:  # XXX
         geometry = self._geometry
 
         patchWidth = probeProfile.shape[-1]
-        patchRadiusXInMeters = geometry.pixelWidthInMeters * patchWidth / 2
-        patchMinimumXInMeters = point.positionXInMeters - patchRadiusXInMeters
+        patchRadiusXInMeters = geometry.pixel_width_m * patchWidth / 2
+        patchMinimumXInMeters = point.position_x_m - patchRadiusXInMeters
         ixBeginF, xi = divmod(
-            patchMinimumXInMeters - geometry.minimumXInMeters,
-            geometry.pixelWidthInMeters,
+            patchMinimumXInMeters - geometry.minimum_x_m,
+            geometry.pixel_width_m,
         )
         ixBegin = int(ixBeginF)
         ixEnd = ixBegin + patchWidth
@@ -69,11 +69,11 @@ class STXMStitcher:  # XXX
         ixSlice1 = slice(ixBegin + 1, ixEnd + 1)
 
         patchHeight = probeProfile.shape[-2]
-        patchRadiusYInMeters = geometry.pixelHeightInMeters * patchHeight / 2
-        patchMinimumYInMeters = point.positionYInMeters - patchRadiusYInMeters
+        patchRadiusYInMeters = geometry.pixel_height_m * patchHeight / 2
+        patchMinimumYInMeters = point.position_y_m - patchRadiusYInMeters
         iyBeginF, eta = divmod(
-            patchMinimumYInMeters - geometry.minimumYInMeters,
-            geometry.pixelHeightInMeters,
+            patchMinimumYInMeters - geometry.minimum_y_m,
+            geometry.pixel_height_m,
         )
         iyBegin = int(iyBeginF)
         iyEnd = iyBegin + patchHeight
@@ -97,10 +97,10 @@ class STXMStitcher:  # XXX
         )
         return STXMImage(
             intensity=intensity,
-            pixel_width_m=self._geometry.pixelWidthInMeters,
-            pixel_height_m=self._geometry.pixelHeightInMeters,
-            center_x_m=self._geometry.centerXInMeters,
-            center_y_m=self._geometry.centerYInMeters,
+            pixel_width_m=self._geometry.pixel_width_m,
+            pixel_height_m=self._geometry.pixel_height_m,
+            center_x_m=self._geometry.center_x_m,
+            center_y_m=self._geometry.center_y_m,
         )
 
 
@@ -116,7 +116,7 @@ class STXMSimulator(Observable):
         if self._productIndex != productIndex:
             self._productIndex = productIndex
             self._image = None
-            self.notifyObservers()
+            self.notify_observers()
 
     def getProductName(self) -> str:
         return self._dataMatcher.getProductName(self._productIndex)
@@ -126,9 +126,9 @@ class STXMSimulator(Observable):
             self._productIndex
         )
         product = reconstructInput.product
-        stitcher = STXMStitcher(product.object_.getGeometry())
+        stitcher = STXMStitcher(product.object_.get_geometry())
 
-        probeIntensity = product.probe.getIntensity()
+        probeIntensity = product.probe.get_intensity()
         probeProfile = probeIntensity / numpy.sqrt(numpy.sum(numpy.abs(probeIntensity) ** 2))
 
         for pattern, scanPoint in zip(reconstructInput.patterns, product.scan):
@@ -136,7 +136,7 @@ class STXMSimulator(Observable):
             stitcher.addMeasurement(scanPoint, patternIntensity, probeProfile)
 
         self._image = stitcher.build()
-        self.notifyObservers()
+        self.notify_observers()
 
     def getImage(self) -> STXMImage:
         if self._image is None:

@@ -33,14 +33,17 @@ class BarycentricArrayStitcher:  # FIXME use
         value: ComplexArrayType | RealArrayType,
         weight: RealArrayType | None = None,
     ) -> None:
-        if value.shape != weight.shape:
-            raise ValueError('Mismatched patch shapes! ({value.shape=} != {weight.shape=})')
-
         if self._upper.dtype != value.dtype:
             raise ValueError('Mismatched value dtypes! ({self._upper.dtype} != {value.dtype})')
 
-        if type(self._lower) is not type(weight):
-            raise ValueError('Mismatched weight types! ({type(self._lower)} != {type(weight)})')
+        if weight is not None:
+            if self._lower is None:
+                raise ValueError('Provided weights without a lower array!')
+            elif self._lower.dtype != weight.dtype:
+                raise ValueError('Mismatched weight types! ({type(self._lower)} != {type(weight)})')
+
+            if value.shape != weight.shape:
+                raise ValueError('Mismatched patch shapes! ({value.shape=} != {weight.shape=})')
 
         x_support, x_frac = calculate_support_frac(center_x, value.shape[-1])
         y_support, y_frac = calculate_support_frac(center_y, value.shape[-2])
@@ -63,7 +66,7 @@ class BarycentricArrayStitcher:  # FIXME use
         usupport[..., 1:, :-1] += weight10 * uvalue
         usupport[..., 1:, 1:] += weight11 * uvalue
 
-        if self._lower is not None:
+        if self._lower is not None and weight is not None:
             # add patch update to lower array support
             lsupport = self._lower[..., y_support, x_support]
             lsupport[..., :-1, :-1] += weight00 * weight

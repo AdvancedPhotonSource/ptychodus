@@ -50,15 +50,15 @@ class PropagatorParameters:
         return numpy.square(self.dx) / numpy.absolute(self.z)
 
     def get_spatial_coordinates(self) -> tuple[RealArrayType, RealArrayType]:
-        JJ, II = numpy.mgrid[: self.height_px, : self.width_px]
-        XX = II - self.width_px // 2
-        YY = JJ - self.height_px // 2
+        JJ, II = numpy.mgrid[: self.height_px, : self.width_px]  # noqa: N806
+        XX = II - self.width_px // 2  # noqa: N806
+        YY = JJ - self.height_px // 2  # noqa: N806
         return YY, XX
 
     def get_frequency_coordinates(self) -> tuple[RealArrayType, RealArrayType]:
         fx = fftshift(fftfreq(self.width_px))
         fy = fftshift(fftfreq(self.height_px))
-        FY, FX = numpy.meshgrid(fy, fx)
+        FY, FX = numpy.meshgrid(fy, fx)  # noqa: N806
         return FY, FX
 
 
@@ -73,8 +73,8 @@ class AngularSpectrumPropagator(Propagator):
         ar = parameters.pixel_aspect_ratio
 
         i2piz = 2j * numpy.pi * parameters.z
-        FY, FX = parameters.get_frequency_coordinates()
-        F2 = numpy.square(FX) + numpy.square(ar * FY)
+        FY, FX = parameters.get_frequency_coordinates()  # noqa: N806
+        F2 = numpy.square(FX) + numpy.square(ar * FY)  # noqa: N806
         ratio = F2 / numpy.square(parameters.dx)
         tf = numpy.exp(i2piz * numpy.sqrt(1 - ratio))
 
@@ -89,8 +89,8 @@ class FresnelTransferFunctionPropagator(Propagator):
         ar = parameters.pixel_aspect_ratio
 
         i2piz = 2j * numpy.pi * parameters.z
-        FY, FX = parameters.get_frequency_coordinates()
-        F2 = numpy.square(FX) + numpy.square(ar * FY)
+        FY, FX = parameters.get_frequency_coordinates()  # noqa: N806
+        F2 = numpy.square(FX) + numpy.square(ar * FY)  # noqa: N806
         ratio = F2 / numpy.square(parameters.dx)
 
         self._transfer_function = numpy.exp(i2piz * (1 - ratio / 2))
@@ -103,15 +103,15 @@ class FresnelTransformPropagator(Propagator):
     def __init__(self, parameters: PropagatorParameters) -> None:
         ipi = 1j * numpy.pi
 
-        Fr = parameters.fresnel_number
+        Fr = parameters.fresnel_number  # noqa: N806
         ar = parameters.pixel_aspect_ratio
-        N = parameters.width_px
-        M = parameters.height_px
-        YY, XX = parameters.get_spatial_coordinates()
+        N = parameters.width_px  # noqa: N806
+        M = parameters.height_px  # noqa: N806
+        YY, XX = parameters.get_spatial_coordinates()  # noqa: N806
 
-        C0 = Fr / (1j * ar)
-        C1 = numpy.exp(2j * numpy.pi * parameters.z)
-        C2 = numpy.exp((numpy.square(XX / N) + numpy.square(ar * YY / M)) * ipi / Fr)
+        C0 = Fr / (1j * ar)  # noqa: N806
+        C1 = numpy.exp(2j * numpy.pi * parameters.z)  # noqa: N806
+        C2 = numpy.exp((numpy.square(XX / N) + numpy.square(ar * YY / M)) * ipi / Fr)  # noqa: N806
         is_forward = parameters.propagation_distance_m >= 0.0
 
         self._is_forward = is_forward
@@ -129,15 +129,15 @@ class FraunhoferPropagator(Propagator):
     def __init__(self, parameters: PropagatorParameters) -> None:
         ipi = 1j * numpy.pi
 
-        Fr = parameters.fresnel_number
+        Fr = parameters.fresnel_number  # noqa: N806
         ar = parameters.pixel_aspect_ratio
-        N = parameters.width_px
-        M = parameters.height_px
-        YY, XX = parameters.get_spatial_coordinates()
+        N = parameters.width_px  # noqa: N806
+        M = parameters.height_px  # noqa: N806
+        YY, XX = parameters.get_spatial_coordinates()  # noqa: N806
 
-        C0 = Fr / (1j * ar)
-        C1 = numpy.exp(2j * numpy.pi * parameters.z)
-        C2 = numpy.exp((numpy.square(XX / N) + numpy.square(ar * YY / M)) * ipi / Fr)
+        C0 = Fr / (1j * ar)  # noqa: N806
+        C1 = numpy.exp(2j * numpy.pi * parameters.z)  # noqa: N806
+        C2 = numpy.exp((numpy.square(XX / N) + numpy.square(ar * YY / M)) * ipi / Fr)  # noqa: N806
         is_forward = parameters.propagation_distance_m >= 0.0
 
         self._is_forward = is_forward

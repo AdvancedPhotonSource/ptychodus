@@ -39,10 +39,10 @@ class TwoStepFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Obse
         self._deconvolutionStrategyChooser = deconvolutionStrategyChooser
 
         upscalingStrategyChooser.synchronize_with_parameter(settings.upscalingStrategy)
-        upscalingStrategyChooser.addObserver(self)
+        upscalingStrategyChooser.add_observer(self)
 
         deconvolutionStrategyChooser.synchronize_with_parameter(settings.deconvolutionStrategy)
-        deconvolutionStrategyChooser.addObserver(self)
+        deconvolutionStrategyChooser.add_observer(self)
 
     def enhance(self, dataset: FluorescenceDataset, product: Product) -> FluorescenceDataset:
         # FIXME OPR
@@ -86,8 +86,8 @@ class TwoStepFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Obse
     def setDeconvolutionStrategy(self, name: str) -> None:
         self._deconvolutionStrategyChooser.set_current_plugin(name)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._upscalingStrategyChooser:
-            self.notifyObservers()
+            self.notify_observers()
         elif observable is self._deconvolutionStrategyChooser:
-            self.notifyObservers()
+            self.notify_observers()

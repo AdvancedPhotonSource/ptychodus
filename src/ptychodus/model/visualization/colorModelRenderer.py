@@ -29,20 +29,20 @@ class CylindricalColorModelRenderer(Renderer):
         self._amplitudeComponent = amplitudeComponent
         self._phaseComponent = phaseComponent
         self._transformation = transformation
-        self._addParameter('transformation', transformation)
+        self._add_parameter('transformation', transformation)
         self._colorAxis = colorAxis
-        self._addGroup('color_axis', colorAxis, observe=True)
+        self._add_group('color_axis', colorAxis, observe=True)
         self._colorModel = CylindricalColorModelParameter()
-        self._addParameter('color_model', self._colorModel)
+        self._add_parameter('color_model', self._colorModel)
 
     def variants(self) -> Iterator[str]:
         return self._colorModel.choices()
 
     def getVariant(self) -> str:
-        return self._colorModel.getValue()
+        return self._colorModel.get_value()
 
     def setVariant(self, variant: str) -> None:
-        self._colorModel.setValue(variant)
+        self._colorModel.set_value(variant)
 
     def isCyclic(self) -> bool:
         return True
@@ -81,8 +81,8 @@ class CylindricalColorModelRenderer(Renderer):
         rgba = self._colorize(amplitudeTransformed, phaseInRadians)
 
         return VisualizationProduct(
-            valueLabel=self._transformation.decorateText(self._amplitudeComponent.name),
+            value_label=self._transformation.decorateText(self._amplitudeComponent.name),
             values=array,
             rgba=rgba,
-            pixelGeometry=pixelGeometry,
+            pixel_geometry=pixelGeometry,
         )

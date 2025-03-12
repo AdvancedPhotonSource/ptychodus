@@ -33,8 +33,8 @@ class AutomationPresenter(Observable, Observer):
         self._datasetBuffer = datasetBuffer
         self._datasetRepository = datasetRepository
 
-        settings.addObserver(self)
-        watcher.addObserver(self)
+        settings.add_observer(self)
+        watcher.add_observer(self)
 
     def getStrategyList(self) -> Iterator[str]:
         return self._workflow.getAvailableWorkflows()
@@ -46,25 +46,25 @@ class AutomationPresenter(Observable, Observer):
         self._workflow.setWorkflow(strategy)
 
     def getDataDirectory(self) -> Path:
-        return self._settings.dataDirectory.getValue()
+        return self._settings.dataDirectory.get_value()
 
     def setDataDirectory(self, directory: Path) -> None:
-        self._settings.dataDirectory.setValue(directory)
+        self._settings.dataDirectory.set_value(directory)
 
     def getProcessingIntervalLimitsInSeconds(self) -> Interval[int]:
         return Interval[int](0, 600)
 
     def getProcessingIntervalInSeconds(self) -> int:
         limits = self.getProcessingIntervalLimitsInSeconds()
-        return limits.clamp(self._settings.processingIntervalInSeconds.getValue())
+        return limits.clamp(self._settings.processingIntervalInSeconds.get_value())
 
     def setProcessingIntervalInSeconds(self, value: int) -> None:
-        self._settings.processingIntervalInSeconds.setValue(value)
+        self._settings.processingIntervalInSeconds.set_value(value)
 
     def loadExistingDatasetsToRepository(self) -> None:
         dataDirectory = self.getDataDirectory()
-        pattern = '**/' if self._workflow.isWatchRecursive else ''
-        pattern += self._workflow.getWatchFilePattern()
+        pattern = '**/' if self._workflow.is_watch_recursive else ''
+        pattern += self._workflow.get_watch_file_pattern()
         scanFileList = sorted(scanFile for scanFile in dataDirectory.glob(pattern))
 
         for scanFile in scanFileList:
@@ -87,22 +87,22 @@ class AutomationPresenter(Observable, Observer):
 
     def getWatchdogDelayInSeconds(self) -> int:
         limits = self.getWatchdogDelayLimitsInSeconds()
-        return limits.clamp(self._settings.watchdogDelayInSeconds.getValue())
+        return limits.clamp(self._settings.watchdogDelayInSeconds.get_value())
 
     def setWatchdogDelayInSeconds(self, value: int) -> None:
-        self._settings.watchdogDelayInSeconds.setValue(value)
+        self._settings.watchdogDelayInSeconds.set_value(value)
 
     def setWatchdogPollingObserverEnabled(self, enable: bool) -> None:
-        self._settings.useWatchdogPollingObserver.setValue(enable)
+        self._settings.useWatchdogPollingObserver.set_value(enable)
 
     def isWatchdogPollingObserverEnabled(self) -> bool:
-        return self._settings.useWatchdogPollingObserver.getValue()
+        return self._settings.useWatchdogPollingObserver.get_value()
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._settings:
-            self.notifyObservers()
+            self.notify_observers()
         elif observable is self._watcher:
-            self.notifyObservers()
+            self.notify_observers()
 
 
 class AutomationProcessingPresenter(Observable, Observer):
@@ -117,8 +117,8 @@ class AutomationProcessingPresenter(Observable, Observer):
         self._repository = repository
         self._processor = processor
 
-        settings.addObserver(self)
-        repository.addObserver(self)
+        settings.add_observer(self)
+        repository.add_observer(self)
 
     def getDatasetLabel(self, index: int) -> str:
         return self._repository.getLabel(index)
@@ -138,11 +138,11 @@ class AutomationProcessingPresenter(Observable, Observer):
         else:
             self._processor.stop()
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._settings:
-            self.notifyObservers()
+            self.notify_observers()
         elif observable is self._repository:
-            self.notifyObservers()
+            self.notify_observers()
 
 
 class AutomationCore:

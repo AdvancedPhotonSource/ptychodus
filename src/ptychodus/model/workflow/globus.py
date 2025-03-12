@@ -41,7 +41,7 @@ def ptychodus_reconstruct(**data: str) -> None:
     patternsFile = Path(data['ptychodus_patterns_file'])
 
     with ModelCore(settingsFile) as model:
-        model.workflowAPI.importAssembledPatterns(patternsFile)
+        model.workflowAPI.import_assembled_patterns(patternsFile)
         model.batchModeExecute(action, inputFile, outputFile)
 
 

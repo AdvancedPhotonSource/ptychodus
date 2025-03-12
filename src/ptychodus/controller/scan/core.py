@@ -57,7 +57,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         tableProxyModel.dataChanged.connect(
             lambda topLeft, bottomRight, roles: controller._redrawPlot()
         )
-        repository.addObserver(controller)
+        repository.add_observer(controller)
 
         builderListModel = QStringListModel()
         builderListModel.setStringList([name for name in api.builderNames()])
@@ -123,7 +123,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
 
         if filePath:
             try:
-                self._api.openScan(itemIndex, filePath, fileType=nameFilter)
+                self._api.openScan(itemIndex, filePath, file_type=nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Reader', err)
@@ -191,8 +191,8 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
             if self._tableModel.isItemChecked(itemIndex):
                 itemName = self._repository.getName(itemIndex)
                 scan = self._repository[itemIndex].getScan()
-                x = [point.positionXInMeters for point in scan]
-                y = [point.positionYInMeters for point in scan]
+                x = [point.position_x_m for point in scan]
+                y = [point.position_y_m for point in scan]
                 self._plotView.axes.plot(x, y, '.-', label=itemName, linewidth=1.5)
 
         self._plotView.axes.invert_yaxis()
@@ -227,14 +227,14 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         self._view.buttonBox.analyzeButton.setEnabled(enabled)
         self._redrawPlot()
 
-    def handleItemInserted(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_item_inserted(self, index: int, item: ScanRepositoryItem) -> None:
         self._tableModel.insertItem(index, item)
 
-    def handleItemChanged(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_item_changed(self, index: int, item: ScanRepositoryItem) -> None:
         self._tableModel.updateItem(index, item)
 
         if self._tableModel.isItemChecked(index):
             self._redrawPlot()
 
-    def handleItemRemoved(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_item_removed(self, index: int, item: ScanRepositoryItem) -> None:
         self._tableModel.removeItem(index, item)

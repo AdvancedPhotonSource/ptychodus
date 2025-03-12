@@ -13,10 +13,10 @@ from ptychodus.api.visualization import (
 class Renderer(ParameterGroup):
     def __init__(self, name: str) -> None:
         super().__init__()
-        self._name = self.createStringParameter('name', name)
+        self._name = self.create_string_parameter('name', name)
 
     def getName(self) -> str:
-        return self._name.getValue()
+        return self._name.get_value()
 
     @abstractmethod
     def variants(self) -> Iterator[str]:

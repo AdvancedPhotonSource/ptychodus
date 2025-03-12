@@ -96,18 +96,18 @@ class ProductCore(Observer):
 
         # TODO vvv refactor vvv
         productFileReaderChooser.synchronize_with_parameter(self.settings.fileType)
-        productFileWriterChooser.set_current_plugin(self.settings.fileType.getValue())
+        productFileWriterChooser.set_current_plugin(self.settings.fileType.get_value())
         scanFileReaderChooser.synchronize_with_parameter(self._scanSettings.fileType)
-        scanFileWriterChooser.set_current_plugin(self._scanSettings.fileType.getValue())
+        scanFileWriterChooser.set_current_plugin(self._scanSettings.fileType.get_value())
         probeFileReaderChooser.synchronize_with_parameter(self._probeSettings.fileType)
-        probeFileWriterChooser.set_current_plugin(self._probeSettings.fileType.getValue())
+        probeFileWriterChooser.set_current_plugin(self._probeSettings.fileType.get_value())
         objectFileReaderChooser.synchronize_with_parameter(self._objectSettings.fileType)
-        objectFileWriterChooser.set_current_plugin(self._objectSettings.fileType.getValue())
+        objectFileWriterChooser.set_current_plugin(self._objectSettings.fileType.get_value())
         # TODO ^^^^^^^^^^^^^^^^
 
         self._reinitObservable = reinitObservable
-        reinitObservable.addObserver(self)
+        reinitObservable.add_observer(self)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._reinitObservable:
             self.productRepository.insertProductFromSettings()

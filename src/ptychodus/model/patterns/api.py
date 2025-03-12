@@ -26,7 +26,7 @@ class PatternsStreamingContext:
         self._metadata = metadata
 
     def start(self) -> None:
-        contents_tree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
+        contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
         stream_dataset = SimpleDiffractionDataset(self._metadata, contents_tree, [])
         self._dataset.reload(stream_dataset)
         self._dataset.start_loading()
@@ -64,33 +64,33 @@ class PatternsAPI:
     def getFileReaderChooser(self) -> PluginChooser[DiffractionFileReader]:
         return self._fileReaderChooser
 
-    def openPatterns(
+    def open_patterns(
         self,
         filePath: Path,
         *,
-        fileType: str | None = None,
-        cropCenter: CropCenter | None = None,
-        cropExtent: ImageExtent | None = None,
+        file_type: str | None = None,
+        crop_center: CropCenter | None = None,
+        crop_extent: ImageExtent | None = None,
         detectorExtent: ImageExtent | None = None,
     ) -> int:
-        if cropCenter is not None:
-            self._patternSettings.cropCenterXInPixels.setValue(cropCenter.positionXInPixels)
-            self._patternSettings.cropCenterYInPixels.setValue(cropCenter.positionYInPixels)
+        if crop_center is not None:
+            self._patternSettings.cropCenterXInPixels.set_value(crop_center.position_x_px)
+            self._patternSettings.cropCenterYInPixels.set_value(crop_center.position_y_px)
 
-        if cropExtent is not None:
-            self._patternSettings.cropWidthInPixels.setValue(cropExtent.widthInPixels)
-            self._patternSettings.cropHeightInPixels.setValue(cropExtent.heightInPixels)
+        if crop_extent is not None:
+            self._patternSettings.cropWidthInPixels.set_value(crop_extent.width_px)
+            self._patternSettings.cropHeightInPixels.set_value(crop_extent.height_px)
 
         if detectorExtent is not None:
-            self._detectorSettings.widthInPixels.setValue(detectorExtent.widthInPixels)
-            self._detectorSettings.heightInPixels.setValue(detectorExtent.heightInPixels)
+            self._detectorSettings.widthInPixels.set_value(detectorExtent.width_px)
+            self._detectorSettings.heightInPixels.set_value(detectorExtent.height_px)
 
         if filePath.is_file():
-            if fileType is not None:
-                self._fileReaderChooser.set_current_plugin(fileType)
+            if file_type is not None:
+                self._fileReaderChooser.set_current_plugin(file_type)
 
-            fileType = self._fileReaderChooser.get_current_plugin().simple_name
-            logger.debug(f'Reading "{filePath}" as "{fileType}"')
+            file_type = self._fileReaderChooser.get_current_plugin().simple_name
+            logger.debug(f'Reading "{filePath}" as "{file_type}"')
             fileReader = self._fileReaderChooser.get_current_plugin().strategy
 
             try:
@@ -127,8 +127,8 @@ class PatternsAPI:
         writer = self._fileWriterChooser.get_current_plugin().strategy
         writer.write(filePath, self._dataset)
 
-    def importAssembledPatterns(self, filePath: Path) -> None:
+    def import_assembled_patterns(self, filePath: Path) -> None:
         self._dataset.import_assembled_patterns(filePath)
 
-    def exportAssembledPatterns(self, filePath: Path) -> None:
+    def export_assembled_patterns(self, filePath: Path) -> None:
         self._dataset.export_assembled_patterns(filePath)

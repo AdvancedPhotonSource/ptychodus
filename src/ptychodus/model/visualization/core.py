@@ -99,9 +99,9 @@ class VisualizationEngine(Observable, Observer):
             )
             self._rendererChooser.set_current_plugin('Complex')
 
-        self._rendererChooser.addObserver(self)
+        self._rendererChooser.add_observer(self)
         self._rendererPlugin = self._rendererChooser.get_current_plugin()
-        self._rendererPlugin.strategy.addObserver(self)
+        self._rendererPlugin.strategy.add_observer(self)
 
     def renderers(self) -> Iterator[str]:
         for plugin in self._rendererChooser:
@@ -120,10 +120,10 @@ class VisualizationEngine(Observable, Observer):
         return self._transformation.choices()
 
     def getTransformation(self) -> str:
-        return self._transformation.getValue()
+        return self._transformation.get_value()
 
     def setTransformation(self, value: str) -> None:
-        self._transformation.setValue(value)
+        self._transformation.set_value(value)
 
     def variants(self) -> Iterator[str]:
         return self._rendererPlugin.strategy.variants()
@@ -135,16 +135,16 @@ class VisualizationEngine(Observable, Observer):
         return self._rendererPlugin.strategy.setVariant(value)
 
     def getMinDisplayValue(self) -> float:
-        return self._colorAxis.lower.getValue()
+        return self._colorAxis.lower.get_value()
 
     def setMinDisplayValue(self, value: float) -> None:
-        self._colorAxis.lower.setValue(value)
+        self._colorAxis.lower.set_value(value)
 
     def getMaxDisplayValue(self) -> float:
-        return self._colorAxis.upper.getValue()
+        return self._colorAxis.upper.get_value()
 
     def setMaxDisplayValue(self, value: float) -> None:
-        self._colorAxis.upper.setValue(value)
+        self._colorAxis.upper.set_value(value)
 
     def setDisplayValueRange(self, lower: float, upper: float) -> None:
         self._colorAxis.setRange(lower, upper)
@@ -163,11 +163,11 @@ class VisualizationEngine(Observable, Observer):
             array, pixelGeometry, autoscaleColorAxis=autoscaleColorAxis
         )
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._rendererChooser:
-            self._rendererPlugin.strategy.removeObserver(self)
+            self._rendererPlugin.strategy.remove_observer(self)
             self._rendererPlugin = self._rendererChooser.get_current_plugin()
-            self._rendererPlugin.strategy.addObserver(self)
-            self.notifyObservers()
+            self._rendererPlugin.strategy.add_observer(self)
+            self.notify_observers()
         elif observable is self._rendererPlugin.strategy:
-            self.notifyObservers()
+            self.notify_observers()

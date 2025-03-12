@@ -20,155 +20,155 @@ logger = logging.getLogger(__name__)
 class ConcreteWorkflowProductAPI(WorkflowProductAPI):
     def __init__(
         self,
-        productAPI: ProductAPI,
-        scanAPI: ScanAPI,
-        probeAPI: ProbeAPI,
-        objectAPI: ObjectAPI,
-        reconstructorAPI: ReconstructorAPI,
+        product_api: ProductAPI,
+        scan_api: ScanAPI,
+        probe_api: ProbeAPI,
+        object_api: ObjectAPI,
+        reconstructor_api: ReconstructorAPI,
         executor: WorkflowExecutor,
-        productIndex: int,
+        product_index: int,
     ) -> None:
-        self._productAPI = productAPI
-        self._scanAPI = scanAPI
-        self._probeAPI = probeAPI
-        self._objectAPI = objectAPI
-        self._reconstructorAPI = reconstructorAPI
+        self._product_api = product_api
+        self._scan_api = scan_api
+        self._probe_api = probe_api
+        self._object_api = object_api
+        self._reconstructor_api = reconstructor_api
         self._executor = executor
-        self._productIndex = productIndex
+        self._product_index = product_index
 
-    def openScan(self, filePath: Path, *, fileType: str | None = None) -> None:
-        self._scanAPI.openScan(self._productIndex, filePath, fileType=fileType)
+    def open_scan(self, file_path: Path, *, file_type: str | None = None) -> None:
+        self._scan_api.openScan(self._product_index, file_path, file_type=file_type)
 
-    def buildScan(
-        self, builderName: str | None = None, builderParameters: Mapping[str, Any] = {}
+    def build_scan(
+        self, builder_name: str | None = None, builder_parameters: Mapping[str, Any] = {}
     ) -> None:
-        if builderName is None:
-            self._scanAPI.buildScanFromSettings(self._productIndex)
+        if builder_name is None:
+            self._scan_api.buildScanFromSettings(self._product_index)
         else:
-            self._scanAPI.buildScan(self._productIndex, builderName, builderParameters)
+            self._scan_api.buildScan(self._product_index, builder_name, builder_parameters)
 
-    def openProbe(self, filePath: Path, *, fileType: str | None = None) -> None:
-        self._probeAPI.openProbe(self._productIndex, filePath, fileType=fileType)
+    def open_probe(self, file_path: Path, *, file_type: str | None = None) -> None:
+        self._probe_api.openProbe(self._product_index, file_path, file_type=file_type)
 
-    def buildProbe(
-        self, builderName: str | None = None, builderParameters: Mapping[str, Any] = {}
+    def build_probe(
+        self, builder_name: str | None = None, builder_parameters: Mapping[str, Any] = {}
     ) -> None:
-        if builderName is None:
-            self._probeAPI.buildProbeFromSettings(self._productIndex)
+        if builder_name is None:
+            self._probe_api.buildProbeFromSettings(self._product_index)
         else:
-            self._probeAPI.buildProbe(self._productIndex, builderName, builderParameters)
+            self._probe_api.buildProbe(self._product_index, builder_name, builder_parameters)
 
-    def openObject(self, filePath: Path, *, fileType: str | None = None) -> None:
-        self._objectAPI.openObject(self._productIndex, filePath, fileType=fileType)
+    def open_object(self, file_path: Path, *, file_type: str | None = None) -> None:
+        self._object_api.openObject(self._product_index, file_path, file_type=file_type)
 
-    def buildObject(
-        self, builderName: str | None = None, builderParameters: Mapping[str, Any] = {}
+    def build_object(
+        self, builder_name: str | None = None, builder_parameters: Mapping[str, Any] = {}
     ) -> None:
-        if builderName is None:
-            self._objectAPI.buildObjectFromSettings(self._productIndex)
+        if builder_name is None:
+            self._object_api.buildObjectFromSettings(self._product_index)
         else:
-            self._objectAPI.buildObject(self._productIndex, builderName, builderParameters)
+            self._object_api.buildObject(self._product_index, builder_name, builder_parameters)
 
-    def reconstructLocal(self) -> WorkflowProductAPI:
-        logger.debug(f'Reconstruct: index={self._productIndex}')
-        outputProductIndex = self._reconstructorAPI.reconstruct(self._productIndex)
+    def reconstruct_local(self) -> WorkflowProductAPI:
+        logger.debug(f'Reconstruct: index={self._product_index}')
+        output_product_index = self._reconstructor_api.reconstruct(self._product_index)
 
         return ConcreteWorkflowProductAPI(
-            self._productAPI,
-            self._scanAPI,
-            self._probeAPI,
-            self._objectAPI,
-            self._reconstructorAPI,
+            self._product_api,
+            self._scan_api,
+            self._probe_api,
+            self._object_api,
+            self._reconstructor_api,
             self._executor,
-            outputProductIndex,
+            output_product_index,
         )
 
-    def reconstructRemote(self) -> None:
-        logger.debug(f'Execute Workflow: index={self._productIndex}')
-        self._executor.runFlow(self._productIndex)
+    def reconstruct_remote(self) -> None:
+        logger.debug(f'Execute Workflow: index={self._product_index}')
+        self._executor.runFlow(self._product_index)
 
-    def saveProduct(self, filePath: Path, *, fileType: str | None = None) -> None:
-        self._productAPI.saveProduct(self._productIndex, filePath, fileType=fileType)
+    def save_product(self, file_path: Path, *, file_type: str | None = None) -> None:
+        self._product_api.saveProduct(self._product_index, file_path, file_type=file_type)
 
 
 class ConcreteWorkflowAPI(WorkflowAPI):
     def __init__(
         self,
-        settingsRegistry: SettingsRegistry,
-        patternsAPI: PatternsAPI,
-        productAPI: ProductAPI,
-        scanAPI: ScanAPI,
-        probeAPI: ProbeAPI,
-        objectAPI: ObjectAPI,
-        reconstructorAPI: ReconstructorAPI,
+        settings_registry: SettingsRegistry,
+        patterns_api: PatternsAPI,
+        product_api: ProductAPI,
+        scan_api: ScanAPI,
+        probe_api: ProbeAPI,
+        object_api: ObjectAPI,
+        reconstructor_api: ReconstructorAPI,
         executor: WorkflowExecutor,
     ) -> None:
-        self._settingsRegistry = settingsRegistry
-        self._patternsAPI = patternsAPI
-        self._productAPI = productAPI
-        self._scanAPI = scanAPI
-        self._probeAPI = probeAPI
-        self._objectAPI = objectAPI
-        self._reconstructorAPI = reconstructorAPI
+        self._settings_registry = settings_registry
+        self._patterns_api = patterns_api
+        self._product_api = product_api
+        self._scan_api = scan_api
+        self._probe_api = probe_api
+        self._object_api = object_api
+        self._reconstructor_api = reconstructor_api
         self._executor = executor
 
-    def _createProductAPI(self, productIndex: int) -> WorkflowProductAPI:
-        if productIndex < 0:
-            raise ValueError(f'Bad product index ({productIndex=})!')
+    def _create_product_api(self, product_index: int) -> WorkflowProductAPI:
+        if product_index < 0:
+            raise ValueError(f'Bad product index ({product_index=})!')
 
         return ConcreteWorkflowProductAPI(
-            self._productAPI,
-            self._scanAPI,
-            self._probeAPI,
-            self._objectAPI,
-            self._reconstructorAPI,
+            self._product_api,
+            self._scan_api,
+            self._probe_api,
+            self._object_api,
+            self._reconstructor_api,
             self._executor,
-            productIndex,
+            product_index,
         )
 
-    def openPatterns(
+    def open_patterns(
         self,
-        filePath: Path,
+        file_path: Path,
         *,
-        fileType: str | None = None,
-        cropCenter: CropCenter | None = None,
-        cropExtent: ImageExtent | None = None,
+        file_type: str | None = None,
+        crop_center: CropCenter | None = None,
+        crop_extent: ImageExtent | None = None,
     ) -> None:
-        self._patternsAPI.openPatterns(
-            filePath, fileType=fileType, cropCenter=cropCenter, cropExtent=cropExtent
+        self._patterns_api.open_patterns(
+            file_path, file_type=file_type, crop_center=crop_center, crop_extent=crop_extent
         )
 
-    def importAssembledPatterns(self, filePath: Path) -> None:
-        self._patternsAPI.importAssembledPatterns(filePath)
+    def import_assembled_patterns(self, file_path: Path) -> None:
+        self._patterns_api.import_assembled_patterns(file_path)
 
-    def exportAssembledPatterns(self, filePath: Path) -> None:
-        self._patternsAPI.exportAssembledPatterns(filePath)
+    def export_assembled_patterns(self, file_path: Path) -> None:
+        self._patterns_api.export_assembled_patterns(file_path)
 
-    def openProduct(self, filePath: Path, *, fileType: str | None = None) -> WorkflowProductAPI:
-        productIndex = self._productAPI.openProduct(filePath, fileType=fileType)
-        return self._createProductAPI(productIndex)
+    def open_product(self, file_path: Path, *, file_type: str | None = None) -> WorkflowProductAPI:
+        product_index = self._product_api.openProduct(file_path, file_type=file_type)
+        return self._create_product_api(product_index)
 
-    def createProduct(
+    def create_product(
         self,
         name: str,
         *,
         comments: str = '',
-        detectorDistanceInMeters: float | None = None,
-        probeEnergyInElectronVolts: float | None = None,
-        probePhotonCount: float | None = None,
-        exposureTimeInSeconds: float | None = None,
+        detector_distance_m: float | None = None,
+        probe_energy_eV: float | None = None,  # noqa: N803
+        probe_photon_count: float | None = None,
+        exposure_time_s: float | None = None,
     ) -> WorkflowProductAPI:
-        productIndex = self._productAPI.insertNewProduct(
+        product_index = self._product_api.insertNewProduct(
             name,
             comments=comments,
-            detectorDistanceInMeters=detectorDistanceInMeters,
-            probeEnergyInElectronVolts=probeEnergyInElectronVolts,
-            probePhotonCount=probePhotonCount,
-            exposureTimeInSeconds=exposureTimeInSeconds,
+            detectorDistanceInMeters=detector_distance_m,
+            probeEnergyInElectronVolts=probe_energy_eV,
+            probePhotonCount=probe_photon_count,
+            exposureTimeInSeconds=exposure_time_s,
         )
-        return self._createProductAPI(productIndex)
+        return self._create_product_api(product_index)
 
-    def saveSettings(
-        self, filePath: Path, changePathPrefix: PathPrefixChange | None = None
+    def save_settings(
+        self, file_path: Path, change_path_prefix: PathPrefixChange | None = None
     ) -> None:
-        self._settingsRegistry.saveSettings(filePath, changePathPrefix)
+        self._settings_registry.save_settings(file_path, change_path_prefix)

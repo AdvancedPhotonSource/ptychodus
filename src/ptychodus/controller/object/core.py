@@ -74,7 +74,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
             fileDialogFactory,
             treeModel,
         )
-        repository.addObserver(controller)
+        repository.add_observer(controller)
 
         builderListModel = QStringListModel()
         builderListModel.setStringList([name for name in api.builderNames()])
@@ -143,7 +143,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
         if filePath:
             try:
-                self._api.openObject(itemIndex, filePath, fileType=nameFilter)
+                self._api.openObject(itemIndex, filePath, file_type=nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Reader', err)
@@ -236,26 +236,26 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
             else:
                 object_ = item.getObject()
                 array = (
-                    object_.getLayer(current.row())
+                    object_.get_layer(current.row())
                     if current.parent().isValid()
-                    else object_.getLayersFlattened()
+                    else object_.get_layers_flattened()
                 )
-                pixelGeometry = object_.getPixelGeometry()
+                pixelGeometry = object_.get_pixel_geometry()
 
                 if pixelGeometry is None:
                     logger.warning('Missing object pixel geometry!')
                 else:
                     self._imageController.setArray(array, pixelGeometry)
 
-    def handleItemInserted(self, index: int, item: ObjectRepositoryItem) -> None:
+    def handle_item_inserted(self, index: int, item: ObjectRepositoryItem) -> None:
         self._treeModel.insertItem(index, item)
 
-    def handleItemChanged(self, index: int, item: ObjectRepositoryItem) -> None:
+    def handle_item_changed(self, index: int, item: ObjectRepositoryItem) -> None:
         self._treeModel.updateItem(index, item)
 
         if index == self._getCurrentItemIndex():
             currentIndex = self._view.treeView.currentIndex()
             self._updateView(currentIndex, currentIndex)
 
-    def handleItemRemoved(self, index: int, item: ObjectRepositoryItem) -> None:
+    def handle_item_removed(self, index: int, item: ObjectRepositoryItem) -> None:
         self._treeModel.removeItem(index, item)

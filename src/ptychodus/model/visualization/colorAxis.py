@@ -12,19 +12,19 @@ logger = logging.getLogger(__name__)
 class ColorAxis(ParameterGroup):
     def __init__(self) -> None:
         super().__init__()
-        self.lower = self.createRealParameter('lower', 0.0)
-        self.upper = self.createRealParameter('upper', 1.0)
+        self.lower = self.create_real_parameter('lower', 0.0)
+        self.upper = self.create_real_parameter('upper', 1.0)
 
     def getRange(self) -> Interval[float]:
-        return Interval[float].createProper(
-            self.lower.getValue(),
-            self.upper.getValue(),
+        return Interval[float].create_proper(
+            self.lower.get_value(),
+            self.upper.get_value(),
         )
 
     def setRange(self, lower: float, upper: float):
-        self.lower.setValue(lower, notify=False)
-        self.upper.setValue(upper, notify=False)
-        self.notifyObservers()
+        self.lower.set_value(lower, notify=False)
+        self.upper.set_value(upper, notify=False)
+        self.notify_observers()
 
     def setToDataRange(self, array: RealArrayType) -> None:
         if array.size > 0:

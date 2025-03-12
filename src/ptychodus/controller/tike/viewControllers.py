@@ -88,7 +88,7 @@ class TikeParametersViewController(ParameterViewController, Observer):
         self._widget.setLayout(layout)
 
         self._syncModelToView()
-        self._settings.addObserver(self)
+        self._settings.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._widget
@@ -96,7 +96,7 @@ class TikeParametersViewController(ParameterViewController, Observer):
     def _syncModelToView(self) -> None:
         self._logLevelComboBox.setCurrentText(self._settings.getLogLevel())
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._settings:
             self._syncModelToView()
 

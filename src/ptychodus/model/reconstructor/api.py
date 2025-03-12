@@ -82,7 +82,7 @@ class ReconstructorAPI:
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Opening model...')
             tic = time.perf_counter()
-            reconstructor.openModel(filePath)
+            reconstructor.open_model(filePath)
             toc = time.perf_counter()
             logger.info(f'Open time {toc - tic:.4f} seconds.')
         else:
@@ -94,7 +94,7 @@ class ReconstructorAPI:
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Saving model...')
             tic = time.perf_counter()
-            reconstructor.saveModel(filePath)
+            reconstructor.save_model(filePath)
             toc = time.perf_counter()
             logger.info(f'Save time {toc - tic:.4f} seconds.')
         else:
@@ -114,7 +114,7 @@ class ReconstructorAPI:
 
             logger.info('Exporting...')
             tic = time.perf_counter()
-            reconstructor.exportTrainingData(filePath, parameters)
+            reconstructor.export_training_data(filePath, parameters)
             toc = time.perf_counter()
             logger.info(f'Export time {toc - tic:.4f} seconds.')
         else:

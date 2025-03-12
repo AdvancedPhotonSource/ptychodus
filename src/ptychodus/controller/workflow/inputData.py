@@ -19,7 +19,7 @@ class WorkflowInputDataController(Observer):
         cls, presenter: WorkflowParametersPresenter, view: WorkflowInputDataView
     ) -> WorkflowInputDataController:
         controller = cls(presenter, view)
-        presenter.addObserver(controller)
+        presenter.add_observer(controller)
 
         view.endpointIDLineEdit.editingFinished.connect(controller._syncEndpointIDToModel)
         view.globusPathLineEdit.editingFinished.connect(controller._syncGlobusPathToModel)
@@ -46,6 +46,6 @@ class WorkflowInputDataController(Observer):
         self._view.globusPathLineEdit.setText(str(self._presenter.getInputDataGlobusPath()))
         self._view.posixPathLineEdit.setText(str(self._presenter.getInputDataPosixPath()))
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._syncModelToView()

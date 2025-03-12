@@ -13,7 +13,7 @@ class IdentityDeconvolution(DeconvolutionStrategy):
 class RichardsonLucyDeconvolution(DeconvolutionStrategy):
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
         cps = skimage.restoration.richardson_lucy(
-            emap.counts_per_second, product.probe.getIntensity()
+            emap.counts_per_second, product.probe.get_intensity()
         )
         return ElementMap(emap.name, cps)
 
@@ -22,7 +22,7 @@ class WienerDeconvolution(DeconvolutionStrategy):
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
         balance = 0.05  # TODO
         cps = skimage.restoration.wiener(
-            emap.counts_per_second, product.probe.getIntensity(), balance
+            emap.counts_per_second, product.probe.get_intensity(), balance
         )
         return ElementMap(emap.name, cps)
 
@@ -30,7 +30,7 @@ class WienerDeconvolution(DeconvolutionStrategy):
 class UnsupervisedWienerDeconvolution(DeconvolutionStrategy):
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
         cps, _ = skimage.restoration.unsupervised_wiener(
-            emap.counts_per_second, product.probe.getIntensity()
+            emap.counts_per_second, product.probe.get_intensity()
         )
         return ElementMap(emap.name, cps)
 
