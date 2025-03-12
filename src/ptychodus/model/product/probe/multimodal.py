@@ -26,33 +26,33 @@ class MultimodalProbeBuilder(ParameterGroup):
         self._settings = settings
 
         self.numberOfIncoherentModes = settings.numberOfIncoherentModes.copy()
-        self._addParameter('number_of_incoherent_modes', self.numberOfIncoherentModes)
+        self._add_parameter('number_of_incoherent_modes', self.numberOfIncoherentModes)
 
         self.incoherentModeDecayType = settings.incoherentModeDecayType.copy()
-        self._addParameter('incoherent_mode_decay_type', self.incoherentModeDecayType)
+        self._add_parameter('incoherent_mode_decay_type', self.incoherentModeDecayType)
 
         self.incoherentModeDecayRatio = settings.incoherentModeDecayRatio.copy()
-        self._addParameter('incoherent_mode_decay_ratio', self.incoherentModeDecayRatio)
+        self._add_parameter('incoherent_mode_decay_ratio', self.incoherentModeDecayRatio)
 
         self.orthogonalizeIncoherentModes = settings.orthogonalizeIncoherentModes.copy()
-        self._addParameter('orthogonalize_incoherent_modes', self.orthogonalizeIncoherentModes)
+        self._add_parameter('orthogonalize_incoherent_modes', self.orthogonalizeIncoherentModes)
 
     def syncToSettings(self) -> None:
         for parameter in self.parameters().values():
-            parameter.syncValueToParent()
+            parameter.sync_value_to_parent()
 
     def copy(self) -> MultimodalProbeBuilder:
         builder = MultimodalProbeBuilder(self._rng, self._settings)
 
         for key, value in self.parameters().items():
-            builder.parameters()[key].setValue(value.getValue())
+            builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
     def _init_modes(self, probe: WavefieldArrayType) -> WavefieldArrayType:
         # TODO OPR
         assert probe.ndim == 4
-        array = numpy.tile(probe[0, 0, :, :], (self.numberOfIncoherentModes.getValue(), 1, 1))
+        array = numpy.tile(probe[0, 0, :, :], (self.numberOfIncoherentModes.get_value(), 1, 1))
         it = iter(array)  # iterate incoherent modes
         next(it)  # preserve the first incoherent mode
 
@@ -74,8 +74,8 @@ class MultimodalProbeBuilder(ParameterGroup):
         return imodes_as_ortho_rows.reshape(*probe.shape)
 
     def _get_imode_weights(self, num_imodes: int) -> Sequence[float]:
-        imode_decay_type_text = self.incoherentModeDecayType.getValue()
-        imode_decay_ratio = self.incoherentModeDecayRatio.getValue()
+        imode_decay_type_text = self.incoherentModeDecayType.get_value()
+        imode_decay_ratio = self.incoherentModeDecayRatio.get_value()
 
         if imode_decay_ratio > 0.0:
             try:
@@ -105,14 +105,14 @@ class MultimodalProbeBuilder(ParameterGroup):
         return array
 
     def build(self, probe: Probe, geometryProvider: ProbeGeometryProvider) -> Probe:
-        array = self._init_modes(probe.getArray())
+        array = self._init_modes(probe.get_array())
 
-        if self.orthogonalizeIncoherentModes.getValue():
+        if self.orthogonalizeIncoherentModes.get_value():
             array = self._orthogonalizeIncoherentModes(array)
 
-        power = probe.getIntensity().sum()
+        power = probe.get_intensity().sum()
 
-        if geometryProvider.probePhotonCount > 0.0:
-            power = geometryProvider.probePhotonCount
+        if geometryProvider.probe_photon_count > 0.0:
+            power = geometryProvider.probe_photon_count
 
-        return Probe(self._adjust_power(array, power), probe.getPixelGeometry())
+        return Probe(self._adjust_power(array, power), probe.get_pixel_geometry())

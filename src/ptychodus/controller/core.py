@@ -27,7 +27,7 @@ class ControllerCore:
     def __init__(self, model: ModelCore, view: ViewCore) -> None:
         self.view = view
 
-        self._memoryController = MemoryController(model.memoryPresenter, view.memory_progress_bar)
+        self._memoryController = MemoryController(model.memoryPresenter, view.memory_widget)
         self._fileDialogFactory = FileDialogFactory()
         self._ptyChiViewControllerFactory = PtyChiViewControllerFactory(
             model.ptyChiReconstructorLibrary

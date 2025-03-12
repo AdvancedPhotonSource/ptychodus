@@ -51,16 +51,16 @@ class PtyChiCrossCorrelationViewController(ParameterViewController, Observer):
         layout.addRow('Probe Threshold:', self._probeThresholdViewController.getWidget())
         self._widget.setLayout(layout)
 
-        algorithm.addObserver(self)
+        algorithm.add_observer(self)
         self._syncModelToView()
 
     def getWidget(self) -> QWidget:
         return self._widget
 
     def _syncModelToView(self) -> None:
-        self._widget.setVisible(self._algorithm.getValue().upper() == 'CROSS_CORRELATION')
+        self._widget.setVisible(self._algorithm.get_value().upper() == 'CROSS_CORRELATION')
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._algorithm:
             self._syncModelToView()
 

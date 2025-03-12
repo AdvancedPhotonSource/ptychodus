@@ -33,39 +33,39 @@ class Reconstructor(ABC):
 
 
 @dataclass(frozen=True)
-class TrainOutput:
-    trainingLoss: Sequence[float]
-    validationLoss: Sequence[float]
+class TrainOutput:  # FIXME add epoch
+    training_loss: Sequence[float]
+    validation_loss: Sequence[float]
     result: int
 
 
 class TrainableReconstructor(Reconstructor):
     @abstractmethod
-    def getModelFileFilter(self) -> str:
+    def get_model_file_filter(self) -> str:
         pass
 
     @abstractmethod
-    def openModel(self, filePath: Path) -> None:
+    def open_model(self, file_path: Path) -> None:
         pass
 
     @abstractmethod
-    def saveModel(self, filePath: Path) -> None:
+    def save_model(self, file_path: Path) -> None:
         pass
 
     @abstractmethod
-    def getTrainingDataFileFilter(self) -> str:
+    def get_training_data_file_filter(self) -> str:
         pass
 
     @abstractmethod
-    def exportTrainingData(self, filePath: Path, parameters: ReconstructInput) -> None:
+    def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
         pass
 
     @abstractmethod
-    def getTrainingDataPath(self) -> Path:
+    def get_training_data_path(self) -> Path:
         pass
 
     @abstractmethod
-    def train(self, dataPath: Path) -> TrainOutput:
+    def train(self, data_path: Path) -> TrainOutput:
         pass
 
 
@@ -80,25 +80,25 @@ class NullReconstructor(TrainableReconstructor):
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         return ReconstructOutput(parameters.product, 0)
 
-    def getModelFileFilter(self) -> str:
+    def get_model_file_filter(self) -> str:
         return str()
 
-    def openModel(self, filePath: Path) -> None:
+    def open_model(self, file_path: Path) -> None:
         pass
 
-    def saveModel(self, filePath: Path) -> None:
+    def save_model(self, file_path: Path) -> None:
         pass
 
-    def getTrainingDataFileFilter(self) -> str:
+    def get_training_data_file_filter(self) -> str:
         return str()
 
-    def exportTrainingData(self, filePath: Path, parameters: ReconstructInput) -> None:
+    def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
         pass
 
-    def getTrainingDataPath(self) -> Path:
+    def get_training_data_path(self) -> Path:
         return Path()
 
-    def train(self, dataPath: Path) -> TrainOutput:
+    def train(self, data_path: Path) -> TrainOutput:
         return TrainOutput([], [], 0)
 
 

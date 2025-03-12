@@ -35,26 +35,26 @@ class XMCDAnalyzer:
         lcircObject = self._repository[lcircItemIndex].getObject()
         rcircObject = self._repository[rcircItemIndex].getObject()
 
-        lcircObjectGeometry = lcircObject.getGeometry()
-        rcircObjectGeometry = rcircObject.getGeometry()
+        lcircObjectGeometry = lcircObject.get_geometry()
+        rcircObjectGeometry = rcircObject.get_geometry()
 
-        if lcircObjectGeometry.widthInPixels != rcircObjectGeometry.widthInPixels:
+        if lcircObjectGeometry.width_px != rcircObjectGeometry.width_px:
             raise ValueError('Object width mismatch!')
 
-        if lcircObjectGeometry.heightInPixels != rcircObjectGeometry.heightInPixels:
+        if lcircObjectGeometry.height_px != rcircObjectGeometry.height_px:
             raise ValueError('Object height mismatch!')
 
-        if lcircObjectGeometry.pixelWidthInMeters != rcircObjectGeometry.pixelWidthInMeters:
+        if lcircObjectGeometry.pixel_width_m != rcircObjectGeometry.pixel_width_m:
             raise ValueError('Object pixel width mismatch!')
 
-        if lcircObjectGeometry.pixelHeightInMeters != rcircObjectGeometry.pixelHeightInMeters:
+        if lcircObjectGeometry.pixel_height_m != rcircObjectGeometry.pixel_height_m:
             raise ValueError('Object pixel height mismatch!')
 
         # TODO align lcircArray/rcircArray
 
         # FIXME OPR
-        lcircAmp = numpy.absolute(lcircObject.getArray())
-        rcircAmp = numpy.absolute(rcircObject.getArray())
+        lcircAmp = numpy.absolute(lcircObject.get_array())
+        rcircAmp = numpy.absolute(rcircObject.get_array())
 
         ratio = numpy.divide(lcircAmp, rcircAmp)
         product = numpy.multiply(lcircAmp, rcircAmp)
@@ -69,8 +69,8 @@ class XMCDAnalyzer:
         )
 
         return XMCDResult(
-            pixel_geometry=rcircObject.getPixelGeometry(),
-            center=rcircObject.getCenter(),
+            pixel_geometry=rcircObject.get_pixel_geometry(),
+            center=rcircObject.get_center(),
             polar_difference=polar_difference,
             polar_sum=polar_sum,
             polar_ratio=polar_ratio,
@@ -92,13 +92,13 @@ class XMCDAnalyzer:
         pixel_geometry = result.pixel_geometry
 
         if pixel_geometry is not None:
-            contents['pixel_height_m'] = pixel_geometry.heightInMeters
-            contents['pixel_width_m'] = pixel_geometry.widthInMeters
+            contents['pixel_height_m'] = pixel_geometry.height_m
+            contents['pixel_width_m'] = pixel_geometry.width_m
 
         center = result.center
 
         if center is not None:
-            contents['center_x_m'] = center.positionXInMeters
-            contents['center_y_m'] = center.positionYInMeters
+            contents['center_x_m'] = center.position_x_m
+            contents['center_y_m'] = center.position_y_m
 
         numpy.savez(file_path, **contents)

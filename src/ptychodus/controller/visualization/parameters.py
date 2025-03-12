@@ -35,7 +35,7 @@ class VisualizationParametersController(Observer):
         )
 
         controller._syncModelToView()
-        engine.addObserver(controller)
+        engine.add_observer(controller)
 
         view.rendererComboBox.textActivated.connect(engine.setRenderer)
         view.transformationComboBox.textActivated.connect(engine.setTransformation)
@@ -66,6 +66,6 @@ class VisualizationParametersController(Observer):
             Decimal(repr(self._engine.getMaxDisplayValue()))
         )
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._engine:
             self._syncModelToView()

@@ -51,7 +51,7 @@ class ProbeTreeModel(QAbstractItemModel):
     def _appendModes(node: ProbeTreeNode, item: ProbeRepositoryItem) -> None:
         probe = item.getProbe()
 
-        for layer in range(probe.numberOfIncoherentModes):
+        for layer in range(probe.num_incoherent_modes):
             node.insertNode()
 
     def insertItem(self, index: int, item: ProbeRepositoryItem) -> None:
@@ -66,7 +66,7 @@ class ProbeTreeModel(QAbstractItemModel):
 
         node = self._treeRoot.children[index]
         numModesOld = len(node.children)
-        numModesNew = item.getProbe().numberOfIncoherentModes
+        numModesNew = item.getProbe().num_incoherent_modes
 
         if numModesOld < numModesNew:
             self.beginInsertRows(topLeft, numModesOld, numModesNew)
@@ -148,7 +148,7 @@ class ProbeTreeModel(QAbstractItemModel):
                 probe = item.getProbe()
 
                 try:
-                    relativePower = probe.getIncoherentModeRelativePower(index.row())
+                    relativePower = probe.get_incoherent_mode_relative_power(index.row())
                 except IndexError:
                     return -1
 
@@ -166,16 +166,16 @@ class ProbeTreeModel(QAbstractItemModel):
                 elif index.column() == 2:
                     return item.getBuilder().getName()
                 elif index.column() == 3:
-                    return str(probe.dataType)
+                    return str(probe.dtype)
                 elif index.column() == 4:
-                    return probe.widthInPixels
+                    return probe.width_px
                 elif index.column() == 5:
-                    return probe.heightInPixels
+                    return probe.height_px
                 elif index.column() == 6:
-                    return f'{probe.sizeInBytes / (1024 * 1024):.2f}'
+                    return f'{probe.nbytes / (1024 * 1024):.2f}'
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
                 probe = item.getProbe()
-                coherence = probe.getCoherence()
+                coherence = probe.get_coherence()
                 return int(100.0 * coherence) if numpy.isfinite(coherence) else -1
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:

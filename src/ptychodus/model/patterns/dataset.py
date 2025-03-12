@@ -73,13 +73,13 @@ class AssembledDiffractionPatternArray(DiffractionPatternArray):
         good_pixels = numpy.full((1, 1), True)
         return cls('null', indexes, data, good_pixels, 0)
 
-    def getLabel(self) -> str:
+    def get_label(self) -> str:
         return self._label
 
-    def getIndexes(self) -> PatternIndexesType:
+    def get_indexes(self) -> PatternIndexesType:
         return self._indexes
 
-    def getData(self) -> PatternDataType:
+    def get_data(self) -> PatternDataType:
         return self._data
 
     def get_pattern(self, index: int) -> PatternDataType:
@@ -169,7 +169,7 @@ class ArrayLoader:
         for _ in self.completed_tasks():
             pass
 
-        for index in range(self._settings.numberOfDataThreads.getValue()):
+        for index in range(self._settings.numberOfDataThreads.get_value()):
             thread = threading.Thread(target=self._load_arrays)
             thread.start()
             self._workers.append(thread)
@@ -212,8 +212,8 @@ class AssembledDiffractionDataset(DiffractionDataset):
         self._loader = ArrayLoader(settings, sizer)
         self._observer_list: list[DiffractionDatasetObserver] = []
 
-        self._contents_tree = SimpleTreeNode.createRoot([])
-        self._metadata = DiffractionMetadata.createNullInstance()
+        self._contents_tree = SimpleTreeNode.create_root([])
+        self._metadata = DiffractionMetadata.create_null()
         self._indexes: PatternIndexesType = numpy.zeros((), dtype=int)
         self._data: PatternDataType = numpy.zeros((0, 0, 0), dtype=int)
         self._arrays: list[AssembledDiffractionPatternArray] = list()
@@ -226,10 +226,10 @@ class AssembledDiffractionDataset(DiffractionDataset):
     def start_loading(self) -> None:
         pattern_extent = self._sizer.get_processed_image_extent()
         data_shape = self._indexes.size, *pattern_extent.shape
-        data_dtype = self._metadata.patternDataType
+        data_dtype = self._metadata.pattern_dtype
 
-        if self._settings.memmapEnabled.getValue():
-            scratch_dir = self._settings.scratchDirectory.getValue()
+        if self._settings.memmapEnabled.get_value():
+            scratch_dir = self._settings.scratchDirectory.get_value()
             scratch_dir.mkdir(mode=0o755, parents=True, exist_ok=True)
             npy_tmp_file = tempfile.NamedTemporaryFile(dir=scratch_dir, suffix='.npy')
             logger.debug(f'Scratch data file {npy_tmp_file.name} is {data_shape}')
@@ -257,10 +257,10 @@ class AssembledDiffractionDataset(DiffractionDataset):
         except ValueError:
             pass
 
-    def getContentsTree(self) -> SimpleTreeNode:
+    def get_contents_tree(self) -> SimpleTreeNode:
         return self._contents_tree
 
-    def getMetadata(self) -> DiffractionMetadata:
+    def get_metadata(self) -> DiffractionMetadata:
         return self._metadata
 
     def get_processed_bad_pixels(self) -> BooleanArrayType:
@@ -303,19 +303,19 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
     def assemble_patterns(self) -> None:
         for task in self._loader.completed_tasks():
-            array_size = self._metadata.numberOfPatternsPerArray
+            array_size = self._metadata.num_patterns_per_array
             array_slice = slice(task.index * array_size, (task.index + 1) * array_size)
 
-            self._indexes[array_slice] = task.array.getIndexes()
+            self._indexes[array_slice] = task.array.get_indexes()
             pattern_indexes = self._indexes[array_slice]
             pattern_indexes.flags.writeable = False
 
-            self._data[array_slice, :, :] = task.array.getData()
+            self._data[array_slice, :, :] = task.array.get_data()
             pattern_data = self._data[array_slice, :, :]
             pattern_data.flags.writeable = False
 
             array = AssembledDiffractionPatternArray(
-                label=task.array.getLabel(),
+                label=task.array.get_label(),
                 indexes=pattern_indexes,
                 data=pattern_data,
                 good_pixels=numpy.logical_not(self.get_processed_bad_pixels()),
@@ -330,8 +330,8 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
     def clear(self) -> None:
         self._loader.stop(finish_loading=False)
-        self._contents_tree = SimpleTreeNode.createRoot([])
-        self._metadata = DiffractionMetadata.createNullInstance()
+        self._contents_tree = SimpleTreeNode.create_root([])
+        self._metadata = DiffractionMetadata.create_null()
         self._indexes = numpy.zeros((), dtype=int)
         self._data = numpy.zeros((0, 0, 0), dtype=int)
         self._arrays.clear()
@@ -345,9 +345,9 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
     def reload(self, dataset: DiffractionDataset) -> None:
         self.clear()
-        self._contents_tree = dataset.getContentsTree()
-        self._metadata = dataset.getMetadata()
-        self._indexes = -numpy.ones(self._metadata.numberOfPatternsTotal, dtype=int)
+        self._contents_tree = dataset.get_contents_tree()
+        self._metadata = dataset.get_metadata()
+        self._indexes = -numpy.ones(self._metadata.num_patterns_total, dtype=int)
 
         for observer in self._observer_list:
             observer.handle_dataset_reloaded()
@@ -369,12 +369,12 @@ class AssembledDiffractionDataset(DiffractionDataset):
             self._data = contents['patterns']
             numberOfPatterns, detectorHeight, detectorWidth = self._data.shape
 
-            self._contents_tree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
+            self._contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
             self._metadata = DiffractionMetadata(
-                numberOfPatternsPerArray=numberOfPatterns,
-                numberOfPatternsTotal=numberOfPatterns,
-                patternDataType=self._data.dtype,
-                detectorExtent=ImageExtent(detectorWidth, detectorHeight),
+                num_patterns_per_array=numberOfPatterns,
+                num_patterns_total=numberOfPatterns,
+                pattern_dtype=self._data.dtype,
+                detector_extent=ImageExtent(detectorWidth, detectorHeight),
             )
             self._arrays = [
                 AssembledDiffractionPatternArray(
@@ -401,7 +401,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
         )
 
     def get_info_text(self) -> str:
-        file_path = self._metadata.filePath
+        file_path = self._metadata.file_path
         label = file_path.stem if file_path else 'None'
         number, height, width = self._data.shape
         dtype = str(self._data.dtype)

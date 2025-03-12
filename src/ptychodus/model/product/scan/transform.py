@@ -16,35 +16,35 @@ class ScanPointTransform(ParameterGroup):
         self._settings = settings
 
         self.affineAX = settings.affineTransformAX.copy()
-        self._addParameter('affine_ax', self.affineAX)
+        self._add_parameter('affine_ax', self.affineAX)
 
         self.affineAY = settings.affineTransformAY.copy()
-        self._addParameter('affine_ay', self.affineAY)
+        self._add_parameter('affine_ay', self.affineAY)
 
         self.affineATInMeters = settings.affineTransformATInMeters.copy()
-        self._addParameter('affine_at_m', self.affineATInMeters)
+        self._add_parameter('affine_at_m', self.affineATInMeters)
 
         self.affineBX = settings.affineTransformBX.copy()
-        self._addParameter('affine_bx', self.affineBX)
+        self._add_parameter('affine_bx', self.affineBX)
 
         self.affineBY = settings.affineTransformBY.copy()
-        self._addParameter('affine_by', self.affineBY)
+        self._add_parameter('affine_by', self.affineBY)
 
         self.affineBTInMeters = settings.affineTransformBTInMeters.copy()
-        self._addParameter('affine_bt_m', self.affineBTInMeters)
+        self._add_parameter('affine_bt_m', self.affineBTInMeters)
 
         self.jitterRadiusInMeters = settings.jitterRadiusInMeters.copy()
-        self._addParameter('jitter_radius_m', self.jitterRadiusInMeters)
+        self._add_parameter('jitter_radius_m', self.jitterRadiusInMeters)
 
     def syncToSettings(self) -> None:
         for parameter in self.parameters().values():
-            parameter.syncValueToParent()
+            parameter.sync_value_to_parent()
 
     def copy(self) -> ScanPointTransform:
         transform = ScanPointTransform(self._rng, self._settings)
 
         for key, value in self.parameters().items():
-            transform.parameters()[key].setValue(value.getValue())
+            transform.parameters()[key].set_value(value.get_value())
 
         return transform
 
@@ -69,29 +69,29 @@ class ScanPointTransform(ParameterGroup):
 
     def applyPresets(self, index: int) -> None:
         if self.swapXY(index):
-            self.affineAY.setValue(-1 if self.negateY(index) else +1)
-            self.affineBX.setValue(-1 if self.negateX(index) else +1)
-            self.affineAX.setValue(0)
-            self.affineBY.setValue(0)
+            self.affineAY.set_value(-1 if self.negateY(index) else +1)
+            self.affineBX.set_value(-1 if self.negateX(index) else +1)
+            self.affineAX.set_value(0)
+            self.affineBY.set_value(0)
         else:
-            self.affineAX.setValue(-1 if self.negateX(index) else +1)
-            self.affineBY.setValue(-1 if self.negateY(index) else +1)
-            self.affineAY.setValue(0)
-            self.affineBX.setValue(0)
+            self.affineAX.set_value(-1 if self.negateX(index) else +1)
+            self.affineBY.set_value(-1 if self.negateY(index) else +1)
+            self.affineAY.set_value(0)
+            self.affineBX.set_value(0)
 
     def __call__(self, point: ScanPoint) -> ScanPoint:
-        ax = self.affineAX.getValue()
-        ay = self.affineAY.getValue()
-        at_m = self.affineATInMeters.getValue()
+        ax = self.affineAX.get_value()
+        ay = self.affineAY.get_value()
+        at_m = self.affineATInMeters.get_value()
 
-        bx = self.affineBX.getValue()
-        by = self.affineBY.getValue()
-        bt_m = self.affineBTInMeters.getValue()
+        bx = self.affineBX.get_value()
+        by = self.affineBY.get_value()
+        bt_m = self.affineBTInMeters.get_value()
 
-        posX = ax * point.positionXInMeters + ay * point.positionYInMeters + at_m
-        posY = bx * point.positionXInMeters + by * point.positionYInMeters + bt_m
+        posX = ax * point.position_x_m + ay * point.position_y_m + at_m
+        posY = bx * point.position_x_m + by * point.position_y_m + bt_m
 
-        rad = self.jitterRadiusInMeters.getValue()
+        rad = self.jitterRadiusInMeters.get_value()
 
         if rad > 0.0:
             while True:

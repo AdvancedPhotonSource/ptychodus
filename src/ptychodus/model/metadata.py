@@ -30,64 +30,64 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
 
     @property
     def _metadata(self) -> DiffractionMetadata:
-        return self._diffractionDataset.getMetadata()
+        return self._diffractionDataset.get_metadata()
 
     def canSyncDetectorExtent(self) -> bool:
-        return self._metadata.detectorExtent is not None
+        return self._metadata.detector_extent is not None
 
     def syncDetectorExtent(self) -> None:
-        detectorExtent = self._metadata.detectorExtent
+        detectorExtent = self._metadata.detector_extent
 
         if detectorExtent:
-            self._detectorSettings.widthInPixels.setValue(detectorExtent.widthInPixels)
-            self._detectorSettings.heightInPixels.setValue(detectorExtent.heightInPixels)
+            self._detectorSettings.widthInPixels.set_value(detectorExtent.width_px)
+            self._detectorSettings.heightInPixels.set_value(detectorExtent.height_px)
 
     def canSyncDetectorPixelSize(self) -> bool:
-        return self._metadata.detectorPixelGeometry is not None
+        return self._metadata.detector_pixel_geometry is not None
 
     def syncDetectorPixelSize(self) -> None:
-        pixelGeometry = self._metadata.detectorPixelGeometry
+        pixelGeometry = self._metadata.detector_pixel_geometry
 
         if pixelGeometry:
-            self._detectorSettings.pixelWidthInMeters.setValue(pixelGeometry.widthInMeters)
-            self._detectorSettings.pixelHeightInMeters.setValue(pixelGeometry.heightInMeters)
+            self._detectorSettings.pixelWidthInMeters.set_value(pixelGeometry.width_m)
+            self._detectorSettings.pixelHeightInMeters.set_value(pixelGeometry.height_m)
 
     def canSyncDetectorBitDepth(self) -> bool:
-        return self._metadata.detectorBitDepth is not None
+        return self._metadata.detector_bit_depth is not None
 
     def syncDetectorBitDepth(self) -> None:
-        bitDepth = self._metadata.detectorBitDepth
+        bitDepth = self._metadata.detector_bit_depth
 
         if bitDepth:
-            self._detectorSettings.bitDepth.setValue(bitDepth)
+            self._detectorSettings.bitDepth.set_value(bitDepth)
 
     def canSyncPatternCropCenter(self) -> bool:
-        return self._metadata.cropCenter is not None or self._metadata.detectorExtent is not None
+        return self._metadata.crop_center is not None or self._metadata.detector_extent is not None
 
     def canSyncPatternCropExtent(self) -> bool:
-        return self._metadata.detectorExtent is not None
+        return self._metadata.detector_extent is not None
 
     def syncPatternCrop(self, syncCenter: bool, syncExtent: bool) -> None:
         if syncCenter:
-            cropCenter = self._metadata.cropCenter
+            cropCenter = self._metadata.crop_center
 
             if cropCenter:
-                self._patternSettings.cropCenterXInPixels.setValue(cropCenter.positionXInPixels)
-                self._patternSettings.cropCenterYInPixels.setValue(cropCenter.positionYInPixels)
-            elif self._metadata.detectorExtent:
-                self._patternSettings.cropCenterXInPixels.setValue(
-                    int(self._metadata.detectorExtent.widthInPixels) // 2
+                self._patternSettings.cropCenterXInPixels.set_value(cropCenter.position_x_px)
+                self._patternSettings.cropCenterYInPixels.set_value(cropCenter.position_y_px)
+            elif self._metadata.detector_extent:
+                self._patternSettings.cropCenterXInPixels.set_value(
+                    int(self._metadata.detector_extent.width_px) // 2
                 )
-                self._patternSettings.cropCenterYInPixels.setValue(
-                    int(self._metadata.detectorExtent.heightInPixels) // 2
+                self._patternSettings.cropCenterYInPixels.set_value(
+                    int(self._metadata.detector_extent.height_px) // 2
                 )
 
-        if syncExtent and self._metadata.detectorExtent:
-            centerX = self._patternSettings.cropCenterXInPixels.getValue()
-            centerY = self._patternSettings.cropCenterYInPixels.getValue()
+        if syncExtent and self._metadata.detector_extent:
+            centerX = self._patternSettings.cropCenterXInPixels.get_value()
+            centerY = self._patternSettings.cropCenterYInPixels.get_value()
 
-            extentX = int(self._metadata.detectorExtent.widthInPixels)
-            extentY = int(self._metadata.detectorExtent.heightInPixels)
+            extentX = int(self._metadata.detector_extent.width_px)
+            extentY = int(self._metadata.detector_extent.height_px)
 
             maxRadiusX = min(centerX, extentX - centerX)
             maxRadiusY = min(centerY, extentY - centerY)
@@ -97,35 +97,35 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
             while cropDiameterInPixels < maxRadius:
                 cropDiameterInPixels <<= 1
 
-            self._patternSettings.cropWidthInPixels.setValue(cropDiameterInPixels)
-            self._patternSettings.cropHeightInPixels.setValue(cropDiameterInPixels)
+            self._patternSettings.cropWidthInPixels.set_value(cropDiameterInPixels)
+            self._patternSettings.cropHeightInPixels.set_value(cropDiameterInPixels)
 
     def canSyncProbePhotonCount(self) -> bool:
-        return self._metadata.probePhotonCount is not None
+        return self._metadata.probe_photon_count is not None
 
     def syncProbePhotonCount(self) -> None:
-        photonCount = self._metadata.probePhotonCount
+        photonCount = self._metadata.probe_photon_count
 
         if photonCount:
-            self._productSettings.probePhotonCount.setValue(photonCount)
+            self._productSettings.probePhotonCount.set_value(photonCount)
 
     def canSyncProbeEnergy(self) -> bool:
-        return self._metadata.probeEnergyInElectronVolts is not None
+        return self._metadata.probe_energy_eV is not None
 
     def syncProbeEnergy(self) -> None:
-        energyInElectronVolts = self._metadata.probeEnergyInElectronVolts
+        energyInElectronVolts = self._metadata.probe_energy_eV
 
         if energyInElectronVolts:
-            self._productSettings.probeEnergyInElectronVolts.setValue(energyInElectronVolts)
+            self._productSettings.probeEnergyInElectronVolts.set_value(energyInElectronVolts)
 
     def canSyncDetectorDistance(self) -> bool:
-        return self._metadata.detectorDistanceInMeters is not None
+        return self._metadata.detector_distance_m is not None
 
     def syncDetectorDistance(self) -> None:
-        distanceInMeters = self._metadata.detectorDistanceInMeters
+        distanceInMeters = self._metadata.detector_distance_m
 
         if distanceInMeters:
-            self._productSettings.detectorDistanceInMeters.setValue(distanceInMeters)
+            self._productSettings.detectorDistanceInMeters.set_value(distanceInMeters)
 
     def handle_array_inserted(self, index: int) -> None:
         pass
@@ -134,4 +134,4 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
         pass
 
     def handle_dataset_reloaded(self) -> None:
-        self.notifyObservers()
+        self.notify_observers()

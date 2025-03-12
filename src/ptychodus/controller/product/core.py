@@ -78,20 +78,20 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 if index.column() == 0:
                     return metadata.getName()
                 elif index.column() == 1:
-                    return f'{metadata.detectorDistanceInMeters.getValue():.4g}'
+                    return f'{metadata.detectorDistanceInMeters.get_value():.4g}'
                 elif index.column() == 2:
-                    return f'{metadata.probeEnergyInElectronVolts.getValue() / 1e3:.4g}'
+                    return f'{metadata.probeEnergyInElectronVolts.get_value() / 1e3:.4g}'
                 elif index.column() == 3:
-                    return f'{metadata.probePhotonCount.getValue():.4g}'
+                    return f'{metadata.probePhotonCount.get_value():.4g}'
                 elif index.column() == 4:
-                    return f'{metadata.exposureTimeInSeconds.getValue():.4g}'
+                    return f'{metadata.exposureTimeInSeconds.get_value():.4g}'
                 elif index.column() == 5:
                     return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
                 elif index.column() == 6:
                     return f'{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}'
                 elif index.column() == 7:
                     product = item.getProduct()
-                    return f'{product.sizeInBytes / (1024 * 1024):.2f}'
+                    return f'{product.nbytes / (1024 * 1024):.2f}'
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
@@ -112,7 +112,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 except ValueError:
                     return False
 
-                metadata.detectorDistanceInMeters.setValue(distanceInM)
+                metadata.detectorDistanceInMeters.set_value(distanceInM)
                 return True
             elif index.column() == 2:
                 try:
@@ -120,7 +120,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 except ValueError:
                     return False
 
-                metadata.probeEnergyInElectronVolts.setValue(energyInKEV * 1e3)
+                metadata.probeEnergyInElectronVolts.set_value(energyInKEV * 1e3)
                 return True
             elif index.column() == 3:
                 try:
@@ -128,7 +128,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 except ValueError:
                     return False
 
-                metadata.probePhotonCount.setValue(photonCount)
+                metadata.probePhotonCount.set_value(photonCount)
                 return True
             elif index.column() == 4:
                 try:
@@ -136,7 +136,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 except ValueError:
                     return False
 
-                metadata.exposureTimeInSeconds.setValue(exposureTimeInSeconds)
+                metadata.exposureTimeInSeconds.set_value(exposureTimeInSeconds)
                 return True
 
         return False
@@ -239,13 +239,13 @@ class ProductController(ProductRepositoryObserver):
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Product',
-            nameFilters=self._api.getOpenFileFilterList(),
+            nameFilters=[nameFilter for nameFilter in self._api.getOpenFileFilterList()],
             selectedNameFilter=self._api.getOpenFileFilter(),
         )
 
         if filePath:
             try:
-                self._api.openProduct(filePath, fileType=nameFilter)
+                self._api.openProduct(filePath, file_type=nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Reader', err)
@@ -260,13 +260,13 @@ class ProductController(ProductRepositoryObserver):
             filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
                 self._view,
                 'Save Product',
-                nameFilters=self._api.getSaveFileFilterList(),
+                nameFilters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
                 selectedNameFilter=self._api.getSaveFileFilter(),
             )
 
             if filePath:
                 try:
-                    self._api.saveProduct(current.row(), filePath, fileType=nameFilter)
+                    self._api.saveProduct(current.row(), filePath, file_type=nameFilter)
                 except Exception as err:
                     logger.exception(err)
                     ExceptionDialog.showException('File Writer', err)

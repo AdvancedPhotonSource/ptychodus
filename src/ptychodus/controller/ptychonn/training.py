@@ -30,7 +30,7 @@ class PtychoNNTrainingParametersController(Observer):
         fileDialogFactory: FileDialogFactory,
     ) -> PtychoNNTrainingParametersController:
         controller = cls(presenter, view, fileDialogFactory)
-        presenter.addObserver(controller)
+        presenter.add_observer(controller)
 
         view.validationSetFractionalSizeSlider.valueChanged.connect(
             presenter.setValidationSetFractionalSize
@@ -73,6 +73,6 @@ class PtychoNNTrainingParametersController(Observer):
         self._view.statusIntervalSpinBox.setValue(self._presenter.getStatusIntervalInEpochs())
         self._view.statusIntervalSpinBox.blockSignals(False)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._syncModelToView()

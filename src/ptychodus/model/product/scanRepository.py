@@ -42,13 +42,13 @@ class ScanRepository(ObservableSequence[ScanRepositoryItem], ProductRepositoryOb
         return len(self._repository)
 
     def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notifyObserversItemInserted(index, item.getScan())
+        self.notify_observers_item_inserted(index, item.getScan())
 
     def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
         pass
 
     def handleScanChanged(self, index: int, item: ScanRepositoryItem) -> None:
-        self.notifyObserversItemChanged(index, item)
+        self.notify_observers_item_changed(index, item)
 
     def handleProbeChanged(self, index: int, item: ProbeRepositoryItem) -> None:
         pass
@@ -60,4 +60,4 @@ class ScanRepository(ObservableSequence[ScanRepositoryItem], ProductRepositoryOb
         pass
 
     def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notifyObserversItemRemoved(index, item.getScan())
+        self.notify_observers_item_removed(index, item.getScan())

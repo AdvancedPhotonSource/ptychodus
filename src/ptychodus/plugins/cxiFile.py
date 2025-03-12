@@ -28,7 +28,7 @@ class CXIDiffractionFileReader(DiffractionFileReader):
         self._treeBuilder = H5DiffractionFileTreeBuilder()
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        dataset = SimpleDiffractionDataset.createNullInstance(filePath)
+        dataset = SimpleDiffractionDataset.create_null(filePath)
 
         try:
             with h5py.File(filePath, 'r') as h5File:
@@ -56,14 +56,14 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                     # /entry_1/instrument_1/detector_1/mask Dataset {512, 512}
 
                     metadata = DiffractionMetadata(
-                        numberOfPatternsPerArray=numberOfPatterns,
-                        numberOfPatternsTotal=numberOfPatterns,
-                        patternDataType=data.dtype,
-                        detectorDistanceInMeters=detectorDistanceInMeters,
-                        detectorExtent=detectorExtent,
-                        detectorPixelGeometry=detectorPixelGeometry,
-                        probeEnergyInElectronVolts=probeEnergyInElectronVolts,
-                        filePath=filePath,
+                        num_patterns_per_array=numberOfPatterns,
+                        num_patterns_total=numberOfPatterns,
+                        pattern_dtype=data.dtype,
+                        detector_distance_m=detectorDistanceInMeters,
+                        detector_extent=detectorExtent,
+                        detector_pixel_geometry=detectorPixelGeometry,
+                        probe_energy_eV=probeEnergyInElectronVolts,
+                        file_path=filePath,
                     )
 
                     array = H5DiffractionPatternArray(
@@ -101,25 +101,25 @@ class CXIProbeFileReader(ProbeFileReader):
         with h5py.File(filePath, 'r') as h5File:
             array = h5File['/entry_1/instrument_1/source_1/illumination'][()]
 
-        return Probe(array=array, pixelGeometry=None)
+        return Probe(array=array, pixel_geometry=None)
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
+def register_plugins(registry: PluginRegistry) -> None:
     SIMPLE_NAME: Final[str] = 'CXI'
     DISPLAY_NAME: Final[str] = 'Coherent X-ray Imaging Files (*.cxi)'
 
-    registry.diffractionFileReaders.registerPlugin(
+    registry.diffractionFileReaders.register_plugin(
         CXIDiffractionFileReader(),
-        simpleName=SIMPLE_NAME,
-        displayName=DISPLAY_NAME,
+        simple_name=SIMPLE_NAME,
+        display_name=DISPLAY_NAME,
     )
-    registry.scanFileReaders.registerPlugin(
+    registry.scanFileReaders.register_plugin(
         CXIScanFileReader(),
-        simpleName=SIMPLE_NAME,
-        displayName=DISPLAY_NAME,
+        simple_name=SIMPLE_NAME,
+        display_name=DISPLAY_NAME,
     )
-    registry.probeFileReaders.registerPlugin(
+    registry.probeFileReaders.register_plugin(
         CXIProbeFileReader(),
-        simpleName=SIMPLE_NAME,
-        displayName=DISPLAY_NAME,
+        simple_name=SIMPLE_NAME,
+        display_name=DISPLAY_NAME,
     )

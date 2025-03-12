@@ -30,15 +30,15 @@ class SLACDiffractionFileReader(DiffractionFileReader):
         numberOfPatterns, detectorHeight, detectorWidth = patterns.shape
 
         metadata = DiffractionMetadata(
-            numberOfPatternsPerArray=numberOfPatterns,
-            numberOfPatternsTotal=numberOfPatterns,
-            patternDataType=patterns.dtype,
-            detectorExtent=ImageExtent(detectorWidth, detectorHeight),
-            filePath=filePath,
+            num_patterns_per_array=numberOfPatterns,
+            num_patterns_total=numberOfPatterns,
+            pattern_dtype=patterns.dtype,
+            detector_extent=ImageExtent(detectorWidth, detectorHeight),
+            file_path=filePath,
         )
 
-        contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
-        contentsTree.createChild(
+        contentsTree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+        contentsTree.create_child(
             [filePath.stem, type(patterns).__name__, f'{patterns.dtype}{patterns.shape}']
         )
 
@@ -62,10 +62,10 @@ class SLACProductFileReader(ProductFileReader):
         metadata = ProductMetadata(
             name=filePath.stem,
             comments='',
-            detectorDistanceInMeters=0.0,  # not included in file
-            probeEnergyInElectronVolts=0.0,  # not included in file
-            probePhotonCount=0.0,  # not included in file
-            exposureTimeInSeconds=0.0,  # not included in file
+            detector_distance_m=0.0,  # not included in file
+            probe_energy_eV=0.0,  # not included in file
+            probe_photon_count=0.0,  # not included in file
+            exposure_time_s=0.0,  # not included in file
         )
 
         scanPointList: list[ScanPoint] = list()
@@ -79,23 +79,23 @@ class SLACProductFileReader(ProductFileReader):
         return Product(
             metadata=metadata,
             scan=Scan(scanPointList),
-            probe=Probe(array=probeArray, pixelGeometry=None),
-            object_=Object(array=objectArray, pixelGeometry=None, center=None),
+            probe=Probe(array=probeArray, pixel_geometry=None),
+            object_=Object(array=objectArray, pixel_geometry=None, center=None),
             costs=costs,
         )
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
+def register_plugins(registry: PluginRegistry) -> None:
     SIMPLE_NAME: Final[str] = 'SLAC'
     DISPLAY_NAME: Final[str] = 'SLAC NumPy Zipped Archive (*.npz)'
 
-    registry.diffractionFileReaders.registerPlugin(
+    registry.diffractionFileReaders.register_plugin(
         SLACDiffractionFileReader(),
-        simpleName=SIMPLE_NAME,
-        displayName=DISPLAY_NAME,
+        simple_name=SIMPLE_NAME,
+        display_name=DISPLAY_NAME,
     )
-    registry.productFileReaders.registerPlugin(
+    registry.productFileReaders.register_plugin(
         SLACProductFileReader(),
-        simpleName=SIMPLE_NAME,
-        displayName=DISPLAY_NAME,
+        simple_name=SIMPLE_NAME,
+        display_name=DISPLAY_NAME,
     )

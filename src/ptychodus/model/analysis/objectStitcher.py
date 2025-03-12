@@ -4,10 +4,10 @@ from ptychodus.api.object import Object, ObjectArrayType, ObjectGeometry
 from ptychodus.api.scan import ScanPoint
 
 
-class ObjectStitcher:
+class ObjectStitcher:  # XXX
     def __init__(self, geometry: ObjectGeometry) -> None:
         self._geometry = geometry
-        self._weights = numpy.zeros((geometry.heightInPixels, geometry.widthInPixels))
+        self._weights = numpy.zeros((geometry.height_px, geometry.width_px))
         self._array: ObjectArrayType = numpy.zeros_like(self._weights, dtype=complex)
 
     def _addPatchPart(
@@ -21,11 +21,11 @@ class ObjectStitcher:
         geometry = self._geometry
 
         patchWidth = patchArray.shape[-1]
-        patchRadiusXInMeters = geometry.pixelWidthInMeters * patchWidth / 2
-        patchMinimumXInMeters = patchCenter.positionXInMeters - patchRadiusXInMeters
+        patchRadiusXInMeters = geometry.pixel_width_m * patchWidth / 2
+        patchMinimumXInMeters = patchCenter.position_x_m - patchRadiusXInMeters
         ixBeginF, xi = divmod(
-            patchMinimumXInMeters - geometry.minimumXInMeters,
-            geometry.pixelWidthInMeters,
+            patchMinimumXInMeters - geometry.minimum_x_m,
+            geometry.pixel_width_m,
         )
         ixBegin = int(ixBeginF)
         ixEnd = ixBegin + patchWidth
@@ -33,11 +33,11 @@ class ObjectStitcher:
         ixSlice1 = slice(ixBegin + 1, ixEnd + 1)
 
         patchHeight = patchArray.shape[-2]
-        patchRadiusYInMeters = geometry.pixelHeightInMeters * patchHeight / 2
-        patchMinimumYInMeters = patchCenter.positionYInMeters - patchRadiusYInMeters
+        patchRadiusYInMeters = geometry.pixel_height_m * patchHeight / 2
+        patchMinimumYInMeters = patchCenter.position_y_m - patchRadiusYInMeters
         iyBeginF, eta = divmod(
-            patchMinimumYInMeters - geometry.minimumYInMeters,
-            geometry.pixelHeightInMeters,
+            patchMinimumYInMeters - geometry.minimum_y_m,
+            geometry.pixel_height_m,
         )
         iyBegin = int(iyBeginF)
         iyEnd = iyBegin + patchHeight
@@ -55,6 +55,6 @@ class ObjectStitcher:
     def build(self) -> Object:  # FIXME multilayer objects?
         return Object(
             array=self._array,
-            pixelGeometry=self._geometry.getPixelGeometry(),
-            center=self._geometry.getCenter(),
+            pixel_geometry=self._geometry.get_pixel_geometry(),
+            center=self._geometry.get_center(),
         )

@@ -16,46 +16,46 @@ class ConcentricScanBuilder(ScanBuilder):
         self._settings = settings
 
         self.radialStepSizeInMeters = settings.radialStepSizeInMeters.copy()
-        self._addParameter('radial_step_size_m', self.radialStepSizeInMeters)
+        self._add_parameter('radial_step_size_m', self.radialStepSizeInMeters)
 
         self.numberOfShells = settings.numberOfShells.copy()
-        self._addParameter('number_of_shells', self.numberOfShells)
+        self._add_parameter('number_of_shells', self.numberOfShells)
 
         self.numberOfPointsInFirstShell = settings.numberOfPointsInFirstShell.copy()
-        self._addParameter('number_of_points_1st_shell', self.numberOfPointsInFirstShell)
+        self._add_parameter('number_of_points_1st_shell', self.numberOfPointsInFirstShell)
 
     def copy(self) -> ConcentricScanBuilder:
         builder = ConcentricScanBuilder(self._settings)
 
         for key, value in self.parameters().items():
-            builder.parameters()[key].setValue(value.getValue())
+            builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
     @property
     def _numberOfPoints(self) -> int:
-        numberOfShells = self.numberOfShells.getValue()
+        numberOfShells = self.numberOfShells.get_value()
         triangle = (numberOfShells * (numberOfShells + 1)) // 2
-        return triangle * self.numberOfPointsInFirstShell.getValue()
+        return triangle * self.numberOfPointsInFirstShell.get_value()
 
     def build(self) -> Scan:
         pointList: list[ScanPoint] = list()
 
         for index in range(self._numberOfPoints):
-            triangle = index // self.numberOfPointsInFirstShell.getValue()
+            triangle = index // self.numberOfPointsInFirstShell.get_value()
             shellIndex = int((1 + numpy.sqrt(1 + 8 * triangle)) / 2) - 1  # see OEIS A002024
             shellTriangle = (shellIndex * (shellIndex + 1)) // 2
-            firstIndexInShell = self.numberOfPointsInFirstShell.getValue() * shellTriangle
+            firstIndexInShell = self.numberOfPointsInFirstShell.get_value() * shellTriangle
             pointIndexInShell = index - firstIndexInShell
 
-            radiusInMeters = self.radialStepSizeInMeters.getValue() * (shellIndex + 1)
-            numberOfPointsInShell = self.numberOfPointsInFirstShell.getValue() * (shellIndex + 1)
+            radiusInMeters = self.radialStepSizeInMeters.get_value() * (shellIndex + 1)
+            numberOfPointsInShell = self.numberOfPointsInFirstShell.get_value() * (shellIndex + 1)
             thetaInRadians = 2 * numpy.pi * pointIndexInShell / numberOfPointsInShell
 
             point = ScanPoint(
                 index=index,
-                positionXInMeters=radiusInMeters * numpy.cos(thetaInRadians),
-                positionYInMeters=radiusInMeters * numpy.sin(thetaInRadians),
+                position_x_m=radiusInMeters * numpy.cos(thetaInRadians),
+                position_y_m=radiusInMeters * numpy.sin(thetaInRadians),
             )
             pointList.append(point)
 

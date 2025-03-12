@@ -29,13 +29,13 @@ class TiffDiffractionPatternArray(DiffractionPatternArray):
         self._filePath = filePath
         self._indexes = numpy.array([index])
 
-    def getLabel(self) -> str:
+    def get_label(self) -> str:
         return self._filePath.stem
 
-    def getIndexes(self) -> PatternIndexesType:
+    def get_indexes(self) -> PatternIndexesType:
         return self._indexes
 
-    def getData(self) -> PatternDataType:
+    def get_data(self) -> PatternDataType:
         with TiffFile(self._filePath) as tiff:
             data = tiff.asarray()
 
@@ -63,15 +63,15 @@ class TiffDiffractionFileReader(DiffractionFileReader):
         return filePathDict, filePattern
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        dataset = SimpleDiffractionDataset.createNullInstance(filePath)
+        dataset = SimpleDiffractionDataset.create_null(filePath)
 
         filePathMapping, filePattern = self._getFileSeries(filePath)
-        contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
+        contentsTree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
         arrayList: list[DiffractionPatternArray] = list()
 
         for idx, (_, fp) in enumerate(sorted(filePathMapping.items())):  # TODO use keys
             array = TiffDiffractionPatternArray(fp, idx)
-            contentsTree.createChild([array.getLabel(), 'TIFF', str(idx)])
+            contentsTree.create_child([array.get_label(), 'TIFF', str(idx)])
             arrayList.append(array)
 
         try:
@@ -86,11 +86,11 @@ class TiffDiffractionFileReader(DiffractionFileReader):
             numberOfPatternsPerArray, detectorHeight, detectorWidth = data.shape
 
             metadata = DiffractionMetadata(
-                numberOfPatternsPerArray=numberOfPatternsPerArray,
-                numberOfPatternsTotal=numberOfPatternsPerArray * len(arrayList),
-                patternDataType=data.dtype,
-                detectorExtent=ImageExtent(detectorWidth, detectorHeight),
-                filePath=filePath.parent / filePattern,
+                num_patterns_per_array=numberOfPatternsPerArray,
+                num_patterns_total=numberOfPatternsPerArray * len(arrayList),
+                pattern_dtype=data.dtype,
+                detector_extent=ImageExtent(detectorWidth, detectorHeight),
+                file_path=filePath.parent / filePattern,
             )
 
             dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
@@ -98,11 +98,11 @@ class TiffDiffractionFileReader(DiffractionFileReader):
         return dataset
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.diffractionFileReaders.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.diffractionFileReaders.register_plugin(
         TiffDiffractionFileReader(),
-        simpleName='TIFF',
-        displayName='Tagged Image File Format Files (*.tif *.tiff)',
+        simple_name='TIFF',
+        display_name='Tagged Image File Format Files (*.tif *.tiff)',
     )
 
 

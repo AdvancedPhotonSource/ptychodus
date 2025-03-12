@@ -2,20 +2,20 @@ from ptychodus.api.probe import FresnelZonePlate
 from ptychodus.api.plugins import PluginRegistry
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.fresnelZonePlates.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.fresnelZonePlates.register_plugin(
         FresnelZonePlate(160e-6, 70e-9, 60e-6),
-        displayName='2-ID-D',
+        display_name='2-ID-D',
     )
-    registry.fresnelZonePlates.registerPlugin(
+    registry.fresnelZonePlates.register_plugin(
         FresnelZonePlate(160e-6, 30e-9, 80e-6),
-        displayName='HXN',
+        display_name='HXN',
     )
-    registry.fresnelZonePlates.registerPlugin(
+    registry.fresnelZonePlates.register_plugin(
         FresnelZonePlate(114.8e-6, 60e-9, 40e-6),
-        displayName='LYNX',
+        display_name='LYNX',
     )
-    registry.fresnelZonePlates.registerPlugin(
+    registry.fresnelZonePlates.register_plugin(
         FresnelZonePlate(180e-6, 50e-9, 60e-6),
-        displayName='Velociprobe',
+        display_name='Velociprobe',
     )

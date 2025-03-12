@@ -76,9 +76,9 @@ class LYNXSoftGlueZynqScanFileReader(ScanFileReader):
         return Scan(pointList)
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.scanFileReaders.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.scanFileReaders.register_plugin(
         LYNXSoftGlueZynqScanFileReader(),
-        simpleName=LYNXSoftGlueZynqScanFileReader.SIMPLE_NAME,
-        displayName='LYNX SoftGlueZynq Scan Files (*.dat)',
+        simple_name=LYNXSoftGlueZynqScanFileReader.SIMPLE_NAME,
+        display_name='LYNX SoftGlueZynq Scan Files (*.dat)',
     )

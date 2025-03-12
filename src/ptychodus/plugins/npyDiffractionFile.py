@@ -24,7 +24,7 @@ class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
     DISPLAY_NAME: Final[str] = 'NumPy Binary Files (*.npy)'
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        dataset = SimpleDiffractionDataset.createNullInstance(filePath)
+        dataset = SimpleDiffractionDataset.create_null(filePath)
 
         try:
             data = numpy.load(filePath)
@@ -37,15 +37,15 @@ class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
             numberOfPatterns, detectorHeight, detectorWidth = data.shape
 
             metadata = DiffractionMetadata(
-                numberOfPatternsPerArray=numberOfPatterns,
-                numberOfPatternsTotal=numberOfPatterns,
-                patternDataType=data.dtype,
-                detectorExtent=ImageExtent(detectorWidth, detectorHeight),
-                filePath=filePath,
+                num_patterns_per_array=numberOfPatterns,
+                num_patterns_total=numberOfPatterns,
+                pattern_dtype=data.dtype,
+                detector_extent=ImageExtent(detectorWidth, detectorHeight),
+                file_path=filePath,
             )
 
-            contentsTree = SimpleTreeNode.createRoot(['Name', 'Type', 'Details'])
-            contentsTree.createChild(
+            contentsTree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+            contentsTree.create_child(
                 [filePath.stem, type(data).__name__, f'{data.dtype}{data.shape}']
             )
 
@@ -60,20 +60,20 @@ class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
         return dataset
 
     def write(self, filePath: Path, dataset: DiffractionDataset) -> None:
-        patterns = numpy.concatenate([array.getData() for array in dataset])
+        patterns = numpy.concatenate([array.get_data() for array in dataset])
         numpy.save(filePath, patterns)
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
+def register_plugins(registry: PluginRegistry) -> None:
     npyDiffractionFileIO = NPYDiffractionFileIO()
 
-    registry.diffractionFileReaders.registerPlugin(
+    registry.diffractionFileReaders.register_plugin(
         npyDiffractionFileIO,
-        simpleName=NPYDiffractionFileIO.SIMPLE_NAME,
-        displayName=NPYDiffractionFileIO.DISPLAY_NAME,
+        simple_name=NPYDiffractionFileIO.SIMPLE_NAME,
+        display_name=NPYDiffractionFileIO.DISPLAY_NAME,
     )
-    registry.diffractionFileWriters.registerPlugin(
+    registry.diffractionFileWriters.register_plugin(
         npyDiffractionFileIO,
-        simpleName=NPYDiffractionFileIO.SIMPLE_NAME,
-        displayName=NPYDiffractionFileIO.DISPLAY_NAME,
+        simple_name=NPYDiffractionFileIO.SIMPLE_NAME,
+        display_name=NPYDiffractionFileIO.DISPLAY_NAME,
     )

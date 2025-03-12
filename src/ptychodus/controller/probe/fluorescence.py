@@ -62,7 +62,7 @@ class FluorescenceTwoStepViewController(Observer):
         )
 
         self._syncModelToView()
-        algorithm.addObserver(self)
+        algorithm.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._view
@@ -73,7 +73,7 @@ class FluorescenceTwoStepViewController(Observer):
             self._algorithm.getDeconvolutionStrategy()
         )
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._algorithm:
             self._syncModelToView()
 
@@ -90,7 +90,7 @@ class FluorescenceVSPIViewController(Observer):
         self._view.maxIterationsSpinBox.setRange(1, self.MAX_INT)
         self._view.maxIterationsSpinBox.valueChanged.connect(algorithm.setMaxIterations)
 
-        algorithm.addObserver(self)
+        algorithm.add_observer(self)
         self._syncModelToView()
 
     def getWidget(self) -> QWidget:
@@ -103,7 +103,7 @@ class FluorescenceVSPIViewController(Observer):
         self._view.dampingFactorLineEdit.setValue(Decimal(repr(self._algorithm.getDampingFactor())))
         self._view.maxIterationsSpinBox.setValue(self._algorithm.getMaxIterations())
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._algorithm:
             self._syncModelToView()
 
@@ -187,14 +187,14 @@ class FluorescenceViewController(Observer):
             engine, self._dialog.visualizationParametersView
         )
 
-        enhancer.addObserver(self)
+        enhancer.add_observer(self)
 
     def _openMeasuredDataset(self) -> None:
         title = 'Open Measured Fluorescence Dataset'
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._dialog,
             title,
-            nameFilters=self._enhancer.getOpenFileFilterList(),
+            nameFilters=[nameFilter for nameFilter in self._enhancer.getOpenFileFilterList()],
             selectedNameFilter=self._enhancer.getOpenFileFilter(),
         )
 
@@ -229,7 +229,7 @@ class FluorescenceViewController(Observer):
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._dialog,
             title,
-            nameFilters=self._enhancer.getSaveFileFilterList(),
+            nameFilters=[nameFilter for nameFilter in self._enhancer.getSaveFileFilterList()],
             selectedNameFilter=self._enhancer.getSaveFileFilter(),
         )
 
@@ -275,6 +275,6 @@ class FluorescenceViewController(Observer):
                 emap_enhanced.counts_per_second, self._enhancer.getPixelGeometry()
             )
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._enhancer:
             self._syncModelToView()

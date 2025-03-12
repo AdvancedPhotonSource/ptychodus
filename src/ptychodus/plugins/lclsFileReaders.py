@@ -32,13 +32,13 @@ class PyTablesDiffractionPatternArray(DiffractionPatternArray):
         self._filePath = filePath
         self._dataPath = dataPath
 
-    def getLabel(self) -> str:
+    def get_label(self) -> str:
         return self._label
 
-    def getIndexes(self) -> PatternIndexesType:
+    def get_indexes(self) -> PatternIndexesType:
         return self._indexes
 
-    def getData(self) -> PatternDataType:
+    def get_data(self) -> PatternDataType:
         with tables.open_file(self._filePath, mode='r') as h5file:
             try:
                 item = h5file.get_node(self._dataPath)
@@ -61,8 +61,8 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
         self._treeBuilder = H5DiffractionFileTreeBuilder()
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        dataset = SimpleDiffractionDataset.createNullInstance(filePath)
-        metadata = DiffractionMetadata.createNullInstance(filePath)
+        dataset = SimpleDiffractionDataset.create_null(filePath)
+        metadata = DiffractionMetadata.create_null(filePath)
 
         try:
             with tables.open_file(filePath, mode='r') as h5File:
@@ -81,11 +81,11 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
                         dataPath=self._dataPath,
                     )
                     metadata = DiffractionMetadata(
-                        numberOfPatternsPerArray=numberOfPatterns,
-                        numberOfPatternsTotal=numberOfPatterns,
-                        patternDataType=data.dtype,
-                        detectorExtent=ImageExtent(detectorWidth, detectorHeight),
-                        filePath=filePath,
+                        num_patterns_per_array=numberOfPatterns,
+                        num_patterns_total=numberOfPatterns,
+                        pattern_dtype=data.dtype,
+                        detector_extent=ImageExtent(detectorWidth, detectorHeight),
+                        file_path=filePath,
                     )
 
             with h5py.File(filePath, 'r') as h5File:
@@ -146,20 +146,20 @@ class LCLSScanFileReader(ScanFileReader):
         return Scan(scanPointList)
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
+def register_plugins(registry: PluginRegistry) -> None:
     SIMPLE_NAME: Final[str] = 'LCLS_XPP'
 
-    registry.diffractionFileReaders.registerPlugin(
+    registry.diffractionFileReaders.register_plugin(
         LCLSDiffractionFileReader(),
-        simpleName=SIMPLE_NAME,
-        displayName='LCLS XPP Diffraction Files (*.h5 *.hdf5)',
+        simple_name=SIMPLE_NAME,
+        display_name='LCLS XPP Diffraction Files (*.h5 *.hdf5)',
     )
-    registry.scanFileReaders.registerPlugin(
+    registry.scanFileReaders.register_plugin(
         LCLSScanFileReader(
             tomographyAngleInDegrees=180.0,
             ipm2LowThreshold=2500.0,
             ipm2HighThreshold=6000.0,
         ),
-        simpleName=SIMPLE_NAME,
-        displayName='LCLS XPP Scan Files (*.h5 *.hdf5)',
+        simple_name=SIMPLE_NAME,
+        display_name='LCLS XPP Scan Files (*.h5 *.hdf5)',
     )

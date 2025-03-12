@@ -27,20 +27,20 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         self._metadata = metadata
         self._scan = scan
 
-        self._patternSizer.addObserver(self)
-        self._metadata.addObserver(self)
-        self._scan.addObserver(self)
+        self._patternSizer.add_observer(self)
+        self._metadata.add_observer(self)
+        self._scan.add_observer(self)
 
     @property
-    def probePhotonCount(self) -> float:
-        return self._metadata.probePhotonCount.getValue()
+    def probe_photon_count(self) -> float:
+        return self._metadata.probePhotonCount.get_value()
 
     @property
     def probeEnergyInJoules(self) -> float:
-        return self._metadata.probeEnergyInElectronVolts.getValue() * ELECTRON_VOLT_J
+        return self._metadata.probeEnergyInElectronVolts.get_value() * ELECTRON_VOLT_J
 
     @property
-    def probeWavelengthInMeters(self) -> float:
+    def probe_wavelength_m(self) -> float:
         hc_Jm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S
 
         try:
@@ -51,31 +51,31 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
     @property
     def probeWavelengthsPerMeter(self) -> float:
         """wavenumber"""
-        return 1.0 / self.probeWavelengthInMeters
+        return 1.0 / self.probe_wavelength_m
 
     @property
     def probeRadiansPerMeter(self) -> float:
         """angular wavenumber"""
-        return 2.0 * numpy.pi / self.probeWavelengthInMeters
+        return 2.0 * numpy.pi / self.probe_wavelength_m
 
     @property
     def probePhotonsPerSecond(self) -> float:
         try:
-            return self.probePhotonCount / self._metadata.exposureTimeInSeconds.getValue()
+            return self.probe_photon_count / self._metadata.exposureTimeInSeconds.get_value()
         except ZeroDivisionError:
             return 0.0
 
     @property
-    def probePowerInWatts(self) -> float:
+    def probe_power_W(self) -> float:
         return self.probeEnergyInJoules * self.probePhotonsPerSecond
 
     @property
-    def detectorDistanceInMeters(self) -> float:
-        return self._metadata.detectorDistanceInMeters.getValue()
+    def detector_distance_m(self) -> float:
+        return self._metadata.detectorDistanceInMeters.get_value()
 
     @property
     def _lambdaZInSquareMeters(self) -> float:
-        return self.probeWavelengthInMeters * self.detectorDistanceInMeters
+        return self.probe_wavelength_m * self.detector_distance_m
 
     @property
     def objectPlanePixelWidthInMeters(self) -> float:
@@ -85,13 +85,13 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
     def objectPlanePixelHeightInMeters(self) -> float:
         return self._lambdaZInSquareMeters / self._patternSizer.get_processed_height_m()
 
-    def getDetectorPixelGeometry(self):
+    def get_detector_pixel_geometry(self):
         return self._patternSizer.get_processed_pixel_geometry()
 
     def getObjectPlanePixelGeometry(self) -> PixelGeometry:
         return PixelGeometry(
-            widthInMeters=self.objectPlanePixelWidthInMeters,
-            heightInMeters=self.objectPlanePixelHeightInMeters,
+            width_m=self.objectPlanePixelWidthInMeters,
+            height_m=self.objectPlanePixelHeightInMeters,
         )
 
     @property
@@ -101,62 +101,57 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         areaInSquareMeters = widthInMeters * heightInMeters
         return areaInSquareMeters / self._lambdaZInSquareMeters
 
-    def getProbeGeometry(self) -> ProbeGeometry:
+    def get_probe_geometry(self) -> ProbeGeometry:
         extent = self._patternSizer.get_processed_image_extent()
         return ProbeGeometry(
-            widthInPixels=extent.widthInPixels,
-            heightInPixels=extent.heightInPixels,
-            pixelWidthInMeters=self.objectPlanePixelWidthInMeters,
-            pixelHeightInMeters=self.objectPlanePixelHeightInMeters,
+            width_px=extent.width_px,
+            height_px=extent.height_px,
+            pixel_width_m=self.objectPlanePixelWidthInMeters,
+            pixel_height_m=self.objectPlanePixelHeightInMeters,
         )
 
     def isProbeGeometryValid(self, geometry: ProbeGeometry) -> bool:
-        expected = self.getProbeGeometry()
-        widthIsValid = (
-            geometry.pixelWidthInMeters > 0.0 and geometry.widthInMeters == expected.widthInMeters
-        )
-        heightIsValid = (
-            geometry.pixelHeightInMeters > 0.0
-            and geometry.heightInMeters == expected.heightInMeters
-        )
+        expected = self.get_probe_geometry()
+        widthIsValid = geometry.pixel_width_m > 0.0 and geometry.width_m == expected.width_m
+        heightIsValid = geometry.pixel_height_m > 0.0 and geometry.height_m == expected.height_m
         return widthIsValid and heightIsValid
 
-    def getObjectGeometry(self) -> ObjectGeometry:
-        probeGeometry = self.getProbeGeometry()
-        widthInMeters = probeGeometry.widthInMeters
-        heightInMeters = probeGeometry.heightInMeters
+    def get_object_geometry(self) -> ObjectGeometry:
+        probeGeometry = self.get_probe_geometry()
+        widthInMeters = probeGeometry.width_m
+        heightInMeters = probeGeometry.height_m
         centerXInMeters = 0.0
         centerYInMeters = 0.0
 
         scanBoundingBox = self._scan.getBoundingBox()
 
         if scanBoundingBox is not None:
-            widthInMeters += scanBoundingBox.widthInMeters
-            heightInMeters += scanBoundingBox.heightInMeters
-            centerXInMeters = scanBoundingBox.centerXInMeters
-            centerYInMeters = scanBoundingBox.centerYInMeters
+            widthInMeters += scanBoundingBox.width_m
+            heightInMeters += scanBoundingBox.height_m
+            centerXInMeters = scanBoundingBox.center_x_m
+            centerYInMeters = scanBoundingBox.center_y_m
 
         widthInPixels = widthInMeters / self.objectPlanePixelWidthInMeters
         heightInPixels = heightInMeters / self.objectPlanePixelHeightInMeters
 
         return ObjectGeometry(
-            widthInPixels=int(numpy.ceil(widthInPixels)),
-            heightInPixels=int(numpy.ceil(heightInPixels)),
-            pixelWidthInMeters=self.objectPlanePixelWidthInMeters,
-            pixelHeightInMeters=self.objectPlanePixelHeightInMeters,
-            centerXInMeters=centerXInMeters,
-            centerYInMeters=centerYInMeters,
+            width_px=int(numpy.ceil(widthInPixels)),
+            height_px=int(numpy.ceil(heightInPixels)),
+            pixel_width_m=self.objectPlanePixelWidthInMeters,
+            pixel_height_m=self.objectPlanePixelHeightInMeters,
+            center_x_m=centerXInMeters,
+            center_y_m=centerYInMeters,
         )
 
     def isObjectGeometryValid(self, geometry: ObjectGeometry) -> bool:
-        expectedGeometry = self.getObjectGeometry()
-        pixelSizeIsValid = geometry.pixelWidthInMeters > 0.0 and geometry.pixelHeightInMeters > 0.0
+        expectedGeometry = self.get_object_geometry()
+        pixelSizeIsValid = geometry.pixel_width_m > 0.0 and geometry.pixel_height_m > 0.0
         return pixelSizeIsValid and geometry.contains(expectedGeometry)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._metadata:
-            self.notifyObservers()
+            self.notify_observers()
         elif observable is self._scan:
-            self.notifyObservers()
+            self.notify_observers()
         elif observable is self._patternSizer:
-            self.notifyObservers()
+            self.notify_observers()

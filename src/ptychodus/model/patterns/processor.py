@@ -29,12 +29,12 @@ class DiffractionPatternFilterValues:
 
 class DiffractionPatternCrop:
     def __init__(self, center: CropCenter, extent: ImageExtent) -> None:
-        center_x = center.positionXInPixels
-        radius_x = extent.widthInPixels // 2
+        center_x = center.position_x_px
+        radius_x = extent.width_px // 2
         self.slice_x = slice(center_x - radius_x, center_x + radius_x)
 
-        center_y = center.positionYInPixels
-        radius_y = extent.heightInPixels // 2
+        center_y = center.position_y_px
+        radius_y = extent.height_px // 2
         self.slice_y = slice(center_y - radius_y, center_y + radius_y)
 
     def apply(self, data: PatternDataType) -> PatternDataType:
@@ -73,7 +73,7 @@ class DiffractionPatternProcessor:
     flip_y: bool
 
     def __call__(self, array: DiffractionPatternArray) -> DiffractionPatternArray:
-        data = array.getData()
+        data = array.get_data()
 
         if data.ndim != 3:
             raise ValueError(f'Invalid diffraction pattern dimensions! (shape={data.shape})')
@@ -97,4 +97,4 @@ class DiffractionPatternProcessor:
         if self.flip_x:
             data = numpy.flip(data, axis=-1)
 
-        return SimpleDiffractionPatternArray(array.getLabel(), array.getIndexes(), data)
+        return SimpleDiffractionPatternArray(array.get_label(), array.get_indexes(), data)

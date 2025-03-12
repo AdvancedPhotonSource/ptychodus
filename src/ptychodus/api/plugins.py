@@ -1,8 +1,8 @@
 from __future__ import annotations
-from collections.abc import Sequence
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from types import ModuleType
-from typing import Generic, TypeVar, overload
+from typing import Generic, TypeVar
 import importlib
 import logging
 import pkgutil
@@ -15,7 +15,8 @@ from .fluorescence import (
     UpscalingStrategy,
 )
 from .object import ObjectFileReader, ObjectFileWriter
-from .observer import Observable
+from .observer import Observable, Observer
+from .parametric import StringParameter
 from .patterns import DiffractionFileReader, DiffractionFileWriter
 from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter
 from .product import ProductFileReader, ProductFileWriter
@@ -33,69 +34,62 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class PluginEntry(Generic[T]):
+class Plugin(Generic[T]):
     strategy: T
-    simpleName: str
-    displayName: str
+    simple_name: str
+    display_name: str
 
 
-class PluginChooser(Sequence[PluginEntry[T]], Observable):
+class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
     def __init__(self) -> None:
         super().__init__()
-        self._entryList: list[PluginEntry[T]] = list()
-        self._currentIndex = 0
+        self._registered_plugins: list[Plugin[T]] = list()
+        self._current_index = 0
+        self._parameter: StringParameter | None = None
 
-    def getSimpleNameList(self) -> Sequence[str]:
-        return [entry.simpleName for entry in self._entryList]
+    def register_plugin(self, strategy: T, *, display_name: str, simple_name: str = '') -> None:
+        if not simple_name:
+            simple_name = re.sub(r'\W+', '', display_name)
 
-    def getDisplayNameList(self) -> Sequence[str]:
-        return [entry.displayName for entry in self._entryList]
+        plugin = Plugin[T](strategy, simple_name, display_name)
+        self._registered_plugins.append(plugin)
+        self.notify_observers()
 
-    def registerPlugin(self, strategy: T, *, displayName: str, simpleName: str = '') -> None:
-        if not simpleName:
-            simpleName = re.sub(r'\W+', '', displayName)
+    def get_current_plugin(self) -> Plugin[T]:
+        return self._registered_plugins[self._current_index]
 
-        entry = PluginEntry[T](strategy, simpleName, displayName)
-        self._entryList.append(entry)
-        self.notifyObservers()
-
-    @property
-    def currentPlugin(self) -> PluginEntry[T]:
-        return self._entryList[self._currentIndex]
-
-    def setCurrentPluginByName(self, name: str) -> None:
+    def set_current_plugin(self, name: str) -> None:
         namecf = name.casefold()
 
-        for index, entry in enumerate(self._entryList):
-            if namecf == entry.simpleName.casefold() or namecf == entry.displayName.casefold():
-                if self._currentIndex != index:
-                    self._currentIndex = index
-                    self.notifyObservers()
+        for index, plugin in enumerate(self._registered_plugins):
+            if namecf == plugin.simple_name.casefold() or namecf == plugin.display_name.casefold():
+                if self._current_index != index:
+                    self._current_index = index
+
+                    if self._parameter is not None:
+                        self._parameter.set_value(self.get_current_plugin().simple_name)
+
+                    self.notify_observers()
 
                 return
 
         logger.debug(f'Invalid plugin name "{name}"')
 
-    @overload
-    def __getitem__(self, index: int) -> PluginEntry[T]: ...
+    def synchronize_with_parameter(self, parameter: StringParameter) -> None:
+        self._parameter = parameter
+        self.set_current_plugin(parameter.get_value())
+        self._parameter.add_observer(self)
 
-    @overload
-    def __getitem__(self, index: slice) -> Sequence[PluginEntry[T]]: ...
-
-    def __getitem__(self, index: int | slice) -> PluginEntry[T] | Sequence[PluginEntry[T]]:
-        return self._entryList[index]
-
-    def __len__(self) -> int:
-        return len(self._entryList)
+    def __iter__(self) -> Iterator[Plugin[T]]:
+        for plugin in self._registered_plugins:
+            yield plugin
 
     def __bool__(self) -> bool:
-        return bool(self._entryList)
+        return bool(self._registered_plugins)
 
-    def copy(self) -> PluginChooser[T]:
-        clone = PluginChooser[T]()
-        clone._entryList = self._entryList.copy()
-        clone._currentIndex = self._currentIndex
-        return clone
+    def _update(self, observable: Observable) -> None:
+        if self._parameter is not None and observable is self._parameter:
+            self.set_current_plugin(self._parameter.get_value())
 
 
 class PluginRegistry:
@@ -118,7 +112,7 @@ class PluginRegistry:
         self.deconvolutionStrategies = PluginChooser[DeconvolutionStrategy]()
 
     @classmethod
-    def loadPlugins(cls) -> PluginRegistry:
+    def load_plugins(cls) -> PluginRegistry:
         registry = cls()
 
         import ptychodus.plugins
@@ -129,14 +123,14 @@ class PluginRegistry:
         # returned name an absolute name instead of a relative one. This allows
         # import_module to work without having to do additional modification to
         # the name.
-        for moduleInfo in pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + '.'):
+        for module_info in pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + '.'):
             try:
-                module = importlib.import_module(moduleInfo.name)
+                module = importlib.import_module(module_info.name)
             except ModuleNotFoundError as exc:
-                logger.info(f'Skipping {moduleInfo.name}')
+                logger.info(f'Skipping {module_info.name}')
                 logger.warning(exc)
             else:
-                logger.info(f'Registering {moduleInfo.name}')
-                module.registerPlugins(registry)
+                logger.info(f'Registering {module_info.name}')
+                module.register_plugins(registry)
 
         return registry

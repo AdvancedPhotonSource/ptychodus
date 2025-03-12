@@ -24,7 +24,7 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
         self._treeBuilder = H5DiffractionFileTreeBuilder()
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        dataset = SimpleDiffractionDataset.createNullInstance(filePath)
+        dataset = SimpleDiffractionDataset.create_null(filePath)
 
         try:
             with h5py.File(filePath, 'r') as h5File:
@@ -39,12 +39,12 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
                     numberOfPatterns, detectorHeight, detectorWidth = data.shape
 
                     metadata = DiffractionMetadata(
-                        numberOfPatternsPerArray=numberOfPatterns,
-                        numberOfPatternsTotal=numberOfPatterns,
-                        patternDataType=data.dtype,
-                        detectorExtent=ImageExtent(detectorWidth, detectorHeight),
-                        detectorPixelGeometry=PixelGeometry(pixelSize, pixelSize),
-                        filePath=filePath,
+                        num_patterns_per_array=numberOfPatterns,
+                        num_patterns_total=numberOfPatterns,
+                        pattern_dtype=data.dtype,
+                        detector_extent=ImageExtent(detectorWidth, detectorHeight),
+                        detector_pixel_geometry=PixelGeometry(pixelSize, pixelSize),
+                        file_path=filePath,
                     )
 
                     array = H5DiffractionPatternArray(
@@ -61,9 +61,9 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
         return dataset
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.diffractionFileReaders.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.diffractionFileReaders.register_plugin(
         LYNXDiffractionFileReader(),
-        simpleName='APS_LYNX',
-        displayName='APS LYNX Diffraction Files (*.h5 *.hdf5)',
+        simple_name='APS_LYNX',
+        display_name='APS LYNX Diffraction Files (*.h5 *.hdf5)',
     )

@@ -52,7 +52,7 @@ class AutomationDatasetRepository(Observable):
     def getLabel(self, index: int) -> str:
         with self._lock:
             filePath = self._fileList[index]
-            return str(filePath.relative_to(self._settings.dataDirectory.getValue()))
+            return str(filePath.relative_to(self._settings.dataDirectory.get_value()))
 
     def getState(self, index: int) -> AutomationDatasetState:
         with self._lock:
@@ -66,4 +66,4 @@ class AutomationDatasetRepository(Observable):
     def notifyObserversIfRepositoryChanged(self) -> None:
         if self._changedEvent.is_set():
             self._changedEvent.clear()
-            self.notifyObservers()
+            self.notify_observers()

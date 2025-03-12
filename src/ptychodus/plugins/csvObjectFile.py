@@ -9,23 +9,23 @@ from ptychodus.api.plugins import PluginRegistry
 class CSVObjectFileReader(ObjectFileReader):
     def read(self, filePath: Path) -> Object:
         array = numpy.genfromtxt(filePath, delimiter=',', dtype='complex')
-        return Object(array=array, pixelGeometry=None, center=None)
+        return Object(array=array, pixel_geometry=None, center=None)
 
 
 class CSVObjectFileWriter(ObjectFileWriter):
     def write(self, filePath: Path, object_: Object) -> None:
-        array = object_.getArray()
+        array = object_.get_array()
         numpy.savetxt(filePath, array, delimiter=',')
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.objectFileReaders.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.objectFileReaders.register_plugin(
         CSVObjectFileReader(),
-        simpleName='CSV',
-        displayName='Comma-Separated Values Files (*.csv)',
+        simple_name='CSV',
+        display_name='Comma-Separated Values Files (*.csv)',
     )
-    registry.objectFileWriters.registerPlugin(
+    registry.objectFileWriters.register_plugin(
         CSVObjectFileWriter(),
-        simpleName='CSV',
-        displayName='Comma-Separated Values Files (*.csv)',
+        simple_name='CSV',
+        display_name='Comma-Separated Values Files (*.csv)',
     )

@@ -44,15 +44,15 @@ class VelociprobeScanFileReader(ScanFileReader):
         stageRotationInRadians = numpy.deg2rad(self._neXusReader.stageRotationInDegrees)
         stageRotationCosine = numpy.cos(stageRotationInRadians)
 
-        xMean = sum(p.positionXInMeters for p in scan) / len(scan)
-        yMean = sum(p.positionYInMeters for p in scan) / len(scan)
+        xMean = sum(p.position_x_m for p in scan) / len(scan)
+        yMean = sum(p.position_y_m for p in scan) / len(scan)
         pointList: list[ScanPoint] = list()
 
         for untransformedPoint in scan:
             point = ScanPoint(
                 untransformedPoint.index,
-                (untransformedPoint.positionXInMeters - xMean) * stageRotationCosine,
-                (untransformedPoint.positionYInMeters - yMean),
+                (untransformedPoint.position_x_m - xMean) * stageRotationCosine,
+                (untransformedPoint.position_y_m - yMean),
             )
             pointList.append(point)
 

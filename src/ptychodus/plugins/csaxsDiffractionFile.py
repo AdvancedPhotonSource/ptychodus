@@ -30,7 +30,7 @@ class CSAXSDiffractionFileReader(DiffractionFileReader):
         self._treeBuilder = H5DiffractionFileTreeBuilder()
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        dataset = SimpleDiffractionDataset.createNullInstance(filePath)
+        dataset = SimpleDiffractionDataset.create_null(filePath)
 
         try:
             with h5py.File(filePath, 'r') as h5File:
@@ -48,20 +48,20 @@ class CSAXSDiffractionFileReader(DiffractionFileReader):
                     numberOfPatterns, detectorHeight, detectorWidth = data.shape
                     detectorDistanceInMeters = float(distance_mm[()]) * self.ONE_MILLIMETER_M
                     detectorPixelGeometry = PixelGeometry(
-                        widthInMeters=float(x_pixel_size_um[()]) * self.ONE_MICRON_M,
-                        heightInMeters=float(y_pixel_size_um[()]) * self.ONE_MICRON_M,
+                        width_m=float(x_pixel_size_um[()]) * self.ONE_MICRON_M,
+                        height_m=float(y_pixel_size_um[()]) * self.ONE_MICRON_M,
                     )
                     probeEnergyInElectronVolts = 1000 * float(energy_keV[()])
 
                     metadata = DiffractionMetadata(
-                        numberOfPatternsPerArray=numberOfPatterns,
-                        numberOfPatternsTotal=numberOfPatterns,
-                        patternDataType=data.dtype,
-                        detectorDistanceInMeters=abs(detectorDistanceInMeters),
-                        detectorExtent=ImageExtent(detectorWidth, detectorHeight),
-                        detectorPixelGeometry=detectorPixelGeometry,
-                        probeEnergyInElectronVolts=probeEnergyInElectronVolts,
-                        filePath=filePath,
+                        num_patterns_per_array=numberOfPatterns,
+                        num_patterns_total=numberOfPatterns,
+                        pattern_dtype=data.dtype,
+                        detector_distance_m=abs(detectorDistanceInMeters),
+                        detector_extent=ImageExtent(detectorWidth, detectorHeight),
+                        detector_pixel_geometry=detectorPixelGeometry,
+                        probe_energy_eV=probeEnergyInElectronVolts,
+                        file_path=filePath,
                     )
 
                     array = H5DiffractionPatternArray(
@@ -78,9 +78,9 @@ class CSAXSDiffractionFileReader(DiffractionFileReader):
         return dataset
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.diffractionFileReaders.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.diffractionFileReaders.register_plugin(
         CSAXSDiffractionFileReader(),
-        simpleName=CSAXSDiffractionFileReader.SIMPLE_NAME,
-        displayName=CSAXSDiffractionFileReader.DISPLAY_NAME,
+        simple_name=CSAXSDiffractionFileReader.SIMPLE_NAME,
+        display_name=CSAXSDiffractionFileReader.DISPLAY_NAME,
     )

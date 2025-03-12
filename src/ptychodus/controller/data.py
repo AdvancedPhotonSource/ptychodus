@@ -23,7 +23,7 @@ class FileDialogFactory(Observable):
 
         if self._openWorkingDirectory != directory:
             self._openWorkingDirectory = directory
-            self.notifyObservers()
+            self.notify_observers()
 
     def getOpenFilePath(
         self,

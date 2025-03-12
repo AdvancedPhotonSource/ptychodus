@@ -27,7 +27,7 @@ class PtychoNNModelParametersController(Observer):
         fileDialogFactory: FileDialogFactory,
     ) -> PtychoNNModelParametersController:
         controller = cls(presenter, view, fileDialogFactory)
-        presenter.addObserver(controller)
+        presenter.add_observer(controller)
 
         view.numberOfConvolutionKernelsSpinBox.valueChanged.connect(
             presenter.setNumberOfConvolutionKernels
@@ -62,6 +62,6 @@ class PtychoNNModelParametersController(Observer):
             self._presenter.isBatchNormalizationEnabled()
         )
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._syncModelToView()

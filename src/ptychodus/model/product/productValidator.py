@@ -37,7 +37,7 @@ class ProductValidator(Observable, Observer):
 
         if self._isScanValid != isScanValidNow:
             self._isScanValid = isScanValidNow
-            self.notifyObservers()
+            self.notify_observers()
 
     def isProbeValid(self) -> bool:
         return self._isProbeValid
@@ -49,23 +49,23 @@ class ProductValidator(Observable, Observer):
         hasValidityChanged = False
 
         probe = self._probe.getProbe()
-        isProbeValidNow = self._geometry.isProbeGeometryValid(probe.getGeometry())
+        isProbeValidNow = self._geometry.isProbeGeometryValid(probe.get_geometry())
 
         if self._isProbeValid != isProbeValidNow:
             self._isProbeValid = isProbeValidNow
             hasValidityChanged = True
 
         object_ = self._object.getObject()
-        isObjectValidNow = self._geometry.isObjectGeometryValid(object_.getGeometry())
+        isObjectValidNow = self._geometry.isObjectGeometryValid(object_.get_geometry())
 
         if self._isObjectValid != isObjectValidNow:
             self._isObjectValid = isObjectValidNow
             hasValidityChanged = True
 
         if hasValidityChanged:
-            self.notifyObservers()
+            self.notify_observers()
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._dataset:
             self._validateScan()
         elif observable is self._scan:

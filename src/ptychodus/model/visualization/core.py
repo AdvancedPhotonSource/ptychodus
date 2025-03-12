@@ -37,14 +37,14 @@ class VisualizationEngine(Observable, Observer):
         self._colorAxis = ColorAxis()
         acyclicColormap = ColormapParameter(isCyclic=False)
 
-        self._rendererChooser.registerPlugin(
+        self._rendererChooser.register_plugin(
             ColormapRenderer(
                 RealArrayComponent(),
                 self._transformation,
                 self._colorAxis,
                 acyclicColormap,
             ),
-            displayName='Real',
+            display_name='Real',
         )
 
         if isComplex:
@@ -52,66 +52,66 @@ class VisualizationEngine(Observable, Observer):
             phaseComponent = PhaseInRadiansArrayComponent()
             cyclicColormap = ColormapParameter(isCyclic=True)
 
-            self._rendererChooser.registerPlugin(
+            self._rendererChooser.register_plugin(
                 ColormapRenderer(
                     ImaginaryArrayComponent(),
                     self._transformation,
                     self._colorAxis,
                     acyclicColormap,
                 ),
-                displayName='Imaginary',
+                display_name='Imaginary',
             )
-            self._rendererChooser.registerPlugin(
+            self._rendererChooser.register_plugin(
                 ColormapRenderer(
                     amplitudeComponent,
                     self._transformation,
                     self._colorAxis,
                     acyclicColormap,
                 ),
-                displayName='Amplitude',
+                display_name='Amplitude',
             )
-            self._rendererChooser.registerPlugin(
+            self._rendererChooser.register_plugin(
                 ColormapRenderer(
                     phaseComponent,
                     self._transformation,
                     self._colorAxis,
                     cyclicColormap,
                 ),
-                displayName='Phase',
+                display_name='Phase',
             )
-            self._rendererChooser.registerPlugin(
+            self._rendererChooser.register_plugin(
                 ColormapRenderer(
                     UnwrappedPhaseInRadiansArrayComponent(),
                     self._transformation,
                     self._colorAxis,
                     acyclicColormap,
                 ),
-                displayName='Phase (Unwrapped)',
+                display_name='Phase (Unwrapped)',
             )
-            self._rendererChooser.registerPlugin(
+            self._rendererChooser.register_plugin(
                 CylindricalColorModelRenderer(
                     amplitudeComponent,
                     phaseComponent,
                     self._transformation,
                     self._colorAxis,
                 ),
-                displayName='Complex',
+                display_name='Complex',
             )
-            self._rendererChooser.setCurrentPluginByName('Complex')
+            self._rendererChooser.set_current_plugin('Complex')
 
-        self._rendererChooser.addObserver(self)
-        self._rendererPlugin = self._rendererChooser.currentPlugin
-        self._rendererPlugin.strategy.addObserver(self)
+        self._rendererChooser.add_observer(self)
+        self._rendererPlugin = self._rendererChooser.get_current_plugin()
+        self._rendererPlugin.strategy.add_observer(self)
 
     def renderers(self) -> Iterator[str]:
         for plugin in self._rendererChooser:
-            yield plugin.displayName
+            yield plugin.display_name
 
     def getRenderer(self) -> str:
-        return self._rendererPlugin.displayName
+        return self._rendererPlugin.display_name
 
     def setRenderer(self, value: str) -> None:
-        self._rendererChooser.setCurrentPluginByName(value)
+        self._rendererChooser.set_current_plugin(value)
 
     def isRendererCyclic(self) -> bool:
         return self._rendererPlugin.strategy.isCyclic()
@@ -120,10 +120,10 @@ class VisualizationEngine(Observable, Observer):
         return self._transformation.choices()
 
     def getTransformation(self) -> str:
-        return self._transformation.getValue()
+        return self._transformation.get_value()
 
     def setTransformation(self, value: str) -> None:
-        self._transformation.setValue(value)
+        self._transformation.set_value(value)
 
     def variants(self) -> Iterator[str]:
         return self._rendererPlugin.strategy.variants()
@@ -135,16 +135,16 @@ class VisualizationEngine(Observable, Observer):
         return self._rendererPlugin.strategy.setVariant(value)
 
     def getMinDisplayValue(self) -> float:
-        return self._colorAxis.lower.getValue()
+        return self._colorAxis.lower.get_value()
 
     def setMinDisplayValue(self, value: float) -> None:
-        self._colorAxis.lower.setValue(value)
+        self._colorAxis.lower.set_value(value)
 
     def getMaxDisplayValue(self) -> float:
-        return self._colorAxis.upper.getValue()
+        return self._colorAxis.upper.get_value()
 
     def setMaxDisplayValue(self, value: float) -> None:
-        self._colorAxis.upper.setValue(value)
+        self._colorAxis.upper.set_value(value)
 
     def setDisplayValueRange(self, lower: float, upper: float) -> None:
         self._colorAxis.setRange(lower, upper)
@@ -163,11 +163,11 @@ class VisualizationEngine(Observable, Observer):
             array, pixelGeometry, autoscaleColorAxis=autoscaleColorAxis
         )
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._rendererChooser:
-            self._rendererPlugin.strategy.removeObserver(self)
-            self._rendererPlugin = self._rendererChooser.currentPlugin
-            self._rendererPlugin.strategy.addObserver(self)
-            self.notifyObservers()
+            self._rendererPlugin.strategy.remove_observer(self)
+            self._rendererPlugin = self._rendererChooser.get_current_plugin()
+            self._rendererPlugin.strategy.add_observer(self)
+            self.notify_observers()
         elif observable is self._rendererPlugin.strategy:
-            self.notifyObservers()
+            self.notify_observers()

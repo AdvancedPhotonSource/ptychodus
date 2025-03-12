@@ -43,7 +43,7 @@ class AutodiffReconstructor(Reconstructor):
 
         ####
 
-        loss_function_str = self._settings.lossFunction.getValue()
+        loss_function_str = self._settings.lossFunction.get_value()
 
         try:
             loss_function = LossFunctions[loss_function_str.upper()]
@@ -53,7 +53,7 @@ class AutodiffReconstructor(Reconstructor):
 
         ####
 
-        forward_model_class_str = self._settings.forwardModelClass.getValue()
+        forward_model_class_str = self._settings.forwardModelClass.get_value()
 
         try:
             forward_model_class = ForwardModels[forward_model_class_str.upper()]
@@ -160,7 +160,7 @@ class AutodiffReconstructor(Reconstructor):
             object_options=self._create_object_options(product.object_),
             probe_options=self._create_probe_options(product.probe, product.metadata),
             probe_position_options=self._create_probe_position_options(
-                product.scan, product.object_.getGeometry()
+                product.scan, product.object_.get_geometry()
             ),
             opr_mode_weight_options=self._create_opr_mode_weight_options(),
         )

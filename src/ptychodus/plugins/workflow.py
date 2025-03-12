@@ -12,22 +12,22 @@ logger = logging.getLogger(__name__)
 
 class PtychodusAutoloadProductFileBasedWorkflow(FileBasedWorkflow):
     @property
-    def isWatchRecursive(self) -> bool:
+    def is_watch_recursive(self) -> bool:
         return True
 
-    def getWatchFilePattern(self) -> str:
+    def get_watch_file_pattern(self) -> str:
         return 'product-out.npz'
 
     def execute(self, workflowAPI: WorkflowAPI, filePath: Path) -> None:
-        workflowAPI.openProduct(filePath, fileType='NPZ')
+        workflowAPI.open_product(filePath, file_type='NPZ')
 
 
 class APS2IDFileBasedWorkflow(FileBasedWorkflow):
     @property
-    def isWatchRecursive(self) -> bool:
+    def is_watch_recursive(self) -> bool:
         return False
 
-    def getWatchFilePattern(self) -> str:
+    def get_watch_file_pattern(self) -> str:
         return '*.csv'
 
     def execute(self, workflowAPI: WorkflowAPI, filePath: Path) -> None:
@@ -35,20 +35,20 @@ class APS2IDFileBasedWorkflow(FileBasedWorkflow):
         scanID = int(re.findall(r'\d+', scanName)[-1])
 
         diffractionFilePath = filePath.parents[1] / 'raw_data' / f'scan{scanID}_master.h5'
-        workflowAPI.openPatterns(diffractionFilePath, fileType='NeXus')
-        productAPI = workflowAPI.createProduct(f'scan{scanID}')
-        productAPI.openScan(filePath, fileType='CSV')
-        productAPI.buildProbe()
-        productAPI.buildObject()
-        productAPI.reconstructRemote()
+        workflowAPI.open_patterns(diffractionFilePath, file_type='NeXus')
+        productAPI = workflowAPI.create_product(f'scan{scanID}')
+        productAPI.open_scan(filePath, file_type='CSV')
+        productAPI.build_probe()
+        productAPI.build_object()
+        productAPI.reconstruct_remote()
 
 
 class APS26IDFileBasedWorkflow(FileBasedWorkflow):
     @property
-    def isWatchRecursive(self) -> bool:
+    def is_watch_recursive(self) -> bool:
         return False
 
-    def getWatchFilePattern(self) -> str:
+    def get_watch_file_pattern(self) -> str:
         return '*.mda'
 
     def execute(self, workflowAPI: WorkflowAPI, filePath: Path) -> None:
@@ -63,12 +63,12 @@ class APS26IDFileBasedWorkflow(FileBasedWorkflow):
             if digits != 0:
                 break
 
-        workflowAPI.openPatterns(diffractionFilePath, fileType='HDF5')
-        productAPI = workflowAPI.createProduct(f'scan_{scanID}')
-        productAPI.openScan(filePath, fileType='MDA')
-        productAPI.buildProbe()
-        productAPI.buildObject()
-        productAPI.reconstructRemote()
+        workflowAPI.open_patterns(diffractionFilePath, file_type='HDF5')
+        productAPI = workflowAPI.create_product(f'scan_{scanID}')
+        productAPI.open_scan(filePath, file_type='MDA')
+        productAPI.build_probe()
+        productAPI.build_object()
+        productAPI.reconstruct_remote()
 
 
 @dataclass(frozen=True)
@@ -94,10 +94,10 @@ class APS31IDEMetadata:
 
 class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
     @property
-    def isWatchRecursive(self) -> bool:
+    def is_watch_recursive(self) -> bool:
         return True
 
-    def getWatchFilePattern(self) -> str:
+    def get_watch_file_pattern(self) -> str:
         return '*.h5'
 
     def execute(self, workflowAPI: WorkflowAPI, filePath: Path) -> None:
@@ -142,36 +142,36 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
             logger.warning(f'Failed to locate label for {row_no}!')
         else:
             productName = f'scan{scan_no:05d}_' + metadata.label
-            workflowAPI.openPatterns(filePath, fileType='LYNX')
-            inputProductAPI = workflowAPI.createProduct(productName, comments=str(metadata))
-            inputProductAPI.openScan(scanFile, fileType='LYNXOrchestra')
-            inputProductAPI.buildProbe()
-            inputProductAPI.buildObject()
+            workflowAPI.open_patterns(filePath, file_type='LYNX')
+            inputProductAPI = workflowAPI.create_product(productName, comments=str(metadata))
+            inputProductAPI.open_scan(scanFile, file_type='LYNXOrchestra')
+            inputProductAPI.build_probe()
+            inputProductAPI.build_object()
             # TODO would prefer to write instructions and submit to queue
-            outputProductAPI = inputProductAPI.reconstructLocal()
-            outputProductAPI.saveProduct(
-                experimentDir / 'ptychodus' / f'{productName}.h5', fileType='HDF5'
+            outputProductAPI = inputProductAPI.reconstruct_local()
+            outputProductAPI.save_product(
+                experimentDir / 'ptychodus' / f'{productName}.h5', file_type='HDF5'
             )
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.fileBasedWorkflows.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.fileBasedWorkflows.register_plugin(
         PtychodusAutoloadProductFileBasedWorkflow(),
-        simpleName='Autoload_Product',
-        displayName='Autoload Product',
+        simple_name='Autoload_Product',
+        display_name='Autoload Product',
     )
-    registry.fileBasedWorkflows.registerPlugin(
+    registry.fileBasedWorkflows.register_plugin(
         APS2IDFileBasedWorkflow(),
-        simpleName='APS_2ID',
-        displayName='APS 2-ID',
+        simple_name='APS_2ID',
+        display_name='APS 2-ID',
     )
-    registry.fileBasedWorkflows.registerPlugin(
+    registry.fileBasedWorkflows.register_plugin(
         APS26IDFileBasedWorkflow(),
-        simpleName='APS_26ID',
-        displayName='APS 26-ID',
+        simple_name='APS_26ID',
+        display_name='APS 26-ID',
     )
-    registry.fileBasedWorkflows.registerPlugin(
+    registry.fileBasedWorkflows.register_plugin(
         APS31IDEFileBasedWorkflow(),
-        simpleName='APS_31IDE',
-        displayName='APS 31-ID-E',
+        simple_name='APS_31IDE',
+        display_name='APS 31-ID-E',
     )

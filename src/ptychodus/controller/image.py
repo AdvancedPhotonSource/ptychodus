@@ -88,7 +88,7 @@ class ImageRendererController(Observer):
         view.variantComboBox.setModel(controller._variantModel)
 
         controller._syncModelToView()
-        engine.addObserver(controller)
+        engine.add_observer(controller)
 
         view.rendererComboBox.textActivated.connect(engine.setRenderer)
         view.transformationComboBox.textActivated.connect(engine.setTransformation)
@@ -112,7 +112,7 @@ class ImageRendererController(Observer):
         self._view.variantComboBox.setCurrentText(self._engine.getVariant())
         self._view.variantComboBox.blockSignals(False)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._engine:
             self._syncModelToView()
 
@@ -144,7 +144,7 @@ class ImageDataRangeController(Observer):
         displayRangeDialog = ImageDisplayRangeDialog.createInstance(view)
         controller = cls(engine, view, imageWidget, displayRangeDialog, visualizationController)
         controller._syncModelToView()
-        engine.addObserver(controller)
+        engine.add_observer(controller)
 
         view.minDisplayValueSlider.valueChanged.connect(
             lambda value: engine.setMinDisplayValue(float(value))
@@ -203,7 +203,7 @@ class ImageDataRangeController(Observer):
 
         self._syncColorLegendToView()
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._engine:
             self._syncModelToView()
 

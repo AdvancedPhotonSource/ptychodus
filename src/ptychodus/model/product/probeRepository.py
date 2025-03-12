@@ -44,7 +44,7 @@ class ProbeRepository(ObservableSequence[ProbeRepositoryItem], ProductRepository
         return len(self._repository)
 
     def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notifyObserversItemInserted(index, item.getProbe())
+        self.notify_observers_item_inserted(index, item.getProbe())
 
     def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
         pass
@@ -53,7 +53,7 @@ class ProbeRepository(ObservableSequence[ProbeRepositoryItem], ProductRepository
         pass
 
     def handleProbeChanged(self, index: int, item: ProbeRepositoryItem) -> None:
-        self.notifyObserversItemChanged(index, item)
+        self.notify_observers_item_changed(index, item)
 
     def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
         pass
@@ -62,4 +62,4 @@ class ProbeRepository(ObservableSequence[ProbeRepositoryItem], ProductRepository
         pass
 
     def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notifyObserversItemRemoved(index, item.getProbe())
+        self.notify_observers_item_removed(index, item.getProbe())

@@ -56,7 +56,7 @@ class VisualizationController(Observer):
         itemEvents = ImageItemEvents()
         item = ImageItem(itemEvents, statusBar)
         controller = cls(engine, view, item, statusBar, fileDialogFactory)
-        engine.addObserver(controller)
+        engine.add_observer(controller)
 
         itemEvents.lineCutFinished.connect(controller._analyzeLineCut)
         itemEvents.rectangleFinished.connect(controller._analyzeRegion)
@@ -117,12 +117,12 @@ class VisualizationController(Observer):
             logger.warning('No visualization product!')
             return
 
-        valueLabel = product.getValueLabel()
-        lineCut = product.getLineCut(line2D)
+        valueLabel = product.get_value_label()
+        lineCut = product.get_line_cut(line2D)
 
         ax = self._lineCutDialog.axes
         ax.clear()
-        ax.plot(lineCut.distanceInMeters, lineCut.value, '.-', linewidth=1.5)
+        ax.plot(lineCut.distance_m, lineCut.value, '.-', linewidth=1.5)
         ax.set_xlabel('Distance [m]')
         ax.set_ylabel(valueLabel)
         ax.grid(True)
@@ -147,9 +147,9 @@ class VisualizationController(Observer):
             logger.warning('No visualization product!')
             return
 
-        valueLabel = product.getValueLabel()
-        kde = product.estimateKernelDensity(box)
-        values = numpy.linspace(kde.valueLower, kde.valueUpper, 1000)
+        valueLabel = product.get_value_label()
+        kde = product.estimate_kernel_density(box)
+        values = numpy.linspace(kde.value_lower, kde.value_upper, 1000)
 
         ax = self._histogramDialog.axes
         ax.clear()
@@ -181,11 +181,11 @@ class VisualizationController(Observer):
 
         if product is not None:
             self.setArray(
-                product.getValues(),
-                product.getPixelGeometry(),
+                product.get_values(),
+                product.get_pixel_geometry(),
                 autoscaleColorAxis=autoscaleColorAxis,
             )
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._engine:
             self.rerenderImage()

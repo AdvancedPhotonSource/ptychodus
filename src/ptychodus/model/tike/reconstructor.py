@@ -47,14 +47,14 @@ class TikeReconstructor:
         settings = self._objectCorrectionSettings
         options = None
 
-        if settings.useObjectCorrection.getValue():
+        if settings.useObjectCorrection.get_value():
             options = tike.ptycho.ObjectOptions(
-                positivity_constraint=float(settings.positivityConstraint.getValue()),
-                smoothness_constraint=float(settings.smoothnessConstraint.getValue()),
-                use_adaptive_moment=settings.useAdaptiveMoment.getValue(),
-                vdecay=float(settings.vdecay.getValue()),
-                mdecay=float(settings.mdecay.getValue()),
-                clip_magnitude=settings.useMagnitudeClipping.getValue(),
+                positivity_constraint=float(settings.positivityConstraint.get_value()),
+                smoothness_constraint=float(settings.smoothnessConstraint.get_value()),
+                use_adaptive_moment=settings.useAdaptiveMoment.get_value(),
+                vdecay=float(settings.vdecay.get_value()),
+                mdecay=float(settings.mdecay.get_value()),
+                clip_magnitude=settings.useMagnitudeClipping.get_value(),
             )
 
         return options
@@ -65,14 +65,14 @@ class TikeReconstructor:
         settings = self._positionCorrectionSettings
         options = None
 
-        if settings.usePositionCorrection.getValue():
+        if settings.usePositionCorrection.get_value():
             options = tike.ptycho.PositionOptions(
                 initial_scan=initialScan,
-                use_adaptive_moment=settings.useAdaptiveMoment.getValue(),
-                vdecay=float(settings.vdecay.getValue()),
-                mdecay=float(settings.mdecay.getValue()),
-                use_position_regularization=settings.usePositionRegularization.getValue(),
-                update_magnitude_limit=float(settings.updateMagnitudeLimit.getValue()),
+                use_adaptive_moment=settings.useAdaptiveMoment.get_value(),
+                vdecay=float(settings.vdecay.get_value()),
+                mdecay=float(settings.mdecay.get_value()),
+                use_position_regularization=settings.usePositionRegularization.get_value(),
+                update_magnitude_limit=float(settings.updateMagnitudeLimit.get_value()),
             )
 
         return options
@@ -81,30 +81,30 @@ class TikeReconstructor:
         settings = self._probeCorrectionSettings
         options = None
 
-        if settings.useProbeCorrection.getValue():
+        if settings.useProbeCorrection.get_value():
             probeSupport = (
-                float(settings.probeSupportWeight.getValue())
-                if settings.useFiniteProbeSupport.getValue()
+                float(settings.probeSupportWeight.get_value())
+                if settings.useFiniteProbeSupport.get_value()
                 else 0.0
             )
 
             options = tike.ptycho.ProbeOptions(
-                force_orthogonality=settings.forceOrthogonality.getValue(),
-                force_centered_intensity=settings.forceCenteredIntensity.getValue(),
-                force_sparsity=float(settings.forceSparsity.getValue()),
-                use_adaptive_moment=settings.useAdaptiveMoment.getValue(),
-                vdecay=float(settings.vdecay.getValue()),
-                mdecay=float(settings.mdecay.getValue()),
+                force_orthogonality=settings.forceOrthogonality.get_value(),
+                force_centered_intensity=settings.forceCenteredIntensity.get_value(),
+                force_sparsity=float(settings.forceSparsity.get_value()),
+                use_adaptive_moment=settings.useAdaptiveMoment.get_value(),
+                vdecay=float(settings.vdecay.get_value()),
+                mdecay=float(settings.mdecay.get_value()),
                 probe_support=probeSupport,
-                probe_support_radius=float(settings.probeSupportRadius.getValue()),
-                probe_support_degree=float(settings.probeSupportDegree.getValue()),
-                additional_probe_penalty=float(settings.additionalProbePenalty.getValue()),
+                probe_support_radius=float(settings.probeSupportRadius.get_value()),
+                probe_support_degree=float(settings.probeSupportDegree.get_value()),
+                additional_probe_penalty=float(settings.additionalProbePenalty.get_value()),
             )
 
         return options
 
     def getNumGpus(self) -> int | tuple[int, ...]:
-        numGpus = self._settings.numGpus.getValue()
+        numGpus = self._settings.numGpus.get_value()
         onlyDigitsAndCommas = all(c.isdigit() or c == ',' for c in numGpus)
         hasDigit = any(c.isdigit() for c in numGpus)
 
@@ -124,9 +124,9 @@ class TikeReconstructor:
         patternsArray = numpy.fft.ifftshift(parameters.patterns, axes=(-2, -1))
 
         objectInput = parameters.product.object_
-        objectGeometry = objectInput.getGeometry()
-        objectInputArray = objectInput.getArray().astype('complex64')
-        numberOfLayers = objectInput.numberOfLayers
+        objectGeometry = objectInput.get_geometry()
+        objectInputArray = objectInput.get_array().astype('complex64')
+        numberOfLayers = objectInput.num_layers
 
         if numberOfLayers == 1:
             objectInputArray = objectInputArray[0]
@@ -134,7 +134,7 @@ class TikeReconstructor:
             raise ValueError(f'Tike does not support multislice (layers={numberOfLayers})!')
 
         probeInput = parameters.product.probe
-        probeInputArray = probeInput.getArray().astype('complex64')
+        probeInputArray = probeInput.get_array().astype('complex64')
 
         scanInput = parameters.product.scan
         scanInputCoords: list[float] = list()
@@ -144,9 +144,9 @@ class TikeReconstructor:
         uy = -probeInputArray.shape[-2] / 2
 
         for scanPoint in scanInput:
-            objectPoint = objectGeometry.mapScanPointToObjectPoint(scanPoint)
-            scanInputCoords.append(objectPoint.positionYInPixels + uy)
-            scanInputCoords.append(objectPoint.positionXInPixels + ux)
+            objectPoint = objectGeometry.map_scan_point_to_object_point(scanPoint)
+            scanInputCoords.append(objectPoint.position_y_px + uy)
+            scanInputCoords.append(objectPoint.position_x_px + ux)
 
         scanInputArray = numpy.array(
             scanInputCoords,
@@ -165,7 +165,7 @@ class TikeReconstructor:
 
         exitwave_options = tike.ptycho.ExitWaveOptions(
             measured_pixels=numpy.logical_not(parameters.bad_pixels),
-            noise_model=self._settings.noiseModel.getValue(),
+            noise_model=self._settings.noiseModel.get_value(),
         )
 
         ptychoParameters = tike.ptycho.solvers.PtychoParameters(
@@ -179,13 +179,13 @@ class TikeReconstructor:
             exitwave_options=exitwave_options,
         )
 
-        if self._multigridSettings.useMultigrid.getValue():
+        if self._multigridSettings.useMultigrid.get_value():
             result = tike.ptycho.reconstruct_multigrid(
                 data=patternsArray,
                 parameters=ptychoParameters,
                 num_gpu=numGpus,
                 use_mpi=False,
-                num_levels=self._multigridSettings.numLevels.getValue(),
+                num_levels=self._multigridSettings.numLevels.get_value(),
                 interp=None,  # TODO does this have other options?
             )
         else:
@@ -205,22 +205,22 @@ class TikeReconstructor:
 
         for uncorrectedPoint, xy in zip(scanInput, result.scan):
             objectPoint = ObjectPoint(uncorrectedPoint.index, xy[1] - ux, xy[0] - uy)
-            scanPoint = objectGeometry.mapObjectPointToScanPoint(objectPoint)
+            scanPoint = objectGeometry.map_object_point_to_scan_point(objectPoint)
             scanOutputPoints.append(scanPoint)
 
         scanOutput = Scan(scanOutputPoints)
 
-        if self._probeCorrectionSettings.useProbeCorrection.getValue():
-            probeOutput = Probe(array=result.probe, pixelGeometry=probeInput.getPixelGeometry())
+        if self._probeCorrectionSettings.useProbeCorrection.get_value():
+            probeOutput = Probe(array=result.probe, pixel_geometry=probeInput.get_pixel_geometry())
         else:
             probeOutput = probeInput.copy()
 
-        if self._objectCorrectionSettings.useObjectCorrection.getValue():
+        if self._objectCorrectionSettings.useObjectCorrection.get_value():
             objectOutput = Object(
                 array=result.psi,
-                layerDistanceInMeters=objectInput.layerDistanceInMeters,
-                pixelGeometry=objectInput.getPixelGeometry(),
-                center=objectInput.getCenter(),
+                layer_distance_m=objectInput.layer_distance_m,
+                pixel_geometry=objectInput.get_pixel_geometry(),
+                center=objectInput.get_center(),
             )
         else:
             objectOutput = objectInput.copy()
@@ -250,11 +250,11 @@ class RegularizedPIEReconstructor(Reconstructor):
         return self._tikeReconstructor._settings
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        self._algorithmOptions.num_batch = self._settings.numBatch.getValue()
-        self._algorithmOptions.batch_method = self._settings.batchMethod.getValue()
-        self._algorithmOptions.num_iter = self._settings.numIter.getValue()
-        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.getValue()
-        self._algorithmOptions.alpha = float(self._settings.alpha.getValue())
+        self._algorithmOptions.num_batch = self._settings.numBatch.get_value()
+        self._algorithmOptions.batch_method = self._settings.batchMethod.get_value()
+        self._algorithmOptions.num_iter = self._settings.numIter.get_value()
+        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.get_value()
+        self._algorithmOptions.alpha = float(self._settings.alpha.get_value())
         return self._tikeReconstructor(parameters, self._algorithmOptions)
 
 
@@ -273,8 +273,8 @@ class IterativeLeastSquaresReconstructor(Reconstructor):
         return self._tikeReconstructor._settings
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        self._algorithmOptions.num_batch = self._settings.numBatch.getValue()
-        self._algorithmOptions.batch_method = self._settings.batchMethod.getValue()
-        self._algorithmOptions.num_iter = self._settings.numIter.getValue()
-        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.getValue()
+        self._algorithmOptions.num_batch = self._settings.numBatch.get_value()
+        self._algorithmOptions.batch_method = self._settings.batchMethod.get_value()
+        self._algorithmOptions.num_iter = self._settings.numIter.get_value()
+        self._algorithmOptions.convergence_window = self._settings.convergenceWindow.get_value()
         return self._tikeReconstructor(parameters, self._algorithmOptions)

@@ -41,7 +41,7 @@ class AutomationProcessingController(Observer):
         fileDialogFactory: FileDialogFactory,
     ) -> AutomationProcessingController:
         controller = cls(presenter, view, fileDialogFactory)
-        presenter.addObserver(controller)
+        presenter.add_observer(controller)
 
         for strategy in presenter.getStrategyList():
             view.strategyComboBox.addItem(strategy)
@@ -88,7 +88,7 @@ class AutomationProcessingController(Observer):
         self._view.intervalSpinBox.setValue(self._presenter.getProcessingIntervalInSeconds())
         self._view.intervalSpinBox.blockSignals(False)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._syncModelToView()
 
@@ -104,7 +104,7 @@ class AutomationWatchdogController(Observer):
         cls, presenter: AutomationPresenter, view: AutomationWatchdogView
     ) -> AutomationWatchdogController:
         controller = cls(presenter, view)
-        presenter.addObserver(controller)
+        presenter.add_observer(controller)
 
         view.delaySpinBox.valueChanged.connect(presenter.setWatchdogDelayInSeconds)
         view.usePollingObserverCheckBox.toggled.connect(presenter.setWatchdogPollingObserverEnabled)
@@ -125,7 +125,7 @@ class AutomationWatchdogController(Observer):
             self._presenter.isWatchdogPollingObserverEnabled()
         )
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._syncModelToView()
 
@@ -190,7 +190,7 @@ class AutomationController(Observer):
         fileDialogFactory: FileDialogFactory,
     ) -> AutomationController:
         controller = cls(core, presenter, processingPresenter, view, fileDialogFactory)
-        processingPresenter.addObserver(controller)
+        processingPresenter.add_observer(controller)
 
         view.processingListView.setModel(controller._listModel)
 
@@ -219,6 +219,6 @@ class AutomationController(Observer):
         self._view.watchButton.setChecked(self._presenter.isWatchdogEnabled())
         self._view.processButton.setChecked(self._processingPresenter.isProcessingEnabled())
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._processingPresenter:
             self._syncModelToView()

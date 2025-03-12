@@ -46,7 +46,7 @@ class ProbePropagationViewController(Observer):
             engine, self._dialog.zyView, self._dialog.statusBar, fileDialogFactory
         )
 
-        propagator.addObserver(self)
+        propagator.add_observer(self)
         self._syncModelToView()
 
     def _updateCurrentCoordinate(self, step: int) -> None:
@@ -165,6 +165,6 @@ class ProbePropagationViewController(Observer):
             logger.exception(err)
             ExceptionDialog.showException('Update Views', err)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._propagator:
             self._syncModelToView()

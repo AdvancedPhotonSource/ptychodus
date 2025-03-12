@@ -33,40 +33,40 @@ class ScanRepositoryItem(ParameterGroup):
         self._boundingBoxBuilder = ScanBoundingBoxBuilder()
         self._lengthInMeters = 0.0
 
-        self._addGroup('builder', builder, observe=True)
-        self._addGroup('transform', transform, observe=True)
+        self._add_group('builder', builder, observe=True)
+        self._add_group('transform', transform, observe=True)
 
         self.expandBoundingBox = settings.expandBoundingBox.copy()
-        self._addParameter('expand_bbox', self.expandBoundingBox)
+        self._add_parameter('expand_bbox', self.expandBoundingBox)
 
         self.expandedBoundingBoxMinimumXInMeters = (
             settings.expandedBoundingBoxMinimumXInMeters.copy()
         )
-        self._addParameter('expanded_bbox_xmin_m', self.expandedBoundingBoxMinimumXInMeters)
+        self._add_parameter('expanded_bbox_xmin_m', self.expandedBoundingBoxMinimumXInMeters)
 
         self.expandedBoundingBoxMaximumXInMeters = (
             settings.expandedBoundingBoxMaximumXInMeters.copy()
         )
-        self._addParameter('expanded_bbox_xmax_m', self.expandedBoundingBoxMaximumXInMeters)
+        self._add_parameter('expanded_bbox_xmax_m', self.expandedBoundingBoxMaximumXInMeters)
 
         self.expandedBoundingBoxMinimumYInMeters = (
             settings.expandedBoundingBoxMinimumYInMeters.copy()
         )
-        self._addParameter('expanded_bbox_ymin_m', self.expandedBoundingBoxMinimumYInMeters)
+        self._add_parameter('expanded_bbox_ymin_m', self.expandedBoundingBoxMinimumYInMeters)
 
         self.expandedBoundingBoxMaximumYInMeters = (
             settings.expandedBoundingBoxMaximumYInMeters.copy()
         )
-        self._addParameter('expanded_bbox_ymax_m', self.expandedBoundingBoxMaximumYInMeters)
+        self._add_parameter('expanded_bbox_ymax_m', self.expandedBoundingBoxMaximumYInMeters)
 
         self._rebuild()
 
     def assignItem(self, item: ScanRepositoryItem) -> None:
-        self._removeGroup('transform')
-        self._transform.removeObserver(self)
+        self._remove_group('transform')
+        self._transform.remove_observer(self)
         self._transform = item.getTransform().copy()
-        self._transform.addObserver(self)
-        self._addGroup('transform', self._transform)
+        self._transform.add_observer(self)
+        self._add_group('transform', self._transform)
 
         self.setBuilder(item.getBuilder().copy())
 
@@ -76,7 +76,7 @@ class ScanRepositoryItem(ParameterGroup):
 
     def syncToSettings(self) -> None:
         for parameter in self.parameters().values():
-            parameter.syncValueToParent()
+            parameter.sync_value_to_parent()
 
         self._builder.syncToSettings()
         self._transform.syncToSettings()
@@ -88,22 +88,22 @@ class ScanRepositoryItem(ParameterGroup):
         return self._builder
 
     def setBuilder(self, builder: ScanBuilder, *, mutable: bool = True) -> None:
-        self._removeGroup('builder')
-        self._builder.removeObserver(self)
+        self._remove_group('builder')
+        self._builder.remove_observer(self)
         self._builder = builder
-        self._builder.addObserver(self)
-        self._addGroup('builder', self._builder)
+        self._builder.add_observer(self)
+        self._add_group('builder', self._builder)
         self._rebuild(mutable=mutable)
 
     def getBoundingBox(self) -> ScanBoundingBox | None:
         bbox = self._boundingBoxBuilder.getBoundingBox()
 
-        if self.expandBoundingBox.getValue():
+        if self.expandBoundingBox.get_value():
             expandedBoundingBox = ScanBoundingBox(
-                minimumXInMeters=self.expandedBoundingBoxMinimumXInMeters.getValue(),
-                maximumXInMeters=self.expandedBoundingBoxMaximumXInMeters.getValue(),
-                minimumYInMeters=self.expandedBoundingBoxMinimumYInMeters.getValue(),
-                maximumYInMeters=self.expandedBoundingBoxMaximumYInMeters.getValue(),
+                minimum_x_m=self.expandedBoundingBoxMinimumXInMeters.get_value(),
+                maximum_x_m=self.expandedBoundingBoxMaximumXInMeters.get_value(),
+                minimum_y_m=self.expandedBoundingBoxMinimumYInMeters.get_value(),
+                maximum_y_m=self.expandedBoundingBoxMaximumYInMeters.get_value(),
             )
             bbox = expandedBoundingBox if bbox is None else bbox.hull(expandedBoundingBox)
 
@@ -123,14 +123,14 @@ class ScanRepositoryItem(ParameterGroup):
             boundingBoxBuilder.hull(point)
 
         for pointL, pointR in pairwise(transformedPoints):
-            dx = pointR.positionXInMeters - pointL.positionXInMeters
-            dy = pointR.positionYInMeters - pointL.positionYInMeters
+            dx = pointR.position_x_m - pointL.position_x_m
+            dy = pointR.position_y_m - pointL.position_y_m
             lengthInMeters += numpy.hypot(dx, dy)
 
         self._transformedScan = Scan(transformedPoints)
         self._boundingBoxBuilder = boundingBoxBuilder
         self._lengthInMeters = lengthInMeters
-        self.notifyObservers()
+        self.notify_observers()
 
     def _rebuild(self, *, mutable: bool = True) -> None:
         try:
@@ -144,10 +144,10 @@ class ScanRepositoryItem(ParameterGroup):
     def getTransform(self) -> ScanPointTransform:
         return self._transform
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._builder:
             self._rebuild()
         elif observable is self._transform:
             self._transformScan()
         else:
-            super().update(observable)
+            super()._update(observable)

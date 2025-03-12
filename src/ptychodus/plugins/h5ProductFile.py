@@ -60,10 +60,10 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             metadata = ProductMetadata(
                 name=str(h5File.attrs[self.NAME]),
                 comments=str(h5File.attrs[self.COMMENTS]),
-                detectorDistanceInMeters=float(h5File.attrs[self.DETECTOR_OBJECT_DISTANCE]),
-                probeEnergyInElectronVolts=float(h5File.attrs[self.PROBE_ENERGY]),
-                probePhotonCount=probePhotonCount,
-                exposureTimeInSeconds=float(h5File.attrs[self.EXPOSURE_TIME]),
+                detector_distance_m=float(h5File.attrs[self.DETECTOR_OBJECT_DISTANCE]),
+                probe_energy_eV=float(h5File.attrs[self.PROBE_ENERGY]),
+                probe_photon_count=probePhotonCount,
+                exposure_time_s=float(h5File.attrs[self.EXPOSURE_TIME]),
             )
 
             h5ScanIndexes = h5File[self.PROBE_POSITION_INDEXES]
@@ -76,29 +76,29 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
 
             h5Probe = h5File[self.PROBE_ARRAY]
             probePixelGeometry = PixelGeometry(
-                widthInMeters=float(h5Probe.attrs[self.PROBE_PIXEL_WIDTH]),
-                heightInMeters=float(h5Probe.attrs[self.PROBE_PIXEL_HEIGHT]),
+                width_m=float(h5Probe.attrs[self.PROBE_PIXEL_WIDTH]),
+                height_m=float(h5Probe.attrs[self.PROBE_PIXEL_HEIGHT]),
             )
             probe = Probe(
                 array=h5Probe[()],
-                pixelGeometry=probePixelGeometry,
+                pixel_geometry=probePixelGeometry,
             )
 
             h5Object = h5File[self.OBJECT_ARRAY]
             objectPixelGeometry = PixelGeometry(
-                widthInMeters=float(h5Object.attrs[self.OBJECT_PIXEL_WIDTH]),
-                heightInMeters=float(h5Object.attrs[self.OBJECT_PIXEL_HEIGHT]),
+                width_m=float(h5Object.attrs[self.OBJECT_PIXEL_WIDTH]),
+                height_m=float(h5Object.attrs[self.OBJECT_PIXEL_HEIGHT]),
             )
             objectCenter = ObjectCenter(
-                positionXInMeters=float(h5Object.attrs[self.OBJECT_CENTER_X]),
-                positionYInMeters=float(h5Object.attrs[self.OBJECT_CENTER_Y]),
+                position_x_m=float(h5Object.attrs[self.OBJECT_CENTER_X]),
+                position_y_m=float(h5Object.attrs[self.OBJECT_CENTER_Y]),
             )
             h5ObjectLayerDistance = h5File[self.OBJECT_LAYER_DISTANCE]
             object_ = Object(
                 array=h5Object[()],
-                pixelGeometry=objectPixelGeometry,
+                pixel_geometry=objectPixelGeometry,
                 center=objectCenter,
-                layerDistanceInMeters=h5ObjectLayerDistance[()],
+                layer_distance_m=h5ObjectLayerDistance[()],
             )
 
             h5Costs = h5File[self.COSTS_ARRAY]
@@ -119,50 +119,50 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
 
         for point in product.scan:
             scanIndexes.append(point.index)
-            scanXInMeters.append(point.positionXInMeters)
-            scanYInMeters.append(point.positionYInMeters)
+            scanXInMeters.append(point.position_x_m)
+            scanYInMeters.append(point.position_y_m)
 
         with h5py.File(filePath, 'w') as h5File:
             metadata = product.metadata
             h5File.attrs[self.NAME] = metadata.name
             h5File.attrs[self.COMMENTS] = metadata.comments
-            h5File.attrs[self.DETECTOR_OBJECT_DISTANCE] = metadata.detectorDistanceInMeters
-            h5File.attrs[self.PROBE_ENERGY] = metadata.probeEnergyInElectronVolts
-            h5File.attrs[self.PROBE_PHOTON_COUNT] = metadata.probePhotonCount
-            h5File.attrs[self.EXPOSURE_TIME] = metadata.exposureTimeInSeconds
+            h5File.attrs[self.DETECTOR_OBJECT_DISTANCE] = metadata.detector_distance_m
+            h5File.attrs[self.PROBE_ENERGY] = metadata.probe_energy_eV
+            h5File.attrs[self.PROBE_PHOTON_COUNT] = metadata.probe_photon_count
+            h5File.attrs[self.EXPOSURE_TIME] = metadata.exposure_time_s
 
             h5File.create_dataset(self.PROBE_POSITION_INDEXES, data=scanIndexes)
             h5File.create_dataset(self.PROBE_POSITION_X, data=scanXInMeters)
             h5File.create_dataset(self.PROBE_POSITION_Y, data=scanYInMeters)
 
             probe = product.probe
-            probeGeometry = probe.getGeometry()
-            h5Probe = h5File.create_dataset(self.PROBE_ARRAY, data=probe.getArray())
-            h5Probe.attrs[self.PROBE_PIXEL_WIDTH] = probeGeometry.pixelWidthInMeters
-            h5Probe.attrs[self.PROBE_PIXEL_HEIGHT] = probeGeometry.pixelHeightInMeters
+            probeGeometry = probe.get_geometry()
+            h5Probe = h5File.create_dataset(self.PROBE_ARRAY, data=probe.get_array())
+            h5Probe.attrs[self.PROBE_PIXEL_WIDTH] = probeGeometry.pixel_width_m
+            h5Probe.attrs[self.PROBE_PIXEL_HEIGHT] = probeGeometry.pixel_height_m
 
             object_ = product.object_
-            objectGeometry = object_.getGeometry()
-            h5Object = h5File.create_dataset(self.OBJECT_ARRAY, data=object_.getArray())
-            h5Object.attrs[self.OBJECT_CENTER_X] = objectGeometry.centerXInMeters
-            h5Object.attrs[self.OBJECT_CENTER_Y] = objectGeometry.centerYInMeters
-            h5Object.attrs[self.OBJECT_PIXEL_WIDTH] = objectGeometry.pixelWidthInMeters
-            h5Object.attrs[self.OBJECT_PIXEL_HEIGHT] = objectGeometry.pixelHeightInMeters
-            h5File.create_dataset(self.OBJECT_LAYER_DISTANCE, data=object_.layerDistanceInMeters)
+            objectGeometry = object_.get_geometry()
+            h5Object = h5File.create_dataset(self.OBJECT_ARRAY, data=object_.get_array())
+            h5Object.attrs[self.OBJECT_CENTER_X] = objectGeometry.center_x_m
+            h5Object.attrs[self.OBJECT_CENTER_Y] = objectGeometry.center_y_m
+            h5Object.attrs[self.OBJECT_PIXEL_WIDTH] = objectGeometry.pixel_width_m
+            h5Object.attrs[self.OBJECT_PIXEL_HEIGHT] = objectGeometry.pixel_height_m
+            h5File.create_dataset(self.OBJECT_LAYER_DISTANCE, data=object_.layer_distance_m)
 
             h5File.create_dataset(self.COSTS_ARRAY, data=product.costs)
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
+def register_plugins(registry: PluginRegistry) -> None:
     h5ProductFileIO = H5ProductFileIO()
 
-    registry.productFileReaders.registerPlugin(
+    registry.productFileReaders.register_plugin(
         h5ProductFileIO,
-        simpleName=H5ProductFileIO.SIMPLE_NAME,
-        displayName=H5ProductFileIO.DISPLAY_NAME,
+        simple_name=H5ProductFileIO.SIMPLE_NAME,
+        display_name=H5ProductFileIO.DISPLAY_NAME,
     )
-    registry.productFileWriters.registerPlugin(
+    registry.productFileWriters.register_plugin(
         h5ProductFileIO,
-        simpleName=H5ProductFileIO.SIMPLE_NAME,
-        displayName=H5ProductFileIO.DISPLAY_NAME,
+        simple_name=H5ProductFileIO.SIMPLE_NAME,
+        display_name=H5ProductFileIO.DISPLAY_NAME,
     )

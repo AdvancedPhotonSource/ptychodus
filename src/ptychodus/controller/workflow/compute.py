@@ -19,7 +19,7 @@ class WorkflowComputeController(Observer):
         cls, presenter: WorkflowParametersPresenter, view: WorkflowComputeView
     ) -> WorkflowComputeController:
         controller = cls(presenter, view)
-        presenter.addObserver(controller)
+        presenter.add_observer(controller)
 
         view.computeEndpointIDLineEdit.editingFinished.connect(
             controller._syncComputeEndpointIDToModel
@@ -54,6 +54,6 @@ class WorkflowComputeController(Observer):
         self._view.dataGlobusPathLineEdit.setText(str(self._presenter.getComputeDataGlobusPath()))
         self._view.dataPosixPathLineEdit.setText(str(self._presenter.getComputeDataPosixPath()))
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._syncModelToView()

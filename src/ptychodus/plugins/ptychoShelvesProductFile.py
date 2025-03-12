@@ -34,16 +34,16 @@ class PtychoShelvesProductFileReader(ProductFileReader):
         metadata = ProductMetadata(
             name=filePath.stem,
             comments='',
-            detectorDistanceInMeters=0.0,  # not included in file
-            probeEnergyInElectronVolts=probe_energy_eV,
-            probePhotonCount=0.0,  # not included in file
-            exposureTimeInSeconds=0.0,  # not included in file
+            detector_distance_m=0.0,  # not included in file
+            probe_energy_eV=probe_energy_eV,
+            probe_photon_count=0.0,  # not included in file
+            exposure_time_s=0.0,  # not included in file
         )
 
         dx_spec = p_struct['dx_spec']
         pixel_width_m = dx_spec[0]
         pixel_height_m = dx_spec[1]
-        pixel_geometry = PixelGeometry(widthInMeters=pixel_width_m, heightInMeters=pixel_height_m)
+        pixel_geometry = PixelGeometry(width_m=pixel_width_m, height_m=pixel_height_m)
 
         outputs_struct = matDict['outputs']
         probe_positions = outputs_struct['probe_positions']
@@ -65,7 +65,7 @@ class PtychoShelvesProductFileReader(ProductFileReader):
             # probe_array[height, width, num_shared_modes, num_varying_modes]
             probe_array = probe_array.transpose(3, 2, 0, 1)
 
-        probe = Probe(array=probe_array, pixelGeometry=pixel_geometry)
+        probe = Probe(array=probe_array, pixel_geometry=pixel_geometry)
 
         object_array = matDict['object']
 
@@ -86,9 +86,9 @@ class PtychoShelvesProductFileReader(ProductFileReader):
 
         object_ = Object(
             array=object_array,
-            pixelGeometry=pixel_geometry,
+            pixel_geometry=pixel_geometry,
             center=None,
-            layerDistanceInMeters=layer_distance_m,
+            layer_distance_m=layer_distance_m,
         )
         costs = outputs_struct['fourier_error_out']
 
@@ -101,9 +101,9 @@ class PtychoShelvesProductFileReader(ProductFileReader):
         )
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.productFileReaders.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.productFileReaders.register_plugin(
         PtychoShelvesProductFileReader(),
-        simpleName=PtychoShelvesProductFileReader.SIMPLE_NAME,
-        displayName=PtychoShelvesProductFileReader.DISPLAY_NAME,
+        simple_name=PtychoShelvesProductFileReader.SIMPLE_NAME,
+        display_name=PtychoShelvesProductFileReader.DISPLAY_NAME,
     )

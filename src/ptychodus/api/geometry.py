@@ -8,33 +8,33 @@ T = TypeVar('T', int, float, Decimal)
 
 @dataclass(frozen=True)
 class PixelGeometry:
-    widthInMeters: float
-    heightInMeters: float
+    width_m: float
+    height_m: float
 
     def copy(self) -> PixelGeometry:
         return PixelGeometry(
-            widthInMeters=float(self.widthInMeters),
-            heightInMeters=float(self.heightInMeters),
+            width_m=float(self.width_m),
+            height_m=float(self.height_m),
         )
 
     def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.widthInMeters}, {self.heightInMeters})'
+        return f'{type(self).__name__}({self.width_m}, {self.height_m})'
 
 
 @dataclass(frozen=True)
 class ImageExtent:
-    widthInPixels: int
-    heightInPixels: int
+    width_px: int
+    height_px: int
 
     @property
     def size(self) -> int:
         """returns the number of pixels in the image"""
-        return self.widthInPixels * self.heightInPixels
+        return self.width_px * self.height_px
 
     @property
     def shape(self) -> tuple[int, int]:
-        """returns the image shape (heightInPixels, widthInPixels) tuple"""
-        return self.heightInPixels, self.widthInPixels
+        """returns the image shape (height_px, width_px) tuple"""
+        return self.height_px, self.width_px
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, ImageExtent):
@@ -43,7 +43,7 @@ class ImageExtent:
         return False
 
     def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.widthInPixels}, {self.heightInPixels})'
+        return f'{type(self).__name__}({self.width_px}, {self.height_px})'
 
 
 @dataclass(frozen=True)
@@ -103,14 +103,14 @@ class Interval(Generic[T]):
         self.upper: T = upper
 
     @classmethod
-    def createProper(self, a: T, b: T) -> Interval[T]:
+    def create_proper(cls, a: T, b: T) -> Interval[T]:
         if b < a:
             return Interval[T](b, a)
         else:
             return Interval[T](a, b)
 
     @property
-    def isEmpty(self) -> bool:
+    def is_empty(self) -> bool:
         return self.upper < self.lower
 
     def clamp(self, value: T) -> T:

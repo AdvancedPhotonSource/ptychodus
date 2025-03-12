@@ -120,7 +120,7 @@ class ModelCore:
     ) -> None:
         configureLogger(isDeveloperModeEnabled)
         self.rng = numpy.random.default_rng()
-        self._pluginRegistry = PluginRegistry.loadPlugins()
+        self._pluginRegistry = PluginRegistry.load_plugins()
 
         self.memoryPresenter = MemoryPresenter()
         self.settingsRegistry = SettingsRegistry()
@@ -211,7 +211,7 @@ class ModelCore:
         )
 
         if settingsFile:
-            self.settingsRegistry.openSettings(settingsFile)
+            self.settingsRegistry.open_settings(settingsFile)
 
     def __enter__(self) -> ModelCore:
         self.patterns_core.start()
@@ -300,7 +300,7 @@ class ModelCore:
             return output.result
 
         inputProductIndex = self._productCore.productAPI.openProduct(
-            inputPath, fileType=productFileType
+            inputPath, file_type=productFileType
         )
 
         if inputProductIndex < 0:
@@ -316,7 +316,7 @@ class ModelCore:
             logger.info('Reconstruction complete.')
 
             self._productCore.productAPI.saveProduct(
-                outputProductIndex, outputPath, fileType=productFileType
+                outputProductIndex, outputPath, file_type=productFileType
             )
 
             if fluorescenceInputFilePath is not None and fluorescenceOutputFilePath is not None:

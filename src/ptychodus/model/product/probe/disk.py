@@ -15,40 +15,40 @@ class DiskProbeBuilder(ProbeBuilder):
         self._settings = settings
 
         self.diameterInMeters = settings.diskDiameterInMeters.copy()
-        self._addParameter('diameter_m', self.diameterInMeters)
+        self._add_parameter('diameter_m', self.diameterInMeters)
 
         # from sample to the focal plane
         self.defocusDistanceInMeters = settings.defocusDistanceInMeters.copy()
-        self._addParameter('defocus_distance_m', self.defocusDistanceInMeters)
+        self._add_parameter('defocus_distance_m', self.defocusDistanceInMeters)
 
     def copy(self) -> DiskProbeBuilder:
         builder = DiskProbeBuilder(self._settings)
 
         for key, value in self.parameters().items():
-            builder.parameters()[key].setValue(value.getValue())
+            builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
-        geometry = geometryProvider.getProbeGeometry()
+        geometry = geometryProvider.get_probe_geometry()
         coords = self.getTransverseCoordinates(geometry)
 
         R_m = coords.positionRInMeters
-        r_m = self.diameterInMeters.getValue() / 2.0
+        r_m = self.diameterInMeters.get_value() / 2.0
         disk = numpy.where(R_m < r_m, 1 + 0j, 0j)
 
         propagatorParameters = PropagatorParameters(
-            wavelength_m=geometryProvider.probeWavelengthInMeters,
+            wavelength_m=geometryProvider.probe_wavelength_m,
             width_px=disk.shape[-1],
             height_px=disk.shape[-2],
-            pixel_width_m=geometry.pixelWidthInMeters,
-            pixel_height_m=geometry.pixelHeightInMeters,
-            propagation_distance_m=self.defocusDistanceInMeters.getValue(),
+            pixel_width_m=geometry.pixel_width_m,
+            pixel_height_m=geometry.pixel_height_m,
+            propagation_distance_m=self.defocusDistanceInMeters.get_value(),
         )
         propagator = AngularSpectrumPropagator(propagatorParameters)
         array = propagator.propagate(disk)
 
         return Probe(
             array=self.normalize(array),
-            pixelGeometry=geometry.getPixelGeometry(),
+            pixel_geometry=geometry.get_pixel_geometry(),
         )

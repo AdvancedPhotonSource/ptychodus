@@ -50,32 +50,32 @@ class DelimitedScanFileWriter(ScanFileWriter):
     def write(self, filePath: Path, scan: Scan) -> None:
         with filePath.open(mode='wt') as csvFile:
             for point in scan:
-                x = point.positionXInMeters
-                y = point.positionYInMeters
+                x = point.position_x_m
+                y = point.position_y_m
                 line = (
                     f'{y}{self._delimiter}{x}\n' if self._swapXY else f'{x}{self._delimiter}{y}\n'
                 )
                 csvFile.write(line)
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.scanFileReaders.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.scanFileReaders.register_plugin(
         DelimitedScanFileReader(' ', swapXY=False),
-        simpleName='TXT',
-        displayName='Space-Separated Values Files (*.txt)',
+        simple_name='TXT',
+        display_name='Space-Separated Values Files (*.txt)',
     )
-    registry.scanFileWriters.registerPlugin(
+    registry.scanFileWriters.register_plugin(
         DelimitedScanFileWriter(' ', swapXY=False),
-        simpleName='TXT',
-        displayName='Space-Separated Values Files (*.txt)',
+        simple_name='TXT',
+        display_name='Space-Separated Values Files (*.txt)',
     )
-    registry.scanFileReaders.registerPlugin(
+    registry.scanFileReaders.register_plugin(
         DelimitedScanFileReader(',', swapXY=True),
-        simpleName='CSV',
-        displayName='Comma-Separated Values Files (*.csv)',
+        simple_name='CSV',
+        display_name='Comma-Separated Values Files (*.csv)',
     )
-    registry.scanFileWriters.registerPlugin(
+    registry.scanFileWriters.register_plugin(
         DelimitedScanFileWriter(',', swapXY=True),
-        simpleName='CSV',
-        displayName='Comma-Separated Values Files (*.csv)',
+        simple_name='CSV',
+        display_name='Comma-Separated Values Files (*.csv)',
     )

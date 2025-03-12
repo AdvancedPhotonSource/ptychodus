@@ -108,7 +108,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             fileDialogFactory,
             treeModel,
         )
-        repository.addObserver(controller)
+        repository.add_observer(controller)
 
         builderListModel = QStringListModel()
         builderListModel.setStringList([name for name in api.builderNames()])
@@ -179,13 +179,13 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
             self._view,
             'Open Probe',
-            nameFilters=self._api.getOpenFileFilterList(),
+            nameFilters=[nameFilter for nameFilter in self._api.getOpenFileFilterList()],
             selectedNameFilter=self._api.getOpenFileFilter(),
         )
 
         if filePath:
             try:
-                self._api.openProbe(itemIndex, filePath, fileType=nameFilter)
+                self._api.openProbe(itemIndex, filePath, file_type=nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.showException('File Reader', err)
@@ -223,7 +223,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
             self._view,
             'Save Probe',
-            nameFilters=self._api.getSaveFileFilterList(),
+            nameFilters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
             selectedNameFilter=self._api.getSaveFileFilter(),
         )
 
@@ -294,26 +294,26 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             else:
                 probe = item.getProbe()
                 array = (
-                    probe.getIncoherentMode(current.row())
+                    probe.get_incoherent_mode(current.row())
                     if current.parent().isValid()
-                    else probe.getIncoherentModesFlattened()
+                    else probe.get_incoherent_modes_flattened()
                 )
-                pixelGeometry = probe.getPixelGeometry()
+                pixelGeometry = probe.get_pixel_geometry()
 
                 if pixelGeometry is None:
                     logger.warning('Missing probe pixel geometry!')
                 else:
                     self._imageController.setArray(array, pixelGeometry)
 
-    def handleItemInserted(self, index: int, item: ProbeRepositoryItem) -> None:
+    def handle_item_inserted(self, index: int, item: ProbeRepositoryItem) -> None:
         self._treeModel.insertItem(index, item)
 
-    def handleItemChanged(self, index: int, item: ProbeRepositoryItem) -> None:
+    def handle_item_changed(self, index: int, item: ProbeRepositoryItem) -> None:
         self._treeModel.updateItem(index, item)
 
         if index == self._getCurrentItemIndex():
             currentIndex = self._view.treeView.currentIndex()
             self._updateView(currentIndex, currentIndex)
 
-    def handleItemRemoved(self, index: int, item: ProbeRepositoryItem) -> None:
+    def handle_item_removed(self, index: int, item: ProbeRepositoryItem) -> None:
         self._treeModel.removeItem(index, item)

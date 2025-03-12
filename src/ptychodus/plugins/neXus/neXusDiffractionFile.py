@@ -196,10 +196,10 @@ class NeXusDiffractionDataset(DiffractionDataset):
         self._contentsTree = contentsTree
         self._entry = entry
 
-    def getMetadata(self) -> DiffractionMetadata:
+    def get_metadata(self) -> DiffractionMetadata:
         return self._metadata
 
-    def getContentsTree(self) -> SimpleTreeNode:
+    def get_contents_tree(self) -> SimpleTreeNode:
         return self._contentsTree
 
     @overload
@@ -224,11 +224,11 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
         self.stageRotationInDegrees = 0.0  # TODO This is a hack; remove when able!
 
     def read(self, filePath: Path) -> DiffractionDataset:
-        dataset: DiffractionDataset = SimpleDiffractionDataset.createNullInstance(filePath)
+        dataset: DiffractionDataset = SimpleDiffractionDataset.create_null(filePath)
 
         try:
             with h5py.File(filePath, 'r') as h5File:
-                metadata = DiffractionMetadata.createNullInstance(filePath)
+                metadata = DiffractionMetadata.create_null(filePath)
                 contentsTree = self._treeBuilder.build(h5File)
 
                 try:
@@ -264,16 +264,16 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                 probeEnergyInElectronVolts = detectorSpecific.photonEnergyInElectronVolts
 
                 metadata = DiffractionMetadata(
-                    numberOfPatternsPerArray=numberOfPatternsPerArray,
-                    numberOfPatternsTotal=detectorSpecific.numberOfPatternsTotal,
-                    patternDataType=patternDataType,
-                    detectorDistanceInMeters=detector.detectorDistanceInMeters,
-                    detectorExtent=detectorExtent,
-                    detectorPixelGeometry=detectorPixelGeometry,
-                    detectorBitDepth=detector.bitDepthReadout,
-                    cropCenter=cropCenter,
-                    probeEnergyInElectronVolts=probeEnergyInElectronVolts,
-                    filePath=filePath,
+                    num_patterns_per_array=numberOfPatternsPerArray,
+                    num_patterns_total=detectorSpecific.numberOfPatternsTotal,
+                    pattern_dtype=patternDataType,
+                    detector_distance_m=detector.detectorDistanceInMeters,
+                    detector_extent=detectorExtent,
+                    detector_pixel_geometry=detectorPixelGeometry,
+                    detector_bit_depth=detector.bitDepthReadout,
+                    crop_center=cropCenter,
+                    probe_energy_eV=probeEnergyInElectronVolts,
+                    file_path=filePath,
                 )
 
                 dataset = NeXusDiffractionDataset(metadata, contentsTree, entry)

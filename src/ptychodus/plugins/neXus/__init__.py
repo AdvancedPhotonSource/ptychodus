@@ -4,21 +4,21 @@ from .neXusDiffractionFile import NeXusDiffractionFileReader
 from .velociprobeScanFile import VelociprobeScanFileReader
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
+def register_plugins(registry: PluginRegistry) -> None:
     neXusFileReader = NeXusDiffractionFileReader()
 
-    registry.diffractionFileReaders.registerPlugin(
+    registry.diffractionFileReaders.register_plugin(
         neXusFileReader,
-        simpleName='NeXus',
-        displayName='NeXus Master Files (*.h5 *.hdf5)',
+        simple_name='NeXus',
+        display_name='NeXus Master Files (*.h5 *.hdf5)',
     )
-    registry.scanFileReaders.registerPlugin(
+    registry.scanFileReaders.register_plugin(
         VelociprobeScanFileReader.createLaserInterferometerInstance(neXusFileReader),
-        simpleName='VelociprobeLaserInterferometer',
-        displayName='Velociprobe Scan Files - Laser Interferometer (*.txt)',
+        simple_name='VelociprobeLaserInterferometer',
+        display_name='Velociprobe Scan Files - Laser Interferometer (*.txt)',
     )
-    registry.scanFileReaders.registerPlugin(
+    registry.scanFileReaders.register_plugin(
         VelociprobeScanFileReader.createPositionEncoderInstance(neXusFileReader),
-        simpleName='VelociprobePositionEncoder',
-        displayName='Velociprobe Scan Files - Position Encoder (*.txt)',
+        simple_name='VelociprobePositionEncoder',
+        display_name='Velociprobe Scan Files - Position Encoder (*.txt)',
     )

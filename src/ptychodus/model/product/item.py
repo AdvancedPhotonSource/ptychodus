@@ -61,10 +61,10 @@ class ProductRepositoryItem(ParameterGroup):
         self._validator = validator
         self._costs = list(costs)
 
-        self._addGroup('metadata', self._metadata, observe=True)
-        self._addGroup('scan', self._scan, observe=True)
-        self._addGroup('probe', self._probe, observe=True)
-        self._addGroup('object', self._object, observe=True)
+        self._add_group('metadata', self._metadata, observe=True)
+        self._add_group('scan', self._scan, observe=True)
+        self._add_group('probe', self._probe, observe=True)
+        self._add_group('object', self._object, observe=True)
 
     def assignItem(self, item: ProductRepositoryItem, *, notify: bool = True) -> None:
         self._metadata.assignItem(item.getMetadata())
@@ -127,7 +127,7 @@ class ProductRepositoryItem(ParameterGroup):
             costs=self.getCosts(),
         )
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._metadata:
             self._invalidateCosts()
             self._parent.handleMetadataChanged(self)

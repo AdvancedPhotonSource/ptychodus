@@ -12,7 +12,7 @@ class OpenDatasetWizardMetadataViewController(Observer):
         self._presenter = presenter
         self._page = OpenDatasetWizardMetadataPage()
 
-        presenter.addObserver(self)
+        presenter.add_observer(self)
         self._sync_model_to_view()
         self._page._setComplete(True)
 
@@ -76,6 +76,6 @@ class OpenDatasetWizardMetadataViewController(Observer):
     def getWidget(self) -> QWizardPage:
         return self._page
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
             self._sync_model_to_view()

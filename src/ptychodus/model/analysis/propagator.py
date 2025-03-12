@@ -38,7 +38,7 @@ class ProbePropagator(Observable):
             self._productIndex = productIndex
             self._propagatedWavefield = None
             self._propagatedIntensity = None
-            self.notifyObservers()
+            self.notify_observers()
 
     def getProductName(self) -> str:
         item = self._repository[self._productIndex]
@@ -53,18 +53,16 @@ class ProbePropagator(Observable):
     ) -> None:  # FIXME OPR
         item = self._repository[self._productIndex]
         probe = item.getProbe().getProbe()
-        wavelengthInMeters = item.getGeometry().probeWavelengthInMeters
+        wavelengthInMeters = item.getGeometry().probe_wavelength_m
         propagatedWavefield = numpy.zeros(
-            (numberOfSteps, probe.heightInPixels, probe.widthInPixels),
-            dtype=probe.dataType,
+            (numberOfSteps, probe.height_px, probe.width_px),
+            dtype=probe.dtype,
         )
-        propagatedIntensity = numpy.zeros(
-            (numberOfSteps, probe.heightInPixels, probe.widthInPixels)
-        )
+        propagatedIntensity = numpy.zeros((numberOfSteps, probe.height_px, probe.width_px))
         distanceInMeters = numpy.linspace(
             beginCoordinateInMeters, endCoordinateInMeters, numberOfSteps
         )
-        pixelGeometry = probe.getPixelGeometry()
+        pixelGeometry = probe.get_pixel_geometry()
 
         if pixelGeometry is None:
             raise ValueError('No pixel geometry!')
@@ -72,30 +70,30 @@ class ProbePropagator(Observable):
         for idx, zInMeters in enumerate(distanceInMeters):
             propagatorParameters = PropagatorParameters(
                 wavelength_m=wavelengthInMeters,
-                width_px=probe.widthInPixels,
-                height_px=probe.heightInPixels,
-                pixel_width_m=pixelGeometry.widthInMeters,
-                pixel_height_m=pixelGeometry.heightInMeters,
+                width_px=probe.width_px,
+                height_px=probe.height_px,
+                pixel_width_m=pixelGeometry.width_m,
+                pixel_height_m=pixelGeometry.height_m,
                 propagation_distance_m=float(zInMeters),
             )
             propagator = AngularSpectrumPropagator(propagatorParameters)
 
-            for mode in range(probe.numberOfIncoherentModes):
-                wf = propagator.propagate(probe.getIncoherentMode(mode))
+            for mode in range(probe.num_incoherent_modes):
+                wf = propagator.propagate(probe.get_incoherent_mode(mode))
                 propagatedWavefield[idx, mode, :, :] = wf
                 propagatedIntensity[idx, :, :] += intensity(wf)
 
-        self._settings.beginCoordinateInMeters.setValue(beginCoordinateInMeters)
-        self._settings.endCoordinateInMeters.setValue(endCoordinateInMeters)
+        self._settings.beginCoordinateInMeters.set_value(beginCoordinateInMeters)
+        self._settings.endCoordinateInMeters.set_value(endCoordinateInMeters)
         self._propagatedWavefield = propagatedWavefield
         self._propagatedIntensity = propagatedIntensity
-        self.notifyObservers()
+        self.notify_observers()
 
     def getBeginCoordinateInMeters(self) -> float:
-        return self._settings.beginCoordinateInMeters.getValue()
+        return self._settings.beginCoordinateInMeters.get_value()
 
     def getEndCoordinateInMeters(self) -> float:
-        return self._settings.endCoordinateInMeters.getValue()
+        return self._settings.endCoordinateInMeters.get_value()
 
     def _getProbe(self) -> Probe:
         item = self._repository[self._productIndex]
@@ -107,11 +105,11 @@ class ProbePropagator(Observable):
         except IndexError:
             return None
         else:
-            return probe.getPixelGeometry()
+            return probe.get_pixel_geometry()
 
     def getNumberOfSteps(self) -> int:
         if self._propagatedIntensity is None:
-            return self._settings.numberOfSteps.getValue()
+            return self._settings.numberOfSteps.get_value()
 
         return self._propagatedIntensity.shape[0]
 
@@ -159,7 +157,7 @@ class ProbePropagator(Observable):
         pixel_geometry = self.getPixelGeometry()
 
         if pixel_geometry is not None:
-            contents['pixel_height_m'] = pixel_geometry.heightInMeters
-            contents['pixel_width_m'] = pixel_geometry.widthInMeters
+            contents['pixel_height_m'] = pixel_geometry.height_m
+            contents['pixel_width_m'] = pixel_geometry.width_m
 
         numpy.savez(filePath, **contents)

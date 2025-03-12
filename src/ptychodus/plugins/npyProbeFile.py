@@ -9,23 +9,23 @@ from ptychodus.api.probe import Probe, ProbeFileReader, ProbeFileWriter
 class NPYProbeFileReader(ProbeFileReader):
     def read(self, filePath: Path) -> Probe:
         array = numpy.load(filePath)
-        return Probe(array=array, pixelGeometry=None)
+        return Probe(array=array, pixel_geometry=None)
 
 
 class NPYProbeFileWriter(ProbeFileWriter):
     def write(self, filePath: Path, probe: Probe) -> None:
-        array = probe.getArray()
+        array = probe.get_array()
         numpy.save(filePath, array)
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
-    registry.probeFileReaders.registerPlugin(
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.probeFileReaders.register_plugin(
         NPYProbeFileReader(),
-        simpleName='NPY',
-        displayName='NumPy Binary Files (*.npy)',
+        simple_name='NPY',
+        display_name='NumPy Binary Files (*.npy)',
     )
-    registry.probeFileWriters.registerPlugin(
+    registry.probeFileWriters.register_plugin(
         NPYProbeFileWriter(),
-        simpleName='NPY',
-        displayName='NumPy Binary Files (*.npy)',
+        simple_name='NPY',
+        display_name='NumPy Binary Files (*.npy)',
     )
