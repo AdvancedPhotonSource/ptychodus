@@ -50,7 +50,7 @@ class ObjectTreeModel(QAbstractItemModel):
 
     @staticmethod
     def _appendLayers(node: ObjectTreeNode, item: ObjectRepositoryItem) -> None:
-        object_ = item.getObject()
+        object_ = item.get_object()
 
         for layer in range(object_.num_layers):
             node.insertNode()
@@ -67,7 +67,7 @@ class ObjectTreeModel(QAbstractItemModel):
 
         node = self._treeRoot.children[index]
         numLayersOld = len(node.children)
-        numLayersNew = item.getObject().num_layers
+        numLayersNew = item.get_object().num_layers
 
         if numLayersOld < numLayersNew:
             self.beginInsertRows(topLeft, numLayersOld, numLayersNew)
@@ -153,7 +153,7 @@ class ObjectTreeModel(QAbstractItemModel):
                         return float('inf')
         else:
             item = self._repository[index.row()]
-            object_ = item.getObject()
+            object_ = item.get_object()
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 if index.column() == 0:

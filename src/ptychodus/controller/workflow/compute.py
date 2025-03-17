@@ -15,7 +15,7 @@ class WorkflowComputeController(Observer):
         self._view = view
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls, presenter: WorkflowParametersPresenter, view: WorkflowComputeView
     ) -> WorkflowComputeController:
         controller = cls(presenter, view)

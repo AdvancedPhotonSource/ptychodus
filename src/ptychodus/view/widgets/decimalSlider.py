@@ -21,7 +21,7 @@ class DecimalSlider(QWidget):
         self._maximum = Decimal()
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         orientation: Qt.Orientation,
         parent: QWidget | None = None,

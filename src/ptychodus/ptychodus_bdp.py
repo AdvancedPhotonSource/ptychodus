@@ -14,7 +14,7 @@ import ptychodus
 logger = logging.getLogger(__name__)
 
 
-def versionString() -> str:
+def version_string() -> str:
     return f'{ptychodus.__name__.title()} ({ptychodus.__version__})'
 
 
@@ -32,9 +32,9 @@ class DirectoryType:
 
 
 def main() -> int:
-    changePathPrefix: PathPrefixChange | None = None
-    cropCenter: CropCenter | None = None
-    cropExtent: ImageExtent | None = None
+    change_path_prefix: PathPrefixChange | None = None
+    crop_center: CropCenter | None = None
+    crop_extent: ImageExtent | None = None
 
     prog = Path(__file__).stem.lower()
     parser = argparse.ArgumentParser(
@@ -164,13 +164,13 @@ def main() -> int:
         '-v',
         '--version',
         action='version',
-        version=versionString(),
+        version=version_string(),
     )
 
     args = parser.parse_args()
 
     if args.local_path_prefix is not None and args.remote_path_prefix is not None:
-        changePathPrefix = PathPrefixChange(
+        change_path_prefix = PathPrefixChange(
             find_path_prefix=args.local_path_prefix,
             replacement_path_prefix=args.remote_path_prefix,
         )
@@ -178,7 +178,7 @@ def main() -> int:
         parser.error('--local_path_prefix and --remote_path_prefix must be given together.')
 
     if args.crop_center_x_px is not None and args.crop_center_y_px is not None:
-        cropCenter = CropCenter(
+        crop_center = CropCenter(
             position_x_px=args.crop_center_x_px,
             position_y_px=args.crop_center_y_px,
         )
@@ -186,7 +186,7 @@ def main() -> int:
         parser.error('--crop_center_x_px and --crop_center_y_px must be given together.')
 
     if args.crop_width_px is not None and args.crop_height_px is not None:
-        cropExtent = ImageExtent(
+        crop_extent = ImageExtent(
             width_px=args.crop_width_px,
             height_px=args.crop_height_px,
         )
@@ -199,14 +199,14 @@ def main() -> int:
     if args.number_of_gpus is not None:
         logger.warning('Number of GPUs is not implemented yet!')  # TODO
 
-    with ModelCore(Path(args.settings.name), isDeveloperModeEnabled=args.dev) as model:
-        model.workflowAPI.open_patterns(
+    with ModelCore(Path(args.settings.name), is_developer_mode_enabled=args.dev) as model:
+        model.workflow_api.open_patterns(
             Path(args.patterns_file_path.name),
-            crop_center=cropCenter,
-            crop_extent=cropExtent,
+            crop_center=crop_center,
+            crop_extent=crop_extent,
         )
 
-        workflowProductAPI = model.workflowAPI.create_product(
+        workflow_product_api = model.workflow_api.create_product(
             name=args.name,
             comments=args.comment,
             detector_distance_m=args.detector_distance_m,
@@ -214,15 +214,15 @@ def main() -> int:
             probe_photon_count=args.probe_photon_count,
             exposure_time_s=args.exposure_time_s,
         )
-        workflowProductAPI.open_scan(Path(args.scan_file_path.name))
-        workflowProductAPI.build_probe()
-        workflowProductAPI.build_object()
+        workflow_product_api.open_scan(Path(args.scan_file_path.name))
+        workflow_product_api.build_probe()
+        workflow_product_api.build_object()
 
-        stagingDir = args.output_directory
-        stagingDir.mkdir(parents=True, exist_ok=True)
-        model.workflowAPI.save_settings(stagingDir / 'settings.ini', changePathPrefix)
-        model.workflowAPI.export_assembled_patterns(stagingDir / 'patterns.npz')
-        workflowProductAPI.save_product(stagingDir / 'product-in.npz', file_type='NPZ')
+        staging_dir = args.output_directory
+        staging_dir.mkdir(parents=True, exist_ok=True)
+        model.workflow_api.save_settings(staging_dir / 'settings.ini', change_path_prefix)
+        model.workflow_api.export_assembled_patterns(staging_dir / 'patterns.npz')
+        workflow_product_api.save_product(staging_dir / 'product-in.npz', file_type='NPZ')
 
     return 0
 

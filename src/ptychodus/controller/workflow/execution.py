@@ -22,18 +22,18 @@ class WorkflowExecutionController:
     ) -> None:
         self._executionPresenter = executionPresenter
         self._view = view
-        self._inputDataController = WorkflowInputDataController.createInstance(
+        self._inputDataController = WorkflowInputDataController.create_instance(
             parametersPresenter, view.inputDataView
         )
-        self._computeController = WorkflowComputeController.createInstance(
+        self._computeController = WorkflowComputeController.create_instance(
             parametersPresenter, view.computeView
         )
-        self._outputDataController = WorkflowOutputDataController.createInstance(
+        self._outputDataController = WorkflowOutputDataController.create_instance(
             parametersPresenter, view.outputDataView
         )
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         parametersPresenter: WorkflowParametersPresenter,
         executionPresenter: WorkflowExecutionPresenter,
@@ -56,4 +56,4 @@ class WorkflowExecutionController:
             self._executionPresenter.runFlow(inputProductIndex)
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Reconstructor', err)
+            ExceptionDialog.show_exception('Reconstructor', err)

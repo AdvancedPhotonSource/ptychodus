@@ -70,7 +70,7 @@ class ProductRepositoryItem(ParameterGroup):
         self._metadata.assignItem(item.getMetadata())
         self._scan.assignItem(item.getScan())
         self._probe.assignItem(item.getProbe())
-        self._object.assignItem(item.getObject())
+        self._object.assignItem(item.get_object())
         self._costs = list(item.getCosts())
 
         if notify:
@@ -90,7 +90,7 @@ class ProductRepositoryItem(ParameterGroup):
         self._probe.syncToSettings()
         self._object.syncToSettings()
 
-    def getName(self) -> str:
+    def get_name(self) -> str:
         return self._metadata.getName()
 
     def setName(self, name: str) -> None:
@@ -102,13 +102,13 @@ class ProductRepositoryItem(ParameterGroup):
     def getScan(self) -> ScanRepositoryItem:
         return self._scan
 
-    def getGeometry(self) -> ProductGeometry:
+    def get_geometry(self) -> ProductGeometry:
         return self._geometry
 
     def getProbe(self) -> ProbeRepositoryItem:
         return self._probe
 
-    def getObject(self) -> ObjectRepositoryItem:
+    def get_object(self) -> ObjectRepositoryItem:
         return self._object
 
     def _invalidateCosts(self) -> None:
@@ -123,7 +123,7 @@ class ProductRepositoryItem(ParameterGroup):
             metadata=self._metadata.getMetadata(),
             scan=self._scan.getScan(),
             probe=self._probe.getProbe(),
-            object_=self._object.getObject(),
+            object_=self._object.get_object(),
             costs=self.getCosts(),
         )
 

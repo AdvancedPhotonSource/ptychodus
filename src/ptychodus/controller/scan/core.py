@@ -12,8 +12,8 @@ from ...view.repository import RepositoryTableView
 from ...view.scan import ScanPlotView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
-from .editorFactory import ScanEditorViewControllerFactory
-from .tableModel import ScanTableModel
+from .editor_factory import ScanEditorViewControllerFactory
+from .table_model import ScanTableModel
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         self._editorFactory = ScanEditorViewControllerFactory()
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         repository: ScanRepository,
         api: ScanAPI,
@@ -126,7 +126,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
                 self._api.openScan(itemIndex, filePath, file_type=nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Reader', err)
+                ExceptionDialog.show_exception('File Reader', err)
 
     def _copyToCurrentScan(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -158,11 +158,11 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         if itemIndex < 0:
             return
 
-        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+        filePath, nameFilter = self._fileDialogFactory.get_save_file_path(
             self._view,
             'Save Scan',
-            nameFilters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
-            selectedNameFilter=self._api.getSaveFileFilter(),
+            name_filters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
+            selected_name_filter=self._api.getSaveFileFilter(),
         )
 
         if filePath:
@@ -170,7 +170,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
                 self._api.saveScan(itemIndex, filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Writer', err)
+                ExceptionDialog.show_exception('File Writer', err)
 
     def _syncCurrentScanToSettings(self) -> None:
         itemIndex = self._getCurrentItemIndex()

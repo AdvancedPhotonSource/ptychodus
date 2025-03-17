@@ -19,12 +19,12 @@ class NPYProbeFileWriter(ProbeFileWriter):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.probeFileReaders.register_plugin(
+    registry.probe_file_readers.register_plugin(
         NPYProbeFileReader(),
         simple_name='NPY',
         display_name='NumPy Binary Files (*.npy)',
     )
-    registry.probeFileWriters.register_plugin(
+    registry.probe_file_writers.register_plugin(
         NPYProbeFileWriter(),
         simple_name='NPY',
         display_name='NumPy Binary Files (*.npy)',

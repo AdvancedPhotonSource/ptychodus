@@ -77,51 +77,51 @@ def register_plugins(registry: PluginRegistry) -> None:
     # TODO kriging
     # TODO inverse distance weighting
 
-    registry.upscalingStrategies.register_plugin(
+    registry.upscaling_strategies.register_plugin(
         IdentityUpscaling(),
         display_name='Identity',
     )
-    registry.upscalingStrategies.register_plugin(
+    registry.upscaling_strategies.register_plugin(
         GridDataUpscaling('nearest'),
         display_name='Nearest Neighbor',
     )
-    registry.upscalingStrategies.register_plugin(
+    registry.upscaling_strategies.register_plugin(
         GridDataUpscaling('linear'),
         display_name='Linear',
     )
-    registry.upscalingStrategies.register_plugin(
+    registry.upscaling_strategies.register_plugin(
         GridDataUpscaling('cubic'),
         display_name='Cubic',
     )
-    registry.upscalingStrategies.register_plugin(
+    registry.upscaling_strategies.register_plugin(
         RadialBasisFunctionUpscaling('linear'),
         display_name='Linear RBF',
     )
-    registry.upscalingStrategies.register_plugin(
+    registry.upscaling_strategies.register_plugin(
         RadialBasisFunctionUpscaling('thin_plate_spline'),
         display_name='Thin Plate Spline RBF',
     )
-    registry.upscalingStrategies.register_plugin(
+    registry.upscaling_strategies.register_plugin(
         RadialBasisFunctionUpscaling('cubic'),
         display_name='Cubic RBF',
     )
-    registry.upscalingStrategies.register_plugin(
+    registry.upscaling_strategies.register_plugin(
         RadialBasisFunctionUpscaling('quintic'),
         display_name='Quintic RBF',
     )
-    registry.upscalingStrategies.register_plugin(
+    registry.upscaling_strategies.register_plugin(
         RadialBasisFunctionUpscaling('multiquadric'),
         display_name='Multiquadric RBF',
     )
-    registry.upscalingStrategies.register_plugin(
+    registry.upscaling_strategies.register_plugin(
         RadialBasisFunctionUpscaling('inverse_multiquadric'),
         display_name='Inverse Multiquadric RBF',
     )
-    registry.upscalingStrategies.register_plugin(
+    registry.upscaling_strategies.register_plugin(
         RadialBasisFunctionUpscaling('inverse_quadratic'),
         display_name='Inverse Quadratic RBF',
     )
-    registry.upscalingStrategies.register_plugin(
+    registry.upscaling_strategies.register_plugin(
         RadialBasisFunctionUpscaling('gaussian'),
         display_name='Gaussian RBF',
     )

@@ -91,11 +91,11 @@ class SettingsController(Observer):
             self._settingsRegistry.open_settings(filePath)
 
     def _saveSettings(self) -> None:
-        filePath, _ = self._fileDialogFactory.getSaveFilePath(
+        filePath, _ = self._fileDialogFactory.get_save_file_path(
             self._view,
             'Save Settings',
-            nameFilters=self._settingsRegistry.get_save_file_filters(),
-            selectedNameFilter=self._settingsRegistry.get_save_file_filter(),
+            name_filters=self._settingsRegistry.get_save_file_filters(),
+            selected_name_filter=self._settingsRegistry.get_save_file_filter(),
         )
 
         if filePath:

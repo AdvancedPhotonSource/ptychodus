@@ -181,7 +181,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         index = metadata.getIndex()
 
         if index < 0:
-            logger.warning(f'Failed to look up index for "{item.getName()}"!')
+            logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
         for observer in self._observerList:
@@ -193,7 +193,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         scan = item.getScan()
 
         if index < 0:
-            logger.warning(f'Failed to look up index for "{item.getName()}"!')
+            logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
         for observer in self._observerList:
@@ -205,7 +205,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         probe = item.getProbe()
 
         if index < 0:
-            logger.warning(f'Failed to look up index for "{item.getName()}"!')
+            logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
         for observer in self._observerList:
@@ -214,10 +214,10 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
     def handleObjectChanged(self, item: ProductRepositoryItem) -> None:
         metadata = item.getMetadata()
         index = metadata.getIndex()
-        object_ = item.getObject()
+        object_ = item.get_object()
 
         if index < 0:
-            logger.warning(f'Failed to look up index for "{item.getName()}"!')
+            logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
         for observer in self._observerList:
@@ -229,7 +229,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         costs = item.getCosts()
 
         if index < 0:
-            logger.warning(f'Failed to look up index for "{item.getName()}"!')
+            logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
         for observer in self._observerList:

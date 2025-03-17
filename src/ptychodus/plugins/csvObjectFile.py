@@ -19,12 +19,12 @@ class CSVObjectFileWriter(ObjectFileWriter):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.objectFileReaders.register_plugin(
+    registry.object_file_readers.register_plugin(
         CSVObjectFileReader(),
         simple_name='CSV',
         display_name='Comma-Separated Values Files (*.csv)',
     )
-    registry.objectFileWriters.register_plugin(
+    registry.object_file_writers.register_plugin(
         CSVObjectFileWriter(),
         simple_name='CSV',
         display_name='Comma-Separated Values Files (*.csv)',

@@ -21,7 +21,7 @@ class ProbeRepository(ObservableSequence[ProbeRepositoryItem], ProductRepository
         self._repository.addObserver(self)
 
     def getName(self, index: int) -> str:
-        return self._repository[index].getName()
+        return self._repository[index].get_name()
 
     def setName(self, index: int, name: str) -> None:
         self._repository[index].setName(name)

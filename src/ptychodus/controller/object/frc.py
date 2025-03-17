@@ -3,7 +3,7 @@ import logging
 
 from ...model.analysis import FourierRingCorrelator
 from ...view.object import FourierRingCorrelationDialog
-from .treeModel import ObjectTreeModel
+from .tree_model import ObjectTreeModel
 
 logger = logging.getLogger(__name__)
 

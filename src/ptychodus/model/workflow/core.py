@@ -230,7 +230,7 @@ class WorkflowCore:
         except ModuleNotFoundError:
             logger.info('Globus not found.')
         else:
-            self._thread = GlobusWorkflowThread.createInstance(
+            self._thread = GlobusWorkflowThread.create_instance(
                 self._authorizer, self._statusRepository, self._executor
             )
 

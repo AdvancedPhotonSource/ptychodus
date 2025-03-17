@@ -34,7 +34,7 @@ class AutomationProcessingController(Observer):
         self._fileDialogFactory = fileDialogFactory
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         presenter: AutomationPresenter,
         view: AutomationProcessingView,
@@ -100,7 +100,7 @@ class AutomationWatchdogController(Observer):
         self._view = view
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls, presenter: AutomationPresenter, view: AutomationWatchdogView
     ) -> AutomationWatchdogController:
         controller = cls(presenter, view)
@@ -168,10 +168,10 @@ class AutomationController(Observer):
         super().__init__()
         self._core = core
         self._presenter = presenter
-        self._processingController = AutomationProcessingController.createInstance(
+        self._processingController = AutomationProcessingController.create_instance(
             presenter, view.processingView, fileDialogFactory
         )
-        self._watchdogController = AutomationWatchdogController.createInstance(
+        self._watchdogController = AutomationWatchdogController.create_instance(
             presenter, view.watchdogView
         )
         self._processingPresenter = processingPresenter
@@ -181,7 +181,7 @@ class AutomationController(Observer):
         self._automationTimer = QTimer()
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         core: AutomationCore,
         presenter: AutomationPresenter,

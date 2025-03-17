@@ -190,22 +190,22 @@ class H5DiffractionFileWriter(DiffractionFileWriter):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.diffractionFileReaders.register_plugin(
+    registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(dataPath='/entry/data/data'),
         simple_name='APS_HXN',
         display_name='CNM/APS HXN Diffraction Files (*.h5 *.hdf5)',
     )
-    registry.diffractionFileReaders.register_plugin(
+    registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(dataPath='/entry/measurement/Eiger/data'),
         simple_name='MAX_IV_NanoMax',
         display_name='MAX IV NanoMax Diffraction Files (*.h5 *.hdf5)',
     )
-    registry.diffractionFileReaders.register_plugin(
+    registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(dataPath='/dp'),
         simple_name='PtychoShelves',
         display_name='PtychoShelves Diffraction Files (*.h5 *.hdf5)',
     )
-    registry.diffractionFileWriters.register_plugin(
+    registry.diffraction_file_writers.register_plugin(
         H5DiffractionFileWriter(dataPath='/dp'),
         simple_name='PtychoShelves',
         display_name='PtychoShelves Diffraction Files (*.h5 *.hdf5)',

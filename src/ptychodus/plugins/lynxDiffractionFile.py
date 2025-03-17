@@ -62,7 +62,7 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.diffractionFileReaders.register_plugin(
+    registry.diffraction_file_readers.register_plugin(
         LYNXDiffractionFileReader(),
         simple_name='APS_LYNX',
         display_name='APS LYNX Diffraction Files (*.h5 *.hdf5)',

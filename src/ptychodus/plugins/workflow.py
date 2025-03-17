@@ -155,22 +155,22 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.fileBasedWorkflows.register_plugin(
+    registry.file_based_workflows.register_plugin(
         PtychodusAutoloadProductFileBasedWorkflow(),
         simple_name='Autoload_Product',
         display_name='Autoload Product',
     )
-    registry.fileBasedWorkflows.register_plugin(
+    registry.file_based_workflows.register_plugin(
         APS2IDFileBasedWorkflow(),
         simple_name='APS_2ID',
         display_name='APS 2-ID',
     )
-    registry.fileBasedWorkflows.register_plugin(
+    registry.file_based_workflows.register_plugin(
         APS26IDFileBasedWorkflow(),
         simple_name='APS_26ID',
         display_name='APS 26-ID',
     )
-    registry.fileBasedWorkflows.register_plugin(
+    registry.file_based_workflows.register_plugin(
         APS31IDEFileBasedWorkflow(),
         simple_name='APS_31IDE',
         display_name='APS 31-ID-E',

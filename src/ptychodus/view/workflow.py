@@ -30,7 +30,7 @@ class WorkflowAuthorizationDialog(QDialog):
         self.cancelButton = self.buttonBox.addButton(QDialogButtonBox.StandardButton.Cancel)
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> WorkflowAuthorizationDialog:
+    def create_instance(cls, parent: QWidget | None = None) -> WorkflowAuthorizationDialog:
         view = cls(parent)
 
         view.setWindowTitle('Authorize Workflow')
@@ -63,7 +63,7 @@ class WorkflowInputDataView(QGroupBox):
         self.posixPathLineEdit = QLineEdit()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> WorkflowInputDataView:
+    def create_instance(cls, parent: QWidget | None = None) -> WorkflowInputDataView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -84,7 +84,7 @@ class WorkflowOutputDataView(QGroupBox):
         self.posixPathLineEdit = QLineEdit()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> WorkflowOutputDataView:
+    def create_instance(cls, parent: QWidget | None = None) -> WorkflowOutputDataView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -106,7 +106,7 @@ class WorkflowComputeView(QGroupBox):
         self.dataPosixPathLineEdit = QLineEdit()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> WorkflowComputeView:
+    def create_instance(cls, parent: QWidget | None = None) -> WorkflowComputeView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -123,13 +123,13 @@ class WorkflowExecutionView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Execution', parent)
         self.productComboBox = QComboBox()
-        self.inputDataView = WorkflowInputDataView.createInstance()
-        self.computeView = WorkflowComputeView.createInstance()
-        self.outputDataView = WorkflowOutputDataView.createInstance()
+        self.inputDataView = WorkflowInputDataView.create_instance()
+        self.computeView = WorkflowComputeView.create_instance()
+        self.outputDataView = WorkflowOutputDataView.create_instance()
         self.executeButton = QPushButton('Execute')
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> WorkflowExecutionView:
+    def create_instance(cls, parent: QWidget | None = None) -> WorkflowExecutionView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -151,7 +151,7 @@ class WorkflowStatusView(QGroupBox):
         self.refreshButton = QPushButton('Refresh')
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> WorkflowStatusView:
+    def create_instance(cls, parent: QWidget | None = None) -> WorkflowStatusView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -165,12 +165,12 @@ class WorkflowStatusView(QGroupBox):
 class WorkflowParametersView(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.executionView = WorkflowExecutionView.createInstance()
-        self.statusView = WorkflowStatusView.createInstance()
-        self.authorizationDialog = WorkflowAuthorizationDialog.createInstance(self)
+        self.executionView = WorkflowExecutionView.create_instance()
+        self.statusView = WorkflowStatusView.create_instance()
+        self.authorizationDialog = WorkflowAuthorizationDialog.create_instance(self)
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> WorkflowParametersView:
+    def create_instance(cls, parent: QWidget | None = None) -> WorkflowParametersView:
         view = cls(parent)
 
         layout = QVBoxLayout()

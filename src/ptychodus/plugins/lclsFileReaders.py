@@ -149,12 +149,12 @@ class LCLSScanFileReader(ScanFileReader):
 def register_plugins(registry: PluginRegistry) -> None:
     SIMPLE_NAME: Final[str] = 'LCLS_XPP'
 
-    registry.diffractionFileReaders.register_plugin(
+    registry.diffraction_file_readers.register_plugin(
         LCLSDiffractionFileReader(),
         simple_name=SIMPLE_NAME,
         display_name='LCLS XPP Diffraction Files (*.h5 *.hdf5)',
     )
-    registry.scanFileReaders.register_plugin(
+    registry.scan_file_readers.register_plugin(
         LCLSScanFileReader(
             tomographyAngleInDegrees=180.0,
             ipm2LowThreshold=2500.0,

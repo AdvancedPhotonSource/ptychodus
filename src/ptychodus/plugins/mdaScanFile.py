@@ -491,17 +491,17 @@ class HXNScanFileReader(ScanFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.scanFileReaders.register_plugin(
+    registry.scan_file_readers.register_plugin(
         MDAScanFileReader(),
         simple_name='MDA',
         display_name='EPICS MDA Files (*.mda)',
     )
-    registry.scanFileReaders.register_plugin(
+    registry.scan_file_readers.register_plugin(
         MDAScanFileReader(),
         simple_name='APS_2ID',
         display_name='APS 2-ID MDA Files (*.mda)',
     )
-    registry.scanFileReaders.register_plugin(
+    registry.scan_file_readers.register_plugin(
         HXNScanFileReader(),
         simple_name='APS_HXN',
         display_name='CNM/APS HXN Scan Files (*.mda)',

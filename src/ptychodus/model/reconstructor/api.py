@@ -44,14 +44,14 @@ class ReconstructorAPI:
         indexFilter: ScanIndexFilter = ScanIndexFilter.ALL,
     ) -> int:
         reconstructor = self._reconstructorChooser.get_current_plugin().strategy
-        parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(
+        parameters = self._dataMatcher.match_diffraction_patterns_with_positions(
             inputProductIndex, indexFilter
         )
         outputProductIndex = self._productRepository.insertNewProduct(likeIndex=inputProductIndex)
         outputProduct = self._productRepository[outputProductIndex]
 
         outputProductName = (
-            self._dataMatcher.getProductName(inputProductIndex)
+            self._dataMatcher.get_product_name(inputProductIndex)
             + f'_{self._reconstructorChooser.get_current_plugin().simple_name}'
         )
 
@@ -106,7 +106,7 @@ class ReconstructorAPI:
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Preparing input data...')
             tic = time.perf_counter()
-            parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(
+            parameters = self._dataMatcher.match_diffraction_patterns_with_positions(
                 inputProductIndex, ScanIndexFilter.ALL
             )
             toc = time.perf_counter()

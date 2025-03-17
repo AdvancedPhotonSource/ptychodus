@@ -10,7 +10,7 @@ from ptychodus.api.visualization import (
     VisualizationProduct,
 )
 
-from .colorAxis import ColorAxis
+from .color_axis import ColorAxis
 from .colormap import ColormapParameter
 from .components import DataArrayComponent
 from .renderer import Renderer
@@ -22,60 +22,60 @@ class ColormapRenderer(Renderer):
         self,
         component: DataArrayComponent,
         transformation: ScalarTransformationParameter,
-        colorAxis: ColorAxis,
+        color_axis: ColorAxis,
         colormap: ColormapParameter,
     ) -> None:
         super().__init__(component.name)
         self._component = component
         self._transformation = transformation
         self._add_parameter('transformation', transformation)
-        self._colorAxis = colorAxis
-        self._add_group('color_axis', colorAxis, observe=True)
+        self._color_axis = color_axis
+        self._add_group('color_axis', color_axis, observe=True)
         self._colormap = colormap
         self._add_parameter('colormap', colormap)
 
     def variants(self) -> Iterator[str]:
         return self._colormap.choices()
 
-    def getVariant(self) -> str:
+    def get_variant(self) -> str:
         return self._colormap.get_value()
 
-    def setVariant(self, variant: str) -> None:
+    def set_variant(self, variant: str) -> None:
         self._colormap.set_value(variant)
 
-    def isCyclic(self) -> bool:
+    def is_cyclic(self) -> bool:
         return self._component.isCyclic
 
-    def _colorize(self, valuesTransformed: RealArrayType) -> RealArrayType:
-        vrange = self._colorAxis.getRange()
+    def _colorize(self, values_transformed: RealArrayType) -> RealArrayType:
+        vrange = self._color_axis.get_range()
         norm = Normalize(vmin=vrange.lower, vmax=vrange.upper, clip=False)
         cmap = self._colormap.getPlugin()
-        scalarMappable = ScalarMappable(norm, cmap)
-        return scalarMappable.to_rgba(valuesTransformed)
+        scalar_mappable = ScalarMappable(norm, cmap)
+        return scalar_mappable.to_rgba(values_transformed)
 
     def colorize(self, array: NumberArrayType) -> RealArrayType:
         values = self._component.calculate(array)
-        valuesTransformed = self._transformation.transform(values)
-        return self._colorize(valuesTransformed)
+        values_transformed = self._transformation.transform(values)
+        return self._colorize(values_transformed)
 
     def render(
         self,
         array: NumberArrayType,
-        pixelGeometry: PixelGeometry,
+        pixel_geometry: PixelGeometry,
         *,
-        autoscaleColorAxis: bool,
+        autoscale_color_axis: bool,
     ) -> VisualizationProduct:
         values = self._component.calculate(array)
-        valuesTransformed = self._transformation.transform(values)
+        values_transformed = self._transformation.transform(values)
 
-        if autoscaleColorAxis:
-            self._colorAxis.setToDataRange(valuesTransformed)
+        if autoscale_color_axis:
+            self._color_axis.set_to_data_range(values_transformed)
 
-        rgba = self._colorize(valuesTransformed)
+        rgba = self._colorize(values_transformed)
 
         return VisualizationProduct(
-            value_label=self._transformation.decorateText(self._component.name),
+            value_label=self._transformation.decorate_text(self._component.name),
             values=array,
             rgba=rgba,
-            pixel_geometry=pixelGeometry,
+            pixel_geometry=pixel_geometry,
         )

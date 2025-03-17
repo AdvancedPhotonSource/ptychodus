@@ -40,16 +40,16 @@ class DiffractionPatternPositionMatcher:
         self._diffractionDataset = diffractionDataset
         self._productRepository = productRepository
 
-    def getProductName(self, inputProductIndex: int) -> str:
+    def get_product_name(self, inputProductIndex: int) -> str:
         inputProductItem = self._productRepository[inputProductIndex]
-        return inputProductItem.getName()
+        return inputProductItem.get_name()
 
     def getObjectPlanePixelGeometry(self, inputProductIndex: int) -> PixelGeometry:
         inputProductItem = self._productRepository[inputProductIndex]
-        objectGeometry = inputProductItem.getGeometry().get_object_geometry()
+        objectGeometry = inputProductItem.get_geometry().get_object_geometry()
         return objectGeometry.get_pixel_geometry()
 
-    def matchDiffractionPatternsWithPositions(
+    def match_diffraction_patterns_with_positions(
         self, inputProductIndex: int, indexFilter: ScanIndexFilter = ScanIndexFilter.ALL
     ) -> ReconstructInput:
         inputProductItem = self._productRepository[inputProductIndex]

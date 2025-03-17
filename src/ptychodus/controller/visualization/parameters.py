@@ -19,7 +19,7 @@ class VisualizationParametersController(Observer):
         self._variantModel = QStringListModel()
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls, engine: VisualizationEngine, view: VisualizationParametersView
     ) -> VisualizationParametersController:
         controller = cls(engine, view)

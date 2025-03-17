@@ -99,7 +99,7 @@ class TiffDiffractionFileReader(DiffractionFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.diffractionFileReaders.register_plugin(
+    registry.diffraction_file_readers.register_plugin(
         TiffDiffractionFileReader(),
         simple_name='TIFF',
         display_name='Tagged Image File Format Files (*.tif *.tiff)',

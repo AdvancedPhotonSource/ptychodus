@@ -54,7 +54,7 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
         )
 
     def createUniqueName(self, candidateName: str) -> str:
-        reservedNames = set([item.getName() for item in self._repository])
+        reservedNames = set([item.get_name() for item in self._repository])
         name = candidateName if candidateName else 'Unnamed'
         match = 0
 

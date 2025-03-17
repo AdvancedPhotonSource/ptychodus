@@ -129,8 +129,10 @@ class ScanEditorViewControllerFactory:
     def _appendCommonControls(
         self, dialogBuilder: ParameterViewBuilder, item: ScanRepositoryItem
     ) -> None:
-        dialogBuilder.addViewControllerToBottom(ScanTransformViewController(item.getTransform()))
-        dialogBuilder.addViewControllerToBottom(ScanBoundingBoxViewController(item))
+        dialogBuilder.add_view_controller_to_bottom(
+            ScanTransformViewController(item.getTransform())
+        )
+        dialogBuilder.add_view_controller_to_bottom(ScanBoundingBoxViewController(item))
 
     def createEditorDialog(
         self, itemName: str, item: ScanRepositoryItem, parent: QWidget
@@ -142,10 +144,10 @@ class ScanEditorViewControllerFactory:
 
         if isinstance(scanBuilder, CartesianScanBuilder):
             dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.addSpinBox(
+            dialogBuilder.add_spin_box(
                 scanBuilder.numberOfPointsX, 'Number of Points X:', group=baseScanGroup
             )
-            dialogBuilder.addSpinBox(
+            dialogBuilder.add_spin_box(
                 scanBuilder.numberOfPointsY, 'Number of Points Y:', group=baseScanGroup
             )
             dialogBuilder.addLengthWidget(
@@ -158,13 +160,13 @@ class ScanEditorViewControllerFactory:
                 )
 
             self._appendCommonControls(dialogBuilder, item)
-            return dialogBuilder.buildDialog(title, parent)
+            return dialogBuilder.build_dialog(title, parent)
         elif isinstance(scanBuilder, ConcentricScanBuilder):
             dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.addSpinBox(
+            dialogBuilder.add_spin_box(
                 scanBuilder.numberOfShells, 'Number of Shells:', group=baseScanGroup
             )
-            dialogBuilder.addSpinBox(
+            dialogBuilder.add_spin_box(
                 scanBuilder.numberOfPointsInFirstShell,
                 'Number of Points in First Shell:',
                 group=baseScanGroup,
@@ -175,28 +177,28 @@ class ScanEditorViewControllerFactory:
                 group=baseScanGroup,
             )
             self._appendCommonControls(dialogBuilder, item)
-            return dialogBuilder.buildDialog(title, parent)
+            return dialogBuilder.build_dialog(title, parent)
         elif isinstance(scanBuilder, FromFileScanBuilder):
             dialogBuilder = ParameterViewBuilder()
             self._appendCommonControls(dialogBuilder, item)
-            return dialogBuilder.buildDialog(title, parent)
+            return dialogBuilder.build_dialog(title, parent)
         elif isinstance(scanBuilder, FromMemoryScanBuilder):
             dialogBuilder = ParameterViewBuilder()
             self._appendCommonControls(dialogBuilder, item)
-            return dialogBuilder.buildDialog(title, parent)
+            return dialogBuilder.build_dialog(title, parent)
         elif isinstance(scanBuilder, SpiralScanBuilder):
             dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.addSpinBox(
+            dialogBuilder.add_spin_box(
                 scanBuilder.numberOfPoints, 'Number of Points:', group=baseScanGroup
             )
             dialogBuilder.addLengthWidget(
                 scanBuilder.radiusScalarInMeters, 'Radius Scalar:', group=baseScanGroup
             )
             self._appendCommonControls(dialogBuilder, item)
-            return dialogBuilder.buildDialog(title, parent)
+            return dialogBuilder.build_dialog(title, parent)
         elif isinstance(scanBuilder, LissajousScanBuilder):
             dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.addSpinBox(
+            dialogBuilder.add_spin_box(
                 scanBuilder.numberOfPoints, 'Number of Points:', group=baseScanGroup
             )
             dialogBuilder.addLengthWidget(
@@ -215,7 +217,7 @@ class ScanEditorViewControllerFactory:
                 scanBuilder.angularShiftInTurns, 'Angular Shift:', group=baseScanGroup
             )
             self._appendCommonControls(dialogBuilder, item)
-            return dialogBuilder.buildDialog(title, parent)
+            return dialogBuilder.build_dialog(title, parent)
 
         return QMessageBox(
             QMessageBox.Icon.Information,

@@ -81,7 +81,7 @@ class LYNXOrchestraScanFileReader(ScanFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.scanFileReaders.register_plugin(
+    registry.scan_file_readers.register_plugin(
         LYNXOrchestraScanFileReader(),
         simple_name=LYNXOrchestraScanFileReader.SIMPLE_NAME,
         display_name='LYNX Orchestra Scan Files (*.dat)',

@@ -28,12 +28,12 @@ class CSVProbeFileWriter(ProbeFileWriter):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.probeFileReaders.register_plugin(
+    registry.probe_file_readers.register_plugin(
         CSVProbeFileReader(),
         simple_name='CSV',
         display_name='Comma-Separated Values Files (*.csv)',
     )
-    registry.probeFileWriters.register_plugin(
+    registry.probe_file_writers.register_plugin(
         CSVProbeFileWriter(),
         simple_name='CSV',
         display_name='Comma-Separated Values Files (*.csv)',

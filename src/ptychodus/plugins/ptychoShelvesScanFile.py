@@ -37,7 +37,7 @@ class PtychoShelvesScanFileReader(ScanFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.scanFileReaders.register_plugin(
+    registry.scan_file_readers.register_plugin(
         PtychoShelvesScanFileReader(),
         simple_name='PtychoShelves',
         display_name='PtychoShelves Scan Position Files (*.h5 *.hdf5)',

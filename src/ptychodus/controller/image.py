@@ -41,7 +41,7 @@ class ImageToolsController:
         self._mouseToolButtonGroup = mouseToolButtonGroup
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls, view: ImageToolsGroupBox, visualizationController: VisualizationController
     ) -> ImageToolsController:
         view.moveButton.setCheckable(True)
@@ -78,7 +78,7 @@ class ImageRendererController(Observer):
         self._variantModel = QStringListModel()
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls, engine: VisualizationEngine, view: ImageRendererGroupBox
     ) -> ImageRendererController:
         controller = cls(engine, view)
@@ -134,14 +134,14 @@ class ImageDataRangeController(Observer):
         self._displayRangeIsLocked = True
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         engine: VisualizationEngine,
         view: ImageDataRangeGroupBox,
         imageWidget: ImageWidget,
         visualizationController: VisualizationController,
     ) -> ImageDataRangeController:
-        displayRangeDialog = ImageDisplayRangeDialog.createInstance(view)
+        displayRangeDialog = ImageDisplayRangeDialog.create_instance(view)
         controller = cls(engine, view, imageWidget, displayRangeDialog, visualizationController)
         controller._syncModelToView()
         engine.add_observer(controller)
@@ -216,13 +216,13 @@ class ImageController:
         visualizationController: VisualizationController,
     ) -> None:
         self._visualizationController = visualizationController
-        self._toolsController = ImageToolsController.createInstance(
+        self._toolsController = ImageToolsController.create_instance(
             view.imageRibbon.imageToolsGroupBox, visualizationController
         )
-        self._rendererController = ImageRendererController.createInstance(
+        self._rendererController = ImageRendererController.create_instance(
             engine, view.imageRibbon.colormapGroupBox
         )
-        self._dataRangeController = ImageDataRangeController.createInstance(
+        self._dataRangeController = ImageDataRangeController.create_instance(
             engine,
             view.imageRibbon.dataRangeGroupBox,
             view.imageWidget,
@@ -230,20 +230,20 @@ class ImageController:
         )
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         engine: VisualizationEngine,
         view: ImageView,
         statusBar: QStatusBar,
         fileDialogFactory: FileDialogFactory,
     ) -> ImageController:
-        visualizationController = VisualizationController.createInstance(
+        visualizationController = VisualizationController.create_instance(
             engine, view.imageWidget, statusBar, fileDialogFactory
         )
         return cls(engine, view, visualizationController)
 
-    def setArray(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> None:
+    def set_array(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> None:
         self._visualizationController.setArray(array, pixelGeometry)
 
-    def clearArray(self) -> None:
+    def clear_array(self) -> None:
         self._visualizationController.clearArray()

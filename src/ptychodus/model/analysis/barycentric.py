@@ -1,13 +1,14 @@
-from ptychodus.api.typing import ComplexArrayType, RealArrayType
+from typing import Generic, TypeVar
 
-__all__ = ['BarycentricArrayStitcher']
+from numpy.typing import NDArray
+import numpy
 
+from ptychodus.api.typing import RealArrayType
 
-# FIXME BEGIN
-# For ObjectStitcher, add object patches with uniform(?) weights.
-# For STXM, add pattern counts * normalized probe profile.
-# For Exposure, add probe profile. No weights?
-# FIXME END
+__all__ = [
+    'BarycentricArrayInterpolator',
+    'BarycentricArrayStitcher',
+]
 
 
 def calculate_support_frac(x: float, n: int) -> tuple[slice, float]:
@@ -16,10 +17,38 @@ def calculate_support_frac(x: float, n: int) -> tuple[slice, float]:
     return slice(whole, whole + n + 1), lower - whole
 
 
-class BarycentricArrayStitcher:  # FIXME use
-    def __init__(
-        self, upper: ComplexArrayType | RealArrayType, lower: RealArrayType | None = None
-    ) -> None:
+class BarycentricArrayInterpolator[InexactDType: numpy.inexact]:
+    def __init__(self, array: NDArray[InexactDType]) -> None:
+        super().__init__()
+        self._array = array
+
+    def get_patch(
+        self, center_x: float, center_y: float, width: int, height: int
+    ) -> NDArray[InexactDType]:
+        x_support, x_frac = calculate_support_frac(center_x, width)
+        y_support, y_frac = calculate_support_frac(center_y, height)
+
+        # reused quantities
+        x_frac_c = 1.0 - x_frac
+        y_frac_c = 1.0 - y_frac
+
+        # barycentric interpolant weights
+        weight00 = y_frac_c * x_frac_c
+        weight01 = y_frac_c * x_frac
+        weight10 = y_frac * x_frac_c
+        weight11 = y_frac * x_frac
+
+        support = self._array[..., y_support, x_support]
+        patch = weight00 * support[..., :-1, :-1]
+        patch = patch + weight01 * support[..., :-1, 1:]
+        patch = patch + weight10 * support[..., 1:, :-1]
+        patch = patch + weight11 * support[..., 1:, 1:]
+        return patch  # type: ignore
+
+
+class BarycentricArrayStitcher[InexactDType: numpy.inexact]:
+    def __init__(self, upper: NDArray[InexactDType], lower: RealArrayType | None = None) -> None:
+        super().__init__()
         self._upper = upper
         self._lower = lower
 
@@ -30,7 +59,7 @@ class BarycentricArrayStitcher:  # FIXME use
         self,
         center_x: float,
         center_y: float,
-        value: ComplexArrayType | RealArrayType,
+        value: NDArray[InexactDType],
         weight: RealArrayType | None = None,
     ) -> None:
         if self._upper.dtype != value.dtype:
@@ -61,10 +90,10 @@ class BarycentricArrayStitcher:  # FIXME use
         # add patch update to upper array support
         uvalue = value if weight is None else weight * value
         usupport = self._upper[..., y_support, x_support]
-        usupport[..., :-1, :-1] += weight00 * uvalue
-        usupport[..., :-1, 1:] += weight01 * uvalue
-        usupport[..., 1:, :-1] += weight10 * uvalue
-        usupport[..., 1:, 1:] += weight11 * uvalue
+        usupport[..., :-1, :-1] = usupport[..., :-1, :-1] + weight00 * uvalue
+        usupport[..., :-1, 1:] = usupport[..., :-1, 1:] + weight01 * uvalue
+        usupport[..., 1:, :-1] = usupport[..., 1:, :-1] + weight10 * uvalue
+        usupport[..., 1:, 1:] = usupport[..., 1:, 1:] + weight11 * uvalue
 
         if self._lower is not None and weight is not None:
             # add patch update to lower array support
@@ -74,5 +103,10 @@ class BarycentricArrayStitcher:  # FIXME use
             lsupport[..., 1:, :-1] += weight10 * weight
             lsupport[..., 1:, 1:] += weight11 * weight
 
-    def stitch(self) -> ComplexArrayType | RealArrayType:
-        return self._upper if self._lower is None else self._upper / self._lower
+    def stitch(self) -> NDArray[InexactDType]:
+        if self._lower is None:
+            return self._upper
+
+        return numpy.divide(
+            self._upper, self._lower, out=numpy.zeros_like(self._upper), where=(self._lower > 0)
+        )

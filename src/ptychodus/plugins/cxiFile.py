@@ -108,17 +108,17 @@ def register_plugins(registry: PluginRegistry) -> None:
     SIMPLE_NAME: Final[str] = 'CXI'
     DISPLAY_NAME: Final[str] = 'Coherent X-ray Imaging Files (*.cxi)'
 
-    registry.diffractionFileReaders.register_plugin(
+    registry.diffraction_file_readers.register_plugin(
         CXIDiffractionFileReader(),
         simple_name=SIMPLE_NAME,
         display_name=DISPLAY_NAME,
     )
-    registry.scanFileReaders.register_plugin(
+    registry.scan_file_readers.register_plugin(
         CXIScanFileReader(),
         simple_name=SIMPLE_NAME,
         display_name=DISPLAY_NAME,
     )
-    registry.probeFileReaders.register_plugin(
+    registry.probe_file_readers.register_plugin(
         CXIProbeFileReader(),
         simple_name=SIMPLE_NAME,
         display_name=DISPLAY_NAME,

@@ -28,22 +28,22 @@ class ProbePropagationViewController(Observer):
         self._fileDialogFactory = fileDialogFactory
 
         self._dialog = ProbePropagationDialog()
-        self._dialog.propagateButton.clicked.connect(self._propagate)
-        self._dialog.saveButton.clicked.connect(self._savePropagatedProbe)
-        self._dialog.coordinateSlider.valueChanged.connect(self._updateCurrentCoordinate)
-        self._dialog.parametersView.numberOfStepsSpinBox.setRange(1, 999)
+        self._dialog.propagate_button.clicked.connect(self._propagate)
+        self._dialog.save_button.clicked.connect(self._savePropagatedProbe)
+        self._dialog.coordinate_slider.valueChanged.connect(self._updateCurrentCoordinate)
+        self._dialog.parameters_view.num_steps_spin_box.setRange(1, 999)
 
         self._xyVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.xyView, self._dialog.statusBar, fileDialogFactory
+            engine, self._dialog.xy_view, self._dialog.status_bar, fileDialogFactory
         )
         self._zxVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.zxView, self._dialog.statusBar, fileDialogFactory
+            engine, self._dialog.zx_view, self._dialog.status_bar, fileDialogFactory
         )
-        self._visualizationParametersController = VisualizationParametersController.createInstance(
-            engine, self._dialog.parametersView.visualizationParametersView
+        self._visualizationParametersController = VisualizationParametersController.create_instance(
+            engine, self._dialog.parameters_view.visualization_parameters_view
         )
         self._zyVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.zyView, self._dialog.statusBar, fileDialogFactory
+            engine, self._dialog.zy_view, self._dialog.status_bar, fileDialogFactory
         )
 
         propagator.add_observer(self)
@@ -52,7 +52,7 @@ class ProbePropagationViewController(Observer):
     def _updateCurrentCoordinate(self, step: int) -> None:
         lerpValue = 0.0
 
-        slider = self._dialog.coordinateSlider
+        slider = self._dialog.coordinate_slider
         upper = step - slider.minimum()
         lower = slider.maximum() - slider.minimum()
 
@@ -70,31 +70,31 @@ class ProbePropagationViewController(Observer):
             self._xyVisualizationWidgetController.clearArray()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Update Current Coordinate', err)
+            ExceptionDialog.show_exception('Update Current Coordinate', err)
         else:
             pixelGeometry = self._propagator.getPixelGeometry()
 
             if pixelGeometry is None:
                 logger.warning('Missing propagator pixel geometry!')
             else:
-                self._xyVisualizationWidgetController.setArray(xyProjection, pixelGeometry)
+                self._xyVisualizationWidgetController.set_array(xyProjection, pixelGeometry)
 
         # TODO auto-units
         lerpValue *= 1e6
-        self._dialog.coordinateLabel.setText(f'{lerpValue:.1f} \u00b5m')
+        self._dialog.coordinate_label.setText(f'{lerpValue:.1f} \u00b5m')
 
     def _propagate(self) -> None:
-        view = self._dialog.parametersView
+        view = self._dialog.parameters_view
 
         try:
             self._propagator.propagate(
-                numberOfSteps=view.numberOfStepsSpinBox.value(),
-                beginCoordinateInMeters=float(view.beginCoordinateWidget.getLengthInMeters()),
-                endCoordinateInMeters=float(view.endCoordinateWidget.getLengthInMeters()),
+                numberOfSteps=view.num_steps_spin_box.value(),
+                beginCoordinateInMeters=float(view.begin_coordinate_widget.getLengthInMeters()),
+                endCoordinateInMeters=float(view.end_coordinate_widget.getLengthInMeters()),
             )
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Propagate Probe', err)
+            ExceptionDialog.show_exception('Propagate Probe', err)
 
     def launch(self, productIndex: int) -> None:
         self._propagator.setProduct(productIndex)
@@ -103,18 +103,18 @@ class ProbePropagationViewController(Observer):
             itemName = self._propagator.getProductName()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Launch', err)
+            ExceptionDialog.show_exception('Launch', err)
         else:
             self._dialog.setWindowTitle(f'Propagate Probe: {itemName}')
             self._dialog.open()
 
     def _savePropagatedProbe(self) -> None:
         title = 'Save Propagated Probe'
-        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+        filePath, nameFilter = self._fileDialogFactory.get_save_file_path(
             self._dialog,
             title,
-            nameFilters=self._propagator.getSaveFileFilterList(),
-            selectedNameFilter=self._propagator.getSaveFileFilter(),
+            name_filters=self._propagator.getSaveFileFilterList(),
+            selected_name_filter=self._propagator.getSaveFileFilter(),
         )
 
         if filePath:
@@ -122,29 +122,29 @@ class ProbePropagationViewController(Observer):
                 self._propagator.savePropagatedProbe(filePath)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException(title, err)
+                ExceptionDialog.show_exception(title, err)
 
     def _syncModelToView(self) -> None:
-        view = self._dialog.parametersView
-        view.beginCoordinateWidget.setLengthInMeters(
+        view = self._dialog.parameters_view
+        view.begin_coordinate_widget.setLengthInMeters(
             Decimal.from_float(self._propagator.getBeginCoordinateInMeters())
         )
-        view.endCoordinateWidget.setLengthInMeters(
+        view.end_coordinate_widget.setLengthInMeters(
             Decimal.from_float(self._propagator.getEndCoordinateInMeters())
         )
-        view.numberOfStepsSpinBox.setValue(self._propagator.getNumberOfSteps())
+        view.num_steps_spin_box.setValue(self._propagator.getNumberOfSteps())
 
         numberOfSteps = self._propagator.getNumberOfSteps()
 
         if numberOfSteps > 1:
-            self._dialog.coordinateSlider.setEnabled(True)
-            self._dialog.coordinateSlider.setRange(0, numberOfSteps - 1)
+            self._dialog.coordinate_slider.setEnabled(True)
+            self._dialog.coordinate_slider.setRange(0, numberOfSteps - 1)
         else:
-            self._dialog.coordinateSlider.setEnabled(False)
-            self._dialog.coordinateSlider.setRange(0, 1)
-            self._dialog.coordinateSlider.setValue(0)
+            self._dialog.coordinate_slider.setEnabled(False)
+            self._dialog.coordinate_slider.setRange(0, 1)
+            self._dialog.coordinate_slider.setValue(0)
 
-        self._updateCurrentCoordinate(self._dialog.coordinateSlider.value())
+        self._updateCurrentCoordinate(self._dialog.coordinate_slider.value())
         pixelGeometry = self._propagator.getPixelGeometry()
 
         if pixelGeometry is None:
@@ -152,10 +152,10 @@ class ProbePropagationViewController(Observer):
             return
 
         try:
-            self._zxVisualizationWidgetController.setArray(
+            self._zxVisualizationWidgetController.set_array(
                 self._propagator.getZXProjection(), pixelGeometry
             )
-            self._zyVisualizationWidgetController.setArray(
+            self._zyVisualizationWidgetController.set_array(
                 self._propagator.getZYProjection(), pixelGeometry
             )
         except ValueError:
@@ -163,7 +163,7 @@ class ProbePropagationViewController(Observer):
             self._zyVisualizationWidgetController.clearArray()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Update Views', err)
+            ExceptionDialog.show_exception('Update Views', err)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._propagator:

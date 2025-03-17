@@ -10,7 +10,7 @@ class SettingsButtonBox(QWidget):
         self.saveButton = QPushButton('Save')
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> SettingsButtonBox:
+    def create_instance(cls, parent: QWidget | None = None) -> SettingsButtonBox:
         view = cls(parent)
 
         layout = QHBoxLayout()
@@ -26,10 +26,10 @@ class SettingsView(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.listView = QListView()
-        self.buttonBox = SettingsButtonBox.createInstance()
+        self.buttonBox = SettingsButtonBox.create_instance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> SettingsView:
+    def create_instance(cls, parent: QWidget | None = None) -> SettingsView:
         view = cls(parent)
 
         layout = QVBoxLayout()

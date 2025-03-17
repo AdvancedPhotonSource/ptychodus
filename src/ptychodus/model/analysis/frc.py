@@ -60,8 +60,8 @@ class FourierRingCorrelator:
         coherent diffractive imaging," Opt. Express 19, 21333-21344 (2011)
         """
 
-        object1 = self._repository[itemIndex1].getObject()
-        object2 = self._repository[itemIndex2].getObject()
+        object1 = self._repository[itemIndex1].get_object()
+        object2 = self._repository[itemIndex2].get_object()
 
         # TODO support multilayer objects
         array1 = object1.get_layer(0)

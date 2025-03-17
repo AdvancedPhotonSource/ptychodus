@@ -48,14 +48,14 @@ class ViewCore(QMainWindow):
         self.settingsAction = self.navigationToolBar.addAction(
             QIcon(':/icons/settings'), 'Settings'
         )
-        self.settingsView = SettingsView.createInstance()
+        self.settingsView = SettingsView.create_instance()
         self.settingsTableView = QTableView()
 
         self.patternsAction = self.navigationToolBar.addAction(
             QIcon(':/icons/patterns'), 'Patterns'
         )
         self.patternsView = PatternsView()
-        self.patternsImageView = ImageView.createInstance()
+        self.patternsImageView = ImageView.create_instance()
 
         self.productAction = self.navigationToolBar.addAction(QIcon(':/icons/products'), 'Products')
         self.productView = ProductView()
@@ -63,15 +63,15 @@ class ViewCore(QMainWindow):
 
         self.scanAction = self.navigationToolBar.addAction(QIcon(':/icons/scan'), 'Positions')
         self.scanView = RepositoryTableView()
-        self.scanPlotView = ScanPlotView.createInstance()
+        self.scanPlotView = ScanPlotView.create_instance()
 
         self.probeAction = self.navigationToolBar.addAction(QIcon(':/icons/probe'), 'Probe')
         self.probeView = RepositoryTreeView()
-        self.probeImageView = ImageView.createInstance()
+        self.probeImageView = ImageView.create_instance()
 
         self.objectAction = self.navigationToolBar.addAction(QIcon(':/icons/object'), 'Object')
         self.objectView = RepositoryTreeView()
-        self.objectImageView = ImageView.createInstance()
+        self.objectImageView = ImageView.create_instance()
 
         self.reconstructorAction = self.navigationToolBar.addAction(
             QIcon(':/icons/reconstructor'), 'Reconstructor'
@@ -82,13 +82,13 @@ class ViewCore(QMainWindow):
         self.workflowAction = self.navigationToolBar.addAction(
             QIcon(':/icons/workflow'), 'Workflow'
         )
-        self.workflowParametersView = WorkflowParametersView.createInstance()
+        self.workflowParametersView = WorkflowParametersView.create_instance()
         self.workflowTableView = QTableView()
 
         self.automationAction = self.navigationToolBar.addAction(
             QIcon(':/icons/automate'), 'Automation'
         )
-        self.automationView = AutomationView.createInstance()
+        self.automationView = AutomationView.create_instance()
         self.automationWidget = QWidget()
 
         #####

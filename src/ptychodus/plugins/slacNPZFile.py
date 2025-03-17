@@ -89,12 +89,12 @@ def register_plugins(registry: PluginRegistry) -> None:
     SIMPLE_NAME: Final[str] = 'SLAC'
     DISPLAY_NAME: Final[str] = 'SLAC NumPy Zipped Archive (*.npz)'
 
-    registry.diffractionFileReaders.register_plugin(
+    registry.diffraction_file_readers.register_plugin(
         SLACDiffractionFileReader(),
         simple_name=SIMPLE_NAME,
         display_name=DISPLAY_NAME,
     )
-    registry.productFileReaders.register_plugin(
+    registry.product_file_readers.register_plugin(
         SLACProductFileReader(),
         simple_name=SIMPLE_NAME,
         display_name=DISPLAY_NAME,

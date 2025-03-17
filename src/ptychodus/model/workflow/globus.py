@@ -41,7 +41,7 @@ def ptychodus_reconstruct(**data: str) -> None:
     patternsFile = Path(data['ptychodus_patterns_file'])
 
     with ModelCore(settingsFile) as model:
-        model.workflowAPI.import_assembled_patterns(patternsFile)
+        model.workflow_api.import_assembled_patterns(patternsFile)
         model.batchModeExecute(action, inputFile, outputFile)
 
 
@@ -172,7 +172,7 @@ class GlobusWorkflowThread(threading.Thread):
         self.__gladierClient: gladier.GladierBaseClient | None = None
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         authorizer: WorkflowAuthorizer,
         statusRepository: WorkflowStatusRepository,

@@ -47,7 +47,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
                 case 0:
                     return self._properties[index.row()]
                 case 1:
-                    geometry = self._product.getGeometry()
+                    geometry = self._product.get_geometry()
 
                     match index.row():
                         case 0:
@@ -100,7 +100,7 @@ class ProductEditorViewController(Observer):
         tableProxyModel.setSourceModel(tableModel)
 
         dialog = ProductEditorDialog(parent)
-        dialog.setWindowTitle(f'Edit Product: {product.getName()}')
+        dialog.setWindowTitle(f'Edit Product: {product.get_name()}')
         dialog.tableView.setModel(tableProxyModel)
         dialog.tableView.setSortingEnabled(True)
         dialog.tableView.verticalHeader().hide()

@@ -42,11 +42,11 @@ class VisualizationController(Observer):
         self._item = item
         self._statusBar = statusBar
         self._fileDialogFactory = fileDialogFactory
-        self._lineCutDialog = LineCutDialog.createInstance(view)
-        self._histogramDialog = HistogramDialog.createInstance(view)
+        self._lineCutDialog = LineCutDialog.create_instance(view)
+        self._histogramDialog = HistogramDialog.create_instance(view)
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         engine: VisualizationEngine,
         view: VisualizationView,
@@ -84,7 +84,7 @@ class VisualizationController(Observer):
                 )
             except ValueError as err:
                 logger.exception(err)
-                ExceptionDialog.showException('Renderer', err)
+                ExceptionDialog.show_exception('Renderer', err)
             else:
                 self._item.setProduct(product)
         else:
@@ -98,7 +98,7 @@ class VisualizationController(Observer):
         self._item.setMouseTool(mouseTool)
 
     def saveImage(self) -> None:
-        filePath, _ = self._fileDialogFactory.getSaveFilePath(
+        filePath, _ = self._fileDialogFactory.get_save_file_path(
             self._view, 'Save Image', mimeTypeFilters=VisualizationController.MIME_TYPES
         )
 

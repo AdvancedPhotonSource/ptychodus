@@ -10,7 +10,7 @@ class ExceptionDialog(QMessageBox):
     MAX_SIZE: Final[int] = 16777215
 
     @classmethod
-    def showException(cls, actor: str, exception: Exception) -> None:
+    def show_exception(cls, actor: str, exception: Exception) -> None:
         dialog = cls()
         dialog.setSizeGripEnabled(True)
         dialog.setWindowTitle('Exception Dialog')

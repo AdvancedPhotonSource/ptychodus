@@ -366,7 +366,7 @@ class ObjectAPI:
         except IndexError:
             logger.warning(f'Failed to save object {index}!')
         else:
-            self._builderFactory.saveObject(filePath, fileType, item.getObject())
+            self._builderFactory.saveObject(filePath, fileType, item.get_object())
 
 
 class ProductAPI:
@@ -405,7 +405,7 @@ class ProductAPI:
 
     def getItemName(self, productIndex: int) -> str:
         item = self._repository[productIndex]
-        return item.getName()
+        return item.get_name()
 
     def getOpenFileFilterList(self) -> Iterator[str]:
         for plugin in self._fileReaderChooser:

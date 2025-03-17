@@ -291,7 +291,7 @@ class OpenDatasetWizardFilesViewController(Observer):
             self._api.open_patterns(file_path, file_type=file_type)
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Open Dataset', err)
+            ExceptionDialog.show_exception('Open Dataset', err)
 
     def getWidget(self) -> QWizardPage:
         return self._page

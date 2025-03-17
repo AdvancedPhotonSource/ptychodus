@@ -321,7 +321,7 @@ class PathParameterViewController(ParameterViewController, Observer):
             self._parameter.set_value(path)
 
     def _chooseFileToSave(self) -> None:
-        path, _ = self._fileDialogFactory.getSaveFilePath(
+        path, _ = self._fileDialogFactory.get_save_file_path(
             self._widget,
             self._caption,
             self._nameFilters,
@@ -399,7 +399,7 @@ class DecimalLineEditParameterViewController(ParameterViewController, Observer):
     ) -> None:
         super().__init__()
         self._parameter = parameter
-        self._widget = DecimalLineEdit.createInstance(isSigned=is_signed)
+        self._widget = DecimalLineEdit.create_instance(isSigned=is_signed)
 
         if tool_tip:
             self._widget.setToolTip(tool_tip)
@@ -426,7 +426,7 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
     def __init__(self, parameter: RealParameter, *, tool_tip: str = '') -> None:
         super().__init__()
         self._parameter = parameter
-        self._widget = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
+        self._widget = DecimalSlider.create_instance(Qt.Orientation.Horizontal)
 
         if tool_tip:
             self._widget.setToolTip(tool_tip)
@@ -463,7 +463,7 @@ class LengthWidgetParameterViewController(ParameterViewController, Observer):
     ) -> None:
         super().__init__()
         self._parameter = parameter
-        self._widget = LengthWidget.createInstance(isSigned=is_signed)
+        self._widget = LengthWidget.create_instance(is_signed=is_signed)
 
         if tool_tip:
             self._widget.setToolTip(tool_tip)
@@ -490,7 +490,7 @@ class AngleWidgetParameterViewController(ParameterViewController, Observer):
     def __init__(self, parameter: RealParameter, tool_tip: str = '') -> None:
         super().__init__()
         self._parameter = parameter
-        self._widget = AngleWidget.createInstance()
+        self._widget = AngleWidget.create_instance()
 
         if tool_tip:
             self._widget.setToolTip(tool_tip)
@@ -547,11 +547,11 @@ class ParameterDialog(QDialog):
 class ParameterViewBuilder:
     def __init__(self, fileDialogFactory: FileDialogFactory | None = None) -> None:
         self._fileDialogFactory = fileDialogFactory
-        self._viewControllersTop: list[ParameterViewController] = list()
-        self._viewControllers: dict[tuple[str, str], ParameterViewController] = dict()
-        self._viewControllersBottom: list[ParameterViewController] = list()
+        self._view_controllers_top: list[ParameterViewController] = list()
+        self._view_controllers: dict[tuple[str, str], ParameterViewController] = dict()
+        self._view_controllers_bottom: list[ParameterViewController] = list()
 
-    def addCheckBox(
+    def add_check_box(
         self,
         parameter: BooleanParameter,
         label: str,
@@ -560,7 +560,7 @@ class ParameterViewBuilder:
         group: str = '',
     ) -> None:
         viewController = CheckBoxParameterViewController(parameter, '', tool_tip=tool_tip)
-        self.addViewController(viewController, label, group=group)
+        self.add_view_controller(viewController, label, group=group)
 
     def addComboBox(
         self,
@@ -572,7 +572,7 @@ class ParameterViewBuilder:
         group: str = '',
     ) -> None:
         viewController = ComboBoxParameterViewController(parameter, items, tool_tip=tool_tip)
-        self.addViewController(viewController, label, group=group)
+        self.add_view_controller(viewController, label, group=group)
 
     def addFileOpener(
         self,
@@ -598,7 +598,7 @@ class ParameterViewBuilder:
                 selectedNameFilter=selectedNameFilter,
                 tool_tip=tool_tip,
             )
-            self.addViewController(viewController, label, group=group)
+            self.add_view_controller(viewController, label, group=group)
 
     def addFileSaver(
         self,
@@ -624,7 +624,7 @@ class ParameterViewBuilder:
                 selectedNameFilter=selectedNameFilter,
                 tool_tip=tool_tip,
             )
-            self.addViewController(viewController, label, group=group)
+            self.add_view_controller(viewController, label, group=group)
 
     def addDirectoryChooser(
         self, parameter: PathParameter, label: str, *, tool_tip: str = '', group: str = ''
@@ -637,9 +637,9 @@ class ParameterViewBuilder:
                 self._fileDialogFactory,
                 tool_tip=tool_tip,
             )
-            self.addViewController(viewController, label, group=group)
+            self.add_view_controller(viewController, label, group=group)
 
-    def addSpinBox(
+    def add_spin_box(
         self,
         parameter: IntegerParameter,
         label: str,
@@ -648,7 +648,7 @@ class ParameterViewBuilder:
         group: str = '',
     ) -> None:
         viewController = SpinBoxParameterViewController(parameter, tool_tip=tool_tip)
-        self.addViewController(viewController, label, group=group)
+        self.add_view_controller(viewController, label, group=group)
 
     def addIntegerLineEdit(
         self,
@@ -659,9 +659,9 @@ class ParameterViewBuilder:
         group: str = '',
     ) -> None:
         viewController = IntegerLineEditParameterViewController(parameter, tool_tip=tool_tip)
-        self.addViewController(viewController, label, group=group)
+        self.add_view_controller(viewController, label, group=group)
 
-    def addDecimalLineEdit(
+    def add_decimal_line_edit(
         self,
         parameter: RealParameter,
         label: str,
@@ -670,9 +670,9 @@ class ParameterViewBuilder:
         group: str = '',
     ) -> None:
         viewController = DecimalLineEditParameterViewController(parameter, tool_tip=tool_tip)
-        self.addViewController(viewController, label, group=group)
+        self.add_view_controller(viewController, label, group=group)
 
-    def addDecimalSlider(
+    def add_decimal_slider(
         self,
         parameter: RealParameter,
         label: str,
@@ -681,7 +681,7 @@ class ParameterViewBuilder:
         group: str = '',
     ) -> None:
         viewController = DecimalSliderParameterViewController(parameter, tool_tip=tool_tip)
-        self.addViewController(viewController, label, group=group)
+        self.add_view_controller(viewController, label, group=group)
 
     def addLengthWidget(
         self,
@@ -692,7 +692,7 @@ class ParameterViewBuilder:
         group: str = '',
     ) -> None:
         viewController = LengthWidgetParameterViewController(parameter, tool_tip=tool_tip)
-        self.addViewController(viewController, label, group=group)
+        self.add_view_controller(viewController, label, group=group)
 
     def addAngleWidget(
         self,
@@ -702,84 +702,84 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = AngleWidgetParameterViewController(parameter, tool_tip=tool_tip)
-        self.addViewController(viewController, label, group=group)
+        view_controller = AngleWidgetParameterViewController(parameter, tool_tip=tool_tip)
+        self.add_view_controller(view_controller, label, group=group)
 
-    def addViewControllerToTop(self, viewController: ParameterViewController) -> None:
-        self._viewControllersTop.append(viewController)
+    def add_view_controller_to_top(self, view_controller: ParameterViewController) -> None:
+        self._view_controllers_top.append(view_controller)
 
-    def addViewController(
+    def add_view_controller(
         self,
-        viewController: ParameterViewController,
+        view_controller: ParameterViewController,
         label: str,
         *,
         group: str = '',
     ) -> None:
-        self._viewControllers[group, label] = viewController
+        self._view_controllers[group, label] = view_controller
 
-    def addViewControllerToBottom(self, viewController: ParameterViewController) -> None:
-        self._viewControllersBottom.append(viewController)
+    def add_view_controller_to_bottom(self, view_controller: ParameterViewController) -> None:
+        self._view_controllers_bottom.append(view_controller)
 
-    def _buildLayout(self, *, add_stretch: bool) -> QVBoxLayout:
-        groupDict: dict[str, QFormLayout] = dict()
+    def _build_layout(self, *, add_stretch: bool) -> QVBoxLayout:
+        group_dict: dict[str, QFormLayout] = dict()
 
-        for (groupName, widgetLabel), vc in self._viewControllers.items():
+        for (group_name, widget_label), vc in self._view_controllers.items():
             try:
-                formLayout = groupDict[groupName]
+                form_layout = group_dict[group_name]
             except KeyError:
-                formLayout = QFormLayout()
-                groupDict[groupName] = formLayout
+                form_layout = QFormLayout()
+                group_dict[group_name] = form_layout
 
-            formLayout.addRow(widgetLabel, vc.getWidget())
+            form_layout.addRow(widget_label, vc.getWidget())
 
         layout = QVBoxLayout()
 
-        for viewController in self._viewControllersTop:
-            layout.addWidget(viewController.getWidget())
+        for view_controller in self._view_controllers_top:
+            layout.addWidget(view_controller.getWidget())
 
-        for groupName, groupLayout in groupDict.items():
-            if groupName:
-                groupBox = QGroupBox(groupName)
-                groupBox.setLayout(groupLayout)
-                layout.addWidget(groupBox)
-            elif groupLayout.count() > 0:
-                layout.addLayout(groupLayout)
+        for group_name, group_layout in group_dict.items():
+            if group_name:
+                group_box = QGroupBox(group_name)
+                group_box.setLayout(group_layout)
+                layout.addWidget(group_box)
+            elif group_layout.count() > 0:
+                layout.addLayout(group_layout)
 
-        for viewController in self._viewControllersBottom:
-            layout.addWidget(viewController.getWidget())
+        for view_controller in self._view_controllers_bottom:
+            layout.addWidget(view_controller.getWidget())
 
         if add_stretch:
             layout.addStretch()
 
         return layout
 
-    def _flushViewControllers(self) -> Sequence[ParameterViewController]:
-        viewControllers: list[ParameterViewController] = list()
-        viewControllers.extend(self._viewControllersTop)
-        viewControllers.extend(self._viewControllers.values())
-        viewControllers.extend(self._viewControllersBottom)
+    def _flush_view_controllers(self) -> Sequence[ParameterViewController]:
+        view_controllers: list[ParameterViewController] = list()
+        view_controllers.extend(self._view_controllers_top)
+        view_controllers.extend(self._view_controllers.values())
+        view_controllers.extend(self._view_controllers_bottom)
 
-        self._viewControllersTop.clear()
-        self._viewControllers.clear()
-        self._viewControllersBottom.clear()
+        self._view_controllers_top.clear()
+        self._view_controllers.clear()
+        self._view_controllers_bottom.clear()
 
-        return viewControllers
+        return view_controllers
 
-    def buildWidget(self) -> QWidget:
-        layout = self._buildLayout(add_stretch=True)
+    def build_widget(self) -> QWidget:
+        layout = self._build_layout(add_stretch=True)
 
-        widget = ParameterWidget(self._flushViewControllers())
+        widget = ParameterWidget(self._flush_view_controllers())
         widget.setLayout(layout)
 
         return widget
 
-    def buildDialog(self, windowTitle: str, parent: QWidget | None) -> QDialog:
-        buttonBox = QDialogButtonBox()
-        layout = self._buildLayout(add_stretch=False)
-        layout.addWidget(buttonBox)
+    def build_dialog(self, window_title: str, parent: QWidget | None) -> QDialog:
+        button_box = QDialogButtonBox()
+        layout = self._build_layout(add_stretch=False)
+        layout.addWidget(button_box)
 
-        dialog = ParameterDialog(self._flushViewControllers(), buttonBox, parent)
+        dialog = ParameterDialog(self._flush_view_controllers(), button_box, parent)
         dialog.setLayout(layout)
-        dialog.setWindowTitle(windowTitle)
+        dialog.setWindowTitle(window_title)
 
         return dialog

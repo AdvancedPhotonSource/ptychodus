@@ -15,7 +15,7 @@ class Renderer(ParameterGroup):
         super().__init__()
         self._name = self.create_string_parameter('name', name)
 
-    def getName(self) -> str:
+    def get_name(self) -> str:
         return self._name.get_value()
 
     @abstractmethod
@@ -23,15 +23,15 @@ class Renderer(ParameterGroup):
         pass
 
     @abstractmethod
-    def getVariant(self) -> str:
+    def get_variant(self) -> str:
         pass
 
     @abstractmethod
-    def setVariant(self, variant: str) -> None:
+    def set_variant(self, variant: str) -> None:
         pass
 
     @abstractmethod
-    def isCyclic(self) -> bool:
+    def is_cyclic(self) -> bool:
         pass
 
     @abstractmethod
@@ -40,6 +40,6 @@ class Renderer(ParameterGroup):
 
     @abstractmethod
     def render(
-        self, array: NumberArrayType, pixelGeometry: PixelGeometry, *, autoscaleColorAxis: bool
+        self, array: NumberArrayType, pixel_geometry: PixelGeometry, *, autoscale_color_axis: bool
     ) -> VisualizationProduct:
         pass

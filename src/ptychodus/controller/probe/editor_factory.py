@@ -174,22 +174,22 @@ class ProbeEditorViewControllerFactory:
         modesBuilder: MultimodalProbeBuilder,
     ) -> None:
         additionalModesGroup = 'Additional Modes'  # FIXME OPR
-        dialogBuilder.addSpinBox(
+        dialogBuilder.add_spin_box(
             modesBuilder.numberOfIncoherentModes,
             'Number of Modes:',
             group=additionalModesGroup,
         )
-        dialogBuilder.addCheckBox(
+        dialogBuilder.add_check_box(
             modesBuilder.orthogonalizeIncoherentModes,
             'Orthogonalize Modes:',
             group=additionalModesGroup,
         )
-        dialogBuilder.addViewController(
+        dialogBuilder.add_view_controller(
             DecayTypeParameterViewController(modesBuilder.incoherentModeDecayType),
             'Decay Type:',
             group=additionalModesGroup,
         )
-        dialogBuilder.addDecimalSlider(
+        dialogBuilder.add_decimal_slider(
             modesBuilder.incoherentModeDecayRatio,
             'Decay Ratio:',
             group=additionalModesGroup,
@@ -207,7 +207,7 @@ class ProbeEditorViewControllerFactory:
         if isinstance(probeBuilder, AveragePatternProbeBuilder):
             dialogBuilder = ParameterViewBuilder()
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.buildDialog(title, parent)
+            return dialogBuilder.build_dialog(title, parent)
         elif isinstance(probeBuilder, DiskProbeBuilder):
             dialogBuilder = ParameterViewBuilder()
             dialogBuilder.addLengthWidget(
@@ -221,14 +221,14 @@ class ProbeEditorViewControllerFactory:
                 group=primaryModeGroup,
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.buildDialog(title, parent)
+            return dialogBuilder.build_dialog(title, parent)
         elif isinstance(probeBuilder, FresnelZonePlateProbeBuilder):
             dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.addViewControllerToTop(
+            dialogBuilder.add_view_controller_to_top(
                 FresnelZonePlateViewController(primaryModeGroup, probeBuilder)
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.buildDialog(title, parent)
+            return dialogBuilder.build_dialog(title, parent)
         elif isinstance(probeBuilder, RectangularProbeBuilder):
             dialogBuilder = ParameterViewBuilder()
             dialogBuilder.addLengthWidget(
@@ -247,7 +247,7 @@ class ProbeEditorViewControllerFactory:
                 group=primaryModeGroup,
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.buildDialog(title, parent)
+            return dialogBuilder.build_dialog(title, parent)
         elif isinstance(probeBuilder, SuperGaussianProbeBuilder):
             dialogBuilder = ParameterViewBuilder()
             dialogBuilder.addLengthWidget(
@@ -260,20 +260,20 @@ class ProbeEditorViewControllerFactory:
                 'Full Width at Half Maximum:',
                 group=primaryModeGroup,
             )
-            dialogBuilder.addDecimalLineEdit(
+            dialogBuilder.add_decimal_line_edit(
                 probeBuilder.orderParameter,
                 'Order Parameter:',
                 group=primaryModeGroup,
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.buildDialog(title, parent)
+            return dialogBuilder.build_dialog(title, parent)
         elif isinstance(probeBuilder, ZernikeProbeBuilder):
             dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.addViewControllerToTop(
+            dialogBuilder.add_view_controller_to_top(
                 ZernikeViewController(primaryModeGroup, probeBuilder)
             )
             self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.buildDialog(title, parent)
+            return dialogBuilder.build_dialog(title, parent)
 
         return QMessageBox(
             QMessageBox.Icon.Information,

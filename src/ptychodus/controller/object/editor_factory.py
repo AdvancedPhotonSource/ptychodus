@@ -46,29 +46,29 @@ class ObjectEditorViewControllerFactory:
 
         if isinstance(objectBuilder, RandomObjectBuilder):
             dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.addSpinBox(
+            dialogBuilder.add_spin_box(
                 objectBuilder.extraPaddingX, 'Extra Padding X:', group=firstLayerGroup
             )
-            dialogBuilder.addSpinBox(
+            dialogBuilder.add_spin_box(
                 objectBuilder.extraPaddingY, 'Extra Padding Y:', group=firstLayerGroup
             )
-            dialogBuilder.addDecimalSlider(
+            dialogBuilder.add_decimal_slider(
                 objectBuilder.amplitudeMean, 'Amplitude Mean:', group=firstLayerGroup
             )
-            dialogBuilder.addDecimalSlider(
+            dialogBuilder.add_decimal_slider(
                 objectBuilder.amplitudeDeviation,
                 'Amplitude Deviation:',
                 group=firstLayerGroup,
             )
-            dialogBuilder.addDecimalSlider(
+            dialogBuilder.add_decimal_slider(
                 objectBuilder.phaseDeviation, 'Phase Deviation:', group=firstLayerGroup
             )
-            dialogBuilder.addViewController(
+            dialogBuilder.add_view_controller(
                 MultisliceViewController(item),
                 'Number of Layers:',
                 group=additionalLayersGroup,
             )
-            return dialogBuilder.buildDialog(title, parent)
+            return dialogBuilder.build_dialog(title, parent)
 
         return QMessageBox(
             QMessageBox.Icon.Information,

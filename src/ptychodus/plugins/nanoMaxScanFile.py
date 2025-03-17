@@ -40,7 +40,7 @@ class NanoMaxScanFileReader(ScanFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.scanFileReaders.register_plugin(
+    registry.scan_file_readers.register_plugin(
         NanoMaxScanFileReader(),
         simple_name='NanoMax',
         display_name='NanoMax DiffractionEndStation Scan Files (*.h5 *.hdf5)',

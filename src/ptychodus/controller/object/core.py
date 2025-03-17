@@ -14,9 +14,9 @@ from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
 from ..image import ImageController
-from .editorFactory import ObjectEditorViewControllerFactory
+from .editor_factory import ObjectEditorViewControllerFactory
 from .frc import FourierRingCorrelationViewController
-from .treeModel import ObjectTreeModel
+from .tree_model import ObjectTreeModel
 from .xmcd import XMCDViewController
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         )
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         repository: ObjectRepository,
         api: ObjectAPI,
@@ -146,7 +146,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                 self._api.openObject(itemIndex, filePath, file_type=nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Reader', err)
+                ExceptionDialog.show_exception('File Reader', err)
 
     def _copyToCurrentObject(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -178,11 +178,11 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         if itemIndex < 0:
             return
 
-        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+        filePath, nameFilter = self._fileDialogFactory.get_save_file_path(
             self._view,
             'Save Object',
-            nameFilters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
-            selectedNameFilter=self._api.getSaveFileFilter(),
+            name_filters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
+            selected_name_filter=self._api.getSaveFileFilter(),
         )
 
         if filePath:
@@ -190,7 +190,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                 self._api.saveObject(itemIndex, filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Writer', err)
+                ExceptionDialog.show_exception('File Writer', err)
 
     def _syncCurrentObjectToSettings(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -215,7 +215,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         if itemIndex < 0:
             logger.warning('No current item!')
         else:
-            self._xmcdViewController.analyze(itemIndex, itemIndex)
+            self._xmcdViewController._analyze(itemIndex, itemIndex)
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()
@@ -227,14 +227,14 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
-            self._imageController.clearArray()
+            self._imageController.clear_array()
         else:
             try:
                 item = self._repository[itemIndex]
             except IndexError:
                 logger.warning('Unable to access item for visualization!')
             else:
-                object_ = item.getObject()
+                object_ = item.get_object()
                 array = (
                     object_.get_layer(current.row())
                     if current.parent().isValid()
@@ -245,7 +245,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                 if pixelGeometry is None:
                     logger.warning('Missing object pixel geometry!')
                 else:
-                    self._imageController.setArray(array, pixelGeometry)
+                    self._imageController.set_array(array, pixelGeometry)
 
     def handle_item_inserted(self, index: int, item: ObjectRepositoryItem) -> None:
         self._treeModel.insertItem(index, item)

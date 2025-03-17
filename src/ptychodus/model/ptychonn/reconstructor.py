@@ -8,7 +8,7 @@ import numpy.typing
 import ptychonn
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.object import ObjectArrayType
+from ptychodus.api.object import Object, ObjectArrayType
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import (
     ReconstructInput,
@@ -17,30 +17,26 @@ from ptychodus.api.reconstructor import (
     TrainOutput,
 )
 
-from ..analysis import ObjectLinearInterpolator, ObjectStitcher
+from ..analysis import BarycentricArrayInterpolator, BarycentricArrayStitcher
 from .model import PtychoNNModelProvider
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 
 logger = logging.getLogger(__name__)
 
 
-# FIXME BEGIN
-class CenterBoxMeanPhaseCenteringStrategy:
+class CenterBoxMeanPhaseCenteringStrategy:  # FIXME USE
     def __call__(self, array: ObjectArrayType) -> ObjectArrayType:
-        oneThirdHeight = array.shape[-2] // 3
-        oneThirdWidth = array.shape[-1] // 3
+        one_third_height = array.shape[-2] // 3
+        one_third_width = array.shape[-1] // 3
 
         amplitude = numpy.absolute(array)
         phase = numpy.angle(array)
 
-        centerBoxMeanPhase = phase[
-            oneThirdHeight : oneThirdHeight * 2, oneThirdWidth : oneThirdWidth * 2
+        center_box_mean_phase = phase[
+            one_third_height : one_third_height * 2, one_third_width : one_third_width * 2
         ].mean()
 
-        return amplitude * numpy.exp(1j * (phase - centerBoxMeanPhase))
-
-
-# FIXME END
+        return amplitude * numpy.exp(1j * (phase - center_box_mean_phase))
 
 
 class PtychoNNTrainableReconstructor(TrainableReconstructor):
@@ -51,80 +47,72 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
     def __init__(
         self,
-        modelSettings: PtychoNNModelSettings,
-        trainingSettings: PtychoNNTrainingSettings,
-        modelProvider: PtychoNNModelProvider,
+        model_settings: PtychoNNModelSettings,
+        training_settings: PtychoNNTrainingSettings,
+        model_provider: PtychoNNModelProvider,
     ) -> None:
-        self._modelSettings = modelSettings
-        self._trainingSettings = trainingSettings
-        self._modelProvider = modelProvider
+        self._model_settings = model_settings
+        self._training_settings = training_settings
+        self._model_provider = model_provider
 
-        ptychonnVersion = version('ptychonn')
-        logger.info(f'\tPtychoNN {ptychonnVersion}')
+        ptychonn_version = version('ptychonn')
+        logger.info(f'\tPtychoNN {ptychonn_version}')
 
     @property
     def name(self) -> str:
-        return self._modelProvider.getModelName()
+        return self._model_provider.get_model_name()
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         # TODO data size/shape requirements to GUI
         data = parameters.patterns
-        dataSize = data.shape[-1]
+        data_size = data.shape[-1]
 
-        if dataSize != data.shape[-2]:
+        if data_size != data.shape[-2]:
             raise ValueError('PtychoNN expects square diffraction data!')
 
-        isDataSizePow2 = dataSize & (dataSize - 1) == 0 and dataSize > 0
+        is_data_size_pow2 = data_size & (data_size - 1) == 0 and data_size > 0
 
-        if not isDataSizePow2:
+        if not is_data_size_pow2:
             raise ValueError('PtychoNN expects that the diffraction data size is a power of two!')
 
-        # Bin diffraction data
-        # TODO extract binning to data loading (and verify that x-y coordinates are correct)
-        inputSize = dataSize
-        binSize = dataSize // inputSize
-
-        if binSize == 1:
-            binnedData = data
-        else:
-            binnedData = numpy.zeros((data.shape[0], inputSize, inputSize), dtype=data.dtype)
-
-            for i in range(inputSize):
-                for j in range(inputSize):
-                    binnedData[:, i, j] = numpy.sum(
-                        data[
-                            :,
-                            binSize * i : binSize * (i + 1),
-                            binSize * j : binSize * (j + 1),
-                        ]
-                    )
-
-        model = self._modelProvider.getModel()
+        model = self._model_provider.get_model()
 
         logger.debug('Inferring...')
-        objectPatches = ptychonn.infer(
-            data=binnedData.astype(numpy.float32),
+        object_patches = ptychonn.infer(
+            data=data.astype(numpy.float32),
             model=model,
         )
 
         logger.debug('Stitching...')
-        stitcher = ObjectStitcher(parameters.product.object_.get_geometry())
+        object_array = parameters.product.object_.get_array()
+        object_geometry = parameters.product.object_.get_geometry()
+        stitcher = BarycentricArrayStitcher(
+            upper=numpy.zeros_like(object_array), lower=numpy.zeros_like(object_array, dtype=float)
+        )
 
-        for scanPoint, objectPatchChannels in zip(parameters.product.scan, objectPatches):
-            patchArray = numpy.exp(1j * objectPatchChannels[0])
+        for scan_point, object_patch_channels in zip(parameters.product.scan, object_patches):
+            patch_array = numpy.exp(1j * object_patch_channels[0])
 
-            if objectPatchChannels.shape[0] == 2:
-                patchArray *= objectPatchChannels[1]
+            if object_patch_channels.shape[0] == 2:
+                patch_array *= object_patch_channels[1]
             else:
-                patchArray *= 0.5
+                patch_array *= 0.5
 
-            stitcher.addPatch(scanPoint, patchArray)
+            object_point = object_geometry.map_scan_point_to_object_point(scan_point)
+            stitcher.add_patch(object_point.position_x_px, object_point.position_y_px, patch_array)
+
+        object_ = Object(
+            array=stitcher.stitch(),
+            pixel_geometry=object_geometry.get_pixel_geometry(),
+            center=object_geometry.get_center(),
+            layer_distance_m=parameters.product.object_.layer_distance_m,
+        )
 
         product = Product(
             metadata=parameters.product.metadata,
             scan=parameters.product.scan,
             probe=parameters.product.probe,
-            object_=stitcher.build(),
+            object_=object_,
             costs=list(),  # TODO put something here?
         )
 
@@ -133,18 +121,19 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
     def get_model_file_filter(self) -> str:
         return self.MODEL_FILE_FILTER
 
-    def open_model(self, filePath: Path) -> None:
-        self._modelProvider.openModel(filePath)
+    def open_model(self, file_path: Path) -> None:
+        self._model_provider.open_model(file_path)
 
-    def save_model(self, filePath: Path) -> None:
-        self._modelProvider.saveModel(filePath)
+    def save_model(self, file_path: Path) -> None:
+        self._model_provider.save_model(file_path)
 
     def get_training_data_file_filter(self) -> str:
         return self.TRAINING_DATA_FILE_FILTER
 
-    def export_training_data(self, filePath: Path, parameters: ReconstructInput) -> None:
-        interpolator = ObjectLinearInterpolator(parameters.product.object_)
-        num_channels = self._modelProvider.getNumberOfChannels()
+    def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
+        object_geometry = parameters.product.object_.get_geometry()
+        interpolator = BarycentricArrayInterpolator(parameters.product.object_.get_array())
+        num_channels = self._model_provider.get_num_channels()
         probe_extent = ImageExtent(
             width_px=parameters.product.probe.width_px,
             height_px=parameters.product.probe.height_px,
@@ -154,60 +143,66 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         )
 
         for index, scan_point in enumerate(parameters.product.scan):
-            patch = interpolator.get_patch(scan_point, probe_extent).get_array()
+            object_point = object_geometry.map_scan_point_to_object_point(scan_point)
+            patch = interpolator.get_patch(
+                object_point.position_x_px,
+                object_point.position_y_px,
+                probe_extent.width_px,
+                probe_extent.height_px,
+            )
             patches[index, 0, :, :] = numpy.angle(patch)
 
             if num_channels > 1:
                 patches[index, 1, :, :] = numpy.absolute(patch)
 
-        logger.debug(f'Writing "{filePath}" as "NPZ"')
-        trainingData = {
+        logger.debug(f'Writing "{file_path}" as "NPZ"')
+        training_data = {
             self.PATTERNS_KW: parameters.patterns.astype(numpy.float32),
             self.PATCHES_KW: patches,
         }
-        numpy.savez_compressed(filePath, **trainingData)
+        numpy.savez_compressed(file_path, **training_data)
 
     def get_training_data_path(self) -> Path:
-        return self._trainingSettings.trainingDataPath.get_value()
+        return self._training_settings.training_data_path.get_value()
 
-    def train(self, dataPath: Path) -> TrainOutput:
-        logger.debug(f'Reading "{dataPath}" as "NPZ"')
-        trainingData = numpy.load(dataPath)
-        self._trainingSettings.trainingDataPath.set_value(dataPath)
+    def train(self, data_path: Path) -> TrainOutput:
+        logger.debug(f'Reading "{data_path}" as "NPZ"')
+        training_data = numpy.load(data_path)
+        self._training_settings.training_data_path.set_value(data_path)
 
-        model = self._modelProvider.getModel()
+        model = self._model_provider.get_model()
         logger.debug('Training...')
-        trainingSetFractionalSize = (
-            1 - self._trainingSettings.validationSetFractionalSize.get_value()
+        training_set_fractional_size = (
+            1 - self._training_settings.validation_set_fractional_size.get_value()
         )
-        trainer, trainerLog = ptychonn.train(
+        trainer, trainer_log = ptychonn.train(
             model=model,
-            batch_size=self._modelSettings.batchSize.get_value(),
+            batch_size=self._model_settings.batch_size.get_value(),
             out_dir=None,
-            X_train=trainingData[self.PATTERNS_KW],
-            Y_train=trainingData[self.PATCHES_KW],
-            epochs=self._trainingSettings.trainingEpochs.get_value(),
-            training_fraction=float(trainingSetFractionalSize),
-            log_frequency=self._trainingSettings.statusIntervalInEpochs.get_value(),
+            X_train=training_data[self.PATTERNS_KW],
+            Y_train=training_data[self.PATCHES_KW],
+            epochs=self._training_settings.training_epochs.get_value(),
+            training_fraction=float(training_set_fractional_size),
+            log_frequency=self._training_settings.status_interval_in_epochs.get_value(),
             strategy='ddp_notebook',
         )
-        self._modelProvider.setTrainer(trainer)
+        self._model_provider.set_trainer(trainer)
 
-        trainingLoss: list[float] = list()
-        validationLoss: list[float] = list()
+        training_loss: list[float] = list()
+        validation_loss: list[float] = list()
 
-        for entry in trainerLog.logs:
+        for entry in trainer_log.logs:
             try:
                 tloss = entry['training_loss']
                 vloss = entry['validation_loss']
             except KeyError:
                 pass
             else:
-                trainingLoss.append(tloss)
-                validationLoss.append(vloss)
+                training_loss.append(tloss)
+                validation_loss.append(vloss)
 
         return TrainOutput(
-            training_loss=trainingLoss,
-            validation_loss=validationLoss,
+            training_loss=training_loss,
+            validation_loss=validation_loss,
             result=0,
         )

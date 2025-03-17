@@ -88,7 +88,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
     def get_detector_pixel_geometry(self):
         return self._patternSizer.get_processed_pixel_geometry()
 
-    def getObjectPlanePixelGeometry(self) -> PixelGeometry:
+    def get_object_plane_pixel_geometry(self) -> PixelGeometry:
         return PixelGeometry(
             width_m=self.objectPlanePixelWidthInMeters,
             height_m=self.objectPlanePixelHeightInMeters,

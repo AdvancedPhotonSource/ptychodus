@@ -13,16 +13,16 @@ class LengthWidget(QWidget):
     def __init__(self, isSigned: bool, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.lengthInMeters = Decimal()
-        self.lineEdit = DecimalLineEdit.createInstance(isSigned=isSigned)
+        self.lineEdit = DecimalLineEdit.create_instance(isSigned=isSigned)
         self.unitsComboBox = QComboBox()
 
     @classmethod
-    def createInstance(
-        cls, *, isSigned: bool = False, parent: QWidget | None = None
+    def create_instance(
+        cls, *, is_signed: bool = False, parent: QWidget | None = None
     ) -> LengthWidget:
-        widget = cls(isSigned, parent)
+        widget = cls(is_signed, parent)
 
-        if not isSigned:
+        if not is_signed:
             widget.lineEdit.setMinimum(Decimal())
 
         widget.lineEdit.valueChanged.connect(widget._setLengthInMetersFromWidgets)

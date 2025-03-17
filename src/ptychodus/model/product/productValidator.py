@@ -55,7 +55,7 @@ class ProductValidator(Observable, Observer):
             self._isProbeValid = isProbeValidNow
             hasValidityChanged = True
 
-        object_ = self._object.getObject()
+        object_ = self._object.get_object()
         isObjectValidNow = self._geometry.isObjectGeometryValid(object_.get_geometry())
 
         if self._isObjectValid != isObjectValidNow:

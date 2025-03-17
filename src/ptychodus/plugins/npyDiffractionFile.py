@@ -67,12 +67,12 @@ class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
 def register_plugins(registry: PluginRegistry) -> None:
     npyDiffractionFileIO = NPYDiffractionFileIO()
 
-    registry.diffractionFileReaders.register_plugin(
+    registry.diffraction_file_readers.register_plugin(
         npyDiffractionFileIO,
         simple_name=NPYDiffractionFileIO.SIMPLE_NAME,
         display_name=NPYDiffractionFileIO.DISPLAY_NAME,
     )
-    registry.diffractionFileWriters.register_plugin(
+    registry.diffraction_file_writers.register_plugin(
         npyDiffractionFileIO,
         simple_name=NPYDiffractionFileIO.SIMPLE_NAME,
         display_name=NPYDiffractionFileIO.DISPLAY_NAME,

@@ -88,8 +88,8 @@ class PtyChiViewControllerFactory(ReconstructorViewControllerFactory):
         self._model = model
 
     @property
-    def backendName(self) -> str:
+    def backend_name(self) -> str:
         return 'pty-chi'
 
-    def createViewController(self, reconstructorName: str) -> QWidget:
+    def create_view_controller(self, reconstructorName: str) -> QWidget:
         return PtyChiViewController(self._model, reconstructorName)

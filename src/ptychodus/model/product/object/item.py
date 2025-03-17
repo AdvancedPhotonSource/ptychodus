@@ -67,7 +67,7 @@ class ObjectRepositoryItem(ParameterGroup):
         self.layerDistanceInMeters.set_value(distanceInMeters)
         self._rebuild()
 
-    def getObject(self) -> Object:
+    def get_object(self) -> Object:
         return self._object
 
     def getBuilder(self) -> ObjectBuilder:

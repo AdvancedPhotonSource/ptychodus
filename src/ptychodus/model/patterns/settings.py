@@ -10,19 +10,19 @@ class DetectorSettings(Observable, Observer):
         self._settingsGroup = registry.create_group('Detector')
         self._settingsGroup.add_observer(self)
 
-        self.widthInPixels = self._settingsGroup.create_integer_parameter(
+        self.width_px = self._settingsGroup.create_integer_parameter(
             'WidthInPixels', 1024, minimum=1
         )
-        self.pixelWidthInMeters = self._settingsGroup.create_real_parameter(
+        self.pixel_width_m = self._settingsGroup.create_real_parameter(
             'PixelWidthInMeters', 75e-6, minimum=0.0
         )
-        self.heightInPixels = self._settingsGroup.create_integer_parameter(
+        self.height_px = self._settingsGroup.create_integer_parameter(
             'HeightInPixels', 1024, minimum=1
         )
-        self.pixelHeightInMeters = self._settingsGroup.create_real_parameter(
+        self.pixel_height_m = self._settingsGroup.create_real_parameter(
             'PixelHeightInMeters', 75e-6, minimum=0.0
         )
-        self.bitDepth = self._settingsGroup.create_integer_parameter('BitDepth', 8, minimum=1)
+        self.bit_depth = self._settingsGroup.create_integer_parameter('BitDepth', 8, minimum=1)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._settingsGroup:

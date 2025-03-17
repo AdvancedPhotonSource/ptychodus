@@ -85,12 +85,12 @@ class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
 def register_plugins(registry: PluginRegistry) -> None:
     npzDiffractionFileIO = NPZDiffractionFileIO()
 
-    registry.diffractionFileReaders.register_plugin(
+    registry.diffraction_file_readers.register_plugin(
         npzDiffractionFileIO,
         simple_name=NPZDiffractionFileIO.SIMPLE_NAME,
         display_name=NPZDiffractionFileIO.DISPLAY_NAME,
     )
-    registry.diffractionFileWriters.register_plugin(
+    registry.diffraction_file_writers.register_plugin(
         npzDiffractionFileIO,
         simple_name=NPZDiffractionFileIO.SIMPLE_NAME,
         display_name=NPZDiffractionFileIO.DISPLAY_NAME,

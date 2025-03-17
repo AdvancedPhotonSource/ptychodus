@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog
 from ptychodus.api.observer import SequenceObserver
 
 from ...model.analysis import (
-    ExposureAnalyzer,
+    IlluminationMapper,
     ProbePropagator,
     STXMSimulator,
 )
@@ -23,12 +23,12 @@ from ...view.widgets import (
 )
 from ..data import FileDialogFactory
 from ..image import ImageController
-from .editorFactory import ProbeEditorViewControllerFactory
-from .exposure import ExposureViewController
+from .editor_factory import ProbeEditorViewControllerFactory
+from .illumination import IlluminationViewController
 from .fluorescence import FluorescenceViewController
 from .propagator import ProbePropagationViewController
 from .stxm import STXMViewController
-from .treeModel import ProbeTreeModel
+from .tree_model import ProbeTreeModel
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         propagatorVisualizationEngine: VisualizationEngine,
         stxmSimulator: STXMSimulator,
         stxmVisualizationEngine: VisualizationEngine,
-        exposureAnalyzer: ExposureAnalyzer,
+        exposureAnalyzer: IlluminationMapper,
         exposureVisualizationEngine: VisualizationEngine,
         fluorescenceEnhancer: FluorescenceEnhancer,
         fluorescenceVisualizationEngine: VisualizationEngine,
@@ -66,7 +66,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self._stxmViewController = STXMViewController(
             stxmSimulator, stxmVisualizationEngine, fileDialogFactory
         )
-        self._exposureViewController = ExposureViewController(
+        self._exposureViewController = IlluminationViewController(
             exposureAnalyzer, exposureVisualizationEngine, fileDialogFactory
         )
         self._fluorescenceViewController = FluorescenceViewController(
@@ -74,7 +74,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         )
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         repository: ProbeRepository,
         api: ProbeAPI,
@@ -83,7 +83,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         propagatorVisualizationEngine: VisualizationEngine,
         stxmSimulator: STXMSimulator,
         stxmVisualizationEngine: VisualizationEngine,
-        exposureAnalyzer: ExposureAnalyzer,
+        exposureAnalyzer: IlluminationMapper,
         exposureVisualizationEngine: VisualizationEngine,
         fluorescenceEnhancer: FluorescenceEnhancer,
         fluorescenceVisualizationEngine: VisualizationEngine,
@@ -188,7 +188,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
                 self._api.openProbe(itemIndex, filePath, file_type=nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Reader', err)
+                ExceptionDialog.show_exception('File Reader', err)
 
     def _copyToCurrentProbe(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -220,11 +220,11 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         if itemIndex < 0:
             return
 
-        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+        filePath, nameFilter = self._fileDialogFactory.get_save_file_path(
             self._view,
             'Save Probe',
-            nameFilters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
-            selectedNameFilter=self._api.getSaveFileFilter(),
+            name_filters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
+            selected_name_filter=self._api.getSaveFileFilter(),
         )
 
         if filePath:
@@ -232,7 +232,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
                 self._api.saveProbe(itemIndex, filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Writer', err)
+                ExceptionDialog.show_exception('File Writer', err)
 
     def _syncCurrentProbeToSettings(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -257,7 +257,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         if itemIndex < 0:
             logger.warning('No current item!')
         else:
-            self._stxmViewController.launch(itemIndex)
+            self._stxmViewController.simulate(itemIndex)
 
     def _analyzeExposure(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -285,7 +285,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex < 0:
-            self._imageController.clearArray()
+            self._imageController.clear_array()
         else:
             try:
                 item = self._repository[itemIndex]
@@ -303,7 +303,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
                 if pixelGeometry is None:
                     logger.warning('Missing probe pixel geometry!')
                 else:
-                    self._imageController.setArray(array, pixelGeometry)
+                    self._imageController.set_array(array, pixelGeometry)
 
     def handle_item_inserted(self, index: int, item: ProbeRepositoryItem) -> None:
         self._treeModel.insertItem(index, item)

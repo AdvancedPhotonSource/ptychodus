@@ -79,7 +79,7 @@ class CSAXSDiffractionFileReader(DiffractionFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.diffractionFileReaders.register_plugin(
+    registry.diffraction_file_readers.register_plugin(
         CSAXSDiffractionFileReader(),
         simple_name=CSAXSDiffractionFileReader.SIMPLE_NAME,
         display_name=CSAXSDiffractionFileReader.DISPLAY_NAME,

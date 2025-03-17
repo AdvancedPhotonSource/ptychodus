@@ -42,7 +42,7 @@ class ProbePropagator(Observable):
 
     def getProductName(self) -> str:
         item = self._repository[self._productIndex]
-        return item.getName()
+        return item.get_name()
 
     def propagate(
         self,
@@ -53,7 +53,7 @@ class ProbePropagator(Observable):
     ) -> None:  # FIXME OPR
         item = self._repository[self._productIndex]
         probe = item.getProbe().getProbe()
-        wavelengthInMeters = item.getGeometry().probe_wavelength_m
+        wavelengthInMeters = item.get_geometry().probe_wavelength_m
         propagatedWavefield = numpy.zeros(
             (numberOfSteps, probe.height_px, probe.width_px),
             dtype=probe.dtype,
@@ -83,17 +83,17 @@ class ProbePropagator(Observable):
                 propagatedWavefield[idx, mode, :, :] = wf
                 propagatedIntensity[idx, :, :] += intensity(wf)
 
-        self._settings.beginCoordinateInMeters.set_value(beginCoordinateInMeters)
-        self._settings.endCoordinateInMeters.set_value(endCoordinateInMeters)
+        self._settings.begin_coordinate_m.set_value(beginCoordinateInMeters)
+        self._settings.end_coordinate_m.set_value(endCoordinateInMeters)
         self._propagatedWavefield = propagatedWavefield
         self._propagatedIntensity = propagatedIntensity
         self.notify_observers()
 
     def getBeginCoordinateInMeters(self) -> float:
-        return self._settings.beginCoordinateInMeters.get_value()
+        return self._settings.begin_coordinate_m.get_value()
 
     def getEndCoordinateInMeters(self) -> float:
-        return self._settings.endCoordinateInMeters.get_value()
+        return self._settings.end_coordinate_m.get_value()
 
     def _getProbe(self) -> Probe:
         item = self._repository[self._productIndex]
@@ -109,7 +109,7 @@ class ProbePropagator(Observable):
 
     def getNumberOfSteps(self) -> int:
         if self._propagatedIntensity is None:
-            return self._settings.numberOfSteps.get_value()
+            return self._settings.num_steps.get_value()
 
         return self._propagatedIntensity.shape[0]
 

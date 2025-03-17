@@ -94,22 +94,22 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
 
 class PluginRegistry:
     def __init__(self) -> None:
-        self.diffractionFileReaders = PluginChooser[DiffractionFileReader]()
-        self.diffractionFileWriters = PluginChooser[DiffractionFileWriter]()
-        self.scanFileReaders = PluginChooser[ScanFileReader]()
-        self.scanFileWriters = PluginChooser[ScanFileWriter]()
-        self.fresnelZonePlates = PluginChooser[FresnelZonePlate]()
-        self.probeFileReaders = PluginChooser[ProbeFileReader]()
-        self.probeFileWriters = PluginChooser[ProbeFileWriter]()
-        self.objectFileReaders = PluginChooser[ObjectFileReader]()
-        self.objectFileWriters = PluginChooser[ObjectFileWriter]()
-        self.productFileReaders = PluginChooser[ProductFileReader]()
-        self.productFileWriters = PluginChooser[ProductFileWriter]()
-        self.fileBasedWorkflows = PluginChooser[FileBasedWorkflow]()
-        self.fluorescenceFileReaders = PluginChooser[FluorescenceFileReader]()
-        self.fluorescenceFileWriters = PluginChooser[FluorescenceFileWriter]()
-        self.upscalingStrategies = PluginChooser[UpscalingStrategy]()
-        self.deconvolutionStrategies = PluginChooser[DeconvolutionStrategy]()
+        self.diffraction_file_readers = PluginChooser[DiffractionFileReader]()
+        self.diffraction_file_writers = PluginChooser[DiffractionFileWriter]()
+        self.scan_file_readers = PluginChooser[ScanFileReader]()
+        self.scan_file_writers = PluginChooser[ScanFileWriter]()
+        self.fresnel_zone_plates = PluginChooser[FresnelZonePlate]()
+        self.probe_file_readers = PluginChooser[ProbeFileReader]()
+        self.probe_file_writers = PluginChooser[ProbeFileWriter]()
+        self.object_file_readers = PluginChooser[ObjectFileReader]()
+        self.object_file_writers = PluginChooser[ObjectFileWriter]()
+        self.product_file_readers = PluginChooser[ProductFileReader]()
+        self.product_file_writers = PluginChooser[ProductFileWriter]()
+        self.file_based_workflows = PluginChooser[FileBasedWorkflow]()
+        self.fluorescence_file_readers = PluginChooser[FluorescenceFileReader]()
+        self.fluorescence_file_writers = PluginChooser[FluorescenceFileWriter]()
+        self.upscaling_strategies = PluginChooser[UpscalingStrategy]()
+        self.deconvolution_strategies = PluginChooser[DeconvolutionStrategy]()
 
     @classmethod
     def load_plugins(cls) -> PluginRegistry:

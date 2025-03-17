@@ -58,13 +58,13 @@ class FileDialogFactory(Observable):
 
         return filePath, dialog.selectedNameFilter()
 
-    def getSaveFilePath(
+    def get_save_file_path(
         self,
         parent: QWidget,
         caption: str,
-        nameFilters: Sequence[str] | None = None,
+        name_filters: Sequence[str] | None = None,
         mimeTypeFilters: Sequence[str] | None = None,
-        selectedNameFilter: str | None = None,
+        selected_name_filter: str | None = None,
     ) -> tuple[Path | None, str]:
         filePath = None
 
@@ -72,14 +72,14 @@ class FileDialogFactory(Observable):
         dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
         dialog.setFileMode(QFileDialog.FileMode.AnyFile)
 
-        if nameFilters is not None:
-            dialog.setNameFilters(nameFilters)
+        if name_filters is not None:
+            dialog.setNameFilters(name_filters)
 
         if mimeTypeFilters is not None:
             dialog.setMimeTypeFilters(mimeTypeFilters)
 
-        if selectedNameFilter is not None:
-            dialog.selectNameFilter(selectedNameFilter)
+        if selected_name_filter is not None:
+            dialog.selectNameFilter(selected_name_filter)
 
         if dialog.exec() == QDialog.DialogCode.Accepted:  # TODO exec -> open
             fileNameList = dialog.selectedFiles()

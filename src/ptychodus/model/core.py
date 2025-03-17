@@ -23,7 +23,7 @@ from ptychodus.api.workflow import WorkflowAPI
 
 from .analysis import (
     AnalysisCore,
-    ExposureAnalyzer,
+    IlluminationMapper,
     FourierRingCorrelator,
     ProbePropagator,
     STXMSimulator,
@@ -115,9 +115,9 @@ class PtychodusStreamingContext:
 
 class ModelCore:
     def __init__(
-        self, settingsFile: Path | None = None, *, isDeveloperModeEnabled: bool = False
+        self, settingsFile: Path | None = None, *, is_developer_mode_enabled: bool = False
     ) -> None:
-        configureLogger(isDeveloperModeEnabled)
+        configureLogger(is_developer_mode_enabled)
         self.rng = numpy.random.default_rng()
         self._pluginRegistry = PluginRegistry.load_plugins()
 
@@ -126,8 +126,8 @@ class ModelCore:
 
         self.patterns_core = PatternsCore(
             self.settingsRegistry,
-            self._pluginRegistry.diffractionFileReaders,
-            self._pluginRegistry.diffractionFileWriters,
+            self._pluginRegistry.diffraction_file_readers,
+            self._pluginRegistry.diffraction_file_writers,
             self.settingsRegistry,
         )
         self._productCore = ProductCore(
@@ -135,15 +135,15 @@ class ModelCore:
             self.settingsRegistry,
             self.patterns_core.patternSizer,
             self.patterns_core.dataset,
-            self._pluginRegistry.scanFileReaders,
-            self._pluginRegistry.scanFileWriters,
-            self._pluginRegistry.fresnelZonePlates,
-            self._pluginRegistry.probeFileReaders,
-            self._pluginRegistry.probeFileWriters,
-            self._pluginRegistry.objectFileReaders,
-            self._pluginRegistry.objectFileWriters,
-            self._pluginRegistry.productFileReaders,
-            self._pluginRegistry.productFileWriters,
+            self._pluginRegistry.scan_file_readers,
+            self._pluginRegistry.scan_file_writers,
+            self._pluginRegistry.fresnel_zone_plates,
+            self._pluginRegistry.probe_file_readers,
+            self._pluginRegistry.probe_file_writers,
+            self._pluginRegistry.object_file_readers,
+            self._pluginRegistry.object_file_writers,
+            self._pluginRegistry.product_file_readers,
+            self._pluginRegistry.product_file_writers,
             self.settingsRegistry,
         )
         self.metadataPresenter = MetadataPresenter(
@@ -153,18 +153,18 @@ class ModelCore:
             self._productCore.settings,
         )
 
-        self.patternVisualizationEngine = VisualizationEngine(isComplex=False)
-        self.probeVisualizationEngine = VisualizationEngine(isComplex=True)
-        self.objectVisualizationEngine = VisualizationEngine(isComplex=True)
+        self.patternVisualizationEngine = VisualizationEngine(is_complex=False)
+        self.probeVisualizationEngine = VisualizationEngine(is_complex=True)
+        self.objectVisualizationEngine = VisualizationEngine(is_complex=True)
 
         self.ptyChiReconstructorLibrary = PtyChiReconstructorLibrary(
-            self.settingsRegistry, self.patterns_core.patternSizer, isDeveloperModeEnabled
+            self.settingsRegistry, self.patterns_core.patternSizer, is_developer_mode_enabled
         )
-        self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
-            self.settingsRegistry, isDeveloperModeEnabled
+        self.tikeReconstructorLibrary = TikeReconstructorLibrary.create_instance(
+            self.settingsRegistry, is_developer_mode_enabled
         )
-        self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
-            self.settingsRegistry, isDeveloperModeEnabled
+        self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.create_instance(
+            self.settingsRegistry, is_developer_mode_enabled
         )
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
@@ -179,10 +179,10 @@ class ModelCore:
         self._fluorescenceCore = FluorescenceCore(
             self.settingsRegistry,
             self._productCore.productRepository,
-            self._pluginRegistry.upscalingStrategies,
-            self._pluginRegistry.deconvolutionStrategies,
-            self._pluginRegistry.fluorescenceFileReaders,
-            self._pluginRegistry.fluorescenceFileWriters,
+            self._pluginRegistry.upscaling_strategies,
+            self._pluginRegistry.deconvolution_strategies,
+            self._pluginRegistry.fluorescence_file_readers,
+            self._pluginRegistry.fluorescence_file_writers,
         )
         self._analysisCore = AnalysisCore(
             self.settingsRegistry,
@@ -202,7 +202,7 @@ class ModelCore:
         self._automationCore = AutomationCore(
             self.settingsRegistry,
             self._workflowCore.workflowAPI,
-            self._pluginRegistry.fileBasedWorkflows,
+            self._pluginRegistry.file_based_workflows,
         )
 
         if settingsFile:
@@ -315,7 +315,7 @@ class ModelCore:
             )
 
             if fluorescenceInputFilePath is not None and fluorescenceOutputFilePath is not None:
-                self._fluorescenceCore.enhanceFluorescence(
+                self._fluorescenceCore.enhance_fluorescence(
                     outputProductIndex,
                     fluorescenceInputFilePath,
                     fluorescenceOutputFilePath,
@@ -336,31 +336,31 @@ class ModelCore:
 
     @property
     def stxmSimulator(self) -> STXMSimulator:
-        return self._analysisCore.stxmSimulator
+        return self._analysisCore.stxm_simulator
 
     @property
     def stxmVisualizationEngine(self) -> VisualizationEngine:
-        return self._analysisCore.stxmVisualizationEngine
+        return self._analysisCore.stxm_visualization_engine
 
     @property
     def probePropagator(self) -> ProbePropagator:
-        return self._analysisCore.probePropagator
+        return self._analysisCore.probe_propagator
 
     @property
     def probePropagatorVisualizationEngine(self) -> VisualizationEngine:
-        return self._analysisCore.probePropagatorVisualizationEngine
+        return self._analysisCore.probe_propagator_visualization_engine
 
     @property
-    def exposureAnalyzer(self) -> ExposureAnalyzer:
-        return self._analysisCore.exposureAnalyzer
+    def exposureAnalyzer(self) -> IlluminationMapper:
+        return self._analysisCore.exposure_analyzer
 
     @property
     def exposureVisualizationEngine(self) -> VisualizationEngine:
-        return self._analysisCore.exposureVisualizationEngine
+        return self._analysisCore.exposure_visualization_engine
 
     @property
     def fourierRingCorrelator(self) -> FourierRingCorrelator:
-        return self._analysisCore.fourierRingCorrelator
+        return self._analysisCore.fourier_ring_correlator
 
     @property
     def fluorescenceEnhancer(self) -> FluorescenceEnhancer:
@@ -368,15 +368,15 @@ class ModelCore:
 
     @property
     def fluorescenceVisualizationEngine(self) -> VisualizationEngine:
-        return self._fluorescenceCore.visualizationEngine
+        return self._fluorescenceCore.visualization_engine
 
     @property
     def xmcdAnalyzer(self) -> XMCDAnalyzer:
-        return self._analysisCore.xmcdAnalyzer
+        return self._analysisCore.xmcd_analyzer
 
     @property
     def xmcdVisualizationEngine(self) -> VisualizationEngine:
-        return self._analysisCore.xmcdVisualizationEngine
+        return self._analysisCore.xmcd_visualization_engine
 
     @property
     def areWorkflowsSupported(self) -> bool:
@@ -399,7 +399,7 @@ class ModelCore:
         return self._workflowCore.parametersPresenter
 
     @property
-    def workflowAPI(self) -> WorkflowAPI:
+    def workflow_api(self) -> WorkflowAPI:
         return self._workflowCore.workflowAPI
 
     @property

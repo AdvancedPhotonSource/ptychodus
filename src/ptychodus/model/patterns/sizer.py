@@ -123,8 +123,8 @@ class PatternSizer(Observable, Observer):
         super().__init__()
         self._pattern_settings = pattern_settings
         self.axis_x = PatternAxisSizer(
-            detector_settings.widthInPixels,
-            detector_settings.pixelWidthInMeters,
+            detector_settings.width_px,
+            detector_settings.pixel_width_m,
             pattern_settings.cropEnabled,
             pattern_settings.cropWidthInPixels,
             pattern_settings.cropCenterXInPixels,
@@ -134,8 +134,8 @@ class PatternSizer(Observable, Observer):
             pattern_settings.padX,
         )
         self.axis_y = PatternAxisSizer(
-            detector_settings.heightInPixels,
-            detector_settings.pixelHeightInMeters,
+            detector_settings.height_px,
+            detector_settings.pixel_height_m,
             pattern_settings.cropEnabled,
             pattern_settings.cropHeightInPixels,
             pattern_settings.cropCenterYInPixels,

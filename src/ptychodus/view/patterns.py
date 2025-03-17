@@ -26,17 +26,17 @@ class DetectorView(QGroupBox):
 class PatternsButtonBox(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.openButton = QPushButton('Open')
-        self.saveButton = QPushButton('Save')
-        self.infoButton = QPushButton('Info')
-        self.closeButton = QPushButton('Close')
+        self.open_button = QPushButton('Open')
+        self.save_button = QPushButton('Save')
+        self.info_button = QPushButton('Info')
+        self.close_button = QPushButton('Close')
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.openButton)
-        layout.addWidget(self.saveButton)
-        layout.addWidget(self.infoButton)
-        layout.addWidget(self.closeButton)
+        layout.addWidget(self.open_button)
+        layout.addWidget(self.save_button)
+        layout.addWidget(self.info_button)
+        layout.addWidget(self.close_button)
         self.setLayout(layout)
 
 
@@ -111,15 +111,15 @@ class PatternsView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.detectorView = DetectorView()
-        self.treeView = QTreeView()
+        self.tree_view = QTreeView()
         self.infoLabel = QLabel()
-        self.buttonBox = PatternsButtonBox()
+        self.button_box = PatternsButtonBox()
 
-        self.treeView.header().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.tree_view.header().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout = QVBoxLayout()
         layout.addWidget(self.detectorView)
-        layout.addWidget(self.treeView)
+        layout.addWidget(self.tree_view)
         layout.addWidget(self.infoLabel)
-        layout.addWidget(self.buttonBox)
+        layout.addWidget(self.button_box)
         self.setLayout(layout)

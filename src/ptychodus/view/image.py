@@ -29,11 +29,11 @@ class ImageDisplayRangeDialog(QDialog):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.buttonBox = QDialogButtonBox()
-        self.minValueLineEdit = DecimalLineEdit.createInstance()
-        self.maxValueLineEdit = DecimalLineEdit.createInstance()
+        self.minValueLineEdit = DecimalLineEdit.create_instance()
+        self.maxValueLineEdit = DecimalLineEdit.create_instance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ImageDisplayRangeDialog:
+    def create_instance(cls, parent: QWidget | None = None) -> ImageDisplayRangeDialog:
         dialog = cls(parent)
         dialog.setWindowTitle('Set Display Range')
         dialog.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
@@ -61,7 +61,7 @@ class ImageToolsGroupBox(BottomTitledGroupBox):
         self.lineCutButton = QToolButton()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ImageToolsGroupBox:
+    def create_instance(cls, parent: QWidget | None = None) -> ImageToolsGroupBox:
         view = cls(parent)
 
         view.homeButton.setIcon(QIcon(':/icons/home'))
@@ -110,7 +110,7 @@ class ImageRendererGroupBox(BottomTitledGroupBox):
         self.variantComboBox = QComboBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ImageRendererGroupBox:
+    def create_instance(cls, parent: QWidget | None = None) -> ImageRendererGroupBox:
         view = cls(parent)
 
         view.rendererComboBox.setToolTip('Array Component')
@@ -132,14 +132,14 @@ class ImageRendererGroupBox(BottomTitledGroupBox):
 class ImageDataRangeGroupBox(BottomTitledGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Data Range', parent)
-        self.minDisplayValueSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
-        self.maxDisplayValueSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
+        self.minDisplayValueSlider = DecimalSlider.create_instance(Qt.Orientation.Horizontal)
+        self.maxDisplayValueSlider = DecimalSlider.create_instance(Qt.Orientation.Horizontal)
         self.autoButton = QPushButton('Auto')
         self.editButton = QPushButton('Edit')
         self.colorLegendButton = QPushButton('Color Legend')
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ImageDataRangeGroupBox:
+    def create_instance(cls, parent: QWidget | None = None) -> ImageDataRangeGroupBox:
         view = cls(parent)
 
         view.minDisplayValueSlider.setToolTip('Minimum Display Value')
@@ -169,12 +169,12 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
 class ImageRibbon(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.imageToolsGroupBox = ImageToolsGroupBox.createInstance()
-        self.colormapGroupBox = ImageRendererGroupBox.createInstance()
-        self.dataRangeGroupBox = ImageDataRangeGroupBox.createInstance()
+        self.imageToolsGroupBox = ImageToolsGroupBox.create_instance()
+        self.colormapGroupBox = ImageRendererGroupBox.create_instance()
+        self.dataRangeGroupBox = ImageDataRangeGroupBox.create_instance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ImageRibbon:
+    def create_instance(cls, parent: QWidget | None = None) -> ImageRibbon:
         view = cls(parent)
 
         layout = QHBoxLayout()
@@ -293,11 +293,11 @@ class ImageWidget(VisualizationView):
 class ImageView(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.imageRibbon = ImageRibbon.createInstance()
+        self.imageRibbon = ImageRibbon.create_instance()
         self.imageWidget = ImageWidget()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ImageView:
+    def create_instance(cls, parent: QWidget | None = None) -> ImageView:
         view = cls(parent)
 
         layout = QVBoxLayout()

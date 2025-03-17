@@ -16,7 +16,7 @@ class ScanPlotView(QWidget):
         self.axes = self.figure.add_subplot(111)
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ScanPlotView:
+    def create_instance(cls, parent: QWidget | None = None) -> ScanPlotView:
         view = cls(parent)
 
         layout = QVBoxLayout()

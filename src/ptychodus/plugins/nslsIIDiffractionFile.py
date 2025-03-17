@@ -70,7 +70,7 @@ class NSLSIIDiffractionFileReader(DiffractionFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.diffractionFileReaders.register_plugin(
+    registry.diffraction_file_readers.register_plugin(
         NSLSIIDiffractionFileReader(),
         simple_name=NSLSIIDiffractionFileReader.SIMPLE_NAME,
         display_name=NSLSIIDiffractionFileReader.DISPLAY_NAME,

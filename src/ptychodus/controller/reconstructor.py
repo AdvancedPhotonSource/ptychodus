@@ -28,11 +28,11 @@ logger = logging.getLogger(__name__)
 class ReconstructorViewControllerFactory(ABC):
     @property
     @abstractmethod
-    def backendName(self) -> str:
+    def backend_name(self) -> str:
         pass
 
     @abstractmethod
-    def createViewController(self, reconstructorName: str) -> QWidget:
+    def create_view_controller(self, reconstructor_name: str) -> QWidget:
         pass
 
 
@@ -54,7 +54,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._plotView = plotView
         self._fileDialogFactory = fileDialogFactory
         self._viewControllerFactoryDict: dict[str, ReconstructorViewControllerFactory] = {
-            vcf.backendName: vcf for vcf in viewControllerFactoryList
+            vcf.backend_name: vcf for vcf in viewControllerFactoryList
         }
 
         for name in presenter.getReconstructorList():
@@ -125,7 +125,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
         if backendName in self._viewControllerFactoryDict:
             viewControllerFactory = self._viewControllerFactoryDict[backendName]
-            widget = viewControllerFactory.createViewController(reconstructorName)
+            widget = viewControllerFactory.create_view_controller(reconstructorName)
         else:
             widget = QLabel(f'{backendName} not found!')
             widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -142,7 +142,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             outputProductIndex = self._presenter.reconstruct(inputProductIndex)
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Reconstructor', err)
+            ExceptionDialog.show_exception('Reconstructor', err)
         else:
             self._view.parametersView.productComboBox.setCurrentIndex(outputProductIndex)
             self._view.progressDialog.show()
@@ -157,7 +157,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             self._presenter.reconstructSplit(inputProductIndex)
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Split Reconstructor', err)
+            ExceptionDialog.show_exception('Split Reconstructor', err)
 
         self._view.progressDialog.show()
 
@@ -172,12 +172,12 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
                 self._presenter.openModel(filePath)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('Model Reader', err)
+                ExceptionDialog.show_exception('Model Reader', err)
 
     def _saveModel(self) -> None:
         nameFilter = self._presenter.getModelFileFilter()
-        filePath, _ = self._fileDialogFactory.getSaveFilePath(
-            self._view, 'Save Model', nameFilters=[nameFilter], selectedNameFilter=nameFilter
+        filePath, _ = self._fileDialogFactory.get_save_file_path(
+            self._view, 'Save Model', name_filters=[nameFilter], selected_name_filter=nameFilter
         )
 
         if filePath:
@@ -185,7 +185,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
                 self._presenter.saveModel(filePath)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('Model Writer', err)
+                ExceptionDialog.show_exception('Model Writer', err)
 
     def _exportTrainingData(self) -> None:
         inputProductIndex = self._view.parametersView.productComboBox.currentIndex()
@@ -194,11 +194,11 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             return
 
         nameFilter = self._presenter.getTrainingDataFileFilter()
-        filePath, _ = self._fileDialogFactory.getSaveFilePath(
+        filePath, _ = self._fileDialogFactory.get_save_file_path(
             self._view,
             'Export Training Data',
-            nameFilters=[nameFilter],
-            selectedNameFilter=nameFilter,
+            name_filters=[nameFilter],
+            selected_name_filter=nameFilter,
         )
 
         if filePath:
@@ -206,7 +206,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
                 self._presenter.exportTrainingData(filePath, inputProductIndex)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('Training Data Writer', err)
+                ExceptionDialog.show_exception('Training Data Writer', err)
 
     def _train(self) -> None:
         dataPath = self._fileDialogFactory.getExistingDirectoryPath(
@@ -220,7 +220,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
                 self._presenter.train(dataPath)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('Trainer', err)
+                ExceptionDialog.show_exception('Trainer', err)
 
     def _redrawPlot(self) -> None:
         productIndex = self._view.parametersView.productComboBox.currentIndex()

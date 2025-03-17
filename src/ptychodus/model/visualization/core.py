@@ -11,10 +11,10 @@ from ptychodus.api.visualization import (
     VisualizationProduct,
 )
 
-from .colorAxis import ColorAxis
-from .colorModelRenderer import CylindricalColorModelRenderer
+from .color_axis import ColorAxis
+from .color_model_renderer import CylindricalColorModelRenderer
 from .colormap import ColormapParameter
-from .colormapRenderer import ColormapRenderer
+from .colormap_renderer import ColormapRenderer
 from .components import (
     AmplitudeArrayComponent,
     ImaginaryArrayComponent,
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 class VisualizationEngine(Observable, Observer):
-    def __init__(self, *, isComplex: bool) -> None:
+    def __init__(self, *, is_complex: bool) -> None:
         super().__init__()
         self._rendererChooser = PluginChooser[Renderer]()
         self._transformation = ScalarTransformationParameter()
@@ -47,7 +47,7 @@ class VisualizationEngine(Observable, Observer):
             display_name='Real',
         )
 
-        if isComplex:
+        if is_complex:
             amplitudeComponent = AmplitudeArrayComponent()
             phaseComponent = PhaseInRadiansArrayComponent()
             cyclicColormap = ColormapParameter(isCyclic=True)
@@ -114,7 +114,7 @@ class VisualizationEngine(Observable, Observer):
         self._rendererChooser.set_current_plugin(value)
 
     def isRendererCyclic(self) -> bool:
-        return self._rendererPlugin.strategy.isCyclic()
+        return self._rendererPlugin.strategy.is_cyclic()
 
     def transformations(self) -> Iterator[str]:
         return self._transformation.choices()
@@ -129,10 +129,10 @@ class VisualizationEngine(Observable, Observer):
         return self._rendererPlugin.strategy.variants()
 
     def getVariant(self) -> str:
-        return self._rendererPlugin.strategy.getVariant()
+        return self._rendererPlugin.strategy.get_variant()
 
     def setVariant(self, value: str) -> None:
-        return self._rendererPlugin.strategy.setVariant(value)
+        return self._rendererPlugin.strategy.set_variant(value)
 
     def getMinDisplayValue(self) -> float:
         return self._colorAxis.lower.get_value()
@@ -147,7 +147,7 @@ class VisualizationEngine(Observable, Observer):
         self._colorAxis.upper.set_value(value)
 
     def setDisplayValueRange(self, lower: float, upper: float) -> None:
-        self._colorAxis.setRange(lower, upper)
+        self._colorAxis.set_range(lower, upper)
 
     def colorize(self, array: NumberArrayType) -> RealArrayType:
         return self._rendererPlugin.strategy.colorize(array)
@@ -160,7 +160,7 @@ class VisualizationEngine(Observable, Observer):
         autoscaleColorAxis: bool,
     ) -> VisualizationProduct:
         return self._rendererPlugin.strategy.render(
-            array, pixelGeometry, autoscaleColorAxis=autoscaleColorAxis
+            array, pixelGeometry, autoscale_color_axis=autoscaleColorAxis
         )
 
     def _update(self, observable: Observable) -> None:

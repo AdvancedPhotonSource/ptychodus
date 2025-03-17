@@ -7,7 +7,7 @@ import csv
 import numpy
 
 from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint, ScanPointParseError
-from .neXusDiffractionFile import NeXusDiffractionFileReader
+from .nexus_diffraction_file import NeXusDiffractionFileReader
 
 __all__ = [
     'VelociprobeScanFileReader',

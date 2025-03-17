@@ -1,6 +1,8 @@
 import logging
 
-from ...model.analysis import XMCDAnalyzer, XMCDResult
+from ptychodus.api.observer import Observable, Observer
+
+from ...model.analysis import XMCDAnalyzer, XMCDData
 from ...model.visualization import VisualizationEngine
 from ...view.object import XMCDDialog
 from ...view.widgets import ExceptionDialog
@@ -9,101 +11,111 @@ from ..visualization import (
     VisualizationParametersController,
     VisualizationWidgetController,
 )
-from .treeModel import ObjectTreeModel
+from .tree_model import ObjectTreeModel
 
 logger = logging.getLogger(__name__)
 
 
-class XMCDViewController:
+class XMCDViewController(Observer):
     def __init__(
         self,
         analyzer: XMCDAnalyzer,
         engine: VisualizationEngine,
-        fileDialogFactory: FileDialogFactory,
-        treeModel: ObjectTreeModel,
+        file_dialog_factory: FileDialogFactory,
+        tree_model: ObjectTreeModel,
     ) -> None:
         super().__init__()
         self._analyzer = analyzer
         self._engine = engine
-        self._fileDialogFactory = fileDialogFactory
+        self._file_dialog_factory = file_dialog_factory
         self._dialog = XMCDDialog()
-        self._dialog.setWindowTitle('XMCD Analysis')
-        self._dialog.parametersView.lcircComboBox.setModel(treeModel)
-        self._dialog.parametersView.lcircComboBox.currentIndexChanged.connect(self._analyze)
-        self._dialog.parametersView.rcircComboBox.setModel(treeModel)
-        self._dialog.parametersView.rcircComboBox.currentIndexChanged.connect(self._analyze)
-        self._dialog.parametersView.saveButton.clicked.connect(self._saveResult)
+        self._dialog.parameters_view.lcirc_combo_box.setModel(tree_model)
+        self._dialog.parameters_view.lcirc_combo_box.currentIndexChanged.connect(self._analyze)
+        self._dialog.parameters_view.rcirc_combo_box.setModel(tree_model)
+        self._dialog.parameters_view.rcirc_combo_box.currentIndexChanged.connect(self._analyze)
+        self._dialog.parameters_view.save_button.clicked.connect(self._save_data)
 
-        self._differenceVisualizationWidgetController = VisualizationWidgetController(
+        self._difference_visualization_widget_controller = VisualizationWidgetController(
             engine,
-            self._dialog.differenceWidget,
-            self._dialog.statusBar,
-            fileDialogFactory,
+            self._dialog.difference_widget,
+            self._dialog.status_bar,
+            file_dialog_factory,
         )
-        self._sumVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.sumWidget, self._dialog.statusBar, fileDialogFactory
+        self._sum_visualization_widget_controller = VisualizationWidgetController(
+            engine, self._dialog.sum_widget, self._dialog.status_bar, file_dialog_factory
         )
-        self._ratioVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.ratioWidget, self._dialog.statusBar, fileDialogFactory
+        self._ratio_visualization_widget_controller = VisualizationWidgetController(
+            engine, self._dialog.ratio_widget, self._dialog.status_bar, file_dialog_factory
         )
-        self._visualizationParametersController = VisualizationParametersController.createInstance(
-            engine, self._dialog.parametersView.visualizationParametersView
+        self._visualization_parameters_controller = (
+            VisualizationParametersController.create_instance(
+                engine, self._dialog.parameters_view.visualization_parameters_view
+            )
         )
-        self._result: XMCDResult | None = None
 
-    def _analyze(self) -> None:
-        lcircItemIndex = self._dialog.parametersView.lcircComboBox.currentIndex()
-        rcircItemIndex = self._dialog.parametersView.rcircComboBox.currentIndex()
+        analyzer.add_observer(self)
 
-        if lcircItemIndex < 0 or rcircItemIndex < 0:
+    def _analyze(self) -> None:  # FIXME
+        lcirc_product_index = self._dialog.parameters_view.lcirc_combo_box.currentIndex()
+        rcirc_product_index = self._dialog.parameters_view.rcirc_combo_box.currentIndex()
+
+        if lcirc_product_index < 0 or rcirc_product_index < 0:
             return
 
         try:
-            result = self._analyzer.analyze(lcircItemIndex, rcircItemIndex)
+            lcirc_product_name = self._analyzer.get_lcirc_product_name()
+            rcirc_product_name = self._analyzer.get_rcirc_product_name()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('XMCD Analysis', err)
-            return
-
-        self._result = result
-        pixel_geometry = result.pixel_geometry
-
-        if pixel_geometry is None:
-            logger.warning('Missing XMCD pixel geometry!')
+            ExceptionDialog.show_exception('Analyze XMCD', err)
         else:
-            self._differenceVisualizationWidgetController.setArray(
-                result.polar_difference[0, :, :], pixel_geometry
+            self._dialog.setWindowTitle(
+                f'Analyze XMCD: L: {lcirc_product_name} R: {rcirc_product_name}'
             )
-            self._sumVisualizationWidgetController.setArray(
-                result.polar_sum[0, :, :], pixel_geometry
-            )
-            # TODO support multi-layer objects
-            self._ratioVisualizationWidgetController.setArray(
-                result.polar_ratio[0, :, :], pixel_geometry
-            )
+            self._dialog.open()
 
-    def analyze(self, lcircItemIndex: int, rcircItemIndex: int) -> None:
-        self._dialog.parametersView.lcircComboBox.setCurrentIndex(lcircItemIndex)
-        self._dialog.parametersView.rcircComboBox.setCurrentIndex(rcircItemIndex)
+        self._analyzer.analyze(lcirc_product_index, rcirc_product_index)
+
+    def analyze(self, lcirc_product_index: int, rcirc_product_index: int) -> None:  # FIXME
+        self._dialog.parameters_view.lcirc_combo_box.setCurrentIndex(lcirc_product_index)
+        self._dialog.parameters_view.rcirc_combo_box.setCurrentIndex(rcirc_product_index)
         self._analyze()
-        self._dialog.open()
 
-    def _saveResult(self) -> None:
-        if self._result is None:
-            logger.debug('No result to save!')
-            return
-
-        title = 'Save Result'
-        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+    def _save_data(self) -> None:
+        title = 'Save XMCD Data'
+        file_path, _ = self._file_dialog_factory.get_save_file_path(
             self._dialog,
             title,
-            nameFilters=self._analyzer.getSaveFileFilterList(),
-            selectedNameFilter=self._analyzer.getSaveFileFilter(),
+            name_filters=self._analyzer.get_save_file_filters(),
+            selected_name_filter=self._analyzer.get_save_file_filter(),
         )
 
-        if filePath:
+        if file_path:
             try:
-                self._analyzer.saveResult(filePath, self._result)
+                self._analyzer.save_data(file_path)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException(title, err)
+                ExceptionDialog.show_exception(title, err)
+
+    def _sync_model_to_view(self) -> None:
+        try:
+            data = self._analyzer.get_data()
+        except ValueError:
+            self._difference_visualization_widget_controller.clearArray()
+            self._sum_visualization_widget_controller.clearArray()
+            self._ratio_visualization_widget_controller.clearArray()
+        except Exception as err:
+            logger.exception(err)
+            ExceptionDialog.show_exception('Update Views', err)
+        else:
+            self._difference_visualization_widget_controller.set_array(
+                data.polar_difference, data.pixel_geometry
+            )
+            self._sum_visualization_widget_controller.set_array(data.polar_sum, data.pixel_geometry)
+            self._ratio_visualization_widget_controller.set_array(
+                data.polar_ratio, data.pixel_geometry
+            )
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._analyzer:
+            self._sync_model_to_view()

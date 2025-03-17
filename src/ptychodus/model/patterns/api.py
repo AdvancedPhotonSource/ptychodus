@@ -82,8 +82,8 @@ class PatternsAPI:
             self._patternSettings.cropHeightInPixels.set_value(crop_extent.height_px)
 
         if detectorExtent is not None:
-            self._detectorSettings.widthInPixels.set_value(detectorExtent.width_px)
-            self._detectorSettings.heightInPixels.set_value(detectorExtent.height_px)
+            self._detectorSettings.width_px.set_value(detectorExtent.width_px)
+            self._detectorSettings.height_px.set_value(detectorExtent.height_px)
 
         if filePath.is_file():
             if file_type is not None:
@@ -120,7 +120,7 @@ class PatternsAPI:
     def getFileWriterChooser(self) -> PluginChooser[DiffractionFileWriter]:
         return self._fileWriterChooser
 
-    def savePatterns(self, filePath: Path, fileType: str) -> None:
+    def save_patterns(self, filePath: Path, fileType: str) -> None:
         self._fileWriterChooser.set_current_plugin(fileType)
         fileType = self._fileWriterChooser.get_current_plugin().simple_name
         logger.debug(f'Writing "{filePath}" as "{fileType}"')

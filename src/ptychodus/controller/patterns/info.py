@@ -98,7 +98,7 @@ class PatternsInfoViewController(DiffractionDatasetObserver):
         self._treeModel = treeModel
 
     @classmethod
-    def showInfo(cls, dataset: AssembledDiffractionDataset, parent: QWidget) -> None:
+    def show_info(cls, dataset: AssembledDiffractionDataset, parent: QWidget) -> None:
         treeModel = SimpleTreeModel(dataset.get_contents_tree())
         controller = cls(dataset, treeModel)
         dataset.add_observer(controller)

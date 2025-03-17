@@ -72,7 +72,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 return None
 
             metadata = item.getMetadata()
-            geometry = item.getGeometry()
+            geometry = item.get_geometry()
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 if index.column() == 0:
@@ -171,7 +171,7 @@ class ProductController(ProductRepositoryObserver):
         self._tableProxyModel = tableProxyModel
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         dataset: AssembledDiffractionDataset,
         repository: ProductRepository,
@@ -248,7 +248,7 @@ class ProductController(ProductRepositoryObserver):
                 self._api.openProduct(filePath, file_type=nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Reader', err)
+                ExceptionDialog.show_exception('File Reader', err)
 
     def _createNewProduct(self) -> None:
         self._api.insertNewProduct()
@@ -257,11 +257,11 @@ class ProductController(ProductRepositoryObserver):
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
-            filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+            filePath, nameFilter = self._fileDialogFactory.get_save_file_path(
                 self._view,
                 'Save Product',
-                nameFilters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
-                selectedNameFilter=self._api.getSaveFileFilter(),
+                name_filters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
+                selected_name_filter=self._api.getSaveFileFilter(),
             )
 
             if filePath:
@@ -269,7 +269,7 @@ class ProductController(ProductRepositoryObserver):
                     self._api.saveProduct(current.row(), filePath, file_type=nameFilter)
                 except Exception as err:
                     logger.exception(err)
-                    ExceptionDialog.showException('File Writer', err)
+                    ExceptionDialog.show_exception('File Writer', err)
         else:
             logger.error('No current item!')
 

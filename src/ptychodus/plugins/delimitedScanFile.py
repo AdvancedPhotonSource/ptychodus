@@ -59,22 +59,22 @@ class DelimitedScanFileWriter(ScanFileWriter):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.scanFileReaders.register_plugin(
+    registry.scan_file_readers.register_plugin(
         DelimitedScanFileReader(' ', swapXY=False),
         simple_name='TXT',
         display_name='Space-Separated Values Files (*.txt)',
     )
-    registry.scanFileWriters.register_plugin(
+    registry.scan_file_writers.register_plugin(
         DelimitedScanFileWriter(' ', swapXY=False),
         simple_name='TXT',
         display_name='Space-Separated Values Files (*.txt)',
     )
-    registry.scanFileReaders.register_plugin(
+    registry.scan_file_readers.register_plugin(
         DelimitedScanFileReader(',', swapXY=True),
         simple_name='CSV',
         display_name='Comma-Separated Values Files (*.csv)',
     )
-    registry.scanFileWriters.register_plugin(
+    registry.scan_file_writers.register_plugin(
         DelimitedScanFileWriter(',', swapXY=True),
         simple_name='CSV',
         display_name='Comma-Separated Values Files (*.csv)',
