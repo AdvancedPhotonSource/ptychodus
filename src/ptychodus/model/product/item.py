@@ -69,7 +69,7 @@ class ProductRepositoryItem(ParameterGroup):
     def assignItem(self, item: ProductRepositoryItem, *, notify: bool = True) -> None:
         self._metadata.assignItem(item.getMetadata())
         self._scan.assignItem(item.getScan())
-        self._probe.assignItem(item.getProbe())
+        self._probe.assignItem(item.get_probe())
         self._object.assignItem(item.get_object())
         self._costs = list(item.getCosts())
 
@@ -105,7 +105,7 @@ class ProductRepositoryItem(ParameterGroup):
     def get_geometry(self) -> ProductGeometry:
         return self._geometry
 
-    def getProbe(self) -> ProbeRepositoryItem:
+    def get_probe(self) -> ProbeRepositoryItem:
         return self._probe
 
     def get_object(self) -> ObjectRepositoryItem:
@@ -118,11 +118,11 @@ class ProductRepositoryItem(ParameterGroup):
     def getCosts(self) -> Sequence[float]:
         return self._costs
 
-    def getProduct(self) -> Product:
+    def get_product(self) -> Product:
         return Product(
             metadata=self._metadata.getMetadata(),
             scan=self._scan.getScan(),
-            probe=self._probe.getProbe(),
+            probe=self._probe.get_probe(),
             object_=self._object.get_object(),
             costs=self.getCosts(),
         )

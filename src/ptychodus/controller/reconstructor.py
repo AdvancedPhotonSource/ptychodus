@@ -104,7 +104,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
         presenter.add_observer(self)
         productRepository.addObserver(self)
-        self._syncModelToView()
+        self._sync_model_to_view()
 
     def _updateProgress(self) -> None:
         isReconstructing = self._presenter.isReconstructing
@@ -243,7 +243,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         ax.plot(item.getCosts(), '.-', label='Cost', linewidth=1.5)
         self._plotView.figureCanvas.draw()
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._view.parametersView.algorithmComboBox.setCurrentText(
             self._presenter.getReconstructor()
         )
@@ -280,4 +280,4 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncModelToView()
+            self._sync_model_to_view()

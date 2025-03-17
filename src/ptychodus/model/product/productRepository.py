@@ -202,7 +202,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
     def handleProbeChanged(self, item: ProductRepositoryItem) -> None:
         metadata = item.getMetadata()
         index = metadata.getIndex()
-        probe = item.getProbe()
+        probe = item.get_probe()
 
         if index < 0:
             logger.warning(f'Failed to look up index for "{item.get_name()}"!')

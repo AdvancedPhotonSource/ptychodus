@@ -14,7 +14,7 @@ class AngleWidget(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.angleInTurns = Decimal()
-        self.angleLineEdit = DecimalLineEdit.create_instance(isSigned=False)
+        self.angleLineEdit = DecimalLineEdit.create_instance(is_signed=False)
         self.unitsComboBox = QComboBox()
 
     @classmethod

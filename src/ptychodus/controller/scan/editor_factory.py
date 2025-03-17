@@ -80,24 +80,24 @@ class ScanTransformViewController(ParameterViewController):
         layout = QGridLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._labelXP, 0, 0)
-        layout.addWidget(self._affineAXViewController.getWidget(), 0, 1)
+        layout.addWidget(self._affineAXViewController.get_widget(), 0, 1)
         layout.addWidget(self._labelAX, 0, 2)
-        layout.addWidget(self._affineAYViewController.getWidget(), 0, 3)
+        layout.addWidget(self._affineAYViewController.get_widget(), 0, 3)
         layout.addWidget(self._labelAY, 0, 4)
-        layout.addWidget(self._affineATViewController.getWidget(), 0, 5)
+        layout.addWidget(self._affineATViewController.get_widget(), 0, 5)
 
         layout.addWidget(self._labelYP, 1, 0)
-        layout.addWidget(self._affineBXViewController.getWidget(), 1, 1)
+        layout.addWidget(self._affineBXViewController.get_widget(), 1, 1)
         layout.addWidget(self._labelBX, 1, 2)
-        layout.addWidget(self._affineBYViewController.getWidget(), 1, 3)
+        layout.addWidget(self._affineBYViewController.get_widget(), 1, 3)
         layout.addWidget(self._labelBY, 1, 4)
-        layout.addWidget(self._affineBTViewController.getWidget(), 1, 5)
+        layout.addWidget(self._affineBTViewController.get_widget(), 1, 5)
 
         layout.addWidget(self._jitterRadiusLabel, 2, 0)
-        layout.addWidget(self._jitterRadiusViewController.getWidget(), 2, 1, 1, 5)
+        layout.addWidget(self._jitterRadiusViewController.get_widget(), 2, 1, 1, 5)
         self._widget.contents.setLayout(layout)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
 
@@ -118,11 +118,11 @@ class ScanBoundingBoxViewController(CheckableGroupBoxParameterViewController):
         )
 
         layout = QFormLayout()
-        layout.addRow('Minimum X:', self._minimumXController.getWidget())
-        layout.addRow('Maximum X:', self._maximumXController.getWidget())
-        layout.addRow('Minimum Y:', self._minimumYController.getWidget())
-        layout.addRow('Maximum Y:', self._maximumYController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Minimum X:', self._minimumXController.get_widget())
+        layout.addRow('Maximum X:', self._maximumXController.get_widget())
+        layout.addRow('Minimum Y:', self._minimumYController.get_widget())
+        layout.addRow('Maximum Y:', self._maximumYController.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class ScanEditorViewControllerFactory:

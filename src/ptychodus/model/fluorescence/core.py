@@ -137,7 +137,7 @@ class FluorescenceEnhancer(Observable, Observer):
             raise ValueError('Fluorescence dataset not loaded!')
         else:
             algorithm = self._algorithm_chooser.get_current_plugin().strategy
-            product = self._product.getProduct()
+            product = self._product.get_product()
             self._enhanced = algorithm.enhance(self._measured, product)
             self.notify_observers()
 

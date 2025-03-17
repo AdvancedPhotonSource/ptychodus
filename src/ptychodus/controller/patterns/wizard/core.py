@@ -35,7 +35,7 @@ class OpenDatasetWizardController:
         self._wizard.setWindowTitle('Open Dataset')
         self._wizard.addPage(self._file_view_controller.getWidget())
         self._wizard.addPage(self._metadata_view_controller.getWidget())
-        self._wizard.addPage(self._patterns_view_controller.getWidget())
+        self._wizard.addPage(self._patterns_view_controller.get_widget())
 
         self._wizard.button(QWizard.WizardButton.NextButton).clicked.connect(
             self._executeNextButtonAction
@@ -49,7 +49,7 @@ class OpenDatasetWizardController:
 
         if page is self._metadata_view_controller.getWidget():
             self._file_view_controller.open_dataset()
-        elif page is self._patterns_view_controller.getWidget():
+        elif page is self._patterns_view_controller.get_widget():
             self._metadata_view_controller.importMetadata()
 
     def _executeFinishButtonAction(self) -> None:

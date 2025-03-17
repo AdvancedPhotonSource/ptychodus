@@ -53,7 +53,7 @@ class ProbeRepositoryItem(ParameterGroup):
         self._builder.syncToSettings()
         self._additionalModesBuilder.syncToSettings()
 
-    def getProbe(self) -> Probe:
+    def get_probe(self) -> Probe:
         return self._probe
 
     def getBuilder(self) -> ProbeBuilder:

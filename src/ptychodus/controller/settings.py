@@ -77,7 +77,7 @@ class SettingsController(Observer):
         view.buttonBox.openButton.clicked.connect(self._openSettings)
         view.buttonBox.saveButton.clicked.connect(self._saveSettings)
 
-        self._syncModelToView()
+        self._sync_model_to_view()
 
     def _openSettings(self) -> None:
         filePath, _ = self._fileDialogFactory.getOpenFilePath(
@@ -116,7 +116,7 @@ class SettingsController(Observer):
 
         self._tableModel.setNamesAndValues(names, values)
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._listModel.setStringList(sorted(iter(self._settingsRegistry)))
 
         current = self._view.listView.currentIndex()
@@ -124,4 +124,4 @@ class SettingsController(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._settingsRegistry:
-            self._syncModelToView()
+            self._sync_model_to_view()

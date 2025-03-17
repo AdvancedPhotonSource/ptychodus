@@ -49,7 +49,7 @@ class ProbeTreeModel(QAbstractItemModel):
 
     @staticmethod
     def _appendModes(node: ProbeTreeNode, item: ProbeRepositoryItem) -> None:
-        probe = item.getProbe()
+        probe = item.get_probe()
 
         for layer in range(probe.num_incoherent_modes):
             node.insertNode()
@@ -66,7 +66,7 @@ class ProbeTreeModel(QAbstractItemModel):
 
         node = self._treeRoot.children[index]
         numModesOld = len(node.children)
-        numModesNew = item.getProbe().num_incoherent_modes
+        numModesNew = item.get_probe().num_incoherent_modes
 
         if numModesOld < numModesNew:
             self.beginInsertRows(topLeft, numModesOld, numModesNew)
@@ -145,7 +145,7 @@ class ProbeTreeModel(QAbstractItemModel):
             if role == Qt.ItemDataRole.DisplayRole and index.column() == 0:
                 return f'Mode {index.row() + 1}'
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
-                probe = item.getProbe()
+                probe = item.get_probe()
 
                 try:
                     relativePower = probe.get_incoherent_mode_relative_power(index.row())
@@ -156,7 +156,7 @@ class ProbeTreeModel(QAbstractItemModel):
                     return int(100.0 * relativePower)
         else:
             item = self._repository[index.row()]
-            probe = item.getProbe()
+            probe = item.get_probe()
 
             if role == Qt.ItemDataRole.DisplayRole:
                 if index.column() == 0:
@@ -174,7 +174,7 @@ class ProbeTreeModel(QAbstractItemModel):
                 elif index.column() == 6:
                     return f'{probe.nbytes / (1024 * 1024):.2f}'
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
-                probe = item.getProbe()
+                probe = item.get_probe()
                 coherence = probe.get_coherence()
                 return int(100.0 * coherence) if numpy.isfinite(coherence) else -1
 

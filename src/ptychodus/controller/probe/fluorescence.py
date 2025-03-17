@@ -61,13 +61,13 @@ class FluorescenceTwoStepViewController(Observer):
             algorithm.set_deconvolution_strategy
         )
 
-        self._syncModelToView()
+        self._sync_model_to_view()
         algorithm.add_observer(self)
 
     def getWidget(self) -> QWidget:
         return self._view
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._view.upscalingStrategyComboBox.setCurrentText(
             self._algorithm.get_upscaling_strategy()
         )
@@ -77,7 +77,7 @@ class FluorescenceTwoStepViewController(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._algorithm:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class FluorescenceVSPIViewController(Observer):
@@ -93,7 +93,7 @@ class FluorescenceVSPIViewController(Observer):
         self._view.max_iterations_spin_box.valueChanged.connect(algorithm.set_max_iterations)
 
         algorithm.add_observer(self)
-        self._syncModelToView()
+        self._sync_model_to_view()
 
     def getWidget(self) -> QWidget:
         return self._view
@@ -101,7 +101,7 @@ class FluorescenceVSPIViewController(Observer):
     def _syncDampingFactorToModel(self, value: Decimal) -> None:
         self._algorithm.set_damping_factor(float(value))
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._view.damping_factor_line_edit.setValue(
             Decimal(repr(self._algorithm.get_damping_factor()))
         )
@@ -109,7 +109,7 @@ class FluorescenceVSPIViewController(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._algorithm:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class FluorescenceViewController(Observer):
@@ -246,7 +246,7 @@ class FluorescenceViewController(Observer):
                 logger.exception(err)
                 ExceptionDialog.show_exception(title, err)
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._dialog.fluorescence_parameters_view.algorithm_combo_box.setCurrentText(
             self._enhancer.get_algorithm()
         )
@@ -283,4 +283,4 @@ class FluorescenceViewController(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._enhancer:
-            self._syncModelToView()
+            self._sync_model_to_view()

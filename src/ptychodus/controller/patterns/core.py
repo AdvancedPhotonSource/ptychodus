@@ -38,11 +38,11 @@ class DetectorController:
         self._bit_depth_view_controller = SpinBoxParameterViewController(settings.bit_depth)
 
         layout = QFormLayout()
-        layout.addRow('Detector Width [px]:', self._width_px_view_controller.getWidget())
-        layout.addRow('Detector Height [px]:', self._height_px_view_controller.getWidget())
-        layout.addRow('Pixel Width:', self._pixel_width_view_controller.getWidget())
-        layout.addRow('Pixel Height:', self._pixel_height_view_controller.getWidget())
-        layout.addRow('Bit Depth:', self._bit_depth_view_controller.getWidget())
+        layout.addRow('Detector Width [px]:', self._width_px_view_controller.get_widget())
+        layout.addRow('Detector Height [px]:', self._height_px_view_controller.get_widget())
+        layout.addRow('Pixel Width:', self._pixel_width_view_controller.get_widget())
+        layout.addRow('Pixel Height:', self._pixel_height_view_controller.get_widget())
+        layout.addRow('Bit Depth:', self._bit_depth_view_controller.get_widget())
         view.setLayout(layout)
 
 

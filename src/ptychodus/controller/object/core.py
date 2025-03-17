@@ -215,7 +215,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         if itemIndex < 0:
             logger.warning('No current item!')
         else:
-            self._xmcdViewController._analyze(itemIndex, itemIndex)
+            self._xmcdViewController.analyze(itemIndex, itemIndex)
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()

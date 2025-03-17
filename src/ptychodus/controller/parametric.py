@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 class ParameterViewController(ABC):
     @abstractmethod
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         pass
 
 
@@ -56,19 +56,19 @@ class CheckableGroupBoxParameterViewController(ParameterViewController, Observer
         if tool_tip:
             self._widget.setToolTip(tool_tip)
 
-        self._syncModelToView()
+        self.__sync_model_to_view()
         self._widget.toggled.connect(parameter.set_value)
         self._parameter.add_observer(self)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncModelToView(self) -> None:
+    def __sync_model_to_view(self) -> None:
         self._widget.setChecked(self._parameter.get_value())
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
-            self._syncModelToView()
+            self.__sync_model_to_view()
 
 
 class CheckBoxParameterViewController(ParameterViewController, Observer):
@@ -80,19 +80,19 @@ class CheckBoxParameterViewController(ParameterViewController, Observer):
         if tool_tip:
             self._widget.setToolTip(tool_tip)
 
-        self._syncModelToView()
+        self.__sync_model_to_view()
         self._widget.toggled.connect(parameter.set_value)
         parameter.add_observer(self)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncModelToView(self) -> None:
+    def __sync_model_to_view(self) -> None:
         self._widget.setChecked(self._parameter.get_value())
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
-            self._syncModelToView()
+            self.__sync_model_to_view()
 
 
 class SpinBoxParameterViewController(ParameterViewController, Observer):
@@ -106,14 +106,14 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
         if tool_tip:
             self._widget.setToolTip(tool_tip)
 
-        self._syncModelToView()
+        self.__sync_model_to_view()
         self._widget.valueChanged.connect(parameter.set_value)
         parameter.add_observer(self)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncModelToView(self) -> None:
+    def __sync_model_to_view(self) -> None:
         minimum = self._parameter.get_minimum()
         maximum = self._parameter.get_maximum()
 
@@ -132,7 +132,7 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
-            self._syncModelToView()
+            self.__sync_model_to_view()
 
 
 class ComboBoxParameterViewController(ParameterViewController, Observer):
@@ -149,19 +149,19 @@ class ComboBoxParameterViewController(ParameterViewController, Observer):
         if tool_tip:
             self._widget.setToolTip(tool_tip)
 
-        self._syncModelToView()
+        self.__sync_model_to_view()
         self._widget.textActivated.connect(parameter.set_value)
         parameter.add_observer(self)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncModelToView(self) -> None:
+    def __sync_model_to_view(self) -> None:
         self._widget.setCurrentText(self._parameter.get_value())
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
-            self._syncModelToView()
+            self.__sync_model_to_view()
 
 
 class LineEditParameterViewController(ParameterViewController, Observer):
@@ -178,173 +178,173 @@ class LineEditParameterViewController(ParameterViewController, Observer):
         if tool_tip:
             self._widget.setToolTip(tool_tip)
 
-        self._syncModelToView()
-        self._widget.editingFinished.connect(self._syncViewToModel)
+        self.__sync_model_to_view()
+        self._widget.editingFinished.connect(self.__sync_view_to_model)
         parameter.add_observer(self)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncViewToModel(self) -> None:
+    def __sync_view_to_model(self) -> None:
         self._parameter.set_value(self._widget.text())
 
-    def _syncModelToView(self) -> None:
+    def __sync_model_to_view(self) -> None:
         self._widget.setText(self._parameter.get_value())
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
-            self._syncModelToView()
+            self.__sync_model_to_view()
 
 
 class PathParameterViewController(ParameterViewController, Observer):
     def __init__(
         self,
         parameter: PathParameter,
-        fileDialogFactory: FileDialogFactory,
+        file_dialog_factory: FileDialogFactory,
         *,
         caption: str,
-        nameFilters: Sequence[str] | None,
-        mimeTypeFilters: Sequence[str] | None,
-        selectedNameFilter: str | None,
+        name_filters: Sequence[str] | None,
+        mime_type_filters: Sequence[str] | None,
+        selected_name_filter: str | None,
         tool_tip: str,
     ) -> None:
         super().__init__()
         self._parameter = parameter
-        self._fileDialogFactory = fileDialogFactory
+        self._file_dialog_factory = file_dialog_factory
         self._caption = caption
-        self._nameFilters = nameFilters
-        self._mimeTypeFilters = mimeTypeFilters
-        self._selectedNameFilter = selectedNameFilter
-        self._lineEdit = QLineEdit()
-        self._browseButton = QPushButton('Browse')
+        self._name_filters = name_filters
+        self._mime_type_filters = mime_type_filters
+        self._selected_name_filter = selected_name_filter
+        self._line_edit = QLineEdit()
+        self._browse_button = QPushButton('Browse')
         self._widget = QWidget()
 
         if tool_tip:
-            self._lineEdit.setToolTip(tool_tip)
+            self._line_edit.setToolTip(tool_tip)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self._lineEdit)
-        layout.addWidget(self._browseButton)
+        layout.addWidget(self._line_edit)
+        layout.addWidget(self._browse_button)
         self._widget.setLayout(layout)
 
-        self._syncModelToView()
+        self.__sync_model_to_view()
         parameter.add_observer(self)
-        self._lineEdit.editingFinished.connect(self._syncPathToModel)
+        self._line_edit.editingFinished.connect(self.__sync_path_to_model)
 
     @classmethod
-    def createFileOpener(
+    def create_file_opener(
         cls,
         parameter: PathParameter,
-        fileDialogFactory: FileDialogFactory,
+        file_dialog_factory: FileDialogFactory,
         *,
         caption: str = 'Open File',
-        nameFilters: Sequence[str] | None = None,
-        mimeTypeFilters: Sequence[str] | None = None,
-        selectedNameFilter: str | None = None,
+        name_filters: Sequence[str] | None = None,
+        mime_type_filters: Sequence[str] | None = None,
+        selected_name_filter: str | None = None,
         tool_tip: str = '',
     ) -> PathParameterViewController:
-        viewController = cls(
+        view_controller = cls(
             parameter,
-            fileDialogFactory,
+            file_dialog_factory,
             caption=caption,
-            nameFilters=nameFilters,
-            mimeTypeFilters=mimeTypeFilters,
-            selectedNameFilter=selectedNameFilter,
+            name_filters=name_filters,
+            mime_type_filters=mime_type_filters,
+            selected_name_filter=selected_name_filter,
             tool_tip=tool_tip,
         )
-        viewController._browseButton.clicked.connect(viewController._chooseFileToOpen)
-        return viewController
+        view_controller._browse_button.clicked.connect(view_controller._choose_file_to_open)
+        return view_controller
 
     @classmethod
-    def createFileSaver(
+    def create_file_saver(
         cls,
         parameter: PathParameter,
-        fileDialogFactory: FileDialogFactory,
+        file_dialog_factory: FileDialogFactory,
         *,
         caption: str = 'Save File',
-        nameFilters: Sequence[str] | None = None,
-        mimeTypeFilters: Sequence[str] | None = None,
-        selectedNameFilter: str | None = None,
+        name_filters: Sequence[str] | None = None,
+        mime_type_filters: Sequence[str] | None = None,
+        selected_name_filter: str | None = None,
         tool_tip: str = '',
     ) -> PathParameterViewController:
-        viewController = cls(
+        view_controller = cls(
             parameter,
-            fileDialogFactory,
+            file_dialog_factory,
             caption=caption,
-            nameFilters=nameFilters,
-            mimeTypeFilters=mimeTypeFilters,
-            selectedNameFilter=selectedNameFilter,
+            name_filters=name_filters,
+            mime_type_filters=mime_type_filters,
+            selected_name_filter=selected_name_filter,
             tool_tip=tool_tip,
         )
-        viewController._browseButton.clicked.connect(viewController._chooseFileToSave)
-        return viewController
+        view_controller._browse_button.clicked.connect(view_controller._choose_file_to_save)
+        return view_controller
 
     @classmethod
-    def createDirectoryChooser(
+    def create_directory_chooser(
         cls,
         parameter: PathParameter,
-        fileDialogFactory: FileDialogFactory,
+        file_dialog_factory: FileDialogFactory,
         *,
         caption: str = 'Choose Directory',
         tool_tip: str = '',
     ) -> PathParameterViewController:
-        viewController = cls(
+        view_controller = cls(
             parameter,
-            fileDialogFactory,
+            file_dialog_factory,
             caption=caption,
-            nameFilters=None,
-            mimeTypeFilters=None,
-            selectedNameFilter=None,
+            name_filters=None,
+            mime_type_filters=None,
+            selected_name_filter=None,
             tool_tip=tool_tip,
         )
-        viewController._browseButton.clicked.connect(viewController._chooseDirectory)
-        return viewController
+        view_controller._browse_button.clicked.connect(view_controller._choose_directory)
+        return view_controller
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncPathToModel(self) -> None:
-        path = Path(self._lineEdit.text())
+    def __sync_path_to_model(self) -> None:
+        path = Path(self._line_edit.text())
         self._parameter.set_value(path)
 
-    def _chooseFileToOpen(self) -> None:
-        path, _ = self._fileDialogFactory.getOpenFilePath(
+    def _choose_file_to_open(self) -> None:
+        path, _ = self._file_dialog_factory.getOpenFilePath(
             self._widget,
             self._caption,
-            self._nameFilters,
-            self._mimeTypeFilters,
-            self._selectedNameFilter,
+            self._name_filters,
+            self._mime_type_filters,
+            self._selected_name_filter,
         )
 
         if path:
             self._parameter.set_value(path)
 
-    def _chooseFileToSave(self) -> None:
-        path, _ = self._fileDialogFactory.get_save_file_path(
+    def _choose_file_to_save(self) -> None:
+        path, _ = self._file_dialog_factory.get_save_file_path(
             self._widget,
             self._caption,
-            self._nameFilters,
-            self._mimeTypeFilters,
-            self._selectedNameFilter,
+            self._name_filters,
+            self._mime_type_filters,
+            self._selected_name_filter,
         )
 
         if path:
             self._parameter.set_value(path)
 
-    def _chooseDirectory(self) -> None:
-        path = self._fileDialogFactory.getExistingDirectoryPath(self._widget, self._caption)
+    def _choose_directory(self) -> None:
+        path = self._file_dialog_factory.getExistingDirectoryPath(self._widget, self._caption)
 
         if path:
             self._parameter.set_value(path)
 
-    def _syncModelToView(self) -> None:
+    def __sync_model_to_view(self) -> None:
         path = self._parameter.get_value()
-        self._lineEdit.setText(str(path))
+        self._line_edit.setText(str(path))
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
-            self._syncModelToView()
+            self.__sync_model_to_view()
 
 
 class IntegerLineEditParameterViewController(ParameterViewController, Observer):
@@ -368,14 +368,14 @@ class IntegerLineEditParameterViewController(ParameterViewController, Observer):
 
         self._widget.setValidator(validator)
 
-        self._syncModelToView()
-        self._widget.editingFinished.connect(self._syncViewToModel)
+        self.__sync_model_to_view()
+        self._widget.editingFinished.connect(self.__sync_view_to_model)
         parameter.add_observer(self)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncViewToModel(self) -> None:
+    def __sync_view_to_model(self) -> None:
         text = self._widget.text()
 
         try:
@@ -385,12 +385,12 @@ class IntegerLineEditParameterViewController(ParameterViewController, Observer):
         else:
             self._parameter.set_value(value)
 
-    def _syncModelToView(self) -> None:
+    def __sync_model_to_view(self) -> None:
         self._widget.setText(str(self._parameter.get_value()))
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
-            self._syncModelToView()
+            self.__sync_model_to_view()
 
 
 class DecimalLineEditParameterViewController(ParameterViewController, Observer):
@@ -399,27 +399,27 @@ class DecimalLineEditParameterViewController(ParameterViewController, Observer):
     ) -> None:
         super().__init__()
         self._parameter = parameter
-        self._widget = DecimalLineEdit.create_instance(isSigned=is_signed)
+        self._widget = DecimalLineEdit.create_instance(is_signed=is_signed)
 
         if tool_tip:
             self._widget.setToolTip(tool_tip)
 
-        self._syncModelToView()
-        self._widget.valueChanged.connect(self._syncViewToModel)
+        self.__sync_model_to_view()
+        self._widget.valueChanged.connect(self.__sync_view_to_model)
         parameter.add_observer(self)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncViewToModel(self, value: Decimal) -> None:
+    def __sync_view_to_model(self, value: Decimal) -> None:
         self._parameter.set_value(float(value))
 
-    def _syncModelToView(self) -> None:
-        self._widget.setValue(Decimal(repr(self._parameter.get_value())))
+    def __sync_model_to_view(self) -> None:
+        self._widget.setValue(Decimal(str(self._parameter.get_value())))
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
-            self._syncModelToView()
+            self.__sync_model_to_view()
 
 
 class DecimalSliderParameterViewController(ParameterViewController, Observer):
@@ -431,30 +431,30 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
         if tool_tip:
             self._widget.setToolTip(tool_tip)
 
-        self._syncModelToView()
-        self._widget.valueChanged.connect(self._syncViewToModel)
+        self.__sync_model_to_view()
+        self._widget.valueChanged.connect(self.__sync_view_to_model)
         parameter.add_observer(self)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncViewToModel(self, value: Decimal) -> None:
+    def __sync_view_to_model(self, value: Decimal) -> None:
         self._parameter.set_value(float(value))
 
-    def _syncModelToView(self) -> None:
+    def __sync_model_to_view(self) -> None:
         minimum = self._parameter.get_minimum()
         maximum = self._parameter.get_maximum()
 
         if minimum is None or maximum is None:
             raise ValueError('Range not provided!')
         else:
-            value = Decimal(repr(self._parameter.get_value()))
-            range_ = Interval[Decimal](Decimal(repr(minimum)), Decimal(repr(maximum)))
+            value = Decimal(str(self._parameter.get_value()))
+            range_ = Interval[Decimal](Decimal(str(minimum)), Decimal(str(maximum)))
             self._widget.setValueAndRange(value, range_)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
-            self._syncModelToView()
+            self.__sync_model_to_view()
 
 
 class LengthWidgetParameterViewController(ParameterViewController, Observer):
@@ -468,22 +468,22 @@ class LengthWidgetParameterViewController(ParameterViewController, Observer):
         if tool_tip:
             self._widget.setToolTip(tool_tip)
 
-        self._syncModelToView()
-        self._widget.lengthChanged.connect(self._syncViewToModel)
+        self.__sync_model_to_view()
+        self._widget.lengthChanged.connect(self.__sync_view_to_model)
         parameter.add_observer(self)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncViewToModel(self, value: Decimal) -> None:
+    def __sync_view_to_model(self, value: Decimal) -> None:
         self._parameter.set_value(float(value))
 
-    def _syncModelToView(self) -> None:
-        self._widget.setLengthInMeters(Decimal(repr(self._parameter.get_value())))
+    def __sync_model_to_view(self) -> None:
+        self._widget.setLengthInMeters(Decimal(str(self._parameter.get_value())))
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
-            self._syncModelToView()
+            self.__sync_model_to_view()
 
 
 class AngleWidgetParameterViewController(ParameterViewController, Observer):
@@ -495,22 +495,22 @@ class AngleWidgetParameterViewController(ParameterViewController, Observer):
         if tool_tip:
             self._widget.setToolTip(tool_tip)
 
-        self._syncModelToView()
-        self._widget.angleChanged.connect(self._syncViewToModel)
+        self.__sync_model_to_view()
+        self._widget.angleChanged.connect(self.__sync_view_to_model)
         parameter.add_observer(self)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncViewToModel(self, value: Decimal) -> None:
+    def __sync_view_to_model(self, value: Decimal) -> None:
         self._parameter.set_value(float(value))
 
-    def _syncModelToView(self) -> None:
-        self._widget.setAngleInTurns(Decimal(repr(self._parameter.get_value())))
+    def __sync_model_to_view(self) -> None:
+        self._widget.setAngleInTurns(Decimal(str(self._parameter.get_value())))
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
-            self._syncModelToView()
+            self.__sync_model_to_view()
 
 
 class ParameterWidget(QWidget):
@@ -545,8 +545,8 @@ class ParameterDialog(QDialog):
 
 
 class ParameterViewBuilder:
-    def __init__(self, fileDialogFactory: FileDialogFactory | None = None) -> None:
-        self._fileDialogFactory = fileDialogFactory
+    def __init__(self, file_dialog_factory: FileDialogFactory | None = None) -> None:
+        self._file_dialog_factory = file_dialog_factory
         self._view_controllers_top: list[ParameterViewController] = list()
         self._view_controllers: dict[tuple[str, str], ParameterViewController] = dict()
         self._view_controllers_bottom: list[ParameterViewController] = list()
@@ -586,16 +586,16 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        if self._fileDialogFactory is None:
+        if self._file_dialog_factory is None:
             raise ValueError('Cannot add file chooser without FileDialogFactory!')
         else:
-            viewController = PathParameterViewController.createFileOpener(
+            viewController = PathParameterViewController.create_file_opener(
                 parameter,
-                self._fileDialogFactory,
+                self._file_dialog_factory,
                 caption=caption,
-                nameFilters=nameFilters,
-                mimeTypeFilters=mimeTypeFilters,
-                selectedNameFilter=selectedNameFilter,
+                name_filters=nameFilters,
+                mime_type_filters=mimeTypeFilters,
+                selected_name_filter=selectedNameFilter,
                 tool_tip=tool_tip,
             )
             self.add_view_controller(viewController, label, group=group)
@@ -612,16 +612,16 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        if self._fileDialogFactory is None:
+        if self._file_dialog_factory is None:
             raise ValueError('Cannot add file chooser without FileDialogFactory!')
         else:
-            viewController = PathParameterViewController.createFileSaver(
+            viewController = PathParameterViewController.create_file_saver(
                 parameter,
-                self._fileDialogFactory,
+                self._file_dialog_factory,
                 caption=caption,
-                nameFilters=nameFilters,
-                mimeTypeFilters=mimeTypeFilters,
-                selectedNameFilter=selectedNameFilter,
+                name_filters=nameFilters,
+                mime_type_filters=mimeTypeFilters,
+                selected_name_filter=selectedNameFilter,
                 tool_tip=tool_tip,
             )
             self.add_view_controller(viewController, label, group=group)
@@ -629,12 +629,12 @@ class ParameterViewBuilder:
     def addDirectoryChooser(
         self, parameter: PathParameter, label: str, *, tool_tip: str = '', group: str = ''
     ) -> None:
-        if self._fileDialogFactory is None:
+        if self._file_dialog_factory is None:
             raise ValueError('Cannot add directory chooser without FileDialogFactory!')
         else:
-            viewController = PathParameterViewController.createDirectoryChooser(
+            viewController = PathParameterViewController.create_directory_chooser(
                 parameter,
-                self._fileDialogFactory,
+                self._file_dialog_factory,
                 tool_tip=tool_tip,
             )
             self.add_view_controller(viewController, label, group=group)
@@ -730,12 +730,12 @@ class ParameterViewBuilder:
                 form_layout = QFormLayout()
                 group_dict[group_name] = form_layout
 
-            form_layout.addRow(widget_label, vc.getWidget())
+            form_layout.addRow(widget_label, vc.get_widget())
 
         layout = QVBoxLayout()
 
         for view_controller in self._view_controllers_top:
-            layout.addWidget(view_controller.getWidget())
+            layout.addWidget(view_controller.get_widget())
 
         for group_name, group_layout in group_dict.items():
             if group_name:
@@ -746,7 +746,7 @@ class ParameterViewBuilder:
                 layout.addLayout(group_layout)
 
         for view_controller in self._view_controllers_bottom:
-            layout.addWidget(view_controller.getWidget())
+            layout.addWidget(view_controller.get_widget())
 
         if add_stretch:
             layout.addStretch()

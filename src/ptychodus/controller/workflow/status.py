@@ -39,7 +39,7 @@ class WorkflowStatusController(Observer):
         view.autoRefreshSpinBox.valueChanged.connect(presenter.setRefreshIntervalInSeconds)
         view.refreshButton.clicked.connect(presenter.refreshStatus)
 
-        self._syncModelToView()
+        self._sync_model_to_view()
         presenter.add_observer(self)
 
     def _handleTableViewClick(self, index: QModelIndex) -> None:
@@ -63,7 +63,7 @@ class WorkflowStatusController(Observer):
         self._tableModel.beginResetModel()
         self._tableModel.endResetModel()
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         refreshIntervalLimitsInSeconds = self._presenter.getRefreshIntervalLimitsInSeconds()
 
         self._view.autoRefreshSpinBox.blockSignals(True)
@@ -75,4 +75,4 @@ class WorkflowStatusController(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncModelToView()
+            self._sync_model_to_view()

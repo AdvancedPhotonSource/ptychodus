@@ -22,7 +22,7 @@ class DecimalLineEdit(QWidget):
 
     @classmethod
     def create_instance(
-        cls, *, isSigned: bool = False, parent: QWidget | None = None
+        cls, *, is_signed: bool = False, parent: QWidget | None = None
     ) -> DecimalLineEdit:
         widget = cls(parent)
 
@@ -35,7 +35,7 @@ class DecimalLineEdit(QWidget):
         layout.addWidget(widget._lineEdit)
         widget.setLayout(layout)
 
-        if not isSigned:
+        if not is_signed:
             widget._validator.setBottom(0.0)
 
         return widget

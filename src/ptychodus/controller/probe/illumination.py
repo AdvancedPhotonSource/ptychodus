@@ -53,7 +53,11 @@ class IlluminationViewController(Observer):
             self._dialog.setWindowTitle(f'Illumination Map: {product_name}')
             self._dialog.open()
 
-        self._mapper.map()
+        try:
+            self._mapper.map()
+        except Exception as err:
+            logger.exception(err)
+            ExceptionDialog.show_exception('Illumination Mapper', err)
 
     def _save_data(self) -> None:
         title = 'Save Illumination Map'
@@ -80,7 +84,7 @@ class IlluminationViewController(Observer):
             logger.exception(err)
             ExceptionDialog.show_exception('Update Views', err)
         else:
-            self._visualization_widget_controller.set_array(data.intensity, data.pixel_geometry)
+            self._visualization_widget_controller.set_array(data.photon_number, data.pixel_geometry)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._mapper:

@@ -13,17 +13,17 @@ class MultisliceViewController(ParameterViewController, Observer):
         self._parameter = item.layerDistanceInMeters
         self._widget = QSpinBox()
 
-        self._syncModelToView()
-        self._widget.valueChanged.connect(self._syncViewToModel)
+        self._sync_model_to_view()
+        self._widget.valueChanged.connect(self._sync_view_to_model)
         self._parameter.add_observer(self)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncViewToModel(self, numberOfLayers: int) -> None:
+    def _sync_view_to_model(self, numberOfLayers: int) -> None:
         self._item.setNumberOfLayers(numberOfLayers)
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._widget.blockSignals(True)
         self._widget.setRange(1, 99)
         self._widget.setValue(self._item.getNumberOfLayers())
@@ -31,7 +31,7 @@ class MultisliceViewController(ParameterViewController, Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class ObjectEditorViewControllerFactory:

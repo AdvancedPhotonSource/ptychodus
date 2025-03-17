@@ -53,7 +53,7 @@ class DiffractionPatternPositionMatcher:
         self, inputProductIndex: int, indexFilter: ScanIndexFilter = ScanIndexFilter.ALL
     ) -> ReconstructInput:
         inputProductItem = self._productRepository[inputProductIndex]
-        inputProduct = inputProductItem.getProduct()
+        inputProduct = inputProductItem.get_product()
         dataIndexes = self._diffractionDataset.get_assembled_indexes()
         scanIndexes = [point.index for point in inputProduct.scan if indexFilter(point.index)]
         commonIndexes = sorted(set(dataIndexes).intersection(scanIndexes))

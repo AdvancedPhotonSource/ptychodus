@@ -62,19 +62,19 @@ class FresnelZonePlateViewController(ParameterViewController):
 
         layout = QFormLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addRow('Zone Plate Diameter:', self._zonePlateDiameterViewController.getWidget())
+        layout.addRow('Zone Plate Diameter:', self._zonePlateDiameterViewController.get_widget())
         layout.addRow(
             'Outermost Zone Width:',
-            self._outermostZoneWidthInMetersViewController.getWidget(),
+            self._outermostZoneWidthInMetersViewController.get_widget(),
         )
         layout.addRow(
             'Central Beamstop Diameter:',
-            self._centralBeamstopDiameterInMetersViewController.getWidget(),
+            self._centralBeamstopDiameterInMetersViewController.get_widget(),
         )
-        layout.addRow('Defocus Distance:', self._defocusDistanceInMetersViewController.getWidget())
+        layout.addRow('Defocus Distance:', self._defocusDistanceInMetersViewController.get_widget())
         self._widget.contents.setLayout(layout)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
 
@@ -93,19 +93,19 @@ class ZernikeViewController(ParameterViewController, Observer):
         self._coefficientsTableView.setModel(self._coefficientsTableModel)
 
         layout = QFormLayout()
-        layout.addRow('Diameter:', self._diameterViewController.getWidget())
+        layout.addRow('Diameter:', self._diameterViewController.get_widget())
         layout.addRow('Order:', self._orderSpinBox)
         layout.addRow(self._coefficientsTableView)
         self._widget.setLayout(layout)
 
-        self._syncModelToView()
+        self._sync_model_to_view()
         self._orderSpinBox.valueChanged.connect(probeBuilder.setOrder)
         probeBuilder.add_observer(self)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._orderSpinBox.setRange(1, 100)
         self._orderSpinBox.setValue(self._probeBuilder.getOrder())
 
@@ -114,7 +114,7 @@ class ZernikeViewController(ParameterViewController, Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._probeBuilder:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class DecayTypeParameterViewController(ParameterViewController, Observer):
@@ -132,7 +132,7 @@ class DecayTypeParameterViewController(ParameterViewController, Observer):
             self._exponentialDecayButton, ProbeModeDecayType.EXPONENTIAL.value
         )
         self._buttonGroup.setExclusive(True)
-        self._buttonGroup.idToggled.connect(self._syncViewToModel)
+        self._buttonGroup.idToggled.connect(self._sync_view_to_model)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -142,18 +142,18 @@ class DecayTypeParameterViewController(ParameterViewController, Observer):
         self._widget = QWidget()
         self._widget.setLayout(layout)
 
-        self._syncModelToView()
+        self._sync_model_to_view()
         parameter.add_observer(self)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncViewToModel(self, toolId: int, checked: bool) -> None:
+    def _sync_view_to_model(self, toolId: int, checked: bool) -> None:
         if checked:
             decayType = ProbeModeDecayType(toolId)
             self._parameter.set_value(decayType.name)
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         try:
             decayType = ProbeModeDecayType[self._parameter.get_value().upper()]
         except KeyError:
@@ -164,7 +164,7 @@ class DecayTypeParameterViewController(ParameterViewController, Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class ProbeEditorViewControllerFactory:

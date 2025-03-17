@@ -109,9 +109,9 @@ class ProductEditorViewController(Observer):
 
         viewController = cls(dataset, product, tableModel, dialog)
         product.add_observer(viewController)
-        dialog.textEdit.textChanged.connect(viewController._syncViewToModel)
+        dialog.textEdit.textChanged.connect(viewController._sync_view_to_model)
 
-        viewController._syncModelToView()
+        viewController._sync_model_to_view()
 
         dialog.actionsView.estimateProbePhotonCountButton.clicked.connect(
             viewController._estimateProbePhotonCount
@@ -120,11 +120,11 @@ class ProductEditorViewController(Observer):
         dialog.open()
         dialog.adjustSize()
 
-    def _syncViewToModel(self) -> None:
+    def _sync_view_to_model(self) -> None:
         metadata = self._product.getMetadata()
         metadata.comments.set_value(self._dialog.textEdit.toPlainText())
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._tableModel.beginResetModel()
         self._tableModel.endResetModel()
 
@@ -143,4 +143,4 @@ class ProductEditorViewController(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._product:
-            self._syncModelToView()
+            self._sync_model_to_view()

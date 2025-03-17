@@ -47,7 +47,7 @@ class ProbePropagationViewController(Observer):
         )
 
         propagator.add_observer(self)
-        self._syncModelToView()
+        self._sync_model_to_view()
 
     def _updateCurrentCoordinate(self, step: int) -> None:
         lerpValue = 0.0
@@ -58,21 +58,21 @@ class ProbePropagationViewController(Observer):
 
         if lower > 0:
             alpha = upper / lower
-            z0 = self._propagator.getBeginCoordinateInMeters()
-            z1 = self._propagator.getEndCoordinateInMeters()
+            z0 = self._propagator.get_begin_coordinate_m()
+            z1 = self._propagator.get_end_coordinate_m()
             lerpValue = (1 - alpha) * z0 + alpha * z1
         else:
             logger.error('Bad slider range!')
 
         try:
-            xyProjection = self._propagator.getXYProjection(step)
+            xyProjection = self._propagator.get_xy_projection(step)
         except (IndexError, ValueError):
             self._xyVisualizationWidgetController.clearArray()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.show_exception('Update Current Coordinate', err)
         else:
-            pixelGeometry = self._propagator.getPixelGeometry()
+            pixelGeometry = self._propagator.get_pixel_geometry()
 
             if pixelGeometry is None:
                 logger.warning('Missing propagator pixel geometry!')
@@ -88,19 +88,19 @@ class ProbePropagationViewController(Observer):
 
         try:
             self._propagator.propagate(
-                numberOfSteps=view.num_steps_spin_box.value(),
-                beginCoordinateInMeters=float(view.begin_coordinate_widget.getLengthInMeters()),
-                endCoordinateInMeters=float(view.end_coordinate_widget.getLengthInMeters()),
+                num_steps=view.num_steps_spin_box.value(),
+                begin_coordinate_m=float(view.begin_coordinate_widget.getLengthInMeters()),
+                end_coordinate_m=float(view.end_coordinate_widget.getLengthInMeters()),
             )
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.show_exception('Propagate Probe', err)
 
     def launch(self, productIndex: int) -> None:
-        self._propagator.setProduct(productIndex)
+        self._propagator.set_product(productIndex)
 
         try:
-            itemName = self._propagator.getProductName()
+            itemName = self._propagator.get_product_name()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.show_exception('Launch', err)
@@ -113,28 +113,28 @@ class ProbePropagationViewController(Observer):
         filePath, nameFilter = self._fileDialogFactory.get_save_file_path(
             self._dialog,
             title,
-            name_filters=self._propagator.getSaveFileFilterList(),
-            selected_name_filter=self._propagator.getSaveFileFilter(),
+            name_filters=self._propagator.get_save_file_filters(),
+            selected_name_filter=self._propagator.get_save_file_filter(),
         )
 
         if filePath:
             try:
-                self._propagator.savePropagatedProbe(filePath)
+                self._propagator.save_propagated_probe(filePath)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.show_exception(title, err)
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         view = self._dialog.parameters_view
         view.begin_coordinate_widget.setLengthInMeters(
-            Decimal.from_float(self._propagator.getBeginCoordinateInMeters())
+            Decimal.from_float(self._propagator.get_begin_coordinate_m())
         )
         view.end_coordinate_widget.setLengthInMeters(
-            Decimal.from_float(self._propagator.getEndCoordinateInMeters())
+            Decimal.from_float(self._propagator.get_end_coordinate_m())
         )
-        view.num_steps_spin_box.setValue(self._propagator.getNumberOfSteps())
+        view.num_steps_spin_box.setValue(self._propagator.get_num_steps())
 
-        numberOfSteps = self._propagator.getNumberOfSteps()
+        numberOfSteps = self._propagator.get_num_steps()
 
         if numberOfSteps > 1:
             self._dialog.coordinate_slider.setEnabled(True)
@@ -145,7 +145,7 @@ class ProbePropagationViewController(Observer):
             self._dialog.coordinate_slider.setValue(0)
 
         self._updateCurrentCoordinate(self._dialog.coordinate_slider.value())
-        pixelGeometry = self._propagator.getPixelGeometry()
+        pixelGeometry = self._propagator.get_pixel_geometry()
 
         if pixelGeometry is None:
             logger.warning('Missing propagator pixel geometry!')
@@ -153,10 +153,10 @@ class ProbePropagationViewController(Observer):
 
         try:
             self._zxVisualizationWidgetController.set_array(
-                self._propagator.getZXProjection(), pixelGeometry
+                self._propagator.get_zx_projection(), pixelGeometry
             )
             self._zyVisualizationWidgetController.set_array(
-                self._propagator.getZYProjection(), pixelGeometry
+                self._propagator.get_zy_projection(), pixelGeometry
             )
         except ValueError:
             self._zxVisualizationWidgetController.clearArray()
@@ -167,4 +167,4 @@ class ProbePropagationViewController(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._propagator:
-            self._syncModelToView()
+            self._sync_model_to_view()

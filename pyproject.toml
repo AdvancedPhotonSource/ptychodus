@@ -75,3 +75,6 @@ select = [
     # TODO "N",
     "NPY",
 ]
+
+[tool.pyright]
+pythonVersion = "3.10"

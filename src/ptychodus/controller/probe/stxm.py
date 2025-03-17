@@ -53,7 +53,11 @@ class STXMViewController(Observer):
             self._dialog.setWindowTitle(f'Simulate STXM: {product_name}')
             self._dialog.open()
 
-        self._simulator.simulate()
+        try:
+            self._simulator.simulate()
+        except Exception as err:
+            logger.exception(err)
+            ExceptionDialog.show_exception('Simulate STXM', err)
 
     def _save_data(self) -> None:
         title = 'Save STXM Data'

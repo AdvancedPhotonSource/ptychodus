@@ -10,6 +10,8 @@ __all__ = [
     'BarycentricArrayStitcher',
 ]
 
+InexactDType = TypeVar('InexactDType', bound=numpy.inexact)
+
 
 def calculate_support_frac(x: float, n: int) -> tuple[slice, float]:
     lower = x - n / 2
@@ -17,7 +19,7 @@ def calculate_support_frac(x: float, n: int) -> tuple[slice, float]:
     return slice(whole, whole + n + 1), lower - whole
 
 
-class BarycentricArrayInterpolator[InexactDType: numpy.inexact]:
+class BarycentricArrayInterpolator(Generic[InexactDType]):
     def __init__(self, array: NDArray[InexactDType]) -> None:
         super().__init__()
         self._array = array
@@ -46,14 +48,14 @@ class BarycentricArrayInterpolator[InexactDType: numpy.inexact]:
         return patch  # type: ignore
 
 
-class BarycentricArrayStitcher[InexactDType: numpy.inexact]:
+class BarycentricArrayStitcher(Generic[InexactDType]):
     def __init__(self, upper: NDArray[InexactDType], lower: RealArrayType | None = None) -> None:
         super().__init__()
         self._upper = upper
         self._lower = lower
 
         if lower is not None and upper.shape != lower.shape:
-            raise ValueError('Mismatched array shapes! ({upper.shape} != {lower.shape})')
+            raise ValueError(f'Mismatched array shapes! ({upper.shape} != {lower.shape})')
 
     def add_patch(
         self,
@@ -62,17 +64,15 @@ class BarycentricArrayStitcher[InexactDType: numpy.inexact]:
         value: NDArray[InexactDType],
         weight: RealArrayType | None = None,
     ) -> None:
-        if self._upper.dtype != value.dtype:
-            raise ValueError('Mismatched value dtypes! ({self._upper.dtype} != {value.dtype})')
+        if numpy.iscomplexobj(self._upper) != numpy.iscomplexobj(value):
+            raise ValueError(f'Mismatched value dtypes! ({self._upper.dtype} != {value.dtype})')
 
         if weight is not None:
             if self._lower is None:
                 raise ValueError('Provided weights without a lower array!')
-            elif self._lower.dtype != weight.dtype:
-                raise ValueError('Mismatched weight types! ({type(self._lower)} != {type(weight)})')
 
             if value.shape != weight.shape:
-                raise ValueError('Mismatched patch shapes! ({value.shape=} != {weight.shape=})')
+                raise ValueError(f'Mismatched patch shapes! ({value.shape=} != {weight.shape=})')
 
         x_support, x_frac = calculate_support_frac(center_x, value.shape[-1])
         y_support, y_frac = calculate_support_frac(center_y, value.shape[-2])

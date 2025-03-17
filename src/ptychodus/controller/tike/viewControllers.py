@@ -74,31 +74,31 @@ class TikeParametersViewController(ParameterViewController, Observer):
         self._widget = QGroupBox('Tike Parameters')
 
         layout = QFormLayout()
-        layout.addRow('Number of GPUs:', self._numGpusViewController.getWidget())
-        layout.addRow('Noise Model:', self._noiseModelViewController.getWidget())
-        layout.addRow('Number of Batches:', self._numBatchViewController.getWidget())
-        layout.addRow('Batch Method:', self._batchMethodViewController.getWidget())
-        layout.addRow('Number of Iterations:', self._numIterViewController.getWidget())
-        layout.addRow('Convergence Window:', self._convergenceWindowViewController.getWidget())
+        layout.addRow('Number of GPUs:', self._numGpusViewController.get_widget())
+        layout.addRow('Noise Model:', self._noiseModelViewController.get_widget())
+        layout.addRow('Number of Batches:', self._numBatchViewController.get_widget())
+        layout.addRow('Batch Method:', self._batchMethodViewController.get_widget())
+        layout.addRow('Number of Iterations:', self._numIterViewController.get_widget())
+        layout.addRow('Convergence Window:', self._convergenceWindowViewController.get_widget())
 
         if showAlpha:
-            layout.addRow('Alpha:', self._alphaViewController.getWidget())
+            layout.addRow('Alpha:', self._alphaViewController.get_widget())
 
         layout.addRow('Log Level:', self._logLevelComboBox)
         self._widget.setLayout(layout)
 
-        self._syncModelToView()
+        self._sync_model_to_view()
         self._settings.add_observer(self)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._logLevelComboBox.setCurrentText(self._settings.getLogLevel())
 
     def _update(self, observable: Observable) -> None:
         if observable is self._settings:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class TikeMultigridViewController(CheckableGroupBoxParameterViewController):
@@ -111,8 +111,8 @@ class TikeMultigridViewController(CheckableGroupBoxParameterViewController):
         )
 
         layout = QFormLayout()
-        layout.addRow('Number of Levels:', self._numLevelsController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Number of Levels:', self._numLevelsController.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class TikeAdaptiveMomentViewController(CheckableGroupBoxParameterViewController):
@@ -129,9 +129,9 @@ class TikeAdaptiveMomentViewController(CheckableGroupBoxParameterViewController)
         )
 
         layout = QFormLayout()
-        layout.addRow('M Decay:', self._mdecayViewController.getWidget())
-        layout.addRow('V Decay:', self._vdecayViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('M Decay:', self._mdecayViewController.get_widget())
+        layout.addRow('V Decay:', self._vdecayViewController.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class TikeObjectCorrectionViewController(CheckableGroupBoxParameterViewController):
@@ -154,14 +154,14 @@ class TikeObjectCorrectionViewController(CheckableGroupBoxParameterViewControlle
 
         layout = QFormLayout()
         layout.addRow(
-            'Positivity Constraint:', self._positivityConstraintViewController.getWidget()
+            'Positivity Constraint:', self._positivityConstraintViewController.get_widget()
         )
         layout.addRow(
-            'Smoothness Constraint:', self._smoothnessConstraintViewController.getWidget()
+            'Smoothness Constraint:', self._smoothnessConstraintViewController.get_widget()
         )
-        layout.addRow(self._adaptiveMomentViewController.getWidget())
-        layout.addRow(self._useMagnitudeClippingViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow(self._adaptiveMomentViewController.get_widget())
+        layout.addRow(self._useMagnitudeClippingViewController.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class TikeProbeSupportViewController(CheckableGroupBoxParameterViewController):
@@ -180,10 +180,10 @@ class TikeProbeSupportViewController(CheckableGroupBoxParameterViewController):
         )
 
         layout = QFormLayout()
-        layout.addRow('Weight:', self._weightViewController.getWidget())
-        layout.addRow('Radius:', self._radiusViewController.getWidget())
-        layout.addRow('Degree:', self._degreeViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Weight:', self._weightViewController.get_widget())
+        layout.addRow('Radius:', self._radiusViewController.get_widget())
+        layout.addRow('Degree:', self._degreeViewController.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class TikeProbeCorrectionViewController(CheckableGroupBoxParameterViewController):
@@ -212,15 +212,15 @@ class TikeProbeCorrectionViewController(CheckableGroupBoxParameterViewController
         )
 
         layout = QFormLayout()
-        layout.addRow('Force Sparsity:', self._forceSparsityViewController.getWidget())
-        layout.addRow(self._forceOrthogonalityViewController.getWidget())
-        layout.addRow(self._forceCenteredIntensityViewController.getWidget())
-        layout.addRow(self._supportViewController.getWidget())
-        layout.addRow(self._adaptiveMomentViewController.getWidget())
+        layout.addRow('Force Sparsity:', self._forceSparsityViewController.get_widget())
+        layout.addRow(self._forceOrthogonalityViewController.get_widget())
+        layout.addRow(self._forceCenteredIntensityViewController.get_widget())
+        layout.addRow(self._supportViewController.get_widget())
+        layout.addRow(self._adaptiveMomentViewController.get_widget())
         layout.addRow(
-            'Additional Probe Penalty:', self._additionalProbePenaltyViewController.getWidget()
+            'Additional Probe Penalty:', self._additionalProbePenaltyViewController.get_widget()
         )
-        self.getWidget().setLayout(layout)
+        self.get_widget().setLayout(layout)
 
 
 class TikePositionCorrectionViewController(CheckableGroupBoxParameterViewController):
@@ -240,9 +240,9 @@ class TikePositionCorrectionViewController(CheckableGroupBoxParameterViewControl
         )
 
         layout = QFormLayout()
-        layout.addRow(self._usePositionRegularizationViewController.getWidget())
-        layout.addRow(self._adaptiveMomentViewController.getWidget())
+        layout.addRow(self._usePositionRegularizationViewController.get_widget())
+        layout.addRow(self._adaptiveMomentViewController.get_widget())
         layout.addRow(
-            'Update Magnitude Limit:', self._updateMagnitudeLimitViewController.getWidget()
+            'Update Magnitude Limit:', self._updateMagnitudeLimitViewController.get_widget()
         )
-        self.getWidget().setLayout(layout)
+        self.get_widget().setLayout(layout)

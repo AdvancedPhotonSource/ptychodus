@@ -90,7 +90,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 elif index.column() == 6:
                     return f'{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}'
                 elif index.column() == 7:
-                    product = item.getProduct()
+                    product = item.get_product()
                     return f'{product.nbytes / (1024 * 1024):.2f}'
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:

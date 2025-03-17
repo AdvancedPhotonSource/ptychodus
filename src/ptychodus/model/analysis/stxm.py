@@ -55,8 +55,8 @@ class STXMSimulator(Observable):
         object_shape = object_geometry.height_px, object_geometry.width_px
 
         stitcher = BarycentricArrayStitcher[numpy.double](
-            upper=numpy.zeros_like(object_shape),
-            lower=numpy.zeros_like(object_shape),
+            upper=numpy.zeros(object_shape),
+            lower=numpy.zeros(object_shape),
         )
 
         for pattern, scan_point in zip(reconstruct_input.patterns, product.scan):

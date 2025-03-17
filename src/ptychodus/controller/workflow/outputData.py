@@ -28,7 +28,7 @@ class WorkflowOutputDataController(Observer):
         view.globusPathLineEdit.editingFinished.connect(controller._syncGlobusPathToModel)
         view.posixPathLineEdit.editingFinished.connect(controller._syncPosixPathToModel)
 
-        controller._syncModelToView()
+        controller._sync_model_to_view()
 
         return controller
 
@@ -44,7 +44,7 @@ class WorkflowOutputDataController(Observer):
         dataPath = Path(self._view.posixPathLineEdit.text())
         self._presenter.setOutputDataPosixPath(dataPath)
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         isRoundTripEnabled = self._presenter.isRoundTripEnabled()
         self._view.roundTripCheckBox.setChecked(isRoundTripEnabled)
         self._view.endpointIDLineEdit.setText(str(self._presenter.getOutputDataEndpointID()))
@@ -56,4 +56,4 @@ class WorkflowOutputDataController(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncModelToView()
+            self._sync_model_to_view()

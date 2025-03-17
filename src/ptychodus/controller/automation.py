@@ -51,7 +51,7 @@ class AutomationProcessingController(Observer):
         view.directoryBrowseButton.clicked.connect(controller._browseDirectory)
         view.intervalSpinBox.valueChanged.connect(presenter.setProcessingIntervalInSeconds)
 
-        controller._syncModelToView()
+        controller._sync_model_to_view()
 
         return controller
 
@@ -67,7 +67,7 @@ class AutomationProcessingController(Observer):
         if dirPath:
             self._presenter.setDataDirectory(dirPath)
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._view.strategyComboBox.blockSignals(True)
         self._view.strategyComboBox.setCurrentText(self._presenter.getStrategy())
         self._view.strategyComboBox.blockSignals(False)
@@ -90,7 +90,7 @@ class AutomationProcessingController(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class AutomationWatchdogController(Observer):
@@ -109,11 +109,11 @@ class AutomationWatchdogController(Observer):
         view.delaySpinBox.valueChanged.connect(presenter.setWatchdogDelayInSeconds)
         view.usePollingObserverCheckBox.toggled.connect(presenter.setWatchdogPollingObserverEnabled)
 
-        controller._syncModelToView()
+        controller._sync_model_to_view()
 
         return controller
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         delayLimitsInSeconds = self._presenter.getWatchdogDelayLimitsInSeconds()
 
         self._view.delaySpinBox.blockSignals(True)
@@ -127,7 +127,7 @@ class AutomationWatchdogController(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class AutomationProcessingListModel(QAbstractListModel):
@@ -201,7 +201,7 @@ class AutomationController(Observer):
         view.processButton.toggled.connect(processingPresenter.setProcessingEnabled)
         view.clearButton.clicked.connect(presenter.clearDatasetRepository)
 
-        controller._syncModelToView()
+        controller._sync_model_to_view()
 
         controller._executeWaitingTasksTimer.timeout.connect(core.executeWaitingTasks)
         controller._executeWaitingTasksTimer.start(60 * 1000)  # TODO customize (in milliseconds)
@@ -211,7 +211,7 @@ class AutomationController(Observer):
 
         return controller
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._view.processButton.setChecked(self._processingPresenter.isProcessingEnabled())
         self._listModel.beginResetModel()
         self._listModel.endResetModel()
@@ -221,4 +221,4 @@ class AutomationController(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._processingPresenter:
-            self._syncModelToView()
+            self._sync_model_to_view()

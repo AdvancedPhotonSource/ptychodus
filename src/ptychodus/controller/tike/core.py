@@ -31,11 +31,11 @@ class TikeViewController(QWidget):
         )
 
         layout = QVBoxLayout()
-        layout.addWidget(self._parametersViewController.getWidget())
-        layout.addWidget(self._multigridViewController.getWidget())
-        layout.addWidget(self._positionCorrectionViewController.getWidget())
-        layout.addWidget(self._probeCorrectionViewController.getWidget())
-        layout.addWidget(self._objectCorrectionViewController.getWidget())
+        layout.addWidget(self._parametersViewController.get_widget())
+        layout.addWidget(self._multigridViewController.get_widget())
+        layout.addWidget(self._positionCorrectionViewController.get_widget())
+        layout.addWidget(self._probeCorrectionViewController.get_widget())
+        layout.addWidget(self._objectCorrectionViewController.get_widget())
         layout.addStretch()
         self.setLayout(layout)
 

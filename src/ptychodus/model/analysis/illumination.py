@@ -25,18 +25,49 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class IlluminationMap:
-    photon_count: RealArrayType
-    photon_flux_Hz: RealArrayType  # noqa: N815
-    exposure_J_m2: RealArrayType  # noqa: N815
-    irradiance_W_m2: RealArrayType  # noqa: N815
-    dose_Gy: RealArrayType  # noqa: N815
-    dose_rate_Gy_s: RealArrayType  # noqa: N815
+    photon_number: RealArrayType
+    photon_energy_J: float  # noqa: N815
+    exposure_time_s: float
+    mass_attenuation_m2_kg: float
     pixel_geometry: PixelGeometry | None
     center: ObjectCenter | None
+
+    @property
+    def photon_fluence_1_m2(self) -> RealArrayType:
+        return (
+            numpy.zeros_like(self.photon_number)
+            if self.pixel_geometry is None
+            else self.photon_number / self.pixel_geometry.area_m2
+        )
+
+    @property
+    def photon_fluence_rate_Hz_m2(self) -> RealArrayType:  # noqa: N802
+        return self.photon_fluence_1_m2 / self.exposure_time_s
+
+    @property
+    def energy_fluence_J_m2(self) -> RealArrayType:  # noqa: N802
+        return self.photon_fluence_1_m2 * self.photon_energy_J
+
+    @property
+    def energy_fluence_rate_W_m2(self) -> RealArrayType:  # noqa: N802
+        return self.photon_fluence_rate_Hz_m2 * self.photon_energy_J
+
+    @property
+    def dose_Gy(self) -> RealArrayType:  # noqa: N802
+        return self.energy_fluence_J_m2 * self.mass_attenuation_m2_kg
+
+    @property
+    def dose_rate_Gy_s(self) -> RealArrayType:  # noqa: N802
+        return self.energy_fluence_rate_W_m2 * self.mass_attenuation_m2_kg
+
+    @property
+    def intensity_W_m2(self) -> RealArrayType:  # noqa: N802
+        return self.energy_fluence_rate_W_m2
 
 
 class IlluminationMapper(Observable):
     def __init__(self, repository: ProductRepository) -> None:
+        super().__init__()
         self._repository = repository
 
         self._product_index = -1
@@ -52,29 +83,32 @@ class IlluminationMapper(Observable):
         product = self._repository[self._product_index]
         return product.get_name()
 
-    def map(self) -> IlluminationMap:
-        product = self._repository[self._product_index]
-        object_item = product.get_object()
-        object_ = object_item.get_object()
-        object_geometry = object_.get_geometry()
+    def map(self) -> None:
+        product = self._repository[self._product_index].get_product()
+        object_geometry = product.object_.get_geometry()
+        mass_attenuation_m2_kg = 1.0  # FIXME
 
-        photon_count = numpy.zeros_like(object_.get_array(), dtype=float)  # FIXME
-        photon_flux_Hz = numpy.zeros_like(object_.get_array(), dtype=float)  # FIXME
-        exposure_J_m2 = numpy.zeros_like(object_.get_array(), dtype=float)  # FIXME
-        irradiance_W_m2 = numpy.zeros_like(object_.get_array(), dtype=float)  # FIXME
-        dose_Gy = numpy.zeros_like(object_.get_array(), dtype=float)  # FIXME
-        dose_rate_Gy_s = numpy.zeros_like(object_.get_array(), dtype=float)  # FIXME
+        stitcher = BarycentricArrayStitcher[numpy.double](
+            numpy.zeros((object_geometry.height_px, object_geometry.width_px))
+        )
 
-        return IlluminationMap(
-            photon_count=photon_count,
-            photon_flux_Hz=photon_flux_Hz,
-            exposure_J_m2=exposure_J_m2,
-            irradiance_W_m2=irradiance_W_m2,
-            dose_Gy=dose_Gy,
-            dose_rate_Gy_s=dose_rate_Gy_s,
+        for scan_point in product.scan:
+            object_point = object_geometry.map_scan_point_to_object_point(scan_point)
+            stitcher.add_patch(
+                object_point.position_x_px,
+                object_point.position_y_px,
+                product.probe.get_intensity(),  # FIXME OPR & scaling
+            )
+
+        self._product_data = IlluminationMap(
+            photon_number=stitcher.stitch(),
+            photon_energy_J=product.metadata.probe_energy_J,
+            exposure_time_s=product.metadata.exposure_time_s,
+            mass_attenuation_m2_kg=mass_attenuation_m2_kg,
             pixel_geometry=object_geometry.get_pixel_geometry(),
             center=object_geometry.get_center(),
         )
+        self.notify_observers()
 
     def get_data(self) -> IlluminationMap:
         if self._product_data is None:
@@ -93,10 +127,11 @@ class IlluminationMapper(Observable):
             raise ValueError('No analyzed data!')
 
         contents: dict[str, Any] = {
-            'photon_count': self._product_data.photon_count,
-            'photon_flux_Hz': self._product_data.photon_flux_Hz,
-            'exposure_J_m2': self._product_data.exposure_J_m2,
-            'irradiance_W_m2': self._product_data.irradiance_W_m2,
+            'photon_number': self._product_data.photon_number,
+            'photon_fluence_1_m2': self._product_data.photon_fluence_1_m2,
+            'photon_fluence_rate_Hz_m2': self._product_data.photon_fluence_rate_Hz_m2,
+            'energy_fluence_J_m2': self._product_data.energy_fluence_J_m2,
+            'energy_fluence_rate_W_m2': self._product_data.energy_fluence_rate_W_m2,
             'dose_Gy': self._product_data.dose_Gy,
             'dose_rate_Gy_s': self._product_data.dose_rate_Gy_s,
         }

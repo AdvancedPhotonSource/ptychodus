@@ -87,7 +87,7 @@ class ImageRendererController(Observer):
         view.transformationComboBox.setModel(controller._transformationModel)
         view.variantComboBox.setModel(controller._variantModel)
 
-        controller._syncModelToView()
+        controller._sync_model_to_view()
         engine.add_observer(controller)
 
         view.rendererComboBox.textActivated.connect(engine.setRenderer)
@@ -96,7 +96,7 @@ class ImageRendererController(Observer):
 
         return controller
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._view.rendererComboBox.blockSignals(True)
         self._rendererModel.setStringList([name for name in self._engine.renderers()])
         self._view.rendererComboBox.setCurrentText(self._engine.getRenderer())
@@ -114,7 +114,7 @@ class ImageRendererController(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._engine:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class ImageDataRangeController(Observer):
@@ -143,7 +143,7 @@ class ImageDataRangeController(Observer):
     ) -> ImageDataRangeController:
         displayRangeDialog = ImageDisplayRangeDialog.create_instance(view)
         controller = cls(engine, view, imageWidget, displayRangeDialog, visualizationController)
-        controller._syncModelToView()
+        controller._sync_model_to_view()
         engine.add_observer(controller)
 
         view.minDisplayValueSlider.valueChanged.connect(
@@ -186,7 +186,7 @@ class ImageDataRangeController(Observer):
             self._engine.isRendererCyclic(),
         )
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         minValue = Decimal(repr(self._engine.getMinDisplayValue()))
         maxValue = Decimal(repr(self._engine.getMaxDisplayValue()))
 
@@ -205,7 +205,7 @@ class ImageDataRangeController(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._engine:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class ImageController:

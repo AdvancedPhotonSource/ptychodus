@@ -28,7 +28,7 @@ class WorkflowComputeController(Observer):
         view.dataGlobusPathLineEdit.editingFinished.connect(controller._syncGlobusPathToModel)
         view.dataPosixPathLineEdit.editingFinished.connect(controller._syncPosixPathToModel)
 
-        controller._syncModelToView()
+        controller._sync_model_to_view()
 
         return controller
 
@@ -48,7 +48,7 @@ class WorkflowComputeController(Observer):
         dataPath = Path(self._view.dataPosixPathLineEdit.text())
         self._presenter.setComputeDataPosixPath(dataPath)
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._view.computeEndpointIDLineEdit.setText(str(self._presenter.getComputeEndpointID()))
         self._view.dataEndpointIDLineEdit.setText(str(self._presenter.getComputeDataEndpointID()))
         self._view.dataGlobusPathLineEdit.setText(str(self._presenter.getComputeDataGlobusPath()))
@@ -56,4 +56,4 @@ class WorkflowComputeController(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncModelToView()
+            self._sync_model_to_view()

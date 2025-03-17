@@ -107,7 +107,7 @@ class STXMDialog(QDialog):
         self.setLayout(layout)
 
 
-class ExposureParametersView(QGroupBox):
+class IlluminationParametersView(QGroupBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Parameters', parent)
         self.quantitative_probe_check_box = QCheckBox('Quantitative Probe')
@@ -125,21 +125,23 @@ class ExposureParametersView(QGroupBox):
         self.setLayout(layout)
 
 
-class ExposureQuantityView(QGroupBox):
+class IlluminationQuantityView(QGroupBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Quantity', parent)
-        self.photon_count_button = QRadioButton('Photon Count')
-        self.photon_flux_button = QRadioButton('Photon Flux [Hz]')
-        self.exposure_button = QRadioButton('Exposure [J/m\u00b2]')
-        self.irradiance_button = QRadioButton('Irradiance [W/m\u00b2]')
+        self.photon_number_button = QRadioButton('Photon Number')
+        self.photon_fluence_button = QRadioButton('Photon Fluence [1/m\u00b2]')
+        self.photon_fluence_rate_button = QRadioButton('Photon Fluence Rate [Hz/m\u00b2]')
+        self.energy_fluence_button = QRadioButton('Energy Fluence [J/m\u00b2]')
+        self.energy_fluence_rate_button = QRadioButton('Energy Fluence Rate [W/m\u00b2]')
         self.dose_button = QRadioButton('Dose [Gy]')
         self.dose_rate_button = QRadioButton('Dose Rate [Gy/s]')
 
         layout = QVBoxLayout()
-        layout.addWidget(self.photon_count_button)
-        layout.addWidget(self.photon_flux_button)
-        layout.addWidget(self.exposure_button)
-        layout.addWidget(self.irradiance_button)
+        layout.addWidget(self.photon_number_button)
+        layout.addWidget(self.photon_fluence_button)
+        layout.addWidget(self.photon_fluence_rate_button)
+        layout.addWidget(self.energy_fluence_button)
+        layout.addWidget(self.energy_fluence_rate_button)
         layout.addWidget(self.dose_button)
         layout.addWidget(self.dose_rate_button)
         self.setLayout(layout)
@@ -149,8 +151,8 @@ class IlluminationDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.visualization_widget = VisualizationWidget.create_instance('Visualization')
-        self.exposure_parameters_view = ExposureParametersView()
-        self.exposure_quantity_view = ExposureQuantityView()
+        self.exposure_parameters_view = IlluminationParametersView()
+        self.exposure_quantity_view = IlluminationQuantityView()
         self.visualization_parameters_view = VisualizationParametersView.create_instance()
         self.save_button = QPushButton('Save')
         self.status_bar = QStatusBar()

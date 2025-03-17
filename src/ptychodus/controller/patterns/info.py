@@ -107,10 +107,10 @@ class PatternsInfoViewController(DiffractionDatasetObserver):
         dialog.setWindowTitle('Patterns Info')
         dialog.treeView.setModel(treeModel)
 
-        controller._syncModelToView()
+        controller._sync_model_to_view()
         dialog.open()
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._treeModel.setRootNode(self._dataset.get_contents_tree())
 
     def handle_array_inserted(self, index: int) -> None:
@@ -120,4 +120,4 @@ class PatternsInfoViewController(DiffractionDatasetObserver):
         pass
 
     def handle_dataset_reloaded(self) -> None:
-        self._syncModelToView()
+        self._sync_model_to_view()

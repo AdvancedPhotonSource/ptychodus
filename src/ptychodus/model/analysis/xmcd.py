@@ -30,6 +30,7 @@ class XMCDAnalyzer(Observable):
     #      of repeat scans for each polarization separately to improve statistics
 
     def __init__(self, repository: ProductRepository) -> None:
+        super().__init__()
         self._repository = repository
 
         self._lcirc_product_index = -1
@@ -42,6 +43,9 @@ class XMCDAnalyzer(Observable):
             self._lcirc_product_data = None
             self.notify_observers()
 
+    def get_lcirc_product(self) -> int:
+        return self._lcirc_product_index
+
     def get_lcirc_product_name(self) -> str:
         lcirc_product = self._repository[self._lcirc_product_index]
         return lcirc_product.get_name()
@@ -51,6 +55,9 @@ class XMCDAnalyzer(Observable):
             self._rcirc_product_index = rcirc_product_index
             self._rcirc_product_data = None
             self.notify_observers()
+
+    def get_rcirc_product(self) -> int:
+        return self._rcirc_product_index
 
     def get_rcirc_product_name(self) -> str:
         rcirc_product = self._repository[self._rcirc_product_index]
@@ -98,6 +105,7 @@ class XMCDAnalyzer(Observable):
             pixel_geometry=rcirc_object.get_pixel_geometry(),
             center=rcirc_object.get_center(),
         )
+        self.notify_observers()
 
     def get_data(self) -> XMCDData:
         if self._product_data is None:

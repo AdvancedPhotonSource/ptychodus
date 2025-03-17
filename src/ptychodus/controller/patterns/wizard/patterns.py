@@ -37,23 +37,23 @@ class PatternLoadViewController(ParameterViewController):
         self._widget = QGroupBox('Load')
 
         layout = QFormLayout()
-        layout.addRow('Number of Data Threads:', self._view_controller.getWidget())
+        layout.addRow('Number of Data Threads:', self._view_controller.get_widget())
         self._widget.setLayout(layout)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
 
 class PatternMemoryMapViewController(CheckableGroupBoxParameterViewController):
     def __init__(self, settings: PatternSettings, file_dialog_factory: FileDialogFactory) -> None:
         super().__init__(settings.memmapEnabled, 'Memory Map Diffraction Data')
-        self._view_controller = PathParameterViewController.createDirectoryChooser(
+        self._view_controller = PathParameterViewController.create_directory_chooser(
             settings.scratchDirectory, file_dialog_factory
         )
 
         layout = QFormLayout()
-        layout.addRow('Scratch Directory:', self._view_controller.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Scratch Directory:', self._view_controller.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class PatternCropViewController(CheckableGroupBoxParameterViewController):
@@ -85,7 +85,7 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
         layout.addWidget(self._flip_y_check_box, 2, 2, Qt.AlignmentFlag.AlignHCenter)
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
-        self.getWidget().setLayout(layout)
+        self.get_widget().setLayout(layout)
 
         self._sync_model_to_view()
 
@@ -158,7 +158,7 @@ class PatternBinningViewController(CheckableGroupBoxParameterViewController):
         layout.addWidget(self._bin_size_y_spin_box, 0, 2)
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
-        self.getWidget().setLayout(layout)
+        self.get_widget().setLayout(layout)
 
         self._sync_model_to_view()
 
@@ -212,7 +212,7 @@ class PatternPaddingViewController(CheckableGroupBoxParameterViewController):
         layout.addWidget(self._pad_y_spin_box, 0, 2)
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
-        self.getWidget().setLayout(layout)
+        self.get_widget().setLayout(layout)
 
         self._sync_model_to_view()
 
@@ -254,17 +254,17 @@ class PatternTransformViewController:
         self._upper_bound_view_controller = SpinBoxParameterViewController(settings.valueUpperBound)
 
         layout = QGridLayout()
-        layout.addWidget(self._lower_bound_enabled_view_controller.getWidget(), 0, 0)
-        layout.addWidget(self._lower_bound_view_controller.getWidget(), 0, 1, 1, 2)
-        layout.addWidget(self._upper_bound_enabled_view_controller.getWidget(), 1, 0)
-        layout.addWidget(self._upper_bound_view_controller.getWidget(), 1, 1, 1, 2)
+        layout.addWidget(self._lower_bound_enabled_view_controller.get_widget(), 0, 0)
+        layout.addWidget(self._lower_bound_view_controller.get_widget(), 0, 1, 1, 2)
+        layout.addWidget(self._upper_bound_enabled_view_controller.get_widget(), 1, 0)
+        layout.addWidget(self._upper_bound_view_controller.get_widget(), 1, 1, 1, 2)
         layout.setColumnStretch(2, 1)
         layout.setColumnStretch(3, 1)
 
         self._widget = QGroupBox('Transform')
         self._widget.setLayout(layout)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
 
@@ -282,12 +282,12 @@ class OpenDatasetWizardPatternsViewController(ParameterViewController):
         self._transformViewController = PatternTransformViewController(settings)
 
         layout = QVBoxLayout()
-        layout.addWidget(self._loadViewController.getWidget())
-        layout.addWidget(self._memoryMapViewController.getWidget())
-        layout.addWidget(self._cropViewController.getWidget())
-        layout.addWidget(self._binningViewController.getWidget())
-        layout.addWidget(self._paddingViewController.getWidget())
-        layout.addWidget(self._transformViewController.getWidget())
+        layout.addWidget(self._loadViewController.get_widget())
+        layout.addWidget(self._memoryMapViewController.get_widget())
+        layout.addWidget(self._cropViewController.get_widget())
+        layout.addWidget(self._binningViewController.get_widget())
+        layout.addWidget(self._paddingViewController.get_widget())
+        layout.addWidget(self._transformViewController.get_widget())
         layout.addStretch()
 
         self._page = OpenDatasetWizardPage()
@@ -295,5 +295,5 @@ class OpenDatasetWizardPatternsViewController(ParameterViewController):
         self._page._setComplete(True)
         self._page.setLayout(layout)
 
-    def getWidget(self) -> QWizardPage:
+    def get_widget(self) -> QWizardPage:
         return self._page

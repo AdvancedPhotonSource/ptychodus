@@ -258,7 +258,7 @@ class ProbeAPI:
         except IndexError:
             logger.warning(f'Failed to save probe {index}!')
         else:
-            self._builderFactory.saveProbe(filePath, fileType, item.getProbe())
+            self._builderFactory.saveProbe(filePath, fileType, item.get_probe())
 
 
 class ObjectAPI:
@@ -454,4 +454,4 @@ class ProductAPI:
         file_type = self._fileWriterChooser.get_current_plugin().simple_name
         logger.debug(f'Writing "{filePath}" as "{file_type}"')
         writer = self._fileWriterChooser.get_current_plugin().strategy
-        writer.write(filePath, item.getProduct())
+        writer.write(filePath, item.get_product())

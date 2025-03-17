@@ -13,7 +13,7 @@ class LengthWidget(QWidget):
     def __init__(self, isSigned: bool, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.lengthInMeters = Decimal()
-        self.lineEdit = DecimalLineEdit.create_instance(isSigned=isSigned)
+        self.lineEdit = DecimalLineEdit.create_instance(is_signed=isSigned)
         self.unitsComboBox = QComboBox()
 
     @classmethod

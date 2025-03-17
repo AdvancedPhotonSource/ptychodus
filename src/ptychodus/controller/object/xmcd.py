@@ -30,9 +30,13 @@ class XMCDViewController(Observer):
         self._file_dialog_factory = file_dialog_factory
         self._dialog = XMCDDialog()
         self._dialog.parameters_view.lcirc_combo_box.setModel(tree_model)
-        self._dialog.parameters_view.lcirc_combo_box.currentIndexChanged.connect(self._analyze)
+        self._dialog.parameters_view.lcirc_combo_box.currentIndexChanged.connect(
+            analyzer.set_lcirc_product
+        )
         self._dialog.parameters_view.rcirc_combo_box.setModel(tree_model)
-        self._dialog.parameters_view.rcirc_combo_box.currentIndexChanged.connect(self._analyze)
+        self._dialog.parameters_view.rcirc_combo_box.currentIndexChanged.connect(
+            analyzer.set_rcirc_product
+        )
         self._dialog.parameters_view.save_button.clicked.connect(self._save_data)
 
         self._difference_visualization_widget_controller = VisualizationWidgetController(
@@ -55,12 +59,9 @@ class XMCDViewController(Observer):
 
         analyzer.add_observer(self)
 
-    def _analyze(self) -> None:  # FIXME
-        lcirc_product_index = self._dialog.parameters_view.lcirc_combo_box.currentIndex()
-        rcirc_product_index = self._dialog.parameters_view.rcirc_combo_box.currentIndex()
-
-        if lcirc_product_index < 0 or rcirc_product_index < 0:
-            return
+    def analyze(self, lcirc_product_index: int, rcirc_product_index: int) -> None:
+        self._analyzer.set_lcirc_product(lcirc_product_index)
+        self._analyzer.set_rcirc_product(rcirc_product_index)
 
         try:
             lcirc_product_name = self._analyzer.get_lcirc_product_name()
@@ -74,12 +75,7 @@ class XMCDViewController(Observer):
             )
             self._dialog.open()
 
-        self._analyzer.analyze(lcirc_product_index, rcirc_product_index)
-
-    def analyze(self, lcirc_product_index: int, rcirc_product_index: int) -> None:  # FIXME
-        self._dialog.parameters_view.lcirc_combo_box.setCurrentIndex(lcirc_product_index)
-        self._dialog.parameters_view.rcirc_combo_box.setCurrentIndex(rcirc_product_index)
-        self._analyze()
+        self._analyzer.analyze()
 
     def _save_data(self) -> None:
         title = 'Save XMCD Data'
@@ -98,6 +94,12 @@ class XMCDViewController(Observer):
                 ExceptionDialog.show_exception(title, err)
 
     def _sync_model_to_view(self) -> None:
+        lcirc_product_index = self._analyzer.get_lcirc_product()
+        self._dialog.parameters_view.lcirc_combo_box.setCurrentIndex(lcirc_product_index)
+
+        rcirc_product_index = self._analyzer.get_rcirc_product()
+        self._dialog.parameters_view.rcirc_combo_box.setCurrentIndex(rcirc_product_index)
+
         try:
             data = self._analyzer.get_data()
         except ValueError:

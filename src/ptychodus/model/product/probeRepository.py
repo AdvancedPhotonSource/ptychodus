@@ -36,15 +36,15 @@ class ProbeRepository(ObservableSequence[ProbeRepositoryItem], ProductRepository
         self, index: int | slice
     ) -> ProbeRepositoryItem | Sequence[ProbeRepositoryItem]:
         if isinstance(index, slice):
-            return [item.getProbe() for item in self._repository[index]]
+            return [item.get_probe() for item in self._repository[index]]
         else:
-            return self._repository[index].getProbe()
+            return self._repository[index].get_probe()
 
     def __len__(self) -> int:
         return len(self._repository)
 
     def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notify_observers_item_inserted(index, item.getProbe())
+        self.notify_observers_item_inserted(index, item.get_probe())
 
     def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
         pass
@@ -62,4 +62,4 @@ class ProbeRepository(ObservableSequence[ProbeRepositoryItem], ProductRepository
         pass
 
     def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notify_observers_item_removed(index, item.getProbe())
+        self.notify_observers_item_removed(index, item.get_probe())
