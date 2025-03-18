@@ -12,11 +12,11 @@ from .item import (
     ProductRepositoryItemObserver,
     ProductRepositoryObserver,
 )
-from .metadataFactory import MetadataRepositoryItemFactory
+from .metadata_factory import MetadataRepositoryItemFactory
 from .object import ObjectRepositoryItemFactory
 from .probe import ProbeRepositoryItemFactory
-from .productGeometry import ProductGeometry
-from .productValidator import ProductValidator
+from .product_geometry import ProductGeometry
+from .product_validator import ProductValidator
 from .scan import ScanRepositoryItemFactory
 from .settings import ProductSettings
 
@@ -178,7 +178,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def handleMetadataChanged(self, item: ProductRepositoryItem) -> None:
         metadata = item.getMetadata()
-        index = metadata.getIndex()
+        index = metadata.get_index()
 
         if index < 0:
             logger.warning(f'Failed to look up index for "{item.get_name()}"!')
@@ -189,7 +189,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def handleScanChanged(self, item: ProductRepositoryItem) -> None:
         metadata = item.getMetadata()
-        index = metadata.getIndex()
+        index = metadata.get_index()
         scan = item.getScan()
 
         if index < 0:
@@ -201,7 +201,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def handleProbeChanged(self, item: ProductRepositoryItem) -> None:
         metadata = item.getMetadata()
-        index = metadata.getIndex()
+        index = metadata.get_index()
         probe = item.get_probe()
 
         if index < 0:
@@ -213,7 +213,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def handleObjectChanged(self, item: ProductRepositoryItem) -> None:
         metadata = item.getMetadata()
-        index = metadata.getIndex()
+        index = metadata.get_index()
         object_ = item.get_object()
 
         if index < 0:
@@ -225,7 +225,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def handleCostsChanged(self, item: ProductRepositoryItem) -> None:
         metadata = item.getMetadata()
-        index = metadata.getIndex()
+        index = metadata.get_index()
         costs = item.getCosts()
 
         if index < 0:

@@ -8,14 +8,14 @@ from ptychodus.api.product import ProductFileReader, ProductFileWriter
 
 from .object.builderFactory import ObjectBuilderFactory
 from .object.settings import ObjectSettings
-from .objectRepository import ObjectRepository
+from .object_repository import ObjectRepository
 from .probe.builderFactory import ProbeBuilderFactory
 from .probe.settings import ProbeSettings
-from .probeRepository import ProbeRepository
-from .productRepository import ProductRepository
+from .probe_repository import ProbeRepository
+from .product_repository import ProductRepository
 from .scan.builderFactory import ScanBuilderFactory
 from .scan.settings import ScanSettings
-from .scanRepository import ScanRepository
+from .scan_repository import ScanRepository
 from .settings import ProductSettings
 
 logger = logging.getLogger(__name__)

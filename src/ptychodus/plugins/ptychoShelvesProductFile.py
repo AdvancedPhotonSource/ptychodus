@@ -38,6 +38,7 @@ class PtychoShelvesProductFileReader(ProductFileReader):
             probe_energy_eV=probe_energy_eV,
             probe_photon_count=0.0,  # not included in file
             exposure_time_s=0.0,  # not included in file
+            mass_attenuation_m2_kg=0.0,  # not included in file
         )
 
         dx_spec = p_struct['dx_spec']

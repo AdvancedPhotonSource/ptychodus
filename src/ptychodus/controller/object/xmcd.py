@@ -110,13 +110,18 @@ class XMCDViewController(Observer):
             logger.exception(err)
             ExceptionDialog.show_exception('Update Views', err)
         else:
-            self._difference_visualization_widget_controller.set_array(
-                data.polar_difference, data.pixel_geometry
-            )
-            self._sum_visualization_widget_controller.set_array(data.polar_sum, data.pixel_geometry)
-            self._ratio_visualization_widget_controller.set_array(
-                data.polar_ratio, data.pixel_geometry
-            )
+            if data.pixel_geometry is None:
+                logger.warning('Missing XMCD pixel geometry!')
+            else:
+                self._difference_visualization_widget_controller.set_array(
+                    data.polar_difference, data.pixel_geometry
+                )
+                self._sum_visualization_widget_controller.set_array(
+                    data.polar_sum, data.pixel_geometry
+                )
+                self._ratio_visualization_widget_controller.set_array(
+                    data.polar_ratio, data.pixel_geometry
+                )
 
     def _update(self, observable: Observable) -> None:
         if observable is self._analyzer:

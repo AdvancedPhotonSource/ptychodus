@@ -10,8 +10,8 @@ from ptychodus.api.product import Product
 from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
-from .productGeometry import ProductGeometry
-from .productValidator import ProductValidator
+from .product_geometry import ProductGeometry
+from .product_validator import ProductValidator
 from .scan import ScanRepositoryItem
 
 logger = logging.getLogger(__name__)
@@ -67,7 +67,7 @@ class ProductRepositoryItem(ParameterGroup):
         self._add_group('object', self._object, observe=True)
 
     def assignItem(self, item: ProductRepositoryItem, *, notify: bool = True) -> None:
-        self._metadata.assignItem(item.getMetadata())
+        self._metadata.assign_item(item.getMetadata())
         self._scan.assignItem(item.getScan())
         self._probe.assignItem(item.get_probe())
         self._object.assignItem(item.get_object())
@@ -85,16 +85,16 @@ class ProductRepositoryItem(ParameterGroup):
         self._parent.handleCostsChanged(self)
 
     def syncToSettings(self) -> None:
-        self._metadata.syncToSettings()
+        self._metadata.sync_to_settings()
         self._scan.syncToSettings()
         self._probe.syncToSettings()
         self._object.syncToSettings()
 
     def get_name(self) -> str:
-        return self._metadata.getName()
+        return self._metadata.get_name()
 
     def setName(self, name: str) -> None:
-        self._metadata.setName(name)
+        self._metadata.set_name(name)
 
     def getMetadata(self) -> MetadataRepositoryItem:
         return self._metadata
@@ -120,7 +120,7 @@ class ProductRepositoryItem(ParameterGroup):
 
     def get_product(self) -> Product:
         return Product(
-            metadata=self._metadata.getMetadata(),
+            metadata=self._metadata.get_metadata(),
             scan=self._scan.getScan(),
             probe=self._probe.get_probe(),
             object_=self._object.get_object(),

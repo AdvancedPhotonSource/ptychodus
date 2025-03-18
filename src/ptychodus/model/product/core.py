@@ -11,12 +11,12 @@ from ptychodus.api.settings import SettingsRegistry
 from ..patterns import AssembledDiffractionDataset, PatternSizer
 from .api import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
 from .object import ObjectBuilderFactory, ObjectRepositoryItemFactory, ObjectSettings
-from .objectRepository import ObjectRepository
+from .object_repository import ObjectRepository
 from .probe import ProbeBuilderFactory, ProbeRepositoryItemFactory, ProbeSettings
-from .probeRepository import ProbeRepository
-from .productRepository import ProductRepository
+from .probe_repository import ProbeRepository
+from .product_repository import ProductRepository
 from .scan import ScanBuilderFactory, ScanRepositoryItemFactory, ScanSettings
-from .scanRepository import ScanRepository
+from .scan_repository import ScanRepository
 from .settings import ProductSettings
 
 
@@ -95,8 +95,8 @@ class ProductCore(Observer):
         )
 
         # TODO vvv refactor vvv
-        productFileReaderChooser.synchronize_with_parameter(self.settings.fileType)
-        productFileWriterChooser.set_current_plugin(self.settings.fileType.get_value())
+        productFileReaderChooser.synchronize_with_parameter(self.settings.file_type)
+        productFileWriterChooser.set_current_plugin(self.settings.file_type.get_value())
         scanFileReaderChooser.synchronize_with_parameter(self._scanSettings.fileType)
         scanFileWriterChooser.set_current_plugin(self._scanSettings.fileType.get_value())
         probeFileReaderChooser.synchronize_with_parameter(self._probeSettings.fileType)

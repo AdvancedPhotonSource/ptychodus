@@ -23,6 +23,7 @@ class ProductMetadata:
     probe_energy_eV: float  # noqa: N815
     probe_photon_count: float
     exposure_time_s: float
+    mass_attenuation_m2_kg: float
 
     @property
     def probe_energy_J(self) -> float:  # noqa: N802
@@ -45,6 +46,7 @@ class ProductMetadata:
         sz += getsizeof(self.probe_energy_eV)
         sz += getsizeof(self.probe_photon_count)
         sz += getsizeof(self.exposure_time_s)
+        sz += getsizeof(self.mass_attenuation_m2_kg)
         return sz
 
 

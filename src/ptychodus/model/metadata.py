@@ -107,7 +107,7 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
         photonCount = self._metadata.probe_photon_count
 
         if photonCount:
-            self._productSettings.probePhotonCount.set_value(photonCount)
+            self._productSettings.probe_photon_count.set_value(photonCount)
 
     def canSyncProbeEnergy(self) -> bool:
         return self._metadata.probe_energy_eV is not None
@@ -116,7 +116,7 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
         energyInElectronVolts = self._metadata.probe_energy_eV
 
         if energyInElectronVolts:
-            self._productSettings.probeEnergyInElectronVolts.set_value(energyInElectronVolts)
+            self._productSettings.probe_energy_eV.set_value(energyInElectronVolts)
 
     def canSyncDetectorDistance(self) -> bool:
         return self._metadata.detector_distance_m is not None
@@ -125,7 +125,7 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
         distanceInMeters = self._metadata.detector_distance_m
 
         if distanceInMeters:
-            self._productSettings.detectorDistanceInMeters.set_value(distanceInMeters)
+            self._productSettings.detector_distance_m.set_value(distanceInMeters)
 
     def handle_array_inserted(self, index: int) -> None:
         pass

@@ -133,7 +133,7 @@ class ProductEditorViewController(Observer):
 
     def _estimateProbePhotonCount(self) -> None:
         metadata = self._product.getMetadata()
-        metadata.probePhotonCount.set_value(self._dataset.get_maximum_pattern_counts())
+        metadata.probe_photon_count.set_value(self._dataset.get_maximum_pattern_counts())
 
         self._tableModel.beginResetModel()
         self._tableModel.endResetModel()

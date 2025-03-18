@@ -66,6 +66,7 @@ class SLACProductFileReader(ProductFileReader):
             probe_energy_eV=0.0,  # not included in file
             probe_photon_count=0.0,  # not included in file
             exposure_time_s=0.0,  # not included in file
+            mass_attenuation_m2_kg=0.0,  # not included in file
         )
 
         scanPointList: list[ScanPoint] = list()

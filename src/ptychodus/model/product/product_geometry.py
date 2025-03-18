@@ -33,11 +33,11 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     @property
     def probe_photon_count(self) -> float:
-        return self._metadata.probePhotonCount.get_value()
+        return self._metadata.probe_photon_count.get_value()
 
     @property
     def probeEnergyInJoules(self) -> float:
-        return self._metadata.probeEnergyInElectronVolts.get_value() * ELECTRON_VOLT_J
+        return self._metadata.probe_energy_eV.get_value() * ELECTRON_VOLT_J
 
     @property
     def probe_wavelength_m(self) -> float:
@@ -61,7 +61,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
     @property
     def probePhotonsPerSecond(self) -> float:
         try:
-            return self.probe_photon_count / self._metadata.exposureTimeInSeconds.get_value()
+            return self.probe_photon_count / self._metadata.exposure_time_s.get_value()
         except ZeroDivisionError:
             return 0.0
 
@@ -71,7 +71,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     @property
     def detector_distance_m(self) -> float:
-        return self._metadata.detectorDistanceInMeters.get_value()
+        return self._metadata.detector_distance_m.get_value()
 
     @property
     def _lambdaZInSquareMeters(self) -> float:

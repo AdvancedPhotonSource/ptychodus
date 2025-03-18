@@ -86,7 +86,6 @@ class IlluminationMapper(Observable):
     def map(self) -> None:
         product = self._repository[self._product_index].get_product()
         object_geometry = product.object_.get_geometry()
-        mass_attenuation_m2_kg = 1.0  # FIXME
 
         stitcher = BarycentricArrayStitcher[numpy.double](
             numpy.zeros((object_geometry.height_px, object_geometry.width_px))
@@ -104,7 +103,7 @@ class IlluminationMapper(Observable):
             photon_number=stitcher.stitch(),
             photon_energy_J=product.metadata.probe_energy_J,
             exposure_time_s=product.metadata.exposure_time_s,
-            mass_attenuation_m2_kg=mass_attenuation_m2_kg,
+            mass_attenuation_m2_kg=product.metadata.mass_attenuation_m2_kg,
             pixel_geometry=object_geometry.get_pixel_geometry(),
             center=object_geometry.get_center(),
         )

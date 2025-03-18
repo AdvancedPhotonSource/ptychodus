@@ -3,7 +3,7 @@ from ptychodus.api.observer import Observable, Observer
 from ..patterns import AssembledDiffractionDataset
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
-from .productGeometry import ProductGeometry
+from .product_geometry import ProductGeometry
 from .scan import ScanRepositoryItem
 
 

@@ -26,10 +26,10 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
             self,
             name=metadata.name,
             comments=metadata.comments,
-            detectorDistanceInMeters=metadata.detector_distance_m,
-            probeEnergyInElectronVolts=metadata.probe_energy_eV,
-            probePhotonCount=metadata.probe_photon_count,
-            exposureTimeInSeconds=metadata.exposure_time_s,
+            detector_distance_m=metadata.detector_distance_m,
+            probe_energy_eV=metadata.probe_energy_eV,
+            probe_photon_count=metadata.probe_photon_count,
+            exposure_time_s=metadata.exposure_time_s,
         )
 
     def createDefault(
@@ -47,13 +47,13 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
             self,
             name=name,
             comments=comments,
-            detectorDistanceInMeters=detectorDistanceInMeters,
-            probeEnergyInElectronVolts=probeEnergyInElectronVolts,
-            probePhotonCount=probePhotonCount,
-            exposureTimeInSeconds=exposureTimeInSeconds,
+            detector_distance_m=detectorDistanceInMeters,
+            probe_energy_eV=probeEnergyInElectronVolts,
+            probe_photon_count=probePhotonCount,
+            exposure_time_s=exposureTimeInSeconds,
         )
 
-    def createUniqueName(self, candidateName: str) -> str:
+    def create_unique_name(self, candidateName: str) -> str:
         reservedNames = set([item.get_name() for item in self._repository])
         name = candidateName if candidateName else 'Unnamed'
         match = 0

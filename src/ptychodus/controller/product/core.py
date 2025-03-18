@@ -76,15 +76,15 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 if index.column() == 0:
-                    return metadata.getName()
+                    return metadata.get_name()
                 elif index.column() == 1:
-                    return f'{metadata.detectorDistanceInMeters.get_value():.4g}'
+                    return f'{metadata.detector_distance_m.get_value():.4g}'
                 elif index.column() == 2:
-                    return f'{metadata.probeEnergyInElectronVolts.get_value() / 1e3:.4g}'
+                    return f'{metadata.probe_energy_eV.get_value() / 1e3:.4g}'
                 elif index.column() == 3:
-                    return f'{metadata.probePhotonCount.get_value():.4g}'
+                    return f'{metadata.probe_photon_count.get_value():.4g}'
                 elif index.column() == 4:
-                    return f'{metadata.exposureTimeInSeconds.get_value():.4g}'
+                    return f'{metadata.exposure_time_s.get_value():.4g}'
                 elif index.column() == 5:
                     return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
                 elif index.column() == 6:
@@ -104,7 +104,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
             metadata = item.getMetadata()
 
             if index.column() == 0:
-                metadata.setName(str(value))
+                metadata.set_name(str(value))
                 return True
             elif index.column() == 1:
                 try:
@@ -112,7 +112,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 except ValueError:
                     return False
 
-                metadata.detectorDistanceInMeters.set_value(distanceInM)
+                metadata.detector_distance_m.set_value(distanceInM)
                 return True
             elif index.column() == 2:
                 try:
@@ -120,7 +120,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 except ValueError:
                     return False
 
-                metadata.probeEnergyInElectronVolts.set_value(energyInKEV * 1e3)
+                metadata.probe_energy_eV.set_value(energyInKEV * 1e3)
                 return True
             elif index.column() == 3:
                 try:
@@ -128,7 +128,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 except ValueError:
                     return False
 
-                metadata.probePhotonCount.set_value(photonCount)
+                metadata.probe_photon_count.set_value(photonCount)
                 return True
             elif index.column() == 4:
                 try:
@@ -136,7 +136,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 except ValueError:
                     return False
 
-                metadata.exposureTimeInSeconds.set_value(exposureTimeInSeconds)
+                metadata.exposure_time_s.set_value(exposureTimeInSeconds)
                 return True
 
         return False

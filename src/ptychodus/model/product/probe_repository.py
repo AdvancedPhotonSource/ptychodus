@@ -8,13 +8,13 @@ from .item import ProductRepositoryItem, ProductRepositoryObserver
 from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
-from .productRepository import ProductRepository
+from .product_repository import ProductRepository
 from .scan import ScanRepositoryItem
 
 logger = logging.getLogger(__name__)
 
 
-class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductRepositoryObserver):
+class ProbeRepository(ObservableSequence[ProbeRepositoryItem], ProductRepositoryObserver):
     def __init__(self, repository: ProductRepository) -> None:
         super().__init__()
         self._repository = repository
@@ -27,24 +27,24 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductReposito
         self._repository[index].setName(name)
 
     @overload
-    def __getitem__(self, index: int) -> ObjectRepositoryItem: ...
+    def __getitem__(self, index: int) -> ProbeRepositoryItem: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[ObjectRepositoryItem]: ...
+    def __getitem__(self, index: slice) -> Sequence[ProbeRepositoryItem]: ...
 
     def __getitem__(
         self, index: int | slice
-    ) -> ObjectRepositoryItem | Sequence[ObjectRepositoryItem]:
+    ) -> ProbeRepositoryItem | Sequence[ProbeRepositoryItem]:
         if isinstance(index, slice):
-            return [item.get_object() for item in self._repository[index]]
+            return [item.get_probe() for item in self._repository[index]]
         else:
-            return self._repository[index].get_object()
+            return self._repository[index].get_probe()
 
     def __len__(self) -> int:
         return len(self._repository)
 
     def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notify_observers_item_inserted(index, item.get_object())
+        self.notify_observers_item_inserted(index, item.get_probe())
 
     def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
         pass
@@ -53,13 +53,13 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductReposito
         pass
 
     def handleProbeChanged(self, index: int, item: ProbeRepositoryItem) -> None:
-        pass
+        self.notify_observers_item_changed(index, item)
 
     def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
-        self.notify_observers_item_changed(index, item)
+        pass
 
     def handleCostsChanged(self, index: int, costs: Sequence[float]) -> None:
         pass
 
     def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notify_observers_item_removed(index, item.get_object())
+        self.notify_observers_item_removed(index, item.get_probe())
