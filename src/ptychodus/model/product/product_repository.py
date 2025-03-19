@@ -65,11 +65,11 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         self._itemList.append(item)
 
         for observer in self._observerList:
-            observer.handleItemInserted(index, item)
+            observer.handle_item_inserted(index, item)
 
         return index
 
-    def insertNewProduct(
+    def insert_new_product(
         self,
         *,
         name: str = '',
@@ -78,7 +78,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         probeEnergyInElectronVolts: float | None = None,
         probePhotonCount: float | None = None,
         exposureTimeInSeconds: float | None = None,
-        likeIndex: int,
+        like_index: int,
     ) -> int:
         metadataItem = self._metadataRepositoryItemFactory.createDefault(
             name=name,
@@ -106,8 +106,8 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
         index = self._insertProduct(item)
 
-        if likeIndex >= 0:
-            item.assignItem(self._itemList[likeIndex], notify=False)
+        if like_index >= 0:
+            item.assign_item(self._itemList[like_index], notify=False)
 
         return index
 
@@ -160,13 +160,13 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             return
 
         for observer in self._observerList:
-            observer.handleItemRemoved(index, item)
+            observer.handle_item_removed(index, item)
 
     def getInfoText(self) -> str:
         sizeInMB = sum(sys.getsizeof(prod) for prod in self._itemList) / (1024 * 1024)
         return f'Total: {len(self)} [{sizeInMB:.2f}MB]'
 
-    def addObserver(self, observer: ProductRepositoryObserver) -> None:
+    def add_observer(self, observer: ProductRepositoryObserver) -> None:
         if observer not in self._observerList:
             self._observerList.append(observer)
 
@@ -176,8 +176,8 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         except ValueError:
             pass
 
-    def handleMetadataChanged(self, item: ProductRepositoryItem) -> None:
-        metadata = item.getMetadata()
+    def handle_metadata_changed(self, item: ProductRepositoryItem) -> None:
+        metadata = item.get_metadata()
         index = metadata.get_index()
 
         if index < 0:
@@ -185,22 +185,22 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             return
 
         for observer in self._observerList:
-            observer.handleMetadataChanged(index, metadata)
+            observer.handle_metadata_changed(index, metadata)
 
-    def handleScanChanged(self, item: ProductRepositoryItem) -> None:
-        metadata = item.getMetadata()
+    def handle_scan_changed(self, item: ProductRepositoryItem) -> None:
+        metadata = item.get_metadata()
         index = metadata.get_index()
-        scan = item.getScan()
+        scan = item.get_scan()
 
         if index < 0:
             logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
         for observer in self._observerList:
-            observer.handleScanChanged(index, scan)
+            observer.handle_scan_changed(index, scan)
 
-    def handleProbeChanged(self, item: ProductRepositoryItem) -> None:
-        metadata = item.getMetadata()
+    def handle_probe_changed(self, item: ProductRepositoryItem) -> None:
+        metadata = item.get_metadata()
         index = metadata.get_index()
         probe = item.get_probe()
 
@@ -209,10 +209,10 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             return
 
         for observer in self._observerList:
-            observer.handleProbeChanged(index, probe)
+            observer.handle_probe_changed(index, probe)
 
-    def handleObjectChanged(self, item: ProductRepositoryItem) -> None:
-        metadata = item.getMetadata()
+    def handle_object_changed(self, item: ProductRepositoryItem) -> None:
+        metadata = item.get_metadata()
         index = metadata.get_index()
         object_ = item.get_object()
 
@@ -221,16 +221,16 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             return
 
         for observer in self._observerList:
-            observer.handleObjectChanged(index, object_)
+            observer.handle_object_changed(index, object_)
 
-    def handleCostsChanged(self, item: ProductRepositoryItem) -> None:
-        metadata = item.getMetadata()
+    def handle_costs_changed(self, item: ProductRepositoryItem) -> None:
+        metadata = item.get_metadata()
         index = metadata.get_index()
-        costs = item.getCosts()
+        costs = item.get_costs()
 
         if index < 0:
             logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
         for observer in self._observerList:
-            observer.handleCostsChanged(index, costs)
+            observer.handle_costs_changed(index, costs)

@@ -23,25 +23,25 @@ from matplotlib.figure import Figure
 class ReconstructorParametersView(QGroupBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Parameters', parent)
-        self.algorithmComboBox = QComboBox()
-        self.productComboBox = QComboBox()
+        self.algorithm_combo_box = QComboBox()
+        self.product_combo_box = QComboBox()
 
-        self.reconstructorMenu = QMenu()
+        self.reconstructor_menu = QMenu()
         self.reconstructorButton = QPushButton('Reconstructor')
-        self.reconstructorButton.setMenu(self.reconstructorMenu)
+        self.reconstructorButton.setMenu(self.reconstructor_menu)
 
-        self.trainerMenu = QMenu()
-        self.trainerButton = QPushButton('Trainer')
-        self.trainerButton.setMenu(self.trainerMenu)
+        self.trainer_menu = QMenu()
+        self.trainer_button = QPushButton('Trainer')
+        self.trainer_button.setMenu(self.trainer_menu)
 
         actionLayout = QHBoxLayout()
         actionLayout.setContentsMargins(0, 0, 0, 0)
         actionLayout.addWidget(self.reconstructorButton)
-        actionLayout.addWidget(self.trainerButton)
+        actionLayout.addWidget(self.trainer_button)
 
         layout = QFormLayout()
-        layout.addRow('Algorithm:', self.algorithmComboBox)
-        layout.addRow('Product:', self.productComboBox)
+        layout.addRow('Algorithm:', self.algorithm_combo_box)
+        layout.addRow('Product:', self.product_combo_box)
         layout.addRow('Action:', actionLayout)
         self.setLayout(layout)
 
@@ -49,41 +49,41 @@ class ReconstructorParametersView(QGroupBox):
 class ReconstructorProgressDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.textEdit = QPlainTextEdit()
+        self.text_edit = QPlainTextEdit()
         self.progressBar = QProgressBar()
-        self.buttonBox = QDialogButtonBox()
+        self.button_box = QDialogButtonBox()
 
         self.setWindowTitle('Reconstruction Progress')
-        self.buttonBox.addButton(QDialogButtonBox.Ok)
-        self.buttonBox.accepted.connect(self.accept)
-        self.buttonBox.addButton(QDialogButtonBox.Cancel)
-        self.buttonBox.rejected.connect(self.reject)
+        self.button_box.addButton(QDialogButtonBox.Ok)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.addButton(QDialogButtonBox.Cancel)
+        self.button_box.rejected.connect(self.reject)
 
         layout = QVBoxLayout()
-        layout.addWidget(self.textEdit)
+        layout.addWidget(self.text_edit)
         layout.addWidget(self.progressBar)
-        layout.addWidget(self.buttonBox)
+        layout.addWidget(self.button_box)
         self.setLayout(layout)
 
 
 class ReconstructorView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.parametersView = ReconstructorParametersView()
+        self.parameters_view = ReconstructorParametersView()
 
-        self.stackedWidget = QStackedWidget()
-        self.stackedWidget.layout().setContentsMargins(0, 0, 0, 0)
+        self.stacked_widget = QStackedWidget()
+        self.stacked_widget.layout().setContentsMargins(0, 0, 0, 0)
 
         self.scrollArea = QScrollArea()
         self.scrollArea.setWidgetResizable(True)
-        self.scrollArea.setWidget(self.stackedWidget)
+        self.scrollArea.setWidget(self.stacked_widget)
 
         layout = QVBoxLayout()
-        layout.addWidget(self.parametersView)
+        layout.addWidget(self.parameters_view)
         layout.addWidget(self.scrollArea)
         self.setLayout(layout)
 
-        self.progressDialog = ReconstructorProgressDialog()
+        self.progress_dialog = ReconstructorProgressDialog()
 
 
 class ReconstructorPlotView(QWidget):

@@ -66,26 +66,26 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
 
     def _updateLUT(self) -> None:
         for index, item in enumerate(self._repository):
-            metadata = item.getMetadata()
+            metadata = item.get_metadata()
             metadata._index = index
 
-    def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
+    def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
         self._updateLUT()
 
-    def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
+    def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
         pass
 
-    def handleScanChanged(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_scan_changed(self, index: int, item: ScanRepositoryItem) -> None:
         pass
 
-    def handleProbeChanged(self, index: int, item: ProbeRepositoryItem) -> None:
+    def handle_probe_changed(self, index: int, item: ProbeRepositoryItem) -> None:
         pass
 
-    def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
+    def handle_object_changed(self, index: int, item: ObjectRepositoryItem) -> None:
         pass
 
-    def handleCostsChanged(self, index: int, costs: Sequence[float]) -> None:
+    def handle_costs_changed(self, index: int, costs: Sequence[float]) -> None:
         pass
 
-    def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
+    def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
         self._updateLUT()

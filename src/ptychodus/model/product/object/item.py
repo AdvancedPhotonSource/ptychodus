@@ -31,7 +31,7 @@ class ObjectRepositoryItem(ParameterGroup):
         self._add_group('builder', builder, observe=True)
         self._rebuild()
 
-    def assignItem(self, item: ObjectRepositoryItem) -> None:
+    def assign_item(self, item: ObjectRepositoryItem) -> None:
         self.layerDistanceInMeters.set_value(item.layerDistanceInMeters.get_value(), notify=False)
         self.setBuilder(item.getBuilder().copy())
         self._rebuild()
@@ -40,7 +40,7 @@ class ObjectRepositoryItem(ParameterGroup):
         builder = FromMemoryObjectBuilder(self._settings, object_)
         self.setBuilder(builder, mutable=mutable)
 
-    def syncToSettings(self) -> None:
+    def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
             parameter.sync_value_to_parent()
 

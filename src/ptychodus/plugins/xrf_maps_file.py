@@ -23,7 +23,7 @@ class XRFMapsFileIO(FluorescenceFileReader, FluorescenceFileWriter):
         parts = data_path.split('/')
         return '/'.join(parts[:-1]), parts[-1]
 
-    def read(cls, file_path: Path) -> FluorescenceDataset:
+    def read(self, file_path: Path) -> FluorescenceDataset:
         element_maps: list[ElementMap] = list()
         counts_per_second_path = str()
         channel_names_path = str()

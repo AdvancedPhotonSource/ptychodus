@@ -309,7 +309,7 @@ class PathParameterViewController(ParameterViewController, Observer):
         self._parameter.set_value(path)
 
     def _choose_file_to_open(self) -> None:
-        path, _ = self._file_dialog_factory.getOpenFilePath(
+        path, _ = self._file_dialog_factory.get_open_file_path(
             self._widget,
             self._caption,
             self._name_filters,
@@ -333,7 +333,7 @@ class PathParameterViewController(ParameterViewController, Observer):
             self._parameter.set_value(path)
 
     def _choose_directory(self) -> None:
-        path = self._file_dialog_factory.getExistingDirectoryPath(self._widget, self._caption)
+        path = self._file_dialog_factory.get_existing_directory_path(self._widget, self._caption)
 
         if path:
             self._parameter.set_value(path)

@@ -71,7 +71,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 logger.exception(err)
                 return None
 
-            metadata = item.getMetadata()
+            metadata = item.get_metadata()
             geometry = item.get_geometry()
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
@@ -101,7 +101,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 logger.exception(err)
                 return False
 
-            metadata = item.getMetadata()
+            metadata = item.get_metadata()
 
             if index.column() == 0:
                 metadata.set_name(str(value))
@@ -199,7 +199,7 @@ class ProductController(ProductRepositoryObserver):
             tableModel,
             tableProxyModel,
         )
-        repository.addObserver(controller)
+        repository.add_observer(controller)
         controller._updateInfoText()
 
         view.tableView.setModel(tableProxyModel)
@@ -236,11 +236,11 @@ class ProductController(ProductRepositoryObserver):
         return -1
 
     def _openProductFromFile(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
+        filePath, nameFilter = self._fileDialogFactory.get_open_file_path(
             self._view,
             'Open Product',
-            nameFilters=[nameFilter for nameFilter in self._api.getOpenFileFilterList()],
-            selectedNameFilter=self._api.getOpenFileFilter(),
+            name_filters=[nameFilter for nameFilter in self._api.getOpenFileFilterList()],
+            selected_name_filter=self._api.getOpenFileFilter(),
         )
 
         if filePath:
@@ -280,7 +280,7 @@ class ProductController(ProductRepositoryObserver):
             logger.warning('No current item!')
         else:
             item = self._repository[itemIndex]
-            item.syncToSettings()
+            item.sync_to_settings()
 
     def _duplicateCurrentProduct(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
@@ -318,31 +318,31 @@ class ProductController(ProductRepositoryObserver):
         infoText = self._repository.getInfoText()
         self._view.infoLabel.setText(infoText)
 
-    def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
+    def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
         parent = QModelIndex()
         self._tableModel.beginInsertRows(parent, index, index)
         self._tableModel.endInsertRows()
         self._updateInfoText()
 
-    def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
+    def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
         topLeft = self._tableModel.index(index, 0)
         bottomRight = self._tableModel.index(index, self._tableModel.columnCount() - 1)
         self._tableModel.dataChanged.emit(topLeft, bottomRight, [Qt.ItemDataRole.DisplayRole])
         self._updateInfoText()
 
-    def handleScanChanged(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_scan_changed(self, index: int, item: ScanRepositoryItem) -> None:
         self._updateInfoText()
 
-    def handleProbeChanged(self, index: int, item: ProbeRepositoryItem) -> None:
+    def handle_probe_changed(self, index: int, item: ProbeRepositoryItem) -> None:
         self._updateInfoText()
 
-    def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
+    def handle_object_changed(self, index: int, item: ObjectRepositoryItem) -> None:
         self._updateInfoText()
 
-    def handleCostsChanged(self, index: int, costs: Sequence[float]) -> None:
+    def handle_costs_changed(self, index: int, costs: Sequence[float]) -> None:
         self._updateInfoText()
 
-    def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
+    def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
         parent = QModelIndex()
         self._tableModel.beginRemoveRows(parent, index, index)
         self._tableModel.endRemoveRows()

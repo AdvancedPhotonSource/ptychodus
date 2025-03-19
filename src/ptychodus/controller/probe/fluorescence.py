@@ -197,11 +197,11 @@ class FluorescenceViewController(Observer):
 
     def _openMeasuredDataset(self) -> None:
         title = 'Open Measured Fluorescence Dataset'
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
+        filePath, nameFilter = self._fileDialogFactory.get_open_file_path(
             self._dialog,
             title,
-            nameFilters=[nameFilter for nameFilter in self._enhancer.get_open_file_filters()],
-            selectedNameFilter=self._enhancer.get_open_file_filter(),
+            name_filters=[nameFilter for nameFilter in self._enhancer.get_open_file_filters()],
+            selected_name_filter=self._enhancer.get_open_file_filter(),
         )
 
         if filePath:

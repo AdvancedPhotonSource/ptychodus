@@ -25,13 +25,13 @@ class FileDialogFactory(Observable):
             self._openWorkingDirectory = directory
             self.notify_observers()
 
-    def getOpenFilePath(
+    def get_open_file_path(
         self,
         parent: QWidget,
         caption: str,
-        nameFilters: Sequence[str] | None = None,
+        name_filters: Sequence[str] | None = None,
         mimeTypeFilters: Sequence[str] | None = None,
-        selectedNameFilter: str | None = None,
+        selected_name_filter: str | None = None,
     ) -> tuple[Path | None, str]:
         filePath = None
 
@@ -39,14 +39,14 @@ class FileDialogFactory(Observable):
         dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
         dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
 
-        if nameFilters is not None:
-            dialog.setNameFilters(nameFilters)
+        if name_filters is not None:
+            dialog.setNameFilters(name_filters)
 
         if mimeTypeFilters is not None:
             dialog.setMimeTypeFilters(mimeTypeFilters)
 
-        if selectedNameFilter is not None:
-            dialog.selectNameFilter(selectedNameFilter)
+        if selected_name_filter is not None:
+            dialog.selectNameFilter(selected_name_filter)
 
         if dialog.exec() == QDialog.DialogCode.Accepted:  # TODO exec -> open
             fileNameList = dialog.selectedFiles()
@@ -91,15 +91,15 @@ class FileDialogFactory(Observable):
 
         return filePath, dialog.selectedNameFilter()
 
-    def getExistingDirectoryPath(
-        self, parent: QWidget, caption: str, initialDirectory: Path | None = None
+    def get_existing_directory_path(
+        self, parent: QWidget, caption: str, initial_directory: Path | None = None
     ) -> Path | None:
         dirPath = None
 
         dirName = QFileDialog.getExistingDirectory(
             parent,
             caption,
-            str(initialDirectory or self.getOpenWorkingDirectory()),
+            str(initial_directory or self.getOpenWorkingDirectory()),
             QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks,
         )
 

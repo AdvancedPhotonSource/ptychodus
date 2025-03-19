@@ -32,7 +32,7 @@ class ProbeRepositoryItem(ParameterGroup):
 
         self._rebuild()
 
-    def assignItem(self, item: ProbeRepositoryItem) -> None:
+    def assign_item(self, item: ProbeRepositoryItem) -> None:
         self._remove_group('additional_modes')
         self._additionalModesBuilder.remove_observer(self)
         self._additionalModesBuilder = item.getAdditionalModesBuilder().copy()
@@ -46,7 +46,7 @@ class ProbeRepositoryItem(ParameterGroup):
         builder = FromMemoryProbeBuilder(self._settings, probe)
         self.setBuilder(builder, mutable=mutable)
 
-    def syncToSettings(self) -> None:
+    def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
             parameter.sync_value_to_parent()
 

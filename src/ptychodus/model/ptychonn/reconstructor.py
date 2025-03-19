@@ -11,10 +11,11 @@ from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.object import Object, ObjectArrayType
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import (
+    LossValue,
     ReconstructInput,
     ReconstructOutput,
-    TrainableReconstructor,
     TrainOutput,
+    TrainableReconstructor,
 )
 
 from ..analysis import BarycentricArrayInterpolator, BarycentricArrayStitcher
@@ -189,21 +190,18 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         )
         self._model_provider.set_trainer(trainer)
 
-        training_loss: list[float] = list()
-        validation_loss: list[float] = list()
+        losses: list[LossValue] = []
 
-        for entry in trainer_log.logs:
+        for epoch, entry in enumerate(trainer_log.logs):
             try:
                 tloss = entry['training_loss']
                 vloss = entry['validation_loss']
             except KeyError:
                 pass
             else:
-                training_loss.append(tloss)
-                validation_loss.append(vloss)
+                losses.append(LossValue(epoch=epoch, training_loss=tloss, validation_loss=vloss))
 
         return TrainOutput(
-            training_loss=training_loss,
-            validation_loss=validation_loss,
+            losses=losses,
             result=0,
         )

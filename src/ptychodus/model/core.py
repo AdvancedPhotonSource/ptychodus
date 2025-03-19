@@ -291,7 +291,7 @@ class ModelCore:
         # TODO add enum for actions; implement using workflow API
         if action.lower() == 'train':
             output = self._reconstructorCore.reconstructorAPI.train(inputPath)
-            self._reconstructorCore.reconstructorAPI.saveModel(outputPath)
+            self._reconstructorCore.reconstructorAPI.save_model(outputPath)
             return output.result
 
         inputProductIndex = self._productCore.productAPI.openProduct(
@@ -307,7 +307,7 @@ class ModelCore:
             outputProductIndex = self._reconstructorCore.reconstructorAPI.reconstruct(
                 inputProductIndex
             )
-            self._reconstructorCore.reconstructorAPI.processResults(block=True)
+            self._reconstructorCore.reconstructorAPI.process_results(block=True)
             logger.info('Reconstruction complete.')
 
             self._productCore.productAPI.saveProduct(
@@ -321,7 +321,7 @@ class ModelCore:
                     fluorescenceOutputFilePath,
                 )
         elif action.lower() == 'prepare_training_data':
-            self._reconstructorCore.reconstructorAPI.exportTrainingData(
+            self._reconstructorCore.reconstructorAPI.export_training_data(
                 outputPath, inputProductIndex
             )
         else:

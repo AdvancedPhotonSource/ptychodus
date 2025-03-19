@@ -176,11 +176,11 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         if itemIndex < 0:
             return
 
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
+        filePath, nameFilter = self._fileDialogFactory.get_open_file_path(
             self._view,
             'Open Probe',
-            nameFilters=[nameFilter for nameFilter in self._api.getOpenFileFilterList()],
-            selectedNameFilter=self._api.getOpenFileFilter(),
+            name_filters=[nameFilter for nameFilter in self._api.getOpenFileFilterList()],
+            selected_name_filter=self._api.getOpenFileFilter(),
         )
 
         if filePath:
@@ -241,7 +241,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             logger.warning('No current item!')
         else:
             item = self._repository[itemIndex]
-            item.syncToSettings()
+            item.sync_to_settings()
 
     def _propagateProbe(self) -> None:
         itemIndex = self._getCurrentItemIndex()

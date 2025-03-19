@@ -121,18 +121,18 @@ class ProductEditorViewController(Observer):
         dialog.adjustSize()
 
     def _sync_view_to_model(self) -> None:
-        metadata = self._product.getMetadata()
+        metadata = self._product.get_metadata()
         metadata.comments.set_value(self._dialog.textEdit.toPlainText())
 
     def _sync_model_to_view(self) -> None:
         self._tableModel.beginResetModel()
         self._tableModel.endResetModel()
 
-        metadata = self._product.getMetadata()
+        metadata = self._product.get_metadata()
         self._dialog.textEdit.setPlainText(metadata.comments.get_value())
 
     def _estimateProbePhotonCount(self) -> None:
-        metadata = self._product.getMetadata()
+        metadata = self._product.get_metadata()
         metadata.probe_photon_count.set_value(self._dataset.get_maximum_pattern_counts())
 
         self._tableModel.beginResetModel()

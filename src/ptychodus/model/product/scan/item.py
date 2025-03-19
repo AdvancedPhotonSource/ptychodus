@@ -61,7 +61,7 @@ class ScanRepositoryItem(ParameterGroup):
 
         self._rebuild()
 
-    def assignItem(self, item: ScanRepositoryItem) -> None:
+    def assign_item(self, item: ScanRepositoryItem) -> None:
         self._remove_group('transform')
         self._transform.remove_observer(self)
         self._transform = item.getTransform().copy()
@@ -74,7 +74,7 @@ class ScanRepositoryItem(ParameterGroup):
         builder = FromMemoryScanBuilder(self._settings, scan)
         self.setBuilder(builder, mutable=mutable)
 
-    def syncToSettings(self) -> None:
+    def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
             parameter.sync_value_to_parent()
 

@@ -114,11 +114,11 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         if itemIndex < 0:
             return
 
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
+        filePath, nameFilter = self._fileDialogFactory.get_open_file_path(
             self._view,
             'Open Scan',
-            nameFilters=[nameFilter for nameFilter in self._api.getOpenFileFilterList()],
-            selectedNameFilter=self._api.getOpenFileFilter(),
+            name_filters=[nameFilter for nameFilter in self._api.getOpenFileFilterList()],
+            selected_name_filter=self._api.getOpenFileFilter(),
         )
 
         if filePath:
@@ -179,7 +179,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
             logger.warning('No current item!')
         else:
             item = self._repository[itemIndex]
-            item.syncToSettings()
+            item.sync_to_settings()
 
     def _redrawPlot(self) -> None:
         self._plotView.axes.clear()

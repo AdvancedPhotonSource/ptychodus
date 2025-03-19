@@ -60,7 +60,7 @@ class AutomationProcessingController(Observer):
         self._presenter.setDataDirectory(dataDirectory)
 
     def _browseDirectory(self) -> None:
-        dirPath = self._fileDialogFactory.getExistingDirectoryPath(
+        dirPath = self._fileDialogFactory.get_existing_directory_path(
             self._view, 'Choose Data Directory'
         )
 

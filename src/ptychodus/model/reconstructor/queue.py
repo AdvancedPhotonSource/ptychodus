@@ -28,7 +28,7 @@ class UpdateProductTask(ReconstructionTask):
     def execute(self) -> None:
         name = self._product.get_name()
         self._product.assign(self._result.product, mutable=False)
-        self._product.setName(name)
+        self._product.set_name(name)
 
 
 class ExecuteReconstructorTask(ReconstructionTask):
@@ -58,7 +58,7 @@ class ReconstructionQueue:
         self._worker = threading.Thread(target=self._reconstruct)
 
     @property
-    def isReconstructing(self) -> bool:
+    def is_reconstructing(self) -> bool:
         return self._inputQueue.unfinished_tasks > 0
 
     def _reconstruct(self) -> None:
@@ -86,7 +86,7 @@ class ReconstructionQueue:
         task = ExecuteReconstructorTask(reconstructor, parameters, product)
         self._inputQueue.put(task)
 
-    def processResults(self, *, block: bool) -> None:
+    def process_results(self, *, block: bool) -> None:
         while True:
             try:
                 task = self._outputQueue.get(block=block)
@@ -110,7 +110,7 @@ class ReconstructionQueue:
         logger.info('Stopping reconstructor...')
         self._stopWorkEvent.set()
         self._worker.join()
-        self.processResults(block=False)
+        self.process_results(block=False)
         logger.info('Reconstructor stopped.')
 
     def __len__(self) -> int:

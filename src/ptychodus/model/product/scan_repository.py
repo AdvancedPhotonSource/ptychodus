@@ -18,13 +18,13 @@ class ScanRepository(ObservableSequence[ScanRepositoryItem], ProductRepositoryOb
     def __init__(self, repository: ProductRepository) -> None:
         super().__init__()
         self._repository = repository
-        self._repository.addObserver(self)
+        self._repository.add_observer(self)
 
     def getName(self, index: int) -> str:
         return self._repository[index].get_name()
 
     def setName(self, index: int, name: str) -> None:
-        self._repository[index].setName(name)
+        self._repository[index].set_name(name)
 
     @overload
     def __getitem__(self, index: int) -> ScanRepositoryItem: ...
@@ -34,30 +34,30 @@ class ScanRepository(ObservableSequence[ScanRepositoryItem], ProductRepositoryOb
 
     def __getitem__(self, index: int | slice) -> ScanRepositoryItem | Sequence[ScanRepositoryItem]:
         if isinstance(index, slice):
-            return [item.getScan() for item in self._repository[index]]
+            return [item.get_scan() for item in self._repository[index]]
         else:
-            return self._repository[index].getScan()
+            return self._repository[index].get_scan()
 
     def __len__(self) -> int:
         return len(self._repository)
 
-    def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notify_observers_item_inserted(index, item.getScan())
+    def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
+        self.notify_observers_item_inserted(index, item.get_scan())
 
-    def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
+    def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
         pass
 
-    def handleScanChanged(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_scan_changed(self, index: int, item: ScanRepositoryItem) -> None:
         self.notify_observers_item_changed(index, item)
 
-    def handleProbeChanged(self, index: int, item: ProbeRepositoryItem) -> None:
+    def handle_probe_changed(self, index: int, item: ProbeRepositoryItem) -> None:
         pass
 
-    def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
+    def handle_object_changed(self, index: int, item: ObjectRepositoryItem) -> None:
         pass
 
-    def handleCostsChanged(self, index: int, costs: Sequence[float]) -> None:
+    def handle_costs_changed(self, index: int, costs: Sequence[float]) -> None:
         pass
 
-    def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notify_observers_item_removed(index, item.getScan())
+    def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
+        self.notify_observers_item_removed(index, item.get_scan())

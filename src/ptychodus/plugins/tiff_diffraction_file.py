@@ -109,5 +109,5 @@ def register_plugins(registry: PluginRegistry) -> None:
 if __name__ == '__main__':
     file_path = Path(sys.argv[1])
     reader = TiffDiffractionFileReader()
-    tiffFile = reader.read(file_path)
-    print(tiffFile)
+    tiff_file = reader.read(file_path)
+    print(tiff_file)

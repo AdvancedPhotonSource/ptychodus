@@ -19,23 +19,23 @@ logger = logging.getLogger(__name__)
 
 class ProductRepositoryItemObserver(ABC):
     @abstractmethod
-    def handleMetadataChanged(self, item: ProductRepositoryItem) -> None:
+    def handle_metadata_changed(self, item: ProductRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleScanChanged(self, item: ProductRepositoryItem) -> None:
+    def handle_scan_changed(self, item: ProductRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleProbeChanged(self, item: ProductRepositoryItem) -> None:
+    def handle_probe_changed(self, item: ProductRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleObjectChanged(self, item: ProductRepositoryItem) -> None:
+    def handle_object_changed(self, item: ProductRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleCostsChanged(self, item: ProductRepositoryItem) -> None:
+    def handle_costs_changed(self, item: ProductRepositoryItem) -> None:
         pass
 
 
@@ -66,15 +66,15 @@ class ProductRepositoryItem(ParameterGroup):
         self._add_group('probe', self._probe, observe=True)
         self._add_group('object', self._object, observe=True)
 
-    def assignItem(self, item: ProductRepositoryItem, *, notify: bool = True) -> None:
-        self._metadata.assign_item(item.getMetadata())
-        self._scan.assignItem(item.getScan())
-        self._probe.assignItem(item.get_probe())
-        self._object.assignItem(item.get_object())
-        self._costs = list(item.getCosts())
+    def assign_item(self, item: ProductRepositoryItem, *, notify: bool = True) -> None:
+        self._metadata.assign_item(item.get_metadata())
+        self._scan.assign_item(item.get_scan())
+        self._probe.assign_item(item.get_probe())
+        self._object.assign_item(item.get_object())
+        self._costs = list(item.get_costs())
 
         if notify:
-            self._parent.handleCostsChanged(self)
+            self._parent.handle_costs_changed(self)
 
     def assign(self, product: Product, *, mutable: bool = True) -> None:
         self._metadata.assign(product.metadata)
@@ -82,24 +82,24 @@ class ProductRepositoryItem(ParameterGroup):
         self._probe.assign(product.probe, mutable=mutable)
         self._object.assign(product.object_, mutable=mutable)
         self._costs = list(product.costs)
-        self._parent.handleCostsChanged(self)
+        self._parent.handle_costs_changed(self)
 
-    def syncToSettings(self) -> None:
+    def sync_to_settings(self) -> None:
         self._metadata.sync_to_settings()
-        self._scan.syncToSettings()
-        self._probe.syncToSettings()
-        self._object.syncToSettings()
+        self._scan.sync_to_settings()
+        self._probe.sync_to_settings()
+        self._object.sync_to_settings()
 
     def get_name(self) -> str:
         return self._metadata.get_name()
 
-    def setName(self, name: str) -> None:
+    def set_name(self, name: str) -> None:
         self._metadata.set_name(name)
 
-    def getMetadata(self) -> MetadataRepositoryItem:
+    def get_metadata(self) -> MetadataRepositoryItem:
         return self._metadata
 
-    def getScan(self) -> ScanRepositoryItem:
+    def get_scan(self) -> ScanRepositoryItem:
         return self._scan
 
     def get_geometry(self) -> ProductGeometry:
@@ -111,11 +111,11 @@ class ProductRepositoryItem(ParameterGroup):
     def get_object(self) -> ObjectRepositoryItem:
         return self._object
 
-    def _invalidateCosts(self) -> None:
+    def _invalidate_costs(self) -> None:
         self._costs = list()
-        self._parent.handleCostsChanged(self)
+        self._parent.handle_costs_changed(self)
 
-    def getCosts(self) -> Sequence[float]:
+    def get_costs(self) -> Sequence[float]:
         return self._costs
 
     def get_product(self) -> Product:
@@ -124,49 +124,49 @@ class ProductRepositoryItem(ParameterGroup):
             positions=self._scan.getScan(),
             probe=self._probe.get_probe(),
             object_=self._object.get_object(),
-            costs=self.getCosts(),
+            costs=self.get_costs(),
         )
 
     def _update(self, observable: Observable) -> None:
         if observable is self._metadata:
-            self._invalidateCosts()
-            self._parent.handleMetadataChanged(self)
+            self._invalidate_costs()
+            self._parent.handle_metadata_changed(self)
         elif observable is self._scan:
-            self._invalidateCosts()
-            self._parent.handleScanChanged(self)
+            self._invalidate_costs()
+            self._parent.handle_scan_changed(self)
         elif observable is self._probe:
-            self._invalidateCosts()
-            self._parent.handleProbeChanged(self)
+            self._invalidate_costs()
+            self._parent.handle_probe_changed(self)
         elif observable is self._object:
-            self._invalidateCosts()
-            self._parent.handleObjectChanged(self)
+            self._invalidate_costs()
+            self._parent.handle_object_changed(self)
 
 
 class ProductRepositoryObserver(ABC):
     @abstractmethod
-    def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
+    def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
+    def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleScanChanged(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_scan_changed(self, index: int, item: ScanRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleProbeChanged(self, index: int, item: ProbeRepositoryItem) -> None:
+    def handle_probe_changed(self, index: int, item: ProbeRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
+    def handle_object_changed(self, index: int, item: ObjectRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleCostsChanged(self, index: int, costs: Sequence[float]) -> None:
+    def handle_costs_changed(self, index: int, costs: Sequence[float]) -> None:
         pass
 
     @abstractmethod
-    def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
+    def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
         pass

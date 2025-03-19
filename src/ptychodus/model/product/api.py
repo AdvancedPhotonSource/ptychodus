@@ -136,7 +136,7 @@ class ScanAPI:
             logger.warning(f'Failed to access destination scan {destinationIndex} for copying!')
             return
 
-        destinationItem.assignItem(sourceItem)
+        destinationItem.assign_item(sourceItem)
 
     def getSaveFileFilterList(self) -> Iterator[str]:
         return self._builderFactory.getSaveFileFilterList()
@@ -244,7 +244,7 @@ class ProbeAPI:
             logger.warning(f'Failed to access destination probe {destinationIndex} for copying!')
             return
 
-        destinationItem.assignItem(sourceItem)
+        destinationItem.assign_item(sourceItem)
 
     def getSaveFileFilterList(self) -> Iterator[str]:
         return self._builderFactory.getSaveFileFilterList()
@@ -352,7 +352,7 @@ class ObjectAPI:
             logger.warning(f'Failed to access destination object {destinationIndex} for copying!')
             return
 
-        destinationItem.assignItem(sourceItem)
+        destinationItem.assign_item(sourceItem)
 
     def getSaveFileFilterList(self) -> Iterator[str]:
         return self._builderFactory.getSaveFileFilterList()
@@ -393,14 +393,14 @@ class ProductAPI:
         exposureTimeInSeconds: float | None = None,
         likeIndex: int = -1,
     ) -> int:
-        return self._repository.insertNewProduct(
+        return self._repository.insert_new_product(
             name=name,
             comments=comments,
             detectorDistanceInMeters=detectorDistanceInMeters,
             probeEnergyInElectronVolts=probeEnergyInElectronVolts,
             probePhotonCount=probePhotonCount,
             exposureTimeInSeconds=exposureTimeInSeconds,
-            likeIndex=likeIndex,
+            like_index=likeIndex,
         )
 
     def getItemName(self, productIndex: int) -> str:
