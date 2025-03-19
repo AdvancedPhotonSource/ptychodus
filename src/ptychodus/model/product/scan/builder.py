@@ -5,7 +5,7 @@ from pathlib import Path
 import logging
 
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint
+from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint
 
 from .settings import ScanSettings
 
@@ -31,7 +31,7 @@ class ScanBuilder(ParameterGroup):
         pass
 
     @abstractmethod
-    def build(self) -> Scan:
+    def build(self) -> PositionSequence:
         pass
 
 
@@ -39,18 +39,18 @@ class FromMemoryScanBuilder(ScanBuilder):
     def __init__(self, settings: ScanSettings, points: Sequence[ScanPoint]) -> None:
         super().__init__(settings, 'from_memory')
         self._settings = settings
-        self._scan = Scan(points)
+        self._scan = PositionSequence(points)
 
     def copy(self) -> FromMemoryScanBuilder:
         return FromMemoryScanBuilder(self._settings, self._scan)
 
-    def build(self) -> Scan:
+    def build(self) -> PositionSequence:
         return self._scan
 
 
 class FromFileScanBuilder(ScanBuilder):
     def __init__(
-        self, settings: ScanSettings, filePath: Path, fileType: str, fileReader: ScanFileReader
+        self, settings: ScanSettings, filePath: Path, fileType: str, fileReader: PositionFileReader
     ) -> None:
         super().__init__(settings, 'from_file')
         self._settings = settings
@@ -67,7 +67,7 @@ class FromFileScanBuilder(ScanBuilder):
             self._settings, self.filePath.get_value(), self.fileType.get_value(), self._fileReader
         )
 
-    def build(self) -> Scan:
+    def build(self) -> PositionSequence:
         filePath = self.filePath.get_value()
         fileType = self.fileType.get_value()
         logger.debug(f'Reading "{filePath}" as "{fileType}"')

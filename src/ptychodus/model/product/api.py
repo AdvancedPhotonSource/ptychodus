@@ -6,14 +6,14 @@ import logging
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import ProductFileReader, ProductFileWriter
 
-from .object.builderFactory import ObjectBuilderFactory
+from .object.builder_factory import ObjectBuilderFactory
 from .object.settings import ObjectSettings
 from .object_repository import ObjectRepository
-from .probe.builderFactory import ProbeBuilderFactory
+from .probe.builder_factory import ProbeBuilderFactory
 from .probe.settings import ProbeSettings
 from .probe_repository import ProbeRepository
 from .product_repository import ProductRepository
-from .scan.builderFactory import ScanBuilderFactory
+from .scan.builder_factory import ScanBuilderFactory
 from .scan.settings import ScanSettings
 from .scan_repository import ScanRepository
 from .settings import ProductSettings

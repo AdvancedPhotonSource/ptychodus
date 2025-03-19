@@ -19,37 +19,37 @@ from ptychodus.api.patterns import (
 )
 from ptychodus.api.tree import SimpleTreeNode
 
-from ..h5DiffractionFile import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
+from ..h5_diffraction_file import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class DataGroup:
-    arrayList: list[DiffractionPatternArray] = field(default_factory=list)
+    array_list: list[DiffractionPatternArray] = field(default_factory=list)
 
     @classmethod
-    def read(cls, group: h5py.Group, numberOfPatternsPerArray: int) -> DataGroup:
-        arrayList: list[DiffractionPatternArray] = list()
-        masterFilePath = Path(group.file.filename)
+    def read(cls, group: h5py.Group, num_patterns_per_array: int) -> DataGroup:
+        array_list: list[DiffractionPatternArray] = list()
+        master_file_path = Path(group.file.filename)
 
-        for name, h5Item in sorted(group.items()):
-            h5Item = group.get(name, getlink=True)
+        for name, h5_item in sorted(group.items()):
+            h5_item = group.get(name, getlink=True)
 
-            if isinstance(h5Item, h5py.ExternalLink):
+            if isinstance(h5_item, h5py.ExternalLink):
                 array = H5DiffractionPatternArray(
                     label=name,
-                    indexes=numpy.arange(numberOfPatternsPerArray)
-                    + len(arrayList) * numberOfPatternsPerArray,
-                    filePath=masterFilePath.parent / h5Item.filename,
-                    dataPath=str(h5Item.path),
+                    indexes=numpy.arange(num_patterns_per_array)
+                    + len(array_list) * num_patterns_per_array,
+                    file_path=master_file_path.parent / h5_item.filename,
+                    data_path=str(h5_item.path),
                 )
-                arrayList.append(array)
+                array_list.append(array)
 
-        return cls(arrayList)
+        return cls(array_list)
 
     def __iter__(self) -> Iterator[DiffractionPatternArray]:
-        return iter(self.arrayList)
+        return iter(self.array_list)
 
     @overload
     def __getitem__(self, index: int) -> DiffractionPatternArray: ...
@@ -60,73 +60,73 @@ class DataGroup:
     def __getitem__(
         self, index: int | slice
     ) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
-        return self.arrayList[index]
+        return self.array_list[index]
 
     def __len__(self) -> int:
-        return len(self.arrayList)
+        return len(self.array_list)
 
 
 @dataclass(frozen=True)
 class DetectorSpecificGroup:
     nimages: int
     ntrigger: int
-    photonEnergyInElectronVolts: float
-    xPixelsInDetector: int
-    yPixelsInDetector: int
+    photon_energy_eV: float  # noqa: N815
+    x_pixels_in_detector: int
+    y_pixels_in_detector: int
 
     @property
-    def numberOfPatternsTotal(self) -> int:
+    def num_patterns_total(self) -> int:
         return max(self.nimages, self.ntrigger)
 
     @classmethod
     def read(cls, group: h5py.Group) -> DetectorSpecificGroup:
         nimages = group['nimages']
         ntrigger = group['ntrigger']
-        photonEnergy = group['photon_energy']
-        assert photonEnergy.attrs['units'] == b'eV'
-        xPixelsInDetector = group['x_pixels_in_detector']
-        yPixelsInDetector = group['y_pixels_in_detector']
+        photon_energy = group['photon_energy']
+        assert photon_energy.attrs['units'] == b'eV'
+        x_pixels_in_detector = group['x_pixels_in_detector']
+        y_pixels_in_detector = group['y_pixels_in_detector']
         return cls(
             int(nimages[()]),
             int(ntrigger[()]),
-            float(photonEnergy[()]),
-            int(xPixelsInDetector[()]),
-            int(yPixelsInDetector[()]),
+            float(photon_energy[()]),
+            int(x_pixels_in_detector[()]),
+            int(y_pixels_in_detector[()]),
         )
 
 
 @dataclass(frozen=True)
 class DetectorGroup:
-    detectorSpecific: DetectorSpecificGroup
-    detectorDistanceInMeters: float
-    beamCenterXInPixels: int
-    beamCenterYInPixels: int
-    bitDepthReadout: int
-    xPixelSizeInMeters: float
-    yPixelSizeInMeters: float
+    detector_specific: DetectorSpecificGroup
+    detector_distance_m: float
+    beam_center_x_px: int
+    beam_center_y_px: int
+    bit_depth_readout: int
+    x_pixel_size_m: float
+    y_pixel_size_m: float
 
     @classmethod
     def read(cls, group: h5py.Group) -> DetectorGroup:
-        detectorSpecific = DetectorSpecificGroup.read(group['detectorSpecific'])
-        h5DetectorDistance = group['detector_distance']
-        assert h5DetectorDistance.attrs['units'] == b'm'
-        h5BeamCenterX = group['beam_center_x']
-        assert h5BeamCenterX.attrs['units'] == b'pixel'
-        h5BeamCenterY = group['beam_center_y']
-        assert h5BeamCenterY.attrs['units'] == b'pixel'
-        h5BitDepthReadout = group['bit_depth_readout']
-        h5XPixelSize = group['x_pixel_size']
-        assert h5XPixelSize.attrs['units'] == b'm'
-        h5YPixelSize = group['y_pixel_size']
-        assert h5YPixelSize.attrs['units'] == b'm'
+        detector_specific = DetectorSpecificGroup.read(group['detectorSpecific'])
+        h5_detector_distance = group['detector_distance']
+        assert h5_detector_distance.attrs['units'] == b'm'
+        h5_beam_center_x = group['beam_center_x']
+        assert h5_beam_center_x.attrs['units'] == b'pixel'
+        h5_beam_center_y = group['beam_center_y']
+        assert h5_beam_center_y.attrs['units'] == b'pixel'
+        h5_bit_depth_readout = group['bit_depth_readout']
+        h5_x_pixel_size = group['x_pixel_size']
+        assert h5_x_pixel_size.attrs['units'] == b'm'
+        h5_y_pixel_size = group['y_pixel_size']
+        assert h5_y_pixel_size.attrs['units'] == b'm'
         return cls(
-            detectorSpecific,
-            float(h5DetectorDistance[()]),
-            int(h5BeamCenterX[()]),
-            int(h5BeamCenterY[()]),
-            int(h5BitDepthReadout[()]),
-            float(h5XPixelSize[()]),
-            float(h5YPixelSize[()]),
+            detector_specific,
+            float(h5_detector_distance[()]),
+            int(h5_beam_center_x[()]),
+            int(h5_beam_center_y[()]),
+            int(h5_bit_depth_readout[()]),
+            float(h5_x_pixel_size[()]),
+            float(h5_y_pixel_size[()]),
         )
 
 
@@ -142,23 +142,23 @@ class InstrumentGroup:
 
 @dataclass(frozen=True)
 class GoniometerGroup:
-    chiDeg: float
+    chi_deg: float
 
     @classmethod
     def read(cls, group: h5py.Group) -> GoniometerGroup:
-        chiItem = group['chi']
-        chiSpace = chiItem.id.get_space()
+        chi_item = group['chi']
+        chi_space = chi_item.id.get_space()
 
-        assert chiItem.attrs['units'] == b'degree'
+        assert chi_item.attrs['units'] == b'degree'
 
-        if chiSpace.get_simple_extent_type() == h5py.h5s.SCALAR:
-            chiDeg = float(chiItem[()])
-        elif isinstance(chiItem, h5py.Dataset):
-            chiDeg = float(chiItem[0])
+        if chi_space.get_simple_extent_type() == h5py.h5s.SCALAR:
+            chi_deg = float(chi_item[()])
+        elif isinstance(chi_item, h5py.Dataset):
+            chi_deg = float(chi_item[0])
         else:
             raise ValueError('Failed to read goniometer angle (chi)!')
 
-        return cls(chiDeg)
+        return cls(chi_deg)
 
 
 @dataclass(frozen=True)
@@ -178,8 +178,8 @@ class EntryGroup:
     sample: SampleGroup
 
     @classmethod
-    def read(cls, group: h5py.Group, numberOfPatternsPerArray: int) -> EntryGroup:
-        data = DataGroup.read(group['data'], numberOfPatternsPerArray)
+    def read(cls, group: h5py.Group, num_patterns_per_array: int) -> EntryGroup:
+        data = DataGroup.read(group['data'], num_patterns_per_array)
         instrument = InstrumentGroup.read(group['instrument'])
         sample = SampleGroup.read(group['sample'])
         return cls(data, instrument, sample)
@@ -189,11 +189,11 @@ class NeXusDiffractionDataset(DiffractionDataset):
     def __init__(
         self,
         metadata: DiffractionMetadata,
-        contentsTree: SimpleTreeNode,
+        contents_tree: SimpleTreeNode,
         entry: EntryGroup,
     ) -> None:
         self._metadata = metadata
-        self._contentsTree = contentsTree
+        self._contentsTree = contents_tree
         self._entry = entry
 
     def get_metadata(self) -> DiffractionMetadata:
@@ -221,66 +221,66 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
     def __init__(self) -> None:
         super().__init__()
         self._treeBuilder = H5DiffractionFileTreeBuilder()
-        self.stageRotationInDegrees = 0.0  # TODO This is a hack; remove when able!
+        self.stage_rotation_deg = 0.0  # TODO This is a hack; remove when able!
 
-    def read(self, filePath: Path) -> DiffractionDataset:
-        dataset: DiffractionDataset = SimpleDiffractionDataset.create_null(filePath)
+    def read(self, file_path: Path) -> DiffractionDataset:
+        dataset: DiffractionDataset = SimpleDiffractionDataset.create_null(file_path)
 
         try:
-            with h5py.File(filePath, 'r') as h5File:
-                metadata = DiffractionMetadata.create_null(filePath)
-                contentsTree = self._treeBuilder.build(h5File)
+            with h5py.File(file_path, 'r') as h5File:
+                metadata = DiffractionMetadata.create_null(file_path)
+                contents_tree = self._treeBuilder.build(h5File)
 
                 try:
-                    h5Dataset = h5File['/entry/data/data_000001']
+                    h5_dataset = h5File['/entry/data/data_000001']
                 except KeyError:
-                    logger.error(f'File {filePath} is not a NeXus data file.')
+                    logger.error(f'File {file_path} is not a NeXus data file.')
                     raise
 
-                numberOfPatternsPerArray = h5Dataset.shape[0]
-                patternDataType = h5Dataset.dtype
+                num_patterns_per_array = h5_dataset.shape[0]
+                pattern_dtype = h5_dataset.dtype
 
                 try:
-                    entry = EntryGroup.read(h5File['entry'], numberOfPatternsPerArray)
+                    entry = EntryGroup.read(h5File['entry'], num_patterns_per_array)
                 except KeyError:
-                    logger.error(f'File {filePath} is not a NeXus data file.')
+                    logger.error(f'File {file_path} is not a NeXus data file.')
                     raise
 
                 detector = entry.instrument.detector
-                detectorPixelGeometry = PixelGeometry(
-                    detector.xPixelSizeInMeters,
-                    detector.yPixelSizeInMeters,
+                detector_pixel_geometry = PixelGeometry(
+                    detector.x_pixel_size_m,
+                    detector.y_pixel_size_m,
                 )
-                cropCenter = CropCenter(
-                    detector.beamCenterXInPixels,
-                    detector.beamCenterYInPixels,
+                crop_center = CropCenter(
+                    detector.beam_center_x_px,
+                    detector.beam_center_y_px,
                 )
 
-                detectorSpecific = detector.detectorSpecific
-                detectorExtent = ImageExtent(
-                    detectorSpecific.xPixelsInDetector,
-                    detectorSpecific.yPixelsInDetector,
+                detector_specific = detector.detector_specific
+                detector_extent = ImageExtent(
+                    detector_specific.x_pixels_in_detector,
+                    detector_specific.y_pixels_in_detector,
                 )
-                probeEnergyInElectronVolts = detectorSpecific.photonEnergyInElectronVolts
+                probe_energy_eV = detector_specific.photon_energy_eV  # noqa: N806
 
                 metadata = DiffractionMetadata(
-                    num_patterns_per_array=numberOfPatternsPerArray,
-                    num_patterns_total=detectorSpecific.numberOfPatternsTotal,
-                    pattern_dtype=patternDataType,
-                    detector_distance_m=detector.detectorDistanceInMeters,
-                    detector_extent=detectorExtent,
-                    detector_pixel_geometry=detectorPixelGeometry,
-                    detector_bit_depth=detector.bitDepthReadout,
-                    crop_center=cropCenter,
-                    probe_energy_eV=probeEnergyInElectronVolts,
-                    file_path=filePath,
+                    num_patterns_per_array=num_patterns_per_array,
+                    num_patterns_total=detector_specific.num_patterns_total,
+                    pattern_dtype=pattern_dtype,
+                    detector_distance_m=detector.detector_distance_m,
+                    detector_extent=detector_extent,
+                    detector_pixel_geometry=detector_pixel_geometry,
+                    detector_bit_depth=detector.bit_depth_readout,
+                    crop_center=crop_center,
+                    probe_energy_eV=probe_energy_eV,
+                    file_path=file_path,
                 )
 
-                dataset = NeXusDiffractionDataset(metadata, contentsTree, entry)
+                dataset = NeXusDiffractionDataset(metadata, contents_tree, entry)
 
                 # vvv TODO This is a hack; remove when able! vvv
-                self.stageRotationInDegrees = entry.sample.goniometer.chiDeg
+                self.stage_rotation_deg = entry.sample.goniometer.chi_deg
         except OSError:
-            logger.warning(f'Unable to read file "{filePath}".')
+            logger.warning(f'Unable to read file "{file_path}".')
 
         return dataset

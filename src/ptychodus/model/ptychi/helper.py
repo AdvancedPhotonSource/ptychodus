@@ -42,7 +42,7 @@ from ptychodus.api.object import Object, ObjectArrayType, ObjectGeometry, Object
 from ptychodus.api.probe import Probe, WavefieldArrayType
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput
-from ptychodus.api.scan import Scan, ScanPoint
+from ptychodus.api.scan import PositionSequence, ScanPoint
 from ptychodus.api.typing import RealArrayType
 
 from ..patterns import PatternSizer
@@ -460,7 +460,7 @@ class PtyChiProbePositionOptionsHelper:
         )
 
     def get_positions_px(
-        self, scan: Scan, object_geometry: ObjectGeometry
+        self, scan: PositionSequence, object_geometry: ObjectGeometry
     ) -> tuple[RealArrayType, RealArrayType]:
         position_x_px: list[float] = list()
         position_y_px: list[float] = list()
@@ -607,7 +607,7 @@ class PtyChiOptionsHelper:
         ry_px = object_geometry.height_px / 2
 
         for uncorrected_point, pos_x_px, pos_y_px in zip(
-            product.scan, position_x_px, position_y_px
+            product.positions, position_x_px, position_y_px
         ):
             object_point = ObjectPoint(
                 index=uncorrected_point.index,
@@ -617,11 +617,11 @@ class PtyChiOptionsHelper:
             scan_point = object_geometry.map_object_point_to_scan_point(object_point)
             corrected_scan_points.append(scan_point)
 
-        scan_out = Scan(corrected_scan_points)
+        scan_out = PositionSequence(corrected_scan_points)
 
         return Product(
             metadata=product.metadata,
-            scan=scan_out,
+            positions=scan_out,
             probe=probe_out,
             object_=object_out,
             costs=costs,

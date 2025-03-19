@@ -134,7 +134,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def insertProduct(self, product: Product) -> int:
         metadataItem = self._metadataRepositoryItemFactory.create(product.metadata)
-        scanItem = self._scanRepositoryItemFactory.create(product.scan)
+        scanItem = self._scanRepositoryItemFactory.create(product.positions)
         geometry = ProductGeometry(self._patternSizer, metadataItem, scanItem)
         probeItem = self._probeRepositoryItemFactory.create(geometry, product.probe)
         objectItem = self._objectRepositoryItemFactory.create(geometry, product.object_)

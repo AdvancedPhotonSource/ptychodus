@@ -6,7 +6,7 @@ import numpy
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import ReconstructInput
-from ptychodus.api.scan import Scan, ScanPoint
+from ptychodus.api.scan import PositionSequence, ScanPoint
 
 from ..patterns import AssembledDiffractionDataset
 from ..product import ProductRepository
@@ -55,7 +55,7 @@ class DiffractionPatternPositionMatcher:
         inputProductItem = self._productRepository[inputProductIndex]
         inputProduct = inputProductItem.get_product()
         dataIndexes = self._diffractionDataset.get_assembled_indexes()
-        scanIndexes = [point.index for point in inputProduct.scan if indexFilter(point.index)]
+        scanIndexes = [point.index for point in inputProduct.positions if indexFilter(point.index)]
         commonIndexes = sorted(set(dataIndexes).intersection(scanIndexes))
 
         patterns = numpy.take(
@@ -65,7 +65,7 @@ class DiffractionPatternPositionMatcher:
         )
 
         pointList: list[ScanPoint] = list()
-        pointIter = iter(inputProduct.scan)
+        pointIter = iter(inputProduct.positions)
 
         for index in commonIndexes:
             while True:
@@ -79,7 +79,7 @@ class DiffractionPatternPositionMatcher:
 
         product = Product(
             metadata=inputProduct.metadata,
-            scan=Scan(pointList),
+            positions=PositionSequence(pointList),
             probe=probe,
             object_=inputProduct.object_,
             costs=inputProduct.costs,

@@ -15,7 +15,7 @@ from ptychodus.api.reconstructor import (
     ReconstructInput,
     ReconstructOutput,
 )
-from ptychodus.api.scan import Scan, ScanPoint
+from ptychodus.api.scan import PositionSequence, ScanPoint
 
 from .settings import (
     TikeMultigridSettings,
@@ -136,7 +136,7 @@ class TikeReconstructor:
         probeInput = parameters.product.probe
         probeInputArray = probeInput.get_array().astype('complex64')
 
-        scanInput = parameters.product.scan
+        scanInput = parameters.product.positions
         scanInputCoords: list[float] = list()
 
         # Tike coordinate system origin is top-left corner; requires padding
@@ -208,7 +208,7 @@ class TikeReconstructor:
             scanPoint = objectGeometry.map_object_point_to_scan_point(objectPoint)
             scanOutputPoints.append(scanPoint)
 
-        scanOutput = Scan(scanOutputPoints)
+        scanOutput = PositionSequence(scanOutputPoints)
 
         if self._probeCorrectionSettings.useProbeCorrection.get_value():
             probeOutput = Probe(array=result.probe, pixel_geometry=probeInput.get_pixel_geometry())
@@ -227,7 +227,7 @@ class TikeReconstructor:
 
         product = Product(
             metadata=parameters.product.metadata,
-            scan=scanOutput,
+            positions=scanOutput,
             probe=probeOutput,
             object_=objectOutput,
             costs=[float(numpy.mean(values)) for values in result.algorithm_options.costs],

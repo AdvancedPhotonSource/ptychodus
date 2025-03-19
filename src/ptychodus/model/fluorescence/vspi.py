@@ -82,7 +82,7 @@ class VSPILinearOperator(LinearOperator):
         A[M,N] * X[N,P] = B[M,P]
         """
         object_geometry = product.object_.get_geometry()
-        M = len(product.scan)  # noqa: N806
+        M = len(product.positions)  # noqa: N806
         N = object_geometry.height_px * object_geometry.width_px  # noqa: N806
         super().__init__(float, (M, N))
         self._product = product
@@ -95,9 +95,9 @@ class VSPILinearOperator(LinearOperator):
         object_geometry = self._product.object_.get_geometry()
         object_array = X.reshape((object_geometry.height_px, object_geometry.width_px))
         psf = self._get_psf()
-        AX = numpy.zeros(len(self._product.scan))  # noqa: N806
+        AX = numpy.zeros(len(self._product.positions))  # noqa: N806
 
-        for index, scan_point in enumerate(self._product.scan):
+        for index, scan_point in enumerate(self._product.positions):
             object_point = object_geometry.map_scan_point_to_object_point(scan_point)
             interpolator = ArrayPatchInterpolator(object_array, object_point, psf.shape)
             AX[index] = numpy.sum(psf * interpolator.get_patch())
@@ -109,7 +109,7 @@ class VSPILinearOperator(LinearOperator):
         object_array = numpy.zeros((object_geometry.height_px, object_geometry.width_px))
         psf = self._get_psf()
 
-        for index, scan_point in enumerate(self._product.scan):
+        for index, scan_point in enumerate(self._product.positions):
             object_point = object_geometry.map_scan_point_to_object_point(scan_point)
             interpolator = ArrayPatchInterpolator(object_array, object_point, psf.shape)
             interpolator.accumulate_patch(X[index] * psf)

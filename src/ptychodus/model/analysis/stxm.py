@@ -59,7 +59,7 @@ class STXMSimulator(Observable):
             lower=numpy.zeros(object_shape),
         )
 
-        for pattern, scan_point in zip(reconstruct_input.patterns, product.scan):
+        for pattern, scan_point in zip(reconstruct_input.patterns, product.positions):
             pattern_counts = pattern.sum()
             probe_intensity = product.probe.get_intensity()  # FIXME OPR
             probe_profile = probe_intensity / numpy.sqrt(numpy.sum(numpy.abs(probe_intensity) ** 2))

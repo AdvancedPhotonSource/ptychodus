@@ -3,7 +3,7 @@ from enum import IntEnum
 
 import numpy
 
-from ptychodus.api.scan import Scan, ScanPoint
+from ptychodus.api.scan import PositionSequence, ScanPoint
 
 from .builder import ScanBuilder
 from .settings import ScanSettings
@@ -62,7 +62,7 @@ class CartesianScanBuilder(ScanBuilder):
     def isEquilateral(self) -> bool:
         return self._variant.isEquilateral
 
-    def build(self) -> Scan:
+    def build(self) -> PositionSequence:
         nx = self.numberOfPointsX.get_value()
         ny = self.numberOfPointsY.get_value()
         dx = self.stepSizeXInMeters.get_value()
@@ -103,4 +103,4 @@ class CartesianScanBuilder(ScanBuilder):
             )
             pointList.append(point)
 
-        return Scan(pointList)
+        return PositionSequence(pointList)

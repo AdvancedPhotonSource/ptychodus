@@ -18,8 +18,8 @@ class PtychodusAutoloadProductFileBasedWorkflow(FileBasedWorkflow):
     def get_watch_file_pattern(self) -> str:
         return 'product-out.npz'
 
-    def execute(self, workflowAPI: WorkflowAPI, filePath: Path) -> None:
-        workflowAPI.open_product(filePath, file_type='NPZ')
+    def execute(self, workflowAPI: WorkflowAPI, file_path: Path) -> None:
+        workflowAPI.open_product(file_path, file_type='NPZ')
 
 
 class APS2IDFileBasedWorkflow(FileBasedWorkflow):
@@ -30,14 +30,14 @@ class APS2IDFileBasedWorkflow(FileBasedWorkflow):
     def get_watch_file_pattern(self) -> str:
         return '*.csv'
 
-    def execute(self, workflowAPI: WorkflowAPI, filePath: Path) -> None:
-        scanName = filePath.stem
+    def execute(self, workflowAPI: WorkflowAPI, file_path: Path) -> None:
+        scanName = file_path.stem
         scanID = int(re.findall(r'\d+', scanName)[-1])
 
-        diffractionFilePath = filePath.parents[1] / 'raw_data' / f'scan{scanID}_master.h5'
+        diffractionFilePath = file_path.parents[1] / 'raw_data' / f'scan{scanID}_master.h5'
         workflowAPI.open_patterns(diffractionFilePath, file_type='NeXus')
         productAPI = workflowAPI.create_product(f'scan{scanID}')
-        productAPI.open_scan(filePath, file_type='CSV')
+        productAPI.open_scan(file_path, file_type='CSV')
         productAPI.build_probe()
         productAPI.build_object()
         productAPI.reconstruct_remote()
@@ -51,11 +51,11 @@ class APS26IDFileBasedWorkflow(FileBasedWorkflow):
     def get_watch_file_pattern(self) -> str:
         return '*.mda'
 
-    def execute(self, workflowAPI: WorkflowAPI, filePath: Path) -> None:
-        scanName = filePath.stem
+    def execute(self, workflowAPI: WorkflowAPI, file_path: Path) -> None:
+        scanName = file_path.stem
         scanID = int(re.findall(r'\d+', scanName)[-1])
 
-        diffractionDirPath = filePath.parents[1] / 'h5'
+        diffractionDirPath = file_path.parents[1] / 'h5'
 
         for diffractionFilePath in diffractionDirPath.glob(f'scan_{scanID}_*.h5'):
             digits = int(re.findall(r'\d+', diffractionFilePath.stem)[-1])
@@ -65,7 +65,7 @@ class APS26IDFileBasedWorkflow(FileBasedWorkflow):
 
         workflowAPI.open_patterns(diffractionFilePath, file_type='HDF5')
         productAPI = workflowAPI.create_product(f'scan_{scanID}')
-        productAPI.open_scan(filePath, file_type='MDA')
+        productAPI.open_scan(file_path, file_type='MDA')
         productAPI.build_probe()
         productAPI.build_object()
         productAPI.reconstruct_remote()
@@ -100,9 +100,9 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
     def get_watch_file_pattern(self) -> str:
         return '*.h5'
 
-    def execute(self, workflowAPI: WorkflowAPI, filePath: Path) -> None:
-        experimentDir = filePath.parents[3]
-        scan_no = int(re.findall(r'\d+', filePath.stem)[0])
+    def execute(self, workflowAPI: WorkflowAPI, file_path: Path) -> None:
+        experimentDir = file_path.parents[3]
+        scan_no = int(re.findall(r'\d+', file_path.stem)[0])
         scanFile = experimentDir / 'scan_positions' / f'scan_{scan_no:05d}.dat'
         scanNumbersFile = experimentDir / 'dat-files' / 'tomography_scannumbers.txt'
         metadata: APS31IDEMetadata | None = None
@@ -142,7 +142,7 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
             logger.warning(f'Failed to locate label for {row_no}!')
         else:
             productName = f'scan{scan_no:05d}_' + metadata.label
-            workflowAPI.open_patterns(filePath, file_type='LYNX')
+            workflowAPI.open_patterns(file_path, file_type='LYNX')
             inputProductAPI = workflowAPI.create_product(productName, comments=str(metadata))
             inputProductAPI.open_scan(scanFile, file_type='LYNXOrchestra')
             inputProductAPI.build_probe()

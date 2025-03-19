@@ -7,8 +7,8 @@ from ...model.workflow import WorkflowExecutionPresenter, WorkflowParametersPres
 from ...view.widgets import ExceptionDialog
 from ...view.workflow import WorkflowExecutionView
 from .compute import WorkflowComputeController
-from .inputData import WorkflowInputDataController
-from .outputData import WorkflowOutputDataController
+from .input_data import WorkflowInputDataController
+from .output_data import WorkflowOutputDataController
 
 logger = logging.getLogger(__name__)
 

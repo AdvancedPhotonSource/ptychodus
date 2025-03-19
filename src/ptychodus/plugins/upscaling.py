@@ -19,7 +19,7 @@ class GridDataUpscaling(UpscalingStrategy):
         objectGeometry = product.object_.get_geometry()
         scanCoordinatesInPixels: list[float] = list()
 
-        for scanPoint in product.scan:
+        for scanPoint in product.positions:
             objectPoint = objectGeometry.map_scan_point_to_object_point(scanPoint)
             scanCoordinatesInPixels.append(objectPoint.position_y_px)
             scanCoordinatesInPixels.append(objectPoint.position_x_px)
@@ -54,7 +54,7 @@ class RadialBasisFunctionUpscaling(UpscalingStrategy):
         objectGeometry = product.object_.get_geometry()
         scanCoordinatesInPixels: list[float] = list()
 
-        for scanPoint in product.scan:
+        for scanPoint in product.positions:
             objectPoint = objectGeometry.map_scan_point_to_object_point(scanPoint)
             scanCoordinatesInPixels.append(objectPoint.position_y_px)
             scanCoordinatesInPixels.append(objectPoint.position_x_px)

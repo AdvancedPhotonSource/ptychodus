@@ -90,7 +90,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             upper=numpy.zeros_like(object_array), lower=numpy.zeros_like(object_array, dtype=float)
         )
 
-        for scan_point, object_patch_channels in zip(parameters.product.scan, object_patches):
+        for scan_point, object_patch_channels in zip(parameters.product.positions, object_patches):
             patch_array = numpy.exp(1j * object_patch_channels[0])
 
             if object_patch_channels.shape[0] == 2:
@@ -110,7 +110,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
         product = Product(
             metadata=parameters.product.metadata,
-            scan=parameters.product.scan,
+            positions=parameters.product.positions,
             probe=parameters.product.probe,
             object_=object_,
             costs=list(),  # TODO put something here?
@@ -139,10 +139,11 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             height_px=parameters.product.probe.height_px,
         )
         patches = numpy.zeros(
-            (len(parameters.product.scan), num_channels, *probe_extent.shape), dtype=numpy.float32
+            (len(parameters.product.positions), num_channels, *probe_extent.shape),
+            dtype=numpy.float32,
         )
 
-        for index, scan_point in enumerate(parameters.product.scan):
+        for index, scan_point in enumerate(parameters.product.positions):
             object_point = object_geometry.map_scan_point_to_object_point(scan_point)
             patch = interpolator.get_patch(
                 object_point.position_x_px,

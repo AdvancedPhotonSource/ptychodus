@@ -1,9 +1,9 @@
 from .builder import FromFileScanBuilder, FromMemoryScanBuilder
-from .builderFactory import ScanBuilderFactory
+from .builder_factory import ScanBuilderFactory
 from .cartesian import CartesianScanBuilder
 from .concentric import ConcentricScanBuilder
 from .item import ScanRepositoryItem
-from .itemFactory import ScanRepositoryItemFactory
+from .item_factory import ScanRepositoryItemFactory
 from .lissajous import LissajousScanBuilder
 from .settings import ScanSettings
 from .spiral import SpiralScanBuilder

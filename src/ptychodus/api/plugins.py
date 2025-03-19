@@ -20,7 +20,7 @@ from .parametric import StringParameter
 from .patterns import DiffractionFileReader, DiffractionFileWriter
 from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter
 from .product import ProductFileReader, ProductFileWriter
-from .scan import ScanFileReader, ScanFileWriter
+from .scan import PositionFileReader, PositionFileWriter
 from .workflow import FileBasedWorkflow
 
 __all__ = [
@@ -96,8 +96,8 @@ class PluginRegistry:
     def __init__(self) -> None:
         self.diffraction_file_readers = PluginChooser[DiffractionFileReader]()
         self.diffraction_file_writers = PluginChooser[DiffractionFileWriter]()
-        self.scan_file_readers = PluginChooser[ScanFileReader]()
-        self.scan_file_writers = PluginChooser[ScanFileWriter]()
+        self.position_file_readers = PluginChooser[PositionFileReader]()
+        self.position_file_writers = PluginChooser[PositionFileWriter]()
         self.fresnel_zone_plates = PluginChooser[FresnelZonePlate]()
         self.probe_file_readers = PluginChooser[ProbeFileReader]()
         self.probe_file_writers = PluginChooser[ProbeFileWriter]()

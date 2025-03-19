@@ -1,7 +1,7 @@
 from ptychodus.api.plugins import PluginRegistry
 
 from .nexus_diffraction_file import NeXusDiffractionFileReader
-from .velociprobe_scan_file import VelociprobeScanFileReader
+from .velociprobe_position_file import VelociprobePositionFileReader
 
 
 def register_plugins(registry: PluginRegistry) -> None:
@@ -12,13 +12,13 @@ def register_plugins(registry: PluginRegistry) -> None:
         simple_name='NeXus',
         display_name='NeXus Master Files (*.h5 *.hdf5)',
     )
-    registry.scan_file_readers.register_plugin(
-        VelociprobeScanFileReader.createLaserInterferometerInstance(nexus_file_reader),
+    registry.position_file_readers.register_plugin(
+        VelociprobePositionFileReader.create_laser_interferometer_instance(nexus_file_reader),
         simple_name='VelociprobeLaserInterferometer',
-        display_name='Velociprobe Scan Files - Laser Interferometer (*.txt)',
+        display_name='Velociprobe Files - Laser Interferometer (*.txt)',
     )
-    registry.scan_file_readers.register_plugin(
-        VelociprobeScanFileReader.createPositionEncoderInstance(nexus_file_reader),
+    registry.position_file_readers.register_plugin(
+        VelociprobePositionFileReader.create_position_encoder_instance(nexus_file_reader),
         simple_name='VelociprobePositionEncoder',
-        display_name='Velociprobe Scan Files - Position Encoder (*.txt)',
+        display_name='Velociprobe Files - Position Encoder (*.txt)',
     )

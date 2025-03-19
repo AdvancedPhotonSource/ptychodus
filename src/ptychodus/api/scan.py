@@ -46,12 +46,12 @@ class ScanBoundingBox:
         )
 
 
-class Scan(Sequence[ScanPoint]):
+class PositionSequence(Sequence[ScanPoint]):
     def __init__(self, point_seq: Sequence[ScanPoint] | None = None) -> None:
         self._pointSeq: Sequence[ScanPoint] = [] if point_seq is None else point_seq
 
-    def copy(self) -> Scan:
-        return Scan(list(self._pointSeq))
+    def copy(self) -> PositionSequence:
+        return PositionSequence(list(self._pointSeq))
 
     @overload
     def __getitem__(self, index: int) -> ScanPoint: ...
@@ -78,19 +78,19 @@ class ScanPointParseError(Exception):
     pass
 
 
-class ScanFileReader(ABC):
-    """interface for plugins that read scan files"""
+class PositionFileReader(ABC):
+    """interface for plugins that read position files"""
 
     @abstractmethod
-    def read(self, file_path: Path) -> Scan:
-        """reads a scan dictionary from file"""
+    def read(self, file_path: Path) -> PositionSequence:
+        """reads positions from file"""
         pass
 
 
-class ScanFileWriter(ABC):
-    """interface for plugins that write scan files"""
+class PositionFileWriter(ABC):
+    """interface for plugins that write position files"""
 
     @abstractmethod
-    def write(self, file_path: Path, scan: Scan) -> None:
-        """writes a scan dictionary to file"""
+    def write(self, file_path: Path, positions: PositionSequence) -> None:
+        """writes positions to file"""
         pass

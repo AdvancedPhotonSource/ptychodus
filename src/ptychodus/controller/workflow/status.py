@@ -8,7 +8,7 @@ from ptychodus.api.observer import Observable, Observer
 
 from ...model.workflow import WorkflowStatusPresenter
 from ...view.workflow import WorkflowStatusView
-from .tableModel import WorkflowTableModel
+from .table_model import WorkflowTableModel
 
 logger = logging.getLogger(__name__)
 

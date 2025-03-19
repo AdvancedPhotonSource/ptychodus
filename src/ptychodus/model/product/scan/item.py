@@ -6,9 +6,9 @@ import numpy
 
 from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.scan import Scan, ScanBoundingBox, ScanPoint
+from ptychodus.api.scan import PositionSequence, ScanBoundingBox, ScanPoint
 
-from .boundingBox import ScanBoundingBoxBuilder
+from .bounding_box import ScanBoundingBoxBuilder
 from .builder import FromMemoryScanBuilder, ScanBuilder
 from .settings import ScanSettings
 from .transform import ScanPointTransform
@@ -28,8 +28,8 @@ class ScanRepositoryItem(ParameterGroup):
         self._builder = builder
         self._transform = transform
 
-        self._untransformedScan = Scan()
-        self._transformedScan = Scan()
+        self._untransformedScan = PositionSequence()
+        self._transformedScan = PositionSequence()
         self._boundingBoxBuilder = ScanBoundingBoxBuilder()
         self._lengthInMeters = 0.0
 
@@ -70,7 +70,7 @@ class ScanRepositoryItem(ParameterGroup):
 
         self.setBuilder(item.getBuilder().copy())
 
-    def assign(self, scan: Scan, *, mutable: bool = True) -> None:
+    def assign(self, scan: PositionSequence, *, mutable: bool = True) -> None:
         builder = FromMemoryScanBuilder(self._settings, scan)
         self.setBuilder(builder, mutable=mutable)
 
@@ -81,7 +81,7 @@ class ScanRepositoryItem(ParameterGroup):
         self._builder.syncToSettings()
         self._transform.syncToSettings()
 
-    def getScan(self) -> Scan:
+    def getScan(self) -> PositionSequence:
         return self._transformedScan
 
     def getBuilder(self) -> ScanBuilder:
@@ -127,7 +127,7 @@ class ScanRepositoryItem(ParameterGroup):
             dy = pointR.position_y_m - pointL.position_y_m
             lengthInMeters += numpy.hypot(dx, dy)
 
-        self._transformedScan = Scan(transformedPoints)
+        self._transformedScan = PositionSequence(transformedPoints)
         self._boundingBoxBuilder = boundingBoxBuilder
         self._lengthInMeters = lengthInMeters
         self.notify_observers()

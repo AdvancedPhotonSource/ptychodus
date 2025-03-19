@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.scan import Scan, ScanPoint
+from ptychodus.api.scan import PositionSequence, ScanPoint
 
 from .builder import ScanBuilder
 from .settings import ScanSettings
@@ -46,7 +46,7 @@ class LissajousScanBuilder(ScanBuilder):
 
         return builder
 
-    def build(self) -> Scan:
+    def build(self) -> PositionSequence:
         pointList: list[ScanPoint] = list()
 
         for index in range(self.numberOfPoints.get_value()):
@@ -64,4 +64,4 @@ class LissajousScanBuilder(ScanBuilder):
             )
             pointList.append(point)
 
-        return Scan(pointList)
+        return PositionSequence(pointList)

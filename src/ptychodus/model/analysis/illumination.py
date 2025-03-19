@@ -91,7 +91,7 @@ class IlluminationMapper(Observable):
             numpy.zeros((object_geometry.height_px, object_geometry.width_px))
         )
 
-        for scan_point in product.scan:
+        for scan_point in product.positions:
             object_point = object_geometry.map_scan_point_to_object_point(scan_point)
             stitcher.add_patch(
                 object_point.position_x_px,

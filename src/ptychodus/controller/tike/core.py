@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QVBoxLayout, QWidget
 
 from ...model.tike import TikeReconstructorLibrary
 from ..reconstructor import ReconstructorViewControllerFactory
-from .viewControllers import (
+from .view_controllers import (
     TikeMultigridViewController,
     TikeObjectCorrectionViewController,
     TikeParametersViewController,
