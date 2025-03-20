@@ -156,6 +156,8 @@ class ControllerCore:
         view.patternsAction.setChecked(True)
         view.navigationActionGroup.triggered.connect(lambda action: self.swapCentralWidgets(action))
 
+        view.agentAction.setVisible(model.agentPresenter.is_agent_supported)
+
     def showMainWindow(self, windowTitle: str) -> None:
         self.view.setWindowTitle(windowTitle)
         self.view.show()

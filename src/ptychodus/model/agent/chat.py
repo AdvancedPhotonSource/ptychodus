@@ -16,6 +16,16 @@ class ChatMessage:
     content: str
 
 
+class ChatTerminal(ABC):
+    @abstractmethod
+    def send_message(self, content: str) -> None:
+        pass
+
+    @abstractmethod
+    def embed_texts(self, texts: Sequence[str]) -> Sequence[Sequence[float]]:
+        pass
+
+
 class ChatObserver(ABC):
     @abstractmethod
     def handle_new_message(self, message: ChatMessage, index: int) -> None:

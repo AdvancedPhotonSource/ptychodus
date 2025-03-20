@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any, cast
 import json
 import logging
@@ -21,6 +21,7 @@ from langchain_core.messages import (
 from langchain_core.output_parsers.openai_tools import make_invalid_tool_call, parse_tool_call
 from langchain_core.outputs import ChatGeneration, ChatResult
 
+from .chat import ChatHistory, ChatMessage as PtychodusChatMessage, ChatRole, ChatTerminal
 from .settings import ArgoSettings
 
 __all__ = ['ChatArgo']
@@ -279,3 +280,32 @@ class ArgoEmbeddings(Embeddings):
     def embed_query(self, text: str) -> list[float]:
         """Generates an embedding for a single text query."""
         return self.embed_documents([text])[0]
+
+
+class ArgoChatTerminal(ChatTerminal):
+    def __init__(self, settings: ArgoSettings, history: ChatHistory) -> None:
+        self._argo = ChatArgo(settings=settings)
+        self._embeddings = ArgoEmbeddings(settings=settings)
+        self._history = history
+
+    def send_message(self, content: str) -> None:
+        if content:
+            system = SystemMessage(content='You are a large language model with the name Argo.')
+            messages: list[BaseMessage] = [system]
+
+            for line in content.splitlines():
+                message = HumanMessage(content=line)
+                messages.append(message)
+
+                hmessage = PtychodusChatMessage(role=ChatRole.HUMAN, content=str(message.content))
+                self._history.add_message(hmessage)
+
+            logger.debug(f'{messages=}')
+            response = self._argo.invoke(messages)
+            logger.debug(f'{response=}')
+
+            hmessage = PtychodusChatMessage(role=ChatRole.AI, content=str(response.content))
+            self._history.add_message(hmessage)
+
+    def embed_texts(self, texts: Sequence[str]) -> Sequence[Sequence[float]]:
+        return self._embeddings.embed_documents(list(texts)) if texts else [[]]
