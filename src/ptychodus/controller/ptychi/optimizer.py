@@ -28,30 +28,30 @@ class PtyChiStopSpinBoxParameterViewController(ParameterViewController, Observer
         if tool_tip:
             self._widget.setToolTip(tool_tip)
 
-        self._syncModelToView()
-        self._widget.valueChanged.connect(self._syncViewToModel)
-        stop.addObserver(self)
-        num_epochs.addObserver(self)
+        self._sync_model_to_view()
+        self._widget.valueChanged.connect(self._sync_view_to_model)
+        stop.add_observer(self)
+        num_epochs.add_observer(self)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncViewToModel(self, value: int) -> None:
-        num_epochs = self._num_epochs.getValue()
-        self._stop.setValue(value if value < num_epochs else -1)
+    def _sync_view_to_model(self, value: int) -> None:
+        num_epochs = self._num_epochs.get_value()
+        self._stop.set_value(value if value < num_epochs else -1)
 
-    def _syncModelToView(self) -> None:
-        num_epochs = self._num_epochs.getValue()
-        stop = self._stop.getValue()
+    def _sync_model_to_view(self) -> None:
+        num_epochs = self._num_epochs.get_value()
+        stop = self._stop.get_value()
 
         self._widget.blockSignals(True)
         self._widget.setRange(0, num_epochs)
         self._widget.setValue(num_epochs if stop < 0 else stop)
         self._widget.blockSignals(False)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable in (self._stop, self._num_epochs):
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class PtyChiOptimizationPlanViewController(ParameterViewController):
@@ -76,12 +76,12 @@ class PtyChiOptimizationPlanViewController(ParameterViewController):
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self._startViewController.getWidget())
-        layout.addWidget(self._stopViewController.getWidget())
-        layout.addWidget(self._strideViewController.getWidget())
+        layout.addWidget(self._startViewController.get_widget())
+        layout.addWidget(self._stopViewController.get_widget())
+        layout.addWidget(self._strideViewController.get_widget())
         self._widget.setLayout(layout)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
 

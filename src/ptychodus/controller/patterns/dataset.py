@@ -2,93 +2,99 @@ from __future__ import annotations
 from typing import Any, overload
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
-from PyQt5.QtGui import QFont
 
-from ptychodus.api.patterns import DiffractionPatternArrayType, DiffractionPatternState
+from ptychodus.api.patterns import PatternDataType
 
-from ...model.patterns import DiffractionPatternArrayPresenter
+from ptychodus.model.patterns import AssembledDiffractionPatternArray
+
+__all__ = ['DatasetTreeModel']
 
 
 class DatasetTreeNode:
     def __init__(
         self,
-        parentItem: DatasetTreeNode | None,
-        presenter: DiffractionPatternArrayPresenter,
-        frameIndex: int,
+        parent_node: DatasetTreeNode | None,
+        array: AssembledDiffractionPatternArray,
+        frame_index: int,
     ) -> None:
-        self.parentItem = parentItem
-        self._presenter = presenter
-        self._frameIndex = frameIndex
-        self.childItems: list[DatasetTreeNode] = list()
+        self.parent_node = parent_node
+        self._array = array
+        self._frame_index = frame_index
+        self.child_nodes: list[DatasetTreeNode] = list()
 
     @classmethod
-    def createRoot(cls) -> DatasetTreeNode:
-        return cls(None, DiffractionPatternArrayPresenter.createNull(), -1)
+    def create_root(cls) -> DatasetTreeNode:
+        return cls(None, AssembledDiffractionPatternArray.create_null(), -1)
 
-    def createChild(self, presenter: DiffractionPatternArrayPresenter) -> DatasetTreeNode:
-        childItem = DatasetTreeNode(self, presenter, -1)
+    def insert_child(self, pos: int, array: AssembledDiffractionPatternArray) -> DatasetTreeNode:
+        child = DatasetTreeNode(self, array, -1)
 
-        if presenter.data is not None:
-            for frameIndex in range(presenter.data.shape[0]):
-                grandChildItem = DatasetTreeNode(childItem, presenter, frameIndex)
-                childItem.childItems.append(grandChildItem)
+        for frame_index in range(array.get_num_patterns()):
+            grandchild = DatasetTreeNode(child, array, frame_index)
+            child.child_nodes.append(grandchild)
 
-        self.childItems.append(childItem)
-        return childItem
+        self.child_nodes.insert(pos, child)
+        return child
 
-    @property
-    def label(self) -> str:
-        if self._frameIndex < 0:
-            return self._presenter.label
+    def get_label(self) -> str:
+        return self._array.get_label() if self._frame_index < 0 else f'Frame {self._frame_index}'
 
-        return f'Frame {self._frameIndex}'
+    def get_data(self) -> PatternDataType:
+        return (
+            self._array.get_average_pattern()
+            if self._frame_index < 0
+            else self._array.get_pattern(self._frame_index)
+        )
 
-    @property
-    def state(self) -> DiffractionPatternState:
-        return self._presenter.state
+    def get_counts(self) -> int:
+        return (
+            int(self._array.get_average_pattern_counts())
+            if self._frame_index < 0
+            else int(self._array.get_pattern_counts(self._frame_index))
+        )
 
-    @property
-    def data(self) -> DiffractionPatternArrayType | None:
-        if self._presenter.data is None:
-            return None
-        elif self._frameIndex < 0:
-            return self._presenter.data.mean(axis=0)
+    def get_nframes(self) -> int:
+        return len(self.child_nodes) if self._frame_index < 0 else 1
 
-        return self._presenter.data[self._frameIndex]
+    def get_nbytes(self) -> int:
+        return (
+            self._array.get_data().nbytes
+            if self._frame_index < 0
+            else self._array.get_pattern(self._frame_index).nbytes
+        )
 
-    @property
-    def numberOfFrames(self) -> int:
-        if self._frameIndex < 0:
-            return len(self.childItems)
-
-        return 1
-
-    @property
-    def sizeInBytes(self) -> int:
-        if self._presenter.data is None:
-            return 0
-        elif self._frameIndex < 0:
-            return self._presenter.data.nbytes
-
-        return self._presenter.data[self._frameIndex].nbytes
-
-    def row(self) -> int:
-        if self.parentItem:
-            return self.parentItem.childItems.index(self)
-
-        return 0
+    def get_row(self) -> int:
+        return 0 if self.parent_node is None else self.parent_node.child_nodes.index(self)
 
 
 class DatasetTreeModel(QAbstractItemModel):
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._rootNode = DatasetTreeNode.createRoot()
-        self._header = ['Label', 'Frames', 'Size [MB]']
+        self._nodes = DatasetTreeNode.create_root()
+        self._header = ['Label', 'Counts', 'Frames', 'Size [MB]']
 
-    def setRootNode(self, rootNode: DatasetTreeNode) -> None:
+    def clear(self) -> None:
         self.beginResetModel()
-        self._rootNode = rootNode
+        self._nodes = DatasetTreeNode.create_root()
         self.endResetModel()
+
+    def insert_array(self, row: int, array: AssembledDiffractionPatternArray) -> None:
+        self.beginInsertRows(QModelIndex(), row, row)
+        child_node = self._nodes.insert_child(row, array)
+        self.endInsertRows()
+
+        index = self.index(row, 0)
+        self.beginInsertRows(index, 0, len(child_node.child_nodes))
+        self.endInsertRows()
+
+    def refresh_array(self, row: int) -> None:
+        topLeft = self.index(row, 0)
+        bottomRight = self.index(row, self.columnCount() - 1)
+        self.dataChanged.emit(topLeft, bottomRight)
+
+        childTopLeft = self.index(row, 0, topLeft)
+        childBottomRight = self.index(row, self.columnCount() - 1)
+        self.dataChanged.emit(childTopLeft, childBottomRight)
 
     @overload
     def parent(self, child: QModelIndex) -> QModelIndex: ...
@@ -99,19 +105,15 @@ class DatasetTreeModel(QAbstractItemModel):
     def parent(self, child: QModelIndex | None = None) -> QModelIndex | QObject:
         if child is None:
             return super().parent()
-        else:
-            value = QModelIndex()
 
-            if child.isValid():
-                childItem = child.internalPointer()
-                parentItem = childItem.parentItem
+        if child.isValid():
+            child_node = child.internalPointer()
+            parent_node = child_node.parent_node
 
-                if parentItem is self._rootNode:
-                    value = QModelIndex()
-                else:
-                    value = self.createIndex(parentItem.row(), 0, parentItem)
+            if parent_node is not self._nodes:
+                return self.createIndex(parent_node.get_row(), 0, parent_node)
 
-            return value
+        return QModelIndex()
 
     def headerData(
         self,
@@ -122,18 +124,6 @@ class DatasetTreeModel(QAbstractItemModel):
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             return self._header[section]
 
-    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
-        value = super().flags(index)
-
-        if index.isValid():
-            node = index.internalPointer()
-
-            if node.state != DiffractionPatternState.LOADED:
-                value &= ~Qt.ItemFlag.ItemIsSelectable
-                value &= ~Qt.ItemFlag.ItemIsEnabled
-
-        return value
-
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid():
             node = index.internalPointer()
@@ -141,38 +131,27 @@ class DatasetTreeModel(QAbstractItemModel):
             if role == Qt.ItemDataRole.DisplayRole:
                 match index.column():
                     case 0:
-                        return node.label
+                        return node.get_label()
                     case 1:
-                        return node.numberOfFrames
+                        return node.get_counts()
                     case 2:
-                        return f'{node.sizeInBytes / (1024 * 1024):.2f}'
-            elif role == Qt.ItemDataRole.FontRole:
-                font = QFont()
-                font.setItalic(node.state == DiffractionPatternState.FOUND)
-                return font
+                        return node.get_nframes()
+                    case 3:
+                        return f'{node.get_nbytes() / (1024 * 1024):.2f}'
 
     def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
-        value = QModelIndex()
-
         if self.hasIndex(row, column, parent):
-            parentItem = parent.internalPointer() if parent.isValid() else self._rootNode
-            childItem = parentItem.childItems[row]
+            parent_node = parent.internalPointer() if parent.isValid() else self._nodes
+            child_node = parent_node.child_nodes[row]
 
-            if childItem:
-                value = self.createIndex(row, column, childItem)
+            if child_node:
+                return self.createIndex(row, column, child_node)
 
-        return value
+        return QModelIndex()
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        if parent.column() > 0:
-            return 0
-
-        node = self._rootNode
-
-        if parent.isValid():
-            node = parent.internalPointer()
-
-        return len(node.childItems)
+        node = parent.internalPointer() if parent.isValid() else self._nodes
+        return len(node.child_nodes)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._header)

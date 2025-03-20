@@ -7,29 +7,29 @@ from ptychodus.api.settings import SettingsRegistry
 class ArgoSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._group = registry.createGroup('Argo')
-        self._group.addObserver(self)
+        self._group = registry.create_group('Argo')
+        self._group.add_observer(self)
 
-        self.user = self._group.createStringParameter('User', getpass.getuser())
-        self.chatEndpointURL = self._group.createStringParameter(
+        self.user = self._group.create_string_parameter('User', getpass.getuser())
+        self.chatEndpointURL = self._group.create_string_parameter(
             'ChatEndpointURL', 'https://apps.inside.anl.gov/argoapi/api/v1/resource/chat/'
         )
-        self.chatModel = self._group.createStringParameter('ChatModel', 'gpt35')
-        self.temperature = self._group.createRealParameter(
+        self.chatModel = self._group.create_string_parameter('ChatModel', 'gpt35')
+        self.temperature = self._group.create_real_parameter(
             'Temperature', 0.1, minimum=0.0, maximum=2.0
         )
-        self.top_p = self._group.createRealParameter('TopP', 0.9, minimum=0.0, maximum=1.0)
-        self.max_tokens = self._group.createIntegerParameter(
+        self.top_p = self._group.create_real_parameter('TopP', 0.9, minimum=0.0, maximum=1.0)
+        self.max_tokens = self._group.create_integer_parameter(
             'MaxTokens', 1000, minimum=0, maximum=128000
         )
-        self.max_completion_tokens = self._group.createIntegerParameter(
+        self.max_completion_tokens = self._group.create_integer_parameter(
             'MaxCompletionTokens', 1000, minimum=0, maximum=128000
         )
-        self.embeddingsEndpointURL = self._group.createStringParameter(
+        self.embeddingsEndpointURL = self._group.create_string_parameter(
             'EmbeddingsEndpointURL', 'https://apps.inside.anl.gov/argoapi/api/v1/resource/embed/'
         )
-        self.embeddingsModel = self._group.createStringParameter('EmbeddingsModel', 'ada002')
+        self.embeddingsModel = self._group.create_string_parameter('EmbeddingsModel', 'ada002')
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._group:
-            self.notifyObservers()
+            self.notify_observers()

@@ -52,9 +52,9 @@ class PtyChiConstrainL1NormViewController(CheckableGroupBoxParameterViewControll
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.getWidget())
-        layout.addRow('Weight:', self._weightViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._planViewController.get_widget())
+        layout.addRow('Weight:', self._weightViewController.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class PtyChiConstrainSmoothnessViewController(CheckableGroupBoxParameterViewController):
@@ -80,9 +80,9 @@ class PtyChiConstrainSmoothnessViewController(CheckableGroupBoxParameterViewCont
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.getWidget())
-        layout.addRow('Alpha:', self._alphaViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._planViewController.get_widget())
+        layout.addRow('Alpha:', self._alphaViewController.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class PtyChiConstrainTotalVariationViewController(CheckableGroupBoxParameterViewController):
@@ -109,9 +109,9 @@ class PtyChiConstrainTotalVariationViewController(CheckableGroupBoxParameterView
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.getWidget())
-        layout.addRow('Weight:', self._weightViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._planViewController.get_widget())
+        layout.addRow('Weight:', self._weightViewController.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class PtyChiRemoveGridArtifactsViewController(CheckableGroupBoxParameterViewController):
@@ -150,12 +150,12 @@ class PtyChiRemoveGridArtifactsViewController(CheckableGroupBoxParameterViewCont
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.getWidget())
-        layout.addRow('Period X:', self._periodXViewController.getWidget())
-        layout.addRow('Period Y:', self._periodYViewController.getWidget())
-        layout.addRow('Window Size [px]:', self._windowSizeViewController.getWidget())
-        layout.addRow('Direction:', self._directionViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._planViewController.get_widget())
+        layout.addRow('Period X:', self._periodXViewController.get_widget())
+        layout.addRow('Period Y:', self._periodYViewController.get_widget())
+        layout.addRow('Window Size [px]:', self._windowSizeViewController.get_widget())
+        layout.addRow('Direction:', self._directionViewController.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class PtyChiRegularizeMultisliceViewController(CheckableGroupBoxParameterViewController):
@@ -201,12 +201,12 @@ class PtyChiRegularizeMultisliceViewController(CheckableGroupBoxParameterViewCon
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.getWidget())
-        layout.addRow('Weight:', self._weightViewController.getWidget())
-        layout.addRow(self._unwrapPhaseViewController.getWidget())
-        layout.addRow('Gradient Method:', self._gradientMethodViewController.getWidget())
-        layout.addRow('Integration Method:', self._integrationMethodViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._planViewController.get_widget())
+        layout.addRow('Weight:', self._weightViewController.get_widget())
+        layout.addRow(self._unwrapPhaseViewController.get_widget())
+        layout.addRow('Gradient Method:', self._gradientMethodViewController.get_widget())
+        layout.addRow('Integration Method:', self._integrationMethodViewController.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
@@ -289,15 +289,15 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._optimizationPlanViewController.getWidget())
-        layout.addRow('Optimizer:', self._optimizerViewController.getWidget())
-        layout.addRow('Step Size:', self._stepSizeViewController.getWidget())
-        layout.addRow('Patch Interpolator:', self._patchInterpolatorViewController.getWidget())
-        layout.addRow(self._constrainL1NormViewController.getWidget())
-        layout.addRow(self._constrainSmoothnessViewController.getWidget())
-        layout.addRow(self._constrainTotalVariationViewController.getWidget())
-        layout.addRow(self._removeGridArtifactsViewController.getWidget())
-        layout.addRow(self._regularizeMultisliceViewController.getWidget())
+        layout.addRow('Plan:', self._optimizationPlanViewController.get_widget())
+        layout.addRow('Optimizer:', self._optimizerViewController.get_widget())
+        layout.addRow('Step Size:', self._stepSizeViewController.get_widget())
+        layout.addRow('Patch Interpolator:', self._patchInterpolatorViewController.get_widget())
+        layout.addRow(self._constrainL1NormViewController.get_widget())
+        layout.addRow(self._constrainSmoothnessViewController.get_widget())
+        layout.addRow(self._constrainTotalVariationViewController.get_widget())
+        layout.addRow(self._removeGridArtifactsViewController.get_widget())
+        layout.addRow(self._regularizeMultisliceViewController.get_widget())
 
         if dmSettings is not None:
             self._amplitudeClampLimitViewController = DecimalLineEditParameterViewController(
@@ -305,7 +305,7 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
                 tool_tip='Maximum amplitude value for the object.',
             )
             layout.addRow(
-                'Amplitude Clamp Limit:', self._amplitudeClampLimitViewController.getWidget()
+                'Amplitude Clamp Limit:', self._amplitudeClampLimitViewController.get_widget()
             )
 
         if lsqmlSettings is not None:
@@ -314,19 +314,19 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
             )
             layout.addRow(
                 'Optimal Step Size Scaler:',
-                self._objectOptimalStepSizeScalerViewController.getWidget(),
+                self._objectOptimalStepSizeScalerViewController.get_widget(),
             )
 
             self._objectMultimodalUpdateViewController = CheckBoxParameterViewController(
                 lsqmlSettings.objectMultimodalUpdate,
                 'Multimodal Update',
             )
-            layout.addRow(self._objectMultimodalUpdateViewController.getWidget())
+            layout.addRow(self._objectMultimodalUpdateViewController.get_widget())
 
         if pieSettings is not None:
             self._alphaViewController = DecimalSliderParameterViewController(
                 pieSettings.objectAlpha
             )
-            layout.addRow('Alpha:', self._alphaViewController.getWidget())
+            layout.addRow('Alpha:', self._alphaViewController.get_widget())
 
-        self.getWidget().setLayout(layout)
+        self.get_widget().setLayout(layout)

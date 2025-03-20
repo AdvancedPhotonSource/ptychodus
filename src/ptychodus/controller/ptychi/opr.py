@@ -45,12 +45,12 @@ class PtyChiSmoothOPRModeWeightsViewController(CheckableGroupBoxParameterViewCon
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.getWidget())
-        layout.addRow('Smoothing Method:', self._smoothingMethodViewController.getWidget())
+        layout.addRow('Plan:', self._planViewController.get_widget())
+        layout.addRow('Smoothing Method:', self._smoothingMethodViewController.get_widget())
         layout.addRow(
-            'Polynomial Degree:', self._polynomialSmoothingDegreeViewController.getWidget()
+            'Polynomial Degree:', self._polynomialSmoothingDegreeViewController.get_widget()
         )
-        self.getWidget().setLayout(layout)
+        self.get_widget().setLayout(layout)
 
 
 class PtyChiOPRViewController(CheckableGroupBoxParameterViewController):
@@ -103,10 +103,10 @@ class PtyChiOPRViewController(CheckableGroupBoxParameterViewController):
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._optimizationPlanViewController.getWidget())
-        layout.addRow('Optimizer:', self._optimizerViewController.getWidget())
-        layout.addRow('Step Size:', self._stepSizeViewController.getWidget())
-        layout.addRow(self._optimizeIntensitiesViewController.getWidget())
-        layout.addRow(self._optimizeEigenmodeWeightsViewController.getWidget())
-        layout.addRow(self._smoothModeWeightsViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._optimizationPlanViewController.get_widget())
+        layout.addRow('Optimizer:', self._optimizerViewController.get_widget())
+        layout.addRow('Step Size:', self._stepSizeViewController.get_widget())
+        layout.addRow(self._optimizeIntensitiesViewController.get_widget())
+        layout.addRow(self._optimizeEigenmodeWeightsViewController.get_widget())
+        layout.addRow(self._smoothModeWeightsViewController.get_widget())
+        self.get_widget().setLayout(layout)

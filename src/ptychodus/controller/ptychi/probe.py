@@ -41,8 +41,8 @@ class PtyChiConstrainProbePowerViewController(CheckableGroupBoxParameterViewCont
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._planViewController.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class PtyChiOrthogonalizeIncoherentModesViewController(CheckableGroupBoxParameterViewController):
@@ -71,9 +71,9 @@ class PtyChiOrthogonalizeIncoherentModesViewController(CheckableGroupBoxParamete
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.getWidget())
-        layout.addRow('Method:', self._methodViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._planViewController.get_widget())
+        layout.addRow('Method:', self._methodViewController.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class PtyChiOrthogonalizeOPRModesViewController(CheckableGroupBoxParameterViewController):
@@ -95,8 +95,8 @@ class PtyChiOrthogonalizeOPRModesViewController(CheckableGroupBoxParameterViewCo
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._planViewController.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class PtyChiConstrainSupportViewController(CheckableGroupBoxParameterViewController):
@@ -122,9 +122,9 @@ class PtyChiConstrainSupportViewController(CheckableGroupBoxParameterViewControl
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.getWidget())
-        layout.addRow('Threshold:', self._thresholdViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._planViewController.get_widget())
+        layout.addRow('Threshold:', self._thresholdViewController.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class PtyChiConstrainCenterViewController(CheckableGroupBoxParameterViewController):
@@ -146,8 +146,8 @@ class PtyChiConstrainCenterViewController(CheckableGroupBoxParameterViewControll
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._planViewController.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
@@ -220,16 +220,16 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._optimizationPlanViewController.getWidget())
-        layout.addRow('Optimizer:', self._optimizerViewController.getWidget())
-        layout.addRow('Step Size:', self._stepSizeViewController.getWidget())
-        layout.addRow(self._constrainPowerViewController.getWidget())
-        layout.addRow(self._orthogonalizeIncoherentModesViewController.getWidget())
-        layout.addRow(self._orthogonalizeOPRModesViewController.getWidget())
-        layout.addRow(self._constrainSupportViewController.getWidget())
-        layout.addRow(self._constrainCenterViewController.getWidget())
+        layout.addRow('Plan:', self._optimizationPlanViewController.get_widget())
+        layout.addRow('Optimizer:', self._optimizerViewController.get_widget())
+        layout.addRow('Step Size:', self._stepSizeViewController.get_widget())
+        layout.addRow(self._constrainPowerViewController.get_widget())
+        layout.addRow(self._orthogonalizeIncoherentModesViewController.get_widget())
+        layout.addRow(self._orthogonalizeOPRModesViewController.get_widget())
+        layout.addRow(self._constrainSupportViewController.get_widget())
+        layout.addRow(self._constrainCenterViewController.get_widget())
         layout.addRow(
-            'Relax Eigenmode Update:', self._relaxEigenmodeUpdateViewController.getWidget()
+            'Relax Eigenmode Update:', self._relaxEigenmodeUpdateViewController.get_widget()
         )
 
         if lsqmlSettings is not None:
@@ -238,11 +238,11 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
             )
             layout.addRow(
                 'Optimal Step Size Scaler:',
-                self._probeOptimalStepSizeScalerViewController.getWidget(),
+                self._probeOptimalStepSizeScalerViewController.get_widget(),
             )
 
         if pieSettings is not None:
             self._probeAlpha = DecimalSliderParameterViewController(pieSettings.probeAlpha)
-            layout.addRow('Alpha:', self._probeAlpha.getWidget())
+            layout.addRow('Alpha:', self._probeAlpha.get_widget())
 
-        self.getWidget().setLayout(layout)
+        self.get_widget().setLayout(layout)

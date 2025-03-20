@@ -9,7 +9,7 @@ from ptychodus.api.reconstructor import (
 )
 from ptychodus.api.settings import SettingsRegistry
 
-from ..patterns import ActiveDiffractionDataset
+from ..patterns import AssembledDiffractionDataset
 from ..product import ProductRepository
 from .api import ReconstructorAPI
 from .log import ReconstructorLogHandler
@@ -23,7 +23,7 @@ class ReconstructorCore:
     def __init__(
         self,
         settingsRegistry: SettingsRegistry,
-        diffractionDataset: ActiveDiffractionDataset,
+        diffractionDataset: AssembledDiffractionDataset,
         productRepository: ProductRepository,
         librarySeq: Sequence[ReconstructorLibrary],
     ) -> None:
@@ -36,17 +36,17 @@ class ReconstructorCore:
 
         for library in librarySeq:
             for reconstructor in library:
-                self._pluginChooser.registerPlugin(
+                self._pluginChooser.register_plugin(
                     reconstructor,
-                    simpleName=f'{library.name}_{reconstructor.name}',
-                    displayName=f'{library.name}/{reconstructor.name}',
+                    simple_name=f'{library.name}_{reconstructor.name}',
+                    display_name=f'{library.name}/{reconstructor.name}',
                 )
 
             libraryLogger = logging.getLogger(library.logger_name)
             libraryLogger.addHandler(self._logHandler)
 
         if not self._pluginChooser:
-            self._pluginChooser.registerPlugin(NullReconstructor('None'), displayName='None/None')
+            self._pluginChooser.register_plugin(NullReconstructor('None'), display_name='None/None')
 
         self._reconstructionQueue = ReconstructionQueue()
         self.dataMatcher = DiffractionPatternPositionMatcher(diffractionDataset, productRepository)
@@ -58,7 +58,6 @@ class ReconstructorCore:
             self._pluginChooser,
             self._logHandler,
             self.reconstructorAPI,
-            settingsRegistry,
         )
 
     def start(self) -> None:

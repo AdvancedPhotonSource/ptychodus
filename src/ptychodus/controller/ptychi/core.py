@@ -73,11 +73,11 @@ class PtyChiViewController(QWidget):
         )
 
         layout = QVBoxLayout()
-        layout.addWidget(self._reconstructorViewController.getWidget())
-        layout.addWidget(self._objectViewController.getWidget())
-        layout.addWidget(self._probeViewController.getWidget())
-        layout.addWidget(self._probePositionsViewController.getWidget())
-        layout.addWidget(self._oprViewController.getWidget())
+        layout.addWidget(self._reconstructorViewController.get_widget())
+        layout.addWidget(self._objectViewController.get_widget())
+        layout.addWidget(self._probeViewController.get_widget())
+        layout.addWidget(self._probePositionsViewController.get_widget())
+        layout.addWidget(self._oprViewController.get_widget())
         layout.addStretch()
         self.setLayout(layout)
 
@@ -88,8 +88,8 @@ class PtyChiViewControllerFactory(ReconstructorViewControllerFactory):
         self._model = model
 
     @property
-    def backendName(self) -> str:
+    def backend_name(self) -> str:
         return 'pty-chi'
 
-    def createViewController(self, reconstructorName: str) -> QWidget:
+    def create_view_controller(self, reconstructorName: str) -> QWidget:
         return PtyChiViewController(self._model, reconstructorName)

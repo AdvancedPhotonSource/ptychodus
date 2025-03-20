@@ -5,14 +5,14 @@ import logging
 from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.product import ProductMetadata
 
-from ..patterns import ProductSettings
+from .settings import ProductSettings
 
 logger = logging.getLogger(__name__)
 
 
 class UniqueNameFactory(ABC):
     @abstractmethod
-    def createUniqueName(self, candidateName: str) -> str:
+    def create_unique_name(self, candidate_name: str) -> str:
         pass
 
 
@@ -20,96 +20,107 @@ class MetadataRepositoryItem(ParameterGroup):
     def __init__(
         self,
         settings: ProductSettings,
-        nameFactory: UniqueNameFactory,
+        name_factory: UniqueNameFactory,
         *,
         name: str = '',
         comments: str = '',
-        detectorDistanceInMeters: float | None = None,
-        probeEnergyInElectronVolts: float | None = None,
-        probePhotonCount: float | None = None,
-        exposureTimeInSeconds: float | None = None,
+        detector_distance_m: float | None = None,
+        probe_energy_eV: float | None = None,  # noqa: N803
+        probe_photon_count: float | None = None,
+        exposure_time_s: float | None = None,
+        mass_attenuation_m2_kg: float | None = None,
     ) -> None:
         super().__init__()
         self._settings = settings
-        self._nameFactory = nameFactory
+        self._name_factory = name_factory
 
         self._name = settings.name.copy()
-        self._setName(name if name else settings.name.getValue())
-        self._addParameter('name', self._name)
-        self.comments = self.createStringParameter('comments', comments)
+        self._set_name(name if name else settings.name.get_value())
+        self._add_parameter('name', self._name)
+        self.comments = self.create_string_parameter('comments', comments)
 
-        self.detectorDistanceInMeters = settings.detectorDistanceInMeters.copy()
+        self.detector_distance_m = settings.detector_distance_m.copy()
 
-        if detectorDistanceInMeters is not None:
-            self.detectorDistanceInMeters.setValue(detectorDistanceInMeters)
+        if detector_distance_m is not None:
+            self.detector_distance_m.set_value(detector_distance_m)
 
-        self._addParameter('detector_distance_m', self.detectorDistanceInMeters)
+        self._add_parameter('detector_distance_m', self.detector_distance_m)
 
-        self.probeEnergyInElectronVolts = settings.probeEnergyInElectronVolts.copy()
+        self.probe_energy_eV = settings.probe_energy_eV.copy()
 
-        if probeEnergyInElectronVolts is not None:
-            self.probeEnergyInElectronVolts.setValue(probeEnergyInElectronVolts)
+        if probe_energy_eV is not None:
+            self.probe_energy_eV.set_value(probe_energy_eV)
 
-        self._addParameter('probe_energy_eV', self.probeEnergyInElectronVolts)
+        self._add_parameter('probe_energy_eV', self.probe_energy_eV)
 
-        self.probePhotonCount = settings.probePhotonCount.copy()
+        self.probe_photon_count = settings.probe_photon_count.copy()
 
-        if probePhotonCount is not None:
-            self.probePhotonCount.setValue(probePhotonCount)
+        if probe_photon_count is not None:
+            self.probe_photon_count.set_value(probe_photon_count)
 
-        self._addParameter('probe_photon_count', self.probePhotonCount)
+        self._add_parameter('probe_photon_count', self.probe_photon_count)
 
-        self.exposureTimeInSeconds = settings.exposureTimeInSeconds.copy()
+        self.exposure_time_s = settings.exposure_time_s.copy()
 
-        if exposureTimeInSeconds is not None:
-            self.exposureTimeInSeconds.setValue(exposureTimeInSeconds)
+        if exposure_time_s is not None:
+            self.exposure_time_s.set_value(exposure_time_s)
 
-        self._addParameter('exposure_time_s', self.exposureTimeInSeconds)
+        self._add_parameter('exposure_time_s', self.exposure_time_s)
+
+        self.mass_attenuation_m2_kg = settings.mass_attenuation_m2_kg.copy()
+
+        if mass_attenuation_m2_kg is not None:
+            self.mass_attenuation_m2_kg.set_value(mass_attenuation_m2_kg)
+
+        self._add_parameter('mass_attenuation_m2_kg', self.mass_attenuation_m2_kg)
 
         self._index = -1
 
-    def assignItem(self, item: MetadataRepositoryItem, *, notify: bool = True) -> None:
-        self.setName(item.getName())
-        self.comments.setValue(item.comments.getValue())
-        self.detectorDistanceInMeters.setValue(item.detectorDistanceInMeters.getValue())
-        self.probeEnergyInElectronVolts.setValue(item.probeEnergyInElectronVolts.getValue())
-        self.probePhotonCount.setValue(item.probePhotonCount.getValue())
-        self.exposureTimeInSeconds.setValue(item.exposureTimeInSeconds.getValue())
+    def assign_item(self, item: MetadataRepositoryItem, *, notify: bool = True) -> None:
+        self.set_name(item.get_name())
+        self.comments.set_value(item.comments.get_value())
+        self.detector_distance_m.set_value(item.detector_distance_m.get_value())
+        self.probe_energy_eV.set_value(item.probe_energy_eV.get_value())
+        self.probe_photon_count.set_value(item.probe_photon_count.get_value())
+        self.exposure_time_s.set_value(item.exposure_time_s.get_value())
+        self.mass_attenuation_m2_kg.set_value(item.mass_attenuation_m2_kg.get_value())
 
     def assign(self, metadata: ProductMetadata) -> None:
-        self.setName(metadata.name)
-        self.comments.setValue(metadata.comments)
-        self.detectorDistanceInMeters.setValue(metadata.detectorDistanceInMeters)
-        self.probeEnergyInElectronVolts.setValue(metadata.probeEnergyInElectronVolts)
-        self.probePhotonCount.setValue(metadata.probePhotonCount)
-        self.exposureTimeInSeconds.setValue(metadata.exposureTimeInSeconds)
+        self.set_name(metadata.name)
+        self.comments.set_value(metadata.comments)
+        self.detector_distance_m.set_value(metadata.detector_distance_m)
+        self.probe_energy_eV.set_value(metadata.probe_energy_eV)
+        self.probe_photon_count.set_value(metadata.probe_photon_count)
+        self.exposure_time_s.set_value(metadata.exposure_time_s)
+        self.mass_attenuation_m2_kg.set_value(metadata.mass_attenuation_m2_kg)
 
-    def syncToSettings(self) -> None:
+    def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
-            parameter.syncValueToParent()
+            parameter.sync_value_to_parent()
 
-    def getName(self) -> str:
-        return self._name.getValue()
+    def get_name(self) -> str:
+        return self._name.get_value()
 
-    def _setName(self, name: str) -> None:
-        uniqueName = self._nameFactory.createUniqueName(name)
-        self._name.setValue(uniqueName)
+    def _set_name(self, name: str) -> None:
+        unique_name = self._name_factory.create_unique_name(name)
+        self._name.set_value(unique_name)
 
-    def setName(self, name: str) -> None:
+    def set_name(self, name: str) -> None:
         if name:
-            self._setName(name)
+            self._set_name(name)
         else:
-            self._name.notifyObservers()
+            self._name.notify_observers()
 
-    def getIndex(self) -> int:
+    def get_index(self) -> int:
         return self._index
 
-    def getMetadata(self) -> ProductMetadata:
+    def get_metadata(self) -> ProductMetadata:
         return ProductMetadata(
-            name=self._name.getValue(),
-            comments=self.comments.getValue(),
-            detectorDistanceInMeters=self.detectorDistanceInMeters.getValue(),
-            probeEnergyInElectronVolts=self.probeEnergyInElectronVolts.getValue(),
-            probePhotonCount=self.probePhotonCount.getValue(),
-            exposureTimeInSeconds=self.exposureTimeInSeconds.getValue(),
+            name=self._name.get_value(),
+            comments=self.comments.get_value(),
+            detector_distance_m=self.detector_distance_m.get_value(),
+            probe_energy_eV=self.probe_energy_eV.get_value(),
+            probe_photon_count=self.probe_photon_count.get_value(),
+            exposure_time_s=self.exposure_time_s.get_value(),
+            mass_attenuation_m2_kg=self.mass_attenuation_m2_kg.get_value(),
         )

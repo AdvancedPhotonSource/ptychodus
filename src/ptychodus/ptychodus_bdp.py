@@ -14,7 +14,7 @@ import ptychodus
 logger = logging.getLogger(__name__)
 
 
-def versionString() -> str:
+def version_string() -> str:
     return f'{ptychodus.__name__.title()} ({ptychodus.__version__})'
 
 
@@ -32,9 +32,9 @@ class DirectoryType:
 
 
 def main() -> int:
-    changePathPrefix: PathPrefixChange | None = None
-    cropCenter: CropCenter | None = None
-    cropExtent: ImageExtent | None = None
+    change_path_prefix: PathPrefixChange | None = None
+    crop_center: CropCenter | None = None
+    crop_extent: ImageExtent | None = None
 
     prog = Path(__file__).stem.lower()
     parser = argparse.ArgumentParser(
@@ -164,31 +164,31 @@ def main() -> int:
         '-v',
         '--version',
         action='version',
-        version=versionString(),
+        version=version_string(),
     )
 
     args = parser.parse_args()
 
     if args.local_path_prefix is not None and args.remote_path_prefix is not None:
-        changePathPrefix = PathPrefixChange(
-            findPathPrefix=args.local_path_prefix,
-            replacementPathPrefix=args.remote_path_prefix,
+        change_path_prefix = PathPrefixChange(
+            find_path_prefix=args.local_path_prefix,
+            replacement_path_prefix=args.remote_path_prefix,
         )
     elif bool(args.local_path_prefix) ^ bool(args.remote_path_prefix):
         parser.error('--local_path_prefix and --remote_path_prefix must be given together.')
 
     if args.crop_center_x_px is not None and args.crop_center_y_px is not None:
-        cropCenter = CropCenter(
-            positionXInPixels=args.crop_center_x_px,
-            positionYInPixels=args.crop_center_y_px,
+        crop_center = CropCenter(
+            position_x_px=args.crop_center_x_px,
+            position_y_px=args.crop_center_y_px,
         )
     elif bool(args.crop_center_x_px) ^ bool(args.crop_center_y_px):
         parser.error('--crop_center_x_px and --crop_center_y_px must be given together.')
 
     if args.crop_width_px is not None and args.crop_height_px is not None:
-        cropExtent = ImageExtent(
-            widthInPixels=args.crop_width_px,
-            heightInPixels=args.crop_height_px,
+        crop_extent = ImageExtent(
+            width_px=args.crop_width_px,
+            height_px=args.crop_height_px,
         )
     elif bool(args.crop_width_px) ^ bool(args.crop_height_px):
         parser.error('--crop_width_px and --crop_height_px must be given together.')
@@ -199,30 +199,30 @@ def main() -> int:
     if args.number_of_gpus is not None:
         logger.warning('Number of GPUs is not implemented yet!')  # TODO
 
-    with ModelCore(Path(args.settings.name), isDeveloperModeEnabled=args.dev) as model:
-        model.workflowAPI.openPatterns(
+    with ModelCore(Path(args.settings.name), is_developer_mode_enabled=args.dev) as model:
+        model.workflow_api.open_patterns(
             Path(args.patterns_file_path.name),
-            cropCenter=cropCenter,
-            cropExtent=cropExtent,
+            crop_center=crop_center,
+            crop_extent=crop_extent,
         )
 
-        workflowProductAPI = model.workflowAPI.createProduct(
+        workflow_product_api = model.workflow_api.create_product(
             name=args.name,
             comments=args.comment,
-            detectorDistanceInMeters=args.detector_distance_m,
-            probeEnergyInElectronVolts=args.probe_energy_eV,
-            probePhotonCount=args.probe_photon_count,
-            exposureTimeInSeconds=args.exposure_time_s,
+            detector_distance_m=args.detector_distance_m,
+            probe_energy_eV=args.probe_energy_eV,
+            probe_photon_count=args.probe_photon_count,
+            exposure_time_s=args.exposure_time_s,
         )
-        workflowProductAPI.openScan(Path(args.scan_file_path.name))
-        workflowProductAPI.buildProbe()
-        workflowProductAPI.buildObject()
+        workflow_product_api.open_scan(Path(args.scan_file_path.name))
+        workflow_product_api.build_probe()
+        workflow_product_api.build_object()
 
-        stagingDir = args.output_directory
-        stagingDir.mkdir(parents=True, exist_ok=True)
-        model.workflowAPI.saveSettings(stagingDir / 'settings.ini', changePathPrefix)
-        model.workflowAPI.exportProcessedPatterns(stagingDir / 'patterns.npz')
-        workflowProductAPI.saveProduct(stagingDir / 'product-in.npz', fileType='NPZ')
+        staging_dir = args.output_directory
+        staging_dir.mkdir(parents=True, exist_ok=True)
+        model.workflow_api.save_settings(staging_dir / 'settings.ini', change_path_prefix)
+        model.workflow_api.export_assembled_patterns(staging_dir / 'patterns.npz')
+        workflow_product_api.save_product(staging_dir / 'product-in.npz', file_type='NPZ')
 
     return 0
 

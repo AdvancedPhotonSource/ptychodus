@@ -8,7 +8,7 @@ from ptychodus.api.observer import Observable, Observer
 
 from ...model.workflow import WorkflowStatusPresenter
 from ...view.workflow import WorkflowStatusView
-from .tableModel import WorkflowTableModel
+from .table_model import WorkflowTableModel
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +39,8 @@ class WorkflowStatusController(Observer):
         view.autoRefreshSpinBox.valueChanged.connect(presenter.setRefreshIntervalInSeconds)
         view.refreshButton.clicked.connect(presenter.refreshStatus)
 
-        self._syncModelToView()
-        presenter.addObserver(self)
+        self._sync_model_to_view()
+        presenter.add_observer(self)
 
     def _handleTableViewClick(self, index: QModelIndex) -> None:
         if index.column() == 5:
@@ -63,7 +63,7 @@ class WorkflowStatusController(Observer):
         self._tableModel.beginResetModel()
         self._tableModel.endResetModel()
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         refreshIntervalLimitsInSeconds = self._presenter.getRefreshIntervalLimitsInSeconds()
 
         self._view.autoRefreshSpinBox.blockSignals(True)
@@ -73,6 +73,6 @@ class WorkflowStatusController(Observer):
         self._view.autoRefreshSpinBox.setValue(self._presenter.getRefreshIntervalInSeconds())
         self._view.autoRefreshSpinBox.blockSignals(False)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncModelToView()
+            self._sync_model_to_view()

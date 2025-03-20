@@ -19,7 +19,7 @@ class VisualizationParametersController(Observer):
         self._variantModel = QStringListModel()
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls, engine: VisualizationEngine, view: VisualizationParametersView
     ) -> VisualizationParametersController:
         controller = cls(engine, view)
@@ -34,8 +34,8 @@ class VisualizationParametersController(Observer):
             lambda value: engine.setMaxDisplayValue(float(value))
         )
 
-        controller._syncModelToView()
-        engine.addObserver(controller)
+        controller._sync_model_to_view()
+        engine.add_observer(controller)
 
         view.rendererComboBox.textActivated.connect(engine.setRenderer)
         view.transformationComboBox.textActivated.connect(engine.setTransformation)
@@ -43,7 +43,7 @@ class VisualizationParametersController(Observer):
 
         return controller
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._view.rendererComboBox.blockSignals(True)
         self._rendererModel.setStringList([name for name in self._engine.renderers()])
         self._view.rendererComboBox.setCurrentText(self._engine.getRenderer())
@@ -66,6 +66,6 @@ class VisualizationParametersController(Observer):
             Decimal(repr(self._engine.getMaxDisplayValue()))
         )
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._engine:
-            self._syncModelToView()
+            self._sync_model_to_view()

@@ -1,16 +1,17 @@
 from typing import Any
 
 from PyQt5.QtCore import (
-    Qt,
     QAbstractTableModel,
     QModelIndex,
     QObject,
     QSortFilterProxyModel,
+    Qt,
 )
 from PyQt5.QtWidgets import QWidget
 
 from ptychodus.api.observer import Observable, Observer
 
+from ...model.patterns import AssembledDiffractionDataset
 from ...model.product import ProductRepositoryItem
 from ...view.product import ProductEditorDialog
 
@@ -46,11 +47,11 @@ class ProductPropertyTableModel(QAbstractTableModel):
                 case 0:
                     return self._properties[index.row()]
                 case 1:
-                    geometry = self._product.getGeometry()
+                    geometry = self._product.get_geometry()
 
                     match index.row():
                         case 0:
-                            return f'{geometry.probeWavelengthInMeters * 1e9:.4g}'
+                            return f'{geometry.probe_wavelength_m * 1e9:.4g}'
                         case 1:
                             return f'{geometry.probeWavelengthsPerMeter * 1e-9:.4g}'
                         case 2:
@@ -58,7 +59,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
                         case 3:
                             return f'{geometry.probePhotonsPerSecond:.4g}'
                         case 4:
-                            return f'{geometry.probePowerInWatts:.4g}'
+                            return f'{geometry.probe_power_W:.4g}'
                         case 5:
                             return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
                         case 6:
@@ -79,52 +80,67 @@ class ProductPropertyTableModel(QAbstractTableModel):
 class ProductEditorViewController(Observer):
     def __init__(
         self,
+        dataset: AssembledDiffractionDataset,
         product: ProductRepositoryItem,
         tableModel: ProductPropertyTableModel,
         dialog: ProductEditorDialog,
     ) -> None:
         super().__init__()
+        self._dataset = dataset
         self._product = product
         self._tableModel = tableModel
         self._dialog = dialog
 
     @classmethod
-    def editProduct(cls, product: ProductRepositoryItem, parent: QWidget) -> None:
+    def editProduct(
+        cls, dataset: AssembledDiffractionDataset, product: ProductRepositoryItem, parent: QWidget
+    ) -> None:
         tableModel = ProductPropertyTableModel(product)
         tableProxyModel = QSortFilterProxyModel()
         tableProxyModel.setSourceModel(tableModel)
 
         dialog = ProductEditorDialog(parent)
-        dialog.setWindowTitle(f'Edit Product: {product.getName()}')
+        dialog.setWindowTitle(f'Edit Product: {product.get_name()}')
         dialog.tableView.setModel(tableProxyModel)
         dialog.tableView.setSortingEnabled(True)
         dialog.tableView.verticalHeader().hide()
         dialog.tableView.resizeColumnsToContents()
         dialog.tableView.resizeRowsToContents()
 
-        viewController = cls(product, tableModel, dialog)
-        product.addObserver(viewController)
-        dialog.textEdit.textChanged.connect(viewController._syncViewToModel)
+        viewController = cls(dataset, product, tableModel, dialog)
+        product.add_observer(viewController)
+        dialog.textEdit.textChanged.connect(viewController._sync_view_to_model)
 
-        viewController._syncModelToView()
+        viewController._sync_model_to_view()
+
+        dialog.actionsView.estimateProbePhotonCountButton.clicked.connect(
+            viewController._estimateProbePhotonCount
+        )
         dialog.finished.connect(viewController._finish)
         dialog.open()
         dialog.adjustSize()
 
-    def _syncViewToModel(self) -> None:
-        metadata = self._product.getMetadata()
-        metadata.comments.setValue(self._dialog.textEdit.toPlainText())
+    def _sync_view_to_model(self) -> None:
+        metadata = self._product.get_metadata()
+        metadata.comments.set_value(self._dialog.textEdit.toPlainText())
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._tableModel.beginResetModel()
         self._tableModel.endResetModel()
 
-        metadata = self._product.getMetadata()
-        self._dialog.textEdit.setPlainText(metadata.comments.getValue())
+        metadata = self._product.get_metadata()
+        self._dialog.textEdit.setPlainText(metadata.comments.get_value())
+
+    def _estimateProbePhotonCount(self) -> None:
+        metadata = self._product.get_metadata()
+        metadata.probe_photon_count.set_value(self._dataset.get_maximum_pattern_counts())
+
+        self._tableModel.beginResetModel()
+        self._tableModel.endResetModel()
 
     def _finish(self, result: int) -> None:
-        self._product.removeObserver(self)
+        self._product.remove_observer(self)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._product:
-            self._syncModelToView()
+            self._sync_model_to_view()

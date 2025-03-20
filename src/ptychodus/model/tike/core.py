@@ -33,7 +33,7 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
         self.reconstructorList: list[Reconstructor] = list()
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls, settingsRegistry: SettingsRegistry, isDeveloperModeEnabled: bool
     ) -> TikeReconstructorLibrary:
         core = cls(settingsRegistry)

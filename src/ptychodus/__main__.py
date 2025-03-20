@@ -88,10 +88,10 @@ def main() -> int:
     parsedArgs, unparsedArgs = parser.parse_known_args()
     settingsFile = Path(parsedArgs.settings.name) if parsedArgs.settings else None
 
-    with ModelCore(settingsFile, isDeveloperModeEnabled=parsedArgs.dev) as model:
+    with ModelCore(settingsFile, is_developer_mode_enabled=parsedArgs.dev) as model:
         if parsedArgs.patterns is not None:
             patternsFilePath = Path(parsedArgs.patterns.name)
-            model.workflowAPI.importProcessedPatterns(patternsFilePath)
+            model.workflow_api.import_assembled_patterns(patternsFilePath)
 
         if parsedArgs.batch is not None:
             verifyAllArgumentsParsed(parser, unparsedArgs)
@@ -132,7 +132,7 @@ def main() -> int:
 
         from ptychodus.view import ViewCore
 
-        view = ViewCore.createInstance(parsedArgs.dev)
+        view = ViewCore()
 
         from ptychodus.controller import ControllerCore
 

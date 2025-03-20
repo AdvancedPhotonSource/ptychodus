@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QVBoxLayout, QWidget
 
 from ...model.tike import TikeReconstructorLibrary
 from ..reconstructor import ReconstructorViewControllerFactory
-from .viewControllers import (
+from .view_controllers import (
     TikeMultigridViewController,
     TikeObjectCorrectionViewController,
     TikeParametersViewController,
@@ -31,11 +31,11 @@ class TikeViewController(QWidget):
         )
 
         layout = QVBoxLayout()
-        layout.addWidget(self._parametersViewController.getWidget())
-        layout.addWidget(self._multigridViewController.getWidget())
-        layout.addWidget(self._positionCorrectionViewController.getWidget())
-        layout.addWidget(self._probeCorrectionViewController.getWidget())
-        layout.addWidget(self._objectCorrectionViewController.getWidget())
+        layout.addWidget(self._parametersViewController.get_widget())
+        layout.addWidget(self._multigridViewController.get_widget())
+        layout.addWidget(self._positionCorrectionViewController.get_widget())
+        layout.addWidget(self._probeCorrectionViewController.get_widget())
+        layout.addWidget(self._objectCorrectionViewController.get_widget())
         layout.addStretch()
         self.setLayout(layout)
 
@@ -46,10 +46,10 @@ class TikeViewControllerFactory(ReconstructorViewControllerFactory):
         self._model = model
 
     @property
-    def backendName(self) -> str:
+    def backend_name(self) -> str:
         return 'Tike'
 
-    def createViewController(self, reconstructorName: str) -> QWidget:
+    def create_view_controller(self, reconstructorName: str) -> QWidget:
         if reconstructorName == 'rpie':
             viewController = TikeViewController(self._model, showAlpha=True)
         else:

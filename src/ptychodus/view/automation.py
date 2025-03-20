@@ -29,7 +29,7 @@ class AutomationProcessingView(QGroupBox):
         self.intervalSpinBox = QSpinBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> AutomationProcessingView:
+    def create_instance(cls, parent: QWidget | None = None) -> AutomationProcessingView:
         view = cls(parent)
 
         layout = QGridLayout()
@@ -53,7 +53,7 @@ class AutomationWatchdogView(QGroupBox):
         self.usePollingObserverCheckBox = QCheckBox('Use Polling Observer')
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> AutomationWatchdogView:
+    def create_instance(cls, parent: QWidget | None = None) -> AutomationWatchdogView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -67,8 +67,8 @@ class AutomationWatchdogView(QGroupBox):
 class AutomationView(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.processingView = AutomationProcessingView.createInstance()
-        self.watchdogView = AutomationWatchdogView.createInstance()
+        self.processingView = AutomationProcessingView.create_instance()
+        self.watchdogView = AutomationWatchdogView.create_instance()
         self.processingListView = QListView()
         self.loadButton = QPushButton('Load')
         self.watchButton = QPushButton('Watch')
@@ -76,7 +76,7 @@ class AutomationView(QWidget):
         self.clearButton = QPushButton('Clear')
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> AutomationView:
+    def create_instance(cls, parent: QWidget | None = None) -> AutomationView:
         view = cls(parent)
 
         buttonLayout = QHBoxLayout()

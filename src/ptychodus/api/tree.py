@@ -3,36 +3,36 @@ from collections.abc import Sequence
 
 
 class SimpleTreeNode:
-    def __init__(self, parentItem: SimpleTreeNode | None, itemData: Sequence[str]) -> None:
-        self.parentItem = parentItem
-        self.itemData = itemData
-        self.childItems: list[SimpleTreeNode] = list()
+    def __init__(self, parent_item: SimpleTreeNode | None, item_data: Sequence[str]) -> None:
+        self.parent_item = parent_item
+        self.item_data = item_data
+        self.child_items: list[SimpleTreeNode] = list()
 
     @classmethod
-    def createRoot(cls, itemData: Sequence[str]) -> SimpleTreeNode:
-        return cls(None, itemData)
+    def create_root(cls, item_data: Sequence[str]) -> SimpleTreeNode:
+        return cls(None, item_data)
 
-    def createChild(self, itemData: Sequence[str]) -> SimpleTreeNode:
-        childItem = SimpleTreeNode(self, itemData)
-        self.childItems.append(childItem)
-        return childItem
-
-    @property
-    def isRoot(self) -> bool:
-        return self.parentItem is None
+    def create_child(self, item_data: Sequence[str]) -> SimpleTreeNode:
+        child_item = SimpleTreeNode(self, item_data)
+        self.child_items.append(child_item)
+        return child_item
 
     @property
-    def isLeaf(self) -> bool:
-        return not self.childItems
+    def is_root(self) -> bool:
+        return self.parent_item is None
+
+    @property
+    def is_leaf(self) -> bool:
+        return not self.child_items
 
     def data(self, column: int) -> str | None:
         try:
-            return self.itemData[column]
+            return self.item_data[column]
         except IndexError:
             return None
 
     def row(self) -> int:
-        if self.parentItem:
-            return self.parentItem.childItems.index(self)
+        if self.parent_item:
+            return self.parent_item.child_items.index(self)
 
         return 0

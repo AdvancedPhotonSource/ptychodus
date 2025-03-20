@@ -2,7 +2,7 @@ from collections.abc import Sequence
 
 # TODO from pvaccess import Channel, PvObjectQueue
 
-from ptychodus.api.scan import Scan, ScanPoint
+from ptychodus.api.scan import PositionSequence, ScanPoint
 
 from .builder import ScanBuilder
 from .settings import ScanSettings
@@ -19,8 +19,8 @@ class StreamingScanBuilder(ScanBuilder):
     def extend(self, pointSeq: Sequence[ScanPoint]) -> None:
         self._pointList.extend(pointSeq)
 
-    def build(self) -> Scan:
-        return Scan(self._pointList)
+    def build(self) -> PositionSequence:
+        return PositionSequence(self._pointList)
 
 
 # TODO def echo(self, value: int = 125) -> None:

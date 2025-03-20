@@ -16,28 +16,65 @@ from PyQt5.QtWidgets import (
 )
 
 
+class ProductEditorPropertiesView(QGroupBox):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__('Properties')
+        self.tableView = QTableView()
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.tableView)
+        self.setLayout(layout)
+
+
+class ProductEditorActionsView(QGroupBox):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__('Actions')
+        self.estimateProbePhotonCountButton = QPushButton('Estimate Probe Photon Count')
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.estimateProbePhotonCountButton)
+        layout.addStretch()
+        self.setLayout(layout)
+
+
+class ProductEditorCommentsView(QGroupBox):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__('Comments')
+        self.textEdit = QPlainTextEdit()
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.textEdit)
+        self.setLayout(layout)
+
+
 class ProductEditorDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.tableView = QTableView()
-        self.textEdit = QPlainTextEdit()
+        self.propertiesView = ProductEditorPropertiesView()
+        self.actionsView = ProductEditorActionsView()
+        self.commentsView = ProductEditorCommentsView()
         self.buttonBox = QDialogButtonBox()
-
-        commentsLayout = QVBoxLayout()
-        commentsLayout.setContentsMargins(0, 0, 0, 0)
-        commentsLayout.addWidget(self.textEdit)
-
-        commentsBox = QGroupBox('Comments')
-        commentsBox.setLayout(commentsLayout)
 
         self.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
         self.buttonBox.clicked.connect(self._handleButtonBoxClicked)
 
+        topLayout = QHBoxLayout()
+        topLayout.addWidget(self.propertiesView)
+        topLayout.addWidget(self.actionsView)
+
         layout = QVBoxLayout()
-        layout.addWidget(self.tableView)
-        layout.addWidget(commentsBox)
+        layout.addLayout(topLayout)
+        layout.addWidget(self.commentsView)
         layout.addWidget(self.buttonBox)
         self.setLayout(layout)
+
+    @property
+    def tableView(self) -> QTableView:
+        return self.propertiesView.tableView
+
+    @property
+    def textEdit(self) -> QPlainTextEdit:
+        return self.commentsView.textEdit
 
     def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
         if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:

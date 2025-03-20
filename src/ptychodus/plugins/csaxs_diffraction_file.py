@@ -1,0 +1,86 @@
+from pathlib import Path
+from typing import Final
+import logging
+
+import h5py
+import numpy
+
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
+from ptychodus.api.patterns import (
+    DiffractionDataset,
+    DiffractionFileReader,
+    DiffractionMetadata,
+    SimpleDiffractionDataset,
+)
+from ptychodus.api.plugins import PluginRegistry
+
+from .h5_diffraction_file import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
+
+logger = logging.getLogger(__name__)
+
+
+class CSAXSDiffractionFileReader(DiffractionFileReader):
+    SIMPLE_NAME: Final[str] = 'SLS_cSAXS'
+    DISPLAY_NAME: Final[str] = 'SLS cSAXS Files (*.h5 *.hdf5)'
+    ONE_MICRON_M: Final[float] = 1e-6
+    ONE_MILLIMETER_M: Final[float] = 1e-3
+
+    def __init__(self) -> None:
+        self._data_path = '/entry/data/data'
+        self._treeBuilder = H5DiffractionFileTreeBuilder()
+
+    def read(self, file_path: Path) -> DiffractionDataset:
+        dataset = SimpleDiffractionDataset.create_null(file_path)
+
+        try:
+            with h5py.File(file_path, 'r') as h5File:
+                contentsTree = self._treeBuilder.build(h5File)
+
+                try:
+                    data = h5File[self._data_path]
+                    x_pixel_size_um = h5File['/entry/instrument/eiger_4/x_pixel_size']
+                    y_pixel_size_um = h5File['/entry/instrument/eiger_4/y_pixel_size']
+                    distance_mm = h5File['/entry/instrument/monochromator/distance']
+                    energy_keV = h5File['/entry/instrument/monochromator/energy']
+                except KeyError:
+                    logger.warning('Unable to load data.')
+                else:
+                    numberOfPatterns, detectorHeight, detectorWidth = data.shape
+                    detectorDistanceInMeters = float(distance_mm[()]) * self.ONE_MILLIMETER_M
+                    detectorPixelGeometry = PixelGeometry(
+                        width_m=float(x_pixel_size_um[()]) * self.ONE_MICRON_M,
+                        height_m=float(y_pixel_size_um[()]) * self.ONE_MICRON_M,
+                    )
+                    probeEnergyInElectronVolts = 1000 * float(energy_keV[()])
+
+                    metadata = DiffractionMetadata(
+                        num_patterns_per_array=numberOfPatterns,
+                        num_patterns_total=numberOfPatterns,
+                        pattern_dtype=data.dtype,
+                        detector_distance_m=abs(detectorDistanceInMeters),
+                        detector_extent=ImageExtent(detectorWidth, detectorHeight),
+                        detector_pixel_geometry=detectorPixelGeometry,
+                        probe_energy_eV=probeEnergyInElectronVolts,
+                        file_path=file_path,
+                    )
+
+                    array = H5DiffractionPatternArray(
+                        label=file_path.stem,
+                        indexes=numpy.arange(numberOfPatterns),
+                        file_path=file_path,
+                        data_path=self._data_path,
+                    )
+
+                    dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
+        except OSError:
+            logger.warning(f'Unable to read file "{file_path}".')
+
+        return dataset
+
+
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.diffraction_file_readers.register_plugin(
+        CSAXSDiffractionFileReader(),
+        simple_name=CSAXSDiffractionFileReader.SIMPLE_NAME,
+        display_name=CSAXSDiffractionFileReader.DISPLAY_NAME,
+    )

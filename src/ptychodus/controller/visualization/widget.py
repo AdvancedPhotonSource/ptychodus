@@ -20,7 +20,7 @@ class VisualizationWidgetController:
         fileDialogFactory: FileDialogFactory,
     ) -> None:
         self._widget = widget
-        self._controller = VisualizationController.createInstance(
+        self._controller = VisualizationController.create_instance(
             engine, widget.visualizationView, statusBar, fileDialogFactory
         )
 
@@ -31,7 +31,7 @@ class VisualizationWidgetController:
     def _autoDisplayRange(self) -> None:
         self._controller.rerenderImage(autoscaleColorAxis=True)
 
-    def setArray(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> None:
+    def set_array(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> None:
         self._controller.setArray(array, pixelGeometry)
 
     def clearArray(self) -> None:

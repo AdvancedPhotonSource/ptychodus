@@ -69,7 +69,7 @@ class ImageItem(QGraphicsPixmapItem):
         return self._product
 
     def setProduct(self, product: VisualizationProduct) -> None:
-        imageRGBAf = product.getImageRGBA()
+        imageRGBAf = product.get_image_rgba()
         # NOTE .copy() ensures imageRGBAi is not a view
         imageRGBAi = numpy.multiply(imageRGBAf, 255).astype(numpy.uint8).copy()
 
@@ -113,7 +113,7 @@ class ImageItem(QGraphicsPixmapItem):
         pos = event.pos()
 
         if self._product is not None:
-            infoText = self._product.getInfoText(pos.x(), pos.y())
+            infoText = self._product.get_info_text(pos.x(), pos.y())
             self._statusBar.showMessage(infoText)
 
         super().hoverMoveEvent(event)
@@ -217,7 +217,7 @@ class LineCutDialog(QDialog):
         self.axes = self.figure.add_subplot(111)
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> LineCutDialog:
+    def create_instance(cls, parent: QWidget | None = None) -> LineCutDialog:
         view = cls(parent)
         view.setWindowTitle('Line-Cut Dialog')
 
@@ -252,7 +252,7 @@ class RectangleView(QGroupBox):
         self.heightLineEdit = RectangleView._createReadOnlyLineEdit()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> RectangleView:
+    def create_instance(cls, parent: QWidget | None = None) -> RectangleView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -272,10 +272,10 @@ class HistogramDialog(QDialog):
         self.figureCanvas = FigureCanvasQTAgg(self.figure)
         self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
         self.axes = self.figure.add_subplot(111)
-        self.rectangleView = RectangleView.createInstance()
+        self.rectangleView = RectangleView.create_instance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> HistogramDialog:
+    def create_instance(cls, parent: QWidget | None = None) -> HistogramDialog:
         view = cls(parent)
         view.setWindowTitle('Histogram')
 
@@ -312,7 +312,7 @@ class VisualizationWidget(QGroupBox):
         self.visualizationView = VisualizationView()
 
     @classmethod
-    def createInstance(cls, title: str, parent: QWidget | None = None) -> VisualizationWidget:
+    def create_instance(cls, title: str, parent: QWidget | None = None) -> VisualizationWidget:
         view = cls(title, parent)
         view.setAlignment(Qt.AlignHCenter)
 
@@ -338,11 +338,11 @@ class VisualizationParametersView(QGroupBox):
         self.rendererComboBox = QComboBox()
         self.transformationComboBox = QComboBox()
         self.variantComboBox = QComboBox()
-        self.minDisplayValueLineEdit = DecimalLineEdit.createInstance()
-        self.maxDisplayValueLineEdit = DecimalLineEdit.createInstance()
+        self.minDisplayValueLineEdit = DecimalLineEdit.create_instance()
+        self.maxDisplayValueLineEdit = DecimalLineEdit.create_instance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> VisualizationParametersView:
+    def create_instance(cls, parent: QWidget | None = None) -> VisualizationParametersView:
         view = cls(parent)
 
         layout = QFormLayout()

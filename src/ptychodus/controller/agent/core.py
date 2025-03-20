@@ -44,16 +44,16 @@ class AgentInputController(QObject):
         self._presenter.send_message(text)
         self._view.textEdit.clear()
 
-    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
-        if obj == self._view.textEdit and isinstance(event, QKeyEvent):
-            is_shift_pressed = event.modifiers() & Qt.KeyboardModifier.ShiftModifier
+    def eventFilter(self, a0: QObject, a1: QEvent) -> bool:
+        if a0 == self._view.textEdit and isinstance(a1, QKeyEvent):
+            is_shift_pressed = bool(a1.modifiers() & Qt.KeyboardModifier.ShiftModifier)
 
             # require shift+enter for new line, otherwise send on enter
-            if event.key() in (Qt.Key_Enter, Qt.Key_Return) and not is_shift_pressed:
+            if a1.key() in (Qt.Key_Enter, Qt.Key_Return) and not is_shift_pressed:
                 self._send_message()
                 return True
 
-        return super().eventFilter(obj, event)
+        return super().eventFilter(a0, a1)
 
 
 class AgentChatController(ChatObserver):
@@ -127,19 +127,21 @@ class AgentController:
         self._embedButton.clicked.connect(self._embed_text)
 
         groupBoxLayout = QFormLayout()
-        groupBoxLayout.addRow('User:', self._userViewController.getWidget())
-        groupBoxLayout.addRow('Chat Endpoint URL:', self._chatEndpointURLViewController.getWidget())
-        groupBoxLayout.addRow('Chat Model:', self._chatModelViewController.getWidget())
-        groupBoxLayout.addRow('Temperature:', self._temperatureViewController.getWidget())
-        groupBoxLayout.addRow('Top P:', self._topPViewController.getWidget())
-        groupBoxLayout.addRow('Max Tokens:', self._maxTokensViewController.getWidget())
+        groupBoxLayout.addRow('User:', self._userViewController.get_widget())
         groupBoxLayout.addRow(
-            'Max Completion Tokens:', self._maxCompletionTokensViewController.getWidget()
+            'Chat Endpoint URL:', self._chatEndpointURLViewController.get_widget()
+        )
+        groupBoxLayout.addRow('Chat Model:', self._chatModelViewController.get_widget())
+        groupBoxLayout.addRow('Temperature:', self._temperatureViewController.get_widget())
+        groupBoxLayout.addRow('Top P:', self._topPViewController.get_widget())
+        groupBoxLayout.addRow('Max Tokens:', self._maxTokensViewController.get_widget())
+        groupBoxLayout.addRow(
+            'Max Completion Tokens:', self._maxCompletionTokensViewController.get_widget()
         )
         groupBoxLayout.addRow(
-            'Embeddings Endpoint URL:', self._embeddingsEndpointURLViewController.getWidget()
+            'Embeddings Endpoint URL:', self._embeddingsEndpointURLViewController.get_widget()
         )
-        groupBoxLayout.addRow('Embeddings Model:', self._embeddingsModelViewController.getWidget())
+        groupBoxLayout.addRow('Embeddings Model:', self._embeddingsModelViewController.get_widget())
         groupBoxLayout.addRow(self._embedButton)
 
         groupBox = QGroupBox('Argo')

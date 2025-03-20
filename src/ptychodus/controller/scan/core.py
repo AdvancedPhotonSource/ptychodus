@@ -2,7 +2,7 @@ from __future__ import annotations
 import logging
 
 from PyQt5.QtCore import QModelIndex, QSortFilterProxyModel, QStringListModel
-from PyQt5.QtWidgets import QAbstractItemView, QDialog
+from PyQt5.QtWidgets import QAbstractItemView, QDialog, QMessageBox
 
 from ptychodus.api.observer import SequenceObserver
 
@@ -12,8 +12,8 @@ from ...view.repository import RepositoryTableView
 from ...view.scan import ScanPlotView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
-from .editorFactory import ScanEditorViewControllerFactory
-from .tableModel import ScanTableModel
+from .editor_factory import ScanEditorViewControllerFactory
+from .table_model import ScanTableModel
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         self._editorFactory = ScanEditorViewControllerFactory()
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         repository: ScanRepository,
         api: ScanAPI,
@@ -57,7 +57,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         tableProxyModel.dataChanged.connect(
             lambda topLeft, bottomRight, roles: controller._redrawPlot()
         )
-        repository.addObserver(controller)
+        repository.add_observer(controller)
 
         builderListModel = QStringListModel()
         builderListModel.setStringList([name for name in api.builderNames()])
@@ -93,6 +93,9 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
 
         view.buttonBox.editButton.clicked.connect(controller._editCurrentScan)
 
+        estimateTransformAction = view.buttonBox.analyzeMenu.addAction('Estimate Transform...')
+        estimateTransformAction.triggered.connect(controller._estimateTransform)
+
         return controller
 
     def _getCurrentItemIndex(self) -> int:
@@ -111,19 +114,19 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         if itemIndex < 0:
             return
 
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
+        filePath, nameFilter = self._fileDialogFactory.get_open_file_path(
             self._view,
             'Open Scan',
-            nameFilters=self._api.getOpenFileFilterList(),
-            selectedNameFilter=self._api.getOpenFileFilter(),
+            name_filters=[nameFilter for nameFilter in self._api.getOpenFileFilterList()],
+            selected_name_filter=self._api.getOpenFileFilter(),
         )
 
         if filePath:
             try:
-                self._api.openScan(itemIndex, filePath, fileType=nameFilter)
+                self._api.openScan(itemIndex, filePath, file_type=nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Reader', err)
+                ExceptionDialog.show_exception('File Reader', err)
 
     def _copyToCurrentScan(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -155,11 +158,11 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         if itemIndex < 0:
             return
 
-        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+        filePath, nameFilter = self._fileDialogFactory.get_save_file_path(
             self._view,
             'Save Scan',
-            nameFilters=self._api.getSaveFileFilterList(),
-            selectedNameFilter=self._api.getSaveFileFilter(),
+            name_filters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
+            selected_name_filter=self._api.getSaveFileFilter(),
         )
 
         if filePath:
@@ -167,7 +170,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
                 self._api.saveScan(itemIndex, filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Writer', err)
+                ExceptionDialog.show_exception('File Writer', err)
 
     def _syncCurrentScanToSettings(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -176,7 +179,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
             logger.warning('No current item!')
         else:
             item = self._repository[itemIndex]
-            item.syncToSettings()
+            item.sync_to_settings()
 
     def _redrawPlot(self) -> None:
         self._plotView.axes.clear()
@@ -188,8 +191,8 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
             if self._tableModel.isItemChecked(itemIndex):
                 itemName = self._repository.getName(itemIndex)
                 scan = self._repository[itemIndex].getScan()
-                x = [point.positionXInMeters for point in scan]
-                y = [point.positionYInMeters for point in scan]
+                x = [point.position_x_m for point in scan]
+                y = [point.position_y_m for point in scan]
                 self._plotView.axes.plot(x, y, '.-', label=itemName, linewidth=1.5)
 
         self._plotView.axes.invert_yaxis()
@@ -203,6 +206,19 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
 
         self._plotView.figureCanvas.draw()
 
+    def _estimateTransform(self) -> None:  # FIXME
+        itemIndex = self._getCurrentItemIndex()
+
+        if itemIndex < 0:
+            logger.warning('No current item!')
+            return
+
+        _ = QMessageBox.information(
+            self._view,
+            'Not Implemented',
+            'Affine transform estimator is not yet implemented.',
+        )
+
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()
         self._view.buttonBox.loadButton.setEnabled(enabled)
@@ -211,14 +227,14 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         self._view.buttonBox.analyzeButton.setEnabled(enabled)
         self._redrawPlot()
 
-    def handleItemInserted(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_item_inserted(self, index: int, item: ScanRepositoryItem) -> None:
         self._tableModel.insertItem(index, item)
 
-    def handleItemChanged(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_item_changed(self, index: int, item: ScanRepositoryItem) -> None:
         self._tableModel.updateItem(index, item)
 
         if self._tableModel.isItemChecked(index):
             self._redrawPlot()
 
-    def handleItemRemoved(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_item_removed(self, index: int, item: ScanRepositoryItem) -> None:
         self._tableModel.removeItem(index, item)

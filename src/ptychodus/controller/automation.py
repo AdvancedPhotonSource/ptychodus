@@ -34,14 +34,14 @@ class AutomationProcessingController(Observer):
         self._fileDialogFactory = fileDialogFactory
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         presenter: AutomationPresenter,
         view: AutomationProcessingView,
         fileDialogFactory: FileDialogFactory,
     ) -> AutomationProcessingController:
         controller = cls(presenter, view, fileDialogFactory)
-        presenter.addObserver(controller)
+        presenter.add_observer(controller)
 
         for strategy in presenter.getStrategyList():
             view.strategyComboBox.addItem(strategy)
@@ -51,7 +51,7 @@ class AutomationProcessingController(Observer):
         view.directoryBrowseButton.clicked.connect(controller._browseDirectory)
         view.intervalSpinBox.valueChanged.connect(presenter.setProcessingIntervalInSeconds)
 
-        controller._syncModelToView()
+        controller._sync_model_to_view()
 
         return controller
 
@@ -60,14 +60,14 @@ class AutomationProcessingController(Observer):
         self._presenter.setDataDirectory(dataDirectory)
 
     def _browseDirectory(self) -> None:
-        dirPath = self._fileDialogFactory.getExistingDirectoryPath(
+        dirPath = self._fileDialogFactory.get_existing_directory_path(
             self._view, 'Choose Data Directory'
         )
 
         if dirPath:
             self._presenter.setDataDirectory(dirPath)
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._view.strategyComboBox.blockSignals(True)
         self._view.strategyComboBox.setCurrentText(self._presenter.getStrategy())
         self._view.strategyComboBox.blockSignals(False)
@@ -88,9 +88,9 @@ class AutomationProcessingController(Observer):
         self._view.intervalSpinBox.setValue(self._presenter.getProcessingIntervalInSeconds())
         self._view.intervalSpinBox.blockSignals(False)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class AutomationWatchdogController(Observer):
@@ -100,20 +100,20 @@ class AutomationWatchdogController(Observer):
         self._view = view
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls, presenter: AutomationPresenter, view: AutomationWatchdogView
     ) -> AutomationWatchdogController:
         controller = cls(presenter, view)
-        presenter.addObserver(controller)
+        presenter.add_observer(controller)
 
         view.delaySpinBox.valueChanged.connect(presenter.setWatchdogDelayInSeconds)
         view.usePollingObserverCheckBox.toggled.connect(presenter.setWatchdogPollingObserverEnabled)
 
-        controller._syncModelToView()
+        controller._sync_model_to_view()
 
         return controller
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         delayLimitsInSeconds = self._presenter.getWatchdogDelayLimitsInSeconds()
 
         self._view.delaySpinBox.blockSignals(True)
@@ -125,9 +125,9 @@ class AutomationWatchdogController(Observer):
             self._presenter.isWatchdogPollingObserverEnabled()
         )
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class AutomationProcessingListModel(QAbstractListModel):
@@ -168,10 +168,10 @@ class AutomationController(Observer):
         super().__init__()
         self._core = core
         self._presenter = presenter
-        self._processingController = AutomationProcessingController.createInstance(
+        self._processingController = AutomationProcessingController.create_instance(
             presenter, view.processingView, fileDialogFactory
         )
-        self._watchdogController = AutomationWatchdogController.createInstance(
+        self._watchdogController = AutomationWatchdogController.create_instance(
             presenter, view.watchdogView
         )
         self._processingPresenter = processingPresenter
@@ -181,7 +181,7 @@ class AutomationController(Observer):
         self._automationTimer = QTimer()
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         core: AutomationCore,
         presenter: AutomationPresenter,
@@ -190,7 +190,7 @@ class AutomationController(Observer):
         fileDialogFactory: FileDialogFactory,
     ) -> AutomationController:
         controller = cls(core, presenter, processingPresenter, view, fileDialogFactory)
-        processingPresenter.addObserver(controller)
+        processingPresenter.add_observer(controller)
 
         view.processingListView.setModel(controller._listModel)
 
@@ -201,7 +201,7 @@ class AutomationController(Observer):
         view.processButton.toggled.connect(processingPresenter.setProcessingEnabled)
         view.clearButton.clicked.connect(presenter.clearDatasetRepository)
 
-        controller._syncModelToView()
+        controller._sync_model_to_view()
 
         controller._executeWaitingTasksTimer.timeout.connect(core.executeWaitingTasks)
         controller._executeWaitingTasksTimer.start(60 * 1000)  # TODO customize (in milliseconds)
@@ -211,7 +211,7 @@ class AutomationController(Observer):
 
         return controller
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         self._view.processButton.setChecked(self._processingPresenter.isProcessingEnabled())
         self._listModel.beginResetModel()
         self._listModel.endResetModel()
@@ -219,6 +219,6 @@ class AutomationController(Observer):
         self._view.watchButton.setChecked(self._presenter.isWatchdogEnabled())
         self._view.processButton.setChecked(self._processingPresenter.isProcessingEnabled())
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._processingPresenter:
-            self._syncModelToView()
+            self._sync_model_to_view()

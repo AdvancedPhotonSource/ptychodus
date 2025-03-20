@@ -18,7 +18,7 @@ class SettingsTableModel(QAbstractTableModel):
         self._names: Sequence[str] = list()
         self._values: Sequence[str] = list()
 
-    def setNamesAndValues(self, names: Sequence[str], values: Sequence[str]) -> None:
+    def set_names_and_values(self, names: Sequence[str], values: Sequence[str]) -> None:
         self.beginResetModel()
         self._names = names
         self._values = values
@@ -53,75 +53,75 @@ class SettingsTableModel(QAbstractTableModel):
 class SettingsController(Observer):
     def __init__(
         self,
-        settingsRegistry: SettingsRegistry,
+        settings_registry: SettingsRegistry,
         view: SettingsView,
-        tableView: QTableView,
-        fileDialogFactory: FileDialogFactory,
+        table_view: QTableView,
+        file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
-        self._settingsRegistry = settingsRegistry
+        self._settings_registry = settings_registry
         self._view = view
-        self._tableView = tableView
-        self._fileDialogFactory = fileDialogFactory
+        self._table_view = table_view
+        self._file_dialog_factory = file_dialog_factory
 
-        self._listModel = QStringListModel()
-        self._tableModel = SettingsTableModel()
+        self._list_model = QStringListModel()
+        self._table_model = SettingsTableModel()
 
-        settingsRegistry.addObserver(self)
+        settings_registry.add_observer(self)
 
-        view.listView.setModel(self._listModel)
-        view.listView.selectionModel().currentChanged.connect(self._updateView)
+        view.listView.setModel(self._list_model)
+        view.listView.selectionModel().currentChanged.connect(self._update_view)
 
-        self._tableView.setModel(self._tableModel)
+        self._table_view.setModel(self._table_model)
 
-        view.buttonBox.openButton.clicked.connect(self._openSettings)
-        view.buttonBox.saveButton.clicked.connect(self._saveSettings)
+        view.button_box.open_button.clicked.connect(self._open_settings)
+        view.button_box.save_button.clicked.connect(self._save_settings)
 
-        self._syncModelToView()
+        self._sync_model_to_view()
 
-    def _openSettings(self) -> None:
-        filePath, _ = self._fileDialogFactory.getOpenFilePath(
+    def _open_settings(self) -> None:
+        file_path, _ = self._file_dialog_factory.get_open_file_path(
             self._view,
             'Open Settings',
-            nameFilters=self._settingsRegistry.getOpenFileFilterList(),
-            selectedNameFilter=self._settingsRegistry.getOpenFileFilter(),
+            name_filters=self._settings_registry.get_open_file_filters(),
+            selected_name_filter=self._settings_registry.get_open_file_filter(),
         )
 
-        if filePath:
-            self._settingsRegistry.openSettings(filePath)
+        if file_path:
+            self._settings_registry.open_settings(file_path)
 
-    def _saveSettings(self) -> None:
-        filePath, _ = self._fileDialogFactory.getSaveFilePath(
+    def _save_settings(self) -> None:
+        file_path, _ = self._file_dialog_factory.get_save_file_path(
             self._view,
             'Save Settings',
-            nameFilters=self._settingsRegistry.getSaveFileFilterList(),
-            selectedNameFilter=self._settingsRegistry.getSaveFileFilter(),
+            name_filters=self._settings_registry.get_save_file_filters(),
+            selected_name_filter=self._settings_registry.get_save_file_filter(),
         )
 
-        if filePath:
-            self._settingsRegistry.saveSettings(filePath)
+        if file_path:
+            self._settings_registry.save_settings(file_path)
 
-    def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
+    def _update_view(self, current: QModelIndex, previous: QModelIndex) -> None:
         if not current.isValid():
             return
 
-        groupName = self._listModel.data(current, Qt.DisplayRole)
-        group = self._settingsRegistry[groupName]
+        group_name = self._list_model.data(current, Qt.DisplayRole)
+        group = self._settings_registry[group_name]
         names: list[str] = list()
         values: list[str] = list()
 
-        for parameterName, parameter in group.parameters().items():
-            names.append(parameterName)
-            values.append(parameter.getValueAsString())
+        for parameter_name, parameter in group.parameters().items():
+            names.append(parameter_name)
+            values.append(parameter.get_value_as_string())
 
-        self._tableModel.setNamesAndValues(names, values)
+        self._table_model.set_names_and_values(names, values)
 
-    def _syncModelToView(self) -> None:
-        self._listModel.setStringList(sorted(iter(self._settingsRegistry)))
+    def _sync_model_to_view(self) -> None:
+        self._list_model.setStringList(sorted(iter(self._settings_registry)))
 
         current = self._view.listView.currentIndex()
-        self._updateView(current, QModelIndex())
+        self._update_view(current, QModelIndex())
 
-    def update(self, observable: Observable) -> None:
-        if observable is self._settingsRegistry:
-            self._syncModelToView()
+    def _update(self, observable: Observable) -> None:
+        if observable is self._settings_registry:
+            self._sync_model_to_view()

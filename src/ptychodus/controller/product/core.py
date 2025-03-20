@@ -18,6 +18,7 @@ from ...model.product import (
     ProductRepositoryItem,
     ProductRepositoryObserver,
 )
+from ...model.patterns import AssembledDiffractionDataset
 from ...model.product.metadata import MetadataRepositoryItem
 from ...model.product.object import ObjectRepositoryItem
 from ...model.product.probe import ProbeRepositoryItem
@@ -70,27 +71,27 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 logger.exception(err)
                 return None
 
-            metadata = item.getMetadata()
-            geometry = item.getGeometry()
+            metadata = item.get_metadata()
+            geometry = item.get_geometry()
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 if index.column() == 0:
-                    return metadata.getName()
+                    return metadata.get_name()
                 elif index.column() == 1:
-                    return f'{metadata.detectorDistanceInMeters.getValue():.4g}'
+                    return f'{metadata.detector_distance_m.get_value():.4g}'
                 elif index.column() == 2:
-                    return f'{metadata.probeEnergyInElectronVolts.getValue() / 1e3:.4g}'
+                    return f'{metadata.probe_energy_eV.get_value() / 1e3:.4g}'
                 elif index.column() == 3:
-                    return f'{metadata.probePhotonCount.getValue():.4g}'
+                    return f'{metadata.probe_photon_count.get_value():.4g}'
                 elif index.column() == 4:
-                    return f'{metadata.exposureTimeInSeconds.getValue():.4g}'
+                    return f'{metadata.exposure_time_s.get_value():.4g}'
                 elif index.column() == 5:
                     return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
                 elif index.column() == 6:
                     return f'{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}'
                 elif index.column() == 7:
-                    product = item.getProduct()
-                    return f'{product.sizeInBytes / (1024 * 1024):.2f}'
+                    product = item.get_product()
+                    return f'{product.nbytes / (1024 * 1024):.2f}'
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
@@ -100,10 +101,10 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 logger.exception(err)
                 return False
 
-            metadata = item.getMetadata()
+            metadata = item.get_metadata()
 
             if index.column() == 0:
-                metadata.setName(str(value))
+                metadata.set_name(str(value))
                 return True
             elif index.column() == 1:
                 try:
@@ -111,7 +112,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 except ValueError:
                     return False
 
-                metadata.detectorDistanceInMeters.setValue(distanceInM)
+                metadata.detector_distance_m.set_value(distanceInM)
                 return True
             elif index.column() == 2:
                 try:
@@ -119,7 +120,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 except ValueError:
                     return False
 
-                metadata.probeEnergyInElectronVolts.setValue(energyInKEV * 1e3)
+                metadata.probe_energy_eV.set_value(energyInKEV * 1e3)
                 return True
             elif index.column() == 3:
                 try:
@@ -127,7 +128,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 except ValueError:
                     return False
 
-                metadata.probePhotonCount.setValue(photonCount)
+                metadata.probe_photon_count.set_value(photonCount)
                 return True
             elif index.column() == 4:
                 try:
@@ -135,7 +136,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 except ValueError:
                     return False
 
-                metadata.exposureTimeInSeconds.setValue(exposureTimeInSeconds)
+                metadata.exposure_time_s.set_value(exposureTimeInSeconds)
                 return True
 
         return False
@@ -150,6 +151,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 class ProductController(ProductRepositoryObserver):
     def __init__(
         self,
+        dataset: AssembledDiffractionDataset,
         repository: ProductRepository,
         api: ProductAPI,
         view: ProductView,
@@ -159,6 +161,7 @@ class ProductController(ProductRepositoryObserver):
         tableProxyModel: QSortFilterProxyModel,
     ) -> None:
         super().__init__()
+        self._dataset = dataset
         self._repository = repository
         self._api = api
         self._view = view
@@ -168,8 +171,9 @@ class ProductController(ProductRepositoryObserver):
         self._tableProxyModel = tableProxyModel
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
+        dataset: AssembledDiffractionDataset,
         repository: ProductRepository,
         api: ProductAPI,
         view: ProductView,
@@ -186,6 +190,7 @@ class ProductController(ProductRepositoryObserver):
         tableProxyModel.setSourceModel(tableModel)
 
         controller = cls(
+            dataset,
             repository,
             api,
             view,
@@ -194,7 +199,7 @@ class ProductController(ProductRepositoryObserver):
             tableModel,
             tableProxyModel,
         )
-        repository.addObserver(controller)
+        repository.add_observer(controller)
         controller._updateInfoText()
 
         view.tableView.setModel(tableProxyModel)
@@ -231,19 +236,19 @@ class ProductController(ProductRepositoryObserver):
         return -1
 
     def _openProductFromFile(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
+        filePath, nameFilter = self._fileDialogFactory.get_open_file_path(
             self._view,
             'Open Product',
-            nameFilters=self._api.getOpenFileFilterList(),
-            selectedNameFilter=self._api.getOpenFileFilter(),
+            name_filters=[nameFilter for nameFilter in self._api.getOpenFileFilterList()],
+            selected_name_filter=self._api.getOpenFileFilter(),
         )
 
         if filePath:
             try:
-                self._api.openProduct(filePath, fileType=nameFilter)
+                self._api.openProduct(filePath, file_type=nameFilter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Reader', err)
+                ExceptionDialog.show_exception('File Reader', err)
 
     def _createNewProduct(self) -> None:
         self._api.insertNewProduct()
@@ -252,19 +257,19 @@ class ProductController(ProductRepositoryObserver):
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
 
         if current.isValid():
-            filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+            filePath, nameFilter = self._fileDialogFactory.get_save_file_path(
                 self._view,
                 'Save Product',
-                nameFilters=self._api.getSaveFileFilterList(),
-                selectedNameFilter=self._api.getSaveFileFilter(),
+                name_filters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
+                selected_name_filter=self._api.getSaveFileFilter(),
             )
 
             if filePath:
                 try:
-                    self._api.saveProduct(current.row(), filePath, fileType=nameFilter)
+                    self._api.saveProduct(current.row(), filePath, file_type=nameFilter)
                 except Exception as err:
                     logger.exception(err)
-                    ExceptionDialog.showException('File Writer', err)
+                    ExceptionDialog.show_exception('File Writer', err)
         else:
             logger.error('No current item!')
 
@@ -275,7 +280,7 @@ class ProductController(ProductRepositoryObserver):
             logger.warning('No current item!')
         else:
             item = self._repository[itemIndex]
-            item.syncToSettings()
+            item.sync_to_settings()
 
     def _duplicateCurrentProduct(self) -> None:
         current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
@@ -290,7 +295,7 @@ class ProductController(ProductRepositoryObserver):
 
         if current.isValid():
             product = self._repository[current.row()]
-            ProductEditorViewController.editProduct(product, self._view)
+            ProductEditorViewController.editProduct(self._dataset, product, self._view)
         else:
             logger.error('No current item!')
 
@@ -313,31 +318,31 @@ class ProductController(ProductRepositoryObserver):
         infoText = self._repository.getInfoText()
         self._view.infoLabel.setText(infoText)
 
-    def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
+    def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
         parent = QModelIndex()
         self._tableModel.beginInsertRows(parent, index, index)
         self._tableModel.endInsertRows()
         self._updateInfoText()
 
-    def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
+    def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
         topLeft = self._tableModel.index(index, 0)
         bottomRight = self._tableModel.index(index, self._tableModel.columnCount() - 1)
         self._tableModel.dataChanged.emit(topLeft, bottomRight, [Qt.ItemDataRole.DisplayRole])
         self._updateInfoText()
 
-    def handleScanChanged(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_scan_changed(self, index: int, item: ScanRepositoryItem) -> None:
         self._updateInfoText()
 
-    def handleProbeChanged(self, index: int, item: ProbeRepositoryItem) -> None:
+    def handle_probe_changed(self, index: int, item: ProbeRepositoryItem) -> None:
         self._updateInfoText()
 
-    def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
+    def handle_object_changed(self, index: int, item: ObjectRepositoryItem) -> None:
         self._updateInfoText()
 
-    def handleCostsChanged(self, index: int, costs: Sequence[float]) -> None:
+    def handle_costs_changed(self, index: int, costs: Sequence[float]) -> None:
         self._updateInfoText()
 
-    def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
+    def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
         parent = QModelIndex()
         self._tableModel.beginRemoveRows(parent, index, index)
         self._tableModel.endRemoveRows()

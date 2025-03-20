@@ -6,7 +6,7 @@ except PackageNotFoundError:
     pass
 
 try:
-    from .ptychodusAdImageProcessor import PtychodusAdImageProcessor
+    from .ptychodus_stream_processor import PtychodusAdImageProcessor
 except ModuleNotFoundError:
     pass
 

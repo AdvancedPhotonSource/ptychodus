@@ -220,16 +220,16 @@ class ChatArgo(BaseChatModel):
         **kwargs: Any,
     ) -> ChatResult:
         """Generates a chat result from a prompt"""
-        url = self.settings.chatEndpointURL.getValue()
+        url = self.settings.chatEndpointURL.get_value()
         payload = {
-            'user': self.settings.user.getValue(),
-            'model': self.settings.chatModel.getValue(),
+            'user': self.settings.user.get_value(),
+            'model': self.settings.chatModel.get_value(),
             'messages': [_convert_message_to_dict(m) for m in messages],
             'stop': stop or [],
-            'temperature': self.settings.temperature.getValue(),
-            'top_p': self.settings.top_p.getValue(),
-            'max_tokens': self.settings.max_tokens.getValue(),
-            'max_completion_tokens': self.settings.max_completion_tokens.getValue(),
+            'temperature': self.settings.temperature.get_value(),
+            'top_p': self.settings.top_p.get_value(),
+            'max_tokens': self.settings.max_tokens.get_value(),
+            'max_completion_tokens': self.settings.max_completion_tokens.get_value(),
         }
         headers = {'Content-Type': 'application/json'}
         response = requests.post(url, json=payload, headers=headers)
@@ -249,7 +249,7 @@ class ChatArgo(BaseChatModel):
     @property
     def _llm_type(self) -> str:
         """Uniquely identifies the type of the model. Used for logging."""
-        model = self.settings.chatModel.getValue()
+        model = self.settings.chatModel.get_value()
         return f'argo-{model}'
 
 
@@ -259,10 +259,10 @@ class ArgoEmbeddings(Embeddings):
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """Generates embeddings for a list of strings."""
-        url = self._settings.embeddingsEndpointURL.getValue()
+        url = self._settings.embeddingsEndpointURL.get_value()
         payload = {
-            'user': self._settings.user.getValue(),
-            'model': self._settings.embeddingsModel.getValue(),
+            'user': self._settings.user.get_value(),
+            'model': self._settings.embeddingsModel.get_value(),
             'prompt': texts,
         }
         headers = {'Content-Type': 'application/json'}

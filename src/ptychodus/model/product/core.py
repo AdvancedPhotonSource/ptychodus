@@ -5,18 +5,19 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter
 from ptychodus.api.product import ProductFileReader, ProductFileWriter
-from ptychodus.api.scan import ScanFileReader, ScanFileWriter
+from ptychodus.api.scan import PositionFileReader, PositionFileWriter
 from ptychodus.api.settings import SettingsRegistry
 
-from ..patterns import ActiveDiffractionDataset, Detector, PatternSizer, ProductSettings
+from ..patterns import AssembledDiffractionDataset, PatternSizer
 from .api import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
 from .object import ObjectBuilderFactory, ObjectRepositoryItemFactory, ObjectSettings
-from .objectRepository import ObjectRepository
+from .object_repository import ObjectRepository
 from .probe import ProbeBuilderFactory, ProbeRepositoryItemFactory, ProbeSettings
-from .probeRepository import ProbeRepository
-from .productRepository import ProductRepository
+from .probe_repository import ProbeRepository
+from .product_repository import ProductRepository
 from .scan import ScanBuilderFactory, ScanRepositoryItemFactory, ScanSettings
-from .scanRepository import ScanRepository
+from .scan_repository import ScanRepository
+from .settings import ProductSettings
 
 
 class ProductCore(Observer):
@@ -24,12 +25,10 @@ class ProductCore(Observer):
         self,
         rng: numpy.random.Generator,
         settingsRegistry: SettingsRegistry,
-        detector: Detector,
-        settings: ProductSettings,
         patternSizer: PatternSizer,
-        patterns: ActiveDiffractionDataset,
-        scanFileReaderChooser: PluginChooser[ScanFileReader],
-        scanFileWriterChooser: PluginChooser[ScanFileWriter],
+        dataset: AssembledDiffractionDataset,
+        scanFileReaderChooser: PluginChooser[PositionFileReader],
+        scanFileWriterChooser: PluginChooser[PositionFileWriter],
         fresnelZonePlateChooser: PluginChooser[FresnelZonePlate],
         probeFileReaderChooser: PluginChooser[ProbeFileReader],
         probeFileWriterChooser: PluginChooser[ProbeFileWriter],
@@ -40,6 +39,8 @@ class ProductCore(Observer):
         reinitObservable: Observable,
     ) -> None:
         super().__init__()
+        self.settings = ProductSettings(settingsRegistry)
+
         self._scanSettings = ScanSettings(settingsRegistry)
         self._scanBuilderFactory = ScanBuilderFactory(
             self._scanSettings, scanFileReaderChooser, scanFileWriterChooser
@@ -51,8 +52,7 @@ class ProductCore(Observer):
         self._probeSettings = ProbeSettings(settingsRegistry)
         self._probeBuilderFactory = ProbeBuilderFactory(
             self._probeSettings,
-            detector,
-            patterns,
+            dataset,
             fresnelZonePlateChooser,
             probeFileReaderChooser,
             probeFileWriterChooser,
@@ -70,15 +70,15 @@ class ProductCore(Observer):
         )
 
         self.productRepository = ProductRepository(
-            settings,
+            self.settings,
             patternSizer,
-            patterns,
+            dataset,
             self._scanRepositoryItemFactory,
             self._probeRepositoryItemFactory,
             self._objectRepositoryItemFactory,
         )
         self.productAPI = ProductAPI(
-            settings,
+            self.settings,
             self.productRepository,
             productFileReaderChooser,
             productFileWriterChooser,
@@ -95,19 +95,19 @@ class ProductCore(Observer):
         )
 
         # TODO vvv refactor vvv
-        productFileReaderChooser.setCurrentPluginByName(settings.fileType.getValue())
-        productFileWriterChooser.setCurrentPluginByName(settings.fileType.getValue())
-        scanFileReaderChooser.setCurrentPluginByName(self._scanSettings.fileType.getValue())
-        scanFileWriterChooser.setCurrentPluginByName(self._scanSettings.fileType.getValue())
-        probeFileReaderChooser.setCurrentPluginByName(self._probeSettings.fileType.getValue())
-        probeFileWriterChooser.setCurrentPluginByName(self._probeSettings.fileType.getValue())
-        objectFileReaderChooser.setCurrentPluginByName(self._objectSettings.fileType.getValue())
-        objectFileWriterChooser.setCurrentPluginByName(self._objectSettings.fileType.getValue())
+        productFileReaderChooser.synchronize_with_parameter(self.settings.file_type)
+        productFileWriterChooser.set_current_plugin(self.settings.file_type.get_value())
+        scanFileReaderChooser.synchronize_with_parameter(self._scanSettings.fileType)
+        scanFileWriterChooser.set_current_plugin(self._scanSettings.fileType.get_value())
+        probeFileReaderChooser.synchronize_with_parameter(self._probeSettings.fileType)
+        probeFileWriterChooser.set_current_plugin(self._probeSettings.fileType.get_value())
+        objectFileReaderChooser.synchronize_with_parameter(self._objectSettings.fileType)
+        objectFileWriterChooser.set_current_plugin(self._objectSettings.fileType.get_value())
         # TODO ^^^^^^^^^^^^^^^^
 
         self._reinitObservable = reinitObservable
-        reinitObservable.addObserver(self)
+        reinitObservable.add_observer(self)
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._reinitObservable:
             self.productRepository.insertProductFromSettings()

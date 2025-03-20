@@ -34,8 +34,8 @@ class FourierRingCorrelation:
         frcSeries = PlotSeries('frc', self.correlation)
 
         return Plot2D(
-            axisX=PlotAxis('Spatial Frequency [1/nm]', [freqSeries]),
-            axisY=PlotAxis('Fourier Ring Correlation', [frcSeries]),
+            axis_x=PlotAxis('Spatial Frequency [1/nm]', [freqSeries]),
+            axis_y=PlotAxis('Fourier Ring Correlation', [frcSeries]),
         )
 
 
@@ -60,12 +60,12 @@ class FourierRingCorrelator:
         coherent diffractive imaging," Opt. Express 19, 21333-21344 (2011)
         """
 
-        object1 = self._repository[itemIndex1].getObject()
-        object2 = self._repository[itemIndex2].getObject()
+        object1 = self._repository[itemIndex1].get_object()
+        object2 = self._repository[itemIndex2].get_object()
 
         # TODO support multilayer objects
-        array1 = object1.getLayer(0)
-        array2 = object2.getLayer(0)
+        array1 = object1.get_layer(0)
+        array2 = object2.get_layer(0)
 
         if numpy.ndim(array1) != 2 or numpy.ndim(array2) != 2:
             raise ValueError('Arrays must be 2D!')
@@ -74,7 +74,7 @@ class FourierRingCorrelator:
             raise ValueError('Arrays must have same shape!')
 
         # TODO verify compatible pixel geometry
-        pixelGeometry = object2.getPixelGeometry()
+        pixelGeometry = object2.get_pixel_geometry()
 
         if pixelGeometry is None:
             raise ValueError('No pixel geometry!')
@@ -84,8 +84,8 @@ class FourierRingCorrelator:
         # TODO apply soft-edged mask
         # TODO stats: SSNR, area under FRC curve, average SNR, etc.
 
-        x_rm = scipy.fft.fftfreq(array1.shape[-1], d=pixelGeometry.widthInMeters)
-        y_rm = scipy.fft.fftfreq(array1.shape[-2], d=pixelGeometry.heightInMeters)
+        x_rm = scipy.fft.fftfreq(array1.shape[-1], d=pixelGeometry.width_m)
+        y_rm = scipy.fft.fftfreq(array1.shape[-2], d=pixelGeometry.height_m)
         radialBinSize_rm = max(x_rm[1], y_rm[1])
 
         xx_rm, yy_rm = numpy.meshgrid(x_rm, y_rm)

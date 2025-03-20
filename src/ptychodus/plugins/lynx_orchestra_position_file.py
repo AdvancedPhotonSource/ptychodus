@@ -1,0 +1,88 @@
+from pathlib import Path
+from typing import Final
+import csv
+import logging
+
+from ptychodus.api.plugins import PluginRegistry
+from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint, ScanPointParseError
+
+logger = logging.getLogger(__name__)
+
+
+class LYNXOrchestraPositionFileReader(PositionFileReader):
+    SIMPLE_NAME: Final[str] = 'LYNXOrchestra'
+    MICRONS_TO_METERS: Final[float] = 1.0e-6
+    DATA_POINT_COLUMN: Final[int] = 0
+    X_COLUMN: Final[int] = 3
+    Y_COLUMN: Final[int] = 6
+
+    EXPECTED_HEADER: Final[list[str]] = [
+        'DataPoint',
+        'TotalPoints',
+        'Target_x',
+        'Average_x_st_fzp',
+        'Stdev_x_st_fzp',
+        'Target_y',
+        'Average_y_st_fzp',
+        'Stdev_y_st_fzp',
+        'Average_cap1',
+        'Stdev_cap1',
+        'Average_cap2',
+        'Stdev_cap2',
+        'Average_cap3',
+        'Stdev_cap3',
+        'Average_cap4',
+        'Stdev_cap4',
+        'Average_cap5',
+        'Stdev_cap5',
+    ]
+
+    def read(self, file_path: Path) -> PositionSequence:
+        pointList: list[ScanPoint] = list()
+        scanName = self.SIMPLE_NAME
+
+        with file_path.open(newline='') as csvFile:
+            csvReader = csv.reader(csvFile, delimiter=' ', skipinitialspace=True)
+            csvIterator = iter(csvReader)
+
+            titleRow = next(csvIterator)
+
+            try:
+                scanName = ' '.join(titleRow).split(',', maxsplit=1)[0]
+            except IndexError:
+                raise ScanPointParseError('Bad scan name!')
+
+            columnHeaderRow = next(csvIterator)
+
+            if columnHeaderRow == LYNXOrchestraPositionFileReader.EXPECTED_HEADER:
+                logger.debug(f'Reading scan positions for "{scanName}"...')
+            else:
+                raise ScanPointParseError(
+                    'Bad LYNX Orchestra header!\n'
+                    f'Expected: {LYNXOrchestraPositionFileReader.EXPECTED_HEADER}\n'
+                    f'Found:    {columnHeaderRow}\n'
+                )
+
+            for row in csvIterator:
+                if row[0].startswith('#'):
+                    continue
+
+                if len(row) != len(columnHeaderRow):
+                    raise ScanPointParseError('Bad number of columns!')
+
+                point = ScanPoint(
+                    int(row[self.DATA_POINT_COLUMN]),
+                    -float(row[self.X_COLUMN]) * self.MICRONS_TO_METERS,
+                    -float(row[self.Y_COLUMN]) * self.MICRONS_TO_METERS,
+                )
+                pointList.append(point)
+
+        return PositionSequence(pointList)
+
+
+def register_plugins(registry: PluginRegistry) -> None:
+    registry.position_file_readers.register_plugin(
+        LYNXOrchestraPositionFileReader(),
+        simple_name=LYNXOrchestraPositionFileReader.SIMPLE_NAME,
+        display_name='LYNX Orchestra Files (*.dat)',
+    )

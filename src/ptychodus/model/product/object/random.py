@@ -4,7 +4,7 @@ from collections.abc import Sequence
 import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
-from ptychodus.model.analysis.phaseUnwrapper import PhaseUnwrapper
+from ptychodus.model.phase_unwrapper import PhaseUnwrapper
 
 from .builder import ObjectBuilder
 from .settings import ObjectSettings
@@ -17,23 +17,23 @@ class RandomObjectBuilder(ObjectBuilder):
         self._settings = settings
 
         self.extraPaddingX = settings.extraPaddingX.copy()
-        self._addParameter('extra_padding_x', self.extraPaddingX)
+        self._add_parameter('extra_padding_x', self.extraPaddingX)
         self.extraPaddingY = settings.extraPaddingY.copy()
-        self._addParameter('extra_padding_y', self.extraPaddingY)
+        self._add_parameter('extra_padding_y', self.extraPaddingY)
 
         self.amplitudeMean = settings.amplitudeMean.copy()
-        self._addParameter('amplitude_mean', self.amplitudeMean)
+        self._add_parameter('amplitude_mean', self.amplitudeMean)
         self.amplitudeDeviation = settings.amplitudeDeviation.copy()
-        self._addParameter('amplitude_deviation', self.amplitudeDeviation)
+        self._add_parameter('amplitude_deviation', self.amplitudeDeviation)
 
         self.phaseDeviation = settings.phaseDeviation.copy()
-        self._addParameter('phase_deviation', self.phaseDeviation)
+        self._add_parameter('phase_deviation', self.phaseDeviation)
 
     def copy(self) -> RandomObjectBuilder:
         builder = RandomObjectBuilder(self._rng, self._settings)
 
         for key, value in self.parameters().items():
-            builder.parameters()[key].setValue(value.getValue())
+            builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
@@ -42,27 +42,27 @@ class RandomObjectBuilder(ObjectBuilder):
         geometryProvider: ObjectGeometryProvider,
         layerDistanceInMeters: Sequence[float],
     ) -> Object:
-        geometry = geometryProvider.getObjectGeometry()
-        heightInPixels = geometry.heightInPixels + 2 * self.extraPaddingY.getValue()
-        widthInPixels = geometry.widthInPixels + 2 * self.extraPaddingX.getValue()
+        geometry = geometryProvider.get_object_geometry()
+        heightInPixels = geometry.height_px + 2 * self.extraPaddingY.get_value()
+        widthInPixels = geometry.width_px + 2 * self.extraPaddingX.get_value()
         objectShape = (1 + len(layerDistanceInMeters), heightInPixels, widthInPixels)
 
         amplitude = self._rng.normal(
-            self.amplitudeMean.getValue(),
-            self.amplitudeDeviation.getValue(),
+            self.amplitudeMean.get_value(),
+            self.amplitudeDeviation.get_value(),
             objectShape,
         )
         phase = self._rng.normal(
             0.0,
-            self.phaseDeviation.getValue(),
+            self.phaseDeviation.get_value(),
             objectShape,
         )
 
         return Object(
             array=numpy.clip(amplitude, 0.0, 1.0) * numpy.exp(1j * phase),
-            layerDistanceInMeters=layerDistanceInMeters,
-            pixelGeometry=geometry.getPixelGeometry(),
-            center=geometry.getCenter(),
+            layer_distance_m=layerDistanceInMeters,
+            pixel_geometry=geometry.get_pixel_geometry(),
+            center=geometry.get_center(),
         )
 
 
@@ -85,7 +85,7 @@ class UserObjectBuilder(ObjectBuilder):  # FIXME use
         builder = UserObjectBuilder(self._existingObject, self._settings)
 
         for key, value in self.parameters().items():
-            builder.parameters()[key].setValue(value.getValue())
+            builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
@@ -94,8 +94,8 @@ class UserObjectBuilder(ObjectBuilder):  # FIXME use
         geometryProvider: ObjectGeometryProvider,
         layerDistanceInMeters: Sequence[float],
     ) -> Object:
-        geometry = self._existingObject.getGeometry()
-        exitingObjectArr = self._existingObject.getArray()
+        geometry = self._existingObject.get_geometry()
+        exitingObjectArr = self._existingObject.get_array()
         nSlices = len(layerDistanceInMeters) + 1
 
         if nSlices > 1 and nSlices != exitingObjectArr.shape[0]:
@@ -109,7 +109,7 @@ class UserObjectBuilder(ObjectBuilder):  # FIXME use
 
         return Object(
             array=data,
-            layerDistanceInMeters=layerDistanceInMeters,
-            pixelGeometry=geometry.getPixelGeometry(),
-            center=geometry.getCenter(),
+            layer_distance_m=layerDistanceInMeters,
+            pixel_geometry=geometry.get_pixel_geometry(),
+            center=geometry.get_center(),
         )

@@ -17,7 +17,7 @@ class WorkflowAuthorizationController:
         self._dialog = dialog
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         presenter: WorkflowAuthorizationPresenter,
         dialog: WorkflowAuthorizationDialog,

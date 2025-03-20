@@ -1,21 +1,20 @@
+from .barycentric import BarycentricArrayInterpolator, BarycentricArrayStitcher
 from .core import AnalysisCore
-from .exposure import ExposureAnalyzer, ExposureMap
 from .frc import FourierRingCorrelator
-from .objectInterpolator import ObjectLinearInterpolator
-from .objectStitcher import ObjectStitcher
+from .illumination import IlluminationMapper, IlluminationMap
 from .propagator import ProbePropagator
 from .stxm import STXMSimulator
-from .xmcd import XMCDAnalyzer, XMCDResult
+from .xmcd import XMCDAnalyzer, XMCDData
 
 __all__ = [
     'AnalysisCore',
-    'ExposureAnalyzer',
-    'ExposureMap',
+    'BarycentricArrayInterpolator',
+    'BarycentricArrayStitcher',
     'FourierRingCorrelator',
-    'ObjectLinearInterpolator',
-    'ObjectStitcher',
+    'IlluminationMap',
+    'IlluminationMapper',
     'ProbePropagator',
     'STXMSimulator',
     'XMCDAnalyzer',
-    'XMCDResult',
+    'XMCDData',
 ]

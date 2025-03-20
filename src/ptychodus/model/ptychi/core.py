@@ -9,7 +9,7 @@ from ptychodus.api.reconstructor import (
 )
 from ptychodus.api.settings import SettingsRegistry
 
-from ..patterns import Detector
+from ..patterns import PatternSizer
 from .device import PtyChiDeviceRepository
 from .enums import PtyChiEnumerators
 from .settings import (
@@ -29,7 +29,10 @@ logger = logging.getLogger(__name__)
 
 class PtyChiReconstructorLibrary(ReconstructorLibrary):
     def __init__(
-        self, settingsRegistry: SettingsRegistry, detector: Detector, isDeveloperModeEnabled: bool
+        self,
+        settingsRegistry: SettingsRegistry,
+        patternSizer: PatternSizer,
+        isDeveloperModeEnabled: bool,
     ) -> None:
         super().__init__()
         self.autodiffSettings = PtyChiAutodiffSettings(settingsRegistry)
@@ -72,7 +75,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
                 self.probeSettings,
                 self.probePositionSettings,
                 self.oprSettings,
-                detector,
+                patternSizer,
             )
             self.reconstructor_list.append(DMReconstructor(optionsHelper, self.dmSettings))
             self.reconstructor_list.append(PIEReconstructor(optionsHelper, self.pieSettings))

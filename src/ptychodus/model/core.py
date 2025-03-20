@@ -24,7 +24,7 @@ from ptychodus.api.workflow import WorkflowAPI
 from .agent import AgentCore, AgentPresenter, ArgoSettings, ChatHistory
 from .analysis import (
     AnalysisCore,
-    ExposureAnalyzer,
+    IlluminationMapper,
     FourierRingCorrelator,
     ProbePropagator,
     STXMSimulator,
@@ -37,17 +37,12 @@ from .automation import (
 )
 from .fluorescence import FluorescenceCore, FluorescenceEnhancer
 from .memory import MemoryPresenter
-from .patterns import (
-    Detector,
-    DiffractionDatasetInputOutputPresenter,
-    DiffractionDatasetPresenter,
-    DiffractionMetadataPresenter,
-    DiffractionPatternPresenter,
-    PatternsCore,
-)
+from .metadata import MetadataPresenter
+from .patterns import PatternsCore, PatternsStreamingContext
 from .product import (
     ObjectAPI,
     ObjectRepository,
+    PositionsStreamingContext,
     ProbeAPI,
     ProbeRepository,
     ProductAPI,
@@ -89,57 +84,92 @@ def configureLogger(isDeveloperModeEnabled: bool) -> None:
     logger.info(f'HDF5 {h5py.version.hdf5_version}')
 
 
+class PtychodusStreamingContext:
+    def __init__(
+        self,
+        positions_context: PositionsStreamingContext,
+        patterns_context: PatternsStreamingContext,
+    ) -> None:
+        self._positions_context = positions_context
+        self._patterns_context = patterns_context
+
+    def start(self) -> None:
+        self._positions_context.start()
+        self._patterns_context.start()
+
+    def append_positions_x(self, values_m: Sequence[float], trigger_counts: Sequence[int]) -> None:
+        self._positions_context.append_positions_x(values_m, trigger_counts)
+
+    def append_positions_y(self, values_m: Sequence[float], trigger_counts: Sequence[int]) -> None:
+        self._positions_context.append_positions_y(values_m, trigger_counts)
+
+    def append_array(self, array: DiffractionPatternArray) -> None:
+        self._patterns_context.append_array(array)
+
+    def get_queue_size(self) -> int:
+        return self._patterns_context.get_queue_size()
+
+    def stop(self) -> None:
+        self._patterns_context.stop()
+        self._positions_context.stop()
+
+
 class ModelCore:
     def __init__(
-        self, settingsFile: Path | None = None, *, isDeveloperModeEnabled: bool = False
+        self, settingsFile: Path | None = None, *, is_developer_mode_enabled: bool = False
     ) -> None:
-        configureLogger(isDeveloperModeEnabled)
+        configureLogger(is_developer_mode_enabled)
         self.rng = numpy.random.default_rng()
-        self._pluginRegistry = PluginRegistry.loadPlugins()
+        self._pluginRegistry = PluginRegistry.load_plugins()
 
         self.memoryPresenter = MemoryPresenter()
         self.settingsRegistry = SettingsRegistry()
 
-        self._patternsCore = PatternsCore(
+        self.patterns_core = PatternsCore(
             self.settingsRegistry,
-            self._pluginRegistry.diffractionFileReaders,
-            self._pluginRegistry.diffractionFileWriters,
+            self._pluginRegistry.diffraction_file_readers,
+            self._pluginRegistry.diffraction_file_writers,
+            self.settingsRegistry,
         )
         self._productCore = ProductCore(
             self.rng,
             self.settingsRegistry,
-            self._patternsCore.detector,
-            self._patternsCore.productSettings,
-            self._patternsCore.patternSizer,
-            self._patternsCore.dataset,
-            self._pluginRegistry.scanFileReaders,
-            self._pluginRegistry.scanFileWriters,
-            self._pluginRegistry.fresnelZonePlates,
-            self._pluginRegistry.probeFileReaders,
-            self._pluginRegistry.probeFileWriters,
-            self._pluginRegistry.objectFileReaders,
-            self._pluginRegistry.objectFileWriters,
-            self._pluginRegistry.productFileReaders,
-            self._pluginRegistry.productFileWriters,
+            self.patterns_core.patternSizer,
+            self.patterns_core.dataset,
+            self._pluginRegistry.position_file_readers,
+            self._pluginRegistry.position_file_writers,
+            self._pluginRegistry.fresnel_zone_plates,
+            self._pluginRegistry.probe_file_readers,
+            self._pluginRegistry.probe_file_writers,
+            self._pluginRegistry.object_file_readers,
+            self._pluginRegistry.object_file_writers,
+            self._pluginRegistry.product_file_readers,
+            self._pluginRegistry.product_file_writers,
             self.settingsRegistry,
         )
+        self.metadataPresenter = MetadataPresenter(
+            self.patterns_core.detectorSettings,
+            self.patterns_core.patternSettings,
+            self.patterns_core.dataset,
+            self._productCore.settings,
+        )
 
-        self.patternVisualizationEngine = VisualizationEngine(isComplex=False)
-        self.probeVisualizationEngine = VisualizationEngine(isComplex=True)
-        self.objectVisualizationEngine = VisualizationEngine(isComplex=True)
+        self.patternVisualizationEngine = VisualizationEngine(is_complex=False)
+        self.probeVisualizationEngine = VisualizationEngine(is_complex=True)
+        self.objectVisualizationEngine = VisualizationEngine(is_complex=True)
 
         self.ptyChiReconstructorLibrary = PtyChiReconstructorLibrary(
-            self.settingsRegistry, self.detector, isDeveloperModeEnabled
+            self.settingsRegistry, self.patterns_core.patternSizer, is_developer_mode_enabled
         )
-        self.tikeReconstructorLibrary = TikeReconstructorLibrary.createInstance(
-            self.settingsRegistry, isDeveloperModeEnabled
+        self.tikeReconstructorLibrary = TikeReconstructorLibrary.create_instance(
+            self.settingsRegistry, is_developer_mode_enabled
         )
-        self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.createInstance(
-            self.settingsRegistry, isDeveloperModeEnabled
+        self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.create_instance(
+            self.settingsRegistry, is_developer_mode_enabled
         )
         self._reconstructorCore = ReconstructorCore(
             self.settingsRegistry,
-            self._patternsCore.dataset,
+            self.patterns_core.dataset,
             self._productCore.productRepository,
             [
                 self.ptyChiReconstructorLibrary,
@@ -150,10 +180,10 @@ class ModelCore:
         self._fluorescenceCore = FluorescenceCore(
             self.settingsRegistry,
             self._productCore.productRepository,
-            self._pluginRegistry.upscalingStrategies,
-            self._pluginRegistry.deconvolutionStrategies,
-            self._pluginRegistry.fluorescenceFileReaders,
-            self._pluginRegistry.fluorescenceFileWriters,
+            self._pluginRegistry.upscaling_strategies,
+            self._pluginRegistry.deconvolution_strategies,
+            self._pluginRegistry.fluorescence_file_readers,
+            self._pluginRegistry.fluorescence_file_writers,
         )
         self._analysisCore = AnalysisCore(
             self.settingsRegistry,
@@ -163,7 +193,7 @@ class ModelCore:
         )
         self._workflowCore = WorkflowCore(
             self.settingsRegistry,
-            self._patternsCore.patternsAPI,
+            self.patterns_core.patternsAPI,
             self._productCore.productAPI,
             self._productCore.scanAPI,
             self._productCore.probeAPI,
@@ -173,15 +203,15 @@ class ModelCore:
         self._automationCore = AutomationCore(
             self.settingsRegistry,
             self._workflowCore.workflowAPI,
-            self._pluginRegistry.fileBasedWorkflows,
+            self._pluginRegistry.file_based_workflows,
         )
         self._agentCore = AgentCore(self.settingsRegistry)
 
         if settingsFile:
-            self.settingsRegistry.openSettings(settingsFile)
+            self.settingsRegistry.open_settings(settingsFile)
 
     def __enter__(self) -> ModelCore:
-        self._patternsCore.start()
+        self.patterns_core.start()
         self._reconstructorCore.start()
         self._workflowCore.start()
         self._automationCore.start()
@@ -207,25 +237,7 @@ class ModelCore:
         self._automationCore.stop()
         self._workflowCore.stop()
         self._reconstructorCore.stop()
-        self._patternsCore.stop()
-
-    @property
-    def diffractionDatasetInputOutputPresenter(
-        self,
-    ) -> DiffractionDatasetInputOutputPresenter:
-        return self._patternsCore.datasetInputOutputPresenter
-
-    @property
-    def diffractionMetadataPresenter(self) -> DiffractionMetadataPresenter:
-        return self._patternsCore.metadataPresenter
-
-    @property
-    def diffractionDatasetPresenter(self) -> DiffractionDatasetPresenter:
-        return self._patternsCore.datasetPresenter
-
-    @property
-    def patternPresenter(self) -> DiffractionPatternPresenter:
-        return self._patternsCore.patternPresenter
+        self.patterns_core.stop()
 
     @property
     def productRepository(self) -> ProductRepository:
@@ -259,34 +271,14 @@ class ModelCore:
     def objectAPI(self) -> ObjectAPI:
         return self._productCore.objectAPI
 
-    def initializeStreamingWorkflow(self, metadata: DiffractionMetadata) -> None:
-        self._patternsCore.patternsAPI.initializeStreaming(metadata)
-        self._patternsCore.patternsAPI.startAssemblingDiffractionPatterns()
-        self._productCore.scanAPI.initializeStreamingScan()  # FIXME
-
-    def assembleDiffractionPattern(self, array: DiffractionPatternArray, timeStamp: float) -> None:
-        self._patternsCore.patternsAPI.assemble(array)
-        self._productCore.scanAPI.insertArrayTimeStamp(array.getIndex(), timeStamp)  # FIXME
-
-    def assembleScanPositionsX(
-        self, valuesInMeters: Sequence[float], timeStamps: Sequence[float]
-    ) -> None:
-        self._productCore.scanAPI.assembleScanPositionsX(valuesInMeters, timeStamps)  # FIXME
-
-    def assembleScanPositionsY(
-        self, valuesInMeters: Sequence[float], timeStamps: Sequence[float]
-    ) -> None:
-        self._productCore.scanAPI.assembleScanPositionsY(valuesInMeters, timeStamps)  # FIXME
-
-    def finalizeStreamingWorkflow(self) -> None:
-        self._productCore.scanAPI.finalizeStreamingScan()  # FIXME
-        self._patternsCore.patternsAPI.stopAssemblingDiffractionPatterns(finishAssembling=True)
-
-    def getDiffractionPatternAssemblyQueueSize(self) -> int:
-        return self._patternsCore.patternsAPI.getAssemblyQueueSize()
+    def createStreamingContext(self, metadata: DiffractionMetadata) -> PtychodusStreamingContext:
+        return PtychodusStreamingContext(
+            self._productCore.scanAPI.createStreamingContext(),
+            self.patterns_core.patternsAPI.createStreamingContext(metadata),
+        )
 
     def refreshActiveDataset(self) -> None:
-        self._patternsCore.dataset.notifyObserversIfDatasetChanged()
+        self.patterns_core.dataset.assemble_patterns()
 
     def batchModeExecute(
         self,
@@ -301,11 +293,11 @@ class ModelCore:
         # TODO add enum for actions; implement using workflow API
         if action.lower() == 'train':
             output = self._reconstructorCore.reconstructorAPI.train(inputPath)
-            self._reconstructorCore.reconstructorAPI.saveModel(outputPath)
+            self._reconstructorCore.reconstructorAPI.save_model(outputPath)
             return output.result
 
         inputProductIndex = self._productCore.productAPI.openProduct(
-            inputPath, fileType=productFileType
+            inputPath, file_type=productFileType
         )
 
         if inputProductIndex < 0:
@@ -317,21 +309,21 @@ class ModelCore:
             outputProductIndex = self._reconstructorCore.reconstructorAPI.reconstruct(
                 inputProductIndex
             )
-            self._reconstructorCore.reconstructorAPI.processResults(block=True)
+            self._reconstructorCore.reconstructorAPI.process_results(block=True)
             logger.info('Reconstruction complete.')
 
             self._productCore.productAPI.saveProduct(
-                outputProductIndex, outputPath, fileType=productFileType
+                outputProductIndex, outputPath, file_type=productFileType
             )
 
             if fluorescenceInputFilePath is not None and fluorescenceOutputFilePath is not None:
-                self._fluorescenceCore.enhanceFluorescence(
+                self._fluorescenceCore.enhance_fluorescence(
                     outputProductIndex,
                     fluorescenceInputFilePath,
                     fluorescenceOutputFilePath,
                 )
         elif action.lower() == 'prepare_training_data':
-            self._reconstructorCore.reconstructorAPI.exportTrainingData(
+            self._reconstructorCore.reconstructorAPI.export_training_data(
                 outputPath, inputProductIndex
             )
         else:
@@ -341,40 +333,36 @@ class ModelCore:
         return 0
 
     @property
-    def detector(self) -> Detector:
-        return self._patternsCore.detector
-
-    @property
     def reconstructorPresenter(self) -> ReconstructorPresenter:
         return self._reconstructorCore.presenter
 
     @property
     def stxmSimulator(self) -> STXMSimulator:
-        return self._analysisCore.stxmSimulator
+        return self._analysisCore.stxm_simulator
 
     @property
     def stxmVisualizationEngine(self) -> VisualizationEngine:
-        return self._analysisCore.stxmVisualizationEngine
+        return self._analysisCore.stxm_visualization_engine
 
     @property
     def probePropagator(self) -> ProbePropagator:
-        return self._analysisCore.probePropagator
+        return self._analysisCore.probe_propagator
 
     @property
     def probePropagatorVisualizationEngine(self) -> VisualizationEngine:
-        return self._analysisCore.probePropagatorVisualizationEngine
+        return self._analysisCore.probe_propagator_visualization_engine
 
     @property
-    def exposureAnalyzer(self) -> ExposureAnalyzer:
-        return self._analysisCore.exposureAnalyzer
+    def exposureAnalyzer(self) -> IlluminationMapper:
+        return self._analysisCore.exposure_analyzer
 
     @property
     def exposureVisualizationEngine(self) -> VisualizationEngine:
-        return self._analysisCore.exposureVisualizationEngine
+        return self._analysisCore.exposure_visualization_engine
 
     @property
     def fourierRingCorrelator(self) -> FourierRingCorrelator:
-        return self._analysisCore.fourierRingCorrelator
+        return self._analysisCore.fourier_ring_correlator
 
     @property
     def fluorescenceEnhancer(self) -> FluorescenceEnhancer:
@@ -382,15 +370,15 @@ class ModelCore:
 
     @property
     def fluorescenceVisualizationEngine(self) -> VisualizationEngine:
-        return self._fluorescenceCore.visualizationEngine
+        return self._fluorescenceCore.visualization_engine
 
     @property
     def xmcdAnalyzer(self) -> XMCDAnalyzer:
-        return self._analysisCore.xmcdAnalyzer
+        return self._analysisCore.xmcd_analyzer
 
     @property
     def xmcdVisualizationEngine(self) -> VisualizationEngine:
-        return self._analysisCore.xmcdVisualizationEngine
+        return self._analysisCore.xmcd_visualization_engine
 
     @property
     def areWorkflowsSupported(self) -> bool:
@@ -413,7 +401,7 @@ class ModelCore:
         return self._workflowCore.parametersPresenter
 
     @property
-    def workflowAPI(self) -> WorkflowAPI:
+    def workflow_api(self) -> WorkflowAPI:
         return self._workflowCore.workflowAPI
 
     @property

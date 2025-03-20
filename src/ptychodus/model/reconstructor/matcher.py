@@ -6,9 +6,9 @@ import numpy
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import ReconstructInput
-from ptychodus.api.scan import Scan, ScanPoint
+from ptychodus.api.scan import PositionSequence, ScanPoint
 
-from ..patterns import ActiveDiffractionDataset
+from ..patterns import AssembledDiffractionDataset
 from ..product import ProductRepository
 
 logger = logging.getLogger(__name__)
@@ -34,40 +34,38 @@ class ScanIndexFilter(Enum):
 class DiffractionPatternPositionMatcher:
     def __init__(
         self,
-        diffractionDataset: ActiveDiffractionDataset,
+        diffractionDataset: AssembledDiffractionDataset,
         productRepository: ProductRepository,
     ) -> None:
         self._diffractionDataset = diffractionDataset
         self._productRepository = productRepository
 
-    def getProductName(self, inputProductIndex: int) -> str:
+    def get_product_name(self, inputProductIndex: int) -> str:
         inputProductItem = self._productRepository[inputProductIndex]
-        return inputProductItem.getName()
+        return inputProductItem.get_name()
 
     def getObjectPlanePixelGeometry(self, inputProductIndex: int) -> PixelGeometry:
         inputProductItem = self._productRepository[inputProductIndex]
-        objectGeometry = inputProductItem.getGeometry().getObjectGeometry()
-        return objectGeometry.getPixelGeometry()
+        objectGeometry = inputProductItem.get_geometry().get_object_geometry()
+        return objectGeometry.get_pixel_geometry()
 
-    def matchDiffractionPatternsWithPositions(
+    def match_diffraction_patterns_with_positions(
         self, inputProductIndex: int, indexFilter: ScanIndexFilter = ScanIndexFilter.ALL
     ) -> ReconstructInput:
-        goodPixelMask = self._diffractionDataset.getGoodPixelMask()
-
         inputProductItem = self._productRepository[inputProductIndex]
-        inputProduct = inputProductItem.getProduct()
-        dataIndexes = self._diffractionDataset.getAssembledIndexes()
-        scanIndexes = [point.index for point in inputProduct.scan if indexFilter(point.index)]
+        inputProduct = inputProductItem.get_product()
+        dataIndexes = self._diffractionDataset.get_assembled_indexes()
+        scanIndexes = [point.index for point in inputProduct.positions if indexFilter(point.index)]
         commonIndexes = sorted(set(dataIndexes).intersection(scanIndexes))
 
         patterns = numpy.take(
-            self._diffractionDataset.getAssembledData(),
+            self._diffractionDataset.get_assembled_patterns(),
             commonIndexes,
             axis=0,
         )
 
         pointList: list[ScanPoint] = list()
-        pointIter = iter(inputProduct.scan)
+        pointIter = iter(inputProduct.positions)
 
         for index in commonIndexes:
             while True:
@@ -81,10 +79,12 @@ class DiffractionPatternPositionMatcher:
 
         product = Product(
             metadata=inputProduct.metadata,
-            scan=Scan(pointList),
+            positions=PositionSequence(pointList),
             probe=probe,
             object_=inputProduct.object_,
             costs=inputProduct.costs,
         )
 
-        return ReconstructInput(patterns, goodPixelMask, product)
+        return ReconstructInput(
+            patterns, self._diffractionDataset.get_processed_bad_pixels(), product
+        )

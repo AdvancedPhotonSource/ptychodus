@@ -6,17 +6,17 @@ from PyQt5.QtWidgets import QHBoxLayout, QListView, QPushButton, QVBoxLayout, QW
 class SettingsButtonBox(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.openButton = QPushButton('Open')
-        self.saveButton = QPushButton('Save')
+        self.open_button = QPushButton('Open')
+        self.save_button = QPushButton('Save')
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> SettingsButtonBox:
+    def create_instance(cls, parent: QWidget | None = None) -> SettingsButtonBox:
         view = cls(parent)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.openButton)
-        layout.addWidget(view.saveButton)
+        layout.addWidget(view.open_button)
+        layout.addWidget(view.save_button)
         view.setLayout(layout)
 
         return view
@@ -26,15 +26,15 @@ class SettingsView(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.listView = QListView()
-        self.buttonBox = SettingsButtonBox.createInstance()
+        self.button_box = SettingsButtonBox.create_instance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> SettingsView:
+    def create_instance(cls, parent: QWidget | None = None) -> SettingsView:
         view = cls(parent)
 
         layout = QVBoxLayout()
         layout.addWidget(view.listView)
-        layout.addWidget(view.buttonBox)
+        layout.addWidget(view.button_box)
         view.setLayout(layout)
 
         return view

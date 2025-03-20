@@ -43,7 +43,7 @@ class AutomationDatasetBuffer:
                 except StopIteration:
                     pass
                 else:
-                    delayTime = self._settings.watchdogDelayInSeconds.getValue()
+                    delayTime = self._settings.watchdogDelayInSeconds.get_value()
                     isFileReadyForProcessing = eventTime + delayTime < time()
 
                     if isFileReadyForProcessing:

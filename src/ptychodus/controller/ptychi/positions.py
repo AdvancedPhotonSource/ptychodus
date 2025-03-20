@@ -46,23 +46,23 @@ class PtyChiCrossCorrelationViewController(ParameterViewController, Observer):
         self._widget.setFrameShape(QFrame.StyledPanel)
 
         layout = QFormLayout()
-        layout.addRow('Scale:', self._scaleViewController.getWidget())
-        layout.addRow('Real Space Width:', self._realSpaceWidthViewController.getWidget())
-        layout.addRow('Probe Threshold:', self._probeThresholdViewController.getWidget())
+        layout.addRow('Scale:', self._scaleViewController.get_widget())
+        layout.addRow('Real Space Width:', self._realSpaceWidthViewController.get_widget())
+        layout.addRow('Probe Threshold:', self._probeThresholdViewController.get_widget())
         self._widget.setLayout(layout)
 
-        algorithm.addObserver(self)
-        self._syncModelToView()
+        algorithm.add_observer(self)
+        self._sync_model_to_view()
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncModelToView(self) -> None:
-        self._widget.setVisible(self._algorithm.getValue().upper() == 'CROSS_CORRELATION')
+    def _sync_model_to_view(self) -> None:
+        self._widget.setVisible(self._algorithm.get_value().upper() == 'CROSS_CORRELATION')
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._algorithm:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class PtyChiUpdateMagnitudeLimitViewController(CheckableGroupBoxParameterViewController):
@@ -89,9 +89,9 @@ class PtyChiUpdateMagnitudeLimitViewController(CheckableGroupBoxParameterViewCon
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.getWidget())
-        layout.addRow('Limit:', self._viewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._planViewController.get_widget())
+        layout.addRow('Limit:', self._viewController.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewController):
@@ -144,11 +144,11 @@ class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewControlle
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._optimizationPlanViewController.getWidget())
-        layout.addRow('Optimizer:', self._optimizerViewController.getWidget())
-        layout.addRow('Step Size:', self._stepSizeViewController.getWidget())
-        layout.addRow('Algorithm:', self._algorithmViewController.getWidget())
-        layout.addRow(self._crossCorrelationViewController.getWidget())
-        layout.addRow(self._magnitudeUpdateLimitViewController.getWidget())
-        layout.addRow(self._constrainCentroidViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._optimizationPlanViewController.get_widget())
+        layout.addRow('Optimizer:', self._optimizerViewController.get_widget())
+        layout.addRow('Step Size:', self._stepSizeViewController.get_widget())
+        layout.addRow('Algorithm:', self._algorithmViewController.get_widget())
+        layout.addRow(self._crossCorrelationViewController.get_widget())
+        layout.addRow(self._magnitudeUpdateLimitViewController.get_widget())
+        layout.addRow(self._constrainCentroidViewController.get_widget())
+        self.get_widget().setLayout(layout)

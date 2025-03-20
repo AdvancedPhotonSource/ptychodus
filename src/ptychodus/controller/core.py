@@ -27,13 +27,13 @@ class ControllerCore:
     def __init__(self, model: ModelCore, view: ViewCore) -> None:
         self.view = view
 
-        self._memoryController = MemoryController(model.memoryPresenter, view.memoryProgressBar)
+        self._memoryController = MemoryController(model.memoryPresenter, view.memory_widget)
         self._fileDialogFactory = FileDialogFactory()
         self._ptyChiViewControllerFactory = PtyChiViewControllerFactory(
             model.ptyChiReconstructorLibrary
         )
         self._ptychonnViewControllerFactory = PtychoNNViewControllerFactory(
-            model.ptychonnReconstructorLibrary, self._fileDialogFactory
+            model.ptychonnReconstructorLibrary
         )
         self._tikeViewControllerFactory = TikeViewControllerFactory(model.tikeReconstructorLibrary)
         self._settingsController = SettingsController(
@@ -42,42 +42,44 @@ class ControllerCore:
             view.settingsTableView,
             self._fileDialogFactory,
         )
-        self._patternsImageController = ImageController.createInstance(
+        self._patternsImageController = ImageController.create_instance(
             model.patternVisualizationEngine,
             view.patternsImageView,
             view.statusBar(),
             self._fileDialogFactory,
         )
         self._patternsController = PatternsController(
-            model.detector,
-            model.diffractionDatasetInputOutputPresenter,
-            model.diffractionMetadataPresenter,
-            model.diffractionDatasetPresenter,
-            model.patternPresenter,
-            self._patternsImageController,
+            model.patterns_core.detectorSettings,
+            model.patterns_core.patternSettings,
+            model.patterns_core.patternSizer,
+            model.patterns_core.patternsAPI,
+            model.patterns_core.dataset,
+            model.metadataPresenter,
             view.patternsView,
+            self._patternsImageController,
             self._fileDialogFactory,
         )
-        self._productController = ProductController.createInstance(
+        self._productController = ProductController.create_instance(
+            model.patterns_core.dataset,
             model.productRepository,
             model.productAPI,
             view.productView,
             self._fileDialogFactory,
         )
-        self._scanController = ScanController.createInstance(
+        self._scanController = ScanController.create_instance(
             model.scanRepository,
             model.scanAPI,
             view.scanView,
             view.scanPlotView,
             self._fileDialogFactory,
         )
-        self._probeImageController = ImageController.createInstance(
+        self._probeImageController = ImageController.create_instance(
             model.probeVisualizationEngine,
             view.probeImageView,
             view.statusBar(),
             self._fileDialogFactory,
         )
-        self._probeController = ProbeController.createInstance(
+        self._probeController = ProbeController.create_instance(
             model.probeRepository,
             model.probeAPI,
             self._probeImageController,
@@ -92,13 +94,13 @@ class ControllerCore:
             view.probeView,
             self._fileDialogFactory,
         )
-        self._objectImageController = ImageController.createInstance(
+        self._objectImageController = ImageController.create_instance(
             model.objectVisualizationEngine,
             view.objectImageView,
             view.statusBar(),
             self._fileDialogFactory,
         )
-        self._objectController = ObjectController.createInstance(
+        self._objectController = ObjectController.create_instance(
             model.objectRepository,
             model.objectAPI,
             self._objectImageController,
@@ -130,7 +132,7 @@ class ControllerCore:
             view.workflowTableView,
             self._productController.tableModel,
         )
-        self._automationController = AutomationController.createInstance(
+        self._automationController = AutomationController.create_instance(
             model._automationCore,
             model.automationPresenter,
             model.automationProcessingPresenter,
@@ -160,5 +162,5 @@ class ControllerCore:
 
     def swapCentralWidgets(self, action: QAction) -> None:
         index = action.data()
-        self.view.parametersWidget.setCurrentIndex(index)
-        self.view.contentsWidget.setCurrentIndex(index)
+        self.view.left_panel.setCurrentIndex(index)
+        self.view.right_panel.setCurrentIndex(index)

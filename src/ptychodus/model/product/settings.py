@@ -1,0 +1,31 @@
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.settings import SettingsRegistry
+
+
+class ProductSettings(Observable, Observer):
+    def __init__(self, registry: SettingsRegistry) -> None:
+        super().__init__()
+        self._settings_group = registry.create_group('Products')
+        self._settings_group.add_observer(self)
+
+        self.name = self._settings_group.create_string_parameter('Name', 'Unnamed')
+        self.file_type = self._settings_group.create_string_parameter('FileType', 'HDF5')
+        self.detector_distance_m = self._settings_group.create_real_parameter(
+            'DetectorDistanceInMeters', 1.0, minimum=0.0
+        )
+        self.probe_energy_eV = self._settings_group.create_real_parameter(
+            'ProbeEnergyInElectronVolts', 10000.0, minimum=0.0
+        )
+        self.probe_photon_count = self._settings_group.create_real_parameter(
+            'ProbePhotonCount', 0.0, minimum=0.0
+        )
+        self.exposure_time_s = self._settings_group.create_real_parameter(
+            'ExposureTimeInSeconds', 0.0, minimum=0.0
+        )
+        self.mass_attenuation_m2_kg = self._settings_group.create_real_parameter(
+            'MassAttenuationSquareMetersPerKilogram', 0.0, minimum=0.0
+        )
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._settings_group:
+            self.notify_observers()
