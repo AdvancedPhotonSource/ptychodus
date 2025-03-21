@@ -33,7 +33,9 @@ class ObjectRepositoryItemFactory:
         )
         return ObjectRepositoryItem(geometryProvider, self._settings, builder)
 
-    def createFromSettings(self, geometryProvider: ObjectGeometryProvider) -> ObjectRepositoryItem:
+    def create_from_settings(
+        self, geometryProvider: ObjectGeometryProvider
+    ) -> ObjectRepositoryItem:
         try:
             builder = self._builderFactory.createFromSettings()
         except Exception as exc:

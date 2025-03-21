@@ -18,7 +18,7 @@ class ObjectSettings(Observable, Observer):
         )
         self.fileType = self._settingsGroup.create_string_parameter('FileType', 'NPY')
 
-        self.objectLayerDistanceInMeters = self._settingsGroup.create_real_sequence_parameter(
+        self.object_layer_distance_m = self._settingsGroup.create_real_sequence_parameter(
             'ObjectLayerDistanceInMeters', []
         )
 

@@ -72,7 +72,7 @@ class WorkflowExecutor:
         # TODO use workflow API
         self._settingsRegistry.save_settings(inputDataPosixPath / settingsFile)
         self._patternsAPI.export_assembled_patterns(inputDataPosixPath / patternsFile)
-        self._productAPI.saveProduct(
+        self._productAPI.save_product(
             inputProductIndex, inputDataPosixPath / inputFile, file_type='NPZ'
         )
 

@@ -1,6 +1,6 @@
 import logging
 
-import numpy
+import numpy.random
 
 from ptychodus.api.probe import Probe, ProbeGeometryProvider
 
@@ -18,29 +18,30 @@ class ProbeRepositoryItemFactory:
         self,
         rng: numpy.random.Generator,
         settings: ProbeSettings,
-        builderFactory: ProbeBuilderFactory,
+        builder_factory: ProbeBuilderFactory,
     ) -> None:
         self._rng = rng
         self._settings = settings
-        self._builderFactory = builderFactory
+        self._builder_factory = builder_factory
 
     def create(
-        self, geometryProvider: ProbeGeometryProvider, probe: Probe | None = None
+        self, geometry_provider: ProbeGeometryProvider, probe: Probe | None = None
     ) -> ProbeRepositoryItem:
-        builder = (
-            self._builderFactory.createDefault()
-            if probe is None
-            else FromMemoryProbeBuilder(self._settings, probe)
-        )
-        multimodalBuilder = MultimodalProbeBuilder(self._rng, self._settings)
-        return ProbeRepositoryItem(geometryProvider, self._settings, builder, multimodalBuilder)
+        if probe is None:
+            builder = self._builder_factory.create_default()
+            multimodal_builder = MultimodalProbeBuilder(self._rng, self._settings)
+        else:
+            builder = FromMemoryProbeBuilder(self._settings, probe)
+            multimodal_builder = None
 
-    def createFromSettings(self, geometryProvider: ProbeGeometryProvider) -> ProbeRepositoryItem:
+        return ProbeRepositoryItem(geometry_provider, self._settings, builder, multimodal_builder)
+
+    def create_from_settings(self, geometry_provider: ProbeGeometryProvider) -> ProbeRepositoryItem:
         try:
-            builder = self._builderFactory.createFromSettings()
+            builder = self._builder_factory.create_from_settings()
         except Exception as exc:
             logger.error(''.join(exc.args))
-            builder = self._builderFactory.createDefault()
+            builder = self._builder_factory.create_default()
 
-        multimodalBuilder = MultimodalProbeBuilder(self._rng, self._settings)
-        return ProbeRepositoryItem(geometryProvider, self._settings, builder, multimodalBuilder)
+        multimodal_builder = MultimodalProbeBuilder(self._rng, self._settings)
+        return ProbeRepositoryItem(geometry_provider, self._settings, builder, multimodal_builder)

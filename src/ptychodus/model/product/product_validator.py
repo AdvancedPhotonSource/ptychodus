@@ -30,7 +30,7 @@ class ProductValidator(Observable, Observer):
         return self._isScanValid
 
     def _validateScan(self) -> None:
-        scan = self._scan.getScan()
+        scan = self._scan.get_scan()
         scanIndexes = set(point.index for point in scan)
         patternIndexes = set(self._dataset.get_assembled_indexes())
         isScanValidNow = not scanIndexes.isdisjoint(patternIndexes)

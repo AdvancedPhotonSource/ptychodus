@@ -15,84 +15,83 @@ logger = logging.getLogger(__name__)
 class ObjectRepositoryItem(ParameterGroup):
     def __init__(
         self,
-        geometryProvider: ObjectGeometryProvider,
+        geometry_provider: ObjectGeometryProvider,
         settings: ObjectSettings,
         builder: ObjectBuilder,
     ) -> None:
         super().__init__()
-        self._geometryProvider = geometryProvider
+        self._geometry_provider = geometry_provider
         self._settings = settings
         self._builder = builder
         self._object = Object(array=None, pixel_geometry=None, center=None)
 
-        self.layerDistanceInMeters = settings.objectLayerDistanceInMeters.copy()
-        self._add_parameter('layer_distance_m', self.layerDistanceInMeters)
+        self.layer_distance_m = settings.object_layer_distance_m.copy()
+        self._add_parameter('layer_distance_m', self.layer_distance_m)
 
         self._add_group('builder', builder, observe=True)
         self._rebuild()
 
     def assign_item(self, item: ObjectRepositoryItem) -> None:
-        self.layerDistanceInMeters.set_value(item.layerDistanceInMeters.get_value(), notify=False)
-        self.setBuilder(item.getBuilder().copy())
+        self.layer_distance_m.set_value(item.layer_distance_m.get_value(), notify=False)
+        self.set_builder(item.get_builder().copy())
         self._rebuild()
 
-    def assign(self, object_: Object, *, mutable: bool = True) -> None:
+    def assign(self, object_: Object) -> None:
         builder = FromMemoryObjectBuilder(self._settings, object_)
-        self.setBuilder(builder, mutable=mutable)
+        self.set_builder(builder)
 
     def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
             parameter.sync_value_to_parent()
 
-        self._builder.syncToSettings()
+        self._builder.sync_to_settings()
 
-    def getNumberOfLayers(self) -> int:
-        return len(self.layerDistanceInMeters) + 1
+    def get_num_layers(self) -> int:
+        return len(self.layer_distance_m) + 1
 
-    def setNumberOfLayers(self, numberOfLayers: int) -> None:
-        numberOfSpaces = max(0, numberOfLayers - 1)
-        distanceInMeters = list(self.layerDistanceInMeters.get_value())
+    def set_num_layers(self, num_layers: int) -> None:
+        num_spaces = max(0, num_layers - 1)
+        distance_m = list(self.layer_distance_m.get_value())
 
         try:
-            defaultDistanceInMeters = distanceInMeters[-1]
+            default_distance_m = distance_m[-1]
         except IndexError:
-            defaultDistanceInMeters = 0.0
+            default_distance_m = 0.0
 
-        while len(distanceInMeters) < numberOfSpaces:
-            distanceInMeters.append(defaultDistanceInMeters)
+        while len(distance_m) < num_spaces:
+            distance_m.append(default_distance_m)
 
-        if len(distanceInMeters) > numberOfSpaces:
-            distanceInMeters = distanceInMeters[:numberOfSpaces]
+        if len(distance_m) > num_spaces:
+            distance_m = distance_m[:num_spaces]
 
-        self.layerDistanceInMeters.set_value(distanceInMeters)
+        self.layer_distance_m.set_value(distance_m)
         self._rebuild()
 
     def get_object(self) -> Object:
         return self._object
 
-    def getBuilder(self) -> ObjectBuilder:
+    def get_builder(self) -> ObjectBuilder:
         return self._builder
 
-    def setBuilder(self, builder: ObjectBuilder, *, mutable: bool = True) -> None:
+    def set_builder(self, builder: ObjectBuilder) -> None:
         self._remove_group('builder')
         self._builder.remove_observer(self)
         self._builder = builder
         self._builder.add_observer(self)
         self._add_group('builder', self._builder, observe=True)
-        self._rebuild(mutable=mutable)
+        self._rebuild()
 
-    def _rebuild(self, *, mutable: bool = True) -> None:
+    def _rebuild(self) -> None:
         try:
             object_ = self._builder.build(
-                self._geometryProvider, self.layerDistanceInMeters.get_value()
+                self._geometry_provider, self.layer_distance_m.get_value()
             )
         except Exception as exc:
             logger.error(''.join(exc.args))
             return
 
-        # TODO mutable is unused
         self._object = object_
-        self.layerDistanceInMeters.set_value(object_.layer_distance_m)
+        self.layer_distance_m.set_value(object_.layer_distance_m)
         self.notify_observers()
 
     def _update(self, observable: Observable) -> None:

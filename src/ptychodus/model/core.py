@@ -296,7 +296,7 @@ class ModelCore:
             self._reconstructorCore.reconstructorAPI.save_model(outputPath)
             return output.result
 
-        inputProductIndex = self._productCore.productAPI.openProduct(
+        inputProductIndex = self._productCore.productAPI.open_product(
             inputPath, file_type=productFileType
         )
 
@@ -312,7 +312,7 @@ class ModelCore:
             self._reconstructorCore.reconstructorAPI.process_results(block=True)
             logger.info('Reconstruction complete.')
 
-            self._productCore.productAPI.saveProduct(
+            self._productCore.productAPI.save_product(
                 outputProductIndex, outputPath, file_type=productFileType
             )
 

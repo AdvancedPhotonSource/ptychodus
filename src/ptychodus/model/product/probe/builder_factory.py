@@ -58,10 +58,10 @@ class ProbeBuilderFactory(Iterable[str]):
 
         return factory()
 
-    def createDefault(self) -> ProbeBuilder:
+    def create_default(self) -> ProbeBuilder:
         return next(iter(self._builders.values()))()
 
-    def createFromSettings(self) -> ProbeBuilder:
+    def create_from_settings(self) -> ProbeBuilder:
         name = self._settings.builder.get_value()
         nameRepaired = name.casefold()
 

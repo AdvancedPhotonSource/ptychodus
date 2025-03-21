@@ -39,25 +39,25 @@ __all__ = [
 
 
 class FresnelZonePlateViewController(ParameterViewController):
-    def __init__(self, title: str, probeBuilder: FresnelZonePlateProbeBuilder) -> None:
+    def __init__(self, title: str, probe_builder: FresnelZonePlateProbeBuilder) -> None:
         super().__init__()
         self._widget = GroupBoxWithPresets(title)
 
-        for label in probeBuilder.labelsForPresets():
+        for label in probe_builder.labelsForPresets():
             action = self._widget.presetsMenu.addAction(label)
-            action.triggered.connect(lambda _, label=label: probeBuilder.applyPresets(label))
+            action.triggered.connect(lambda _, label=label: probe_builder.applyPresets(label))
 
         self._zonePlateDiameterViewController = LengthWidgetParameterViewController(
-            probeBuilder.zonePlateDiameterInMeters
+            probe_builder.zonePlateDiameterInMeters
         )
         self._outermostZoneWidthInMetersViewController = LengthWidgetParameterViewController(
-            probeBuilder.outermostZoneWidthInMeters
+            probe_builder.outermostZoneWidthInMeters
         )
         self._centralBeamstopDiameterInMetersViewController = LengthWidgetParameterViewController(
-            probeBuilder.centralBeamstopDiameterInMeters
+            probe_builder.centralBeamstopDiameterInMeters
         )
         self._defocusDistanceInMetersViewController = LengthWidgetParameterViewController(
-            probeBuilder.defocusDistanceInMeters
+            probe_builder.defocusDistanceInMeters
         )
 
         layout = QFormLayout()
@@ -79,15 +79,15 @@ class FresnelZonePlateViewController(ParameterViewController):
 
 
 class ZernikeViewController(ParameterViewController, Observer):
-    def __init__(self, title: str, probeBuilder: ZernikeProbeBuilder) -> None:
+    def __init__(self, title: str, probe_builder: ZernikeProbeBuilder) -> None:
         super().__init__()
         self._widget = QGroupBox(title)
-        self._probeBuilder = probeBuilder
+        self._probe_builder = probe_builder
         self._orderSpinBox = QSpinBox()
-        self._coefficientsTableModel = ZernikeTableModel(probeBuilder)
+        self._coefficientsTableModel = ZernikeTableModel(probe_builder)
         self._coefficientsTableView = QTableView()
         self._diameterViewController = LengthWidgetParameterViewController(
-            probeBuilder.diameterInMeters
+            probe_builder.diameterInMeters
         )
 
         self._coefficientsTableView.setModel(self._coefficientsTableModel)
@@ -99,21 +99,21 @@ class ZernikeViewController(ParameterViewController, Observer):
         self._widget.setLayout(layout)
 
         self._sync_model_to_view()
-        self._orderSpinBox.valueChanged.connect(probeBuilder.setOrder)
-        probeBuilder.add_observer(self)
+        self._orderSpinBox.valueChanged.connect(probe_builder.setOrder)
+        probe_builder.add_observer(self)
 
     def get_widget(self) -> QWidget:
         return self._widget
 
     def _sync_model_to_view(self) -> None:
         self._orderSpinBox.setRange(1, 100)
-        self._orderSpinBox.setValue(self._probeBuilder.getOrder())
+        self._orderSpinBox.setValue(self._probe_builder.getOrder())
 
         self._coefficientsTableModel.beginResetModel()  # TODO clean up
         self._coefficientsTableModel.endResetModel()
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._probeBuilder:
+        if observable is self._probe_builder:
             self._sync_model_to_view()
 
 
@@ -148,18 +148,18 @@ class DecayTypeParameterViewController(ParameterViewController, Observer):
     def get_widget(self) -> QWidget:
         return self._widget
 
-    def _sync_view_to_model(self, toolId: int, checked: bool) -> None:
+    def _sync_view_to_model(self, tool_id: int, checked: bool) -> None:
         if checked:
-            decayType = ProbeModeDecayType(toolId)
-            self._parameter.set_value(decayType.name)
+            decay_type = ProbeModeDecayType(tool_id)
+            self._parameter.set_value(decay_type.name)
 
     def _sync_model_to_view(self) -> None:
         try:
-            decayType = ProbeModeDecayType[self._parameter.get_value().upper()]
+            decay_type = ProbeModeDecayType[self._parameter.get_value().upper()]
         except KeyError:
-            decayType = ProbeModeDecayType.POLYNOMIAL
+            decay_type = ProbeModeDecayType.POLYNOMIAL
 
-        button = self._buttonGroup.button(decayType.value)
+        button = self._buttonGroup.button(decay_type.value)
         button.setChecked(True)
 
     def _update(self, observable: Observable) -> None:
@@ -168,117 +168,120 @@ class DecayTypeParameterViewController(ParameterViewController, Observer):
 
 
 class ProbeEditorViewControllerFactory:
-    def _appendAdditionalModes(
+    def _append_additional_modes(
         self,
-        dialogBuilder: ParameterViewBuilder,
-        modesBuilder: MultimodalProbeBuilder,
+        dialog_builder: ParameterViewBuilder,
+        additional_modes_builder: MultimodalProbeBuilder | None,
     ) -> None:
-        additionalModesGroup = 'Additional Modes'  # FIXME OPR
-        dialogBuilder.add_spin_box(
-            modesBuilder.numberOfIncoherentModes,
+        if additional_modes_builder is None:
+            return
+
+        additional_modes_group = 'Additional Modes'  # FIXME OPR
+        dialog_builder.add_spin_box(
+            additional_modes_builder.num_incoherent_modes,
             'Number of Modes:',
-            group=additionalModesGroup,
+            group=additional_modes_group,
         )
-        dialogBuilder.add_check_box(
-            modesBuilder.orthogonalizeIncoherentModes,
+        dialog_builder.add_check_box(
+            additional_modes_builder.orthogonalize_incoherent_modes,
             'Orthogonalize Modes:',
-            group=additionalModesGroup,
+            group=additional_modes_group,
         )
-        dialogBuilder.add_view_controller(
-            DecayTypeParameterViewController(modesBuilder.incoherentModeDecayType),
+        dialog_builder.add_view_controller(
+            DecayTypeParameterViewController(additional_modes_builder.incoherent_mode_decay_type),
             'Decay Type:',
-            group=additionalModesGroup,
+            group=additional_modes_group,
         )
-        dialogBuilder.add_decimal_slider(
-            modesBuilder.incoherentModeDecayRatio,
+        dialog_builder.add_decimal_slider(
+            additional_modes_builder.incoherent_mode_decay_ratio,
             'Decay Ratio:',
-            group=additionalModesGroup,
+            group=additional_modes_group,
         )
 
-    def createEditorDialog(
-        self, itemName: str, item: ProbeRepositoryItem, parent: QWidget
+    def create_editor_dialog(
+        self, item_name: str, item: ProbeRepositoryItem, parent: QWidget
     ) -> QDialog:
-        probeBuilder = item.getBuilder()
-        builderName = probeBuilder.getName()
-        modesBuilder = item.getAdditionalModesBuilder()
-        primaryModeGroup = 'Primary Mode'
-        title = f'{itemName} [{builderName}]'
+        probe_builder = item.get_builder()
+        builder_name = probe_builder.get_name()
+        additional_modes_builder = item.get_additional_modes_builder()
+        primary_mode_group = 'Primary Mode'
+        title = f'{item_name} [{builder_name}]'
 
-        if isinstance(probeBuilder, AveragePatternProbeBuilder):
-            dialogBuilder = ParameterViewBuilder()
-            self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.build_dialog(title, parent)
-        elif isinstance(probeBuilder, DiskProbeBuilder):
-            dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.addLengthWidget(
-                probeBuilder.diameterInMeters,
+        if isinstance(probe_builder, AveragePatternProbeBuilder):
+            dialog_builder = ParameterViewBuilder()
+            self._append_additional_modes(dialog_builder, additional_modes_builder)
+            return dialog_builder.build_dialog(title, parent)
+        elif isinstance(probe_builder, DiskProbeBuilder):
+            dialog_builder = ParameterViewBuilder()
+            dialog_builder.addLengthWidget(
+                probe_builder.diameterInMeters,
                 'Diameter:',
-                group=primaryModeGroup,
+                group=primary_mode_group,
             )
-            dialogBuilder.addLengthWidget(
-                probeBuilder.defocusDistanceInMeters,
+            dialog_builder.addLengthWidget(
+                probe_builder.defocusDistanceInMeters,
                 'Defocus Distance:',
-                group=primaryModeGroup,
+                group=primary_mode_group,
             )
-            self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.build_dialog(title, parent)
-        elif isinstance(probeBuilder, FresnelZonePlateProbeBuilder):
-            dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.add_view_controller_to_top(
-                FresnelZonePlateViewController(primaryModeGroup, probeBuilder)
+            self._append_additional_modes(dialog_builder, additional_modes_builder)
+            return dialog_builder.build_dialog(title, parent)
+        elif isinstance(probe_builder, FresnelZonePlateProbeBuilder):
+            dialog_builder = ParameterViewBuilder()
+            dialog_builder.add_view_controller_to_top(
+                FresnelZonePlateViewController(primary_mode_group, probe_builder)
             )
-            self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.build_dialog(title, parent)
-        elif isinstance(probeBuilder, RectangularProbeBuilder):
-            dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.addLengthWidget(
-                probeBuilder.widthInMeters,
+            self._append_additional_modes(dialog_builder, additional_modes_builder)
+            return dialog_builder.build_dialog(title, parent)
+        elif isinstance(probe_builder, RectangularProbeBuilder):
+            dialog_builder = ParameterViewBuilder()
+            dialog_builder.addLengthWidget(
+                probe_builder.widthInMeters,
                 'Width:',
-                group=primaryModeGroup,
+                group=primary_mode_group,
             )
-            dialogBuilder.addLengthWidget(
-                probeBuilder.heightInMeters,
+            dialog_builder.addLengthWidget(
+                probe_builder.heightInMeters,
                 'Height:',
-                group=primaryModeGroup,
+                group=primary_mode_group,
             )
-            dialogBuilder.addLengthWidget(
-                probeBuilder.defocusDistanceInMeters,
+            dialog_builder.addLengthWidget(
+                probe_builder.defocusDistanceInMeters,
                 'Defocus Distance:',
-                group=primaryModeGroup,
+                group=primary_mode_group,
             )
-            self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.build_dialog(title, parent)
-        elif isinstance(probeBuilder, SuperGaussianProbeBuilder):
-            dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.addLengthWidget(
-                probeBuilder.annularRadiusInMeters,
+            self._append_additional_modes(dialog_builder, additional_modes_builder)
+            return dialog_builder.build_dialog(title, parent)
+        elif isinstance(probe_builder, SuperGaussianProbeBuilder):
+            dialog_builder = ParameterViewBuilder()
+            dialog_builder.addLengthWidget(
+                probe_builder.annularRadiusInMeters,
                 'Annular Radius:',
-                group=primaryModeGroup,
+                group=primary_mode_group,
             )
-            dialogBuilder.addLengthWidget(
-                probeBuilder.fwhmInMeters,
+            dialog_builder.addLengthWidget(
+                probe_builder.fwhmInMeters,
                 'Full Width at Half Maximum:',
-                group=primaryModeGroup,
+                group=primary_mode_group,
             )
-            dialogBuilder.add_decimal_line_edit(
-                probeBuilder.orderParameter,
+            dialog_builder.add_decimal_line_edit(
+                probe_builder.orderParameter,
                 'Order Parameter:',
-                group=primaryModeGroup,
+                group=primary_mode_group,
             )
-            self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.build_dialog(title, parent)
-        elif isinstance(probeBuilder, ZernikeProbeBuilder):
-            dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.add_view_controller_to_top(
-                ZernikeViewController(primaryModeGroup, probeBuilder)
+            self._append_additional_modes(dialog_builder, additional_modes_builder)
+            return dialog_builder.build_dialog(title, parent)
+        elif isinstance(probe_builder, ZernikeProbeBuilder):
+            dialog_builder = ParameterViewBuilder()
+            dialog_builder.add_view_controller_to_top(
+                ZernikeViewController(primary_mode_group, probe_builder)
             )
-            self._appendAdditionalModes(dialogBuilder, modesBuilder)
-            return dialogBuilder.build_dialog(title, parent)
+            self._append_additional_modes(dialog_builder, additional_modes_builder)
+            return dialog_builder.build_dialog(title, parent)
 
         return QMessageBox(
             QMessageBox.Icon.Information,
             title,
-            f'"{builderName}" has no editable parameters!',
+            f'"{builder_name}" has no editable parameters!',
             QMessageBox.Ok,
             parent,
         )

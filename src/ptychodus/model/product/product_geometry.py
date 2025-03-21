@@ -123,7 +123,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         centerXInMeters = 0.0
         centerYInMeters = 0.0
 
-        scanBoundingBox = self._scan.getBoundingBox()
+        scanBoundingBox = self._scan.get_bounding_box()
 
         if scanBoundingBox is not None:
             widthInMeters += scanBoundingBox.width_m

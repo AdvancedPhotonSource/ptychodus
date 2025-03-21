@@ -37,7 +37,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         self._product_index = product_index
 
     def open_scan(self, file_path: Path, *, file_type: str | None = None) -> None:
-        self._scan_api.openScan(self._product_index, file_path, file_type=file_type)
+        self._scan_api.open_scan(self._product_index, file_path, file_type=file_type)
 
     def build_scan(
         self, builder_name: str | None = None, builder_parameters: Mapping[str, Any] = {}
@@ -67,7 +67,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         if builder_name is None:
             self._object_api.buildObjectFromSettings(self._product_index)
         else:
-            self._object_api.buildObject(self._product_index, builder_name, builder_parameters)
+            self._object_api.build_object(self._product_index, builder_name, builder_parameters)
 
     def reconstruct_local(self) -> WorkflowProductAPI:
         logger.debug(f'Reconstruct: index={self._product_index}')
@@ -88,7 +88,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         self._executor.runFlow(self._product_index)
 
     def save_product(self, file_path: Path, *, file_type: str | None = None) -> None:
-        self._product_api.saveProduct(self._product_index, file_path, file_type=file_type)
+        self._product_api.save_product(self._product_index, file_path, file_type=file_type)
 
 
 class ConcreteWorkflowAPI(WorkflowAPI):
@@ -145,7 +145,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         self._patterns_api.export_assembled_patterns(file_path)
 
     def open_product(self, file_path: Path, *, file_type: str | None = None) -> WorkflowProductAPI:
-        product_index = self._product_api.openProduct(file_path, file_type=file_type)
+        product_index = self._product_api.open_product(file_path, file_type=file_type)
         return self._create_product_api(product_index)
 
     def create_product(
@@ -158,7 +158,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
     ) -> WorkflowProductAPI:
-        product_index = self._product_api.insertNewProduct(
+        product_index = self._product_api.insert_new_product(
             name,
             comments=comments,
             detectorDistanceInMeters=detector_distance_m,

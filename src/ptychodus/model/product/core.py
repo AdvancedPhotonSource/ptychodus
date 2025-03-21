@@ -110,4 +110,4 @@ class ProductCore(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._reinitObservable:
-            self.productRepository.insertProductFromSettings()
+            self.productRepository.insert_product_from_settings()

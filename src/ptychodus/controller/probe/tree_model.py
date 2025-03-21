@@ -14,12 +14,12 @@ class ProbeTreeNode:
         self.parent = parent
         self.children: list[ProbeTreeNode] = list()
 
-    def insertNode(self, index: int = -1) -> ProbeTreeNode:
+    def insert_node(self, index: int = -1) -> ProbeTreeNode:
         node = ProbeTreeNode(self)
         self.children.insert(index, node)
         return node
 
-    def removeNode(self, index: int = -1) -> ProbeTreeNode:
+    def remove_node(self, index: int = -1) -> ProbeTreeNode:
         return self.children.pop(index)
 
     def row(self) -> int:
@@ -33,7 +33,7 @@ class ProbeTreeModel(QAbstractItemModel):
         super().__init__(parent)
         self._repository = repository
         self._api = api
-        self._treeRoot = ProbeTreeNode()
+        self._tree_root = ProbeTreeNode()
         self._header = [
             'Name',
             'Relative Power',
@@ -45,54 +45,54 @@ class ProbeTreeModel(QAbstractItemModel):
         ]
 
         for index, item in enumerate(repository):
-            self.insertItem(index, item)
+            self.insert_item(index, item)
 
     @staticmethod
-    def _appendModes(node: ProbeTreeNode, item: ProbeRepositoryItem) -> None:
+    def _append_modes(node: ProbeTreeNode, item: ProbeRepositoryItem) -> None:
         probe = item.get_probe()
 
         for layer in range(probe.num_incoherent_modes):
-            node.insertNode()
+            node.insert_node()
 
-    def insertItem(self, index: int, item: ProbeRepositoryItem) -> None:
+    def insert_item(self, index: int, item: ProbeRepositoryItem) -> None:
         self.beginInsertRows(QModelIndex(), index, index)
-        ProbeTreeModel._appendModes(self._treeRoot.insertNode(index), item)
+        ProbeTreeModel._append_modes(self._tree_root.insert_node(index), item)
         self.endInsertRows()
 
-    def updateItem(self, index: int, item: ProbeRepositoryItem) -> None:
-        topLeft = self.index(index, 0)
-        bottomRight = self.index(index, len(self._header))
-        self.dataChanged.emit(topLeft, bottomRight)
+    def update_item(self, index: int, item: ProbeRepositoryItem) -> None:
+        top_left = self.index(index, 0)
+        bottom_right = self.index(index, len(self._header))
+        self.dataChanged.emit(top_left, bottom_right)
 
-        node = self._treeRoot.children[index]
-        numModesOld = len(node.children)
-        numModesNew = item.get_probe().num_incoherent_modes
+        node = self._tree_root.children[index]
+        num_modes_old = len(node.children)
+        num_modes_new = item.get_probe().num_incoherent_modes
 
-        if numModesOld < numModesNew:
-            self.beginInsertRows(topLeft, numModesOld, numModesNew)
+        if num_modes_old < num_modes_new:
+            self.beginInsertRows(top_left, num_modes_old, num_modes_new)
 
-            while len(node.children) < numModesNew:
-                node.insertNode()
+            while len(node.children) < num_modes_new:
+                node.insert_node()
 
             self.endInsertRows()
-        elif numModesOld > numModesNew:
-            self.beginRemoveRows(topLeft, numModesNew, numModesOld)
+        elif num_modes_old > num_modes_new:
+            self.beginRemoveRows(top_left, num_modes_new, num_modes_old)
 
-            while len(node.children) > numModesNew:
-                node.removeNode()
+            while len(node.children) > num_modes_new:
+                node.remove_node()
 
             self.endRemoveRows()
 
-        childTopLeft = self.index(0, 0, topLeft)
-        childBottomRight = self.index(numModesNew, len(self._header), topLeft)
-        self.dataChanged.emit(childTopLeft, childBottomRight)
+        child_top_left = self.index(0, 0, top_left)
+        child_bottom_right = self.index(num_modes_new, len(self._header), top_left)
+        self.dataChanged.emit(child_top_left, child_bottom_right)
 
-    def removeItem(self, index: int, item: ProbeRepositoryItem) -> None:
+    def remove_item(self, index: int, item: ProbeRepositoryItem) -> None:
         self.beginRemoveRows(QModelIndex(), index, index)
-        self._treeRoot.removeNode(index)
+        self._tree_root.remove_node(index)
         self.endRemoveRows()
 
-    def headerData(
+    def headerData(  # noqa: N802
         self,
         section: int,
         orientation: Qt.Orientation,
@@ -112,11 +112,11 @@ class ProbeTreeModel(QAbstractItemModel):
             return super().parent()
         elif index.isValid():
             node = index.internalPointer()
-            parentNode = node.parent
+            parent_node = node.parent
             return (
                 QModelIndex()
-                if parentNode is self._treeRoot
-                else self.createIndex(parentNode.row(), 0, parentNode)
+                if parent_node is self._tree_root
+                else self.createIndex(parent_node.row(), 0, parent_node)
             )
 
         return QModelIndex()
@@ -124,10 +124,10 @@ class ProbeTreeModel(QAbstractItemModel):
     def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
         if self.hasIndex(row, column, parent):
             if parent.isValid():
-                parentNode = parent.internalPointer()
-                node = parentNode.children[row]
+                parent_node = parent.internalPointer()
+                node = parent_node.children[row]
             else:
-                node = self._treeRoot.children[row]
+                node = self._tree_root.children[row]
 
             return self.createIndex(row, column, node)
 
@@ -148,23 +148,23 @@ class ProbeTreeModel(QAbstractItemModel):
                 probe = item.get_probe()
 
                 try:
-                    relativePower = probe.get_incoherent_mode_relative_power(index.row())
+                    relative_power = probe.get_incoherent_mode_relative_power(index.row())
                 except IndexError:
                     return -1
 
-                if numpy.isfinite(relativePower):
-                    return int(100.0 * relativePower)
+                if numpy.isfinite(relative_power):
+                    return int(100.0 * relative_power)
         else:
             item = self._repository[index.row()]
             probe = item.get_probe()
 
             if role == Qt.ItemDataRole.DisplayRole:
                 if index.column() == 0:
-                    return self._repository.getName(index.row())
+                    return self._repository.get_name(index.row())
                 elif index.column() == 1:
                     return None
                 elif index.column() == 2:
-                    return item.getBuilder().getName()
+                    return item.get_builder().get_name()
                 elif index.column() == 3:
                     return str(probe.dtype)
                 elif index.column() == 4:
@@ -189,7 +189,7 @@ class ProbeTreeModel(QAbstractItemModel):
 
         return value
 
-    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
+    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
             parent = index.parent()
 
@@ -203,12 +203,12 @@ class ProbeTreeModel(QAbstractItemModel):
 
         return False
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         if parent.column() > 0:
             return 0
 
-        node = parent.internalPointer() if parent.isValid() else self._treeRoot
+        node = parent.internalPointer() if parent.isValid() else self._tree_root
         return len(node.children)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._header)

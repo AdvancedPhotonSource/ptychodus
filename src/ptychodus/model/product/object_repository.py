@@ -20,10 +20,10 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductReposito
         self._repository = repository
         self._repository.add_observer(self)
 
-    def getName(self, index: int) -> str:
+    def get_name(self, index: int) -> str:
         return self._repository[index].get_name()
 
-    def setName(self, index: int, name: str) -> None:
+    def set_name(self, index: int, name: str) -> None:
         self._repository[index].set_name(name)
 
     @overload
@@ -36,15 +36,15 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductReposito
         self, index: int | slice
     ) -> ObjectRepositoryItem | Sequence[ObjectRepositoryItem]:
         if isinstance(index, slice):
-            return [item.get_object() for item in self._repository[index]]
+            return [item.get_object_item() for item in self._repository[index]]
         else:
-            return self._repository[index].get_object()
+            return self._repository[index].get_object_item()
 
     def __len__(self) -> int:
         return len(self._repository)
 
     def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notify_observers_item_inserted(index, item.get_object())
+        self.notify_observers_item_inserted(index, item.get_object_item())
 
     def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
         pass
@@ -62,4 +62,4 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductReposito
         pass
 
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notify_observers_item_removed(index, item.get_object())
+        self.notify_observers_item_removed(index, item.get_object_item())

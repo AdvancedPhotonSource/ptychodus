@@ -64,8 +64,8 @@ class XMCDAnalyzer(Observable):
         return rcirc_product.get_name()
 
     def analyze(self) -> None:
-        lcirc_object = self._repository[self._lcirc_product_index].get_object().get_object()
-        rcirc_object = self._repository[self._rcirc_product_index].get_object().get_object()
+        lcirc_object = self._repository[self._lcirc_product_index].get_object_item().get_object()
+        rcirc_object = self._repository[self._rcirc_product_index].get_object_item().get_object()
 
         lcirc_object_geometry = lcirc_object.get_geometry()
         rcirc_object_geometry = rcirc_object.get_geometry()

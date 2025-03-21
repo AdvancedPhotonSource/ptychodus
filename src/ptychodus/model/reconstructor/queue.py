@@ -27,7 +27,7 @@ class UpdateProductTask(ReconstructionTask):
 
     def execute(self) -> None:
         name = self._product.get_name()
-        self._product.assign(self._result.product, mutable=False)
+        self._product.assign(self._result.product)
         self._product.set_name(name)
 
 

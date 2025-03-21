@@ -10,7 +10,7 @@ class MultisliceViewController(ParameterViewController, Observer):
     def __init__(self, item: ObjectRepositoryItem) -> None:
         super().__init__()
         self._item = item
-        self._parameter = item.layerDistanceInMeters
+        self._parameter = item.layer_distance_m
         self._widget = QSpinBox()
 
         self._sync_model_to_view()
@@ -21,12 +21,12 @@ class MultisliceViewController(ParameterViewController, Observer):
         return self._widget
 
     def _sync_view_to_model(self, numberOfLayers: int) -> None:
-        self._item.setNumberOfLayers(numberOfLayers)
+        self._item.set_num_layers(numberOfLayers)
 
     def _sync_model_to_view(self) -> None:
         self._widget.blockSignals(True)
         self._widget.setRange(1, 99)
-        self._widget.setValue(self._item.getNumberOfLayers())
+        self._widget.setValue(self._item.get_num_layers())
         self._widget.blockSignals(False)
 
     def _update(self, observable: Observable) -> None:
@@ -38,8 +38,8 @@ class ObjectEditorViewControllerFactory:
     def createEditorDialog(
         self, itemName: str, item: ObjectRepositoryItem, parent: QWidget
     ) -> QDialog:
-        objectBuilder = item.getBuilder()
-        builderName = objectBuilder.getName()
+        objectBuilder = item.get_builder()
+        builderName = objectBuilder.get_name()
         firstLayerGroup = 'First Layer'
         additionalLayersGroup = 'Additional Layers'
         title = f'{itemName} [{builderName}]'

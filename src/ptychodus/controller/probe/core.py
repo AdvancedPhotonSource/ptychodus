@@ -128,29 +128,29 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         copyAction = view.buttonBox.loadMenu.addAction('Copy...')
         copyAction.triggered.connect(controller._copyToCurrentProbe)
 
-        saveToFileAction = view.buttonBox.saveMenu.addAction('Save File...')
+        saveToFileAction = view.buttonBox.save_menu.addAction('Save File...')
         saveToFileAction.triggered.connect(controller._saveCurrentProbeToFile)
 
-        syncToSettingsAction = view.buttonBox.saveMenu.addAction('Sync To Settings')
+        syncToSettingsAction = view.buttonBox.save_menu.addAction('Sync To Settings')
         syncToSettingsAction.triggered.connect(controller._syncCurrentProbeToSettings)
 
         view.copierDialog.setWindowTitle('Copy Probe')
-        view.copierDialog.sourceComboBox.setModel(treeModel)
-        view.copierDialog.destinationComboBox.setModel(treeModel)
+        view.copierDialog.source_combo_box.setModel(treeModel)
+        view.copierDialog.destination_combo_box.setModel(treeModel)
         view.copierDialog.finished.connect(controller._finishCopyingProbe)
 
-        view.buttonBox.editButton.clicked.connect(controller._editCurrentProbe)
+        view.buttonBox.edit_button.clicked.connect(controller._editCurrentProbe)
 
-        propagateAction = view.buttonBox.analyzeMenu.addAction('Propagate...')
+        propagateAction = view.buttonBox.analyze_menu.addAction('Propagate...')
         propagateAction.triggered.connect(controller._propagateProbe)
 
-        stxmAction = view.buttonBox.analyzeMenu.addAction('Simulate STXM...')
+        stxmAction = view.buttonBox.analyze_menu.addAction('Simulate STXM...')
         stxmAction.triggered.connect(controller._simulateSTXM)
 
-        exposureAction = view.buttonBox.analyzeMenu.addAction('Exposure...')
+        exposureAction = view.buttonBox.analyze_menu.addAction('Exposure...')
         exposureAction.triggered.connect(controller._analyzeExposure)
 
-        fluorescenceAction = view.buttonBox.analyzeMenu.addAction('Enhance Fluorescence...')
+        fluorescenceAction = view.buttonBox.analyze_menu.addAction('Enhance Fluorescence...')
         fluorescenceAction.triggered.connect(controller._enhanceFluorescence)
 
         return controller
@@ -194,13 +194,13 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex >= 0:
-            self._view.copierDialog.destinationComboBox.setCurrentIndex(itemIndex)
+            self._view.copierDialog.destination_combo_box.setCurrentIndex(itemIndex)
             self._view.copierDialog.open()
 
     def _finishCopyingProbe(self, result: int) -> None:
         if result == QDialog.DialogCode.Accepted:
-            sourceIndex = self._view.copierDialog.sourceComboBox.currentIndex()
-            destinationIndex = self._view.copierDialog.destinationComboBox.currentIndex()
+            sourceIndex = self._view.copierDialog.source_combo_box.currentIndex()
+            destinationIndex = self._view.copierDialog.destination_combo_box.currentIndex()
             self._api.copyProbe(sourceIndex, destinationIndex)
 
     def _editCurrentProbe(self) -> None:
@@ -209,9 +209,9 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         if itemIndex < 0:
             return
 
-        itemName = self._repository.getName(itemIndex)
+        itemName = self._repository.get_name(itemIndex)
         item = self._repository[itemIndex]
-        dialog = self._editorFactory.createEditorDialog(itemName, item, self._view)
+        dialog = self._editorFactory.create_editor_dialog(itemName, item, self._view)
         dialog.open()
 
     def _saveCurrentProbeToFile(self) -> None:
@@ -277,10 +277,10 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()
-        self._view.buttonBox.loadButton.setEnabled(enabled)
-        self._view.buttonBox.saveButton.setEnabled(enabled)
-        self._view.buttonBox.editButton.setEnabled(enabled)
-        self._view.buttonBox.analyzeButton.setEnabled(enabled)
+        self._view.buttonBox.load_button.setEnabled(enabled)
+        self._view.buttonBox.save_button.setEnabled(enabled)
+        self._view.buttonBox.edit_button.setEnabled(enabled)
+        self._view.buttonBox.analyze_button.setEnabled(enabled)
 
         itemIndex = self._getCurrentItemIndex()
 
@@ -306,14 +306,14 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
                     self._imageController.set_array(array, pixelGeometry)
 
     def handle_item_inserted(self, index: int, item: ProbeRepositoryItem) -> None:
-        self._treeModel.insertItem(index, item)
+        self._treeModel.insert_item(index, item)
 
     def handle_item_changed(self, index: int, item: ProbeRepositoryItem) -> None:
-        self._treeModel.updateItem(index, item)
+        self._treeModel.update_item(index, item)
 
         if index == self._getCurrentItemIndex():
             currentIndex = self._view.treeView.currentIndex()
             self._updateView(currentIndex, currentIndex)
 
     def handle_item_removed(self, index: int, item: ProbeRepositoryItem) -> None:
-        self._treeModel.removeItem(index, item)
+        self._treeModel.remove_item(index, item)

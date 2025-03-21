@@ -57,7 +57,7 @@ class ScanAPI:
     def createStreamingContext(self) -> PositionsStreamingContext:
         return PositionsStreamingContext()
 
-    def builderNames(self) -> Iterator[str]:
+    def builder_names(self) -> Iterator[str]:
         return iter(self._builderFactory)
 
     def buildScan(
@@ -80,12 +80,12 @@ class ScanAPI:
                 parameter = builder.parameters()[parameterName]
             except KeyError:
                 logger.warning(
-                    f'Scan builder "{builder.getName()}" does not have parameter "{parameterName}"!'
+                    f'Scan builder "{builder.get_name()}" does not have parameter "{parameterName}"!'
                 )
             else:
                 parameter.set_value(parameterValue)
 
-        item.setBuilder(builder)
+        item.set_builder(builder)
 
     def buildScanFromSettings(self, index: int) -> None:
         try:
@@ -95,20 +95,20 @@ class ScanAPI:
             return
 
         try:
-            builder = self._builderFactory.createFromSettings()
+            builder = self._builderFactory.create_from_settings()
         except KeyError:
             logger.warning('Failed to create builder from settings!')
             return
 
-        item.setBuilder(builder)
+        item.set_builder(builder)
 
-    def getOpenFileFilterList(self) -> Iterator[str]:
+    def get_open_file_filters(self) -> Iterator[str]:
         return self._builderFactory.getOpenFileFilterList()
 
-    def getOpenFileFilter(self) -> str:
+    def get_open_file_filter(self) -> str:
         return self._builderFactory.getOpenFileFilter()
 
-    def openScan(self, index: int, filePath: Path, *, file_type: str | None = None) -> None:
+    def open_scan(self, index: int, filePath: Path, *, file_type: str | None = None) -> None:
         builder = self._builderFactory.createScanFromFile(
             filePath,
             self._settings.fileType.get_value() if file_type is None else file_type,
@@ -119,7 +119,7 @@ class ScanAPI:
         except IndexError:
             logger.warning(f'Failed to open scan {index}!')
         else:
-            item.setBuilder(builder)
+            item.set_builder(builder)
 
     def copyScan(self, sourceIndex: int, destinationIndex: int) -> None:
         logger.debug(f'Copying {sourceIndex} -> {destinationIndex}')
@@ -138,19 +138,19 @@ class ScanAPI:
 
         destinationItem.assign_item(sourceItem)
 
-    def getSaveFileFilterList(self) -> Iterator[str]:
+    def get_save_file_filters(self) -> Iterator[str]:
         return self._builderFactory.getSaveFileFilterList()
 
-    def getSaveFileFilter(self) -> str:
+    def get_save_file_filter(self) -> str:
         return self._builderFactory.getSaveFileFilter()
 
-    def saveScan(self, index: int, filePath: Path, fileType: str) -> None:
+    def save_scan(self, index: int, filePath: Path, fileType: str) -> None:
         try:
             item = self._repository[index]
         except IndexError:
             logger.warning(f'Failed to save scan {index}!')
         else:
-            self._builderFactory.saveScan(filePath, fileType, item.getScan())
+            self._builderFactory.saveScan(filePath, fileType, item.get_scan())
 
 
 class ProbeAPI:
@@ -187,13 +187,13 @@ class ProbeAPI:
                 parameter = builder.parameters()[parameterName]
             except KeyError:
                 logger.warning(
-                    f'Probe builder "{builder.getName()}" does not have'
+                    f'Probe builder "{builder.get_name()}" does not have'
                     f' parameter "{parameterName}"!'
                 )
             else:
                 parameter.set_value(parameterValue)
 
-        item.setBuilder(builder)
+        item.set_builder(builder)
 
     def buildProbeFromSettings(self, index: int) -> None:
         try:
@@ -203,12 +203,12 @@ class ProbeAPI:
             return
 
         try:
-            builder = self._builderFactory.createFromSettings()
+            builder = self._builderFactory.create_from_settings()
         except KeyError:
             logger.warning('Failed to create builder from settings!')
             return
 
-        item.setBuilder(builder)
+        item.set_builder(builder)
 
     def getOpenFileFilterList(self) -> Iterator[str]:
         return self._builderFactory.getOpenFileFilterList()
@@ -227,7 +227,7 @@ class ProbeAPI:
         except IndexError:
             logger.warning(f'Failed to open probe {index}!')
         else:
-            item.setBuilder(builder)
+            item.set_builder(builder)
 
     def copyProbe(self, sourceIndex: int, destinationIndex: int) -> None:
         logger.debug(f'Copying {sourceIndex} -> {destinationIndex}')
@@ -275,7 +275,7 @@ class ObjectAPI:
     def builderNames(self) -> Iterator[str]:
         return iter(self._builderFactory)
 
-    def buildObject(
+    def build_object(
         self, index: int, builderName: str, builderParameters: Mapping[str, Any] = {}
     ) -> None:
         try:
@@ -295,13 +295,13 @@ class ObjectAPI:
                 parameter = builder.parameters()[parameterName]
             except KeyError:
                 logger.warning(
-                    f'Object builder "{builder.getName()}" does not have'
+                    f'Object builder "{builder.get_name()}" does not have'
                     f' parameter "{parameterName}"!'
                 )
             else:
                 parameter.set_value(parameterValue)
 
-        item.setBuilder(builder)
+        item.set_builder(builder)
 
     def buildObjectFromSettings(self, index: int) -> None:
         try:
@@ -316,7 +316,7 @@ class ObjectAPI:
             logger.warning('Failed to create builder from settings!')
             return
 
-        item.setBuilder(builder)
+        item.set_builder(builder)
 
     def getOpenFileFilterList(self) -> Iterator[str]:
         return self._builderFactory.getOpenFileFilterList()
@@ -335,7 +335,7 @@ class ObjectAPI:
         except IndexError:
             logger.warning(f'Failed to open object {index}!')
         else:
-            item.setBuilder(builder)
+            item.set_builder(builder)
 
     def copyObject(self, sourceIndex: int, destinationIndex: int) -> None:
         logger.debug(f'Copying {sourceIndex} -> {destinationIndex}')
@@ -382,7 +382,7 @@ class ProductAPI:
         self._fileReaderChooser = fileReaderChooser
         self._fileWriterChooser = fileWriterChooser
 
-    def insertNewProduct(
+    def insert_new_product(
         self,
         name: str = 'Unnamed',
         *,
@@ -391,30 +391,30 @@ class ProductAPI:
         probeEnergyInElectronVolts: float | None = None,
         probePhotonCount: float | None = None,
         exposureTimeInSeconds: float | None = None,
-        likeIndex: int = -1,
+        like_index: int = -1,
     ) -> int:
         return self._repository.insert_new_product(
             name=name,
             comments=comments,
-            detectorDistanceInMeters=detectorDistanceInMeters,
-            probeEnergyInElectronVolts=probeEnergyInElectronVolts,
-            probePhotonCount=probePhotonCount,
-            exposureTimeInSeconds=exposureTimeInSeconds,
-            like_index=likeIndex,
+            detector_distance_m=detectorDistanceInMeters,
+            probe_energy_eV=probeEnergyInElectronVolts,
+            probe_photon_count=probePhotonCount,
+            exposure_time_s=exposureTimeInSeconds,
+            like_index=like_index,
         )
 
     def getItemName(self, productIndex: int) -> str:
         item = self._repository[productIndex]
         return item.get_name()
 
-    def getOpenFileFilterList(self) -> Iterator[str]:
+    def get_open_file_filters(self) -> Iterator[str]:
         for plugin in self._fileReaderChooser:
             yield plugin.display_name
 
-    def getOpenFileFilter(self) -> str:
+    def get_open_file_filter(self) -> str:
         return self._fileReaderChooser.get_current_plugin().display_name
 
-    def openProduct(self, filePath: Path, *, file_type: str | None = None) -> int:
+    def open_product(self, filePath: Path, *, file_type: str | None = None) -> int:
         if filePath.is_file():
             if file_type is not None:
                 self._fileReaderChooser.set_current_plugin(file_type)
@@ -428,20 +428,20 @@ class ProductAPI:
             except Exception as exc:
                 raise RuntimeError(f'Failed to read "{filePath}"') from exc
             else:
-                return self._repository.insertProduct(product)
+                return self._repository.insert_product(product)
         else:
             logger.warning(f'Refusing to create product with invalid file path "{filePath}"')
 
         return -1
 
-    def getSaveFileFilterList(self) -> Iterator[str]:
+    def get_save_file_filters(self) -> Iterator[str]:
         for plugin in self._fileWriterChooser:
             yield plugin.display_name
 
-    def getSaveFileFilter(self) -> str:
+    def get_save_file_filter(self) -> str:
         return self._fileWriterChooser.get_current_plugin().display_name
 
-    def saveProduct(self, index: int, filePath: Path, *, file_type: str | None = None) -> None:
+    def save_product(self, index: int, filePath: Path, *, file_type: str | None = None) -> None:
         try:
             item = self._repository[index]
         except IndexError:

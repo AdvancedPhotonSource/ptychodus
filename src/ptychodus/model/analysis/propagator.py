@@ -52,7 +52,7 @@ class ProbePropagator(Observable):
         num_steps: int,
     ) -> None:
         item = self._repository[self._product_index]
-        probe = item.get_probe().get_probe()
+        probe = item.get_probe_item().get_probe()
         wavelength_m = item.get_geometry().probe_wavelength_m
         propagated_wavefield = numpy.zeros(
             (num_steps, probe.num_incoherent_modes, probe.height_px, probe.width_px),
@@ -96,7 +96,7 @@ class ProbePropagator(Observable):
 
     def _get_probe(self) -> Probe:
         item = self._repository[self._product_index]
-        return item.get_probe().get_probe()
+        return item.get_probe_item().get_probe()
 
     def get_pixel_geometry(self) -> PixelGeometry | None:
         try:

@@ -43,73 +43,63 @@ class ProductRepositoryItem(ParameterGroup):
     def __init__(
         self,
         parent: ProductRepositoryItemObserver,
-        metadata: MetadataRepositoryItem,
-        scan: ScanRepositoryItem,
+        metadata_item: MetadataRepositoryItem,
+        scan_item: ScanRepositoryItem,
         geometry: ProductGeometry,
-        probe: ProbeRepositoryItem,
-        object_: ObjectRepositoryItem,
+        probe_item: ProbeRepositoryItem,
+        object_item: ObjectRepositoryItem,
         validator: ProductValidator,
         costs: Sequence[float],
     ) -> None:
         super().__init__()
         self._parent = parent
-        self._metadata = metadata
-        self._scan = scan
+        self._metadata_item = metadata_item
+        self._scan_item = scan_item
         self._geometry = geometry
-        self._probe = probe
-        self._object = object_
+        self._probe_item = probe_item
+        self._object_item = object_item
         self._validator = validator
         self._costs = list(costs)
 
-        self._add_group('metadata', self._metadata, observe=True)
-        self._add_group('scan', self._scan, observe=True)
-        self._add_group('probe', self._probe, observe=True)
-        self._add_group('object', self._object, observe=True)
+        self._add_group('metadata', self._metadata_item, observe=True)
+        self._add_group('scan', self._scan_item, observe=True)
+        self._add_group('probe', self._probe_item, observe=True)
+        self._add_group('object', self._object_item, observe=True)
 
-    def assign_item(self, item: ProductRepositoryItem, *, notify: bool = True) -> None:
-        self._metadata.assign_item(item.get_metadata())
-        self._scan.assign_item(item.get_scan())
-        self._probe.assign_item(item.get_probe())
-        self._object.assign_item(item.get_object())
-        self._costs = list(item.get_costs())
-
-        if notify:
-            self._parent.handle_costs_changed(self)
-
-    def assign(self, product: Product, *, mutable: bool = True) -> None:
-        self._metadata.assign(product.metadata)
-        self._scan.assign(product.positions, mutable=mutable)
-        self._probe.assign(product.probe, mutable=mutable)
-        self._object.assign(product.object_, mutable=mutable)
+    def assign(self, product: Product) -> None:
+        self._metadata_item.assign(product.metadata)
+        self._scan_item.assign(product.positions)
+        self._probe_item.assign(product.probe)
+        self._object_item.assign(product.object_)
         self._costs = list(product.costs)
         self._parent.handle_costs_changed(self)
 
     def sync_to_settings(self) -> None:
-        self._metadata.sync_to_settings()
-        self._scan.sync_to_settings()
-        self._probe.sync_to_settings()
-        self._object.sync_to_settings()
+        self._metadata_item.sync_to_settings()
+        self._scan_item.sync_to_settings()
+        self._probe_item.sync_to_settings()
+        self._object_item.sync_to_settings()
 
     def get_name(self) -> str:
-        return self._metadata.get_name()
+        return self._metadata_item.get_name()
 
     def set_name(self, name: str) -> None:
-        self._metadata.set_name(name)
+        self._metadata_item.set_name(name)
 
-    def get_metadata(self) -> MetadataRepositoryItem:
-        return self._metadata
+    def get_metadata_item(self) -> MetadataRepositoryItem:
+        return self._metadata_item
 
-    def get_scan(self) -> ScanRepositoryItem:
-        return self._scan
+    def get_scan_item(self) -> ScanRepositoryItem:
+        return self._scan_item
 
     def get_geometry(self) -> ProductGeometry:
         return self._geometry
 
-    def get_probe(self) -> ProbeRepositoryItem:
-        return self._probe
+    def get_probe_item(self) -> ProbeRepositoryItem:
+        return self._probe_item
 
-    def get_object(self) -> ObjectRepositoryItem:
-        return self._object
+    def get_object_item(self) -> ObjectRepositoryItem:
+        return self._object_item
 
     def _invalidate_costs(self) -> None:
         self._costs = list()
@@ -120,24 +110,24 @@ class ProductRepositoryItem(ParameterGroup):
 
     def get_product(self) -> Product:
         return Product(
-            metadata=self._metadata.get_metadata(),
-            positions=self._scan.getScan(),
-            probe=self._probe.get_probe(),
-            object_=self._object.get_object(),
+            metadata=self._metadata_item.get_metadata(),
+            positions=self._scan_item.get_scan(),
+            probe=self._probe_item.get_probe(),
+            object_=self._object_item.get_object(),
             costs=self.get_costs(),
         )
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._metadata:
+        if observable is self._metadata_item:
             self._invalidate_costs()
             self._parent.handle_metadata_changed(self)
-        elif observable is self._scan:
+        elif observable is self._scan_item:
             self._invalidate_costs()
             self._parent.handle_scan_changed(self)
-        elif observable is self._probe:
+        elif observable is self._probe_item:
             self._invalidate_costs()
             self._parent.handle_probe_changed(self)
-        elif observable is self._object:
+        elif observable is self._object_item:
             self._invalidate_costs()
             self._parent.handle_object_changed(self)
 

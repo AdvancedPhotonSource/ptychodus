@@ -48,7 +48,7 @@ class ReconstructorAPI:
             input_product_index, index_filter
         )
         output_product_index = self._product_repository.insert_new_product(
-            like_index=input_product_index
+            like_index=input_product_index, mutable=False
         )
         output_product = self._product_repository[output_product_index]
 

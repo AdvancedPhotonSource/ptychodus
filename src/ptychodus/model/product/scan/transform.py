@@ -36,7 +36,7 @@ class ScanPointTransform(ParameterGroup):
         self.jitterRadiusInMeters = settings.jitterRadiusInMeters.copy()
         self._add_parameter('jitter_radius_m', self.jitterRadiusInMeters)
 
-    def syncToSettings(self) -> None:
+    def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
             parameter.sync_value_to_parent()
 

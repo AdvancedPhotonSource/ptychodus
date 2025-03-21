@@ -92,23 +92,23 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         copyAction = view.buttonBox.loadMenu.addAction('Copy...')
         copyAction.triggered.connect(controller._copyToCurrentObject)
 
-        saveToFileAction = view.buttonBox.saveMenu.addAction('Save File...')
+        saveToFileAction = view.buttonBox.save_menu.addAction('Save File...')
         saveToFileAction.triggered.connect(controller._saveCurrentObjectToFile)
 
-        syncToSettingsAction = view.buttonBox.saveMenu.addAction('Sync To Settings')
+        syncToSettingsAction = view.buttonBox.save_menu.addAction('Sync To Settings')
         syncToSettingsAction.triggered.connect(controller._syncCurrentObjectToSettings)
 
         view.copierDialog.setWindowTitle('Copy Object')
-        view.copierDialog.sourceComboBox.setModel(treeModel)
-        view.copierDialog.destinationComboBox.setModel(treeModel)
+        view.copierDialog.source_combo_box.setModel(treeModel)
+        view.copierDialog.destination_combo_box.setModel(treeModel)
         view.copierDialog.finished.connect(controller._finishCopyingObject)
 
-        view.buttonBox.editButton.clicked.connect(controller._editCurrentObject)
+        view.buttonBox.edit_button.clicked.connect(controller._editCurrentObject)
 
-        frcAction = view.buttonBox.analyzeMenu.addAction('Fourier Ring Correlation...')
+        frcAction = view.buttonBox.analyze_menu.addAction('Fourier Ring Correlation...')
         frcAction.triggered.connect(controller._analyzeFRC)
 
-        xmcdAction = view.buttonBox.analyzeMenu.addAction('XMCD...')
+        xmcdAction = view.buttonBox.analyze_menu.addAction('XMCD...')
         xmcdAction.triggered.connect(controller._analyzeXMCD)
 
         return controller
@@ -152,13 +152,13 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         itemIndex = self._getCurrentItemIndex()
 
         if itemIndex >= 0:
-            self._view.copierDialog.destinationComboBox.setCurrentIndex(itemIndex)
+            self._view.copierDialog.destination_combo_box.setCurrentIndex(itemIndex)
             self._view.copierDialog.open()
 
     def _finishCopyingObject(self, result: int) -> None:
         if result == QDialog.DialogCode.Accepted:
-            sourceIndex = self._view.copierDialog.sourceComboBox.currentIndex()
-            destinationIndex = self._view.copierDialog.destinationComboBox.currentIndex()
+            sourceIndex = self._view.copierDialog.source_combo_box.currentIndex()
+            destinationIndex = self._view.copierDialog.destination_combo_box.currentIndex()
             self._api.copyObject(sourceIndex, destinationIndex)
 
     def _editCurrentObject(self) -> None:
@@ -167,7 +167,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         if itemIndex < 0:
             return
 
-        itemName = self._repository.getName(itemIndex)
+        itemName = self._repository.get_name(itemIndex)
         item = self._repository[itemIndex]
         dialog = self._editorFactory.createEditorDialog(itemName, item, self._view)
         dialog.open()
@@ -219,10 +219,10 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
     def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()
-        self._view.buttonBox.loadButton.setEnabled(enabled)
-        self._view.buttonBox.saveButton.setEnabled(enabled)
-        self._view.buttonBox.editButton.setEnabled(enabled)
-        self._view.buttonBox.analyzeButton.setEnabled(enabled)
+        self._view.buttonBox.load_button.setEnabled(enabled)
+        self._view.buttonBox.save_button.setEnabled(enabled)
+        self._view.buttonBox.edit_button.setEnabled(enabled)
+        self._view.buttonBox.analyze_button.setEnabled(enabled)
 
         itemIndex = self._getCurrentItemIndex()
 
@@ -248,14 +248,14 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                     self._imageController.set_array(array, pixelGeometry)
 
     def handle_item_inserted(self, index: int, item: ObjectRepositoryItem) -> None:
-        self._treeModel.insertItem(index, item)
+        self._treeModel.insert_item(index, item)
 
     def handle_item_changed(self, index: int, item: ObjectRepositoryItem) -> None:
-        self._treeModel.updateItem(index, item)
+        self._treeModel.update_item(index, item)
 
         if index == self._getCurrentItemIndex():
             currentIndex = self._view.treeView.currentIndex()
             self._updateView(currentIndex, currentIndex)
 
     def handle_item_removed(self, index: int, item: ObjectRepositoryItem) -> None:
-        self._treeModel.removeItem(index, item)
+        self._treeModel.remove_item(index, item)

@@ -32,25 +32,25 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
             exposure_time_s=metadata.exposure_time_s,
         )
 
-    def createDefault(
+    def create_default(
         self,
         *,
         name: str = '',
         comments: str = '',
-        detectorDistanceInMeters: float | None = None,
-        probeEnergyInElectronVolts: float | None = None,
-        probePhotonCount: float | None = None,
-        exposureTimeInSeconds: float | None = None,
+        detector_distance_m: float | None = None,
+        probe_energy_eV: float | None = None,
+        probe_photon_count: float | None = None,
+        exposure_time_s: float | None = None,
     ) -> MetadataRepositoryItem:
         return MetadataRepositoryItem(
             self._settings,
             self,
             name=name,
             comments=comments,
-            detector_distance_m=detectorDistanceInMeters,
-            probe_energy_eV=probeEnergyInElectronVolts,
-            probe_photon_count=probePhotonCount,
-            exposure_time_s=exposureTimeInSeconds,
+            detector_distance_m=detector_distance_m,
+            probe_energy_eV=probe_energy_eV,
+            probe_photon_count=probe_photon_count,
+            exposure_time_s=exposure_time_s,
         )
 
     def create_unique_name(self, candidateName: str) -> str:
@@ -66,7 +66,7 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
 
     def _updateLUT(self) -> None:
         for index, item in enumerate(self._repository):
-            metadata = item.get_metadata()
+            metadata = item.get_metadata_item()
             metadata._index = index
 
     def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:

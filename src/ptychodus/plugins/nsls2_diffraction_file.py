@@ -26,43 +26,42 @@ class NSLSIIDiffractionFileReader(DiffractionFileReader):
 
     def __init__(self) -> None:
         self._data_path = 'det_data'
-        self._treeBuilder = H5DiffractionFileTreeBuilder()
+        self._tree_builder = H5DiffractionFileTreeBuilder()
 
     def read(self, file_path: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.create_null(file_path)
 
         try:
-            with h5py.File(file_path, 'r') as h5File:
-                contentsTree = self._treeBuilder.build(h5File)
+            with h5py.File(file_path, 'r') as h5_file:
+                contents_tree = self._tree_builder.build(h5_file)
 
                 try:
-                    data = h5File[self._data_path]
-                    pixelSizeInMicrons = h5File['det_pixel_size']
+                    data = h5_file[self._data_path]
                 except KeyError:
                     logger.warning('Unable to load data.')
                 else:
-                    numberOfPatterns, detectorHeight, detectorWidth = data.shape
-                    pixelSizeInMeters = (
-                        float(numpy.squeeze(pixelSizeInMicrons[()])) * self.ONE_MICRON_M
+                    num_patterns, detector_height, detector_width = data.shape
+                    pixel_size_m = (
+                        float(numpy.squeeze(h5_file['det_pixel_size'][()])) * self.ONE_MICRON_M
                     )
 
                     metadata = DiffractionMetadata(
-                        num_patterns_per_array=numberOfPatterns,
-                        num_patterns_total=numberOfPatterns,
+                        num_patterns_per_array=num_patterns,
+                        num_patterns_total=num_patterns,
                         pattern_dtype=data.dtype,
-                        detector_extent=ImageExtent(detectorWidth, detectorHeight),
-                        detector_pixel_geometry=PixelGeometry(pixelSizeInMeters, pixelSizeInMeters),
+                        detector_extent=ImageExtent(detector_width, detector_height),
+                        detector_pixel_geometry=PixelGeometry(pixel_size_m, pixel_size_m),
                         file_path=file_path,
                     )
 
                     array = H5DiffractionPatternArray(
                         label=file_path.stem,
-                        indexes=numpy.arange(numberOfPatterns),
+                        indexes=numpy.arange(num_patterns),
                         file_path=file_path,
                         data_path=self._data_path,
                     )
 
-                    dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
+                    dataset = SimpleDiffractionDataset(metadata, contents_tree, [array])
         except OSError:
             logger.warning(f'Unable to read file "{file_path}".')
 

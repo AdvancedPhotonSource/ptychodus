@@ -48,10 +48,10 @@ class ScanBuilderFactory(Iterable[str]):
 
         return factory()
 
-    def createDefault(self) -> ScanBuilder:
+    def create_default(self) -> ScanBuilder:
         return next(iter(self._builders.values()))()
 
-    def createFromSettings(self) -> ScanBuilder:
+    def create_from_settings(self) -> ScanBuilder:
         name = self._settings.builder.get_value()
         nameRepaired = name.casefold()
 

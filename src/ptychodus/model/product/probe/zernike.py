@@ -138,11 +138,11 @@ class ZernikeProbeBuilder(ProbeBuilder):
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
         geometry = geometryProvider.get_probe_geometry()
-        coords = self.getTransverseCoordinates(geometry)
+        coords = self.get_transverse_coordinates(geometry)
 
         radius = self.diameterInMeters.get_value() / 2.0
-        distance = numpy.hypot(coords.positionYInMeters, coords.positionXInMeters) / radius
-        angle = numpy.arctan2(coords.positionYInMeters, coords.positionXInMeters)
+        distance = numpy.hypot(coords.position_y_m, coords.position_x_m) / radius
+        angle = numpy.arctan2(coords.position_y_m, coords.position_x_m)
         array = numpy.zeros_like(distance, dtype=complex)
 
         for coef, poly in zip(self.coefficients, self._polynomials):

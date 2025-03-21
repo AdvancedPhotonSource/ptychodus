@@ -12,12 +12,12 @@ class ObjectTreeNode:
         self.parent = parent
         self.children: list[ObjectTreeNode] = list()
 
-    def insertNode(self, index: int = -1) -> ObjectTreeNode:
+    def insert_node(self, index: int = -1) -> ObjectTreeNode:
         node = ObjectTreeNode(self)
         self.children.insert(index, node)
         return node
 
-    def removeNode(self, index: int = -1) -> ObjectTreeNode:
+    def remove_node(self, index: int = -1) -> ObjectTreeNode:
         return self.children.pop(index)
 
     def row(self) -> int:
@@ -34,7 +34,7 @@ class ObjectTreeModel(QAbstractItemModel):
         super().__init__(parent)
         self._repository = repository
         self._api = api
-        self._treeRoot = ObjectTreeNode()
+        self._tree_root = ObjectTreeNode()
         self._header = [
             'Name',
             'Distance [m]',
@@ -46,54 +46,54 @@ class ObjectTreeModel(QAbstractItemModel):
         ]
 
         for index, item in enumerate(repository):
-            self.insertItem(index, item)
+            self.insert_item(index, item)
 
     @staticmethod
-    def _appendLayers(node: ObjectTreeNode, item: ObjectRepositoryItem) -> None:
+    def _append_layers(node: ObjectTreeNode, item: ObjectRepositoryItem) -> None:
         object_ = item.get_object()
 
         for layer in range(object_.num_layers):
-            node.insertNode()
+            node.insert_node()
 
-    def insertItem(self, index: int, item: ObjectRepositoryItem) -> None:
+    def insert_item(self, index: int, item: ObjectRepositoryItem) -> None:
         self.beginInsertRows(QModelIndex(), index, index)
-        ObjectTreeModel._appendLayers(self._treeRoot.insertNode(index), item)
+        ObjectTreeModel._append_layers(self._tree_root.insert_node(index), item)
         self.endInsertRows()
 
-    def updateItem(self, index: int, item: ObjectRepositoryItem) -> None:
-        topLeft = self.index(index, 0)
-        bottomRight = self.index(index, len(self._header))
-        self.dataChanged.emit(topLeft, bottomRight)
+    def update_item(self, index: int, item: ObjectRepositoryItem) -> None:
+        top_left = self.index(index, 0)
+        bottom_right = self.index(index, len(self._header))
+        self.dataChanged.emit(top_left, bottom_right)
 
-        node = self._treeRoot.children[index]
-        numLayersOld = len(node.children)
-        numLayersNew = item.get_object().num_layers
+        node = self._tree_root.children[index]
+        num_layers_old = len(node.children)
+        num_layers_new = item.get_object().num_layers
 
-        if numLayersOld < numLayersNew:
-            self.beginInsertRows(topLeft, numLayersOld, numLayersNew)
+        if num_layers_old < num_layers_new:
+            self.beginInsertRows(top_left, num_layers_old, num_layers_new)
 
-            while len(node.children) < numLayersNew:
-                node.insertNode()
+            while len(node.children) < num_layers_new:
+                node.insert_node()
 
             self.endInsertRows()
-        elif numLayersOld > numLayersNew:
-            self.beginRemoveRows(topLeft, numLayersNew, numLayersOld)
+        elif num_layers_old > num_layers_new:
+            self.beginRemoveRows(top_left, num_layers_new, num_layers_old)
 
-            while len(node.children) > numLayersNew:
-                node.removeNode()
+            while len(node.children) > num_layers_new:
+                node.remove_node()
 
             self.endRemoveRows()
 
-        childTopLeft = self.index(0, 0, topLeft)
-        childBottomRight = self.index(numLayersNew, len(self._header), topLeft)
-        self.dataChanged.emit(childTopLeft, childBottomRight)
+        child_top_left = self.index(0, 0, top_left)
+        child_bottom_right = self.index(num_layers_new, len(self._header), top_left)
+        self.dataChanged.emit(child_top_left, child_bottom_right)
 
-    def removeItem(self, index: int, item: ObjectRepositoryItem) -> None:
+    def remove_item(self, index: int, item: ObjectRepositoryItem) -> None:
         self.beginRemoveRows(QModelIndex(), index, index)
-        self._treeRoot.removeNode(index)
+        self._tree_root.remove_node(index)
         self.endRemoveRows()
 
-    def headerData(
+    def headerData(  # noqa: N802
         self,
         section: int,
         orientation: Qt.Orientation,
@@ -113,11 +113,11 @@ class ObjectTreeModel(QAbstractItemModel):
             return super().parent()
         elif index.isValid():
             node = index.internalPointer()
-            parentNode = node.parent
+            parent_node = node.parent
             return (
                 QModelIndex()
-                if parentNode is self._treeRoot
-                else self.createIndex(parentNode.row(), 0, parentNode)
+                if parent_node is self._tree_root
+                else self.createIndex(parent_node.row(), 0, parent_node)
             )
 
         return QModelIndex()
@@ -125,10 +125,10 @@ class ObjectTreeModel(QAbstractItemModel):
     def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
         if self.hasIndex(row, column, parent):
             if parent.isValid():
-                parentNode = parent.internalPointer()
-                node = parentNode.children[row]
+                parent_node = parent.internalPointer()
+                node = parent_node.children[row]
             else:
-                node = self._treeRoot.children[row]
+                node = self._tree_root.children[row]
 
             return self.createIndex(row, column, node)
 
@@ -148,7 +148,7 @@ class ObjectTreeModel(QAbstractItemModel):
                     return f'Layer {index.row() + 1}'
                 elif index.column() == 1:
                     try:
-                        return item.layerDistanceInMeters[index.row()]
+                        return item.layer_distance_m[index.row()]
                     except IndexError:
                         return float('inf')
         else:
@@ -157,11 +157,11 @@ class ObjectTreeModel(QAbstractItemModel):
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 if index.column() == 0:
-                    return self._repository.getName(index.row())
+                    return self._repository.get_name(index.row())
                 elif index.column() == 1:
                     return object_.get_total_layer_distance_m()
                 elif index.column() == 2:
-                    return item.getBuilder().getName()
+                    return item.get_builder().get_name()
                 elif index.column() == 3:
                     return str(object_.dtype)
                 elif index.column() == 4:
@@ -181,7 +181,7 @@ class ObjectTreeModel(QAbstractItemModel):
                 if index.column() == 1:
                     item = self._repository[parent.row()]
 
-                    if index.row() + 1 < item.getNumberOfLayers():
+                    if index.row() + 1 < item.get_num_layers():
                         value |= Qt.ItemFlag.ItemIsEditable
             else:
                 if index.column() in (0, 2):
@@ -189,7 +189,7 @@ class ObjectTreeModel(QAbstractItemModel):
 
         return value
 
-    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
+    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
             parent = index.parent()
 
@@ -198,28 +198,28 @@ class ObjectTreeModel(QAbstractItemModel):
 
                 if index.column() == 1:
                     try:
-                        distanceInM = float(value)
+                        distance_m = float(value)
                     except ValueError:
                         return False
 
-                    item.layerDistanceInMeters[index.row()] = distanceInM
+                    item.layer_distance_m[index.row()] = distance_m
                     return False
             else:
                 if index.column() == 0:
-                    self._repository.setName(index.row(), str(value))
+                    self._repository.set_name(index.row(), str(value))
                     return True
                 elif index.column() == 2:
-                    self._api.buildObject(index.row(), str(value))
+                    self._api.build_object(index.row(), str(value))
                     return True
 
         return False
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         if parent.column() > 0:
             return 0
 
-        node = parent.internalPointer() if parent.isValid() else self._treeRoot
+        node = parent.internalPointer() if parent.isValid() else self._tree_root
         return len(node.children)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._header)

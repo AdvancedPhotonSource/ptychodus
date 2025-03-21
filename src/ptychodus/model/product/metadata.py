@@ -76,15 +76,6 @@ class MetadataRepositoryItem(ParameterGroup):
 
         self._index = -1
 
-    def assign_item(self, item: MetadataRepositoryItem, *, notify: bool = True) -> None:
-        self.set_name(item.get_name())
-        self.comments.set_value(item.comments.get_value())
-        self.detector_distance_m.set_value(item.detector_distance_m.get_value())
-        self.probe_energy_eV.set_value(item.probe_energy_eV.get_value())
-        self.probe_photon_count.set_value(item.probe_photon_count.get_value())
-        self.exposure_time_s.set_value(item.exposure_time_s.get_value())
-        self.mass_attenuation_m2_kg.set_value(item.mass_attenuation_m2_kg.get_value())
-
     def assign(self, metadata: ProductMetadata) -> None:
         self.set_name(metadata.name)
         self.comments.set_value(metadata.comments)

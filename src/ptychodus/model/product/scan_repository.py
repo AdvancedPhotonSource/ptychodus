@@ -20,7 +20,7 @@ class ScanRepository(ObservableSequence[ScanRepositoryItem], ProductRepositoryOb
         self._repository = repository
         self._repository.add_observer(self)
 
-    def getName(self, index: int) -> str:
+    def get_name(self, index: int) -> str:
         return self._repository[index].get_name()
 
     def setName(self, index: int, name: str) -> None:
@@ -34,15 +34,15 @@ class ScanRepository(ObservableSequence[ScanRepositoryItem], ProductRepositoryOb
 
     def __getitem__(self, index: int | slice) -> ScanRepositoryItem | Sequence[ScanRepositoryItem]:
         if isinstance(index, slice):
-            return [item.get_scan() for item in self._repository[index]]
+            return [item.get_scan_item() for item in self._repository[index]]
         else:
-            return self._repository[index].get_scan()
+            return self._repository[index].get_scan_item()
 
     def __len__(self) -> int:
         return len(self._repository)
 
     def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notify_observers_item_inserted(index, item.get_scan())
+        self.notify_observers_item_inserted(index, item.get_scan_item())
 
     def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
         pass
@@ -60,4 +60,4 @@ class ScanRepository(ObservableSequence[ScanRepositoryItem], ProductRepositoryOb
         pass
 
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notify_observers_item_removed(index, item.get_scan())
+        self.notify_observers_item_removed(index, item.get_scan_item())

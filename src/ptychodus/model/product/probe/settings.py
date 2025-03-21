@@ -19,16 +19,16 @@ class ProbeSettings(Observable, Observer):
         self.numberOfCoherentModes = self._settingsGroup.create_integer_parameter(
             'NumberOfCoherentModes', 1, minimum=1
         )
-        self.numberOfIncoherentModes = self._settingsGroup.create_integer_parameter(
+        self.num_incoherent_modes = self._settingsGroup.create_integer_parameter(
             'NumberOfIncoherentModes', 1, minimum=1
         )
-        self.orthogonalizeIncoherentModes = self._settingsGroup.create_boolean_parameter(
+        self.orthogonalize_incoherent_modes = self._settingsGroup.create_boolean_parameter(
             'OrthogonalizeIncoherentModes', True
         )
-        self.incoherentModeDecayType = self._settingsGroup.create_string_parameter(
+        self.incoherent_mode_decay_type = self._settingsGroup.create_string_parameter(
             'IncoherentModeDecayType', 'Polynomial'
         )
-        self.incoherentModeDecayRatio = self._settingsGroup.create_real_parameter(
+        self.incoherent_mode_decay_ratio = self._settingsGroup.create_real_parameter(
             'IncoherentModeDecayRatio', 1.0, minimum=0.0, maximum=1.0
         )
 

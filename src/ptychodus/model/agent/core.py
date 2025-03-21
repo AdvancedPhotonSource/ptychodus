@@ -23,9 +23,10 @@ class AgentPresenter:
             'gpt35large',
             'gpt4',
             'gpt4large',
-            'gpt4turbo',
             'gpt4o',
-            'gpto1preview',
+            'gpt4turbo',
+            'gpto1mini',
+            'gpto3mini',
         ]:
             yield model
 

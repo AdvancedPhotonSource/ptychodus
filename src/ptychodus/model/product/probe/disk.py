@@ -31,9 +31,9 @@ class DiskProbeBuilder(ProbeBuilder):
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
         geometry = geometryProvider.get_probe_geometry()
-        coords = self.getTransverseCoordinates(geometry)
+        coords = self.get_transverse_coordinates(geometry)
 
-        R_m = coords.positionRInMeters
+        R_m = coords.position_r_m
         r_m = self.diameterInMeters.get_value() / 2.0
         disk = numpy.where(R_m < r_m, 1 + 0j, 0j)
 

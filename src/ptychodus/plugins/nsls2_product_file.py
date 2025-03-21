@@ -19,9 +19,9 @@ class NSLSIIProductFileReader(ProductFileReader):
     def read(self, file_path: Path) -> Product:
         point_list: list[ScanPoint] = list()
 
-        with h5py.File(file_path, 'r') as h5File:
-            detector_distance_m = float(h5File['det_dist'][()]) * self.ONE_MICRON_M
-            probe_energy_eV = 1000.0 * float(h5File['energy'][()])
+        with h5py.File(file_path, 'r') as h5_file:
+            detector_distance_m = float(h5_file['det_dist'][()]) * self.ONE_MICRON_M
+            probe_energy_eV = 1000.0 * float(h5_file['energy'][()])  # noqa: N806
 
             metadata = ProductMetadata(
                 name=file_path.stem,
@@ -33,10 +33,10 @@ class NSLSIIProductFileReader(ProductFileReader):
                 mass_attenuation_m2_kg=0.0,  # not included in file
             )
 
-            pixel_width_m = h5File['img_pixel_size_x'][()]
-            pixel_height_m = h5File['img_pixel_size_y'][()]
+            pixel_width_m = h5_file['img_pixel_size_x'][()]
+            pixel_height_m = h5_file['img_pixel_size_y'][()]
             pixel_geometry = PixelGeometry(width_m=pixel_width_m, height_m=pixel_height_m)
-            positions_m = h5File['pos_xy'][()].T * self.ONE_MICRON_M
+            positions_m = h5_file['pos_xy'][()].T * self.ONE_MICRON_M
 
             for index, _xy in enumerate(positions_m):
                 point = ScanPoint(
@@ -46,10 +46,10 @@ class NSLSIIProductFileReader(ProductFileReader):
                 )
                 point_list.append(point)
 
-            probe_array = h5File['prb'][()].astype(complex)
+            probe_array = h5_file['prb'][()].astype(complex)
             probe = Probe(array=probe_array, pixel_geometry=pixel_geometry)
 
-            object_array = h5File['obj'][()].astype(complex)
+            object_array = h5_file['obj'][()].astype(complex)
             object_ = Object(
                 array=object_array,
                 pixel_geometry=pixel_geometry,

@@ -20,32 +20,32 @@ from PyQt5.QtWidgets import (
 class RepositoryButtonBox(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.loadButton = QPushButton('Load')
+        self.load_button = QPushButton('Load')
         self.loadMenu = QMenu()
-        self.saveButton = QPushButton('Save')
-        self.saveMenu = QMenu()
-        self.editButton = QPushButton('Edit')
-        self.analyzeButton = QPushButton('Analyze')
-        self.analyzeMenu = QMenu()
+        self.save_button = QPushButton('Save')
+        self.save_menu = QMenu()
+        self.edit_button = QPushButton('Edit')
+        self.analyze_button = QPushButton('Analyze')
+        self.analyze_menu = QMenu()
 
-        self.loadButton.setMenu(self.loadMenu)
-        self.saveButton.setMenu(self.saveMenu)
-        self.analyzeButton.setMenu(self.analyzeMenu)
+        self.load_button.setMenu(self.loadMenu)
+        self.save_button.setMenu(self.save_menu)
+        self.analyze_button.setMenu(self.analyze_menu)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.loadButton)
-        layout.addWidget(self.saveButton)
-        layout.addWidget(self.editButton)
-        layout.addWidget(self.analyzeButton)
+        layout.addWidget(self.load_button)
+        layout.addWidget(self.save_button)
+        layout.addWidget(self.edit_button)
+        layout.addWidget(self.analyze_button)
         self.setLayout(layout)
 
 
 class RepositoryItemCopierDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.sourceComboBox = QComboBox()
-        self.destinationComboBox = QComboBox()
+        self.source_combo_box = QComboBox()
+        self.destination_combo_box = QComboBox()
         self.buttonBox = QDialogButtonBox()
 
         self.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
@@ -53,8 +53,8 @@ class RepositoryItemCopierDialog(QDialog):
         self.buttonBox.clicked.connect(self._handleButtonBoxClicked)
 
         layout = QFormLayout()
-        layout.addRow('From:', self.sourceComboBox)
-        layout.addRow('To:', self.destinationComboBox)
+        layout.addRow('From:', self.source_combo_box)
+        layout.addRow('To:', self.destination_combo_box)
         layout.addRow(self.buttonBox)
         self.setLayout(layout)
 
@@ -68,13 +68,13 @@ class RepositoryItemCopierDialog(QDialog):
 class RepositoryTableView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.tableView = QTableView()
-        self.buttonBox = RepositoryButtonBox()
-        self.copierDialog = RepositoryItemCopierDialog()
+        self.table_view = QTableView()
+        self.button_box = RepositoryButtonBox()
+        self.copier_dialog = RepositoryItemCopierDialog()
 
         layout = QVBoxLayout()
-        layout.addWidget(self.tableView)
-        layout.addWidget(self.buttonBox)
+        layout.addWidget(self.table_view)
+        layout.addWidget(self.button_box)
         self.setLayout(layout)
 
 

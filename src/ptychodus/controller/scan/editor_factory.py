@@ -103,18 +103,18 @@ class ScanTransformViewController(ParameterViewController):
 
 class ScanBoundingBoxViewController(CheckableGroupBoxParameterViewController):
     def __init__(self, item: ScanRepositoryItem) -> None:
-        super().__init__(item.expandBoundingBox, 'Expand Bounding Box')
+        super().__init__(item.expand_bbox, 'Expand Bounding Box')
         self._minimumXController = LengthWidgetParameterViewController(
-            item.expandedBoundingBoxMinimumXInMeters, is_signed=True
+            item.expand_bbox_xmin_m, is_signed=True
         )
         self._maximumXController = LengthWidgetParameterViewController(
-            item.expandedBoundingBoxMaximumXInMeters, is_signed=True
+            item.expand_bbox_xmax_m, is_signed=True
         )
         self._minimumYController = LengthWidgetParameterViewController(
-            item.expandedBoundingBoxMinimumYInMeters, is_signed=True
+            item.expand_bbox_ymin_m, is_signed=True
         )
         self._maximumYController = LengthWidgetParameterViewController(
-            item.expandedBoundingBoxMaximumYInMeters, is_signed=True
+            item.expand_bbox_ymax_m, is_signed=True
         )
 
         layout = QFormLayout()
@@ -130,15 +130,15 @@ class ScanEditorViewControllerFactory:
         self, dialogBuilder: ParameterViewBuilder, item: ScanRepositoryItem
     ) -> None:
         dialogBuilder.add_view_controller_to_bottom(
-            ScanTransformViewController(item.getTransform())
+            ScanTransformViewController(item.get_transform())
         )
         dialogBuilder.add_view_controller_to_bottom(ScanBoundingBoxViewController(item))
 
     def createEditorDialog(
         self, itemName: str, item: ScanRepositoryItem, parent: QWidget
     ) -> QDialog:
-        scanBuilder = item.getBuilder()
-        builderName = scanBuilder.getName()
+        scanBuilder = item.get_builder()
+        builderName = scanBuilder.get_name()
         baseScanGroup = 'Base Scan'
         title = f'{itemName} [{builderName}]'
 

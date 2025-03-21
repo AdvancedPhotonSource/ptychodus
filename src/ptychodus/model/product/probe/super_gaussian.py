@@ -32,10 +32,10 @@ class SuperGaussianProbeBuilder(ProbeBuilder):
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
         geometry = geometryProvider.get_probe_geometry()
-        coords = self.getTransverseCoordinates(geometry)
+        coords = self.get_transverse_coordinates(geometry)
 
         Z = (
-            coords.positionRInMeters - self.annularRadiusInMeters.get_value()
+            coords.position_r_m - self.annularRadiusInMeters.get_value()
         ) / self.fwhmInMeters.get_value()
         ZP = numpy.power(2 * Z, 2 * self.orderParameter.get_value())
 

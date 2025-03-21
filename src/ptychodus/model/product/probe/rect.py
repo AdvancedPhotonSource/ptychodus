@@ -34,11 +34,11 @@ class RectangularProbeBuilder(ProbeBuilder):
 
     def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
         geometry = geometryProvider.get_probe_geometry()
-        coords = self.getTransverseCoordinates(geometry)
+        coords = self.get_transverse_coordinates(geometry)
 
-        aX_m = numpy.fabs(coords.positionXInMeters)
+        aX_m = numpy.fabs(coords.position_x_m)
         rx_m = self.widthInMeters.get_value() / 2.0
-        aY_m = numpy.fabs(coords.positionYInMeters)
+        aY_m = numpy.fabs(coords.position_y_m)
         ry_m = self.heightInMeters.get_value() / 2.0
 
         isInside = numpy.logical_and(aX_m < rx_m, aY_m < ry_m)

@@ -115,7 +115,7 @@ class ControllerCore:
             model.productRepository,
             view.reconstructorView,
             view.reconstructorPlotView,
-            self._productController.tableModel,
+            self._productController.table_model,
             self._fileDialogFactory,
             [
                 self._ptyChiViewControllerFactory,
@@ -130,7 +130,7 @@ class ControllerCore:
             model.workflowExecutionPresenter,
             view.workflowParametersView,
             view.workflowTableView,
-            self._productController.tableModel,
+            self._productController.table_model,
         )
         self._automationController = AutomationController.create_instance(
             model._automationCore,

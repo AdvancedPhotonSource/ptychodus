@@ -19,10 +19,10 @@ class ScanBuilder(ParameterGroup):
         self._name.set_value(name)
         self._add_parameter('name', self._name)
 
-    def getName(self) -> str:
+    def get_name(self) -> str:
         return self._name.get_value()
 
-    def syncToSettings(self) -> None:
+    def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
             parameter.sync_value_to_parent()
 

@@ -14,25 +14,25 @@ class ScanTableModel(QAbstractTableModel):
         self._repository = repository
         self._api = api
         self._header = ['Name', 'Plot', 'Builder', 'Points', 'Length [m]', 'Size [MB]']
-        self._checkedItemIndexes: set[int] = set()
+        self._checked_item_indexes: set[int] = set()
 
-    def insertItem(self, index: int, item: ScanRepositoryItem) -> None:
+    def insert_item(self, index: int, item: ScanRepositoryItem) -> None:
         self.beginInsertRows(QModelIndex(), index, index)
         self.endInsertRows()
 
-    def updateItem(self, index: int, item: ScanRepositoryItem) -> None:
-        topLeft = self.index(index, 0)
-        bottomRight = self.index(index, len(self._header))
-        self.dataChanged.emit(topLeft, bottomRight)
+    def update_item(self, index: int, item: ScanRepositoryItem) -> None:
+        top_left = self.index(index, 0)
+        bottom_right = self.index(index, len(self._header))
+        self.dataChanged.emit(top_left, bottom_right)
 
-    def removeItem(self, index: int, item: ScanRepositoryItem) -> None:
+    def remove_item(self, index: int, item: ScanRepositoryItem) -> None:
         self.beginRemoveRows(QModelIndex(), index, index)
         self.endRemoveRows()
 
-    def isItemChecked(self, itemIndex: int) -> bool:
-        return itemIndex in self._checkedItemIndexes
+    def is_item_checked(self, item_index: int) -> bool:
+        return item_index in self._checked_item_indexes
 
-    def headerData(
+    def headerData(  # noqa: N802
         self,
         section: int,
         orientation: Qt.Orientation,
@@ -46,26 +46,26 @@ class ScanTableModel(QAbstractTableModel):
             return None
 
         item = self._repository[index.row()]
-        scan = item.getScan()
+        scan = item.get_scan()
 
         if role == Qt.ItemDataRole.DisplayRole:
             if index.column() == 0:
-                return self._repository.getName(index.row())
+                return self._repository.get_name(index.row())
             elif index.column() == 1:
                 return None
             elif index.column() == 2:
-                return item.getBuilder().getName()
+                return item.get_builder().get_name()
             elif index.column() == 3:
                 return len(scan)
             elif index.column() == 4:
-                return f'{item.getLengthInMeters():.6f}'
+                return f'{item.get_length_m():.6f}'
             elif index.column() == 5:
                 return f'{scan.nbytes / (1024 * 1024):.2f}'
         elif role == Qt.ItemDataRole.CheckStateRole:
             if index.column() == 1:
                 return (
                     Qt.CheckState.Checked
-                    if index.row() in self._checkedItemIndexes
+                    if index.row() in self._checked_item_indexes
                     else Qt.CheckState.Unchecked
                 )
 
@@ -81,7 +81,7 @@ class ScanTableModel(QAbstractTableModel):
 
         return value
 
-    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
+    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
         if not index.isValid():
             return False
 
@@ -95,9 +95,9 @@ class ScanTableModel(QAbstractTableModel):
         elif role == Qt.ItemDataRole.CheckStateRole:
             if index.column() == 1:
                 if value == Qt.CheckState.Checked:
-                    self._checkedItemIndexes.add(index.row())
+                    self._checked_item_indexes.add(index.row())
                 else:
-                    self._checkedItemIndexes.discard(index.row())
+                    self._checked_item_indexes.discard(index.row())
 
                 self.dataChanged.emit(index, index)
 
@@ -105,8 +105,8 @@ class ScanTableModel(QAbstractTableModel):
 
         return False
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._repository)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._header)

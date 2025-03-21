@@ -31,19 +31,17 @@ class ScanSettings(Observable, Observer):
             'JitterRadiusInMeters', 0.0, minimum=0.0
         )
 
-        self.expandBoundingBox = self._settingsGroup.create_boolean_parameter(
-            'ExpandBoundingBox', False
-        )
-        self.expandedBoundingBoxMinimumXInMeters = self._settingsGroup.create_real_parameter(
+        self.expand_bbox = self._settingsGroup.create_boolean_parameter('ExpandBoundingBox', False)
+        self.expand_bbox_xmin_m = self._settingsGroup.create_real_parameter(
             'ExpandedBoundingBoxMinimumXInMeters', -5e-7
         )
-        self.expandedBoundingBoxMaximumXInMeters = self._settingsGroup.create_real_parameter(
+        self.expand_bbox_xmax_m = self._settingsGroup.create_real_parameter(
             'ExpandedBoundingBoxMaximumXInMeters', +5e-7
         )
-        self.expandedBoundingBoxMinimumYInMeters = self._settingsGroup.create_real_parameter(
+        self.expand_bbox_ymin_m = self._settingsGroup.create_real_parameter(
             'ExpandedBoundingBoxMinimumYInMeters', -5e-7
         )
-        self.expandedBoundingBoxMaximumYInMeters = self._settingsGroup.create_real_parameter(
+        self.expand_bbox_ymax_m = self._settingsGroup.create_real_parameter(
             'ExpandedBoundingBoxMaximumYInMeters', +5e-7
         )
 
