@@ -50,31 +50,38 @@ class FromMemoryScanBuilder(ScanBuilder):
 
 class FromFileScanBuilder(ScanBuilder):
     def __init__(
-        self, settings: ScanSettings, filePath: Path, fileType: str, fileReader: PositionFileReader
+        self,
+        settings: ScanSettings,
+        file_path: Path,
+        file_type: str,
+        file_reader: PositionFileReader,
     ) -> None:
         super().__init__(settings, 'from_file')
         self._settings = settings
-        self.filePath = settings.filePath.copy()
-        self.filePath.set_value(filePath)
-        self._add_parameter('file_path', self.filePath)
-        self.fileType = settings.fileType.copy()
-        self.fileType.set_value(fileType)
-        self._add_parameter('file_type', self.fileType)
-        self._fileReader = fileReader
+        self.file_path = settings.file_path.copy()
+        self.file_path.set_value(file_path)
+        self._add_parameter('file_path', self.file_path)
+        self.file_type = settings.file_type.copy()
+        self.file_type.set_value(file_type)
+        self._add_parameter('file_type', self.file_type)
+        self._file_reader = file_reader
 
     def copy(self) -> FromFileScanBuilder:
         return FromFileScanBuilder(
-            self._settings, self.filePath.get_value(), self.fileType.get_value(), self._fileReader
+            self._settings,
+            self.file_path.get_value(),
+            self.file_type.get_value(),
+            self._file_reader,
         )
 
     def build(self) -> PositionSequence:
-        filePath = self.filePath.get_value()
-        fileType = self.fileType.get_value()
-        logger.debug(f'Reading "{filePath}" as "{fileType}"')
+        file_path = self.file_path.get_value()
+        file_type = self.file_type.get_value()
+        logger.debug(f'Reading "{file_path}" as "{file_type}"')
 
         try:
-            scan = self._fileReader.read(filePath)
+            scan = self._file_reader.read(file_path)
         except Exception as exc:
-            raise RuntimeError(f'Failed to read "{filePath}"') from exc
+            raise RuntimeError(f'Failed to read "{file_path}"') from exc
 
         return scan

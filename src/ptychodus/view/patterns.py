@@ -43,41 +43,41 @@ class PatternsButtonBox(QWidget):
 class OpenDatasetWizardPage(QWizardPage):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._isComplete = False
+        self._is_complete = False
 
-    def isComplete(self) -> bool:
+    def isComplete(self) -> bool:  # noqa: N802
         """Overrides QWizardPage.isComplete()"""
-        return self._isComplete
+        return self._is_complete
 
-    def _setComplete(self, complete: bool) -> None:
-        if self._isComplete != complete:
-            self._isComplete = complete
+    def _set_complete(self, complete: bool) -> None:
+        if self._is_complete != complete:
+            self._is_complete = complete
             self.completeChanged.emit()
 
 
 class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.detectorExtentCheckBox = QCheckBox('Detector Extent')
-        self.detectorPixelSizeCheckBox = QCheckBox('Detector Pixel Size')
-        self.detectorBitDepthCheckBox = QCheckBox('Detector Bit Depth')
-        self.detectorDistanceCheckBox = QCheckBox('Detector Distance')
-        self.patternCropCenterCheckBox = QCheckBox('Pattern Crop Center')
-        self.patternCropExtentCheckBox = QCheckBox('Pattern Crop Extent')
-        self.probePhotonCountCheckBox = QCheckBox('Probe Photon Count')
-        self.probeEnergyCheckBox = QCheckBox('Probe Energy')
+        self.detector_extent_check_box = QCheckBox('Detector Extent')
+        self.detector_pixel_size_check_box = QCheckBox('Detector Pixel Size')
+        self.detector_bit_depth_check_box = QCheckBox('Detector Bit Depth')
+        self.detector_distance_check_box = QCheckBox('Detector Distance')
+        self.pattern_crop_center_check_box = QCheckBox('Pattern Crop Center')
+        self.pattern_crop_extent_check_box = QCheckBox('Pattern Crop Extent')
+        self.probe_photon_count_check_box = QCheckBox('Probe Photon Count')
+        self.probe_energy_check_box = QCheckBox('Probe Energy')
 
         self.setTitle('Import Metadata')
 
         layout = QVBoxLayout()
-        layout.addWidget(self.detectorExtentCheckBox)
-        layout.addWidget(self.detectorPixelSizeCheckBox)
-        layout.addWidget(self.detectorBitDepthCheckBox)
-        layout.addWidget(self.detectorDistanceCheckBox)
-        layout.addWidget(self.patternCropCenterCheckBox)
-        layout.addWidget(self.patternCropExtentCheckBox)
-        layout.addWidget(self.probePhotonCountCheckBox)
-        layout.addWidget(self.probeEnergyCheckBox)
+        layout.addWidget(self.detector_extent_check_box)
+        layout.addWidget(self.detector_pixel_size_check_box)
+        layout.addWidget(self.detector_bit_depth_check_box)
+        layout.addWidget(self.detector_distance_check_box)
+        layout.addWidget(self.pattern_crop_center_check_box)
+        layout.addWidget(self.pattern_crop_extent_check_box)
+        layout.addWidget(self.probe_photon_count_check_box)
+        layout.addWidget(self.probe_energy_check_box)
         layout.addStretch()
         self.setLayout(layout)
 
@@ -85,23 +85,23 @@ class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
 class PatternsInfoDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.treeView = QTreeView()
-        self.buttonBox = QDialogButtonBox()
+        self.tree_view = QTreeView()
+        self.button_box = QDialogButtonBox()
 
-        treeHeader = self.treeView.header()
-        treeHeader.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
-        treeHeader.setSectionResizeMode(QHeaderView.ResizeToContents)
+        tree_header = self.tree_view.header()
+        tree_header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        tree_header.setSectionResizeMode(QHeaderView.ResizeToContents)
 
-        self.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
-        self.buttonBox.clicked.connect(self._handleButtonBoxClicked)
+        self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
+        self.button_box.clicked.connect(self._handle_button_box_clicked)
 
         layout = QVBoxLayout()
-        layout.addWidget(self.treeView)
-        layout.addWidget(self.buttonBox)
+        layout.addWidget(self.tree_view)
+        layout.addWidget(self.button_box)
         self.setLayout(layout)
 
-    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
+    def _handle_button_box_clicked(self, button: QAbstractButton) -> None:
+        if self.button_box.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
             self.accept()
         else:
             self.reject()
@@ -110,16 +110,16 @@ class PatternsInfoDialog(QDialog):
 class PatternsView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.detectorView = DetectorView()
+        self.detector_view = DetectorView()
         self.tree_view = QTreeView()
-        self.infoLabel = QLabel()
+        self.info_label = QLabel()
         self.button_box = PatternsButtonBox()
 
         self.tree_view.header().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout = QVBoxLayout()
-        layout.addWidget(self.detectorView)
+        layout.addWidget(self.detector_view)
         layout.addWidget(self.tree_view)
-        layout.addWidget(self.infoLabel)
+        layout.addWidget(self.info_label)
         layout.addWidget(self.button_box)
         self.setLayout(layout)

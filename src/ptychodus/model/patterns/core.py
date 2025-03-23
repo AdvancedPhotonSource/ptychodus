@@ -19,29 +19,29 @@ logger = logging.getLogger(__name__)
 class PatternsCore(Observer):
     def __init__(
         self,
-        settingsRegistry: SettingsRegistry,
-        fileReaderChooser: PluginChooser[DiffractionFileReader],
-        fileWriterChooser: PluginChooser[DiffractionFileWriter],
-        reinitObservable: Observable,
+        settings_registry: SettingsRegistry,
+        file_reader_chooser: PluginChooser[DiffractionFileReader],
+        file_writer_chooser: PluginChooser[DiffractionFileWriter],
+        reinit_observable: Observable,
     ) -> None:
         super().__init__()
-        self.detectorSettings = DetectorSettings(settingsRegistry)
-        self.patternSettings = PatternSettings(settingsRegistry)
-        self.patternSizer = PatternSizer(self.detectorSettings, self.patternSettings)
-        self.dataset = AssembledDiffractionDataset(self.patternSettings, self.patternSizer)
-        self.patternsAPI = PatternsAPI(
-            self.patternSettings,
-            self.detectorSettings,
+        self.detector_settings = DetectorSettings(settings_registry)
+        self.pattern_settings = PatternSettings(settings_registry)
+        self.pattern_sizer = PatternSizer(self.detector_settings, self.pattern_settings)
+        self.dataset = AssembledDiffractionDataset(self.pattern_settings, self.pattern_sizer)
+        self.patterns_api = PatternsAPI(
+            self.pattern_settings,
+            self.detector_settings,
             self.dataset,
-            fileReaderChooser,
-            fileWriterChooser,
+            file_reader_chooser,
+            file_writer_chooser,
         )
 
-        fileReaderChooser.synchronize_with_parameter(self.patternSettings.fileType)
-        fileWriterChooser.set_current_plugin(self.patternSettings.fileType.get_value())
+        file_reader_chooser.synchronize_with_parameter(self.pattern_settings.file_type)
+        file_writer_chooser.set_current_plugin(self.pattern_settings.file_type.get_value())
 
-        self._reinitObservable = reinitObservable
-        reinitObservable.add_observer(self)
+        self._reinit_observable = reinit_observable
+        reinit_observable.add_observer(self)
 
     def start(self) -> None:
         pass
@@ -50,9 +50,9 @@ class PatternsCore(Observer):
         self.dataset.finish_loading(block=False)
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._reinitObservable:
-            self.patternsAPI.open_patterns(
-                filePath=self.patternSettings.filePath.get_value(),
-                file_type=self.patternSettings.fileType.get_value(),
+        if observable is self._reinit_observable:
+            self.patterns_api.open_patterns(
+                file_path=self.pattern_settings.file_path.get_value(),
+                file_type=self.pattern_settings.file_type.get_value(),
             )
             self.dataset.start_loading()

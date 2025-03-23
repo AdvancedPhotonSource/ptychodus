@@ -88,13 +88,13 @@ class DatasetTreeModel(QAbstractItemModel):
         self.endInsertRows()
 
     def refresh_array(self, row: int) -> None:
-        topLeft = self.index(row, 0)
-        bottomRight = self.index(row, self.columnCount() - 1)
-        self.dataChanged.emit(topLeft, bottomRight)
+        top_left = self.index(row, 0)
+        bottom_right = self.index(row, self.columnCount() - 1)
+        self.dataChanged.emit(top_left, bottom_right)
 
-        childTopLeft = self.index(row, 0, topLeft)
-        childBottomRight = self.index(row, self.columnCount() - 1)
-        self.dataChanged.emit(childTopLeft, childBottomRight)
+        child_top_left = self.index(row, 0, top_left)
+        child_bottom_right = self.index(row, self.columnCount() - 1)
+        self.dataChanged.emit(child_top_left, child_bottom_right)
 
     @overload
     def parent(self, child: QModelIndex) -> QModelIndex: ...
@@ -115,7 +115,7 @@ class DatasetTreeModel(QAbstractItemModel):
 
         return QModelIndex()
 
-    def headerData(
+    def headerData(  # noqa: N802
         self,
         section: int,
         orientation: Qt.Orientation,
@@ -149,9 +149,9 @@ class DatasetTreeModel(QAbstractItemModel):
 
         return QModelIndex()
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         node = parent.internalPointer() if parent.isValid() else self._nodes
         return len(node.child_nodes)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._header)

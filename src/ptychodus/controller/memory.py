@@ -19,7 +19,7 @@ class MemoryController:
         self._timer.start(10 * 1000)  # TODO customize (in milliseconds)
 
     def _update_widget(self) -> None:
-        stats = self._presenter.getStatistics()
+        stats = self._presenter.get_statistics()
         total_MB = int(stats.total_physical_memory_bytes / 1e6)
         total_str = f'Total Memory: {total_MB} MB'
 

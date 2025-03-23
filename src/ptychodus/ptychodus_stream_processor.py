@@ -43,7 +43,7 @@ class ReconstructionThread(threading.Thread):
                 logging.debug('ReconstructionThread: Begin assembling scan positions')
                 self._ptychodus_streaming_context.stop()
                 logging.debug('ReconstructionThread: End assembling scan positions')
-                self._ptychodus.batchModeExecute(
+                self._ptychodus.batch_mode_execute(
                     'reconstruct', self._input_product_path, self._output_product_path
                 )
                 self._reconstruct_event.clear()
@@ -106,7 +106,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             num_patterns_total=int(num_patterns_total),
             pattern_dtype=numpy.dtype(pattern_dtype),
         )
-        self._ptychodus_streaming_context = self._ptychodus.createStreamingContext(metadata)
+        self._ptychodus_streaming_context = self._ptychodus.create_streaming_context(metadata)
         self._ptychodus_streaming_context.start()  # FIXME
 
     def process(self, pv_object: pvaccess.PvObject) -> pvaccess.PvObject:

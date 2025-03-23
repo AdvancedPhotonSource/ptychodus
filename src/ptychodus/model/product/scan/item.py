@@ -100,7 +100,7 @@ class ScanRepositoryItem(ParameterGroup):
         self._rebuild()
 
     def get_bounding_box(self) -> ScanBoundingBox | None:
-        bbox = self._bbox_builder.getBoundingBox()
+        bbox = self._bbox_builder.get_bounding_box()
 
         if self.expand_bbox.get_value():
             expanded_bbox = ScanBoundingBox(

@@ -195,7 +195,7 @@ class ProbeTreeModel(QAbstractItemModel):
 
             if not parent.isValid():
                 if index.column() == 0:
-                    self._repository.setName(index.row(), str(value))
+                    self._repository.set_name(index.row(), str(value))
                     return True
                 elif index.column() == 2:
                     self._api.buildProbe(index.row(), str(value))

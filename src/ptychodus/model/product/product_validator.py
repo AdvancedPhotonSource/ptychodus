@@ -22,57 +22,57 @@ class ProductValidator(Observable, Observer):
         self._geometry = geometry
         self._probe = probe
         self._object = object_
-        self._isScanValid = False
-        self._isProbeValid = False
-        self._isObjectValid = False
+        self._is_scan_valid = False
+        self._is_probe_valid = False
+        self._is_object_valid = False
 
-    def isScanValid(self) -> bool:
-        return self._isScanValid
+    def is_scan_valid(self) -> bool:
+        return self._is_scan_valid
 
-    def _validateScan(self) -> None:
+    def _validate_scan(self) -> None:
         scan = self._scan.get_scan()
-        scanIndexes = set(point.index for point in scan)
-        patternIndexes = set(self._dataset.get_assembled_indexes())
-        isScanValidNow = not scanIndexes.isdisjoint(patternIndexes)
+        scan_indexes = set(point.index for point in scan)
+        pattern_indexes = set(self._dataset.get_assembled_indexes())
+        is_scan_valid_now = not scan_indexes.isdisjoint(pattern_indexes)
 
-        if self._isScanValid != isScanValidNow:
-            self._isScanValid = isScanValidNow
+        if self._is_scan_valid != is_scan_valid_now:
+            self._is_scan_valid = is_scan_valid_now
             self.notify_observers()
 
-    def isProbeValid(self) -> bool:
-        return self._isProbeValid
+    def is_probe_valid(self) -> bool:
+        return self._is_probe_valid
 
-    def isObjectValid(self) -> bool:
-        return self._isObjectValid
+    def is_object_valid(self) -> bool:
+        return self._is_object_valid
 
-    def _validateProbeAndObject(self) -> None:
-        hasValidityChanged = False
+    def _validate_probe_and_object(self) -> None:
+        has_validity_changed = False
 
         probe = self._probe.get_probe()
-        isProbeValidNow = self._geometry.isProbeGeometryValid(probe.get_geometry())
+        is_probe_valid_now = self._geometry.is_probe_geometry_valid(probe.get_geometry())
 
-        if self._isProbeValid != isProbeValidNow:
-            self._isProbeValid = isProbeValidNow
-            hasValidityChanged = True
+        if self._is_probe_valid != is_probe_valid_now:
+            self._is_probe_valid = is_probe_valid_now
+            has_validity_changed = True
 
         object_ = self._object.get_object()
-        isObjectValidNow = self._geometry.isObjectGeometryValid(object_.get_geometry())
+        is_object_valid_now = self._geometry.is_object_geometry_valid(object_.get_geometry())
 
-        if self._isObjectValid != isObjectValidNow:
-            self._isObjectValid = isObjectValidNow
-            hasValidityChanged = True
+        if self._is_object_valid != is_object_valid_now:
+            self._is_object_valid = is_object_valid_now
+            has_validity_changed = True
 
-        if hasValidityChanged:
+        if has_validity_changed:
             self.notify_observers()
 
     def _update(self, observable: Observable) -> None:
         if observable is self._dataset:
-            self._validateScan()
+            self._validate_scan()
         elif observable is self._scan:
-            self._validateScan()
+            self._validate_scan()
         elif observable is self._geometry:
-            self._validateProbeAndObject()
+            self._validate_probe_and_object()
         elif observable is self._probe:
-            self._validateProbeAndObject()
+            self._validate_probe_and_object()
         elif observable is self._object:
-            self._validateProbeAndObject()
+            self._validate_probe_and_object()

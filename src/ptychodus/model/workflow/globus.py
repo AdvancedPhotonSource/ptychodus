@@ -35,14 +35,14 @@ def ptychodus_reconstruct(**data: str) -> None:
     from ptychodus.model import ModelCore
 
     action = data['ptychodus_action']
-    inputFile = Path(data['ptychodus_input_file'])
-    outputFile = Path(data['ptychodus_output_file'])
-    settingsFile = Path(data['ptychodus_settings_file'])
-    patternsFile = Path(data['ptychodus_patterns_file'])
+    input_file = Path(data['ptychodus_input_file'])
+    output_file = Path(data['ptychodus_output_file'])
+    settings_file = Path(data['ptychodus_settings_file'])
+    patterns_file = Path(data['ptychodus_patterns_file'])
 
-    with ModelCore(settingsFile) as model:
-        model.workflow_api.import_assembled_patterns(patternsFile)
-        model.batchModeExecute(action, inputFile, outputFile)
+    with ModelCore(settings_file) as model:
+        model.workflow_api.import_assembled_patterns(patterns_file)
+        model.batch_mode_execute(action, input_file, output_file)
 
 
 @gladier.generate_flow_definition
@@ -91,125 +91,125 @@ class PtychodusClientBuilder(ABC):
 class NativePtychodusClientBuilder(PtychodusClientBuilder):
     def __init__(self, authorizer: WorkflowAuthorizer) -> None:
         super().__init__()
-        self._authClient = fair_research_login.NativeClient(
+        self._auth_client = fair_research_login.NativeClient(
             client_id=PTYCHODUS_CLIENT_ID,
             app_name='Ptychodus',
             code_handlers=[CustomCodeHandler(authorizer)],
         )
 
-    def _requestAuthorization(self, scopes: list[str]) -> ScopeAuthorizerMapping:
+    def _request_authorization(self, scopes: list[str]) -> ScopeAuthorizerMapping:
         logger.debug(f'Requested authorization scopes: {pformat(scopes)}')
 
         # 'force' is used for any underlying scope changes. For example, if a flow adds transfer
         # functionality since it was last run, running it again would require a re-login.
-        self._authClient.login(requested_scopes=scopes, force=True, refresh_tokens=True)
-        return self._authClient.get_authorizers_by_scope()
+        self._auth_client.login(requested_scopes=scopes, force=True, refresh_tokens=True)
+        return self._auth_client.get_authorizers_by_scope()
 
     def build(self) -> gladier.GladierBaseClient:
-        initialAuthorizers: dict[str, AuthorizerTypes] = dict()
+        initial_authorizers: dict[str, AuthorizerTypes] = dict()
 
         try:
             # Try to use a previous login to avoid a new login flow
-            initialAuthorizers = self._authClient.get_authorizers_by_scope()
+            initial_authorizers = self._auth_client.get_authorizers_by_scope()
         except fair_research_login.LoadError:
             pass
 
-        loginManager = gladier.managers.CallbackLoginManager(
-            authorizers=initialAuthorizers,
-            callback=self._requestAuthorization,
+        login_manager = gladier.managers.CallbackLoginManager(
+            authorizers=initial_authorizers,
+            callback=self._request_authorization,
         )
 
-        return PtychodusClient(login_manager=loginManager)
+        return PtychodusClient(login_manager=login_manager)
 
 
 class ConfidentialPtychodusClientBuilder(PtychodusClientBuilder):
-    def __init__(self, clientID: str, clientSecret: str, flowID: str | None) -> None:
+    def __init__(self, client_id: str, client_secret: str, flow_id: str | None) -> None:
         super().__init__()
-        self._authClient = globus_sdk.ConfidentialAppAuthClient(
-            client_id=clientID,
-            client_secret=clientSecret,
+        self._auth_client = globus_sdk.ConfidentialAppAuthClient(
+            client_id=client_id,
+            client_secret=client_secret,
             app_name='Ptychodus',
         )
-        self._flowID = flowID
+        self._flow_id = flow_id
 
-    def _requestAuthorization(self, scopes: list[str]) -> ScopeAuthorizerMapping:
+    def _request_authorization(self, scopes: list[str]) -> ScopeAuthorizerMapping:
         logger.debug(f'Requested authorization scopes: {pformat(scopes)}')
 
-        response = self._authClient.oauth2_client_credentials_tokens(requested_scopes=scopes)
+        response = self._auth_client.oauth2_client_credentials_tokens(requested_scopes=scopes)
         return {
             scope: globus_sdk.AccessTokenAuthorizer(access_token=tokens['access_token'])
             for scope, tokens in response.by_scopes.scope_map.items()
         }
 
     def build(self) -> gladier.GladierBaseClient:
-        initialAuthorizers: dict[str, AuthorizerTypes] = dict()
-        loginManager = gladier.managers.CallbackLoginManager(
-            authorizers=initialAuthorizers,
-            callback=self._requestAuthorization,
+        initial_authorizers: dict[str, AuthorizerTypes] = dict()
+        login_manager = gladier.managers.CallbackLoginManager(
+            authorizers=initial_authorizers,
+            callback=self._request_authorization,
         )
-        flowsManager = gladier.managers.FlowsManager(flow_id=self._flowID)
-        return PtychodusClient(login_manager=loginManager, flows_manager=flowsManager)
+        flows_manager = gladier.managers.FlowsManager(flow_id=self._flow_id)
+        return PtychodusClient(login_manager=login_manager, flows_manager=flows_manager)
 
 
 class GlobusWorkflowThread(threading.Thread):
     def __init__(
         self,
         authorizer: WorkflowAuthorizer,
-        statusRepository: WorkflowStatusRepository,
+        status_repository: WorkflowStatusRepository,
         executor: WorkflowExecutor,
-        clientBuilder: PtychodusClientBuilder,
+        client_builder: PtychodusClientBuilder,
     ) -> None:
         super().__init__()
         self._authorizer = authorizer
-        self._statusRepository = statusRepository
+        self._status_repository = status_repository
         self._executor = executor
-        self._clientBuilder = clientBuilder
+        self._client_builder = client_builder
 
         logger.info('\tGlobus SDK ' + version('globus-sdk'))
         logger.info('\tFair Research Login ' + version('fair-research-login'))
         logger.info('\tGladier ' + version('gladier'))
 
-        self.__gladierClient: gladier.GladierBaseClient | None = None
+        self.__gladier_client: gladier.GladierBaseClient | None = None
 
     @classmethod
     def create_instance(
         cls,
         authorizer: WorkflowAuthorizer,
-        statusRepository: WorkflowStatusRepository,
+        status_repository: WorkflowStatusRepository,
         executor: WorkflowExecutor,
     ) -> GlobusWorkflowThread:
         try:
-            clientID = os.environ['CLIENT_ID']
+            client_id = os.environ['CLIENT_ID']
         except KeyError:
-            clientBuilder: PtychodusClientBuilder = NativePtychodusClientBuilder(authorizer)
-            return cls(authorizer, statusRepository, executor, clientBuilder)
+            client_builder: PtychodusClientBuilder = NativePtychodusClientBuilder(authorizer)
+            return cls(authorizer, status_repository, executor, client_builder)
 
         try:
-            clientSecret = os.environ['CLIENT_SECRET']
+            client_secret = os.environ['CLIENT_SECRET']
         except KeyError as ex:
             raise KeyError('CLIENT_ID requires a CLIENT_SECRET environment variable.') from ex
 
         try:
-            flowID = os.environ['FLOW_ID']
+            flow_id = os.environ['FLOW_ID']
         except KeyError:
             # This isn't necessarily bad, but CCs like regular users only get one flow
             # to play with. They probably don't need more than one, but this will ensure
             # there aren't errors due to tracking mismatch in the Glaider config
-            flowID = ''
+            flow_id = ''
             logger.warning('No flow ID enforced. Recommend setting FLOW_ID environment variable.')
 
-        clientBuilder = ConfidentialPtychodusClientBuilder(clientID, clientSecret, flowID)
-        return cls(authorizer, statusRepository, executor, clientBuilder)
+        client_builder = ConfidentialPtychodusClientBuilder(client_id, client_secret, flow_id)
+        return cls(authorizer, status_repository, executor, client_builder)
 
     @property
-    def _gladierClient(self) -> gladier.GladierBaseClient:
-        if self.__gladierClient is None:
-            self.__gladierClient = self._clientBuilder.build()
+    def _gladier_client(self) -> gladier.GladierBaseClient:
+        if self.__gladier_client is None:
+            self.__gladier_client = self._client_builder.build()
 
-        return self.__gladierClient
+        return self.__gladier_client
 
-    def _getCurrentAction(self, runID: str) -> str:
-        status = self._gladierClient.get_status(runID)
+    def _get_current_action(self, runID: str) -> str:
+        status = self._gladier_client.get_status(runID)
         action = status.get('state_name')
 
         if not action:
@@ -230,9 +230,9 @@ class GlobusWorkflowThread(threading.Thread):
 
         return action
 
-    def _refreshStatus(self) -> None:
+    def _refresh_status(self) -> None:
         statusList: list[WorkflowStatus] = list()
-        flowsManager = self._gladierClient.flows_manager
+        flowsManager = self._gladier_client.flows_manager
         flowID = flowsManager.get_flow_id()
         flowsClient = flowsManager.flows_client
         response = flowsClient.list_runs(filter_flow_id=flowID)
@@ -244,7 +244,7 @@ class GlobusWorkflowThread(threading.Thread):
 
         for runDict in runDictList:
             runID = runDict.get('run_id', '')
-            action = self._getCurrentAction(runID)
+            action = self._get_current_action(runID)
             startTimeStr = runDict.get('start_time', '')
             completionTimeStr = runDict.get('completion_time', '')
 
@@ -271,13 +271,13 @@ class GlobusWorkflowThread(threading.Thread):
 
             statusList.append(run)
 
-        self._statusRepository.update(statusList)
+        self._status_repository.update(statusList)
 
     def run(self) -> None:
         while not self._authorizer.shutdownEvent.is_set():
-            if self._statusRepository.refreshStatusEvent.is_set():
-                self._refreshStatus()
-                self._statusRepository.refreshStatusEvent.clear()
+            if self._status_repository.refreshStatusEvent.is_set():
+                self._refresh_status()
+                self._status_repository.refreshStatusEvent.clear()
 
             try:
                 input_ = self._executor.jobQueue.get(block=True, timeout=1)
@@ -285,7 +285,7 @@ class GlobusWorkflowThread(threading.Thread):
                 continue
 
             try:
-                response = self._gladierClient.run_flow(
+                response = self._gladier_client.run_flow(
                     flow_input={'input': input_.flowInput},
                     label=input_.flowLabel,
                     tags=['aps', 'ptychography'],

@@ -86,9 +86,9 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 elif index.column() == 4:
                     return f'{metadata.exposure_time_s.get_value():.4g}'
                 elif index.column() == 5:
-                    return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
+                    return f'{geometry.object_plane_pixel_width_m * 1e9:.4g}'
                 elif index.column() == 6:
-                    return f'{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}'
+                    return f'{geometry.object_plane_pixel_height_m * 1e9:.4g}'
                 elif index.column() == 7:
                     product = item.get_product()
                     return f'{product.nbytes / (1024 * 1024):.2f}'

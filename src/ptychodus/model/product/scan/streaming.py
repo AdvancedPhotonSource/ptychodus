@@ -9,15 +9,15 @@ from .settings import ScanSettings
 
 
 class StreamingScanBuilder(ScanBuilder):
-    def __init__(self, settings: ScanSettings, pointSeq: Sequence[ScanPoint]) -> None:
+    def __init__(self, settings: ScanSettings, point_seq: Sequence[ScanPoint]) -> None:
         super().__init__(settings, 'Streaming')
-        self._pointList = list(pointSeq)
+        self._pointList = list(point_seq)
 
     def append(self, point: ScanPoint) -> None:
         self._pointList.append(point)
 
-    def extend(self, pointSeq: Sequence[ScanPoint]) -> None:
-        self._pointList.extend(pointSeq)
+    def extend(self, point_seq: Sequence[ScanPoint]) -> None:
+        self._pointList.extend(point_seq)
 
     def build(self) -> PositionSequence:
         return PositionSequence(self._pointList)

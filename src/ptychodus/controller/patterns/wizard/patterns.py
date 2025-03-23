@@ -32,7 +32,7 @@ class PatternLoadViewController(ParameterViewController):
     def __init__(self, settings: PatternSettings) -> None:
         super().__init__()
         self._view_controller = SpinBoxParameterViewController(
-            settings.numberOfDataThreads,
+            settings.num_data_threads,
         )
         self._widget = QGroupBox('Load')
 
@@ -46,9 +46,9 @@ class PatternLoadViewController(ParameterViewController):
 
 class PatternMemoryMapViewController(CheckableGroupBoxParameterViewController):
     def __init__(self, settings: PatternSettings, file_dialog_factory: FileDialogFactory) -> None:
-        super().__init__(settings.memmapEnabled, 'Memory Map Diffraction Data')
+        super().__init__(settings.is_memmap_enabled, 'Memory Map Diffraction Data')
         self._view_controller = PathParameterViewController.create_directory_chooser(
-            settings.scratchDirectory, file_dialog_factory
+            settings.scratch_directory, file_dialog_factory
         )
 
         layout = QFormLayout()
@@ -62,7 +62,7 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
         settings: PatternSettings,
         sizer: PatternSizer,
     ) -> None:
-        super().__init__(settings.cropEnabled, 'Crop')
+        super().__init__(settings.is_crop_enabled, 'Crop')
         self._settings = settings
         self._sizer = sizer
 
@@ -89,12 +89,12 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
 
         self._sync_model_to_view()
 
-        self._center_x_spin_box.valueChanged.connect(settings.cropCenterXInPixels.set_value)
-        self._center_y_spin_box.valueChanged.connect(settings.cropCenterYInPixels.set_value)
-        self._width_spin_box.valueChanged.connect(settings.cropWidthInPixels.set_value)
-        self._height_spin_box.valueChanged.connect(settings.cropHeightInPixels.set_value)
-        self._flip_x_check_box.toggled.connect(settings.flipXEnabled.set_value)
-        self._flip_y_check_box.toggled.connect(settings.flipYEnabled.set_value)
+        self._center_x_spin_box.valueChanged.connect(settings.crop_center_x_px.set_value)
+        self._center_y_spin_box.valueChanged.connect(settings.crop_center_y_px.set_value)
+        self._width_spin_box.valueChanged.connect(settings.crop_width_px.set_value)
+        self._height_spin_box.valueChanged.connect(settings.crop_height_px.set_value)
+        self._flip_x_check_box.toggled.connect(settings.is_flip_x_enabled.set_value)
+        self._flip_y_check_box.toggled.connect(settings.is_flip_y_enabled.set_value)
 
         sizer.add_observer(self)
 
@@ -129,8 +129,8 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
         self._height_spin_box.setValue(height)
         self._height_spin_box.blockSignals(False)
 
-        self._flip_x_check_box.setChecked(self._settings.flipXEnabled.get_value())
-        self._flip_y_check_box.setChecked(self._settings.flipYEnabled.get_value())
+        self._flip_x_check_box.setChecked(self._settings.is_flip_x_enabled.get_value())
+        self._flip_y_check_box.setChecked(self._settings.is_flip_y_enabled.get_value())
 
     def _update(self, observable: Observable) -> None:
         if observable is self._sizer:
@@ -145,7 +145,7 @@ class PatternBinningViewController(CheckableGroupBoxParameterViewController):
         settings: PatternSettings,
         sizer: PatternSizer,
     ) -> None:
-        super().__init__(settings.binningEnabled, 'Bin Pixels')
+        super().__init__(settings.is_binning_enabled, 'Bin Pixels')
         self._settings = settings
         self._sizer = sizer
 
@@ -162,8 +162,8 @@ class PatternBinningViewController(CheckableGroupBoxParameterViewController):
 
         self._sync_model_to_view()
 
-        self._bin_size_x_spin_box.valueChanged.connect(settings.binSizeX.set_value)
-        self._bin_size_y_spin_box.valueChanged.connect(settings.binSizeY.set_value)
+        self._bin_size_x_spin_box.valueChanged.connect(settings.bin_size_x.set_value)
+        self._bin_size_y_spin_box.valueChanged.connect(settings.bin_size_y.set_value)
 
         sizer.add_observer(self)
 
@@ -199,7 +199,7 @@ class PatternPaddingViewController(CheckableGroupBoxParameterViewController):
         settings: PatternSettings,
         sizer: PatternSizer,
     ) -> None:
-        super().__init__(settings.paddingEnabled, 'Pad')
+        super().__init__(settings.is_padding_enabled, 'Pad')
         self._settings = settings
         self._sizer = sizer
 
@@ -216,8 +216,8 @@ class PatternPaddingViewController(CheckableGroupBoxParameterViewController):
 
         self._sync_model_to_view()
 
-        self._pad_x_spin_box.valueChanged.connect(settings.padX.set_value)
-        self._pad_y_spin_box.valueChanged.connect(settings.padY.set_value)
+        self._pad_x_spin_box.valueChanged.connect(settings.pad_x.set_value)
+        self._pad_y_spin_box.valueChanged.connect(settings.pad_y.set_value)
 
         sizer.add_observer(self)
 
@@ -245,13 +245,17 @@ class PatternPaddingViewController(CheckableGroupBoxParameterViewController):
 class PatternTransformViewController:
     def __init__(self, settings: PatternSettings) -> None:
         self._lower_bound_enabled_view_controller = CheckBoxParameterViewController(
-            settings.valueLowerBoundEnabled, 'Value Lower Bound:'
+            settings.is_value_lower_bound_enabled, 'Value Lower Bound:'
         )
-        self._lower_bound_view_controller = SpinBoxParameterViewController(settings.valueLowerBound)
+        self._lower_bound_view_controller = SpinBoxParameterViewController(
+            settings.value_lower_bound
+        )
         self._upper_bound_enabled_view_controller = CheckBoxParameterViewController(
-            settings.valueUpperBoundEnabled, 'Value upper Bound:'
+            settings.is_value_upper_bound_enabled, 'Value upper Bound:'
         )
-        self._upper_bound_view_controller = SpinBoxParameterViewController(settings.valueUpperBound)
+        self._upper_bound_view_controller = SpinBoxParameterViewController(
+            settings.value_upper_bound
+        )
 
         layout = QGridLayout()
         layout.addWidget(self._lower_bound_enabled_view_controller.get_widget(), 0, 0)
@@ -272,27 +276,27 @@ class OpenDatasetWizardPatternsViewController(ParameterViewController):
     def __init__(
         self, settings: PatternSettings, sizer: PatternSizer, file_dialog_factory: FileDialogFactory
     ) -> None:
-        self._loadViewController = PatternLoadViewController(settings)
-        self._memoryMapViewController = PatternMemoryMapViewController(
+        self._load_view_controller = PatternLoadViewController(settings)
+        self._memory_map_view_controller = PatternMemoryMapViewController(
             settings, file_dialog_factory
         )
-        self._cropViewController = PatternCropViewController(settings, sizer)
-        self._binningViewController = PatternBinningViewController(settings, sizer)
-        self._paddingViewController = PatternPaddingViewController(settings, sizer)
-        self._transformViewController = PatternTransformViewController(settings)
+        self._crop_view_controller = PatternCropViewController(settings, sizer)
+        self._binning_view_controller = PatternBinningViewController(settings, sizer)
+        self._padding_view_controller = PatternPaddingViewController(settings, sizer)
+        self._transform_view_controller = PatternTransformViewController(settings)
 
         layout = QVBoxLayout()
-        layout.addWidget(self._loadViewController.get_widget())
-        layout.addWidget(self._memoryMapViewController.get_widget())
-        layout.addWidget(self._cropViewController.get_widget())
-        layout.addWidget(self._binningViewController.get_widget())
-        layout.addWidget(self._paddingViewController.get_widget())
-        layout.addWidget(self._transformViewController.get_widget())
+        layout.addWidget(self._load_view_controller.get_widget())
+        layout.addWidget(self._memory_map_view_controller.get_widget())
+        layout.addWidget(self._crop_view_controller.get_widget())
+        layout.addWidget(self._binning_view_controller.get_widget())
+        layout.addWidget(self._padding_view_controller.get_widget())
+        layout.addWidget(self._transform_view_controller.get_widget())
         layout.addStretch()
 
         self._page = OpenDatasetWizardPage()
         self._page.setTitle('Pattern Processing')
-        self._page._setComplete(True)
+        self._page._set_complete(True)
         self._page.setLayout(layout)
 
     def get_widget(self) -> QWizardPage:

@@ -112,12 +112,12 @@ def main() -> int:
             if parsedArgs.fluorescence_output is not None:
                 fluorescenceOutputFilePath = Path(parsedArgs.fluorescence_output.name)
 
-            return model.batchModeExecute(
+            return model.batch_mode_execute(
                 action,
                 inputFilePath,
                 outputFilePath,
-                fluorescenceInputFilePath=fluorescenceInputFilePath,
-                fluorescenceOutputFilePath=fluorescenceOutputFilePath,
+                fluorescence_input_file_path=fluorescenceInputFilePath,
+                fluorescence_output_file_path=fluorescenceOutputFilePath,
             )
 
         try:
@@ -137,7 +137,7 @@ def main() -> int:
         from ptychodus.controller import ControllerCore
 
         controller = ControllerCore(model, view)
-        controller.showMainWindow(versionString())
+        controller.show_main_window(versionString())
 
         return app.exec()
 

@@ -174,7 +174,7 @@ class AutomationCore:
             self._datasetBuffer,
             self.repository,
         )
-        self.processingPresenter = AutomationProcessingPresenter(
+        self.processing_presenter = AutomationProcessingPresenter(
             self._settings, self.repository, self._processor
         )
 

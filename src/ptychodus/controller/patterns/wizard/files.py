@@ -48,10 +48,10 @@ class OpenDatasetWizardBreadcrumbsViewController(Observer):
 
     def _handle_id_clicked(self, button_id: int) -> None:
         path = self._path_list[button_id]
-        self._file_dialog_factory.setOpenWorkingDirectory(path)
+        self._file_dialog_factory.set_open_working_directory(path)
 
     def _sync_model_to_view(self) -> None:
-        path = self._file_dialog_factory.getOpenWorkingDirectory().resolve()
+        path = self._file_dialog_factory.get_open_working_directory().resolve()
 
         for button_id, existing_path in enumerate(self._path_list):
             if path == existing_path:
@@ -126,11 +126,11 @@ class OpenDatasetWizardLocationViewController(Observer):
         path = Path(text)
 
         if not path.is_absolute():
-            path = self._file_dialog_factory.getOpenWorkingDirectory() / text
+            path = self._file_dialog_factory.get_open_working_directory() / text
 
         path = path.resolve()
 
-        self._file_dialog_factory.setOpenWorkingDirectory(path)
+        self._file_dialog_factory.set_open_working_directory(path)
         self._file_path.set_value(path)
 
     def _sync_model_to_view(self) -> None:
@@ -185,7 +185,7 @@ class OpenDatasetWizardFilePathViewController(Observer):
 
         if file_info.isDir():
             directory = Path(file_info.canonicalFilePath())
-            self._file_dialog_factory.setOpenWorkingDirectory(directory)
+            self._file_dialog_factory.set_open_working_directory(directory)
 
     def _handle_current_changed(self, current: QModelIndex, previous: QModelIndex) -> None:
         index = self._proxy_model.mapToSource(current)
@@ -194,7 +194,7 @@ class OpenDatasetWizardFilePathViewController(Observer):
 
     def _sync_model_to_view(self) -> None:
         file_path = self._file_path.get_value()
-        root_path = self._file_dialog_factory.getOpenWorkingDirectory()
+        root_path = self._file_dialog_factory.get_open_working_directory()
 
         index = self._model.setRootPath(str(root_path))
         proxy_index = self._proxy_model.mapFromSource(index)
@@ -218,7 +218,7 @@ class OpenDatasetWizardFilePathViewController(Observer):
 class OpenDatasetWizardFileTypeViewController(Observable, Observer):
     def __init__(self, api: PatternsAPI) -> None:
         super().__init__()
-        self._file_reader_chooser = api.getFileReaderChooser()
+        self._file_reader_chooser = api.get_file_reader_chooser()
         self._file_reader_chooser.add_observer(self)
         self._combo_box = QComboBox()
 
@@ -261,10 +261,10 @@ class OpenDatasetWizardFilesViewController(Observer):
             file_dialog_factory
         )
         self._location_view_controller = OpenDatasetWizardLocationViewController(
-            settings.filePath, file_dialog_factory
+            settings.file_path, file_dialog_factory
         )
         self._file_path_view_controller = OpenDatasetWizardFilePathViewController(
-            settings.filePath, file_dialog_factory
+            settings.file_path, file_dialog_factory
         )
         self._file_type_view_controller = OpenDatasetWizardFileTypeViewController(api)
         self._file_type_view_controller.add_observer(self)
@@ -280,12 +280,12 @@ class OpenDatasetWizardFilesViewController(Observer):
         self._page.setLayout(layout)
 
         self._sync_model_to_view()
-        settings.filePath.add_observer(self)
+        settings.file_path.add_observer(self)
 
     def open_dataset(self) -> None:
-        file_reader_chooser = self._api.getFileReaderChooser()
+        file_reader_chooser = self._api.get_file_reader_chooser()
         file_type = file_reader_chooser.get_current_plugin().simple_name
-        file_path = self._settings.filePath.get_value()
+        file_path = self._settings.file_path.get_value()
 
         try:
             self._api.open_patterns(file_path, file_type=file_type)
@@ -293,12 +293,12 @@ class OpenDatasetWizardFilesViewController(Observer):
             logger.exception(err)
             ExceptionDialog.show_exception('Open Dataset', err)
 
-    def getWidget(self) -> QWizardPage:
+    def get_widget(self) -> QWizardPage:
         return self._page
 
     def _check_if_complete(self) -> None:
-        file_path = self._settings.filePath.get_value()
-        self._page._setComplete(file_path.is_file())
+        file_path = self._settings.file_path.get_value()
+        self._page._set_complete(file_path.is_file())
 
     def restart(self) -> None:
         self._check_if_complete()
@@ -308,15 +308,15 @@ class OpenDatasetWizardFilesViewController(Observer):
         self._file_path_view_controller.set_name_filters(name_filters)
 
     def _sync_model_to_view(self) -> None:
-        file_path = self._settings.filePath.get_value()
+        file_path = self._settings.file_path.get_value()
 
         if file_path.exists():
-            self._file_dialog_factory.setOpenWorkingDirectory(file_path)
+            self._file_dialog_factory.set_open_working_directory(file_path)
 
         self._handle_file_type_changed()
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._settings.filePath:
+        if observable is self._settings.file_path:
             self._check_if_complete()
         elif observable is self._file_type_view_controller:
             self._handle_file_type_changed()

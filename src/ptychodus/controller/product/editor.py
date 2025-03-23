@@ -53,20 +53,20 @@ class ProductPropertyTableModel(QAbstractTableModel):
                         case 0:
                             return f'{geometry.probe_wavelength_m * 1e9:.4g}'
                         case 1:
-                            return f'{geometry.probeWavelengthsPerMeter * 1e-9:.4g}'
+                            return f'{geometry.probe_wavelengths_per_m * 1e-9:.4g}'
                         case 2:
-                            return f'{geometry.probeRadiansPerMeter * 1e-9:.4g}'
+                            return f'{geometry.probe_radians_per_m * 1e-9:.4g}'
                         case 3:
-                            return f'{geometry.probePhotonsPerSecond:.4g}'
+                            return f'{geometry.probe_photons_per_s:.4g}'
                         case 4:
                             return f'{geometry.probe_power_W:.4g}'
                         case 5:
-                            return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
+                            return f'{geometry.object_plane_pixel_width_m * 1e9:.4g}'
                         case 6:
-                            return f'{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}'
+                            return f'{geometry.object_plane_pixel_height_m * 1e9:.4g}'
                         case 7:
                             try:
-                                return f'{geometry.fresnelNumber:.4g}'
+                                return f'{geometry.fresnel_number:.4g}'
                             except ZeroDivisionError:
                                 return 'inf'
 

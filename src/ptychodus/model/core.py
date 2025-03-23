@@ -21,58 +21,30 @@ from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.workflow import WorkflowAPI
 
-from .agent import AgentCore, AgentPresenter, ArgoSettings, ChatHistory
-from .analysis import (
-    AnalysisCore,
-    IlluminationMapper,
-    FourierRingCorrelator,
-    ProbePropagator,
-    STXMSimulator,
-    XMCDAnalyzer,
-)
-from .automation import (
-    AutomationCore,
-    AutomationPresenter,
-    AutomationProcessingPresenter,
-)
-from .fluorescence import FluorescenceCore, FluorescenceEnhancer
+from .agent import AgentCore
+from .analysis import AnalysisCore
+from .automation import AutomationCore
+from .fluorescence import FluorescenceCore
 from .memory import MemoryPresenter
 from .metadata import MetadataPresenter
 from .patterns import PatternsCore, PatternsStreamingContext
-from .product import (
-    ObjectAPI,
-    ObjectRepository,
-    PositionsStreamingContext,
-    ProbeAPI,
-    ProbeRepository,
-    ProductAPI,
-    ProductCore,
-    ProductRepository,
-    ScanAPI,
-    ScanRepository,
-)
+from .product import PositionsStreamingContext, ProductCore
 from .ptychi import PtyChiReconstructorLibrary
 from .ptychonn import PtychoNNReconstructorLibrary
-from .reconstructor import ReconstructorCore, ReconstructorPresenter
+from .reconstructor import ReconstructorCore
 from .tike import TikeReconstructorLibrary
 from .visualization import VisualizationEngine
-from .workflow import (
-    WorkflowAuthorizationPresenter,
-    WorkflowCore,
-    WorkflowExecutionPresenter,
-    WorkflowParametersPresenter,
-    WorkflowStatusPresenter,
-)
+from .workflow import WorkflowCore
 
 logger = logging.getLogger(__name__)
 
 
-def configureLogger(isDeveloperModeEnabled: bool) -> None:
+def configure_logger(is_developer_mode_enabled: bool) -> None:
     logging.basicConfig(
         format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
         stream=sys.stdout,
         encoding='utf-8',
-        level=logging.DEBUG if isDeveloperModeEnabled else logging.INFO,
+        level=logging.DEBUG if is_developer_mode_enabled else logging.INFO,
     )
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
@@ -116,105 +88,105 @@ class PtychodusStreamingContext:
 
 class ModelCore:
     def __init__(
-        self, settingsFile: Path | None = None, *, is_developer_mode_enabled: bool = False
+        self, settings_file: Path | None = None, *, is_developer_mode_enabled: bool = False
     ) -> None:
-        configureLogger(is_developer_mode_enabled)
+        configure_logger(is_developer_mode_enabled)
         self.rng = numpy.random.default_rng()
-        self._pluginRegistry = PluginRegistry.load_plugins()
+        self._plugin_registry = PluginRegistry.load_plugins()
 
-        self.memoryPresenter = MemoryPresenter()
-        self.settingsRegistry = SettingsRegistry()
+        self.memory_presenter = MemoryPresenter()
+        self.settings_registry = SettingsRegistry()
 
-        self.patterns_core = PatternsCore(
-            self.settingsRegistry,
-            self._pluginRegistry.diffraction_file_readers,
-            self._pluginRegistry.diffraction_file_writers,
-            self.settingsRegistry,
+        self.patterns = PatternsCore(
+            self.settings_registry,
+            self._plugin_registry.diffraction_file_readers,
+            self._plugin_registry.diffraction_file_writers,
+            self.settings_registry,
         )
-        self._productCore = ProductCore(
+        self.product = ProductCore(
             self.rng,
-            self.settingsRegistry,
-            self.patterns_core.patternSizer,
-            self.patterns_core.dataset,
-            self._pluginRegistry.position_file_readers,
-            self._pluginRegistry.position_file_writers,
-            self._pluginRegistry.fresnel_zone_plates,
-            self._pluginRegistry.probe_file_readers,
-            self._pluginRegistry.probe_file_writers,
-            self._pluginRegistry.object_file_readers,
-            self._pluginRegistry.object_file_writers,
-            self._pluginRegistry.product_file_readers,
-            self._pluginRegistry.product_file_writers,
-            self.settingsRegistry,
+            self.settings_registry,
+            self.patterns.pattern_sizer,
+            self.patterns.dataset,
+            self._plugin_registry.position_file_readers,
+            self._plugin_registry.position_file_writers,
+            self._plugin_registry.fresnel_zone_plates,
+            self._plugin_registry.probe_file_readers,
+            self._plugin_registry.probe_file_writers,
+            self._plugin_registry.object_file_readers,
+            self._plugin_registry.object_file_writers,
+            self._plugin_registry.product_file_readers,
+            self._plugin_registry.product_file_writers,
+            self.settings_registry,
         )
-        self.metadataPresenter = MetadataPresenter(
-            self.patterns_core.detectorSettings,
-            self.patterns_core.patternSettings,
-            self.patterns_core.dataset,
-            self._productCore.settings,
+        self.metadata_presenter = MetadataPresenter(
+            self.patterns.detector_settings,
+            self.patterns.pattern_settings,
+            self.patterns.dataset,
+            self.product.settings,
         )
 
-        self.patternVisualizationEngine = VisualizationEngine(is_complex=False)
-        self.probeVisualizationEngine = VisualizationEngine(is_complex=True)
-        self.objectVisualizationEngine = VisualizationEngine(is_complex=True)
+        self.pattern_visualization_engine = VisualizationEngine(is_complex=False)
+        self.probe_visualization_engine = VisualizationEngine(is_complex=True)
+        self.object_visualization_engine = VisualizationEngine(is_complex=True)
 
-        self.ptyChiReconstructorLibrary = PtyChiReconstructorLibrary(
-            self.settingsRegistry, self.patterns_core.patternSizer, is_developer_mode_enabled
+        self.ptychi_reconstructor_library = PtyChiReconstructorLibrary(
+            self.settings_registry, self.patterns.pattern_sizer, is_developer_mode_enabled
         )
-        self.tikeReconstructorLibrary = TikeReconstructorLibrary.create_instance(
-            self.settingsRegistry, is_developer_mode_enabled
+        self.tike_reconstructor_library = TikeReconstructorLibrary.create_instance(
+            self.settings_registry, is_developer_mode_enabled
         )
-        self.ptychonnReconstructorLibrary = PtychoNNReconstructorLibrary.create_instance(
-            self.settingsRegistry, is_developer_mode_enabled
+        self.ptychonn_reconstructor_library = PtychoNNReconstructorLibrary.create_instance(
+            self.settings_registry, is_developer_mode_enabled
         )
-        self._reconstructorCore = ReconstructorCore(
-            self.settingsRegistry,
-            self.patterns_core.dataset,
-            self._productCore.productRepository,
+        self.reconstructor = ReconstructorCore(
+            self.settings_registry,
+            self.patterns.dataset,
+            self.product.product_repository,
             [
-                self.ptyChiReconstructorLibrary,
-                self.tikeReconstructorLibrary,
-                self.ptychonnReconstructorLibrary,
+                self.ptychi_reconstructor_library,
+                self.tike_reconstructor_library,
+                self.ptychonn_reconstructor_library,
             ],
         )
-        self._fluorescenceCore = FluorescenceCore(
-            self.settingsRegistry,
-            self._productCore.productRepository,
-            self._pluginRegistry.upscaling_strategies,
-            self._pluginRegistry.deconvolution_strategies,
-            self._pluginRegistry.fluorescence_file_readers,
-            self._pluginRegistry.fluorescence_file_writers,
+        self.fluorescence_core = FluorescenceCore(
+            self.settings_registry,
+            self.product.product_repository,
+            self._plugin_registry.upscaling_strategies,
+            self._plugin_registry.deconvolution_strategies,
+            self._plugin_registry.fluorescence_file_readers,
+            self._plugin_registry.fluorescence_file_writers,
         )
-        self._analysisCore = AnalysisCore(
-            self.settingsRegistry,
-            self._reconstructorCore.dataMatcher,
-            self._productCore.productRepository,
-            self._productCore.objectRepository,
+        self.analysis = AnalysisCore(
+            self.settings_registry,
+            self.reconstructor.data_matcher,
+            self.product.product_repository,
+            self.product.object_repository,
         )
-        self._workflowCore = WorkflowCore(
-            self.settingsRegistry,
-            self.patterns_core.patternsAPI,
-            self._productCore.productAPI,
-            self._productCore.scanAPI,
-            self._productCore.probeAPI,
-            self._productCore.objectAPI,
-            self._reconstructorCore.reconstructorAPI,
+        self.workflow = WorkflowCore(
+            self.settings_registry,
+            self.patterns.patterns_api,
+            self.product.product_api,
+            self.product.scan_api,
+            self.product.probe_api,
+            self.product.object_api,
+            self.reconstructor.reconstructor_api,
         )
-        self._automationCore = AutomationCore(
-            self.settingsRegistry,
-            self._workflowCore.workflowAPI,
-            self._pluginRegistry.file_based_workflows,
+        self.automation = AutomationCore(
+            self.settings_registry,
+            self.workflow.workflow_api,
+            self._plugin_registry.file_based_workflows,
         )
-        self._agentCore = AgentCore(self.settingsRegistry)
+        self.agent = AgentCore(self.settings_registry)
 
-        if settingsFile:
-            self.settingsRegistry.open_settings(settingsFile)
+        if settings_file:
+            self.settings_registry.open_settings(settings_file)
 
     def __enter__(self) -> ModelCore:
-        self.patterns_core.start()
-        self._reconstructorCore.start()
-        self._workflowCore.start()
-        self._automationCore.start()
+        self.patterns.start()
+        self.reconstructor.start()
+        self.workflow.start()
+        self.automation.start()
         return self
 
     @overload
@@ -234,97 +206,68 @@ class ModelCore:
         exception_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        self._automationCore.stop()
-        self._workflowCore.stop()
-        self._reconstructorCore.stop()
-        self.patterns_core.stop()
+        self.automation.stop()
+        self.workflow.stop()
+        self.reconstructor.stop()
+        self.patterns.stop()
 
-    @property
-    def productRepository(self) -> ProductRepository:
-        return self._productCore.productRepository
-
-    @property
-    def productAPI(self) -> ProductAPI:
-        return self._productCore.productAPI
-
-    @property
-    def scanRepository(self) -> ScanRepository:
-        return self._productCore.scanRepository
-
-    @property
-    def scanAPI(self) -> ScanAPI:
-        return self._productCore.scanAPI
-
-    @property
-    def probeRepository(self) -> ProbeRepository:
-        return self._productCore.probeRepository
-
-    @property
-    def probeAPI(self) -> ProbeAPI:
-        return self._productCore.probeAPI
-
-    @property
-    def objectRepository(self) -> ObjectRepository:
-        return self._productCore.objectRepository
-
-    @property
-    def objectAPI(self) -> ObjectAPI:
-        return self._productCore.objectAPI
-
-    def createStreamingContext(self, metadata: DiffractionMetadata) -> PtychodusStreamingContext:
+    def create_streaming_context(self, metadata: DiffractionMetadata) -> PtychodusStreamingContext:
         return PtychodusStreamingContext(
-            self._productCore.scanAPI.createStreamingContext(),
-            self.patterns_core.patternsAPI.createStreamingContext(metadata),
+            self.product.scan_api.create_streaming_context(),
+            self.patterns.patterns_api.create_streaming_context(metadata),
         )
 
-    def refreshActiveDataset(self) -> None:
-        self.patterns_core.dataset.assemble_patterns()
+    def refresh_active_dataset(self) -> None:
+        self.patterns.dataset.assemble_patterns()
 
-    def batchModeExecute(
+    def batch_mode_execute(
         self,
         action: str,
-        inputPath: Path,
-        outputPath: Path,
+        input_path: Path,
+        output_path: Path,
         *,
-        productFileType: str = 'NPZ',
-        fluorescenceInputFilePath: Path | None = None,
-        fluorescenceOutputFilePath: Path | None = None,
+        product_file_type: str = 'NPZ',
+        fluorescence_input_file_path: Path | None = None,
+        fluorescence_output_file_path: Path | None = None,
     ) -> int:
         # TODO add enum for actions; implement using workflow API
         if action.lower() == 'train':
-            output = self._reconstructorCore.reconstructorAPI.train(inputPath)
-            self._reconstructorCore.reconstructorAPI.save_model(outputPath)
+            output = self.reconstructor.reconstructor_api.train(input_path)
+            self.reconstructor.reconstructor_api.save_model(output_path)
             return output.result
 
-        inputProductIndex = self._productCore.productAPI.open_product(
-            inputPath, file_type=productFileType
+        input_product_index = self.product.product_api.open_product(
+            input_path, file_type=product_file_type
         )
 
-        if inputProductIndex < 0:
-            logger.error(f'Failed to open product "{inputPath}"!')
+        if input_product_index < 0:
+            logger.error(f'Failed to open product "{input_path}"!')
             return -1
 
         if action.lower() == 'reconstruct':
             logger.info('Reconstructing...')
-            outputProductIndex = self._reconstructorCore.reconstructorAPI.reconstruct(
-                inputProductIndex
+            output_product_index = self.reconstructor.reconstructor_api.reconstruct(
+                input_product_index
             )
-            self._reconstructorCore.reconstructorAPI.process_results(block=True)
+            self.reconstructor.reconstructor_api.process_results(block=True)
             logger.info('Reconstruction complete.')
 
-            self._productCore.productAPI.save_product(
-                outputProductIndex, outputPath, file_type=productFileType
+            self.product.product_api.save_product(
+                output_product_index, output_path, file_type=product_file_type
             )
 
-            if fluorescenceInputFilePath is not None and fluorescenceOutputFilePath is not None:
-                self._fluorescenceCore.enhance_fluorescence(
-                    outputProductIndex,
-                    fluorescenceInputFilePath,
-                    fluorescenceOutputFilePath,
+            if (
+                fluorescence_input_file_path is not None
+                and fluorescence_output_file_path is not None
+            ):
+                self.fluorescence_core.enhance_fluorescence(
+                    output_product_index,
+                    fluorescence_input_file_path,
+                    fluorescence_output_file_path,
                 )
         elif action.lower() == 'prepare_training_data':
-            self._reconstructorCore.reconstructorAPI.export_training_data(
-                outputPath, inputProductIndex
+            self.reconstructor.reconstructor_api.export_training_data(
+                output_path, input_product_index
             )
         else:
             logger.error(f'Unknown batch mode action "{action}"!')
@@ -333,93 +276,5 @@ class ModelCore:
         return 0
 
     @property
-    def reconstructorPresenter(self) -> ReconstructorPresenter:
-        return self._reconstructorCore.presenter
-
-    @property
-    def stxmSimulator(self) -> STXMSimulator:
-        return self._analysisCore.stxm_simulator
-
-    @property
-    def stxmVisualizationEngine(self) -> VisualizationEngine:
-        return self._analysisCore.stxm_visualization_engine
-
-    @property
-    def probePropagator(self) -> ProbePropagator:
-        return self._analysisCore.probe_propagator
-
-    @property
-    def probePropagatorVisualizationEngine(self) -> VisualizationEngine:
-        return self._analysisCore.probe_propagator_visualization_engine
-
-    @property
-    def exposureAnalyzer(self) -> IlluminationMapper:
-        return self._analysisCore.exposure_analyzer
-
-    @property
-    def exposureVisualizationEngine(self) -> VisualizationEngine:
-        return self._analysisCore.exposure_visualization_engine
-
-    @property
-    def fourierRingCorrelator(self) -> FourierRingCorrelator:
-        return self._analysisCore.fourier_ring_correlator
-
-    @property
-    def fluorescenceEnhancer(self) -> FluorescenceEnhancer:
-        return self._fluorescenceCore.enhancer
-
-    @property
-    def fluorescenceVisualizationEngine(self) -> VisualizationEngine:
-        return self._fluorescenceCore.visualization_engine
-
-    @property
-    def xmcdAnalyzer(self) -> XMCDAnalyzer:
-        return self._analysisCore.xmcd_analyzer
-
-    @property
-    def xmcdVisualizationEngine(self) -> VisualizationEngine:
-        return self._analysisCore.xmcd_visualization_engine
-
-    @property
-    def areWorkflowsSupported(self) -> bool:
-        return self._workflowCore.areWorkflowsSupported
-
-    @property
-    def workflowAuthorizationPresenter(self) -> WorkflowAuthorizationPresenter:
-        return self._workflowCore.authorizationPresenter
-
-    @property
-    def workflowStatusPresenter(self) -> WorkflowStatusPresenter:
-        return self._workflowCore.statusPresenter
-
-    @property
-    def workflowExecutionPresenter(self) -> WorkflowExecutionPresenter:
-        return self._workflowCore.executionPresenter
-
-    @property
-    def workflowParametersPresenter(self) -> WorkflowParametersPresenter:
-        return self._workflowCore.parametersPresenter
-
-    @property
     def workflow_api(self) -> WorkflowAPI:
-        return self._workflowCore.workflowAPI
-
-    @property
-    def automationPresenter(self) -> AutomationPresenter:
-        return self._automationCore.presenter
-
-    @property
-    def automationProcessingPresenter(self) -> AutomationProcessingPresenter:
-        return self._automationCore.processingPresenter
-
-    @property
-    def argoSettings(self) -> ArgoSettings:
-        return self._agentCore.settings
-
-    @property
-    def agentPresenter(self) -> AgentPresenter:
-        return self._agentCore.presenter
-
-    @property
-    def chatHistory(self) -> ChatHistory:
-        return self._agentCore.history
+        return self.workflow.workflow_api

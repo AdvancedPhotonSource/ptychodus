@@ -16,7 +16,7 @@ class ObjectSettings(Observable, Observer):
         self.filePath = self._settingsGroup.create_path_parameter(
             'FilePath', Path('/path/to/object.npy')
         )
-        self.fileType = self._settingsGroup.create_string_parameter('FileType', 'NPY')
+        self.file_type = self._settingsGroup.create_string_parameter('FileType', 'NPY')
 
         self.object_layer_distance_m = self._settingsGroup.create_real_sequence_parameter(
             'ObjectLayerDistanceInMeters', []

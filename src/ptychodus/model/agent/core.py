@@ -47,7 +47,7 @@ class AgentCore:
 
     def __init__(self, settings_registry: SettingsRegistry):
         self.settings = ArgoSettings(settings_registry)
-        self.history = ChatHistory()
+        self.chat_history = ChatHistory()
         self._terminal: ChatTerminal | None = None
 
         try:
@@ -55,6 +55,10 @@ class AgentCore:
         except ModuleNotFoundError:
             logger.info('langchain not found!')
         else:
-            self._terminal = ArgoChatTerminal(self.settings, self.history)
+            self._terminal = ArgoChatTerminal(self.settings, self.chat_history)
 
         self.presenter = AgentPresenter(self._terminal)
+
+    @property
+    def is_supported(self) -> bool:
+        return self.presenter.is_agent_supported

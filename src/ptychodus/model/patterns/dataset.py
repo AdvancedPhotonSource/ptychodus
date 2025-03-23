@@ -169,7 +169,7 @@ class ArrayLoader:
         for _ in self.completed_tasks():
             pass
 
-        for index in range(self._settings.numberOfDataThreads.get_value()):
+        for index in range(self._settings.num_data_threads.get_value()):
             thread = threading.Thread(target=self._load_arrays)
             thread.start()
             self._workers.append(thread)
@@ -228,8 +228,8 @@ class AssembledDiffractionDataset(DiffractionDataset):
         data_shape = self._indexes.size, *pattern_extent.shape
         data_dtype = self._metadata.pattern_dtype
 
-        if self._settings.memmapEnabled.get_value():
-            scratch_dir = self._settings.scratchDirectory.get_value()
+        if self._settings.is_memmap_enabled.get_value():
+            scratch_dir = self._settings.scratch_directory.get_value()
             scratch_dir.mkdir(mode=0o755, parents=True, exist_ok=True)
             npy_tmp_file = tempfile.NamedTemporaryFile(dir=scratch_dir, suffix='.npy')
             logger.debug(f'Scratch data file {npy_tmp_file.name} is {data_shape}')
@@ -355,26 +355,26 @@ class AssembledDiffractionDataset(DiffractionDataset):
         for array in dataset:
             self.append_array(array)
 
-    def import_assembled_patterns(self, filePath: Path) -> None:
-        if filePath.is_file():
+    def import_assembled_patterns(self, file_path: Path) -> None:
+        if file_path.is_file():
             self.clear()
-            logger.debug(f'Reading processed patterns from "{filePath}"')
+            logger.debug(f'Reading processed patterns from "{file_path}"')
 
             try:
-                contents = numpy.load(filePath)
+                contents = numpy.load(file_path)
             except Exception as exc:
-                raise RuntimeError(f'Failed to read "{filePath}"') from exc
+                raise RuntimeError(f'Failed to read "{file_path}"') from exc
 
             self._indexes = contents['indexes']
             self._data = contents['patterns']
-            numberOfPatterns, detectorHeight, detectorWidth = self._data.shape
+            num_patterns, detector_height, detector_width = self._data.shape
 
             self._contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
             self._metadata = DiffractionMetadata(
-                num_patterns_per_array=numberOfPatterns,
-                num_patterns_total=numberOfPatterns,
+                num_patterns_per_array=num_patterns,
+                num_patterns_total=num_patterns,
                 pattern_dtype=self._data.dtype,
-                detector_extent=ImageExtent(detectorWidth, detectorHeight),
+                detector_extent=ImageExtent(detector_width, detector_height),
             )
             self._arrays = [
                 AssembledDiffractionPatternArray(
@@ -390,12 +390,12 @@ class AssembledDiffractionDataset(DiffractionDataset):
             for observer in self._observer_list:
                 observer.handle_dataset_reloaded()
         else:
-            logger.warning(f'Refusing to read invalid file path {filePath}')
+            logger.warning(f'Refusing to read invalid file path {file_path}')
 
-    def export_assembled_patterns(self, filePath: Path) -> None:
-        logger.debug(f'Writing processed patterns to "{filePath}"')
+    def export_assembled_patterns(self, file_path: Path) -> None:
+        logger.debug(f'Writing processed patterns to "{file_path}"')
         numpy.savez(
-            filePath,
+            file_path,
             indexes=self.get_assembled_indexes(),
             patterns=self.get_assembled_patterns(),
         )
@@ -405,5 +405,5 @@ class AssembledDiffractionDataset(DiffractionDataset):
         label = file_path.stem if file_path else 'None'
         number, height, width = self._data.shape
         dtype = str(self._data.dtype)
-        sizeInMB = self._data.nbytes / (1024 * 1024)
-        return f'{label}: {number} x {width}W x {height}H {dtype} [{sizeInMB:.2f}MB]'
+        size_MB = self._data.nbytes / (1024 * 1024)  # noqa: N806
+        return f'{label}: {number} x {width}W x {height}H {dtype} [{size_MB:.2f}MB]'

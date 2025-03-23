@@ -93,7 +93,7 @@ class FromFileProbeBuilder(ProbeBuilder):
         self.file_path = settings.filePath.copy()
         self.file_path.set_value(file_path)
         self._add_parameter('file_path', self.file_path)
-        self.file_type = settings.fileType.copy()
+        self.file_type = settings.file_type.copy()
         self.file_type.set_value(file_type)
         self._add_parameter('file_type', self.file_type)
         self._file_reader = file_reader

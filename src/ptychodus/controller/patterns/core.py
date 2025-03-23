@@ -66,7 +66,7 @@ class PatternsController(DiffractionDatasetObserver):
         self._view = view
         self._image_controller = image_controller
         self._file_dialog_factory = file_dialog_factory
-        self._detector_controller = DetectorController(detector_settings, view.detectorView)
+        self._detector_controller = DetectorController(detector_settings, view.detector_view)
         self._wizard_controller = OpenDatasetWizardController(
             pattern_settings,
             pattern_sizer,
@@ -99,7 +99,7 @@ class PatternsController(DiffractionDatasetObserver):
             self._image_controller.clear_array()
 
     def _save_dataset(self) -> None:
-        file_writer_chooser = self._patterns_api.getFileWriterChooser()
+        file_writer_chooser = self._patterns_api.get_file_writer_chooser()
         file_path, name_filter = self._file_dialog_factory.get_save_file_path(
             self._view,
             'Save Diffraction File',
@@ -125,7 +125,7 @@ class PatternsController(DiffractionDatasetObserver):
         )
 
         if button == QMessageBox.StandardButton.Yes:
-            self._patterns_api.closePatterns()
+            self._patterns_api.close_patterns()
 
     def _sync_model_to_view(self) -> None:
         self._tree_model.clear()
@@ -134,7 +134,7 @@ class PatternsController(DiffractionDatasetObserver):
             self._tree_model.insert_array(index, array)  # type: ignore
 
         info_text = self._dataset.get_info_text()
-        self._view.infoLabel.setText(info_text)
+        self._view.info_label.setText(info_text)
 
     def handle_array_inserted(self, index: int) -> None:
         self._tree_model.insert_array(index, self._dataset[index])

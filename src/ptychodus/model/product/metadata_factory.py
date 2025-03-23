@@ -38,7 +38,7 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
         name: str = '',
         comments: str = '',
         detector_distance_m: float | None = None,
-        probe_energy_eV: float | None = None,
+        probe_energy_eV: float | None = None,  # noqa: N803
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
     ) -> MetadataRepositoryItem:
@@ -53,24 +53,24 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
             exposure_time_s=exposure_time_s,
         )
 
-    def create_unique_name(self, candidateName: str) -> str:
-        reservedNames = set([item.get_name() for item in self._repository])
-        name = candidateName if candidateName else 'Unnamed'
+    def create_unique_name(self, candidate_name: str) -> str:
+        reserved_names = set([item.get_name() for item in self._repository])
+        name = candidate_name if candidate_name else 'Unnamed'
         match = 0
 
-        while name in reservedNames:
+        while name in reserved_names:
             match += 1
-            name = candidateName + f'-{match}'
+            name = candidate_name + f'-{match}'
 
         return name
 
-    def _updateLUT(self) -> None:
+    def _update_lut(self) -> None:
         for index, item in enumerate(self._repository):
             metadata = item.get_metadata_item()
             metadata._index = index
 
     def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
-        self._updateLUT()
+        self._update_lut()
 
     def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
         pass
@@ -88,4 +88,4 @@ class MetadataRepositoryItemFactory(UniqueNameFactory, ProductRepositoryObserver
         pass
 
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
-        self._updateLUT()
+        self._update_lut()

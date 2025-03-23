@@ -68,7 +68,7 @@ class ProbeBuilderFactory(Iterable[str]):
         if nameRepaired == 'from_file':
             return self.createProbeFromFile(
                 self._settings.filePath.get_value(),
-                self._settings.fileType.get_value(),
+                self._settings.file_type.get_value(),
             )
 
         return self.create(nameRepaired)

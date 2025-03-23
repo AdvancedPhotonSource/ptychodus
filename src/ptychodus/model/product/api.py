@@ -54,7 +54,7 @@ class ScanAPI:
         self._repository = repository
         self._builderFactory = builderFactory
 
-    def createStreamingContext(self) -> PositionsStreamingContext:
+    def create_streaming_context(self) -> PositionsStreamingContext:
         return PositionsStreamingContext()
 
     def builder_names(self) -> Iterator[str]:
@@ -103,15 +103,15 @@ class ScanAPI:
         item.set_builder(builder)
 
     def get_open_file_filters(self) -> Iterator[str]:
-        return self._builderFactory.getOpenFileFilterList()
+        return self._builderFactory.get_open_file_filters()
 
     def get_open_file_filter(self) -> str:
-        return self._builderFactory.getOpenFileFilter()
+        return self._builderFactory.get_open_file_filter()
 
     def open_scan(self, index: int, filePath: Path, *, file_type: str | None = None) -> None:
-        builder = self._builderFactory.createScanFromFile(
+        builder = self._builderFactory.create_scan_from_file(
             filePath,
-            self._settings.fileType.get_value() if file_type is None else file_type,
+            self._settings.file_type.get_value() if file_type is None else file_type,
         )
 
         try:
@@ -139,10 +139,10 @@ class ScanAPI:
         destinationItem.assign_item(sourceItem)
 
     def get_save_file_filters(self) -> Iterator[str]:
-        return self._builderFactory.getSaveFileFilterList()
+        return self._builderFactory.get_save_file_filters()
 
     def get_save_file_filter(self) -> str:
-        return self._builderFactory.getSaveFileFilter()
+        return self._builderFactory.get_save_file_filter()
 
     def save_scan(self, index: int, filePath: Path, fileType: str) -> None:
         try:
@@ -150,7 +150,7 @@ class ScanAPI:
         except IndexError:
             logger.warning(f'Failed to save scan {index}!')
         else:
-            self._builderFactory.saveScan(filePath, fileType, item.get_scan())
+            self._builderFactory.save_scan(filePath, fileType, item.get_scan())
 
 
 class ProbeAPI:
@@ -219,7 +219,7 @@ class ProbeAPI:
     def openProbe(self, index: int, filePath: Path, *, file_type: str | None = None) -> None:
         builder = self._builderFactory.createProbeFromFile(
             filePath,
-            self._settings.fileType.get_value() if file_type is None else file_type,
+            self._settings.file_type.get_value() if file_type is None else file_type,
         )
 
         try:
@@ -327,7 +327,7 @@ class ObjectAPI:
     def openObject(self, index: int, filePath: Path, *, file_type: str | None = None) -> None:
         builder = self._builderFactory.createObjectFromFile(
             filePath,
-            self._settings.fileType.get_value() if file_type is None else file_type,
+            self._settings.file_type.get_value() if file_type is None else file_type,
         )
 
         try:

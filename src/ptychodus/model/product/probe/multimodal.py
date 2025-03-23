@@ -26,7 +26,7 @@ class MultimodalProbeBuilder(ParameterGroup):
         self._settings = settings
 
         self.num_incoherent_modes = settings.num_incoherent_modes.copy()
-        self._add_parameter('number_of_incoherent_modes', self.num_incoherent_modes)
+        self._add_parameter('num_incoherent_modes', self.num_incoherent_modes)
 
         self.incoherent_mode_decay_type = settings.incoherent_mode_decay_type.copy()
         self._add_parameter('incoherent_mode_decay_type', self.incoherent_mode_decay_type)

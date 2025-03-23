@@ -213,7 +213,7 @@ class WorkflowCore:
             patternsAPI,
             productAPI,
         )
-        self.workflowAPI = ConcreteWorkflowAPI(
+        self.workflow_api = ConcreteWorkflowAPI(
             settingsRegistry,
             patternsAPI,
             productAPI,
@@ -234,18 +234,18 @@ class WorkflowCore:
                 self._authorizer, self._statusRepository, self._executor
             )
 
-        self.parametersPresenter = WorkflowParametersPresenter(
+        self.parameters_presenter = WorkflowParametersPresenter(
             self._settings,
             self._inputDataLocator,
             self._computeDataLocator,
             self._outputDataLocator,
         )
-        self.authorizationPresenter = WorkflowAuthorizationPresenter(self._authorizer)
-        self.statusPresenter = WorkflowStatusPresenter(self._settings, self._statusRepository)
-        self.executionPresenter = WorkflowExecutionPresenter(self._executor)
+        self.authorization_presenter = WorkflowAuthorizationPresenter(self._authorizer)
+        self.status_presenter = WorkflowStatusPresenter(self._settings, self._statusRepository)
+        self.execution_presenter = WorkflowExecutionPresenter(self._executor)
 
     @property
-    def areWorkflowsSupported(self) -> bool:
+    def is_supported(self) -> bool:
         return self._thread is not None
 
     def start(self) -> None:

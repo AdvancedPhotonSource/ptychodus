@@ -99,7 +99,7 @@ class VisualizationController(Observer):
 
     def saveImage(self) -> None:
         filePath, _ = self._fileDialogFactory.get_save_file_path(
-            self._view, 'Save Image', mimeTypeFilters=VisualizationController.MIME_TYPES
+            self._view, 'Save Image', mime_type_filters=VisualizationController.MIME_TYPES
         )
 
         if filePath:

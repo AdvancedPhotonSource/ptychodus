@@ -19,12 +19,12 @@ class ScanBuilderFactory(Iterable[str]):
     def __init__(
         self,
         settings: ScanSettings,
-        fileReaderChooser: PluginChooser[PositionFileReader],
-        fileWriterChooser: PluginChooser[PositionFileWriter],
+        file_reader_chooser: PluginChooser[PositionFileReader],
+        file_writer_chooser: PluginChooser[PositionFileWriter],
     ) -> None:
         self._settings = settings
-        self._fileReaderChooser = fileReaderChooser
-        self._fileWriterChooser = fileWriterChooser
+        self._file_reader_chooser = file_reader_chooser
+        self._file_writer_chooser = file_writer_chooser
         self._builders: dict[str, Callable[[], ScanBuilder]] = {
             variant.name.lower(): lambda variant=variant: CartesianScanBuilder(variant, settings)  # type: ignore
             for variant in CartesianScanVariant
@@ -53,39 +53,39 @@ class ScanBuilderFactory(Iterable[str]):
 
     def create_from_settings(self) -> ScanBuilder:
         name = self._settings.builder.get_value()
-        nameRepaired = name.casefold()
+        name_repaired = name.casefold()
 
-        if nameRepaired == 'from_file':
-            return self.createScanFromFile(
-                self._settings.filePath.get_value(),
-                self._settings.fileType.get_value(),
+        if name_repaired == 'from_file':
+            return self.create_scan_from_file(
+                self._settings.file_path.get_value(),
+                self._settings.file_type.get_value(),
             )
 
-        return self.create(nameRepaired)
+        return self.create(name_repaired)
 
-    def getOpenFileFilterList(self) -> Iterator[str]:
-        for plugin in self._fileReaderChooser:
+    def get_open_file_filters(self) -> Iterator[str]:
+        for plugin in self._file_reader_chooser:
             yield plugin.display_name
 
-    def getOpenFileFilter(self) -> str:
-        return self._fileReaderChooser.get_current_plugin().display_name
+    def get_open_file_filter(self) -> str:
+        return self._file_reader_chooser.get_current_plugin().display_name
 
-    def createScanFromFile(self, filePath: Path, fileType: str) -> ScanBuilder:
-        self._fileReaderChooser.set_current_plugin(fileType)
-        fileType = self._fileReaderChooser.get_current_plugin().simple_name
-        fileReader = self._fileReaderChooser.get_current_plugin().strategy
-        return FromFileScanBuilder(self._settings, filePath, fileType, fileReader)
+    def create_scan_from_file(self, file_path: Path, file_type: str) -> ScanBuilder:
+        self._file_reader_chooser.set_current_plugin(file_type)
+        file_type = self._file_reader_chooser.get_current_plugin().simple_name
+        file_reader = self._file_reader_chooser.get_current_plugin().strategy
+        return FromFileScanBuilder(self._settings, file_path, file_type, file_reader)
 
-    def getSaveFileFilterList(self) -> Iterator[str]:
-        for plugin in self._fileWriterChooser:
+    def get_save_file_filters(self) -> Iterator[str]:
+        for plugin in self._file_writer_chooser:
             yield plugin.display_name
 
-    def getSaveFileFilter(self) -> str:
-        return self._fileWriterChooser.get_current_plugin().display_name
+    def get_save_file_filter(self) -> str:
+        return self._file_writer_chooser.get_current_plugin().display_name
 
-    def saveScan(self, filePath: Path, fileType: str, scan: PositionSequence) -> None:
-        self._fileWriterChooser.set_current_plugin(fileType)
-        fileType = self._fileWriterChooser.get_current_plugin().simple_name
-        logger.debug(f'Writing "{filePath}" as "{fileType}"')
-        fileWriter = self._fileWriterChooser.get_current_plugin().strategy
-        fileWriter.write(filePath, scan)
+    def save_scan(self, file_path: Path, file_type: str, scan: PositionSequence) -> None:
+        self._file_writer_chooser.set_current_plugin(file_type)
+        file_type = self._file_writer_chooser.get_current_plugin().simple_name
+        logger.debug(f'Writing "{file_path}" as "{file_type}"')
+        file_writer = self._file_writer_chooser.get_current_plugin().strategy
+        file_writer.write(file_path, scan)

@@ -125,24 +125,24 @@ class PatternSizer(Observable, Observer):
         self.axis_x = PatternAxisSizer(
             detector_settings.width_px,
             detector_settings.pixel_width_m,
-            pattern_settings.cropEnabled,
-            pattern_settings.cropWidthInPixels,
-            pattern_settings.cropCenterXInPixels,
-            pattern_settings.binningEnabled,
-            pattern_settings.binSizeX,
-            pattern_settings.paddingEnabled,
-            pattern_settings.padX,
+            pattern_settings.is_crop_enabled,
+            pattern_settings.crop_width_px,
+            pattern_settings.crop_center_x_px,
+            pattern_settings.is_binning_enabled,
+            pattern_settings.bin_size_x,
+            pattern_settings.is_padding_enabled,
+            pattern_settings.pad_x,
         )
         self.axis_y = PatternAxisSizer(
             detector_settings.height_px,
             detector_settings.pixel_height_m,
-            pattern_settings.cropEnabled,
-            pattern_settings.cropHeightInPixels,
-            pattern_settings.cropCenterYInPixels,
-            pattern_settings.binningEnabled,
-            pattern_settings.binSizeY,
-            pattern_settings.paddingEnabled,
-            pattern_settings.padY,
+            pattern_settings.is_crop_enabled,
+            pattern_settings.crop_height_px,
+            pattern_settings.crop_center_y_px,
+            pattern_settings.is_binning_enabled,
+            pattern_settings.bin_size_y,
+            pattern_settings.is_padding_enabled,
+            pattern_settings.pad_y,
         )
 
         self.axis_x.add_observer(self)
@@ -173,18 +173,18 @@ class PatternSizer(Observable, Observer):
         binning: DiffractionPatternBinning | None = None
         padding: DiffractionPatternPadding | None = None
 
-        if self._pattern_settings.valueUpperBoundEnabled.get_value():
-            value_lower_bound = self._pattern_settings.valueLowerBound.get_value()
+        if self._pattern_settings.is_value_upper_bound_enabled.get_value():
+            value_lower_bound = self._pattern_settings.value_lower_bound.get_value()
 
-        if self._pattern_settings.valueUpperBoundEnabled.get_value():
-            value_upper_bound = self._pattern_settings.valueUpperBound.get_value()
+        if self._pattern_settings.is_value_upper_bound_enabled.get_value():
+            value_upper_bound = self._pattern_settings.value_upper_bound.get_value()
 
         filter_values = DiffractionPatternFilterValues(
             lower_bound=value_lower_bound,
             upper_bound=value_upper_bound,
         )
 
-        if self._pattern_settings.cropEnabled.get_value():
+        if self._pattern_settings.is_crop_enabled.get_value():
             crop = DiffractionPatternCrop(
                 center=CropCenter(
                     self.axis_x.get_crop_center(),
@@ -196,7 +196,7 @@ class PatternSizer(Observable, Observer):
                 ),
             )
 
-        if self._pattern_settings.binningEnabled.get_value():
+        if self._pattern_settings.is_binning_enabled.get_value():
             self.axis_x.validate_bin_size()
             self.axis_y.validate_bin_size()
             binning = DiffractionPatternBinning(
@@ -204,7 +204,7 @@ class PatternSizer(Observable, Observer):
                 bin_size_y=self.axis_y.get_bin_size(),
             )
 
-        if self._pattern_settings.paddingEnabled.get_value():
+        if self._pattern_settings.is_padding_enabled.get_value():
             padding = DiffractionPatternPadding(
                 pad_x=self.axis_x.get_pad_size(),
                 pad_y=self.axis_y.get_pad_size(),
@@ -215,8 +215,8 @@ class PatternSizer(Observable, Observer):
             crop=crop,
             binning=binning,
             padding=padding,
-            flip_x=self._pattern_settings.flipXEnabled.get_value(),
-            flip_y=self._pattern_settings.flipYEnabled.get_value(),
+            flip_x=self._pattern_settings.is_flip_x_enabled.get_value(),
+            flip_y=self._pattern_settings.is_flip_y_enabled.get_value(),
         )
 
     def _update(self, observable: Observable) -> None:

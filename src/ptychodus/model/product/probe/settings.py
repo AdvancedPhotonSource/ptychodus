@@ -14,7 +14,7 @@ class ProbeSettings(Observable, Observer):
         self.filePath = self._settingsGroup.create_path_parameter(
             'FilePath', Path('/path/to/probe.npy')
         )
-        self.fileType = self._settingsGroup.create_string_parameter('FileType', 'NPY')
+        self.file_type = self._settingsGroup.create_string_parameter('FileType', 'NPY')
 
         self.numberOfCoherentModes = self._settingsGroup.create_integer_parameter(
             'NumberOfCoherentModes', 1, minimum=1

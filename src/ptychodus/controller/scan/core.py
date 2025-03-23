@@ -149,7 +149,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
 
         item_name = self._repository.get_name(item_index)
         item = self._repository[item_index]
-        dialog = self._editor_factory.createEditorDialog(item_name, item, self._view)
+        dialog = self._editor_factory.create_editor_dialog(item_name, item, self._view)
         dialog.open()
 
     def _save_current_scan_to_file(self) -> None:

@@ -24,90 +24,92 @@ class ProductCore(Observer):
     def __init__(
         self,
         rng: numpy.random.Generator,
-        settingsRegistry: SettingsRegistry,
-        patternSizer: PatternSizer,
+        settings_registry: SettingsRegistry,
+        pattern_sizer: PatternSizer,
         dataset: AssembledDiffractionDataset,
-        scanFileReaderChooser: PluginChooser[PositionFileReader],
-        scanFileWriterChooser: PluginChooser[PositionFileWriter],
-        fresnelZonePlateChooser: PluginChooser[FresnelZonePlate],
-        probeFileReaderChooser: PluginChooser[ProbeFileReader],
-        probeFileWriterChooser: PluginChooser[ProbeFileWriter],
-        objectFileReaderChooser: PluginChooser[ObjectFileReader],
-        objectFileWriterChooser: PluginChooser[ObjectFileWriter],
-        productFileReaderChooser: PluginChooser[ProductFileReader],
-        productFileWriterChooser: PluginChooser[ProductFileWriter],
-        reinitObservable: Observable,
+        scan_file_reader_chooser: PluginChooser[PositionFileReader],
+        scan_file_writer_chooser: PluginChooser[PositionFileWriter],
+        fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
+        probe_file_reader_chooser: PluginChooser[ProbeFileReader],
+        probe_file_writer_chooser: PluginChooser[ProbeFileWriter],
+        object_file_reader_chooser: PluginChooser[ObjectFileReader],
+        object_file_writer_chooser: PluginChooser[ObjectFileWriter],
+        product_file_reader_chooser: PluginChooser[ProductFileReader],
+        product_file_writer_chooser: PluginChooser[ProductFileWriter],
+        reinit_observable: Observable,
     ) -> None:
         super().__init__()
-        self.settings = ProductSettings(settingsRegistry)
+        self.settings = ProductSettings(settings_registry)
 
-        self._scanSettings = ScanSettings(settingsRegistry)
-        self._scanBuilderFactory = ScanBuilderFactory(
-            self._scanSettings, scanFileReaderChooser, scanFileWriterChooser
+        self._scan_settings = ScanSettings(settings_registry)
+        self._scan_builder_factory = ScanBuilderFactory(
+            self._scan_settings, scan_file_reader_chooser, scan_file_writer_chooser
         )
-        self._scanRepositoryItemFactory = ScanRepositoryItemFactory(
-            rng, self._scanSettings, self._scanBuilderFactory
+        self._scan_repository_item_factory = ScanRepositoryItemFactory(
+            rng, self._scan_settings, self._scan_builder_factory
         )
 
-        self._probeSettings = ProbeSettings(settingsRegistry)
-        self._probeBuilderFactory = ProbeBuilderFactory(
-            self._probeSettings,
+        self._probe_settings = ProbeSettings(settings_registry)
+        self._probe_builder_factory = ProbeBuilderFactory(
+            self._probe_settings,
             dataset,
-            fresnelZonePlateChooser,
-            probeFileReaderChooser,
-            probeFileWriterChooser,
+            fresnel_zone_plate_chooser,
+            probe_file_reader_chooser,
+            probe_file_writer_chooser,
         )
-        self._probeRepositoryItemFactory = ProbeRepositoryItemFactory(
-            rng, self._probeSettings, self._probeBuilderFactory
-        )
-
-        self._objectSettings = ObjectSettings(settingsRegistry)
-        self._objectBuilderFactory = ObjectBuilderFactory(
-            rng, self._objectSettings, objectFileReaderChooser, objectFileWriterChooser
-        )
-        self._objectRepositoryItemFactory = ObjectRepositoryItemFactory(
-            rng, self._objectSettings, self._objectBuilderFactory
+        self._probe_repository_item_factory = ProbeRepositoryItemFactory(
+            rng, self._probe_settings, self._probe_builder_factory
         )
 
-        self.productRepository = ProductRepository(
+        self._object_settings = ObjectSettings(settings_registry)
+        self._object_builder_factory = ObjectBuilderFactory(
+            rng, self._object_settings, object_file_reader_chooser, object_file_writer_chooser
+        )
+        self._object_repository_item_factory = ObjectRepositoryItemFactory(
+            rng, self._object_settings, self._object_builder_factory
+        )
+
+        self.product_repository = ProductRepository(
             self.settings,
-            patternSizer,
+            pattern_sizer,
             dataset,
-            self._scanRepositoryItemFactory,
-            self._probeRepositoryItemFactory,
-            self._objectRepositoryItemFactory,
+            self._scan_repository_item_factory,
+            self._probe_repository_item_factory,
+            self._object_repository_item_factory,
         )
-        self.productAPI = ProductAPI(
+        self.product_api = ProductAPI(
             self.settings,
-            self.productRepository,
-            productFileReaderChooser,
-            productFileWriterChooser,
+            self.product_repository,
+            product_file_reader_chooser,
+            product_file_writer_chooser,
         )
-        self.scanRepository = ScanRepository(self.productRepository)
-        self.scanAPI = ScanAPI(self._scanSettings, self.scanRepository, self._scanBuilderFactory)
-        self.probeRepository = ProbeRepository(self.productRepository)
-        self.probeAPI = ProbeAPI(
-            self._probeSettings, self.probeRepository, self._probeBuilderFactory
+        self.scan_repository = ScanRepository(self.product_repository)
+        self.scan_api = ScanAPI(
+            self._scan_settings, self.scan_repository, self._scan_builder_factory
         )
-        self.objectRepository = ObjectRepository(self.productRepository)
-        self.objectAPI = ObjectAPI(
-            self._objectSettings, self.objectRepository, self._objectBuilderFactory
+        self.probe_repository = ProbeRepository(self.product_repository)
+        self.probe_api = ProbeAPI(
+            self._probe_settings, self.probe_repository, self._probe_builder_factory
+        )
+        self.object_repository = ObjectRepository(self.product_repository)
+        self.object_api = ObjectAPI(
+            self._object_settings, self.object_repository, self._object_builder_factory
         )
 
         # TODO vvv refactor vvv
-        productFileReaderChooser.synchronize_with_parameter(self.settings.file_type)
-        productFileWriterChooser.set_current_plugin(self.settings.file_type.get_value())
-        scanFileReaderChooser.synchronize_with_parameter(self._scanSettings.fileType)
-        scanFileWriterChooser.set_current_plugin(self._scanSettings.fileType.get_value())
-        probeFileReaderChooser.synchronize_with_parameter(self._probeSettings.fileType)
-        probeFileWriterChooser.set_current_plugin(self._probeSettings.fileType.get_value())
-        objectFileReaderChooser.synchronize_with_parameter(self._objectSettings.fileType)
-        objectFileWriterChooser.set_current_plugin(self._objectSettings.fileType.get_value())
+        product_file_reader_chooser.synchronize_with_parameter(self.settings.file_type)
+        product_file_writer_chooser.set_current_plugin(self.settings.file_type.get_value())
+        scan_file_reader_chooser.synchronize_with_parameter(self._scan_settings.file_type)
+        scan_file_writer_chooser.set_current_plugin(self._scan_settings.file_type.get_value())
+        probe_file_reader_chooser.synchronize_with_parameter(self._probe_settings.file_type)
+        probe_file_writer_chooser.set_current_plugin(self._probe_settings.file_type.get_value())
+        object_file_reader_chooser.synchronize_with_parameter(self._object_settings.file_type)
+        object_file_writer_chooser.set_current_plugin(self._object_settings.file_type.get_value())
         # TODO ^^^^^^^^^^^^^^^^
 
-        self._reinitObservable = reinitObservable
-        reinitObservable.add_observer(self)
+        self._reinit_observable = reinit_observable
+        reinit_observable.add_observer(self)
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._reinitObservable:
-            self.productRepository.insert_product_from_settings()
+        if observable is self._reinit_observable:
+            self.product_repository.insert_product_from_settings()

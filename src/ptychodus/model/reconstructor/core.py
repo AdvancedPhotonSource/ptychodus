@@ -49,15 +49,15 @@ class ReconstructorCore:
             self._pluginChooser.register_plugin(NullReconstructor('None'), display_name='None/None')
 
         self._reconstructionQueue = ReconstructionQueue()
-        self.dataMatcher = DiffractionPatternPositionMatcher(diffractionDataset, productRepository)
-        self.reconstructorAPI = ReconstructorAPI(
-            self._reconstructionQueue, self.dataMatcher, productRepository, self._pluginChooser
+        self.data_matcher = DiffractionPatternPositionMatcher(diffractionDataset, productRepository)
+        self.reconstructor_api = ReconstructorAPI(
+            self._reconstructionQueue, self.data_matcher, productRepository, self._pluginChooser
         )
         self.presenter = ReconstructorPresenter(
             self.settings,
             self._pluginChooser,
             self._logHandler,
-            self.reconstructorAPI,
+            self.reconstructor_api,
         )
 
     def start(self) -> None:

@@ -15,117 +15,117 @@ from .product import ProductSettings
 class MetadataPresenter(Observable, DiffractionDatasetObserver):
     def __init__(
         self,
-        detectorSettings: DetectorSettings,
-        patternSettings: PatternSettings,
-        diffractionDataset: AssembledDiffractionDataset,
-        productSettings: ProductSettings,
+        detector_settings: DetectorSettings,
+        pattern_settings: PatternSettings,
+        dataset: AssembledDiffractionDataset,
+        product_settings: ProductSettings,
     ) -> None:
         super().__init__()
-        self._detectorSettings = detectorSettings
-        self._patternSettings = patternSettings
-        self._diffractionDataset = diffractionDataset
-        self._productSettings = productSettings
+        self._detector_settings = detector_settings
+        self._pattern_settings = pattern_settings
+        self._dataset = dataset
+        self._product_settings = product_settings
 
-        diffractionDataset.add_observer(self)
+        dataset.add_observer(self)
 
     @property
     def _metadata(self) -> DiffractionMetadata:
-        return self._diffractionDataset.get_metadata()
+        return self._dataset.get_metadata()
 
-    def canSyncDetectorExtent(self) -> bool:
+    def can_sync_detector_extent(self) -> bool:
         return self._metadata.detector_extent is not None
 
-    def syncDetectorExtent(self) -> None:
-        detectorExtent = self._metadata.detector_extent
+    def sync_detector_extent(self) -> None:
+        detector_extent = self._metadata.detector_extent
 
-        if detectorExtent:
-            self._detectorSettings.width_px.set_value(detectorExtent.width_px)
-            self._detectorSettings.height_px.set_value(detectorExtent.height_px)
+        if detector_extent:
+            self._detector_settings.width_px.set_value(detector_extent.width_px)
+            self._detector_settings.height_px.set_value(detector_extent.height_px)
 
-    def canSyncDetectorPixelSize(self) -> bool:
+    def can_sync_detector_pixel_size(self) -> bool:
         return self._metadata.detector_pixel_geometry is not None
 
-    def syncDetectorPixelSize(self) -> None:
-        pixelGeometry = self._metadata.detector_pixel_geometry
+    def sync_detector_pixel_size(self) -> None:
+        pixel_geometry = self._metadata.detector_pixel_geometry
 
-        if pixelGeometry:
-            self._detectorSettings.pixel_width_m.set_value(pixelGeometry.width_m)
-            self._detectorSettings.pixel_height_m.set_value(pixelGeometry.height_m)
+        if pixel_geometry:
+            self._detector_settings.pixel_width_m.set_value(pixel_geometry.width_m)
+            self._detector_settings.pixel_height_m.set_value(pixel_geometry.height_m)
 
-    def canSyncDetectorBitDepth(self) -> bool:
+    def can_sync_detector_bit_depth(self) -> bool:
         return self._metadata.detector_bit_depth is not None
 
-    def syncDetectorBitDepth(self) -> None:
-        bitDepth = self._metadata.detector_bit_depth
+    def sync_detector_bit_depth(self) -> None:
+        bit_depth = self._metadata.detector_bit_depth
 
-        if bitDepth:
-            self._detectorSettings.bit_depth.set_value(bitDepth)
+        if bit_depth:
+            self._detector_settings.bit_depth.set_value(bit_depth)
 
-    def canSyncPatternCropCenter(self) -> bool:
+    def can_sync_pattern_crop_center(self) -> bool:
         return self._metadata.crop_center is not None or self._metadata.detector_extent is not None
 
-    def canSyncPatternCropExtent(self) -> bool:
+    def can_sync_pattern_crop_extent(self) -> bool:
         return self._metadata.detector_extent is not None
 
-    def syncPatternCrop(self, syncCenter: bool, syncExtent: bool) -> None:
-        if syncCenter:
-            cropCenter = self._metadata.crop_center
+    def sync_pattern_crop(self, sync_center: bool, sync_extent: bool) -> None:
+        if sync_center:
+            crop_center = self._metadata.crop_center
 
-            if cropCenter:
-                self._patternSettings.cropCenterXInPixels.set_value(cropCenter.position_x_px)
-                self._patternSettings.cropCenterYInPixels.set_value(cropCenter.position_y_px)
+            if crop_center:
+                self._pattern_settings.crop_center_x_px.set_value(crop_center.position_x_px)
+                self._pattern_settings.crop_center_y_px.set_value(crop_center.position_y_px)
             elif self._metadata.detector_extent:
-                self._patternSettings.cropCenterXInPixels.set_value(
+                self._pattern_settings.crop_center_x_px.set_value(
                     int(self._metadata.detector_extent.width_px) // 2
                 )
-                self._patternSettings.cropCenterYInPixels.set_value(
+                self._pattern_settings.crop_center_y_px.set_value(
                     int(self._metadata.detector_extent.height_px) // 2
                 )
 
-        if syncExtent and self._metadata.detector_extent:
-            centerX = self._patternSettings.cropCenterXInPixels.get_value()
-            centerY = self._patternSettings.cropCenterYInPixels.get_value()
+        if sync_extent and self._metadata.detector_extent:
+            center_x = self._pattern_settings.crop_center_x_px.get_value()
+            center_y = self._pattern_settings.crop_center_y_px.get_value()
 
-            extentX = int(self._metadata.detector_extent.width_px)
-            extentY = int(self._metadata.detector_extent.height_px)
+            extent_x = int(self._metadata.detector_extent.width_px)
+            extent_y = int(self._metadata.detector_extent.height_px)
 
-            maxRadiusX = min(centerX, extentX - centerX)
-            maxRadiusY = min(centerY, extentY - centerY)
-            maxRadius = min(maxRadiusX, maxRadiusY)
-            cropDiameterInPixels = 1
+            max_radius_x = min(center_x, extent_x - center_x)
+            max_radius_y = min(center_y, extent_y - center_y)
+            max_radius = min(max_radius_x, max_radius_y)
+            crop_diameter = 1
 
-            while cropDiameterInPixels < maxRadius:
-                cropDiameterInPixels <<= 1
+            while crop_diameter < max_radius:
+                crop_diameter <<= 1
 
-            self._patternSettings.cropWidthInPixels.set_value(cropDiameterInPixels)
-            self._patternSettings.cropHeightInPixels.set_value(cropDiameterInPixels)
+            self._pattern_settings.crop_width_px.set_value(crop_diameter)
+            self._pattern_settings.crop_height_px.set_value(crop_diameter)
 
-    def canSyncProbePhotonCount(self) -> bool:
+    def can_sync_probe_photon_count(self) -> bool:
         return self._metadata.probe_photon_count is not None
 
-    def syncProbePhotonCount(self) -> None:
-        photonCount = self._metadata.probe_photon_count
+    def sync_probe_photon_count(self) -> None:
+        photon_count = self._metadata.probe_photon_count
 
-        if photonCount:
-            self._productSettings.probe_photon_count.set_value(photonCount)
+        if photon_count:
+            self._product_settings.probe_photon_count.set_value(photon_count)
 
-    def canSyncProbeEnergy(self) -> bool:
+    def can_sync_probe_energy(self) -> bool:
         return self._metadata.probe_energy_eV is not None
 
-    def syncProbeEnergy(self) -> None:
-        energyInElectronVolts = self._metadata.probe_energy_eV
+    def sync_probe_energy(self) -> None:
+        energy_eV = self._metadata.probe_energy_eV  # noqa: N806
 
-        if energyInElectronVolts:
-            self._productSettings.probe_energy_eV.set_value(energyInElectronVolts)
+        if energy_eV:
+            self._product_settings.probe_energy_eV.set_value(energy_eV)
 
-    def canSyncDetectorDistance(self) -> bool:
+    def can_sync_detector_distance(self) -> bool:
         return self._metadata.detector_distance_m is not None
 
-    def syncDetectorDistance(self) -> None:
-        distanceInMeters = self._metadata.detector_distance_m
+    def sync_detector_distance(self) -> None:
+        distance_m = self._metadata.detector_distance_m
 
-        if distanceInMeters:
-            self._productSettings.detector_distance_m.set_value(distanceInMeters)
+        if distance_m:
+            self._product_settings.detector_distance_m.set_value(distance_m)
 
     def handle_array_inserted(self, index: int) -> None:
         pass

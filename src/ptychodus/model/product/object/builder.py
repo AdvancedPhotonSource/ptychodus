@@ -65,7 +65,7 @@ class FromFileObjectBuilder(ObjectBuilder):
         self.filePath = settings.filePath.copy()
         self.filePath.set_value(filePath)
         self._add_parameter('file_path', self.filePath)
-        self.fileType = settings.fileType.copy()
+        self.fileType = settings.file_type.copy()
         self.fileType.set_value(fileType)
         self._add_parameter('file_type', self.fileType)
         self._fileReader = fileReader
