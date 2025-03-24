@@ -77,7 +77,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         repository.add_observer(controller)
 
         builderListModel = QStringListModel()
-        builderListModel.setStringList([name for name in api.builderNames()])
+        builderListModel.setStringList([name for name in api.builder_names()])
         builderItemDelegate = ComboBoxItemDelegate(builderListModel, view.treeView)
 
         view.treeView.setModel(treeModel)
@@ -137,13 +137,13 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         filePath, nameFilter = self._fileDialogFactory.get_open_file_path(
             self._view,
             'Open Object',
-            name_filters=[nameFilter for nameFilter in self._api.getOpenFileFilterList()],
-            selected_name_filter=self._api.getOpenFileFilter(),
+            name_filters=[nameFilter for nameFilter in self._api.get_open_file_filters()],
+            selected_name_filter=self._api.get_open_file_filter(),
         )
 
         if filePath:
             try:
-                self._api.openObject(itemIndex, filePath, file_type=nameFilter)
+                self._api.open_object(itemIndex, filePath, file_type=nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.show_exception('File Reader', err)
@@ -159,7 +159,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         if result == QDialog.DialogCode.Accepted:
             sourceIndex = self._view.copierDialog.source_combo_box.currentIndex()
             destinationIndex = self._view.copierDialog.destination_combo_box.currentIndex()
-            self._api.copyObject(sourceIndex, destinationIndex)
+            self._api.copy_object(sourceIndex, destinationIndex)
 
     def _editCurrentObject(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -181,13 +181,13 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         filePath, nameFilter = self._fileDialogFactory.get_save_file_path(
             self._view,
             'Save Object',
-            name_filters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
-            selected_name_filter=self._api.getSaveFileFilter(),
+            name_filters=[nameFilter for nameFilter in self._api.get_save_file_filters()],
+            selected_name_filter=self._api.get_save_file_filter(),
         )
 
         if filePath:
             try:
-                self._api.saveObject(itemIndex, filePath, nameFilter)
+                self._api.save_object(itemIndex, filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.show_exception('File Writer', err)

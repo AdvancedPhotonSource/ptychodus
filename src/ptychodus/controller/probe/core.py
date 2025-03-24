@@ -111,7 +111,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         repository.add_observer(controller)
 
         builderListModel = QStringListModel()
-        builderListModel.setStringList([name for name in api.builderNames()])
+        builderListModel.setStringList([name for name in api.builder_names()])
         builderItemDelegate = ComboBoxItemDelegate(builderListModel, view.treeView)
 
         view.treeView.setModel(treeModel)
@@ -179,13 +179,13 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         filePath, nameFilter = self._fileDialogFactory.get_open_file_path(
             self._view,
             'Open Probe',
-            name_filters=[nameFilter for nameFilter in self._api.getOpenFileFilterList()],
-            selected_name_filter=self._api.getOpenFileFilter(),
+            name_filters=[nameFilter for nameFilter in self._api.get_open_file_filters()],
+            selected_name_filter=self._api.get_open_file_filter(),
         )
 
         if filePath:
             try:
-                self._api.openProbe(itemIndex, filePath, file_type=nameFilter)
+                self._api.open_probe(itemIndex, filePath, file_type=nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.show_exception('File Reader', err)
@@ -201,7 +201,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         if result == QDialog.DialogCode.Accepted:
             sourceIndex = self._view.copierDialog.source_combo_box.currentIndex()
             destinationIndex = self._view.copierDialog.destination_combo_box.currentIndex()
-            self._api.copyProbe(sourceIndex, destinationIndex)
+            self._api.copy_probe(sourceIndex, destinationIndex)
 
     def _editCurrentProbe(self) -> None:
         itemIndex = self._getCurrentItemIndex()
@@ -223,13 +223,13 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         filePath, nameFilter = self._fileDialogFactory.get_save_file_path(
             self._view,
             'Save Probe',
-            name_filters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
-            selected_name_filter=self._api.getSaveFileFilter(),
+            name_filters=[nameFilter for nameFilter in self._api.get_save_file_filters()],
+            selected_name_filter=self._api.get_save_file_filter(),
         )
 
         if filePath:
             try:
-                self._api.saveProbe(itemIndex, filePath, nameFilter)
+                self._api.save_probe(itemIndex, filePath, nameFilter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.show_exception('File Writer', err)

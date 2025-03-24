@@ -9,35 +9,35 @@ from ptychodus.api.settings import SettingsRegistry
 class ObjectSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = registry.create_group('Object')
-        self._settingsGroup.add_observer(self)
+        self._settings_group = registry.create_group('Object')
+        self._settings_group.add_observer(self)
 
-        self.builder = self._settingsGroup.create_string_parameter('Builder', 'Random')
-        self.filePath = self._settingsGroup.create_path_parameter(
+        self.builder = self._settings_group.create_string_parameter('Builder', 'Random')
+        self.file_path = self._settings_group.create_path_parameter(
             'FilePath', Path('/path/to/object.npy')
         )
-        self.file_type = self._settingsGroup.create_string_parameter('FileType', 'NPY')
+        self.file_type = self._settings_group.create_string_parameter('FileType', 'NPY')
 
-        self.object_layer_distance_m = self._settingsGroup.create_real_sequence_parameter(
+        self.object_layer_distance_m = self._settings_group.create_real_sequence_parameter(
             'ObjectLayerDistanceInMeters', []
         )
 
-        self.extraPaddingX = self._settingsGroup.create_integer_parameter(
+        self.extra_padding_x = self._settings_group.create_integer_parameter(
             'ExtraPaddingX', 1, minimum=0
         )
-        self.extraPaddingY = self._settingsGroup.create_integer_parameter(
+        self.extra_padding_y = self._settings_group.create_integer_parameter(
             'ExtraPaddingY', 1, minimum=0
         )
-        self.amplitudeMean = self._settingsGroup.create_real_parameter(
+        self.amplitude_mean = self._settings_group.create_real_parameter(
             'AmplitudeMean', 1.0, minimum=0.0, maximum=1.0
         )
-        self.amplitudeDeviation = self._settingsGroup.create_real_parameter(
+        self.amplitude_deviation = self._settings_group.create_real_parameter(
             'AmplitudeDeviation', 0.0, minimum=0.0, maximum=1.0
         )
-        self.phaseDeviation = self._settingsGroup.create_real_parameter(
+        self.phase_deviation = self._settings_group.create_real_parameter(
             'PhaseDeviation', 0.0, minimum=0.0, maximum=numpy.pi
         )
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._settingsGroup:
+        if observable is self._settings_group:
             self.notify_observers()

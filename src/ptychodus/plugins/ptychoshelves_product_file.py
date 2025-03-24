@@ -24,12 +24,12 @@ class PtychoShelvesProductFileReader(ProductFileReader):
     DISPLAY_NAME: Final[str] = 'PtychoShelves Files (*.mat)'
 
     def read(self, file_path: Path) -> Product:
-        scanPointList: list[ScanPoint] = list()
+        point_list: list[ScanPoint] = list()
 
-        hc_eVm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S / ELECTRON_VOLT_J
-        matDict = scipy.io.loadmat(file_path, simplify_cells=True)
-        p_struct = matDict['p']
-        probe_energy_eV = hc_eVm / p_struct['lambda']
+        hc_eVm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S / ELECTRON_VOLT_J  # noqa: N806
+        mat_dict = scipy.io.loadmat(file_path, simplify_cells=True)
+        p_struct = mat_dict['p']
+        probe_energy_eV = hc_eVm / p_struct['lambda']  # noqa: N806
 
         metadata = ProductMetadata(
             name=file_path.stem,
@@ -46,7 +46,7 @@ class PtychoShelvesProductFileReader(ProductFileReader):
         pixel_height_m = dx_spec[1]
         pixel_geometry = PixelGeometry(width_m=pixel_width_m, height_m=pixel_height_m)
 
-        outputs_struct = matDict['outputs']
+        outputs_struct = mat_dict['outputs']
         probe_positions = outputs_struct['probe_positions']
 
         for idx, pos_px in enumerate(probe_positions):
@@ -55,9 +55,9 @@ class PtychoShelvesProductFileReader(ProductFileReader):
                 pos_px[0] * pixel_width_m,
                 pos_px[1] * pixel_height_m,
             )
-            scanPointList.append(point)
+            point_list.append(point)
 
-        probe_array = matDict['probe']
+        probe_array = mat_dict['probe']
 
         if probe_array.ndim == 3:
             # probe_array[height, width, num_shared_modes]
@@ -68,7 +68,7 @@ class PtychoShelvesProductFileReader(ProductFileReader):
 
         probe = Probe(array=probe_array, pixel_geometry=pixel_geometry)
 
-        object_array = matDict['object']
+        object_array = mat_dict['object']
 
         if object_array.ndim == 3:
             # object_array[height, width, num_layers]
@@ -95,7 +95,7 @@ class PtychoShelvesProductFileReader(ProductFileReader):
 
         return Product(
             metadata=metadata,
-            positions=PositionSequence(scanPointList),
+            positions=PositionSequence(point_list),
             probe=probe,
             object_=object_,
             costs=costs,

@@ -46,7 +46,7 @@ class WorkflowExecutor:
         ptychodusAction = 'reconstruct'  # TODO or 'train'
 
         try:
-            flowLabel = self._productAPI.getItemName(inputProductIndex)
+            flowLabel = self._productAPI.get_item_name(inputProductIndex)
         except IndexError:
             logger.warning(f'Failed access product for flow ({inputProductIndex=})!')
             return

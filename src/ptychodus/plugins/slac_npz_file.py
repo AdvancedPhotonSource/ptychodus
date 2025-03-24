@@ -24,40 +24,40 @@ logger = logging.getLogger(__name__)
 
 class SLACDiffractionFileReader(DiffractionFileReader):
     def read(self, file_path: Path) -> DiffractionDataset:
-        with numpy.load(file_path) as npzFile:
-            patterns = numpy.transpose(npzFile['diffraction'], [2, 0, 1])
+        with numpy.load(file_path) as npz_file:
+            patterns = numpy.transpose(npz_file['diffraction'], [2, 0, 1])
 
-        numberOfPatterns, detectorHeight, detectorWidth = patterns.shape
+        num_patterns, detector_height, detector_width = patterns.shape
 
         metadata = DiffractionMetadata(
-            num_patterns_per_array=numberOfPatterns,
-            num_patterns_total=numberOfPatterns,
+            num_patterns_per_array=num_patterns,
+            num_patterns_total=num_patterns,
             pattern_dtype=patterns.dtype,
-            detector_extent=ImageExtent(detectorWidth, detectorHeight),
+            detector_extent=ImageExtent(detector_width, detector_height),
             file_path=file_path,
         )
 
-        contentsTree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
-        contentsTree.create_child(
+        contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+        contents_tree.create_child(
             [file_path.stem, type(patterns).__name__, f'{patterns.dtype}{patterns.shape}']
         )
 
         array = SimpleDiffractionPatternArray(
             label=file_path.stem,
-            indexes=numpy.arange(numberOfPatterns),
+            indexes=numpy.arange(num_patterns),
             data=patterns,
         )
 
-        return SimpleDiffractionDataset(metadata, contentsTree, [array])
+        return SimpleDiffractionDataset(metadata, contents_tree, [array])
 
 
 class SLACProductFileReader(ProductFileReader):
     def read(self, file_path: Path) -> Product:
-        with numpy.load(file_path) as npzFile:
-            scanXInMeters = npzFile['xcoords_start']
-            scanYInMeters = npzFile['ycoords_start']
-            probeArray = npzFile['probeGuess']
-            objectArray = npzFile['objectGuess']
+        with numpy.load(file_path) as npz_file:
+            scan_x_m = npz_file['xcoords_start']
+            scan_y_m = npz_file['ycoords_start']
+            probe_array = npz_file['probeGuess']
+            object_array = npz_file['objectGuess']
 
         metadata = ProductMetadata(
             name=file_path.stem,
@@ -69,26 +69,26 @@ class SLACProductFileReader(ProductFileReader):
             mass_attenuation_m2_kg=0.0,  # not included in file
         )
 
-        scanPointList: list[ScanPoint] = list()
+        point_list: list[ScanPoint] = list()
 
-        for idx, (x_m, y_m) in enumerate(zip(scanXInMeters, scanYInMeters)):
+        for idx, (x_m, y_m) in enumerate(zip(scan_x_m, scan_y_m)):
             point = ScanPoint(idx, x_m, y_m)
-            scanPointList.append(point)
+            point_list.append(point)
 
         costs: Sequence[float] = list()  # not included in file
 
         return Product(
             metadata=metadata,
-            positions=PositionSequence(scanPointList),
-            probe=Probe(array=probeArray, pixel_geometry=None),
-            object_=Object(array=objectArray, pixel_geometry=None, center=None),
+            positions=PositionSequence(point_list),
+            probe=Probe(array=probe_array, pixel_geometry=None),
+            object_=Object(array=object_array, pixel_geometry=None, center=None),
             costs=costs,
         )
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    SIMPLE_NAME: Final[str] = 'SLAC'
-    DISPLAY_NAME: Final[str] = 'SLAC NumPy Zipped Archive (*.npz)'
+    SIMPLE_NAME: Final[str] = 'SLAC'  # noqa: N806
+    DISPLAY_NAME: Final[str] = 'SLAC NumPy Zipped Archive (*.npz)'  # noqa: N806
 
     registry.diffraction_file_readers.register_plugin(
         SLACDiffractionFileReader(),

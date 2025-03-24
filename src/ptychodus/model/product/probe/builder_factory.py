@@ -66,7 +66,7 @@ class ProbeBuilderFactory(Iterable[str]):
         nameRepaired = name.casefold()
 
         if nameRepaired == 'from_file':
-            return self.createProbeFromFile(
+            return self.create_probe_from_file(
                 self._settings.filePath.get_value(),
                 self._settings.file_type.get_value(),
             )
@@ -79,27 +79,27 @@ class ProbeBuilderFactory(Iterable[str]):
     def _createFresnelZonePlateBuilder(self) -> ProbeBuilder:
         return FresnelZonePlateProbeBuilder(self._settings, self._fresnelZonePlateChooser)
 
-    def getOpenFileFilterList(self) -> Iterator[str]:
+    def get_open_file_filters(self) -> Iterator[str]:
         for plugin in self._fileReaderChooser:
             yield plugin.display_name
 
-    def getOpenFileFilter(self) -> str:
+    def get_open_file_filter(self) -> str:
         return self._fileReaderChooser.get_current_plugin().display_name
 
-    def createProbeFromFile(self, filePath: Path, fileFilter: str) -> ProbeBuilder:
+    def create_probe_from_file(self, filePath: Path, fileFilter: str) -> ProbeBuilder:
         self._fileReaderChooser.set_current_plugin(fileFilter)
         fileType = self._fileReaderChooser.get_current_plugin().simple_name
         fileReader = self._fileReaderChooser.get_current_plugin().strategy
         return FromFileProbeBuilder(self._settings, filePath, fileType, fileReader)
 
-    def getSaveFileFilterList(self) -> Iterator[str]:
+    def get_save_file_filters(self) -> Iterator[str]:
         for plugin in self._fileWriterChooser:
             yield plugin.display_name
 
-    def getSaveFileFilter(self) -> str:
+    def get_save_file_filter(self) -> str:
         return self._fileWriterChooser.get_current_plugin().display_name
 
-    def saveProbe(self, filePath: Path, fileFilter: str, probe: Probe) -> None:
+    def save_probe(self, filePath: Path, fileFilter: str, probe: Probe) -> None:
         self._fileWriterChooser.set_current_plugin(fileFilter)
         fileType = self._fileWriterChooser.get_current_plugin().simple_name
         logger.debug(f'Writing "{filePath}" as "{fileType}"')

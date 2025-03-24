@@ -47,21 +47,21 @@ class ObjectEditorViewControllerFactory:
         if isinstance(objectBuilder, RandomObjectBuilder):
             dialogBuilder = ParameterViewBuilder()
             dialogBuilder.add_spin_box(
-                objectBuilder.extraPaddingX, 'Extra Padding X:', group=firstLayerGroup
+                objectBuilder.extra_padding_x, 'Extra Padding X:', group=firstLayerGroup
             )
             dialogBuilder.add_spin_box(
-                objectBuilder.extraPaddingY, 'Extra Padding Y:', group=firstLayerGroup
+                objectBuilder.extra_padding_y, 'Extra Padding Y:', group=firstLayerGroup
             )
             dialogBuilder.add_decimal_slider(
-                objectBuilder.amplitudeMean, 'Amplitude Mean:', group=firstLayerGroup
+                objectBuilder.amplitude_mean, 'Amplitude Mean:', group=firstLayerGroup
             )
             dialogBuilder.add_decimal_slider(
-                objectBuilder.amplitudeDeviation,
+                objectBuilder.amplitude_deviation,
                 'Amplitude Deviation:',
                 group=firstLayerGroup,
             )
             dialogBuilder.add_decimal_slider(
-                objectBuilder.phaseDeviation, 'Phase Deviation:', group=firstLayerGroup
+                objectBuilder.phase_deviation, 'Phase Deviation:', group=firstLayerGroup
             )
             dialogBuilder.add_view_controller(
                 MultisliceViewController(item),

@@ -139,7 +139,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         if result == QDialog.DialogCode.Accepted:
             source_index = self._view.copier_dialog.source_combo_box.currentIndex()
             destination_index = self._view.copier_dialog.destination_combo_box.currentIndex()
-            self._api.copyScan(source_index, destination_index)
+            self._api.copy_scan(source_index, destination_index)
 
     def _edit_current_scan(self) -> None:
         item_index = self._get_current_item_index()

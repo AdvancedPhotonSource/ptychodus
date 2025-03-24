@@ -90,7 +90,7 @@ class ScanTableModel(QAbstractTableModel):
                 self._repository.set_name(index.row(), str(value))
                 return True
             elif index.column() == 2:
-                self._api.buildScan(index.row(), str(value))
+                self._api.build_scan(index.row(), str(value))
                 return True
         elif role == Qt.ItemDataRole.CheckStateRole:
             if index.column() == 1:

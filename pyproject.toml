@@ -73,7 +73,7 @@ quote-style = "single"
 
 [tool.ruff.lint]
 select = [
-    # TODO "N",
+    "N",
     "NPY",
 ]
 

@@ -17,29 +17,29 @@ class ObjectRepositoryItemFactory:
         self,
         rng: numpy.random.Generator,
         settings: ObjectSettings,
-        builderFactory: ObjectBuilderFactory,
+        builder_factory: ObjectBuilderFactory,
     ) -> None:
         self._rng = rng
         self._settings = settings
-        self._builderFactory = builderFactory
+        self._builder_factory = builder_factory
 
     def create(
-        self, geometryProvider: ObjectGeometryProvider, object_: Object | None = None
+        self, geometry_provider: ObjectGeometryProvider, object_: Object | None = None
     ) -> ObjectRepositoryItem:
         builder = (
-            self._builderFactory.createDefault()
+            self._builder_factory.create_default()
             if object_ is None
             else FromMemoryObjectBuilder(self._settings, object_)
         )
-        return ObjectRepositoryItem(geometryProvider, self._settings, builder)
+        return ObjectRepositoryItem(geometry_provider, self._settings, builder)
 
     def create_from_settings(
-        self, geometryProvider: ObjectGeometryProvider
+        self, geometry_provider: ObjectGeometryProvider
     ) -> ObjectRepositoryItem:
         try:
-            builder = self._builderFactory.createFromSettings()
+            builder = self._builder_factory.create_from_settings()
         except Exception as exc:
             logger.error(''.join(exc.args))
-            builder = self._builderFactory.createDefault()
+            builder = self._builder_factory.create_default()
 
-        return ObjectRepositoryItem(geometryProvider, self._settings, builder)
+        return ObjectRepositoryItem(geometry_provider, self._settings, builder)

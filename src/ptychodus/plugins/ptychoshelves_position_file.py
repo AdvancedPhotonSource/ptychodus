@@ -12,28 +12,28 @@ logger = logging.getLogger(__name__)
 
 class PtychoShelvesPositionFileReader(PositionFileReader):
     def read(self, file_path: Path) -> PositionSequence:
-        pointList: list[ScanPoint] = list()
+        point_list: list[ScanPoint] = list()
 
         try:
-            with h5py.File(file_path, 'r') as h5File:
+            with h5py.File(file_path, 'r') as h5_file:
                 try:
-                    ppX = numpy.squeeze(h5File['/ppX'])
-                    ppY = numpy.squeeze(h5File['/ppY'])
+                    pp_x = numpy.squeeze(h5_file['/ppX'])
+                    pp_y = numpy.squeeze(h5_file['/ppY'])
                 except KeyError:
                     logger.warning('Unable to find data.')
                 else:
-                    if ppX.shape == ppY.shape:
-                        logger.debug(f'Coordinate arrays have shape {ppX.shape}.')
+                    if pp_x.shape == pp_y.shape:
+                        logger.debug(f'Coordinate arrays have shape {pp_x.shape}.')
                     else:
                         raise ScanPointParseError('Coordinate array shape mismatch!')
 
-                    for idx, (x, y) in enumerate(zip(ppX, ppY)):
+                    for idx, (x, y) in enumerate(zip(pp_x, pp_y)):
                         point = ScanPoint(idx, x, y)
-                        pointList.append(point)
+                        point_list.append(point)
         except OSError:
             logger.warning(f'Unable to read file "{file_path}".')
 
-        return PositionSequence(pointList)
+        return PositionSequence(point_list)
 
 
 def register_plugins(registry: PluginRegistry) -> None:

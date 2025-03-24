@@ -89,15 +89,15 @@ class NPZFluorescenceFileWriter(FluorescenceFileWriter):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    xrfMapsFileIO = XRFMapsFileIO()
+    xrf_maps_file_io = XRFMapsFileIO()
 
     registry.fluorescence_file_readers.register_plugin(
-        xrfMapsFileIO,
+        xrf_maps_file_io,
         simple_name=XRFMapsFileIO.SIMPLE_NAME,
         display_name=XRFMapsFileIO.DISPLAY_NAME,
     )
     registry.fluorescence_file_writers.register_plugin(
-        xrfMapsFileIO,
+        xrf_maps_file_io,
         simple_name=XRFMapsFileIO.SIMPLE_NAME,
         display_name=XRFMapsFileIO.DISPLAY_NAME,
     )

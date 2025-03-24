@@ -46,33 +46,33 @@ class TiffDiffractionPatternArray(DiffractionPatternArray):
 
 
 class TiffDiffractionFileReader(DiffractionFileReader):
-    def _getFileSeries(self, file_path: Path) -> tuple[Mapping[int, Path], str]:
-        file_pathDict: dict[int, Path] = dict()
+    def _get_file_series(self, file_path: Path) -> tuple[Mapping[int, Path], str]:
+        file_path_dict: dict[int, Path] = dict()
 
         digits = re.findall(r'\d+', file_path.stem)
         longest_digits = max(digits, key=len)
-        filePattern = file_path.name.replace(longest_digits, f'(\\d{{{len(longest_digits)}}})')
+        file_pattern = file_path.name.replace(longest_digits, f'(\\d{{{len(longest_digits)}}})')
 
         for fp in file_path.parent.iterdir():
-            z = re.match(filePattern, fp.name)
+            z = re.match(file_pattern, fp.name)
 
             if z:
                 index = int(z.group(1).lstrip('0'))
-                file_pathDict[index] = fp
+                file_path_dict[index] = fp
 
-        return file_pathDict, filePattern
+        return file_path_dict, file_pattern
 
     def read(self, file_path: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.create_null(file_path)
 
-        file_pathMapping, filePattern = self._getFileSeries(file_path)
-        contentsTree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
-        arrayList: list[DiffractionPatternArray] = list()
+        file_path_mapping, file_pattern = self._get_file_series(file_path)
+        contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+        array_list: list[DiffractionPatternArray] = list()
 
-        for idx, (_, fp) in enumerate(sorted(file_pathMapping.items())):  # TODO use keys
+        for idx, (_, fp) in enumerate(sorted(file_path_mapping.items())):  # TODO use keys
             array = TiffDiffractionPatternArray(fp, idx)
-            contentsTree.create_child([array.get_label(), 'TIFF', str(idx)])
-            arrayList.append(array)
+            contents_tree.create_child([array.get_label(), 'TIFF', str(idx)])
+            array_list.append(array)
 
         try:
             with TiffFile(file_path) as tiff:
@@ -83,17 +83,17 @@ class TiffDiffractionFileReader(DiffractionFileReader):
             if data.ndim == 2:
                 data = data[numpy.newaxis, :, :]
 
-            numberOfPatternsPerArray, detectorHeight, detectorWidth = data.shape
+            num_patterns_per_array, detector_height, detector_width = data.shape
 
             metadata = DiffractionMetadata(
-                num_patterns_per_array=numberOfPatternsPerArray,
-                num_patterns_total=numberOfPatternsPerArray * len(arrayList),
+                num_patterns_per_array=num_patterns_per_array,
+                num_patterns_total=num_patterns_per_array * len(array_list),
                 pattern_dtype=data.dtype,
-                detector_extent=ImageExtent(detectorWidth, detectorHeight),
-                file_path=file_path.parent / filePattern,
+                detector_extent=ImageExtent(detector_width, detector_height),
+                file_path=file_path.parent / file_pattern,
             )
 
-            dataset = SimpleDiffractionDataset(metadata, contentsTree, arrayList)
+            dataset = SimpleDiffractionDataset(metadata, contents_tree, array_list)
 
         return dataset
 

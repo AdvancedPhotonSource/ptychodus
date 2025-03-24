@@ -43,29 +43,29 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         self, builder_name: str | None = None, builder_parameters: Mapping[str, Any] = {}
     ) -> None:
         if builder_name is None:
-            self._scan_api.buildScanFromSettings(self._product_index)
+            self._scan_api.build_scan_from_settings(self._product_index)
         else:
-            self._scan_api.buildScan(self._product_index, builder_name, builder_parameters)
+            self._scan_api.build_scan(self._product_index, builder_name, builder_parameters)
 
     def open_probe(self, file_path: Path, *, file_type: str | None = None) -> None:
-        self._probe_api.openProbe(self._product_index, file_path, file_type=file_type)
+        self._probe_api.open_probe(self._product_index, file_path, file_type=file_type)
 
     def build_probe(
         self, builder_name: str | None = None, builder_parameters: Mapping[str, Any] = {}
     ) -> None:
         if builder_name is None:
-            self._probe_api.buildProbeFromSettings(self._product_index)
+            self._probe_api.build_probe_from_settings(self._product_index)
         else:
-            self._probe_api.buildProbe(self._product_index, builder_name, builder_parameters)
+            self._probe_api.build_probe(self._product_index, builder_name, builder_parameters)
 
     def open_object(self, file_path: Path, *, file_type: str | None = None) -> None:
-        self._object_api.openObject(self._product_index, file_path, file_type=file_type)
+        self._object_api.open_object(self._product_index, file_path, file_type=file_type)
 
     def build_object(
         self, builder_name: str | None = None, builder_parameters: Mapping[str, Any] = {}
     ) -> None:
         if builder_name is None:
-            self._object_api.buildObjectFromSettings(self._product_index)
+            self._object_api.build_object_from_settings(self._product_index)
         else:
             self._object_api.build_object(self._product_index, builder_name, builder_parameters)
 
@@ -161,10 +161,10 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         product_index = self._product_api.insert_new_product(
             name,
             comments=comments,
-            detectorDistanceInMeters=detector_distance_m,
-            probeEnergyInElectronVolts=probe_energy_eV,
-            probePhotonCount=probe_photon_count,
-            exposureTimeInSeconds=exposure_time_s,
+            detector_distance_m=detector_distance_m,
+            probe_energy_eV=probe_energy_eV,
+            probe_photon_count=probe_photon_count,
+            exposure_time_s=exposure_time_s,
         )
         return self._create_product_api(product_index)
 

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
@@ -9,6 +11,9 @@ class ProductSettings(Observable, Observer):
         self._settings_group.add_observer(self)
 
         self.name = self._settings_group.create_string_parameter('Name', 'Unnamed')
+        self.file_path = self._settings_group.create_path_parameter(
+            'FilePath', Path('/path/to/product.h5')
+        )
         self.file_type = self._settings_group.create_string_parameter('FileType', 'HDF5')
         self.detector_distance_m = self._settings_group.create_real_parameter(
             'DetectorDistanceInMeters', 1.0, minimum=0.0
