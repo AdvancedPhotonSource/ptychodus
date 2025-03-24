@@ -38,9 +38,9 @@ class H5DiffractionPatternArray(DiffractionPatternArray):
         return self._indexes
 
     def get_data(self) -> PatternDataType:
-        with h5py.File(self._file_path, 'r') as h5File:
+        with h5py.File(self._file_path, 'r') as h5_file:
             try:
-                item = h5File[self._data_path]
+                item = h5_file[self._data_path]
             except KeyError:
                 raise ValueError(f'Symlink {self._file_path}:{self._data_path} is broken!')
             else:
@@ -55,125 +55,128 @@ class H5DiffractionPatternArray(DiffractionPatternArray):
 
 
 class H5DiffractionFileTreeBuilder:
-    def _addAttributes(
-        self, treeNode: SimpleTreeNode, attributeManager: h5py.AttributeManager
+    def _add_attributes(
+        self, tree_node: SimpleTreeNode, attribute_manager: h5py.AttributeManager
     ) -> None:
-        for name, value in attributeManager.items():
+        for name, value in attribute_manager.items():
             if isinstance(value, str):
-                itemDetails = f'STRING = "{value}"'
+                item_details = f'STRING = "{value}"'
             elif isinstance(value, h5py.Empty):
                 logger.debug(f'Skipping empty attribute {name}.')
             elif isinstance(value, numpy.ndarray):
-                itemDetails = f'ARRAY = {value}'
+                item_details = f'ARRAY = {value}'
             else:
-                stringInfo = h5py.check_string_dtype(value.dtype)
+                string_info = h5py.check_string_dtype(value.dtype)
 
-                if stringInfo:
-                    itemDetails = f'STRING = "{value.decode(stringInfo.encoding)}"'
+                if string_info:
+                    item_details = f'STRING = "{value.decode(string_info.encoding)}"'
                 else:
-                    itemDetails = f'SCALAR {value.dtype} = {value}'
+                    item_details = f'SCALAR {value.dtype} = {value}'
 
-            treeNode.create_child([str(name), 'Attribute', itemDetails])
+            tree_node.create_child([str(name), 'Attribute', item_details])
 
-    def createRootNode(self) -> SimpleTreeNode:
+    def create_root_node(self) -> SimpleTreeNode:
         return SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
 
-    def build(self, h5File: h5py.File) -> SimpleTreeNode:
-        rootNode = self.createRootNode()
-        unvisited = [(rootNode, h5File)]
+    def build(self, h5_file: h5py.File) -> SimpleTreeNode:
+        root_node = self.create_root_node()
+        unvisited = [(root_node, h5_file)]
 
         while unvisited:
-            parentItem, h5Group = unvisited.pop()
+            parent_item, h5_group = unvisited.pop()
 
-            for itemName in h5Group:
-                itemType = 'Unknown'
-                itemDetails = ''
-                h5Item = h5Group.get(itemName, getlink=True)
+            for item_name in h5_group:
+                item_type = 'Unknown'
+                item_details = ''
+                h5_item = h5_group.get(item_name, getlink=True)
 
-                treeNode = parentItem.create_child(list())
+                tree_node = parent_item.create_child(list())
 
-                if isinstance(h5Item, h5py.HardLink):
-                    itemType = 'Hard Link'
-                    h5Item = h5Group.get(itemName, getlink=False)
+                if isinstance(h5_item, h5py.HardLink):
+                    item_type = 'Hard Link'
+                    h5_item = h5_group.get(item_name, getlink=False)
 
-                    if isinstance(h5Item, h5py.Group):
-                        itemType = 'Group'
-                        self._addAttributes(treeNode, h5Item.attrs)
-                        unvisited.append((treeNode, h5Item))
-                    elif isinstance(h5Item, h5py.Dataset):
-                        itemType = 'Dataset'
-                        self._addAttributes(treeNode, h5Item.attrs)
-                        spaceId = h5Item.id.get_space()
+                    if isinstance(h5_item, h5py.Group):
+                        item_type = 'Group'
+                        self._add_attributes(tree_node, h5_item.attrs)
+                        unvisited.append((tree_node, h5_item))
+                    elif isinstance(h5_item, h5py.Dataset):
+                        item_type = 'Dataset'
+                        self._add_attributes(tree_node, h5_item.attrs)
+                        space_id = h5_item.id.get_space()
 
-                        if spaceId.get_simple_extent_type() == h5py.h5s.SCALAR:
-                            value = h5Item[()]
+                        if space_id.get_simple_extent_type() == h5py.h5s.SCALAR:
+                            value = h5_item[()]
 
                             if isinstance(value, bytes):
-                                itemDetails = value.decode()
+                                item_details = value.decode()
                             elif isinstance(value, numpy.ndarray):
-                                itemDetails = f'STRING = {h5Item.asstr()}'
+                                item_details = f'STRING = {h5_item.asstr()}'
                             else:
-                                stringInfo = h5py.check_string_dtype(value.dtype)
+                                string_info = h5py.check_string_dtype(value.dtype)
 
-                                if stringInfo:
-                                    itemDetails = f'STRING = "{value.decode(stringInfo.encoding)}"'
+                                if string_info:
+                                    item_details = (
+                                        f'STRING = "{value.decode(string_info.encoding)}"'
+                                    )
                                 else:
-                                    itemDetails = f'SCALAR {value.dtype} = {value}'
-                        elif h5Item.size == 1:
-                            value = h5Item[()]
-                            itemDetails = f'DATASET {value.dtype} = {value}'
+                                    item_details = f'SCALAR {value.dtype} = {value}'
+                        elif h5_item.size == 1:
+                            value = h5_item[()]
+                            item_details = f'DATASET {value.dtype} = {value}'
                         else:
-                            itemDetails = f'{h5Item.shape} {h5Item.dtype}'
-                elif isinstance(h5Item, h5py.SoftLink):
-                    itemType = 'Soft Link'
-                    itemDetails = f'{h5Item.path}'
-                elif isinstance(h5Item, h5py.ExternalLink):
-                    itemType = 'External Link'
-                    itemDetails = f'{h5Item.filename}/{h5Item.path}'
+                            item_details = f'{h5_item.shape} {h5_item.dtype}'
+                elif isinstance(h5_item, h5py.SoftLink):
+                    item_type = 'Soft Link'
+                    item_details = f'{h5_item.path}'
+                elif isinstance(h5_item, h5py.ExternalLink):
+                    item_type = 'External Link'
+                    item_details = f'{h5_item.filename}/{h5_item.path}'
                 else:
-                    logger.debug(f'Unknown item "{itemName}"')
+                    logger.debug(f'Unknown item "{item_name}"')
 
-                treeNode.item_data = [itemName, itemType, itemDetails]
+                tree_node.item_data = [item_name, item_type, item_details]
 
-        return rootNode
+        return root_node
 
 
 class H5DiffractionFileReader(DiffractionFileReader):
     def __init__(self, data_path: str) -> None:
         self._data_path = data_path
-        self._treeBuilder = H5DiffractionFileTreeBuilder()
+        self._tree_builder = H5DiffractionFileTreeBuilder()
 
     def read(self, file_path: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.create_null(file_path)
 
         try:
-            with h5py.File(file_path, 'r') as h5File:
+            with h5py.File(file_path, 'r') as h5_file:
                 metadata = DiffractionMetadata.create_null(file_path)
-                contentsTree = self._treeBuilder.build(h5File)
+                contents_tree = self._tree_builder.build(h5_file)
 
                 try:
-                    data = h5File[self._data_path]
+                    data = h5_file[self._data_path]
                 except KeyError:
                     logger.warning('Unable to find data.')
-                else:
-                    numberOfPatterns, detectorHeight, detectorWidth = data.shape
+                    return dataset
 
-                    metadata = DiffractionMetadata(
-                        num_patterns_per_array=numberOfPatterns,
-                        num_patterns_total=numberOfPatterns,
-                        pattern_dtype=data.dtype,
-                        detector_extent=ImageExtent(detectorWidth, detectorHeight),
-                        file_path=file_path,
-                    )
+                num_patterns, detector_height, detector_width = data.shape
+
+                metadata = DiffractionMetadata(
+                    num_patterns_per_array=num_patterns,
+                    num_patterns_total=num_patterns,
+                    pattern_dtype=data.dtype,
+                    detector_extent=ImageExtent(detector_width, detector_height),
+                    file_path=file_path,
+                )
 
                 array = H5DiffractionPatternArray(
                     label=file_path.stem,
-                    indexes=numpy.arange(numberOfPatterns),
+                    indexes=numpy.arange(num_patterns),
                     file_path=file_path,
                     data_path=self._data_path,
                 )
 
-                dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
+                dataset = SimpleDiffractionDataset(metadata, contents_tree, [array])
         except OSError:
             logger.warning(f'Unable to read file "{file_path}".')
 
@@ -187,8 +190,8 @@ class H5DiffractionFileWriter(DiffractionFileWriter):
     def write(self, file_path: Path, dataset: DiffractionDataset) -> None:
         data = numpy.concatenate([array.get_data() for array in dataset])
 
-        with h5py.File(file_path, 'w') as h5File:
-            h5File.create_dataset(self._data_path, data=data, compression='gzip')
+        with h5py.File(file_path, 'w') as h5_file:
+            h5_file.create_dataset(self._data_path, data=data, compression='gzip')
 
 
 def register_plugins(registry: PluginRegistry) -> None:

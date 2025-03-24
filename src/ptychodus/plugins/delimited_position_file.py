@@ -12,24 +12,24 @@ from ptychodus.api.scan import (
 
 
 class DelimitedPositionFileReader(PositionFileReader):
-    def __init__(self, delimiter: str, swapXY: bool) -> None:
+    def __init__(self, delimiter: str, swap_xy: bool) -> None:
         self._delimiter = delimiter
-        self._swapXY = swapXY
+        self._swap_xy = swap_xy
 
     def read(self, file_path: Path) -> PositionSequence:
-        pointList: list[ScanPoint] = list()
+        point_list: list[ScanPoint] = list()
 
-        if self._swapXY:
+        if self._swap_xy:
             xcol = 1
             ycol = 0
         else:
             xcol = 0
             ycol = 1
 
-        with file_path.open(newline='') as csvFile:
-            csvReader = csv.reader(csvFile, delimiter=self._delimiter)
+        with file_path.open(newline='') as csv_file:
+            csv_reader = csv.reader(csv_file, delimiter=self._delimiter)
 
-            for idx, row in enumerate(csvReader):
+            for idx, row in enumerate(csv_reader):
                 if row[0].startswith('#'):
                     continue
 
@@ -37,45 +37,45 @@ class DelimitedPositionFileReader(PositionFileReader):
                     raise ScanPointParseError('Bad number of columns!')
 
                 point = ScanPoint(idx, float(row[xcol]), float(row[ycol]))
-                pointList.append(point)
+                point_list.append(point)
 
-        return PositionSequence(pointList)
+        return PositionSequence(point_list)
 
 
 class DelimitedPositionFileWriter(PositionFileWriter):
-    def __init__(self, delimiter: str, swapXY: bool) -> None:
+    def __init__(self, delimiter: str, swap_xy: bool) -> None:
         self._delimiter = delimiter
-        self._swapXY = swapXY
+        self._swap_xy = swap_xy
 
     def write(self, file_path: Path, positions: PositionSequence) -> None:
-        with file_path.open(mode='wt') as csvFile:
+        with file_path.open(mode='wt') as csv_file:
             for point in positions:
                 x = point.position_x_m
                 y = point.position_y_m
                 line = (
-                    f'{y}{self._delimiter}{x}\n' if self._swapXY else f'{x}{self._delimiter}{y}\n'
+                    f'{y}{self._delimiter}{x}\n' if self._swap_xy else f'{x}{self._delimiter}{y}\n'
                 )
-                csvFile.write(line)
+                csv_file.write(line)
 
 
 def register_plugins(registry: PluginRegistry) -> None:
     registry.position_file_readers.register_plugin(
-        DelimitedPositionFileReader(' ', swapXY=False),
+        DelimitedPositionFileReader(' ', swap_xy=False),
         simple_name='TXT',
         display_name='Space-Separated Values Files (*.txt)',
     )
     registry.position_file_writers.register_plugin(
-        DelimitedPositionFileWriter(' ', swapXY=False),
+        DelimitedPositionFileWriter(' ', swap_xy=False),
         simple_name='TXT',
         display_name='Space-Separated Values Files (*.txt)',
     )
     registry.position_file_readers.register_plugin(
-        DelimitedPositionFileReader(',', swapXY=True),
+        DelimitedPositionFileReader(',', swap_xy=True),
         simple_name='CSV',
         display_name='Comma-Separated Values Files (*.csv)',
     )
     registry.position_file_writers.register_plugin(
-        DelimitedPositionFileWriter(',', swapXY=True),
+        DelimitedPositionFileWriter(',', swap_xy=True),
         simple_name='CSV',
         display_name='Comma-Separated Values Files (*.csv)',
     )

@@ -23,52 +23,52 @@ logger = logging.getLogger(__name__)
 
 
 class APS2IDDiffractionFileReader(DiffractionFileReader):
-    def _getFileSeries(self, file_path: Path) -> tuple[Mapping[int, Path], str]:
-        file_pathDict: dict[int, Path] = dict()
+    def _get_file_series(self, file_path: Path) -> tuple[Mapping[int, Path], str]:
+        file_path_dict: dict[int, Path] = dict()
 
         digits = re.findall(r'\d+', file_path.stem)
         longest_digits = max(digits, key=len)
-        filePattern = file_path.name.replace(longest_digits, f'(\\d{{{len(longest_digits)}}})')
+        file_pattern = file_path.name.replace(longest_digits, f'(\\d{{{len(longest_digits)}}})')
 
         for fp in file_path.parent.iterdir():
-            z = re.match(filePattern, fp.name)
+            z = re.match(file_pattern, fp.name)
 
             if z:
                 index = int(z.group(1))
-                file_pathDict[index] = fp
+                file_path_dict[index] = fp
 
-        return file_pathDict, filePattern
+        return file_path_dict, file_pattern
 
     def read(self, file_path: Path) -> DiffractionDataset:
-        file_pathMapping, filePattern = self._getFileSeries(file_path)
+        file_path_mapping, file_pattern = self._get_file_series(file_path)
         data_path = '/entry/data/data'
 
-        with h5py.File(file_path, 'r') as h5File:
+        with h5py.File(file_path, 'r') as h5_file:
             try:
-                h5data = h5File[data_path]
+                h5data = h5_file[data_path]
             except KeyError:
                 logger.warning(f'File {file_path} is not an APS 2-ID data file.')
                 return SimpleDiffractionDataset.create_null(file_path)
             else:
-                numberOfPatternsPerArray, detectorHeight, detectorWidth = h5data.shape
+                num_patterns_per_array, detector_height, detector_width = h5data.shape
                 metadata = DiffractionMetadata(
-                    num_patterns_per_array=numberOfPatternsPerArray,
-                    num_patterns_total=numberOfPatternsPerArray * len(file_pathMapping),
+                    num_patterns_per_array=num_patterns_per_array,
+                    num_patterns_total=num_patterns_per_array * len(file_path_mapping),
                     pattern_dtype=h5data.dtype,
-                    detector_extent=ImageExtent(detectorWidth, detectorHeight),
-                    file_path=file_path.parent / filePattern,
+                    detector_extent=ImageExtent(detector_width, detector_height),
+                    file_path=file_path.parent / file_pattern,
                 )
 
-        contentsTree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
-        arrayList: list[DiffractionPatternArray] = list()
+        contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+        array_list: list[DiffractionPatternArray] = list()
 
-        for idx, fp in sorted(file_pathMapping.items()):
-            indexes = numpy.arange(numberOfPatternsPerArray) + idx * numberOfPatternsPerArray
+        for idx, fp in sorted(file_path_mapping.items()):
+            indexes = numpy.arange(num_patterns_per_array) + idx * num_patterns_per_array
             array = H5DiffractionPatternArray(fp.stem, indexes, fp, data_path)
-            contentsTree.create_child([array.get_label(), 'HDF5', str(idx)])
-            arrayList.append(array)
+            contents_tree.create_child([array.get_label(), 'HDF5', str(idx)])
+            array_list.append(array)
 
-        return SimpleDiffractionDataset(metadata, contentsTree, arrayList)
+        return SimpleDiffractionDataset(metadata, contents_tree, array_list)
 
 
 def register_plugins(registry: PluginRegistry) -> None:

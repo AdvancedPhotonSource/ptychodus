@@ -227,12 +227,12 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
         dataset: DiffractionDataset = SimpleDiffractionDataset.create_null(file_path)
 
         try:
-            with h5py.File(file_path, 'r') as h5File:
+            with h5py.File(file_path, 'r') as h5_file:
                 metadata = DiffractionMetadata.create_null(file_path)
-                contents_tree = self._treeBuilder.build(h5File)
+                contents_tree = self._treeBuilder.build(h5_file)
 
                 try:
-                    h5_dataset = h5File['/entry/data/data_000001']
+                    h5_dataset = h5_file['/entry/data/data_000001']
                 except KeyError:
                     logger.error(f'File {file_path} is not a NeXus data file.')
                     raise
@@ -241,7 +241,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                 pattern_dtype = h5_dataset.dtype
 
                 try:
-                    entry = EntryGroup.read(h5File['entry'], num_patterns_per_array)
+                    entry = EntryGroup.read(h5_file['entry'], num_patterns_per_array)
                 except KeyError:
                     logger.error(f'File {file_path} is not a NeXus data file.')
                     raise

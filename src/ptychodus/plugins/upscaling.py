@@ -16,17 +16,17 @@ class GridDataUpscaling(UpscalingStrategy):
         self._method = method
 
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
-        objectGeometry = product.object_.get_geometry()
-        scanCoordinatesInPixels: list[float] = list()
+        object_geometry = product.object_.get_geometry()
+        scan_coords_px: list[float] = list()
 
-        for scanPoint in product.positions:
-            objectPoint = objectGeometry.map_scan_point_to_object_point(scanPoint)
-            scanCoordinatesInPixels.append(objectPoint.position_y_px)
-            scanCoordinatesInPixels.append(objectPoint.position_x_px)
+        for scan_point in product.positions:
+            object_point = object_geometry.map_scan_point_to_object_point(scan_point)
+            scan_coords_px.append(object_point.position_y_px)
+            scan_coords_px.append(object_point.position_x_px)
 
-        points = numpy.reshape(scanCoordinatesInPixels, (-1, 2))
+        points = numpy.reshape(scan_coords_px, (-1, 2))
         values = emap.counts_per_second.flat
-        YY, XX = numpy.mgrid[: objectGeometry.height_px, : objectGeometry.width_px]
+        YY, XX = numpy.mgrid[: object_geometry.height_px, : object_geometry.width_px]  # noqa: N806
         query_points = numpy.transpose((YY.flat, XX.flat))
 
         cps = griddata(points, values, query_points, method=self._method, fill_value=0.0).reshape(
@@ -51,23 +51,23 @@ class RadialBasisFunctionUpscaling(UpscalingStrategy):
         self._degree = degree
 
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
-        objectGeometry = product.object_.get_geometry()
-        scanCoordinatesInPixels: list[float] = list()
+        object_geometry = product.object_.get_geometry()
+        scan_coords_px: list[float] = list()
 
-        for scanPoint in product.positions:
-            objectPoint = objectGeometry.map_scan_point_to_object_point(scanPoint)
-            scanCoordinatesInPixels.append(objectPoint.position_y_px)
-            scanCoordinatesInPixels.append(objectPoint.position_x_px)
+        for scan_point in product.positions:
+            object_point = object_geometry.map_scan_point_to_object_point(scan_point)
+            scan_coords_px.append(object_point.position_y_px)
+            scan_coords_px.append(object_point.position_x_px)
 
         interpolator = RBFInterpolator(
-            numpy.reshape(scanCoordinatesInPixels, (-1, 2)),
+            numpy.reshape(scan_coords_px, (-1, 2)),
             emap.counts_per_second.flat,
             kernel=self._kernel,
             neighbors=self._neighbors,
             epsilon=self._epsilon,
             degree=self._degree,
         )
-        YY, XX = numpy.mgrid[: objectGeometry.height_px, : objectGeometry.width_px]
+        YY, XX = numpy.mgrid[: object_geometry.height_px, : object_geometry.width_px]  # noqa: N806
         cps = interpolator(numpy.transpose((YY.flat, XX.flat)))
         return ElementMap(emap.name, cps.astype(emap.counts_per_second.dtype).reshape(XX.shape))
 

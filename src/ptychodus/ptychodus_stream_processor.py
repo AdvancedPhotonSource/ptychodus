@@ -79,10 +79,10 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             Path(config_dict.get('outputProductPath', 'output.npz')),
             config_dict.get('reconstructPV', 'bdpgp:gp:bit3'),
         )
-        self._posXPV = config_dict.get('posXPV', 'bluesky:pos_x')
-        self._posYPV = config_dict.get('posYPV', 'bluesky:pos_y')
-        self._nFramesProcessed = 0
-        self._processingTime = 0.0
+        self._pos_x_pv = config_dict.get('pos_x_pv', 'bluesky:pos_x')
+        self._pos_y_pv = config_dict.get('pos_y_pv', 'bluesky:pos_y')
+        self._num_frames_processed = 0
+        self._processing_time = 0.0
 
     def start(self) -> None:
         """Called at startup"""
@@ -128,7 +128,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             )
             self._ptychodus_streaming_context.append_array(array)
 
-        pos_x_queue = self.metadataQueueMap[self._posXPV]
+        pos_x_queue = self.metadataQueueMap[self._pos_x_pv]
 
         while True:
             try:
@@ -141,7 +141,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
                     [TimeUtility.getTimeStampAsFloat(ts) for ts in pos_x['t']],
                 )
 
-        pos_y_queue = self.metadataQueueMap[self._posYPV]
+        pos_y_queue = self.metadataQueueMap[self._pos_y_pv]
 
         while True:
             try:
@@ -155,36 +155,36 @@ class PtychodusAdImageProcessor(AdImageProcessor):
                 )
 
         processing_end_time = time.time()
-        self.processing_time += processing_end_time - processing_begin_time
-        self.num_frames_processed += 1
+        self._processing_time += processing_end_time - processing_begin_time
+        self._num_frames_processed += 1
 
         return pv_object
 
     def resetStats(self) -> None:  # noqa: N802
         """Resets statistics for user processor"""
-        self.num_frames_processed = 0
-        self.processing_time = 0.0
+        self._num_frames_processed = 0
+        self._processing_time = 0.0
 
     def getStats(self) -> dict[str, Any]:  # noqa: N802
         """Retrieves statistics for user processor"""
         num_frames_queued = self._ptychodus_streaming_context.get_queue_size()
         processed_frame_rate = 0.0
 
-        if self.processing_time > 0.0:
-            processed_frame_rate = self.num_frames_processed / self.processing_time
+        if self._processing_time > 0.0:
+            processed_frame_rate = self._num_frames_processed / self._processing_time
 
         return {
-            'nFramesProcessed': self.num_frames_processed,
-            'nFramesQueued': num_frames_queued,
-            'processingTime': FloatWithUnits(self.processing_time, 's'),
-            'processedFrameRate': FloatWithUnits(processed_frame_rate, 'fps'),
+            'num_frames_processed': self._num_frames_processed,
+            'num_frames_queued': num_frames_queued,
+            'processing_time': FloatWithUnits(self._processing_time, 's'),
+            'processed_frame_rate': FloatWithUnits(processed_frame_rate, 'fps'),
         }
 
     def getStatsPvaTypes(self) -> dict[str, pvaccess.ScalarType]:  # noqa: N802
         """Defines PVA types for different stats variables"""
         return {
-            'nFramesProcessed': pvaccess.UINT,
-            'nFramesQueued': pvaccess.UINT,
-            'processingTime': pvaccess.DOUBLE,
-            'processingFrameRate': pvaccess.DOUBLE,
+            'num_frames_processed': pvaccess.UINT,
+            'num_frames_queued': pvaccess.UINT,
+            'processing_time': pvaccess.DOUBLE,
+            'processing_frame_rate': pvaccess.DOUBLE,
         }

@@ -25,10 +25,10 @@ logger = logging.getLogger(__name__)
 
 
 class PyTablesDiffractionPatternArray(DiffractionPatternArray):
-    def __init__(self, label: str, numberOfPatterns: int, file_path: Path, data_path: str) -> None:
+    def __init__(self, label: str, num_patterns: int, file_path: Path, data_path: str) -> None:
         super().__init__()
         self._label = label
-        self._indexes = numpy.arange(numberOfPatterns)
+        self._indexes = numpy.arange(num_patterns)
         self._file_path = file_path
         self._data_path = data_path
 
@@ -58,40 +58,41 @@ class PyTablesDiffractionPatternArray(DiffractionPatternArray):
 class LCLSDiffractionFileReader(DiffractionFileReader):
     def __init__(self) -> None:
         self._data_path = '/jungfrau1M/image_img'
-        self._treeBuilder = H5DiffractionFileTreeBuilder()
+        self._tree_builder = H5DiffractionFileTreeBuilder()
 
     def read(self, file_path: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.create_null(file_path)
         metadata = DiffractionMetadata.create_null(file_path)
 
         try:
-            with tables.open_file(file_path, mode='r') as h5File:
+            with tables.open_file(file_path, mode='r') as h5_file:
                 try:
-                    data = h5File.get_node(self._data_path)
+                    data = h5_file.get_node(self._data_path)
                 except tables.NoSuchNodeError:
                     logger.debug('Unable to find data.')
-                else:
-                    data_shape = h5File.root.jungfrau1M.image_img.shape
-                    numberOfPatterns, detectorHeight, detectorWidth = data_shape
+                    return dataset
 
-                    array = PyTablesDiffractionPatternArray(
-                        label=file_path.stem,
-                        numberOfPatterns=numberOfPatterns,
-                        file_path=file_path,
-                        data_path=self._data_path,
-                    )
-                    metadata = DiffractionMetadata(
-                        num_patterns_per_array=numberOfPatterns,
-                        num_patterns_total=numberOfPatterns,
-                        pattern_dtype=data.dtype,
-                        detector_extent=ImageExtent(detectorWidth, detectorHeight),
-                        file_path=file_path,
-                    )
+                data_shape = h5_file.root.jungfrau1M.image_img.shape
+                num_patterns, detector_height, detector_width = data_shape
 
-            with h5py.File(file_path, 'r') as h5File:
-                contentsTree = self._treeBuilder.build(h5File)
+                array = PyTablesDiffractionPatternArray(
+                    label=file_path.stem,
+                    num_patterns=num_patterns,
+                    file_path=file_path,
+                    data_path=self._data_path,
+                )
+                metadata = DiffractionMetadata(
+                    num_patterns_per_array=num_patterns,
+                    num_patterns_total=num_patterns,
+                    pattern_dtype=data.dtype,
+                    detector_extent=ImageExtent(detector_width, detector_height),
+                    file_path=file_path,
+                )
 
-            dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
+            with h5py.File(file_path, 'r') as h5_file:
+                contents_tree = self._tree_builder.build(h5_file)
+
+            dataset = SimpleDiffractionDataset(metadata, contents_tree, [array])
         except OSError:
             logger.debug(f'Unable to read file "{file_path}".')
 
@@ -103,16 +104,16 @@ class LCLSPositionFileReader(PositionFileReader):
 
     def __init__(
         self,
-        tomographyAngleInDegrees: float,
-        ipm2LowThreshold: float,
-        ipm2HighThreshold: float,
+        tomography_angle_deg: float,
+        ipm2_low_threshold: float,
+        ipm2_high_threshold: float,
     ) -> None:
-        self._tomographyAngleInDegrees = tomographyAngleInDegrees
-        self._ipm2LowThreshold = ipm2LowThreshold
-        self._ipm2HighThreshold = ipm2HighThreshold
+        self._tomography_angle_deg = tomography_angle_deg
+        self._ipm2_low_threshold = ipm2_low_threshold
+        self._ipm2_high_threshold = ipm2_high_threshold
 
     def read(self, file_path: Path) -> PositionSequence:
-        scanPointList: list[ScanPoint] = list()
+        point_list: list[ScanPoint] = list()
 
         with tables.open_file(file_path, mode='r') as h5file:
             try:
@@ -130,24 +131,24 @@ class LCLSPositionFileReader(PositionFileReader):
                 ycoords = -pi_z * self.MICRONS_TO_METERS
 
                 # horizontal coordinate may be a combination of pi_x and pi_y
-                tomographyAngleInRadians = numpy.deg2rad(self._tomographyAngleInDegrees)
-                cosAngle = numpy.cos(tomographyAngleInRadians)
-                sinAngle = numpy.sin(tomographyAngleInRadians)
-                xcoords = (cosAngle * pi_x + sinAngle * pi_y) * self.MICRONS_TO_METERS
+                tomography_angle_rad = numpy.deg2rad(self._tomography_angle_deg)
+                cos_angle = numpy.cos(tomography_angle_rad)
+                sin_angle = numpy.sin(tomography_angle_rad)
+                xcoords = (cos_angle * pi_x + sin_angle * pi_y) * self.MICRONS_TO_METERS
 
                 for index, (ipm, x, y) in enumerate(zip(ipm2, xcoords, ycoords)):
-                    if self._ipm2LowThreshold <= ipm and ipm < self._ipm2HighThreshold:
+                    if self._ipm2_low_threshold <= ipm and ipm < self._ipm2_high_threshold:
                         if numpy.isfinite(x) and numpy.isfinite(y):
                             point = ScanPoint(index, x, y)
-                            scanPointList.append(point)
+                            point_list.append(point)
                     else:
                         logger.debug(f'Filtered scan point {index=} {ipm=}.')
 
-        return PositionSequence(scanPointList)
+        return PositionSequence(point_list)
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    SIMPLE_NAME: Final[str] = 'LCLS_XPP'
+    SIMPLE_NAME: Final[str] = 'LCLS_XPP'  # noqa: N806
 
     registry.diffraction_file_readers.register_plugin(
         LCLSDiffractionFileReader(),
@@ -156,9 +157,9 @@ def register_plugins(registry: PluginRegistry) -> None:
     )
     registry.position_file_readers.register_plugin(
         LCLSPositionFileReader(
-            tomographyAngleInDegrees=180.0,
-            ipm2LowThreshold=2500.0,
-            ipm2HighThreshold=6000.0,
+            tomography_angle_deg=180.0,
+            ipm2_low_threshold=2500.0,
+            ipm2_high_threshold=6000.0,
         ),
         simple_name=SIMPLE_NAME,
         display_name='LCLS XPP Files (*.h5 *.hdf5)',

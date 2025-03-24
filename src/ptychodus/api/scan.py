@@ -48,10 +48,10 @@ class ScanBoundingBox:
 
 class PositionSequence(Sequence[ScanPoint]):
     def __init__(self, point_seq: Sequence[ScanPoint] | None = None) -> None:
-        self._pointSeq: Sequence[ScanPoint] = [] if point_seq is None else point_seq
+        self._point_seq: Sequence[ScanPoint] = [] if point_seq is None else point_seq
 
     def copy(self) -> PositionSequence:
-        return PositionSequence(list(self._pointSeq))
+        return PositionSequence(list(self._point_seq))
 
     @overload
     def __getitem__(self, index: int) -> ScanPoint: ...
@@ -60,15 +60,15 @@ class PositionSequence(Sequence[ScanPoint]):
     def __getitem__(self, index: slice) -> Sequence[ScanPoint]: ...
 
     def __getitem__(self, index: int | slice) -> ScanPoint | Sequence[ScanPoint]:
-        return self._pointSeq[index]
+        return self._point_seq[index]
 
     def __len__(self) -> int:
-        return len(self._pointSeq)
+        return len(self._point_seq)
 
     @property
     def nbytes(self) -> int:
-        sz = sys.getsizeof(self._pointSeq)
-        sz += sum(sys.getsizeof(point) for point in self._pointSeq)
+        sz = sys.getsizeof(self._point_seq)
+        sz += sum(sys.getsizeof(point) for point in self._point_seq)
         return sz
 
 

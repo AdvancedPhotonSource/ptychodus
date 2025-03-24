@@ -25,55 +25,55 @@ logger = logging.getLogger(__name__)
 class CXIDiffractionFileReader(DiffractionFileReader):
     def __init__(self) -> None:
         self._data_path = '/entry_1/data_1/data'
-        self._treeBuilder = H5DiffractionFileTreeBuilder()
+        self._tree_builder = H5DiffractionFileTreeBuilder()
 
     def read(self, file_path: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.create_null(file_path)
 
         try:
-            with h5py.File(file_path, 'r') as h5File:
-                contentsTree = self._treeBuilder.build(h5File)
+            with h5py.File(file_path, 'r') as h5_file:
+                contents_tree = self._tree_builder.build(h5_file)
 
                 try:
-                    data = h5File[self._data_path]
+                    data = h5_file[self._data_path]
                 except KeyError:
                     logger.warning('Unable to load data.')
                 else:
-                    numberOfPatterns, detectorHeight, detectorWidth = data.shape
+                    num_patterns, detector_height, detector_width = data.shape
 
-                    detectorExtent = ImageExtent(detectorWidth, detectorHeight)
-                    detectorDistanceInMeters = float(
-                        h5File['/entry_1/instrument_1/detector_1/distance'][()]
+                    detector_extent = ImageExtent(detector_width, detector_height)
+                    detector_distance_m = float(
+                        h5_file['/entry_1/instrument_1/detector_1/distance'][()]
                     )
-                    detectorPixelGeometry = PixelGeometry(
-                        float(h5File['/entry_1/instrument_1/detector_1/x_pixel_size'][()]),
-                        float(h5File['/entry_1/instrument_1/detector_1/y_pixel_size'][()]),
+                    detector_pixel_geometry = PixelGeometry(
+                        float(h5_file['/entry_1/instrument_1/detector_1/x_pixel_size'][()]),
+                        float(h5_file['/entry_1/instrument_1/detector_1/y_pixel_size'][()]),
                     )
-                    probeEnergyInJoules = float(h5File['/entry_1/instrument_1/source_1/energy'][()])
-                    probeEnergyInElectronVolts = probeEnergyInJoules / ELECTRON_VOLT_J
+                    probe_energy_J = float(h5_file['/entry_1/instrument_1/source_1/energy'][()])  # noqa: N806
+                    probe_energy_eV = probe_energy_J / ELECTRON_VOLT_J  # noqa: N806
 
                     # TODO load detector mask; zeros are good pixels
                     # /entry_1/instrument_1/detector_1/mask Dataset {512, 512}
 
                     metadata = DiffractionMetadata(
-                        num_patterns_per_array=numberOfPatterns,
-                        num_patterns_total=numberOfPatterns,
+                        num_patterns_per_array=num_patterns,
+                        num_patterns_total=num_patterns,
                         pattern_dtype=data.dtype,
-                        detector_distance_m=detectorDistanceInMeters,
-                        detector_extent=detectorExtent,
-                        detector_pixel_geometry=detectorPixelGeometry,
-                        probe_energy_eV=probeEnergyInElectronVolts,
+                        detector_distance_m=detector_distance_m,
+                        detector_extent=detector_extent,
+                        detector_pixel_geometry=detector_pixel_geometry,
+                        probe_energy_eV=probe_energy_eV,
                         file_path=file_path,
                     )
 
                     array = H5DiffractionPatternArray(
                         label=file_path.stem,
-                        indexes=numpy.arange(numberOfPatterns),
+                        indexes=numpy.arange(num_patterns),
                         file_path=file_path,
                         data_path=self._data_path,
                     )
 
-                    dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
+                    dataset = SimpleDiffractionDataset(metadata, contents_tree, [array])
         except OSError:
             logger.warning(f'Unable to read file "{file_path}".')
 
@@ -82,31 +82,31 @@ class CXIDiffractionFileReader(DiffractionFileReader):
 
 class CXIPositionFileReader(PositionFileReader):
     def read(self, file_path: Path) -> PositionSequence:
-        scanPointList: list[ScanPoint] = list()
+        point_list: list[ScanPoint] = list()
 
-        with h5py.File(file_path, 'r') as h5File:
-            xyz_m = h5File['/entry_1/data_1/translation'][()]
+        with h5py.File(file_path, 'r') as h5_file:
+            xyz_m = h5_file['/entry_1/data_1/translation'][()]
 
             for idx, (x, y, z) in enumerate(xyz_m):
                 point = ScanPoint(idx, x, y)
-                scanPointList.append(point)
+                point_list.append(point)
 
-        return PositionSequence(scanPointList)
+        return PositionSequence(point_list)
 
 
 class CXIProbeFileReader(ProbeFileReader):
     def read(self, file_path: Path) -> Probe:
         array: WavefieldArrayType | None = None
 
-        with h5py.File(file_path, 'r') as h5File:
-            array = h5File['/entry_1/instrument_1/source_1/illumination'][()]
+        with h5py.File(file_path, 'r') as h5_file:
+            array = h5_file['/entry_1/instrument_1/source_1/illumination'][()]
 
         return Probe(array=array, pixel_geometry=None)
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    SIMPLE_NAME: Final[str] = 'CXI'
-    DISPLAY_NAME: Final[str] = 'Coherent X-ray Imaging Files (*.cxi)'
+    SIMPLE_NAME: Final[str] = 'CXI'  # noqa: N806
+    DISPLAY_NAME: Final[str] = 'Coherent X-ray Imaging Files (*.cxi)'  # noqa: N806
 
     registry.diffraction_file_readers.register_plugin(
         CXIDiffractionFileReader(),
