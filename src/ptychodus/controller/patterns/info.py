@@ -33,7 +33,7 @@ class SimpleTreeModel(QAbstractItemModel):
 
             if child.isValid():
                 child_item = child.internalPointer()
-                parent_item = child_item.parentItem
+                parent_item = child_item.parent_item
 
                 if parent_item is self._root_node:
                     value = QModelIndex()

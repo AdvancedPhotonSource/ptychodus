@@ -39,9 +39,9 @@ class PyTablesDiffractionPatternArray(DiffractionPatternArray):
         return self._indexes
 
     def get_data(self) -> PatternDataType:
-        with tables.open_file(self._file_path, mode='r') as h5file:
+        with tables.open_file(self._file_path, mode='r') as h5_file:
             try:
-                item = h5file.get_node(self._data_path)
+                item = h5_file.get_node(self._data_path)
             except tables.NoSuchNodeError:
                 raise ValueError(f'Symlink {self._file_path}:{self._data_path} is broken!')
             else:
@@ -115,15 +115,15 @@ class LCLSPositionFileReader(PositionFileReader):
     def read(self, file_path: Path) -> PositionSequence:
         point_list: list[ScanPoint] = list()
 
-        with tables.open_file(file_path, mode='r') as h5file:
+        with tables.open_file(file_path, mode='r') as h5_file:
             try:
                 # piezo stage positions are in microns
-                pi_x = h5file.get_node('/lmc/ch03')[:]
-                pi_y = h5file.get_node('/lmc/ch04')[:]
-                pi_z = h5file.get_node('/lmc/ch05')[:]
+                pi_x = h5_file.get_node('/lmc/ch03')[:]
+                pi_y = h5_file.get_node('/lmc/ch04')[:]
+                pi_z = h5_file.get_node('/lmc/ch05')[:]
 
                 # ipm2 is used for filtering and normalizing the data
-                ipm2 = h5file.get_node('/ipm2/sum')[:]
+                ipm2 = h5_file.get_node('/ipm2/sum')[:]
             except tables.NoSuchNodeError:
                 logger.exception('Unable to load scan.')
             else:

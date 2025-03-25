@@ -232,11 +232,11 @@ class AssembledDiffractionDataset(DiffractionDataset):
             scratch_dir = self._settings.scratch_directory.get_value()
             scratch_dir.mkdir(mode=0o755, parents=True, exist_ok=True)
             npy_tmp_file = tempfile.NamedTemporaryFile(dir=scratch_dir, suffix='.npy')
-            logger.debug(f'Scratch data file {npy_tmp_file.name} is {data_shape}')
+            logger.info(f'Scratch data file {npy_tmp_file.name} is {data_shape}')
             self._data = numpy.memmap(npy_tmp_file, dtype=data_dtype, shape=data_shape)
             self._data[:] = 0
         else:
-            logger.debug(f'Scratch memory is {data_shape}')
+            logger.info(f'Scratch memory is {data_shape}')
             self._data = numpy.zeros(data_shape, dtype=data_dtype)
 
         for observer in self._observer_list:
