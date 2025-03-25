@@ -18,24 +18,24 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class FourierRingCorrelation:
-    spatialFrequency_rm: Sequence[float]
+    spatial_frequency_per_m: Sequence[float]
     correlation: Sequence[float]
 
-    def getResolutionInMeters(self, threshold: float) -> float:
+    def get_resolution_m(self, threshold: float) -> float:
         # TODO threshold from bits
-        for freq_rm, frc in zip(self.spatialFrequency_rm, self.correlation):
+        for freq_rm, frc in zip(self.spatial_frequency_per_m, self.correlation):
             if frc < threshold:
                 return 1.0 / freq_rm
 
         return numpy.nan
 
-    def getPlot(self) -> Plot2D:
-        freqSeries = PlotSeries('freq', [1.0e-9 * freq for freq in self.spatialFrequency_rm])
-        frcSeries = PlotSeries('frc', self.correlation)
+    def get_plot(self) -> Plot2D:
+        freq_series = PlotSeries('freq', [1.0e-9 * freq for freq in self.spatial_frequency_per_m])
+        frc_series = PlotSeries('frc', self.correlation)
 
         return Plot2D(
-            axis_x=PlotAxis('Spatial Frequency [1/nm]', [freqSeries]),
-            axis_y=PlotAxis('Fourier Ring Correlation', [frcSeries]),
+            axis_x=PlotAxis('Spatial Frequency [1/nm]', [freq_series]),
+            axis_y=PlotAxis('Fourier Ring Correlation', [frc_series]),
         )
 
 
@@ -44,7 +44,7 @@ class FourierRingCorrelator:
         self._repository = repository
 
     @staticmethod
-    def _integrateRings(rings: IntegerArrayType, array: ObjectArrayType) -> ObjectArrayType:
+    def _integrate_rings(rings: IntegerArrayType, array: ObjectArrayType) -> ObjectArrayType:
         total = numpy.zeros(numpy.max(rings) + 1, dtype=complex)
 
         for index, value in zip(rings.flat, array.flat):
@@ -52,7 +52,7 @@ class FourierRingCorrelator:
 
         return total
 
-    def correlate(self, itemIndex1: int, itemIndex2: int) -> FourierRingCorrelation:
+    def correlate(self, product_index_1: int, product_index_2: int) -> FourierRingCorrelation:
         """
         See: Joan Vila-Comamala, Ana Diaz, Manuel Guizar-Sicairos, Alexandre Mantion,
         Cameron M. Kewish, Andreas Menzel, Oliver Bunk, and Christian David,
@@ -60,8 +60,8 @@ class FourierRingCorrelator:
         coherent diffractive imaging," Opt. Express 19, 21333-21344 (2011)
         """
 
-        object1 = self._repository[itemIndex1].get_object()
-        object2 = self._repository[itemIndex2].get_object()
+        object1 = self._repository[product_index_1].get_object()
+        object2 = self._repository[product_index_2].get_object()
 
         # TODO support multilayer objects
         array1 = object1.get_layer(0)
@@ -74,9 +74,9 @@ class FourierRingCorrelator:
             raise ValueError('Arrays must have same shape!')
 
         # TODO verify compatible pixel geometry
-        pixelGeometry = object2.get_pixel_geometry()
+        pixel_geometry = object2.get_pixel_geometry()
 
-        if pixelGeometry is None:
+        if pixel_geometry is None:
             raise ValueError('No pixel geometry!')
 
         # TODO subpixel image registration: skimage.registration.phase_cross_correlation
@@ -84,26 +84,26 @@ class FourierRingCorrelator:
         # TODO apply soft-edged mask
         # TODO stats: SSNR, area under FRC curve, average SNR, etc.
 
-        x_rm = scipy.fft.fftfreq(array1.shape[-1], d=pixelGeometry.width_m)
-        y_rm = scipy.fft.fftfreq(array1.shape[-2], d=pixelGeometry.height_m)
-        radialBinSize_rm = max(x_rm[1], y_rm[1])
+        x_rm = scipy.fft.fftfreq(array1.shape[-1], d=pixel_geometry.width_m)
+        y_rm = scipy.fft.fftfreq(array1.shape[-2], d=pixel_geometry.height_m)
+        radial_bin_size_per_m = max(x_rm[1], y_rm[1])
 
         xx_rm, yy_rm = numpy.meshgrid(x_rm, y_rm)
         rr_rm = numpy.hypot(xx_rm, yy_rm)
 
-        rings = numpy.divide(rr_rm, radialBinSize_rm).astype(int)
-        spatialFrequency_rm = numpy.arange(numpy.max(rings) + 1) * radialBinSize_rm
+        rings = numpy.divide(rr_rm, radial_bin_size_per_m).astype(int)
+        spatial_frequency_per_m = numpy.arange(numpy.max(rings) + 1) * radial_bin_size_per_m
 
         sf1 = scipy.fft.fft2(array1)
         sf2 = scipy.fft.fft2(array2)
 
-        c11 = self._integrateRings(rings, numpy.multiply(sf1, numpy.conj(sf1)))
-        c12 = self._integrateRings(rings, numpy.multiply(sf1, numpy.conj(sf2)))
-        c22 = self._integrateRings(rings, numpy.multiply(sf2, numpy.conj(sf2)))
+        c11 = self._integrate_rings(rings, numpy.multiply(sf1, numpy.conj(sf1)))
+        c12 = self._integrate_rings(rings, numpy.multiply(sf1, numpy.conj(sf2)))
+        c22 = self._integrate_rings(rings, numpy.multiply(sf2, numpy.conj(sf2)))
 
         correlation = numpy.absolute(c12) / numpy.sqrt(numpy.absolute(numpy.multiply(c11, c22)))
 
         # TODO replace NaNs with interpolated values
 
         rnyquist = numpy.min(array1.shape) // 2 + 1
-        return FourierRingCorrelation(spatialFrequency_rm[:rnyquist], correlation[:rnyquist])
+        return FourierRingCorrelation(spatial_frequency_per_m[:rnyquist], correlation[:rnyquist])

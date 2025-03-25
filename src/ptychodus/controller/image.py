@@ -90,26 +90,26 @@ class ImageRendererController(Observer):
         controller._sync_model_to_view()
         engine.add_observer(controller)
 
-        view.rendererComboBox.textActivated.connect(engine.setRenderer)
-        view.transformationComboBox.textActivated.connect(engine.setTransformation)
-        view.variantComboBox.textActivated.connect(engine.setVariant)
+        view.rendererComboBox.textActivated.connect(engine.set_renderer)
+        view.transformationComboBox.textActivated.connect(engine.set_transformation)
+        view.variantComboBox.textActivated.connect(engine.set_variant)
 
         return controller
 
     def _sync_model_to_view(self) -> None:
         self._view.rendererComboBox.blockSignals(True)
         self._rendererModel.setStringList([name for name in self._engine.renderers()])
-        self._view.rendererComboBox.setCurrentText(self._engine.getRenderer())
+        self._view.rendererComboBox.setCurrentText(self._engine.get_renderer())
         self._view.rendererComboBox.blockSignals(False)
 
         self._view.transformationComboBox.blockSignals(True)
         self._transformationModel.setStringList([name for name in self._engine.transformations()])
-        self._view.transformationComboBox.setCurrentText(self._engine.getTransformation())
+        self._view.transformationComboBox.setCurrentText(self._engine.get_transformation())
         self._view.transformationComboBox.blockSignals(False)
 
         self._view.variantComboBox.blockSignals(True)
         self._variantModel.setStringList([name for name in self._engine.variants()])
-        self._view.variantComboBox.setCurrentText(self._engine.getVariant())
+        self._view.variantComboBox.setCurrentText(self._engine.get_variant())
         self._view.variantComboBox.blockSignals(False)
 
     def _update(self, observable: Observable) -> None:
@@ -147,10 +147,10 @@ class ImageDataRangeController(Observer):
         engine.add_observer(controller)
 
         view.minDisplayValueSlider.valueChanged.connect(
-            lambda value: engine.setMinDisplayValue(float(value))
+            lambda value: engine.set_min_display_value(float(value))
         )
         view.maxDisplayValueSlider.valueChanged.connect(
-            lambda value: engine.setMaxDisplayValue(float(value))
+            lambda value: engine.set_max_display_value(float(value))
         )
         view.autoButton.clicked.connect(controller._autoDisplayRange)
         view.editButton.clicked.connect(displayRangeDialog.open)
@@ -173,22 +173,22 @@ class ImageDataRangeController(Observer):
             upper = float(self._displayRangeDialog.maxValueLineEdit.getValue())
 
             self._displayRangeIsLocked = False
-            self._engine.setDisplayValueRange(lower, upper)
+            self._engine.set_display_value_range(lower, upper)
             self._displayRangeIsLocked = True
 
     def _syncColorLegendToView(self) -> None:
         values = numpy.linspace(
-            self._engine.getMinDisplayValue(), self._engine.getMaxDisplayValue(), 1000
+            self._engine.get_min_display_value(), self._engine.get_max_display_value(), 1000
         )
         self._imageWidget.setColorLegendColors(
             values,
             self._engine.colorize(values),
-            self._engine.isRendererCyclic(),
+            self._engine.is_renderer_cyclic(),
         )
 
     def _sync_model_to_view(self) -> None:
-        minValue = Decimal(repr(self._engine.getMinDisplayValue()))
-        maxValue = Decimal(repr(self._engine.getMaxDisplayValue()))
+        minValue = Decimal(repr(self._engine.get_min_display_value()))
+        maxValue = Decimal(repr(self._engine.get_max_display_value()))
 
         self._displayRangeDialog.minValueLineEdit.setValue(minValue)
         self._displayRangeDialog.maxValueLineEdit.setValue(maxValue)

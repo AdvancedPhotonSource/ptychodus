@@ -11,6 +11,7 @@ import xdrlib
 import yaml
 
 import numpy
+import numpy.typing
 
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint
@@ -298,11 +299,11 @@ class MDAScanData:
 
     @classmethod
     def read(
-        cls, fp: typing.BinaryIO, scanHeader: MDAScanHeader, scanInfo: MDAScanInfo
+        cls, fp: typing.BinaryIO, scan_header: MDAScanHeader, scan_info: MDAScanInfo
     ) -> MDAScanData:
-        npts = scanHeader.num_requested_points
-        np = scanInfo.num_positioners
-        nd = scanInfo.num_detectors
+        npts = scan_header.num_requested_points
+        np = scan_info.num_positioners
+        nd = scan_info.num_detectors
 
         unpacker = xdrlib.Unpacker(fp.read(8 * np * npts))
         readback_lol = [unpacker.unpack_farray(npts, unpacker.unpack_double) for p in range(np)]
@@ -358,7 +359,7 @@ class MDAScan:
 class MDAProcessVariable(Generic[T]):
     name: str
     description: str
-    epicsType: EpicsType
+    epics_type: EpicsType
     unit: str
     value: T
 
@@ -366,7 +367,7 @@ class MDAProcessVariable(Generic[T]):
         return {
             'name': self.name,
             'description': self.description,
-            'epicsType': self.epicsType.name,
+            'epicsType': self.epics_type.name,
             'unit': self.unit,
             'value': self.value,
         }
@@ -380,35 +381,35 @@ class MDAFile:
 
     @staticmethod
     def _read_pv(unpacker: xdrlib.Unpacker) -> MDAProcessVariable[typing.Any]:
-        pvName = read_counted_string(unpacker)
-        pvDesc = read_counted_string(unpacker)
-        pvType = EpicsType(unpacker.unpack_int())
+        pv_name = read_counted_string(unpacker)
+        pv_desc = read_counted_string(unpacker)
+        pv_type = EpicsType(unpacker.unpack_int())
 
-        if pvType == EpicsType.DBR_STRING:
-            valueStr = read_counted_string(unpacker)
-            return MDAProcessVariable[str](pvName, pvDesc, pvType, str(), valueStr)
+        if pv_type == EpicsType.DBR_STRING:
+            value_str = read_counted_string(unpacker)
+            return MDAProcessVariable[str](pv_name, pv_desc, pv_type, str(), value_str)
 
         count = unpacker.unpack_int()
-        pvUnit = read_counted_string(unpacker)
+        pv_unit = read_counted_string(unpacker)
 
-        if pvType == EpicsType.DBR_CTRL_CHAR:
-            valueChar = unpacker.unpack_fstring(count).decode()
-            valueChar = valueChar.split('\x00', 1)[0]  # treat as null-terminated string
-            return MDAProcessVariable[str](pvName, pvDesc, pvType, pvUnit, valueChar)
-        elif pvType == EpicsType.DBR_CTRL_SHORT:
-            valueShort = unpacker.unpack_farray(count, unpacker.unpack_int)
-            return MDAProcessVariable[list[int]](pvName, pvDesc, pvType, pvUnit, valueShort)
-        elif pvType == EpicsType.DBR_CTRL_LONG:
-            valueLong = unpacker.unpack_farray(count, unpacker.unpack_int)
-            return MDAProcessVariable[list[int]](pvName, pvDesc, pvType, pvUnit, valueLong)
-        elif pvType == EpicsType.DBR_CTRL_FLOAT:
-            valueFloat = unpacker.unpack_farray(count, unpacker.unpack_float)
-            return MDAProcessVariable[list[float]](pvName, pvDesc, pvType, pvUnit, valueFloat)
-        elif pvType == EpicsType.DBR_CTRL_DOUBLE:
-            valueDouble = unpacker.unpack_farray(count, unpacker.unpack_double)
-            return MDAProcessVariable[list[float]](pvName, pvDesc, pvType, pvUnit, valueDouble)
+        if pv_type == EpicsType.DBR_CTRL_CHAR:
+            value_char = unpacker.unpack_fstring(count).decode()
+            value_char = value_char.split('\x00', 1)[0]  # treat as null-terminated string
+            return MDAProcessVariable[str](pv_name, pv_desc, pv_type, pv_unit, value_char)
+        elif pv_type == EpicsType.DBR_CTRL_SHORT:
+            value_short = unpacker.unpack_farray(count, unpacker.unpack_int)
+            return MDAProcessVariable[list[int]](pv_name, pv_desc, pv_type, pv_unit, value_short)
+        elif pv_type == EpicsType.DBR_CTRL_LONG:
+            value_long = unpacker.unpack_farray(count, unpacker.unpack_int)
+            return MDAProcessVariable[list[int]](pv_name, pv_desc, pv_type, pv_unit, value_long)
+        elif pv_type == EpicsType.DBR_CTRL_FLOAT:
+            value_float = unpacker.unpack_farray(count, unpacker.unpack_float)
+            return MDAProcessVariable[list[float]](pv_name, pv_desc, pv_type, pv_unit, value_float)
+        elif pv_type == EpicsType.DBR_CTRL_DOUBLE:
+            value_double = unpacker.unpack_farray(count, unpacker.unpack_double)
+            return MDAProcessVariable[list[float]](pv_name, pv_desc, pv_type, pv_unit, value_double)
 
-        return MDAProcessVariable[str](pvName, pvDesc, pvType, pvUnit, str())
+        return MDAProcessVariable[str](pv_name, pv_desc, pv_type, pv_unit, str())
 
     @classmethod
     def read(cls, file_path: Path) -> MDAFile:
@@ -447,11 +448,11 @@ class MDAPositionFileReader(PositionFileReader):
     MICRONS_TO_METERS: Final[float] = 1.0e-6
 
     def read(self, file_path: Path) -> PositionSequence:
-        pointList: list[ScanPoint] = list()
+        point_list: list[ScanPoint] = list()
 
-        mdaFile = MDAFile.read(file_path)
+        mda_file = MDAFile.read(file_path)
 
-        yscan = mdaFile.scan
+        yscan = mda_file.scan
         yarray = yscan.data.readback_array[0, :]
 
         for y, xscan in zip(yarray, yscan.lower_scans):
@@ -459,25 +460,25 @@ class MDAPositionFileReader(PositionFileReader):
 
             for x in xarray:
                 point = ScanPoint(
-                    index=len(pointList),
+                    index=len(point_list),
                     position_x_m=float(x) * self.MICRONS_TO_METERS,
                     position_y_m=float(y) * self.MICRONS_TO_METERS,
                 )
-                pointList.append(point)
+                point_list.append(point)
 
-        return PositionSequence(pointList)
+        return PositionSequence(point_list)
 
 
 class HXNPositionFileReader(PositionFileReader):
     MICRONS_TO_METERS: Final[float] = 1.0e-6
 
     def read(self, file_path: Path) -> PositionSequence:
-        pointList = list()
+        point_list = list()
 
-        mdaFile = MDAFile.read(file_path)
+        mda_file = MDAFile.read(file_path)
 
-        xarray = mdaFile.scan.data.readback_array[0, :]
-        yarray = mdaFile.scan.data.readback_array[1, :]
+        xarray = mda_file.scan.data.readback_array[0, :]
+        yarray = mda_file.scan.data.readback_array[1, :]
 
         for idx, (x, y) in enumerate(zip(xarray, yarray)):
             point = ScanPoint(
@@ -485,9 +486,9 @@ class HXNPositionFileReader(PositionFileReader):
                 position_x_m=float(x) * self.MICRONS_TO_METERS,
                 position_y_m=float(y) * self.MICRONS_TO_METERS,
             )
-            pointList.append(point)
+            point_list.append(point)
 
-        return PositionSequence(pointList)
+        return PositionSequence(point_list)
 
 
 def register_plugins(registry: PluginRegistry) -> None:

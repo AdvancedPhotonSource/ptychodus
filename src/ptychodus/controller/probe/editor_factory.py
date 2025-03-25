@@ -43,21 +43,21 @@ class FresnelZonePlateViewController(ParameterViewController):
         super().__init__()
         self._widget = GroupBoxWithPresets(title)
 
-        for label in probe_builder.labelsForPresets():
+        for label in probe_builder.labels_for_presets():
             action = self._widget.presets_menu.addAction(label)
-            action.triggered.connect(lambda _, label=label: probe_builder.applyPresets(label))
+            action.triggered.connect(lambda _, label=label: probe_builder.apply_presets(label))
 
         self._zonePlateDiameterViewController = LengthWidgetParameterViewController(
-            probe_builder.zonePlateDiameterInMeters
+            probe_builder.zone_plate_diameter_m
         )
         self._outermostZoneWidthInMetersViewController = LengthWidgetParameterViewController(
-            probe_builder.outermostZoneWidthInMeters
+            probe_builder.outermost_zone_width_m
         )
         self._centralBeamstopDiameterInMetersViewController = LengthWidgetParameterViewController(
-            probe_builder.centralBeamstopDiameterInMeters
+            probe_builder.central_beamstop_diameter_m
         )
         self._defocusDistanceInMetersViewController = LengthWidgetParameterViewController(
-            probe_builder.defocusDistanceInMeters
+            probe_builder.defocus_distance_m
         )
 
         layout = QFormLayout()
@@ -86,9 +86,7 @@ class ZernikeViewController(ParameterViewController, Observer):
         self._orderSpinBox = QSpinBox()
         self._coefficientsTableModel = ZernikeTableModel(probe_builder)
         self._coefficientsTableView = QTableView()
-        self._diameterViewController = LengthWidgetParameterViewController(
-            probe_builder.diameterInMeters
-        )
+        self._diameterViewController = LengthWidgetParameterViewController(probe_builder.diameter_m)
 
         self._coefficientsTableView.setModel(self._coefficientsTableModel)
 
@@ -99,7 +97,7 @@ class ZernikeViewController(ParameterViewController, Observer):
         self._widget.setLayout(layout)
 
         self._sync_model_to_view()
-        self._orderSpinBox.valueChanged.connect(probe_builder.setOrder)
+        self._orderSpinBox.valueChanged.connect(probe_builder.set_order)
         probe_builder.add_observer(self)
 
     def get_widget(self) -> QWidget:
@@ -107,7 +105,7 @@ class ZernikeViewController(ParameterViewController, Observer):
 
     def _sync_model_to_view(self) -> None:
         self._orderSpinBox.setRange(1, 100)
-        self._orderSpinBox.setValue(self._probe_builder.getOrder())
+        self._orderSpinBox.setValue(self._probe_builder.get_order())
 
         self._coefficientsTableModel.beginResetModel()  # TODO clean up
         self._coefficientsTableModel.endResetModel()
@@ -214,12 +212,12 @@ class ProbeEditorViewControllerFactory:
         elif isinstance(probe_builder, DiskProbeBuilder):
             dialog_builder = ParameterViewBuilder()
             dialog_builder.addLengthWidget(
-                probe_builder.diameterInMeters,
+                probe_builder.diameter_m,
                 'Diameter:',
                 group=primary_mode_group,
             )
             dialog_builder.addLengthWidget(
-                probe_builder.defocusDistanceInMeters,
+                probe_builder.defocus_distance_m,
                 'Defocus Distance:',
                 group=primary_mode_group,
             )
@@ -235,17 +233,17 @@ class ProbeEditorViewControllerFactory:
         elif isinstance(probe_builder, RectangularProbeBuilder):
             dialog_builder = ParameterViewBuilder()
             dialog_builder.addLengthWidget(
-                probe_builder.widthInMeters,
+                probe_builder.width_m,
                 'Width:',
                 group=primary_mode_group,
             )
             dialog_builder.addLengthWidget(
-                probe_builder.heightInMeters,
+                probe_builder.height_m,
                 'Height:',
                 group=primary_mode_group,
             )
             dialog_builder.addLengthWidget(
-                probe_builder.defocusDistanceInMeters,
+                probe_builder.defocus_distance_m,
                 'Defocus Distance:',
                 group=primary_mode_group,
             )
@@ -254,17 +252,17 @@ class ProbeEditorViewControllerFactory:
         elif isinstance(probe_builder, SuperGaussianProbeBuilder):
             dialog_builder = ParameterViewBuilder()
             dialog_builder.addLengthWidget(
-                probe_builder.annularRadiusInMeters,
+                probe_builder.annular_radius_m,
                 'Annular Radius:',
                 group=primary_mode_group,
             )
             dialog_builder.addLengthWidget(
-                probe_builder.fwhmInMeters,
+                probe_builder.fwhm_m,
                 'Full Width at Half Maximum:',
                 group=primary_mode_group,
             )
             dialog_builder.add_decimal_line_edit(
-                probe_builder.orderParameter,
+                probe_builder.order_parameter,
                 'Order Parameter:',
                 group=primary_mode_group,
             )

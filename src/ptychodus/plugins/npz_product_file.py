@@ -48,67 +48,67 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
     COSTS_ARRAY: Final[str] = 'costs'
 
     def read(self, file_path: Path) -> Product:
-        with numpy.load(file_path) as npzFile:
-            probePhotonCount = 0.0
+        with numpy.load(file_path) as npz_file:
+            probe_photon_count = 0.0
 
             try:
-                probePhotonCount = float(npzFile[self.PROBE_PHOTON_COUNT])
+                probe_photon_count = float(npz_file[self.PROBE_PHOTON_COUNT])
             except KeyError:
                 logger.debug('Probe photon count not found.')
 
             mass_attenuation_m2_kg = 0.0
 
             try:
-                mass_attenuation_m2_kg = float(npzFile[self.MASS_ATTENUATION])
+                mass_attenuation_m2_kg = float(npz_file[self.MASS_ATTENUATION])
             except KeyError:
                 logger.debug('Mass attenuation not found.')
 
             metadata = ProductMetadata(
-                name=str(npzFile[self.NAME]),
-                comments=str(npzFile[self.COMMENTS]),
-                detector_distance_m=float(npzFile[self.DETECTOR_OBJECT_DISTANCE]),
-                probe_energy_eV=float(npzFile[self.PROBE_ENERGY]),
-                probe_photon_count=probePhotonCount,
-                exposure_time_s=float(npzFile[self.EXPOSURE_TIME]),
+                name=str(npz_file[self.NAME]),
+                comments=str(npz_file[self.COMMENTS]),
+                detector_distance_m=float(npz_file[self.DETECTOR_OBJECT_DISTANCE]),
+                probe_energy_eV=float(npz_file[self.PROBE_ENERGY]),
+                probe_photon_count=probe_photon_count,
+                exposure_time_s=float(npz_file[self.EXPOSURE_TIME]),
                 mass_attenuation_m2_kg=mass_attenuation_m2_kg,
             )
 
-            scanIndexes = npzFile[self.PROBE_POSITION_INDEXES]
-            scanXInMeters = npzFile[self.PROBE_POSITION_X]
-            scanYInMeters = npzFile[self.PROBE_POSITION_Y]
+            scan_indexes = npz_file[self.PROBE_POSITION_INDEXES]
+            scan_x_m = npz_file[self.PROBE_POSITION_X]
+            scan_y_m = npz_file[self.PROBE_POSITION_Y]
 
-            probePixelGeometry = PixelGeometry(
-                width_m=float(npzFile[self.PROBE_PIXEL_WIDTH]),
-                height_m=float(npzFile[self.PROBE_PIXEL_HEIGHT]),
+            probe_pixel_geometry = PixelGeometry(
+                width_m=float(npz_file[self.PROBE_PIXEL_WIDTH]),
+                height_m=float(npz_file[self.PROBE_PIXEL_HEIGHT]),
             )
-            probe = Probe(array=npzFile[self.PROBE_ARRAY], pixel_geometry=probePixelGeometry)
+            probe = Probe(array=npz_file[self.PROBE_ARRAY], pixel_geometry=probe_pixel_geometry)
 
-            objectPixelGeometry = PixelGeometry(
-                width_m=float(npzFile[self.OBJECT_PIXEL_WIDTH]),
-                height_m=float(npzFile[self.OBJECT_PIXEL_HEIGHT]),
+            object_pixel_geometry = PixelGeometry(
+                width_m=float(npz_file[self.OBJECT_PIXEL_WIDTH]),
+                height_m=float(npz_file[self.OBJECT_PIXEL_HEIGHT]),
             )
-            objectCenter = ObjectCenter(
-                position_x_m=float(npzFile[self.OBJECT_CENTER_X]),
-                position_y_m=float(npzFile[self.OBJECT_CENTER_Y]),
+            object_center = ObjectCenter(
+                position_x_m=float(npz_file[self.OBJECT_CENTER_X]),
+                position_y_m=float(npz_file[self.OBJECT_CENTER_Y]),
             )
             object_ = Object(
-                array=npzFile[self.OBJECT_ARRAY],
-                pixel_geometry=objectPixelGeometry,
-                center=objectCenter,
-                layer_distance_m=npzFile[self.OBJECT_LAYER_DISTANCE],
+                array=npz_file[self.OBJECT_ARRAY],
+                pixel_geometry=object_pixel_geometry,
+                center=object_center,
+                layer_distance_m=npz_file[self.OBJECT_LAYER_DISTANCE],
             )
 
-            costs = npzFile[self.COSTS_ARRAY]
+            costs = npz_file[self.COSTS_ARRAY]
 
-        scanPointList: list[ScanPoint] = list()
+        point_list: list[ScanPoint] = list()
 
-        for idx, x_m, y_m in zip(scanIndexes, scanXInMeters, scanYInMeters):
+        for idx, x_m, y_m in zip(scan_indexes, scan_x_m, scan_y_m):
             point = ScanPoint(idx, x_m, y_m)
-            scanPointList.append(point)
+            point_list.append(point)
 
         return Product(
             metadata=metadata,
-            positions=PositionSequence(scanPointList),
+            positions=PositionSequence(point_list),
             probe=probe,
             object_=object_,
             costs=costs,
@@ -116,14 +116,14 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
 
     def write(self, file_path: Path, product: Product) -> None:
         contents: dict[str, Any] = dict()
-        scanIndexes: list[int] = list()
-        scanXInMeters: list[float] = list()
-        scanYInMeters: list[float] = list()
+        scan_indexes: list[int] = list()
+        scan_x_m: list[float] = list()
+        scan_y_m: list[float] = list()
 
         for point in product.positions:
-            scanIndexes.append(point.index)
-            scanXInMeters.append(point.position_x_m)
-            scanYInMeters.append(point.position_y_m)
+            scan_indexes.append(point.index)
+            scan_x_m.append(point.position_x_m)
+            scan_y_m.append(point.position_y_m)
 
         metadata = product.metadata
         contents[self.NAME] = metadata.name
@@ -134,23 +134,23 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
         contents[self.EXPOSURE_TIME] = metadata.exposure_time_s
         contents[self.MASS_ATTENUATION] = metadata.mass_attenuation_m2_kg
 
-        contents[self.PROBE_POSITION_INDEXES] = scanIndexes
-        contents[self.PROBE_POSITION_X] = scanXInMeters
-        contents[self.PROBE_POSITION_Y] = scanYInMeters
+        contents[self.PROBE_POSITION_INDEXES] = scan_indexes
+        contents[self.PROBE_POSITION_X] = scan_x_m
+        contents[self.PROBE_POSITION_Y] = scan_y_m
 
         probe = product.probe
-        probeGeometry = probe.get_geometry()
+        probe_geometry = probe.get_geometry()
         contents[self.PROBE_ARRAY] = probe.get_array()
-        contents[self.PROBE_PIXEL_WIDTH] = probeGeometry.pixel_width_m
-        contents[self.PROBE_PIXEL_HEIGHT] = probeGeometry.pixel_height_m
+        contents[self.PROBE_PIXEL_WIDTH] = probe_geometry.pixel_width_m
+        contents[self.PROBE_PIXEL_HEIGHT] = probe_geometry.pixel_height_m
 
         object_ = product.object_
-        objectGeometry = object_.get_geometry()
+        object_geometry = object_.get_geometry()
         contents[self.OBJECT_ARRAY] = object_.get_array()
-        contents[self.OBJECT_CENTER_X] = objectGeometry.center_x_m
-        contents[self.OBJECT_CENTER_Y] = objectGeometry.center_y_m
-        contents[self.OBJECT_PIXEL_WIDTH] = objectGeometry.pixel_width_m
-        contents[self.OBJECT_PIXEL_HEIGHT] = objectGeometry.pixel_height_m
+        contents[self.OBJECT_CENTER_X] = object_geometry.center_x_m
+        contents[self.OBJECT_CENTER_Y] = object_geometry.center_y_m
+        contents[self.OBJECT_PIXEL_WIDTH] = object_geometry.pixel_width_m
+        contents[self.OBJECT_PIXEL_HEIGHT] = object_geometry.pixel_height_m
         contents[self.OBJECT_LAYER_DISTANCE] = object_.layer_distance_m
 
         contents[self.COSTS_ARRAY] = product.costs
@@ -160,59 +160,61 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
 
 class NPZPositionFileReader(PositionFileReader):
     def read(self, file_path: Path) -> PositionSequence:
-        with numpy.load(file_path) as npzFile:
-            scanIndexes = npzFile[NPZProductFileIO.PROBE_POSITION_INDEXES]
-            scanXInMeters = npzFile[NPZProductFileIO.PROBE_POSITION_X]
-            scanYInMeters = npzFile[NPZProductFileIO.PROBE_POSITION_Y]
+        with numpy.load(file_path) as npz_file:
+            scan_indexes = npz_file[NPZProductFileIO.PROBE_POSITION_INDEXES]
+            scan_x_m = npz_file[NPZProductFileIO.PROBE_POSITION_X]
+            scan_y_m = npz_file[NPZProductFileIO.PROBE_POSITION_Y]
 
-        scanPointList: list[ScanPoint] = list()
+        point_list: list[ScanPoint] = list()
 
-        for idx, x_m, y_m in zip(scanIndexes, scanXInMeters, scanYInMeters):
+        for idx, x_m, y_m in zip(scan_indexes, scan_x_m, scan_y_m):
             point = ScanPoint(idx, x_m, y_m)
-            scanPointList.append(point)
+            point_list.append(point)
 
-        return PositionSequence(scanPointList)
+        return PositionSequence(point_list)
 
 
 class NPZProbeFileReader(ProbeFileReader):
     def read(self, file_path: Path) -> Probe:
-        with numpy.load(file_path) as npzFile:
-            pixelGeometry = PixelGeometry(
-                width_m=float(npzFile[NPZProductFileIO.PROBE_PIXEL_WIDTH]),
-                height_m=float(npzFile[NPZProductFileIO.PROBE_PIXEL_HEIGHT]),
+        with numpy.load(file_path) as npz_file:
+            pixel_geometry = PixelGeometry(
+                width_m=float(npz_file[NPZProductFileIO.PROBE_PIXEL_WIDTH]),
+                height_m=float(npz_file[NPZProductFileIO.PROBE_PIXEL_HEIGHT]),
             )
-            return Probe(array=npzFile[NPZProductFileIO.PROBE_ARRAY], pixel_geometry=pixelGeometry)
+            return Probe(
+                array=npz_file[NPZProductFileIO.PROBE_ARRAY], pixel_geometry=pixel_geometry
+            )
 
 
 class NPZObjectFileReader(ObjectFileReader):
     def read(self, file_path: Path) -> Object:
-        with numpy.load(file_path) as npzFile:
-            pixelGeometry = PixelGeometry(
-                width_m=float(npzFile[NPZProductFileIO.OBJECT_PIXEL_WIDTH]),
-                height_m=float(npzFile[NPZProductFileIO.OBJECT_PIXEL_HEIGHT]),
+        with numpy.load(file_path) as npz_file:
+            pixel_geometry = PixelGeometry(
+                width_m=float(npz_file[NPZProductFileIO.OBJECT_PIXEL_WIDTH]),
+                height_m=float(npz_file[NPZProductFileIO.OBJECT_PIXEL_HEIGHT]),
             )
             center = ObjectCenter(
-                position_x_m=float(npzFile[NPZProductFileIO.OBJECT_CENTER_X]),
-                position_y_m=float(npzFile[NPZProductFileIO.OBJECT_CENTER_Y]),
+                position_x_m=float(npz_file[NPZProductFileIO.OBJECT_CENTER_X]),
+                position_y_m=float(npz_file[NPZProductFileIO.OBJECT_CENTER_Y]),
             )
             return Object(
-                array=npzFile[NPZProductFileIO.OBJECT_ARRAY],
-                pixel_geometry=pixelGeometry,
+                array=npz_file[NPZProductFileIO.OBJECT_ARRAY],
+                pixel_geometry=pixel_geometry,
                 center=center,
-                layer_distance_m=npzFile[NPZProductFileIO.OBJECT_LAYER_DISTANCE],
+                layer_distance_m=npz_file[NPZProductFileIO.OBJECT_LAYER_DISTANCE],
             )
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    npzProductFileIO = NPZProductFileIO()
+    npz_product_file_io = NPZProductFileIO()
 
     registry.product_file_readers.register_plugin(
-        npzProductFileIO,
+        npz_product_file_io,
         simple_name=NPZProductFileIO.SIMPLE_NAME,
         display_name=NPZProductFileIO.DISPLAY_NAME,
     )
     registry.product_file_writers.register_plugin(
-        npzProductFileIO,
+        npz_product_file_io,
         simple_name=NPZProductFileIO.SIMPLE_NAME,
         display_name=NPZProductFileIO.DISPLAY_NAME,
     )

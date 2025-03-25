@@ -38,36 +38,36 @@ class LYNXOrchestraPositionFileReader(PositionFileReader):
     ]
 
     def read(self, file_path: Path) -> PositionSequence:
-        pointList: list[ScanPoint] = list()
-        scanName = self.SIMPLE_NAME
+        point_list: list[ScanPoint] = list()
+        scan_name = self.SIMPLE_NAME
 
-        with file_path.open(newline='') as csvFile:
-            csvReader = csv.reader(csvFile, delimiter=' ', skipinitialspace=True)
-            csvIterator = iter(csvReader)
+        with file_path.open(newline='') as csv_file:
+            csv_reader = csv.reader(csv_file, delimiter=' ', skipinitialspace=True)
+            csv_iterator = iter(csv_reader)
 
-            titleRow = next(csvIterator)
+            title_row = next(csv_iterator)
 
             try:
-                scanName = ' '.join(titleRow).split(',', maxsplit=1)[0]
+                scan_name = ' '.join(title_row).split(',', maxsplit=1)[0]
             except IndexError:
                 raise ScanPointParseError('Bad scan name!')
 
-            columnHeaderRow = next(csvIterator)
+            column_header_row = next(csv_iterator)
 
-            if columnHeaderRow == LYNXOrchestraPositionFileReader.EXPECTED_HEADER:
-                logger.debug(f'Reading scan positions for "{scanName}"...')
+            if column_header_row == LYNXOrchestraPositionFileReader.EXPECTED_HEADER:
+                logger.debug(f'Reading scan positions for "{scan_name}"...')
             else:
                 raise ScanPointParseError(
                     'Bad LYNX Orchestra header!\n'
                     f'Expected: {LYNXOrchestraPositionFileReader.EXPECTED_HEADER}\n'
-                    f'Found:    {columnHeaderRow}\n'
+                    f'Found:    {column_header_row}\n'
                 )
 
-            for row in csvIterator:
+            for row in csv_iterator:
                 if row[0].startswith('#'):
                     continue
 
-                if len(row) != len(columnHeaderRow):
+                if len(row) != len(column_header_row):
                     raise ScanPointParseError('Bad number of columns!')
 
                 point = ScanPoint(
@@ -75,9 +75,9 @@ class LYNXOrchestraPositionFileReader(PositionFileReader):
                     -float(row[self.X_COLUMN]) * self.MICRONS_TO_METERS,
                     -float(row[self.Y_COLUMN]) * self.MICRONS_TO_METERS,
                 )
-                pointList.append(point)
+                point_list.append(point)
 
-        return PositionSequence(pointList)
+        return PositionSequence(point_list)
 
 
 def register_plugins(registry: PluginRegistry) -> None:

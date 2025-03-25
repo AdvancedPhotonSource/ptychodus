@@ -53,7 +53,7 @@ class CylindricalColorModelRenderer(Renderer):
         vrange = self._color_axis.get_range()
         norm = Normalize(vmin=vrange.lower, vmax=vrange.upper, clip=False)
 
-        model = numpy.vectorize(self._color_model.getPlugin())
+        model = numpy.vectorize(self._color_model.get_plugin())
         h = (phase_rad + numpy.pi) / (2 * numpy.pi)
         r, g, b, a = model(h, norm(amplitude_transformed))
         return numpy.stack((r, g, b, a), axis=-1)

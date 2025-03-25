@@ -80,7 +80,7 @@ class VisualizationController(Observer):
         if numpy.all(numpy.isfinite(array)):
             try:
                 product = self._engine.render(
-                    array, pixelGeometry, autoscaleColorAxis=autoscaleColorAxis
+                    array, pixelGeometry, autoscale_color_axis=autoscaleColorAxis
                 )
             except ValueError as err:
                 logger.exception(err)

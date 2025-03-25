@@ -44,12 +44,12 @@ class ColormapRenderer(Renderer):
         self._colormap.set_value(variant)
 
     def is_cyclic(self) -> bool:
-        return self._component.isCyclic
+        return self._component.is_cyclic
 
     def _colorize(self, values_transformed: RealArrayType) -> RealArrayType:
         vrange = self._color_axis.get_range()
         norm = Normalize(vmin=vrange.lower, vmax=vrange.upper, clip=False)
-        cmap = self._colormap.getPlugin()
+        cmap = self._colormap.get_plugin()
         scalar_mappable = ScalarMappable(norm, cmap)
         return scalar_mappable.to_rgba(values_transformed)
 

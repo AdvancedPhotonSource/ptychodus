@@ -64,14 +64,14 @@ class ReconstructionQueue:
     def _reconstruct(self) -> None:
         while not self._stopWorkEvent.is_set():
             try:
-                inputTask = self._inputQueue.get(block=True, timeout=1)
+                input_task = self._inputQueue.get(block=True, timeout=1)
 
                 try:
-                    outputTask = inputTask.execute()
+                    output_task = input_task.execute()
                 except Exception:
                     logger.exception('Reconstructor error!')
                 else:
-                    self._outputQueue.put(outputTask)
+                    self._outputQueue.put(output_task)
                 finally:
                     self._inputQueue.task_done()
             except queue.Empty:

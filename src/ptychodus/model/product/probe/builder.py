@@ -90,7 +90,7 @@ class FromFileProbeBuilder(ProbeBuilder):
     ) -> None:
         super().__init__(settings, 'from_file')
         self._settings = settings
-        self.file_path = settings.filePath.copy()
+        self.file_path = settings.file_path.copy()
         self.file_path.set_value(file_path)
         self._add_parameter('file_path', self.file_path)
         self.file_type = settings.file_type.copy()

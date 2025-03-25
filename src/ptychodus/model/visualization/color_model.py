@@ -106,7 +106,7 @@ class CylindricalColorModelParameter(Parameter[str], Observer):
         parameter.set_value(self.get_value())
         return parameter
 
-    def getPlugin(self) -> CylindricalColorModel:
+    def get_plugin(self) -> CylindricalColorModel:
         return self._chooser.get_current_plugin().strategy
 
     def _update(self, observable: Observable) -> None:

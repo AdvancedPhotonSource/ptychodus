@@ -30,40 +30,40 @@ class LYNXSoftGlueZynqPositionFileReader(PositionFileReader):
     ]
 
     def read(self, file_path: Path) -> PositionSequence:
-        pointList: list[ScanPoint] = list()
-        scanName = self.SIMPLE_NAME
+        point_list: list[ScanPoint] = list()
+        scan_name = self.SIMPLE_NAME
 
-        with file_path.open(newline='') as csvFile:
-            csvReader = csv.reader(csvFile, delimiter=' ')
-            csvIterator = iter(csvReader)
+        with file_path.open(newline='') as csv_file:
+            csv_reader = csv.reader(csv_file, delimiter=' ')
+            csv_iterator = iter(csv_reader)
 
-            titleRow = next(csvIterator)
+            title_row = next(csv_iterator)
 
             try:
-                scanName = ' '.join(titleRow).split(',', maxsplit=1)[0]
+                scan_name = ' '.join(title_row).split(',', maxsplit=1)[0]
             except IndexError:
                 raise ScanPointParseError('Bad scan name!')
 
-            columnHeaderRow = next(csvIterator)
+            column_header_row = next(csv_iterator)
 
-            if columnHeaderRow == LYNXSoftGlueZynqPositionFileReader.EXPECTED_HEADER_RAW:
-                logger.debug(f'Reading raw scan positions for "{scanName}"...')
-                X = 1
-                Y = 2
-                DETECTOR_COUNT = 4
-            elif columnHeaderRow == LYNXSoftGlueZynqPositionFileReader.EXPECTED_HEADER_PROCESSED:
-                logger.debug(f'Reading processed scan positions for "{scanName}"...')
-                DETECTOR_COUNT = 0
-                X = 1
-                Y = 3
+            if column_header_row == LYNXSoftGlueZynqPositionFileReader.EXPECTED_HEADER_RAW:
+                logger.debug(f'Reading raw scan positions for "{scan_name}"...')
+                X = 1  # noqa: N806
+                Y = 2  # noqa: N806
+                DETECTOR_COUNT = 4  # noqa: N806
+            elif column_header_row == LYNXSoftGlueZynqPositionFileReader.EXPECTED_HEADER_PROCESSED:
+                logger.debug(f'Reading processed scan positions for "{scan_name}"...')
+                DETECTOR_COUNT = 0  # noqa: N806
+                X = 1  # noqa: N806
+                Y = 3  # noqa: N806
             else:
                 raise ScanPointParseError('Bad header!')
 
-            for row in csvIterator:
+            for row in csv_iterator:
                 if row[0].startswith('#'):
                     continue
 
-                if len(row) != len(columnHeaderRow):
+                if len(row) != len(column_header_row):
                     raise ScanPointParseError('Bad number of columns!')
 
                 point = ScanPoint(
@@ -71,9 +71,9 @@ class LYNXSoftGlueZynqPositionFileReader(PositionFileReader):
                     -float(row[X]) * LYNXSoftGlueZynqPositionFileReader.MICRONS_TO_METERS,
                     -float(row[Y]) * LYNXSoftGlueZynqPositionFileReader.MICRONS_TO_METERS,
                 )
-                pointList.append(point)
+                point_list.append(point)
 
-        return PositionSequence(pointList)
+        return PositionSequence(point_list)
 
 
 def register_plugins(registry: PluginRegistry) -> None:

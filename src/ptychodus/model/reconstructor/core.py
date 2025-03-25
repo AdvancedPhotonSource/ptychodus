@@ -22,46 +22,48 @@ from .settings import ReconstructorSettings
 class ReconstructorCore:
     def __init__(
         self,
-        settingsRegistry: SettingsRegistry,
-        diffractionDataset: AssembledDiffractionDataset,
-        productRepository: ProductRepository,
-        librarySeq: Sequence[ReconstructorLibrary],
+        settings_registry: SettingsRegistry,
+        dataset: AssembledDiffractionDataset,
+        product_repository: ProductRepository,
+        library_seq: Sequence[ReconstructorLibrary],
     ) -> None:
-        self.settings = ReconstructorSettings(settingsRegistry)
-        self._pluginChooser = PluginChooser[Reconstructor]()
-        self._logHandler = ReconstructorLogHandler()
-        self._logHandler.setFormatter(
+        self.settings = ReconstructorSettings(settings_registry)
+        self._plugin_chooser = PluginChooser[Reconstructor]()
+        self._log_handler = ReconstructorLogHandler()
+        self._log_handler.setFormatter(
             logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s')
         )
 
-        for library in librarySeq:
+        for library in library_seq:
             for reconstructor in library:
-                self._pluginChooser.register_plugin(
+                self._plugin_chooser.register_plugin(
                     reconstructor,
                     simple_name=f'{library.name}_{reconstructor.name}',
                     display_name=f'{library.name}/{reconstructor.name}',
                 )
 
-            libraryLogger = logging.getLogger(library.logger_name)
-            libraryLogger.addHandler(self._logHandler)
+            library_logger = logging.getLogger(library.logger_name)
+            library_logger.addHandler(self._log_handler)
 
-        if not self._pluginChooser:
-            self._pluginChooser.register_plugin(NullReconstructor('None'), display_name='None/None')
+        if not self._plugin_chooser:
+            self._plugin_chooser.register_plugin(
+                NullReconstructor('None'), display_name='None/None'
+            )
 
-        self._reconstructionQueue = ReconstructionQueue()
-        self.data_matcher = DiffractionPatternPositionMatcher(diffractionDataset, productRepository)
+        self._reconstruction_queue = ReconstructionQueue()
+        self.data_matcher = DiffractionPatternPositionMatcher(dataset, product_repository)
         self.reconstructor_api = ReconstructorAPI(
-            self._reconstructionQueue, self.data_matcher, productRepository, self._pluginChooser
+            self._reconstruction_queue, self.data_matcher, product_repository, self._plugin_chooser
         )
         self.presenter = ReconstructorPresenter(
             self.settings,
-            self._pluginChooser,
-            self._logHandler,
+            self._plugin_chooser,
+            self._log_handler,
             self.reconstructor_api,
         )
 
     def start(self) -> None:
-        self._reconstructionQueue.start()
+        self._reconstruction_queue.start()
 
     def stop(self) -> None:
-        self._reconstructionQueue.stop()
+        self._reconstruction_queue.stop()

@@ -12,7 +12,8 @@ class ProductSettings(Observable, Observer):
 
         self.name = self._settings_group.create_string_parameter('Name', 'Unnamed')
         self.file_path = self._settings_group.create_path_parameter(
-            'FilePath', Path('/path/to/product.h5')
+            'FilePath',
+            Path('/path/to/product.h5'),  # FIXME use
         )
         self.file_type = self._settings_group.create_string_parameter('FileType', 'HDF5')
         self.detector_distance_m = self._settings_group.create_real_parameter(

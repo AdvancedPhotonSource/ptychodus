@@ -28,20 +28,20 @@ class ProbeBuilderFactory(Iterable[str]):
         self,
         settings: ProbeSettings,
         dataset: AssembledDiffractionDataset,
-        fresnelZonePlateChooser: PluginChooser[FresnelZonePlate],
-        fileReaderChooser: PluginChooser[ProbeFileReader],
-        fileWriterChooser: PluginChooser[ProbeFileWriter],
+        fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
+        file_reader_chooser: PluginChooser[ProbeFileReader],
+        file_writer_chooser: PluginChooser[ProbeFileWriter],
     ) -> None:
         super().__init__()
         self._settings = settings
         self._dataset = dataset
-        self._fresnelZonePlateChooser = fresnelZonePlateChooser
-        self._fileReaderChooser = fileReaderChooser
-        self._fileWriterChooser = fileWriterChooser
+        self._fresnel_zone_plate_chooser = fresnel_zone_plate_chooser
+        self._file_reader_chooser = file_reader_chooser
+        self._file_writer_chooser = file_writer_chooser
         self._builders: Mapping[str, Callable[[], ProbeBuilder]] = {
             'disk': lambda: DiskProbeBuilder(settings),
-            'average_pattern': self._createAveragePatternBuilder,
-            'fresnel_zone_plate': self._createFresnelZonePlateBuilder,
+            'average_pattern': self._create_average_pattern_builder,
+            'fresnel_zone_plate': self._create_fresnel_zone_plate_builder,
             'rectangular': lambda: RectangularProbeBuilder(settings),
             'super_gaussian': lambda: SuperGaussianProbeBuilder(settings),
             'zernike': lambda: ZernikeProbeBuilder(settings),
@@ -63,45 +63,45 @@ class ProbeBuilderFactory(Iterable[str]):
 
     def create_from_settings(self) -> ProbeBuilder:
         name = self._settings.builder.get_value()
-        nameRepaired = name.casefold()
+        name_repaired = name.casefold()
 
-        if nameRepaired == 'from_file':
+        if name_repaired == 'from_file':
             return self.create_probe_from_file(
-                self._settings.filePath.get_value(),
+                self._settings.file_path.get_value(),
                 self._settings.file_type.get_value(),
             )
 
-        return self.create(nameRepaired)
+        return self.create(name_repaired)
 
-    def _createAveragePatternBuilder(self) -> ProbeBuilder:
+    def _create_average_pattern_builder(self) -> ProbeBuilder:
         return AveragePatternProbeBuilder(self._settings, self._dataset)
 
-    def _createFresnelZonePlateBuilder(self) -> ProbeBuilder:
-        return FresnelZonePlateProbeBuilder(self._settings, self._fresnelZonePlateChooser)
+    def _create_fresnel_zone_plate_builder(self) -> ProbeBuilder:
+        return FresnelZonePlateProbeBuilder(self._settings, self._fresnel_zone_plate_chooser)
 
     def get_open_file_filters(self) -> Iterator[str]:
-        for plugin in self._fileReaderChooser:
+        for plugin in self._file_reader_chooser:
             yield plugin.display_name
 
     def get_open_file_filter(self) -> str:
-        return self._fileReaderChooser.get_current_plugin().display_name
+        return self._file_reader_chooser.get_current_plugin().display_name
 
-    def create_probe_from_file(self, filePath: Path, fileFilter: str) -> ProbeBuilder:
-        self._fileReaderChooser.set_current_plugin(fileFilter)
-        fileType = self._fileReaderChooser.get_current_plugin().simple_name
-        fileReader = self._fileReaderChooser.get_current_plugin().strategy
-        return FromFileProbeBuilder(self._settings, filePath, fileType, fileReader)
+    def create_probe_from_file(self, file_path: Path, file_filter: str) -> ProbeBuilder:
+        self._file_reader_chooser.set_current_plugin(file_filter)
+        file_type = self._file_reader_chooser.get_current_plugin().simple_name
+        file_reader = self._file_reader_chooser.get_current_plugin().strategy
+        return FromFileProbeBuilder(self._settings, file_path, file_type, file_reader)
 
     def get_save_file_filters(self) -> Iterator[str]:
-        for plugin in self._fileWriterChooser:
+        for plugin in self._file_writer_chooser:
             yield plugin.display_name
 
     def get_save_file_filter(self) -> str:
-        return self._fileWriterChooser.get_current_plugin().display_name
+        return self._file_writer_chooser.get_current_plugin().display_name
 
-    def save_probe(self, filePath: Path, fileFilter: str, probe: Probe) -> None:
-        self._fileWriterChooser.set_current_plugin(fileFilter)
-        fileType = self._fileWriterChooser.get_current_plugin().simple_name
-        logger.debug(f'Writing "{filePath}" as "{fileType}"')
-        fileWriter = self._fileWriterChooser.get_current_plugin().strategy
-        fileWriter.write(filePath, probe)
+    def save_probe(self, file_path: Path, file_filter: str, probe: Probe) -> None:
+        self._file_writer_chooser.set_current_plugin(file_filter)
+        file_type = self._file_writer_chooser.get_current_plugin().simple_name
+        logger.debug(f'Writing "{file_path}" as "{file_type}"')
+        file_writer = self._file_writer_chooser.get_current_plugin().strategy
+        file_writer.write(file_path, probe)

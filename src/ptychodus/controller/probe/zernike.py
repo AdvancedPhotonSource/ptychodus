@@ -43,8 +43,8 @@ class ZernikeTableModel(QAbstractTableModel):
             return None
 
         try:
-            poly = self._builder.getPolynomial(index.row())
-            coef = self._builder.getCoefficient(index.row())
+            poly = self._builder.get_polynomial(index.row())
+            coef = self._builder.get_coefficient(index.row())
         except IndexError as err:
             logger.exception(err)
             return None
@@ -71,7 +71,7 @@ class ZernikeTableModel(QAbstractTableModel):
                     return False
 
                 try:
-                    coef = self._builder.getCoefficient(index.row())
+                    coef = self._builder.get_coefficient(index.row())
                 except IndexError:
                     return False
 
@@ -80,7 +80,7 @@ class ZernikeTableModel(QAbstractTableModel):
                 except ZeroDivisionError:
                     complexValue = amplitude + 0j
 
-                self._builder.setCoefficient(index.row(), complexValue)
+                self._builder.set_coefficient(index.row(), complexValue)
                 return True
             elif index.column() == 3:
                 try:
@@ -89,12 +89,12 @@ class ZernikeTableModel(QAbstractTableModel):
                     return False
 
                 try:
-                    coef = self._builder.getCoefficient(index.row())
+                    coef = self._builder.get_coefficient(index.row())
                 except IndexError:
                     return False
 
                 complexValue = numpy.absolute(coef) * numpy.exp(2j * numpy.pi * phase)
-                self._builder.setCoefficient(index.row(), complexValue)
+                self._builder.set_coefficient(index.row(), complexValue)
                 return True
 
         return False

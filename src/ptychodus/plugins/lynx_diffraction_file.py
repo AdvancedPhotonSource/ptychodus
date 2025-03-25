@@ -27,34 +27,34 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
         dataset = SimpleDiffractionDataset.create_null(file_path)
 
         try:
-            with h5py.File(file_path, 'r') as h5File:
-                contentsTree = self._treeBuilder.build(h5File)
+            with h5py.File(file_path, 'r') as h5_file:
+                contents_tree = self._treeBuilder.build(h5_file)
 
                 try:
-                    data = h5File[self._data_path]
-                    pixelSize = float(data.attrs['Pixel_size'].item())
+                    data = h5_file[self._data_path]
+                    pixel_size = float(data.attrs['Pixel_size'].item())
                 except KeyError:
                     logger.warning('Unable to load data.')
                 else:
-                    numberOfPatterns, detectorHeight, detectorWidth = data.shape
+                    num_patterns, detector_height, detector_width = data.shape
 
                     metadata = DiffractionMetadata(
-                        num_patterns_per_array=numberOfPatterns,
-                        num_patterns_total=numberOfPatterns,
+                        num_patterns_per_array=num_patterns,
+                        num_patterns_total=num_patterns,
                         pattern_dtype=data.dtype,
-                        detector_extent=ImageExtent(detectorWidth, detectorHeight),
-                        detector_pixel_geometry=PixelGeometry(pixelSize, pixelSize),
+                        detector_extent=ImageExtent(detector_width, detector_height),
+                        detector_pixel_geometry=PixelGeometry(pixel_size, pixel_size),
                         file_path=file_path,
                     )
 
                     array = H5DiffractionPatternArray(
                         label=file_path.stem,
-                        indexes=numpy.arange(numberOfPatterns),
+                        indexes=numpy.arange(num_patterns),
                         file_path=file_path,
                         data_path=self._data_path,
                     )
 
-                    dataset = SimpleDiffractionDataset(metadata, contentsTree, [array])
+                    dataset = SimpleDiffractionDataset(metadata, contents_tree, [array])
         except OSError:
             logger.warning(f'Unable to read file "{file_path}".')
 

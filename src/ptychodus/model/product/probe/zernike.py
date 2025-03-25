@@ -80,22 +80,22 @@ class ZernikeProbeBuilder(ProbeBuilder):
         self._polynomials: list[ZernikePolynomial] = list()
         self._order = 0
 
-        self.diameterInMeters = settings.diskDiameterInMeters.copy()
-        self._add_parameter('diameter_m', self.diameterInMeters)
+        self.diameter_m = settings.disk_diameter_m.copy()
+        self._add_parameter('diameter_m', self.diameter_m)
 
         # TODO init zernike coefficients from settings
         self.coefficients = self.create_complex_sequence_parameter('coefficients', [1 + 0j])
 
-        self.setOrder(1)
+        self.set_order(1)
 
     def copy(self) -> ZernikeProbeBuilder:
         builder = ZernikeProbeBuilder(self._settings)
-        builder.diameterInMeters.set_value(self.diameterInMeters.get_value())
+        builder.diameter_m.set_value(self.diameter_m.get_value())
         builder.coefficients.set_value(self.coefficients.get_value())
-        builder.setOrder(self.getOrder())
+        builder.set_order(self.get_order())
         return builder
 
-    def setOrder(self, order: int) -> None:
+    def set_order(self, order: int) -> None:
         if order < 1:
             logger.warning('Order must be strictly positive!')
             return
@@ -121,26 +121,26 @@ class ZernikeProbeBuilder(ProbeBuilder):
         self._order = order
         self.notify_observers()
 
-    def getOrder(self) -> int:
+    def get_order(self) -> int:
         return self._order
 
-    def setCoefficient(self, idx: int, value: complex) -> None:
+    def set_coefficient(self, idx: int, value: complex) -> None:
         self.coefficients[idx] = value
 
-    def getCoefficient(self, idx: int) -> complex:
+    def get_coefficient(self, idx: int) -> complex:
         return self.coefficients[idx]
 
-    def getPolynomial(self, idx: int) -> ZernikePolynomial:
+    def get_polynomial(self, idx: int) -> ZernikePolynomial:
         return self._polynomials[idx]
 
     def __len__(self) -> int:
         return min(len(self.coefficients), len(self._polynomials))
 
-    def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
-        geometry = geometryProvider.get_probe_geometry()
+    def build(self, geometry_provider: ProbeGeometryProvider) -> Probe:
+        geometry = geometry_provider.get_probe_geometry()
         coords = self.get_transverse_coordinates(geometry)
 
-        radius = self.diameterInMeters.get_value() / 2.0
+        radius = self.diameter_m.get_value() / 2.0
         distance = numpy.hypot(coords.position_y_m, coords.position_x_m) / radius
         angle = numpy.arctan2(coords.position_y_m, coords.position_x_m)
         array = numpy.zeros_like(distance, dtype=complex)

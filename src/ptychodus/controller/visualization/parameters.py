@@ -28,42 +28,42 @@ class VisualizationParametersController(Observer):
         view.variantComboBox.setModel(controller._variantModel)
 
         view.minDisplayValueLineEdit.valueChanged.connect(
-            lambda value: engine.setMinDisplayValue(float(value))
+            lambda value: engine.set_min_display_value(float(value))
         )
         view.maxDisplayValueLineEdit.valueChanged.connect(
-            lambda value: engine.setMaxDisplayValue(float(value))
+            lambda value: engine.set_max_display_value(float(value))
         )
 
         controller._sync_model_to_view()
         engine.add_observer(controller)
 
-        view.rendererComboBox.textActivated.connect(engine.setRenderer)
-        view.transformationComboBox.textActivated.connect(engine.setTransformation)
-        view.variantComboBox.textActivated.connect(engine.setVariant)
+        view.rendererComboBox.textActivated.connect(engine.set_renderer)
+        view.transformationComboBox.textActivated.connect(engine.set_transformation)
+        view.variantComboBox.textActivated.connect(engine.set_variant)
 
         return controller
 
     def _sync_model_to_view(self) -> None:
         self._view.rendererComboBox.blockSignals(True)
         self._rendererModel.setStringList([name for name in self._engine.renderers()])
-        self._view.rendererComboBox.setCurrentText(self._engine.getRenderer())
+        self._view.rendererComboBox.setCurrentText(self._engine.get_renderer())
         self._view.rendererComboBox.blockSignals(False)
 
         self._view.transformationComboBox.blockSignals(True)
         self._transformationModel.setStringList([name for name in self._engine.transformations()])
-        self._view.transformationComboBox.setCurrentText(self._engine.getTransformation())
+        self._view.transformationComboBox.setCurrentText(self._engine.get_transformation())
         self._view.transformationComboBox.blockSignals(False)
 
         self._view.variantComboBox.blockSignals(True)
         self._variantModel.setStringList([name for name in self._engine.variants()])
-        self._view.variantComboBox.setCurrentText(self._engine.getVariant())
+        self._view.variantComboBox.setCurrentText(self._engine.get_variant())
         self._view.variantComboBox.blockSignals(False)
 
         self._view.minDisplayValueLineEdit.setValue(
-            Decimal(repr(self._engine.getMinDisplayValue()))
+            Decimal(repr(self._engine.get_min_display_value()))
         )
         self._view.maxDisplayValueLineEdit.setValue(
-            Decimal(repr(self._engine.getMaxDisplayValue()))
+            Decimal(repr(self._engine.get_max_display_value()))
         )
 
     def _update(self, observable: Observable) -> None:
