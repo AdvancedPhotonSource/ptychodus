@@ -33,38 +33,38 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
         else:
             super().paint(painter, option, index)
 
-    def createEditor(
+    def createEditor(  # noqa: N802
         self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex
     ) -> QWidget:
-        comboBox = QComboBox(parent)
-        comboBox.activated.connect(self._commitDataAndCloseEditor)
-        comboBox.setModel(self._model)
-        return comboBox
+        combo_box = QComboBox(parent)
+        combo_box.activated.connect(self._commit_data_and_close_editor)
+        combo_box.setModel(self._model)
+        return combo_box
 
-    def setEditorData(self, editor: QWidget, index: QModelIndex) -> None:
+    def setEditorData(self, editor: QWidget, index: QModelIndex) -> None:  # noqa: N802
         if isinstance(editor, QComboBox):
-            currentText = str(index.data(Qt.EditRole))
-            comboBoxIndex = editor.findText(currentText)
+            current_text = str(index.data(Qt.EditRole))
+            combo_box_index = editor.findText(current_text)
 
-            if comboBoxIndex >= 0:
-                editor.setCurrentIndex(comboBoxIndex)
+            if combo_box_index >= 0:
+                editor.setCurrentIndex(combo_box_index)
 
             editor.showPopup()
         else:
             super().setEditorData(editor, index)
 
-    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex) -> None:
+    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex) -> None:  # noqa: N802
         if isinstance(editor, QComboBox):
             model.setData(index, editor.currentText(), Qt.EditRole)
         else:
             super().setModelData(editor, model, index)
 
-    def updateEditorGeometry(
+    def updateEditorGeometry(  # noqa: N802
         self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex
     ) -> None:
         editor.setGeometry(option.rect)
 
-    def _commitDataAndCloseEditor(self) -> None:
+    def _commit_data_and_close_editor(self) -> None:
         editor = self.sender()
 
         if isinstance(editor, QComboBox):

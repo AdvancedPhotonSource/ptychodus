@@ -405,7 +405,7 @@ class DecimalLineEditParameterViewController(ParameterViewController, Observer):
             self._widget.setToolTip(tool_tip)
 
         self.__sync_model_to_view()
-        self._widget.valueChanged.connect(self.__sync_view_to_model)
+        self._widget.value_changed.connect(self.__sync_view_to_model)
         parameter.add_observer(self)
 
     def get_widget(self) -> QWidget:
@@ -415,7 +415,7 @@ class DecimalLineEditParameterViewController(ParameterViewController, Observer):
         self._parameter.set_value(float(value))
 
     def __sync_model_to_view(self) -> None:
-        self._widget.setValue(Decimal(str(self._parameter.get_value())))
+        self._widget.set_value(Decimal(str(self._parameter.get_value())))
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
@@ -432,7 +432,7 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
             self._widget.setToolTip(tool_tip)
 
         self.__sync_model_to_view()
-        self._widget.valueChanged.connect(self.__sync_view_to_model)
+        self._widget.value_changed.connect(self.__sync_view_to_model)
         parameter.add_observer(self)
 
     def get_widget(self) -> QWidget:
@@ -450,7 +450,7 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
         else:
             value = Decimal(str(self._parameter.get_value()))
             range_ = Interval[Decimal](Decimal(str(minimum)), Decimal(str(maximum)))
-            self._widget.setValueAndRange(value, range_)
+            self._widget.set_value_and_range(value, range_)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
@@ -469,7 +469,7 @@ class LengthWidgetParameterViewController(ParameterViewController, Observer):
             self._widget.setToolTip(tool_tip)
 
         self.__sync_model_to_view()
-        self._widget.lengthChanged.connect(self.__sync_view_to_model)
+        self._widget.length_changed.connect(self.__sync_view_to_model)
         parameter.add_observer(self)
 
     def get_widget(self) -> QWidget:
@@ -479,7 +479,7 @@ class LengthWidgetParameterViewController(ParameterViewController, Observer):
         self._parameter.set_value(float(value))
 
     def __sync_model_to_view(self) -> None:
-        self._widget.setLengthInMeters(Decimal(str(self._parameter.get_value())))
+        self._widget.set_length_m(Decimal(str(self._parameter.get_value())))
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
@@ -496,7 +496,7 @@ class AngleWidgetParameterViewController(ParameterViewController, Observer):
             self._widget.setToolTip(tool_tip)
 
         self.__sync_model_to_view()
-        self._widget.angleChanged.connect(self.__sync_view_to_model)
+        self._widget.angle_changed.connect(self.__sync_view_to_model)
         parameter.add_observer(self)
 
     def get_widget(self) -> QWidget:
@@ -506,7 +506,7 @@ class AngleWidgetParameterViewController(ParameterViewController, Observer):
         self._parameter.set_value(float(value))
 
     def __sync_model_to_view(self) -> None:
-        self._widget.setAngleInTurns(Decimal(str(self._parameter.get_value())))
+        self._widget.set_angle_in_turns(Decimal(str(self._parameter.get_value())))
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:

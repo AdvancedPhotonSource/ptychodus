@@ -89,8 +89,8 @@ class ProbePropagationViewController(Observer):
         try:
             self._propagator.propagate(
                 num_steps=view.num_steps_spin_box.value(),
-                begin_coordinate_m=float(view.begin_coordinate_widget.getLengthInMeters()),
-                end_coordinate_m=float(view.end_coordinate_widget.getLengthInMeters()),
+                begin_coordinate_m=float(view.begin_coordinate_widget.get_length_m()),
+                end_coordinate_m=float(view.end_coordinate_widget.get_length_m()),
             )
         except Exception as err:
             logger.exception(err)
@@ -126,11 +126,11 @@ class ProbePropagationViewController(Observer):
 
     def _sync_model_to_view(self) -> None:
         view = self._dialog.parameters_view
-        view.begin_coordinate_widget.setLengthInMeters(
-            Decimal.from_float(self._propagator.get_begin_coordinate_m())
+        view.begin_coordinate_widget.set_length_m(
+            Decimal(repr(self._propagator.get_begin_coordinate_m()))
         )
-        view.end_coordinate_widget.setLengthInMeters(
-            Decimal.from_float(self._propagator.get_end_coordinate_m())
+        view.end_coordinate_widget.set_length_m(
+            Decimal(repr(self._propagator.get_end_coordinate_m()))
         )
         view.num_steps_spin_box.setValue(self._propagator.get_num_steps())
 

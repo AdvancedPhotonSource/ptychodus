@@ -27,10 +27,10 @@ class VisualizationParametersController(Observer):
         view.transformationComboBox.setModel(controller._transformationModel)
         view.variantComboBox.setModel(controller._variantModel)
 
-        view.minDisplayValueLineEdit.valueChanged.connect(
+        view.minDisplayValueLineEdit.value_changed.connect(
             lambda value: engine.set_min_display_value(float(value))
         )
-        view.maxDisplayValueLineEdit.valueChanged.connect(
+        view.maxDisplayValueLineEdit.value_changed.connect(
             lambda value: engine.set_max_display_value(float(value))
         )
 
@@ -59,10 +59,10 @@ class VisualizationParametersController(Observer):
         self._view.variantComboBox.setCurrentText(self._engine.get_variant())
         self._view.variantComboBox.blockSignals(False)
 
-        self._view.minDisplayValueLineEdit.setValue(
+        self._view.minDisplayValueLineEdit.set_value(
             Decimal(repr(self._engine.get_min_display_value()))
         )
-        self._view.maxDisplayValueLineEdit.setValue(
+        self._view.maxDisplayValueLineEdit.set_value(
             Decimal(repr(self._engine.get_max_display_value()))
         )
 

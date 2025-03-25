@@ -88,7 +88,7 @@ class FluorescenceVSPIViewController(Observer):
         self._algorithm = algorithm
         self._view = FluorescenceVSPIParametersView()
 
-        self._view.damping_factor_line_edit.valueChanged.connect(self._syncDampingFactorToModel)
+        self._view.damping_factor_line_edit.value_changed.connect(self._syncDampingFactorToModel)
         self._view.max_iterations_spin_box.setRange(1, self.MAX_INT)
         self._view.max_iterations_spin_box.valueChanged.connect(algorithm.set_max_iterations)
 
@@ -102,7 +102,7 @@ class FluorescenceVSPIViewController(Observer):
         self._algorithm.set_damping_factor(float(value))
 
     def _sync_model_to_view(self) -> None:
-        self._view.damping_factor_line_edit.setValue(
+        self._view.damping_factor_line_edit.set_value(
             Decimal(repr(self._algorithm.get_damping_factor()))
         )
         self._view.max_iterations_spin_box.setValue(self._algorithm.get_max_iterations())

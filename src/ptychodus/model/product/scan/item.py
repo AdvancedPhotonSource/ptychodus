@@ -70,6 +70,7 @@ class ScanRepositoryItem(ParameterGroup):
             self._add_group(group, self._transform, observe=True)
 
         self.set_builder(item.get_builder().copy())
+        self._rebuild()
 
     def assign(self, scan: PositionSequence) -> None:
         builder = FromMemoryScanBuilder(self._settings, scan)
@@ -144,7 +145,7 @@ class ScanRepositoryItem(ParameterGroup):
         try:
             scan = self._builder.build()
         except Exception as exc:
-            logger.error(''.join(exc.args))
+            logger.exception('Failed to rebuild scan!')
             return
 
         self._untransformed_scan = scan

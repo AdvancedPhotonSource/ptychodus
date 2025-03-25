@@ -10,7 +10,7 @@ from ptychodus.api.geometry import Interval
 
 
 class DecimalSlider(QWidget):
-    valueChanged = pyqtSignal(Decimal)
+    value_changed = pyqtSignal(Decimal)
 
     def __init__(self, slider: QSlider, parent: QWidget | None) -> None:
         super().__init__(parent)
@@ -26,16 +26,16 @@ class DecimalSlider(QWidget):
         orientation: Qt.Orientation,
         parent: QWidget | None = None,
         *,
-        numberOfTicks: int = 1000,
+        num_ticks: int = 1000,
     ) -> DecimalSlider:
         slider = QSlider(orientation)
-        slider.setRange(0, numberOfTicks)
+        slider.setRange(0, num_ticks)
         slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         slider.setTickInterval(100)
 
         widget = cls(slider, parent)
-        slider.valueChanged.connect(lambda value: widget._setValueFromSlider())
-        widget.setValueAndRange(Decimal(1) / 2, Interval[Decimal](Decimal(0), Decimal(1)))
+        slider.valueChanged.connect(lambda value: widget._set_value_from_slider())
+        widget.set_value_and_range(Decimal(1) / 2, Interval[Decimal](Decimal(0), Decimal(1)))
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -45,39 +45,39 @@ class DecimalSlider(QWidget):
 
         return widget
 
-    def getValue(self) -> Decimal:
+    def get_value(self) -> Decimal:
         return self._value
 
-    def setValue(self, value: Decimal) -> None:
-        if self._setValueToSlider(value):
-            self._emitValueChanged()
+    def set_value(self, value: Decimal) -> None:
+        if self._set_value_to_slider(value):
+            self._emit_value_changed()
 
-    def setValueAndRange(
+    def set_value_and_range(
         self,
         value: Decimal,
         range_: Interval[Decimal],
-        blockValueChangedSignal: bool = False,
+        block_value_changed_signal: bool = False,
     ) -> None:
-        shouldEmit = False
+        should_emit = False
 
         if range_.upper <= range_.lower:
             raise ValueError(f'maximum <= minimum ({range_.upper} <= {range_.lower})')
 
         if range_.lower != self._minimum:
             self._minimum = range_.lower
-            shouldEmit = True
+            should_emit = True
 
         if range_.upper != self._maximum:
             self._maximum = range_.upper
-            shouldEmit = True
+            should_emit = True
 
-        if self._setValueToSlider(value):
-            shouldEmit = True
+        if self._set_value_to_slider(value):
+            should_emit = True
 
-        if not blockValueChangedSignal and shouldEmit:
-            self._emitValueChanged()
+        if not block_value_changed_signal and should_emit:
+            self._emit_value_changed()
 
-    def _setValueFromSlider(self) -> None:
+    def _set_value_from_slider(self) -> None:
         upper = Decimal(self._slider.value() - self._slider.minimum())
         lower = Decimal(self._slider.maximum() - self._slider.minimum())
         alpha = upper / lower
@@ -85,11 +85,11 @@ class DecimalSlider(QWidget):
 
         if value != self._value:
             self._value = value
-            self._updateLabel()
-            self._emitValueChanged()
+            self._update_label()
+            self._emit_value_changed()
 
-    def _setValueToSlider(self, value: Decimal) -> bool:
-        shouldEmit = False
+    def _set_value_to_slider(self, value: Decimal) -> bool:
+        should_emit = False
 
         alpha = (Decimal(value) - self._minimum) / (self._maximum - self._minimum)
         ivaluef = (1 - alpha) * self._slider.minimum() + alpha * self._slider.maximum()
@@ -108,13 +108,13 @@ class DecimalSlider(QWidget):
 
         if value != self._value:
             self._value = Decimal(value)
-            self._updateLabel()
-            shouldEmit = True
+            self._update_label()
+            should_emit = True
 
-        return shouldEmit
+        return should_emit
 
-    def _updateLabel(self) -> None:
+    def _update_label(self) -> None:
         self._label.setText(f'{self._value:.3f}')
 
-    def _emitValueChanged(self) -> None:
-        self.valueChanged.emit(self._value)
+    def _emit_value_changed(self) -> None:
+        self.value_changed.emit(self._value)

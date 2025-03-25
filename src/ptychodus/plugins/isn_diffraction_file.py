@@ -51,7 +51,7 @@ class ISNDiffractionFileReader(DiffractionFileReader):
                 metadata = DiffractionMetadata(
                     num_patterns_per_array=num_patterns_per_array,
                     num_patterns_total=num_patterns_total,
-                    pattern_dtype=numpy.int_,  # FIXME
+                    pattern_dtype=numpy.dtype('u4'),
                     detector_extent=ImageExtent(detector_width, detector_height),
                     detector_pixel_geometry=PixelGeometry(pixel_width_m, pixel_height_m),
                     # FIXME detector_bit_depth=detector_bit_depth,

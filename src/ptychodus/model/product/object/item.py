@@ -87,7 +87,7 @@ class ObjectRepositoryItem(ParameterGroup):
                 self._geometry_provider, self.layer_distance_m.get_value()
             )
         except Exception as exc:
-            logger.error(''.join(exc.args))
+            logger.exception('Failed to rebuild object!')
             return
 
         self._object = object_

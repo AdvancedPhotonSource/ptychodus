@@ -10,12 +10,12 @@ logger = logging.getLogger(__name__)
 
 
 class DecimalLineEdit(QWidget):
-    valueChanged = pyqtSignal(Decimal)
+    value_changed = pyqtSignal(Decimal)
 
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self._validator = QDoubleValidator()
-        self._lineEdit = QLineEdit()
+        self._line_edit = QLineEdit()
         self._value = Decimal()
         self._minimum: Decimal | None = None
         self._maximum: Decimal | None = None
@@ -26,13 +26,13 @@ class DecimalLineEdit(QWidget):
     ) -> DecimalLineEdit:
         widget = cls(parent)
 
-        widget._lineEdit.setValidator(widget._validator)
-        widget._lineEdit.editingFinished.connect(widget._setValueFromLineEdit)
-        widget._setValueToLineEditAndEmitValueChanged()
+        widget._line_edit.setValidator(widget._validator)
+        widget._line_edit.editingFinished.connect(widget._set_value_from_line_edit)
+        widget._set_value_to_line_edit_and_emit_value_changed()
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(widget._lineEdit)
+        layout.addWidget(widget._line_edit)
         widget.setLayout(layout)
 
         if not is_signed:
@@ -40,13 +40,13 @@ class DecimalLineEdit(QWidget):
 
         return widget
 
-    def isReadOnly(self) -> bool:
-        return self._lineEdit.isReadOnly()
+    def is_read_only(self) -> bool:
+        return self._line_edit.isReadOnly()
 
-    def setReadOnly(self, enable: bool) -> None:
-        self._lineEdit.setReadOnly(enable)
+    def set_read_only(self, enable: bool) -> None:
+        self._line_edit.setReadOnly(enable)
 
-    def getValue(self) -> Decimal:
+    def get_value(self) -> Decimal:
         if self._minimum is not None and self._value < self._minimum:
             return self._minimum
 
@@ -55,46 +55,46 @@ class DecimalLineEdit(QWidget):
 
         return self._value
 
-    def setValue(self, value: Decimal) -> None:
+    def set_value(self, value: Decimal) -> None:
         if value != self._value:
             self._value = value
-            self._setValueToLineEditAndEmitValueChanged()
+            self._set_value_to_line_edit_and_emit_value_changed()
 
-    def getMinimum(self) -> Decimal | None:
+    def get_minimum(self) -> Decimal | None:
         return self._minimum
 
-    def setMinimum(self, value: Decimal) -> None:
-        valueBefore = self.getValue()
+    def set_minimum(self, value: Decimal) -> None:
+        value_before = self.get_value()
         self._minimum = value
-        valueAfter = self.getValue()
+        value_after = self.get_value()
 
-        if valueBefore != valueAfter:
-            self._setValueToLineEditAndEmitValueChanged()
+        if value_before != value_after:
+            self._set_value_to_line_edit_and_emit_value_changed()
 
-    def getMaximum(self) -> Decimal | None:
+    def get_maximum(self) -> Decimal | None:
         return self._maximum
 
-    def setMaximum(self, value: Decimal) -> None:
-        valueBefore = self.getValue()
+    def set_maximum(self, value: Decimal) -> None:
+        value_before = self.get_value()
         self._maximum = value
-        valueAfter = self.getValue()
+        value_after = self.get_value()
 
-        if valueBefore != valueAfter:
-            self._setValueToLineEditAndEmitValueChanged()
+        if value_before != value_after:
+            self._set_value_to_line_edit_and_emit_value_changed()
 
-    def _setValueFromLineEdit(self) -> None:
-        decimalText = self._lineEdit.text()
+    def _set_value_from_line_edit(self) -> None:
+        decimal_text = self._line_edit.text()
 
         try:
-            self._value = Decimal(decimalText)
+            self._value = Decimal(decimal_text)
         except ValueError:
-            logger.error(f'Failed to parse value "{decimalText}"')
+            logger.error(f'Failed to parse value "{decimal_text}"')
         else:
-            self._emitValueChanged()
+            self._emit_value_changed()
 
-    def _setValueToLineEditAndEmitValueChanged(self) -> None:
-        self._lineEdit.setText(str(self.getValue()))
-        self._emitValueChanged()
+    def _set_value_to_line_edit_and_emit_value_changed(self) -> None:
+        self._line_edit.setText(str(self.get_value()))
+        self._emit_value_changed()
 
-    def _emitValueChanged(self) -> None:
-        self.valueChanged.emit(self._value)
+    def _emit_value_changed(self) -> None:
+        self.value_changed.emit(self._value)

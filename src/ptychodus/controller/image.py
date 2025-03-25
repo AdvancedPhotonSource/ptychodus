@@ -146,10 +146,10 @@ class ImageDataRangeController(Observer):
         controller._sync_model_to_view()
         engine.add_observer(controller)
 
-        view.minDisplayValueSlider.valueChanged.connect(
+        view.minDisplayValueSlider.value_changed.connect(
             lambda value: engine.set_min_display_value(float(value))
         )
-        view.maxDisplayValueSlider.valueChanged.connect(
+        view.maxDisplayValueSlider.value_changed.connect(
             lambda value: engine.set_max_display_value(float(value))
         )
         view.autoButton.clicked.connect(controller._autoDisplayRange)
@@ -169,8 +169,8 @@ class ImageDataRangeController(Observer):
 
     def _finishEditingDisplayRange(self, result: int) -> None:
         if result == QDialog.DialogCode.Accepted:
-            lower = float(self._displayRangeDialog.minValueLineEdit.getValue())
-            upper = float(self._displayRangeDialog.maxValueLineEdit.getValue())
+            lower = float(self._displayRangeDialog.minValueLineEdit.get_value())
+            upper = float(self._displayRangeDialog.maxValueLineEdit.get_value())
 
             self._displayRangeIsLocked = False
             self._engine.set_display_value_range(lower, upper)
@@ -190,16 +190,16 @@ class ImageDataRangeController(Observer):
         minValue = Decimal(repr(self._engine.get_min_display_value()))
         maxValue = Decimal(repr(self._engine.get_max_display_value()))
 
-        self._displayRangeDialog.minValueLineEdit.setValue(minValue)
-        self._displayRangeDialog.maxValueLineEdit.setValue(maxValue)
+        self._displayRangeDialog.minValueLineEdit.set_value(minValue)
+        self._displayRangeDialog.maxValueLineEdit.set_value(maxValue)
 
         if self._displayRangeIsLocked:
-            self._view.minDisplayValueSlider.setValue(minValue)
-            self._view.maxDisplayValueSlider.setValue(maxValue)
+            self._view.minDisplayValueSlider.set_value(minValue)
+            self._view.maxDisplayValueSlider.set_value(maxValue)
         else:
             displayRangeLimits = Interval[Decimal](minValue, maxValue)
-            self._view.minDisplayValueSlider.setValueAndRange(minValue, displayRangeLimits)
-            self._view.maxDisplayValueSlider.setValueAndRange(maxValue, displayRangeLimits)
+            self._view.minDisplayValueSlider.set_value_and_range(minValue, displayRangeLimits)
+            self._view.maxDisplayValueSlider.set_value_and_range(maxValue, displayRangeLimits)
 
         self._syncColorLegendToView()
 

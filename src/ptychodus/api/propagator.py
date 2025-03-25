@@ -58,7 +58,7 @@ class PropagatorParameters:
     def get_frequency_coordinates(self) -> tuple[RealArrayType, RealArrayType]:
         fx = fftshift(fftfreq(self.width_px))
         fy = fftshift(fftfreq(self.height_px))
-        FY, FX = numpy.meshgrid(fy, fx)  # noqa: N806
+        FY, FX = numpy.meshgrid(fy, fx, indexing='ij')  # noqa: N806
         return FY, FX
 
 

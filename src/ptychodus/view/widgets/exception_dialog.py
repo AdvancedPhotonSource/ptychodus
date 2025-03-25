@@ -30,14 +30,14 @@ class ExceptionDialog(QMessageBox):
             self.setMaximumWidth(self.MAX_SIZE)
             self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-            textEdit = self.findChild(QTextEdit)
+            text_edit = self.findChild(QTextEdit)
 
-            if textEdit is not None:
+            if text_edit is not None:
                 # make the detailed text expandable
-                textEdit.setMinimumHeight(self.MIN_SIZE)
-                textEdit.setMaximumHeight(self.MAX_SIZE)
-                textEdit.setMinimumWidth(self.MIN_SIZE)
-                textEdit.setMaximumWidth(self.MAX_SIZE)
-                textEdit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+                text_edit.setMinimumHeight(self.MIN_SIZE)
+                text_edit.setMaximumHeight(self.MAX_SIZE)
+                text_edit.setMinimumWidth(self.MIN_SIZE)
+                text_edit.setMaximumWidth(self.MAX_SIZE)
+                text_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         return result
