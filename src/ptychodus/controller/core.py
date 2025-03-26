@@ -44,7 +44,7 @@ class ControllerCore:
             view.settings_table_view,
             self._file_dialog_factory,
         )
-        self._patterns_image_controller = ImageController.create_instance(
+        self._patterns_image_controller = ImageController(
             model.pattern_visualization_engine,
             view.patterns_image_view,
             view.statusBar(),
@@ -75,7 +75,7 @@ class ControllerCore:
             view.scan_plot_view,
             self._file_dialog_factory,
         )
-        self._probe_image_controller = ImageController.create_instance(
+        self._probe_image_controller = ImageController(
             model.probe_visualization_engine,
             view.probe_image_view,
             view.statusBar(),
@@ -96,7 +96,7 @@ class ControllerCore:
             view.probe_view,
             self._file_dialog_factory,
         )
-        self._object_image_controller = ImageController.create_instance(
+        self._object_image_controller = ImageController(
             model.object_visualization_engine,
             view.object_image_view,
             view.statusBar(),

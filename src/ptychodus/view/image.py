@@ -171,7 +171,7 @@ class ImageRibbon(QWidget):
         super().__init__(parent)
         self.imageToolsGroupBox = ImageToolsGroupBox.create_instance()
         self.colormapGroupBox = ImageRendererGroupBox.create_instance()
-        self.dataRangeGroupBox = ImageDataRangeGroupBox.create_instance()
+        self.data_range_group_box = ImageDataRangeGroupBox.create_instance()
 
     @classmethod
     def create_instance(cls, parent: QWidget | None = None) -> ImageRibbon:
@@ -181,7 +181,7 @@ class ImageRibbon(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(view.imageToolsGroupBox)
         layout.addWidget(view.colormapGroupBox)
-        layout.addWidget(view.dataRangeGroupBox)
+        layout.addWidget(view.data_range_group_box)
         view.setLayout(layout)
 
         view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
@@ -293,8 +293,8 @@ class ImageWidget(VisualizationView):
 class ImageView(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.imageRibbon = ImageRibbon.create_instance()
-        self.imageWidget = ImageWidget()
+        self.image_ribbon = ImageRibbon.create_instance()
+        self.image_widget = ImageWidget()
 
     @classmethod
     def create_instance(cls, parent: QWidget | None = None) -> ImageView:
@@ -302,8 +302,8 @@ class ImageView(QWidget):
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setMenuBar(view.imageRibbon)
-        layout.addWidget(view.imageWidget)
+        layout.setMenuBar(view.image_ribbon)
+        layout.addWidget(view.image_widget)
         view.setLayout(layout)
 
         view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)

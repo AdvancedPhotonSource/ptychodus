@@ -20,10 +20,10 @@ class MemoryController:
 
     def _update_widget(self) -> None:
         stats = self._presenter.get_statistics()
-        total_MB = int(stats.total_physical_memory_bytes / 1e6)
+        total_MB = int(stats.total_physical_memory_bytes / 1e6)  # noqa: N806
         total_str = f'Total Memory: {total_MB} MB'
 
-        avail_MB = int(stats.available_memory_bytes / 1e6)
+        avail_MB = int(stats.available_memory_bytes / 1e6)  # noqa: N806
         avail_str = f'Available Memory: {avail_MB} MB'
 
         self._widget.display(avail_MB)

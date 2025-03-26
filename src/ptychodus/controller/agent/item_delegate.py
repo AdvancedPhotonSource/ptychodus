@@ -113,7 +113,7 @@ class ChatBubbleItemDelegate(QStyledItemDelegate):
         doc.drawContents(painter, text_rect)
         painter.restore()
 
-    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
+    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:  # noqa: N802
         doc = self._create_text_document(option, index)
         metrics = BubbleMetrics.from_document(doc)
         hint = option.rect.size()

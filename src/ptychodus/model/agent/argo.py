@@ -221,10 +221,10 @@ class ChatArgo(BaseChatModel):
         **kwargs: Any,
     ) -> ChatResult:
         """Generates a chat result from a prompt"""
-        url = self.settings.chatEndpointURL.get_value()
+        url = self.settings.chat_endpoint_url.get_value()
         payload = {
             'user': self.settings.user.get_value(),
-            'model': self.settings.chatModel.get_value(),
+            'model': self.settings.chat_model.get_value(),
             'messages': [_convert_message_to_dict(m) for m in messages],
             'stop': stop or [],
             'temperature': self.settings.temperature.get_value(),
@@ -250,7 +250,7 @@ class ChatArgo(BaseChatModel):
     @property
     def _llm_type(self) -> str:
         """Uniquely identifies the type of the model. Used for logging."""
-        model = self.settings.chatModel.get_value()
+        model = self.settings.chat_model.get_value()
         return f'argo-{model}'
 
 
@@ -260,10 +260,10 @@ class ArgoEmbeddings(Embeddings):
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """Generates embeddings for a list of strings."""
-        url = self._settings.embeddingsEndpointURL.get_value()
+        url = self._settings.embeddings_endpoint_url.get_value()
         payload = {
             'user': self._settings.user.get_value(),
-            'model': self._settings.embeddingsModel.get_value(),
+            'model': self._settings.embeddings_model.get_value(),
             'prompt': texts,
         }
         headers = {'Content-Type': 'application/json'}

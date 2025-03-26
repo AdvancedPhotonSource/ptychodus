@@ -24,7 +24,7 @@ class SettingsTableModel(QAbstractTableModel):
         self._values = values
         self.endResetModel()
 
-    def headerData(
+    def headerData(  # noqa: N802
         self,
         section: int,
         orientation: Qt.Orientation,
@@ -43,10 +43,10 @@ class SettingsTableModel(QAbstractTableModel):
             elif index.column() == 1:
                 return str(self._values[index.row()])
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._names)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return 2
 
 

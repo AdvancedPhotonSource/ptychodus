@@ -24,8 +24,8 @@ from ..parametric import (
     LineEditParameterViewController,
     SpinBoxParameterViewController,
 )
-from .itemDelegate import ChatBubbleItemDelegate
-from .listModel import AgentMessageListModel
+from .item_delegate import ChatBubbleItemDelegate
+from .list_model import AgentMessageListModel
 
 __all__ = ['AgentChatController', 'AgentController']
 
@@ -36,16 +36,16 @@ class AgentInputController(QObject):
         self._presenter = presenter
         self._view = view
 
-        view.textEdit.installEventFilter(self)
-        view.sendButton.clicked.connect(self._send_message)
+        view.text_edit.installEventFilter(self)
+        view.send_button.clicked.connect(self._send_message)
 
     def _send_message(self) -> None:
-        text = self._view.textEdit.toPlainText()
+        text = self._view.text_edit.toPlainText()
         self._presenter.send_message(text)
-        self._view.textEdit.clear()
+        self._view.text_edit.clear()
 
-    def eventFilter(self, a0: QObject, a1: QEvent) -> bool:
-        if a0 == self._view.textEdit and isinstance(a1, QKeyEvent):
+    def eventFilter(self, a0: QObject, a1: QEvent) -> bool:  # noqa: N802
+        if a0 == self._view.text_edit and isinstance(a1, QKeyEvent):
             is_shift_pressed = bool(a1.modifiers() & Qt.KeyboardModifier.ShiftModifier)
 
             # require shift+enter for new line, otherwise send on enter
@@ -65,12 +65,12 @@ class AgentChatController(ChatObserver):
         self._presenter = presenter
         self._view = view
         self._message_list_model = AgentMessageListModel(history)
-        self._input_controller = AgentInputController(presenter, view.inputView)
+        self._input_controller = AgentInputController(presenter, view.input_view)
 
-        view.messageListView.setModel(self._message_list_model)
-        view.messageListView.setItemDelegate(ChatBubbleItemDelegate())
-        view.messageListView.setResizeMode(QListView.ResizeMode.Adjust)
-        view.messageListView.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        view.message_list_view.setModel(self._message_list_model)
+        view.message_list_view.setItemDelegate(ChatBubbleItemDelegate())
+        view.message_list_view.setResizeMode(QListView.ResizeMode.Adjust)
+        view.message_list_view.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
 
         history.add_observer(self)
 
@@ -90,72 +90,74 @@ class AgentController:
         self._presenter = presenter
         self._view = view
 
-        self._userViewController = LineEditParameterViewController(settings.user)
-        self._chatEndpointURLViewController = LineEditParameterViewController(
-            settings.chatEndpointURL, tool_tip='The chat endpoint URL.'
+        self._user_view_controller = LineEditParameterViewController(settings.user)
+        self._chat_endpoint_url_view_controller = LineEditParameterViewController(
+            settings.chat_endpoint_url, tool_tip='The chat endpoint URL.'
         )
-        self._chatModelViewController = ComboBoxParameterViewController(
-            settings.chatModel,
+        self._chat_model_view_controller = ComboBoxParameterViewController(
+            settings.chat_model,
             presenter.get_available_chat_models(),
             tool_tip='The chat model to use.',
         )
-        self._temperatureViewController = DecimalSliderParameterViewController(
+        self._temperature_view_controller = DecimalSliderParameterViewController(
             settings.temperature,
             tool_tip='What sampling temperature to use, between 0 and 2. Higher values mean the model takes more risks.',
         )
-        self._topPViewController = DecimalSliderParameterViewController(
+        self._top_p_view_controller = DecimalSliderParameterViewController(
             settings.top_p,
             tool_tip='An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass.',
         )
-        self._maxTokensViewController = SpinBoxParameterViewController(
+        self._max_tokens_view_controller = SpinBoxParameterViewController(
             settings.max_tokens,
             tool_tip='The maximum number of tokens that can be generated in the chat completion.',
         )
-        self._maxCompletionTokensViewController = SpinBoxParameterViewController(
+        self._max_completion_tokens_view_controller = SpinBoxParameterViewController(
             settings.max_completion_tokens,
             tool_tip='An upper bound for the number of tokens that can be generated for a completion, including visible output tokens and reasoning tokens.',
         )
-        self._embeddingsEndpointURLViewController = LineEditParameterViewController(
-            settings.embeddingsEndpointURL, tool_tip='The embeddings endpoint URL.'
+        self._embeddings_endpoint_url_view_controller = LineEditParameterViewController(
+            settings.embeddings_endpoint_url, tool_tip='The embeddings endpoint URL.'
         )
-        self._embeddingsModelViewController = ComboBoxParameterViewController(
-            settings.embeddingsModel,
+        self._embeddings_model_view_controller = ComboBoxParameterViewController(
+            settings.embeddings_model,
             presenter.get_available_embeddings_models(),
             tool_tip='The embeddings model to use.',
         )
-        self._embedButton = QPushButton('Embed Text')
-        self._embedButton.clicked.connect(self._embed_text)
+        self._embed_button = QPushButton('Embed Text')
+        self._embed_button.clicked.connect(self._embed_text)
 
-        groupBoxLayout = QFormLayout()
-        groupBoxLayout.addRow('User:', self._userViewController.get_widget())
-        groupBoxLayout.addRow(
-            'Chat Endpoint URL:', self._chatEndpointURLViewController.get_widget()
+        group_box_layout = QFormLayout()
+        group_box_layout.addRow('User:', self._user_view_controller.get_widget())
+        group_box_layout.addRow(
+            'Chat Endpoint URL:', self._chat_endpoint_url_view_controller.get_widget()
         )
-        groupBoxLayout.addRow('Chat Model:', self._chatModelViewController.get_widget())
-        groupBoxLayout.addRow('Temperature:', self._temperatureViewController.get_widget())
-        groupBoxLayout.addRow('Top P:', self._topPViewController.get_widget())
-        groupBoxLayout.addRow('Max Tokens:', self._maxTokensViewController.get_widget())
-        groupBoxLayout.addRow(
-            'Max Completion Tokens:', self._maxCompletionTokensViewController.get_widget()
+        group_box_layout.addRow('Chat Model:', self._chat_model_view_controller.get_widget())
+        group_box_layout.addRow('Temperature:', self._temperature_view_controller.get_widget())
+        group_box_layout.addRow('Top P:', self._top_p_view_controller.get_widget())
+        group_box_layout.addRow('Max Tokens:', self._max_tokens_view_controller.get_widget())
+        group_box_layout.addRow(
+            'Max Completion Tokens:', self._max_completion_tokens_view_controller.get_widget()
         )
-        groupBoxLayout.addRow(
-            'Embeddings Endpoint URL:', self._embeddingsEndpointURLViewController.get_widget()
+        group_box_layout.addRow(
+            'Embeddings Endpoint URL:', self._embeddings_endpoint_url_view_controller.get_widget()
         )
-        groupBoxLayout.addRow('Embeddings Model:', self._embeddingsModelViewController.get_widget())
-        groupBoxLayout.addRow(self._embedButton)
+        group_box_layout.addRow(
+            'Embeddings Model:', self._embeddings_model_view_controller.get_widget()
+        )
+        group_box_layout.addRow(self._embed_button)
 
-        groupBox = QGroupBox('Argo')
-        groupBox.setLayout(groupBoxLayout)
+        group_box = QGroupBox('Argo')
+        group_box.setLayout(group_box_layout)
 
         layout = QVBoxLayout()
-        layout.addWidget(groupBox)
+        layout.addWidget(group_box)
         layout.addStretch()
         view.setLayout(layout)
 
     def _embed_text(self) -> None:
         title = 'Embed Text'
         label = 'Enter text to embed:'
-        text, okPressed = QInputDialog.getMultiLineText(self._view, title, label, text='')
+        text, ok_pressed = QInputDialog.getMultiLineText(self._view, title, label, text='')
 
-        if okPressed:
+        if ok_pressed:
             self._presenter.embed_text(text.splitlines())

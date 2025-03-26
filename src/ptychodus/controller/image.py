@@ -213,37 +213,27 @@ class ImageController:
         self,
         engine: VisualizationEngine,
         view: ImageView,
-        visualizationController: VisualizationController,
+        status_bar: QStatusBar,
+        file_dialog_factory: FileDialogFactory,
     ) -> None:
-        self._visualizationController = visualizationController
-        self._toolsController = ImageToolsController.create_instance(
-            view.imageRibbon.imageToolsGroupBox, visualizationController
+        self._visualization_controller = VisualizationController.create_instance(
+            engine, view.image_widget, status_bar, file_dialog_factory
         )
-        self._rendererController = ImageRendererController.create_instance(
-            engine, view.imageRibbon.colormapGroupBox
+        self._tools_controller = ImageToolsController.create_instance(
+            view.image_ribbon.imageToolsGroupBox, self._visualization_controller
         )
-        self._dataRangeController = ImageDataRangeController.create_instance(
+        self._renderer_controller = ImageRendererController.create_instance(
+            engine, view.image_ribbon.colormapGroupBox
+        )
+        self._data_range_controller = ImageDataRangeController.create_instance(
             engine,
-            view.imageRibbon.dataRangeGroupBox,
-            view.imageWidget,
-            visualizationController,
+            view.image_ribbon.data_range_group_box,
+            view.image_widget,
+            self._visualization_controller,
         )
 
-    @classmethod
-    def create_instance(
-        cls,
-        engine: VisualizationEngine,
-        view: ImageView,
-        statusBar: QStatusBar,
-        fileDialogFactory: FileDialogFactory,
-    ) -> ImageController:
-        visualizationController = VisualizationController.create_instance(
-            engine, view.imageWidget, statusBar, fileDialogFactory
-        )
-        return cls(engine, view, visualizationController)
-
-    def set_array(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> None:
-        self._visualizationController.setArray(array, pixelGeometry)
+    def set_array(self, array: NumberArrayType, pixel_geometry: PixelGeometry) -> None:
+        self._visualization_controller.setArray(array, pixel_geometry)
 
     def clear_array(self) -> None:
-        self._visualizationController.clearArray()
+        self._visualization_controller.clearArray()

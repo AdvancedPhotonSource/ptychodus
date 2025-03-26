@@ -20,30 +20,30 @@ class AgentView(QWidget):
 class AgentInputView(QFrame):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.textEdit = QPlainTextEdit()
+        self.text_edit = QPlainTextEdit()
 
-        sendButtonSizePolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        self.sendButton = QPushButton(QIcon(':/icons/send'), 'Send')
-        self.sendButton.setSizePolicy(sendButtonSizePolicy)
+        send_button_size_policy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        self.send_button = QPushButton(QIcon(':/icons/send'), 'Send')
+        self.send_button.setSizePolicy(send_button_size_policy)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.textEdit)
-        layout.addWidget(self.sendButton)
+        layout.addWidget(self.text_edit)
+        layout.addWidget(self.send_button)
         self.setLayout(layout)
 
 
 class AgentChatView(QSplitter):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(Qt.Orientation.Vertical, parent)
-        self.messageListView = QListView()
-        self.scrollArea = QScrollArea()
-        self.scrollArea.setWidgetResizable(True)
-        self.scrollArea.setWidget(self.messageListView)
-        self.inputView = AgentInputView()
+        self.message_list_view = QListView()
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setWidget(self.message_list_view)
+        self.input_view = AgentInputView()
 
-        self.addWidget(self.scrollArea)
-        self.addWidget(self.inputView)
+        self.addWidget(self.scroll_area)
+        self.addWidget(self.input_view)
 
         self.setStretchFactor(0, 2)
         self.setStretchFactor(1, 0)

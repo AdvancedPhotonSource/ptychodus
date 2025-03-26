@@ -36,29 +36,29 @@ class AutomationPresenter(Observable, Observer):
         settings.add_observer(self)
         watcher.add_observer(self)
 
-    def getStrategyList(self) -> Iterator[str]:
+    def get_strategies(self) -> Iterator[str]:
         return self._workflow.getAvailableWorkflows()
 
-    def getStrategy(self) -> str:
+    def get_strategy(self) -> str:
         return self._workflow.getWorkflow()
 
-    def setStrategy(self, strategy: str) -> None:
+    def set_strategy(self, strategy: str) -> None:
         self._workflow.setWorkflow(strategy)
 
     def getDataDirectory(self) -> Path:
         return self._settings.dataDirectory.get_value()
 
-    def setDataDirectory(self, directory: Path) -> None:
+    def set_data_directory(self, directory: Path) -> None:
         self._settings.dataDirectory.set_value(directory)
 
-    def getProcessingIntervalLimitsInSeconds(self) -> Interval[int]:
+    def get_processing_interval_limits_s(self) -> Interval[int]:
         return Interval[int](0, 600)
 
-    def getProcessingIntervalInSeconds(self) -> int:
-        limits = self.getProcessingIntervalLimitsInSeconds()
+    def get_processing_interval_s(self) -> int:
+        limits = self.get_processing_interval_limits_s()
         return limits.clamp(self._settings.processingIntervalInSeconds.get_value())
 
-    def setProcessingIntervalInSeconds(self, value: int) -> None:
+    def set_processing_interval_s(self, value: int) -> None:
         self._settings.processingIntervalInSeconds.set_value(value)
 
     def loadExistingDatasetsToRepository(self) -> None:
@@ -82,11 +82,11 @@ class AutomationPresenter(Observable, Observer):
         else:
             self._watcher.stop()
 
-    def getWatchdogDelayLimitsInSeconds(self) -> Interval[int]:
+    def get_watchdog_delay_limits_s(self) -> Interval[int]:
         return Interval[int](0, 600)
 
-    def getWatchdogDelayInSeconds(self) -> int:
-        limits = self.getWatchdogDelayLimitsInSeconds()
+    def get_watchdog_delay_s(self) -> int:
+        limits = self.get_watchdog_delay_limits_s()
         return limits.clamp(self._settings.watchdogDelayInSeconds.get_value())
 
     def setWatchdogDelayInSeconds(self, value: int) -> None:
@@ -95,7 +95,7 @@ class AutomationPresenter(Observable, Observer):
     def setWatchdogPollingObserverEnabled(self, enable: bool) -> None:
         self._settings.useWatchdogPollingObserver.set_value(enable)
 
-    def isWatchdogPollingObserverEnabled(self) -> bool:
+    def is_watchdog_polling_observer_enabled(self) -> bool:
         return self._settings.useWatchdogPollingObserver.get_value()
 
     def _update(self, observable: Observable) -> None:
@@ -120,13 +120,13 @@ class AutomationProcessingPresenter(Observable, Observer):
         settings.add_observer(self)
         repository.add_observer(self)
 
-    def getDatasetLabel(self, index: int) -> str:
+    def get_dataset_label(self, index: int) -> str:
         return self._repository.getLabel(index)
 
-    def getDatasetState(self, index: int) -> AutomationDatasetState:
+    def get_dataset_state(self, index: int) -> AutomationDatasetState:
         return self._repository.getState(index)
 
-    def getNumberOfDatasets(self) -> int:
+    def get_num_datasets(self) -> int:
         return len(self._repository)
 
     def isProcessingEnabled(self) -> bool:

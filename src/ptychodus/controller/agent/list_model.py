@@ -30,5 +30,5 @@ class AgentMessageListModel(QAbstractListModel):
                 case Qt.ItemDataRole.ForegroundRole:
                     return self.DARK_BLUE if message.role == ChatRole.HUMAN else self.DARK_GREEN
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._history)
