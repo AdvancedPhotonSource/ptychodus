@@ -9,7 +9,7 @@ from ptychodus.api.reconstructor import (
     TrainOutput,
 )
 
-from ..product import ProductRepository
+from ..product import ProductAPI
 from .matcher import DiffractionPatternPositionMatcher, ScanIndexFilter
 from .queue import ReconstructionQueue
 
@@ -21,12 +21,12 @@ class ReconstructorAPI:
         self,
         reconstruction_queue: ReconstructionQueue,
         data_matcher: DiffractionPatternPositionMatcher,
-        product_repository: ProductRepository,
+        product_api: ProductAPI,
         reconstructor_chooser: PluginChooser[Reconstructor],
     ) -> None:
         self._reconstruction_queue = reconstruction_queue
         self._data_matcher = data_matcher
-        self._product_repository = product_repository
+        self._product_api = product_api
         self._reconstructor_chooser = reconstructor_chooser
 
     @property
@@ -47,10 +47,10 @@ class ReconstructorAPI:
         parameters = self._data_matcher.match_diffraction_patterns_with_positions(
             input_product_index, index_filter
         )
-        output_product_index = self._product_repository.insert_new_product(
+        output_product_index = self._product_api.insert_new_product(
             like_index=input_product_index, mutable=False
         )
-        output_product = self._product_repository[output_product_index]
+        output_product = self._product_api.get_item(output_product_index)
 
         output_product_name = (
             self._data_matcher.get_product_name(input_product_index)

@@ -1,5 +1,4 @@
-from __future__ import annotations
-from abc import ABC, abstractmethod
+from abc import abstractmethod, ABC
 import logging
 
 from ptychodus.api.parametric import ParameterGroup
@@ -20,7 +19,6 @@ class MetadataRepositoryItem(ParameterGroup):
     def __init__(
         self,
         settings: ProductSettings,
-        name_factory: UniqueNameFactory,
         *,
         name: str = '',
         comments: str = '',
@@ -32,11 +30,15 @@ class MetadataRepositoryItem(ParameterGroup):
     ) -> None:
         super().__init__()
         self._settings = settings
-        self._name_factory = name_factory
+        self._name_factory: UniqueNameFactory | None = None
 
         self._name = settings.name.copy()
-        self._set_name(name if name else settings.name.get_value())
+
+        if name is not None:
+            self.set_name(name)
+
         self._add_parameter('name', self._name)
+
         self.comments = self.create_string_parameter('comments', comments)
 
         self.detector_distance_m = settings.detector_distance_m.copy()
@@ -74,7 +76,7 @@ class MetadataRepositoryItem(ParameterGroup):
 
         self._add_parameter('mass_attenuation_m2_kg', self.mass_attenuation_m2_kg)
 
-        self._index = -1
+        self._index = -1  # used by ProductRepository
 
     def assign(self, metadata: ProductMetadata) -> None:
         self.set_name(metadata.name)
@@ -89,21 +91,21 @@ class MetadataRepositoryItem(ParameterGroup):
         for parameter in self.parameters().values():
             parameter.sync_value_to_parent()
 
-    def get_name(self) -> str:
-        return self._name.get_value()
-
-    def _set_name(self, name: str) -> None:
-        unique_name = self._name_factory.create_unique_name(name)
-        self._name.set_value(unique_name)
+    def _set_name_factory(self, name_factory: UniqueNameFactory) -> None:
+        self._name_factory = name_factory
+        self.set_name(self.get_name())
 
     def set_name(self, name: str) -> None:
         if name:
-            self._set_name(name)
+            if self._name_factory is not None:
+                name = self._name_factory.create_unique_name(name)
+
+            self._name.set_value(name)
         else:
             self._name.notify_observers()
 
-    def get_index(self) -> int:
-        return self._index
+    def get_name(self) -> str:
+        return self._name.get_value()
 
     def get_metadata(self) -> ProductMetadata:
         return ProductMetadata(

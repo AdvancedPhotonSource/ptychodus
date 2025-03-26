@@ -10,11 +10,12 @@ from ptychodus.api.settings import SettingsRegistry
 
 from ..patterns import AssembledDiffractionDataset, PatternSizer
 from .api import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
+from .item_factory import ProductRepositoryItemFactory
 from .object import ObjectBuilderFactory, ObjectRepositoryItemFactory, ObjectSettings
 from .object_repository import ObjectRepository
 from .probe import ProbeBuilderFactory, ProbeRepositoryItemFactory, ProbeSettings
 from .probe_repository import ProbeRepository
-from .product_repository import ProductRepository
+from .repository import ProductRepository
 from .scan import ScanBuilderFactory, ScanRepositoryItemFactory, ScanSettings
 from .scan_repository import ScanRepository
 from .settings import ProductSettings
@@ -69,17 +70,20 @@ class ProductCore(Observer):
             rng, self._object_settings, self._object_builder_factory
         )
 
-        self.product_repository = ProductRepository(
+        self.product_repository = ProductRepository()
+        self._item_factory = ProductRepositoryItemFactory(
             self.settings,
             pattern_sizer,
             dataset,
             self._scan_repository_item_factory,
             self._probe_repository_item_factory,
             self._object_repository_item_factory,
+            self.product_repository,
         )
         self.product_api = ProductAPI(
             self.settings,
             self.product_repository,
+            self._item_factory,
             product_file_reader_chooser,
             product_file_writer_chooser,
         )
@@ -112,4 +116,4 @@ class ProductCore(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._reinit_observable:
-            self.product_repository.insert_product_from_settings()
+            self.product_api.insert_product_from_settings()

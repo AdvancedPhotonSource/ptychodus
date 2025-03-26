@@ -8,7 +8,7 @@ from .item import ProductRepositoryItem, ProductRepositoryObserver
 from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
-from .product_repository import ProductRepository
+from .repository import ProductRepository
 from .scan import ScanRepositoryItem
 
 logger = logging.getLogger(__name__)

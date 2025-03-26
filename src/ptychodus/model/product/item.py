@@ -7,12 +7,12 @@ from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.product import Product
 
+from .geometry import ProductGeometry
 from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
-from .product_geometry import ProductGeometry
-from .product_validator import ProductValidator
 from .scan import ScanRepositoryItem
+from .validator import ProductValidator
 
 logger = logging.getLogger(__name__)
 

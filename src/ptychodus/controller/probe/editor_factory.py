@@ -174,26 +174,33 @@ class ProbeEditorViewControllerFactory:
         if additional_modes_builder is None:
             return
 
-        additional_modes_group = 'Additional Modes'  # FIXME OPR
+        incoherent_modes_group = 'Incoherent Modes'
         dialog_builder.add_spin_box(
             additional_modes_builder.num_incoherent_modes,
             'Number of Modes:',
-            group=additional_modes_group,
+            group=incoherent_modes_group,
         )
         dialog_builder.add_check_box(
             additional_modes_builder.orthogonalize_incoherent_modes,
             'Orthogonalize Modes:',
-            group=additional_modes_group,
+            group=incoherent_modes_group,
         )
         dialog_builder.add_view_controller(
             DecayTypeParameterViewController(additional_modes_builder.incoherent_mode_decay_type),
             'Decay Type:',
-            group=additional_modes_group,
+            group=incoherent_modes_group,
         )
         dialog_builder.add_decimal_slider(
             additional_modes_builder.incoherent_mode_decay_ratio,
             'Decay Ratio:',
-            group=additional_modes_group,
+            group=incoherent_modes_group,
+        )
+
+        coherent_modes_group = 'Coherent Modes'
+        dialog_builder.add_spin_box(
+            additional_modes_builder.num_coherent_modes,
+            'Number of Modes:',
+            group=coherent_modes_group,
         )
 
     def create_editor_dialog(

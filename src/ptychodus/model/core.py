@@ -142,7 +142,7 @@ class ModelCore:
         self.reconstructor = ReconstructorCore(
             self.settings_registry,
             self.patterns.dataset,
-            self.product.product_repository,
+            self.product.product_api,
             [
                 self.ptychi_reconstructor_library,
                 self.tike_reconstructor_library,

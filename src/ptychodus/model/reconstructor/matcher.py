@@ -9,7 +9,7 @@ from ptychodus.api.reconstructor import ReconstructInput
 from ptychodus.api.scan import PositionSequence, ScanPoint
 
 from ..patterns import AssembledDiffractionDataset
-from ..product import ProductRepository
+from ..product import ProductAPI
 
 logger = logging.getLogger(__name__)
 
@@ -35,24 +35,23 @@ class DiffractionPatternPositionMatcher:
     def __init__(
         self,
         dataset: AssembledDiffractionDataset,
-        product_repository: ProductRepository,
+        product_api: ProductAPI,
     ) -> None:
         self._dataset = dataset
-        self._product_repository = product_repository
+        self._product_api = product_api
 
     def get_product_name(self, input_product_index: int) -> str:
-        input_product_item = self._product_repository[input_product_index]
-        return input_product_item.get_name()
+        return self._product_api.get_item_name(input_product_index)
 
     def get_object_plane_pixel_geometry(self, input_product_index: int) -> PixelGeometry:
-        input_product_item = self._product_repository[input_product_index]
+        input_product_item = self._product_api.get_item(input_product_index)
         object_geometry = input_product_item.get_geometry().get_object_geometry()
         return object_geometry.get_pixel_geometry()
 
     def match_diffraction_patterns_with_positions(
         self, input_product_index: int, index_filter: ScanIndexFilter = ScanIndexFilter.ALL
     ) -> ReconstructInput:
-        input_product_item = self._product_repository[input_product_index]
+        input_product_item = self._product_api.get_item(input_product_index)
         input_product = input_product_item.get_product()
         data_indexes = self._dataset.get_assembled_indexes()
         scan_indexes = [

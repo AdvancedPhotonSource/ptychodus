@@ -16,9 +16,6 @@ class ProbeSettings(Observable, Observer):
         )
         self.file_type = self._settings_group.create_string_parameter('FileType', 'NPY')
 
-        self.num_coherent_modes = self._settings_group.create_integer_parameter(
-            'NumberOfCoherentModes', 1, minimum=1
-        )
         self.num_incoherent_modes = self._settings_group.create_integer_parameter(
             'NumberOfIncoherentModes', 1, minimum=1
         )
@@ -30,6 +27,9 @@ class ProbeSettings(Observable, Observer):
         )
         self.incoherent_mode_decay_ratio = self._settings_group.create_real_parameter(
             'IncoherentModeDecayRatio', 1.0, minimum=0.0, maximum=1.0
+        )
+        self.num_coherent_modes = self._settings_group.create_integer_parameter(
+            'NumberOfCoherentModes', 1, minimum=1
         )
 
         self.disk_diameter_m = self._settings_group.create_real_parameter(

@@ -3,7 +3,7 @@ from .core import ProductCore
 from .item import ProductRepositoryItem, ProductRepositoryObserver
 from .object_repository import ObjectRepository
 from .probe_repository import ProbeRepository
-from .product_repository import ProductRepository
+from .repository import ProductRepository
 from .scan_repository import ScanRepository
 from .settings import ProductSettings
 

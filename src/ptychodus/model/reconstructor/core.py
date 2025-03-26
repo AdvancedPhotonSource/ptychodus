@@ -10,7 +10,7 @@ from ptychodus.api.reconstructor import (
 from ptychodus.api.settings import SettingsRegistry
 
 from ..patterns import AssembledDiffractionDataset
-from ..product import ProductRepository
+from ..product import ProductAPI
 from .api import ReconstructorAPI
 from .log import ReconstructorLogHandler
 from .matcher import DiffractionPatternPositionMatcher
@@ -24,7 +24,7 @@ class ReconstructorCore:
         self,
         settings_registry: SettingsRegistry,
         dataset: AssembledDiffractionDataset,
-        product_repository: ProductRepository,
+        product_api: ProductAPI,
         library_seq: Sequence[ReconstructorLibrary],
     ) -> None:
         self.settings = ReconstructorSettings(settings_registry)
@@ -51,9 +51,9 @@ class ReconstructorCore:
             )
 
         self._reconstruction_queue = ReconstructionQueue()
-        self.data_matcher = DiffractionPatternPositionMatcher(dataset, product_repository)
+        self.data_matcher = DiffractionPatternPositionMatcher(dataset, product_api)
         self.reconstructor_api = ReconstructorAPI(
-            self._reconstruction_queue, self.data_matcher, product_repository, self._plugin_chooser
+            self._reconstruction_queue, self.data_matcher, product_api, self._plugin_chooser
         )
         self.presenter = ReconstructorPresenter(
             self.settings,

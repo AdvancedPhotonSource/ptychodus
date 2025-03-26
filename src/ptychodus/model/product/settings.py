@@ -29,7 +29,9 @@ class ProductSettings(Observable, Observer):
             'ExposureTimeInSeconds', 0.0, minimum=0.0
         )
         self.mass_attenuation_m2_kg = self._settings_group.create_real_parameter(
-            'MassAttenuationSquareMetersPerKilogram', 0.0, minimum=0.0
+            'MassAttenuationSquareMetersPerKilogram',
+            0.0,
+            minimum=0.0,  # FIXME to view
         )
 
     def _update(self, observable: Observable) -> None:

@@ -6,13 +6,15 @@ import logging
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import ProductFileReader, ProductFileWriter
 
+from .item import ProductRepositoryItem
+from .item_factory import ProductRepositoryItemFactory
 from .object.builder_factory import ObjectBuilderFactory
 from .object.settings import ObjectSettings
 from .object_repository import ObjectRepository
 from .probe.builder_factory import ProbeBuilderFactory
 from .probe.settings import ProbeSettings
 from .probe_repository import ProbeRepository
-from .product_repository import ProductRepository
+from .repository import ProductRepository
 from .scan.builder_factory import ScanBuilderFactory
 from .scan.settings import ScanSettings
 from .scan_repository import ScanRepository
@@ -374,11 +376,13 @@ class ProductAPI:
         self,
         settings: ProductSettings,
         repository: ProductRepository,
+        item_factory: ProductRepositoryItemFactory,
         file_reader_chooser: PluginChooser[ProductFileReader],
         file_writer_chooser: PluginChooser[ProductFileWriter],
     ) -> None:
         self._settings = settings
         self._repository = repository
+        self._item_factory = item_factory
         self._file_reader_chooser = file_reader_chooser
         self._file_writer_chooser = file_writer_chooser
 
@@ -391,17 +395,29 @@ class ProductAPI:
         probe_energy_eV: float | None = None,  # noqa: N803
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
+        mass_attenuation_m2_kg: float | None = None,
+        mutable: bool = True,
         like_index: int = -1,
     ) -> int:
-        return self._repository.insert_new_product(
+        item = self._item_factory.create_from_values(
             name=name,
             comments=comments,
             detector_distance_m=detector_distance_m,
             probe_energy_eV=probe_energy_eV,
             probe_photon_count=probe_photon_count,
             exposure_time_s=exposure_time_s,
+            mass_attenuation_m2_kg=mass_attenuation_m2_kg,
+            mutable=mutable,
             like_index=like_index,
         )
+        return self._repository.insert_product(item)
+
+    def insert_product_from_settings(self) -> int:
+        item = self._item_factory.create_from_settings()
+        return self._repository.insert_product(item)
+
+    def get_item(self, product_index: int) -> ProductRepositoryItem:
+        return self._repository[product_index]
 
     def get_item_name(self, product_index: int) -> str:
         item = self._repository[product_index]
@@ -428,7 +444,8 @@ class ProductAPI:
             except Exception as exc:
                 raise RuntimeError(f'Failed to read "{file_path}"') from exc
             else:
-                return self._repository.insert_product(product)
+                item = self._item_factory.create_from_product(product)
+                return self._repository.insert_product(item)
         else:
             logger.warning(f'Refusing to create product with invalid file path "{file_path}"')
 
