@@ -151,12 +151,12 @@ class ScanEditorViewControllerFactory:
             dialog_builder.add_spin_box(
                 scan_builder.num_points_y, 'Number of Points Y:', group=base_scan_group
             )
-            dialog_builder.addLengthWidget(
+            dialog_builder.add_length_widget(
                 scan_builder.step_size_x_m, 'Step Size X:', group=base_scan_group
             )
 
             if not scan_builder.is_equilateral:
-                dialog_builder.addLengthWidget(
+                dialog_builder.add_length_widget(
                     scan_builder.step_size_y_m, 'Step Size Y:', group=base_scan_group
                 )
 
@@ -172,7 +172,7 @@ class ScanEditorViewControllerFactory:
                 'Number of Points in First Shell:',
                 group=base_scan_group,
             )
-            dialog_builder.addLengthWidget(
+            dialog_builder.add_length_widget(
                 scan_builder.radial_step_size_m,
                 'Radial Step Size:',
                 group=base_scan_group,
@@ -192,7 +192,7 @@ class ScanEditorViewControllerFactory:
             dialog_builder.add_spin_box(
                 scan_builder.num_points, 'Number of Points:', group=base_scan_group
             )
-            dialog_builder.addLengthWidget(
+            dialog_builder.add_length_widget(
                 scan_builder.radius_scalar_m, 'Radius Scalar:', group=base_scan_group
             )
             self._append_common_controls(dialog_builder, item)
@@ -202,19 +202,19 @@ class ScanEditorViewControllerFactory:
             dialog_builder.add_spin_box(
                 scan_builder.num_points, 'Number of Points:', group=base_scan_group
             )
-            dialog_builder.addLengthWidget(
+            dialog_builder.add_length_widget(
                 scan_builder.amplitude_x_m, 'Amplitude X:', group=base_scan_group
             )
-            dialog_builder.addLengthWidget(
+            dialog_builder.add_length_widget(
                 scan_builder.amplitude_y_m, 'Amplitude Y:', group=base_scan_group
             )
-            dialog_builder.addAngleWidget(
+            dialog_builder.add_angle_widget(
                 scan_builder.angular_step_x_turns, 'Angular Step X:', group=base_scan_group
             )
-            dialog_builder.addAngleWidget(
+            dialog_builder.add_angle_widget(
                 scan_builder.angular_step_y_turns, 'Angular Step Y:', group=base_scan_group
             )
-            dialog_builder.addAngleWidget(
+            dialog_builder.add_angle_widget(
                 scan_builder.angular_shift_turns, 'Angular Shift:', group=base_scan_group
             )
             self._append_common_controls(dialog_builder, item)

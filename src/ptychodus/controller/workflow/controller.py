@@ -29,15 +29,15 @@ class WorkflowController:
         self._executionPresenter = executionPresenter
         self._parametersView = parametersView
         self._authorizationController = WorkflowAuthorizationController.create_instance(
-            authorizationPresenter, parametersView.authorizationDialog
+            authorizationPresenter, parametersView.authorization_dialog
         )
         self._statusController = WorkflowStatusController(
-            statusPresenter, parametersView.statusView, tableView
+            statusPresenter, parametersView.status_view, tableView
         )
         self._executionController = WorkflowExecutionController.create_instance(
             parametersPresenter,
             executionPresenter,
-            parametersView.executionView,
+            parametersView.execution_view,
             productItemModel,
         )
         self._timer = QTimer()

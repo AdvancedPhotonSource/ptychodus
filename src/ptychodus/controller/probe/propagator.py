@@ -21,36 +21,38 @@ class ProbePropagationViewController(Observer):
         self,
         propagator: ProbePropagator,
         engine: VisualizationEngine,
-        fileDialogFactory: FileDialogFactory,
+        file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._propagator = propagator
-        self._fileDialogFactory = fileDialogFactory
+        self._file_dialog_factory = file_dialog_factory
 
         self._dialog = ProbePropagationDialog()
         self._dialog.propagate_button.clicked.connect(self._propagate)
-        self._dialog.save_button.clicked.connect(self._savePropagatedProbe)
-        self._dialog.coordinate_slider.valueChanged.connect(self._updateCurrentCoordinate)
+        self._dialog.save_button.clicked.connect(self._save_propagated_probe)
+        self._dialog.coordinate_slider.valueChanged.connect(self._update_current_coordinate)
         self._dialog.parameters_view.num_steps_spin_box.setRange(1, 999)
 
-        self._xyVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.xy_view, self._dialog.status_bar, fileDialogFactory
+        self._xy_visualization_widget_controller = VisualizationWidgetController(
+            engine, self._dialog.xy_view, self._dialog.status_bar, file_dialog_factory
         )
-        self._zxVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.zx_view, self._dialog.status_bar, fileDialogFactory
+        self._zx_visualization_widget_controller = VisualizationWidgetController(
+            engine, self._dialog.zx_view, self._dialog.status_bar, file_dialog_factory
         )
-        self._visualizationParametersController = VisualizationParametersController.create_instance(
-            engine, self._dialog.parameters_view.visualization_parameters_view
+        self._visualization_parameters_controller = (
+            VisualizationParametersController.create_instance(
+                engine, self._dialog.parameters_view.visualization_parameters_view
+            )
         )
-        self._zyVisualizationWidgetController = VisualizationWidgetController(
-            engine, self._dialog.zy_view, self._dialog.status_bar, fileDialogFactory
+        self._zy_visualization_widget_controller = VisualizationWidgetController(
+            engine, self._dialog.zy_view, self._dialog.status_bar, file_dialog_factory
         )
 
         propagator.add_observer(self)
         self._sync_model_to_view()
 
-    def _updateCurrentCoordinate(self, step: int) -> None:
-        lerpValue = 0.0
+    def _update_current_coordinate(self, step: int) -> None:
+        lerp_value = 0.0
 
         slider = self._dialog.coordinate_slider
         upper = step - slider.minimum()
@@ -60,28 +62,28 @@ class ProbePropagationViewController(Observer):
             alpha = upper / lower
             z0 = self._propagator.get_begin_coordinate_m()
             z1 = self._propagator.get_end_coordinate_m()
-            lerpValue = (1 - alpha) * z0 + alpha * z1
+            lerp_value = (1 - alpha) * z0 + alpha * z1
         else:
             logger.error('Bad slider range!')
 
         try:
-            xyProjection = self._propagator.get_xy_projection(step)
+            xy_projection = self._propagator.get_xy_projection(step)
         except (IndexError, ValueError):
-            self._xyVisualizationWidgetController.clearArray()
+            self._xy_visualization_widget_controller.clear_array()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.show_exception('Update Current Coordinate', err)
         else:
-            pixelGeometry = self._propagator.get_pixel_geometry()
+            pixel_geometry = self._propagator.get_pixel_geometry()
 
-            if pixelGeometry is None:
+            if pixel_geometry is None:
                 logger.warning('Missing propagator pixel geometry!')
             else:
-                self._xyVisualizationWidgetController.set_array(xyProjection, pixelGeometry)
+                self._xy_visualization_widget_controller.set_array(xy_projection, pixel_geometry)
 
         # TODO auto-units
-        lerpValue *= 1e6
-        self._dialog.coordinate_label.setText(f'{lerpValue:.1f} \u00b5m')
+        lerp_value *= 1e6
+        self._dialog.coordinate_label.setText(f'{lerp_value:.1f} \u00b5m')
 
     def _propagate(self) -> None:
         view = self._dialog.parameters_view
@@ -96,30 +98,30 @@ class ProbePropagationViewController(Observer):
             logger.exception(err)
             ExceptionDialog.show_exception('Propagate Probe', err)
 
-    def launch(self, productIndex: int) -> None:
-        self._propagator.set_product(productIndex)
+    def launch(self, product_index: int) -> None:
+        self._propagator.set_product(product_index)
 
         try:
-            itemName = self._propagator.get_product_name()
+            item_name = self._propagator.get_product_name()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.show_exception('Launch', err)
         else:
-            self._dialog.setWindowTitle(f'Propagate Probe: {itemName}')
+            self._dialog.setWindowTitle(f'Propagate Probe: {item_name}')
             self._dialog.open()
 
-    def _savePropagatedProbe(self) -> None:
+    def _save_propagated_probe(self) -> None:
         title = 'Save Propagated Probe'
-        filePath, nameFilter = self._fileDialogFactory.get_save_file_path(
+        file_path, name_filter = self._file_dialog_factory.get_save_file_path(
             self._dialog,
             title,
             name_filters=self._propagator.get_save_file_filters(),
             selected_name_filter=self._propagator.get_save_file_filter(),
         )
 
-        if filePath:
+        if file_path:
             try:
-                self._propagator.save_propagated_probe(filePath)
+                self._propagator.save_propagated_probe(file_path)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.show_exception(title, err)
@@ -134,33 +136,33 @@ class ProbePropagationViewController(Observer):
         )
         view.num_steps_spin_box.setValue(self._propagator.get_num_steps())
 
-        numberOfSteps = self._propagator.get_num_steps()
+        num_steps = self._propagator.get_num_steps()
 
-        if numberOfSteps > 1:
+        if num_steps > 1:
             self._dialog.coordinate_slider.setEnabled(True)
-            self._dialog.coordinate_slider.setRange(0, numberOfSteps - 1)
+            self._dialog.coordinate_slider.setRange(0, num_steps - 1)
         else:
             self._dialog.coordinate_slider.setEnabled(False)
             self._dialog.coordinate_slider.setRange(0, 1)
             self._dialog.coordinate_slider.setValue(0)
 
-        self._updateCurrentCoordinate(self._dialog.coordinate_slider.value())
-        pixelGeometry = self._propagator.get_pixel_geometry()
+        self._update_current_coordinate(self._dialog.coordinate_slider.value())
+        pixel_geometry = self._propagator.get_pixel_geometry()
 
-        if pixelGeometry is None:
+        if pixel_geometry is None:
             logger.warning('Missing propagator pixel geometry!')
             return
 
         try:
-            self._zxVisualizationWidgetController.set_array(
-                self._propagator.get_zx_projection(), pixelGeometry
+            self._zx_visualization_widget_controller.set_array(
+                self._propagator.get_zx_projection(), pixel_geometry
             )
-            self._zyVisualizationWidgetController.set_array(
-                self._propagator.get_zy_projection(), pixelGeometry
+            self._zy_visualization_widget_controller.set_array(
+                self._propagator.get_zy_projection(), pixel_geometry
             )
         except ValueError:
-            self._zxVisualizationWidgetController.clearArray()
-            self._zyVisualizationWidgetController.clearArray()
+            self._zx_visualization_widget_controller.clear_array()
+            self._zy_visualization_widget_controller.clear_array()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.show_exception('Update Views', err)

@@ -21,51 +21,51 @@ class AutomationDatasetBuffer:
         self._settings = settings
         self._repository = repository
         self._processor = processor
-        self._eventTimes: OrderedDict[Path, float] = OrderedDict()
-        self._eventTimesLock = threading.Lock()
-        self._stopWorkEvent = threading.Event()
+        self._event_times: OrderedDict[Path, float] = OrderedDict()
+        self._event_times_lock = threading.Lock()
+        self._stop_work_event = threading.Event()
         self._worker = threading.Thread()
 
-    def put(self, filePath: Path) -> None:
-        with self._eventTimesLock:
-            self._eventTimes[filePath] = time()
-            self._eventTimes.move_to_end(filePath)
+    def put(self, file_path: Path) -> None:
+        with self._event_times_lock:
+            self._event_times[file_path] = time()
+            self._event_times.move_to_end(file_path)
 
-        self._repository.put(filePath, AutomationDatasetState.EXISTS)
+        self._repository.put(file_path, AutomationDatasetState.EXISTS)
 
     def _process(self) -> None:
-        while not self._stopWorkEvent.is_set():
-            isFileReadyForProcessing = False
+        while not self._stop_work_event.is_set():
+            is_file_ready_for_processing = False
 
-            with self._eventTimesLock:
+            with self._event_times_lock:
                 try:
-                    filePath, eventTime = next(iter(self._eventTimes.items()))
+                    file_path, event_time = next(iter(self._event_times.items()))
                 except StopIteration:
                     pass
                 else:
-                    delayTime = self._settings.watchdogDelayInSeconds.get_value()
-                    isFileReadyForProcessing = eventTime + delayTime < time()
+                    delay_time = self._settings.watchdog_delay_s.get_value()
+                    is_file_ready_for_processing = event_time + delay_time < time()
 
-                    if isFileReadyForProcessing:
-                        self._eventTimes.popitem(last=False)
+                    if is_file_ready_for_processing:
+                        self._event_times.popitem(last=False)
 
-            if isFileReadyForProcessing:
-                self._processor.put(filePath)
+            if is_file_ready_for_processing:
+                self._processor.put(file_path)
             else:
-                self._stopWorkEvent.wait(timeout=5.0)  # TODO make configurable
+                self._stop_work_event.wait(timeout=5.0)  # TODO make configurable
 
     def start(self) -> None:
         if self._worker.is_alive():
             self.stop()
 
         logger.info('Starting automation thread...')
-        self._stopWorkEvent.clear()
+        self._stop_work_event.clear()
         self._worker = threading.Thread(target=self._process)
         self._worker.start()
         logger.info('Automation thread started.')
 
     def stop(self) -> None:
         logger.info('Stopping automation thread...')
-        self._stopWorkEvent.set()
+        self._stop_work_event.set()
         self._worker.join()
         logger.info('Automation thread stopped.')

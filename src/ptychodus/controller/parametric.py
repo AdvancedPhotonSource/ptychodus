@@ -515,30 +515,30 @@ class AngleWidgetParameterViewController(ParameterViewController, Observer):
 
 class ParameterWidget(QWidget):
     def __init__(
-        self, viewControllers: Sequence[ParameterViewController], parent: QWidget | None = None
+        self, view_controllers: Sequence[ParameterViewController], parent: QWidget | None = None
     ) -> None:
         super().__init__(parent)
-        self._viewControllers = viewControllers
+        self._view_controllers = view_controllers
 
 
 class ParameterDialog(QDialog):
     def __init__(
         self,
-        viewControllers: Sequence[ParameterViewController],
-        buttonBox: QDialogButtonBox,
+        view_controllers: Sequence[ParameterViewController],
+        button_box: QDialogButtonBox,
         parent: QWidget | None,
     ) -> None:
         super().__init__(parent)
-        self._viewControllers = viewControllers
-        self._buttonBox = buttonBox
+        self._view_controllers = view_controllers
+        self._button_box = button_box
 
-        buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
-        buttonBox.clicked.connect(self._handleButtonBoxClicked)
+        button_box.addButton(QDialogButtonBox.StandardButton.Ok)
+        button_box.clicked.connect(self._handle_button_box_clicked)
 
-    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
+    def _handle_button_box_clicked(self, button: QAbstractButton) -> None:
         # TODO remove observers from viewControllers
 
-        if self._buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
+        if self._button_box.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
             self.accept()
         else:
             self.reject()
@@ -559,10 +559,10 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = CheckBoxParameterViewController(parameter, '', tool_tip=tool_tip)
-        self.add_view_controller(viewController, label, group=group)
+        view_controller = CheckBoxParameterViewController(parameter, '', tool_tip=tool_tip)
+        self.add_view_controller(view_controller, label, group=group)
 
-    def addComboBox(
+    def add_combo_box(
         self,
         parameter: StringParameter,
         items: Iterable[str],
@@ -571,73 +571,73 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = ComboBoxParameterViewController(parameter, items, tool_tip=tool_tip)
-        self.add_view_controller(viewController, label, group=group)
+        view_controller = ComboBoxParameterViewController(parameter, items, tool_tip=tool_tip)
+        self.add_view_controller(view_controller, label, group=group)
 
-    def addFileOpener(
+    def add_file_opener(
         self,
         parameter: PathParameter,
         label: str,
         *,
         caption: str = 'Open File',
-        nameFilters: Sequence[str] | None = None,
-        mimeTypeFilters: Sequence[str] | None = None,
-        selectedNameFilter: str | None = None,
+        name_filters: Sequence[str] | None = None,
+        mime_type_filters: Sequence[str] | None = None,
+        selected_name_filter: str | None = None,
         tool_tip: str = '',
         group: str = '',
     ) -> None:
         if self._file_dialog_factory is None:
             raise ValueError('Cannot add file chooser without FileDialogFactory!')
         else:
-            viewController = PathParameterViewController.create_file_opener(
+            view_controller = PathParameterViewController.create_file_opener(
                 parameter,
                 self._file_dialog_factory,
                 caption=caption,
-                name_filters=nameFilters,
-                mime_type_filters=mimeTypeFilters,
-                selected_name_filter=selectedNameFilter,
+                name_filters=name_filters,
+                mime_type_filters=mime_type_filters,
+                selected_name_filter=selected_name_filter,
                 tool_tip=tool_tip,
             )
-            self.add_view_controller(viewController, label, group=group)
+            self.add_view_controller(view_controller, label, group=group)
 
-    def addFileSaver(
+    def add_file_saver(
         self,
         parameter: PathParameter,
         label: str,
         *,
         caption: str = 'Save File',
-        nameFilters: Sequence[str] | None = None,
-        mimeTypeFilters: Sequence[str] | None = None,
-        selectedNameFilter: str | None = None,
+        name_filters: Sequence[str] | None = None,
+        mime_type_filters: Sequence[str] | None = None,
+        selected_name_filter: str | None = None,
         tool_tip: str = '',
         group: str = '',
     ) -> None:
         if self._file_dialog_factory is None:
             raise ValueError('Cannot add file chooser without FileDialogFactory!')
         else:
-            viewController = PathParameterViewController.create_file_saver(
+            view_controller = PathParameterViewController.create_file_saver(
                 parameter,
                 self._file_dialog_factory,
                 caption=caption,
-                name_filters=nameFilters,
-                mime_type_filters=mimeTypeFilters,
-                selected_name_filter=selectedNameFilter,
+                name_filters=name_filters,
+                mime_type_filters=mime_type_filters,
+                selected_name_filter=selected_name_filter,
                 tool_tip=tool_tip,
             )
-            self.add_view_controller(viewController, label, group=group)
+            self.add_view_controller(view_controller, label, group=group)
 
-    def addDirectoryChooser(
+    def add_directory_chooser(
         self, parameter: PathParameter, label: str, *, tool_tip: str = '', group: str = ''
     ) -> None:
         if self._file_dialog_factory is None:
             raise ValueError('Cannot add directory chooser without FileDialogFactory!')
         else:
-            viewController = PathParameterViewController.create_directory_chooser(
+            view_controller = PathParameterViewController.create_directory_chooser(
                 parameter,
                 self._file_dialog_factory,
                 tool_tip=tool_tip,
             )
-            self.add_view_controller(viewController, label, group=group)
+            self.add_view_controller(view_controller, label, group=group)
 
     def add_spin_box(
         self,
@@ -647,10 +647,10 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = SpinBoxParameterViewController(parameter, tool_tip=tool_tip)
-        self.add_view_controller(viewController, label, group=group)
+        view_controller = SpinBoxParameterViewController(parameter, tool_tip=tool_tip)
+        self.add_view_controller(view_controller, label, group=group)
 
-    def addIntegerLineEdit(
+    def add_integer_line_edit(
         self,
         parameter: IntegerParameter,
         label: str,
@@ -658,8 +658,8 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = IntegerLineEditParameterViewController(parameter, tool_tip=tool_tip)
-        self.add_view_controller(viewController, label, group=group)
+        view_controller = IntegerLineEditParameterViewController(parameter, tool_tip=tool_tip)
+        self.add_view_controller(view_controller, label, group=group)
 
     def add_decimal_line_edit(
         self,
@@ -669,8 +669,8 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = DecimalLineEditParameterViewController(parameter, tool_tip=tool_tip)
-        self.add_view_controller(viewController, label, group=group)
+        view_controller = DecimalLineEditParameterViewController(parameter, tool_tip=tool_tip)
+        self.add_view_controller(view_controller, label, group=group)
 
     def add_decimal_slider(
         self,
@@ -680,10 +680,10 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = DecimalSliderParameterViewController(parameter, tool_tip=tool_tip)
-        self.add_view_controller(viewController, label, group=group)
+        view_controller = DecimalSliderParameterViewController(parameter, tool_tip=tool_tip)
+        self.add_view_controller(view_controller, label, group=group)
 
-    def addLengthWidget(
+    def add_length_widget(
         self,
         parameter: RealParameter,
         label: str,
@@ -691,10 +691,10 @@ class ParameterViewBuilder:
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        viewController = LengthWidgetParameterViewController(parameter, tool_tip=tool_tip)
-        self.add_view_controller(viewController, label, group=group)
+        view_controller = LengthWidgetParameterViewController(parameter, tool_tip=tool_tip)
+        self.add_view_controller(view_controller, label, group=group)
 
-    def addAngleWidget(
+    def add_angle_widget(
         self,
         parameter: RealParameter,
         label: str,

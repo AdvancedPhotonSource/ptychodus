@@ -21,14 +21,14 @@ logger = logging.getLogger(__name__)
 class LYNXDiffractionFileReader(DiffractionFileReader):
     def __init__(self) -> None:
         self._data_path = '/entry/data/eiger_4'
-        self._treeBuilder = H5DiffractionFileTreeBuilder()
+        self._tree_builder = H5DiffractionFileTreeBuilder()
 
     def read(self, file_path: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.create_null(file_path)
 
         try:
             with h5py.File(file_path, 'r') as h5_file:
-                contents_tree = self._treeBuilder.build(h5_file)
+                contents_tree = self._tree_builder.build(h5_file)
 
                 try:
                     data = h5_file[self._data_path]

@@ -218,12 +218,12 @@ class ProbeEditorViewControllerFactory:
             return dialog_builder.build_dialog(title, parent)
         elif isinstance(probe_builder, DiskProbeBuilder):
             dialog_builder = ParameterViewBuilder()
-            dialog_builder.addLengthWidget(
+            dialog_builder.add_length_widget(
                 probe_builder.diameter_m,
                 'Diameter:',
                 group=primary_mode_group,
             )
-            dialog_builder.addLengthWidget(
+            dialog_builder.add_length_widget(
                 probe_builder.defocus_distance_m,
                 'Defocus Distance:',
                 group=primary_mode_group,
@@ -239,17 +239,17 @@ class ProbeEditorViewControllerFactory:
             return dialog_builder.build_dialog(title, parent)
         elif isinstance(probe_builder, RectangularProbeBuilder):
             dialog_builder = ParameterViewBuilder()
-            dialog_builder.addLengthWidget(
+            dialog_builder.add_length_widget(
                 probe_builder.width_m,
                 'Width:',
                 group=primary_mode_group,
             )
-            dialog_builder.addLengthWidget(
+            dialog_builder.add_length_widget(
                 probe_builder.height_m,
                 'Height:',
                 group=primary_mode_group,
             )
-            dialog_builder.addLengthWidget(
+            dialog_builder.add_length_widget(
                 probe_builder.defocus_distance_m,
                 'Defocus Distance:',
                 group=primary_mode_group,
@@ -258,12 +258,12 @@ class ProbeEditorViewControllerFactory:
             return dialog_builder.build_dialog(title, parent)
         elif isinstance(probe_builder, SuperGaussianProbeBuilder):
             dialog_builder = ParameterViewBuilder()
-            dialog_builder.addLengthWidget(
+            dialog_builder.add_length_widget(
                 probe_builder.annular_radius_m,
                 'Annular Radius:',
                 group=primary_mode_group,
             )
-            dialog_builder.addLengthWidget(
+            dialog_builder.add_length_widget(
                 probe_builder.fwhm_m,
                 'Full Width at Half Maximum:',
                 group=primary_mode_group,

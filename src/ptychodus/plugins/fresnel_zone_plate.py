@@ -16,6 +16,10 @@ def register_plugins(registry: PluginRegistry) -> None:
         display_name='LYNX',
     )
     registry.fresnel_zone_plates.register_plugin(
+        FresnelZonePlate(180e-6, 15e-9, 15e-6),
+        display_name='PtychoProbe',
+    )
+    registry.fresnel_zone_plates.register_plugin(
         FresnelZonePlate(180e-6, 50e-9, 60e-6),
         display_name='Velociprobe',
     )

@@ -33,33 +33,33 @@ class VisualizationController(Observer):
         engine: VisualizationEngine,
         view: VisualizationView,
         item: ImageItem,
-        statusBar: QStatusBar,
-        fileDialogFactory: FileDialogFactory,
+        status_bar: QStatusBar,
+        file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._engine = engine
         self._view = view
         self._item = item
-        self._statusBar = statusBar
-        self._fileDialogFactory = fileDialogFactory
-        self._lineCutDialog = LineCutDialog.create_instance(view)
-        self._histogramDialog = HistogramDialog.create_instance(view)
+        self._status_bar = status_bar
+        self._file_dialog_factory = file_dialog_factory
+        self._line_cut_dialog = LineCutDialog.create_instance(view)
+        self._histogram_dialog = HistogramDialog.create_instance(view)
 
     @classmethod
     def create_instance(
         cls,
         engine: VisualizationEngine,
         view: VisualizationView,
-        statusBar: QStatusBar,
-        fileDialogFactory: FileDialogFactory,
+        status_bar: QStatusBar,
+        file_dialog_factory: FileDialogFactory,
     ) -> VisualizationController:
-        itemEvents = ImageItemEvents()
-        item = ImageItem(itemEvents, statusBar)
-        controller = cls(engine, view, item, statusBar, fileDialogFactory)
+        item_events = ImageItemEvents()
+        item = ImageItem(item_events, status_bar)
+        controller = cls(engine, view, item, status_bar, file_dialog_factory)
         engine.add_observer(controller)
 
-        itemEvents.lineCutFinished.connect(controller._analyzeLineCut)
-        itemEvents.rectangleFinished.connect(controller._analyzeRegion)
+        item_events.line_cut_finished.connect(controller._analyze_line_cut)
+        item_events.rectangle_finished.connect(controller._analyze_region)
 
         scene = QGraphicsScene()
         scene.addItem(item)
@@ -70,66 +70,66 @@ class VisualizationController(Observer):
 
         return controller
 
-    def setArray(
+    def set_array(
         self,
         array: NumberArrayType,
-        pixelGeometry: PixelGeometry,
+        pixel_geometry: PixelGeometry,
         *,
-        autoscaleColorAxis: bool = False,
+        autoscale_color_axis: bool = False,
     ) -> None:
         if numpy.all(numpy.isfinite(array)):
             try:
                 product = self._engine.render(
-                    array, pixelGeometry, autoscale_color_axis=autoscaleColorAxis
+                    array, pixel_geometry, autoscale_color_axis=autoscale_color_axis
                 )
             except ValueError as err:
                 logger.exception(err)
                 ExceptionDialog.show_exception('Renderer', err)
             else:
-                self._item.setProduct(product)
+                self._item.set_product(product)
         else:
             logger.warning('Array contains infinite or NaN values!')
-            self._item.clearProduct()
+            self._item.clear_product()
 
-    def clearArray(self) -> None:
-        self._item.clearProduct()
+    def clear_array(self) -> None:
+        self._item.clear_product()
 
-    def setMouseTool(self, mouseTool: ImageMouseTool) -> None:
-        self._item.setMouseTool(mouseTool)
+    def set_mouse_tool(self, mouse_tool: ImageMouseTool) -> None:
+        self._item.set_mouse_tool(mouse_tool)
 
-    def saveImage(self) -> None:
-        filePath, _ = self._fileDialogFactory.get_save_file_path(
+    def save_image(self) -> None:
+        file_path, _ = self._file_dialog_factory.get_save_file_path(
             self._view, 'Save Image', mime_type_filters=VisualizationController.MIME_TYPES
         )
 
-        if filePath:
+        if file_path:
             pixmap = self._item.pixmap()
-            pixmap.save(str(filePath))
+            pixmap.save(str(file_path))
 
-    def _analyzeLineCut(self, line: QLineF) -> None:
+    def _analyze_line_cut(self, line: QLineF) -> None:
         p1 = Point2D(line.x1(), line.y1())
         p2 = Point2D(line.x2(), line.y2())
-        line2D = Line2D(p1, p2)
+        line2d = Line2D(p1, p2)
 
-        product = self._item.getProduct()
+        product = self._item.get_product()
 
         if product is None:
             logger.warning('No visualization product!')
             return
 
-        valueLabel = product.get_value_label()
-        lineCut = product.get_line_cut(line2D)
+        value_label = product.get_value_label()
+        line_cut = product.get_line_cut(line2d)
 
-        ax = self._lineCutDialog.axes
+        ax = self._line_cut_dialog.axes
         ax.clear()
-        ax.plot(lineCut.distance_m, lineCut.value, '.-', linewidth=1.5)
+        ax.plot(line_cut.distance_m, line_cut.value, '.-', linewidth=1.5)
         ax.set_xlabel('Distance [m]')
-        ax.set_ylabel(valueLabel)
+        ax.set_ylabel(value_label)
         ax.grid(True)
-        self._lineCutDialog.figureCanvas.draw()
-        self._lineCutDialog.open()
+        self._line_cut_dialog.figure_canvas.draw()
+        self._line_cut_dialog.open()
 
-    def _analyzeRegion(self, rect: QRectF) -> None:
+    def _analyze_region(self, rect: QRectF) -> None:
         if rect.isEmpty():
             logger.debug('QRectF is empty!')
             return
@@ -141,51 +141,51 @@ class VisualizationController(Observer):
             height=rect.height(),
         )
 
-        product = self._item.getProduct()
+        product = self._item.get_product()
 
         if product is None:
             logger.warning('No visualization product!')
             return
 
-        valueLabel = product.get_value_label()
+        value_label = product.get_value_label()
         kde = product.estimate_kernel_density(box)
         values = numpy.linspace(kde.value_lower, kde.value_upper, 1000)
 
-        ax = self._histogramDialog.axes
+        ax = self._histogram_dialog.axes
         ax.clear()
         ax.plot(values, kde.kde(values), '.-', linewidth=1.5)
-        ax.set_xlabel(valueLabel)
+        ax.set_xlabel(value_label)
         ax.set_ylabel('Density')
         ax.grid(True)
-        self._histogramDialog.figureCanvas.draw()
+        self._histogram_dialog.figure_canvas.draw()
 
-        rectangleView = self._histogramDialog.rectangleView
-        rectCenter = rect.center()
-        rectangleView.centerXLineEdit.setText(f'{rectCenter.x():.1f}')
-        rectangleView.centerYLineEdit.setText(f'{rectCenter.y():.1f}')
-        rectangleView.widthLineEdit.setText(f'{rect.width():.1f}')
-        rectangleView.heightLineEdit.setText(f'{rect.height():.1f}')
+        rectangle_view = self._histogram_dialog.rectangle_view
+        rect_center = rect.center()
+        rectangle_view.center_x_line_edit.setText(f'{rect_center.x():.1f}')
+        rectangle_view.center_y_line_edit.setText(f'{rect_center.y():.1f}')
+        rectangle_view.width_line_edit.setText(f'{rect.width():.1f}')
+        rectangle_view.height_line_edit.setText(f'{rect.height():.1f}')
 
         # TODO use rect for crop
-        self._histogramDialog.open()
+        self._histogram_dialog.open()
 
-    def zoomToFit(self) -> None:
+    def zoom_to_fit(self) -> None:
         self._item.setPos(0, 0)
         scene = self._view.scene()
-        boundingRect = scene.itemsBoundingRect()
-        scene.setSceneRect(boundingRect)
+        bounding_rect = scene.itemsBoundingRect()
+        scene.setSceneRect(bounding_rect)
         self._view.fitInView(scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
-    def rerenderImage(self, *, autoscaleColorAxis: bool = False) -> None:
-        product = self._item.getProduct()
+    def rerender_image(self, *, autoscale_color_axis: bool = False) -> None:
+        product = self._item.get_product()
 
         if product is not None:
-            self.setArray(
+            self.set_array(
                 product.get_values(),
                 product.get_pixel_geometry(),
-                autoscaleColorAxis=autoscaleColorAxis,
+                autoscale_color_axis=autoscale_color_axis,
             )
 
     def _update(self, observable: Observable) -> None:
         if observable is self._engine:
-            self.rerenderImage()
+            self.rerender_image()

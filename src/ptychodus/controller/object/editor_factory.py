@@ -20,8 +20,8 @@ class MultisliceViewController(ParameterViewController, Observer):
     def get_widget(self) -> QWidget:
         return self._widget
 
-    def _sync_view_to_model(self, numberOfLayers: int) -> None:
-        self._item.set_num_layers(numberOfLayers)
+    def _sync_view_to_model(self, num_layers: int) -> None:
+        self._item.set_num_layers(num_layers)
 
     def _sync_model_to_view(self) -> None:
         self._widget.blockSignals(True)
@@ -35,45 +35,45 @@ class MultisliceViewController(ParameterViewController, Observer):
 
 
 class ObjectEditorViewControllerFactory:
-    def createEditorDialog(
-        self, itemName: str, item: ObjectRepositoryItem, parent: QWidget
+    def create_editor_dialog(
+        self, item_name: str, item: ObjectRepositoryItem, parent: QWidget
     ) -> QDialog:
-        objectBuilder = item.get_builder()
-        builderName = objectBuilder.get_name()
-        firstLayerGroup = 'First Layer'
-        additionalLayersGroup = 'Additional Layers'
-        title = f'{itemName} [{builderName}]'
+        object_builder = item.get_builder()
+        builder_name = object_builder.get_name()
+        first_layer_group = 'First Layer'
+        additional_layers_group = 'Additional Layers'
+        title = f'{item_name} [{builder_name}]'
 
-        if isinstance(objectBuilder, RandomObjectBuilder):
-            dialogBuilder = ParameterViewBuilder()
-            dialogBuilder.add_spin_box(
-                objectBuilder.extra_padding_x, 'Extra Padding X:', group=firstLayerGroup
+        if isinstance(object_builder, RandomObjectBuilder):
+            dialog_builder = ParameterViewBuilder()
+            dialog_builder.add_spin_box(
+                object_builder.extra_padding_x, 'Extra Padding X:', group=first_layer_group
             )
-            dialogBuilder.add_spin_box(
-                objectBuilder.extra_padding_y, 'Extra Padding Y:', group=firstLayerGroup
+            dialog_builder.add_spin_box(
+                object_builder.extra_padding_y, 'Extra Padding Y:', group=first_layer_group
             )
-            dialogBuilder.add_decimal_slider(
-                objectBuilder.amplitude_mean, 'Amplitude Mean:', group=firstLayerGroup
+            dialog_builder.add_decimal_slider(
+                object_builder.amplitude_mean, 'Amplitude Mean:', group=first_layer_group
             )
-            dialogBuilder.add_decimal_slider(
-                objectBuilder.amplitude_deviation,
+            dialog_builder.add_decimal_slider(
+                object_builder.amplitude_deviation,
                 'Amplitude Deviation:',
-                group=firstLayerGroup,
+                group=first_layer_group,
             )
-            dialogBuilder.add_decimal_slider(
-                objectBuilder.phase_deviation, 'Phase Deviation:', group=firstLayerGroup
+            dialog_builder.add_decimal_slider(
+                object_builder.phase_deviation, 'Phase Deviation:', group=first_layer_group
             )
-            dialogBuilder.add_view_controller(
+            dialog_builder.add_view_controller(
                 MultisliceViewController(item),
                 'Number of Layers:',
-                group=additionalLayersGroup,
+                group=additional_layers_group,
             )
-            return dialogBuilder.build_dialog(title, parent)
+            return dialog_builder.build_dialog(title, parent)
 
         return QMessageBox(
             QMessageBox.Icon.Information,
             title,
-            f'"{builderName}" has no editable parameters!',
+            f'"{builder_name}" has no editable parameters!',
             QMessageBox.Ok,
             parent,
         )

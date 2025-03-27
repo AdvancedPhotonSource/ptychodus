@@ -1601,13 +1601,13 @@ else:
     qt_resource_struct = qt_resource_struct_v2
 
 
-def qInitResources() -> None:
+def qInitResources() -> None:  # noqa: N802
     QtCore.qRegisterResourceData(
         rcc_version, qt_resource_struct, qt_resource_name, qt_resource_data
     )
 
 
-def qCleanupResources() -> None:
+def qCleanupResources() -> None:  # noqa: N802
     QtCore.qUnregisterResourceData(
         rcc_version, qt_resource_struct, qt_resource_name, qt_resource_data
     )

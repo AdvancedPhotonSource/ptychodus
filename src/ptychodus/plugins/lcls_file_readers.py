@@ -149,11 +149,12 @@ class LCLSPositionFileReader(PositionFileReader):
 
 def register_plugins(registry: PluginRegistry) -> None:
     SIMPLE_NAME: Final[str] = 'LCLS_XPP'  # noqa: N806
+    DISPLAY_NAME: Final[str] = 'LCLS XPP Files (*.h5 *.hdf5)'  # noqa: N806
 
     registry.diffraction_file_readers.register_plugin(
         LCLSDiffractionFileReader(),
         simple_name=SIMPLE_NAME,
-        display_name='LCLS XPP Files (*.h5 *.hdf5)',
+        display_name=DISPLAY_NAME,
     )
     registry.position_file_readers.register_plugin(
         LCLSPositionFileReader(
@@ -162,5 +163,5 @@ def register_plugins(registry: PluginRegistry) -> None:
             ipm2_high_threshold=6000.0,
         ),
         simple_name=SIMPLE_NAME,
-        display_name='LCLS XPP Files (*.h5 *.hdf5)',
+        display_name=DISPLAY_NAME,
     )

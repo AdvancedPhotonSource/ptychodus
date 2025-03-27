@@ -103,9 +103,9 @@ class XMCDViewController(Observer):
         try:
             data = self._analyzer.get_data()
         except ValueError:
-            self._difference_visualization_widget_controller.clearArray()
-            self._sum_visualization_widget_controller.clearArray()
-            self._ratio_visualization_widget_controller.clearArray()
+            self._difference_visualization_widget_controller.clear_array()
+            self._sum_visualization_widget_controller.clear_array()
+            self._ratio_visualization_widget_controller.clear_array()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.show_exception('Update Views', err)

@@ -10,7 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 class LYNXSoftGlueZynqPositionFileReader(PositionFileReader):
-    SIMPLE_NAME: Final[str] = 'LYNXSoftGlueZynq'
+    SIMPLE_NAME: Final[str] = 'APS_LYNX_SoftGlueZynq'
+    DISPLAY_NAME: Final[str] = 'APS LYNX SoftGlueZynq Files (*.dat)'
     MICRONS_TO_METERS: Final[float] = 1.0e-6
 
     EXPECTED_HEADER_RAW: Final[list[str]] = [
@@ -80,5 +81,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.position_file_readers.register_plugin(
         LYNXSoftGlueZynqPositionFileReader(),
         simple_name=LYNXSoftGlueZynqPositionFileReader.SIMPLE_NAME,
-        display_name='LYNX SoftGlueZynq Files (*.dat)',
+        display_name=LYNXSoftGlueZynqPositionFileReader.DISPLAY_NAME,
     )

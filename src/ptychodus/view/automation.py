@@ -20,12 +20,12 @@ from PyQt5.QtWidgets import (
 class AutomationProcessingView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Processing', parent)
-        self.strategyLabel = QLabel('Strategy:')
+        self.strategy_label = QLabel('Strategy:')
         self.strategy_combo_box = QComboBox()
-        self.directoryLabel = QLabel('Directory:')
+        self.directory_label = QLabel('Directory:')
         self.directory_line_edit = QLineEdit()
         self.directory_browse_button = QPushButton('Browse')
-        self.intervalLabel = QLabel('Interval [sec]:')
+        self.interval_label = QLabel('Interval [sec]:')
         self.interval_spin_box = QSpinBox()
 
     @classmethod
@@ -33,12 +33,12 @@ class AutomationProcessingView(QGroupBox):
         view = cls(parent)
 
         layout = QGridLayout()
-        layout.addWidget(view.strategyLabel, 0, 0)
+        layout.addWidget(view.strategy_label, 0, 0)
         layout.addWidget(view.strategy_combo_box, 0, 1, 1, 2)
-        layout.addWidget(view.directoryLabel, 1, 0)
+        layout.addWidget(view.directory_label, 1, 0)
         layout.addWidget(view.directory_line_edit, 1, 1)
         layout.addWidget(view.directory_browse_button, 1, 2)
-        layout.addWidget(view.intervalLabel, 2, 0)
+        layout.addWidget(view.interval_label, 2, 0)
         layout.addWidget(view.interval_spin_box, 2, 1, 1, 2)
         layout.setColumnStretch(1, 1)
         view.setLayout(layout)
@@ -67,8 +67,8 @@ class AutomationWatchdogView(QGroupBox):
 class AutomationView(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.processingView = AutomationProcessingView.create_instance()
-        self.watchdogView = AutomationWatchdogView.create_instance()
+        self.processing_view = AutomationProcessingView.create_instance()
+        self.watchdog_view = AutomationWatchdogView.create_instance()
         self.processing_list_view = QListView()
         self.load_button = QPushButton('Load')
         self.watch_button = QPushButton('Watch')
@@ -79,17 +79,17 @@ class AutomationView(QWidget):
     def create_instance(cls, parent: QWidget | None = None) -> AutomationView:
         view = cls(parent)
 
-        buttonLayout = QHBoxLayout()
-        buttonLayout.addWidget(view.load_button)
-        buttonLayout.addWidget(view.watch_button)
-        buttonLayout.addWidget(view.process_button)
-        buttonLayout.addWidget(view.clear_button)
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(view.load_button)
+        button_layout.addWidget(view.watch_button)
+        button_layout.addWidget(view.process_button)
+        button_layout.addWidget(view.clear_button)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.processingView)
-        layout.addWidget(view.watchdogView)
+        layout.addWidget(view.processing_view)
+        layout.addWidget(view.watchdog_view)
         layout.addWidget(view.processing_list_view)
-        layout.addLayout(buttonLayout)
+        layout.addLayout(button_layout)
         view.setLayout(layout)
 
         return view

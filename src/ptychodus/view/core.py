@@ -38,61 +38,63 @@ class ViewCore(QMainWindow):
         logger.info(f'PyQt {PYQT_VERSION_STR}')
         logger.info(f'Qt {QT_VERSION_STR}')
 
-        self.navigationToolBar = QToolBar()
-        self.navigation_action_group = QActionGroup(self.navigationToolBar)
+        self.navigation_tool_bar = QToolBar()
+        self.navigation_action_group = QActionGroup(self.navigation_tool_bar)
 
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.left_panel = QStackedWidget()
         self.right_panel = QStackedWidget()
         self.memory_widget = QLCDNumber()
 
-        self.settingsAction = self.navigationToolBar.addAction(
+        self.settings_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/settings'), 'Settings'
         )
         self.settings_view = SettingsView.create_instance()
         self.settings_table_view = QTableView()
 
-        self.patterns_action = self.navigationToolBar.addAction(
+        self.patterns_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/patterns'), 'Patterns'
         )
         self.patterns_view = PatternsView()
         self.patterns_image_view = ImageView.create_instance()
 
-        self.productAction = self.navigationToolBar.addAction(QIcon(':/icons/products'), 'Products')
+        self.product_action = self.navigation_tool_bar.addAction(
+            QIcon(':/icons/products'), 'Products'
+        )
         self.product_view = ProductView()
-        self.productDiagramView = QWidget()
+        self.product_diagram_view = QWidget()
 
-        self.scanAction = self.navigationToolBar.addAction(QIcon(':/icons/scan'), 'Positions')
+        self.scan_action = self.navigation_tool_bar.addAction(QIcon(':/icons/scan'), 'Positions')
         self.scan_view = RepositoryTableView()
         self.scan_plot_view = ScanPlotView.create_instance()
 
-        self.probeAction = self.navigationToolBar.addAction(QIcon(':/icons/probe'), 'Probe')
+        self.probe_action = self.navigation_tool_bar.addAction(QIcon(':/icons/probe'), 'Probe')
         self.probe_view = RepositoryTreeView()
         self.probe_image_view = ImageView.create_instance()
 
-        self.objectAction = self.navigationToolBar.addAction(QIcon(':/icons/object'), 'Object')
+        self.object_action = self.navigation_tool_bar.addAction(QIcon(':/icons/object'), 'Object')
         self.object_view = RepositoryTreeView()
         self.object_image_view = ImageView.create_instance()
 
-        self.reconstructorAction = self.navigationToolBar.addAction(
+        self.reconstructor_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/reconstructor'), 'Reconstructor'
         )
         self.reconstructor_view = ReconstructorView()
         self.reconstructor_plot_view = ReconstructorPlotView()
 
-        self.workflow_action = self.navigationToolBar.addAction(
+        self.workflow_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/workflow'), 'Workflow'
         )
         self.workflow_parameters_view = WorkflowParametersView.create_instance()
         self.workflow_table_view = QTableView()
 
-        self.automationAction = self.navigationToolBar.addAction(
+        self.automation_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/automate'), 'Automation'
         )
         self.automation_view = AutomationView.create_instance()
-        self.automationWidget = QWidget()
+        self.automation_widget = QWidget()
 
-        self.agent_action = self.navigationToolBar.addAction(
+        self.agent_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/sparkles'),
             'Agent',
         )
@@ -103,12 +105,12 @@ class ViewCore(QMainWindow):
 
         self.setWindowIcon(QIcon(':/icons/ptychodus'))
 
-        self.navigationToolBar.setContextMenuPolicy(Qt.ContextMenuPolicy.PreventContextMenu)
-        self.navigationToolBar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
-        self.navigationToolBar.setIconSize(QSize(32, 32))
-        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, self.navigationToolBar)
+        self.navigation_tool_bar.setContextMenuPolicy(Qt.ContextMenuPolicy.PreventContextMenu)
+        self.navigation_tool_bar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+        self.navigation_tool_bar.setIconSize(QSize(32, 32))
+        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, self.navigation_tool_bar)
 
-        for index, action in enumerate(self.navigationToolBar.actions()):
+        for index, action in enumerate(self.navigation_tool_bar.actions()):
             action.setCheckable(True)
             action.setData(index)
             self.navigation_action_group.addAction(action)
@@ -130,13 +132,13 @@ class ViewCore(QMainWindow):
         # maintain same order as navigationToolBar buttons
         self.right_panel.addWidget(self.settings_table_view)
         self.right_panel.addWidget(self.patterns_image_view)
-        self.right_panel.addWidget(self.productDiagramView)
+        self.right_panel.addWidget(self.product_diagram_view)
         self.right_panel.addWidget(self.scan_plot_view)
         self.right_panel.addWidget(self.probe_image_view)
         self.right_panel.addWidget(self.object_image_view)
         self.right_panel.addWidget(self.reconstructor_plot_view)
         self.right_panel.addWidget(self.workflow_table_view)
-        self.right_panel.addWidget(self.automationWidget)
+        self.right_panel.addWidget(self.automation_widget)
         self.right_panel.addWidget(self.agent_chat_view)
         self.right_panel.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.splitter.addWidget(self.right_panel)

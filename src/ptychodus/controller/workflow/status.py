@@ -35,9 +35,9 @@ class WorkflowStatusController(Observer):
         tableView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         tableView.clicked.connect(self._handleTableViewClick)
 
-        view.autoRefreshCheckBox.toggled.connect(self._autoRefreshStatus)
-        view.autoRefreshSpinBox.valueChanged.connect(presenter.setRefreshIntervalInSeconds)
-        view.refreshButton.clicked.connect(presenter.refreshStatus)
+        view.auto_refresh_check_box.toggled.connect(self._autoRefreshStatus)
+        view.auto_refresh_spin_box.valueChanged.connect(presenter.setRefreshIntervalInSeconds)
+        view.refresh_button.clicked.connect(presenter.refreshStatus)
 
         self._sync_model_to_view()
         presenter.add_observer(self)
@@ -49,14 +49,14 @@ class WorkflowStatusController(Observer):
             QDesktopServices.openUrl(url)
 
     def _autoRefreshStatus(self) -> None:
-        if self._view.autoRefreshCheckBox.isChecked():
+        if self._view.auto_refresh_check_box.isChecked():
             self._timer.start(1000 * self._presenter.getRefreshIntervalInSeconds())
-            self._view.autoRefreshSpinBox.setEnabled(False)
-            self._view.refreshButton.setEnabled(False)
+            self._view.auto_refresh_spin_box.setEnabled(False)
+            self._view.refresh_button.setEnabled(False)
         else:
             self._timer.stop()
-            self._view.autoRefreshSpinBox.setEnabled(True)
-            self._view.refreshButton.setEnabled(True)
+            self._view.auto_refresh_spin_box.setEnabled(True)
+            self._view.refresh_button.setEnabled(True)
 
     def refreshTableView(self) -> None:
         # TODO only reset if changed
@@ -66,12 +66,12 @@ class WorkflowStatusController(Observer):
     def _sync_model_to_view(self) -> None:
         refreshIntervalLimitsInSeconds = self._presenter.getRefreshIntervalLimitsInSeconds()
 
-        self._view.autoRefreshSpinBox.blockSignals(True)
-        self._view.autoRefreshSpinBox.setRange(
+        self._view.auto_refresh_spin_box.blockSignals(True)
+        self._view.auto_refresh_spin_box.setRange(
             refreshIntervalLimitsInSeconds.lower, refreshIntervalLimitsInSeconds.upper
         )
-        self._view.autoRefreshSpinBox.setValue(self._presenter.getRefreshIntervalInSeconds())
-        self._view.autoRefreshSpinBox.blockSignals(False)
+        self._view.auto_refresh_spin_box.setValue(self._presenter.getRefreshIntervalInSeconds())
+        self._view.auto_refresh_spin_box.blockSignals(False)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._presenter:

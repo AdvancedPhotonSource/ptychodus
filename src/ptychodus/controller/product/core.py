@@ -179,11 +179,11 @@ class ProductController(ProductRepositoryObserver):
         view: ProductView,
         file_dialog_factory: FileDialogFactory,
     ) -> ProductController:
-        open_file_action = view.button_box.insertMenu.addAction('Open File...')
-        create_new_action = view.button_box.insertMenu.addAction('Create New')
-        duplicate_action = view.button_box.insertMenu.addAction('Duplicate')
-        save_file_action = view.button_box.saveMenu.addAction('Save File...')
-        sync_to_settings_action = view.button_box.saveMenu.addAction('Sync To Settings')
+        open_file_action = view.button_box.insert_menu.addAction('Open File...')
+        create_new_action = view.button_box.insert_menu.addAction('Create New')
+        duplicate_action = view.button_box.insert_menu.addAction('Duplicate')
+        save_file_action = view.button_box.save_menu.addAction('Save File...')
+        sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
 
         table_model = ProductRepositoryTableModel(repository)
         table_proxy_model = QSortFilterProxyModel()
@@ -295,7 +295,7 @@ class ProductController(ProductRepositoryObserver):
 
         if current.isValid():
             product = self._repository[current.row()]
-            ProductEditorViewController.editProduct(self._dataset, product, self._view)
+            ProductEditorViewController.edit_product(self._dataset, product, self._view)
         else:
             logger.error('No current item!')
 

@@ -74,10 +74,10 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
             lambda logical_index: controller._redraw_plot()
         )
 
-        load_from_file_action = view.button_box.loadMenu.addAction('Open File...')
+        load_from_file_action = view.button_box.load_menu.addAction('Open File...')
         load_from_file_action.triggered.connect(controller._load_current_scan_from_file)
 
-        copy_action = view.button_box.loadMenu.addAction('Copy...')
+        copy_action = view.button_box.load_menu.addAction('Copy...')
         copy_action.triggered.connect(controller._copy_to_current_scan)
 
         save_to_file_action = view.button_box.save_menu.addAction('Save File...')
@@ -204,7 +204,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         if len(self._plot_view.axes.lines) > 0:
             self._plot_view.axes.legend(loc='best')
 
-        self._plot_view.figureCanvas.draw()
+        self._plot_view.figure_canvas.draw()
 
     def _estimate_transform(self) -> None:  # FIXME
         item_index = self._get_current_item_index()

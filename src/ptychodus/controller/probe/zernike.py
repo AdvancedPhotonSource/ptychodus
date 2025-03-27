@@ -29,7 +29,7 @@ class ZernikeTableModel(QAbstractTableModel):
 
         return value
 
-    def headerData(
+    def headerData(  # noqa: N802
         self,
         section: int,
         orientation: Qt.Orientation,
@@ -59,7 +59,7 @@ class ZernikeTableModel(QAbstractTableModel):
             elif index.column() == 3:
                 return f'{numpy.angle(coef):.6g}'
 
-    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
+    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
         if not index.isValid():
             return False
 
@@ -76,11 +76,11 @@ class ZernikeTableModel(QAbstractTableModel):
                     return False
 
                 try:
-                    complexValue = amplitude * coef / numpy.absolute(coef)
+                    complex_value = amplitude * coef / numpy.absolute(coef)
                 except ZeroDivisionError:
-                    complexValue = amplitude + 0j
+                    complex_value = amplitude + 0j
 
-                self._builder.set_coefficient(index.row(), complexValue)
+                self._builder.set_coefficient(index.row(), complex_value)
                 return True
             elif index.column() == 3:
                 try:
@@ -93,14 +93,14 @@ class ZernikeTableModel(QAbstractTableModel):
                 except IndexError:
                     return False
 
-                complexValue = numpy.absolute(coef) * numpy.exp(2j * numpy.pi * phase)
-                self._builder.set_coefficient(index.row(), complexValue)
+                complex_value = numpy.absolute(coef) * numpy.exp(2j * numpy.pi * phase)
+                self._builder.set_coefficient(index.row(), complex_value)
                 return True
 
         return False
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._builder)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._header)

@@ -21,14 +21,14 @@ class RepositoryButtonBox(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.load_button = QPushButton('Load')
-        self.loadMenu = QMenu()
+        self.load_menu = QMenu()
         self.save_button = QPushButton('Save')
         self.save_menu = QMenu()
         self.edit_button = QPushButton('Edit')
         self.analyze_button = QPushButton('Analyze')
         self.analyze_menu = QMenu()
 
-        self.load_button.setMenu(self.loadMenu)
+        self.load_button.setMenu(self.load_menu)
         self.save_button.setMenu(self.save_menu)
         self.analyze_button.setMenu(self.analyze_menu)
 
@@ -46,20 +46,20 @@ class RepositoryItemCopierDialog(QDialog):
         super().__init__(parent)
         self.source_combo_box = QComboBox()
         self.destination_combo_box = QComboBox()
-        self.buttonBox = QDialogButtonBox()
+        self.button_box = QDialogButtonBox()
 
-        self.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
-        self.buttonBox.addButton(QDialogButtonBox.StandardButton.Cancel)
-        self.buttonBox.clicked.connect(self._handleButtonBoxClicked)
+        self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
+        self.button_box.addButton(QDialogButtonBox.StandardButton.Cancel)
+        self.button_box.clicked.connect(self._handle_button_box_clicked)
 
         layout = QFormLayout()
         layout.addRow('From:', self.source_combo_box)
         layout.addRow('To:', self.destination_combo_box)
-        layout.addRow(self.buttonBox)
+        layout.addRow(self.button_box)
         self.setLayout(layout)
 
-    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
+    def _handle_button_box_clicked(self, button: QAbstractButton) -> None:
+        if self.button_box.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
             self.accept()
         else:
             self.reject()
@@ -81,13 +81,13 @@ class RepositoryTableView(QWidget):
 class RepositoryTreeView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.treeView = QTreeView()
-        self.buttonBox = RepositoryButtonBox()
-        self.copierDialog = RepositoryItemCopierDialog()
+        self.tree_view = QTreeView()
+        self.button_box = RepositoryButtonBox()
+        self.copier_dialog = RepositoryItemCopierDialog()
 
-        self.treeView.header().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.tree_view.header().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout = QVBoxLayout()
-        layout.addWidget(self.treeView)
-        layout.addWidget(self.buttonBox)
+        layout.addWidget(self.tree_view)
+        layout.addWidget(self.button_box)
         self.setLayout(layout)

@@ -69,8 +69,8 @@ class SettingsController(Observer):
 
         settings_registry.add_observer(self)
 
-        view.listView.setModel(self._list_model)
-        view.listView.selectionModel().currentChanged.connect(self._update_view)
+        view.list_view.setModel(self._list_model)
+        view.list_view.selectionModel().currentChanged.connect(self._update_view)
 
         self._table_view.setModel(self._table_model)
 
@@ -119,7 +119,7 @@ class SettingsController(Observer):
     def _sync_model_to_view(self) -> None:
         self._list_model.setStringList(sorted(iter(self._settings_registry)))
 
-        current = self._view.listView.currentIndex()
+        current = self._view.list_view.currentIndex()
         self._update_view(current, QModelIndex())
 
     def _update(self, observable: Observable) -> None:

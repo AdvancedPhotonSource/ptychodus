@@ -190,12 +190,12 @@ class FluorescenceVSPIParametersView(QWidget):
 class FluorescenceTwoStepParametersView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.upscalingStrategyComboBox = QComboBox()
+        self.upscaling_strategy_combo_box = QComboBox()
         self.deconvolution_strategy_combo_box = QComboBox()
 
         layout = QFormLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addRow('Upscaling Strategy:', self.upscalingStrategyComboBox)
+        layout.addRow('Upscaling Strategy:', self.upscaling_strategy_combo_box)
         layout.addRow('Deconvolution Strategy:', self.deconvolution_strategy_combo_box)
         self.setLayout(layout)
 

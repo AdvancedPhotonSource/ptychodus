@@ -445,7 +445,8 @@ class MDAFile:
 
 
 class MDAPositionFileReader(PositionFileReader):
-    MICRONS_TO_METERS: Final[float] = 1.0e-6
+    def __init__(self, scale_to_meters: float) -> None:
+        self._scale_to_meters = scale_to_meters
 
     def read(self, file_path: Path) -> PositionSequence:
         point_list: list[ScanPoint] = list()
@@ -461,8 +462,8 @@ class MDAPositionFileReader(PositionFileReader):
             for x in xarray:
                 point = ScanPoint(
                     index=len(point_list),
-                    position_x_m=float(x) * self.MICRONS_TO_METERS,
-                    position_y_m=float(y) * self.MICRONS_TO_METERS,
+                    position_x_m=float(x) * self._scale_to_meters,
+                    position_y_m=float(y) * self._scale_to_meters,
                 )
                 point_list.append(point)
 
@@ -493,18 +494,23 @@ class HXNPositionFileReader(PositionFileReader):
 
 def register_plugins(registry: PluginRegistry) -> None:
     registry.position_file_readers.register_plugin(
-        MDAPositionFileReader(),
+        MDAPositionFileReader(scale_to_meters=1.0e-6),
         simple_name='MDA',
         display_name='EPICS MDA Files (*.mda)',
     )
     registry.position_file_readers.register_plugin(
-        MDAPositionFileReader(),
-        simple_name='APS_2ID',
-        display_name='APS 2-ID MDA Files (*.mda)',
+        MDAPositionFileReader(scale_to_meters=1.0e-3),
+        simple_name='APS_2IDD',
+        display_name='APS 2-ID-D MDA Files (*.mda)',
+    )
+    registry.position_file_readers.register_plugin(
+        MDAPositionFileReader(scale_to_meters=1.0e-3),
+        simple_name='APS_2IDE',
+        display_name='APS 2-ID-E MDA Files (*.mda)',
     )
     registry.position_file_readers.register_plugin(
         HXNPositionFileReader(),
-        simple_name='APS_HXN',
+        simple_name='CNM_APS_HXN',
         display_name='CNM/APS HXN MDA Files (*.mda)',
     )
 

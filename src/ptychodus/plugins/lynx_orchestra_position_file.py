@@ -10,7 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 class LYNXOrchestraPositionFileReader(PositionFileReader):
-    SIMPLE_NAME: Final[str] = 'LYNXOrchestra'
+    SIMPLE_NAME: Final[str] = 'APS_LYNX_Orchestra'
+    DISPLAY_NAME: Final[str] = 'APS LYNX SoftGlueZynq Files (*.dat)'
     MICRONS_TO_METERS: Final[float] = 1.0e-6
     DATA_POINT_COLUMN: Final[int] = 0
     X_COLUMN: Final[int] = 3
@@ -84,5 +85,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.position_file_readers.register_plugin(
         LYNXOrchestraPositionFileReader(),
         simple_name=LYNXOrchestraPositionFileReader.SIMPLE_NAME,
-        display_name='LYNX Orchestra Files (*.dat)',
+        display_name=LYNXOrchestraPositionFileReader.DISPLAY_NAME,
     )

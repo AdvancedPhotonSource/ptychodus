@@ -21,30 +21,30 @@ class WorkflowInputDataController(Observer):
         controller = cls(presenter, view)
         presenter.add_observer(controller)
 
-        view.endpointIDLineEdit.editingFinished.connect(controller._syncEndpointIDToModel)
-        view.globusPathLineEdit.editingFinished.connect(controller._syncGlobusPathToModel)
-        view.posixPathLineEdit.editingFinished.connect(controller._syncPosixPathToModel)
+        view.endpoint_id_line_edit.editingFinished.connect(controller._syncEndpointIDToModel)
+        view.globus_path_line_edit.editingFinished.connect(controller._syncGlobusPathToModel)
+        view.posix_path_line_edit.editingFinished.connect(controller._syncPosixPathToModel)
 
         controller._sync_model_to_view()
 
         return controller
 
     def _syncEndpointIDToModel(self) -> None:
-        endpointID = UUID(self._view.endpointIDLineEdit.text())
+        endpointID = UUID(self._view.endpoint_id_line_edit.text())
         self._presenter.setInputDataEndpointID(endpointID)
 
     def _syncGlobusPathToModel(self) -> None:
-        dataPath = self._view.globusPathLineEdit.text()
+        dataPath = self._view.globus_path_line_edit.text()
         self._presenter.setInputDataGlobusPath(dataPath)
 
     def _syncPosixPathToModel(self) -> None:
-        dataPath = Path(self._view.posixPathLineEdit.text()).expanduser()
+        dataPath = Path(self._view.posix_path_line_edit.text()).expanduser()
         self._presenter.setInputDataPosixPath(dataPath)
 
     def _sync_model_to_view(self) -> None:
-        self._view.endpointIDLineEdit.setText(str(self._presenter.getInputDataEndpointID()))
-        self._view.globusPathLineEdit.setText(str(self._presenter.getInputDataGlobusPath()))
-        self._view.posixPathLineEdit.setText(str(self._presenter.getInputDataPosixPath()))
+        self._view.endpoint_id_line_edit.setText(str(self._presenter.getInputDataEndpointID()))
+        self._view.globus_path_line_edit.setText(str(self._presenter.getInputDataGlobusPath()))
+        self._view.posix_path_line_edit.setText(str(self._presenter.getInputDataPosixPath()))
 
     def _update(self, observable: Observable) -> None:
         if observable is self._presenter:

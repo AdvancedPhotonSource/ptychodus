@@ -25,14 +25,14 @@ class WorkflowAuthorizationController:
         controller = cls(presenter, dialog)
 
         dialog.finished.connect(controller._finishAuthorization)
-        dialog.lineEdit.textChanged.connect(controller._setDialogButtonsEnabled)
+        dialog.line_edit.textChanged.connect(controller._setDialogButtonsEnabled)
         controller._setDialogButtonsEnabled()
 
         return controller
 
     def _setDialogButtonsEnabled(self) -> None:
-        text = self._dialog.lineEdit.text()
-        self._dialog.okButton.setEnabled(len(text) > 0)
+        text = self._dialog.line_edit.text()
+        self._dialog.ok_button.setEnabled(len(text) > 0)
 
     def startAuthorizationIfNeeded(self) -> None:
         if not (self._presenter.isAuthorized or self._dialog.isVisible()):
@@ -43,12 +43,12 @@ class WorkflowAuthorizationController:
         text = f'Input the Globus authorization code from <a href="{authorizeURL}">this link</a>:'
 
         self._dialog.label.setText(text)
-        self._dialog.lineEdit.clear()
+        self._dialog.line_edit.clear()
         self._dialog.open()
 
     def _finishAuthorization(self, result: int) -> None:
         if result != QDialog.DialogCode.Accepted:
             return
 
-        authCode = self._dialog.lineEdit.text()
+        authCode = self._dialog.line_edit.text()
         self._presenter.setCodeFromAuthorizeURL(authCode)

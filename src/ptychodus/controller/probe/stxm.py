@@ -79,7 +79,7 @@ class STXMViewController(Observer):
         try:
             data = self._simulator.get_data()
         except ValueError:
-            self._visualization_widget_controller.clearArray()
+            self._visualization_widget_controller.clear_array()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.show_exception('Update Views', err)

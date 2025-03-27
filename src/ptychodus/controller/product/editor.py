@@ -32,7 +32,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
             'Fresnel Number',
         ]
 
-    def headerData(
+    def headerData(  # noqa: N802
         self,
         section: int,
         orientation: Qt.Orientation,
@@ -70,10 +70,10 @@ class ProductPropertyTableModel(QAbstractTableModel):
                             except ZeroDivisionError:
                                 return 'inf'
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._properties)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._header)
 
 
@@ -82,61 +82,61 @@ class ProductEditorViewController(Observer):
         self,
         dataset: AssembledDiffractionDataset,
         product: ProductRepositoryItem,
-        tableModel: ProductPropertyTableModel,
+        table_model: ProductPropertyTableModel,
         dialog: ProductEditorDialog,
     ) -> None:
         super().__init__()
         self._dataset = dataset
         self._product = product
-        self._tableModel = tableModel
+        self._table_model = table_model
         self._dialog = dialog
 
     @classmethod
-    def editProduct(
+    def edit_product(
         cls, dataset: AssembledDiffractionDataset, product: ProductRepositoryItem, parent: QWidget
     ) -> None:
-        tableModel = ProductPropertyTableModel(product)
-        tableProxyModel = QSortFilterProxyModel()
-        tableProxyModel.setSourceModel(tableModel)
+        table_model = ProductPropertyTableModel(product)
+        table_proxy_model = QSortFilterProxyModel()
+        table_proxy_model.setSourceModel(table_model)
 
         dialog = ProductEditorDialog(parent)
         dialog.setWindowTitle(f'Edit Product: {product.get_name()}')
-        dialog.tableView.setModel(tableProxyModel)
-        dialog.tableView.setSortingEnabled(True)
-        dialog.tableView.verticalHeader().hide()
-        dialog.tableView.resizeColumnsToContents()
-        dialog.tableView.resizeRowsToContents()
+        dialog.table_view.setModel(table_proxy_model)
+        dialog.table_view.setSortingEnabled(True)
+        dialog.table_view.verticalHeader().hide()
+        dialog.table_view.resizeColumnsToContents()
+        dialog.table_view.resizeRowsToContents()
 
-        viewController = cls(dataset, product, tableModel, dialog)
-        product.add_observer(viewController)
-        dialog.textEdit.textChanged.connect(viewController._sync_view_to_model)
+        view_controller = cls(dataset, product, table_model, dialog)
+        product.add_observer(view_controller)
+        dialog.text_edit.textChanged.connect(view_controller._sync_view_to_model)
 
-        viewController._sync_model_to_view()
+        view_controller._sync_model_to_view()
 
-        dialog.actionsView.estimateProbePhotonCountButton.clicked.connect(
-            viewController._estimateProbePhotonCount
+        dialog.actions_view.estimate_probe_photon_count_button.clicked.connect(
+            view_controller._estimate_probe_photon_count
         )
-        dialog.finished.connect(viewController._finish)
+        dialog.finished.connect(view_controller._finish)
         dialog.open()
         dialog.adjustSize()
 
     def _sync_view_to_model(self) -> None:
         metadata = self._product.get_metadata_item()
-        metadata.comments.set_value(self._dialog.textEdit.toPlainText())
+        metadata.comments.set_value(self._dialog.text_edit.toPlainText())
 
     def _sync_model_to_view(self) -> None:
-        self._tableModel.beginResetModel()
-        self._tableModel.endResetModel()
+        self._table_model.beginResetModel()
+        self._table_model.endResetModel()
 
         metadata = self._product.get_metadata_item()
-        self._dialog.textEdit.setPlainText(metadata.comments.get_value())
+        self._dialog.text_edit.setPlainText(metadata.comments.get_value())
 
-    def _estimateProbePhotonCount(self) -> None:
+    def _estimate_probe_photon_count(self) -> None:
         metadata = self._product.get_metadata_item()
         metadata.probe_photon_count.set_value(self._dataset.get_maximum_pattern_counts())
 
-        self._tableModel.beginResetModel()
-        self._tableModel.endResetModel()
+        self._table_model.beginResetModel()
+        self._table_model.endResetModel()
 
     def _finish(self, result: int) -> None:
         self._product.remove_observer(self)

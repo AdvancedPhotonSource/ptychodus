@@ -23,13 +23,13 @@ class WorkflowExecutionController:
         self._executionPresenter = executionPresenter
         self._view = view
         self._inputDataController = WorkflowInputDataController.create_instance(
-            parametersPresenter, view.inputDataView
+            parametersPresenter, view.input_data_view
         )
         self._computeController = WorkflowComputeController.create_instance(
-            parametersPresenter, view.computeView
+            parametersPresenter, view.compute_view
         )
         self._outputDataController = WorkflowOutputDataController.create_instance(
-            parametersPresenter, view.outputDataView
+            parametersPresenter, view.output_data_view
         )
 
     @classmethod
@@ -41,12 +41,12 @@ class WorkflowExecutionController:
         productItemModel: QAbstractItemModel,
     ) -> WorkflowExecutionController:
         controller = cls(parametersPresenter, executionPresenter, view)
-        view.productComboBox.setModel(productItemModel)
-        view.executeButton.clicked.connect(controller._execute)
+        view.product_combo_box.setModel(productItemModel)
+        view.execute_button.clicked.connect(controller._execute)
         return controller
 
     def _execute(self) -> None:
-        inputProductIndex = self._view.productComboBox.currentIndex()
+        inputProductIndex = self._view.product_combo_box.currentIndex()
 
         if inputProductIndex < 0:
             logger.debug('No current index!')

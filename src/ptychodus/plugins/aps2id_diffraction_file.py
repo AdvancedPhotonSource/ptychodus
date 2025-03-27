@@ -74,6 +74,11 @@ class APS2IDDiffractionFileReader(DiffractionFileReader):
 def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         APS2IDDiffractionFileReader(),
-        simple_name='APS_2ID',
-        display_name='APS 2-ID Files (*.h5 *.hdf5)',
+        simple_name='APS_2IDD',
+        display_name='APS 2-ID-D Files (*.h5 *.hdf5)',
+    )
+    registry.diffraction_file_readers.register_plugin(
+        APS2IDDiffractionFileReader(),
+        simple_name='APS_2IDE',
+        display_name='APS 2-ID-E Files (*.h5 *.hdf5)',
     )

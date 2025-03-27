@@ -33,39 +33,41 @@ class ImageToolsController:
     def __init__(
         self,
         view: ImageToolsGroupBox,
-        visualizationController: VisualizationController,
-        mouseToolButtonGroup: QButtonGroup,
+        visualization_controller: VisualizationController,
+        mouse_tool_button_group: QButtonGroup,
     ) -> None:
         self._view = view
-        self._visualizationController = visualizationController
-        self._mouseToolButtonGroup = mouseToolButtonGroup
+        self._visualization_controller = visualization_controller
+        self._mouse_tool_button_group = mouse_tool_button_group
 
     @classmethod
     def create_instance(
-        cls, view: ImageToolsGroupBox, visualizationController: VisualizationController
+        cls, view: ImageToolsGroupBox, visualization_controller: VisualizationController
     ) -> ImageToolsController:
-        view.moveButton.setCheckable(True)
-        view.moveButton.setChecked(True)
-        view.rulerButton.setCheckable(True)
-        view.rectangleButton.setCheckable(True)
-        view.lineCutButton.setCheckable(True)
+        view.move_button.setCheckable(True)
+        view.move_button.setChecked(True)
+        view.ruler_button.setCheckable(True)
+        view.rectangle_button.setCheckable(True)
+        view.line_cut_button.setCheckable(True)
 
-        mouseToolButtonGroup = QButtonGroup()
-        mouseToolButtonGroup.addButton(view.moveButton, ImageMouseTool.MOVE_TOOL.value)
-        mouseToolButtonGroup.addButton(view.rulerButton, ImageMouseTool.RULER_TOOL.value)
-        mouseToolButtonGroup.addButton(view.rectangleButton, ImageMouseTool.RECTANGLE_TOOL.value)
-        mouseToolButtonGroup.addButton(view.lineCutButton, ImageMouseTool.LINE_CUT_TOOL.value)
+        mouse_tool_button_group = QButtonGroup()
+        mouse_tool_button_group.addButton(view.move_button, ImageMouseTool.MOVE_TOOL.value)
+        mouse_tool_button_group.addButton(view.ruler_button, ImageMouseTool.RULER_TOOL.value)
+        mouse_tool_button_group.addButton(
+            view.rectangle_button, ImageMouseTool.RECTANGLE_TOOL.value
+        )
+        mouse_tool_button_group.addButton(view.line_cut_button, ImageMouseTool.LINE_CUT_TOOL.value)
 
-        controller = cls(view, visualizationController, mouseToolButtonGroup)
-        view.homeButton.clicked.connect(visualizationController.zoomToFit)
-        view.saveButton.clicked.connect(visualizationController.saveImage)
-        mouseToolButtonGroup.idToggled.connect(controller._setMouseTool)
+        controller = cls(view, visualization_controller, mouse_tool_button_group)
+        view.home_button.clicked.connect(visualization_controller.zoom_to_fit)
+        view.save_button.clicked.connect(visualization_controller.save_image)
+        mouse_tool_button_group.idToggled.connect(controller._set_mouse_tool)
         return controller
 
-    def _setMouseTool(self, toolId: int, checked: bool) -> None:
+    def _set_mouse_tool(self, tool_id: int, checked: bool) -> None:
         if checked:
-            mouseTool = ImageMouseTool(toolId)
-            self._visualizationController.setMouseTool(mouseTool)
+            mouse_tool = ImageMouseTool(tool_id)
+            self._visualization_controller.set_mouse_tool(mouse_tool)
 
 
 class ImageRendererController(Observer):
@@ -73,9 +75,9 @@ class ImageRendererController(Observer):
         super().__init__()
         self._engine = engine
         self._view = view
-        self._rendererModel = QStringListModel()
-        self._transformationModel = QStringListModel()
-        self._variantModel = QStringListModel()
+        self._renderer_model = QStringListModel()
+        self._transformation_model = QStringListModel()
+        self._variant_model = QStringListModel()
 
     @classmethod
     def create_instance(
@@ -83,34 +85,34 @@ class ImageRendererController(Observer):
     ) -> ImageRendererController:
         controller = cls(engine, view)
 
-        view.rendererComboBox.setModel(controller._rendererModel)
-        view.transformationComboBox.setModel(controller._transformationModel)
-        view.variantComboBox.setModel(controller._variantModel)
+        view.renderer_combo_box.setModel(controller._renderer_model)
+        view.transformation_combo_box.setModel(controller._transformation_model)
+        view.variant_combo_box.setModel(controller._variant_model)
 
         controller._sync_model_to_view()
         engine.add_observer(controller)
 
-        view.rendererComboBox.textActivated.connect(engine.set_renderer)
-        view.transformationComboBox.textActivated.connect(engine.set_transformation)
-        view.variantComboBox.textActivated.connect(engine.set_variant)
+        view.renderer_combo_box.textActivated.connect(engine.set_renderer)
+        view.transformation_combo_box.textActivated.connect(engine.set_transformation)
+        view.variant_combo_box.textActivated.connect(engine.set_variant)
 
         return controller
 
     def _sync_model_to_view(self) -> None:
-        self._view.rendererComboBox.blockSignals(True)
-        self._rendererModel.setStringList([name for name in self._engine.renderers()])
-        self._view.rendererComboBox.setCurrentText(self._engine.get_renderer())
-        self._view.rendererComboBox.blockSignals(False)
+        self._view.renderer_combo_box.blockSignals(True)
+        self._renderer_model.setStringList([name for name in self._engine.renderers()])
+        self._view.renderer_combo_box.setCurrentText(self._engine.get_renderer())
+        self._view.renderer_combo_box.blockSignals(False)
 
-        self._view.transformationComboBox.blockSignals(True)
-        self._transformationModel.setStringList([name for name in self._engine.transformations()])
-        self._view.transformationComboBox.setCurrentText(self._engine.get_transformation())
-        self._view.transformationComboBox.blockSignals(False)
+        self._view.transformation_combo_box.blockSignals(True)
+        self._transformation_model.setStringList([name for name in self._engine.transformations()])
+        self._view.transformation_combo_box.setCurrentText(self._engine.get_transformation())
+        self._view.transformation_combo_box.blockSignals(False)
 
-        self._view.variantComboBox.blockSignals(True)
-        self._variantModel.setStringList([name for name in self._engine.variants()])
-        self._view.variantComboBox.setCurrentText(self._engine.get_variant())
-        self._view.variantComboBox.blockSignals(False)
+        self._view.variant_combo_box.blockSignals(True)
+        self._variant_model.setStringList([name for name in self._engine.variants()])
+        self._view.variant_combo_box.setCurrentText(self._engine.get_variant())
+        self._view.variant_combo_box.blockSignals(False)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._engine:
@@ -122,86 +124,86 @@ class ImageDataRangeController(Observer):
         self,
         engine: VisualizationEngine,
         view: ImageDataRangeGroupBox,
-        imageWidget: ImageWidget,
-        displayRangeDialog: ImageDisplayRangeDialog,
-        visualizationController: VisualizationController,
+        image_widget: ImageWidget,
+        display_range_dialog: ImageDisplayRangeDialog,
+        visualization_controller: VisualizationController,
     ) -> None:
         self._engine = engine
         self._view = view
-        self._imageWidget = imageWidget
-        self._displayRangeDialog = displayRangeDialog
-        self._visualizationController = visualizationController
-        self._displayRangeIsLocked = True
+        self._image_widget = image_widget
+        self._display_range_dialog = display_range_dialog
+        self._visualization_controller = visualization_controller
+        self._display_range_is_locked = True
 
     @classmethod
     def create_instance(
         cls,
         engine: VisualizationEngine,
         view: ImageDataRangeGroupBox,
-        imageWidget: ImageWidget,
-        visualizationController: VisualizationController,
+        image_widget: ImageWidget,
+        visualization_controller: VisualizationController,
     ) -> ImageDataRangeController:
-        displayRangeDialog = ImageDisplayRangeDialog.create_instance(view)
-        controller = cls(engine, view, imageWidget, displayRangeDialog, visualizationController)
+        display_range_dialog = ImageDisplayRangeDialog.create_instance(view)
+        controller = cls(engine, view, image_widget, display_range_dialog, visualization_controller)
         controller._sync_model_to_view()
         engine.add_observer(controller)
 
-        view.minDisplayValueSlider.value_changed.connect(
+        view.min_display_value_slider.value_changed.connect(
             lambda value: engine.set_min_display_value(float(value))
         )
-        view.maxDisplayValueSlider.value_changed.connect(
+        view.max_display_value_slider.value_changed.connect(
             lambda value: engine.set_max_display_value(float(value))
         )
-        view.autoButton.clicked.connect(controller._autoDisplayRange)
-        view.editButton.clicked.connect(displayRangeDialog.open)
-        displayRangeDialog.finished.connect(controller._finishEditingDisplayRange)
+        view.auto_button.clicked.connect(controller._auto_display_range)
+        view.edit_button.clicked.connect(display_range_dialog.open)
+        display_range_dialog.finished.connect(controller._finish_editing_display_range)
 
-        view.colorLegendButton.setCheckable(True)
-        imageWidget.setColorLegendVisible(view.colorLegendButton.isChecked())
-        view.colorLegendButton.toggled.connect(imageWidget.setColorLegendVisible)
+        view.color_legend_button.setCheckable(True)
+        image_widget.set_color_legend_visible(view.color_legend_button.isChecked())
+        view.color_legend_button.toggled.connect(image_widget.set_color_legend_visible)
 
         return controller
 
-    def _autoDisplayRange(self) -> None:
-        self._displayRangeIsLocked = False
-        self._visualizationController.rerenderImage(autoscaleColorAxis=True)
-        self._displayRangeIsLocked = True
+    def _auto_display_range(self) -> None:
+        self._display_range_is_locked = False
+        self._visualization_controller.rerender_image(autoscale_color_axis=True)
+        self._display_range_is_locked = True
 
-    def _finishEditingDisplayRange(self, result: int) -> None:
+    def _finish_editing_display_range(self, result: int) -> None:
         if result == QDialog.DialogCode.Accepted:
-            lower = float(self._displayRangeDialog.minValueLineEdit.get_value())
-            upper = float(self._displayRangeDialog.maxValueLineEdit.get_value())
+            lower = float(self._display_range_dialog.min_value_line_edit.get_value())
+            upper = float(self._display_range_dialog.max_value_line_edit.get_value())
 
-            self._displayRangeIsLocked = False
+            self._display_range_is_locked = False
             self._engine.set_display_value_range(lower, upper)
-            self._displayRangeIsLocked = True
+            self._display_range_is_locked = True
 
-    def _syncColorLegendToView(self) -> None:
+    def _sync_color_legend_to_view(self) -> None:
         values = numpy.linspace(
             self._engine.get_min_display_value(), self._engine.get_max_display_value(), 1000
         )
-        self._imageWidget.setColorLegendColors(
+        self._image_widget.set_color_legend_colors(
             values,
             self._engine.colorize(values),
             self._engine.is_renderer_cyclic(),
         )
 
     def _sync_model_to_view(self) -> None:
-        minValue = Decimal(repr(self._engine.get_min_display_value()))
-        maxValue = Decimal(repr(self._engine.get_max_display_value()))
+        min_value = Decimal(repr(self._engine.get_min_display_value()))
+        max_value = Decimal(repr(self._engine.get_max_display_value()))
 
-        self._displayRangeDialog.minValueLineEdit.set_value(minValue)
-        self._displayRangeDialog.maxValueLineEdit.set_value(maxValue)
+        self._display_range_dialog.min_value_line_edit.set_value(min_value)
+        self._display_range_dialog.max_value_line_edit.set_value(max_value)
 
-        if self._displayRangeIsLocked:
-            self._view.minDisplayValueSlider.set_value(minValue)
-            self._view.maxDisplayValueSlider.set_value(maxValue)
+        if self._display_range_is_locked:
+            self._view.min_display_value_slider.set_value(min_value)
+            self._view.max_display_value_slider.set_value(max_value)
         else:
-            displayRangeLimits = Interval[Decimal](minValue, maxValue)
-            self._view.minDisplayValueSlider.set_value_and_range(minValue, displayRangeLimits)
-            self._view.maxDisplayValueSlider.set_value_and_range(maxValue, displayRangeLimits)
+            display_range_limits = Interval[Decimal](min_value, max_value)
+            self._view.min_display_value_slider.set_value_and_range(min_value, display_range_limits)
+            self._view.max_display_value_slider.set_value_and_range(max_value, display_range_limits)
 
-        self._syncColorLegendToView()
+        self._sync_color_legend_to_view()
 
     def _update(self, observable: Observable) -> None:
         if observable is self._engine:
@@ -220,10 +222,10 @@ class ImageController:
             engine, view.image_widget, status_bar, file_dialog_factory
         )
         self._tools_controller = ImageToolsController.create_instance(
-            view.image_ribbon.imageToolsGroupBox, self._visualization_controller
+            view.image_ribbon.image_tools_group_box, self._visualization_controller
         )
         self._renderer_controller = ImageRendererController.create_instance(
-            engine, view.image_ribbon.colormapGroupBox
+            engine, view.image_ribbon.colormap_group_box
         )
         self._data_range_controller = ImageDataRangeController.create_instance(
             engine,
@@ -233,7 +235,7 @@ class ImageController:
         )
 
     def set_array(self, array: NumberArrayType, pixel_geometry: PixelGeometry) -> None:
-        self._visualization_controller.setArray(array, pixel_geometry)
+        self._visualization_controller.set_array(array, pixel_geometry)
 
     def clear_array(self) -> None:
-        self._visualization_controller.clearArray()
+        self._visualization_controller.clear_array()

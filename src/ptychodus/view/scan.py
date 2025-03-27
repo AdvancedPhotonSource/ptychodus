@@ -11,8 +11,8 @@ class ScanPlotView(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.figure = Figure()
-        self.figureCanvas = FigureCanvasQTAgg(self.figure)
-        self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
+        self.figure_canvas = FigureCanvasQTAgg(self.figure)
+        self.navigation_toolbar = NavigationToolbar(self.figure_canvas, self)
         self.axes = self.figure.add_subplot(111)
 
     @classmethod
@@ -21,8 +21,8 @@ class ScanPlotView(QWidget):
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.navigationToolbar)
-        layout.addWidget(view.figureCanvas)
+        layout.addWidget(view.navigation_toolbar)
+        layout.addWidget(view.figure_canvas)
         view.setLayout(layout)
 
         return view

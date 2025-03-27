@@ -79,7 +79,7 @@ class IlluminationViewController(Observer):
         try:
             data = self._mapper.get_data()
         except ValueError:
-            self._visualization_widget_controller.clearArray()
+            self._visualization_widget_controller.clear_array()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.show_exception('Update Views', err)

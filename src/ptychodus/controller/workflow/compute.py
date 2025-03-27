@@ -21,38 +21,46 @@ class WorkflowComputeController(Observer):
         controller = cls(presenter, view)
         presenter.add_observer(controller)
 
-        view.computeEndpointIDLineEdit.editingFinished.connect(
+        view.compute_endpoint_id_line_edit.editingFinished.connect(
             controller._syncComputeEndpointIDToModel
         )
-        view.dataEndpointIDLineEdit.editingFinished.connect(controller._syncDataEndpointIDToModel)
-        view.dataGlobusPathLineEdit.editingFinished.connect(controller._syncGlobusPathToModel)
-        view.dataPosixPathLineEdit.editingFinished.connect(controller._syncPosixPathToModel)
+        view.data_endpoint_id_line_edit.editingFinished.connect(
+            controller._syncDataEndpointIDToModel
+        )
+        view.data_globus_path_line_edit.editingFinished.connect(controller._syncGlobusPathToModel)
+        view.data_posix_path_line_edit.editingFinished.connect(controller._syncPosixPathToModel)
 
         controller._sync_model_to_view()
 
         return controller
 
     def _syncComputeEndpointIDToModel(self) -> None:
-        endpointID = UUID(self._view.computeEndpointIDLineEdit.text())
+        endpointID = UUID(self._view.compute_endpoint_id_line_edit.text())
         self._presenter.setComputeEndpointID(endpointID)
 
     def _syncDataEndpointIDToModel(self) -> None:
-        endpointID = UUID(self._view.dataEndpointIDLineEdit.text())
+        endpointID = UUID(self._view.data_endpoint_id_line_edit.text())
         self._presenter.setComputeDataEndpointID(endpointID)
 
     def _syncGlobusPathToModel(self) -> None:
-        dataPath = self._view.dataGlobusPathLineEdit.text()
+        dataPath = self._view.data_globus_path_line_edit.text()
         self._presenter.setComputeDataGlobusPath(dataPath)
 
     def _syncPosixPathToModel(self) -> None:
-        dataPath = Path(self._view.dataPosixPathLineEdit.text())
+        dataPath = Path(self._view.data_posix_path_line_edit.text())
         self._presenter.setComputeDataPosixPath(dataPath)
 
     def _sync_model_to_view(self) -> None:
-        self._view.computeEndpointIDLineEdit.setText(str(self._presenter.getComputeEndpointID()))
-        self._view.dataEndpointIDLineEdit.setText(str(self._presenter.getComputeDataEndpointID()))
-        self._view.dataGlobusPathLineEdit.setText(str(self._presenter.getComputeDataGlobusPath()))
-        self._view.dataPosixPathLineEdit.setText(str(self._presenter.getComputeDataPosixPath()))
+        self._view.compute_endpoint_id_line_edit.setText(
+            str(self._presenter.getComputeEndpointID())
+        )
+        self._view.data_endpoint_id_line_edit.setText(
+            str(self._presenter.getComputeDataEndpointID())
+        )
+        self._view.data_globus_path_line_edit.setText(
+            str(self._presenter.getComputeDataGlobusPath())
+        )
+        self._view.data_posix_path_line_edit.setText(str(self._presenter.getComputeDataPosixPath()))
 
     def _update(self, observable: Observable) -> None:
         if observable is self._presenter:

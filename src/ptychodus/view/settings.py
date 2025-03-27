@@ -25,7 +25,7 @@ class SettingsButtonBox(QWidget):
 class SettingsView(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.listView = QListView()
+        self.list_view = QListView()
         self.button_box = SettingsButtonBox.create_instance()
 
     @classmethod
@@ -33,7 +33,7 @@ class SettingsView(QWidget):
         view = cls(parent)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.listView)
+        layout.addWidget(view.list_view)
         layout.addWidget(view.button_box)
         view.setLayout(layout)
 

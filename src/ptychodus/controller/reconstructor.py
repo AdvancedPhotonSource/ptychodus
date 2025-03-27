@@ -241,7 +241,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         ax.set_ylabel('Cost')
         ax.grid(True)
         ax.plot(item.get_costs(), '.-', label='Cost', linewidth=1.5)
-        self._plot_view.figureCanvas.draw()
+        self._plot_view.figure_canvas.draw()
 
     def _sync_model_to_view(self) -> None:
         self._view.parameters_view.algorithm_combo_box.setCurrentText(

@@ -62,7 +62,7 @@ class AutomationProcessingController(Observer):
         self._view.strategy_combo_box.setCurrentText(self._presenter.get_strategy())
         self._view.strategy_combo_box.blockSignals(False)
 
-        data_dir = self._presenter.getDataDirectory()
+        data_dir = self._presenter.get_data_directory()
 
         if data_dir:
             self._view.directory_line_edit.setText(str(data_dir))
@@ -89,9 +89,9 @@ class AutomationWatchdogController(Observer):
 
         presenter.add_observer(self)
 
-        view.delay_spin_box.valueChanged.connect(presenter.setWatchdogDelayInSeconds)
+        view.delay_spin_box.valueChanged.connect(presenter.set_watchdog_delay_s)
         view.use_polling_observer_check_box.toggled.connect(
-            presenter.setWatchdogPollingObserverEnabled
+            presenter.set_watchdog_polling_observer_enabled
         )
 
         self._sync_model_to_view()
@@ -152,9 +152,9 @@ class AutomationController(Observer):
         self._core = core
         self._presenter = presenter
         self._processing_controller = AutomationProcessingController(
-            presenter, view.processingView, file_dialog_factory
+            presenter, view.processing_view, file_dialog_factory
         )
-        self._watchdog_controller = AutomationWatchdogController(presenter, view.watchdogView)
+        self._watchdog_controller = AutomationWatchdogController(presenter, view.watchdog_view)
         self._processing_presenter = processing_presenter
         self._list_model = AutomationProcessingListModel(processing_presenter)
         self._view = view
@@ -175,30 +175,30 @@ class AutomationController(Observer):
 
         view.processing_list_view.setModel(controller._list_model)
 
-        view.load_button.clicked.connect(presenter.loadExistingDatasetsToRepository)
+        view.load_button.clicked.connect(presenter.load_existing_datasets_to_repository)
         view.watch_button.setCheckable(True)
-        view.watch_button.toggled.connect(presenter.setWatchdogEnabled)
+        view.watch_button.toggled.connect(presenter.set_watchdog_enabled)
         view.process_button.setCheckable(True)
-        view.process_button.toggled.connect(processing_presenter.setProcessingEnabled)
-        view.clear_button.clicked.connect(presenter.clearDatasetRepository)
+        view.process_button.toggled.connect(processing_presenter.set_processing_enabled)
+        view.clear_button.clicked.connect(presenter.clear_dataset_repository)
 
         controller._sync_model_to_view()
 
-        controller._execute_waiting_tasks_timer.timeout.connect(core.executeWaitingTasks)
+        controller._execute_waiting_tasks_timer.timeout.connect(core.execute_waiting_tasks)
         controller._execute_waiting_tasks_timer.start(60 * 1000)  # TODO customize (in milliseconds)
 
-        controller._automation_timer.timeout.connect(core.refreshDatasetRepository)
+        controller._automation_timer.timeout.connect(core.refresh_dataset_repository)
         controller._automation_timer.start(10 * 1000)  # TODO customize (in milliseconds)
 
         return controller
 
     def _sync_model_to_view(self) -> None:
-        self._view.process_button.setChecked(self._processing_presenter.isProcessingEnabled())
+        self._view.process_button.setChecked(self._processing_presenter.is_processing_enabled())
         self._list_model.beginResetModel()
         self._list_model.endResetModel()
 
-        self._view.watch_button.setChecked(self._presenter.isWatchdogEnabled())
-        self._view.process_button.setChecked(self._processing_presenter.isProcessingEnabled())
+        self._view.watch_button.setChecked(self._presenter.is_watchdog_enabled())
+        self._view.process_button.setChecked(self._processing_presenter.is_processing_enabled())
 
     def _update(self, observable: Observable) -> None:
         if observable is self._processing_presenter:
