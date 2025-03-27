@@ -46,8 +46,6 @@ class ProductRepositoryItemFactory:
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
         mass_attenuation_m2_kg: float | None = None,
-        mutable: bool = True,
-        like_index: int = -1,
     ) -> ProductRepositoryItem:
         metadata_item = MetadataRepositoryItem(
             self._settings,
@@ -60,30 +58,12 @@ class ProductRepositoryItemFactory:
             mass_attenuation_m2_kg=mass_attenuation_m2_kg,
         )
 
-        if mutable:
-            scan_item = self._scan_item_factory.create()
-        elif like_index >= 0:
-            like_item = self._repository[like_index]
-            scan_item = self._scan_item_factory.create(like_item.get_scan_item().get_scan())
-        else:
-            raise ValueError('FIXME1')  # FIXME
+        # FIXME probe photon count fallback to settings, then estimate from patterns
 
+        scan_item = self._scan_item_factory.create()
         geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
-
-        if mutable:
-            probe_item = self._probe_item_factory.create(geometry)
-            object_item = self._object_item_factory.create(geometry)
-        elif like_index >= 0:
-            like_item = self._repository[like_index]
-            probe_item = self._probe_item_factory.create(
-                geometry, like_item.get_probe_item().get_probe()
-            )
-            object_item = self._object_item_factory.create(
-                geometry, like_item.get_object_item().get_object()
-            )
-        else:
-            raise ValueError('FIXME2')  # FIXME
-
+        probe_item = self._probe_item_factory.create(geometry)
+        object_item = self._object_item_factory.create(geometry)
         validator = ProductValidator(self._dataset, scan_item, geometry, probe_item, object_item)
 
         return ProductRepositoryItem(
@@ -108,10 +88,12 @@ class ProductRepositoryItemFactory:
             exposure_time_s=product.metadata.exposure_time_s,
             mass_attenuation_m2_kg=product.metadata.mass_attenuation_m2_kg,
         )
+
         scan_item = self._scan_item_factory.create(product.positions)
         geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
         probe_item = self._probe_item_factory.create(geometry, product.probe)
         object_item = self._object_item_factory.create(geometry, product.object_)
+        validator = ProductValidator(self._dataset, scan_item, geometry, probe_item, object_item)
 
         return ProductRepositoryItem(
             parent=self._repository,
@@ -120,13 +102,13 @@ class ProductRepositoryItemFactory:
             geometry=geometry,
             probe_item=probe_item,
             object_item=object_item,
-            validator=ProductValidator(self._dataset, scan_item, geometry, probe_item, object_item),
+            validator=validator,
             costs=product.costs,
         )
 
     def create_from_settings(self) -> ProductRepositoryItem:
         # TODO add mechanism to sync product state to settings
-        # FIXME try to load from file, then fall back to load from components
+        # FIXME try to load from settings.file_path, then fall back to load from components
         metadata_item = MetadataRepositoryItem(self._settings)
         scan_item = self._scan_item_factory.create_from_settings()
         geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)

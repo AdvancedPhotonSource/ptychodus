@@ -25,12 +25,13 @@ class ScanRepositoryItemFactory:
         self._builder_factory = builder_factory
 
     def create(self, scan: PositionSequence | None = None) -> ScanRepositoryItem:
+        transform = ScanPointTransform(self._rng, self._settings)
+
         if scan is None:
             builder = self._builder_factory.create_default()
-            transform = ScanPointTransform(self._rng, self._settings)
         else:
             builder = FromMemoryScanBuilder(self._settings, scan)
-            transform = None
+            transform.set_identity()
 
         return ScanRepositoryItem(self._settings, builder, transform)
 
@@ -38,7 +39,7 @@ class ScanRepositoryItemFactory:
         try:
             builder = self._builder_factory.create_from_settings()
         except Exception as exc:
-            logger.error(''.join(exc.args))
+            logger.exception(''.join(exc.args))
             builder = self._builder_factory.create_default()
 
         transform = ScanPointTransform(self._rng, self._settings)

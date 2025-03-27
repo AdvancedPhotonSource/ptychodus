@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Final
 import logging
 
 import h5py
@@ -22,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 
 class ISNDiffractionFileReader(DiffractionFileReader):
+    ONE_MILLIMETER_M: Final[float] = 1.0e-3
+
     def __init__(self) -> None:
         self._tree_builder = H5DiffractionFileTreeBuilder()
 
@@ -39,6 +42,7 @@ class ISNDiffractionFileReader(DiffractionFileReader):
                     configs = h5_file['configs']
                     num_patterns_per_array = int(configs['num_images'][()])
                     num_patterns_total = 50 * num_patterns_per_array  # FIXME
+                    detector_distance_mm = float(configs['det_dist_mm'])
                     detector_width = int(configs['det_size_x'][()])
                     detector_height = int(configs['det_size_y'][()])
                     pixel_width_m = float(configs['pix_size_x'][()])
@@ -52,9 +56,9 @@ class ISNDiffractionFileReader(DiffractionFileReader):
                     num_patterns_per_array=num_patterns_per_array,
                     num_patterns_total=num_patterns_total,
                     pattern_dtype=numpy.dtype('u4'),
+                    detector_distance_m=self.ONE_MILLIMETER_M * detector_distance_mm,
                     detector_extent=ImageExtent(detector_width, detector_height),
                     detector_pixel_geometry=PixelGeometry(pixel_width_m, pixel_height_m),
-                    # FIXME detector_bit_depth=detector_bit_depth,
                     probe_energy_eV=probe_energy_eV,
                     file_path=file_path,
                 )
@@ -70,7 +74,7 @@ class ISNDiffractionFileReader(DiffractionFileReader):
 
                     if isinstance(h5_item, h5py.ExternalLink):
                         offset = len(array_list) * metadata.num_patterns_per_array
-                        data_path = '/entry/data/data'  # FIXME str(h5_item.path)
+                        data_path = '/entry/data/data'  # TODO str(h5_item.path)
                         array = H5DiffractionPatternArray(
                             label=name,
                             indexes=numpy.arange(num_patterns_per_array) + offset,

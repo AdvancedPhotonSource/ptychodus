@@ -3,22 +3,12 @@ from typing import overload
 import logging
 import sys
 
-from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.product import ProductMetadata
-
-from ..patterns import AssembledDiffractionDataset, PatternSizer
 from .item import ProductRepositoryItem, ProductRepositoryItemObserver, ProductRepositoryObserver
-from .metadata import UniqueNameFactory
-from .object import ObjectRepositoryItemFactory
-from .probe import ProbeRepositoryItemFactory
-from .scan import ScanRepositoryItemFactory
 
 logger = logging.getLogger(__name__)
 
 
-class ProductRepository(
-    Sequence[ProductRepositoryItem], UniqueNameFactory, ProductRepositoryItemObserver
-):
+class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemObserver):
     def __init__(self) -> None:
         super().__init__()
         self._item_list: list[ProductRepositoryItem] = []
@@ -49,16 +39,19 @@ class ProductRepository(
 
         return name
 
-    def _update_lut(self) -> None:  # FIXME
+    def _update_indexes(self) -> None:
         for index, item in enumerate(self._item_list):
-            metadata = item.get_metadata_item()
-            metadata._index = index
+            metadata_item = item.get_metadata_item()
+            metadata_item._index = index
 
     def insert_product(self, item: ProductRepositoryItem) -> int:
+        metadata_item = item.get_metadata_item()
+        metadata_item._set_name_factory(self)
+
         index = len(self._item_list)
         self._item_list.append(item)
 
-        self._update_lut()
+        self._update_indexes()
 
         for observer in self._observer_list:
             observer.handle_item_inserted(index, item)
@@ -72,7 +65,7 @@ class ProductRepository(
             logger.debug(f'Failed to remove product item {index}!')
             return
 
-        self._update_lut()
+        self._update_indexes()
 
         for observer in self._observer_list:
             observer.handle_item_removed(index, item)
@@ -96,6 +89,7 @@ class ProductRepository(
         index = metadata._index
 
         if index < 0:
+            print('metadata')  # FIXME
             logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
@@ -108,6 +102,7 @@ class ProductRepository(
         scan = item.get_scan_item()
 
         if index < 0:
+            print('scan')  # FIXME
             logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
@@ -120,6 +115,7 @@ class ProductRepository(
         probe = item.get_probe_item()
 
         if index < 0:
+            print('probe')  # FIXME
             logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
@@ -132,6 +128,7 @@ class ProductRepository(
         object_ = item.get_object_item()
 
         if index < 0:
+            print('object')  # FIXME
             logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
@@ -144,6 +141,7 @@ class ProductRepository(
         costs = item.get_costs()
 
         if index < 0:
+            print('costs')  # FIXME
             logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 

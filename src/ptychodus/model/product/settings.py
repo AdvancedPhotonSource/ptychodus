@@ -12,8 +12,7 @@ class ProductSettings(Observable, Observer):
 
         self.name = self._settings_group.create_string_parameter('Name', 'Unnamed')
         self.file_path = self._settings_group.create_path_parameter(
-            'FilePath',
-            Path('/path/to/product.h5'),  # FIXME use
+            'FilePath', Path('/path/to/product.h5')
         )
         self.file_type = self._settings_group.create_string_parameter('FileType', 'HDF5')
         self.detector_distance_m = self._settings_group.create_real_parameter(
@@ -29,9 +28,7 @@ class ProductSettings(Observable, Observer):
             'ExposureTimeInSeconds', 0.0, minimum=0.0
         )
         self.mass_attenuation_m2_kg = self._settings_group.create_real_parameter(
-            'MassAttenuationSquareMetersPerKilogram',
-            0.0,
-            minimum=0.0,  # FIXME to view
+            'MassAttenuationSquareMetersPerKilogram', 0.0, minimum=0.0
         )
 
     def _update(self, observable: Observable) -> None:

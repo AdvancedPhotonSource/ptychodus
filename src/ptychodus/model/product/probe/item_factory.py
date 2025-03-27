@@ -27,12 +27,13 @@ class ProbeRepositoryItemFactory:
     def create(
         self, geometry_provider: ProbeGeometryProvider, probe: Probe | None = None
     ) -> ProbeRepositoryItem:
+        multimodal_builder = MultimodalProbeBuilder(self._rng, self._settings)
+
         if probe is None:
             builder = self._builder_factory.create_default()
-            multimodal_builder = MultimodalProbeBuilder(self._rng, self._settings)
         else:
             builder = FromMemoryProbeBuilder(self._settings, probe)
-            multimodal_builder = None
+            multimodal_builder.set_identity()
 
         return ProbeRepositoryItem(geometry_provider, self._settings, builder, multimodal_builder)
 

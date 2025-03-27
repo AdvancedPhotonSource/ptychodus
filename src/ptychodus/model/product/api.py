@@ -4,7 +4,7 @@ from typing import Any
 import logging
 
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.product import ProductFileReader, ProductFileWriter
+from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter
 
 from .item import ProductRepositoryItem
 from .item_factory import ProductRepositoryItemFactory
@@ -396,8 +396,6 @@ class ProductAPI:
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
         mass_attenuation_m2_kg: float | None = None,
-        mutable: bool = True,
-        like_index: int = -1,
     ) -> int:
         item = self._item_factory.create_from_values(
             name=name,
@@ -407,9 +405,11 @@ class ProductAPI:
             probe_photon_count=probe_photon_count,
             exposure_time_s=exposure_time_s,
             mass_attenuation_m2_kg=mass_attenuation_m2_kg,
-            mutable=mutable,
-            like_index=like_index,
         )
+        return self._repository.insert_product(item)
+
+    def insert_product(self, product: Product) -> int:
+        item = self._item_factory.create_from_product(product)
         return self._repository.insert_product(item)
 
     def insert_product_from_settings(self) -> int:

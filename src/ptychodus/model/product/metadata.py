@@ -32,6 +32,7 @@ class MetadataRepositoryItem(ParameterGroup):
         self._settings = settings
         self._name_factory: UniqueNameFactory | None = None
 
+        # FIXME extract as UniqueStringParameter to eliminate "Failed to look up" errors
         self._name = settings.name.copy()
 
         if name is not None:

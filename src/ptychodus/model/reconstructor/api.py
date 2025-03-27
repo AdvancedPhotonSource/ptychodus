@@ -47,11 +47,8 @@ class ReconstructorAPI:
         parameters = self._data_matcher.match_diffraction_patterns_with_positions(
             input_product_index, index_filter
         )
-        output_product_index = self._product_api.insert_new_product(
-            like_index=input_product_index, mutable=False
-        )
+        output_product_index = self._product_api.insert_product(parameters.product)
         output_product = self._product_api.get_item(output_product_index)
-
         output_product_name = (
             self._data_matcher.get_product_name(input_product_index)
             + f'_{self._reconstructor_chooser.get_current_plugin().simple_name}'

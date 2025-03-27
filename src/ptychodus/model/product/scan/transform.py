@@ -79,6 +79,9 @@ class ScanPointTransform(ParameterGroup):
             self.affine_ay.set_value(0)
             self.affine_bx.set_value(0)
 
+    def set_identity(self) -> None:
+        self.apply_presets(0)
+
     def __call__(self, point: ScanPoint) -> ScanPoint:
         ax = self.affine_ax.get_value()
         ay = self.affine_ay.get_value()

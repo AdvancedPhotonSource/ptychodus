@@ -7,10 +7,7 @@ from .probe import ProbeRepositoryItem
 from .scan import ScanRepositoryItem
 
 
-# FIXME call validator
-
-
-class ProductValidator(Observable, Observer):
+class ProductValidator(Observable, Observer):  # FIXME display
     def __init__(
         self,
         dataset: AssembledDiffractionDataset,

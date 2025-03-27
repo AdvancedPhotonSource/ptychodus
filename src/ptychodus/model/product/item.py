@@ -8,7 +8,7 @@ from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.product import Product
 
 from .geometry import ProductGeometry
-from .metadata import MetadataRepositoryItem
+from .metadata import MetadataRepositoryItem, UniqueNameFactory
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
 from .scan import ScanRepositoryItem
@@ -17,7 +17,7 @@ from .validator import ProductValidator
 logger = logging.getLogger(__name__)
 
 
-class ProductRepositoryItemObserver(ABC):
+class ProductRepositoryItemObserver(UniqueNameFactory):
     @abstractmethod
     def handle_metadata_changed(self, item: ProductRepositoryItem) -> None:
         pass

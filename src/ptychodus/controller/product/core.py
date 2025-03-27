@@ -40,7 +40,6 @@ class ProductRepositoryTableModel(QAbstractTableModel):
             'Detector-Object\nDistance [m]',
             'Probe Energy\n[keV]',
             'Probe Photon\nCount',
-            'Exposure\nTime [s]',
             'Pixel Width\n[nm]',
             'Pixel Height\n[nm]',
             'Size\n[MB]',
@@ -49,7 +48,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
 
-        if index.isValid() and index.column() < 5:
+        if index.isValid() and index.column() < 4:
             value |= Qt.ItemFlag.ItemIsEditable
 
         return value
@@ -71,27 +70,26 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 logger.exception(err)
                 return None
 
-            metadata = item.get_metadata_item()
+            metadata_item = item.get_metadata_item()
             geometry = item.get_geometry()
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
-                if index.column() == 0:
-                    return metadata.get_name()
-                elif index.column() == 1:
-                    return f'{metadata.detector_distance_m.get_value():.4g}'
-                elif index.column() == 2:
-                    return f'{metadata.probe_energy_eV.get_value() / 1e3:.4g}'
-                elif index.column() == 3:
-                    return f'{metadata.probe_photon_count.get_value():.4g}'
-                elif index.column() == 4:
-                    return f'{metadata.exposure_time_s.get_value():.4g}'
-                elif index.column() == 5:
-                    return f'{geometry.object_plane_pixel_width_m * 1e9:.4g}'
-                elif index.column() == 6:
-                    return f'{geometry.object_plane_pixel_height_m * 1e9:.4g}'
-                elif index.column() == 7:
-                    product = item.get_product()
-                    return f'{product.nbytes / (1024 * 1024):.2f}'
+                match index.column():
+                    case 0:
+                        return metadata_item.get_name()
+                    case 1:
+                        return f'{metadata_item.detector_distance_m.get_value():.4g}'
+                    case 2:
+                        return f'{metadata_item.probe_energy_eV.get_value() / 1e3:.4g}'
+                    case 3:
+                        return f'{metadata_item.probe_photon_count.get_value():.4g}'
+                    case 4:
+                        return f'{geometry.object_plane_pixel_width_m * 1e9:.4g}'
+                    case 5:
+                        return f'{geometry.object_plane_pixel_height_m * 1e9:.4g}'
+                    case 6:
+                        product = item.get_product()
+                        return f'{product.nbytes / (1024 * 1024):.2f}'
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
@@ -129,14 +127,6 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                     return False
 
                 metadata_item.probe_photon_count.set_value(photon_count)
-                return True
-            elif index.column() == 4:
-                try:
-                    exposure_time_s = float(value)
-                except ValueError:
-                    return False
-
-                metadata_item.exposure_time_s.set_value(exposure_time_s)
                 return True
 
         return False
@@ -286,7 +276,8 @@ class ProductController(ProductRepositoryObserver):
         current = self._table_proxy_model.mapToSource(self._view.table_view.currentIndex())
 
         if current.isValid():
-            self._api.insert_new_product(like_index=current.row())
+            like_item = self._repository[current.row()]
+            self._api.insert_product(like_item.get_product())
         else:
             logger.error('No current item!')
 

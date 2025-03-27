@@ -21,7 +21,7 @@ class ScanRepositoryItem(ParameterGroup):
         self,
         settings: ScanSettings,
         builder: ScanBuilder,
-        transform: ScanPointTransform | None,
+        transform: ScanPointTransform,
     ) -> None:
         super().__init__()
         self._settings = settings
@@ -33,9 +33,7 @@ class ScanRepositoryItem(ParameterGroup):
         self._length_m = 0.0
 
         self._add_group('builder', builder, observe=True)
-
-        if transform is not None:
-            self._add_group('transform', transform, observe=True)
+        self._add_group('transform', transform, observe=True)
 
         self.expand_bbox = settings.expand_bbox.copy()
         self._add_parameter('expand_bbox', self.expand_bbox)
@@ -57,17 +55,14 @@ class ScanRepositoryItem(ParameterGroup):
     def assign_item(self, item: ScanRepositoryItem) -> None:
         group = 'transform'
 
-        if self._transform is not None:
-            self._remove_group(group)
-            self._transform.remove_observer(self)
-            self._transform = None
+        self._remove_group(group)
+        self._transform.remove_observer(self)
 
         transform = item.get_transform()
 
-        if transform is not None:
-            self._transform = transform.copy()
-            self._transform.add_observer(self)
-            self._add_group(group, self._transform, observe=True)
+        self._transform = transform.copy()
+        self._transform.add_observer(self)
+        self._add_group(group, self._transform, observe=True)
 
         self.set_builder(item.get_builder().copy())
         self._rebuild()
@@ -81,9 +76,7 @@ class ScanRepositoryItem(ParameterGroup):
             parameter.sync_value_to_parent()
 
         self._builder.sync_to_settings()
-
-        if self._transform is not None:
-            self._transform.sync_to_settings()
+        self._transform.sync_to_settings()
 
     def get_scan(self) -> PositionSequence:
         return self._transformed_scan
@@ -123,11 +116,7 @@ class ScanRepositoryItem(ParameterGroup):
         length_m = 0.0
 
         for untransformed_point in self._untransformed_scan:
-            point = (
-                untransformed_point
-                if self._transform is None
-                else self._transform(untransformed_point)
-            )
+            point = self._transform(untransformed_point)
             transformed_points.append(point)
             bbox_builder.hull(point)
 
@@ -151,7 +140,7 @@ class ScanRepositoryItem(ParameterGroup):
         self._untransformed_scan = scan
         self._transform_scan()
 
-    def get_transform(self) -> ScanPointTransform | None:
+    def get_transform(self) -> ScanPointTransform:
         return self._transform
 
     def _update(self, observable: Observable) -> None:

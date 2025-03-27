@@ -17,9 +17,9 @@ from ...view.product import ProductEditorDialog
 
 
 class ProductPropertyTableModel(QAbstractTableModel):
-    def __init__(self, product: ProductRepositoryItem, parent: QObject | None = None) -> None:
+    def __init__(self, product_item: ProductRepositoryItem, parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._product = product
+        self._product_item = product_item
         self._header = ['Property', 'Value']
         self._properties = [
             'Probe Wavelength [nm]',
@@ -30,7 +30,17 @@ class ProductPropertyTableModel(QAbstractTableModel):
             'Object Plane Pixel Width [nm]',
             'Object Plane Pixel Height [nm]',
             'Fresnel Number',
+            'Exposure Time [s]',
+            'Mass Attenuation [m\u00b2/kg]',
         ]
+
+    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+        value = super().flags(index)
+
+        if index.isValid() and index.column() in (8, 9):
+            value |= Qt.ItemFlag.ItemIsEditable
+
+        return value
 
     def headerData(  # noqa: N802
         self,
@@ -47,7 +57,8 @@ class ProductPropertyTableModel(QAbstractTableModel):
                 case 0:
                     return self._properties[index.row()]
                 case 1:
-                    geometry = self._product.get_geometry()
+                    metadata_item = self._product_item.get_metadata_item()
+                    geometry = self._product_item.get_geometry()
 
                     match index.row():
                         case 0:
@@ -69,6 +80,34 @@ class ProductPropertyTableModel(QAbstractTableModel):
                                 return f'{geometry.fresnel_number:.4g}'
                             except ZeroDivisionError:
                                 return 'inf'
+                        case 8:
+                            return f'{metadata_item.exposure_time_s.get_value():.4g}'
+                        case 9:
+                            return f'{metadata_item.mass_attenuation_m2_kg.get_value():.4g}'
+
+    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
+        if index.isValid() and role == Qt.ItemDataRole.EditRole:
+            metadata_item = self._product_item.get_metadata_item()
+
+            match index.row():
+                case 8:
+                    try:
+                        exposure_time_s = float(value)
+                    except ValueError:
+                        return False
+
+                    metadata_item.exposure_time_s.set_value(exposure_time_s)
+                    return True
+                case 9:
+                    try:
+                        mass_attenuation_m2_kg = float(value)
+                    except ValueError:
+                        return False
+
+                    metadata_item.mass_attenuation_m2_kg.set_value(mass_attenuation_m2_kg)
+                    return True
+
+        return False
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._properties)

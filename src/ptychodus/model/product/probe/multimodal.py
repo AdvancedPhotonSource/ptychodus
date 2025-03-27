@@ -107,6 +107,9 @@ class MultimodalProbeBuilder(ParameterGroup):
 
         return array
 
+    def set_identity(self) -> None:
+        pass  # FIXME set things to not mess with the probe
+
     def build(self, probe: Probe, geometry_provider: ProbeGeometryProvider) -> Probe:
         array = self._init_modes(probe.get_array())
 
