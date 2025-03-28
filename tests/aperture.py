@@ -19,18 +19,18 @@ class SquareAperture:
         lower = self._wavelength_m * z_m
         return upper / lower
 
-    def _integral1D(self, r_m: RealArrayType, z_m: float) -> ComplexArrayType:
-        sqrt2NF = numpy.sqrt(2 * self.get_fresnel_number(z_m))
+    def _integral1d(self, r_m: RealArrayType, z_m: float) -> ComplexArrayType:
+        sqrt2NF = numpy.sqrt(2 * self.get_fresnel_number(z_m))  # noqa: N806
         xi = 2 * r_m / self._width_m
-        Sm, Cm = fresnel(sqrt2NF * (1 - xi))
-        Sp, Cp = fresnel(sqrt2NF * (1 + xi))
+        Sm, Cm = fresnel(sqrt2NF * (1 - xi))  # noqa: N806
+        Sp, Cp = fresnel(sqrt2NF * (1 + xi))  # noqa: N806
         return (Cm + Cp + 1j * (Sm + Sp)) / numpy.sqrt(2)
 
     def diffract(self, x_m: RealArrayType, y_m: RealArrayType, z_m: float) -> ComplexArrayType:
         """Fresnel diffraction; see Goodman p.100"""
         assert x_m.shape == y_m.shape
-        Ix = self._integral1D(x_m, z_m)
-        Iy = self._integral1D(y_m, z_m)
+        Ix = self._integral1d(x_m, z_m)  # noqa: N806
+        Iy = self._integral1d(y_m, z_m)  # noqa: N806
         return Ix * Iy * numpy.exp(2j * numpy.pi * z_m / self._wavelength_m) / 1j
 
 
@@ -49,8 +49,8 @@ class CircularAperture:
         assert x_m.shape == y_m.shape
 
         twopi = 2 * numpy.pi
-        sqrtLZ = numpy.sqrt(self._wavelength_m * z_m)
-        sqrtNF = numpy.sqrt(self.get_fresnel_number(z_m))
+        sqrtLZ = numpy.sqrt(self._wavelength_m * z_m)  # noqa: N806
+        sqrtNF = numpy.sqrt(self.get_fresnel_number(z_m))  # noqa: N806
 
         rhop = rho / sqrtLZ
         rp = numpy.hypot(x_m, y_m) / sqrtLZ

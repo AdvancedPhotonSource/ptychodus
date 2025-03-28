@@ -47,31 +47,33 @@ class FresnelZonePlateViewController(ParameterViewController):
             action = self._widget.presets_menu.addAction(label)
             action.triggered.connect(lambda _, label=label: probe_builder.apply_presets(label))
 
-        self._zonePlateDiameterViewController = LengthWidgetParameterViewController(
+        self._zone_plate_diameter_view_controller = LengthWidgetParameterViewController(
             probe_builder.zone_plate_diameter_m
         )
-        self._outermostZoneWidthInMetersViewController = LengthWidgetParameterViewController(
+        self._outermost_zone_width_view_controller = LengthWidgetParameterViewController(
             probe_builder.outermost_zone_width_m
         )
-        self._centralBeamstopDiameterInMetersViewController = LengthWidgetParameterViewController(
+        self._central_beamstop_diameter_view_controller = LengthWidgetParameterViewController(
             probe_builder.central_beamstop_diameter_m
         )
-        self._defocusDistanceInMetersViewController = LengthWidgetParameterViewController(
+        self._defocus_distance_view_controller = LengthWidgetParameterViewController(
             probe_builder.defocus_distance_m
         )
 
         layout = QFormLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addRow('Zone Plate Diameter:', self._zonePlateDiameterViewController.get_widget())
+        layout.addRow(
+            'Zone Plate Diameter:', self._zone_plate_diameter_view_controller.get_widget()
+        )
         layout.addRow(
             'Outermost Zone Width:',
-            self._outermostZoneWidthInMetersViewController.get_widget(),
+            self._outermost_zone_width_view_controller.get_widget(),
         )
         layout.addRow(
             'Central Beamstop Diameter:',
-            self._centralBeamstopDiameterInMetersViewController.get_widget(),
+            self._central_beamstop_diameter_view_controller.get_widget(),
         )
-        layout.addRow('Defocus Distance:', self._defocusDistanceInMetersViewController.get_widget())
+        layout.addRow('Defocus Distance:', self._defocus_distance_view_controller.get_widget())
         self._widget.contents.setLayout(layout)
 
     def get_widget(self) -> QWidget:
@@ -83,32 +85,34 @@ class ZernikeViewController(ParameterViewController, Observer):
         super().__init__()
         self._widget = QGroupBox(title)
         self._probe_builder = probe_builder
-        self._orderSpinBox = QSpinBox()
-        self._coefficientsTableModel = ZernikeTableModel(probe_builder)
-        self._coefficientsTableView = QTableView()
-        self._diameterViewController = LengthWidgetParameterViewController(probe_builder.diameter_m)
+        self._order_spin_box = QSpinBox()
+        self._coefficients_table_model = ZernikeTableModel(probe_builder)
+        self._coefficients_table_view = QTableView()
+        self._diameter_view_controller = LengthWidgetParameterViewController(
+            probe_builder.diameter_m
+        )
 
-        self._coefficientsTableView.setModel(self._coefficientsTableModel)
+        self._coefficients_table_view.setModel(self._coefficients_table_model)
 
         layout = QFormLayout()
-        layout.addRow('Diameter:', self._diameterViewController.get_widget())
-        layout.addRow('Order:', self._orderSpinBox)
-        layout.addRow(self._coefficientsTableView)
+        layout.addRow('Diameter:', self._diameter_view_controller.get_widget())
+        layout.addRow('Order:', self._order_spin_box)
+        layout.addRow(self._coefficients_table_view)
         self._widget.setLayout(layout)
 
         self._sync_model_to_view()
-        self._orderSpinBox.valueChanged.connect(probe_builder.set_order)
+        self._order_spin_box.valueChanged.connect(probe_builder.set_order)
         probe_builder.add_observer(self)
 
     def get_widget(self) -> QWidget:
         return self._widget
 
     def _sync_model_to_view(self) -> None:
-        self._orderSpinBox.setRange(1, 100)
-        self._orderSpinBox.setValue(self._probe_builder.get_order())
+        self._order_spin_box.setRange(1, 100)
+        self._order_spin_box.setValue(self._probe_builder.get_order())
 
-        self._coefficientsTableModel.beginResetModel()  # TODO clean up
-        self._coefficientsTableModel.endResetModel()
+        self._coefficients_table_model.beginResetModel()  # TODO clean up
+        self._coefficients_table_model.endResetModel()
 
     def _update(self, observable: Observable) -> None:
         if observable is self._probe_builder:
@@ -119,23 +123,23 @@ class DecayTypeParameterViewController(ParameterViewController, Observer):
     def __init__(self, parameter: StringParameter) -> None:
         super().__init__()
         self._parameter = parameter
-        self._polynomialDecayButton = QRadioButton('Polynomial')
-        self._exponentialDecayButton = QRadioButton('Exponential')
+        self._polynomial_decay_button = QRadioButton('Polynomial')
+        self._exponential_decay_button = QRadioButton('Exponential')
 
-        self._buttonGroup = QButtonGroup()
-        self._buttonGroup.addButton(
-            self._polynomialDecayButton, ProbeModeDecayType.POLYNOMIAL.value
+        self._button_group = QButtonGroup()
+        self._button_group.addButton(
+            self._polynomial_decay_button, ProbeModeDecayType.POLYNOMIAL.value
         )
-        self._buttonGroup.addButton(
-            self._exponentialDecayButton, ProbeModeDecayType.EXPONENTIAL.value
+        self._button_group.addButton(
+            self._exponential_decay_button, ProbeModeDecayType.EXPONENTIAL.value
         )
-        self._buttonGroup.setExclusive(True)
-        self._buttonGroup.idToggled.connect(self._sync_view_to_model)
+        self._button_group.setExclusive(True)
+        self._button_group.idToggled.connect(self._sync_view_to_model)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self._polynomialDecayButton)
-        layout.addWidget(self._exponentialDecayButton)
+        layout.addWidget(self._polynomial_decay_button)
+        layout.addWidget(self._exponential_decay_button)
 
         self._widget = QWidget()
         self._widget.setLayout(layout)
@@ -157,7 +161,7 @@ class DecayTypeParameterViewController(ParameterViewController, Observer):
         except KeyError:
             decay_type = ProbeModeDecayType.POLYNOMIAL
 
-        button = self._buttonGroup.button(decay_type.value)
+        button = self._button_group.button(decay_type.value)
         button.setChecked(True)
 
     def _update(self, observable: Observable) -> None:

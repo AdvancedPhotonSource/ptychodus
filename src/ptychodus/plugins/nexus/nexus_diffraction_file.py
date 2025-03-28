@@ -193,14 +193,14 @@ class NeXusDiffractionDataset(DiffractionDataset):
         entry: EntryGroup,
     ) -> None:
         self._metadata = metadata
-        self._contentsTree = contents_tree
+        self._contents_tree = contents_tree
         self._entry = entry
 
     def get_metadata(self) -> DiffractionMetadata:
         return self._metadata
 
     def get_contents_tree(self) -> SimpleTreeNode:
-        return self._contentsTree
+        return self._contents_tree
 
     @overload
     def __getitem__(self, index: int) -> DiffractionPatternArray: ...
@@ -220,7 +220,7 @@ class NeXusDiffractionDataset(DiffractionDataset):
 class NeXusDiffractionFileReader(DiffractionFileReader):
     def __init__(self) -> None:
         super().__init__()
-        self._treeBuilder = H5DiffractionFileTreeBuilder()
+        self._tree_builder = H5DiffractionFileTreeBuilder()
         self.stage_rotation_deg = 0.0  # TODO This is a hack; remove when able!
 
     def read(self, file_path: Path) -> DiffractionDataset:
@@ -229,7 +229,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
         try:
             with h5py.File(file_path, 'r') as h5_file:
                 metadata = DiffractionMetadata.create_null(file_path)
-                contents_tree = self._treeBuilder.build(h5_file)
+                contents_tree = self._tree_builder.build(h5_file)
 
                 try:
                     h5_dataset = h5_file['/entry/data/data_000001']

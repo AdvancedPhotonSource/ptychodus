@@ -21,10 +21,10 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
     def __init__(self, model: QAbstractItemModel, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._model = model
-        self._paintComboBox = False
+        self._paint_combo_box = False
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
-        if self._paintComboBox and index.flags() & Qt.ItemFlag.ItemIsEditable:
+        if self._paint_combo_box and index.flags() & Qt.ItemFlag.ItemIsEditable:
             opt = QStyleOptionComboBox()
             opt.rect = option.rect
             opt.currentText = index.data(Qt.DisplayRole)

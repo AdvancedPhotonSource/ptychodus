@@ -78,11 +78,11 @@ class UserObjectBuilder(ObjectBuilder):  # FIXME use
         Otherwise, the object is copied as is.
         """
         super().__init__(settings, 'user')
-        self._existingObject = object_
+        self._existing_object = object_
         self._settings = settings
 
     def copy(self) -> UserObjectBuilder:
-        builder = UserObjectBuilder(self._existingObject, self._settings)
+        builder = UserObjectBuilder(self._existing_object, self._settings)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
@@ -94,8 +94,8 @@ class UserObjectBuilder(ObjectBuilder):  # FIXME use
         geometry_provider: ObjectGeometryProvider,
         layer_distance_m: Sequence[float],
     ) -> Object:
-        geometry = self._existingObject.get_geometry()
-        existing_object_array = self._existingObject.get_array()
+        geometry = self._existing_object.get_geometry()
+        existing_object_array = self._existing_object.get_array()
         num_slices = len(layer_distance_m) + 1
 
         if num_slices > 1 and num_slices != existing_object_array.shape[0]:
