@@ -48,7 +48,7 @@ class DatasetTreeNode:
 
     def get_counts(self) -> int:
         return (
-            int(self._array.get_average_pattern_counts())
+            int(self._array.get_mean_pattern_counts())
             if self._frame_index < 0
             else int(self._array.get_pattern_counts(self._frame_index))
         )
@@ -71,14 +71,34 @@ class DatasetTreeModel(QAbstractItemModel):
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._nodes = DatasetTreeNode.create_root()
+        self._max_counts = 1
         self._header = ['Label', 'Counts', 'Frames', 'Size [MB]']
 
     def clear(self) -> None:
         self.beginResetModel()
         self._nodes = DatasetTreeNode.create_root()
+        self._max_counts = 1
         self.endResetModel()
 
     def insert_array(self, row: int, array: AssembledDiffractionPatternArray) -> None:
+        max_counts = array.get_max_pattern_counts()
+
+        if self._max_counts < max_counts:
+            self._max_counts = max_counts
+            num_rows = self.rowCount()
+
+            top_left = self.index(0, 1)
+            bottom_right = self.index(num_rows - 1, 1)
+            self.dataChanged.emit(top_left, bottom_right)
+
+            for row2 in range(num_rows):
+                parent_index = self.index(row2, 0)
+                num_rows2 = self.rowCount(parent_index)
+
+                child_top_left = self.index(0, 1, parent_index)
+                child_bottom_right = self.index(num_rows2 - 1, 1, parent_index)
+                self.dataChanged.emit(child_top_left, child_bottom_right)
+
         self.beginInsertRows(QModelIndex(), row, row)
         child_node = self._nodes.insert_child(row, array)
         self.endInsertRows()
@@ -92,8 +112,11 @@ class DatasetTreeModel(QAbstractItemModel):
         bottom_right = self.index(row, self.columnCount() - 1)
         self.dataChanged.emit(top_left, bottom_right)
 
-        child_top_left = self.index(row, 0, top_left)
-        child_bottom_right = self.index(row, self.columnCount() - 1)
+        num_rows = self.rowCount(top_left)
+        num_cols = self.columnCount(top_left)
+
+        child_top_left = self.index(0, 0, top_left)
+        child_bottom_right = self.index(num_rows - 1, num_cols - 1, top_left)
         self.dataChanged.emit(child_top_left, child_bottom_right)
 
     @overload
@@ -133,11 +156,14 @@ class DatasetTreeModel(QAbstractItemModel):
                     case 0:
                         return node.get_label()
                     case 1:
-                        return node.get_counts()
+                        return str(node.get_counts())
                     case 2:
                         return node.get_nframes()
                     case 3:
                         return f'{node.get_nbytes() / (1024 * 1024):.2f}'
+            elif role == Qt.ItemDataRole.UserRole:
+                if index.column() == 1:
+                    return (100 * node.get_counts()) // self._max_counts
 
     def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
         if self.hasIndex(row, column, parent):

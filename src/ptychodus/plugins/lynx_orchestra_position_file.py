@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class LYNXOrchestraPositionFileReader(PositionFileReader):
     SIMPLE_NAME: Final[str] = 'APS_LYNX_Orchestra'
-    DISPLAY_NAME: Final[str] = 'APS LYNX SoftGlueZynq Files (*.dat)'
+    DISPLAY_NAME: Final[str] = 'APS LYNX Orchestra Files (*.dat)'
     MICRONS_TO_METERS: Final[float] = 1.0e-6
     DATA_POINT_COLUMN: Final[int] = 0
     X_COLUMN: Final[int] = 3

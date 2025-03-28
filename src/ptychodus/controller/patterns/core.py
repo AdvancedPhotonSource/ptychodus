@@ -14,7 +14,7 @@ from ...model.patterns import (
     PatternsAPI,
 )
 from ...view.patterns import DetectorView, PatternsView
-from ...view.widgets import ExceptionDialog
+from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate
 from ..data import FileDialogFactory
 from ..image import ImageController
 from ..parametric import LengthWidgetParameterViewController, SpinBoxParameterViewController
@@ -78,6 +78,8 @@ class PatternsController(DiffractionDatasetObserver):
 
         view.tree_view.setModel(self._tree_model)
         view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        counts_item_delegate = ProgressBarItemDelegate(view.tree_view)
+        view.tree_view.setItemDelegateForColumn(1, counts_item_delegate)
         view.tree_view.selectionModel().currentChanged.connect(self._update_view)
         self._update_view(QModelIndex(), QModelIndex())
 

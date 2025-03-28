@@ -26,6 +26,23 @@ class ProbeTreeNode:
         return 0 if self.parent is None else self.parent.children.index(self)
 
 
+def calc_relative_power_percent(probe: Probe, imode: int) -> int:
+    try:
+        relative_power = probe.get_incoherent_mode_relative_power(imode)
+    except IndexError:
+        return -1
+
+    if numpy.isfinite(relative_power):
+        return int(100.0 * relative_power)
+
+    return -1
+
+
+def calc_coherent_percent(probe: Probe) -> int:
+    coherence = probe.get_coherence()
+    return int(100.0 * coherence) if numpy.isfinite(coherence) else -1
+
+
 class ProbeTreeModel(QAbstractItemModel):
     def __init__(
         self, repository: ProbeRepository, api: ProbeAPI, parent: QObject | None = None
@@ -142,41 +159,38 @@ class ProbeTreeModel(QAbstractItemModel):
         if parent.isValid():
             item = self._repository[parent.row()]
 
-            if role == Qt.ItemDataRole.DisplayRole and index.column() == 0:
-                return f'Mode {index.row() + 1}'
+            if role == Qt.ItemDataRole.DisplayRole:
+                match index.column():
+                    case 0:
+                        return f'Mode {index.row() + 1}'
+                    case 1:
+                        power_percent = calc_relative_power_percent(item.get_probe(), index.row())
+                        return f'{power_percent}%'
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
-                probe = item.get_probe()
-
-                try:
-                    relative_power = probe.get_incoherent_mode_relative_power(index.row())
-                except IndexError:
-                    return -1
-
-                if numpy.isfinite(relative_power):
-                    return int(100.0 * relative_power)
+                return calc_relative_power_percent(item.get_probe(), index.row())
         else:
             item = self._repository[index.row()]
             probe = item.get_probe()
 
             if role == Qt.ItemDataRole.DisplayRole:
-                if index.column() == 0:
-                    return self._repository.get_name(index.row())
-                elif index.column() == 1:
-                    return None
-                elif index.column() == 2:
-                    return item.get_builder().get_name()
-                elif index.column() == 3:
-                    return str(probe.dtype)
-                elif index.column() == 4:
-                    return probe.width_px
-                elif index.column() == 5:
-                    return probe.height_px
-                elif index.column() == 6:
-                    return f'{probe.nbytes / (1024 * 1024):.2f}'
+                match index.column():
+                    case 0:
+                        return self._repository.get_name(index.row())
+                    case 1:
+                        coherent_percent = calc_coherent_percent(probe)
+                        return f'{coherent_percent}%'
+                    case 2:
+                        return item.get_builder().get_name()
+                    case 3:
+                        return str(probe.dtype)
+                    case 4:
+                        return probe.width_px
+                    case 5:
+                        return probe.height_px
+                    case 6:
+                        return f'{probe.nbytes / (1024 * 1024):.2f}'
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
-                probe = item.get_probe()
-                coherence = probe.get_coherence()
-                return int(100.0 * coherence) if numpy.isfinite(coherence) else -1
+                return calc_coherent_percent(item.get_probe())
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)

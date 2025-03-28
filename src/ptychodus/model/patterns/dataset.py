@@ -92,10 +92,15 @@ class AssembledDiffractionPatternArray(DiffractionPatternArray):
     def get_average_pattern(self) -> PatternDataType:
         return self._data.mean(axis=0)
 
-    def get_average_pattern_counts(self) -> float:
+    def get_mean_pattern_counts(self) -> float:
         loaded_data = self._data[self._indexes >= 0]
         total_counts = numpy.sum(loaded_data[:, self._good_pixels], axis=-1)
         return total_counts.mean()
+
+    def get_max_pattern_counts(self) -> int:
+        loaded_data = self._data[self._indexes >= 0]
+        total_counts = numpy.sum(loaded_data[:, self._good_pixels], axis=-1)
+        return total_counts.max()
 
     def get_array_index(self) -> int:
         return self._array_index

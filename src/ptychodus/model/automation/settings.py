@@ -11,7 +11,7 @@ class AutomationSettings(Observable, Observer):
         self._group = registry.create_group('Automation')
         self._group.add_observer(self)
 
-        self.strategy = self._group.create_string_parameter('Strategy', 'APS2ID')
+        self.strategy = self._group.create_string_parameter('Strategy', 'Autoload_Product')
         self.data_directory = self._group.create_path_parameter(
             'DataDirectory', Path('/path/to/data')
         )

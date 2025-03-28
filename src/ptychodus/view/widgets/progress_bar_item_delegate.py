@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class ProgressBarItemDelegate(QStyledItemDelegate):
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
+        text = index.data(Qt.ItemDataRole.DisplayRole)
         progress = index.data(Qt.ItemDataRole.UserRole)
 
         if progress is None:
@@ -25,6 +26,6 @@ class ProgressBarItemDelegate(QStyledItemDelegate):
             opt.minimum = 0
             opt.maximum = 100
             opt.progress = progress
-            opt.text = f'{progress}%'
+            opt.text = text
             opt.textVisible = True
             QApplication.style().drawControl(QStyle.ControlElement.CE_ProgressBar, opt, painter)
