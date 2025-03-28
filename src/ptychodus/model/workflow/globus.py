@@ -79,7 +79,7 @@ class CustomCodeHandler(fair_research_login.CodeHandler):
         return self.get_code()
 
     def get_code(self) -> str:
-        return self._authorizer.getCodeFromAuthorizeURL()
+        return self._authorizer.get_code_from_authorize_url()
 
 
 class PtychodusClientBuilder(ABC):
@@ -208,8 +208,8 @@ class GlobusWorkflowThread(threading.Thread):
 
         return self.__gladier_client
 
-    def _get_current_action(self, runID: str) -> str:
-        status = self._gladier_client.get_status(runID)
+    def _get_current_action(self, run_id: str) -> str:
+        status = self._gladier_client.get_status(run_id)
         action = status.get('state_name')
 
         if not action:
@@ -231,63 +231,63 @@ class GlobusWorkflowThread(threading.Thread):
         return action
 
     def _refresh_status(self) -> None:
-        statusList: list[WorkflowStatus] = list()
-        flowsManager = self._gladier_client.flows_manager
-        flowID = flowsManager.get_flow_id()
-        flowsClient = flowsManager.flows_client
-        response = flowsClient.list_runs(filter_flow_id=flowID)
-        runDictList = response['runs']
+        status_list: list[WorkflowStatus] = list()
+        flows_manager = self._gladier_client.flows_manager
+        flow_id = flows_manager.get_flow_id()
+        flows_client = flows_manager.flows_client
+        response = flows_client.list_runs(filter_flow_id=flow_id)
+        run_dict_list = response['runs']
 
         while response['has_next_page']:
-            response = flowsClient.list_runs(filter_flow_id=flowID, marker=response['marker'])
-            runDictList.extend(response['runs'])
+            response = flows_client.list_runs(filter_flow_id=flow_id, marker=response['marker'])
+            run_dict_list.extend(response['runs'])
 
-        for runDict in runDictList:
-            runID = runDict.get('run_id', '')
-            action = self._get_current_action(runID)
-            startTimeStr = runDict.get('start_time', '')
-            completionTimeStr = runDict.get('completion_time', '')
-
-            try:
-                startTime = datetime.fromisoformat(startTimeStr)
-            except ValueError:
-                logger.warning(f'Failed to parse startTime "{startTimeStr}"!')
-                startTime = datetime(1, 1, 1)
+        for run_dict in run_dict_list:
+            run_id = run_dict.get('run_id', '')
+            action = self._get_current_action(run_id)
+            start_time_str = run_dict.get('start_time', '')
+            completion_time_str = run_dict.get('completion_time', '')
 
             try:
-                completionTime = datetime.fromisoformat(completionTimeStr)
+                start_time = datetime.fromisoformat(start_time_str)
             except ValueError:
-                completionTime = None
+                logger.warning(f'Failed to parse startTime "{start_time_str}"!')
+                start_time = datetime(1, 1, 1)
+
+            try:
+                completion_time = datetime.fromisoformat(completion_time_str)
+            except ValueError:
+                completion_time = None
 
             run = WorkflowStatus(
-                label=runDict.get('label', ''),
-                startTime=startTime,
-                completionTime=completionTime,
-                status=runDict.get('status', ''),
+                label=run_dict.get('label', ''),
+                start_time=start_time,
+                completion_time=completion_time,
+                status=run_dict.get('status', ''),
                 action=action,
-                runID=runID,
-                runURL=f'https://app.globus.org/runs/{runID}/logs',
+                run_id=run_id,
+                run_url=f'https://app.globus.org/runs/{run_id}/logs',
             )
 
-            statusList.append(run)
+            status_list.append(run)
 
-        self._status_repository.update(statusList)
+        self._status_repository.update(status_list)
 
     def run(self) -> None:
-        while not self._authorizer.shutdownEvent.is_set():
-            if self._status_repository.refreshStatusEvent.is_set():
+        while not self._authorizer.shutdown_event.is_set():
+            if self._status_repository.refresh_status_event.is_set():
                 self._refresh_status()
-                self._status_repository.refreshStatusEvent.clear()
+                self._status_repository.refresh_status_event.clear()
 
             try:
-                input_ = self._executor.jobQueue.get(block=True, timeout=1)
+                input_ = self._executor.job_queue.get(block=True, timeout=1)
             except queue.Empty:
                 continue
 
             try:
                 response = self._gladier_client.run_flow(
-                    flow_input={'input': input_.flowInput},
-                    label=input_.flowLabel,
+                    flow_input={'input': input_.flow_input},
+                    label=input_.flow_label,
                     tags=['aps', 'ptychography'],
                 )
             except Exception:
@@ -295,4 +295,4 @@ class GlobusWorkflowThread(threading.Thread):
             else:
                 logger.info(f'Run Flow Response: {json.dumps(response, indent=4)}')
             finally:
-                self._executor.jobQueue.task_done()
+                self._executor.job_queue.task_done()

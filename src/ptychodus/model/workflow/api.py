@@ -85,7 +85,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
 
     def reconstruct_remote(self) -> None:
         logger.debug(f'Execute Workflow: index={self._product_index}')
-        self._executor.runFlow(self._product_index)
+        self._executor.run_flow(self._product_index)
 
     def save_product(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._product_api.save_product(self._product_index, file_path, file_type=file_type)

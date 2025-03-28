@@ -18,39 +18,39 @@ class WorkflowStatusController(Observer):
         self,
         presenter: WorkflowStatusPresenter,
         view: WorkflowStatusView,
-        tableView: QTableView,
+        table_view: QTableView,
     ) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
-        self._tableView = tableView
-        self._tableModel = WorkflowTableModel(presenter)
-        self._proxyModel = QSortFilterProxyModel()
-        self._proxyModel.setSourceModel(self._tableModel)
+        self._table_view = table_view
+        self._table_model = WorkflowTableModel(presenter)
+        self._proxy_model = QSortFilterProxyModel()
+        self._proxy_model.setSourceModel(self._table_model)
         self._timer = QTimer()
-        self._timer.timeout.connect(presenter.refreshStatus)
+        self._timer.timeout.connect(presenter.refresh_status)
 
-        tableView.setModel(self._proxyModel)
-        tableView.setSortingEnabled(True)
-        tableView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        tableView.clicked.connect(self._handleTableViewClick)
+        table_view.setModel(self._proxy_model)
+        table_view.setSortingEnabled(True)
+        table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table_view.clicked.connect(self._handle_table_view_clicked)
 
-        view.auto_refresh_check_box.toggled.connect(self._autoRefreshStatus)
-        view.auto_refresh_spin_box.valueChanged.connect(presenter.setRefreshIntervalInSeconds)
-        view.refresh_button.clicked.connect(presenter.refreshStatus)
+        view.auto_refresh_check_box.toggled.connect(self._auto_refresh_status)
+        view.auto_refresh_spin_box.valueChanged.connect(presenter.set_refresh_interval_s)
+        view.refresh_button.clicked.connect(presenter.refresh_status)
 
         self._sync_model_to_view()
         presenter.add_observer(self)
 
-    def _handleTableViewClick(self, index: QModelIndex) -> None:
+    def _handle_table_view_clicked(self, index: QModelIndex) -> None:
         if index.column() == 5:
             url = index.data(Qt.ItemDataRole.UserRole)
             logger.info(f'Opening URL: "{url.toString()}"')
             QDesktopServices.openUrl(url)
 
-    def _autoRefreshStatus(self) -> None:
+    def _auto_refresh_status(self) -> None:
         if self._view.auto_refresh_check_box.isChecked():
-            self._timer.start(1000 * self._presenter.getRefreshIntervalInSeconds())
+            self._timer.start(1000 * self._presenter.get_refresh_interval_s())
             self._view.auto_refresh_spin_box.setEnabled(False)
             self._view.refresh_button.setEnabled(False)
         else:
@@ -58,19 +58,19 @@ class WorkflowStatusController(Observer):
             self._view.auto_refresh_spin_box.setEnabled(True)
             self._view.refresh_button.setEnabled(True)
 
-    def refreshTableView(self) -> None:
+    def refresh_table_view(self) -> None:
         # TODO only reset if changed
-        self._tableModel.beginResetModel()
-        self._tableModel.endResetModel()
+        self._table_model.beginResetModel()
+        self._table_model.endResetModel()
 
     def _sync_model_to_view(self) -> None:
-        refreshIntervalLimitsInSeconds = self._presenter.getRefreshIntervalLimitsInSeconds()
+        refresh_interval_limits_s = self._presenter.get_refresh_interval_limits_s()
 
         self._view.auto_refresh_spin_box.blockSignals(True)
         self._view.auto_refresh_spin_box.setRange(
-            refreshIntervalLimitsInSeconds.lower, refreshIntervalLimitsInSeconds.upper
+            refresh_interval_limits_s.lower, refresh_interval_limits_s.upper
         )
-        self._view.auto_refresh_spin_box.setValue(self._presenter.getRefreshIntervalInSeconds())
+        self._view.auto_refresh_spin_box.setValue(self._presenter.get_refresh_interval_s())
         self._view.auto_refresh_spin_box.blockSignals(False)
 
     def _update(self, observable: Observable) -> None:

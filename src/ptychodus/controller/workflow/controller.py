@@ -16,34 +16,34 @@ from .status import WorkflowStatusController
 class WorkflowController:
     def __init__(
         self,
-        parametersPresenter: WorkflowParametersPresenter,
-        authorizationPresenter: WorkflowAuthorizationPresenter,
-        statusPresenter: WorkflowStatusPresenter,
-        executionPresenter: WorkflowExecutionPresenter,
-        parametersView: WorkflowParametersView,
-        tableView: QTableView,
-        productItemModel: QAbstractItemModel,
+        parameters_presenter: WorkflowParametersPresenter,
+        authorization_presenter: WorkflowAuthorizationPresenter,
+        status_presenter: WorkflowStatusPresenter,
+        execution_presenter: WorkflowExecutionPresenter,
+        parameters_view: WorkflowParametersView,
+        table_view: QTableView,
+        product_item_model: QAbstractItemModel,
     ) -> None:
-        self._parametersPresenter = parametersPresenter
-        self._authorizationPresenter = authorizationPresenter
-        self._executionPresenter = executionPresenter
-        self._parametersView = parametersView
-        self._authorizationController = WorkflowAuthorizationController.create_instance(
-            authorizationPresenter, parametersView.authorization_dialog
+        self._parameters_presenter = parameters_presenter
+        self._authorization_presenter = authorization_presenter
+        self._execution_presenter = execution_presenter
+        self._parameters_view = parameters_view
+        self._authorization_controller = WorkflowAuthorizationController.create_instance(
+            authorization_presenter, parameters_view.authorization_dialog
         )
-        self._statusController = WorkflowStatusController(
-            statusPresenter, parametersView.status_view, tableView
+        self._status_controller = WorkflowStatusController(
+            status_presenter, parameters_view.status_view, table_view
         )
-        self._executionController = WorkflowExecutionController.create_instance(
-            parametersPresenter,
-            executionPresenter,
-            parametersView.execution_view,
-            productItemModel,
+        self._execution_controller = WorkflowExecutionController.create_instance(
+            parameters_presenter,
+            execution_presenter,
+            parameters_view.execution_view,
+            product_item_model,
         )
         self._timer = QTimer()
-        self._timer.timeout.connect(self._processEvents)
+        self._timer.timeout.connect(self._process_events)
         self._timer.start(5 * 1000)  # TODO customize
 
-    def _processEvents(self) -> None:
-        self._authorizationController.startAuthorizationIfNeeded()
-        self._statusController.refreshTableView()
+    def _process_events(self) -> None:
+        self._authorization_controller.start_authorization_if_needed()
+        self._status_controller.refresh_table_view()

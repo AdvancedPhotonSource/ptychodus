@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import overload
 import threading
 
@@ -8,21 +8,21 @@ import threading
 @dataclass(frozen=True)
 class WorkflowStatus:
     label: str
-    startTime: datetime
-    completionTime: datetime | None
+    start_time: datetime
+    completion_time: datetime | None
     status: str
     action: str
-    runID: str
-    runURL: str
+    run_id: str
+    run_url: str
 
 
 class WorkflowStatusRepository(Sequence[WorkflowStatus]):
     def __init__(self) -> None:
         super().__init__()
-        self._statusLock = threading.Lock()
-        self._statusList: list[WorkflowStatus] = list()
-        self._statusDateTime = datetime.min
-        self.refreshStatusEvent = threading.Event()
+        self._status_lock = threading.Lock()
+        self._status_list: list[WorkflowStatus] = list()
+        self._status_date_time = datetime.min
+        self.refresh_status_event = threading.Event()
 
     @overload
     def __getitem__(self, index: int) -> WorkflowStatus: ...
@@ -31,22 +31,22 @@ class WorkflowStatusRepository(Sequence[WorkflowStatus]):
     def __getitem__(self, index: slice) -> Sequence[WorkflowStatus]: ...
 
     def __getitem__(self, index: int | slice) -> WorkflowStatus | Sequence[WorkflowStatus]:
-        with self._statusLock:
-            return self._statusList[index]
+        with self._status_lock:
+            return self._status_list[index]
 
     def __len__(self) -> int:
-        with self._statusLock:
-            return len(self._statusList)
+        with self._status_lock:
+            return len(self._status_list)
 
-    def getStatusDateTime(self) -> datetime:
-        with self._statusLock:
-            return self._statusDateTime
+    def get_status_date_time(self) -> datetime:
+        with self._status_lock:
+            return self._status_date_time
 
-    def refreshStatus(self) -> None:
-        self.refreshStatusEvent.set()
+    def refresh_status(self) -> None:
+        self.refresh_status_event.set()
 
-    def update(self, statusSequence: Sequence[WorkflowStatus]) -> None:
-        with self._statusLock:
-            self._statusDateTime = datetime.utcnow()
-            self._statusList = list(statusSequence)
-            self._statusList.sort(key=lambda x: x.startTime)
+    def update(self, status_sequence: Sequence[WorkflowStatus]) -> None:
+        with self._status_lock:
+            self._status_date_time = datetime.now(timezone.utc)
+            self._status_list = list(status_sequence)
+            self._status_list.sort(key=lambda x: x.start_time)

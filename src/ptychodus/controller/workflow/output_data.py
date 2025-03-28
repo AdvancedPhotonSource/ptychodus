@@ -23,36 +23,36 @@ class WorkflowOutputDataController(Observer):
         controller = cls(presenter, view)
         presenter.add_observer(controller)
 
-        view.round_trip_check_box.toggled.connect(presenter.setRoundTripEnabled)
-        view.endpoint_id_line_edit.editingFinished.connect(controller._syncEndpointIDToModel)
-        view.globus_path_line_edit.editingFinished.connect(controller._syncGlobusPathToModel)
-        view.posix_path_line_edit.editingFinished.connect(controller._syncPosixPathToModel)
+        view.round_trip_check_box.toggled.connect(presenter.set_round_trip_enabled)
+        view.endpoint_id_line_edit.editingFinished.connect(controller._sync_endpoint_id_to_model)
+        view.globus_path_line_edit.editingFinished.connect(controller._sync_globus_path_to_model)
+        view.posix_path_line_edit.editingFinished.connect(controller._sync_posix_path_to_model)
 
         controller._sync_model_to_view()
 
         return controller
 
-    def _syncEndpointIDToModel(self) -> None:
-        endpointID = UUID(self._view.endpoint_id_line_edit.text())
-        self._presenter.setOutputDataEndpointID(endpointID)
+    def _sync_endpoint_id_to_model(self) -> None:
+        endpoint_id = UUID(self._view.endpoint_id_line_edit.text())
+        self._presenter.set_output_data_endpoint_id(endpoint_id)
 
-    def _syncGlobusPathToModel(self) -> None:
-        dataPath = self._view.globus_path_line_edit.text()
-        self._presenter.setOutputDataGlobusPath(dataPath)
+    def _sync_globus_path_to_model(self) -> None:
+        data_path = self._view.globus_path_line_edit.text()
+        self._presenter.set_output_data_globus_path(data_path)
 
-    def _syncPosixPathToModel(self) -> None:
-        dataPath = Path(self._view.posix_path_line_edit.text())
-        self._presenter.setOutputDataPosixPath(dataPath)
+    def _sync_posix_path_to_model(self) -> None:
+        data_path = Path(self._view.posix_path_line_edit.text())
+        self._presenter.set_output_data_posix_path(data_path)
 
     def _sync_model_to_view(self) -> None:
-        isRoundTripEnabled = self._presenter.isRoundTripEnabled()
-        self._view.round_trip_check_box.setChecked(isRoundTripEnabled)
-        self._view.endpoint_id_line_edit.setText(str(self._presenter.getOutputDataEndpointID()))
-        self._view.endpoint_id_line_edit.setEnabled(not isRoundTripEnabled)
-        self._view.globus_path_line_edit.setText(str(self._presenter.getOutputDataGlobusPath()))
-        self._view.globus_path_line_edit.setEnabled(not isRoundTripEnabled)
-        self._view.posix_path_line_edit.setText(str(self._presenter.getOutputDataPosixPath()))
-        self._view.posix_path_line_edit.setEnabled(not isRoundTripEnabled)
+        is_round_trip_enabled = self._presenter.is_round_trip_enabled()
+        self._view.round_trip_check_box.setChecked(is_round_trip_enabled)
+        self._view.endpoint_id_line_edit.setText(str(self._presenter.get_output_data_endpoint_id()))
+        self._view.endpoint_id_line_edit.setEnabled(not is_round_trip_enabled)
+        self._view.globus_path_line_edit.setText(str(self._presenter.get_output_data_globus_path()))
+        self._view.globus_path_line_edit.setEnabled(not is_round_trip_enabled)
+        self._view.posix_path_line_edit.setText(str(self._presenter.get_output_data_posix_path()))
+        self._view.posix_path_line_edit.setEnabled(not is_round_trip_enabled)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._presenter:

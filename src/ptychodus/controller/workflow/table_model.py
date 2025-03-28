@@ -10,7 +10,7 @@ class WorkflowTableModel(QAbstractTableModel):
     def __init__(self, presenter: WorkflowStatusPresenter, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
-        self._sectionHeaders = [
+        self._section_headers = [
             'Label',
             'Start Time',
             'Completion Time',
@@ -18,9 +18,9 @@ class WorkflowTableModel(QAbstractTableModel):
             'Action',
             'Run ID',
         ]
-        self._dtFormat = '%Y-%m-%d %H:%M:%S'
+        self._dt_format = '%Y-%m-%d %H:%M:%S'
 
-    def headerData(
+    def headerData(  # noqa: N802
         self,
         section: int,
         orientation: Qt.Orientation,
@@ -28,31 +28,32 @@ class WorkflowTableModel(QAbstractTableModel):
     ) -> Any:
         if role == Qt.ItemDataRole.DisplayRole:
             if orientation == Qt.Orientation.Horizontal:
-                return self._sectionHeaders[section]
+                return self._section_headers[section]
             elif orientation == Qt.Orientation.Vertical:
                 return section
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid():
-            flowRun = self._presenter[index.row()]
+            flow_run = self._presenter[index.row()]
 
             if role == Qt.ItemDataRole.DisplayRole:
-                if index.column() == 0:
-                    return flowRun.label
-                elif index.column() == 1:
-                    return flowRun.startTime.strftime(self._dtFormat)
-                elif index.column() == 2:
-                    if flowRun.completionTime is not None:
-                        return flowRun.completionTime.strftime(self._dtFormat)
-                elif index.column() == 3:
-                    return flowRun.status
-                elif index.column() == 4:
-                    return flowRun.action
-                elif index.column() == 5:
-                    return flowRun.runID
+                match index.column():
+                    case 0:
+                        return flow_run.label
+                    case 1:
+                        return flow_run.start_time.strftime(self._dt_format)
+                    case 2:
+                        if flow_run.completion_time is not None:
+                            return flow_run.completion_time.strftime(self._dt_format)
+                    case 3:
+                        return flow_run.status
+                    case 4:
+                        return flow_run.action
+                    case 5:
+                        return flow_run.run_id
             elif index.column() == 5:
                 if role == Qt.ItemDataRole.ToolTipRole:
-                    return flowRun.runURL
+                    return flow_run.run_url
                 elif role == Qt.ItemDataRole.FontRole:
                     font = QFont()
                     font.setUnderline(True)
@@ -61,10 +62,10 @@ class WorkflowTableModel(QAbstractTableModel):
                     color = QColor(Qt.GlobalColor.blue)
                     return color
                 elif role == Qt.ItemDataRole.UserRole:
-                    return QUrl(flowRun.runURL)
+                    return QUrl(flow_run.run_url)
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._presenter)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return len(self._sectionHeaders)
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
+        return len(self._section_headers)
