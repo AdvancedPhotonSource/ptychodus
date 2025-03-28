@@ -5,6 +5,8 @@ import numpy
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
+from ptychodus.api.probe import Probe
+
 from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
 
@@ -119,16 +121,16 @@ class ProbeTreeModel(QAbstractItemModel):
             return self._header[section]
 
     @overload
-    def parent(self, index: QModelIndex) -> QModelIndex: ...
+    def parent(self, child: QModelIndex) -> QModelIndex: ...
 
     @overload
     def parent(self) -> QObject: ...
 
-    def parent(self, index: QModelIndex | None = None) -> QModelIndex | QObject:
-        if index is None:
+    def parent(self, child: QModelIndex | None = None) -> QModelIndex | QObject:
+        if child is None:
             return super().parent()
-        elif index.isValid():
-            node = index.internalPointer()
+        elif child.isValid():
+            node = child.internalPointer()
             parent_node = node.parent
             return (
                 QModelIndex()

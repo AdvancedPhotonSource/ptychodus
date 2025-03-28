@@ -76,7 +76,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 match index.column():
                     case 0:
-                        return metadata_item.get_name()
+                        return metadata_item.name.get_value()
                     case 1:
                         return f'{metadata_item.detector_distance_m.get_value():.4g}'
                     case 2:
@@ -102,7 +102,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
             metadata_item = item.get_metadata_item()
 
             if index.column() == 0:
-                metadata_item.set_name(str(value))
+                metadata_item.name.set_value(str(value))
                 return True
             elif index.column() == 1:
                 try:

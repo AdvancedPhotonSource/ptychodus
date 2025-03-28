@@ -66,6 +66,8 @@ class ProductRepositoryItem(ParameterGroup):
         self._add_group('probe', self._probe_item, observe=True)
         self._add_group('object', self._object_item, observe=True)
 
+        self._index = -1  # used by ProductRepository
+
     def assign(self, product: Product) -> None:
         self._metadata_item.assign(product.metadata)
         self._scan_item.assign(product.positions)
@@ -81,10 +83,10 @@ class ProductRepositoryItem(ParameterGroup):
         self._object_item.sync_to_settings()
 
     def get_name(self) -> str:
-        return self._metadata_item.get_name()
+        return self._metadata_item.name.get_value()
 
     def set_name(self, name: str) -> None:
-        self._metadata_item.set_name(name)
+        self._metadata_item.name.set_value(name)
 
     def get_metadata_item(self) -> MetadataRepositoryItem:
         return self._metadata_item

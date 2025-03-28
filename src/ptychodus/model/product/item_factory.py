@@ -49,6 +49,7 @@ class ProductRepositoryItemFactory:
     ) -> ProductRepositoryItem:
         metadata_item = MetadataRepositoryItem(
             self._settings,
+            self._repository,
             name=name,
             comments=comments,
             detector_distance_m=detector_distance_m,
@@ -80,6 +81,7 @@ class ProductRepositoryItemFactory:
     def create_from_product(self, product: Product) -> ProductRepositoryItem:
         metadata_item = MetadataRepositoryItem(
             self._settings,
+            self._repository,
             name=product.metadata.name,
             comments=product.metadata.comments,
             detector_distance_m=product.metadata.detector_distance_m,
@@ -109,7 +111,7 @@ class ProductRepositoryItemFactory:
     def create_from_settings(self) -> ProductRepositoryItem:
         # TODO add mechanism to sync product state to settings
         # FIXME try to load from settings.file_path, then fall back to load from components
-        metadata_item = MetadataRepositoryItem(self._settings)
+        metadata_item = MetadataRepositoryItem(self._settings, self._repository)
         scan_item = self._scan_item_factory.create_from_settings()
         geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
         probe_item = self._probe_item_factory.create_from_settings(geometry)

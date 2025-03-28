@@ -1,7 +1,8 @@
+from __future__ import annotations
 from abc import abstractmethod, ABC
 import logging
 
-from ptychodus.api.parametric import ParameterGroup
+from ptychodus.api.parametric import Parameter, ParameterGroup
 from ptychodus.api.product import ProductMetadata
 
 from .settings import ProductSettings
@@ -15,10 +16,42 @@ class UniqueNameFactory(ABC):
         pass
 
 
+class UniqueStringParameter(Parameter[str]):
+    def __init__(
+        self, value: str | None, name_factory: UniqueNameFactory, parent: Parameter[str]
+    ) -> None:
+        super().__init__(parent)
+        self._value = name_factory.create_unique_name(value or parent.get_value())
+        self._name_factory = name_factory
+
+    def get_value(self) -> str:
+        return self._value
+
+    def set_value(self, value: str, *, notify: bool = True) -> None:
+        if value:
+            if self._value != value:
+                self._value = self._name_factory.create_unique_name(value)
+
+                if notify:
+                    self.notify_observers()
+        else:
+            self.notify_observers()
+
+    def get_value_as_string(self) -> str:
+        return str(self._value)
+
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(str(value))
+
+    def copy(self) -> UniqueStringParameter:
+        return UniqueStringParameter(self.get_value(), self._name_factory, self)
+
+
 class MetadataRepositoryItem(ParameterGroup):
     def __init__(
         self,
         settings: ProductSettings,
+        name_factory: UniqueNameFactory,
         *,
         name: str = '',
         comments: str = '',
@@ -30,15 +63,9 @@ class MetadataRepositoryItem(ParameterGroup):
     ) -> None:
         super().__init__()
         self._settings = settings
-        self._name_factory: UniqueNameFactory | None = None
 
-        # FIXME extract as UniqueStringParameter to eliminate "Failed to look up" errors
-        self._name = settings.name.copy()
-
-        if name is not None:
-            self.set_name(name)
-
-        self._add_parameter('name', self._name)
+        self.name = UniqueStringParameter(name, name_factory, settings.name.copy())
+        self._add_parameter('name', self.name)
 
         self.comments = self.create_string_parameter('comments', comments)
 
@@ -77,10 +104,8 @@ class MetadataRepositoryItem(ParameterGroup):
 
         self._add_parameter('mass_attenuation_m2_kg', self.mass_attenuation_m2_kg)
 
-        self._index = -1  # used by ProductRepository
-
     def assign(self, metadata: ProductMetadata) -> None:
-        self.set_name(metadata.name)
+        self.name.set_value(metadata.name)
         self.comments.set_value(metadata.comments)
         self.detector_distance_m.set_value(metadata.detector_distance_m)
         self.probe_energy_eV.set_value(metadata.probe_energy_eV)
@@ -92,25 +117,9 @@ class MetadataRepositoryItem(ParameterGroup):
         for parameter in self.parameters().values():
             parameter.sync_value_to_parent()
 
-    def _set_name_factory(self, name_factory: UniqueNameFactory) -> None:
-        self._name_factory = name_factory
-        self.set_name(self.get_name())
-
-    def set_name(self, name: str) -> None:
-        if name:
-            if self._name_factory is not None:
-                name = self._name_factory.create_unique_name(name)
-
-            self._name.set_value(name)
-        else:
-            self._name.notify_observers()
-
-    def get_name(self) -> str:
-        return self._name.get_value()
-
     def get_metadata(self) -> ProductMetadata:
         return ProductMetadata(
-            name=self._name.get_value(),
+            name=self.name.get_value(),
             comments=self.comments.get_value(),
             detector_distance_m=self.detector_distance_m.get_value(),
             probe_energy_eV=self.probe_energy_eV.get_value(),

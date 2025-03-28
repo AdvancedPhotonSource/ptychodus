@@ -41,13 +41,9 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def _update_indexes(self) -> None:
         for index, item in enumerate(self._item_list):
-            metadata_item = item.get_metadata_item()
-            metadata_item._index = index
+            item._index = index
 
     def insert_product(self, item: ProductRepositoryItem) -> int:
-        metadata_item = item.get_metadata_item()
-        metadata_item._set_name_factory(self)
-
         index = len(self._item_list)
         self._item_list.append(item)
 
@@ -86,10 +82,9 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def handle_metadata_changed(self, item: ProductRepositoryItem) -> None:
         metadata = item.get_metadata_item()
-        index = metadata._index
+        index = item._index
 
         if index < 0:
-            print('metadata')  # FIXME
             logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
@@ -97,12 +92,10 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             observer.handle_metadata_changed(index, metadata)
 
     def handle_scan_changed(self, item: ProductRepositoryItem) -> None:
-        metadata = item.get_metadata_item()
-        index = metadata._index
+        index = item._index
         scan = item.get_scan_item()
 
         if index < 0:
-            print('scan')  # FIXME
             logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
@@ -110,12 +103,10 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             observer.handle_scan_changed(index, scan)
 
     def handle_probe_changed(self, item: ProductRepositoryItem) -> None:
-        metadata = item.get_metadata_item()
-        index = metadata._index
+        index = item._index
         probe = item.get_probe_item()
 
         if index < 0:
-            print('probe')  # FIXME
             logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
@@ -123,12 +114,10 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             observer.handle_probe_changed(index, probe)
 
     def handle_object_changed(self, item: ProductRepositoryItem) -> None:
-        metadata = item.get_metadata_item()
-        index = metadata._index
+        index = item._index
         object_ = item.get_object_item()
 
         if index < 0:
-            print('object')  # FIXME
             logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
@@ -136,12 +125,10 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             observer.handle_object_changed(index, object_)
 
     def handle_costs_changed(self, item: ProductRepositoryItem) -> None:
-        metadata = item.get_metadata_item()
-        index = metadata._index
+        index = item._index
         costs = item.get_costs()
 
         if index < 0:
-            print('costs')  # FIXME
             logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
