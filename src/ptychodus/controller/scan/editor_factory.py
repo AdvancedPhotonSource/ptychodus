@@ -43,32 +43,32 @@ class ScanTransformViewController(ParameterViewController):
             action = self._widget.presets_menu.addAction(presets_label)
             action.triggered.connect(lambda _, index=index: transform.apply_presets(index))
 
-        self._label_xp = QLabel('x\u2032 =')
-        self._label_xp.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._affine_ax_view_controller = DecimalLineEditParameterViewController(
-            transform.affine_ax, is_signed=True
+        self._label_ye = QLabel('y\u2032 =')
+        self._label_ye.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._affine00_view_controller = DecimalLineEditParameterViewController(
+            transform.affine00, is_signed=True
         )
-        self._label_ax = QLabel('x +')
-        self._affine_ay_view_controller = DecimalLineEditParameterViewController(
-            transform.affine_ay, is_signed=True
+        self._label_yp0 = QLabel('y +')
+        self._affine01_view_controller = DecimalLineEditParameterViewController(
+            transform.affine01, is_signed=True
         )
-        self._label_ay = QLabel('y +')
-        self._affine_at_view_controller = LengthWidgetParameterViewController(
-            transform.affine_at_m, is_signed=True
+        self._label_xp0 = QLabel('x +')
+        self._affine02_view_controller = LengthWidgetParameterViewController(
+            transform.affine02, is_signed=True
         )
 
-        self._label_yp = QLabel('y\u2032 =')
-        self._label_yp.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._affine_bx_view_controller = DecimalLineEditParameterViewController(
-            transform.affine_bx, is_signed=True
+        self._label_xe = QLabel('x\u2032 =')
+        self._label_xe.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._affine10_view_controller = DecimalLineEditParameterViewController(
+            transform.affine10, is_signed=True
         )
-        self._label_bx = QLabel('x +')
-        self._affine_by_view_controller = DecimalLineEditParameterViewController(
-            transform.affine_by, is_signed=True
+        self._label_yp1 = QLabel('y +')
+        self._affine11_view_controller = DecimalLineEditParameterViewController(
+            transform.affine11, is_signed=True
         )
-        self._label_by = QLabel('y +')
-        self._affine_bt_view_controller = LengthWidgetParameterViewController(
-            transform.affine_bt_m, is_signed=True
+        self._label_xp1 = QLabel('x +')
+        self._affine12_view_controller = LengthWidgetParameterViewController(
+            transform.affine12, is_signed=True
         )
 
         self._jitter_radius_label = QLabel('Jitter Radius:')
@@ -78,19 +78,19 @@ class ScanTransformViewController(ParameterViewController):
 
         layout = QGridLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self._label_xp, 0, 0)
-        layout.addWidget(self._affine_ax_view_controller.get_widget(), 0, 1)
-        layout.addWidget(self._label_ax, 0, 2)
-        layout.addWidget(self._affine_ay_view_controller.get_widget(), 0, 3)
-        layout.addWidget(self._label_ay, 0, 4)
-        layout.addWidget(self._affine_at_view_controller.get_widget(), 0, 5)
+        layout.addWidget(self._label_ye, 0, 0)
+        layout.addWidget(self._affine00_view_controller.get_widget(), 0, 1)
+        layout.addWidget(self._label_yp0, 0, 2)
+        layout.addWidget(self._affine01_view_controller.get_widget(), 0, 3)
+        layout.addWidget(self._label_xp0, 0, 4)
+        layout.addWidget(self._affine02_view_controller.get_widget(), 0, 5)
 
-        layout.addWidget(self._label_yp, 1, 0)
-        layout.addWidget(self._affine_bx_view_controller.get_widget(), 1, 1)
-        layout.addWidget(self._label_bx, 1, 2)
-        layout.addWidget(self._affine_by_view_controller.get_widget(), 1, 3)
-        layout.addWidget(self._label_by, 1, 4)
-        layout.addWidget(self._affine_bt_view_controller.get_widget(), 1, 5)
+        layout.addWidget(self._label_xe, 1, 0)
+        layout.addWidget(self._affine10_view_controller.get_widget(), 1, 1)
+        layout.addWidget(self._label_yp1, 1, 2)
+        layout.addWidget(self._affine11_view_controller.get_widget(), 1, 3)
+        layout.addWidget(self._label_xp1, 1, 4)
+        layout.addWidget(self._affine12_view_controller.get_widget(), 1, 5)
 
         layout.addWidget(self._jitter_radius_label, 2, 0)
         layout.addWidget(self._jitter_radius_view_controller.get_widget(), 2, 1, 1, 5)

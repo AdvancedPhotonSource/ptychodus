@@ -775,7 +775,7 @@ class ParameterViewBuilder:
 
     def build_dialog(self, window_title: str, parent: QWidget | None) -> QDialog:
         button_box = QDialogButtonBox()
-        layout = self._build_layout(add_stretch=False)
+        layout = self._build_layout(add_stretch=True)
         layout.addWidget(button_box)
 
         dialog = ParameterDialog(self._flush_view_controllers(), button_box, parent)

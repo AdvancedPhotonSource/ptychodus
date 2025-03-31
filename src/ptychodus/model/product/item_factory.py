@@ -1,6 +1,7 @@
 import logging
 
-from ptychodus.api.product import Product
+from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.product import Product, ProductFileReader
 
 from ..patterns import AssembledDiffractionDataset, PatternSizer
 from .geometry import ProductGeometry
@@ -26,6 +27,7 @@ class ProductRepositoryItemFactory:
         probe_item_factory: ProbeRepositoryItemFactory,
         object_item_factory: ObjectRepositoryItemFactory,
         repository: ProductRepository,
+        file_reader_chooser: PluginChooser[ProductFileReader],
     ) -> None:
         super().__init__()
         self._settings = settings
@@ -35,6 +37,7 @@ class ProductRepositoryItemFactory:
         self._probe_item_factory = probe_item_factory
         self._object_item_factory = object_item_factory
         self._repository = repository
+        self._file_reader_chooser = file_reader_chooser
 
     def create_from_values(
         self,
@@ -109,8 +112,20 @@ class ProductRepositoryItemFactory:
         )
 
     def create_from_settings(self) -> ProductRepositoryItem:
-        # TODO add mechanism to sync product state to settings
-        # FIXME try to load from settings.file_path, then fall back to load from components
+        file_path = self._settings.file_path.get_value()
+
+        if file_path.is_file():
+            file_type = self._file_reader_chooser.get_current_plugin().simple_name
+            logger.debug(f'Reading "{file_path}" as "{file_type}"')
+            file_reader = self._file_reader_chooser.get_current_plugin().strategy
+
+            try:
+                product = file_reader.read(file_path)
+            except Exception as exc:
+                raise RuntimeError(f'Failed to read "{file_path}"') from exc
+            else:
+                return self.create_from_product(product)
+
         metadata_item = MetadataRepositoryItem(self._settings, self._repository)
         scan_item = self._scan_item_factory.create_from_settings()
         geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)

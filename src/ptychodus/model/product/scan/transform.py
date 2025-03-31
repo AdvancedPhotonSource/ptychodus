@@ -15,23 +15,23 @@ class ScanPointTransform(ParameterGroup):
         self._rng = rng
         self._settings = settings
 
-        self.affine_ax = settings.affine_transform_ax.copy()
-        self._add_parameter('affine_ax', self.affine_ax)
+        self.affine00 = settings.affine00.copy()
+        self._add_parameter('affine00', self.affine00)
 
-        self.affine_ay = settings.affine_transform_ay.copy()
-        self._add_parameter('affine_ay', self.affine_ay)
+        self.affine01 = settings.affine01.copy()
+        self._add_parameter('affine01', self.affine01)
 
-        self.affine_at_m = settings.affine_transform_at_m.copy()
-        self._add_parameter('affine_at_m', self.affine_at_m)
+        self.affine02 = settings.affine02.copy()
+        self._add_parameter('affine02', self.affine02)
 
-        self.affine_bx = settings.affine_transform_bx.copy()
-        self._add_parameter('affine_bx', self.affine_bx)
+        self.affine10 = settings.affine10.copy()
+        self._add_parameter('affine10', self.affine10)
 
-        self.affine_by = settings.affine_transform_by.copy()
-        self._add_parameter('affine_by', self.affine_by)
+        self.affine11 = settings.affine11.copy()
+        self._add_parameter('affine11', self.affine11)
 
-        self.affine_bt_m = settings.affine_transform_bt_m.copy()
-        self._add_parameter('affine_bt_m', self.affine_bt_m)
+        self.affine12 = settings.affine12.copy()
+        self._add_parameter('affine12', self.affine12)
 
         self.jitter_radius_m = settings.jitter_radius_m.copy()
         self._add_parameter('jitter_radius_m', self.jitter_radius_m)
@@ -62,37 +62,37 @@ class ScanPointTransform(ParameterGroup):
 
     def labels_for_presets(self) -> Iterator[str]:
         for index in range(8):
-            xp = '\u2212x' if self.negate_x(index) else '\u002bx'
             yp = '\u2212y' if self.negate_y(index) else '\u002by'
-            fxy = f'{yp}, {xp}' if self.swap_xy(index) else f'{xp}, {yp}'
-            yield f'(x, y) \u2192 ({fxy})'
+            xp = '\u2212x' if self.negate_x(index) else '\u002bx'
+            fyx = f'{xp}, {yp}' if self.swap_xy(index) else f'{yp}, {xp}'
+            yield f'(y, x) \u2192 ({fyx})'
 
     def apply_presets(self, index: int) -> None:
         if self.swap_xy(index):
-            self.affine_ay.set_value(-1 if self.negate_y(index) else +1)
-            self.affine_bx.set_value(-1 if self.negate_x(index) else +1)
-            self.affine_ax.set_value(0)
-            self.affine_by.set_value(0)
+            self.affine00.set_value(0)
+            self.affine01.set_value(-1 if self.negate_x(index) else +1)
+            self.affine10.set_value(-1 if self.negate_y(index) else +1)
+            self.affine11.set_value(0)
         else:
-            self.affine_ax.set_value(-1 if self.negate_x(index) else +1)
-            self.affine_by.set_value(-1 if self.negate_y(index) else +1)
-            self.affine_ay.set_value(0)
-            self.affine_bx.set_value(0)
+            self.affine00.set_value(-1 if self.negate_y(index) else +1)
+            self.affine01.set_value(0)
+            self.affine10.set_value(0)
+            self.affine11.set_value(-1 if self.negate_x(index) else +1)
 
     def set_identity(self) -> None:
         self.apply_presets(0)
 
     def __call__(self, point: ScanPoint) -> ScanPoint:
-        ax = self.affine_ax.get_value()
-        ay = self.affine_ay.get_value()
-        at_m = self.affine_at_m.get_value()
+        a00 = self.affine00.get_value()
+        a01 = self.affine01.get_value()
+        a02 = self.affine02.get_value()
 
-        bx = self.affine_bx.get_value()
-        by = self.affine_by.get_value()
-        bt_m = self.affine_bt_m.get_value()
+        a10 = self.affine10.get_value()
+        a11 = self.affine11.get_value()
+        a12 = self.affine12.get_value()
 
-        pos_x = ax * point.position_x_m + ay * point.position_y_m + at_m
-        pos_y = bx * point.position_x_m + by * point.position_y_m + bt_m
+        pos_y = a00 * point.position_y_m + a01 * point.position_x_m + a02
+        pos_x = a10 * point.position_y_m + a11 * point.position_x_m + a12
 
         rad = self.jitter_radius_m.get_value()
 

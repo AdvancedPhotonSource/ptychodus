@@ -16,25 +16,12 @@ class ScanSettings(Observable, Observer):
         )
         self.file_type = self._settings_group.create_string_parameter('FileType', 'CSV')
 
-        self.affine_transform_ax = self._settings_group.create_real_parameter(
-            'AffineTransformAX', 1.0
-        )
-        self.affine_transform_ay = self._settings_group.create_real_parameter(
-            'AffineTransformAY', 0.0
-        )
-        self.affine_transform_at_m = self._settings_group.create_real_parameter(
-            'AffineTransformATInMeters', 0.0
-        )
-
-        self.affine_transform_bx = self._settings_group.create_real_parameter(
-            'AffineTransformBX', 0.0
-        )
-        self.affine_transform_by = self._settings_group.create_real_parameter(
-            'AffineTransformBY', 1.0
-        )
-        self.affine_transform_bt_m = self._settings_group.create_real_parameter(
-            'AffineTransformBTInMeters', 0.0
-        )
+        self.affine00 = self._settings_group.create_real_parameter('Affine00', 1.0)
+        self.affine01 = self._settings_group.create_real_parameter('Affine01', 0.0)
+        self.affine02 = self._settings_group.create_real_parameter('Affine02', 0.0)
+        self.affine10 = self._settings_group.create_real_parameter('Affine10', 0.0)
+        self.affine11 = self._settings_group.create_real_parameter('Affine11', 1.0)
+        self.affine12 = self._settings_group.create_real_parameter('Affine12', 0.0)
         self.jitter_radius_m = self._settings_group.create_real_parameter(
             'JitterRadiusInMeters', 0.0, minimum=0.0
         )

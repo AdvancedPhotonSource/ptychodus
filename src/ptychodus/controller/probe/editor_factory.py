@@ -178,7 +178,7 @@ class ProbeEditorViewControllerFactory:
         if additional_modes_builder is None:
             return
 
-        incoherent_modes_group = 'Incoherent Modes'
+        incoherent_modes_group = 'Incoherent (Mixed State) Modes'
         dialog_builder.add_spin_box(
             additional_modes_builder.num_incoherent_modes,
             'Number of Modes:',
@@ -200,7 +200,7 @@ class ProbeEditorViewControllerFactory:
             group=incoherent_modes_group,
         )
 
-        coherent_modes_group = 'Coherent Modes'
+        coherent_modes_group = 'Coherent (OPR) Modes'
         dialog_builder.add_spin_box(
             additional_modes_builder.num_coherent_modes,
             'Number of Modes:',

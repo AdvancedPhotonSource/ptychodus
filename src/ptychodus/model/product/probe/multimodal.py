@@ -69,7 +69,7 @@ class MultimodalProbeBuilder(ParameterGroup):
         return array
 
     def _orthogonalize_incoherent_modes(self, probe: WavefieldArrayType) -> WavefieldArrayType:
-        # FIXME OPR
+        # FIXME OPR?
         imodes_as_rows = probe.reshape(probe.shape[-3], -1)
         imodes_as_cols = imodes_as_rows.T
         imodes_as_ortho_cols = scipy.linalg.orth(imodes_as_cols)
@@ -108,9 +108,13 @@ class MultimodalProbeBuilder(ParameterGroup):
         return array
 
     def set_identity(self) -> None:
-        pass  # FIXME set things to not mess with the probe
+        self.num_incoherent_modes.set_value(1)
+        self.num_coherent_modes.set_value(1)
 
     def build(self, probe: Probe, geometry_provider: ProbeGeometryProvider) -> Probe:
+        if self.num_incoherent_modes.get_value() <= 1 and self.num_coherent_modes.get_value() <= 1:
+            return probe
+
         array = self._init_modes(probe.get_array())
 
         if self.orthogonalize_incoherent_modes.get_value():

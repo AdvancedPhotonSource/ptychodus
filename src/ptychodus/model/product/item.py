@@ -132,6 +132,8 @@ class ProductRepositoryItem(ParameterGroup):
         elif observable is self._object_item:
             self._invalidate_costs()
             self._parent.handle_object_changed(self)
+        else:
+            super()._update(observable)
 
 
 class ProductRepositoryObserver(ABC):

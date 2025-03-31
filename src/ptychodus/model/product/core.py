@@ -79,6 +79,7 @@ class ProductCore(Observer):
             self._probe_repository_item_factory,
             self._object_repository_item_factory,
             self.product_repository,
+            product_file_reader_chooser,
         )
         self.product_api = ProductAPI(
             self.settings,
