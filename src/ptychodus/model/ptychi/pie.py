@@ -68,7 +68,7 @@ class PIEReconstructor(Reconstructor):
             patch_interpolation_method=helper.patch_interpolation_method,
             remove_object_probe_ambiguity=helper.remove_object_probe_ambiguity,
             build_preconditioner_with_all_modes=helper.build_preconditioner_with_all_modes,
-            alpha=self._settings.objectAlpha.get_value(),
+            alpha=self._settings.object_alpha.get_value(),
         )
 
     def _create_probe_options(self, probe: Probe, metadata: ProductMetadata) -> PIEProbeOptions:
@@ -86,7 +86,7 @@ class PIEReconstructor(Reconstructor):
             support_constraint=helper.support_constraint,
             center_constraint=helper.center_constraint,
             eigenmode_update_relaxation=helper.eigenmode_update_relaxation,
-            alpha=self._settings.probeAlpha.get_value(),
+            alpha=self._settings.probe_alpha.get_value(),
         )
 
     def _create_probe_position_options(

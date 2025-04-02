@@ -80,15 +80,15 @@ class PtyChiReconstructorOptionsHelper:
 
     @property
     def num_epochs(self) -> int:
-        return self._settings.numEpochs.get_value()
+        return self._settings.num_epochs.get_value()
 
     @property
     def batch_size(self) -> int:
-        return self._settings.batchSize.get_value()
+        return self._settings.batch_size.get_value()
 
     @property
     def batching_mode(self) -> BatchingModes:
-        batching_mode_str = self._settings.batchingMode.get_value()
+        batching_mode_str = self._settings.batching_mode.get_value()
 
         try:
             return BatchingModes[batching_mode_str.upper()]
@@ -98,19 +98,19 @@ class PtyChiReconstructorOptionsHelper:
 
     @property
     def compact_mode_update_clustering(self) -> bool:
-        return self._settings.compactModeUpdateClustering.get_value() > 0
+        return self._settings.compact_mode_update_clustering.get_value() > 0
 
     @property
     def compact_mode_update_clustering_stride(self) -> int:
-        return self._settings.compactModeUpdateClustering.get_value()
+        return self._settings.compact_mode_update_clustering.get_value()
 
     @property
     def default_device(self) -> Devices:
-        return Devices.GPU if self._settings.useDevices.get_value() else Devices.CPU
+        return Devices.GPU if self._settings.use_devices.get_value() else Devices.CPU
 
     @property
     def default_dtype(self) -> Dtypes:
-        return Dtypes.FLOAT64 if self._settings.useDoublePrecision.get_value() else Dtypes.FLOAT32
+        return Dtypes.FLOAT64 if self._settings.use_double_precision.get_value() else Dtypes.FLOAT32
 
     @property
     def random_seed(self) -> int | None:
@@ -123,8 +123,8 @@ class PtyChiReconstructorOptionsHelper:
     @property
     def forward_model_options(self) -> ForwardModelOptions:
         return ForwardModelOptions(
-            low_memory_mode=self._settings.useLowMemoryMode.get_value(),
-            pad_for_shift=self._settings.padForShift.get_value(),
+            low_memory_mode=self._settings.use_low_memory_mode.get_value(),
+            pad_for_shift=self._settings.pad_for_shift.get_value(),
         )
 
 
@@ -134,14 +134,14 @@ class PtyChiObjectOptionsHelper:
 
     @property
     def optimizable(self) -> bool:
-        return self._settings.isOptimizable.get_value()
+        return self._settings.is_optimizable.get_value()
 
     @property
     def optimization_plan(self) -> OptimizationPlan:
         return create_optimization_plan(
-            self._settings.optimizationPlanStart.get_value(),
-            self._settings.optimizationPlanStop.get_value(),
-            self._settings.optimizationPlanStride.get_value(),
+            self._settings.optimization_plan_start.get_value(),
+            self._settings.optimization_plan_stop.get_value(),
+            self._settings.optimization_plan_stride.get_value(),
         )
 
     @property
@@ -150,7 +150,7 @@ class PtyChiObjectOptionsHelper:
 
     @property
     def step_size(self) -> float:
-        return self._settings.stepSize.get_value()
+        return self._settings.step_size.get_value()
 
     @property
     def optimizer_params(self) -> dict:  # TODO
@@ -159,42 +159,42 @@ class PtyChiObjectOptionsHelper:
     @property
     def l1_norm_constraint(self) -> ObjectL1NormConstraintOptions:
         return ObjectL1NormConstraintOptions(
-            enabled=self._settings.constrainL1Norm.get_value(),
+            enabled=self._settings.constrain_l1_norm.get_value(),
             optimization_plan=create_optimization_plan(
-                self._settings.constrainL1NormStart.get_value(),
-                self._settings.constrainL1NormStop.get_value(),
-                self._settings.constrainL1NormStride.get_value(),
+                self._settings.constrain_l1_norm_start.get_value(),
+                self._settings.constrain_l1_norm_stop.get_value(),
+                self._settings.constrain_l1_norm_stride.get_value(),
             ),
-            weight=self._settings.constrainL1NormWeight.get_value(),
+            weight=self._settings.constrain_l1_norm_weight.get_value(),
         )
 
     @property
     def smoothness_constraint(self) -> ObjectSmoothnessConstraintOptions:
         return ObjectSmoothnessConstraintOptions(
-            enabled=self._settings.constrainSmoothness.get_value(),
+            enabled=self._settings.constrain_smoothness.get_value(),
             optimization_plan=create_optimization_plan(
-                self._settings.constrainSmoothnessStart.get_value(),
-                self._settings.constrainSmoothnessStop.get_value(),
-                self._settings.constrainSmoothnessStride.get_value(),
+                self._settings.constrain_smoothness_start.get_value(),
+                self._settings.constrain_smoothness_stop.get_value(),
+                self._settings.constrain_smoothness_stride.get_value(),
             ),
-            alpha=self._settings.constrainSmoothnessAlpha.get_value(),
+            alpha=self._settings.constrain_smoothness_alpha.get_value(),
         )
 
     @property
     def total_variation(self) -> ObjectTotalVariationOptions:
         return ObjectTotalVariationOptions(
-            enabled=self._settings.constrainTotalVariation.get_value(),
+            enabled=self._settings.constrain_total_variation.get_value(),
             optimization_plan=create_optimization_plan(
-                self._settings.constrainTotalVariationStart.get_value(),
-                self._settings.constrainTotalVariationStop.get_value(),
-                self._settings.constrainTotalVariationStride.get_value(),
+                self._settings.constrain_total_variation_start.get_value(),
+                self._settings.constrain_total_variation_stop.get_value(),
+                self._settings.constrain_total_variation_stride.get_value(),
             ),
-            weight=self._settings.constrainTotalVariationWeight.get_value(),
+            weight=self._settings.constrain_total_variation_weight.get_value(),
         )
 
     @property
     def remove_grid_artifacts(self) -> RemoveGridArtifactsOptions:
-        direction_str = self._settings.removeGridArtifactsDirection.get_value()
+        direction_str = self._settings.remove_grid_artifacts_direction.get_value()
 
         try:
             direction = Directions[direction_str.upper()]
@@ -203,22 +203,22 @@ class PtyChiObjectOptionsHelper:
             direction = Directions.XY
 
         return RemoveGridArtifactsOptions(
-            enabled=self._settings.removeGridArtifacts.get_value(),
+            enabled=self._settings.remove_grid_artifacts.get_value(),
             optimization_plan=create_optimization_plan(
-                self._settings.removeGridArtifactsStart.get_value(),
-                self._settings.removeGridArtifactsStop.get_value(),
-                self._settings.removeGridArtifactsStride.get_value(),
+                self._settings.remove_grid_artifacts_start.get_value(),
+                self._settings.remove_grid_artifacts_stop.get_value(),
+                self._settings.remove_grid_artifacts_stride.get_value(),
             ),
-            period_x_m=self._settings.removeGridArtifactsPeriodXInMeters.get_value(),
-            period_y_m=self._settings.removeGridArtifactsPeriodYInMeters.get_value(),
-            window_size=self._settings.removeGridArtifactsWindowSizeInPixels.get_value(),
+            period_x_m=self._settings.remove_grid_artifacts_period_x_m.get_value(),
+            period_y_m=self._settings.remove_grid_artifacts_period_y_m.get_value(),
+            window_size=self._settings.remove_grid_artifacts_window_size_px.get_value(),
             direction=direction,
         )
 
     @property
     def multislice_regularization(self) -> ObjectMultisliceRegularizationOptions:
         unwrap_image_grad_method_str = (
-            self._settings.regularizeMultisliceUnwrapPhaseImageGradientMethod.get_value()
+            self._settings.regularize_multislice_unwrap_phase_image_gradient_method.get_value()
         )
 
         try:
@@ -230,7 +230,7 @@ class PtyChiObjectOptionsHelper:
             unwrap_image_grad_method = ImageGradientMethods.FOURIER_SHIFT
 
         unwrap_image_integration_method_str = (
-            self._settings.regularizeMultisliceUnwrapPhaseImageIntegrationMethod.get_value()
+            self._settings.regularize_multislice_unwrap_phase_image_integration_method.get_value()
         )
 
         try:
@@ -244,21 +244,21 @@ class PtyChiObjectOptionsHelper:
             unwrap_image_integration_method = ImageIntegrationMethods.DECONVOLUTION
 
         return ObjectMultisliceRegularizationOptions(
-            enabled=self._settings.regularizeMultislice.get_value(),
+            enabled=self._settings.regularize_multislice.get_value(),
             optimization_plan=create_optimization_plan(
-                self._settings.regularizeMultisliceStart.get_value(),
-                self._settings.regularizeMultisliceStop.get_value(),
-                self._settings.regularizeMultisliceStride.get_value(),
+                self._settings.regularize_multislice_start.get_value(),
+                self._settings.regularize_multislice_stop.get_value(),
+                self._settings.regularize_multislice_stride.get_value(),
             ),
-            weight=self._settings.regularizeMultisliceWeight.get_value(),
-            unwrap_phase=self._settings.regularizeMultisliceUnwrapPhase.get_value(),
+            weight=self._settings.regularize_multislice_weight.get_value(),
+            unwrap_phase=self._settings.regularize_multislice_unwrap_phase.get_value(),
             unwrap_image_grad_method=unwrap_image_grad_method,
             unwrap_image_integration_method=unwrap_image_integration_method,
         )
 
     @property
     def patch_interpolation_method(self) -> PatchInterpolationMethods:
-        method_str = self._settings.patchInterpolator.get_value()
+        method_str = self._settings.patch_interpolator.get_value()
 
         try:
             return PatchInterpolationMethods[method_str.upper()]
@@ -269,17 +269,17 @@ class PtyChiObjectOptionsHelper:
     @property
     def remove_object_probe_ambiguity(self) -> RemoveObjectProbeAmbiguityOptions:
         return RemoveObjectProbeAmbiguityOptions(
-            enabled=self._settings.removeObjectProbeAmbiguity.get_value(),
+            enabled=self._settings.remove_object_probe_ambiguity.get_value(),
             optimization_plan=create_optimization_plan(
-                self._settings.removeObjectProbeAmbiguityStart.get_value(),
-                self._settings.removeObjectProbeAmbiguityStop.get_value(),
-                self._settings.removeObjectProbeAmbiguityStride.get_value(),
+                self._settings.remove_object_probe_ambiguity_start.get_value(),
+                self._settings.remove_object_probe_ambiguity_stop.get_value(),
+                self._settings.remove_object_probe_ambiguity_stride.get_value(),
             ),
         )
 
     @property
     def build_preconditioner_with_all_modes(self) -> bool:
-        return self._settings.buildPreconditionerWithAllModes.get_value()
+        return self._settings.build_preconditioner_with_all_modes.get_value()
 
     def get_initial_guess(self, object_: Object) -> ObjectArrayType:
         return object_.get_array()
@@ -303,14 +303,14 @@ class PtyChiProbeOptionsHelper:
 
     @property
     def optimizable(self) -> bool:
-        return self._settings.isOptimizable.get_value()
+        return self._settings.is_optimizable.get_value()
 
     @property
     def optimization_plan(self) -> OptimizationPlan:
         return create_optimization_plan(
-            self._settings.optimizationPlanStart.get_value(),
-            self._settings.optimizationPlanStop.get_value(),
-            self._settings.optimizationPlanStride.get_value(),
+            self._settings.optimization_plan_start.get_value(),
+            self._settings.optimization_plan_stop.get_value(),
+            self._settings.optimization_plan_stride.get_value(),
         )
 
     @property
@@ -319,7 +319,7 @@ class PtyChiProbeOptionsHelper:
 
     @property
     def step_size(self) -> float:
-        return self._settings.stepSize.get_value()
+        return self._settings.step_size.get_value()
 
     @property
     def optimizer_params(self) -> dict:  # TODO
@@ -327,7 +327,7 @@ class PtyChiProbeOptionsHelper:
 
     @property
     def orthogonalize_incoherent_modes(self) -> ProbeOrthogonalizeIncoherentModesOptions:
-        method_str = self._settings.orthogonalizeIncoherentModesMethod.get_value()
+        method_str = self._settings.orthogonalize_incoherent_modes_method.get_value()
 
         try:
             method = OrthogonalizationMethods[method_str.upper()]
@@ -336,11 +336,11 @@ class PtyChiProbeOptionsHelper:
             method = OrthogonalizationMethods.GS
 
         return ProbeOrthogonalizeIncoherentModesOptions(
-            enabled=self._settings.orthogonalizeIncoherentModes.get_value(),
+            enabled=self._settings.orthogonalize_incoherent_modes.get_value(),
             optimization_plan=create_optimization_plan(
-                self._settings.orthogonalizeIncoherentModesStart.get_value(),
-                self._settings.orthogonalizeIncoherentModesStop.get_value(),
-                self._settings.orthogonalizeIncoherentModesStride.get_value(),
+                self._settings.orthogonalize_incoherent_modes_start.get_value(),
+                self._settings.orthogonalize_incoherent_modes_stop.get_value(),
+                self._settings.orthogonalize_incoherent_modes_stride.get_value(),
             ),
             method=method,
         )
@@ -348,51 +348,51 @@ class PtyChiProbeOptionsHelper:
     @property
     def orthogonalize_opr_modes(self) -> ProbeOrthogonalizeOPRModesOptions:
         return ProbeOrthogonalizeOPRModesOptions(
-            enabled=self._settings.orthogonalizeOPRModes.get_value(),
+            enabled=self._settings.orthogonalize_opr_modes.get_value(),
             optimization_plan=create_optimization_plan(
-                self._settings.orthogonalizeOPRModesStart.get_value(),
-                self._settings.orthogonalizeOPRModesStop.get_value(),
-                self._settings.orthogonalizeOPRModesStride.get_value(),
+                self._settings.orthogonalize_opr_modes_start.get_value(),
+                self._settings.orthogonalize_opr_modes_stop.get_value(),
+                self._settings.orthogonalize_opr_modes_stride.get_value(),
             ),
         )
 
     @property
     def support_constraint(self) -> ProbeSupportConstraintOptions:
         return ProbeSupportConstraintOptions(
-            enabled=self._settings.constrainSupport.get_value(),
+            enabled=self._settings.constrain_support.get_value(),
             optimization_plan=create_optimization_plan(
-                self._settings.constrainSupportStart.get_value(),
-                self._settings.constrainSupportStop.get_value(),
-                self._settings.constrainSupportStride.get_value(),
+                self._settings.constrain_support_start.get_value(),
+                self._settings.constrain_support_stop.get_value(),
+                self._settings.constrain_support_stride.get_value(),
             ),
-            threshold=self._settings.constrainSupportThreshold.get_value(),
+            threshold=self._settings.constrain_support_threshold.get_value(),
         )
 
     @property
     def center_constraint(self) -> ProbeCenterConstraintOptions:
         return ProbeCenterConstraintOptions(
-            enabled=self._settings.constrainCenter.get_value(),
+            enabled=self._settings.constrain_center.get_value(),
             optimization_plan=create_optimization_plan(
-                self._settings.constrainCenterStart.get_value(),
-                self._settings.constrainCenterStop.get_value(),
-                self._settings.constrainCenterStride.get_value(),
+                self._settings.constrain_center_start.get_value(),
+                self._settings.constrain_center_stop.get_value(),
+                self._settings.constrain_center_stride.get_value(),
             ),
         )
 
     @property
     def eigenmode_update_relaxation(self) -> float:
-        return self._settings.relaxEigenmodeUpdate.get_value()
+        return self._settings.relax_eigenmode_update.get_value()
 
     def get_initial_guess(self, probe: Probe) -> WavefieldArrayType:
         return probe.get_array()
 
     def get_power_constraint(self, metadata: ProductMetadata) -> ProbePowerConstraintOptions:
         return ProbePowerConstraintOptions(
-            enabled=self._settings.constrainProbePower.get_value(),
+            enabled=self._settings.constrain_probe_power.get_value(),
             optimization_plan=create_optimization_plan(
-                self._settings.constrainProbePowerStart.get_value(),
-                self._settings.constrainProbePowerStop.get_value(),
-                self._settings.constrainProbePowerStride.get_value(),
+                self._settings.constrain_probe_power_start.get_value(),
+                self._settings.constrain_probe_power_stop.get_value(),
+                self._settings.constrain_probe_power_stride.get_value(),
             ),
             probe_power=metadata.probe_photon_count,
         )
@@ -404,14 +404,14 @@ class PtyChiProbePositionOptionsHelper:
 
     @property
     def optimizable(self) -> bool:
-        return self._settings.isOptimizable.get_value()
+        return self._settings.is_optimizable.get_value()
 
     @property
     def optimization_plan(self) -> OptimizationPlan:
         return create_optimization_plan(
-            self._settings.optimizationPlanStart.get_value(),
-            self._settings.optimizationPlanStop.get_value(),
-            self._settings.optimizationPlanStride.get_value(),
+            self._settings.optimization_plan_start.get_value(),
+            self._settings.optimization_plan_stop.get_value(),
+            self._settings.optimization_plan_stride.get_value(),
         )
 
     @property
@@ -420,7 +420,7 @@ class PtyChiProbePositionOptionsHelper:
 
     @property
     def step_size(self) -> float:
-        return self._settings.stepSize.get_value()
+        return self._settings.step_size.get_value()
 
     @property
     def optimizer_params(self) -> dict:  # TODO
@@ -429,22 +429,22 @@ class PtyChiProbePositionOptionsHelper:
     @property
     def magnitude_limit(self) -> ProbePositionMagnitudeLimitOptions:
         return ProbePositionMagnitudeLimitOptions(
-            enabled=self._settings.limitMagnitudeUpdate.get_value(),
+            enabled=self._settings.limit_magnitude_update.get_value(),
             optimization_plan=create_optimization_plan(
-                self._settings.limitMagnitudeUpdateStart.get_value(),
-                self._settings.limitMagnitudeUpdateStop.get_value(),
-                self._settings.limitMagnitudeUpdateStride.get_value(),
+                self._settings.limit_magnitude_update_start.get_value(),
+                self._settings.limit_magnitude_update_stop.get_value(),
+                self._settings.limit_magnitude_update_stride.get_value(),
             ),
-            limit=self._settings.magnitudeUpdateLimit.get_value(),
+            limit=self._settings.magnitude_update_limit.get_value(),
         )
 
     @property
     def constrain_position_mean(self) -> bool:
-        return self._settings.constrainCentroid.get_value()
+        return self._settings.constrain_centroid.get_value()
 
     @property
     def correction_options(self) -> PositionCorrectionOptions:
-        correction_type_str = self._settings.positionCorrectionType.get_value()
+        correction_type_str = self._settings.position_correction_type.get_value()
 
         try:
             correction_type = PositionCorrectionTypes[correction_type_str.upper()]
@@ -454,9 +454,9 @@ class PtyChiProbePositionOptionsHelper:
 
         return PositionCorrectionOptions(
             correction_type=correction_type,
-            cross_correlation_scale=self._settings.crossCorrelationScale.get_value(),
-            cross_correlation_real_space_width=self._settings.crossCorrelationRealSpaceWidth.get_value(),
-            cross_correlation_probe_threshold=self._settings.crossCorrelationProbeThreshold.get_value(),
+            cross_correlation_scale=self._settings.cross_correlation_scale.get_value(),
+            cross_correlation_real_space_width=self._settings.cross_correlation_real_space_width.get_value(),
+            cross_correlation_probe_threshold=self._settings.cross_correlation_probe_threshold.get_value(),
         )
 
     def get_positions_px(
@@ -481,14 +481,14 @@ class PtyChiOPROptionsHelper:
 
     @property
     def optimizable(self) -> bool:
-        return self._settings.isOptimizable.get_value()
+        return self._settings.is_optimizable.get_value()
 
     @property
     def optimization_plan(self) -> OptimizationPlan:
         return create_optimization_plan(
-            self._settings.optimizationPlanStart.get_value(),
-            self._settings.optimizationPlanStop.get_value(),
-            self._settings.optimizationPlanStride.get_value(),
+            self._settings.optimization_plan_start.get_value(),
+            self._settings.optimization_plan_stop.get_value(),
+            self._settings.optimization_plan_stride.get_value(),
         )
 
     @property
@@ -497,7 +497,7 @@ class PtyChiOPROptionsHelper:
 
     @property
     def step_size(self) -> float:
-        return self._settings.stepSize.get_value()
+        return self._settings.step_size.get_value()
 
     @property
     def optimizer_params(self) -> dict:  # TODO
@@ -505,7 +505,7 @@ class PtyChiOPROptionsHelper:
 
     @property
     def smoothing(self) -> OPRModeWeightsSmoothingOptions:
-        method_str = self._settings.smoothingMethod.get_value()
+        method_str = self._settings.smoothing_method.get_value()
 
         try:
             method: OPRWeightSmoothingMethods | None = OPRWeightSmoothingMethods[method_str.upper()]
@@ -514,27 +514,27 @@ class PtyChiOPROptionsHelper:
             logger.warning('Failed to parse OPR weight smoothing method "{method_str}"!')
 
         return OPRModeWeightsSmoothingOptions(
-            enabled=self._settings.smoothModeWeights.get_value(),
+            enabled=self._settings.smooth_mode_weights.get_value(),
             optimization_plan=create_optimization_plan(
-                self._settings.smoothModeWeightsStart.get_value(),
-                self._settings.smoothModeWeightsStop.get_value(),
-                self._settings.smoothModeWeightsStride.get_value(),
+                self._settings.smooth_mode_weights_start.get_value(),
+                self._settings.smooth_mode_weights_stop.get_value(),
+                self._settings.smooth_mode_weights_stride.get_value(),
             ),
             method=method,
-            polynomial_degree=self._settings.polynomialSmoothingDegree.get_value(),
+            polynomial_degree=self._settings.polynomial_smoothing_degree.get_value(),
         )
 
     @property
     def optimize_eigenmode_weights(self) -> bool:
-        return self._settings.optimizeEigenmodeWeights.get_value()
+        return self._settings.optimize_eigenmode_weights.get_value()
 
     @property
     def optimize_intensity_variation(self) -> bool:
-        return self._settings.optimizeIntensities.get_value()
+        return self._settings.optimize_intensities.get_value()
 
     @property
     def update_relaxation(self) -> float:
-        return self._settings.relaxUpdate.get_value()
+        return self._settings.relax_update.get_value()
 
     def get_initial_weights(self) -> RealArrayType:
         return numpy.array([0.0])  # FIXME
@@ -564,17 +564,17 @@ class PtyChiOptionsHelper:
         pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry()
         free_space_propagation_distance_m = (
             numpy.inf
-            if self._reconstructor_settings.useFarFieldPropagation
+            if self._reconstructor_settings.use_far_field_propagation
             else metadata.detector_distance_m
         )
         return PtychographyDataOptions(
             data=parameters.patterns,
             free_space_propagation_distance_m=free_space_propagation_distance_m,
             wavelength_m=metadata.probe_wavelength_m,
-            fft_shift=self._reconstructor_settings.fftShiftDiffractionPatterns.get_value(),
+            fft_shift=self._reconstructor_settings.fft_shift_diffraction_patterns.get_value(),
             detector_pixel_size_m=pixel_geometry.width_m,
             valid_pixel_mask=numpy.logical_not(parameters.bad_pixels),
-            save_data_on_device=self._reconstructor_settings.saveDataOnDevice.get_value(),
+            save_data_on_device=self._reconstructor_settings.save_data_on_device.get_value(),
         )
 
     def create_product(

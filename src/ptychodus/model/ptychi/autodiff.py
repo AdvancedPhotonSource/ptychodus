@@ -43,7 +43,7 @@ class AutodiffReconstructor(Reconstructor):
 
         ####
 
-        loss_function_str = self._settings.lossFunction.get_value()
+        loss_function_str = self._settings.loss_function.get_value()
 
         try:
             loss_function = LossFunctions[loss_function_str.upper()]
@@ -53,7 +53,7 @@ class AutodiffReconstructor(Reconstructor):
 
         ####
 
-        forward_model_class_str = self._settings.forwardModelClass.get_value()
+        forward_model_class_str = self._settings.forward_model_class.get_value()
 
         try:
             forward_model_class = ForwardModels[forward_model_class_str.upper()]

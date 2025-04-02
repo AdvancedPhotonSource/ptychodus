@@ -63,22 +63,22 @@ class PtyChiOptimizationPlanViewController(ParameterViewController):
         num_epochs: IntegerParameter,
     ) -> None:
         super().__init__()
-        self._startViewController = SpinBoxParameterViewController(
+        self._start_view_controller = SpinBoxParameterViewController(
             start, tool_tip='Iteration to start optimizing'
         )
-        self._stopViewController = PtyChiStopSpinBoxParameterViewController(
+        self._stop_view_controller = PtyChiStopSpinBoxParameterViewController(
             stop, num_epochs, tool_tip='Iteration to stop optimizing'
         )
-        self._strideViewController = SpinBoxParameterViewController(
+        self._stride_view_controller = SpinBoxParameterViewController(
             stride, tool_tip='Number of iterations between updates'
         )
         self._widget = QWidget()
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self._startViewController.get_widget())
-        layout.addWidget(self._stopViewController.get_widget())
-        layout.addWidget(self._strideViewController.get_widget())
+        layout.addWidget(self._start_view_controller.get_widget())
+        layout.addWidget(self._stop_view_controller.get_widget())
+        layout.addWidget(self._stride_view_controller.get_widget())
         self._widget.setLayout(layout)
 
     def get_widget(self) -> QWidget:

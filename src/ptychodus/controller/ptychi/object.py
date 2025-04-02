@@ -31,7 +31,7 @@ __all__ = ['PtyChiObjectViewController']
 class PtyChiConstrainL1NormViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
-        constrainL1Norm: BooleanParameter,
+        constrain_l1_norm: BooleanParameter,
         start: IntegerParameter,
         stop: IntegerParameter,
         stride: IntegerParameter,
@@ -39,28 +39,28 @@ class PtyChiConstrainL1NormViewController(CheckableGroupBoxParameterViewControll
         num_epochs: IntegerParameter,
     ) -> None:
         super().__init__(
-            constrainL1Norm,
+            constrain_l1_norm,
             'Constrain L\u2081 Norm',
             tool_tip='Whether to constrain the L\u2081 norm.',
         )
-        self._planViewController = PtyChiOptimizationPlanViewController(
+        self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
-        self._weightViewController = DecimalLineEditParameterViewController(
+        self._weight_view_controller = DecimalLineEditParameterViewController(
             weight,
             tool_tip='Weight of the L\u2081 norm constraint.',
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.get_widget())
-        layout.addRow('Weight:', self._weightViewController.get_widget())
+        layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        layout.addRow('Weight:', self._weight_view_controller.get_widget())
         self.get_widget().setLayout(layout)
 
 
 class PtyChiConstrainSmoothnessViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
-        constrainSmoothness: BooleanParameter,
+        constrain_smoothness: BooleanParameter,
         start: IntegerParameter,
         stop: IntegerParameter,
         stride: IntegerParameter,
@@ -68,27 +68,27 @@ class PtyChiConstrainSmoothnessViewController(CheckableGroupBoxParameterViewCont
         num_epochs: IntegerParameter,
     ) -> None:
         super().__init__(
-            constrainSmoothness,
+            constrain_smoothness,
             'Constrain Smoothness',
             tool_tip='Whether to constrain smoothness in the magnitude (but not phase) of the object',
         )
-        self._planViewController = PtyChiOptimizationPlanViewController(
+        self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
-        self._alphaViewController = DecimalSliderParameterViewController(
+        self._alpha_view_controller = DecimalSliderParameterViewController(
             alpha, tool_tip='Relaxation smoothing constant.'
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.get_widget())
-        layout.addRow('Alpha:', self._alphaViewController.get_widget())
+        layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        layout.addRow('Alpha:', self._alpha_view_controller.get_widget())
         self.get_widget().setLayout(layout)
 
 
 class PtyChiConstrainTotalVariationViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
-        constrainTotalVariation: BooleanParameter,
+        constrain_total_variation: BooleanParameter,
         start: IntegerParameter,
         stop: IntegerParameter,
         stride: IntegerParameter,
@@ -96,116 +96,116 @@ class PtyChiConstrainTotalVariationViewController(CheckableGroupBoxParameterView
         num_epochs: IntegerParameter,
     ) -> None:
         super().__init__(
-            constrainTotalVariation,
+            constrain_total_variation,
             'Constrain Total Variation',
             tool_tip='Whether to constrain the total variation.',
         )
-        self._planViewController = PtyChiOptimizationPlanViewController(
+        self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
-        self._weightViewController = DecimalLineEditParameterViewController(
+        self._weight_view_controller = DecimalLineEditParameterViewController(
             weight,
             tool_tip='Weight of the total variation constraint.',
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.get_widget())
-        layout.addRow('Weight:', self._weightViewController.get_widget())
+        layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        layout.addRow('Weight:', self._weight_view_controller.get_widget())
         self.get_widget().setLayout(layout)
 
 
 class PtyChiRemoveGridArtifactsViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
-        removeGridArtifacts: BooleanParameter,
+        remove_grid_artifacts: BooleanParameter,
         start: IntegerParameter,
         stop: IntegerParameter,
         stride: IntegerParameter,
-        periodXInMeters: RealParameter,
-        periodYInMeters: RealParameter,
-        windowSizeInPixels: IntegerParameter,
+        period_x_m: RealParameter,
+        period_y_m: RealParameter,
+        window_size_px: IntegerParameter,
         direction: StringParameter,
         num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
         super().__init__(
-            removeGridArtifacts,
+            remove_grid_artifacts,
             'Remove Grid Artifacts',
             tool_tip="Whether to remove grid artifacts in the object's phase at the end of an epoch.",
         )
-        self._planViewController = PtyChiOptimizationPlanViewController(
+        self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
-        self._periodXViewController = LengthWidgetParameterViewController(
-            periodXInMeters, tool_tip='Horizontal period of grid artifacts in meters.'
+        self._period_x_view_controller = LengthWidgetParameterViewController(
+            period_x_m, tool_tip='Horizontal period of grid artifacts in meters.'
         )
-        self._periodYViewController = LengthWidgetParameterViewController(
-            periodYInMeters, tool_tip='Vertical period of grid artifacts in meters.'
+        self._period_y_view_controller = LengthWidgetParameterViewController(
+            period_y_m, tool_tip='Vertical period of grid artifacts in meters.'
         )
-        self._windowSizeViewController = SpinBoxParameterViewController(
-            windowSizeInPixels, tool_tip='Window size for grid artifact removal in pixels.'
+        self._window_size_view_controller = SpinBoxParameterViewController(
+            window_size_px, tool_tip='Window size for grid artifact removal in pixels.'
         )
-        self._directionViewController = ComboBoxParameterViewController(
+        self._direction_view_controller = ComboBoxParameterViewController(
             direction, enumerators.directions(), tool_tip='Direction of grid artifact removal.'
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.get_widget())
-        layout.addRow('Period X:', self._periodXViewController.get_widget())
-        layout.addRow('Period Y:', self._periodYViewController.get_widget())
-        layout.addRow('Window Size [px]:', self._windowSizeViewController.get_widget())
-        layout.addRow('Direction:', self._directionViewController.get_widget())
+        layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        layout.addRow('Period X:', self._period_x_view_controller.get_widget())
+        layout.addRow('Period Y:', self._period_y_view_controller.get_widget())
+        layout.addRow('Window Size [px]:', self._window_size_view_controller.get_widget())
+        layout.addRow('Direction:', self._direction_view_controller.get_widget())
         self.get_widget().setLayout(layout)
 
 
 class PtyChiRegularizeMultisliceViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
-        regularizeMultislice: BooleanParameter,
+        regularize_multislice: BooleanParameter,
         start: IntegerParameter,
         stop: IntegerParameter,
         stride: IntegerParameter,
         weight: RealParameter,
-        unwrapPhase: BooleanParameter,
-        gradientMethod: StringParameter,
-        integrationMethod: StringParameter,
+        unwrap_phase: BooleanParameter,
+        gradient_method: StringParameter,
+        integration_method: StringParameter,
         num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
         super().__init__(
-            regularizeMultislice,
+            regularize_multislice,
             'Regularize Multislice',
             tool_tip='Whether to regularize multislice objects using cross-slice smoothing.',
         )
-        self._planViewController = PtyChiOptimizationPlanViewController(
+        self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
-        self._weightViewController = DecimalLineEditParameterViewController(
+        self._weight_view_controller = DecimalLineEditParameterViewController(
             weight,
             tool_tip='Weight for multislice regularization.',
         )
-        self._unwrapPhaseViewController = CheckBoxParameterViewController(
-            unwrapPhase,
+        self._unwrap_phase_view_controller = CheckBoxParameterViewController(
+            unwrap_phase,
             'Unwrap Phase',
             tool_tip='Whether to unwrap the phase of the object during multislice regularization.',
         )
-        self._gradientMethodViewController = ComboBoxParameterViewController(
-            gradientMethod,
-            enumerators.imageGradientMethods(),
+        self._gradient_method_view_controller = ComboBoxParameterViewController(
+            gradient_method,
+            enumerators.image_gradient_methods(),
             tool_tip='Method for calculating the phase gradient during phase unwrapping.',
         )
-        self._integrationMethodViewController = ComboBoxParameterViewController(
-            integrationMethod,
-            enumerators.imageIntegrationMethods(),
+        self._integration_method_view_controller = ComboBoxParameterViewController(
+            integration_method,
+            enumerators.image_integration_methods(),
             tool_tip='Method for integrating the phase gradient during phase unwrapping.',
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.get_widget())
-        layout.addRow('Weight:', self._weightViewController.get_widget())
-        layout.addRow(self._unwrapPhaseViewController.get_widget())
-        layout.addRow('Gradient Method:', self._gradientMethodViewController.get_widget())
-        layout.addRow('Integration Method:', self._integrationMethodViewController.get_widget())
+        layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        layout.addRow('Weight:', self._weight_view_controller.get_widget())
+        layout.addRow(self._unwrap_phase_view_controller.get_widget())
+        layout.addRow('Gradient Method:', self._gradient_method_view_controller.get_widget())
+        layout.addRow('Integration Method:', self._integration_method_view_controller.get_widget())
         self.get_widget().setLayout(layout)
 
 
@@ -213,120 +213,126 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
         settings: PtyChiObjectSettings,
-        dmSettings: PtyChiDMSettings | None,
-        lsqmlSettings: PtyChiLSQMLSettings | None,
-        pieSettings: PtyChiPIESettings | None,
+        dm_settings: PtyChiDMSettings | None,
+        lsqml_settings: PtyChiLSQMLSettings | None,
+        pie_settings: PtyChiPIESettings | None,
         num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
         super().__init__(
-            settings.isOptimizable, 'Optimize Object', tool_tip='Whether the object is optimizable.'
+            settings.is_optimizable,
+            'Optimize Object',
+            tool_tip='Whether the object is optimizable.',
         )
-        self._optimizationPlanViewController = PtyChiOptimizationPlanViewController(
-            settings.optimizationPlanStart,
-            settings.optimizationPlanStop,
-            settings.optimizationPlanStride,
+        self._optimization_plan_view_controller = PtyChiOptimizationPlanViewController(
+            settings.optimization_plan_start,
+            settings.optimization_plan_stop,
+            settings.optimization_plan_stride,
             num_epochs,
         )
-        self._optimizerViewController = PtyChiOptimizerParameterViewController(
+        self._optimizer_view_controller = PtyChiOptimizerParameterViewController(
             settings.optimizer, enumerators
         )
-        self._stepSizeViewController = DecimalLineEditParameterViewController(
-            settings.stepSize, tool_tip='Optimizer step size'
+        self._step_size_view_controller = DecimalLineEditParameterViewController(
+            settings.step_size, tool_tip='Optimizer step size'
         )
-        self._patchInterpolatorViewController = ComboBoxParameterViewController(
-            settings.patchInterpolator,
-            enumerators.patchInterpolationMethods(),
+        self._patch_interpolator_view_controller = ComboBoxParameterViewController(
+            settings.patch_interpolator,
+            enumerators.patch_interpolation_methods(),
             tool_tip='Interpolation method used for extracting and updating patches of the object.',
         )
-        self._constrainL1NormViewController = PtyChiConstrainL1NormViewController(
-            settings.constrainL1Norm,
-            settings.constrainL1NormStart,
-            settings.constrainL1NormStop,
-            settings.constrainL1NormStride,
-            settings.constrainL1NormWeight,
+        self._constrain_l1_norm_view_controller = PtyChiConstrainL1NormViewController(
+            settings.constrain_l1_norm,
+            settings.constrain_l1_norm_start,
+            settings.constrain_l1_norm_stop,
+            settings.constrain_l1_norm_stride,
+            settings.constrain_l1_norm_weight,
             num_epochs,
         )
-        self._constrainSmoothnessViewController = PtyChiConstrainSmoothnessViewController(
-            settings.constrainSmoothness,
-            settings.constrainSmoothnessStart,
-            settings.constrainSmoothnessStop,
-            settings.constrainSmoothnessStride,
-            settings.constrainSmoothnessAlpha,
+        self._constrain_smoothness_view_controller = PtyChiConstrainSmoothnessViewController(
+            settings.constrain_smoothness,
+            settings.constrain_smoothness_start,
+            settings.constrain_smoothness_stop,
+            settings.constrain_smoothness_stride,
+            settings.constrain_smoothness_alpha,
             num_epochs,
         )
-        self._constrainTotalVariationViewController = PtyChiConstrainTotalVariationViewController(
-            settings.constrainTotalVariation,
-            settings.constrainTotalVariationStart,
-            settings.constrainTotalVariationStop,
-            settings.constrainTotalVariationStride,
-            settings.constrainTotalVariationWeight,
-            num_epochs,
+        self._constrain_total_variation_view_controller = (
+            PtyChiConstrainTotalVariationViewController(
+                settings.constrain_total_variation,
+                settings.constrain_total_variation_start,
+                settings.constrain_total_variation_stop,
+                settings.constrain_total_variation_stride,
+                settings.constrain_total_variation_weight,
+                num_epochs,
+            )
         )
-        self._removeGridArtifactsViewController = PtyChiRemoveGridArtifactsViewController(
-            settings.removeGridArtifacts,
-            settings.removeGridArtifactsStart,
-            settings.removeGridArtifactsStop,
-            settings.removeGridArtifactsStride,
-            settings.removeGridArtifactsPeriodXInMeters,
-            settings.removeGridArtifactsPeriodYInMeters,
-            settings.removeGridArtifactsWindowSizeInPixels,
-            settings.removeGridArtifactsDirection,
+        self._remove_grid_artifacts_view_controller = PtyChiRemoveGridArtifactsViewController(
+            settings.remove_grid_artifacts,
+            settings.remove_grid_artifacts_start,
+            settings.remove_grid_artifacts_stop,
+            settings.remove_grid_artifacts_stride,
+            settings.remove_grid_artifacts_period_x_m,
+            settings.remove_grid_artifacts_period_y_m,
+            settings.remove_grid_artifacts_window_size_px,
+            settings.remove_grid_artifacts_direction,
             num_epochs,
             enumerators,
         )
-        self._regularizeMultisliceViewController = PtyChiRegularizeMultisliceViewController(
-            settings.regularizeMultislice,
-            settings.regularizeMultisliceStart,
-            settings.regularizeMultisliceStop,
-            settings.regularizeMultisliceStride,
-            settings.regularizeMultisliceWeight,
-            settings.regularizeMultisliceUnwrapPhase,
-            settings.regularizeMultisliceUnwrapPhaseImageGradientMethod,
-            settings.regularizeMultisliceUnwrapPhaseImageIntegrationMethod,
+        self._regularize_multislice_view_controller = PtyChiRegularizeMultisliceViewController(
+            settings.regularize_multislice,
+            settings.regularize_multislice_start,
+            settings.regularize_multislice_stop,
+            settings.regularize_multislice_stride,
+            settings.regularize_multislice_weight,
+            settings.regularize_multislice_unwrap_phase,
+            settings.regularize_multislice_unwrap_phase_image_gradient_method,
+            settings.regularize_multislice_unwrap_phase_image_integration_method,
             num_epochs,
             enumerators,
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._optimizationPlanViewController.get_widget())
-        layout.addRow('Optimizer:', self._optimizerViewController.get_widget())
-        layout.addRow('Step Size:', self._stepSizeViewController.get_widget())
-        layout.addRow('Patch Interpolator:', self._patchInterpolatorViewController.get_widget())
-        layout.addRow(self._constrainL1NormViewController.get_widget())
-        layout.addRow(self._constrainSmoothnessViewController.get_widget())
-        layout.addRow(self._constrainTotalVariationViewController.get_widget())
-        layout.addRow(self._removeGridArtifactsViewController.get_widget())
-        layout.addRow(self._regularizeMultisliceViewController.get_widget())
+        layout.addRow('Plan:', self._optimization_plan_view_controller.get_widget())
+        layout.addRow('Optimizer:', self._optimizer_view_controller.get_widget())
+        layout.addRow('Step Size:', self._step_size_view_controller.get_widget())
+        layout.addRow('Patch Interpolator:', self._patch_interpolator_view_controller.get_widget())
+        layout.addRow(self._constrain_l1_norm_view_controller.get_widget())
+        layout.addRow(self._constrain_smoothness_view_controller.get_widget())
+        layout.addRow(self._constrain_total_variation_view_controller.get_widget())
+        layout.addRow(self._remove_grid_artifacts_view_controller.get_widget())
+        layout.addRow(self._regularize_multislice_view_controller.get_widget())
 
-        if dmSettings is not None:
-            self._amplitudeClampLimitViewController = DecimalLineEditParameterViewController(
-                dmSettings.objectAmplitudeClampLimit,
+        if dm_settings is not None:
+            self._amplitude_clamp_limit_view_controller = DecimalLineEditParameterViewController(
+                dm_settings.object_amplitude_clamp_limit,
                 tool_tip='Maximum amplitude value for the object.',
             )
             layout.addRow(
-                'Amplitude Clamp Limit:', self._amplitudeClampLimitViewController.get_widget()
+                'Amplitude Clamp Limit:', self._amplitude_clamp_limit_view_controller.get_widget()
             )
 
-        if lsqmlSettings is not None:
-            self._objectOptimalStepSizeScalerViewController = (
-                DecimalLineEditParameterViewController(lsqmlSettings.objectOptimalStepSizeScaler)
+        if lsqml_settings is not None:
+            self._object_optimal_step_size_scaler_view_controller = (
+                DecimalLineEditParameterViewController(
+                    lsqml_settings.object_optimal_step_size_scaler
+                )
             )
             layout.addRow(
                 'Optimal Step Size Scaler:',
-                self._objectOptimalStepSizeScalerViewController.get_widget(),
+                self._object_optimal_step_size_scaler_view_controller.get_widget(),
             )
 
-            self._objectMultimodalUpdateViewController = CheckBoxParameterViewController(
-                lsqmlSettings.objectMultimodalUpdate,
+            self._object_multimodal_update_view_controller = CheckBoxParameterViewController(
+                lsqml_settings.object_multimodal_update,
                 'Multimodal Update',
             )
-            layout.addRow(self._objectMultimodalUpdateViewController.get_widget())
+            layout.addRow(self._object_multimodal_update_view_controller.get_widget())
 
-        if pieSettings is not None:
-            self._alphaViewController = DecimalSliderParameterViewController(
-                pieSettings.objectAlpha
+        if pie_settings is not None:
+            self._alpha_view_controller = DecimalSliderParameterViewController(
+                pie_settings.object_alpha
             )
-            layout.addRow('Alpha:', self._alphaViewController.get_widget())
+            layout.addRow('Alpha:', self._alpha_view_controller.get_widget())
 
         self.get_widget().setLayout(layout)
