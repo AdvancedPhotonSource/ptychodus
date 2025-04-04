@@ -16,6 +16,7 @@ from .probe import ProbeController
 from .product import ProductController
 from .ptychi import PtyChiViewControllerFactory
 from .ptychonn import PtychoNNViewControllerFactory
+from .ptychopinn import PtychoPINNViewControllerFactory
 from .reconstructor import ReconstructorController
 from .scan import ScanController
 from .settings import SettingsController
@@ -34,6 +35,9 @@ class ControllerCore:
         )
         self._ptychonn_view_controller_factory = PtychoNNViewControllerFactory(
             model.ptychonn_reconstructor_library
+        )
+        self._ptychopinn_view_controller_factory = PtychoPINNViewControllerFactory(
+            model.ptychopinn_reconstructor_library, self._file_dialog_factory
         )
         self._tike_view_controller_factory = TikeViewControllerFactory(
             model.tike_reconstructor_library
@@ -121,6 +125,7 @@ class ControllerCore:
             self._file_dialog_factory,
             [
                 self._ptychi_view_controller_factory,
+                self._ptychopinn_view_controller_factory,
                 self._ptychonn_view_controller_factory,
                 self._tike_view_controller_factory,
             ],

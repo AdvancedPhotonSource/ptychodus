@@ -54,6 +54,7 @@ module = [
     "lightning.*",
     "parsl.*",
     "ptychi.*",
+    "ptycho.*",
     "ptychonn.*",
     "pvaccess",
     "pvapy.*",

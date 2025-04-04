@@ -31,6 +31,7 @@ from .patterns import PatternsCore, PatternsStreamingContext
 from .product import PositionsStreamingContext, ProductCore
 from .ptychi import PtyChiReconstructorLibrary
 from .ptychonn import PtychoNNReconstructorLibrary
+from .ptychopinn import PtychoPINNReconstructorLibrary
 from .reconstructor import ReconstructorCore
 from .tike import TikeReconstructorLibrary
 from .visualization import VisualizationEngine
@@ -139,6 +140,9 @@ class ModelCore:
         self.ptychonn_reconstructor_library = PtychoNNReconstructorLibrary.create_instance(
             self.settings_registry, is_developer_mode_enabled
         )
+        self.ptychopinn_reconstructor_library = PtychoPINNReconstructorLibrary(
+            self.settings_registry, is_developer_mode_enabled
+        )
         self.reconstructor = ReconstructorCore(
             self.settings_registry,
             self.patterns.dataset,
@@ -147,6 +151,7 @@ class ModelCore:
                 self.ptychi_reconstructor_library,
                 self.tike_reconstructor_library,
                 self.ptychonn_reconstructor_library,
+                self.ptychopinn_reconstructor_library,
             ],
         )
         self.fluorescence_core = FluorescenceCore(
