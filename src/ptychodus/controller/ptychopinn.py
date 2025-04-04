@@ -14,15 +14,15 @@ class PowerTwoSpinBox(QSpinBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
 
-    def stepBy(self, steps: int) -> None:
+    def stepBy(self, steps: int) -> None:  # noqa: N802
         if steps < 0:
             self.setValue(self.value() // (1 << -steps))
         elif steps > 0:
             self.setValue(self.value() * (1 << steps))
 
-    def validate(self, input_text: str, pos: int) -> tuple[QValidator.State, str, int]:
+    def validate(self, input: str, pos: int) -> tuple[QValidator.State, str, int]:
         try:
-            value = int(input_text)
+            value = int(input)
         except ValueError:
             pass
         else:
@@ -30,9 +30,9 @@ class PowerTwoSpinBox(QSpinBox):
                 is_pow2 = (value & (value - 1)) == 0
 
                 if is_pow2:
-                    return QValidator.Acceptable, input_text, pos
+                    return QValidator.Acceptable, input, pos
 
-        return QValidator.Intermediate, input_text, pos
+        return QValidator.Intermediate, input, pos
 
 
 class PowerTwoSpinBoxParameterViewController(ParameterViewController, Observer):
@@ -48,7 +48,7 @@ class PowerTwoSpinBoxParameterViewController(ParameterViewController, Observer):
         self._widget.valueChanged.connect(parameter.set_value)
         parameter.add_observer(self)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
     def _sync_model_to_view(self) -> None:
@@ -80,17 +80,17 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
         self._file_dialog_factory = file_dialog_factory
 
     @property
-    def backendName(self) -> str:
+    def backend_name(self) -> str:
         return 'PtychoPINN'
 
-    def createViewController(self, reconstructorName: str) -> QWidget:
-        is_pinn = reconstructorName.lower() == 'pinn'
+    def create_view_controller(self, reconstructor_name: str) -> QWidget:
+        is_pinn = reconstructor_name.lower() == 'pinn'
         builder = ParameterViewBuilder(self._file_dialog_factory)
         enumerators = self._model.enumerators
 
         model_group = 'Model'
         model_settings = self._model.model_settings
-        builder.addSpinBox(
+        builder.add_spin_box(
             model_settings.n_filters_scale,
             'Num. Filters Scale Factor:',
             tool_tip='Scale factor for number of filters',
@@ -98,19 +98,19 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
         )
 
         if is_pinn:
-            builder.addSpinBox(
+            builder.add_spin_box(
                 model_settings.gridsize,
                 'Grid Size:',
                 tool_tip='Controls number of images processed per solution region (e.g., gridsize=2 means 2^2=4 images at a time)',
                 group=model_group,
             )
-            builder.addComboBox(
+            builder.add_combo_box(
                 model_settings.amp_activation,
                 enumerators.get_amp_activations(),
                 'Amplitude Activation Function:',
                 group=model_group,
             )
-            builder.addCheckBox(
+            builder.add_check_box(
                 model_settings.object_big,
                 'Object Big',
                 group=model_group,
@@ -119,7 +119,7 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
                 'and the decoders return a single real space image instead of `gridsize**2` images. '
                 'Typically left True.',
             )
-            builder.addCheckBox(
+            builder.add_check_box(
                 model_settings.probe_big,
                 'Probe Big',
                 group=model_group,
@@ -128,7 +128,7 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
                 'but may be needed if the probe illumination has wide tails. '
                 'Has no effect unless pad_object is True.',
             )
-            builder.addCheckBox(
+            builder.add_check_box(
                 model_settings.probe_mask,
                 'Probe Mask',
                 group=model_group,
@@ -136,7 +136,7 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
                 "If toggling this changes the reconstruction, it's likely that there are edge / real space truncation artifacts. "
                 'Should be used with pad_object = False.',
             )
-            builder.addCheckBox(
+            builder.add_check_box(
                 model_settings.pad_object,
                 'Pad Object',
                 group=model_group,
@@ -147,13 +147,13 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
                 'which uses a small number of CNN filters to generate a low-resolution reconstruction of the outer region. '
                 'Typically left True.',
             )
-            builder.addDecimalLineEdit(
+            builder.add_decimal_line_edit(
                 model_settings.probe_scale,
                 'Probe Scale Factor:',
                 group=model_group,
                 tool_tip='Scaling factor for the probe amplitude. ',
             )
-            builder.addDecimalLineEdit(
+            builder.add_decimal_line_edit(
                 model_settings.gaussian_smoothing_sigma,
                 'Gaussian Smoothing Sigma:',
                 group=model_group,
@@ -164,49 +164,49 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
 
         inference_group = 'Inference'
         inference_settings = self._model.inference_settings
-        builder.addSpinBox(
+        builder.add_spin_box(
             inference_settings.n_nearest_neighbors, 'Number of Neighbors:', group=inference_group
         )
-        builder.addSpinBox(
+        builder.add_spin_box(
             inference_settings.n_samples, 'Number of Samples:', group=inference_group
         )
 
         training_group = 'Training'
         training_settings = self._model.training_settings
-        builder.addViewController(
+        builder.add_view_controller(
             PowerTwoSpinBoxParameterViewController(training_settings.batch_size),
             'Batch Size:',
             group=training_group,
         )
-        builder.addSpinBox(training_settings.nepochs, 'Number of Epochs:', group=training_group)
+        builder.add_spin_box(training_settings.nepochs, 'Number of Epochs:', group=training_group)
 
         if is_pinn:
-            builder.addDecimalSlider(
+            builder.add_decimal_slider(
                 training_settings.mae_weight, 'Weight for MAE loss:', group=training_group
             )
-            builder.addDecimalSlider(
+            builder.add_decimal_slider(
                 training_settings.nll_weight, 'Weight for NLL loss:', group=training_group
             )
-            builder.addDecimalSlider(
+            builder.add_decimal_slider(
                 training_settings.realspace_mae_weight,
                 'Realspace MAE Weight:',
                 group=training_group,
             )
-            builder.addDecimalSlider(
+            builder.add_decimal_slider(
                 training_settings.realspace_weight, 'Realspace Weight:', group=training_group
             )
-            builder.addCheckBox(
+            builder.add_check_box(
                 training_settings.positions_provided,
                 'Positions Provided',
                 group=training_group,
             )
-            builder.addCheckBox(
+            builder.add_check_box(
                 training_settings.probe_trainable,
                 'Probe Trainable',
                 group=training_group,
                 tool_tip='Optimizes the probe function during training. Experimental feature.',
             )
-            builder.addCheckBox(
+            builder.add_check_box(
                 training_settings.intensity_scale_trainable,
                 'Intensity Scale Trainable',
                 group=training_group,
@@ -214,4 +214,4 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
                 'Typically left True.',
             )
 
-        return builder.buildWidget()
+        return builder.build_widget()

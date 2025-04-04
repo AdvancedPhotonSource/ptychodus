@@ -17,10 +17,11 @@ import ptycho.params
 from ptychodus.api.object import Object
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import (
+    LossValue,
     ReconstructInput,
     ReconstructOutput,
-    TrainableReconstructor,
     TrainOutput,
+    TrainableReconstructor,
 )
 
 from .settings import (
@@ -41,7 +42,7 @@ def create_raw_data(parameters: ReconstructInput) -> RawData:
     position_x_px: list[float] = list()
     position_y_px: list[float] = list()
 
-    for scan_point in parameters.product.scan:
+    for scan_point in parameters.product.positions:
         object_point = object_geometry.map_scan_point_to_object_point(scan_point)
         position_x_px.append(object_point.position_x_px)
         position_y_px.append(object_point.position_y_px)
@@ -52,7 +53,7 @@ def create_raw_data(parameters: ReconstructInput) -> RawData:
         diff3d=parameters.patterns,
         probeGuess=parameters.product.probe.get_incoherent_mode(0),
         # assume that all patches are from the same object
-        scan_index=numpy.zeros(len(parameters.product.scan), dtype=int),
+        scan_index=numpy.zeros(len(parameters.product.positions), dtype=int),
         objectGuess=parameters.product.object_.get_layer(0),
     )
 
@@ -169,7 +170,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
         product = Product(
             metadata=parameters.product.metadata,
-            scan=parameters.product.scan,
+            positions=parameters.product.positions,
             probe=parameters.product.probe,
             object_=object_out,
             costs=costs,
@@ -246,4 +247,5 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         # dict_keys(['history', 'model_instance', 'reconstructed_obj', 'pred_amp', 'reconstructed_obj_cdi', 'stitched_obj', 'train_container', 'test_container', 'obj_tensor_full', 'global_offsets', 'recon_amp', 'recon_phase'])
         # FIXME self._model_dict = train_results
 
-        return TrainOutput([], [], 0)  # FIXME
+        losses: Sequence[LossValue] = []
+        return TrainOutput(losses, 0)  # FIXME

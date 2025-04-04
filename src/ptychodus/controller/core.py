@@ -36,8 +36,8 @@ class ControllerCore:
         self._ptychonn_view_controller_factory = PtychoNNViewControllerFactory(
             model.ptychonn_reconstructor_library
         )
-        self._ptychopinnViewControllerFactory = PtychoPINNViewControllerFactory(
-            model.ptychopinnReconstructorLibrary, self._fileDialogFactory
+        self._ptychopinn_view_controller_factory = PtychoPINNViewControllerFactory(
+            model.ptychopinn_reconstructor_library, self._file_dialog_factory
         )
         self._tike_view_controller_factory = TikeViewControllerFactory(
             model.tike_reconstructor_library
@@ -125,9 +125,9 @@ class ControllerCore:
             self._file_dialog_factory,
             [
                 self._ptychi_view_controller_factory,
+                self._ptychopinn_view_controller_factory,
                 self._ptychonn_view_controller_factory,
                 self._tike_view_controller_factory,
-                self._ptychopinnViewControllerFactory,
             ],
         )
         self._workflow_controller = WorkflowController(

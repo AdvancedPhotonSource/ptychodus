@@ -140,8 +140,8 @@ class ModelCore:
         self.ptychonn_reconstructor_library = PtychoNNReconstructorLibrary.create_instance(
             self.settings_registry, is_developer_mode_enabled
         )
-        self.ptychopinnReconstructorLibrary = PtychoPINNReconstructorLibrary(
-            self.settingsRegistry, isDeveloperModeEnabled
+        self.ptychopinn_reconstructor_library = PtychoPINNReconstructorLibrary(
+            self.settings_registry, is_developer_mode_enabled
         )
         self.reconstructor = ReconstructorCore(
             self.settings_registry,
@@ -151,7 +151,7 @@ class ModelCore:
                 self.ptychi_reconstructor_library,
                 self.tike_reconstructor_library,
                 self.ptychonn_reconstructor_library,
-                self.ptychopinnReconstructorLibrary,
+                self.ptychopinn_reconstructor_library,
             ],
         )
         self.fluorescence_core = FluorescenceCore(
