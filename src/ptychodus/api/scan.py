@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import overload
 import sys
 
+import numpy
+
 
 @dataclass(frozen=True)
 class ScanPoint:
@@ -48,10 +50,19 @@ class ScanBoundingBox:
 
 class PositionSequence(Sequence[ScanPoint]):
     def __init__(self, point_seq: Sequence[ScanPoint] | None = None) -> None:
-        self._point_seq: Sequence[ScanPoint] = [] if point_seq is None else point_seq
+        coordinates_m: list[float] = []
+
+        if point_seq is not None:
+            for point in point_seq:
+                coordinates_m.append(point.position_y_m)
+                coordinates_m.append(point.position_x_m)
+
+        self._coordinates_m = numpy.reshape(coordinates_m, (-1, 2))
 
     def copy(self) -> PositionSequence:
-        return PositionSequence(list(self._point_seq))
+        pos_seq = PositionSequence()
+        pos_seq._coordinates_m = self._coordinates_m.copy()
+        return pos_seq
 
     @overload
     def __getitem__(self, index: int) -> ScanPoint: ...
@@ -60,16 +71,21 @@ class PositionSequence(Sequence[ScanPoint]):
     def __getitem__(self, index: slice) -> Sequence[ScanPoint]: ...
 
     def __getitem__(self, index: int | slice) -> ScanPoint | Sequence[ScanPoint]:
-        return self._point_seq[index]
+        if isinstance(index, slice):
+            return [self[idx] for idx in range(index.start, index.stop, index.step)]
+
+        return ScanPoint(
+            index=index,
+            position_x_m=self._coordinates_m[index, -1],
+            position_y_m=self._coordinates_m[index, -2],
+        )
 
     def __len__(self) -> int:
-        return len(self._point_seq)
+        return self._coordinates_m.shape[0]
 
     @property
     def nbytes(self) -> int:
-        sz = sys.getsizeof(self._point_seq)
-        sz += sum(sys.getsizeof(point) for point in self._point_seq)
-        return sz
+        return self._coordinates_m.nbytes
 
 
 class ScanPointParseError(Exception):
