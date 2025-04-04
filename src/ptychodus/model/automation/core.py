@@ -23,80 +23,80 @@ class AutomationPresenter(Observable, Observer):
         settings: AutomationSettings,
         workflow: CurrentFileBasedWorkflow,
         watcher: DataDirectoryWatcher,
-        datasetBuffer: AutomationDatasetBuffer,
-        datasetRepository: AutomationDatasetRepository,
+        dataset_buffer: AutomationDatasetBuffer,
+        dataset_repository: AutomationDatasetRepository,
     ) -> None:
         super().__init__()
         self._settings = settings
         self._workflow = workflow
         self._watcher = watcher
-        self._datasetBuffer = datasetBuffer
-        self._datasetRepository = datasetRepository
+        self._dataset_buffer = dataset_buffer
+        self._dataset_repository = dataset_repository
 
         settings.add_observer(self)
         watcher.add_observer(self)
 
-    def getStrategyList(self) -> Iterator[str]:
-        return self._workflow.getAvailableWorkflows()
+    def get_strategies(self) -> Iterator[str]:
+        return self._workflow.get_available_workflows()
 
-    def getStrategy(self) -> str:
-        return self._workflow.getWorkflow()
+    def get_strategy(self) -> str:
+        return self._workflow.get_workflow()
 
-    def setStrategy(self, strategy: str) -> None:
-        self._workflow.setWorkflow(strategy)
+    def set_strategy(self, strategy: str) -> None:
+        self._workflow.set_workflow(strategy)
 
-    def getDataDirectory(self) -> Path:
-        return self._settings.dataDirectory.get_value()
+    def get_data_directory(self) -> Path:
+        return self._settings.data_directory.get_value()
 
-    def setDataDirectory(self, directory: Path) -> None:
-        self._settings.dataDirectory.set_value(directory)
+    def set_data_directory(self, directory: Path) -> None:
+        self._settings.data_directory.set_value(directory)
 
-    def getProcessingIntervalLimitsInSeconds(self) -> Interval[int]:
+    def get_processing_interval_limits_s(self) -> Interval[int]:
         return Interval[int](0, 600)
 
-    def getProcessingIntervalInSeconds(self) -> int:
-        limits = self.getProcessingIntervalLimitsInSeconds()
-        return limits.clamp(self._settings.processingIntervalInSeconds.get_value())
+    def get_processing_interval_s(self) -> int:
+        limits = self.get_processing_interval_limits_s()
+        return limits.clamp(self._settings.processing_interval_s.get_value())
 
-    def setProcessingIntervalInSeconds(self, value: int) -> None:
-        self._settings.processingIntervalInSeconds.set_value(value)
+    def set_processing_interval_s(self, value: int) -> None:
+        self._settings.processing_interval_s.set_value(value)
 
-    def loadExistingDatasetsToRepository(self) -> None:
-        dataDirectory = self.getDataDirectory()
+    def load_existing_datasets_to_repository(self) -> None:
+        data_directory = self.get_data_directory()
         pattern = '**/' if self._workflow.is_watch_recursive else ''
         pattern += self._workflow.get_watch_file_pattern()
-        scanFileList = sorted(scanFile for scanFile in dataDirectory.glob(pattern))
+        scan_file_list = sorted(scanFile for scanFile in data_directory.glob(pattern))
 
-        for scanFile in scanFileList:
-            self._datasetBuffer.put(scanFile)
+        for scan_file in scan_file_list:
+            self._dataset_buffer.put(scan_file)
 
-    def clearDatasetRepository(self) -> None:
-        self._datasetRepository.clear()
+    def clear_dataset_repository(self) -> None:
+        self._dataset_repository.clear()
 
-    def isWatchdogEnabled(self) -> bool:
-        return self._watcher.isAlive
+    def is_watchdog_enabled(self) -> bool:
+        return self._watcher.is_alive
 
-    def setWatchdogEnabled(self, enable: bool) -> None:
+    def set_watchdog_enabled(self, enable: bool) -> None:
         if enable:
             self._watcher.start()
         else:
             self._watcher.stop()
 
-    def getWatchdogDelayLimitsInSeconds(self) -> Interval[int]:
+    def get_watchdog_delay_limits_s(self) -> Interval[int]:
         return Interval[int](0, 600)
 
-    def getWatchdogDelayInSeconds(self) -> int:
-        limits = self.getWatchdogDelayLimitsInSeconds()
-        return limits.clamp(self._settings.watchdogDelayInSeconds.get_value())
+    def get_watchdog_delay_s(self) -> int:
+        limits = self.get_watchdog_delay_limits_s()
+        return limits.clamp(self._settings.watchdog_delay_s.get_value())
 
-    def setWatchdogDelayInSeconds(self, value: int) -> None:
-        self._settings.watchdogDelayInSeconds.set_value(value)
+    def set_watchdog_delay_s(self, value: int) -> None:
+        self._settings.watchdog_delay_s.set_value(value)
 
-    def setWatchdogPollingObserverEnabled(self, enable: bool) -> None:
-        self._settings.useWatchdogPollingObserver.set_value(enable)
+    def set_watchdog_polling_observer_enabled(self, enable: bool) -> None:
+        self._settings.use_watchdog_polling_observer.set_value(enable)
 
-    def isWatchdogPollingObserverEnabled(self) -> bool:
-        return self._settings.useWatchdogPollingObserver.get_value()
+    def is_watchdog_polling_observer_enabled(self) -> bool:
+        return self._settings.use_watchdog_polling_observer.get_value()
 
     def _update(self, observable: Observable) -> None:
         if observable is self._settings:
@@ -120,19 +120,19 @@ class AutomationProcessingPresenter(Observable, Observer):
         settings.add_observer(self)
         repository.add_observer(self)
 
-    def getDatasetLabel(self, index: int) -> str:
-        return self._repository.getLabel(index)
+    def get_dataset_label(self, index: int) -> str:
+        return self._repository.get_label(index)
 
-    def getDatasetState(self, index: int) -> AutomationDatasetState:
-        return self._repository.getState(index)
+    def get_dataset_state(self, index: int) -> AutomationDatasetState:
+        return self._repository.get_state(index)
 
-    def getNumberOfDatasets(self) -> int:
+    def get_num_datasets(self) -> int:
         return len(self._repository)
 
-    def isProcessingEnabled(self) -> bool:
-        return self._processor.isAlive
+    def is_processing_enabled(self) -> bool:
+        return self._processor.is_alive
 
-    def setProcessingEnabled(self, enable: bool) -> None:
+    def set_processing_enabled(self, enable: bool) -> None:
         if enable:
             self._processor.start()
         else:
@@ -148,46 +148,46 @@ class AutomationProcessingPresenter(Observable, Observer):
 class AutomationCore:
     def __init__(
         self,
-        settingsRegistry: SettingsRegistry,
-        workflowAPI: WorkflowAPI,
-        workflowChooser: PluginChooser[FileBasedWorkflow],
+        settings_registry: SettingsRegistry,
+        workflow_api: WorkflowAPI,
+        workflow_chooser: PluginChooser[FileBasedWorkflow],
     ) -> None:
-        self._settings = AutomationSettings(settingsRegistry)
+        self._settings = AutomationSettings(settings_registry)
         self.repository = AutomationDatasetRepository(self._settings)
-        self._workflow = CurrentFileBasedWorkflow(self._settings, workflowChooser)
-        self._processingQueue: queue.Queue[Path] = queue.Queue()
+        self._workflow = CurrentFileBasedWorkflow(self._settings, workflow_chooser)
+        self._processing_queue: queue.Queue[Path] = queue.Queue()
         self._processor = AutomationDatasetProcessor(
             self._settings,
             self.repository,
             self._workflow,
-            workflowAPI,
-            self._processingQueue,
+            workflow_api,
+            self._processing_queue,
         )
-        self._datasetBuffer = AutomationDatasetBuffer(
+        self._dataset_buffer = AutomationDatasetBuffer(
             self._settings, self.repository, self._processor
         )
-        self._watcher = DataDirectoryWatcher(self._settings, self._workflow, self._datasetBuffer)
+        self._watcher = DataDirectoryWatcher(self._settings, self._workflow, self._dataset_buffer)
         self.presenter = AutomationPresenter(
             self._settings,
             self._workflow,
             self._watcher,
-            self._datasetBuffer,
+            self._dataset_buffer,
             self.repository,
         )
-        self.processingPresenter = AutomationProcessingPresenter(
+        self.processing_presenter = AutomationProcessingPresenter(
             self._settings, self.repository, self._processor
         )
 
     def start(self) -> None:
-        self._datasetBuffer.start()
+        self._dataset_buffer.start()
 
-    def refreshDatasetRepository(self) -> None:
-        self.repository.notifyObserversIfRepositoryChanged()
+    def refresh_dataset_repository(self) -> None:
+        self.repository.notify_observers_if_repository_changed()
 
-    def executeWaitingTasks(self) -> None:
-        self._processor.runOnce()
+    def execute_waiting_tasks(self) -> None:
+        self._processor.run_once()
 
     def stop(self) -> None:
         self._processor.stop()
         self._watcher.stop()
-        self._datasetBuffer.stop()
+        self._dataset_buffer.stop()

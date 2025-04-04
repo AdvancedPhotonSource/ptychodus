@@ -17,7 +17,7 @@ from ptychodus.api.object import Object, ObjectGeometry
 from ptychodus.api.probe import Probe
 from ptychodus.api.product import ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Reconstructor
-from ptychodus.api.scan import Scan
+from ptychodus.api.scan import PositionSequence
 
 from .helper import PtyChiOptionsHelper
 from .settings import PtyChiLSQMLSettings
@@ -40,7 +40,7 @@ class LSQMLReconstructor(Reconstructor):
 
         ####
 
-        noise_model_str = self._settings.noiseModel.get_value()
+        noise_model_str = self._settings.noise_model.get_value()
 
         try:
             noise_model = NoiseModels[noise_model_str.upper()]
@@ -52,9 +52,9 @@ class LSQMLReconstructor(Reconstructor):
 
         momentum_acceleration_gradient_mixing_factor: float | None = None
 
-        if self._settings.useMomentumAccelerationGradientMixingFactor.get_value():
+        if self._settings.use_momentum_acceleration_gradient_mixing_factor.get_value():
             momentum_acceleration_gradient_mixing_factor = (
-                self._settings.momentumAccelerationGradientMixingFactor.get_value()
+                self._settings.momentum_acceleration_gradient_mixing_factor.get_value()
             )
 
         ####
@@ -71,10 +71,10 @@ class LSQMLReconstructor(Reconstructor):
             displayed_loss_function=helper.displayed_loss_function,
             forward_model_options=helper.forward_model_options,
             noise_model=noise_model,
-            gaussian_noise_std=self._settings.gaussianNoiseDeviation.get_value(),
-            solve_obj_prb_step_size_jointly_for_first_slice_in_multislice=self._settings.solveObjectProbeStepSizeJointlyForFirstSliceInMultislice.get_value(),
-            solve_step_sizes_only_using_first_probe_mode=self._settings.solveStepSizesOnlyUsingFirstProbeMode.get_value(),
-            momentum_acceleration_gain=self._settings.momentumAccelerationGain.get_value(),
+            gaussian_noise_std=self._settings.gaussian_noise_deviation.get_value(),
+            solve_obj_prb_step_size_jointly_for_first_slice_in_multislice=self._settings.solve_object_probe_step_size_jointly_for_first_slice_in_multislice.get_value(),
+            solve_step_sizes_only_using_first_probe_mode=self._settings.solve_step_sizes_only_using_first_probe_mode.get_value(),
+            momentum_acceleration_gain=self._settings.momentum_acceleration_gain.get_value(),
             momentum_acceleration_gradient_mixing_factor=momentum_acceleration_gradient_mixing_factor,
         )
 
@@ -97,8 +97,8 @@ class LSQMLReconstructor(Reconstructor):
             patch_interpolation_method=helper.patch_interpolation_method,
             remove_object_probe_ambiguity=helper.remove_object_probe_ambiguity,
             build_preconditioner_with_all_modes=helper.build_preconditioner_with_all_modes,
-            optimal_step_size_scaler=self._settings.objectOptimalStepSizeScaler.get_value(),
-            multimodal_update=self._settings.objectMultimodalUpdate.get_value(),
+            optimal_step_size_scaler=self._settings.object_optimal_step_size_scaler.get_value(),
+            multimodal_update=self._settings.object_multimodal_update.get_value(),
         )
 
     def _create_probe_options(self, probe: Probe, metadata: ProductMetadata) -> LSQMLProbeOptions:
@@ -116,11 +116,11 @@ class LSQMLReconstructor(Reconstructor):
             support_constraint=helper.support_constraint,
             center_constraint=helper.center_constraint,
             eigenmode_update_relaxation=helper.eigenmode_update_relaxation,
-            optimal_step_size_scaler=self._settings.probeOptimalStepSizeScaler.get_value(),
+            optimal_step_size_scaler=self._settings.probe_optimal_step_size_scaler.get_value(),
         )
 
     def _create_probe_position_options(
-        self, scan: Scan, object_geometry: ObjectGeometry
+        self, scan: PositionSequence, object_geometry: ObjectGeometry
     ) -> LSQMLProbePositionOptions:
         helper = self._options_helper.probe_position_helper
         position_x_px, position_y_px = helper.get_positions_px(scan, object_geometry)
@@ -160,7 +160,7 @@ class LSQMLReconstructor(Reconstructor):
             object_options=self._create_object_options(product.object_),
             probe_options=self._create_probe_options(product.probe, product.metadata),
             probe_position_options=self._create_probe_position_options(
-                product.scan, product.object_.get_geometry()
+                product.positions, product.object_.get_geometry()
             ),
             opr_mode_weight_options=self._create_opr_mode_weight_options(),
         )

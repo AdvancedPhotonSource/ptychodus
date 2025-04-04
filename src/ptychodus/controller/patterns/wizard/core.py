@@ -33,30 +33,30 @@ class OpenDatasetWizardController:
 
         self._wizard = QWizard()
         self._wizard.setWindowTitle('Open Dataset')
-        self._wizard.addPage(self._file_view_controller.getWidget())
-        self._wizard.addPage(self._metadata_view_controller.getWidget())
-        self._wizard.addPage(self._patterns_view_controller.getWidget())
+        self._wizard.addPage(self._file_view_controller.get_widget())
+        self._wizard.addPage(self._metadata_view_controller.get_widget())
+        self._wizard.addPage(self._patterns_view_controller.get_widget())
 
         self._wizard.button(QWizard.WizardButton.NextButton).clicked.connect(
-            self._executeNextButtonAction
+            self._execute_next_button_action
         )
         self._wizard.button(QWizard.WizardButton.FinishButton).clicked.connect(
-            self._executeFinishButtonAction
+            self._execute_finish_button_action
         )
 
-    def _executeNextButtonAction(self) -> None:
+    def _execute_next_button_action(self) -> None:
         page = self._wizard.currentPage()
 
-        if page is self._metadata_view_controller.getWidget():
+        if page is self._metadata_view_controller.get_widget():
             self._file_view_controller.open_dataset()
-        elif page is self._patterns_view_controller.getWidget():
-            self._metadata_view_controller.importMetadata()
+        elif page is self._patterns_view_controller.get_widget():
+            self._metadata_view_controller.import_metadata()
 
-    def _executeFinishButtonAction(self) -> None:
-        self._api.startAssemblingDiffractionPatterns()
+    def _execute_finish_button_action(self) -> None:
+        self._api.start_assembling_diffraction_patterns()
 
     def open_dataset(self) -> None:
-        self._api.finishAssemblingDiffractionPatterns(block=False)
+        self._api.finish_assembling_diffraction_patterns(block=False)
         self._wizard.restart()
         self._file_view_controller.restart()
         self._wizard.show()

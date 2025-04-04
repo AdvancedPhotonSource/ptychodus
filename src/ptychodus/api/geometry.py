@@ -7,9 +7,29 @@ T = TypeVar('T', int, float, Decimal)
 
 
 @dataclass(frozen=True)
+class AffineTransform:
+    a00: float
+    a01: float
+    a02: float
+
+    a10: float
+    a11: float
+    a12: float
+
+    def __call__(self, x: float, y: float) -> tuple[float, float]:
+        xp = self.a00 * x + self.a01 * y + self.a02
+        yp = self.a10 * x + self.a11 * y + self.a12
+        return xp, yp
+
+
+@dataclass(frozen=True)
 class PixelGeometry:
     width_m: float
     height_m: float
+
+    @property
+    def area_m2(self) -> float:
+        return self.width_m * self.height_m
 
     def copy(self) -> PixelGeometry:
         return PixelGeometry(

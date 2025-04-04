@@ -82,8 +82,8 @@ class VSPILinearOperator(LinearOperator):
         A[M,N] * X[N,P] = B[M,P]
         """
         object_geometry = product.object_.get_geometry()
-        M = len(product.scan)
-        N = object_geometry.height_px * object_geometry.width_px
+        M = len(product.positions)  # noqa: N806
+        N = object_geometry.height_px * object_geometry.width_px  # noqa: N806
         super().__init__(float, (M, N))
         self._product = product
 
@@ -91,30 +91,30 @@ class VSPILinearOperator(LinearOperator):
         intensity = self._product.probe.get_intensity()
         return intensity / intensity.sum()
 
-    def _matvec(self, X: RealArrayType) -> RealArrayType:
+    def _matvec(self, X: RealArrayType) -> RealArrayType:  # noqa: N803
         object_geometry = self._product.object_.get_geometry()
         object_array = X.reshape((object_geometry.height_px, object_geometry.width_px))
         psf = self._get_psf()
-        AX = numpy.zeros(len(self._product.scan))
+        AX = numpy.zeros(len(self._product.positions))  # noqa: N806
 
-        for index, scan_point in enumerate(self._product.scan):
+        for index, scan_point in enumerate(self._product.positions):
             object_point = object_geometry.map_scan_point_to_object_point(scan_point)
             interpolator = ArrayPatchInterpolator(object_array, object_point, psf.shape)
             AX[index] = numpy.sum(psf * interpolator.get_patch())
 
         return AX
 
-    def _rmatvec(self, X: RealArrayType) -> RealArrayType:
+    def _rmatvec(self, X: RealArrayType) -> RealArrayType:  # noqa: N803
         object_geometry = self._product.object_.get_geometry()
         object_array = numpy.zeros((object_geometry.height_px, object_geometry.width_px))
         psf = self._get_psf()
 
-        for index, scan_point in enumerate(self._product.scan):
+        for index, scan_point in enumerate(self._product.positions):
             object_point = object_geometry.map_scan_point_to_object_point(scan_point)
             interpolator = ArrayPatchInterpolator(object_array, object_point, psf.shape)
             interpolator.accumulate_patch(X[index] * psf)
 
-        HX = object_array.flatten()
+        HX = object_array.flatten()  # noqa: N806
 
         return HX
 
@@ -127,15 +127,15 @@ class VSPIFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Observa
         super().__init__()
         self._settings = settings
 
-        settings.vspiDampingFactor.add_observer(self)
-        settings.vspiMaxIterations.add_observer(self)
+        settings.vspi_damping_factor.add_observer(self)
+        settings.vspi_max_iterations.add_observer(self)
 
     def enhance(self, dataset: FluorescenceDataset, product: Product) -> FluorescenceDataset:
         # FIXME OPR
         object_geometry = product.object_.get_geometry()
         e_cps_shape = object_geometry.height_px, object_geometry.width_px
         element_maps: list[ElementMap] = list()
-        A = VSPILinearOperator(product)
+        A = VSPILinearOperator(product)  # noqa: N806
 
         for emap in dataset.element_maps:
             logger.info(f'Enhancing "{emap.name}"...')
@@ -144,8 +144,8 @@ class VSPIFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Observa
             result = lsmr(
                 A,
                 m_cps.flatten(),
-                damp=self._settings.vspiDampingFactor.get_value(),
-                maxiter=self._settings.vspiMaxIterations.get_value(),
+                damp=self._settings.vspi_damping_factor.get_value(),
+                maxiter=self._settings.vspi_max_iterations.get_value(),
                 show=True,
             )
             logger.debug(result)
@@ -162,20 +162,20 @@ class VSPIFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Observa
             channel_names_path=dataset.channel_names_path,
         )
 
-    def getDampingFactor(self) -> float:
-        return self._settings.vspiDampingFactor.get_value()
+    def get_damping_factor(self) -> float:
+        return self._settings.vspi_damping_factor.get_value()
 
-    def setDampingFactor(self, factor: float) -> None:
-        self._settings.vspiDampingFactor.set_value(factor)
+    def set_damping_factor(self, factor: float) -> None:
+        self._settings.vspi_damping_factor.set_value(factor)
 
-    def getMaxIterations(self) -> int:
-        return self._settings.vspiMaxIterations.get_value()
+    def get_max_iterations(self) -> int:
+        return self._settings.vspi_max_iterations.get_value()
 
-    def setMaxIterations(self, number: int) -> None:
-        self._settings.vspiMaxIterations.set_value(number)
+    def set_max_iterations(self, number: int) -> None:
+        self._settings.vspi_max_iterations.set_value(number)
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._settings.vspiDampingFactor:
+        if observable is self._settings.vspi_damping_factor:
             self.notify_observers()
-        elif observable is self._settings.vspiMaxIterations:
+        elif observable is self._settings.vspi_max_iterations:
             self.notify_observers()

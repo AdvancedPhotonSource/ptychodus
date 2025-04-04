@@ -16,7 +16,7 @@ from ptychodus.api.object import Object, ObjectGeometry
 from ptychodus.api.probe import Probe
 from ptychodus.api.product import ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Reconstructor
-from ptychodus.api.scan import Scan
+from ptychodus.api.scan import PositionSequence
 
 from .helper import PtyChiOptionsHelper
 from .settings import PtyChiPIESettings
@@ -68,7 +68,7 @@ class RPIEReconstructor(Reconstructor):
             patch_interpolation_method=helper.patch_interpolation_method,
             remove_object_probe_ambiguity=helper.remove_object_probe_ambiguity,
             build_preconditioner_with_all_modes=helper.build_preconditioner_with_all_modes,
-            alpha=self._settings.objectAlpha.get_value(),
+            alpha=self._settings.object_alpha.get_value(),
         )
 
     def _create_probe_options(self, probe: Probe, metadata: ProductMetadata) -> PIEProbeOptions:
@@ -86,11 +86,11 @@ class RPIEReconstructor(Reconstructor):
             support_constraint=helper.support_constraint,
             center_constraint=helper.center_constraint,
             eigenmode_update_relaxation=helper.eigenmode_update_relaxation,
-            alpha=self._settings.probeAlpha.get_value(),
+            alpha=self._settings.probe_alpha.get_value(),
         )
 
     def _create_probe_position_options(
-        self, scan: Scan, object_geometry: ObjectGeometry
+        self, scan: PositionSequence, object_geometry: ObjectGeometry
     ) -> PIEProbePositionOptions:
         helper = self._options_helper.probe_position_helper
         position_x_px, position_y_px = helper.get_positions_px(scan, object_geometry)
@@ -130,7 +130,7 @@ class RPIEReconstructor(Reconstructor):
             object_options=self._create_object_options(product.object_),
             probe_options=self._create_probe_options(product.probe, product.metadata),
             probe_position_options=self._create_probe_position_options(
-                product.scan, product.object_.get_geometry()
+                product.positions, product.object_.get_geometry()
             ),
             opr_mode_weight_options=self._create_opr_mode_weight_options(),
         )

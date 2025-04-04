@@ -16,7 +16,7 @@ from ptychodus.api.object import Object, ObjectGeometry
 from ptychodus.api.probe import Probe
 from ptychodus.api.product import ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Reconstructor
-from ptychodus.api.scan import Scan
+from ptychodus.api.scan import PositionSequence
 
 from .helper import PtyChiOptionsHelper
 from .settings import PtyChiDMSettings
@@ -47,8 +47,8 @@ class DMReconstructor(Reconstructor):
             random_seed=helper.random_seed,
             displayed_loss_function=helper.displayed_loss_function,
             forward_model_options=helper.forward_model_options,
-            exit_wave_update_relaxation=self._settings.exitWaveUpdateRelaxation.get_value(),
-            chunk_length=self._settings.chunkLength.get_value(),
+            exit_wave_update_relaxation=self._settings.exit_wave_update_relaxation.get_value(),
+            chunk_length=self._settings.chunk_length.get_value(),
         )
 
     def _create_object_options(self, object_: Object) -> DMObjectOptions:
@@ -70,7 +70,7 @@ class DMReconstructor(Reconstructor):
             patch_interpolation_method=helper.patch_interpolation_method,
             remove_object_probe_ambiguity=helper.remove_object_probe_ambiguity,
             build_preconditioner_with_all_modes=helper.build_preconditioner_with_all_modes,
-            amplitude_clamp_limit=self._settings.objectAmplitudeClampLimit.get_value(),
+            amplitude_clamp_limit=self._settings.object_amplitude_clamp_limit.get_value(),
         )
 
     def _create_probe_options(self, probe: Probe, metadata: ProductMetadata) -> DMProbeOptions:
@@ -91,7 +91,7 @@ class DMReconstructor(Reconstructor):
         )
 
     def _create_probe_position_options(
-        self, scan: Scan, object_geometry: ObjectGeometry
+        self, scan: PositionSequence, object_geometry: ObjectGeometry
     ) -> DMProbePositionOptions:
         helper = self._options_helper.probe_position_helper
         position_x_px, position_y_px = helper.get_positions_px(scan, object_geometry)
@@ -131,7 +131,7 @@ class DMReconstructor(Reconstructor):
             object_options=self._create_object_options(product.object_),
             probe_options=self._create_probe_options(product.probe, product.metadata),
             probe_position_options=self._create_probe_position_options(
-                product.scan, product.object_.get_geometry()
+                product.positions, product.object_.get_geometry()
             ),
             opr_mode_weight_options=self._create_opr_mode_weight_options(),
         )

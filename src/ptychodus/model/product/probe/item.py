@@ -15,77 +15,81 @@ logger = logging.getLogger(__name__)
 class ProbeRepositoryItem(ParameterGroup):
     def __init__(
         self,
-        geometryProvider: ProbeGeometryProvider,
+        geometry_provider: ProbeGeometryProvider,
         settings: ProbeSettings,
         builder: ProbeBuilder,
-        additionalModesBuilder: MultimodalProbeBuilder,
+        additional_modes_builder: MultimodalProbeBuilder,
     ) -> None:
         super().__init__()
-        self._geometryProvider = geometryProvider
+        self._geometry_provider = geometry_provider
         self._settings = settings
         self._builder = builder
-        self._additionalModesBuilder = additionalModesBuilder
+        self._additional_modes_builder = additional_modes_builder
         self._probe = Probe(array=None, pixel_geometry=None)
 
         self._add_group('builder', builder, observe=True)
-        self._add_group('additional_modes', additionalModesBuilder, observe=True)
+        self._add_group('additional_modes', additional_modes_builder, observe=True)
 
         self._rebuild()
 
-    def assignItem(self, item: ProbeRepositoryItem) -> None:
-        self._remove_group('additional_modes')
-        self._additionalModesBuilder.remove_observer(self)
-        self._additionalModesBuilder = item.getAdditionalModesBuilder().copy()
-        self._additionalModesBuilder.add_observer(self)
-        self._add_group('additional_modes', self._additionalModesBuilder, observe=True)
+    def assign_item(self, item: ProbeRepositoryItem) -> None:
+        group = 'additional_modes'
 
-        self.setBuilder(item.getBuilder().copy())
+        self._remove_group(group)
+        self._additional_modes_builder.remove_observer(self)
+
+        additional_modes_builder = item.get_additional_modes_builder()
+
+        self._additional_modes_builder = additional_modes_builder.copy()
+        self._additional_modes_builder.add_observer(self)
+        self._add_group(group, self._additional_modes_builder, observe=True)
+
+        self.set_builder(item.get_builder().copy())
         self._rebuild()
 
-    def assign(self, probe: Probe, *, mutable: bool = True) -> None:
+    def assign(self, probe: Probe) -> None:
         builder = FromMemoryProbeBuilder(self._settings, probe)
-        self.setBuilder(builder, mutable=mutable)
+        self.set_builder(builder)
 
-    def syncToSettings(self) -> None:
+    def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
             parameter.sync_value_to_parent()
 
-        self._builder.syncToSettings()
-        self._additionalModesBuilder.syncToSettings()
+        self._builder.sync_to_settings()
+        self._additional_modes_builder.sync_to_settings()
 
-    def getProbe(self) -> Probe:
+    def get_probe(self) -> Probe:
         return self._probe
 
-    def getBuilder(self) -> ProbeBuilder:
+    def get_builder(self) -> ProbeBuilder:
         return self._builder
 
-    def setBuilder(self, builder: ProbeBuilder, *, mutable: bool = True) -> None:
-        self._remove_group('builder')
+    def set_builder(self, builder: ProbeBuilder) -> None:
+        group = 'builder'
+        self._remove_group(group)
         self._builder.remove_observer(self)
         self._builder = builder
         self._builder.add_observer(self)
-        self._add_group('builder', self._builder, observe=True)
-        self._rebuild(mutable=mutable)
+        self._add_group(group, self._builder, observe=True)
+        self._rebuild()
 
-    def _rebuild(self, *, mutable: bool = True) -> None:
+    def _rebuild(self) -> None:
         try:
-            probe = self._builder.build(self._geometryProvider)
+            probe = self._builder.build(self._geometry_provider)
         except Exception as exc:
-            logger.error(''.join(exc.args))
+            logger.exception('Failed to rebuild probe!')
             return
 
-        self._probe = (
-            self._additionalModesBuilder.build(probe, self._geometryProvider) if mutable else probe
-        )
+        self._probe = self._additional_modes_builder.build(probe, self._geometry_provider)
         self.notify_observers()
 
-    def getAdditionalModesBuilder(self) -> MultimodalProbeBuilder:
-        return self._additionalModesBuilder
+    def get_additional_modes_builder(self) -> MultimodalProbeBuilder:
+        return self._additional_modes_builder
 
     def _update(self, observable: Observable) -> None:
         if observable is self._builder:
             self._rebuild()
-        elif observable is self._additionalModesBuilder:
+        elif observable is self._additional_modes_builder:
             self._rebuild()
         else:
             super()._update(observable)

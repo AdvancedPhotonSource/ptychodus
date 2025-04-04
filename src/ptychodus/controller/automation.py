@@ -26,71 +26,59 @@ class AutomationProcessingController(Observer):
         self,
         presenter: AutomationPresenter,
         view: AutomationProcessingView,
-        fileDialogFactory: FileDialogFactory,
+        file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
-        self._fileDialogFactory = fileDialogFactory
+        self._file_dialog_factory = file_dialog_factory
 
-    @classmethod
-    def createInstance(
-        cls,
-        presenter: AutomationPresenter,
-        view: AutomationProcessingView,
-        fileDialogFactory: FileDialogFactory,
-    ) -> AutomationProcessingController:
-        controller = cls(presenter, view, fileDialogFactory)
-        presenter.add_observer(controller)
+        presenter.add_observer(self)
 
-        for strategy in presenter.getStrategyList():
-            view.strategyComboBox.addItem(strategy)
+        for strategy in presenter.get_strategies():
+            view.strategy_combo_box.addItem(strategy)
 
-        view.strategyComboBox.textActivated.connect(presenter.setStrategy)
-        view.directoryLineEdit.editingFinished.connect(controller._syncDirectoryToModel)
-        view.directoryBrowseButton.clicked.connect(controller._browseDirectory)
-        view.intervalSpinBox.valueChanged.connect(presenter.setProcessingIntervalInSeconds)
+        view.strategy_combo_box.textActivated.connect(presenter.set_strategy)
+        view.directory_line_edit.editingFinished.connect(self._sync_directory_to_model)
+        view.directory_browse_button.clicked.connect(self._browse_directory)
+        view.interval_spin_box.valueChanged.connect(presenter.set_processing_interval_s)
 
-        controller._syncModelToView()
+        self._sync_model_to_view()
 
-        return controller
+    def _sync_directory_to_model(self) -> None:
+        data_dir = Path(self._view.directory_line_edit.text())
+        self._presenter.set_data_directory(data_dir)
 
-    def _syncDirectoryToModel(self) -> None:
-        dataDirectory = Path(self._view.directoryLineEdit.text())
-        self._presenter.setDataDirectory(dataDirectory)
-
-    def _browseDirectory(self) -> None:
-        dirPath = self._fileDialogFactory.getExistingDirectoryPath(
+    def _browse_directory(self) -> None:
+        dir_path = self._file_dialog_factory.get_existing_directory_path(
             self._view, 'Choose Data Directory'
         )
 
-        if dirPath:
-            self._presenter.setDataDirectory(dirPath)
+        if dir_path:
+            self._presenter.set_data_directory(dir_path)
 
-    def _syncModelToView(self) -> None:
-        self._view.strategyComboBox.blockSignals(True)
-        self._view.strategyComboBox.setCurrentText(self._presenter.getStrategy())
-        self._view.strategyComboBox.blockSignals(False)
+    def _sync_model_to_view(self) -> None:
+        self._view.strategy_combo_box.blockSignals(True)
+        self._view.strategy_combo_box.setCurrentText(self._presenter.get_strategy())
+        self._view.strategy_combo_box.blockSignals(False)
 
-        dataDirectory = self._presenter.getDataDirectory()
+        data_dir = self._presenter.get_data_directory()
 
-        if dataDirectory:
-            self._view.directoryLineEdit.setText(str(dataDirectory))
+        if data_dir:
+            self._view.directory_line_edit.setText(str(data_dir))
         else:
-            self._view.directoryLineEdit.clear()
+            self._view.directory_line_edit.clear()
 
-        intervalLimitsInSeconds = self._presenter.getProcessingIntervalLimitsInSeconds()
+        interval_limits_s = self._presenter.get_processing_interval_limits_s()
 
-        self._view.intervalSpinBox.blockSignals(True)
-        self._view.intervalSpinBox.setRange(
-            intervalLimitsInSeconds.lower, intervalLimitsInSeconds.upper
-        )
-        self._view.intervalSpinBox.setValue(self._presenter.getProcessingIntervalInSeconds())
-        self._view.intervalSpinBox.blockSignals(False)
+        self._view.interval_spin_box.blockSignals(True)
+        self._view.interval_spin_box.setRange(interval_limits_s.lower, interval_limits_s.upper)
+        self._view.interval_spin_box.setValue(self._presenter.get_processing_interval_s())
+        self._view.interval_spin_box.blockSignals(False)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class AutomationWatchdogController(Observer):
@@ -99,35 +87,30 @@ class AutomationWatchdogController(Observer):
         self._presenter = presenter
         self._view = view
 
-    @classmethod
-    def createInstance(
-        cls, presenter: AutomationPresenter, view: AutomationWatchdogView
-    ) -> AutomationWatchdogController:
-        controller = cls(presenter, view)
-        presenter.add_observer(controller)
+        presenter.add_observer(self)
 
-        view.delaySpinBox.valueChanged.connect(presenter.setWatchdogDelayInSeconds)
-        view.usePollingObserverCheckBox.toggled.connect(presenter.setWatchdogPollingObserverEnabled)
+        view.delay_spin_box.valueChanged.connect(presenter.set_watchdog_delay_s)
+        view.use_polling_observer_check_box.toggled.connect(
+            presenter.set_watchdog_polling_observer_enabled
+        )
 
-        controller._syncModelToView()
+        self._sync_model_to_view()
 
-        return controller
+    def _sync_model_to_view(self) -> None:
+        delay_limits_s = self._presenter.get_watchdog_delay_limits_s()
 
-    def _syncModelToView(self) -> None:
-        delayLimitsInSeconds = self._presenter.getWatchdogDelayLimitsInSeconds()
+        self._view.delay_spin_box.blockSignals(True)
+        self._view.delay_spin_box.setRange(delay_limits_s.lower, delay_limits_s.upper)
+        self._view.delay_spin_box.setValue(self._presenter.get_watchdog_delay_s())
+        self._view.delay_spin_box.blockSignals(False)
 
-        self._view.delaySpinBox.blockSignals(True)
-        self._view.delaySpinBox.setRange(delayLimitsInSeconds.lower, delayLimitsInSeconds.upper)
-        self._view.delaySpinBox.setValue(self._presenter.getWatchdogDelayInSeconds())
-        self._view.delaySpinBox.blockSignals(False)
-
-        self._view.usePollingObserverCheckBox.setChecked(
-            self._presenter.isWatchdogPollingObserverEnabled()
+        self._view.use_polling_observer_check_box.setChecked(
+            self._presenter.is_watchdog_polling_observer_enabled()
         )
 
     def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class AutomationProcessingListModel(QAbstractListModel):
@@ -140,10 +123,10 @@ class AutomationProcessingListModel(QAbstractListModel):
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid():
             if role == Qt.ItemDataRole.DisplayRole:
-                return self._presenter.getDatasetLabel(index.row())
+                return self._presenter.get_dataset_label(index.row())
             elif role == Qt.ItemDataRole.FontRole:
                 font = QFont()
-                state = self._presenter.getDatasetState(index.row())
+                state = self._presenter.get_dataset_state(index.row())
 
                 if state == AutomationDatasetState.WAITING:
                     font.setItalic(True)
@@ -152,8 +135,8 @@ class AutomationProcessingListModel(QAbstractListModel):
 
                 return font
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return self._presenter.getNumberOfDatasets()
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
+        return self._presenter.get_num_datasets()
 
 
 class AutomationController(Observer):
@@ -161,64 +144,62 @@ class AutomationController(Observer):
         self,
         core: AutomationCore,
         presenter: AutomationPresenter,
-        processingPresenter: AutomationProcessingPresenter,
+        processing_presenter: AutomationProcessingPresenter,
         view: AutomationView,
-        fileDialogFactory: FileDialogFactory,
+        file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._core = core
         self._presenter = presenter
-        self._processingController = AutomationProcessingController.createInstance(
-            presenter, view.processingView, fileDialogFactory
+        self._processing_controller = AutomationProcessingController(
+            presenter, view.processing_view, file_dialog_factory
         )
-        self._watchdogController = AutomationWatchdogController.createInstance(
-            presenter, view.watchdogView
-        )
-        self._processingPresenter = processingPresenter
-        self._listModel = AutomationProcessingListModel(processingPresenter)
+        self._watchdog_controller = AutomationWatchdogController(presenter, view.watchdog_view)
+        self._processing_presenter = processing_presenter
+        self._list_model = AutomationProcessingListModel(processing_presenter)
         self._view = view
-        self._executeWaitingTasksTimer = QTimer()
-        self._automationTimer = QTimer()
+        self._execute_waiting_tasks_timer = QTimer()
+        self._automation_timer = QTimer()
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         core: AutomationCore,
         presenter: AutomationPresenter,
-        processingPresenter: AutomationProcessingPresenter,
+        processing_presenter: AutomationProcessingPresenter,
         view: AutomationView,
-        fileDialogFactory: FileDialogFactory,
+        file_dialog_factory: FileDialogFactory,
     ) -> AutomationController:
-        controller = cls(core, presenter, processingPresenter, view, fileDialogFactory)
-        processingPresenter.add_observer(controller)
+        controller = cls(core, presenter, processing_presenter, view, file_dialog_factory)
+        processing_presenter.add_observer(controller)
 
-        view.processingListView.setModel(controller._listModel)
+        view.processing_list_view.setModel(controller._list_model)
 
-        view.loadButton.clicked.connect(presenter.loadExistingDatasetsToRepository)
-        view.watchButton.setCheckable(True)
-        view.watchButton.toggled.connect(presenter.setWatchdogEnabled)
-        view.processButton.setCheckable(True)
-        view.processButton.toggled.connect(processingPresenter.setProcessingEnabled)
-        view.clearButton.clicked.connect(presenter.clearDatasetRepository)
+        view.load_button.clicked.connect(presenter.load_existing_datasets_to_repository)
+        view.watch_button.setCheckable(True)
+        view.watch_button.toggled.connect(presenter.set_watchdog_enabled)
+        view.process_button.setCheckable(True)
+        view.process_button.toggled.connect(processing_presenter.set_processing_enabled)
+        view.clear_button.clicked.connect(presenter.clear_dataset_repository)
 
-        controller._syncModelToView()
+        controller._sync_model_to_view()
 
-        controller._executeWaitingTasksTimer.timeout.connect(core.executeWaitingTasks)
-        controller._executeWaitingTasksTimer.start(60 * 1000)  # TODO customize (in milliseconds)
+        controller._execute_waiting_tasks_timer.timeout.connect(core.execute_waiting_tasks)
+        controller._execute_waiting_tasks_timer.start(60 * 1000)  # TODO customize (in milliseconds)
 
-        controller._automationTimer.timeout.connect(core.refreshDatasetRepository)
-        controller._automationTimer.start(10 * 1000)  # TODO customize (in milliseconds)
+        controller._automation_timer.timeout.connect(core.refresh_dataset_repository)
+        controller._automation_timer.start(10 * 1000)  # TODO customize (in milliseconds)
 
         return controller
 
-    def _syncModelToView(self) -> None:
-        self._view.processButton.setChecked(self._processingPresenter.isProcessingEnabled())
-        self._listModel.beginResetModel()
-        self._listModel.endResetModel()
+    def _sync_model_to_view(self) -> None:
+        self._view.process_button.setChecked(self._processing_presenter.is_processing_enabled())
+        self._list_model.beginResetModel()
+        self._list_model.endResetModel()
 
-        self._view.watchButton.setChecked(self._presenter.isWatchdogEnabled())
-        self._view.processButton.setChecked(self._processingPresenter.isProcessingEnabled())
+        self._view.watch_button.setChecked(self._presenter.is_watchdog_enabled())
+        self._view.process_button.setChecked(self._processing_presenter.is_processing_enabled())
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._processingPresenter:
-            self._syncModelToView()
+        if observable is self._processing_presenter:
+            self._sync_model_to_view()

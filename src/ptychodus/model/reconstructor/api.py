@@ -9,7 +9,7 @@ from ptychodus.api.reconstructor import (
     TrainOutput,
 )
 
-from ..product import ProductRepository
+from ..product import ProductAPI
 from .matcher import DiffractionPatternPositionMatcher, ScanIndexFilter
 from .queue import ReconstructionQueue
 
@@ -19,115 +19,114 @@ logger = logging.getLogger(__name__)
 class ReconstructorAPI:
     def __init__(
         self,
-        reconstructionQueue: ReconstructionQueue,
-        dataMatcher: DiffractionPatternPositionMatcher,
-        productRepository: ProductRepository,
-        reconstructorChooser: PluginChooser[Reconstructor],
+        reconstruction_queue: ReconstructionQueue,
+        data_matcher: DiffractionPatternPositionMatcher,
+        product_api: ProductAPI,
+        reconstructor_chooser: PluginChooser[Reconstructor],
     ) -> None:
-        self._reconstructionQueue = reconstructionQueue
-        self._dataMatcher = dataMatcher
-        self._productRepository = productRepository
-        self._reconstructorChooser = reconstructorChooser
+        self._reconstruction_queue = reconstruction_queue
+        self._data_matcher = data_matcher
+        self._product_api = product_api
+        self._reconstructor_chooser = reconstructor_chooser
 
     @property
-    def isReconstructing(self) -> bool:
-        return self._reconstructionQueue.isReconstructing
+    def is_reconstructing(self) -> bool:
+        return self._reconstruction_queue.is_reconstructing
 
-    def processResults(self, *, block: bool) -> None:
-        self._reconstructionQueue.processResults(block=block)
+    def process_results(self, *, block: bool) -> None:
+        self._reconstruction_queue.process_results(block=block)
 
     def reconstruct(
         self,
-        inputProductIndex: int,
+        input_product_index: int,
         *,
-        outputProductSuffix: str = '',
-        indexFilter: ScanIndexFilter = ScanIndexFilter.ALL,
+        output_product_suffix: str = '',
+        index_filter: ScanIndexFilter = ScanIndexFilter.ALL,
     ) -> int:
-        reconstructor = self._reconstructorChooser.get_current_plugin().strategy
-        parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(
-            inputProductIndex, indexFilter
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
+        parameters = self._data_matcher.match_diffraction_patterns_with_positions(
+            input_product_index, index_filter
         )
-        outputProductIndex = self._productRepository.insertNewProduct(likeIndex=inputProductIndex)
-        outputProduct = self._productRepository[outputProductIndex]
-
-        outputProductName = (
-            self._dataMatcher.getProductName(inputProductIndex)
-            + f'_{self._reconstructorChooser.get_current_plugin().simple_name}'
-        )
-
-        if outputProductSuffix:
-            outputProductName += f'_{outputProductSuffix}'
-
-        outputProduct.setName(outputProductName)
-        self._reconstructionQueue.put(reconstructor, parameters, outputProduct)
-        return outputProductIndex
-
-    def reconstructSplit(self, inputProductIndex: int) -> tuple[int, int]:
-        outputProductIndexOdd = self.reconstruct(
-            inputProductIndex,
-            outputProductSuffix='odd',
-            indexFilter=ScanIndexFilter.ODD,
-        )
-        outputProductIndexEven = self.reconstruct(
-            inputProductIndex,
-            outputProductSuffix='even',
-            indexFilter=ScanIndexFilter.EVEN,
+        output_product_index = self._product_api.insert_product(parameters.product)
+        output_product = self._product_api.get_item(output_product_index)
+        output_product_name = (
+            self._data_matcher.get_product_name(input_product_index)
+            + f'_{self._reconstructor_chooser.get_current_plugin().simple_name}'
         )
 
-        return outputProductIndexOdd, outputProductIndexEven
+        if output_product_suffix:
+            output_product_name += f'_{output_product_suffix}'
 
-    def openModel(self, filePath: Path) -> None:
-        reconstructor = self._reconstructorChooser.get_current_plugin().strategy
+        output_product.set_name(output_product_name)
+        self._reconstruction_queue.put(reconstructor, parameters, output_product)
+        return output_product_index
+
+    def reconstruct_split(self, input_product_index: int) -> tuple[int, int]:
+        output_product_index_odd = self.reconstruct(
+            input_product_index,
+            output_product_suffix='odd',
+            index_filter=ScanIndexFilter.ODD,
+        )
+        output_product_index_even = self.reconstruct(
+            input_product_index,
+            output_product_suffix='even',
+            index_filter=ScanIndexFilter.EVEN,
+        )
+
+        return output_product_index_odd, output_product_index_even
+
+    def open_model(self, file_path: Path) -> None:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Opening model...')
             tic = time.perf_counter()
-            reconstructor.open_model(filePath)
+            reconstructor.open_model(file_path)
             toc = time.perf_counter()
             logger.info(f'Open time {toc - tic:.4f} seconds.')
         else:
             logger.warning('Reconstructor is not trainable!')
 
-    def saveModel(self, filePath: Path) -> None:
-        reconstructor = self._reconstructorChooser.get_current_plugin().strategy
+    def save_model(self, file_path: Path) -> None:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Saving model...')
             tic = time.perf_counter()
-            reconstructor.save_model(filePath)
+            reconstructor.save_model(file_path)
             toc = time.perf_counter()
             logger.info(f'Save time {toc - tic:.4f} seconds.')
         else:
             logger.warning('Reconstructor is not trainable!')
 
-    def exportTrainingData(self, filePath: Path, inputProductIndex: int) -> None:
-        reconstructor = self._reconstructorChooser.get_current_plugin().strategy
+    def export_training_data(self, file_path: Path, input_product_index: int) -> None:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Preparing input data...')
             tic = time.perf_counter()
-            parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(
-                inputProductIndex, ScanIndexFilter.ALL
+            parameters = self._data_matcher.match_diffraction_patterns_with_positions(
+                input_product_index, ScanIndexFilter.ALL
             )
             toc = time.perf_counter()
             logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
 
             logger.info('Exporting...')
             tic = time.perf_counter()
-            reconstructor.export_training_data(filePath, parameters)
+            reconstructor.export_training_data(file_path, parameters)
             toc = time.perf_counter()
             logger.info(f'Export time {toc - tic:.4f} seconds.')
         else:
             logger.warning('Reconstructor is not trainable!')
 
-    def train(self, dataPath: Path) -> TrainOutput:
-        reconstructor = self._reconstructorChooser.get_current_plugin().strategy
-        result = TrainOutput([], [], -1)
+    def train(self, data_path: Path) -> TrainOutput:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
+        result = TrainOutput([], -1)
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Training...')
             tic = time.perf_counter()
-            result = reconstructor.train(dataPath)
+            result = reconstructor.train(data_path)
             toc = time.perf_counter()
             logger.info(f'Training time {toc - tic:.4f} seconds. (code={result.result})')
         else:

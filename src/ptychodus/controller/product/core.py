@@ -40,7 +40,6 @@ class ProductRepositoryTableModel(QAbstractTableModel):
             'Detector-Object\nDistance [m]',
             'Probe Energy\n[keV]',
             'Probe Photon\nCount',
-            'Exposure\nTime [s]',
             'Pixel Width\n[nm]',
             'Pixel Height\n[nm]',
             'Size\n[MB]',
@@ -49,12 +48,12 @@ class ProductRepositoryTableModel(QAbstractTableModel):
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
 
-        if index.isValid() and index.column() < 5:
+        if index.isValid() and index.column() < 4:
             value |= Qt.ItemFlag.ItemIsEditable
 
         return value
 
-    def headerData(
+    def headerData(  # noqa: N802
         self,
         section: int,
         orientation: Qt.Orientation,
@@ -71,29 +70,28 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 logger.exception(err)
                 return None
 
-            metadata = item.getMetadata()
-            geometry = item.getGeometry()
+            metadata_item = item.get_metadata_item()
+            geometry = item.get_geometry()
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
-                if index.column() == 0:
-                    return metadata.getName()
-                elif index.column() == 1:
-                    return f'{metadata.detectorDistanceInMeters.get_value():.4g}'
-                elif index.column() == 2:
-                    return f'{metadata.probeEnergyInElectronVolts.get_value() / 1e3:.4g}'
-                elif index.column() == 3:
-                    return f'{metadata.probePhotonCount.get_value():.4g}'
-                elif index.column() == 4:
-                    return f'{metadata.exposureTimeInSeconds.get_value():.4g}'
-                elif index.column() == 5:
-                    return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
-                elif index.column() == 6:
-                    return f'{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}'
-                elif index.column() == 7:
-                    product = item.getProduct()
-                    return f'{product.nbytes / (1024 * 1024):.2f}'
+                match index.column():
+                    case 0:
+                        return metadata_item.name.get_value()
+                    case 1:
+                        return f'{metadata_item.detector_distance_m.get_value():.4g}'
+                    case 2:
+                        return f'{metadata_item.probe_energy_eV.get_value() / 1e3:.4g}'
+                    case 3:
+                        return f'{metadata_item.probe_photon_count.get_value():.4g}'
+                    case 4:
+                        return f'{geometry.object_plane_pixel_width_m * 1e9:.4g}'
+                    case 5:
+                        return f'{geometry.object_plane_pixel_height_m * 1e9:.4g}'
+                    case 6:
+                        product = item.get_product()
+                        return f'{product.nbytes / (1024 * 1024):.2f}'
 
-    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
+    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
             try:
                 item = self._repository[index.row()]
@@ -101,50 +99,42 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 logger.exception(err)
                 return False
 
-            metadata = item.getMetadata()
+            metadata_item = item.get_metadata_item()
 
             if index.column() == 0:
-                metadata.setName(str(value))
+                metadata_item.name.set_value(str(value))
                 return True
             elif index.column() == 1:
                 try:
-                    distanceInM = float(value)
+                    distance_m = float(value)
                 except ValueError:
                     return False
 
-                metadata.detectorDistanceInMeters.set_value(distanceInM)
+                metadata_item.detector_distance_m.set_value(distance_m)
                 return True
             elif index.column() == 2:
                 try:
-                    energyInKEV = float(value)
+                    energy_keV = float(value)  # noqa: N806
                 except ValueError:
                     return False
 
-                metadata.probeEnergyInElectronVolts.set_value(energyInKEV * 1e3)
+                metadata_item.probe_energy_eV.set_value(energy_keV * 1e3)
                 return True
             elif index.column() == 3:
                 try:
-                    photonCount = float(value)
+                    photon_count = float(value)
                 except ValueError:
                     return False
 
-                metadata.probePhotonCount.set_value(photonCount)
-                return True
-            elif index.column() == 4:
-                try:
-                    exposureTimeInSeconds = float(value)
-                except ValueError:
-                    return False
-
-                metadata.exposureTimeInSeconds.set_value(exposureTimeInSeconds)
+                metadata_item.probe_photon_count.set_value(photon_count)
                 return True
 
         return False
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._repository)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._header)
 
 
@@ -155,195 +145,196 @@ class ProductController(ProductRepositoryObserver):
         repository: ProductRepository,
         api: ProductAPI,
         view: ProductView,
-        fileDialogFactory: FileDialogFactory,
-        duplicateAction: QAction,
-        tableModel: ProductRepositoryTableModel,
-        tableProxyModel: QSortFilterProxyModel,
+        file_dialog_factory: FileDialogFactory,
+        duplicate_action: QAction,
+        table_model: ProductRepositoryTableModel,
+        table_proxy_model: QSortFilterProxyModel,
     ) -> None:
         super().__init__()
         self._dataset = dataset
         self._repository = repository
         self._api = api
         self._view = view
-        self._fileDialogFactory = fileDialogFactory
-        self._duplicateAction = duplicateAction
-        self._tableModel = tableModel
-        self._tableProxyModel = tableProxyModel
+        self._file_dialog_factory = file_dialog_factory
+        self._duplicate_action = duplicate_action
+        self._table_model = table_model
+        self._table_proxy_model = table_proxy_model
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         dataset: AssembledDiffractionDataset,
         repository: ProductRepository,
         api: ProductAPI,
         view: ProductView,
-        fileDialogFactory: FileDialogFactory,
+        file_dialog_factory: FileDialogFactory,
     ) -> ProductController:
-        openFileAction = view.buttonBox.insertMenu.addAction('Open File...')
-        createNewAction = view.buttonBox.insertMenu.addAction('Create New')
-        duplicateAction = view.buttonBox.insertMenu.addAction('Duplicate')
-        saveFileAction = view.buttonBox.saveMenu.addAction('Save File...')
-        syncToSettingsAction = view.buttonBox.saveMenu.addAction('Sync To Settings')
+        open_file_action = view.button_box.insert_menu.addAction('Open File...')
+        create_new_action = view.button_box.insert_menu.addAction('Create New')
+        duplicate_action = view.button_box.insert_menu.addAction('Duplicate')
+        save_file_action = view.button_box.save_menu.addAction('Save File...')
+        sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
 
-        tableModel = ProductRepositoryTableModel(repository)
-        tableProxyModel = QSortFilterProxyModel()
-        tableProxyModel.setSourceModel(tableModel)
+        table_model = ProductRepositoryTableModel(repository)
+        table_proxy_model = QSortFilterProxyModel()
+        table_proxy_model.setSourceModel(table_model)
 
         controller = cls(
             dataset,
             repository,
             api,
             view,
-            fileDialogFactory,
-            duplicateAction,
-            tableModel,
-            tableProxyModel,
+            file_dialog_factory,
+            duplicate_action,
+            table_model,
+            table_proxy_model,
         )
-        repository.addObserver(controller)
-        controller._updateInfoText()
+        repository.add_observer(controller)
+        controller._update_info_text()
 
-        view.tableView.setModel(tableProxyModel)
-        view.tableView.setSortingEnabled(True)
-        view.tableView.sortByColumn(0, Qt.SortOrder.AscendingOrder)
-        view.tableView.verticalHeader().hide()
-        view.tableView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        view.tableView.selectionModel().currentChanged.connect(controller._updateEnabledButtons)
-        controller._updateEnabledButtons(QModelIndex(), QModelIndex())
+        view.table_view.setModel(table_proxy_model)
+        view.table_view.setSortingEnabled(True)
+        view.table_view.sortByColumn(0, Qt.SortOrder.AscendingOrder)
+        view.table_view.verticalHeader().hide()
+        view.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        view.table_view.selectionModel().currentChanged.connect(controller._update_enabled_buttons)
+        controller._update_enabled_buttons(QModelIndex(), QModelIndex())
 
-        openFileAction.triggered.connect(controller._openProductFromFile)
-        createNewAction.triggered.connect(controller._createNewProduct)
-        duplicateAction.triggered.connect(controller._duplicateCurrentProduct)
-        saveFileAction.triggered.connect(controller._saveCurrentProductToFile)
-        syncToSettingsAction.triggered.connect(controller._syncCurrentProductToSettings)
+        open_file_action.triggered.connect(controller._open_product_from_file)
+        create_new_action.triggered.connect(controller._create_new_product)
+        duplicate_action.triggered.connect(controller._duplicate_current_product)
+        save_file_action.triggered.connect(controller._save_current_product_to_file)
+        sync_to_settings_action.triggered.connect(controller._sync_current_product_to_settings)
 
-        view.buttonBox.editButton.clicked.connect(controller._editCurrentProduct)
-        view.buttonBox.removeButton.clicked.connect(controller._removeCurrentProduct)
+        view.button_box.edit_button.clicked.connect(controller._edit_current_product)
+        view.button_box.remove_button.clicked.connect(controller._remove_current_product)
 
         return controller
 
     @property
-    def tableModel(self) -> QAbstractTableModel:
-        return self._tableModel
+    def table_model(self) -> QAbstractTableModel:
+        return self._table_model
 
-    def _getCurrentItemIndex(self) -> int:
-        proxyIndex = self._view.tableView.currentIndex()
+    def _get_current_item_index(self) -> int:
+        proxy_index = self._view.table_view.currentIndex()
 
-        if proxyIndex.isValid():
-            modelIndex = self._tableProxyModel.mapToSource(proxyIndex)
-            return modelIndex.row()
+        if proxy_index.isValid():
+            model_index = self._table_proxy_model.mapToSource(proxy_index)
+            return model_index.row()
 
         logger.warning('No current index!')
         return -1
 
-    def _openProductFromFile(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
+    def _open_product_from_file(self) -> None:
+        file_path, name_filter = self._file_dialog_factory.get_open_file_path(
             self._view,
             'Open Product',
-            nameFilters=[nameFilter for nameFilter in self._api.getOpenFileFilterList()],
-            selectedNameFilter=self._api.getOpenFileFilter(),
+            name_filters=[nf for nf in self._api.get_open_file_filters()],
+            selected_name_filter=self._api.get_open_file_filter(),
         )
 
-        if filePath:
+        if file_path:
             try:
-                self._api.openProduct(filePath, file_type=nameFilter)
+                self._api.open_product(file_path, file_type=name_filter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Reader', err)
+                ExceptionDialog.show_exception('File Reader', err)
 
-    def _createNewProduct(self) -> None:
-        self._api.insertNewProduct()
+    def _create_new_product(self) -> None:
+        self._api.insert_new_product()
 
-    def _saveCurrentProductToFile(self) -> None:
-        current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
+    def _save_current_product_to_file(self) -> None:
+        current = self._table_proxy_model.mapToSource(self._view.table_view.currentIndex())
 
         if current.isValid():
-            filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+            file_path, name_filter = self._file_dialog_factory.get_save_file_path(
                 self._view,
                 'Save Product',
-                nameFilters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
-                selectedNameFilter=self._api.getSaveFileFilter(),
+                name_filters=[nf for nf in self._api.get_save_file_filters()],
+                selected_name_filter=self._api.get_save_file_filter(),
             )
 
-            if filePath:
+            if file_path:
                 try:
-                    self._api.saveProduct(current.row(), filePath, file_type=nameFilter)
+                    self._api.save_product(current.row(), file_path, file_type=name_filter)
                 except Exception as err:
                     logger.exception(err)
-                    ExceptionDialog.showException('File Writer', err)
+                    ExceptionDialog.show_exception('File Writer', err)
         else:
             logger.error('No current item!')
 
-    def _syncCurrentProductToSettings(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
+    def _sync_current_product_to_settings(self) -> None:
+        item_index = self._get_current_item_index()
 
-        if itemIndex < 0:
+        if item_index < 0:
             logger.warning('No current item!')
         else:
-            item = self._repository[itemIndex]
-            item.syncToSettings()
+            item = self._repository[item_index]
+            item.sync_to_settings()
 
-    def _duplicateCurrentProduct(self) -> None:
-        current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
+    def _duplicate_current_product(self) -> None:
+        current = self._table_proxy_model.mapToSource(self._view.table_view.currentIndex())
 
         if current.isValid():
-            self._api.insertNewProduct(likeIndex=current.row())
+            like_item = self._repository[current.row()]
+            self._api.insert_product(like_item.get_product())
         else:
             logger.error('No current item!')
 
-    def _editCurrentProduct(self) -> None:
-        current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
+    def _edit_current_product(self) -> None:
+        current = self._table_proxy_model.mapToSource(self._view.table_view.currentIndex())
 
         if current.isValid():
             product = self._repository[current.row()]
-            ProductEditorViewController.editProduct(self._dataset, product, self._view)
+            ProductEditorViewController.edit_product(self._dataset, product, self._view)
         else:
             logger.error('No current item!')
 
-    def _removeCurrentProduct(self) -> None:
-        current = self._tableProxyModel.mapToSource(self._view.tableView.currentIndex())
+    def _remove_current_product(self) -> None:
+        current = self._table_proxy_model.mapToSource(self._view.table_view.currentIndex())
 
         if current.isValid():
-            self._repository.removeProduct(current.row())
+            self._repository.remove_product(current.row())
         else:
             logger.error('No current item!')
 
-    def _updateEnabledButtons(self, current: QModelIndex, previous: QModelIndex) -> None:
+    def _update_enabled_buttons(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()
-        self._duplicateAction.setEnabled(enabled)
-        self._view.buttonBox.saveButton.setEnabled(enabled)
-        self._view.buttonBox.editButton.setEnabled(enabled)
-        self._view.buttonBox.removeButton.setEnabled(enabled)
+        self._duplicate_action.setEnabled(enabled)
+        self._view.button_box.save_button.setEnabled(enabled)
+        self._view.button_box.edit_button.setEnabled(enabled)
+        self._view.button_box.remove_button.setEnabled(enabled)
 
-    def _updateInfoText(self) -> None:
-        infoText = self._repository.getInfoText()
-        self._view.infoLabel.setText(infoText)
+    def _update_info_text(self) -> None:
+        info_text = self._repository.get_info_text()
+        self._view.info_label.setText(info_text)
 
-    def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
+    def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
         parent = QModelIndex()
-        self._tableModel.beginInsertRows(parent, index, index)
-        self._tableModel.endInsertRows()
-        self._updateInfoText()
+        self._table_model.beginInsertRows(parent, index, index)
+        self._table_model.endInsertRows()
+        self._update_info_text()
 
-    def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
-        topLeft = self._tableModel.index(index, 0)
-        bottomRight = self._tableModel.index(index, self._tableModel.columnCount() - 1)
-        self._tableModel.dataChanged.emit(topLeft, bottomRight, [Qt.ItemDataRole.DisplayRole])
-        self._updateInfoText()
+    def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
+        top_left = self._table_model.index(index, 0)
+        bottom_right = self._table_model.index(index, self._table_model.columnCount() - 1)
+        self._table_model.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole])
+        self._update_info_text()
 
-    def handleScanChanged(self, index: int, item: ScanRepositoryItem) -> None:
-        self._updateInfoText()
+    def handle_scan_changed(self, index: int, item: ScanRepositoryItem) -> None:
+        self._update_info_text()
 
-    def handleProbeChanged(self, index: int, item: ProbeRepositoryItem) -> None:
-        self._updateInfoText()
+    def handle_probe_changed(self, index: int, item: ProbeRepositoryItem) -> None:
+        self._update_info_text()
 
-    def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
-        self._updateInfoText()
+    def handle_object_changed(self, index: int, item: ObjectRepositoryItem) -> None:
+        self._update_info_text()
 
-    def handleCostsChanged(self, index: int, costs: Sequence[float]) -> None:
-        self._updateInfoText()
+    def handle_costs_changed(self, index: int, costs: Sequence[float]) -> None:
+        self._update_info_text()
 
-    def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
+    def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
         parent = QModelIndex()
-        self._tableModel.beginRemoveRows(parent, index, index)
-        self._tableModel.endRemoveRows()
-        self._updateInfoText()
+        self._table_model.beginRemoveRows(parent, index, index)
+        self._table_model.endRemoveRows()
+        self._update_info_text()

@@ -25,9 +25,9 @@ def test_pyramid() -> None:
     num_pixels = 256
     max_radial_degree = 6
 
-    Y, X = numpy.mgrid[:num_pixels, :num_pixels]
-    X = (X - (num_pixels - 1) / 2) / (num_pixels / 2)
-    Y = (Y - (num_pixels - 1) / 2) / (num_pixels / 2)
+    Y, X = numpy.mgrid[:num_pixels, :num_pixels]  # noqa: N806
+    X = (X - (num_pixels - 1) / 2) / (num_pixels / 2)  # noqa: N806
+    Y = (Y - (num_pixels - 1) / 2) / (num_pixels / 2)  # noqa: N806
 
     distance = numpy.hypot(Y, X)
     angle = numpy.arctan2(Y, X)
@@ -41,7 +41,7 @@ def test_pyramid() -> None:
     for radial_degree in range(max_radial_degree):
         for angular_frequency in range(-radial_degree, radial_degree + 1, 2):
             polynomial = ZernikePolynomial(radial_degree, angular_frequency)
-            Z = polynomial(distance, angle, undefined_value=numpy.nan)
+            Z = polynomial(distance, angle, undefined_value=numpy.nan)  # noqa: N806
 
             row = radial_degree
             col = max_radial_degree + angular_frequency

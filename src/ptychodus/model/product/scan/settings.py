@@ -7,93 +7,82 @@ from ptychodus.api.settings import SettingsRegistry
 class ScanSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = registry.create_group('Scan')
-        self._settingsGroup.add_observer(self)
+        self._settings_group = registry.create_group('Scan')
+        self._settings_group.add_observer(self)
 
-        self.builder = self._settingsGroup.create_string_parameter('Builder', 'rectangular_raster')
-        self.filePath = self._settingsGroup.create_path_parameter(
+        self.builder = self._settings_group.create_string_parameter('Builder', 'rectangular_raster')
+        self.file_path = self._settings_group.create_path_parameter(
             'FilePath', Path('/path/to/scan.csv')
         )
-        self.fileType = self._settingsGroup.create_string_parameter('FileType', 'CSV')
+        self.file_type = self._settings_group.create_string_parameter('FileType', 'CSV')
 
-        self.affineTransformAX = self._settingsGroup.create_real_parameter('AffineTransformAX', 1.0)
-        self.affineTransformAY = self._settingsGroup.create_real_parameter('AffineTransformAY', 0.0)
-        self.affineTransformATInMeters = self._settingsGroup.create_real_parameter(
-            'AffineTransformATInMeters', 0.0
-        )
-
-        self.affineTransformBX = self._settingsGroup.create_real_parameter('AffineTransformBX', 0.0)
-        self.affineTransformBY = self._settingsGroup.create_real_parameter('AffineTransformBY', 1.0)
-        self.affineTransformBTInMeters = self._settingsGroup.create_real_parameter(
-            'AffineTransformBTInMeters', 0.0
-        )
-        self.jitterRadiusInMeters = self._settingsGroup.create_real_parameter(
+        self.affine00 = self._settings_group.create_real_parameter('Affine00', 1.0)
+        self.affine01 = self._settings_group.create_real_parameter('Affine01', 0.0)
+        self.affine02 = self._settings_group.create_real_parameter('Affine02', 0.0)
+        self.affine10 = self._settings_group.create_real_parameter('Affine10', 0.0)
+        self.affine11 = self._settings_group.create_real_parameter('Affine11', 1.0)
+        self.affine12 = self._settings_group.create_real_parameter('Affine12', 0.0)
+        self.jitter_radius_m = self._settings_group.create_real_parameter(
             'JitterRadiusInMeters', 0.0, minimum=0.0
         )
 
-        self.expandBoundingBox = self._settingsGroup.create_boolean_parameter(
-            'ExpandBoundingBox', False
-        )
-        self.expandedBoundingBoxMinimumXInMeters = self._settingsGroup.create_real_parameter(
+        self.expand_bbox = self._settings_group.create_boolean_parameter('ExpandBoundingBox', False)
+        self.expand_bbox_xmin_m = self._settings_group.create_real_parameter(
             'ExpandedBoundingBoxMinimumXInMeters', -5e-7
         )
-        self.expandedBoundingBoxMaximumXInMeters = self._settingsGroup.create_real_parameter(
+        self.expand_bbox_xmax_m = self._settings_group.create_real_parameter(
             'ExpandedBoundingBoxMaximumXInMeters', +5e-7
         )
-        self.expandedBoundingBoxMinimumYInMeters = self._settingsGroup.create_real_parameter(
+        self.expand_bbox_ymin_m = self._settings_group.create_real_parameter(
             'ExpandedBoundingBoxMinimumYInMeters', -5e-7
         )
-        self.expandedBoundingBoxMaximumYInMeters = self._settingsGroup.create_real_parameter(
+        self.expand_bbox_ymax_m = self._settings_group.create_real_parameter(
             'ExpandedBoundingBoxMaximumYInMeters', +5e-7
         )
 
-        self.numberOfPointsX = self._settingsGroup.create_integer_parameter(
+        self.num_points_x = self._settings_group.create_integer_parameter(
             'NumberOfPointsX', 10, minimum=0
         )
-        self.numberOfPointsY = self._settingsGroup.create_integer_parameter(
+        self.num_points_y = self._settings_group.create_integer_parameter(
             'NumberOfPointsY', 10, minimum=0
         )
-        self.stepSizeXInMeters = self._settingsGroup.create_real_parameter(
+        self.step_size_x_m = self._settings_group.create_real_parameter(
             'StepSizeXInMeters', 1e-6, minimum=0.0
         )
-        self.stepSizeYInMeters = self._settingsGroup.create_real_parameter(
+        self.step_size_y_m = self._settings_group.create_real_parameter(
             'StepSizeYInMeters', 1e-6, minimum=0.0
         )
 
-        self.radialStepSizeInMeters = self._settingsGroup.create_real_parameter(
+        self.radial_step_size_m = self._settings_group.create_real_parameter(
             'RadialStepSizeInMeters', 1e-6, minimum=0.0
         )
-        self.numberOfShells = self._settingsGroup.create_integer_parameter(
+        self.num_shells = self._settings_group.create_integer_parameter(
             'NumberOfShells', 5, minimum=0
         )
-        self.numberOfPointsInFirstShell = self._settingsGroup.create_integer_parameter(
+        self.num_points_in_first_shell = self._settings_group.create_integer_parameter(
             'NumberOfPointsInFirstShell', 10, minimum=0
         )
 
-        self.amplitudeXInMeters = self._settingsGroup.create_real_parameter(
+        self.amplitude_x_m = self._settings_group.create_real_parameter(
             'AmplitudeXInMeters', 4.5e-6, minimum=0.0
         )
-        self.amplitudeYInMeters = self._settingsGroup.create_real_parameter(
+        self.amplitude_y_m = self._settings_group.create_real_parameter(
             'AmplitudeYInMeters', 4.5e-6, minimum=0.0
         )
-        self.angularStepXInTurns = self._settingsGroup.create_real_parameter(
+        self.angular_step_x_turns = self._settings_group.create_real_parameter(
             'AngularStepXInTurns', 0.03
         )
-        self.angularStepYInTurns = self._settingsGroup.create_real_parameter(
+        self.angular_step_y_turns = self._settings_group.create_real_parameter(
             'AngularStepYInTurns', 0.04
         )
-        self.angularShiftInTurns = self._settingsGroup.create_real_parameter(
+        self.angular_shift_turns = self._settings_group.create_real_parameter(
             'AngularShiftInTurns', 0.25
         )
 
-        self.radiusScalarInMeters = self._settingsGroup.create_real_parameter(
+        self.radius_scalar_m = self._settings_group.create_real_parameter(
             'RadiusScalarInMeters', 0.5e-6, minimum=0.0
         )
 
-    @property
-    def numberOfPoints(self) -> int:
-        return self.numberOfPointsX.get_value() * self.numberOfPointsY.get_value()
-
     def _update(self, observable: Observable) -> None:
-        if observable is self._settingsGroup:
+        if observable is self._settings_group:
             self.notify_observers()

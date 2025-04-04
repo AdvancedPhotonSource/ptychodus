@@ -3,7 +3,7 @@ from enum import IntEnum
 
 import numpy
 
-from ptychodus.api.scan import Scan, ScanPoint
+from ptychodus.api.scan import PositionSequence, ScanPoint
 
 from .builder import ScanBuilder
 from .settings import ScanSettings
@@ -20,15 +20,15 @@ class CartesianScanVariant(IntEnum):
     HEXAGONAL_SNAKE = 0x7
 
     @property
-    def isSnaked(self) -> bool:
+    def is_snaked(self) -> bool:
         return self.value & 1 != 0
 
     @property
-    def isTriangular(self) -> bool:
+    def is_triangular(self) -> bool:
         return self.value & 2 != 0
 
     @property
-    def isEquilateral(self) -> bool:
+    def is_equilateral(self) -> bool:
         return self.value & 4 != 0
 
 
@@ -38,17 +38,17 @@ class CartesianScanBuilder(ScanBuilder):
         self._variant = variant
         self._settings = settings
 
-        self.numberOfPointsX = settings.numberOfPointsX.copy()
-        self._add_parameter('number_of_points_x', self.numberOfPointsX)
+        self.num_points_x = settings.num_points_x.copy()
+        self._add_parameter('num_points_x', self.num_points_x)
 
-        self.numberOfPointsY = settings.numberOfPointsY.copy()
-        self._add_parameter('number_of_points_y', self.numberOfPointsY)
+        self.num_points_y = settings.num_points_y.copy()
+        self._add_parameter('num_points_y', self.num_points_y)
 
-        self.stepSizeXInMeters = settings.stepSizeXInMeters.copy()
-        self._add_parameter('step_size_x_m', self.stepSizeXInMeters)
+        self.step_size_x_m = settings.step_size_x_m.copy()
+        self._add_parameter('step_size_x_m', self.step_size_x_m)
 
-        self.stepSizeYInMeters = settings.stepSizeYInMeters.copy()
-        self._add_parameter('step_size_y_m', self.stepSizeYInMeters)
+        self.step_size_y_m = settings.step_size_y_m.copy()
+        self._add_parameter('step_size_y_m', self.step_size_y_m)
 
     def copy(self) -> CartesianScanBuilder:
         builder = CartesianScanBuilder(self._variant, self._settings)
@@ -59,28 +59,28 @@ class CartesianScanBuilder(ScanBuilder):
         return builder
 
     @property
-    def isEquilateral(self) -> bool:
-        return self._variant.isEquilateral
+    def is_equilateral(self) -> bool:
+        return self._variant.is_equilateral
 
-    def build(self) -> Scan:
-        nx = self.numberOfPointsX.get_value()
-        ny = self.numberOfPointsY.get_value()
-        dx = self.stepSizeXInMeters.get_value()
+    def build(self) -> PositionSequence:
+        nx = self.num_points_x.get_value()
+        ny = self.num_points_y.get_value()
+        dx = self.step_size_x_m.get_value()
 
-        if self._variant.isEquilateral:
+        if self._variant.is_equilateral:
             dy = dx
 
-            if self._variant.isTriangular:
+            if self._variant.is_triangular:
                 dy *= numpy.sqrt(0.75)
         else:
-            dy = self.stepSizeYInMeters.get_value()
+            dy = self.step_size_y_m.get_value()
 
-        pointList: list[ScanPoint] = list()
+        point_list: list[ScanPoint] = list()
 
         for index in range(nx * ny):
             y, x = divmod(index, nx)
 
-            if self._variant.isSnaked:
+            if self._variant.is_snaked:
                 if y & 1:
                     x = nx - 1 - x
 
@@ -90,7 +90,7 @@ class CartesianScanBuilder(ScanBuilder):
             xf = (x - cx) * dx
             yf = (y - cy) * dy
 
-            if self._variant.isTriangular:
+            if self._variant.is_triangular:
                 if y & 1:
                     xf += dx / 4
                 else:
@@ -101,6 +101,6 @@ class CartesianScanBuilder(ScanBuilder):
                 position_x_m=xf,
                 position_y_m=yf,
             )
-            pointList.append(point)
+            point_list.append(point)
 
-        return Scan(pointList)
+        return PositionSequence(point_list)

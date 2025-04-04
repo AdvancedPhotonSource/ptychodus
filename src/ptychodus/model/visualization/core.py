@@ -11,10 +11,10 @@ from ptychodus.api.visualization import (
     VisualizationProduct,
 )
 
-from .colorAxis import ColorAxis
-from .colorModelRenderer import CylindricalColorModelRenderer
+from .color_axis import ColorAxis
+from .color_model_renderer import CylindricalColorModelRenderer
 from .colormap import ColormapParameter
-from .colormapRenderer import ColormapRenderer
+from .colormap_renderer import ColormapRenderer
 from .components import (
     AmplitudeArrayComponent,
     ImaginaryArrayComponent,
@@ -30,144 +30,144 @@ logger = logging.getLogger(__name__)
 
 
 class VisualizationEngine(Observable, Observer):
-    def __init__(self, *, isComplex: bool) -> None:
+    def __init__(self, *, is_complex: bool) -> None:
         super().__init__()
-        self._rendererChooser = PluginChooser[Renderer]()
+        self._renderer_chooser = PluginChooser[Renderer]()
         self._transformation = ScalarTransformationParameter()
-        self._colorAxis = ColorAxis()
-        acyclicColormap = ColormapParameter(isCyclic=False)
+        self._color_axis = ColorAxis()
+        acyclic_colormap = ColormapParameter(is_cyclic=False)
 
-        self._rendererChooser.register_plugin(
+        self._renderer_chooser.register_plugin(
             ColormapRenderer(
                 RealArrayComponent(),
                 self._transformation,
-                self._colorAxis,
-                acyclicColormap,
+                self._color_axis,
+                acyclic_colormap,
             ),
             display_name='Real',
         )
 
-        if isComplex:
-            amplitudeComponent = AmplitudeArrayComponent()
-            phaseComponent = PhaseInRadiansArrayComponent()
-            cyclicColormap = ColormapParameter(isCyclic=True)
+        if is_complex:
+            amplitude_component = AmplitudeArrayComponent()
+            phase_component = PhaseInRadiansArrayComponent()
+            cyclic_colormap = ColormapParameter(is_cyclic=True)
 
-            self._rendererChooser.register_plugin(
+            self._renderer_chooser.register_plugin(
                 ColormapRenderer(
                     ImaginaryArrayComponent(),
                     self._transformation,
-                    self._colorAxis,
-                    acyclicColormap,
+                    self._color_axis,
+                    acyclic_colormap,
                 ),
                 display_name='Imaginary',
             )
-            self._rendererChooser.register_plugin(
+            self._renderer_chooser.register_plugin(
                 ColormapRenderer(
-                    amplitudeComponent,
+                    amplitude_component,
                     self._transformation,
-                    self._colorAxis,
-                    acyclicColormap,
+                    self._color_axis,
+                    acyclic_colormap,
                 ),
                 display_name='Amplitude',
             )
-            self._rendererChooser.register_plugin(
+            self._renderer_chooser.register_plugin(
                 ColormapRenderer(
-                    phaseComponent,
+                    phase_component,
                     self._transformation,
-                    self._colorAxis,
-                    cyclicColormap,
+                    self._color_axis,
+                    cyclic_colormap,
                 ),
                 display_name='Phase',
             )
-            self._rendererChooser.register_plugin(
+            self._renderer_chooser.register_plugin(
                 ColormapRenderer(
                     UnwrappedPhaseInRadiansArrayComponent(),
                     self._transformation,
-                    self._colorAxis,
-                    acyclicColormap,
+                    self._color_axis,
+                    acyclic_colormap,
                 ),
                 display_name='Phase (Unwrapped)',
             )
-            self._rendererChooser.register_plugin(
+            self._renderer_chooser.register_plugin(
                 CylindricalColorModelRenderer(
-                    amplitudeComponent,
-                    phaseComponent,
+                    amplitude_component,
+                    phase_component,
                     self._transformation,
-                    self._colorAxis,
+                    self._color_axis,
                 ),
                 display_name='Complex',
             )
-            self._rendererChooser.set_current_plugin('Complex')
+            self._renderer_chooser.set_current_plugin('Complex')
 
-        self._rendererChooser.add_observer(self)
-        self._rendererPlugin = self._rendererChooser.get_current_plugin()
-        self._rendererPlugin.strategy.add_observer(self)
+        self._renderer_chooser.add_observer(self)
+        self._renderer_plugin = self._renderer_chooser.get_current_plugin()
+        self._renderer_plugin.strategy.add_observer(self)
 
     def renderers(self) -> Iterator[str]:
-        for plugin in self._rendererChooser:
+        for plugin in self._renderer_chooser:
             yield plugin.display_name
 
-    def getRenderer(self) -> str:
-        return self._rendererPlugin.display_name
+    def get_renderer(self) -> str:
+        return self._renderer_plugin.display_name
 
-    def setRenderer(self, value: str) -> None:
-        self._rendererChooser.set_current_plugin(value)
+    def set_renderer(self, value: str) -> None:
+        self._renderer_chooser.set_current_plugin(value)
 
-    def isRendererCyclic(self) -> bool:
-        return self._rendererPlugin.strategy.isCyclic()
+    def is_renderer_cyclic(self) -> bool:
+        return self._renderer_plugin.strategy.is_cyclic()
 
     def transformations(self) -> Iterator[str]:
         return self._transformation.choices()
 
-    def getTransformation(self) -> str:
+    def get_transformation(self) -> str:
         return self._transformation.get_value()
 
-    def setTransformation(self, value: str) -> None:
+    def set_transformation(self, value: str) -> None:
         self._transformation.set_value(value)
 
     def variants(self) -> Iterator[str]:
-        return self._rendererPlugin.strategy.variants()
+        return self._renderer_plugin.strategy.variants()
 
-    def getVariant(self) -> str:
-        return self._rendererPlugin.strategy.getVariant()
+    def get_variant(self) -> str:
+        return self._renderer_plugin.strategy.get_variant()
 
-    def setVariant(self, value: str) -> None:
-        return self._rendererPlugin.strategy.setVariant(value)
+    def set_variant(self, value: str) -> None:
+        return self._renderer_plugin.strategy.set_variant(value)
 
-    def getMinDisplayValue(self) -> float:
-        return self._colorAxis.lower.get_value()
+    def get_min_display_value(self) -> float:
+        return self._color_axis.lower.get_value()
 
-    def setMinDisplayValue(self, value: float) -> None:
-        self._colorAxis.lower.set_value(value)
+    def set_min_display_value(self, value: float) -> None:
+        self._color_axis.lower.set_value(value)
 
-    def getMaxDisplayValue(self) -> float:
-        return self._colorAxis.upper.get_value()
+    def get_max_display_value(self) -> float:
+        return self._color_axis.upper.get_value()
 
-    def setMaxDisplayValue(self, value: float) -> None:
-        self._colorAxis.upper.set_value(value)
+    def set_max_display_value(self, value: float) -> None:
+        self._color_axis.upper.set_value(value)
 
-    def setDisplayValueRange(self, lower: float, upper: float) -> None:
-        self._colorAxis.setRange(lower, upper)
+    def set_display_value_range(self, lower: float, upper: float) -> None:
+        self._color_axis.set_range(lower, upper)
 
     def colorize(self, array: NumberArrayType) -> RealArrayType:
-        return self._rendererPlugin.strategy.colorize(array)
+        return self._renderer_plugin.strategy.colorize(array)
 
     def render(
         self,
         array: NumberArrayType,
-        pixelGeometry: PixelGeometry,
+        pixel_geometry: PixelGeometry,
         *,
-        autoscaleColorAxis: bool,
+        autoscale_color_axis: bool,
     ) -> VisualizationProduct:
-        return self._rendererPlugin.strategy.render(
-            array, pixelGeometry, autoscaleColorAxis=autoscaleColorAxis
+        return self._renderer_plugin.strategy.render(
+            array, pixel_geometry, autoscale_color_axis=autoscale_color_axis
         )
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._rendererChooser:
-            self._rendererPlugin.strategy.remove_observer(self)
-            self._rendererPlugin = self._rendererChooser.get_current_plugin()
-            self._rendererPlugin.strategy.add_observer(self)
+        if observable is self._renderer_chooser:
+            self._renderer_plugin.strategy.remove_observer(self)
+            self._renderer_plugin = self._renderer_chooser.get_current_plugin()
+            self._renderer_plugin.strategy.add_observer(self)
             self.notify_observers()
-        elif observable is self._rendererPlugin.strategy:
+        elif observable is self._renderer_plugin.strategy:
             self.notify_observers()

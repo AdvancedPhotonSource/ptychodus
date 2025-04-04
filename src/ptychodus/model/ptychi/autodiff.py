@@ -18,7 +18,7 @@ from ptychodus.api.object import Object, ObjectGeometry
 from ptychodus.api.probe import Probe
 from ptychodus.api.product import ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Reconstructor
-from ptychodus.api.scan import Scan
+from ptychodus.api.scan import PositionSequence
 
 from .helper import PtyChiOptionsHelper
 from .settings import PtyChiAutodiffSettings
@@ -43,7 +43,7 @@ class AutodiffReconstructor(Reconstructor):
 
         ####
 
-        loss_function_str = self._settings.lossFunction.get_value()
+        loss_function_str = self._settings.loss_function.get_value()
 
         try:
             loss_function = LossFunctions[loss_function_str.upper()]
@@ -53,7 +53,7 @@ class AutodiffReconstructor(Reconstructor):
 
         ####
 
-        forward_model_class_str = self._settings.forwardModelClass.get_value()
+        forward_model_class_str = self._settings.forward_model_class.get_value()
 
         try:
             forward_model_class = ForwardModels[forward_model_class_str.upper()]
@@ -120,7 +120,7 @@ class AutodiffReconstructor(Reconstructor):
         )
 
     def _create_probe_position_options(
-        self, scan: Scan, object_geometry: ObjectGeometry
+        self, scan: PositionSequence, object_geometry: ObjectGeometry
     ) -> AutodiffPtychographyProbePositionOptions:
         helper = self._options_helper.probe_position_helper
         position_x_px, position_y_px = helper.get_positions_px(scan, object_geometry)
@@ -160,7 +160,7 @@ class AutodiffReconstructor(Reconstructor):
             object_options=self._create_object_options(product.object_),
             probe_options=self._create_probe_options(product.probe, product.metadata),
             probe_position_options=self._create_probe_position_options(
-                product.scan, product.object_.get_geometry()
+                product.positions, product.object_.get_geometry()
             ),
             opr_mode_weight_options=self._create_opr_mode_weight_options(),
         )

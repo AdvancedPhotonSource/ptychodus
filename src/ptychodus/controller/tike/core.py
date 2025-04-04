@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QVBoxLayout, QWidget
 
 from ...model.tike import TikeReconstructorLibrary
 from ..reconstructor import ReconstructorViewControllerFactory
-from .viewControllers import (
+from .view_controllers import (
     TikeMultigridViewController,
     TikeObjectCorrectionViewController,
     TikeParametersViewController,
@@ -13,29 +13,29 @@ from .viewControllers import (
 
 class TikeViewController(QWidget):
     def __init__(
-        self, model: TikeReconstructorLibrary, showAlpha: bool, parent: QWidget | None = None
+        self, model: TikeReconstructorLibrary, show_alpha: bool, parent: QWidget | None = None
     ) -> None:
         super().__init__(parent)
-        self._parametersViewController = TikeParametersViewController(
-            model.settings, showAlpha=showAlpha
+        self._parameters_view_controller = TikeParametersViewController(
+            model.settings, show_alpha=show_alpha
         )
-        self._multigridViewController = TikeMultigridViewController(model.multigridSettings)
-        self._objectCorrectionViewController = TikeObjectCorrectionViewController(
-            model.objectCorrectionSettings
+        self._multigrid_view_controller = TikeMultigridViewController(model.multigrid_settings)
+        self._object_correction_view_controller = TikeObjectCorrectionViewController(
+            model.object_correction_settings
         )
-        self._probeCorrectionViewController = TikeProbeCorrectionViewController(
-            model.probeCorrectionSettings
+        self._probe_correction_view_controller = TikeProbeCorrectionViewController(
+            model.probe_correction_settings
         )
-        self._positionCorrectionViewController = TikePositionCorrectionViewController(
-            model.positionCorrectionSettings
+        self._position_correction_view_controller = TikePositionCorrectionViewController(
+            model.position_correction_settings
         )
 
         layout = QVBoxLayout()
-        layout.addWidget(self._parametersViewController.getWidget())
-        layout.addWidget(self._multigridViewController.getWidget())
-        layout.addWidget(self._positionCorrectionViewController.getWidget())
-        layout.addWidget(self._probeCorrectionViewController.getWidget())
-        layout.addWidget(self._objectCorrectionViewController.getWidget())
+        layout.addWidget(self._parameters_view_controller.get_widget())
+        layout.addWidget(self._multigrid_view_controller.get_widget())
+        layout.addWidget(self._position_correction_view_controller.get_widget())
+        layout.addWidget(self._probe_correction_view_controller.get_widget())
+        layout.addWidget(self._object_correction_view_controller.get_widget())
         layout.addStretch()
         self.setLayout(layout)
 
@@ -46,13 +46,13 @@ class TikeViewControllerFactory(ReconstructorViewControllerFactory):
         self._model = model
 
     @property
-    def backendName(self) -> str:
+    def backend_name(self) -> str:
         return 'Tike'
 
-    def createViewController(self, reconstructorName: str) -> QWidget:
-        if reconstructorName == 'rpie':
-            viewController = TikeViewController(self._model, showAlpha=True)
+    def create_view_controller(self, reconstructor_name: str) -> QWidget:
+        if reconstructor_name == 'rpie':
+            view_controller = TikeViewController(self._model, show_alpha=True)
         else:
-            viewController = TikeViewController(self._model, showAlpha=False)
+            view_controller = TikeViewController(self._model, show_alpha=False)
 
-        return viewController
+        return view_controller

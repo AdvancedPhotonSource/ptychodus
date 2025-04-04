@@ -46,12 +46,12 @@ class ScanBoundingBox:
         )
 
 
-class Scan(Sequence[ScanPoint]):
+class PositionSequence(Sequence[ScanPoint]):
     def __init__(self, point_seq: Sequence[ScanPoint] | None = None) -> None:
-        self._pointSeq: Sequence[ScanPoint] = [] if point_seq is None else point_seq
+        self._point_seq: Sequence[ScanPoint] = [] if point_seq is None else point_seq
 
-    def copy(self) -> Scan:
-        return Scan(list(self._pointSeq))
+    def copy(self) -> PositionSequence:
+        return PositionSequence(list(self._point_seq))
 
     @overload
     def __getitem__(self, index: int) -> ScanPoint: ...
@@ -60,15 +60,15 @@ class Scan(Sequence[ScanPoint]):
     def __getitem__(self, index: slice) -> Sequence[ScanPoint]: ...
 
     def __getitem__(self, index: int | slice) -> ScanPoint | Sequence[ScanPoint]:
-        return self._pointSeq[index]
+        return self._point_seq[index]
 
     def __len__(self) -> int:
-        return len(self._pointSeq)
+        return len(self._point_seq)
 
     @property
     def nbytes(self) -> int:
-        sz = sys.getsizeof(self._pointSeq)
-        sz += sum(sys.getsizeof(point) for point in self._pointSeq)
+        sz = sys.getsizeof(self._point_seq)
+        sz += sum(sys.getsizeof(point) for point in self._point_seq)
         return sz
 
 
@@ -78,19 +78,19 @@ class ScanPointParseError(Exception):
     pass
 
 
-class ScanFileReader(ABC):
-    """interface for plugins that read scan files"""
+class PositionFileReader(ABC):
+    """interface for plugins that read position files"""
 
     @abstractmethod
-    def read(self, file_path: Path) -> Scan:
-        """reads a scan dictionary from file"""
+    def read(self, file_path: Path) -> PositionSequence:
+        """reads positions from file"""
         pass
 
 
-class ScanFileWriter(ABC):
-    """interface for plugins that write scan files"""
+class PositionFileWriter(ABC):
+    """interface for plugins that write position files"""
 
     @abstractmethod
-    def write(self, file_path: Path, scan: Scan) -> None:
-        """writes a scan dictionary to file"""
+    def write(self, file_path: Path, positions: PositionSequence) -> None:
+        """writes positions to file"""
         pass

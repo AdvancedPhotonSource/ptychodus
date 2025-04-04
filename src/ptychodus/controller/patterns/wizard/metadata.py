@@ -14,66 +14,66 @@ class OpenDatasetWizardMetadataViewController(Observer):
 
         presenter.add_observer(self)
         self._sync_model_to_view()
-        self._page._setComplete(True)
+        self._page._set_complete(True)
 
-    def importMetadata(self) -> None:
-        if self._page.detectorExtentCheckBox.isChecked():
-            self._presenter.syncDetectorExtent()
+    def import_metadata(self) -> None:
+        if self._page.detector_extent_check_box.isChecked():
+            self._presenter.sync_detector_extent()
 
-        if self._page.detectorPixelSizeCheckBox.isChecked():
-            self._presenter.syncDetectorPixelSize()
+        if self._page.detector_pixel_size_check_box.isChecked():
+            self._presenter.sync_detector_pixel_size()
 
-        if self._page.detectorBitDepthCheckBox.isChecked():
-            self._presenter.syncDetectorBitDepth()
+        if self._page.detector_bit_depth_check_box.isChecked():
+            self._presenter.sync_detector_bit_depth()
 
-        if self._page.detectorDistanceCheckBox.isChecked():
-            self._presenter.syncDetectorDistance()
+        if self._page.detector_distance_check_box.isChecked():
+            self._presenter.sync_detector_distance()
 
-        self._presenter.syncPatternCrop(
-            syncCenter=self._page.patternCropCenterCheckBox.isChecked(),
-            syncExtent=self._page.patternCropExtentCheckBox.isChecked(),
+        self._presenter.sync_pattern_crop(
+            sync_center=self._page.pattern_crop_center_check_box.isChecked(),
+            sync_extent=self._page.pattern_crop_extent_check_box.isChecked(),
         )
 
-        if self._page.probePhotonCountCheckBox.isChecked():
-            self._presenter.syncProbePhotonCount()
+        if self._page.probe_photon_count_check_box.isChecked():
+            self._presenter.sync_probe_photon_count()
 
-        if self._page.probeEnergyCheckBox.isChecked():
-            self._presenter.syncProbeEnergy()
+        if self._page.probe_energy_check_box.isChecked():
+            self._presenter.sync_probe_energy()
 
     def _sync_model_to_view(self) -> None:
-        canSyncDetectorExtent = self._presenter.canSyncDetectorExtent()
-        self._page.detectorExtentCheckBox.setVisible(canSyncDetectorExtent)
-        self._page.detectorExtentCheckBox.setChecked(canSyncDetectorExtent)
+        can_sync_detector_extent = self._presenter.can_sync_detector_extent()
+        self._page.detector_extent_check_box.setVisible(can_sync_detector_extent)
+        self._page.detector_extent_check_box.setChecked(can_sync_detector_extent)
 
-        canSyncDetectorPixelSize = self._presenter.canSyncDetectorPixelSize()
-        self._page.detectorPixelSizeCheckBox.setVisible(canSyncDetectorPixelSize)
-        self._page.detectorPixelSizeCheckBox.setChecked(canSyncDetectorPixelSize)
+        can_sync_detector_pixel_size = self._presenter.can_sync_detector_pixel_size()
+        self._page.detector_pixel_size_check_box.setVisible(can_sync_detector_pixel_size)
+        self._page.detector_pixel_size_check_box.setChecked(can_sync_detector_pixel_size)
 
-        canSyncDetectorBitDepth = self._presenter.canSyncDetectorBitDepth()
-        self._page.detectorBitDepthCheckBox.setVisible(canSyncDetectorBitDepth)
-        self._page.detectorBitDepthCheckBox.setChecked(canSyncDetectorBitDepth)
+        can_sync_detector_bit_depth = self._presenter.can_sync_detector_bit_depth()
+        self._page.detector_bit_depth_check_box.setVisible(can_sync_detector_bit_depth)
+        self._page.detector_bit_depth_check_box.setChecked(can_sync_detector_bit_depth)
 
-        canSyncDetectorDistance = self._presenter.canSyncDetectorDistance()
-        self._page.detectorDistanceCheckBox.setVisible(canSyncDetectorDistance)
-        self._page.detectorDistanceCheckBox.setChecked(canSyncDetectorDistance)
+        can_sync_detector_distance = self._presenter.can_sync_detector_distance()
+        self._page.detector_distance_check_box.setVisible(can_sync_detector_distance)
+        self._page.detector_distance_check_box.setChecked(can_sync_detector_distance)
 
-        canSyncPatternCropCenter = self._presenter.canSyncPatternCropCenter()
-        self._page.patternCropCenterCheckBox.setVisible(canSyncPatternCropCenter)
-        self._page.patternCropCenterCheckBox.setChecked(canSyncPatternCropCenter)
+        can_sync_pattern_crop_center = self._presenter.can_sync_pattern_crop_center()
+        self._page.pattern_crop_center_check_box.setVisible(can_sync_pattern_crop_center)
+        self._page.pattern_crop_center_check_box.setChecked(can_sync_pattern_crop_center)
 
-        canSyncPatternCropExtent = self._presenter.canSyncPatternCropExtent()
-        self._page.patternCropExtentCheckBox.setVisible(canSyncPatternCropExtent)
-        self._page.patternCropExtentCheckBox.setChecked(canSyncPatternCropExtent)
+        can_sync_pattern_crop_extent = self._presenter.can_sync_pattern_crop_extent()
+        self._page.pattern_crop_extent_check_box.setVisible(can_sync_pattern_crop_extent)
+        self._page.pattern_crop_extent_check_box.setChecked(can_sync_pattern_crop_extent)
 
-        canSyncProbePhotonCount = self._presenter.canSyncProbePhotonCount()
-        self._page.probePhotonCountCheckBox.setVisible(canSyncProbePhotonCount)
-        self._page.probePhotonCountCheckBox.setChecked(canSyncProbePhotonCount)
+        can_sync_probe_photon_count = self._presenter.can_sync_probe_photon_count()
+        self._page.probe_photon_count_check_box.setVisible(can_sync_probe_photon_count)
+        self._page.probe_photon_count_check_box.setChecked(can_sync_probe_photon_count)
 
-        canSyncProbeEnergy = self._presenter.canSyncProbeEnergy()
-        self._page.probeEnergyCheckBox.setVisible(canSyncProbeEnergy)
-        self._page.probeEnergyCheckBox.setChecked(canSyncProbeEnergy)
+        can_sync_probe_energy = self._presenter.can_sync_probe_energy()
+        self._page.probe_energy_check_box.setVisible(can_sync_probe_energy)
+        self._page.probe_energy_check_box.setChecked(can_sync_probe_energy)
 
-    def getWidget(self) -> QWizardPage:
+    def get_widget(self) -> QWizardPage:
         return self._page
 
     def _update(self, observable: Observable) -> None:

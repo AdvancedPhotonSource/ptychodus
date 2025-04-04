@@ -16,7 +16,7 @@ __all__ = [
 
 class ScalarTransformation(ABC):
     @abstractmethod
-    def decorateText(self, text: str) -> str:
+    def decorate_text(self, text: str) -> str:
         pass
 
     @abstractmethod
@@ -25,7 +25,7 @@ class ScalarTransformation(ABC):
 
 
 class IdentityScalarTransformation(ScalarTransformation):
-    def decorateText(self, text: str) -> str:
+    def decorate_text(self, text: str) -> str:
         return text
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
@@ -33,7 +33,7 @@ class IdentityScalarTransformation(ScalarTransformation):
 
 
 class SquareRootScalarTransformation(ScalarTransformation):
-    def decorateText(self, text: str) -> str:
+    def decorate_text(self, text: str) -> str:
         return f'$\\sqrt{{\\mathrm{{{text}}}}}$'
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
@@ -42,7 +42,7 @@ class SquareRootScalarTransformation(ScalarTransformation):
 
 
 class Log2ScalarTransformation(ScalarTransformation):
-    def decorateText(self, text: str) -> str:
+    def decorate_text(self, text: str) -> str:
         return f'$\\log_2{{\\left(\\mathrm{{{text}}}\\right)}}$'
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
@@ -51,7 +51,7 @@ class Log2ScalarTransformation(ScalarTransformation):
 
 
 class LogScalarTransformation(ScalarTransformation):
-    def decorateText(self, text: str) -> str:
+    def decorate_text(self, text: str) -> str:
         return f'$\\ln{{\\left(\\mathrm{{{text}}}\\right)}}$'
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
@@ -60,7 +60,7 @@ class LogScalarTransformation(ScalarTransformation):
 
 
 class Log10ScalarTransformation(ScalarTransformation):
-    def decorateText(self, text: str) -> str:
+    def decorate_text(self, text: str) -> str:
         return f'$\\log_{{10}}{{\\left(\\mathrm{{{text}}}\\right)}}$'
 
     def __call__(self, array: RealArrayType) -> RealArrayType:
@@ -121,8 +121,8 @@ class ScalarTransformationParameter(Parameter[str], Observer):
         parameter.set_value(self.get_value())
         return parameter
 
-    def decorateText(self, text: str) -> str:
-        return self._chooser.get_current_plugin().strategy.decorateText(text)
+    def decorate_text(self, text: str) -> str:
+        return self._chooser.get_current_plugin().strategy.decorate_text(text)
 
     def transform(self, values: RealArrayType) -> RealArrayType:
         return self._chooser.get_current_plugin().strategy(values)

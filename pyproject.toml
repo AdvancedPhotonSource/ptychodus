@@ -26,6 +26,7 @@ dynamic = ["version"]
 ptychodus = "ptychodus.__main__:main"
 
 [project.optional-dependencies]
+agent = ["langchain", "requests"]
 globus = ["gladier", "gladier-tools>=0.5.4"]
 gui = ["PyQt5"]
 ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
@@ -73,6 +74,9 @@ quote-style = "single"
 
 [tool.ruff.lint]
 select = [
-    # TODO "N",
+    "N",
     "NPY",
 ]
+
+[tool.pyright]
+pythonVersion = "3.10"

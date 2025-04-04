@@ -45,90 +45,90 @@ class PatternsStreamingContext:
 class PatternsAPI:
     def __init__(
         self,
-        patternSettings: PatternSettings,
-        detectorSettings: DetectorSettings,
+        pattern_settings: PatternSettings,
+        detector_settings: DetectorSettings,
         dataset: AssembledDiffractionDataset,
-        fileReaderChooser: PluginChooser[DiffractionFileReader],
-        fileWriterChooser: PluginChooser[DiffractionFileWriter],
+        file_reader_chooser: PluginChooser[DiffractionFileReader],
+        file_writer_chooser: PluginChooser[DiffractionFileWriter],
     ) -> None:
         super().__init__()
-        self._patternSettings = patternSettings
-        self._detectorSettings = detectorSettings
+        self._pattern_settings = pattern_settings
+        self._detector_settings = detector_settings
         self._dataset = dataset
-        self._fileReaderChooser = fileReaderChooser
-        self._fileWriterChooser = fileWriterChooser
+        self._file_reader_chooser = file_reader_chooser
+        self._file_writer_chooser = file_writer_chooser
 
-    def createStreamingContext(self, metadata: DiffractionMetadata) -> PatternsStreamingContext:
+    def create_streaming_context(self, metadata: DiffractionMetadata) -> PatternsStreamingContext:
         return PatternsStreamingContext(self._dataset, metadata)
 
-    def getFileReaderChooser(self) -> PluginChooser[DiffractionFileReader]:
-        return self._fileReaderChooser
+    def get_file_reader_chooser(self) -> PluginChooser[DiffractionFileReader]:
+        return self._file_reader_chooser
 
     def open_patterns(
         self,
-        filePath: Path,
+        file_path: Path,
         *,
         file_type: str | None = None,
         crop_center: CropCenter | None = None,
         crop_extent: ImageExtent | None = None,
-        detectorExtent: ImageExtent | None = None,
+        detector_extent: ImageExtent | None = None,
     ) -> int:
         if crop_center is not None:
-            self._patternSettings.cropCenterXInPixels.set_value(crop_center.position_x_px)
-            self._patternSettings.cropCenterYInPixels.set_value(crop_center.position_y_px)
+            self._pattern_settings.crop_center_x_px.set_value(crop_center.position_x_px)
+            self._pattern_settings.crop_center_y_px.set_value(crop_center.position_y_px)
 
         if crop_extent is not None:
-            self._patternSettings.cropWidthInPixels.set_value(crop_extent.width_px)
-            self._patternSettings.cropHeightInPixels.set_value(crop_extent.height_px)
+            self._pattern_settings.crop_width_px.set_value(crop_extent.width_px)
+            self._pattern_settings.crop_height_px.set_value(crop_extent.height_px)
 
-        if detectorExtent is not None:
-            self._detectorSettings.widthInPixels.set_value(detectorExtent.width_px)
-            self._detectorSettings.heightInPixels.set_value(detectorExtent.height_px)
+        if detector_extent is not None:
+            self._detector_settings.width_px.set_value(detector_extent.width_px)
+            self._detector_settings.height_px.set_value(detector_extent.height_px)
 
-        if filePath.is_file():
+        if file_path.is_file():
             if file_type is not None:
-                self._fileReaderChooser.set_current_plugin(file_type)
+                self._file_reader_chooser.set_current_plugin(file_type)
 
-            file_type = self._fileReaderChooser.get_current_plugin().simple_name
-            logger.debug(f'Reading "{filePath}" as "{file_type}"')
-            fileReader = self._fileReaderChooser.get_current_plugin().strategy
+            file_type = self._file_reader_chooser.get_current_plugin().simple_name
+            logger.debug(f'Reading "{file_path}" as "{file_type}"')
+            file_reader = self._file_reader_chooser.get_current_plugin().strategy
 
             try:
-                dataset = fileReader.read(filePath)
+                dataset = file_reader.read(file_path)
             except Exception as exc:
-                raise RuntimeError(f'Failed to read "{filePath}"') from exc
+                raise RuntimeError(f'Failed to read "{file_path}"') from exc
             else:
                 self._dataset.reload(dataset)
                 return 0
         else:
-            logger.warning(f'Refusing to read invalid file path {filePath}')
+            logger.warning(f'Refusing to read invalid file path {file_path}')
 
         return -1
 
-    def startAssemblingDiffractionPatterns(self) -> None:
+    def start_assembling_diffraction_patterns(self) -> None:
         self._dataset.start_loading()
 
-    def finishAssemblingDiffractionPatterns(self, *, block: bool) -> None:
+    def finish_assembling_diffraction_patterns(self, *, block: bool) -> None:
         self._dataset.finish_loading(block=block)
 
         if block:
             self._dataset.assemble_patterns()
 
-    def closePatterns(self) -> None:
+    def close_patterns(self) -> None:
         self._dataset.clear()
 
-    def getFileWriterChooser(self) -> PluginChooser[DiffractionFileWriter]:
-        return self._fileWriterChooser
+    def get_file_writer_chooser(self) -> PluginChooser[DiffractionFileWriter]:
+        return self._file_writer_chooser
 
-    def savePatterns(self, filePath: Path, fileType: str) -> None:
-        self._fileWriterChooser.set_current_plugin(fileType)
-        fileType = self._fileWriterChooser.get_current_plugin().simple_name
-        logger.debug(f'Writing "{filePath}" as "{fileType}"')
-        writer = self._fileWriterChooser.get_current_plugin().strategy
-        writer.write(filePath, self._dataset)
+    def save_patterns(self, file_path: Path, file_type: str) -> None:
+        self._file_writer_chooser.set_current_plugin(file_type)
+        file_type = self._file_writer_chooser.get_current_plugin().simple_name
+        logger.debug(f'Writing "{file_path}" as "{file_type}"')
+        writer = self._file_writer_chooser.get_current_plugin().strategy
+        writer.write(file_path, self._dataset)
 
-    def import_assembled_patterns(self, filePath: Path) -> None:
-        self._dataset.import_assembled_patterns(filePath)
+    def import_assembled_patterns(self, file_path: Path) -> None:
+        self._dataset.import_assembled_patterns(file_path)
 
-    def export_assembled_patterns(self, filePath: Path) -> None:
-        self._dataset.export_assembled_patterns(filePath)
+    def export_assembled_patterns(self, file_path: Path) -> None:
+        self._dataset.export_assembled_patterns(file_path)

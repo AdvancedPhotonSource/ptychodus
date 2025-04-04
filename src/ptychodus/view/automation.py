@@ -20,26 +20,26 @@ from PyQt5.QtWidgets import (
 class AutomationProcessingView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Processing', parent)
-        self.strategyLabel = QLabel('Strategy:')
-        self.strategyComboBox = QComboBox()
-        self.directoryLabel = QLabel('Directory:')
-        self.directoryLineEdit = QLineEdit()
-        self.directoryBrowseButton = QPushButton('Browse')
-        self.intervalLabel = QLabel('Interval [sec]:')
-        self.intervalSpinBox = QSpinBox()
+        self.strategy_label = QLabel('Strategy:')
+        self.strategy_combo_box = QComboBox()
+        self.directory_label = QLabel('Directory:')
+        self.directory_line_edit = QLineEdit()
+        self.directory_browse_button = QPushButton('Browse')
+        self.interval_label = QLabel('Interval [sec]:')
+        self.interval_spin_box = QSpinBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> AutomationProcessingView:
+    def create_instance(cls, parent: QWidget | None = None) -> AutomationProcessingView:
         view = cls(parent)
 
         layout = QGridLayout()
-        layout.addWidget(view.strategyLabel, 0, 0)
-        layout.addWidget(view.strategyComboBox, 0, 1, 1, 2)
-        layout.addWidget(view.directoryLabel, 1, 0)
-        layout.addWidget(view.directoryLineEdit, 1, 1)
-        layout.addWidget(view.directoryBrowseButton, 1, 2)
-        layout.addWidget(view.intervalLabel, 2, 0)
-        layout.addWidget(view.intervalSpinBox, 2, 1, 1, 2)
+        layout.addWidget(view.strategy_label, 0, 0)
+        layout.addWidget(view.strategy_combo_box, 0, 1, 1, 2)
+        layout.addWidget(view.directory_label, 1, 0)
+        layout.addWidget(view.directory_line_edit, 1, 1)
+        layout.addWidget(view.directory_browse_button, 1, 2)
+        layout.addWidget(view.interval_label, 2, 0)
+        layout.addWidget(view.interval_spin_box, 2, 1, 1, 2)
         layout.setColumnStretch(1, 1)
         view.setLayout(layout)
 
@@ -49,16 +49,16 @@ class AutomationProcessingView(QGroupBox):
 class AutomationWatchdogView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Watchdog', parent)
-        self.delaySpinBox = QSpinBox()
-        self.usePollingObserverCheckBox = QCheckBox('Use Polling Observer')
+        self.delay_spin_box = QSpinBox()
+        self.use_polling_observer_check_box = QCheckBox('Use Polling Observer')
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> AutomationWatchdogView:
+    def create_instance(cls, parent: QWidget | None = None) -> AutomationWatchdogView:
         view = cls(parent)
 
         layout = QFormLayout()
-        layout.addRow('Delay [sec]:', view.delaySpinBox)
-        layout.addRow(view.usePollingObserverCheckBox)
+        layout.addRow('Delay [sec]:', view.delay_spin_box)
+        layout.addRow(view.use_polling_observer_check_box)
         view.setLayout(layout)
 
         return view
@@ -67,29 +67,29 @@ class AutomationWatchdogView(QGroupBox):
 class AutomationView(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.processingView = AutomationProcessingView.createInstance()
-        self.watchdogView = AutomationWatchdogView.createInstance()
-        self.processingListView = QListView()
-        self.loadButton = QPushButton('Load')
-        self.watchButton = QPushButton('Watch')
-        self.processButton = QPushButton('Process')
-        self.clearButton = QPushButton('Clear')
+        self.processing_view = AutomationProcessingView.create_instance()
+        self.watchdog_view = AutomationWatchdogView.create_instance()
+        self.processing_list_view = QListView()
+        self.load_button = QPushButton('Load')
+        self.watch_button = QPushButton('Watch')
+        self.process_button = QPushButton('Process')
+        self.clear_button = QPushButton('Clear')
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> AutomationView:
+    def create_instance(cls, parent: QWidget | None = None) -> AutomationView:
         view = cls(parent)
 
-        buttonLayout = QHBoxLayout()
-        buttonLayout.addWidget(view.loadButton)
-        buttonLayout.addWidget(view.watchButton)
-        buttonLayout.addWidget(view.processButton)
-        buttonLayout.addWidget(view.clearButton)
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(view.load_button)
+        button_layout.addWidget(view.watch_button)
+        button_layout.addWidget(view.process_button)
+        button_layout.addWidget(view.clear_button)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.processingView)
-        layout.addWidget(view.watchdogView)
-        layout.addWidget(view.processingListView)
-        layout.addLayout(buttonLayout)
+        layout.addWidget(view.processing_view)
+        layout.addWidget(view.watchdog_view)
+        layout.addWidget(view.processing_list_view)
+        layout.addLayout(button_layout)
         view.setLayout(layout)
 
         return view

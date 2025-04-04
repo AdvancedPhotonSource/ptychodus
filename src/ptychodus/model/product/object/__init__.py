@@ -1,7 +1,7 @@
 from .builder import ObjectBuilder
-from .builderFactory import ObjectBuilderFactory
+from .builder_factory import ObjectBuilderFactory
 from .item import ObjectRepositoryItem
-from .itemFactory import ObjectRepositoryItemFactory
+from .item_factory import ObjectRepositoryItemFactory
 from .random import RandomObjectBuilder
 from .settings import ObjectSettings
 

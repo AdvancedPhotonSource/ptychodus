@@ -17,9 +17,9 @@ from ...view.product import ProductEditorDialog
 
 
 class ProductPropertyTableModel(QAbstractTableModel):
-    def __init__(self, product: ProductRepositoryItem, parent: QObject | None = None) -> None:
+    def __init__(self, product_item: ProductRepositoryItem, parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._product = product
+        self._product_item = product_item
         self._header = ['Property', 'Value']
         self._properties = [
             'Probe Wavelength [nm]',
@@ -30,9 +30,19 @@ class ProductPropertyTableModel(QAbstractTableModel):
             'Object Plane Pixel Width [nm]',
             'Object Plane Pixel Height [nm]',
             'Fresnel Number',
+            'Exposure Time [s]',
+            'Mass Attenuation [m\u00b2/kg]',
         ]
 
-    def headerData(
+    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+        value = super().flags(index)
+
+        if index.isValid() and index.column() in (8, 9):
+            value |= Qt.ItemFlag.ItemIsEditable
+
+        return value
+
+    def headerData(  # noqa: N802
         self,
         section: int,
         orientation: Qt.Orientation,
@@ -47,33 +57,62 @@ class ProductPropertyTableModel(QAbstractTableModel):
                 case 0:
                     return self._properties[index.row()]
                 case 1:
-                    geometry = self._product.getGeometry()
+                    metadata_item = self._product_item.get_metadata_item()
+                    geometry = self._product_item.get_geometry()
 
                     match index.row():
                         case 0:
                             return f'{geometry.probe_wavelength_m * 1e9:.4g}'
                         case 1:
-                            return f'{geometry.probeWavelengthsPerMeter * 1e-9:.4g}'
+                            return f'{geometry.probe_wavelengths_per_m * 1e-9:.4g}'
                         case 2:
-                            return f'{geometry.probeRadiansPerMeter * 1e-9:.4g}'
+                            return f'{geometry.probe_radians_per_m * 1e-9:.4g}'
                         case 3:
-                            return f'{geometry.probePhotonsPerSecond:.4g}'
+                            return f'{geometry.probe_photons_per_s:.4g}'
                         case 4:
                             return f'{geometry.probe_power_W:.4g}'
                         case 5:
-                            return f'{geometry.objectPlanePixelWidthInMeters * 1e9:.4g}'
+                            return f'{geometry.object_plane_pixel_width_m * 1e9:.4g}'
                         case 6:
-                            return f'{geometry.objectPlanePixelHeightInMeters * 1e9:.4g}'
+                            return f'{geometry.object_plane_pixel_height_m * 1e9:.4g}'
                         case 7:
                             try:
-                                return f'{geometry.fresnelNumber:.4g}'
+                                return f'{geometry.fresnel_number:.4g}'
                             except ZeroDivisionError:
                                 return 'inf'
+                        case 8:
+                            return f'{metadata_item.exposure_time_s.get_value():.4g}'
+                        case 9:
+                            return f'{metadata_item.mass_attenuation_m2_kg.get_value():.4g}'
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
+        if index.isValid() and role == Qt.ItemDataRole.EditRole:
+            metadata_item = self._product_item.get_metadata_item()
+
+            match index.row():
+                case 8:
+                    try:
+                        exposure_time_s = float(value)
+                    except ValueError:
+                        return False
+
+                    metadata_item.exposure_time_s.set_value(exposure_time_s)
+                    return True
+                case 9:
+                    try:
+                        mass_attenuation_m2_kg = float(value)
+                    except ValueError:
+                        return False
+
+                    metadata_item.mass_attenuation_m2_kg.set_value(mass_attenuation_m2_kg)
+                    return True
+
+        return False
+
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._properties)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._header)
 
 
@@ -82,65 +121,65 @@ class ProductEditorViewController(Observer):
         self,
         dataset: AssembledDiffractionDataset,
         product: ProductRepositoryItem,
-        tableModel: ProductPropertyTableModel,
+        table_model: ProductPropertyTableModel,
         dialog: ProductEditorDialog,
     ) -> None:
         super().__init__()
         self._dataset = dataset
         self._product = product
-        self._tableModel = tableModel
+        self._table_model = table_model
         self._dialog = dialog
 
     @classmethod
-    def editProduct(
+    def edit_product(
         cls, dataset: AssembledDiffractionDataset, product: ProductRepositoryItem, parent: QWidget
     ) -> None:
-        tableModel = ProductPropertyTableModel(product)
-        tableProxyModel = QSortFilterProxyModel()
-        tableProxyModel.setSourceModel(tableModel)
+        table_model = ProductPropertyTableModel(product)
+        table_proxy_model = QSortFilterProxyModel()
+        table_proxy_model.setSourceModel(table_model)
 
         dialog = ProductEditorDialog(parent)
-        dialog.setWindowTitle(f'Edit Product: {product.getName()}')
-        dialog.tableView.setModel(tableProxyModel)
-        dialog.tableView.setSortingEnabled(True)
-        dialog.tableView.verticalHeader().hide()
-        dialog.tableView.resizeColumnsToContents()
-        dialog.tableView.resizeRowsToContents()
+        dialog.setWindowTitle(f'Edit Product: {product.get_name()}')
+        dialog.table_view.setModel(table_proxy_model)
+        dialog.table_view.setSortingEnabled(True)
+        dialog.table_view.verticalHeader().hide()
+        dialog.table_view.resizeColumnsToContents()
+        dialog.table_view.resizeRowsToContents()
 
-        viewController = cls(dataset, product, tableModel, dialog)
-        product.add_observer(viewController)
-        dialog.textEdit.textChanged.connect(viewController._syncViewToModel)
+        view_controller = cls(dataset, product, table_model, dialog)
+        product.add_observer(view_controller)
+        dialog.text_edit.textChanged.connect(view_controller._sync_view_to_model)
 
-        viewController._syncModelToView()
+        view_controller._sync_model_to_view()
 
-        dialog.actionsView.estimateProbePhotonCountButton.clicked.connect(
-            viewController._estimateProbePhotonCount
+        dialog.actions_view.estimate_probe_photon_count_button.clicked.connect(
+            view_controller._estimate_probe_photon_count
         )
-        dialog.finished.connect(viewController._finish)
+        dialog.finished.connect(view_controller._finish)
         dialog.open()
         dialog.adjustSize()
 
-    def _syncViewToModel(self) -> None:
-        metadata = self._product.getMetadata()
-        metadata.comments.set_value(self._dialog.textEdit.toPlainText())
+    def _sync_view_to_model(self) -> None:
+        metadata = self._product.get_metadata_item()
+        metadata.comments.set_value(self._dialog.text_edit.toPlainText())
 
-    def _syncModelToView(self) -> None:
-        self._tableModel.beginResetModel()
-        self._tableModel.endResetModel()
+    def _sync_model_to_view(self) -> None:
+        self._table_model.beginResetModel()
+        self._table_model.endResetModel()
 
-        metadata = self._product.getMetadata()
-        self._dialog.textEdit.setPlainText(metadata.comments.get_value())
+        metadata = self._product.get_metadata_item()
+        self._dialog.text_edit.setPlainText(metadata.comments.get_value())
 
-    def _estimateProbePhotonCount(self) -> None:
-        metadata = self._product.getMetadata()
-        metadata.probePhotonCount.set_value(self._dataset.get_maximum_pattern_counts())
+    def _estimate_probe_photon_count(self) -> None:
+        metadata = self._product.get_metadata_item()
+        metadata.probe_photon_count.set_value(self._dataset.get_maximum_pattern_counts())
 
-        self._tableModel.beginResetModel()
-        self._tableModel.endResetModel()
+        self._table_model.beginResetModel()
+        self._table_model.endResetModel()
 
     def _finish(self, result: int) -> None:
         self._product.remove_observer(self)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._product:
-            self._syncModelToView()
+            self._sync_model_to_view()

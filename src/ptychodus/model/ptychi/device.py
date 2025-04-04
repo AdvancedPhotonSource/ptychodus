@@ -6,13 +6,13 @@ logger = logging.getLogger(__name__)
 
 
 class PtyChiDeviceRepository(Sequence[str]):
-    def __init__(self, *, isDeveloperModeEnabled: bool) -> None:
+    def __init__(self, *, is_developer_mode_enabled: bool) -> None:
         self._devices: list[str] = list()
 
         try:
             import ptychi
         except ModuleNotFoundError:
-            if isDeveloperModeEnabled:
+            if is_developer_mode_enabled:
                 self._devices.extend(f'gpu:{n}' for n in range(4))
         else:
             for device in ptychi.list_available_devices():

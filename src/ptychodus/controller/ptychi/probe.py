@@ -27,28 +27,28 @@ __all__ = ['PtyChiProbeViewController']
 class PtyChiConstrainProbePowerViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
-        constrainPower: BooleanParameter,
+        constrain_power: BooleanParameter,
         start: IntegerParameter,
         stop: IntegerParameter,
         stride: IntegerParameter,
         num_epochs: IntegerParameter,
     ) -> None:
         super().__init__(
-            constrainPower, 'Constrain Power', tool_tip='Whether to constrain probe power.'
+            constrain_power, 'Constrain Power', tool_tip='Whether to constrain probe power.'
         )
-        self._planViewController = PtyChiOptimizationPlanViewController(
+        self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class PtyChiOrthogonalizeIncoherentModesViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
-        orthogonalizeModes: BooleanParameter,
+        orthogonalize_modes: BooleanParameter,
         start: IntegerParameter,
         stop: IntegerParameter,
         stride: IntegerParameter,
@@ -57,52 +57,52 @@ class PtyChiOrthogonalizeIncoherentModesViewController(CheckableGroupBoxParamete
         enumerators: PtyChiEnumerators,
     ) -> None:
         super().__init__(
-            orthogonalizeModes,
+            orthogonalize_modes,
             'Orthogonalize Incoherent Modes',
             tool_tip='Whether to orthogonalize incoherent probe modes.',
         )
-        self._planViewController = PtyChiOptimizationPlanViewController(
+        self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
-        self._methodViewController = ComboBoxParameterViewController(
+        self._method_view_controller = ComboBoxParameterViewController(
             method,
-            enumerators.orthogonalizationMethods(),
+            enumerators.orthogonalization_methods(),
             tool_tip='Method to use for incoherent mode orthogonalization.',
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.getWidget())
-        layout.addRow('Method:', self._methodViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        layout.addRow('Method:', self._method_view_controller.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class PtyChiOrthogonalizeOPRModesViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
-        orthogonalizeModes: BooleanParameter,
+        orthogonalize_modes: BooleanParameter,
         start: IntegerParameter,
         stop: IntegerParameter,
         stride: IntegerParameter,
         num_epochs: IntegerParameter,
     ) -> None:
         super().__init__(
-            orthogonalizeModes,
+            orthogonalize_modes,
             'Orthogonalize OPR Modes',
             tool_tip='Whether to orthogonalize OPR modes.',
         )
-        self._planViewController = PtyChiOptimizationPlanViewController(
+        self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class PtyChiConstrainSupportViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
-        constrainSupport: BooleanParameter,
+        constrain_support: BooleanParameter,
         start: IntegerParameter,
         stop: IntegerParameter,
         stride: IntegerParameter,
@@ -110,139 +110,141 @@ class PtyChiConstrainSupportViewController(CheckableGroupBoxParameterViewControl
         num_epochs: IntegerParameter,
     ) -> None:
         super().__init__(
-            constrainSupport,
+            constrain_support,
             'Constrain Support',
             tool_tip='When enabled, the probe will be shrinkwrapped so that small values are set to zero.',
         )
-        self._planViewController = PtyChiOptimizationPlanViewController(
+        self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
-        self._thresholdViewController = DecimalLineEditParameterViewController(
+        self._threshold_view_controller = DecimalLineEditParameterViewController(
             threshold, tool_tip='Threshold for the probe support constraint.'
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.getWidget())
-        layout.addRow('Threshold:', self._thresholdViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        layout.addRow('Threshold:', self._threshold_view_controller.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class PtyChiConstrainCenterViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
-        constrainCenter: BooleanParameter,
+        constrain_center: BooleanParameter,
         start: IntegerParameter,
         stop: IntegerParameter,
         stride: IntegerParameter,
         num_epochs: IntegerParameter,
     ) -> None:
         super().__init__(
-            constrainCenter,
+            constrain_center,
             'Constrain Center',
             tool_tip='When enabled, the probe center of mass will be constrained to the center of the probe array.',
         )
-        self._planViewController = PtyChiOptimizationPlanViewController(
+        self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._planViewController.getWidget())
-        self.getWidget().setLayout(layout)
+        layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        self.get_widget().setLayout(layout)
 
 
 class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
         settings: PtyChiProbeSettings,
-        lsqmlSettings: PtyChiLSQMLSettings | None,
-        pieSettings: PtyChiPIESettings | None,
+        lsqml_settings: PtyChiLSQMLSettings | None,
+        pie_settings: PtyChiPIESettings | None,
         num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
         super().__init__(
-            settings.isOptimizable, 'Optimize Probe', tool_tip='Whether the probe is optimizable.'
+            settings.is_optimizable, 'Optimize Probe', tool_tip='Whether the probe is optimizable.'
         )
-        self._optimizationPlanViewController = PtyChiOptimizationPlanViewController(
-            settings.optimizationPlanStart,
-            settings.optimizationPlanStop,
-            settings.optimizationPlanStride,
+        self._optimization_plan_view_controller = PtyChiOptimizationPlanViewController(
+            settings.optimization_plan_start,
+            settings.optimization_plan_stop,
+            settings.optimization_plan_stride,
             num_epochs,
         )
-        self._optimizerViewController = PtyChiOptimizerParameterViewController(
+        self._optimizer_view_controller = PtyChiOptimizerParameterViewController(
             settings.optimizer, enumerators
         )
-        self._stepSizeViewController = DecimalLineEditParameterViewController(
-            settings.stepSize, tool_tip='Optimizer step size'
+        self._step_size_view_controller = DecimalLineEditParameterViewController(
+            settings.step_size, tool_tip='Optimizer step size'
         )
-        self._constrainPowerViewController = PtyChiConstrainProbePowerViewController(
-            settings.constrainProbePower,
-            settings.constrainProbePowerStart,
-            settings.constrainProbePowerStop,
-            settings.constrainProbePowerStride,
+        self._constrain_probe_power_view_controller = PtyChiConstrainProbePowerViewController(
+            settings.constrain_probe_power,
+            settings.constrain_probe_power_start,
+            settings.constrain_probe_power_stop,
+            settings.constrain_probe_power_stride,
             num_epochs,
         )
-        self._orthogonalizeIncoherentModesViewController = (
+        self._orthogonalize_incoherent_modes_view_controller = (
             PtyChiOrthogonalizeIncoherentModesViewController(
-                settings.orthogonalizeIncoherentModes,
-                settings.orthogonalizeIncoherentModesStart,
-                settings.orthogonalizeIncoherentModesStop,
-                settings.orthogonalizeIncoherentModesStride,
-                settings.orthogonalizeIncoherentModesMethod,
+                settings.orthogonalize_incoherent_modes,
+                settings.orthogonalize_incoherent_modes_start,
+                settings.orthogonalize_incoherent_modes_stop,
+                settings.orthogonalize_incoherent_modes_stride,
+                settings.orthogonalize_incoherent_modes_method,
                 num_epochs,
                 enumerators,
             )
         )
-        self._orthogonalizeOPRModesViewController = PtyChiOrthogonalizeOPRModesViewController(
-            settings.orthogonalizeOPRModes,
-            settings.orthogonalizeOPRModesStart,
-            settings.orthogonalizeOPRModesStop,
-            settings.orthogonalizeOPRModesStride,
+        self._orthogonalize_opr_modes_view_controller = PtyChiOrthogonalizeOPRModesViewController(
+            settings.orthogonalize_opr_modes,
+            settings.orthogonalize_opr_modes_start,
+            settings.orthogonalize_opr_modes_stop,
+            settings.orthogonalize_opr_modes_stride,
             num_epochs,
         )
-        self._constrainSupportViewController = PtyChiConstrainSupportViewController(
-            settings.constrainSupport,
-            settings.constrainSupportStart,
-            settings.constrainSupportStop,
-            settings.constrainSupportStride,
-            settings.constrainSupportThreshold,
+        self._constrain_support_view_controller = PtyChiConstrainSupportViewController(
+            settings.constrain_support,
+            settings.constrain_support_start,
+            settings.constrain_support_stop,
+            settings.constrain_support_stride,
+            settings.constrain_support_threshold,
             num_epochs,
         )
-        self._constrainCenterViewController = PtyChiConstrainCenterViewController(
-            settings.constrainCenter,
-            settings.constrainCenterStart,
-            settings.constrainCenterStop,
-            settings.constrainCenterStride,
+        self._constrain_center_view_controller = PtyChiConstrainCenterViewController(
+            settings.constrain_center,
+            settings.constrain_center_start,
+            settings.constrain_center_stop,
+            settings.constrain_center_stride,
             num_epochs,
         )
-        self._relaxEigenmodeUpdateViewController = DecimalSliderParameterViewController(
-            settings.relaxEigenmodeUpdate,
+        self._relax_eigenmode_update_view_controller = DecimalSliderParameterViewController(
+            settings.relax_eigenmode_update,
             tool_tip='Relaxation factor for the eigenmode update.',
         )
 
         layout = QFormLayout()
-        layout.addRow('Plan:', self._optimizationPlanViewController.getWidget())
-        layout.addRow('Optimizer:', self._optimizerViewController.getWidget())
-        layout.addRow('Step Size:', self._stepSizeViewController.getWidget())
-        layout.addRow(self._constrainPowerViewController.getWidget())
-        layout.addRow(self._orthogonalizeIncoherentModesViewController.getWidget())
-        layout.addRow(self._orthogonalizeOPRModesViewController.getWidget())
-        layout.addRow(self._constrainSupportViewController.getWidget())
-        layout.addRow(self._constrainCenterViewController.getWidget())
+        layout.addRow('Plan:', self._optimization_plan_view_controller.get_widget())
+        layout.addRow('Optimizer:', self._optimizer_view_controller.get_widget())
+        layout.addRow('Step Size:', self._step_size_view_controller.get_widget())
+        layout.addRow(self._constrain_probe_power_view_controller.get_widget())
+        layout.addRow(self._orthogonalize_incoherent_modes_view_controller.get_widget())
+        layout.addRow(self._orthogonalize_opr_modes_view_controller.get_widget())
+        layout.addRow(self._constrain_support_view_controller.get_widget())
+        layout.addRow(self._constrain_center_view_controller.get_widget())
         layout.addRow(
-            'Relax Eigenmode Update:', self._relaxEigenmodeUpdateViewController.getWidget()
+            'Relax Eigenmode Update:', self._relax_eigenmode_update_view_controller.get_widget()
         )
 
-        if lsqmlSettings is not None:
-            self._probeOptimalStepSizeScalerViewController = DecimalLineEditParameterViewController(
-                lsqmlSettings.probeOptimalStepSizeScaler
+        if lsqml_settings is not None:
+            self._probe_optimal_step_size_scaler_view_controller = (
+                DecimalLineEditParameterViewController(
+                    lsqml_settings.probe_optimal_step_size_scaler
+                )
             )
             layout.addRow(
                 'Optimal Step Size Scaler:',
-                self._probeOptimalStepSizeScalerViewController.getWidget(),
+                self._probe_optimal_step_size_scaler_view_controller.get_widget(),
             )
 
-        if pieSettings is not None:
-            self._probeAlpha = DecimalSliderParameterViewController(pieSettings.probeAlpha)
-            layout.addRow('Alpha:', self._probeAlpha.getWidget())
+        if pie_settings is not None:
+            self._probe_alpha = DecimalSliderParameterViewController(pie_settings.probe_alpha)
+            layout.addRow('Alpha:', self._probe_alpha.get_widget())
 
-        self.getWidget().setLayout(layout)
+        self.get_widget().setLayout(layout)

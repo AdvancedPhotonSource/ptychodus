@@ -14,9 +14,9 @@ from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
 from ..image import ImageController
-from .editorFactory import ObjectEditorViewControllerFactory
+from .editor_factory import ObjectEditorViewControllerFactory
 from .frc import FourierRingCorrelationViewController
-from .treeModel import ObjectTreeModel
+from .tree_model import ObjectTreeModel
 from .xmcd import XMCDViewController
 
 logger = logging.getLogger(__name__)
@@ -27,235 +27,235 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self,
         repository: ObjectRepository,
         api: ObjectAPI,
-        imageController: ImageController,
+        image_controller: ImageController,
         correlator: FourierRingCorrelator,
-        xmcdAnalyzer: XMCDAnalyzer,
-        xmcdVisualizationEngine: VisualizationEngine,
+        xmcd_analyzer: XMCDAnalyzer,
+        xmcd_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
-        fileDialogFactory: FileDialogFactory,
-        treeModel: ObjectTreeModel,
+        file_dialog_factory: FileDialogFactory,
+        tree_model: ObjectTreeModel,
     ) -> None:
         super().__init__()
         self._repository = repository
         self._api = api
-        self._imageController = imageController
+        self._image_controller = image_controller
         self._view = view
-        self._fileDialogFactory = fileDialogFactory
-        self._treeModel = treeModel
-        self._editorFactory = ObjectEditorViewControllerFactory()
+        self._file_dialog_factory = file_dialog_factory
+        self._tree_model = tree_model
+        self._editor_factory = ObjectEditorViewControllerFactory()
 
-        self._frcViewController = FourierRingCorrelationViewController(correlator, treeModel)
-        self._xmcdViewController = XMCDViewController(
-            xmcdAnalyzer, xmcdVisualizationEngine, fileDialogFactory, treeModel
+        self._frc_view_controller = FourierRingCorrelationViewController(correlator, tree_model)
+        self._xmcd_view_controller = XMCDViewController(
+            xmcd_analyzer, xmcd_visualization_engine, file_dialog_factory, tree_model
         )
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
         repository: ObjectRepository,
         api: ObjectAPI,
-        imageController: ImageController,
+        image_controller: ImageController,
         correlator: FourierRingCorrelator,
-        xmcdAnalyzer: XMCDAnalyzer,
-        xmcdVisualizationEngine: VisualizationEngine,
+        xmcd_analyzer: XMCDAnalyzer,
+        xmcd_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
-        fileDialogFactory: FileDialogFactory,
+        file_dialog_factory: FileDialogFactory,
     ) -> ObjectController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
-        treeModel = ObjectTreeModel(repository, api)
+        tree_model = ObjectTreeModel(repository, api)
         controller = cls(
             repository,
             api,
-            imageController,
+            image_controller,
             correlator,
-            xmcdAnalyzer,
-            xmcdVisualizationEngine,
+            xmcd_analyzer,
+            xmcd_visualization_engine,
             view,
-            fileDialogFactory,
-            treeModel,
+            file_dialog_factory,
+            tree_model,
         )
         repository.add_observer(controller)
 
-        builderListModel = QStringListModel()
-        builderListModel.setStringList([name for name in api.builderNames()])
-        builderItemDelegate = ComboBoxItemDelegate(builderListModel, view.treeView)
+        builder_list_model = QStringListModel()
+        builder_list_model.setStringList([name for name in api.builder_names()])
+        builder_item_delegate = ComboBoxItemDelegate(builder_list_model, view.tree_view)
 
-        view.treeView.setModel(treeModel)
-        view.treeView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        view.treeView.setItemDelegateForColumn(2, builderItemDelegate)
-        view.treeView.selectionModel().currentChanged.connect(controller._updateView)
-        controller._updateView(QModelIndex(), QModelIndex())
+        view.tree_view.setModel(tree_model)
+        view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        view.tree_view.setItemDelegateForColumn(2, builder_item_delegate)
+        view.tree_view.selectionModel().currentChanged.connect(controller._update_view)
+        controller._update_view(QModelIndex(), QModelIndex())
 
-        loadFromFileAction = view.buttonBox.loadMenu.addAction('Open File...')
-        loadFromFileAction.triggered.connect(controller._loadCurrentObjectFromFile)
+        load_from_file_action = view.button_box.load_menu.addAction('Open File...')
+        load_from_file_action.triggered.connect(controller._load_current_object_from_file)
 
-        copyAction = view.buttonBox.loadMenu.addAction('Copy...')
-        copyAction.triggered.connect(controller._copyToCurrentObject)
+        copy_action = view.button_box.load_menu.addAction('Copy...')
+        copy_action.triggered.connect(controller._copy_to_current_object)
 
-        saveToFileAction = view.buttonBox.saveMenu.addAction('Save File...')
-        saveToFileAction.triggered.connect(controller._saveCurrentObjectToFile)
+        save_to_file_action = view.button_box.save_menu.addAction('Save File...')
+        save_to_file_action.triggered.connect(controller._save_current_object_to_file)
 
-        syncToSettingsAction = view.buttonBox.saveMenu.addAction('Sync To Settings')
-        syncToSettingsAction.triggered.connect(controller._syncCurrentObjectToSettings)
+        sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
+        sync_to_settings_action.triggered.connect(controller._sync_current_object_to_settings)
 
-        view.copierDialog.setWindowTitle('Copy Object')
-        view.copierDialog.sourceComboBox.setModel(treeModel)
-        view.copierDialog.destinationComboBox.setModel(treeModel)
-        view.copierDialog.finished.connect(controller._finishCopyingObject)
+        view.copier_dialog.setWindowTitle('Copy Object')
+        view.copier_dialog.source_combo_box.setModel(tree_model)
+        view.copier_dialog.destination_combo_box.setModel(tree_model)
+        view.copier_dialog.finished.connect(controller._finish_copying_object)
 
-        view.buttonBox.editButton.clicked.connect(controller._editCurrentObject)
+        view.button_box.edit_button.clicked.connect(controller._edit_current_object)
 
-        frcAction = view.buttonBox.analyzeMenu.addAction('Fourier Ring Correlation...')
-        frcAction.triggered.connect(controller._analyzeFRC)
+        frc_action = view.button_box.analyze_menu.addAction('Fourier Ring Correlation...')
+        frc_action.triggered.connect(controller._analyze_frc)
 
-        xmcdAction = view.buttonBox.analyzeMenu.addAction('XMCD...')
-        xmcdAction.triggered.connect(controller._analyzeXMCD)
+        xmcd_action = view.button_box.analyze_menu.addAction('XMCD...')
+        xmcd_action.triggered.connect(controller._analyze_xmcd)
 
         return controller
 
-    def _getCurrentItemIndex(self) -> int:
-        modelIndex = self._view.treeView.currentIndex()
+    def _get_current_item_index(self) -> int:
+        model_index = self._view.tree_view.currentIndex()
 
-        if modelIndex.isValid():
-            parent = modelIndex.parent()
+        if model_index.isValid():
+            parent = model_index.parent()
 
             while parent.isValid():
-                modelIndex = parent
-                parent = modelIndex.parent()
+                model_index = parent
+                parent = model_index.parent()
 
-            return modelIndex.row()
+            return model_index.row()
 
         logger.warning('No current index!')
         return -1
 
-    def _loadCurrentObjectFromFile(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
+    def _load_current_object_from_file(self) -> None:
+        item_index = self._get_current_item_index()
 
-        if itemIndex < 0:
+        if item_index < 0:
             return
 
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
+        file_path, name_filter = self._file_dialog_factory.get_open_file_path(
             self._view,
             'Open Object',
-            nameFilters=[nameFilter for nameFilter in self._api.getOpenFileFilterList()],
-            selectedNameFilter=self._api.getOpenFileFilter(),
+            name_filters=[nf for nf in self._api.get_open_file_filters()],
+            selected_name_filter=self._api.get_open_file_filter(),
         )
 
-        if filePath:
+        if file_path:
             try:
-                self._api.openObject(itemIndex, filePath, file_type=nameFilter)
+                self._api.open_object(item_index, file_path, file_type=name_filter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Reader', err)
+                ExceptionDialog.show_exception('File Reader', err)
 
-    def _copyToCurrentObject(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
+    def _copy_to_current_object(self) -> None:
+        item_index = self._get_current_item_index()
 
-        if itemIndex >= 0:
-            self._view.copierDialog.destinationComboBox.setCurrentIndex(itemIndex)
-            self._view.copierDialog.open()
+        if item_index >= 0:
+            self._view.copier_dialog.destination_combo_box.setCurrentIndex(item_index)
+            self._view.copier_dialog.open()
 
-    def _finishCopyingObject(self, result: int) -> None:
+    def _finish_copying_object(self, result: int) -> None:
         if result == QDialog.DialogCode.Accepted:
-            sourceIndex = self._view.copierDialog.sourceComboBox.currentIndex()
-            destinationIndex = self._view.copierDialog.destinationComboBox.currentIndex()
-            self._api.copyObject(sourceIndex, destinationIndex)
+            source_index = self._view.copier_dialog.source_combo_box.currentIndex()
+            destination_index = self._view.copier_dialog.destination_combo_box.currentIndex()
+            self._api.copy_object(source_index, destination_index)
 
-    def _editCurrentObject(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
+    def _edit_current_object(self) -> None:
+        item_index = self._get_current_item_index()
 
-        if itemIndex < 0:
+        if item_index < 0:
             return
 
-        itemName = self._repository.getName(itemIndex)
-        item = self._repository[itemIndex]
-        dialog = self._editorFactory.createEditorDialog(itemName, item, self._view)
+        item_name = self._repository.get_name(item_index)
+        item = self._repository[item_index]
+        dialog = self._editor_factory.create_editor_dialog(item_name, item, self._view)
         dialog.open()
 
-    def _saveCurrentObjectToFile(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
+    def _save_current_object_to_file(self) -> None:
+        item_index = self._get_current_item_index()
 
-        if itemIndex < 0:
+        if item_index < 0:
             return
 
-        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+        file_path, name_filter = self._file_dialog_factory.get_save_file_path(
             self._view,
             'Save Object',
-            nameFilters=[nameFilter for nameFilter in self._api.getSaveFileFilterList()],
-            selectedNameFilter=self._api.getSaveFileFilter(),
+            name_filters=[nameFilter for nameFilter in self._api.get_save_file_filters()],
+            selected_name_filter=self._api.get_save_file_filter(),
         )
 
-        if filePath:
+        if file_path:
             try:
-                self._api.saveObject(itemIndex, filePath, nameFilter)
+                self._api.save_object(item_index, file_path, name_filter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Writer', err)
+                ExceptionDialog.show_exception('File Writer', err)
 
-    def _syncCurrentObjectToSettings(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
+    def _sync_current_object_to_settings(self) -> None:
+        item_index = self._get_current_item_index()
 
-        if itemIndex < 0:
+        if item_index < 0:
             logger.warning('No current item!')
         else:
-            item = self._repository[itemIndex]
-            item.syncToSettings()
+            item = self._repository[item_index]
+            item.sync_to_settings()
 
-    def _analyzeFRC(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
+    def _analyze_frc(self) -> None:
+        item_index = self._get_current_item_index()
 
-        if itemIndex < 0:
+        if item_index < 0:
             logger.warning('No current item!')
         else:
-            self._frcViewController.analyze(itemIndex, itemIndex)
+            self._frc_view_controller.analyze(item_index, item_index)
 
-    def _analyzeXMCD(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
+    def _analyze_xmcd(self) -> None:
+        item_index = self._get_current_item_index()
 
-        if itemIndex < 0:
+        if item_index < 0:
             logger.warning('No current item!')
         else:
-            self._xmcdViewController.analyze(itemIndex, itemIndex)
+            self._xmcd_view_controller.analyze(item_index, item_index)
 
-    def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
+    def _update_view(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()
-        self._view.buttonBox.loadButton.setEnabled(enabled)
-        self._view.buttonBox.saveButton.setEnabled(enabled)
-        self._view.buttonBox.editButton.setEnabled(enabled)
-        self._view.buttonBox.analyzeButton.setEnabled(enabled)
+        self._view.button_box.load_button.setEnabled(enabled)
+        self._view.button_box.save_button.setEnabled(enabled)
+        self._view.button_box.edit_button.setEnabled(enabled)
+        self._view.button_box.analyze_button.setEnabled(enabled)
 
-        itemIndex = self._getCurrentItemIndex()
+        item_index = self._get_current_item_index()
 
-        if itemIndex < 0:
-            self._imageController.clearArray()
+        if item_index < 0:
+            self._image_controller.clear_array()
         else:
             try:
-                item = self._repository[itemIndex]
+                item = self._repository[item_index]
             except IndexError:
                 logger.warning('Unable to access item for visualization!')
             else:
-                object_ = item.getObject()
+                object_ = item.get_object()
                 array = (
                     object_.get_layer(current.row())
                     if current.parent().isValid()
                     else object_.get_layers_flattened()
                 )
-                pixelGeometry = object_.get_pixel_geometry()
+                pixel_geometry = object_.get_pixel_geometry()
 
-                if pixelGeometry is None:
+                if pixel_geometry is None:
                     logger.warning('Missing object pixel geometry!')
                 else:
-                    self._imageController.setArray(array, pixelGeometry)
+                    self._image_controller.set_array(array, pixel_geometry)
 
     def handle_item_inserted(self, index: int, item: ObjectRepositoryItem) -> None:
-        self._treeModel.insertItem(index, item)
+        self._tree_model.insert_item(index, item)
 
     def handle_item_changed(self, index: int, item: ObjectRepositoryItem) -> None:
-        self._treeModel.updateItem(index, item)
+        self._tree_model.update_item(index, item)
 
-        if index == self._getCurrentItemIndex():
-            currentIndex = self._view.treeView.currentIndex()
-            self._updateView(currentIndex, currentIndex)
+        if index == self._get_current_item_index():
+            current_index = self._view.tree_view.currentIndex()
+            self._update_view(current_index, current_index)
 
     def handle_item_removed(self, index: int, item: ObjectRepositoryItem) -> None:
-        self._treeModel.removeItem(index, item)
+        self._tree_model.remove_item(index, item)

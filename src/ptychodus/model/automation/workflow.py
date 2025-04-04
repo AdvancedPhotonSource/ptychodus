@@ -12,37 +12,37 @@ class CurrentFileBasedWorkflow(FileBasedWorkflow, Observable, Observer):
     def __init__(
         self,
         settings: AutomationSettings,
-        workflowChooser: PluginChooser[FileBasedWorkflow],
+        workflow_chooser: PluginChooser[FileBasedWorkflow],
     ) -> None:
         super().__init__()
-        self._workflowChooser = workflowChooser
+        self._workflow_chooser = workflow_chooser
 
-        workflowChooser.synchronize_with_parameter(settings.strategy)
-        workflowChooser.add_observer(self)
+        workflow_chooser.synchronize_with_parameter(settings.strategy)
+        workflow_chooser.add_observer(self)
 
-    def getAvailableWorkflows(self) -> Iterator[str]:
-        for plugin in self._workflowChooser:
+    def get_available_workflows(self) -> Iterator[str]:
+        for plugin in self._workflow_chooser:
             yield plugin.display_name
 
-    def getWorkflow(self) -> str:
-        return self._workflowChooser.get_current_plugin().display_name
+    def get_workflow(self) -> str:
+        return self._workflow_chooser.get_current_plugin().display_name
 
-    def setWorkflow(self, name: str) -> None:
-        self._workflowChooser.set_current_plugin(name)
+    def set_workflow(self, name: str) -> None:
+        self._workflow_chooser.set_current_plugin(name)
 
     @property
     def is_watch_recursive(self) -> bool:
-        workflow = self._workflowChooser.get_current_plugin().strategy
+        workflow = self._workflow_chooser.get_current_plugin().strategy
         return workflow.is_watch_recursive
 
     def get_watch_file_pattern(self) -> str:
-        workflow = self._workflowChooser.get_current_plugin().strategy
+        workflow = self._workflow_chooser.get_current_plugin().strategy
         return workflow.get_watch_file_pattern()
 
-    def execute(self, api: WorkflowAPI, filePath: Path) -> None:
-        workflow = self._workflowChooser.get_current_plugin().strategy
-        workflow.execute(api, filePath)
+    def execute(self, api: WorkflowAPI, file_path: Path) -> None:
+        workflow = self._workflow_chooser.get_current_plugin().strategy
+        workflow.execute(api, file_path)
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._workflowChooser:
+        if observable is self._workflow_chooser:
             self.notify_observers()

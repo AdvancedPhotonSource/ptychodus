@@ -38,19 +38,19 @@ class UnsupervisedWienerDeconvolution(DeconvolutionStrategy):
 def register_plugins(registry: PluginRegistry) -> None:
     # NOTE See https://scikit-image.org/docs/stable/api/skimage.restoration.html
     # TODO Implement method from https://doi.org/10.1364/OE.20.018287
-    registry.deconvolutionStrategies.register_plugin(
+    registry.deconvolution_strategies.register_plugin(
         IdentityDeconvolution(),
         display_name='Identity',
     )
-    registry.deconvolutionStrategies.register_plugin(
+    registry.deconvolution_strategies.register_plugin(
         RichardsonLucyDeconvolution(),
         display_name='Richardson-Lucy',
     )
-    registry.deconvolutionStrategies.register_plugin(
+    registry.deconvolution_strategies.register_plugin(
         WienerDeconvolution(),
         display_name='Wiener',
     )
-    registry.deconvolutionStrategies.register_plugin(
+    registry.deconvolution_strategies.register_plugin(
         UnsupervisedWienerDeconvolution(),
         display_name='Unsupervised Wiener',
     )

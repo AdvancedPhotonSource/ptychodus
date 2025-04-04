@@ -11,7 +11,7 @@ class MemoryStatistics:
 
 
 class MemoryPresenter:
-    def getStatistics(self) -> MemoryStatistics:
+    def get_statistics(self) -> MemoryStatistics:
         mem = psutil.virtual_memory()
         return MemoryStatistics(
             total_physical_memory_bytes=mem.total,

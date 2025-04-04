@@ -14,12 +14,12 @@ class DiskProbeBuilder(ProbeBuilder):
         super().__init__(settings, 'disk')
         self._settings = settings
 
-        self.diameterInMeters = settings.diskDiameterInMeters.copy()
-        self._add_parameter('diameter_m', self.diameterInMeters)
+        self.diameter_m = settings.disk_diameter_m.copy()
+        self._add_parameter('diameter_m', self.diameter_m)
 
         # from sample to the focal plane
-        self.defocusDistanceInMeters = settings.defocusDistanceInMeters.copy()
-        self._add_parameter('defocus_distance_m', self.defocusDistanceInMeters)
+        self.defocus_distance_m = settings.defocus_distance_m.copy()
+        self._add_parameter('defocus_distance_m', self.defocus_distance_m)
 
     def copy(self) -> DiskProbeBuilder:
         builder = DiskProbeBuilder(self._settings)
@@ -29,23 +29,23 @@ class DiskProbeBuilder(ProbeBuilder):
 
         return builder
 
-    def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
-        geometry = geometryProvider.get_probe_geometry()
-        coords = self.getTransverseCoordinates(geometry)
+    def build(self, geometry_provider: ProbeGeometryProvider) -> Probe:
+        geometry = geometry_provider.get_probe_geometry()
+        coords = self.get_transverse_coordinates(geometry)
 
-        R_m = coords.positionRInMeters
-        r_m = self.diameterInMeters.get_value() / 2.0
+        R_m = coords.position_r_m  # noqa: N806
+        r_m = self.diameter_m.get_value() / 2.0
         disk = numpy.where(R_m < r_m, 1 + 0j, 0j)
 
-        propagatorParameters = PropagatorParameters(
-            wavelength_m=geometryProvider.probe_wavelength_m,
+        propagator_parameters = PropagatorParameters(
+            wavelength_m=geometry_provider.probe_wavelength_m,
             width_px=disk.shape[-1],
             height_px=disk.shape[-2],
             pixel_width_m=geometry.pixel_width_m,
             pixel_height_m=geometry.pixel_height_m,
-            propagation_distance_m=self.defocusDistanceInMeters.get_value(),
+            propagation_distance_m=self.defocus_distance_m.get_value(),
         )
-        propagator = AngularSpectrumPropagator(propagatorParameters)
+        propagator = AngularSpectrumPropagator(propagator_parameters)
         array = propagator.propagate(disk)
 
         return Probe(

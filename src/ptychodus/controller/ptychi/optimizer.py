@@ -28,19 +28,19 @@ class PtyChiStopSpinBoxParameterViewController(ParameterViewController, Observer
         if tool_tip:
             self._widget.setToolTip(tool_tip)
 
-        self._syncModelToView()
-        self._widget.valueChanged.connect(self._syncViewToModel)
+        self._sync_model_to_view()
+        self._widget.valueChanged.connect(self._sync_view_to_model)
         stop.add_observer(self)
         num_epochs.add_observer(self)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
-    def _syncViewToModel(self, value: int) -> None:
+    def _sync_view_to_model(self, value: int) -> None:
         num_epochs = self._num_epochs.get_value()
         self._stop.set_value(value if value < num_epochs else -1)
 
-    def _syncModelToView(self) -> None:
+    def _sync_model_to_view(self) -> None:
         num_epochs = self._num_epochs.get_value()
         stop = self._stop.get_value()
 
@@ -51,7 +51,7 @@ class PtyChiStopSpinBoxParameterViewController(ParameterViewController, Observer
 
     def _update(self, observable: Observable) -> None:
         if observable in (self._stop, self._num_epochs):
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class PtyChiOptimizationPlanViewController(ParameterViewController):
@@ -63,25 +63,25 @@ class PtyChiOptimizationPlanViewController(ParameterViewController):
         num_epochs: IntegerParameter,
     ) -> None:
         super().__init__()
-        self._startViewController = SpinBoxParameterViewController(
+        self._start_view_controller = SpinBoxParameterViewController(
             start, tool_tip='Iteration to start optimizing'
         )
-        self._stopViewController = PtyChiStopSpinBoxParameterViewController(
+        self._stop_view_controller = PtyChiStopSpinBoxParameterViewController(
             stop, num_epochs, tool_tip='Iteration to stop optimizing'
         )
-        self._strideViewController = SpinBoxParameterViewController(
+        self._stride_view_controller = SpinBoxParameterViewController(
             stride, tool_tip='Number of iterations between updates'
         )
         self._widget = QWidget()
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self._startViewController.getWidget())
-        layout.addWidget(self._stopViewController.getWidget())
-        layout.addWidget(self._strideViewController.getWidget())
+        layout.addWidget(self._start_view_controller.get_widget())
+        layout.addWidget(self._stop_view_controller.get_widget())
+        layout.addWidget(self._stride_view_controller.get_widget())
         self._widget.setLayout(layout)
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._widget
 
 

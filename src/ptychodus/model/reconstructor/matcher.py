@@ -6,10 +6,10 @@ import numpy
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import ReconstructInput
-from ptychodus.api.scan import Scan, ScanPoint
+from ptychodus.api.scan import PositionSequence, ScanPoint
 
 from ..patterns import AssembledDiffractionDataset
-from ..product import ProductRepository
+from ..product import ProductAPI
 
 logger = logging.getLogger(__name__)
 
@@ -34,57 +34,56 @@ class ScanIndexFilter(Enum):
 class DiffractionPatternPositionMatcher:
     def __init__(
         self,
-        diffractionDataset: AssembledDiffractionDataset,
-        productRepository: ProductRepository,
+        dataset: AssembledDiffractionDataset,
+        product_api: ProductAPI,
     ) -> None:
-        self._diffractionDataset = diffractionDataset
-        self._productRepository = productRepository
+        self._dataset = dataset
+        self._product_api = product_api
 
-    def getProductName(self, inputProductIndex: int) -> str:
-        inputProductItem = self._productRepository[inputProductIndex]
-        return inputProductItem.getName()
+    def get_product_name(self, input_product_index: int) -> str:
+        return self._product_api.get_item_name(input_product_index)
 
-    def getObjectPlanePixelGeometry(self, inputProductIndex: int) -> PixelGeometry:
-        inputProductItem = self._productRepository[inputProductIndex]
-        objectGeometry = inputProductItem.getGeometry().get_object_geometry()
-        return objectGeometry.get_pixel_geometry()
+    def get_object_plane_pixel_geometry(self, input_product_index: int) -> PixelGeometry:
+        input_product_item = self._product_api.get_item(input_product_index)
+        object_geometry = input_product_item.get_geometry().get_object_geometry()
+        return object_geometry.get_pixel_geometry()
 
-    def matchDiffractionPatternsWithPositions(
-        self, inputProductIndex: int, indexFilter: ScanIndexFilter = ScanIndexFilter.ALL
+    def match_diffraction_patterns_with_positions(
+        self, input_product_index: int, index_filter: ScanIndexFilter = ScanIndexFilter.ALL
     ) -> ReconstructInput:
-        inputProductItem = self._productRepository[inputProductIndex]
-        inputProduct = inputProductItem.getProduct()
-        dataIndexes = self._diffractionDataset.get_assembled_indexes()
-        scanIndexes = [point.index for point in inputProduct.scan if indexFilter(point.index)]
-        commonIndexes = sorted(set(dataIndexes).intersection(scanIndexes))
+        input_product_item = self._product_api.get_item(input_product_index)
+        input_product = input_product_item.get_product()
+        data_indexes = self._dataset.get_assembled_indexes()
+        scan_indexes = [
+            point.index for point in input_product.positions if index_filter(point.index)
+        ]
+        common_indexes = sorted(set(data_indexes).intersection(scan_indexes))
 
         patterns = numpy.take(
-            self._diffractionDataset.get_assembled_patterns(),
-            commonIndexes,
+            self._dataset.get_assembled_patterns(),
+            common_indexes,
             axis=0,
         )
 
-        pointList: list[ScanPoint] = list()
-        pointIter = iter(inputProduct.scan)
+        point_list: list[ScanPoint] = list()
+        point_iterator = iter(input_product.positions)
 
-        for index in commonIndexes:
+        for index in common_indexes:
             while True:
-                point = next(pointIter)
+                point = next(point_iterator)
 
                 if point.index == index:
-                    pointList.append(point)
+                    point_list.append(point)
                     break
 
-        probe = inputProduct.probe  # TODO remap if needed
+        probe = input_product.probe  # TODO remap if needed
 
         product = Product(
-            metadata=inputProduct.metadata,
-            scan=Scan(pointList),
+            metadata=input_product.metadata,
+            positions=PositionSequence(point_list),
             probe=probe,
-            object_=inputProduct.object_,
-            costs=inputProduct.costs,
+            object_=input_product.object_,
+            costs=input_product.costs,
         )
 
-        return ReconstructInput(
-            patterns, self._diffractionDataset.get_processed_bad_pixels(), product
-        )
+        return ReconstructInput(patterns, self._dataset.get_processed_bad_pixels(), product)

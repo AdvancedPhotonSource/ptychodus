@@ -21,53 +21,53 @@ class ReconstructorPresenter(Observable, Observer):
     def __init__(
         self,
         settings: ReconstructorSettings,
-        reconstructorChooser: PluginChooser[Reconstructor],
-        logHandler: ReconstructorLogHandler,
-        reconstructorAPI: ReconstructorAPI,
+        reconstructor_chooser: PluginChooser[Reconstructor],
+        log_handler: ReconstructorLogHandler,
+        reconstructor_api: ReconstructorAPI,
     ) -> None:
         super().__init__()
         self._settings = settings
-        self._reconstructorChooser = reconstructorChooser
-        self._logHandler = logHandler
-        self._reconstructorAPI = reconstructorAPI
+        self._reconstructor_chooser = reconstructor_chooser
+        self._log_handler = log_handler
+        self._reconstructor_api = reconstructor_api
 
-        reconstructorChooser.synchronize_with_parameter(settings.algorithm)
-        reconstructorChooser.add_observer(self)
+        reconstructor_chooser.synchronize_with_parameter(settings.algorithm)
+        reconstructor_chooser.add_observer(self)
 
-    def getReconstructorList(self) -> Iterator[str]:
-        for plugin in self._reconstructorChooser:
+    def reconstructors(self) -> Iterator[str]:
+        for plugin in self._reconstructor_chooser:
             yield plugin.display_name
 
-    def getReconstructor(self) -> str:
-        return self._reconstructorChooser.get_current_plugin().display_name
+    def get_reconstructor(self) -> str:
+        return self._reconstructor_chooser.get_current_plugin().display_name
 
-    def setReconstructor(self, name: str) -> None:
-        self._reconstructorChooser.set_current_plugin(name)
+    def set_reconstructor(self, name: str) -> None:
+        self._reconstructor_chooser.set_current_plugin(name)
 
-    def reconstruct(self, inputProductIndex: int) -> int:
-        return self._reconstructorAPI.reconstruct(inputProductIndex)
+    def reconstruct(self, input_product_index: int) -> int:
+        return self._reconstructor_api.reconstruct(input_product_index)
 
-    def reconstructSplit(self, inputProductIndex: int) -> tuple[int, int]:
-        return self._reconstructorAPI.reconstructSplit(inputProductIndex)
+    def reconstruct_split(self, input_product_index: int) -> tuple[int, int]:
+        return self._reconstructor_api.reconstruct_split(input_product_index)
 
     @property
-    def isReconstructing(self) -> bool:
-        return self._reconstructorAPI.isReconstructing
+    def is_reconstructing(self) -> bool:
+        return self._reconstructor_api.is_reconstructing
 
-    def flushLog(self) -> Iterator[str]:
-        for text in self._logHandler.messages():
+    def flush_log(self) -> Iterator[str]:
+        for text in self._log_handler.messages():
             yield text
 
-    def processResults(self, *, block: bool) -> None:
-        self._reconstructorAPI.processResults(block=block)
+    def process_results(self, *, block: bool) -> None:
+        self._reconstructor_api.process_results(block=block)
 
     @property
-    def isTrainable(self) -> bool:
-        reconstructor = self._reconstructorChooser.get_current_plugin().strategy
+    def is_trainable(self) -> bool:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
         return isinstance(reconstructor, TrainableReconstructor)
 
-    def getModelFileFilter(self) -> str:
-        reconstructor = self._reconstructorChooser.get_current_plugin().strategy
+    def get_model_file_filter(self) -> str:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             return reconstructor.get_model_file_filter()
@@ -76,14 +76,14 @@ class ReconstructorPresenter(Observable, Observer):
 
         return str()
 
-    def openModel(self, filePath: Path) -> None:
-        return self._reconstructorAPI.openModel(filePath)
+    def open_model(self, file_path: Path) -> None:
+        return self._reconstructor_api.open_model(file_path)
 
-    def saveModel(self, filePath: Path) -> None:
-        return self._reconstructorAPI.saveModel(filePath)
+    def save_model(self, file_path: Path) -> None:
+        return self._reconstructor_api.save_model(file_path)
 
-    def getTrainingDataFileFilter(self) -> str:
-        reconstructor = self._reconstructorChooser.get_current_plugin().strategy
+    def get_training_data_file_filter(self) -> str:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             return reconstructor.get_training_data_file_filter()
@@ -92,11 +92,11 @@ class ReconstructorPresenter(Observable, Observer):
 
         return str()
 
-    def exportTrainingData(self, filePath: Path, inputProductIndex: int) -> None:
-        return self._reconstructorAPI.exportTrainingData(filePath, inputProductIndex)
+    def export_training_data(self, file_path: Path, input_product_index: int) -> None:
+        return self._reconstructor_api.export_training_data(file_path, input_product_index)
 
-    def getTrainingDataPath(self) -> Path:
-        reconstructor = self._reconstructorChooser.get_current_plugin().strategy
+    def get_training_data_path(self) -> Path:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             return reconstructor.get_training_data_path()
@@ -105,9 +105,9 @@ class ReconstructorPresenter(Observable, Observer):
 
         return Path()
 
-    def train(self, dataPath: Path) -> TrainOutput:
-        return self._reconstructorAPI.train(dataPath)
+    def train(self, data_path: Path) -> TrainOutput:
+        return self._reconstructor_api.train(data_path)
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._reconstructorChooser:
+        if observable is self._reconstructor_chooser:
             self.notify_observers()

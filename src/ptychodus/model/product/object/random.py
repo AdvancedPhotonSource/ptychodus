@@ -4,7 +4,7 @@ from collections.abc import Sequence
 import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
-from ptychodus.model.phaseUnwrapper import PhaseUnwrapper
+from ptychodus.model.phase_unwrapper import PhaseUnwrapper
 
 from .builder import ObjectBuilder
 from .settings import ObjectSettings
@@ -16,18 +16,18 @@ class RandomObjectBuilder(ObjectBuilder):
         self._rng = rng
         self._settings = settings
 
-        self.extraPaddingX = settings.extraPaddingX.copy()
-        self._add_parameter('extra_padding_x', self.extraPaddingX)
-        self.extraPaddingY = settings.extraPaddingY.copy()
-        self._add_parameter('extra_padding_y', self.extraPaddingY)
+        self.extra_padding_x = settings.extra_padding_x.copy()
+        self._add_parameter('extra_padding_x', self.extra_padding_x)
+        self.extra_padding_y = settings.extra_padding_y.copy()
+        self._add_parameter('extra_padding_y', self.extra_padding_y)
 
-        self.amplitudeMean = settings.amplitudeMean.copy()
-        self._add_parameter('amplitude_mean', self.amplitudeMean)
-        self.amplitudeDeviation = settings.amplitudeDeviation.copy()
-        self._add_parameter('amplitude_deviation', self.amplitudeDeviation)
+        self.amplitude_mean = settings.amplitude_mean.copy()
+        self._add_parameter('amplitude_mean', self.amplitude_mean)
+        self.amplitude_deviation = settings.amplitude_deviation.copy()
+        self._add_parameter('amplitude_deviation', self.amplitude_deviation)
 
-        self.phaseDeviation = settings.phaseDeviation.copy()
-        self._add_parameter('phase_deviation', self.phaseDeviation)
+        self.phase_deviation = settings.phase_deviation.copy()
+        self._add_parameter('phase_deviation', self.phase_deviation)
 
     def copy(self) -> RandomObjectBuilder:
         builder = RandomObjectBuilder(self._rng, self._settings)
@@ -39,28 +39,28 @@ class RandomObjectBuilder(ObjectBuilder):
 
     def build(
         self,
-        geometryProvider: ObjectGeometryProvider,
-        layerDistanceInMeters: Sequence[float],
+        geometry_provider: ObjectGeometryProvider,
+        layer_distance_m: Sequence[float],
     ) -> Object:
-        geometry = geometryProvider.get_object_geometry()
-        heightInPixels = geometry.height_px + 2 * self.extraPaddingY.get_value()
-        widthInPixels = geometry.width_px + 2 * self.extraPaddingX.get_value()
-        objectShape = (1 + len(layerDistanceInMeters), heightInPixels, widthInPixels)
+        geometry = geometry_provider.get_object_geometry()
+        height_px = geometry.height_px + 2 * self.extra_padding_y.get_value()
+        width_px = geometry.width_px + 2 * self.extra_padding_x.get_value()
+        object_shape = (1 + len(layer_distance_m), height_px, width_px)
 
         amplitude = self._rng.normal(
-            self.amplitudeMean.get_value(),
-            self.amplitudeDeviation.get_value(),
-            objectShape,
+            self.amplitude_mean.get_value(),
+            self.amplitude_deviation.get_value(),
+            object_shape,
         )
         phase = self._rng.normal(
             0.0,
-            self.phaseDeviation.get_value(),
-            objectShape,
+            self.phase_deviation.get_value(),
+            object_shape,
         )
 
         return Object(
             array=numpy.clip(amplitude, 0.0, 1.0) * numpy.exp(1j * phase),
-            layer_distance_m=layerDistanceInMeters,
+            layer_distance_m=layer_distance_m,
             pixel_geometry=geometry.get_pixel_geometry(),
             center=geometry.get_center(),
         )
@@ -78,11 +78,11 @@ class UserObjectBuilder(ObjectBuilder):  # FIXME use
         Otherwise, the object is copied as is.
         """
         super().__init__(settings, 'user')
-        self._existingObject = object_
+        self._existing_object = object_
         self._settings = settings
 
     def copy(self) -> UserObjectBuilder:
-        builder = UserObjectBuilder(self._existingObject, self._settings)
+        builder = UserObjectBuilder(self._existing_object, self._settings)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
@@ -91,25 +91,25 @@ class UserObjectBuilder(ObjectBuilder):  # FIXME use
 
     def build(
         self,
-        geometryProvider: ObjectGeometryProvider,
-        layerDistanceInMeters: Sequence[float],
+        geometry_provider: ObjectGeometryProvider,
+        layer_distance_m: Sequence[float],
     ) -> Object:
-        geometry = self._existingObject.get_geometry()
-        exitingObjectArr = self._existingObject.get_array()
-        nSlices = len(layerDistanceInMeters) + 1
+        geometry = self._existing_object.get_geometry()
+        existing_object_array = self._existing_object.get_array()
+        num_slices = len(layer_distance_m) + 1
 
-        if nSlices > 1 and nSlices != exitingObjectArr.shape[0]:
-            amplitude = numpy.abs(exitingObjectArr[0:1]) ** (1.0 / nSlices)
-            amplitude = amplitude.repeat(nSlices, axis=0)
-            phase = PhaseUnwrapper().unwrap(exitingObjectArr[0])[None, ...] / nSlices
-            phase = phase.repeat(nSlices, axis=0)
+        if num_slices > 1 and num_slices != existing_object_array.shape[0]:
+            amplitude = numpy.abs(existing_object_array[0:1]) ** (1.0 / num_slices)
+            amplitude = amplitude.repeat(num_slices, axis=0)
+            phase = PhaseUnwrapper().unwrap(existing_object_array[0])[None, ...] / num_slices
+            phase = phase.repeat(num_slices, axis=0)
             data = numpy.clip(amplitude, 0.0, 1.0) * numpy.exp(1j * phase)
         else:
-            data = exitingObjectArr
+            data = existing_object_array
 
         return Object(
             array=data,
-            layer_distance_m=layerDistanceInMeters,
+            layer_distance_m=layer_distance_m,
             pixel_geometry=geometry.get_pixel_geometry(),
             center=geometry.get_center(),
         )

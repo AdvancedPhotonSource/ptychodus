@@ -33,9 +33,15 @@ class Reconstructor(ABC):
 
 
 @dataclass(frozen=True)
-class TrainOutput:  # FIXME add epoch
-    training_loss: Sequence[float]
-    validation_loss: Sequence[float]
+class LossValue:
+    epoch: int
+    training_loss: float
+    validation_loss: float
+
+
+@dataclass(frozen=True)
+class TrainOutput:
+    losses: Sequence[LossValue]
     result: int
 
 
@@ -99,7 +105,7 @@ class NullReconstructor(TrainableReconstructor):
         return Path()
 
     def train(self, data_path: Path) -> TrainOutput:
-        return TrainOutput([], [], 0)
+        return TrainOutput([], 0)
 
 
 class ReconstructorLibrary(Iterable[Reconstructor]):

@@ -8,16 +8,16 @@ from ptychodus.api.settings import SettingsRegistry
 class WorkflowSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = registry.create_group('Workflow')
-        self._settingsGroup.add_observer(self)
+        self._group = registry.create_group('Workflow')
+        self._group.add_observer(self)
 
-        self.computeEndpointID = self._settingsGroup.create_uuid_parameter(
+        self.compute_endpoint_id = self._group.create_uuid_parameter(
             'ComputeEndpointID', UUID(int=0)
         )
-        self.statusRefreshIntervalInSeconds = self._settingsGroup.create_integer_parameter(
+        self.status_refresh_interval_s = self._group.create_integer_parameter(
             'StatusRefreshIntervalInSeconds', 10
         )
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._settingsGroup:
+        if observable is self._group:
             self.notify_observers()

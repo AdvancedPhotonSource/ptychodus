@@ -6,9 +6,9 @@ import numpy
 
 from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.scan import Scan, ScanBoundingBox, ScanPoint
+from ptychodus.api.scan import PositionSequence, ScanBoundingBox, ScanPoint
 
-from .boundingBox import ScanBoundingBoxBuilder
+from .bounding_box import ScanBoundingBoxBuilder
 from .builder import FromMemoryScanBuilder, ScanBuilder
 from .settings import ScanSettings
 from .transform import ScanPointTransform
@@ -27,127 +27,126 @@ class ScanRepositoryItem(ParameterGroup):
         self._settings = settings
         self._builder = builder
         self._transform = transform
-
-        self._untransformedScan = Scan()
-        self._transformedScan = Scan()
-        self._boundingBoxBuilder = ScanBoundingBoxBuilder()
-        self._lengthInMeters = 0.0
+        self._untransformed_scan = PositionSequence()
+        self._transformed_scan = PositionSequence()
+        self._bbox_builder = ScanBoundingBoxBuilder()
+        self._length_m = 0.0
 
         self._add_group('builder', builder, observe=True)
         self._add_group('transform', transform, observe=True)
 
-        self.expandBoundingBox = settings.expandBoundingBox.copy()
-        self._add_parameter('expand_bbox', self.expandBoundingBox)
+        self.expand_bbox = settings.expand_bbox.copy()
+        self._add_parameter('expand_bbox', self.expand_bbox)
 
-        self.expandedBoundingBoxMinimumXInMeters = (
-            settings.expandedBoundingBoxMinimumXInMeters.copy()
-        )
-        self._add_parameter('expanded_bbox_xmin_m', self.expandedBoundingBoxMinimumXInMeters)
+        self.expand_bbox_xmin_m = settings.expand_bbox_xmin_m.copy()
+        self._add_parameter('expand_bbox_xmin_m', self.expand_bbox_xmin_m)
 
-        self.expandedBoundingBoxMaximumXInMeters = (
-            settings.expandedBoundingBoxMaximumXInMeters.copy()
-        )
-        self._add_parameter('expanded_bbox_xmax_m', self.expandedBoundingBoxMaximumXInMeters)
+        self.expand_bbox_xmax_m = settings.expand_bbox_xmax_m.copy()
+        self._add_parameter('expand_bbox_xmax_m', self.expand_bbox_xmax_m)
 
-        self.expandedBoundingBoxMinimumYInMeters = (
-            settings.expandedBoundingBoxMinimumYInMeters.copy()
-        )
-        self._add_parameter('expanded_bbox_ymin_m', self.expandedBoundingBoxMinimumYInMeters)
+        self.expand_bbox_ymin_m = settings.expand_bbox_ymin_m.copy()
+        self._add_parameter('expand_bbox_ymin_m', self.expand_bbox_ymin_m)
 
-        self.expandedBoundingBoxMaximumYInMeters = (
-            settings.expandedBoundingBoxMaximumYInMeters.copy()
-        )
-        self._add_parameter('expanded_bbox_ymax_m', self.expandedBoundingBoxMaximumYInMeters)
+        self.expand_bbox_ymax_m = settings.expand_bbox_ymax_m.copy()
+        self._add_parameter('expand_bbox_ymax_m', self.expand_bbox_ymax_m)
 
         self._rebuild()
 
-    def assignItem(self, item: ScanRepositoryItem) -> None:
-        self._remove_group('transform')
+    def assign_item(self, item: ScanRepositoryItem) -> None:
+        group = 'transform'
+
+        self._remove_group(group)
         self._transform.remove_observer(self)
-        self._transform = item.getTransform().copy()
+
+        transform = item.get_transform()
+
+        self._transform = transform.copy()
         self._transform.add_observer(self)
-        self._add_group('transform', self._transform)
+        self._add_group(group, self._transform, observe=True)
 
-        self.setBuilder(item.getBuilder().copy())
+        self.set_builder(item.get_builder().copy())
+        self._rebuild()
 
-    def assign(self, scan: Scan, *, mutable: bool = True) -> None:
+    def assign(self, scan: PositionSequence) -> None:
         builder = FromMemoryScanBuilder(self._settings, scan)
-        self.setBuilder(builder, mutable=mutable)
+        self.set_builder(builder)
 
-    def syncToSettings(self) -> None:
+    def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
             parameter.sync_value_to_parent()
 
-        self._builder.syncToSettings()
-        self._transform.syncToSettings()
+        self._builder.sync_to_settings()
+        self._transform.sync_to_settings()
 
-    def getScan(self) -> Scan:
-        return self._transformedScan
+    def get_scan(self) -> PositionSequence:
+        return self._transformed_scan
 
-    def getBuilder(self) -> ScanBuilder:
+    def get_builder(self) -> ScanBuilder:
         return self._builder
 
-    def setBuilder(self, builder: ScanBuilder, *, mutable: bool = True) -> None:
-        self._remove_group('builder')
+    def set_builder(self, builder: ScanBuilder) -> None:
+        group = 'builder'
+        self._remove_group(group)
         self._builder.remove_observer(self)
         self._builder = builder
         self._builder.add_observer(self)
-        self._add_group('builder', self._builder)
-        self._rebuild(mutable=mutable)
+        self._add_group(group, self._builder, observe=True)
+        self._rebuild()
 
-    def getBoundingBox(self) -> ScanBoundingBox | None:
-        bbox = self._boundingBoxBuilder.getBoundingBox()
+    def get_bounding_box(self) -> ScanBoundingBox | None:
+        bbox = self._bbox_builder.get_bounding_box()
 
-        if self.expandBoundingBox.get_value():
-            expandedBoundingBox = ScanBoundingBox(
-                minimum_x_m=self.expandedBoundingBoxMinimumXInMeters.get_value(),
-                maximum_x_m=self.expandedBoundingBoxMaximumXInMeters.get_value(),
-                minimum_y_m=self.expandedBoundingBoxMinimumYInMeters.get_value(),
-                maximum_y_m=self.expandedBoundingBoxMaximumYInMeters.get_value(),
+        if self.expand_bbox.get_value():
+            expanded_bbox = ScanBoundingBox(
+                minimum_x_m=self.expand_bbox_xmin_m.get_value(),
+                maximum_x_m=self.expand_bbox_xmax_m.get_value(),
+                minimum_y_m=self.expand_bbox_ymin_m.get_value(),
+                maximum_y_m=self.expand_bbox_ymax_m.get_value(),
             )
-            bbox = expandedBoundingBox if bbox is None else bbox.hull(expandedBoundingBox)
+            bbox = expanded_bbox if bbox is None else bbox.hull(expanded_bbox)
 
         return bbox
 
-    def getLengthInMeters(self) -> float:
-        return self._lengthInMeters
+    def get_length_m(self) -> float:
+        return self._length_m
 
-    def _transformScan(self) -> None:
-        transformedPoints: list[ScanPoint] = list()
-        boundingBoxBuilder = ScanBoundingBoxBuilder()
-        lengthInMeters = 0.0
+    def _transform_scan(self) -> None:
+        transformed_points: list[ScanPoint] = list()
+        bbox_builder = ScanBoundingBoxBuilder()
+        length_m = 0.0
 
-        for untransformedPoint in self._untransformedScan:
-            point = self._transform(untransformedPoint)
-            transformedPoints.append(point)
-            boundingBoxBuilder.hull(point)
+        for untransformed_point in self._untransformed_scan:
+            point = self._transform(untransformed_point)
+            transformed_points.append(point)
+            bbox_builder.hull(point)
 
-        for pointL, pointR in pairwise(transformedPoints):
-            dx = pointR.position_x_m - pointL.position_x_m
-            dy = pointR.position_y_m - pointL.position_y_m
-            lengthInMeters += numpy.hypot(dx, dy)
+        for point_l, point_r in pairwise(transformed_points):
+            dx = point_r.position_x_m - point_l.position_x_m
+            dy = point_r.position_y_m - point_l.position_y_m
+            length_m += numpy.hypot(dx, dy)
 
-        self._transformedScan = Scan(transformedPoints)
-        self._boundingBoxBuilder = boundingBoxBuilder
-        self._lengthInMeters = lengthInMeters
+        self._transformed_scan = PositionSequence(transformed_points)
+        self._bbox_builder = bbox_builder
+        self._length_m = length_m
         self.notify_observers()
 
-    def _rebuild(self, *, mutable: bool = True) -> None:
+    def _rebuild(self) -> None:
         try:
             scan = self._builder.build()
         except Exception as exc:
-            logger.error(''.join(exc.args))
-        else:
-            self._untransformedScan = scan
-            self._transformScan()  # FIXME mutable
+            logger.exception('Failed to rebuild scan!')
+            return
 
-    def getTransform(self) -> ScanPointTransform:
+        self._untransformed_scan = scan
+        self._transform_scan()
+
+    def get_transform(self) -> ScanPointTransform:
         return self._transform
 
     def _update(self, observable: Observable) -> None:
         if observable is self._builder:
             self._rebuild()
         elif observable is self._transform:
-            self._transformScan()
+            self._transform_scan()
         else:
             super()._update(observable)

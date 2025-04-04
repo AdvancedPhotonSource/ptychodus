@@ -14,58 +14,58 @@ class VisualizationParametersController(Observer):
         super().__init__()
         self._engine = engine
         self._view = view
-        self._rendererModel = QStringListModel()
-        self._transformationModel = QStringListModel()
-        self._variantModel = QStringListModel()
+        self._renderer_model = QStringListModel()
+        self._transformation_model = QStringListModel()
+        self._variant_model = QStringListModel()
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls, engine: VisualizationEngine, view: VisualizationParametersView
     ) -> VisualizationParametersController:
         controller = cls(engine, view)
-        view.rendererComboBox.setModel(controller._rendererModel)
-        view.transformationComboBox.setModel(controller._transformationModel)
-        view.variantComboBox.setModel(controller._variantModel)
+        view.renderer_combo_box.setModel(controller._renderer_model)
+        view.transformation_combo_box.setModel(controller._transformation_model)
+        view.variant_combo_box.setModel(controller._variant_model)
 
-        view.minDisplayValueLineEdit.valueChanged.connect(
-            lambda value: engine.setMinDisplayValue(float(value))
+        view.min_display_value_line_edit.value_changed.connect(
+            lambda value: engine.set_min_display_value(float(value))
         )
-        view.maxDisplayValueLineEdit.valueChanged.connect(
-            lambda value: engine.setMaxDisplayValue(float(value))
+        view.max_display_value_line_edit.value_changed.connect(
+            lambda value: engine.set_max_display_value(float(value))
         )
 
-        controller._syncModelToView()
+        controller._sync_model_to_view()
         engine.add_observer(controller)
 
-        view.rendererComboBox.textActivated.connect(engine.setRenderer)
-        view.transformationComboBox.textActivated.connect(engine.setTransformation)
-        view.variantComboBox.textActivated.connect(engine.setVariant)
+        view.renderer_combo_box.textActivated.connect(engine.set_renderer)
+        view.transformation_combo_box.textActivated.connect(engine.set_transformation)
+        view.variant_combo_box.textActivated.connect(engine.set_variant)
 
         return controller
 
-    def _syncModelToView(self) -> None:
-        self._view.rendererComboBox.blockSignals(True)
-        self._rendererModel.setStringList([name for name in self._engine.renderers()])
-        self._view.rendererComboBox.setCurrentText(self._engine.getRenderer())
-        self._view.rendererComboBox.blockSignals(False)
+    def _sync_model_to_view(self) -> None:
+        self._view.renderer_combo_box.blockSignals(True)
+        self._renderer_model.setStringList([name for name in self._engine.renderers()])
+        self._view.renderer_combo_box.setCurrentText(self._engine.get_renderer())
+        self._view.renderer_combo_box.blockSignals(False)
 
-        self._view.transformationComboBox.blockSignals(True)
-        self._transformationModel.setStringList([name for name in self._engine.transformations()])
-        self._view.transformationComboBox.setCurrentText(self._engine.getTransformation())
-        self._view.transformationComboBox.blockSignals(False)
+        self._view.transformation_combo_box.blockSignals(True)
+        self._transformation_model.setStringList([name for name in self._engine.transformations()])
+        self._view.transformation_combo_box.setCurrentText(self._engine.get_transformation())
+        self._view.transformation_combo_box.blockSignals(False)
 
-        self._view.variantComboBox.blockSignals(True)
-        self._variantModel.setStringList([name for name in self._engine.variants()])
-        self._view.variantComboBox.setCurrentText(self._engine.getVariant())
-        self._view.variantComboBox.blockSignals(False)
+        self._view.variant_combo_box.blockSignals(True)
+        self._variant_model.setStringList([name for name in self._engine.variants()])
+        self._view.variant_combo_box.setCurrentText(self._engine.get_variant())
+        self._view.variant_combo_box.blockSignals(False)
 
-        self._view.minDisplayValueLineEdit.setValue(
-            Decimal(repr(self._engine.getMinDisplayValue()))
+        self._view.min_display_value_line_edit.set_value(
+            Decimal(repr(self._engine.get_min_display_value()))
         )
-        self._view.maxDisplayValueLineEdit.setValue(
-            Decimal(repr(self._engine.getMaxDisplayValue()))
+        self._view.max_display_value_line_edit.set_value(
+            Decimal(repr(self._engine.get_max_display_value()))
         )
 
     def _update(self, observable: Observable) -> None:
         if observable is self._engine:
-            self._syncModelToView()
+            self._sync_model_to_view()
