@@ -14,7 +14,7 @@ from ptychi.api import (
 from ptychi.api.task import PtychographyTask
 
 from ptychodus.api.object import Object, ObjectGeometry
-from ptychodus.api.probe import Probe
+from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Reconstructor
 from ptychodus.api.scan import PositionSequence
@@ -101,7 +101,9 @@ class LSQMLReconstructor(Reconstructor):
             multimodal_update=self._settings.object_multimodal_update.get_value(),
         )
 
-    def _create_probe_options(self, probe: Probe, metadata: ProductMetadata) -> LSQMLProbeOptions:
+    def _create_probe_options(
+        self, probe: ProbeSequence, metadata: ProductMetadata
+    ) -> LSQMLProbeOptions:
         helper = self._options_helper.probe_helper
         return LSQMLProbeOptions(
             optimizable=helper.optimizable,
@@ -158,7 +160,7 @@ class LSQMLReconstructor(Reconstructor):
             data_options=self._options_helper.create_data_options(parameters),
             reconstructor_options=self._create_reconstructor_options(),
             object_options=self._create_object_options(product.object_),
-            probe_options=self._create_probe_options(product.probe, product.metadata),
+            probe_options=self._create_probe_options(product.probes, product.metadata),
             probe_position_options=self._create_probe_position_options(
                 product.positions, product.object_.get_geometry()
             ),

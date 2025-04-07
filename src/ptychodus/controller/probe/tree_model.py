@@ -5,7 +5,7 @@ import numpy
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
-from ptychodus.api.probe import Probe
+from ptychodus.api.probe import ProbeSequence
 
 from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
@@ -28,7 +28,7 @@ class ProbeTreeNode:
         return 0 if self.parent is None else self.parent.children.index(self)
 
 
-def calc_relative_power_percent(probe: Probe, imode: int) -> int:
+def calc_relative_power_percent(probe: ProbeSequence, imode: int) -> int:
     try:
         relative_power = probe.get_incoherent_mode_relative_power(imode)
     except IndexError:
@@ -40,7 +40,7 @@ def calc_relative_power_percent(probe: Probe, imode: int) -> int:
     return -1
 
 
-def calc_coherent_percent(probe: Probe) -> int:
+def calc_coherent_percent(probe: ProbeSequence) -> int:
     coherence = probe.get_coherence()
     return int(100.0 * coherence) if numpy.isfinite(coherence) else -1
 
@@ -68,7 +68,7 @@ class ProbeTreeModel(QAbstractItemModel):
 
     @staticmethod
     def _append_modes(node: ProbeTreeNode, item: ProbeRepositoryItem) -> None:
-        probe = item.get_probe()
+        probe = item.get_probes()
 
         for layer in range(probe.num_incoherent_modes):
             node.insert_node()
@@ -85,7 +85,7 @@ class ProbeTreeModel(QAbstractItemModel):
 
         node = self._tree_root.children[index]
         num_modes_old = len(node.children)
-        num_modes_new = item.get_probe().num_incoherent_modes
+        num_modes_new = item.get_probes().num_incoherent_modes
 
         if num_modes_old < num_modes_new:
             self.beginInsertRows(top_left, num_modes_old, num_modes_new)
@@ -166,13 +166,13 @@ class ProbeTreeModel(QAbstractItemModel):
                     case 0:
                         return f'Mode {index.row() + 1}'
                     case 1:
-                        power_percent = calc_relative_power_percent(item.get_probe(), index.row())
+                        power_percent = calc_relative_power_percent(item.get_probes(), index.row())
                         return f'{power_percent}%'
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
-                return calc_relative_power_percent(item.get_probe(), index.row())
+                return calc_relative_power_percent(item.get_probes(), index.row())
         else:
             item = self._repository[index.row()]
-            probe = item.get_probe()
+            probe = item.get_probes()
 
             if role == Qt.ItemDataRole.DisplayRole:
                 match index.column():
@@ -192,7 +192,7 @@ class ProbeTreeModel(QAbstractItemModel):
                     case 6:
                         return f'{probe.nbytes / (1024 * 1024):.2f}'
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
-                return calc_coherent_percent(item.get_probe())
+                return calc_coherent_percent(item.get_probes())
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)

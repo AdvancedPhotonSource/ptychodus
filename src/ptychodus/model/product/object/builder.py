@@ -97,16 +97,17 @@ class FromFileObjectBuilder(ObjectBuilder):
             raise RuntimeError(f'Failed to read "{file_path}"') from exc
 
         object_geometry = geometry_provider.get_object_geometry()
-        pixel_geometry = object_from_file.get_pixel_geometry()
-        center = object_from_file.get_center()
 
-        if pixel_geometry is None:
+        try:
+            pixel_geometry = object_from_file.get_pixel_geometry()
+        except ValueError:
             pixel_geometry = object_geometry.get_pixel_geometry()
 
-        if center is None:
+        try:
+            center = object_from_file.get_center()
+        except ValueError:
             center = object_geometry.get_center()
 
-        # TODO remap object from pixelGeometryFromFile to pixelGeometryFromProvider
         return Object(
             object_from_file.get_array(),
             pixel_geometry,

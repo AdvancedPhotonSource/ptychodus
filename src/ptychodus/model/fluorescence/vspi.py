@@ -87,32 +87,34 @@ class VSPILinearOperator(LinearOperator):
         super().__init__(float, (M, N))
         self._product = product
 
-    def _get_psf(self) -> RealArrayType:
-        intensity = self._product.probe.get_intensity()
-        return intensity / intensity.sum()
-
-    def _matvec(self, X: RealArrayType) -> RealArrayType:  # noqa: N803
+    def _matvec(self, x: RealArrayType) -> RealArrayType:  # noqa: N803
         object_geometry = self._product.object_.get_geometry()
-        object_array = X.reshape((object_geometry.height_px, object_geometry.width_px))
-        psf = self._get_psf()
+        object_array = x.reshape((object_geometry.height_px, object_geometry.width_px))
         AX = numpy.zeros(len(self._product.positions))  # noqa: N806
 
-        for index, scan_point in enumerate(self._product.positions):
+        for index, (scan_point, probe) in enumerate(
+            zip(self._product.positions, self._product.probes)
+        ):
             object_point = object_geometry.map_scan_point_to_object_point(scan_point)
+            probe_intensity = probe.get_intensity()
+            psf = probe_intensity / probe_intensity.sum()
             interpolator = ArrayPatchInterpolator(object_array, object_point, psf.shape)
             AX[index] = numpy.sum(psf * interpolator.get_patch())
 
         return AX
 
-    def _rmatvec(self, X: RealArrayType) -> RealArrayType:  # noqa: N803
+    def _rmatvec(self, x: RealArrayType) -> RealArrayType:  # noqa: N803
         object_geometry = self._product.object_.get_geometry()
         object_array = numpy.zeros((object_geometry.height_px, object_geometry.width_px))
-        psf = self._get_psf()
 
-        for index, scan_point in enumerate(self._product.positions):
+        for index, (scan_point, probe) in enumerate(
+            zip(self._product.positions, self._product.probes)
+        ):
             object_point = object_geometry.map_scan_point_to_object_point(scan_point)
+            probe_intensity = probe.get_intensity()
+            psf = probe_intensity / probe_intensity.sum()
             interpolator = ArrayPatchInterpolator(object_array, object_point, psf.shape)
-            interpolator.accumulate_patch(X[index] * psf)
+            interpolator.accumulate_patch(x[index] * psf)
 
         HX = object_array.flatten()  # noqa: N806
 

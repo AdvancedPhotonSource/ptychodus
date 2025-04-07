@@ -7,7 +7,7 @@ import numpy.random
 import scipy.linalg
 
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.probe import Probe, ProbeGeometryProvider, WavefieldArrayType
+from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider, WavefieldArrayType
 
 from .settings import ProbeSettings
 
@@ -111,7 +111,9 @@ class MultimodalProbeBuilder(ParameterGroup):
         self.num_incoherent_modes.set_value(1)
         self.num_coherent_modes.set_value(1)
 
-    def build(self, probe: Probe, geometry_provider: ProbeGeometryProvider) -> Probe:
+    def build(
+        self, probe: ProbeSequence, geometry_provider: ProbeGeometryProvider
+    ) -> ProbeSequence:
         if self.num_incoherent_modes.get_value() <= 1 and self.num_coherent_modes.get_value() <= 1:
             return probe
 
@@ -125,4 +127,4 @@ class MultimodalProbeBuilder(ParameterGroup):
         if geometry_provider.probe_photon_count > 0.0:
             power = geometry_provider.probe_photon_count
 
-        return Probe(self._adjust_power(array, power), probe.get_pixel_geometry())
+        return ProbeSequence(self._adjust_power(array, power), probe.get_pixel_geometry())

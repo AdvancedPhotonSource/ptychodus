@@ -154,6 +154,7 @@ class ProbePropagationViewController(Observer):
             return
 
         try:
+            # vvv FIXME display correct pixel geometry for projection vvv
             self._zx_visualization_widget_controller.set_array(
                 self._propagator.get_zx_projection(), pixel_geometry
             )

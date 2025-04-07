@@ -260,7 +260,7 @@ class ProbeAPI:
         except IndexError:
             logger.warning(f'Failed to save probe {index}!')
         else:
-            self._builder_factory.save_probe(file_path, file_type, item.get_probe())
+            self._builder_factory.save_probe(file_path, file_type, item.get_probes())
 
 
 class ObjectAPI:

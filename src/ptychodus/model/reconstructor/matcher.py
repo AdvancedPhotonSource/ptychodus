@@ -76,12 +76,12 @@ class DiffractionPatternPositionMatcher:
                     point_list.append(point)
                     break
 
-        probe = input_product.probe  # TODO remap if needed
+        probe = input_product.probes  # TODO remap if needed
 
         product = Product(
             metadata=input_product.metadata,
             positions=PositionSequence(point_list),
-            probe=probe,
+            probes=probe,
             object_=input_product.object_,
             costs=input_product.costs,
         )

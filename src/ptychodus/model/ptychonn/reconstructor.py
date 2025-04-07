@@ -112,7 +112,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         product = Product(
             metadata=parameters.product.metadata,
             positions=parameters.product.positions,
-            probe=parameters.product.probe,
+            probes=parameters.product.probes,
             object_=object_,
             costs=list(),  # TODO put something here?
         )
@@ -136,8 +136,8 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         interpolator = BarycentricArrayInterpolator(parameters.product.object_.get_array())
         num_channels = self._model_provider.get_num_channels()
         probe_extent = ImageExtent(
-            width_px=parameters.product.probe.width_px,
-            height_px=parameters.product.probe.height_px,
+            width_px=parameters.product.probes.width_px,
+            height_px=parameters.product.probes.height_px,
         )
         patches = numpy.zeros(
             (len(parameters.product.positions), num_channels, *probe_extent.shape),

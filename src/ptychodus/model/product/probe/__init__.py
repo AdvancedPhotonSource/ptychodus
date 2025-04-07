@@ -1,5 +1,5 @@
 from .average_pattern import AveragePatternProbeBuilder
-from .builder import ProbeBuilder
+from .builder import ProbeSequenceBuilder
 from .builder_factory import ProbeBuilderFactory
 from .disk import DiskProbeBuilder
 from .fzp import FresnelZonePlateProbeBuilder
@@ -16,7 +16,7 @@ __all__ = [
     'DiskProbeBuilder',
     'FresnelZonePlateProbeBuilder',
     'MultimodalProbeBuilder',
-    'ProbeBuilder',
+    'ProbeSequenceBuilder',
     'ProbeBuilderFactory',
     'ProbeModeDecayType',
     'ProbeRepositoryItem',

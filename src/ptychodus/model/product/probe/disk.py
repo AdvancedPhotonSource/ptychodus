@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.probe import Probe, ProbeGeometryProvider
+from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
 from ptychodus.api.propagator import AngularSpectrumPropagator, PropagatorParameters
 
-from .builder import ProbeBuilder
+from .builder import ProbeSequenceBuilder
 from .settings import ProbeSettings
 
 
-class DiskProbeBuilder(ProbeBuilder):
+class DiskProbeBuilder(ProbeSequenceBuilder):
     def __init__(self, settings: ProbeSettings) -> None:
         super().__init__(settings, 'disk')
         self._settings = settings
@@ -29,7 +29,7 @@ class DiskProbeBuilder(ProbeBuilder):
 
         return builder
 
-    def build(self, geometry_provider: ProbeGeometryProvider) -> Probe:
+    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
         geometry = geometry_provider.get_probe_geometry()
         coords = self.get_transverse_coordinates(geometry)
 
@@ -48,7 +48,8 @@ class DiskProbeBuilder(ProbeBuilder):
         propagator = AngularSpectrumPropagator(propagator_parameters)
         array = propagator.propagate(disk)
 
-        return Probe(
+        return ProbeSequence(
             array=self.normalize(array),
+            opr_weights=None,
             pixel_geometry=geometry.get_pixel_geometry(),
         )

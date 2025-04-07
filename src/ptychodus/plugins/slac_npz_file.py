@@ -14,7 +14,7 @@ from ptychodus.api.patterns import (
     SimpleDiffractionPatternArray,
 )
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import Probe
+from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import Product, ProductFileReader, ProductMetadata
 from ptychodus.api.scan import PositionSequence, ScanPoint
 from ptychodus.api.tree import SimpleTreeNode
@@ -80,7 +80,7 @@ class SLACProductFileReader(ProductFileReader):
         return Product(
             metadata=metadata,
             positions=PositionSequence(point_list),
-            probe=Probe(array=probe_array, pixel_geometry=None),
+            probes=ProbeSequence(array=probe_array, opr_weights=None, pixel_geometry=None),
             object_=Object(array=object_array, pixel_geometry=None, center=None),
             costs=costs,
         )

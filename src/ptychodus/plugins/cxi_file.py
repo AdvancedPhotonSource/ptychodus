@@ -14,7 +14,7 @@ from ptychodus.api.patterns import (
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import Probe, ProbeFileReader
+from ptychodus.api.probe import ProbeSequence, ProbeFileReader
 from ptychodus.api.product import ELECTRON_VOLT_J
 from ptychodus.api.propagator import WavefieldArrayType
 from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint
@@ -95,13 +95,13 @@ class CXIPositionFileReader(PositionFileReader):
 
 
 class CXIProbeFileReader(ProbeFileReader):
-    def read(self, file_path: Path) -> Probe:
+    def read(self, file_path: Path) -> ProbeSequence:
         array: WavefieldArrayType | None = None
 
         with h5py.File(file_path, 'r') as h5_file:
             array = h5_file['/entry_1/instrument_1/source_1/illumination'][()]
 
-        return Probe(array=array, pixel_geometry=None)
+        return ProbeSequence(array=array, opr_weights=None, pixel_geometry=None)
 
 
 def register_plugins(registry: PluginRegistry) -> None:

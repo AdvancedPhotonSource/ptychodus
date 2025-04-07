@@ -39,7 +39,7 @@ from ptychi.api.options.base import (
 )
 
 from ptychodus.api.object import Object, ObjectArrayType, ObjectGeometry, ObjectPoint
-from ptychodus.api.probe import Probe, WavefieldArrayType
+from ptychodus.api.probe import ProbeSequence, WavefieldArrayType
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput
 from ptychodus.api.scan import PositionSequence, ScanPoint
@@ -289,11 +289,6 @@ class PtyChiObjectOptionsHelper:
 
     def get_pixel_size_m(self, object_: Object) -> float:
         pixel_geometry = object_.get_pixel_geometry()
-
-        if pixel_geometry is None:
-            logger.error('Missing object pixel geometry!')
-            return 1.0
-
         return pixel_geometry.width_m
 
 
@@ -383,7 +378,7 @@ class PtyChiProbeOptionsHelper:
     def eigenmode_update_relaxation(self) -> float:
         return self._settings.relax_eigenmode_update.get_value()
 
-    def get_initial_guess(self, probe: Probe) -> WavefieldArrayType:
+    def get_initial_guess(self, probe: ProbeSequence) -> WavefieldArrayType:
         return probe.get_array()
 
     def get_power_constraint(self, metadata: ProductMetadata) -> ProbePowerConstraintOptions:
@@ -596,9 +591,9 @@ class PtyChiOptionsHelper:
         )
 
         # TODO OPR
-        probe_out = Probe(
+        probe_out = ProbeSequence(
             array=numpy.array(probe_array[0]),
-            pixel_geometry=product.probe.get_pixel_geometry(),
+            pixel_geometry=product.probes.get_pixel_geometry(),
         )
 
         corrected_scan_points: list[ScanPoint] = list()
@@ -622,7 +617,7 @@ class PtyChiOptionsHelper:
         return Product(
             metadata=product.metadata,
             positions=scan_out,
-            probe=probe_out,
+            probes=probe_out,
             object_=object_out,
             costs=costs,
         )

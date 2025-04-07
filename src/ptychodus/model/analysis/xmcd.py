@@ -21,8 +21,8 @@ class XMCDData:
     polar_difference: ObjectArrayType
     polar_sum: ObjectArrayType
     polar_ratio: ObjectArrayType
-    pixel_geometry: PixelGeometry | None
-    center: ObjectCenter | None
+    pixel_geometry: PixelGeometry
+    center: ObjectCenter
 
 
 class XMCDAnalyzer(Observable):
@@ -127,18 +127,10 @@ class XMCDAnalyzer(Observable):
             'polar_difference': self._product_data.polar_difference,
             'polar_sum': self._product_data.polar_sum,
             'polar_ratio': self._product_data.polar_ratio,
+            'pixel_height_m': self._product_data.pixel_geometry.height_m,
+            'pixel_width_m': self._product_data.pixel_geometry.width_m,
+            'center_x_m': self._product_data.center.position_x_m,
+            'center_y_m': self._product_data.center.position_y_m,
         }
-
-        pixel_geometry = self._product_data.pixel_geometry
-
-        if pixel_geometry is not None:
-            contents['pixel_height_m'] = pixel_geometry.height_m
-            contents['pixel_width_m'] = pixel_geometry.width_m
-
-        center = self._product_data.center
-
-        if center is not None:
-            contents['center_x_m'] = center.position_x_m
-            contents['center_y_m'] = center.position_y_m
 
         numpy.savez(file_path, **contents)

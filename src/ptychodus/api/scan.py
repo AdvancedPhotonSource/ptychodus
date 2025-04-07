@@ -60,9 +60,9 @@ class PositionSequence(Sequence[ScanPoint]):
         self._coordinates_m = numpy.reshape(coordinates_m, (-1, 2))
 
     def copy(self) -> PositionSequence:
-        pos_seq = PositionSequence()
-        pos_seq._coordinates_m = self._coordinates_m.copy()
-        return pos_seq
+        seq = PositionSequence()
+        seq._coordinates_m = self._coordinates_m.copy()
+        return seq
 
     @overload
     def __getitem__(self, index: int) -> ScanPoint: ...

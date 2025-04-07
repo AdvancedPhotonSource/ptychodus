@@ -50,7 +50,6 @@ class TwoStepFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Obse
         upscaler = self._upscaling_strategy_chooser.get_current_plugin().strategy
         deconvolver = self._deconvolution_strategy_chooser.get_current_plugin().strategy
         element_maps: list[ElementMap] = list()
-        object_geometry = product.object_.get_geometry()
 
         for emap in dataset.element_maps:
             logger.info(f'Enhancing "{emap.name}"...')

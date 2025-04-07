@@ -171,34 +171,29 @@ class Object:
     def num_layers(self) -> int:
         return self._array.shape[-3]
 
-    def get_pixel_geometry(self) -> PixelGeometry | None:
+    def get_pixel_geometry(self) -> PixelGeometry:
+        if self._pixel_geometry is None:
+            raise ValueError('Missing object pixel geometry!')
+
         return self._pixel_geometry
 
-    def get_center(self) -> ObjectCenter | None:
+    def get_center(self) -> ObjectCenter:
+        if self._center is None:
+            raise ValueError('Missing object center!')
+
         return self._center
 
     def get_geometry(self) -> ObjectGeometry:
-        pixel_width_m = 0.0
-        pixel_height_m = 0.0
-
-        if self._pixel_geometry is not None:
-            pixel_width_m = self._pixel_geometry.width_m
-            pixel_height_m = self._pixel_geometry.height_m
-
-        center_x_m = 0.0
-        center_y_m = 0.0
-
-        if self._center is not None:
-            center_x_m = self._center.position_x_m
-            center_y_m = self._center.position_y_m
+        pixel_geometry = self.get_pixel_geometry()
+        center = self.get_center()
 
         return ObjectGeometry(
             width_px=self.width_px,
             height_px=self.height_px,
-            pixel_width_m=pixel_width_m,
-            pixel_height_m=pixel_height_m,
-            center_x_m=center_x_m,
-            center_y_m=center_y_m,
+            pixel_width_m=pixel_geometry.width_m,
+            pixel_height_m=pixel_geometry.height_m,
+            center_x_m=center.position_x_m,
+            center_y_m=center.position_y_m,
         )
 
     def get_layer(self, number: int) -> ObjectArrayType:

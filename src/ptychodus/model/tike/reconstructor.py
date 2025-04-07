@@ -8,7 +8,7 @@ import numpy.typing
 import tike.ptycho
 
 from ptychodus.api.object import Object, ObjectPoint
-from ptychodus.api.probe import Probe
+from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import (
     Reconstructor,
@@ -133,7 +133,7 @@ class TikeReconstructor:
         else:
             raise ValueError(f'Tike does not support multislice (layers={num_layers})!')
 
-        probe_input = parameters.product.probe
+        probe_input = parameters.product.probes
         probe_input_array = probe_input.get_array().astype('complex64')
 
         scan_input = parameters.product.positions
@@ -211,7 +211,7 @@ class TikeReconstructor:
         scan_output = PositionSequence(scan_output_points)
 
         if self._probe_correction_settings.use_probe_correction.get_value():
-            probe_output = Probe(
+            probe_output = ProbeSequence(
                 array=result.probe, pixel_geometry=probe_input.get_pixel_geometry()
             )
         else:
@@ -230,7 +230,7 @@ class TikeReconstructor:
         product = Product(
             metadata=parameters.product.metadata,
             positions=scan_output,
-            probe=probe_output,
+            probes=probe_output,
             object_=object_output,
             costs=[float(numpy.mean(values)) for values in result.algorithm_options.costs],
         )

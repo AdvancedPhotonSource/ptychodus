@@ -6,7 +6,7 @@ from pathlib import Path
 from sys import getsizeof
 
 from .object import Object
-from .probe import Probe
+from .probe import ProbeSequence
 from .scan import PositionSequence
 
 # Source: https://physics.nist.gov/cuu/Constants/index.html
@@ -54,7 +54,7 @@ class ProductMetadata:
 class Product:
     metadata: ProductMetadata
     positions: PositionSequence
-    probe: Probe
+    probes: ProbeSequence
     object_: Object
     costs: Sequence[float]
 
@@ -62,7 +62,7 @@ class Product:
     def nbytes(self) -> int:
         sz = self.metadata.nbytes
         sz += self.positions.nbytes
-        sz += self.probe.nbytes
+        sz += self.probes.nbytes
         sz += self.object_.nbytes
         return sz
 

@@ -7,7 +7,7 @@ import numpy
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter, ObjectFileReader
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import Probe, ProbeFileReader
+from ptychodus.api.probe import ProbeSequence, ProbeFileReader
 from ptychodus.api.product import (
     Product,
     ProductFileReader,
@@ -32,6 +32,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
     MASS_ATTENUATION: Final[str] = 'mass_attenuation_m2_kg'
 
     PROBE_ARRAY: Final[str] = 'probe'
+    OPR_WEIGHTS: Final[str] = 'opr_weights'
     PROBE_PIXEL_HEIGHT: Final[str] = 'probe_pixel_height_m'
     PROBE_PIXEL_WIDTH: Final[str] = 'probe_pixel_width_m'
     PROBE_POSITION_INDEXES: Final[str] = 'probe_position_indexes'
@@ -81,7 +82,18 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
                 width_m=float(npz_file[self.PROBE_PIXEL_WIDTH]),
                 height_m=float(npz_file[self.PROBE_PIXEL_HEIGHT]),
             )
-            probe = Probe(array=npz_file[self.PROBE_ARRAY], pixel_geometry=probe_pixel_geometry)
+
+            try:
+                opr_weights = npz_file[self.OPR_WEIGHTS]
+            except KeyError:
+                logger.debug('OPR weights not found.')
+                opr_weights = None
+
+            probe = ProbeSequence(
+                array=npz_file[self.PROBE_ARRAY],
+                opr_weights=opr_weights,
+                pixel_geometry=probe_pixel_geometry,
+            )
 
             object_pixel_geometry = PixelGeometry(
                 width_m=float(npz_file[self.OBJECT_PIXEL_WIDTH]),
@@ -109,7 +121,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
         return Product(
             metadata=metadata,
             positions=PositionSequence(point_list),
-            probe=probe,
+            probes=probe,
             object_=object_,
             costs=costs,
         )
@@ -138,11 +150,19 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
         contents[self.PROBE_POSITION_X] = scan_x_m
         contents[self.PROBE_POSITION_Y] = scan_y_m
 
-        probe = product.probe
-        probe_geometry = probe.get_geometry()
+        probe = product.probes
         contents[self.PROBE_ARRAY] = probe.get_array()
-        contents[self.PROBE_PIXEL_WIDTH] = probe_geometry.pixel_width_m
-        contents[self.PROBE_PIXEL_HEIGHT] = probe_geometry.pixel_height_m
+
+        try:
+            opr_weights = probe.get_opr_weights()
+        except ValueError:
+            pass
+        else:
+            contents[self.OPR_WEIGHTS] = opr_weights
+
+        probe_pixel_geometry = probe.get_pixel_geometry()
+        contents[self.PROBE_PIXEL_WIDTH] = probe_pixel_geometry.width_m
+        contents[self.PROBE_PIXEL_HEIGHT] = probe_pixel_geometry.height_m
 
         object_ = product.object_
         object_geometry = object_.get_geometry()
@@ -175,14 +195,22 @@ class NPZPositionFileReader(PositionFileReader):
 
 
 class NPZProbeFileReader(ProbeFileReader):
-    def read(self, file_path: Path) -> Probe:
+    def read(self, file_path: Path) -> ProbeSequence:
         with numpy.load(file_path) as npz_file:
+            try:
+                opr_weights = npz_file[NPZProductFileIO.OPR_WEIGHTS]
+            except KeyError:
+                logger.debug('OPR weights not found.')
+                opr_weights = None
+
             pixel_geometry = PixelGeometry(
                 width_m=float(npz_file[NPZProductFileIO.PROBE_PIXEL_WIDTH]),
                 height_m=float(npz_file[NPZProductFileIO.PROBE_PIXEL_HEIGHT]),
             )
-            return Probe(
-                array=npz_file[NPZProductFileIO.PROBE_ARRAY], pixel_geometry=pixel_geometry
+            return ProbeSequence(
+                array=npz_file[NPZProductFileIO.PROBE_ARRAY],
+                opr_weights=opr_weights,
+                pixel_geometry=pixel_geometry,
             )
 
 

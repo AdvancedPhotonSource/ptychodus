@@ -71,7 +71,7 @@ class ProductRepositoryItem(ParameterGroup):
     def assign(self, product: Product) -> None:
         self._metadata_item.assign(product.metadata)
         self._scan_item.assign(product.positions)
-        self._probe_item.assign(product.probe)
+        self._probe_item.assign(product.probes)
         self._object_item.assign(product.object_)
         self._costs = list(product.costs)
         self._parent.handle_costs_changed(self)
@@ -114,7 +114,7 @@ class ProductRepositoryItem(ParameterGroup):
         return Product(
             metadata=self._metadata_item.get_metadata(),
             positions=self._scan_item.get_scan(),
-            probe=self._probe_item.get_probe(),
+            probes=self._probe_item.get_probes(),
             object_=self._object_item.get_object(),
             costs=self.get_costs(),
         )

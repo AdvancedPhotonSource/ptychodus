@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.probe import Probe, ProbeGeometryProvider
+from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
 
-from .builder import ProbeBuilder
+from .builder import ProbeSequenceBuilder
 from .settings import ProbeSettings
 
 
-class SuperGaussianProbeBuilder(ProbeBuilder):
+class SuperGaussianProbeBuilder(ProbeSequenceBuilder):
     def __init__(self, settings: ProbeSettings) -> None:
         super().__init__(settings, 'super_gaussian')
         self._settings = settings
@@ -30,7 +30,7 @@ class SuperGaussianProbeBuilder(ProbeBuilder):
 
         return builder
 
-    def build(self, geometry_provider: ProbeGeometryProvider) -> Probe:
+    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
         geometry = geometry_provider.get_probe_geometry()
         coords = self.get_transverse_coordinates(geometry)
 
@@ -39,7 +39,8 @@ class SuperGaussianProbeBuilder(ProbeBuilder):
         ) / self.fwhm_m.get_value()
         ZP = numpy.power(2 * Z, 2 * self.order_parameter.get_value())  # noqa: N806
 
-        return Probe(
+        return ProbeSequence(
             array=self.normalize(numpy.exp(-numpy.log(2) * ZP) + 0j),
+            opr_weights=None,
             pixel_geometry=geometry.get_pixel_geometry(),
         )

@@ -84,10 +84,7 @@ class STXMViewController(Observer):
             logger.exception(err)
             ExceptionDialog.show_exception('Update Views', err)
         else:
-            if data.pixel_geometry is None:
-                logger.warning('Missing STXM pixel geometry!')
-            else:
-                self._visualization_widget_controller.set_array(data.intensity, data.pixel_geometry)
+            self._visualization_widget_controller.set_array(data.intensity, data.pixel_geometry)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._simulator:
