@@ -8,6 +8,7 @@ import scipy.linalg
 
 from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider, WavefieldArrayType
+from ptychodus.api.typing import RealArrayType
 
 from .settings import ProbeSettings
 
@@ -28,14 +29,14 @@ class MultimodalProbeBuilder(ParameterGroup):
         self.num_incoherent_modes = settings.num_incoherent_modes.copy()
         self._add_parameter('num_incoherent_modes', self.num_incoherent_modes)
 
+        self.orthogonalize_incoherent_modes = settings.orthogonalize_incoherent_modes.copy()
+        self._add_parameter('orthogonalize_incoherent_modes', self.orthogonalize_incoherent_modes)
+
         self.incoherent_mode_decay_type = settings.incoherent_mode_decay_type.copy()
         self._add_parameter('incoherent_mode_decay_type', self.incoherent_mode_decay_type)
 
         self.incoherent_mode_decay_ratio = settings.incoherent_mode_decay_ratio.copy()
         self._add_parameter('incoherent_mode_decay_ratio', self.incoherent_mode_decay_ratio)
-
-        self.orthogonalize_incoherent_modes = settings.orthogonalize_incoherent_modes.copy()
-        self._add_parameter('orthogonalize_incoherent_modes', self.orthogonalize_incoherent_modes)
 
         self.num_coherent_modes = settings.num_coherent_modes.copy()
         self._add_parameter('num_coherent_modes', self.num_coherent_modes)
@@ -52,7 +53,7 @@ class MultimodalProbeBuilder(ParameterGroup):
 
         return builder
 
-    def _init_modes(self, probe: WavefieldArrayType) -> WavefieldArrayType:
+    def _generate_incoherent_modes(self, probe: WavefieldArrayType) -> WavefieldArrayType:
         # FIXME OPR num_coherent_modes
         assert probe.ndim == 4
         array = numpy.tile(probe[0, 0, :, :], (self.num_incoherent_modes.get_value(), 1, 1))
@@ -117,14 +118,28 @@ class MultimodalProbeBuilder(ParameterGroup):
         if self.num_incoherent_modes.get_value() <= 1 and self.num_coherent_modes.get_value() <= 1:
             return probe
 
-        array = self._init_modes(probe.get_array())
+        array = self._generate_incoherent_modes(probe.get_array())
+
+        # FIXME modes_to_add...
 
         if self.orthogonalize_incoherent_modes.get_value():
             array = self._orthogonalize_incoherent_modes(array)
+
+        opr_weights: RealArrayType | None = None
+        num_points = -1  # FIXME from scan
+
+        if self.num_coherent_modes.get_value() > 1:
+            opr_weights = numpy.zeros((num_points, self.num_coherent_modes.get_value()))
+            assert opr_weights is not None # unnecessary but makes pylance less annoying
+            opr_weights[:, 0] = 1.0
 
         power = probe.get_intensity().sum()
 
         if geometry_provider.probe_photon_count > 0.0:
             power = geometry_provider.probe_photon_count
 
-        return ProbeSequence(self._adjust_power(array, power), probe.get_pixel_geometry())
+        return ProbeSequence(
+            array=self._adjust_power(array, power),
+            opr_weights=opr_weights,
+            pixel_geometry=probe.get_pixel_geometry(),
+        )

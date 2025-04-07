@@ -25,7 +25,7 @@ class ProgressBarItemDelegate(QStyledItemDelegate):
             opt.rect = option.rect
             opt.minimum = 0
             opt.maximum = 100
-            opt.progress = progress
+            opt.progress = int(progress)
             opt.text = text
             opt.textVisible = True
             QApplication.style().drawControl(QStyle.ControlElement.CE_ProgressBar, opt, painter)
