@@ -13,7 +13,7 @@ from ptychodus.api.probe import (
     ProbeFileReader,
     ProbeGeometry,
     ProbeGeometryProvider,
-    WavefieldArrayType,
+    ComplexArrayType,
 )
 from ptychodus.api.typing import RealArrayType
 
@@ -52,7 +52,7 @@ class ProbeSequenceBuilder(ParameterGroup):
             position_y_m=position_y_m,
         )
 
-    def normalize(self, array: WavefieldArrayType) -> WavefieldArrayType:
+    def normalize(self, array: ComplexArrayType) -> ComplexArrayType:
         return array / numpy.sqrt(numpy.sum(numpy.square(numpy.abs(array))))
 
     def get_name(self) -> str:

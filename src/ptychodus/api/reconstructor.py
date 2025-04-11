@@ -4,8 +4,10 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from ptychodus.api.typing import BooleanArrayType
+
+from .patterns import PatternDataType
 from .product import Product
-from .patterns import BooleanArrayType, PatternDataType
 
 
 @dataclass(frozen=True)

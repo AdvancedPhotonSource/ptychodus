@@ -1,16 +1,13 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TypeAlias
 
 from scipy.fft import fft2, fftfreq, fftshift, ifft2, ifftshift
 import numpy
 
 from .typing import ComplexArrayType, RealArrayType
 
-WavefieldArrayType: TypeAlias = ComplexArrayType
 
-
-def intensity(wavefield: WavefieldArrayType) -> RealArrayType:
+def intensity(wavefield: ComplexArrayType) -> RealArrayType:
     return numpy.real(numpy.multiply(wavefield, numpy.conjugate(wavefield)))
 
 
@@ -64,7 +61,7 @@ class PropagatorParameters:
 
 class Propagator(ABC):
     @abstractmethod
-    def propagate(self, wavefield: WavefieldArrayType) -> WavefieldArrayType:
+    def propagate(self, wavefield: ComplexArrayType) -> ComplexArrayType:
         pass
 
 
@@ -80,7 +77,7 @@ class AngularSpectrumPropagator(Propagator):
 
         self._transfer_function = numpy.where(ratio < 1, tf, 0)
 
-    def propagate(self, wavefield: WavefieldArrayType) -> WavefieldArrayType:
+    def propagate(self, wavefield: ComplexArrayType) -> ComplexArrayType:
         return fftshift(ifft2(self._transfer_function * fft2(ifftshift(wavefield))))
 
 
@@ -95,7 +92,7 @@ class FresnelTransferFunctionPropagator(Propagator):
 
         self._transfer_function = numpy.exp(i2piz * (1 - ratio / 2))
 
-    def propagate(self, wavefield: WavefieldArrayType) -> WavefieldArrayType:
+    def propagate(self, wavefield: ComplexArrayType) -> ComplexArrayType:
         return fftshift(ifft2(self._transfer_function * fft2(ifftshift(wavefield))))
 
 
@@ -118,7 +115,7 @@ class FresnelTransformPropagator(Propagator):
         self._A = C2 * C1 * C0 if is_forward else C2 * C1 / C0
         self._B = numpy.exp(ipi * Fr * (numpy.square(XX) + numpy.square(YY / ar)))
 
-    def propagate(self, wavefield: WavefieldArrayType) -> WavefieldArrayType:
+    def propagate(self, wavefield: ComplexArrayType) -> ComplexArrayType:
         if self._is_forward:
             return self._A * fftshift(fft2(ifftshift(wavefield * self._B)))
         else:
@@ -143,7 +140,7 @@ class FraunhoferPropagator(Propagator):
         self._is_forward = is_forward
         self._A = C2 * C1 * C0 if is_forward else C2 * C1 / C0
 
-    def propagate(self, wavefield: WavefieldArrayType) -> WavefieldArrayType:
+    def propagate(self, wavefield: ComplexArrayType) -> ComplexArrayType:
         if self._is_forward:
             return self._A * fftshift(fft2(ifftshift(wavefield)))
         else:

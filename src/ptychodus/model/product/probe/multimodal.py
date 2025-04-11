@@ -7,8 +7,8 @@ import numpy.random
 import scipy.linalg
 
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider, WavefieldArrayType
-from ptychodus.api.typing import RealArrayType
+from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
+from ptychodus.api.typing import ComplexArrayType, RealArrayType
 
 from .settings import ProbeSettings
 
@@ -65,7 +65,7 @@ class MultimodalProbeBuilder(ParameterGroup):
 
         return builder
 
-    def _orthogonalize_incoherent_modes(self, array_in: WavefieldArrayType) -> WavefieldArrayType:
+    def _orthogonalize_incoherent_modes(self, array_in: ComplexArrayType) -> ComplexArrayType:
         imodes_as_rows = array_in[0].reshape(array_in.shape[-3], -1)
         imodes_as_cols = imodes_as_rows.T
         imodes_as_ortho_cols = scipy.linalg.orth(imodes_as_cols)
@@ -89,7 +89,7 @@ class MultimodalProbeBuilder(ParameterGroup):
 
         return imode_decay_type.get_weights(num_imodes, imode_decay_ratio)
 
-    def _adjust_imode_power(self, array_in: WavefieldArrayType, power: float) -> WavefieldArrayType:
+    def _adjust_imode_power(self, array_in: ComplexArrayType, power: float) -> ComplexArrayType:
         imode_weights = self._get_imode_weights(array_in.shape[-3])
         array_out = array_in.copy()
         it = iter(array_out[0])  # iterate incoherent modes
@@ -101,7 +101,7 @@ class MultimodalProbeBuilder(ParameterGroup):
 
         return array_out
 
-    def _random_phase_shift_axis(self, size: int) -> WavefieldArrayType:
+    def _random_phase_shift_axis(self, size: int) -> ComplexArrayType:
         a = self._rng.uniform() - 0.5
         b = (size - 1 - 2 * numpy.arange(size)) / size
         return numpy.exp(1j * numpy.pi * a * b)
@@ -109,9 +109,9 @@ class MultimodalProbeBuilder(ParameterGroup):
     def _init_modes(
         self,
         geometry_provider: ProbeGeometryProvider,
-        array_in: WavefieldArrayType,
+        array_in: ComplexArrayType,
         normalize_cmodes: bool = True,
-    ) -> WavefieldArrayType:
+    ) -> ComplexArrayType:
         assert array_in.ndim == 4
         num_cmodes = self.num_coherent_modes.get_value()
         num_imodes = self.num_incoherent_modes.get_value()

@@ -25,7 +25,7 @@ class AveragePatternProbeBuilder(ProbeSequenceBuilder):
 
     def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
         geometry = geometry_provider.get_probe_geometry()
-        detector_intensity = numpy.average(self._dataset.get_assembled_patterns(), axis=0)
+        detector_intensity = numpy.mean(self._dataset.get_assembled_patterns(), axis=0)
 
         pixel_geometry = geometry_provider.get_detector_pixel_geometry()
         propagator_parameters = PropagatorParameters(

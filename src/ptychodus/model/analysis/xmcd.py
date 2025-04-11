@@ -8,8 +8,9 @@ import logging
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.object import ObjectArrayType, ObjectCenter
+from ptychodus.api.object import ObjectCenter
 from ptychodus.api.observer import Observable
+from ptychodus.api.typing import ComplexArrayType
 
 from ..product import ProductRepository
 
@@ -18,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class XMCDData:
-    polar_difference: ObjectArrayType
-    polar_sum: ObjectArrayType
-    polar_ratio: ObjectArrayType
+    polar_difference: ComplexArrayType
+    polar_sum: ComplexArrayType
+    polar_ratio: ComplexArrayType
     pixel_geometry: PixelGeometry
     center: ObjectCenter
 

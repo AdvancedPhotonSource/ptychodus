@@ -12,7 +12,7 @@ from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.propagator import (
     AngularSpectrumPropagator,
     PropagatorParameters,
-    WavefieldArrayType,
+    ComplexArrayType,
     intensity,
 )
 from ptychodus.api.typing import RealArrayType
@@ -30,7 +30,7 @@ class ProbePropagator(Observable):
         self._repository = repository
 
         self._product_index = -1
-        self._propagated_wavefield: WavefieldArrayType | None = None
+        self._propagated_wavefield: ComplexArrayType | None = None
         self._propagated_intensity: RealArrayType | None = None
 
     def set_product(self, product_index: int) -> None:

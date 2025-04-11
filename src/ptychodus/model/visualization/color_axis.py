@@ -4,7 +4,7 @@ import numpy
 
 from ptychodus.api.geometry import Interval
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.visualization import RealArrayType
+from ptychodus.api.typing import RealArrayType
 
 logger = logging.getLogger(__name__)
 

@@ -38,12 +38,12 @@ from ptychi.api.options.base import (
     RemoveObjectProbeAmbiguityOptions,
 )
 
-from ptychodus.api.object import Object, ObjectArrayType, ObjectGeometry, ObjectPoint
-from ptychodus.api.probe import ProbeSequence, WavefieldArrayType
+from ptychodus.api.object import Object, ObjectGeometry, ObjectPoint
+from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput
 from ptychodus.api.scan import PositionSequence, ScanPoint
-from ptychodus.api.typing import RealArrayType
+from ptychodus.api.typing import ComplexArrayType, RealArrayType
 
 from ..patterns import PatternSizer
 from .settings import (
@@ -281,7 +281,7 @@ class PtyChiObjectOptionsHelper:
     def build_preconditioner_with_all_modes(self) -> bool:
         return self._settings.build_preconditioner_with_all_modes.get_value()
 
-    def get_initial_guess(self, object_: Object) -> ObjectArrayType:
+    def get_initial_guess(self, object_: Object) -> ComplexArrayType:
         return object_.get_array()
 
     def get_slice_spacings_m(self, object_: Object) -> RealArrayType:
@@ -378,7 +378,7 @@ class PtyChiProbeOptionsHelper:
     def eigenmode_update_relaxation(self) -> float:
         return self._settings.relax_eigenmode_update.get_value()
 
-    def get_initial_guess(self, probe: ProbeSequence) -> WavefieldArrayType:
+    def get_initial_guess(self, probe: ProbeSequence) -> ComplexArrayType:
         return probe.get_array()
 
     def get_power_constraint(self, metadata: ProductMetadata) -> ProbePowerConstraintOptions:

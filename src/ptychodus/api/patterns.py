@@ -11,7 +11,6 @@ import numpy.typing
 from .geometry import ImageExtent, PixelGeometry
 from .tree import SimpleTreeNode
 
-BooleanArrayType: TypeAlias = numpy.typing.NDArray[numpy.bool_]
 PatternDataType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
 PatternIndexesType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
 

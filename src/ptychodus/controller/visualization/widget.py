@@ -3,7 +3,7 @@ from __future__ import annotations
 from PyQt5.QtWidgets import QStatusBar
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.visualization import NumberArrayType
+from ptychodus.api.typing import NumberArrayType
 
 from ...model.visualization import VisualizationEngine
 from ...view.visualization import VisualizationWidget

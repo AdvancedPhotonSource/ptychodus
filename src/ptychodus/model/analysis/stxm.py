@@ -10,7 +10,7 @@ import numpy
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import ObjectCenter
 from ptychodus.api.observer import Observable
-from ptychodus.api.visualization import RealArrayType
+from ptychodus.api.typing import RealArrayType
 
 from ..reconstructor import DiffractionPatternPositionMatcher
 from .barycentric import BarycentricArrayStitcher

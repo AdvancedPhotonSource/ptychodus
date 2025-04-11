@@ -8,8 +8,8 @@ from typing import overload
 import numpy
 
 from .geometry import PixelGeometry
-from .propagator import WavefieldArrayType, intensity
-from .typing import RealArrayType
+from .propagator import intensity
+from .typing import ComplexArrayType, RealArrayType
 
 
 @dataclass(frozen=True)
@@ -82,10 +82,9 @@ class ProbeGeometryProvider(ABC):
 class Probe:
     def __init__(
         self,
-        array: WavefieldArrayType,
+        array: ComplexArrayType,
         pixel_geometry: PixelGeometry,
     ) -> None:
-        assert array.ndim == 3
         self._array = array
         self._pixel_geometry = pixel_geometry
 
@@ -106,7 +105,7 @@ class Probe:
             pixel_geometry=self._pixel_geometry.copy(),
         )
 
-    def get_array(self) -> WavefieldArrayType:
+    def get_array(self) -> ComplexArrayType:
         return self._array
 
     def get_pixel_geometry(self) -> PixelGeometry:
@@ -128,12 +127,11 @@ class Probe:
     def num_incoherent_modes(self) -> int:
         return self._array.shape[-3]
 
-    def get_incoherent_mode(self, number: int) -> WavefieldArrayType:
-        return self._array[0, number, :, :]
+    def get_incoherent_mode(self, number: int) -> ComplexArrayType:
+        return self._array[number, :, :]
 
-    def get_incoherent_modes_flattened(self) -> WavefieldArrayType:
-        modes = self._array[0]
-        return modes.transpose((1, 0, 2)).reshape(modes.shape[-2], -1)
+    def get_incoherent_modes_flattened(self) -> ComplexArrayType:
+        return self._array.transpose((1, 0, 2)).reshape(self.height_px, -1)
 
     def get_incoherent_mode_relative_power(self, number: int) -> float:
         return self._mode_relative_power[number]
@@ -148,12 +146,12 @@ class Probe:
 class ProbeSequence(Sequence[Probe]):
     def __init__(
         self,
-        array: WavefieldArrayType | None,
+        array: ComplexArrayType | None,
         opr_weights: RealArrayType | None,
         pixel_geometry: PixelGeometry | None,
     ) -> None:
         if array is None:
-            self._array: WavefieldArrayType = numpy.zeros((1, 1, 0, 0), dtype=complex)
+            self._array: ComplexArrayType = numpy.zeros((1, 1, 0, 0), dtype=complex)
         elif numpy.iscomplexobj(array):
             match array.ndim:
                 case 2:
@@ -189,7 +187,7 @@ class ProbeSequence(Sequence[Probe]):
             None if self._pixel_geometry is None else self._pixel_geometry.copy(),
         )
 
-    def get_array(self) -> WavefieldArrayType:
+    def get_array(self) -> ComplexArrayType:
         return self._array
 
     def get_opr_weights(self) -> RealArrayType:

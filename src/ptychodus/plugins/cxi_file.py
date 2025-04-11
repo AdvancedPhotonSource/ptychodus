@@ -16,8 +16,8 @@ from ptychodus.api.patterns import (
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeSequence, ProbeFileReader
 from ptychodus.api.product import ELECTRON_VOLT_J
-from ptychodus.api.propagator import WavefieldArrayType
 from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint
+from ptychodus.api.typing import ComplexArrayType
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ class CXIPositionFileReader(PositionFileReader):
 
 class CXIProbeFileReader(ProbeFileReader):
     def read(self, file_path: Path) -> ProbeSequence:
-        array: WavefieldArrayType | None = None
+        array: ComplexArrayType | None = None
 
         with h5py.File(file_path, 'r') as h5_file:
             array = h5_file['/entry_1/instrument_1/source_1/illumination'][()]

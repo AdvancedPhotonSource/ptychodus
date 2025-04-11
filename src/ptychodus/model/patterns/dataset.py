@@ -15,7 +15,6 @@ import numpy.typing
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.patterns import (
-    BooleanArrayType,
     DiffractionDataset,
     DiffractionMetadata,
     DiffractionPatternArray,
@@ -23,6 +22,7 @@ from ptychodus.api.patterns import (
     PatternIndexesType,
 )
 from ptychodus.api.tree import SimpleTreeNode
+from ptychodus.api.typing import BooleanArrayType
 from ptychodus.api.units import BYTES_PER_MEGABYTE
 
 from .settings import PatternSettings

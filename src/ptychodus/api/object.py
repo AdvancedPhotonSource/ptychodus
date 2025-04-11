@@ -3,15 +3,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypeAlias
 
 import numpy
-import numpy.typing
 
 from .geometry import ImageExtent, PixelGeometry
 from .scan import ScanPoint
-
-ObjectArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
+from .typing import ComplexArrayType
 
 
 @dataclass(frozen=True)
@@ -112,13 +109,13 @@ class ObjectGeometryProvider(ABC):
 class Object:
     def __init__(
         self,
-        array: ObjectArrayType | None,
+        array: ComplexArrayType | None,
         pixel_geometry: PixelGeometry | None,
         center: ObjectCenter | None,
         layer_distance_m: Sequence[float] = [],
     ) -> None:
         if array is None:
-            self._array: ObjectArrayType = numpy.zeros((1, 0, 0), dtype=complex)
+            self._array: ComplexArrayType = numpy.zeros((1, 0, 0), dtype=complex)
         elif numpy.iscomplexobj(array):
             match array.ndim:
                 case 2:
@@ -148,7 +145,7 @@ class Object:
             layer_distance_m=list(self._layer_distance_m),
         )
 
-    def get_array(self) -> ObjectArrayType:
+    def get_array(self) -> ComplexArrayType:
         return self._array
 
     @property
@@ -196,10 +193,10 @@ class Object:
             center_y_m=center.position_y_m,
         )
 
-    def get_layer(self, number: int) -> ObjectArrayType:
+    def get_layer(self, number: int) -> ComplexArrayType:
         return self._array[number, :, :]
 
-    def get_layers_flattened(self) -> ObjectArrayType:
+    def get_layers_flattened(self) -> ComplexArrayType:
         return numpy.prod(self._array, axis=-3)
 
     @property
