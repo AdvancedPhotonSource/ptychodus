@@ -4,6 +4,7 @@ from typing import Any, overload
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
 from ptychodus.api.patterns import PatternDataType
+from ptychodus.api.units import BYTES_PER_MEGABYTE
 
 from ptychodus.model.patterns import AssembledDiffractionPatternArray
 
@@ -160,7 +161,7 @@ class DatasetTreeModel(QAbstractItemModel):
                     case 2:
                         return node.get_nframes()
                     case 3:
-                        return f'{node.get_nbytes() / (1024 * 1024):.2f}'
+                        return f'{node.get_nbytes() / BYTES_PER_MEGABYTE:.2f}'
             elif role == Qt.ItemDataRole.UserRole:
                 if index.column() == 1:
                     return (100 * node.get_counts()) // self._max_counts

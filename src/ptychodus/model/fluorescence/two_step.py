@@ -46,7 +46,6 @@ class TwoStepFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Obse
         deconvolution_strategy_chooser.add_observer(self)
 
     def enhance(self, dataset: FluorescenceDataset, product: Product) -> FluorescenceDataset:
-        # FIXME OPR
         upscaler = self._upscaling_strategy_chooser.get_current_plugin().strategy
         deconvolver = self._deconvolution_strategy_chooser.get_current_plugin().strategy
         element_maps: list[ElementMap] = list()

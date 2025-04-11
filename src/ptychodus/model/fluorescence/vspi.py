@@ -25,7 +25,7 @@ __all__ = [
 ]
 
 
-class ArrayPatchInterpolator:  # XXX
+class ArrayPatchInterpolator:
     def __init__(self, array: RealArrayType, point: ObjectPoint, shape: tuple[int, ...]) -> None:
         # top left corner of object support
         xmin = point.position_x_px - shape[-1] / 2
@@ -133,7 +133,6 @@ class VSPIFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Observa
         settings.vspi_max_iterations.add_observer(self)
 
     def enhance(self, dataset: FluorescenceDataset, product: Product) -> FluorescenceDataset:
-        # FIXME OPR
         object_geometry = product.object_.get_geometry()
         e_cps_shape = object_geometry.height_px, object_geometry.width_px
         element_maps: list[ElementMap] = list()

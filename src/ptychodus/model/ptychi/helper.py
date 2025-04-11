@@ -590,9 +590,9 @@ class PtyChiOptionsHelper:
             center=object_in.get_center(),
         )
 
-        # TODO OPR
         probe_out = ProbeSequence(
             array=numpy.array(probe_array[0]),
+            opr_weights=None,  # FIXME OPR
             pixel_geometry=product.probes.get_pixel_geometry(),
         )
 
@@ -606,8 +606,8 @@ class PtyChiOptionsHelper:
         ):
             object_point = ObjectPoint(
                 index=uncorrected_point.index,
-                position_x_px=pos_x_px + rx_px,
-                position_y_px=pos_y_px + ry_px,
+                position_x_px=float(pos_x_px + rx_px),
+                position_y_px=float(pos_y_px + ry_px),
             )
             scan_point = object_geometry.map_object_point_to_scan_point(object_point)
             corrected_scan_points.append(scan_point)

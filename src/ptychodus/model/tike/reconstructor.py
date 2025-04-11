@@ -212,7 +212,9 @@ class TikeReconstructor:
 
         if self._probe_correction_settings.use_probe_correction.get_value():
             probe_output = ProbeSequence(
-                array=result.probe, pixel_geometry=probe_input.get_pixel_geometry()
+                array=result.probe,
+                opr_weights=None,
+                pixel_geometry=probe_input.get_pixel_geometry(),
             )
         else:
             probe_output = probe_input.copy()

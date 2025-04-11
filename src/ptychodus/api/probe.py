@@ -65,6 +65,11 @@ class ProbeGeometryProvider(ABC):
     def probe_power_W(self) -> float:  # noqa: N802
         pass
 
+    @property
+    @abstractmethod
+    def num_scan_points(self) -> int:
+        pass
+
     @abstractmethod
     def get_detector_pixel_geometry(self) -> PixelGeometry:
         pass
@@ -247,6 +252,10 @@ class ProbeSequence(Sequence[Probe]):
 
         return Probe(array, self.get_pixel_geometry())
 
+    def get_probe_no_opr(self) -> Probe:
+        array = self._array[0, :, :, :].copy()
+        return Probe(array, self.get_pixel_geometry())
+
     def get_geometry(self) -> ProbeGeometry:
         pixel_geometry = self.get_pixel_geometry()
 
@@ -256,15 +265,6 @@ class ProbeSequence(Sequence[Probe]):
             pixel_width_m=pixel_geometry.width_m,
             pixel_height_m=pixel_geometry.height_m,
         )
-
-    def get_average_probe(self) -> Probe:
-        array = self._array[0, :, :, :].copy()
-
-        if self._opr_weights is not None:
-            average_opr_weights = self._opr_weights.mean(axis=0)
-            array[0, :, :] = numpy.tensordot(average_opr_weights, self._array[:, 0, :, :], axes=1)
-
-        return Probe(array, self.get_pixel_geometry())
 
     def __len__(self) -> int:
         # FIXME sys.maxsize?

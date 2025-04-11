@@ -3,6 +3,8 @@ from typing import overload
 import logging
 import sys
 
+from ptychodus.api.units import BYTES_PER_MEGABYTE
+
 from .item import ProductRepositoryItem, ProductRepositoryItemObserver, ProductRepositoryObserver
 
 logger = logging.getLogger(__name__)
@@ -67,7 +69,7 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             observer.handle_item_removed(index, item)
 
     def get_info_text(self) -> str:
-        size_MB = sum(sys.getsizeof(prod) for prod in self._item_list) / (1024 * 1024)  # noqa: N806
+        size_MB = sum(sys.getsizeof(prod) for prod in self._item_list) / BYTES_PER_MEGABYTE  # noqa: N806
         return f'Total: {len(self)} [{size_MB:.2f}MB]'
 
     def add_observer(self, observer: ProductRepositoryObserver) -> None:

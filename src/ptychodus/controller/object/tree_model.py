@@ -3,6 +3,8 @@ from typing import Any, overload
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
+from ptychodus.api.units import BYTES_PER_MEGABYTE
+
 from ...model.product import ObjectAPI, ObjectRepository
 from ...model.product.object import ObjectRepositoryItem
 
@@ -169,7 +171,7 @@ class ObjectTreeModel(QAbstractItemModel):
                 elif index.column() == 5:
                     return object_.height_px
                 elif index.column() == 6:
-                    return f'{object_.nbytes / (1024 * 1024):.2f}'
+                    return f'{object_.nbytes / BYTES_PER_MEGABYTE:.2f}'
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)

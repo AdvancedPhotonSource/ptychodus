@@ -14,7 +14,7 @@ class NPYProbeFileReader(ProbeFileReader):
 
 class NPYProbeFileWriter(ProbeFileWriter):
     def write(self, file_path: Path, probes: ProbeSequence) -> None:
-        array = probes.get_average_probe().get_array()
+        array = probes.get_probe_no_opr().get_array()
         numpy.save(file_path, array)
 
 

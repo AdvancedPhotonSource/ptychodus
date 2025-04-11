@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Any, TypeAlias
 import logging
 
 import numpy
@@ -6,7 +7,8 @@ import numpy.typing
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.object import ObjectArrayType
-from ptychodus.api.typing import Float32ArrayType
+
+Float32ArrayType: TypeAlias = numpy.typing.NDArray[numpy.float32]
 
 logger = logging.getLogger(__name__)
 

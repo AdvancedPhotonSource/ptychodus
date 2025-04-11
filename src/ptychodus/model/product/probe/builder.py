@@ -126,7 +126,7 @@ class FromFileProbeBuilder(ProbeSequenceBuilder):
         try:
             opr_weights = probe_from_file.get_opr_weights()
         except ValueError:
-            opr_weights = None  # FIXME init as [1,0,0...]
+            opr_weights = None
 
         # TODO regrid probe as needed based on probe geometry from file/provider
         return ProbeSequence(

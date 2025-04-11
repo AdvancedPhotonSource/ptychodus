@@ -21,7 +21,7 @@ class NSLSIIProductFileReader(ProductFileReader):
 
         with h5py.File(file_path, 'r') as h5_file:
             detector_distance_m = float(h5_file['det_dist'][()]) * self.ONE_MICRON_M
-            probe_energy_eV = 1000.0 * float(h5_file['energy'][()])  # noqa: N806
+            probe_energy_eV = 1000 * float(h5_file['energy'][()])  # noqa: N806
 
             metadata = ProductMetadata(
                 name=file_path.stem,

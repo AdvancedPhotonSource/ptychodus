@@ -70,6 +70,10 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         return self.probe_energy_J * self.probe_photons_per_s
 
     @property
+    def num_scan_points(self) -> int:
+        return len(self._scan.get_scan())
+
+    @property
     def detector_distance_m(self) -> float:
         return self._metadata.detector_distance_m.get_value()
 

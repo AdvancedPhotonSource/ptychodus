@@ -12,6 +12,8 @@ from PyQt5.QtCore import (
 )
 from PyQt5.QtWidgets import QAbstractItemView, QAction
 
+from ptychodus.api.units import BYTES_PER_MEGABYTE
+
 from ...model.product import (
     ProductAPI,
     ProductRepository,
@@ -89,7 +91,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                         return f'{geometry.object_plane_pixel_height_m * 1e9:.4g}'
                     case 6:
                         product = item.get_product()
-                        return f'{product.nbytes / (1024 * 1024):.2f}'
+                        return f'{product.nbytes / BYTES_PER_MEGABYTE:.2f}'
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
         if index.isValid() and role == Qt.ItemDataRole.EditRole:

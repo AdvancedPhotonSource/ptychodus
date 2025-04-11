@@ -292,7 +292,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             except IndexError:
                 logger.warning('Unable to access item for visualization!')
             else:
-                probe = item.get_probes()
+                probe = item.get_probes().get_probe_no_opr()  # TODO OPR
                 array = (
                     probe.get_incoherent_mode(current.row())
                     if current.parent().isValid()

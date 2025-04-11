@@ -52,7 +52,7 @@ class ProbePropagator(Observable):
         num_steps: int,
     ) -> None:
         item = self._repository[self._product_index]
-        probe = item.get_probe_item().get_probes()[0]  # TODO OPR
+        probe = item.get_probe_item().get_probes().get_probe_no_opr()  # TODO OPR
         wavelength_m = item.get_geometry().probe_wavelength_m
         propagated_wavefield = numpy.zeros(
             (num_steps, probe.num_incoherent_modes, probe.height_px, probe.width_px),
