@@ -8,6 +8,7 @@ import scipy.linalg
 
 from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
+from ptychodus.api.propagator import intensity
 from ptychodus.api.typing import ComplexArrayType, RealArrayType
 
 from .settings import ProbeSettings
@@ -131,9 +132,7 @@ class MultimodalProbeBuilder(ParameterGroup):
                 values = real + 1j * imag
 
                 if normalize_cmodes:
-                    # FIXME pnorm(x=probe) = torch.sqrt(torch.mean((x * x.conj()).real, dim=(-2, -1), keepdims=True))
-                    # FIXME probe[1:] = probe[1:] / pnorm[1:, :]
-                    pass
+                    values /= numpy.sqrt(numpy.mean(intensity(values)))
 
             array_out[cmode, 0, :, :] = values
 

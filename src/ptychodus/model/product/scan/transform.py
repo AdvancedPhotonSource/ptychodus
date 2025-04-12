@@ -3,6 +3,7 @@ from collections.abc import Iterator
 
 import numpy
 
+from ptychodus.api.geometry import AffineTransform
 from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.scan import ScanPoint
 
@@ -83,17 +84,16 @@ class ScanPointTransform(ParameterGroup):
         self.apply_presets(0)
 
     def __call__(self, point: ScanPoint) -> ScanPoint:
-        a00 = self.affine00.get_value()
-        a01 = self.affine01.get_value()
-        a02 = self.affine02.get_value()
+        transform = AffineTransform(
+            a00=self.affine00.get_value(),
+            a01=self.affine01.get_value(),
+            a02=self.affine02.get_value(),
+            a10=self.affine10.get_value(),
+            a11=self.affine11.get_value(),
+            a12=self.affine12.get_value(),
+        )
 
-        a10 = self.affine10.get_value()
-        a11 = self.affine11.get_value()
-        a12 = self.affine12.get_value()
-
-        pos_y = a00 * point.position_y_m + a01 * point.position_x_m + a02
-        pos_x = a10 * point.position_y_m + a11 * point.position_x_m + a12
-
+        pos_y, pos_x = transform(point.position_y_m, point.position_x_m)
         rad = self.jitter_radius_m.get_value()
 
         if rad > 0.0:
