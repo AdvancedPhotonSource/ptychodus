@@ -22,9 +22,6 @@ class ObjectCenter:
             position_y_m=float(self.position_y_m),
         )
 
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.position_x_m}, {self.position_y_m})'
-
 
 @dataclass(frozen=True)
 class ObjectPoint:

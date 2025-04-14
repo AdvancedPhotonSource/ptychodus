@@ -19,25 +19,25 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
     def __init__(
         self,
         pattern_sizer: PatternSizer,
-        metadata: MetadataRepositoryItem,
-        scan: ScanRepositoryItem,
+        metadata_item: MetadataRepositoryItem,
+        scan_item: ScanRepositoryItem,
     ) -> None:
         super().__init__()
         self._pattern_sizer = pattern_sizer
-        self._metadata = metadata
-        self._scan = scan
+        self._metadata_item = metadata_item
+        self._scan_item = scan_item
 
         self._pattern_sizer.add_observer(self)
-        self._metadata.add_observer(self)
-        self._scan.add_observer(self)
+        self._metadata_item.add_observer(self)
+        self._scan_item.add_observer(self)
 
     @property
     def probe_photon_count(self) -> float:
-        return self._metadata.probe_photon_count.get_value()
+        return self._metadata_item.probe_photon_count.get_value()
 
     @property
     def probe_energy_J(self) -> float:  # noqa: N802
-        return self._metadata.probe_energy_eV.get_value() * ELECTRON_VOLT_J
+        return self._metadata_item.probe_energy_eV.get_value() * ELECTRON_VOLT_J
 
     @property
     def probe_wavelength_m(self) -> float:
@@ -61,7 +61,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
     @property
     def probe_photons_per_s(self) -> float:
         try:
-            return self.probe_photon_count / self._metadata.exposure_time_s.get_value()
+            return self.probe_photon_count / self._metadata_item.exposure_time_s.get_value()
         except ZeroDivisionError:
             return 0.0
 
@@ -71,11 +71,11 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     @property
     def num_scan_points(self) -> int:
-        return len(self._scan.get_scan())
+        return len(self._scan_item.get_scan())
 
     @property
     def detector_distance_m(self) -> float:
-        return self._metadata.detector_distance_m.get_value()
+        return self._metadata_item.detector_distance_m.get_value()
 
     @property
     def _lambda_z_m2(self) -> float:
@@ -127,7 +127,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         center_x_m = 0.0
         center_y_m = 0.0
 
-        scan_bbox = self._scan.get_bounding_box()
+        scan_bbox = self._scan_item.get_bounding_box()
 
         if scan_bbox is not None:
             width_m += scan_bbox.width_m
@@ -153,9 +153,9 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         return pixel_size_is_valid and geometry.contains(expected_geometry)
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._metadata:
+        if observable is self._metadata_item:
             self.notify_observers()
-        elif observable is self._scan:
+        elif observable is self._scan_item:
             self.notify_observers()
         elif observable is self._pattern_sizer:
             self.notify_observers()

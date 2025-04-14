@@ -68,7 +68,7 @@ class PtychoShelvesProductFileReader(ProductFileReader):
 
         probe = ProbeSequence(
             array=probe_array,
-            opr_weights=None,  # FIXME OPR
+            opr_weights=None,  # TODO OPR, if available
             pixel_geometry=pixel_geometry,
         )
 

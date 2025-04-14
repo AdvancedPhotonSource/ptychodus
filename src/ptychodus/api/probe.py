@@ -265,7 +265,6 @@ class ProbeSequence(Sequence[Probe]):
         )
 
     def __len__(self) -> int:
-        # FIXME sys.maxsize?
         return 1 if self._opr_weights is None else self._opr_weights.shape[0]
 
 

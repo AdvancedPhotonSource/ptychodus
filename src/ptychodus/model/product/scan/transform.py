@@ -69,6 +69,8 @@ class ScanPointTransform(ParameterGroup):
             yield f'(y, x) \u2192 ({fyx})'
 
     def apply_presets(self, index: int) -> None:
+        self.block_notifications(True)
+
         if self.swap_xy(index):
             self.affine00.set_value(0)
             self.affine01.set_value(-1 if self.negate_x(index) else +1)
@@ -80,11 +82,10 @@ class ScanPointTransform(ParameterGroup):
             self.affine10.set_value(0)
             self.affine11.set_value(-1 if self.negate_x(index) else +1)
 
-    def set_identity(self) -> None:
-        self.apply_presets(0)
+        self.block_notifications(False)
 
-    def __call__(self, point: ScanPoint) -> ScanPoint:
-        transform = AffineTransform(
+    def get_transform(self) -> AffineTransform:
+        return AffineTransform(
             a00=self.affine00.get_value(),
             a01=self.affine01.get_value(),
             a02=self.affine02.get_value(),
@@ -93,6 +94,11 @@ class ScanPointTransform(ParameterGroup):
             a12=self.affine12.get_value(),
         )
 
+    def set_identity(self) -> None:
+        self.apply_presets(0)
+
+    def __call__(self, point: ScanPoint) -> ScanPoint:
+        transform = self.get_transform()
         pos_y, pos_x = transform(point.position_y_m, point.position_x_m)
         rad = self.jitter_radius_m.get_value()
 

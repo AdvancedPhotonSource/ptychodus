@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 import logging
 import time
@@ -41,24 +42,28 @@ class ReconstructorAPI:
         input_product_index: int,
         *,
         output_product_suffix: str = '',
+        transform: int | None = None,
         index_filter: ScanIndexFilter = ScanIndexFilter.ALL,
     ) -> int:
-        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
-        parameters = self._data_matcher.match_diffraction_patterns_with_positions(
-            input_product_index, index_filter
-        )
-        output_product_index = self._product_api.insert_product(parameters.product)
-        output_product = self._product_api.get_item(output_product_index)
-        output_product_name = (
-            self._data_matcher.get_product_name(input_product_index)
-            + f'_{self._reconstructor_chooser.get_current_plugin().simple_name}'
-        )
+        reconstructor = self._reconstructor_chooser.get_current_plugin()
+        input_product_item = self._product_api.get_item(input_product_index)
+        output_product_index = self._product_api.insert_product(input_product_item.get_product())
+        output_product_item = self._product_api.get_item(output_product_index)
+        output_product_name = f'{input_product_item.get_name()}_{reconstructor.simple_name}'
 
         if output_product_suffix:
             output_product_name += f'_{output_product_suffix}'
 
-        output_product.set_name(output_product_name)
-        self._reconstruction_queue.put(reconstructor, parameters, output_product)
+        output_product_item.set_name(output_product_name)
+
+        if transform is not None:
+            scan_item_transform = output_product_item.get_scan_item().get_transform()
+            scan_item_transform.apply_presets(transform)
+
+            object_item = output_product_item.get_object_item()
+            object_item.rebuild(recenter=True)
+
+        self._reconstruction_queue.put(reconstructor.strategy, output_product_index, index_filter)
         return output_product_index
 
     def reconstruct_split(self, input_product_index: int) -> tuple[int, int]:
@@ -74,6 +79,23 @@ class ReconstructorAPI:
         )
 
         return output_product_index_odd, output_product_index_even
+
+    def reconstruct_transformed(self, input_product_index: int) -> Sequence[int]:
+        output_product_indexes: list[int] = []
+        input_product = self._product_api.get_item(input_product_index)
+
+        for preset_value, preset_label in enumerate(
+            input_product.get_scan_item().get_transform().labels_for_presets()
+        ):
+            output_product_index = self.reconstruct(
+                input_product_index,
+                output_product_suffix=preset_label,
+                transform=preset_value,
+                index_filter=ScanIndexFilter.ALL,
+            )
+            output_product_indexes.append(output_product_index)
+
+        return output_product_indexes
 
     def open_model(self, file_path: Path) -> None:
         reconstructor = self._reconstructor_chooser.get_current_plugin().strategy

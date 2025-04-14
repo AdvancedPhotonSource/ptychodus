@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 import logging
 
@@ -49,6 +49,9 @@ class ReconstructorPresenter(Observable, Observer):
 
     def reconstruct_split(self, input_product_index: int) -> tuple[int, int]:
         return self._reconstructor_api.reconstruct_split(input_product_index)
+
+    def reconstruct_transformed(self, input_product_index: int) -> Sequence[int]:
+        return self._reconstructor_api.reconstruct_transformed(input_product_index)
 
     @property
     def is_reconstructing(self) -> bool:

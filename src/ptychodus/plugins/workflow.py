@@ -10,10 +10,6 @@ from ptychodus.api.workflow import FileBasedWorkflow, WorkflowAPI
 logger = logging.getLogger(__name__)
 
 
-# FIXME workflow to try all scan transformations
-# FIXME workflow for split reconstructions
-
-
 class PtychodusAutoloadProductFileBasedWorkflow(FileBasedWorkflow):
     @property
     def is_watch_recursive(self) -> bool:

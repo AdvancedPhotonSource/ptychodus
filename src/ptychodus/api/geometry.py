@@ -37,9 +37,6 @@ class PixelGeometry:
             height_m=float(self.height_m),
         )
 
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.width_m}, {self.height_m})'
-
 
 @dataclass(frozen=True)
 class ImageExtent:
@@ -62,17 +59,11 @@ class ImageExtent:
 
         return False
 
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.width_px}, {self.height_px})'
-
 
 @dataclass(frozen=True)
 class Point2D:
     x: float
     y: float
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.x}, {self.y})'
 
 
 @dataclass(frozen=True)
@@ -85,9 +76,6 @@ class Line2D:
         x = beta * self.begin.x + alpha * self.end.x
         y = beta * self.begin.y + alpha * self.end.y
         return Point2D(x, y)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.begin}, {self.end})'
 
 
 @dataclass(frozen=True)
@@ -112,9 +100,6 @@ class Box2D:
     @property
     def y_end(self) -> float:
         return self.y + self.height
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.x}, {self.y}, {self.width}, {self.height})'
 
 
 class Interval(Generic[T]):

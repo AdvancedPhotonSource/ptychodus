@@ -102,7 +102,7 @@ class LSQMLReconstructor(Reconstructor):
         )
 
     def _create_probe_options(
-        self, probe: ProbeSequence, metadata: ProductMetadata
+        self, probes: ProbeSequence, metadata: ProductMetadata
     ) -> LSQMLProbeOptions:
         helper = self._options_helper.probe_helper
         return LSQMLProbeOptions(
@@ -111,7 +111,7 @@ class LSQMLReconstructor(Reconstructor):
             optimizer=helper.optimizer,
             step_size=helper.step_size,
             optimizer_params=helper.optimizer_params,
-            initial_guess=helper.get_initial_guess(probe),
+            initial_guess=helper.get_initial_guess(probes),
             power_constraint=helper.get_power_constraint(metadata),
             orthogonalize_incoherent_modes=helper.orthogonalize_incoherent_modes,
             orthogonalize_opr_modes=helper.orthogonalize_opr_modes,
@@ -139,7 +139,7 @@ class LSQMLReconstructor(Reconstructor):
             correction_options=helper.correction_options,
         )
 
-    def _create_opr_mode_weight_options(self) -> LSQMLOPRModeWeightsOptions:
+    def _create_opr_mode_weight_options(self, probes: ProbeSequence) -> LSQMLOPRModeWeightsOptions:
         helper = self._options_helper.opr_helper
         return LSQMLOPRModeWeightsOptions(
             optimizable=helper.optimizable,
@@ -147,7 +147,7 @@ class LSQMLReconstructor(Reconstructor):
             optimizer=helper.optimizer,
             step_size=helper.step_size,
             optimizer_params=helper.optimizer_params,
-            initial_weights=helper.get_initial_weights(),
+            initial_weights=helper.get_initial_weights(probes),
             optimize_eigenmode_weights=helper.optimize_eigenmode_weights,
             optimize_intensity_variation=helper.optimize_intensity_variation,
             smoothing=helper.smoothing,
@@ -164,7 +164,7 @@ class LSQMLReconstructor(Reconstructor):
             probe_position_options=self._create_probe_position_options(
                 product.positions, product.object_.get_geometry()
             ),
-            opr_mode_weight_options=self._create_opr_mode_weight_options(),
+            opr_mode_weight_options=self._create_opr_mode_weight_options(product.probes),
         )
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
@@ -177,7 +177,7 @@ class LSQMLReconstructor(Reconstructor):
 
         if task_reconstructor is not None:
             loss_tracker = task_reconstructor.loss_tracker
-            # FIXME update api to include epoch and loss
+            # TODO update api to include epoch and loss
             # epoch = loss_tracker.table['epoch'].to_numpy()
             loss = loss_tracker.table['loss'].to_numpy()
             costs = [float(x) for x in loss.flatten()]
@@ -188,7 +188,7 @@ class LSQMLReconstructor(Reconstructor):
             position_y_px=task.get_probe_positions_y(as_numpy=True),
             probe_array=task.get_data_to_cpu('probe', as_numpy=True),
             object_array=task.get_data_to_cpu('object', as_numpy=True),
-            opr_mode_weights=task.get_data_to_cpu('opr_mode_weights', as_numpy=True),
+            opr_weights=task.get_data_to_cpu('opr_mode_weights', as_numpy=True),
             costs=costs,
         )
         return ReconstructOutput(product, 0)

@@ -44,7 +44,7 @@ class STXMSimulator(Observable):
             self.notify_observers()
 
     def get_product_name(self) -> str:
-        return self._data_matcher.get_product_name(self._product_index)
+        return self._data_matcher.get_product_item(self._product_index).get_name()
 
     def simulate(self) -> None:
         reconstruct_input = self._data_matcher.match_diffraction_patterns_with_positions(

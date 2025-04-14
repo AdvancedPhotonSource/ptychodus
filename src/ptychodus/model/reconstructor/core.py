@@ -50,8 +50,8 @@ class ReconstructorCore:
                 NullReconstructor('None'), display_name='None/None'
             )
 
-        self._reconstruction_queue = ReconstructionQueue()
         self.data_matcher = DiffractionPatternPositionMatcher(dataset, product_api)
+        self._reconstruction_queue = ReconstructionQueue(self.data_matcher)
         self.reconstructor_api = ReconstructorAPI(
             self._reconstruction_queue, self.data_matcher, product_api, self._plugin_chooser
         )
