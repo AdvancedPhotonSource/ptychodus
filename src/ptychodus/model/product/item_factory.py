@@ -62,7 +62,8 @@ class ProductRepositoryItemFactory:
             mass_attenuation_m2_kg=mass_attenuation_m2_kg,
         )
 
-        # FIXME probe photon count fallback to settings, then estimate from patterns
+        if metadata_item.probe_photon_count.get_value() <= 0:
+            metadata_item.probe_photon_count.set_value(self._dataset.get_maximum_pattern_counts())
 
         scan_item = self._scan_item_factory.create()
         geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
