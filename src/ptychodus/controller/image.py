@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import QButtonGroup, QDialog, QStatusBar
 
 from ptychodus.api.geometry import Interval, PixelGeometry
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.visualization import NumberArrayType
+from ptychodus.api.typing import NumberArrayType
 
 from ..model.visualization import VisualizationEngine
 from ..view.image import (

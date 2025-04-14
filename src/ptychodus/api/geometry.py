@@ -16,10 +16,10 @@ class AffineTransform:
     a11: float
     a12: float
 
-    def __call__(self, x: float, y: float) -> tuple[float, float]:
-        xp = self.a00 * x + self.a01 * y + self.a02
-        yp = self.a10 * x + self.a11 * y + self.a12
-        return xp, yp
+    def __call__(self, y: float, x: float) -> tuple[float, float]:
+        yp = self.a00 * y + self.a01 * x + self.a02
+        xp = self.a10 * y + self.a11 * x + self.a12
+        return yp, xp
 
 
 @dataclass(frozen=True)
@@ -36,9 +36,6 @@ class PixelGeometry:
             width_m=float(self.width_m),
             height_m=float(self.height_m),
         )
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.width_m}, {self.height_m})'
 
 
 @dataclass(frozen=True)
@@ -62,17 +59,11 @@ class ImageExtent:
 
         return False
 
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.width_px}, {self.height_px})'
-
 
 @dataclass(frozen=True)
 class Point2D:
     x: float
     y: float
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.x}, {self.y})'
 
 
 @dataclass(frozen=True)
@@ -85,9 +76,6 @@ class Line2D:
         x = beta * self.begin.x + alpha * self.end.x
         y = beta * self.begin.y + alpha * self.end.y
         return Point2D(x, y)
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.begin}, {self.end})'
 
 
 @dataclass(frozen=True)
@@ -112,9 +100,6 @@ class Box2D:
     @property
     def y_end(self) -> float:
         return self.y + self.height
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.x}, {self.y}, {self.width}, {self.height})'
 
 
 class Interval(Generic[T]):

@@ -6,7 +6,7 @@ import h5py
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import Probe
+from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import Product, ProductFileReader, ProductMetadata
 from ptychodus.api.scan import PositionSequence, ScanPoint
 
@@ -21,7 +21,7 @@ class NSLSIIProductFileReader(ProductFileReader):
 
         with h5py.File(file_path, 'r') as h5_file:
             detector_distance_m = float(h5_file['det_dist'][()]) * self.ONE_MICRON_M
-            probe_energy_eV = 1000.0 * float(h5_file['energy'][()])  # noqa: N806
+            probe_energy_eV = 1000 * float(h5_file['energy'][()])  # noqa: N806
 
             metadata = ProductMetadata(
                 name=file_path.stem,
@@ -47,7 +47,9 @@ class NSLSIIProductFileReader(ProductFileReader):
                 point_list.append(point)
 
             probe_array = h5_file['prb'][()].astype(complex)
-            probe = Probe(array=probe_array, pixel_geometry=pixel_geometry)
+            probes = ProbeSequence(
+                array=probe_array, opr_weights=None, pixel_geometry=pixel_geometry
+            )
 
             object_array = h5_file['obj'][()].astype(complex)
             object_ = Object(
@@ -60,7 +62,7 @@ class NSLSIIProductFileReader(ProductFileReader):
         return Product(
             metadata=metadata,
             positions=PositionSequence(point_list),
-            probe=probe,
+            probes=probes,
             object_=object_,
             costs=costs,
         )

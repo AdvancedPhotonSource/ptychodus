@@ -3,15 +3,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypeAlias
 
 import numpy
-import numpy.typing
 
 from .geometry import ImageExtent, PixelGeometry
 from .scan import ScanPoint
-
-ObjectArrayType: TypeAlias = numpy.typing.NDArray[numpy.complexfloating[Any, Any]]
+from .typing import ComplexArrayType
 
 
 @dataclass(frozen=True)
@@ -24,9 +21,6 @@ class ObjectCenter:
             position_x_m=float(self.position_x_m),
             position_y_m=float(self.position_y_m),
         )
-
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}({self.position_x_m}, {self.position_y_m})'
 
 
 @dataclass(frozen=True)
@@ -112,13 +106,13 @@ class ObjectGeometryProvider(ABC):
 class Object:
     def __init__(
         self,
-        array: ObjectArrayType | None,
+        array: ComplexArrayType | None,
         pixel_geometry: PixelGeometry | None,
         center: ObjectCenter | None,
         layer_distance_m: Sequence[float] = [],
     ) -> None:
         if array is None:
-            self._array: ObjectArrayType = numpy.zeros((1, 0, 0), dtype=complex)
+            self._array: ComplexArrayType = numpy.zeros((1, 0, 0), dtype=complex)
         elif numpy.iscomplexobj(array):
             match array.ndim:
                 case 2:
@@ -148,7 +142,7 @@ class Object:
             layer_distance_m=list(self._layer_distance_m),
         )
 
-    def get_array(self) -> ObjectArrayType:
+    def get_array(self) -> ComplexArrayType:
         return self._array
 
     @property
@@ -171,40 +165,35 @@ class Object:
     def num_layers(self) -> int:
         return self._array.shape[-3]
 
-    def get_pixel_geometry(self) -> PixelGeometry | None:
+    def get_pixel_geometry(self) -> PixelGeometry:
+        if self._pixel_geometry is None:
+            raise ValueError('Missing object pixel geometry!')
+
         return self._pixel_geometry
 
-    def get_center(self) -> ObjectCenter | None:
+    def get_center(self) -> ObjectCenter:
+        if self._center is None:
+            raise ValueError('Missing object center!')
+
         return self._center
 
     def get_geometry(self) -> ObjectGeometry:
-        pixel_width_m = 0.0
-        pixel_height_m = 0.0
-
-        if self._pixel_geometry is not None:
-            pixel_width_m = self._pixel_geometry.width_m
-            pixel_height_m = self._pixel_geometry.height_m
-
-        center_x_m = 0.0
-        center_y_m = 0.0
-
-        if self._center is not None:
-            center_x_m = self._center.position_x_m
-            center_y_m = self._center.position_y_m
+        pixel_geometry = self.get_pixel_geometry()
+        center = self.get_center()
 
         return ObjectGeometry(
             width_px=self.width_px,
             height_px=self.height_px,
-            pixel_width_m=pixel_width_m,
-            pixel_height_m=pixel_height_m,
-            center_x_m=center_x_m,
-            center_y_m=center_y_m,
+            pixel_width_m=pixel_geometry.width_m,
+            pixel_height_m=pixel_geometry.height_m,
+            center_x_m=center.position_x_m,
+            center_y_m=center.position_y_m,
         )
 
-    def get_layer(self, number: int) -> ObjectArrayType:
+    def get_layer(self, number: int) -> ComplexArrayType:
         return self._array[number, :, :]
 
-    def get_layers_flattened(self) -> ObjectArrayType:
+    def get_layers_flattened(self) -> ComplexArrayType:
         return numpy.prod(self._array, axis=-3)
 
     @property

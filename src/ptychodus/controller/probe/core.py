@@ -292,18 +292,13 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             except IndexError:
                 logger.warning('Unable to access item for visualization!')
             else:
-                probe = item.get_probe()
+                probe = item.get_probes().get_probe_no_opr()  # TODO OPR
                 array = (
                     probe.get_incoherent_mode(current.row())
                     if current.parent().isValid()
                     else probe.get_incoherent_modes_flattened()
                 )
-                pixel_geometry = probe.get_pixel_geometry()
-
-                if pixel_geometry is None:
-                    logger.warning('Missing probe pixel geometry!')
-                else:
-                    self._image_controller.set_array(array, pixel_geometry)
+                self._image_controller.set_array(array, probe.get_pixel_geometry())
 
     def handle_item_inserted(self, index: int, item: ProbeRepositoryItem) -> None:
         self._tree_model.insert_item(index, item)

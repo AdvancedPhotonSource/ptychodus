@@ -6,6 +6,7 @@ import numpy
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
 from ptychodus.api.probe import Probe
+from ptychodus.api.units import BYTES_PER_MEGABYTE
 
 from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
@@ -68,7 +69,7 @@ class ProbeTreeModel(QAbstractItemModel):
 
     @staticmethod
     def _append_modes(node: ProbeTreeNode, item: ProbeRepositoryItem) -> None:
-        probe = item.get_probe()
+        probe = item.get_probes()
 
         for layer in range(probe.num_incoherent_modes):
             node.insert_node()
@@ -85,7 +86,7 @@ class ProbeTreeModel(QAbstractItemModel):
 
         node = self._tree_root.children[index]
         num_modes_old = len(node.children)
-        num_modes_new = item.get_probe().num_incoherent_modes
+        num_modes_new = item.get_probes().num_incoherent_modes
 
         if num_modes_old < num_modes_new:
             self.beginInsertRows(top_left, num_modes_old, num_modes_new)
@@ -166,13 +167,16 @@ class ProbeTreeModel(QAbstractItemModel):
                     case 0:
                         return f'Mode {index.row() + 1}'
                     case 1:
-                        power_percent = calc_relative_power_percent(item.get_probe(), index.row())
+                        probe = item.get_probes().get_probe_no_opr()  # TODO OPR
+                        power_percent = calc_relative_power_percent(probe, index.row())
                         return f'{power_percent}%'
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
-                return calc_relative_power_percent(item.get_probe(), index.row())
+                probe = item.get_probes().get_probe_no_opr()  # TODO OPR
+                return calc_relative_power_percent(probe, index.row())
         else:
             item = self._repository[index.row()]
-            probe = item.get_probe()
+            probes = item.get_probes()
+            probe = probes.get_probe_no_opr()  # TODO OPR
 
             if role == Qt.ItemDataRole.DisplayRole:
                 match index.column():
@@ -190,9 +194,10 @@ class ProbeTreeModel(QAbstractItemModel):
                     case 5:
                         return probe.height_px
                     case 6:
-                        return f'{probe.nbytes / (1024 * 1024):.2f}'
+                        return f'{probes.nbytes / BYTES_PER_MEGABYTE:.2f}'
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
-                return calc_coherent_percent(item.get_probe())
+                probe = item.get_probes().get_probe_no_opr()  # TODO OPR
+                return calc_coherent_percent(probe)
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)

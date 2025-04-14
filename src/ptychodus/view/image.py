@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ptychodus.api.visualization import RealArrayType
+from ptychodus.api.typing import RealArrayType
 
 from .visualization import VisualizationView
 from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider

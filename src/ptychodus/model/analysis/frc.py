@@ -7,8 +7,7 @@ import numpy
 import numpy.typing
 import scipy.fft
 
-from ptychodus.api.object import ObjectArrayType
-from ptychodus.api.typing import IntegerArrayType
+from ptychodus.api.typing import ComplexArrayType, IntegerArrayType
 from ptychodus.api.visualization import Plot2D, PlotAxis, PlotSeries
 
 from ..product import ObjectRepository
@@ -44,7 +43,7 @@ class FourierRingCorrelator:
         self._repository = repository
 
     @staticmethod
-    def _integrate_rings(rings: IntegerArrayType, array: ObjectArrayType) -> ObjectArrayType:
+    def _integrate_rings(rings: IntegerArrayType, array: ComplexArrayType) -> ComplexArrayType:
         total = numpy.zeros(numpy.max(rings) + 1, dtype=complex)
 
         for index, value in zip(rings.flat, array.flat):
@@ -75,9 +74,6 @@ class FourierRingCorrelator:
 
         # TODO verify compatible pixel geometry
         pixel_geometry = object2.get_pixel_geometry()
-
-        if pixel_geometry is None:
-            raise ValueError('No pixel geometry!')
 
         # TODO subpixel image registration: skimage.registration.phase_cross_correlation
         # TODO remove phase offset and ramp

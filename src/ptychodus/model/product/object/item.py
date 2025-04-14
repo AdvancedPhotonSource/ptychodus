@@ -29,12 +29,12 @@ class ObjectRepositoryItem(ParameterGroup):
         self._add_parameter('layer_distance_m', self.layer_distance_m)
 
         self._add_group('builder', builder, observe=True)
-        self._rebuild()
+        self.rebuild()
 
     def assign_item(self, item: ObjectRepositoryItem) -> None:
         self.layer_distance_m.set_value(item.layer_distance_m.get_value(), notify=False)
         self.set_builder(item.get_builder().copy())
-        self._rebuild()
+        self.rebuild()
 
     def assign(self, object_: Object) -> None:
         builder = FromMemoryObjectBuilder(self._settings, object_)
@@ -65,7 +65,7 @@ class ObjectRepositoryItem(ParameterGroup):
             distance_m = distance_m[:num_spaces]
 
         self.layer_distance_m.set_value(distance_m)
-        self._rebuild()
+        self.rebuild()
 
     def get_object(self) -> Object:
         return self._object
@@ -79,9 +79,9 @@ class ObjectRepositoryItem(ParameterGroup):
         self._builder = builder
         self._builder.add_observer(self)
         self._add_group('builder', self._builder, observe=True)
-        self._rebuild()
+        self.rebuild()
 
-    def _rebuild(self) -> None:
+    def rebuild(self, *, recenter: bool = False) -> None:
         try:
             object_ = self._builder.build(
                 self._geometry_provider, self.layer_distance_m.get_value()
@@ -90,12 +90,22 @@ class ObjectRepositoryItem(ParameterGroup):
             logger.exception('Failed to rebuild object!')
             return
 
-        self._object = object_
+        if recenter:
+            object_geometry = self._geometry_provider.get_object_geometry()
+            self._object = Object(
+                array=object_.get_array(),
+                layer_distance_m=object_.layer_distance_m,
+                pixel_geometry=object_.get_pixel_geometry(),
+                center=object_geometry.get_center(),
+            )
+        else:
+            self._object = object_
+
         self.layer_distance_m.set_value(object_.layer_distance_m)
         self.notify_observers()
 
     def _update(self, observable: Observable) -> None:
         if observable is self._builder:
-            self._rebuild()
+            self.rebuild()
         else:
             super()._update(observable)

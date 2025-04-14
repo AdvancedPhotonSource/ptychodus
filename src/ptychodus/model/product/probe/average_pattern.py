@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.probe import Probe, ProbeGeometryProvider
+from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
 from ptychodus.api.propagator import FresnelTransformPropagator, PropagatorParameters
 
 from ...patterns import AssembledDiffractionDataset
-from .builder import ProbeBuilder
+from .builder import ProbeSequenceBuilder
 from .settings import ProbeSettings
 
 
-class AveragePatternProbeBuilder(ProbeBuilder):
+class AveragePatternProbeBuilder(ProbeSequenceBuilder):
     def __init__(
         self,
         settings: ProbeSettings,
@@ -23,9 +23,9 @@ class AveragePatternProbeBuilder(ProbeBuilder):
     def copy(self) -> AveragePatternProbeBuilder:
         return AveragePatternProbeBuilder(self._settings, self._dataset)
 
-    def build(self, geometry_provider: ProbeGeometryProvider) -> Probe:
+    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
         geometry = geometry_provider.get_probe_geometry()
-        detector_intensity = numpy.average(self._dataset.get_assembled_patterns(), axis=0)
+        detector_intensity = numpy.mean(self._dataset.get_assembled_patterns(), axis=0)
 
         pixel_geometry = geometry_provider.get_detector_pixel_geometry()
         propagator_parameters = PropagatorParameters(
@@ -39,7 +39,8 @@ class AveragePatternProbeBuilder(ProbeBuilder):
         propagator = FresnelTransformPropagator(propagator_parameters)
         array = propagator.propagate(numpy.sqrt(detector_intensity).astype(complex))
 
-        return Probe(
+        return ProbeSequence(
             array=self.normalize(array),
+            opr_weights=None,
             pixel_geometry=geometry.get_pixel_geometry(),
         )

@@ -116,9 +116,9 @@ class ScanRepositoryItem(ParameterGroup):
         length_m = 0.0
 
         for untransformed_point in self._untransformed_scan:
-            point = self._transform(untransformed_point)
-            transformed_points.append(point)
-            bbox_builder.hull(point)
+            transformed_point = self._transform(untransformed_point)
+            transformed_points.append(transformed_point)
+            bbox_builder.hull(transformed_point)
 
         for point_l, point_r in pairwise(transformed_points):
             dx = point_r.position_x_m - point_l.position_x_m

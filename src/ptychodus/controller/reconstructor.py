@@ -88,6 +88,10 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._model_action_group.addAction(save_model_action)
         self._model_action_group.addAction(view.parameters_view.reconstructor_menu.addSeparator())
 
+        reconstruct_transformed_action = view.parameters_view.reconstructor_menu.addAction(
+            'Reconstruct Transformed Points'
+        )
+        reconstruct_transformed_action.triggered.connect(self._reconstruct_transformed)
         reconstruct_split_action = view.parameters_view.reconstructor_menu.addAction(
             'Reconstruct Odd/Even Split'
         )
@@ -155,6 +159,20 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
         try:
             self._presenter.reconstruct_split(input_product_index)
+        except Exception as err:
+            logger.exception(err)
+            ExceptionDialog.show_exception('Split Reconstructor', err)
+
+        self._view.progress_dialog.show()
+
+    def _reconstruct_transformed(self) -> None:
+        input_product_index = self._view.parameters_view.product_combo_box.currentIndex()
+
+        if input_product_index < 0:
+            return
+
+        try:
+            self._presenter.reconstruct_transformed(input_product_index)
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.show_exception('Split Reconstructor', err)

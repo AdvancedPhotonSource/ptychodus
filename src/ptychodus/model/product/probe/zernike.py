@@ -6,10 +6,10 @@ import numpy
 import numpy.typing
 import scipy.special
 
-from ptychodus.api.probe import Probe, ProbeGeometryProvider
+from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
 from ptychodus.api.typing import RealArrayType
 
-from .builder import ProbeBuilder
+from .builder import ProbeSequenceBuilder
 from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)
@@ -73,7 +73,7 @@ class ZernikePolynomial:
         return f'$Z_{{{self.radial_degree}}}^{{{self.angular_frequency:+d}}}$'
 
 
-class ZernikeProbeBuilder(ProbeBuilder):
+class ZernikeProbeBuilder(ProbeSequenceBuilder):
     def __init__(self, settings: ProbeSettings) -> None:
         super().__init__(settings, 'zernike')
         self._settings = settings
@@ -136,7 +136,7 @@ class ZernikeProbeBuilder(ProbeBuilder):
     def __len__(self) -> int:
         return min(len(self.coefficients), len(self._polynomials))
 
-    def build(self, geometry_provider: ProbeGeometryProvider) -> Probe:
+    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
         geometry = geometry_provider.get_probe_geometry()
         coords = self.get_transverse_coordinates(geometry)
 
@@ -148,7 +148,8 @@ class ZernikeProbeBuilder(ProbeBuilder):
         for coef, poly in zip(self.coefficients, self._polynomials):
             array += numpy.multiply(coef, poly(distance, angle))
 
-        return Probe(
+        return ProbeSequence(
             array=self.normalize(array),
+            opr_weights=None,
             pixel_geometry=geometry.get_pixel_geometry(),
         )

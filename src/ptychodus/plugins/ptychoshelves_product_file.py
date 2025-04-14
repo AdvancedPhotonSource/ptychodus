@@ -7,7 +7,7 @@ import scipy.io
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import Probe
+from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import (
     ELECTRON_VOLT_J,
     LIGHT_SPEED_M_PER_S,
@@ -66,7 +66,11 @@ class PtychoShelvesProductFileReader(ProductFileReader):
             # probe_array[height, width, num_shared_modes, num_varying_modes]
             probe_array = probe_array.transpose(3, 2, 0, 1)
 
-        probe = Probe(array=probe_array, pixel_geometry=pixel_geometry)
+        probe = ProbeSequence(
+            array=probe_array,
+            opr_weights=None,  # TODO OPR, if available
+            pixel_geometry=pixel_geometry,
+        )
 
         object_array = mat_dict['object']
 
@@ -96,7 +100,7 @@ class PtychoShelvesProductFileReader(ProductFileReader):
         return Product(
             metadata=metadata,
             positions=PositionSequence(point_list),
-            probe=probe,
+            probes=probe,
             object_=object_,
             costs=costs,
         )

@@ -51,7 +51,7 @@ def create_raw_data(parameters: ReconstructInput) -> RawData:
         xcoords=numpy.array(position_x_px),
         ycoords=numpy.array(position_y_px),
         diff3d=parameters.patterns,
-        probeGuess=parameters.product.probe.get_incoherent_mode(0),
+        probeGuess=parameters.product.probes.get_probe_no_opr().get_incoherent_mode(0),
         # assume that all patches are from the same object
         scan_index=numpy.zeros(len(parameters.product.positions), dtype=int),
         objectGuess=parameters.product.object_.get_layer(0),
@@ -171,7 +171,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         product = Product(
             metadata=parameters.product.metadata,
             positions=parameters.product.positions,
-            probe=parameters.product.probe,
+            probes=parameters.product.probes,
             object_=object_out,
             costs=costs,
         )

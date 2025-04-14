@@ -2,6 +2,8 @@ from typing import Any
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject
 
+from ptychodus.api.units import BYTES_PER_MEGABYTE
+
 from ...model.product import ScanAPI, ScanRepository
 from ...model.product.scan import ScanRepositoryItem
 
@@ -60,7 +62,7 @@ class ScanTableModel(QAbstractTableModel):
             elif index.column() == 4:
                 return f'{item.get_length_m():.6f}'
             elif index.column() == 5:
-                return f'{scan.nbytes / (1024 * 1024):.2f}'
+                return f'{scan.nbytes / BYTES_PER_MEGABYTE:.2f}'
         elif role == Qt.ItemDataRole.CheckStateRole:
             if index.column() == 1:
                 return (

@@ -10,7 +10,7 @@ import numpy
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import ObjectCenter
 from ptychodus.api.observer import Observable
-from ptychodus.api.visualization import RealArrayType
+from ptychodus.api.typing import RealArrayType
 
 from ..product import ProductRepository
 from .barycentric import BarycentricArrayStitcher
@@ -29,16 +29,12 @@ class IlluminationMap:
     photon_energy_J: float  # noqa: N815
     exposure_time_s: float
     mass_attenuation_m2_kg: float
-    pixel_geometry: PixelGeometry | None
-    center: ObjectCenter | None
+    pixel_geometry: PixelGeometry
+    center: ObjectCenter
 
     @property
     def photon_fluence_1_m2(self) -> RealArrayType:
-        return (
-            numpy.zeros_like(self.photon_number)
-            if self.pixel_geometry is None
-            else self.photon_number / self.pixel_geometry.area_m2
-        )
+        return self.photon_number / self.pixel_geometry.area_m2
 
     @property
     def photon_fluence_rate_Hz_m2(self) -> RealArrayType:  # noqa: N802
@@ -91,12 +87,12 @@ class IlluminationMapper(Observable):
             numpy.zeros((object_geometry.height_px, object_geometry.width_px))
         )
 
-        for scan_point in product.positions:
+        for scan_point, probe in zip(product.positions, product.probes):
             object_point = object_geometry.map_scan_point_to_object_point(scan_point)
             stitcher.add_patch(
                 object_point.position_x_px,
                 object_point.position_y_px,
-                product.probe.get_intensity(),  # FIXME OPR & scaling
+                probe.get_intensity(),  # FIXME scaling
             )
 
         self._product_data = IlluminationMap(
@@ -133,18 +129,10 @@ class IlluminationMapper(Observable):
             'energy_fluence_rate_W_m2': self._product_data.energy_fluence_rate_W_m2,
             'dose_Gy': self._product_data.dose_Gy,
             'dose_rate_Gy_s': self._product_data.dose_rate_Gy_s,
+            'pixel_height_m': self._product_data.pixel_geometry.height_m,
+            'pixel_width_m': self._product_data.pixel_geometry.width_m,
+            'center_x_m': self._product_data.center.position_x_m,
+            'center_y_m': self._product_data.center.position_y_m,
         }
-
-        pixel_geometry = self._product_data.pixel_geometry
-
-        if pixel_geometry is not None:
-            contents['pixel_height_m'] = pixel_geometry.height_m
-            contents['pixel_width_m'] = pixel_geometry.width_m
-
-        center = self._product_data.center
-
-        if center is not None:
-            contents['center_x_m'] = center.position_x_m
-            contents['center_y_m'] = center.position_y_m
 
         numpy.savez(file_path, **contents)

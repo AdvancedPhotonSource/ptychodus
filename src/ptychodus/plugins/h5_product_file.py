@@ -7,7 +7,7 @@ import h5py
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe import Probe
+from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import (
     Product,
     ProductFileReader,
@@ -32,6 +32,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
     MASS_ATTENUATION: Final[str] = 'mass_attenuation_m2_kg'
 
     PROBE_ARRAY: Final[str] = 'probe'
+    OPR_WEIGHTS: Final[str] = 'opr_weights'
     PROBE_PIXEL_HEIGHT: Final[str] = 'pixel_height_m'
     PROBE_PIXEL_WIDTH: Final[str] = 'pixel_width_m'
     PROBE_POSITION_INDEXES: Final[str] = 'probe_position_indexes'
@@ -88,8 +89,16 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
                 width_m=float(h5_probe.attrs[self.PROBE_PIXEL_WIDTH]),
                 height_m=float(h5_probe.attrs[self.PROBE_PIXEL_HEIGHT]),
             )
-            probe = Probe(
+
+            try:
+                opr_weights = h5_probe.attrs[self.OPR_WEIGHTS]
+            except KeyError:
+                logger.debug('OPR weights not found.')
+                opr_weights = None
+
+            probe = ProbeSequence(
                 array=h5_probe[()],
+                opr_weights=opr_weights,
                 pixel_geometry=probe_pixel_geometry,
             )
 
@@ -116,7 +125,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
         return Product(
             metadata=metadata,
             positions=PositionSequence(point_list),
-            probe=probe,
+            probes=probe,
             object_=object_,
             costs=costs,
         )
@@ -145,11 +154,19 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             h5_file.create_dataset(self.PROBE_POSITION_X, data=scan_x_m)
             h5_file.create_dataset(self.PROBE_POSITION_Y, data=scan_y_m)
 
-            probe = product.probe
-            probe_geometry = probe.get_geometry()
+            probe = product.probes
             h5_probe = h5_file.create_dataset(self.PROBE_ARRAY, data=probe.get_array())
-            h5_probe.attrs[self.PROBE_PIXEL_WIDTH] = probe_geometry.pixel_width_m
-            h5_probe.attrs[self.PROBE_PIXEL_HEIGHT] = probe_geometry.pixel_height_m
+
+            try:
+                opr_weights = probe.get_opr_weights()
+            except ValueError:
+                pass
+            else:
+                h5_file.create_dataset(self.OPR_WEIGHTS, data=opr_weights)
+
+            probe_pixel_geometry = probe.get_pixel_geometry()
+            h5_probe.attrs[self.PROBE_PIXEL_WIDTH] = probe_pixel_geometry.width_m
+            h5_probe.attrs[self.PROBE_PIXEL_HEIGHT] = probe_pixel_geometry.height_m
 
             object_ = product.object_
             object_geometry = object_.get_geometry()

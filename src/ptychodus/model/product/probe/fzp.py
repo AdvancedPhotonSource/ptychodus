@@ -6,14 +6,14 @@ import numpy.typing
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.probe import FresnelZonePlate, Probe, ProbeGeometryProvider
+from ptychodus.api.probe import FresnelZonePlate, ProbeSequence, ProbeGeometryProvider
 from ptychodus.api.propagator import FresnelTransformPropagator, PropagatorParameters
 
-from .builder import ProbeBuilder
+from .builder import ProbeSequenceBuilder
 from .settings import ProbeSettings
 
 
-class FresnelZonePlateProbeBuilder(ProbeBuilder):
+class FresnelZonePlateProbeBuilder(ProbeSequenceBuilder):
     def __init__(
         self,
         settings: ProbeSettings,
@@ -55,7 +55,7 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
         self.outermost_zone_width_m.set_value(fzp.outermost_zone_width_m)
         self.central_beamstop_diameter_m.set_value(fzp.central_beamstop_diameter_m)
 
-    def build(self, geometry_provider: ProbeGeometryProvider) -> Probe:
+    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
         wavelength_m = geometry_provider.probe_wavelength_m
         zone_plate = FresnelZonePlate(
             zone_plate_diameter_m=self.zone_plate_diameter_m.get_value(),
@@ -99,7 +99,8 @@ class FresnelZonePlateProbeBuilder(ProbeBuilder):
         propagator = FresnelTransformPropagator(propagator_parameters)
         array = propagator.propagate(fzp_transmission_function)
 
-        return Probe(
+        return ProbeSequence(
             array=self.normalize(array),
+            opr_weights=None,
             pixel_geometry=sample_plane_geometry.get_pixel_geometry(),
         )

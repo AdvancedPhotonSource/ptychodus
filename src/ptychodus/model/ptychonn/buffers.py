@@ -1,12 +1,14 @@
 from __future__ import annotations
+from typing import Any, TypeAlias
 import logging
 
 import numpy
 import numpy.typing
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.object import ObjectArrayType
-from ptychodus.api.typing import Float32ArrayType
+from ptychodus.api.typing import ComplexArrayType
+
+Float32ArrayType: TypeAlias = numpy.typing.NDArray[numpy.float32]
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +64,7 @@ class ObjectPatchCircularBuffer:
     def is_zero_sized(self) -> bool:
         return self._buffer.size == 0
 
-    def append(self, array: ObjectArrayType) -> None:
+    def append(self, array: ComplexArrayType) -> None:
         self._buffer[self._pos, 0, :, :] = numpy.angle(array).astype(numpy.float32)
 
         if self._buffer.shape[1] > 1:

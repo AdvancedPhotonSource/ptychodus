@@ -3,9 +3,9 @@ import logging
 
 from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.probe import Probe, ProbeGeometryProvider
+from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
 
-from .builder import FromMemoryProbeBuilder, ProbeBuilder
+from .builder import FromMemoryProbeBuilder, ProbeSequenceBuilder
 from .multimodal import MultimodalProbeBuilder
 from .settings import ProbeSettings
 
@@ -17,7 +17,7 @@ class ProbeRepositoryItem(ParameterGroup):
         self,
         geometry_provider: ProbeGeometryProvider,
         settings: ProbeSettings,
-        builder: ProbeBuilder,
+        builder: ProbeSequenceBuilder,
         additional_modes_builder: MultimodalProbeBuilder,
     ) -> None:
         super().__init__()
@@ -25,7 +25,7 @@ class ProbeRepositoryItem(ParameterGroup):
         self._settings = settings
         self._builder = builder
         self._additional_modes_builder = additional_modes_builder
-        self._probe = Probe(array=None, pixel_geometry=None)
+        self._probe_seq = ProbeSequence(array=None, opr_weights=None, pixel_geometry=None)
 
         self._add_group('builder', builder, observe=True)
         self._add_group('additional_modes', additional_modes_builder, observe=True)
@@ -47,7 +47,7 @@ class ProbeRepositoryItem(ParameterGroup):
         self.set_builder(item.get_builder().copy())
         self._rebuild()
 
-    def assign(self, probe: Probe) -> None:
+    def assign(self, probe: ProbeSequence) -> None:
         builder = FromMemoryProbeBuilder(self._settings, probe)
         self.set_builder(builder)
 
@@ -58,13 +58,13 @@ class ProbeRepositoryItem(ParameterGroup):
         self._builder.sync_to_settings()
         self._additional_modes_builder.sync_to_settings()
 
-    def get_probe(self) -> Probe:
-        return self._probe
+    def get_probes(self) -> ProbeSequence:
+        return self._probe_seq
 
-    def get_builder(self) -> ProbeBuilder:
+    def get_builder(self) -> ProbeSequenceBuilder:
         return self._builder
 
-    def set_builder(self, builder: ProbeBuilder) -> None:
+    def set_builder(self, builder: ProbeSequenceBuilder) -> None:
         group = 'builder'
         self._remove_group(group)
         self._builder.remove_observer(self)
@@ -80,7 +80,7 @@ class ProbeRepositoryItem(ParameterGroup):
             logger.exception('Failed to rebuild probe!')
             return
 
-        self._probe = self._additional_modes_builder.build(probe, self._geometry_provider)
+        self._probe_seq = self._additional_modes_builder.build(probe, self._geometry_provider)
         self.notify_observers()
 
     def get_additional_modes_builder(self) -> MultimodalProbeBuilder:

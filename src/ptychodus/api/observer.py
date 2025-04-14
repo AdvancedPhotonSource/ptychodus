@@ -22,6 +22,8 @@ class Observer(ABC):
 class Observable:
     def __init__(self) -> None:
         self._observer_list: list[Observer] = list()
+        self._block_notifications = False
+        self._pending_notify = False
 
     def add_observer(self, observer: Observer) -> None:
         if observer not in self._observer_list:
@@ -33,7 +35,18 @@ class Observable:
         except ValueError:
             pass
 
+    def block_notifications(self, block: bool) -> None:
+        self._block_notifications = block
+
+        if self._pending_notify:
+            self.notify_observers()
+            self._pending_notify = False
+
     def notify_observers(self) -> None:
+        if self._block_notifications:
+            self._pending_notify = True
+            return
+
         for observer in self._observer_list:
             observer._update(self)
 

@@ -38,12 +38,12 @@ from ptychi.api.options.base import (
     RemoveObjectProbeAmbiguityOptions,
 )
 
-from ptychodus.api.object import Object, ObjectArrayType, ObjectGeometry, ObjectPoint
-from ptychodus.api.probe import Probe, WavefieldArrayType
+from ptychodus.api.object import Object, ObjectGeometry, ObjectPoint
+from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput
 from ptychodus.api.scan import PositionSequence, ScanPoint
-from ptychodus.api.typing import RealArrayType
+from ptychodus.api.typing import ComplexArrayType, RealArrayType
 
 from ..patterns import PatternSizer
 from .settings import (
@@ -68,7 +68,7 @@ def parse_optimizer(text: str) -> Optimizers:
     try:
         optimizer = Optimizers[text.upper()]
     except KeyError:
-        logger.warning('Failed to parse optimizer "{text}"!')
+        logger.warning(f'Failed to parse optimizer "{text}"!')
         optimizer = Optimizers.SGD
 
     return optimizer
@@ -93,7 +93,7 @@ class PtyChiReconstructorOptionsHelper:
         try:
             return BatchingModes[batching_mode_str.upper()]
         except KeyError:
-            logger.warning('Failed to parse batching mode "{batching_mode_str}"!')
+            logger.warning(f'Failed to parse batching mode "{batching_mode_str}"!')
             return BatchingModes.RANDOM
 
     @property
@@ -199,7 +199,7 @@ class PtyChiObjectOptionsHelper:
         try:
             direction = Directions[direction_str.upper()]
         except KeyError:
-            logger.warning('Failed to parse direction "{direction_str}"!')
+            logger.warning(f'Failed to parse direction "{direction_str}"!')
             direction = Directions.XY
 
         return RemoveGridArtifactsOptions(
@@ -225,7 +225,7 @@ class PtyChiObjectOptionsHelper:
             unwrap_image_grad_method = ImageGradientMethods[unwrap_image_grad_method_str.upper()]
         except KeyError:
             logger.warning(
-                'Failed to parse image gradient method "{unwrap_image_grad_method_str}"!'
+                f'Failed to parse image gradient method "{unwrap_image_grad_method_str}"!'
             )
             unwrap_image_grad_method = ImageGradientMethods.FOURIER_SHIFT
 
@@ -239,7 +239,7 @@ class PtyChiObjectOptionsHelper:
             ]
         except KeyError:
             logger.warning(
-                'Failed to parse image integrationient method "{unwrap_image_integration_method_str}"!'
+                f'Failed to parse image integrationient method "{unwrap_image_integration_method_str}"!'
             )
             unwrap_image_integration_method = ImageIntegrationMethods.DECONVOLUTION
 
@@ -263,7 +263,7 @@ class PtyChiObjectOptionsHelper:
         try:
             return PatchInterpolationMethods[method_str.upper()]
         except KeyError:
-            logger.warning('Failed to parse patch interpolation method "{method_str}"!')
+            logger.warning(f'Failed to parse patch interpolation method "{method_str}"!')
             return PatchInterpolationMethods.FOURIER
 
     @property
@@ -281,7 +281,7 @@ class PtyChiObjectOptionsHelper:
     def build_preconditioner_with_all_modes(self) -> bool:
         return self._settings.build_preconditioner_with_all_modes.get_value()
 
-    def get_initial_guess(self, object_: Object) -> ObjectArrayType:
+    def get_initial_guess(self, object_: Object) -> ComplexArrayType:
         return object_.get_array()
 
     def get_slice_spacings_m(self, object_: Object) -> RealArrayType:
@@ -289,11 +289,6 @@ class PtyChiObjectOptionsHelper:
 
     def get_pixel_size_m(self, object_: Object) -> float:
         pixel_geometry = object_.get_pixel_geometry()
-
-        if pixel_geometry is None:
-            logger.error('Missing object pixel geometry!')
-            return 1.0
-
         return pixel_geometry.width_m
 
 
@@ -332,7 +327,7 @@ class PtyChiProbeOptionsHelper:
         try:
             method = OrthogonalizationMethods[method_str.upper()]
         except KeyError:
-            logger.warning('Failed to parse batching mode "{method_str}"!')
+            logger.warning(f'Failed to parse batching mode "{method_str}"!')
             method = OrthogonalizationMethods.GS
 
         return ProbeOrthogonalizeIncoherentModesOptions(
@@ -383,7 +378,7 @@ class PtyChiProbeOptionsHelper:
     def eigenmode_update_relaxation(self) -> float:
         return self._settings.relax_eigenmode_update.get_value()
 
-    def get_initial_guess(self, probe: Probe) -> WavefieldArrayType:
+    def get_initial_guess(self, probe: ProbeSequence) -> ComplexArrayType:
         return probe.get_array()
 
     def get_power_constraint(self, metadata: ProductMetadata) -> ProbePowerConstraintOptions:
@@ -449,7 +444,7 @@ class PtyChiProbePositionOptionsHelper:
         try:
             correction_type = PositionCorrectionTypes[correction_type_str.upper()]
         except KeyError:
-            logger.warning('Failed to parse batching mode "{correction_type_str}"!')
+            logger.warning(f'Failed to parse batching mode "{correction_type_str}"!')
             correction_type = PositionCorrectionTypes.GRADIENT
 
         return PositionCorrectionOptions(
@@ -510,8 +505,8 @@ class PtyChiOPROptionsHelper:
         try:
             method: OPRWeightSmoothingMethods | None = OPRWeightSmoothingMethods[method_str.upper()]
         except KeyError:
+            logger.debug('OPR weight smoothing method is None.')
             method = None
-            logger.warning('Failed to parse OPR weight smoothing method "{method_str}"!')
 
         return OPRModeWeightsSmoothingOptions(
             enabled=self._settings.smooth_mode_weights.get_value(),
@@ -536,8 +531,15 @@ class PtyChiOPROptionsHelper:
     def update_relaxation(self) -> float:
         return self._settings.relax_update.get_value()
 
-    def get_initial_weights(self) -> RealArrayType:
-        return numpy.array([0.0])  # FIXME
+    def get_initial_weights(self, probe: ProbeSequence) -> RealArrayType:
+        try:
+            return probe.get_opr_weights()
+        except ValueError:
+            pass
+
+        initial_weights = numpy.zeros((probe.num_coherent_modes))
+        initial_weights[0] = 1.0
+        return initial_weights
 
 
 class PtyChiOptionsHelper:
@@ -584,7 +586,7 @@ class PtyChiOptionsHelper:
         position_y_px: Tensor | numpy.ndarray,
         probe_array: Tensor | numpy.ndarray,
         object_array: Tensor | numpy.ndarray,
-        opr_mode_weights: Tensor | numpy.ndarray,
+        opr_weights: Tensor | numpy.ndarray,
         costs: Sequence[float],
     ) -> Product:
         object_in = product.object_
@@ -595,10 +597,10 @@ class PtyChiOptionsHelper:
             center=object_in.get_center(),
         )
 
-        # TODO OPR
-        probe_out = Probe(
+        probe_out = ProbeSequence(
             array=numpy.array(probe_array[0]),
-            pixel_geometry=product.probe.get_pixel_geometry(),
+            opr_weights=numpy.array(opr_weights),
+            pixel_geometry=product.probes.get_pixel_geometry(),
         )
 
         corrected_scan_points: list[ScanPoint] = list()
@@ -611,8 +613,8 @@ class PtyChiOptionsHelper:
         ):
             object_point = ObjectPoint(
                 index=uncorrected_point.index,
-                position_x_px=pos_x_px + rx_px,
-                position_y_px=pos_y_px + ry_px,
+                position_x_px=float(pos_x_px + rx_px),
+                position_y_px=float(pos_y_px + ry_px),
             )
             scan_point = object_geometry.map_object_point_to_scan_point(object_point)
             corrected_scan_points.append(scan_point)
@@ -622,7 +624,7 @@ class PtyChiOptionsHelper:
         return Product(
             metadata=product.metadata,
             positions=scan_out,
-            probe=probe_out,
+            probes=probe_out,
             object_=object_out,
             costs=costs,
         )

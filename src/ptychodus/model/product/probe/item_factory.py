@@ -2,7 +2,7 @@ import logging
 
 import numpy.random
 
-from ptychodus.api.probe import Probe, ProbeGeometryProvider
+from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
 
 from .builder import FromMemoryProbeBuilder
 from .builder_factory import ProbeBuilderFactory
@@ -25,7 +25,7 @@ class ProbeRepositoryItemFactory:
         self._builder_factory = builder_factory
 
     def create(
-        self, geometry_provider: ProbeGeometryProvider, probe: Probe | None = None
+        self, geometry_provider: ProbeGeometryProvider, probe: ProbeSequence | None = None
     ) -> ProbeRepositoryItem:
         multimodal_builder = MultimodalProbeBuilder(self._rng, self._settings)
 

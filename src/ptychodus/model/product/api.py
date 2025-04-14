@@ -31,7 +31,10 @@ class PositionsStreamingContext:
         self._triggers_y: list[int] = []
 
     def start(self) -> None:
-        pass  # FIXME
+        self._positions_x_m.clear()
+        self._triggers_x.clear()
+        self._positions_y_m.clear()
+        self._triggers_y.clear()
 
     def append_positions_x(self, values_m: Sequence[float], trigger_counts: Sequence[int]) -> None:
         self._positions_x_m.extend(values_m)
@@ -42,7 +45,7 @@ class PositionsStreamingContext:
         self._triggers_y.extend(trigger_counts)
 
     def stop(self) -> None:
-        pass  # FIXME
+        pass  # TODO
 
 
 class ScanAPI:
@@ -260,7 +263,7 @@ class ProbeAPI:
         except IndexError:
             logger.warning(f'Failed to save probe {index}!')
         else:
-            self._builder_factory.save_probe(file_path, file_type, item.get_probe())
+            self._builder_factory.save_probe(file_path, file_type, item.get_probes())
 
 
 class ObjectAPI:
@@ -418,10 +421,6 @@ class ProductAPI:
 
     def get_item(self, product_index: int) -> ProductRepositoryItem:
         return self._repository[product_index]
-
-    def get_item_name(self, product_index: int) -> str:
-        item = self._repository[product_index]
-        return item.get_name()
 
     def get_open_file_filters(self) -> Iterator[str]:
         for plugin in self._file_reader_chooser:

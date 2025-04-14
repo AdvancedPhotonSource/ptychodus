@@ -240,12 +240,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                     if current.parent().isValid()
                     else object_.get_layers_flattened()
                 )
-                pixel_geometry = object_.get_pixel_geometry()
-
-                if pixel_geometry is None:
-                    logger.warning('Missing object pixel geometry!')
-                else:
-                    self._image_controller.set_array(array, pixel_geometry)
+                self._image_controller.set_array(array, object_.get_pixel_geometry())
 
     def handle_item_inserted(self, index: int, item: ObjectRepositoryItem) -> None:
         self._tree_model.insert_item(index, item)

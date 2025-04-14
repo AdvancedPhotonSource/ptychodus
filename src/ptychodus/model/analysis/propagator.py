@@ -8,11 +8,11 @@ import numpy
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.observer import Observable
-from ptychodus.api.probe import Probe
+from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.propagator import (
     AngularSpectrumPropagator,
     PropagatorParameters,
-    WavefieldArrayType,
+    ComplexArrayType,
     intensity,
 )
 from ptychodus.api.typing import RealArrayType
@@ -30,7 +30,7 @@ class ProbePropagator(Observable):
         self._repository = repository
 
         self._product_index = -1
-        self._propagated_wavefield: WavefieldArrayType | None = None
+        self._propagated_wavefield: ComplexArrayType | None = None
         self._propagated_intensity: RealArrayType | None = None
 
     def set_product(self, product_index: int) -> None:
@@ -52,7 +52,7 @@ class ProbePropagator(Observable):
         num_steps: int,
     ) -> None:
         item = self._repository[self._product_index]
-        probe = item.get_probe_item().get_probe()
+        probe = item.get_probe_item().get_probes().get_probe_no_opr()  # TODO OPR
         wavelength_m = item.get_geometry().probe_wavelength_m
         propagated_wavefield = numpy.zeros(
             (num_steps, probe.num_incoherent_modes, probe.height_px, probe.width_px),
@@ -61,9 +61,6 @@ class ProbePropagator(Observable):
         propagated_intensity = numpy.zeros((num_steps, probe.height_px, probe.width_px))
         distance_m = numpy.linspace(begin_coordinate_m, end_coordinate_m, num_steps)
         pixel_geometry = probe.get_pixel_geometry()
-
-        if pixel_geometry is None:
-            raise ValueError('No pixel geometry!')
 
         for idx, z_m in enumerate(distance_m):
             propagator_parameters = PropagatorParameters(
@@ -76,7 +73,6 @@ class ProbePropagator(Observable):
             )
             propagator = AngularSpectrumPropagator(propagator_parameters)
 
-            # FIXME OPR
             for mode in range(probe.num_incoherent_modes):
                 wf = propagator.propagate(probe.get_incoherent_mode(mode))
                 propagated_wavefield[idx, mode, :, :] = wf
@@ -94,9 +90,9 @@ class ProbePropagator(Observable):
     def get_end_coordinate_m(self) -> float:
         return self._settings.end_coordinate_m.get_value()
 
-    def _get_probe(self) -> Probe:
+    def _get_probe(self) -> ProbeSequence:
         item = self._repository[self._product_index]
-        return item.get_probe_item().get_probe()
+        return item.get_probe_item().get_probes()
 
     def get_pixel_geometry(self) -> PixelGeometry | None:
         try:

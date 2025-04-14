@@ -66,7 +66,7 @@ class RandomObjectBuilder(ObjectBuilder):
         )
 
 
-class UserObjectBuilder(ObjectBuilder):  # FIXME use
+class UserObjectBuilder(ObjectBuilder):  # TODO use
     def __init__(self, object_: Object, settings: ObjectSettings) -> None:
         """Create an object from an existing object with a potentially
         different number of slices.

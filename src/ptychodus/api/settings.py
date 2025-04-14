@@ -47,7 +47,12 @@ class SettingsRegistry(Observable):
     def open_settings(self, file_path: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)
         logger.debug(f'Reading settings from "{file_path}"')
-        config.read(file_path)
+
+        try:
+            config.read(file_path)
+        except Exception as exc:
+            logger.exception(exc)
+            return
 
         # TODO generalize to support nested parameter groups
         for group_name, group in self._parameter_group.groups().items():
@@ -95,5 +100,9 @@ class SettingsRegistry(Observable):
 
         logger.debug(f'Writing settings to "{file_path}"')
 
-        with file_path.open(mode='w') as config_file:
-            config.write(config_file)
+        try:
+            with file_path.open(mode='w') as config_file:
+                config.write(config_file)
+        except Exception as exc:
+            logger.exception(exc)
+            return

@@ -15,7 +15,6 @@ import numpy.typing
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.patterns import (
-    BooleanArrayType,
     DiffractionDataset,
     DiffractionMetadata,
     DiffractionPatternArray,
@@ -23,6 +22,8 @@ from ptychodus.api.patterns import (
     PatternIndexesType,
 )
 from ptychodus.api.tree import SimpleTreeNode
+from ptychodus.api.typing import BooleanArrayType
+from ptychodus.api.units import BYTES_PER_MEGABYTE
 
 from .settings import PatternSettings
 from .sizer import PatternSizer
@@ -410,5 +411,5 @@ class AssembledDiffractionDataset(DiffractionDataset):
         label = file_path.stem if file_path else 'None'
         number, height, width = self._data.shape
         dtype = str(self._data.dtype)
-        size_MB = self._data.nbytes / (1024 * 1024)  # noqa: N806
+        size_MB = self._data.nbytes / BYTES_PER_MEGABYTE  # noqa: N806
         return f'{label}: {number} x {width}W x {height}H {dtype} [{size_MB:.2f}MB]'

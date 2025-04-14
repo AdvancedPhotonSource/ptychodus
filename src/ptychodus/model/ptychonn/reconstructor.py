@@ -8,7 +8,7 @@ import numpy.typing
 import ptychonn
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.object import Object, ObjectArrayType
+from ptychodus.api.object import Object
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import (
     LossValue,
@@ -17,6 +17,7 @@ from ptychodus.api.reconstructor import (
     TrainOutput,
     TrainableReconstructor,
 )
+from ptychodus.api.typing import ComplexArrayType
 
 from ..analysis import BarycentricArrayInterpolator, BarycentricArrayStitcher
 from .model import PtychoNNModelProvider
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class CenterBoxMeanPhaseCenteringStrategy:  # FIXME USE
-    def __call__(self, array: ObjectArrayType) -> ObjectArrayType:
+    def __call__(self, array: ComplexArrayType) -> ComplexArrayType:
         one_third_height = array.shape[-2] // 3
         one_third_width = array.shape[-1] // 3
 
@@ -112,7 +113,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         product = Product(
             metadata=parameters.product.metadata,
             positions=parameters.product.positions,
-            probe=parameters.product.probe,
+            probes=parameters.product.probes,
             object_=object_,
             costs=list(),  # TODO put something here?
         )
@@ -136,8 +137,8 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         interpolator = BarycentricArrayInterpolator(parameters.product.object_.get_array())
         num_channels = self._model_provider.get_num_channels()
         probe_extent = ImageExtent(
-            width_px=parameters.product.probe.width_px,
-            height_px=parameters.product.probe.height_px,
+            width_px=parameters.product.probes.width_px,
+            height_px=parameters.product.probes.height_px,
         )
         patches = numpy.zeros(
             (len(parameters.product.positions), num_channels, *probe_extent.shape),
