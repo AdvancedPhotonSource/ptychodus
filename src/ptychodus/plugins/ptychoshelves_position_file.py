@@ -14,24 +14,21 @@ class PtychoShelvesPositionFileReader(PositionFileReader):
     def read(self, file_path: Path) -> PositionSequence:
         point_list: list[ScanPoint] = list()
 
-        try:
-            with h5py.File(file_path, 'r') as h5_file:
-                try:
-                    pp_x = numpy.squeeze(h5_file['/ppX'])
-                    pp_y = numpy.squeeze(h5_file['/ppY'])
-                except KeyError:
-                    logger.warning('Unable to find data.')
+        with h5py.File(file_path, 'r') as h5_file:
+            try:
+                pp_x = numpy.squeeze(h5_file['/ppX'])
+                pp_y = numpy.squeeze(h5_file['/ppY'])
+            except KeyError:
+                logger.warning('Unable to find data.')
+            else:
+                if pp_x.shape == pp_y.shape:
+                    logger.debug(f'Coordinate arrays have shape {pp_x.shape}.')
                 else:
-                    if pp_x.shape == pp_y.shape:
-                        logger.debug(f'Coordinate arrays have shape {pp_x.shape}.')
-                    else:
-                        raise ScanPointParseError('Coordinate array shape mismatch!')
+                    raise ScanPointParseError('Coordinate array shape mismatch!')
 
-                    for idx, (x, y) in enumerate(zip(pp_x, pp_y)):
-                        point = ScanPoint(idx, x, y)
-                        point_list.append(point)
-        except OSError:
-            logger.warning(f'Unable to read file "{file_path}".')
+                for idx, (x, y) in enumerate(zip(pp_x, pp_y)):
+                    point = ScanPoint(idx, x, y)
+                    point_list.append(point)
 
         return PositionSequence(point_list)
 

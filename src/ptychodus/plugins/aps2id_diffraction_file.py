@@ -80,7 +80,7 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         APS2IDDiffractionFileReader(),
         simple_name='APS_2IDE',
-        display_name='APS 2-ID-E Files (*.h5 *.hdf5)',
+        display_name='APS 2-ID-E Microprobe Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_readers.register_plugin(
         APS2IDDiffractionFileReader(),

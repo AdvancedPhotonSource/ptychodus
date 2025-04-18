@@ -284,7 +284,12 @@ class AssembledDiffractionDataset(DiffractionDataset):
     def get_maximum_pattern_counts(self) -> int:
         patterns = self.get_assembled_patterns()
         good_pixels = numpy.logical_not(self.get_processed_bad_pixels())
-        total_counts = numpy.sum(patterns[:, good_pixels], axis=-1)
+        try:
+            total_counts = numpy.sum(patterns[:, good_pixels], axis=-1)
+        except IndexError:
+            # patterns not loaded
+            return 0
+
         return total_counts.max()
 
     @overload

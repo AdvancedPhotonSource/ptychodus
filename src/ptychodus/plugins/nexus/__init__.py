@@ -14,11 +14,11 @@ def register_plugins(registry: PluginRegistry) -> None:
     )
     registry.position_file_readers.register_plugin(
         VelociprobePositionFileReader.create_laser_interferometer_instance(nexus_file_reader),
-        simple_name='VelociprobeLaserInterferometer',
-        display_name='Velociprobe Files - Laser Interferometer (*.txt)',
+        simple_name='APS_Velociprobe-LI',
+        display_name='APS Velociprobe Files - Laser Interferometer (*.txt)',
     )
     registry.position_file_readers.register_plugin(
         VelociprobePositionFileReader.create_position_encoder_instance(nexus_file_reader),
-        simple_name='VelociprobePositionEncoder',
-        display_name='Velociprobe Files - Position Encoder (*.txt)',
+        simple_name='APS_Velociprobe-PE',
+        display_name='APS Velociprobe Files - Position Encoder (*.txt)',
     )

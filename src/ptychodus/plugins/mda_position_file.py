@@ -506,7 +506,7 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.position_file_readers.register_plugin(
         MDAPositionFileReader(scale_to_meters=1.0e-3),
         simple_name='APS_2IDE',
-        display_name='APS 2-ID-E Files (*.mda)',
+        display_name='APS 2-ID-E Microprobe Files (*.mda)',
     )
     registry.position_file_readers.register_plugin(
         MDAPositionFileReader(scale_to_meters=1.0e-6),

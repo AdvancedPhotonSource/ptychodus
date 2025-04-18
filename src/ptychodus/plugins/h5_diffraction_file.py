@@ -196,6 +196,11 @@ class H5DiffractionFileWriter(DiffractionFileWriter):
 
 def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
+        H5DiffractionFileReader(data_path='/exchange/data'),
+        simple_name='APS_CSSI',
+        display_name='APS CSSI Files (*.h5 *.hdf5)',
+    )
+    registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(data_path='/entry/data/data'),
         simple_name='APS_HXN',
         display_name='CNM/APS HXN Files (*.h5 *.hdf5)',

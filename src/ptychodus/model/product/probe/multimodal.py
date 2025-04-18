@@ -67,20 +67,23 @@ class MultimodalProbeBuilder(ParameterGroup):
         return builder
 
     def _orthogonalize_incoherent_modes(self, array_in: ComplexArrayType) -> ComplexArrayType:
-        imodes_as_rows = array_in[0].reshape(array_in.shape[-3], -1)
-        imodes_as_cols = imodes_as_rows.T
-
-        try:
-            imodes_as_ortho_cols = scipy.linalg.orth(imodes_as_cols)
-        except ValueError as ex:
-            logger.exception(ex)
-            return array_in.copy()
-
-        imodes_as_ortho_rows = imodes_as_ortho_cols.T
-        imodes_ortho = imodes_as_ortho_rows.reshape(*array_in.shape)
-
         array_out = array_in.copy()
-        array_out[0, :, :, :] = imodes_ortho
+
+        if array_in.shape[-3] > 1:
+            imodes_as_rows = array_in[0].reshape(array_in.shape[-3], -1)
+            imodes_as_cols = imodes_as_rows.T
+
+            try:
+                imodes_as_ortho_cols = scipy.linalg.orth(imodes_as_cols)
+            except ValueError as ex:
+                logger.exception(ex)
+                return array_in.copy()
+
+            imodes_as_ortho_rows = imodes_as_ortho_cols.T
+            imodes_ortho = imodes_as_ortho_rows.reshape(*array_in.shape)
+
+            array_out[0, :, :, :] = imodes_ortho
+
         return array_out
 
     def _get_imode_weights(self, num_imodes: int) -> Sequence[float]:
