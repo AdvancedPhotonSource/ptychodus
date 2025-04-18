@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class CSSIPositionFileReader(PositionFileReader):
-    MICRONS_TO_METERS: Final[float] = 1.0e-6
+    ONE_MILLIMETER_M: Final[float] = 1e-3
 
     def read(self, file_path: Path) -> PositionSequence:
         point_list: list[ScanPoint] = list()
@@ -25,8 +25,8 @@ class CSSIPositionFileReader(PositionFileReader):
                 for idx, row in enumerate(h5_positions):
                     point = ScanPoint(
                         idx,
-                        row[0] * self.MICRONS_TO_METERS,
-                        row[1] * self.MICRONS_TO_METERS,
+                        row[0] * self.ONE_MILLIMETER_M,
+                        row[1] * self.ONE_MILLIMETER_M,
                     )
                     point_list.append(point)
 
