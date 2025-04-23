@@ -31,6 +31,10 @@ class PixelGeometry:
     def area_m2(self) -> float:
         return self.width_m * self.height_m
 
+    @property
+    def aspect_ratio(self) -> float:
+        return self.width_m / self.height_m
+
     def copy(self) -> PixelGeometry:
         return PixelGeometry(
             width_m=float(self.width_m),

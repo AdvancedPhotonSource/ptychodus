@@ -109,7 +109,7 @@ class Object:
         array: ComplexArrayType | None,
         pixel_geometry: PixelGeometry | None,
         center: ObjectCenter | None,
-        layer_distance_m: Sequence[float] = [],
+        layer_spacing_m: Sequence[float] = [],
     ) -> None:
         if array is None:
             self._array: ComplexArrayType = numpy.zeros((1, 0, 0), dtype=complex)
@@ -126,20 +126,20 @@ class Object:
 
         self._pixel_geometry = pixel_geometry
         self._center = center
-        self._layer_distance_m = layer_distance_m
+        self._layer_spacing_m = layer_spacing_m
 
-        expected_spaces = self._array.shape[-3] - 1
-        actual_spaces = len(layer_distance_m)
+        expected_layers = self._array.shape[-3]
+        actual_layers = len(layer_spacing_m) + 1
 
-        if actual_spaces != expected_spaces:
-            raise ValueError(f'Expected {expected_spaces} layer distances; got {actual_spaces}!')
+        if actual_layers != expected_layers:
+            raise ValueError(f'Expected {expected_layers} layers; got {actual_layers}!')
 
     def copy(self) -> Object:
         return Object(
             array=self._array.copy(),
             pixel_geometry=None if self._pixel_geometry is None else self._pixel_geometry.copy(),
             center=None if self._center is None else self._center.copy(),
-            layer_distance_m=list(self._layer_distance_m),
+            layer_spacing_m=list(self._layer_spacing_m),
         )
 
     def get_array(self) -> ComplexArrayType:
@@ -197,11 +197,11 @@ class Object:
         return numpy.prod(self._array, axis=-3)
 
     @property
-    def layer_distance_m(self) -> Sequence[float]:
-        return self._layer_distance_m
+    def layer_spacing_m(self) -> Sequence[float]:
+        return self._layer_spacing_m
 
-    def get_total_layer_distance_m(self) -> float:
-        return sum(self._layer_distance_m)
+    def get_total_thickness_m(self) -> float:
+        return sum(self._layer_spacing_m)
 
 
 class ObjectFileReader(ABC):

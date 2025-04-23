@@ -107,7 +107,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             array=stitcher.stitch(),
             pixel_geometry=object_geometry.get_pixel_geometry(),
             center=object_geometry.get_center(),
-            layer_distance_m=parameters.product.object_.layer_distance_m,
+            layer_spacing_m=parameters.product.object_.layer_spacing_m,
         )
 
         product = Product(

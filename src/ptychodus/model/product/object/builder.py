@@ -34,7 +34,7 @@ class ObjectBuilder(ParameterGroup):
     def build(
         self,
         geometry_provider: ObjectGeometryProvider,
-        layer_distance_m: Sequence[float],
+        layer_spacing_m: Sequence[float],
     ) -> Object:
         pass
 
@@ -51,7 +51,7 @@ class FromMemoryObjectBuilder(ObjectBuilder):
     def build(
         self,
         geometry_provider: ObjectGeometryProvider,
-        layer_distance_m: Sequence[float],
+        layer_spacing_m: Sequence[float],
     ) -> Object:
         return self._object
 
@@ -85,7 +85,7 @@ class FromFileObjectBuilder(ObjectBuilder):
     def build(
         self,
         geometry_provider: ObjectGeometryProvider,
-        layer_distance_m: Sequence[float],
+        layer_spacing_m: Sequence[float],
     ) -> Object:
         file_path = self.file_path.get_value()
         file_type = self.file_type.get_value()
@@ -112,5 +112,5 @@ class FromFileObjectBuilder(ObjectBuilder):
             object_from_file.get_array(),
             pixel_geometry,
             center,
-            object_from_file.layer_distance_m,
+            object_from_file.layer_spacing_m,
         )

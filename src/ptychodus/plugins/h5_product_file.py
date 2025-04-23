@@ -42,7 +42,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
     OBJECT_ARRAY: Final[str] = 'object'
     OBJECT_CENTER_X: Final[str] = 'center_x_m'
     OBJECT_CENTER_Y: Final[str] = 'center_y_m'
-    OBJECT_LAYER_DISTANCE: Final[str] = 'object_layer_distance_m'
+    OBJECT_LAYER_SPACING: Final[str] = 'object_layer_spacing_m'
     OBJECT_PIXEL_HEIGHT: Final[str] = 'pixel_height_m'
     OBJECT_PIXEL_WIDTH: Final[str] = 'pixel_width_m'
 
@@ -111,12 +111,12 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
                 position_x_m=float(h5_object.attrs[self.OBJECT_CENTER_X]),
                 position_y_m=float(h5_object.attrs[self.OBJECT_CENTER_Y]),
             )
-            h5_object_layer_distance = h5_file[self.OBJECT_LAYER_DISTANCE]
+            h5_object_layer_spacing = h5_file[self.OBJECT_LAYER_SPACING]
             object_ = Object(
                 array=h5_object[()],
                 pixel_geometry=object_pixel_geometry,
                 center=object_center,
-                layer_distance_m=h5_object_layer_distance[()],
+                layer_spacing_m=h5_object_layer_spacing[()],
             )
 
             h5_costs = h5_file[self.COSTS_ARRAY]
@@ -175,7 +175,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             h5_object.attrs[self.OBJECT_CENTER_Y] = object_geometry.center_y_m
             h5_object.attrs[self.OBJECT_PIXEL_WIDTH] = object_geometry.pixel_width_m
             h5_object.attrs[self.OBJECT_PIXEL_HEIGHT] = object_geometry.pixel_height_m
-            h5_file.create_dataset(self.OBJECT_LAYER_DISTANCE, data=object_.layer_distance_m)
+            h5_file.create_dataset(self.OBJECT_LAYER_SPACING, data=object_.layer_spacing_m)
 
             h5_file.create_dataset(self.COSTS_ARRAY, data=product.costs)
 

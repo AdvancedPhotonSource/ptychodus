@@ -25,14 +25,14 @@ class ObjectRepositoryItem(ParameterGroup):
         self._builder = builder
         self._object = Object(array=None, pixel_geometry=None, center=None)
 
-        self.layer_distance_m = settings.object_layer_distance_m.copy()
-        self._add_parameter('layer_distance_m', self.layer_distance_m)
+        self.layer_spacing_m = settings.object_layer_spacing_m.copy()
+        self._add_parameter('layer_spacing_m', self.layer_spacing_m)
 
         self._add_group('builder', builder, observe=True)
         self.rebuild()
 
     def assign_item(self, item: ObjectRepositoryItem) -> None:
-        self.layer_distance_m.set_value(item.layer_distance_m.get_value(), notify=False)
+        self.layer_spacing_m.set_value(item.layer_spacing_m.get_value(), notify=False)
         self.set_builder(item.get_builder().copy())
         self.rebuild()
 
@@ -47,11 +47,11 @@ class ObjectRepositoryItem(ParameterGroup):
         self._builder.sync_to_settings()
 
     def get_num_layers(self) -> int:
-        return len(self.layer_distance_m) + 1
+        return len(self.layer_spacing_m) + 1
 
     def set_num_layers(self, num_layers: int) -> None:
         num_spaces = max(0, num_layers - 1)
-        distance_m = list(self.layer_distance_m.get_value())
+        distance_m = list(self.layer_spacing_m.get_value())
 
         try:
             default_distance_m = distance_m[-1]
@@ -64,7 +64,7 @@ class ObjectRepositoryItem(ParameterGroup):
         if len(distance_m) > num_spaces:
             distance_m = distance_m[:num_spaces]
 
-        self.layer_distance_m.set_value(distance_m)
+        self.layer_spacing_m.set_value(distance_m)
         self.rebuild()
 
     def get_object(self) -> Object:
@@ -83,9 +83,7 @@ class ObjectRepositoryItem(ParameterGroup):
 
     def rebuild(self, *, recenter: bool = False) -> None:
         try:
-            object_ = self._builder.build(
-                self._geometry_provider, self.layer_distance_m.get_value()
-            )
+            object_ = self._builder.build(self._geometry_provider, self.layer_spacing_m.get_value())
         except Exception as exc:
             logger.exception('Failed to rebuild object!')
             return
@@ -94,14 +92,14 @@ class ObjectRepositoryItem(ParameterGroup):
             object_geometry = self._geometry_provider.get_object_geometry()
             self._object = Object(
                 array=object_.get_array(),
-                layer_distance_m=object_.layer_distance_m,
+                layer_spacing_m=object_.layer_spacing_m,
                 pixel_geometry=object_.get_pixel_geometry(),
                 center=object_geometry.get_center(),
             )
         else:
             self._object = object_
 
-        self.layer_distance_m.set_value(object_.layer_distance_m)
+        self.layer_spacing_m.set_value(object_.layer_spacing_m)
         self.notify_observers()
 
     def _update(self, observable: Observable) -> None:

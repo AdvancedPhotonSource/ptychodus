@@ -10,7 +10,7 @@ class MultisliceViewController(ParameterViewController, Observer):
     def __init__(self, item: ObjectRepositoryItem) -> None:
         super().__init__()
         self._item = item
-        self._parameter = item.layer_distance_m
+        self._parameter = item.layer_spacing_m
         self._widget = QSpinBox()
 
         self._sync_model_to_view()

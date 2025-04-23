@@ -21,7 +21,7 @@ from .settings import (
     PtyChiPIESettings,
     PtyChiProbePositionSettings,
     PtyChiProbeSettings,
-    PtyChiReconstructorSettings,
+    PtyChiSettings,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         self.pie_settings = PtyChiPIESettings(settings_registry)
         self.probe_position_settings = PtyChiProbePositionSettings(settings_registry)
         self.probe_settings = PtyChiProbeSettings(settings_registry)
-        self.reconstructor_settings = PtyChiReconstructorSettings(settings_registry)
+        self.reconstructor_settings = PtyChiSettings(settings_registry)
 
         self.enumerators = PtyChiEnumerators()
         self.device_repository = PtyChiDeviceRepository(

@@ -42,7 +42,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
     OBJECT_ARRAY: Final[str] = 'object'
     OBJECT_CENTER_X: Final[str] = 'object_center_x_m'
     OBJECT_CENTER_Y: Final[str] = 'object_center_y_m'
-    OBJECT_LAYER_DISTANCE: Final[str] = 'object_layer_distance_m'
+    OBJECT_LAYER_SPACING: Final[str] = 'object_layer_spacing_m'
     OBJECT_PIXEL_HEIGHT: Final[str] = 'object_pixel_height_m'
     OBJECT_PIXEL_WIDTH: Final[str] = 'object_pixel_width_m'
 
@@ -107,7 +107,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
                 array=npz_file[self.OBJECT_ARRAY],
                 pixel_geometry=object_pixel_geometry,
                 center=object_center,
-                layer_distance_m=npz_file[self.OBJECT_LAYER_DISTANCE],
+                layer_spacing_m=npz_file[self.OBJECT_LAYER_SPACING],
             )
 
             costs = npz_file[self.COSTS_ARRAY]
@@ -171,7 +171,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
         contents[self.OBJECT_CENTER_Y] = object_geometry.center_y_m
         contents[self.OBJECT_PIXEL_WIDTH] = object_geometry.pixel_width_m
         contents[self.OBJECT_PIXEL_HEIGHT] = object_geometry.pixel_height_m
-        contents[self.OBJECT_LAYER_DISTANCE] = object_.layer_distance_m
+        contents[self.OBJECT_LAYER_SPACING] = object_.layer_spacing_m
 
         contents[self.COSTS_ARRAY] = product.costs
 
@@ -229,7 +229,7 @@ class NPZObjectFileReader(ObjectFileReader):
                 array=npz_file[NPZProductFileIO.OBJECT_ARRAY],
                 pixel_geometry=pixel_geometry,
                 center=center,
-                layer_distance_m=npz_file[NPZProductFileIO.OBJECT_LAYER_DISTANCE],
+                layer_spacing_m=npz_file[NPZProductFileIO.OBJECT_LAYER_SPACING],
             )
 
 

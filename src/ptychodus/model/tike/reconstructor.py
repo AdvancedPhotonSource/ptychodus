@@ -222,7 +222,7 @@ class TikeReconstructor:
         if self._object_correction_settings.use_object_correction.get_value():
             object_output = Object(
                 array=result.psi,
-                layer_distance_m=object_input.layer_distance_m,
+                layer_spacing_m=object_input.layer_spacing_m,
                 pixel_geometry=object_input.get_pixel_geometry(),
                 center=object_input.get_center(),
             )

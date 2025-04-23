@@ -78,7 +78,7 @@ class PtychoShelvesProductFileReader(ProductFileReader):
             # object_array[height, width, num_layers]
             object_array = object_array.transpose(2, 0, 1)
 
-        layer_distance_m: Sequence[float] = list()
+        layer_spacing_m: Sequence[float] = list()
 
         try:
             multi_slice_param = p_struct['multi_slice_param']
@@ -87,13 +87,13 @@ class PtychoShelvesProductFileReader(ProductFileReader):
             pass
         else:
             num_spaces = object_array.shape[-3] - 1
-            layer_distance_m = numpy.squeeze(z_distance)[:num_spaces]
+            layer_spacing_m = numpy.squeeze(z_distance)[:num_spaces]
 
         object_ = Object(
             array=object_array,
             pixel_geometry=pixel_geometry,
             center=None,
-            layer_distance_m=layer_distance_m,
+            layer_spacing_m=layer_spacing_m,
         )
         costs = outputs_struct['fourier_error_out']
 

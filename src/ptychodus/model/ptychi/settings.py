@@ -2,25 +2,13 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
 
-class PtyChiReconstructorSettings(Observable, Observer):
+class PtyChiSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
         self._group = registry.create_group('PtyChi')
         self._group.add_observer(self)
 
-        self.num_epochs = self._group.create_integer_parameter('NumEpochs', 100, minimum=1)
-        self.batch_size = self._group.create_integer_parameter('BatchSize', 100, minimum=1)
-        self.batching_mode = self._group.create_string_parameter('BatchingMode', 'random')
-        self.compact_mode_update_clustering = self._group.create_integer_parameter(
-            'CompactModeUpdateClustering', 1, minimum=0
-        )
-        self.use_double_precision = self._group.create_boolean_parameter(
-            'UseDoublePrecision', False
-        )
-        self.use_devices = self._group.create_boolean_parameter('UseDevices', True)
-        self.use_low_memory_mode = self._group.create_boolean_parameter('UseLowMemoryMode', False)
-        self.pad_for_shift = self._group.create_integer_parameter('PadForShift', 0, minimum=0)
-
+        # PtychographyDataOptions
         self.use_far_field_propagation = self._group.create_boolean_parameter(
             'UseFarFieldPropagation', True
         )
@@ -28,6 +16,28 @@ class PtyChiReconstructorSettings(Observable, Observer):
             'FFTShiftDiffractionPatterns', True
         )
         self.save_data_on_device = self._group.create_boolean_parameter('SaveDataOnDevice', False)
+
+        # ReconstructorOptions
+        self.num_epochs = self._group.create_integer_parameter('NumEpochs', 100, minimum=1)
+        self.batch_size = self._group.create_integer_parameter('BatchSize', 100, minimum=1)
+        self.batching_mode = self._group.create_string_parameter('BatchingMode', 'random')
+        self.compact_mode_update_clustering = self._group.create_integer_parameter(
+            'CompactModeUpdateClustering', 1, minimum=0
+        )
+        self.use_devices = self._group.create_boolean_parameter('UseDevices', True)
+        self.use_double_precision = self._group.create_boolean_parameter(
+            'UseDoublePrecision', False
+        )
+        self.use_double_precision_for_fft = self._group.create_boolean_parameter(
+            'UseDoublePrecisionForFFT', False
+        )
+        self.allow_nondeterministic_algorithms = self._group.create_boolean_parameter(
+            'AllowNondeterministicAlgorithms', True
+        )
+
+        # ForwardModelOptions
+        self.use_low_memory_mode = self._group.create_boolean_parameter('UseLowMemoryMode', False)
+        self.pad_for_shift = self._group.create_integer_parameter('PadForShift', 0, minimum=0)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:
@@ -53,8 +63,23 @@ class PtyChiObjectSettings(Observable, Observer):
         self.optimizer = self._group.create_string_parameter('Optimizer', 'SGD')
         self.step_size = self._group.create_real_parameter('StepSize', 1.0, minimum=0.0)
 
-        self.patch_interpolator = self._group.create_string_parameter(
-            'PatchInterpolator', 'FOURIER'
+        self.optimize_slice_spacing = self._group.create_boolean_parameter(
+            'OptimizeSliceSpacing', False
+        )
+        self.optimize_slice_spacing_start = self._group.create_integer_parameter(
+            'OptimizeSliceSpacingStart', 0, minimum=0
+        )
+        self.optimize_slice_spacing_stop = self._group.create_integer_parameter(
+            'OptimizeSliceSpacingStop', -1
+        )
+        self.optimize_slice_spacing_stride = self._group.create_integer_parameter(
+            'OptimizeSliceSpacingStride', 1, minimum=1
+        )
+        self.optimize_slice_spacing_optimizer = self._group.create_string_parameter(
+            'OptimizeSliceSpacingOptimizer', 'SGD'
+        )
+        self.optimize_slice_spacing_step_size = self._group.create_real_parameter(
+            'OptimizeSliceSpacingStepSize', 1.0e-10, minimum=0.0
         )
 
         self.constrain_l1_norm = self._group.create_boolean_parameter('ConstrainL1Norm', False)
@@ -69,6 +94,20 @@ class PtyChiObjectSettings(Observable, Observer):
         )
         self.constrain_l1_norm_weight = self._group.create_real_parameter(
             'ConstrainL1NormWeight', 0.0, minimum=0.0
+        )
+
+        self.constrain_l2_norm = self._group.create_boolean_parameter('ConstrainL2Norm', False)
+        self.constrain_l2_norm_start = self._group.create_integer_parameter(
+            'ConstrainL2NormStart', 0, minimum=0
+        )
+        self.constrain_l2_norm_stop = self._group.create_integer_parameter(
+            'ConstrainL2NormStop', -1
+        )
+        self.constrain_l2_norm_stride = self._group.create_integer_parameter(
+            'ConstrainL2NormStride', 1, minimum=1
+        )
+        self.constrain_l2_norm_weight = self._group.create_real_parameter(
+            'ConstrainL2NormWeight', 0.0, minimum=0.0
         )
 
         self.constrain_smoothness = self._group.create_boolean_parameter(
@@ -150,14 +189,19 @@ class PtyChiObjectSettings(Observable, Observer):
         )
         self.regularize_multislice_unwrap_phase_image_gradient_method = (
             self._group.create_string_parameter(
-                'RegularizeMultisliceUnwrapPhaseImageGradientMethod', 'FOURIER_SHIFT'
+                'RegularizeMultisliceUnwrapPhaseImageGradientMethod', 'FOURIER_DIFFERENTIATION'
             )
         )
         self.regularize_multislice_unwrap_phase_image_integration_method = (
             self._group.create_string_parameter(
-                'RegularizeMultisliceUnwrapPhaseImageIntegrationMethod', 'DECONVOLUTION'
+                'RegularizeMultisliceUnwrapPhaseImageIntegrationMethod', 'FOURIER'
             )
         )
+
+        self.patch_interpolator = self._group.create_string_parameter(
+            'PatchInterpolator', 'FOURIER'
+        )
+
         self.remove_object_probe_ambiguity = self._group.create_boolean_parameter(
             'RemoveObjectProbeAmbiguity', True
         )
@@ -224,7 +268,7 @@ class PtyChiProbeSettings(Observable, Observer):
             'OrthogonalizeIncoherentModesStride', 1, minimum=1
         )
         self.orthogonalize_incoherent_modes_method = self._group.create_string_parameter(
-            'OrthogonalizeIncoherentModesMethod', 'GS'
+            'OrthogonalizeIncoherentModesMethod', 'SVD'
         )
 
         self.orthogonalize_opr_modes = self._group.create_boolean_parameter(
@@ -291,8 +335,11 @@ class PtyChiProbePositionSettings(Observable, Observer):
         self.optimizer = self._group.create_string_parameter('Optimizer', 'SGD')
         self.step_size = self._group.create_real_parameter('StepSize', 1.0, minimum=0.0)
 
-        self.position_correction_type = self._group.create_string_parameter(
-            'PositionCorrectionType', 'Gradient'
+        self.constrain_centroid = self._group.create_boolean_parameter('ConstrainCentroid', False)
+
+        self.correction_type = self._group.create_string_parameter('CorrectionType', 'GRADIENT')
+        self.differentiation_method = self._group.create_string_parameter(
+            'DifferentiationMethod', 'GAUSSIAN'
         )
         self.cross_correlation_scale = self._group.create_integer_parameter(
             'CrossCorrelationScale', 20000, minimum=1
@@ -303,24 +350,38 @@ class PtyChiProbePositionSettings(Observable, Observer):
         self.cross_correlation_probe_threshold = self._group.create_real_parameter(
             'CrossCorrelationProbeThreshold', 0.1, minimum=0.0, maximum=1.0
         )
-
-        self.limit_magnitude_update = self._group.create_boolean_parameter(
-            'LimitMagnitudeUpdate', False
-        )
-        self.limit_magnitude_update_start = self._group.create_integer_parameter(
-            'LimitMagnitudeUpdateStart', 0, minimum=0
-        )
-        self.limit_magnitude_update_stop = self._group.create_integer_parameter(
-            'LimitMagnitudeUpdateStop', -1
-        )
-        self.limit_magnitude_update_stride = self._group.create_integer_parameter(
-            'LimitMagnitudeUpdateStride', 1, minimum=1
-        )
-        self.magnitude_update_limit = self._group.create_real_parameter(
-            'MagnitudeUpdateLimit', 0.0, minimum=0.0
+        self.update_magnitude_limit = self._group.create_real_parameter(
+            'UpdateMagnitudeLimit',
+            float('inf'),
+            minimum=0.0,
         )
 
-        self.constrain_centroid = self._group.create_boolean_parameter('ConstrainCentroid', False)
+        self.constrain_affine_transform = self._group.create_boolean_parameter(
+            'ConstrainAffineTransform', False
+        )
+        self.constrain_affine_transform_start = self._group.create_integer_parameter(
+            'ConstrainAffineTransformStart', 0, minimum=0
+        )
+        self.constrain_affine_transform_stop = self._group.create_integer_parameter(
+            'ConstrainAffineTransformStop', -1
+        )
+        self.constrain_affine_transform_stride = self._group.create_integer_parameter(
+            'ConstrainAffineTransformStride', 1, minimum=1
+        )
+        self.constrain_affine_transform_degrees_of_freedom = self._group.create_integer_parameter(
+            'ConstrainAffineTransformDegreesOfFreedom', 0, minimum=0
+        )
+        self.constrain_affine_transform_position_weight_update_interval = (
+            self._group.create_integer_parameter(
+                'ConstrainAffineTransformPositionWeightUpdateInterval', 10, minimum=1
+            )
+        )
+        self.constrain_affine_transform_apply_constraint = self._group.create_boolean_parameter(
+            'ConstrainAffineTransformApplyConstraint', True
+        )
+        self.constrain_affine_transform_max_expected_error_px = self._group.create_real_parameter(
+            'ConstrainAffineTransformMaxExpectedErrorInPixels', 1.0, minimum=0.0
+        )
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:
@@ -346,11 +407,11 @@ class PtyChiOPRSettings(Observable, Observer):
         self.optimizer = self._group.create_string_parameter('Optimizer', 'SGD')
         self.step_size = self._group.create_real_parameter('StepSize', 1.0, minimum=0.0)
 
-        self.optimize_intensities = self._group.create_boolean_parameter(
-            'OptimizeIntensities', False
-        )
         self.optimize_eigenmode_weights = self._group.create_boolean_parameter(
             'OptimizeEigenmodeWeigts', True
+        )
+        self.optimize_intensities = self._group.create_boolean_parameter(
+            'OptimizeIntensities', False
         )
 
         self.smooth_mode_weights = self._group.create_boolean_parameter('SmoothModeWeights', False)
@@ -406,6 +467,12 @@ class PtyChiDMSettings(Observable, Observer):
         self.object_amplitude_clamp_limit = self._group.create_real_parameter(
             'ObjectAmplitudeClampLimit', 1000, minimum=0.0
         )
+        self.object_inertia = self._group.create_real_parameter(
+            'ObjectInertia', 0.0, minimum=0.0, maximum=1.0
+        )
+        self.probe_inertia = self._group.create_real_parameter(
+            'ProbeInertia', 0.0, minimum=0.0, maximum=1.0
+        )
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:
@@ -428,7 +495,7 @@ class PtyChiLSQMLSettings(Observable, Observer):
             )
         )
         self.solve_step_sizes_only_using_first_probe_mode = self._group.create_boolean_parameter(
-            'SolveStepSizesOnlyUsingFirstProbeMode', False
+            'SolveStepSizesOnlyUsingFirstProbeMode', True
         )
         self.momentum_acceleration_gain = self._group.create_real_parameter(
             'MomentumAccelerationGain', 0.0, minimum=0.0
@@ -441,15 +508,18 @@ class PtyChiLSQMLSettings(Observable, Observer):
         self.momentum_acceleration_gradient_mixing_factor = self._group.create_real_parameter(
             'MomentumAccelerationGradientMixingFactor', 1.0
         )
-
-        self.probe_optimal_step_size_scaler = self._group.create_real_parameter(
-            'ProbeOptimalStepSizeScaler', 0.9, minimum=0.0
+        self.rescale_probe_intensity_in_first_epoch = self._group.create_boolean_parameter(
+            'RescaleProbeIntensityInFirstEpoch', True
         )
+
         self.object_optimal_step_size_scaler = self._group.create_real_parameter(
             'ObjectOptimalStepSizeScaler', 0.9, minimum=0.0
         )
         self.object_multimodal_update = self._group.create_boolean_parameter(
             'ObjectMultimodalUpdate', True
+        )
+        self.probe_optimal_step_size_scaler = self._group.create_real_parameter(
+            'ProbeOptimalStepSizeScaler', 0.9, minimum=0.0
         )
 
     def _update(self, observable: Observable) -> None:

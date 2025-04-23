@@ -5,6 +5,7 @@ from torch import Tensor
 import numpy
 
 from ptychi.api import (
+    AffineDegreesOfFreedom,
     BatchingModes,
     Devices,
     Directions,
@@ -13,6 +14,7 @@ from ptychi.api import (
     ImageIntegrationMethods,
     LossFunctions,
     OPRWeightSmoothingMethods,
+    ObjectPosOriginCoordsMethods,
     OptimizationPlan,
     Optimizers,
     OrthogonalizationMethods,
@@ -24,18 +26,20 @@ from ptychi.api.options.base import (
     ForwardModelOptions,
     OPRModeWeightsSmoothingOptions,
     ObjectL1NormConstraintOptions,
+    ObjectL2NormConstraintOptions,
     ObjectMultisliceRegularizationOptions,
     ObjectSmoothnessConstraintOptions,
     ObjectTotalVariationOptions,
+    PositionAffineTransformConstraintOptions,
     PositionCorrectionOptions,
     ProbeCenterConstraintOptions,
     ProbeOrthogonalizeIncoherentModesOptions,
     ProbeOrthogonalizeOPRModesOptions,
-    ProbePositionMagnitudeLimitOptions,
     ProbePowerConstraintOptions,
     ProbeSupportConstraintOptions,
     RemoveGridArtifactsOptions,
     RemoveObjectProbeAmbiguityOptions,
+    SliceSpacingOptions,
 )
 
 from ptychodus.api.object import Object, ObjectGeometry, ObjectPoint
@@ -51,7 +55,7 @@ from .settings import (
     PtyChiObjectSettings,
     PtyChiProbePositionSettings,
     PtyChiProbeSettings,
-    PtyChiReconstructorSettings,
+    PtyChiSettings,
 )
 
 
@@ -75,7 +79,7 @@ def parse_optimizer(text: str) -> Optimizers:
 
 
 class PtyChiReconstructorOptionsHelper:
-    def __init__(self, settings: PtyChiReconstructorSettings) -> None:
+    def __init__(self, settings: PtyChiSettings) -> None:
         self._settings = settings
 
     @property
@@ -111,6 +115,14 @@ class PtyChiReconstructorOptionsHelper:
     @property
     def default_dtype(self) -> Dtypes:
         return Dtypes.FLOAT64 if self._settings.use_double_precision.get_value() else Dtypes.FLOAT32
+
+    @property
+    def use_double_precision_for_fft(self) -> bool:
+        return self._settings.use_double_precision_for_fft.get_value()
+
+    @property
+    def allow_nondeterministic_algorithms(self) -> bool:
+        return self._settings.allow_nondeterministic_algorithms.get_value()
 
     @property
     def random_seed(self) -> int | None:
@@ -157,6 +169,20 @@ class PtyChiObjectOptionsHelper:
         return dict()
 
     @property
+    def slice_spacing_options(self) -> SliceSpacingOptions:
+        optimizer = parse_optimizer(self._settings.optimize_slice_spacing_optimizer.get_value())
+        return SliceSpacingOptions(
+            optimizable=self._settings.optimize_slice_spacing.get_value(),
+            optimization_plan=create_optimization_plan(
+                self._settings.optimize_slice_spacing_start.get_value(),
+                self._settings.optimize_slice_spacing_stop.get_value(),
+                self._settings.optimize_slice_spacing_stride.get_value(),
+            ),
+            optimizer=optimizer,
+            step_size=self._settings.optimize_slice_spacing_step_size.get_value(),
+        )
+
+    @property
     def l1_norm_constraint(self) -> ObjectL1NormConstraintOptions:
         return ObjectL1NormConstraintOptions(
             enabled=self._settings.constrain_l1_norm.get_value(),
@@ -166,6 +192,18 @@ class PtyChiObjectOptionsHelper:
                 self._settings.constrain_l1_norm_stride.get_value(),
             ),
             weight=self._settings.constrain_l1_norm_weight.get_value(),
+        )
+
+    @property
+    def l2_norm_constraint(self) -> ObjectL2NormConstraintOptions:
+        return ObjectL2NormConstraintOptions(
+            enabled=self._settings.constrain_l2_norm.get_value(),
+            optimization_plan=create_optimization_plan(
+                self._settings.constrain_l2_norm_start.get_value(),
+                self._settings.constrain_l2_norm_stop.get_value(),
+                self._settings.constrain_l2_norm_stride.get_value(),
+            ),
+            weight=self._settings.constrain_l2_norm_weight.get_value(),
         )
 
     @property
@@ -281,15 +319,27 @@ class PtyChiObjectOptionsHelper:
     def build_preconditioner_with_all_modes(self) -> bool:
         return self._settings.build_preconditioner_with_all_modes.get_value()
 
+    @property
+    def determine_position_origin_coords_by(self) -> ObjectPosOriginCoordsMethods:
+        return ObjectPosOriginCoordsMethods.SPECIFIED
+
     def get_initial_guess(self, object_: Object) -> ComplexArrayType:
         return object_.get_array()
 
-    def get_slice_spacings_m(self, object_: Object) -> RealArrayType:
-        return numpy.array(object_.layer_distance_m[:-1])  # FIXME iff multislice
+    def get_slice_spacings_m(self, object_: Object) -> RealArrayType | None:
+        slice_spacings_m = object_.layer_spacing_m
+        return numpy.array(slice_spacings_m) if slice_spacings_m else None
 
     def get_pixel_size_m(self, object_: Object) -> float:
         pixel_geometry = object_.get_pixel_geometry()
         return pixel_geometry.width_m
+
+    def get_pixel_aspect_ratio(self, object_: Object) -> float:
+        pixel_geometry = object_.get_pixel_geometry()
+        return pixel_geometry.aspect_ratio
+
+    def get_position_origin_coords(self, object_: Object) -> RealArrayType:
+        return numpy.zeros(2)
 
 
 class PtyChiProbeOptionsHelper:
@@ -422,36 +472,54 @@ class PtyChiProbePositionOptionsHelper:
         return dict()
 
     @property
-    def magnitude_limit(self) -> ProbePositionMagnitudeLimitOptions:
-        return ProbePositionMagnitudeLimitOptions(
-            enabled=self._settings.limit_magnitude_update.get_value(),
-            optimization_plan=create_optimization_plan(
-                self._settings.limit_magnitude_update_start.get_value(),
-                self._settings.limit_magnitude_update_stop.get_value(),
-                self._settings.limit_magnitude_update_stride.get_value(),
-            ),
-            limit=self._settings.magnitude_update_limit.get_value(),
-        )
-
-    @property
     def constrain_position_mean(self) -> bool:
         return self._settings.constrain_centroid.get_value()
 
     @property
     def correction_options(self) -> PositionCorrectionOptions:
-        correction_type_str = self._settings.position_correction_type.get_value()
+        correction_type_str = self._settings.correction_type.get_value()
 
         try:
             correction_type = PositionCorrectionTypes[correction_type_str.upper()]
         except KeyError:
-            logger.warning(f'Failed to parse batching mode "{correction_type_str}"!')
+            logger.warning(f'Failed to parse correction type "{correction_type_str}"!')
             correction_type = PositionCorrectionTypes.GRADIENT
+
+        differentiation_method_str = self._settings.differentiation_method.get_value()
+
+        try:
+            differentiation_method = ImageGradientMethods[differentiation_method_str.upper()]
+        except KeyError:
+            logger.warning(
+                f'Failed to parse differentiation method "{differentiation_method_str}"!'
+            )
+            differentiation_method = ImageGradientMethods.GAUSSIAN
 
         return PositionCorrectionOptions(
             correction_type=correction_type,
+            differentiation_method=differentiation_method,
             cross_correlation_scale=self._settings.cross_correlation_scale.get_value(),
             cross_correlation_real_space_width=self._settings.cross_correlation_real_space_width.get_value(),
             cross_correlation_probe_threshold=self._settings.cross_correlation_probe_threshold.get_value(),
+            slice_for_correction=0,  # TODO
+            update_magnitude_limit=self._settings.update_magnitude_limit.get_value(),
+        )
+
+    @property
+    def affine_transform_constraint(self) -> PositionAffineTransformConstraintOptions:
+        degrees_of_freedom: list[AffineDegreesOfFreedom] = list()  # FIXME
+
+        return PositionAffineTransformConstraintOptions(
+            enabled=self._settings.constrain_affine_transform.get_value(),
+            optimization_plan=create_optimization_plan(
+                self._settings.constrain_affine_transform_start.get_value(),
+                self._settings.constrain_affine_transform_stop.get_value(),
+                self._settings.constrain_affine_transform_stride.get_value(),
+            ),
+            degrees_of_freedom=degrees_of_freedom,
+            position_weight_update_interval=self._settings.constrain_affine_transform_position_weight_update_interval.get_value(),
+            apply_constraint=self._settings.constrain_affine_transform_apply_constraint.get_value(),
+            max_expected_error=self._settings.constrain_affine_transform_max_expected_error_px.get_value(),
         )
 
     def get_positions_px(
@@ -499,6 +567,14 @@ class PtyChiOPROptionsHelper:
         return dict()
 
     @property
+    def optimize_eigenmode_weights(self) -> bool:
+        return self._settings.optimize_eigenmode_weights.get_value()
+
+    @property
+    def optimize_intensity_variation(self) -> bool:
+        return self._settings.optimize_intensities.get_value()
+
+    @property
     def smoothing(self) -> OPRModeWeightsSmoothingOptions:
         method_str = self._settings.smoothing_method.get_value()
 
@@ -520,14 +596,6 @@ class PtyChiOPROptionsHelper:
         )
 
     @property
-    def optimize_eigenmode_weights(self) -> bool:
-        return self._settings.optimize_eigenmode_weights.get_value()
-
-    @property
-    def optimize_intensity_variation(self) -> bool:
-        return self._settings.optimize_intensities.get_value()
-
-    @property
     def update_relaxation(self) -> float:
         return self._settings.relax_update.get_value()
 
@@ -545,7 +613,7 @@ class PtyChiOPROptionsHelper:
 class PtyChiOptionsHelper:
     def __init__(
         self,
-        reconstructor_settings: PtyChiReconstructorSettings,
+        reconstructor_settings: PtyChiSettings,
         object_settings: PtyChiObjectSettings,
         probe_settings: PtyChiProbeSettings,
         probe_position_settings: PtyChiProbePositionSettings,
@@ -592,7 +660,7 @@ class PtyChiOptionsHelper:
         object_in = product.object_
         object_out = Object(
             array=numpy.array(object_array),
-            layer_distance_m=object_in.layer_distance_m,
+            layer_spacing_m=object_in.layer_spacing_m,
             pixel_geometry=object_in.get_pixel_geometry(),
             center=object_in.get_center(),
         )

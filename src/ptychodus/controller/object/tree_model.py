@@ -150,7 +150,7 @@ class ObjectTreeModel(QAbstractItemModel):
                     return f'Layer {index.row() + 1}'
                 elif index.column() == 1:
                     try:
-                        return item.layer_distance_m[index.row()]
+                        return item.layer_spacing_m[index.row()]
                     except IndexError:
                         return float('inf')
         else:
@@ -161,7 +161,7 @@ class ObjectTreeModel(QAbstractItemModel):
                 if index.column() == 0:
                     return self._repository.get_name(index.row())
                 elif index.column() == 1:
-                    return object_.get_total_layer_distance_m()
+                    return object_.get_total_thickness_m()
                 elif index.column() == 2:
                     return item.get_builder().get_name()
                 elif index.column() == 3:
@@ -204,7 +204,7 @@ class ObjectTreeModel(QAbstractItemModel):
                     except ValueError:
                         return False
 
-                    item.layer_distance_m[index.row()] = distance_m
+                    item.layer_spacing_m[index.row()] = distance_m
                     return False
             else:
                 if index.column() == 0:

@@ -16,8 +16,8 @@ class ObjectSettings(Observable, Observer):
         self.file_path = self._group.create_path_parameter('FilePath', Path('/path/to/object.npy'))
         self.file_type = self._group.create_string_parameter('FileType', 'NPY')
 
-        self.object_layer_distance_m = self._group.create_real_sequence_parameter(
-            'ObjectLayerDistanceInMeters', []
+        self.object_layer_spacing_m = self._group.create_real_sequence_parameter(
+            'ObjectLayerSpacingInMeters', []
         )
 
         self.extra_padding_x = self._group.create_integer_parameter('ExtraPaddingX', 1, minimum=0)

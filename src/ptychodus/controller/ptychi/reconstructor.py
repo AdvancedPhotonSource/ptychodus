@@ -18,7 +18,7 @@ from ...model.ptychi import (
     PtyChiDeviceRepository,
     PtyChiEnumerators,
     PtyChiLSQMLSettings,
-    PtyChiReconstructorSettings,
+    PtyChiSettings,
 )
 from ..parametric import (
     CheckBoxParameterViewController,
@@ -122,7 +122,7 @@ class PtyChiMomentumAccelerationGradientMixingFactorViewController(
 class PtyChiReconstructorViewController(ParameterViewController):
     def __init__(
         self,
-        settings: PtyChiReconstructorSettings,
+        settings: PtyChiSettings,
         autodiff_settings: PtyChiAutodiffSettings | None,
         dm_settings: PtyChiDMSettings | None,
         lsqml_settings: PtyChiLSQMLSettings | None,

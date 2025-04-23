@@ -40,12 +40,12 @@ class RandomObjectBuilder(ObjectBuilder):
     def build(
         self,
         geometry_provider: ObjectGeometryProvider,
-        layer_distance_m: Sequence[float],
+        layer_spacing_m: Sequence[float],
     ) -> Object:
         geometry = geometry_provider.get_object_geometry()
         height_px = geometry.height_px + 2 * self.extra_padding_y.get_value()
         width_px = geometry.width_px + 2 * self.extra_padding_x.get_value()
-        object_shape = (1 + len(layer_distance_m), height_px, width_px)
+        object_shape = (1 + len(layer_spacing_m), height_px, width_px)
 
         amplitude = self._rng.normal(
             self.amplitude_mean.get_value(),
@@ -60,7 +60,7 @@ class RandomObjectBuilder(ObjectBuilder):
 
         return Object(
             array=numpy.clip(amplitude, 0.0, 1.0) * numpy.exp(1j * phase),
-            layer_distance_m=layer_distance_m,
+            layer_spacing_m=layer_spacing_m,
             pixel_geometry=geometry.get_pixel_geometry(),
             center=geometry.get_center(),
         )
@@ -92,11 +92,11 @@ class UserObjectBuilder(ObjectBuilder):  # TODO use
     def build(
         self,
         geometry_provider: ObjectGeometryProvider,
-        layer_distance_m: Sequence[float],
+        layer_spacing_m: Sequence[float],
     ) -> Object:
         geometry = self._existing_object.get_geometry()
         existing_object_array = self._existing_object.get_array()
-        num_slices = len(layer_distance_m) + 1
+        num_slices = len(layer_spacing_m) + 1
 
         if num_slices > 1 and num_slices != existing_object_array.shape[0]:
             amplitude = numpy.abs(existing_object_array[0:1]) ** (1.0 / num_slices)
@@ -109,7 +109,7 @@ class UserObjectBuilder(ObjectBuilder):  # TODO use
 
         return Object(
             array=data,
-            layer_distance_m=layer_distance_m,
+            layer_spacing_m=layer_spacing_m,
             pixel_geometry=geometry.get_pixel_geometry(),
             center=geometry.get_center(),
         )
