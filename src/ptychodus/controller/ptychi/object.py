@@ -28,6 +28,43 @@ from .optimizer import PtyChiOptimizationPlanViewController, PtyChiOptimizerPara
 __all__ = ['PtyChiObjectViewController']
 
 
+class PtyChiOptimizeSliceSpacingViewController(CheckableGroupBoxParameterViewController):
+    def __init__(
+        self,
+        optimize_slice_spacing: BooleanParameter,
+        start: IntegerParameter,
+        stop: IntegerParameter,
+        stride: IntegerParameter,
+        optimizer: StringParameter,
+        step_size: RealParameter,
+        num_epochs: IntegerParameter,
+        enumerators: PtyChiEnumerators,
+    ) -> None:
+        super().__init__(
+            optimize_slice_spacing,
+            'Optimize Slice Spacing',
+            tool_tip='Whether to optimize the slice spacing.',
+        )
+        self._plan_view_controller = PtyChiOptimizationPlanViewController(
+            start,
+            stop,
+            stride,
+            num_epochs,
+        )
+        self._optimizer_view_controller = PtyChiOptimizerParameterViewController(
+            optimizer, enumerators
+        )
+        self._step_size_view_controller = DecimalLineEditParameterViewController(
+            step_size, tool_tip='Optimizer step size'
+        )
+
+        layout = QFormLayout()
+        layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        layout.addRow('Optimizer:', self._optimizer_view_controller.get_widget())
+        layout.addRow('Step Size:', self._step_size_view_controller.get_widget())
+        self.get_widget().setLayout(layout)
+
+
 class PtyChiConstrainL1NormViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
@@ -49,6 +86,35 @@ class PtyChiConstrainL1NormViewController(CheckableGroupBoxParameterViewControll
         self._weight_view_controller = DecimalLineEditParameterViewController(
             weight,
             tool_tip='Weight of the L\u2081 norm constraint.',
+        )
+
+        layout = QFormLayout()
+        layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        layout.addRow('Weight:', self._weight_view_controller.get_widget())
+        self.get_widget().setLayout(layout)
+
+
+class PtyChiConstrainL2NormViewController(CheckableGroupBoxParameterViewController):
+    def __init__(
+        self,
+        constrain_l2_norm: BooleanParameter,
+        start: IntegerParameter,
+        stop: IntegerParameter,
+        stride: IntegerParameter,
+        weight: RealParameter,
+        num_epochs: IntegerParameter,
+    ) -> None:
+        super().__init__(
+            constrain_l2_norm,
+            'Constrain L\u2082 Norm',
+            tool_tip='Whether to constrain the L\u2082 norm.',
+        )
+        self._plan_view_controller = PtyChiOptimizationPlanViewController(
+            start, stop, stride, num_epochs
+        )
+        self._weight_view_controller = DecimalLineEditParameterViewController(
+            weight,
+            tool_tip='Weight of the L\u2082 norm constraint.',
         )
 
         layout = QFormLayout()
@@ -209,6 +275,29 @@ class PtyChiRegularizeMultisliceViewController(CheckableGroupBoxParameterViewCon
         self.get_widget().setLayout(layout)
 
 
+class PtyChiRemoveObjectProbeAmbiguityViewController(CheckableGroupBoxParameterViewController):
+    def __init__(
+        self,
+        remove_object_probe_ambiguity: BooleanParameter,
+        start: IntegerParameter,
+        stop: IntegerParameter,
+        stride: IntegerParameter,
+        num_epochs: IntegerParameter,
+    ) -> None:
+        super().__init__(
+            remove_object_probe_ambiguity,
+            'Remove Object Probe Ambiguity',
+            tool_tip='Whether to remove object-probe ambiguity.',
+        )
+        self._plan_view_controller = PtyChiOptimizationPlanViewController(
+            start, stop, stride, num_epochs
+        )
+
+        layout = QFormLayout()
+        layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        self.get_widget().setLayout(layout)
+
+
 class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
@@ -236,10 +325,15 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
         self._step_size_view_controller = DecimalLineEditParameterViewController(
             settings.step_size, tool_tip='Optimizer step size'
         )
-        self._patch_interpolator_view_controller = ComboBoxParameterViewController(
-            settings.patch_interpolator,
-            enumerators.patch_interpolation_methods(),
-            tool_tip='Interpolation method used for extracting and updating patches of the object.',
+        self._optimize_slice_spacing_view_controller = PtyChiOptimizeSliceSpacingViewController(
+            settings.optimize_slice_spacing,
+            settings.optimize_slice_spacing_start,
+            settings.optimize_slice_spacing_stop,
+            settings.optimize_slice_spacing_stride,
+            settings.optimize_slice_spacing_optimizer,
+            settings.optimize_slice_spacing_step_size,
+            num_epochs,
+            enumerators,
         )
         self._constrain_l1_norm_view_controller = PtyChiConstrainL1NormViewController(
             settings.constrain_l1_norm,
@@ -247,6 +341,14 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
             settings.constrain_l1_norm_stop,
             settings.constrain_l1_norm_stride,
             settings.constrain_l1_norm_weight,
+            num_epochs,
+        )
+        self._constrain_l2_norm_view_controller = PtyChiConstrainL2NormViewController(
+            settings.constrain_l2_norm,
+            settings.constrain_l2_norm_start,
+            settings.constrain_l2_norm_stop,
+            settings.constrain_l2_norm_stride,
+            settings.constrain_l2_norm_weight,
             num_epochs,
         )
         self._constrain_smoothness_view_controller = PtyChiConstrainSmoothnessViewController(
@@ -291,17 +393,40 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
             num_epochs,
             enumerators,
         )
+        self._patch_interpolator_view_controller = ComboBoxParameterViewController(
+            settings.patch_interpolator,
+            enumerators.patch_interpolation_methods(),
+            tool_tip='Interpolation method used for extracting and updating patches of the object.',
+        )
+        self._remove_object_probe_ambiguity_view_controller = (
+            PtyChiRemoveObjectProbeAmbiguityViewController(
+                settings.remove_object_probe_ambiguity,
+                settings.remove_object_probe_ambiguity_start,
+                settings.remove_object_probe_ambiguity_stop,
+                settings.remove_object_probe_ambiguity_stride,
+                num_epochs,
+            )
+        )
+        self._build_preconditioner_with_all_modes_view_controller = CheckBoxParameterViewController(
+            settings.build_preconditioner_with_all_modes,
+            'Build Preconditioner with All Modes',
+            tool_tip='Whether to build the preconditioner using all modes.',
+        )
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._optimization_plan_view_controller.get_widget())
         layout.addRow('Optimizer:', self._optimizer_view_controller.get_widget())
         layout.addRow('Step Size:', self._step_size_view_controller.get_widget())
-        layout.addRow('Patch Interpolator:', self._patch_interpolator_view_controller.get_widget())
+        layout.addRow(self._optimize_slice_spacing_view_controller.get_widget())
         layout.addRow(self._constrain_l1_norm_view_controller.get_widget())
+        layout.addRow(self._constrain_l2_norm_view_controller.get_widget())
         layout.addRow(self._constrain_smoothness_view_controller.get_widget())
         layout.addRow(self._constrain_total_variation_view_controller.get_widget())
         layout.addRow(self._remove_grid_artifacts_view_controller.get_widget())
         layout.addRow(self._regularize_multislice_view_controller.get_widget())
+        layout.addRow('Patch Interpolator:', self._patch_interpolator_view_controller.get_widget())
+        layout.addRow(self._remove_object_probe_ambiguity_view_controller.get_widget())
+        layout.addRow(self._build_preconditioner_with_all_modes_view_controller.get_widget())
 
         if dm_settings is not None:
             self._amplitude_clamp_limit_view_controller = DecimalLineEditParameterViewController(
@@ -311,6 +436,12 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
             layout.addRow(
                 'Amplitude Clamp Limit:', self._amplitude_clamp_limit_view_controller.get_widget()
             )
+
+            self._inertia_view_controller = DecimalLineEditParameterViewController(
+                dm_settings.object_inertia,
+                tool_tip='Inertia for the object update.',
+            )
+            layout.addRow('Inertia:', self._inertia_view_controller.get_widget())
 
         if lsqml_settings is not None:
             self._object_optimal_step_size_scaler_view_controller = (

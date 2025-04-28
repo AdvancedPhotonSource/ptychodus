@@ -77,15 +77,15 @@ class PtyChiOPRViewController(CheckableGroupBoxParameterViewController):
         self._step_size_view_controller = DecimalLineEditParameterViewController(
             settings.step_size, tool_tip='Optimizer step size'
         )
-        self._optimize_intensities_view_controller = CheckBoxParameterViewController(
-            settings.optimize_intensities,
-            'Optimize Intensities',
-            tool_tip='Whether to optimize intensity variation (i.e., the weight of the first OPR mode).',
-        )
         self._optimize_eigenmode_weights_view_controller = CheckBoxParameterViewController(
             settings.optimize_eigenmode_weights,
             'Optimize Eigenmode Weights',
             tool_tip='Whether to optimize eigenmode weights (i.e., the weights of the second and following OPR modes).',
+        )
+        self._optimize_intensities_view_controller = CheckBoxParameterViewController(
+            settings.optimize_intensities,
+            'Optimize Intensities',
+            tool_tip='Whether to optimize intensity variation (i.e., the weight of the first OPR mode).',
         )
         self._smooth_mode_weights_view_controller = PtyChiSmoothOPRModeWeightsViewController(
             settings.smooth_mode_weights,
@@ -109,4 +109,5 @@ class PtyChiOPRViewController(CheckableGroupBoxParameterViewController):
         layout.addRow(self._optimize_intensities_view_controller.get_widget())
         layout.addRow(self._optimize_eigenmode_weights_view_controller.get_widget())
         layout.addRow(self._smooth_mode_weights_view_controller.get_widget())
+        layout.addRow('Relax Update:', self._relax_update_view_controller.get_widget())
         self.get_widget().setLayout(layout)

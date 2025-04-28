@@ -8,15 +8,6 @@ class PtyChiSettings(Observable, Observer):
         self._group = registry.create_group('PtyChi')
         self._group.add_observer(self)
 
-        # PtychographyDataOptions
-        self.use_far_field_propagation = self._group.create_boolean_parameter(
-            'UseFarFieldPropagation', True
-        )
-        self.fft_shift_diffraction_patterns = self._group.create_boolean_parameter(
-            'FFTShiftDiffractionPatterns', True
-        )
-        self.save_data_on_device = self._group.create_boolean_parameter('SaveDataOnDevice', False)
-
         # ReconstructorOptions
         self.num_epochs = self._group.create_integer_parameter('NumEpochs', 100, minimum=1)
         self.batch_size = self._group.create_integer_parameter('BatchSize', 100, minimum=1)
@@ -38,6 +29,15 @@ class PtyChiSettings(Observable, Observer):
         # ForwardModelOptions
         self.use_low_memory_mode = self._group.create_boolean_parameter('UseLowMemoryMode', False)
         self.pad_for_shift = self._group.create_integer_parameter('PadForShift', 0, minimum=0)
+
+        # PtychographyDataOptions
+        self.use_far_field_propagation = self._group.create_boolean_parameter(
+            'UseFarFieldPropagation', True
+        )
+        self.fft_shift_diffraction_patterns = self._group.create_boolean_parameter(
+            'FFTShiftDiffractionPatterns', True
+        )
+        self.save_data_on_device = self._group.create_boolean_parameter('SaveDataOnDevice', False)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:
@@ -214,6 +214,7 @@ class PtyChiObjectSettings(Observable, Observer):
         self.remove_object_probe_ambiguity_stride = self._group.create_integer_parameter(
             'RemoveObjectProbeAmbiguityStride', 10, minimum=1
         )
+
         self.build_preconditioner_with_all_modes = self._group.create_boolean_parameter(
             'BuildPreconditionerWithAllModes', False
         )

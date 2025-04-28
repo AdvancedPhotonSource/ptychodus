@@ -65,6 +65,53 @@ class PtyChiCrossCorrelationViewController(ParameterViewController, Observer):
             self._sync_model_to_view()
 
 
+class PtyChiConstrainAffineTransformViewController(CheckableGroupBoxParameterViewController):
+    def __init__(
+        self,
+        is_optimizable: BooleanParameter,
+        start: IntegerParameter,
+        stop: IntegerParameter,
+        stride: IntegerParameter,
+        degrees_of_freedom: IntegerParameter,
+        position_weight_update_interval: IntegerParameter,
+        apply_constraint: BooleanParameter,
+        max_expected_error_px: RealParameter,
+        num_epochs: IntegerParameter,
+    ) -> None:
+        super().__init__(
+            is_optimizable,
+            'Constrain Affine Transform',
+            tool_tip='Constrain the affine transform during position correction.',
+        )
+        self._plan_view_controller = PtyChiOptimizationPlanViewController(
+            start, stop, stride, num_epochs
+        )
+        # FIXME affine degrees of freedom: checkable combo box?
+        self._position_weight_update_interval_view_controller = SpinBoxParameterViewController(
+            position_weight_update_interval,
+            tool_tip='Interval for updating the position weight.',
+        )
+        self._apply_constraint_view_controller = CheckBoxParameterViewController(
+            apply_constraint, 'Apply Constraint', tool_tip='Whether to apply the constraint.'
+        )
+        self._max_expected_error_px_view_controller = DecimalLineEditParameterViewController(
+            max_expected_error_px, tool_tip='Maximum expected error in pixels.'
+        )
+
+        layout = QFormLayout()
+        layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        # FIXE layout.addRow('Degrees of Freedom:', self._degrees_of_freedom_view_controller.get_widget())
+        layout.addRow(
+            'Position Weight Update Interval:',
+            self._position_weight_update_interval_view_controller.get_widget(),
+        )
+        layout.addRow(self._apply_constraint_view_controller.get_widget())
+        layout.addRow(
+            'Max Expected Error [px]:', self._max_expected_error_px_view_controller.get_widget()
+        )
+        self.get_widget().setLayout(layout)
+
+
 class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
@@ -89,10 +136,20 @@ class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewControlle
         self._step_size_view_controller = DecimalLineEditParameterViewController(
             settings.step_size, tool_tip='Optimizer step size'
         )
-        self._algorithm_view_controller = ComboBoxParameterViewController(
+        self._constrain_centroid_view_controller = CheckBoxParameterViewController(
+            settings.constrain_centroid,
+            'Constrain Centroid',
+            tool_tip='Whether to subtract the mean from positions after updating positions.',
+        )
+        self._correction_type_view_controller = ComboBoxParameterViewController(
             settings.correction_type,
             enumerators.position_correction_types(),
             tool_tip='Algorithm used to calculate the position correction update.',
+        )
+        self._differentiation_method_view_controller = ComboBoxParameterViewController(
+            settings.differentiation_method,
+            enumerators.image_gradient_methods(),
+            tool_tip='Method for calculating the object gradient.',
         )
         self._cross_correlation_view_controller = PtyChiCrossCorrelationViewController(
             settings.correction_type,
@@ -100,17 +157,36 @@ class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewControlle
             settings.cross_correlation_real_space_width,
             settings.cross_correlation_probe_threshold,
         )
-        self._constrain_centroid_view_controller = CheckBoxParameterViewController(
-            settings.constrain_centroid,
-            'Constrain Centroid',
-            tool_tip='Whether to subtract the mean from positions after updating positions.',
+        self._update_magnitude_limit_view_controller = DecimalLineEditParameterViewController(
+            settings.update_magnitude_limit,
+            tool_tip='Maximum allowed magnitude of position update in each axis.',
+        )  # FIXME verify inf is handled correctly
+        self._constrain_affine_transform_view_controller = (
+            PtyChiConstrainAffineTransformViewController(
+                settings.constrain_affine_transform,
+                settings.constrain_affine_transform_start,
+                settings.constrain_affine_transform_stop,
+                settings.constrain_affine_transform_stride,
+                settings.constrain_affine_transform_degrees_of_freedom,
+                settings.constrain_affine_transform_position_weight_update_interval,
+                settings.constrain_affine_transform_apply_constraint,
+                settings.constrain_affine_transform_max_expected_error_px,
+                num_epochs,
+            )
         )
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._optimization_plan_view_controller.get_widget())
         layout.addRow('Optimizer:', self._optimizer_view_controller.get_widget())
         layout.addRow('Step Size:', self._step_size_view_controller.get_widget())
-        layout.addRow('Algorithm:', self._algorithm_view_controller.get_widget())
-        layout.addRow(self._cross_correlation_view_controller.get_widget())
         layout.addRow(self._constrain_centroid_view_controller.get_widget())
+        layout.addRow('Correction Type:', self._correction_type_view_controller.get_widget())
+        layout.addRow(
+            'Differentiation Method:', self._differentiation_method_view_controller.get_widget()
+        )
+        layout.addRow(self._cross_correlation_view_controller.get_widget())
+        layout.addRow(
+            'Update Magnitude Limit:', self._update_magnitude_limit_view_controller.get_widget()
+        )
+        layout.addRow(self._constrain_affine_transform_view_controller.get_widget())
         self.get_widget().setLayout(layout)

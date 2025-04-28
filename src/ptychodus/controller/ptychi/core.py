@@ -43,7 +43,7 @@ class PtyChiViewController(QWidget):
 
         # FIXME verify tooltips
         self._reconstructor_view_controller = PtyChiReconstructorViewController(
-            model.reconstructor_settings,
+            model.settings,
             autodiff_settings,
             dm_settings,
             lsqml_settings,
@@ -55,23 +55,24 @@ class PtyChiViewController(QWidget):
             dm_settings,
             lsqml_settings,
             pie_settings,
-            model.reconstructor_settings.num_epochs,
+            model.settings.num_epochs,
             model.enumerators,
         )
         self._probe_view_controller = PtyChiProbeViewController(
             model.probe_settings,
+            dm_settings,
             lsqml_settings,
             pie_settings,
-            model.reconstructor_settings.num_epochs,
+            model.settings.num_epochs,
             model.enumerators,
         )
         self._probe_positions_view_controller = PtyChiProbePositionsViewController(
             model.probe_position_settings,
-            model.reconstructor_settings.num_epochs,
+            model.settings.num_epochs,
             model.enumerators,
         )
         self._opr_view_controller = PtyChiOPRViewController(
-            model.opr_settings, model.reconstructor_settings.num_epochs, model.enumerators
+            model.opr_settings, model.settings.num_epochs, model.enumerators
         )
 
         layout = QVBoxLayout()

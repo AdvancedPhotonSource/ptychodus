@@ -8,6 +8,7 @@ from ptychodus.api.parametric import (
 )
 
 from ...model.ptychi import (
+    PtyChiDMSettings,
     PtyChiEnumerators,
     PtyChiLSQMLSettings,
     PtyChiPIESettings,
@@ -154,6 +155,7 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
         settings: PtyChiProbeSettings,
+        dm_settings: PtyChiDMSettings | None,
         lsqml_settings: PtyChiLSQMLSettings | None,
         pie_settings: PtyChiPIESettings | None,
         num_epochs: IntegerParameter,
@@ -232,19 +234,23 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
             'Relax Eigenmode Update:', self._relax_eigenmode_update_view_controller.get_widget()
         )
 
+        if dm_settings is not None:
+            self._inertia_view_controller = DecimalLineEditParameterViewController(
+                dm_settings.probe_inertia, tool_tip='Inertia for the probe update.'
+            )
+            layout.addRow('Inertia:', self._inertia_view_controller.get_widget())
+
         if lsqml_settings is not None:
-            self._probe_optimal_step_size_scaler_view_controller = (
-                DecimalLineEditParameterViewController(
-                    lsqml_settings.probe_optimal_step_size_scaler
-                )
+            self._optimal_step_size_scaler_view_controller = DecimalLineEditParameterViewController(
+                lsqml_settings.probe_optimal_step_size_scaler
             )
             layout.addRow(
                 'Optimal Step Size Scaler:',
-                self._probe_optimal_step_size_scaler_view_controller.get_widget(),
+                self._optimal_step_size_scaler_view_controller.get_widget(),
             )
 
         if pie_settings is not None:
-            self._probe_alpha = DecimalSliderParameterViewController(pie_settings.probe_alpha)
-            layout.addRow('Alpha:', self._probe_alpha.get_widget())
+            self._alpha = DecimalSliderParameterViewController(pie_settings.probe_alpha)
+            layout.addRow('Alpha:', self._alpha.get_widget())
 
         self.get_widget().setLayout(layout)

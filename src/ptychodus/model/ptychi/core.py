@@ -43,7 +43,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         self.pie_settings = PtyChiPIESettings(settings_registry)
         self.probe_position_settings = PtyChiProbePositionSettings(settings_registry)
         self.probe_settings = PtyChiProbeSettings(settings_registry)
-        self.reconstructor_settings = PtyChiSettings(settings_registry)
+        self.settings = PtyChiSettings(settings_registry)
 
         self.enumerators = PtyChiEnumerators()
         self.device_repository = PtyChiDeviceRepository(
@@ -70,7 +70,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
             logger.info(f'Pty-Chi {ptychi_version}')
 
             options_helper = PtyChiOptionsHelper(
-                self.reconstructor_settings,
+                self.settings,
                 self.object_settings,
                 self.probe_settings,
                 self.probe_position_settings,

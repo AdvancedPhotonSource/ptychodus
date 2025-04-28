@@ -139,21 +139,46 @@ class PtyChiReconstructorViewController(ParameterViewController):
         self._batching_mode_view_controller = ComboBoxParameterViewController(
             settings.batching_mode, enumerators.batching_modes(), tool_tip='Batching mode to use.'
         )
-        self._compact_mode_update_clustering = SpinBoxParameterViewController(
+        self._compact_mode_update_clustering_view_controller = SpinBoxParameterViewController(
             settings.compact_mode_update_clustering,
-            tool_tip='Number of epochs between updating clusters.',
-        )
-        self._precision_view_controller = PtyChiPrecisionParameterViewController(
-            settings.use_double_precision,
-            tool_tip='Floating point precision to use for computation.',
+            tool_tip='When greater than zero, the number of epochs between updating clusters in compact batching mode.',
         )
         self._device_view_controller = PtyChiDeviceViewController(
             settings.use_devices, repository, tool_tip='Default device to use for computation.'
         )
+        self._compute_precision_view_controller = PtyChiPrecisionParameterViewController(
+            settings.use_double_precision,
+            tool_tip='Floating point precision to use for computation.',
+        )
+        self._fft_precision_view_controller = PtyChiPrecisionParameterViewController(
+            settings.use_double_precision_for_fft,
+            tool_tip='Floating point precision to use for critical FFT operations.',
+        )
+        self.allow_nondeterministic_algorithms_view_controller = CheckBoxParameterViewController(
+            settings.allow_nondeterministic_algorithms,
+            'Allow Nondeterministic Algorithms',
+            tool_tip='When checked, nondeterministic algorithms will be used. This may lead to different results on different runs.',
+        )
+
         self._use_low_memory_view_controller = CheckBoxParameterViewController(
             settings.use_low_memory_mode,
             'Use Low Memory Mode',
             tool_tip='When checked, forward propagation of ptychography will be done using less vectorized code. This reduces the speed, but also lowers memory usage.',
+        )
+        self._pad_for_shift_view_controller = SpinBoxParameterViewController(
+            settings.pad_for_shift,
+            tool_tip='Number of pixels to pad arrays (with border values) before shifting.',
+        )
+
+        self._use_far_field_propagation_view_controller = CheckBoxParameterViewController(
+            settings.use_far_field_propagation,
+            'Use Far Field Propagation',
+            tool_tip='When checked, far field propagation will be used instead of near field propagation.',
+        )
+        self._fft_shift_diffraction_patterns_view_controller = CheckBoxParameterViewController(
+            settings.fft_shift_diffraction_patterns,
+            'FFT Shift Diffraction Patterns',
+            tool_tip='When checked, the diffraction patterns will be FFT-shifted.',
         )
         self._save_data_on_device_view_controller = CheckBoxParameterViewController(
             settings.save_data_on_device,
@@ -164,15 +189,26 @@ class PtyChiReconstructorViewController(ParameterViewController):
 
         layout = QFormLayout()
         layout.addRow('Number of Epochs:', self._num_epochs_view_controller.get_widget())
-        layout.addRow('Batch Size:', self._batch_size_view_controller.get_widget())
-        layout.addRow('Batch Mode:', self._batching_mode_view_controller.get_widget())
-        layout.addRow('Update Clustering:', self._compact_mode_update_clustering.get_widget())
 
-        if repository:
-            layout.addRow(self._device_view_controller.get_widget())
+        if dm_settings is None:
+            layout.addRow('Batch Size:', self._batch_size_view_controller.get_widget())
+            layout.addRow('Batch Mode:', self._batching_mode_view_controller.get_widget())
+            layout.addRow(
+                'Update Clustering:',
+                self._compact_mode_update_clustering_view_controller.get_widget(),
+            )
 
-        layout.addRow('Precision:', self._precision_view_controller.get_widget())
+        layout.addRow(self._device_view_controller.get_widget())
+        layout.addRow('Compute Precision:', self._compute_precision_view_controller.get_widget())
+        layout.addRow('FFT Precision:', self._fft_precision_view_controller.get_widget())
+        layout.addRow(self.allow_nondeterministic_algorithms_view_controller.get_widget())
+
         layout.addRow(self._use_low_memory_view_controller.get_widget())
+        layout.addRow('Pad For Shift:', self._pad_for_shift_view_controller.get_widget())
+
+        layout.addRow(self._use_far_field_propagation_view_controller.get_widget())
+        layout.addRow(self._fft_shift_diffraction_patterns_view_controller.get_widget())
+        layout.addRow(self._save_data_on_device_view_controller.get_widget())
 
         if autodiff_settings is not None:
             self._loss_function_view_controller = ComboBoxParameterViewController(
@@ -248,6 +284,14 @@ class PtyChiReconstructorViewController(ParameterViewController):
             layout.addRow(
                 self._momentum_acceleration_gradient_mixing_factor_view_controller.get_widget()
             )
+
+            self._rescale_probe_intensity_in_first_epoch_view_controller = (
+                CheckBoxParameterViewController(
+                    lsqml_settings.rescale_probe_intensity_in_first_epoch,
+                    'Rescale Probe Intensity In First Epoch',
+                )
+            )
+            layout.addRow(self._rescale_probe_intensity_in_first_epoch_view_controller.get_widget())
 
         self._widget.setLayout(layout)
 
