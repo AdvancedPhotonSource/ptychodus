@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QHBoxLayout, QSpinBox, QWidget
+from PyQt5.QtWidgets import QHBoxLayout, QLabel, QSpinBox, QWidget
 
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import IntegerParameter, StringParameter
@@ -76,9 +76,12 @@ class PtyChiOptimizationPlanViewController(ParameterViewController):
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self._start_view_controller.get_widget())
-        layout.addWidget(self._stop_view_controller.get_widget())
-        layout.addWidget(self._stride_view_controller.get_widget())
+        layout.addWidget(QLabel('Start'), 0)
+        layout.addWidget(self._start_view_controller.get_widget(), 1)
+        layout.addWidget(QLabel('Stop'), 0)
+        layout.addWidget(self._stop_view_controller.get_widget(), 1)
+        layout.addWidget(QLabel('Stride'), 0)
+        layout.addWidget(self._stride_view_controller.get_widget(), 1)
         self._widget.setLayout(layout)
 
     def get_widget(self) -> QWidget:

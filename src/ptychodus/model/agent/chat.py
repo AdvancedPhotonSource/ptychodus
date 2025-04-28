@@ -6,14 +6,24 @@ from typing import overload
 
 
 class ChatRole(Enum):
-    HUMAN = auto()
-    AI = auto()
+    SYSTEM = auto()
+    USER = auto()
+    AGENT = auto()
 
 
 @dataclass(frozen=True)
 class ChatMessage:
     role: ChatRole
     content: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            'role': self.role.name.lower(),
+            'content': self.content,
+        }
+
+    def __str__(self) -> str:
+        return str(self.to_dict())
 
 
 class ChatTerminal(ABC):

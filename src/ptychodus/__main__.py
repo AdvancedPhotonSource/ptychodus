@@ -136,7 +136,7 @@ def main() -> int:
 
         from ptychodus.controller import ControllerCore
 
-        controller = ControllerCore(model, view)
+        controller = ControllerCore(model, view, is_developer_mode_enabled=parsed_args.dev)
         controller.show_main_window(version_string())
 
         return app.exec()

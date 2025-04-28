@@ -24,11 +24,11 @@ class AgentMessageListModel(QAbstractListModel):
                 case Qt.ItemDataRole.DisplayRole:
                     return message.content
                 case Qt.ItemDataRole.TextAlignmentRole:
-                    return Qt.AlignRight if message.role == ChatRole.HUMAN else Qt.AlignLeft
+                    return Qt.AlignRight if message.role == ChatRole.USER else Qt.AlignLeft
                 case Qt.ItemDataRole.BackgroundRole:
-                    return self.LIGHT_BLUE if message.role == ChatRole.HUMAN else self.LIGHT_GREEN
+                    return self.LIGHT_BLUE if message.role == ChatRole.USER else self.LIGHT_GREEN
                 case Qt.ItemDataRole.ForegroundRole:
-                    return self.DARK_BLUE if message.role == ChatRole.HUMAN else self.DARK_GREEN
+                    return self.DARK_BLUE if message.role == ChatRole.USER else self.DARK_GREEN
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._history)

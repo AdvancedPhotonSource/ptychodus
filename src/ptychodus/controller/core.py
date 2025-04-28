@@ -25,7 +25,9 @@ from .workflow import WorkflowController
 
 
 class ControllerCore:
-    def __init__(self, model: ModelCore, view: ViewCore) -> None:
+    def __init__(
+        self, model: ModelCore, view: ViewCore, *, is_developer_mode_enabled: bool = False
+    ) -> None:
         self.view = view
 
         self._memory_controller = MemoryController(model.memory_presenter, view.memory_widget)
@@ -159,19 +161,20 @@ class ControllerCore:
 
         view.workflow_action.setVisible(model.workflow.is_supported)
 
-        self.swap_central_widgets(view.patterns_action)
+        self._swap_central_widgets(view.patterns_action)
         view.patterns_action.setChecked(True)
         view.navigation_action_group.triggered.connect(
-            lambda action: self.swap_central_widgets(action)
+            lambda action: self._swap_central_widgets(action)
         )
 
-        view.agent_action.setVisible(model.agent.is_supported)
+        view.agent_action.setVisible(is_developer_mode_enabled)
+        view.scan_view.button_box.analyze_button.setEnabled(is_developer_mode_enabled)
 
     def show_main_window(self, window_title: str) -> None:
         self.view.setWindowTitle(window_title)
         self.view.show()
 
-    def swap_central_widgets(self, action: QAction) -> None:
+    def _swap_central_widgets(self, action: QAction) -> None:
         index = action.data()
         self.view.left_panel.setCurrentIndex(index)
         self.view.right_panel.setCurrentIndex(index)

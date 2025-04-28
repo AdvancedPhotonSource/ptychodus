@@ -206,7 +206,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
 
         self._plot_view.figure_canvas.draw()
 
-    def _estimate_transform(self) -> None:  # FIXME
+    def _estimate_transform(self) -> None:  # TODO
         item_index = self._get_current_item_index()
 
         if item_index < 0:
