@@ -23,25 +23,14 @@ Build Docker image
 
 .. code-block:: shell
 
-   $ time docker build -t python-ptychodus .
+   $ podman build -t ptychodus:latest .
+
 
 Run container
 
 .. code-block:: shell
 
-   $ xhost +local:docker
-   $ docker run -it --rm  -e "DISPLAY=$DISPLAY" -v "$HOME/.Xauthority:/root/.Xauthority:ro" --network host \
+   $ xhost +local:podman
+   $ podman run -it --rm  -e "DISPLAY=$DISPLAY" -v "$HOME/.Xauthority:/root/.Xauthority:ro" --network host \
          --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 python-ptychodus
-   $ xhost -local:docker
-
-Check container status
-
-.. code-block:: shell
-
-   $ docker ps -a
-
-Clean up images
-
-.. code-block:: shell
-
-   $ sudo docker system prune -a
+   $ xhost -local:podman
