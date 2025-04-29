@@ -73,7 +73,7 @@ class STXMSimulator(Observable):
             )
 
         self._product_data = STXMData(
-            intensity=stitcher.stitch(),  # FIXME
+            intensity=stitcher.stitch(),
             pixel_geometry=object_geometry.get_pixel_geometry(),
             center=object_geometry.get_center(),
         )

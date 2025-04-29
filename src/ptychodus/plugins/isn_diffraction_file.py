@@ -41,7 +41,7 @@ class ISNDiffractionFileReader(DiffractionFileReader):
                 try:
                     configs = h5_file['configs']
                     num_patterns_per_array = int(configs['num_images'][()])
-                    num_patterns_total = 50 * num_patterns_per_array  # FIXME
+                    num_patterns_total = 50 * num_patterns_per_array  # TODO generalize
                     detector_distance_mm = float(configs['det_dist_mm'])
                     detector_width = int(configs['det_size_x'][()])
                     detector_height = int(configs['det_size_y'][()])

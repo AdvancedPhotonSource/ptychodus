@@ -149,6 +149,6 @@ class AffineTransformEstimator(Observable):
                         best_error = candidate_error_rms
                         best_model = candidate_model
 
-        # FIXME unscale best_model
+        # TODO broken: unscale best_model
 
         return best_model

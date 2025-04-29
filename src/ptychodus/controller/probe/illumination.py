@@ -41,7 +41,7 @@ class IlluminationViewController(Observer):
 
         mapper.add_observer(self)
 
-    def analyze(self, product_index: int) -> None:
+    def map(self, product_index: int) -> None:
         self._mapper.set_product(product_index)
 
         try:

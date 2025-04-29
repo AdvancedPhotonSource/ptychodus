@@ -92,7 +92,7 @@ class IlluminationMapper(Observable):
             stitcher.add_patch(
                 object_point.position_x_px,
                 object_point.position_y_px,
-                probe.get_intensity(),  # FIXME scaling
+                probe.get_intensity(),
             )
 
         self._product_data = IlluminationMap(

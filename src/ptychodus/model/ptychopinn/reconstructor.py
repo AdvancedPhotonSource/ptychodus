@@ -62,9 +62,9 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     MODEL_FILE_FILTER: Final[str] = 'Zipped Archive (*.zip)'
     TRAINING_DATA_FILE_FILTER: Final[str] = 'NumPy Zipped Archive (*.npz)'
 
-    # FIXME datasets for testing: xpp, "u", ALS
-    # FIXME normalize data in preprocessing step (see note in slack)
-    # FIXME ptychodus stitches
+    # TODO datasets for testing: xpp, "u", ALS
+    # TODO normalize data in preprocessing step (see note in slack)
+    # TODO ptychodus stitches
 
     def __init__(
         self,
@@ -182,13 +182,13 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         return self.MODEL_FILE_FILTER
 
     def open_model(self, file_path: Path) -> None:
-        # FIXME model path to/from settings
+        # TODO model path to/from settings
         self._inference_settings.model_path.set_value(file_path)
         # ModelManager updates global config (ptycho.params.cfg) when loading
         self._model_dict = ptycho.model_manager.ModelManager.load_multiple_models(
             file_path.parent / file_path.stem
         )
-        # FIXME update settings from ptycho.params.cfg after loading
+        # TODO update settings from ptycho.params.cfg after loading
 
     def save_model(self, file_path: Path) -> None:
         ptycho.model_manager.save(file_path)
@@ -225,7 +225,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             nll_weight=self._training_settings.nll_weight.get_value(),
             realspace_mae_weight=self._training_settings.realspace_mae_weight.get_value(),
             realspace_weight=self._training_settings.realspace_weight.get_value(),
-            nphotons=self._training_settings.nphotons.get_value(),  # FIXME
+            nphotons=self._training_settings.nphotons.get_value(),  # TODO get from product
             positions_provided=self._training_settings.positions_provided.get_value(),
             probe_trainable=self._training_settings.probe_trainable.get_value(),
             intensity_scale_trainable=self._training_settings.intensity_scale_trainable.get_value(),
@@ -243,9 +243,9 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         output_dir = self._training_settings.output_dir.get_value()
         self.save_model(output_dir)
         save_outputs(recon_amp, recon_phase, train_results, str(output_dir))
-        print(train_results.keys())  # FIXME remove
+        print(train_results.keys())  # TODO remove
         # dict_keys(['history', 'model_instance', 'reconstructed_obj', 'pred_amp', 'reconstructed_obj_cdi', 'stitched_obj', 'train_container', 'test_container', 'obj_tensor_full', 'global_offsets', 'recon_amp', 'recon_phase'])
-        # FIXME self._model_dict = train_results
+        # TODO self._model_dict = train_results
 
         losses: Sequence[LossValue] = []
-        return TrainOutput(losses, 0)  # FIXME
+        return TrainOutput(losses, 0)  # TODO

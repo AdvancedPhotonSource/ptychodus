@@ -43,8 +43,8 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         propagator_visualization_engine: VisualizationEngine,
         stxm_simulator: STXMSimulator,
         stxm_visualization_engine: VisualizationEngine,
-        exposure_analyzer: IlluminationMapper,
-        exposure_visualization_engine: VisualizationEngine,
+        illumination_mapper: IlluminationMapper,
+        illumination_visualization_engine: VisualizationEngine,
         fluorescence_enhancer: FluorescenceEnhancer,
         fluorescence_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
@@ -66,8 +66,8 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self._stxm_view_controller = STXMViewController(
             stxm_simulator, stxm_visualization_engine, file_dialog_factory
         )
-        self._exposure_view_controller = IlluminationViewController(
-            exposure_analyzer, exposure_visualization_engine, file_dialog_factory
+        self._illumination_view_controller = IlluminationViewController(
+            illumination_mapper, illumination_visualization_engine, file_dialog_factory
         )
         self._fluorescence_view_controller = FluorescenceViewController(
             fluorescence_enhancer, fluorescence_visualization_engine, file_dialog_factory
@@ -83,8 +83,8 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         propagator_visualization_engine: VisualizationEngine,
         stxm_simulator: STXMSimulator,
         stxm_visualization_engine: VisualizationEngine,
-        exposure_analyzer: IlluminationMapper,
-        exposure_visualization_engine: VisualizationEngine,
+        illumination_mapper: IlluminationMapper,
+        illumination_visualization_engine: VisualizationEngine,
         fluorescence_enhancer: FluorescenceEnhancer,
         fluorescence_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
@@ -100,8 +100,8 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             propagator_visualization_engine,
             stxm_simulator,
             stxm_visualization_engine,
-            exposure_analyzer,
-            exposure_visualization_engine,
+            illumination_mapper,
+            illumination_visualization_engine,
             fluorescence_enhancer,
             fluorescence_visualization_engine,
             view,
@@ -147,8 +147,8 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         stxm_action = view.button_box.analyze_menu.addAction('Simulate STXM...')
         stxm_action.triggered.connect(controller._simulate_stxm)
 
-        exposure_action = view.button_box.analyze_menu.addAction('Exposure...')
-        exposure_action.triggered.connect(controller._analyze_exposure)
+        illumination_action = view.button_box.analyze_menu.addAction('Map Illumination...')
+        illumination_action.triggered.connect(controller._map_illumination)
 
         fluorescence_action = view.button_box.analyze_menu.addAction('Enhance Fluorescence...')
         fluorescence_action.triggered.connect(controller._enhance_fluorescence)
@@ -259,13 +259,13 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         else:
             self._stxm_view_controller.simulate(item_index)
 
-    def _analyze_exposure(self) -> None:
+    def _map_illumination(self) -> None:
         item_index = self._get_current_item_index()
 
         if item_index < 0:
             logger.warning('No current item!')
         else:
-            self._exposure_view_controller.analyze(item_index)
+            self._illumination_view_controller.map(item_index)
 
     def _enhance_fluorescence(self) -> None:
         item_index = self._get_current_item_index()

@@ -35,7 +35,7 @@ class PtychoPINNTrainingSettings(Observable, Observer):
         self._group = registry.create_group('PtychoPINNTraining')
         self._group.add_observer(self)
 
-        self.nphotons = self._group.create_real_parameter('NPhotons', 1e6)  # FIXME remove
+        self.nphotons = self._group.create_real_parameter('NPhotons', 1e6)  # TODO remove
         self.data_dir = self._group.create_path_parameter(
             'data_dir', Path('/path/to/training_data')
         )

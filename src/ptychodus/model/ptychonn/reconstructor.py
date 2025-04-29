@@ -26,7 +26,7 @@ from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 logger = logging.getLogger(__name__)
 
 
-class CenterBoxMeanPhaseCenteringStrategy:  # FIXME USE
+class CenterBoxMeanPhaseCenteringStrategy:  # TODO USE
     def __call__(self, array: ComplexArrayType) -> ComplexArrayType:
         one_third_height = array.shape[-2] // 3
         one_third_width = array.shape[-1] // 3

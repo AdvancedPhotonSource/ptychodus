@@ -191,10 +191,12 @@ class MultimodalProbeBuilder(ParameterGroup):
         array = self._init_modes(geometry_provider, probes.get_array())
 
         try:
-            # FIXME verify opr_weights.shape
             opr_weights: RealArrayType | None = probes.get_opr_weights()
-        except ValueError:  # FIXME verify exception
+        except ValueError:
             opr_weights = self._init_opr_weights(geometry_provider)
+        else:
+            # TODO if opr_weights.shape[0] != num_scan_points: raise ValueError()
+            pass
 
         return ProbeSequence(
             array=array,
