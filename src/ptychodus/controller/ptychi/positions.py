@@ -1,4 +1,7 @@
-from PyQt5.QtWidgets import QFormLayout, QFrame, QWidget
+from typing import Any
+
+from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject
+from PyQt5.QtWidgets import QFormLayout, QFrame, QListView, QWidget
 
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import (
@@ -8,7 +11,11 @@ from ptychodus.api.parametric import (
     StringParameter,
 )
 
-from ...model.ptychi import PtyChiEnumerators, PtyChiProbePositionSettings
+from ...model.ptychi import (
+    PtyChiAffineDegreesOfFreedomBitField,
+    PtyChiEnumerators,
+    PtyChiProbePositionSettings,
+)
 from ..parametric import (
     CheckBoxParameterViewController,
     CheckableGroupBoxParameterViewController,
@@ -65,6 +72,65 @@ class PtyChiCrossCorrelationViewController(ParameterViewController, Observer):
             self._sync_model_to_view()
 
 
+class PtyChiAffineDegreesOfFreedomListModel(QAbstractListModel):
+    def __init__(self, parameter: IntegerParameter, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self._dof = PtyChiAffineDegreesOfFreedomBitField(parameter)
+
+    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+        value = super().flags(index)
+
+        if index.isValid():
+            value |= Qt.ItemFlag.ItemIsUserCheckable
+
+        return value
+
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+        if index.isValid():
+            if role == Qt.ItemDataRole.DisplayRole:
+                return self._dof[index.row()]
+            elif role == Qt.ItemDataRole.CheckStateRole:
+                return (
+                    Qt.CheckState.Checked
+                    if self._dof.is_bit_set(index.row())
+                    else Qt.CheckState.Unchecked
+                )
+
+    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
+        if index.isValid() and role == Qt.ItemDataRole.CheckStateRole:
+            self._dof.set_bit(index.row(), value == Qt.CheckState.Checked)
+            self.dataChanged.emit(index, index)
+            return True
+
+        return False
+
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
+        return len(self._dof)
+
+
+class PtyChiAffineDegreesOfFreedomViewController(ParameterViewController, Observer):
+    def __init__(self, parameter: IntegerParameter) -> None:
+        super().__init__()
+        self._parameter = parameter
+        self._list_model = PtyChiAffineDegreesOfFreedomListModel(parameter)
+        self._widget = QListView()
+        self._widget.setModel(self._list_model)
+
+        parameter.add_observer(self)
+        self._sync_model_to_view()
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+    def _sync_model_to_view(self) -> None:
+        self._list_model.beginResetModel()
+        self._list_model.endResetModel()
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self._sync_model_to_view()
+
+
 class PtyChiConstrainAffineTransformViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
@@ -86,8 +152,10 @@ class PtyChiConstrainAffineTransformViewController(CheckableGroupBoxParameterVie
         self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
-        # FIXME affine degrees of freedom: checkable combo box?
-        self._position_weight_update_interval_view_controller = SpinBoxParameterViewController(
+        self._degrees_of_freedom_view_controller = PtyChiAffineDegreesOfFreedomViewController(
+            degrees_of_freedom
+        )
+        self._weight_update_interval_view_controller = SpinBoxParameterViewController(
             position_weight_update_interval,
             tool_tip='Interval for updating the position weight.',
         )
@@ -100,10 +168,9 @@ class PtyChiConstrainAffineTransformViewController(CheckableGroupBoxParameterVie
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
-        # FIXE layout.addRow('Degrees of Freedom:', self._degrees_of_freedom_view_controller.get_widget())
+        layout.addRow('Degrees of Freedom:', self._degrees_of_freedom_view_controller.get_widget())
         layout.addRow(
-            'Position Weight Update Interval:',
-            self._position_weight_update_interval_view_controller.get_widget(),
+            'Weight Update Interval:', self._weight_update_interval_view_controller.get_widget()
         )
         layout.addRow(self._apply_constraint_view_controller.get_widget())
         layout.addRow(

@@ -50,6 +50,7 @@ from ptychodus.api.scan import PositionSequence, ScanPoint
 from ptychodus.api.typing import ComplexArrayType, RealArrayType
 
 from ..patterns import PatternSizer
+from .affine import PtyChiAffineDegreesOfFreedom, PtyChiAffineDegreesOfFreedomBitField
 from .settings import (
     PtyChiOPRSettings,
     PtyChiObjectSettings,
@@ -446,6 +447,9 @@ class PtyChiProbeOptionsHelper:
 class PtyChiProbePositionOptionsHelper:
     def __init__(self, settings: PtyChiProbePositionSettings) -> None:
         self._settings = settings
+        self._affine_dof = PtyChiAffineDegreesOfFreedomBitField(
+            settings.constrain_affine_transform_degrees_of_freedom
+        )
 
     @property
     def optimizable(self) -> bool:
@@ -507,7 +511,22 @@ class PtyChiProbePositionOptionsHelper:
 
     @property
     def affine_transform_constraint(self) -> PositionAffineTransformConstraintOptions:
-        degrees_of_freedom: list[AffineDegreesOfFreedom] = list()  # FIXME
+        degrees_of_freedom: list[AffineDegreesOfFreedom] = list()
+
+        if self._affine_dof.is_bit_set(PtyChiAffineDegreesOfFreedom.TRANSLATION):
+            degrees_of_freedom.append(AffineDegreesOfFreedom.TRANSLATION)
+
+        if self._affine_dof.is_bit_set(PtyChiAffineDegreesOfFreedom.ROTATION):
+            degrees_of_freedom.append(AffineDegreesOfFreedom.ROTATION)
+
+        if self._affine_dof.is_bit_set(PtyChiAffineDegreesOfFreedom.SCALING):
+            degrees_of_freedom.append(AffineDegreesOfFreedom.SCALE)
+
+        if self._affine_dof.is_bit_set(PtyChiAffineDegreesOfFreedom.SHEARING):
+            degrees_of_freedom.append(AffineDegreesOfFreedom.SHEAR)
+
+        if self._affine_dof.is_bit_set(PtyChiAffineDegreesOfFreedom.ASYMMETRY):
+            degrees_of_freedom.append(AffineDegreesOfFreedom.ASSYMETRY)
 
         return PositionAffineTransformConstraintOptions(
             enabled=self._settings.constrain_affine_transform.get_value(),
