@@ -351,10 +351,12 @@ class PtyChiProbePositionSettings(Observable, Observer):
         self.cross_correlation_probe_threshold = self._group.create_real_parameter(
             'CrossCorrelationProbeThreshold', 0.1, minimum=0.0, maximum=1.0
         )
+
+        self.limit_update_magnitude = self._group.create_boolean_parameter(
+            'LimitUpdateMagnitude', False
+        )
         self.update_magnitude_limit = self._group.create_real_parameter(
-            'UpdateMagnitudeLimit',
-            float('inf'),
-            minimum=0.0,
+            'UpdateMagnitudeLimit', 1.0, minimum=0.0
         )
 
         self.constrain_affine_transform = self._group.create_boolean_parameter(

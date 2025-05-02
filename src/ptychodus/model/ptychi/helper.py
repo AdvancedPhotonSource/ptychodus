@@ -499,6 +499,12 @@ class PtyChiProbePositionOptionsHelper:
             )
             differentiation_method = ImageGradientMethods.GAUSSIAN
 
+        update_magnitude_limit = (
+            self._settings.update_magnitude_limit.get_value()
+            if self._settings.limit_update_magnitude.get_value()
+            else float('inf')
+        )
+
         return PositionCorrectionOptions(
             correction_type=correction_type,
             differentiation_method=differentiation_method,
@@ -506,7 +512,7 @@ class PtyChiProbePositionOptionsHelper:
             cross_correlation_real_space_width=self._settings.cross_correlation_real_space_width.get_value(),
             cross_correlation_probe_threshold=self._settings.cross_correlation_probe_threshold.get_value(),
             slice_for_correction=0,  # TODO
-            update_magnitude_limit=self._settings.update_magnitude_limit.get_value(),
+            update_magnitude_limit=update_magnitude_limit,
         )
 
     @property

@@ -72,6 +72,42 @@ class PtyChiCrossCorrelationViewController(ParameterViewController, Observer):
             self._sync_model_to_view()
 
 
+class PtyChiUpdateMagnitudeLimitViewController(ParameterViewController, Observer):
+    def __init__(
+        self,
+        limit_update_magnitude: BooleanParameter,
+        update_magnitude_limit: RealParameter,
+    ) -> None:
+        self._limit_update_magnitude = limit_update_magnitude
+        self._limit_update_magnitude_view_controller = CheckBoxParameterViewController(
+            limit_update_magnitude,
+            'Limit Update Magnitude:',
+            tool_tip='Whether to limit the update magnitude.',
+        )
+        self._update_magnitude_limit_view_controller = DecimalLineEditParameterViewController(
+            update_magnitude_limit,
+            tool_tip='Maximum allowed magnitude of position update in each axis.',
+        )
+
+        limit_update_magnitude.add_observer(self)
+        self._sync_model_to_view()
+
+    def get_label(self) -> QWidget:
+        return self._limit_update_magnitude_view_controller.get_widget()
+
+    def get_widget(self) -> QWidget:
+        return self._update_magnitude_limit_view_controller.get_widget()
+
+    def _sync_model_to_view(self) -> None:
+        self._update_magnitude_limit_view_controller.get_widget().setEnabled(
+            self._limit_update_magnitude.get_value()
+        )
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._limit_update_magnitude:
+            self._sync_model_to_view()
+
+
 class PtyChiAffineDegreesOfFreedomListModel(QAbstractListModel):
     def __init__(self, parameter: IntegerParameter, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -224,10 +260,10 @@ class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewControlle
             settings.cross_correlation_real_space_width,
             settings.cross_correlation_probe_threshold,
         )
-        self._update_magnitude_limit_view_controller = DecimalLineEditParameterViewController(
+        self._update_magnitude_limit_view_controller = PtyChiUpdateMagnitudeLimitViewController(
+            settings.limit_update_magnitude,
             settings.update_magnitude_limit,
-            tool_tip='Maximum allowed magnitude of position update in each axis.',
-        )  # FIXME verify inf is handled correctly
+        )
         self._constrain_affine_transform_view_controller = (
             PtyChiConstrainAffineTransformViewController(
                 settings.constrain_affine_transform,
@@ -253,7 +289,8 @@ class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewControlle
         )
         layout.addRow(self._cross_correlation_view_controller.get_widget())
         layout.addRow(
-            'Update Magnitude Limit:', self._update_magnitude_limit_view_controller.get_widget()
+            self._update_magnitude_limit_view_controller.get_label(),
+            self._update_magnitude_limit_view_controller.get_widget(),
         )
         layout.addRow(self._constrain_affine_transform_view_controller.get_widget())
         self.get_widget().setLayout(layout)
