@@ -60,8 +60,8 @@ class PtyChiPrecisionParameterViewController(ParameterViewController, Observer):
         self._button_group = QButtonGroup()
         self._widget = QWidget()
 
-        self._single_precision_button.setToolTip('Compute using single precision.')
-        self._double_precision_button.setToolTip('Compute using double precision.')
+        self._single_precision_button.setToolTip('Compute using single precision')
+        self._double_precision_button.setToolTip('Compute using double precision')
 
         if tool_tip:
             self._widget.setToolTip(tool_tip)
@@ -104,14 +104,16 @@ class PtyChiMomentumAccelerationGradientMixingFactorViewController(
         self,
         use_gradient_mixing_factor: BooleanParameter,
         gradient_mixing_factor: RealParameter,
+        *,
+        tool_tip: str = '',
     ) -> None:
         super().__init__(
             use_gradient_mixing_factor,
             'Use Gradient Mixing Factor',
-            tool_tip='Controls how the current gradient is mixed with the accumulated velocity in LSQML momentum acceleration.',
+            tool_tip='Controls how the current gradient is mixed with the accumulated velocity in LSQML momentum acceleration',
         )
         self._gradient_mixing_factor_view_controller = DecimalLineEditParameterViewController(
-            gradient_mixing_factor
+            gradient_mixing_factor, tool_tip=tool_tip
         )
 
         layout = QVBoxLayout()
@@ -131,59 +133,59 @@ class PtyChiReconstructorViewController(ParameterViewController):
     ) -> None:
         super().__init__()
         self._num_epochs_view_controller = SpinBoxParameterViewController(
-            settings.num_epochs, tool_tip='Number of epochs to run.'
+            settings.num_epochs, tool_tip='Number of epochs to run'
         )
         self._batch_size_view_controller = SpinBoxParameterViewController(
-            settings.batch_size, tool_tip='Number of data to process in each minibatch.'
+            settings.batch_size, tool_tip='Number of data to process in each minibatch'
         )
         self._batching_mode_view_controller = ComboBoxParameterViewController(
-            settings.batching_mode, enumerators.batching_modes(), tool_tip='Batching mode to use.'
+            settings.batching_mode, enumerators.batching_modes(), tool_tip='Batching mode to use'
         )
         self._compact_mode_update_clustering_view_controller = SpinBoxParameterViewController(
             settings.compact_mode_update_clustering,
-            tool_tip='When greater than zero, the number of epochs between updating clusters in compact batching mode.',
+            tool_tip='When greater than zero, the number of epochs between updating clusters in compact batching mode',
         )
         self._device_view_controller = PtyChiDeviceViewController(
-            settings.use_devices, repository, tool_tip='Default device to use for computation.'
+            settings.use_devices, repository, tool_tip='Default device to use for computation'
         )
         self._compute_precision_view_controller = PtyChiPrecisionParameterViewController(
             settings.use_double_precision,
-            tool_tip='Floating point precision to use for computation.',
+            tool_tip='Floating point precision to use for computation',
         )
         self._fft_precision_view_controller = PtyChiPrecisionParameterViewController(
             settings.use_double_precision_for_fft,
-            tool_tip='Floating point precision to use for critical FFT operations.',
+            tool_tip='Floating point precision to use for critical FFT operations',
         )
         self.allow_nondeterministic_algorithms_view_controller = CheckBoxParameterViewController(
             settings.allow_nondeterministic_algorithms,
             'Allow Nondeterministic Algorithms',
-            tool_tip='When checked, nondeterministic algorithms will be used. This may lead to different results on different runs.',
+            tool_tip='When checked, nondeterministic algorithms will be used. This may lead to different results on different runs',
         )
 
         self._use_low_memory_view_controller = CheckBoxParameterViewController(
             settings.use_low_memory_mode,
             'Use Low Memory Mode',
-            tool_tip='When checked, forward propagation of ptychography will be done using less vectorized code. This reduces the speed, but also lowers memory usage.',
+            tool_tip='When checked, forward propagation of ptychography will be done using less vectorized code. This reduces the speed, but also lowers memory usage',
         )
         self._pad_for_shift_view_controller = SpinBoxParameterViewController(
             settings.pad_for_shift,
-            tool_tip='Number of pixels to pad arrays (with border values) before shifting.',
+            tool_tip='Number of pixels to pad arrays (with border values) before shifting',
         )
 
         self._use_far_field_propagation_view_controller = CheckBoxParameterViewController(
             settings.use_far_field_propagation,
             'Use Far Field Propagation',
-            tool_tip='When checked, far field propagation will be used instead of near field propagation.',
+            tool_tip='When checked, far field propagation will be used instead of near field propagation',
         )
         self._fft_shift_diffraction_patterns_view_controller = CheckBoxParameterViewController(
             settings.fft_shift_diffraction_patterns,
             'FFT Shift Diffraction Patterns',
-            tool_tip='When checked, the diffraction patterns will be FFT-shifted.',
+            tool_tip='When checked, the diffraction patterns will be FFT-shifted',
         )
         self._save_data_on_device_view_controller = CheckBoxParameterViewController(
             settings.save_data_on_device,
             'Save Data on Device',
-            tool_tip='When checked, diffraction data will be saved on the device.',
+            tool_tip='When checked, diffraction data will be saved on the device',
         )
         self._widget = QGroupBox('Reconstructor')
 
@@ -212,18 +214,25 @@ class PtyChiReconstructorViewController(ParameterViewController):
 
         if autodiff_settings is not None:
             self._loss_function_view_controller = ComboBoxParameterViewController(
-                autodiff_settings.loss_function, enumerators.loss_functions()
+                autodiff_settings.loss_function,
+                enumerators.loss_functions(),
+                tool_tip='Loss function to optimize',
             )
             layout.addRow('Loss Function:', self._loss_function_view_controller.get_widget())
 
             self._forward_model_class_view_controller = ComboBoxParameterViewController(
-                autodiff_settings.forward_model_class, enumerators.forward_models()
+                autodiff_settings.forward_model_class,
+                enumerators.forward_models(),
+                tool_tip='Forward model class',
             )
             layout.addRow('Forward Model:', self._forward_model_class_view_controller.get_widget())
 
         if dm_settings is not None:
             self._exit_wave_update_relaxation_view_controller = (
-                DecimalSliderParameterViewController(dm_settings.exit_wave_update_relaxation)
+                DecimalSliderParameterViewController(
+                    dm_settings.exit_wave_update_relaxation,
+                    tool_tip='Relaxation multiplier for the exit wave update',
+                )
             )
             layout.addRow(
                 'Exit Wave Update Relaxation:',
@@ -231,18 +240,22 @@ class PtyChiReconstructorViewController(ParameterViewController):
             )
 
             self._chunk_length_view_controller = SpinBoxParameterViewController(
-                dm_settings.chunk_length
+                dm_settings.chunk_length,
+                tool_tip='Number of scan positions used in each chunk of the exit wave update loop',
             )
             layout.addRow('Chunk Length:', self._chunk_length_view_controller.get_widget())
 
         if lsqml_settings is not None:
             self._noise_model_view_controller = ComboBoxParameterViewController(
-                lsqml_settings.noise_model, enumerators.noise_models()
+                lsqml_settings.noise_model,
+                enumerators.noise_models(),
+                tool_tip='Noise model to use',
             )
             layout.addRow('Noise Model:', self._noise_model_view_controller.get_widget())
 
             self._gaussian_noise_deviation_view_controller = DecimalLineEditParameterViewController(
-                lsqml_settings.gaussian_noise_deviation
+                lsqml_settings.gaussian_noise_deviation,
+                tool_tip='Standard deviation of the Gaussian noise',
             )
             layout.addRow(
                 'Gaussian Noise Deviation:',
@@ -252,44 +265,45 @@ class PtyChiReconstructorViewController(ParameterViewController):
             self._solve_object_probe_step_size_jointly_for_first_slice_in_multislice_view_controller = CheckBoxParameterViewController(
                 lsqml_settings.solve_object_probe_step_size_jointly_for_first_slice_in_multislice,
                 'Solve Object Probe Step Size Jointly For First Slice In Multislice',
+                tool_tip='When checked, the object and probe step length calculation will be solved simultaneously',
             )
             layout.addRow(
                 self._solve_object_probe_step_size_jointly_for_first_slice_in_multislice_view_controller.get_widget()
             )
 
-            self._solve_step_sizes_only_using_first_probe_mode_view_controller = (
-                CheckBoxParameterViewController(
-                    lsqml_settings.solve_step_sizes_only_using_first_probe_mode,
-                    'Solve Step Sizes Only Using First Probe Mode',
-                )
+            self._solve_step_sizes_only_using_first_probe_mode_view_controller = CheckBoxParameterViewController(
+                lsqml_settings.solve_step_sizes_only_using_first_probe_mode,
+                'Solve Step Sizes Only Using First Probe Mode',
+                tool_tip='When checked, the step sizes will be calculated using only the first probe mode',
             )
             layout.addRow(
                 self._solve_step_sizes_only_using_first_probe_mode_view_controller.get_widget()
             )
 
             self._momentum_acceleration_gain_view_controller = (
-                DecimalLineEditParameterViewController(lsqml_settings.momentum_acceleration_gain)
+                DecimalLineEditParameterViewController(
+                    lsqml_settings.momentum_acceleration_gain,
+                    tool_tip='Gain of momentum accleration',
+                )
             )
             layout.addRow(
                 'Momentum Acceleration Gain:',
                 self._momentum_acceleration_gain_view_controller.get_widget(),
             )
 
-            self._momentum_acceleration_gradient_mixing_factor_view_controller = (
-                PtyChiMomentumAccelerationGradientMixingFactorViewController(
-                    lsqml_settings.use_momentum_acceleration_gradient_mixing_factor,
-                    lsqml_settings.momentum_acceleration_gradient_mixing_factor,
-                )
+            self._momentum_acceleration_gradient_mixing_factor_view_controller = PtyChiMomentumAccelerationGradientMixingFactorViewController(
+                lsqml_settings.use_momentum_acceleration_gradient_mixing_factor,
+                lsqml_settings.momentum_acceleration_gradient_mixing_factor,
+                tool_tip='Controls how the current gradient is mixed with the accumulated velocity in LSQML momentum acceleration',
             )
             layout.addRow(
                 self._momentum_acceleration_gradient_mixing_factor_view_controller.get_widget()
             )
 
-            self._rescale_probe_intensity_in_first_epoch_view_controller = (
-                CheckBoxParameterViewController(
-                    lsqml_settings.rescale_probe_intensity_in_first_epoch,
-                    'Rescale Probe Intensity In First Epoch',
-                )
+            self._rescale_probe_intensity_in_first_epoch_view_controller = CheckBoxParameterViewController(
+                lsqml_settings.rescale_probe_intensity_in_first_epoch,
+                'Rescale Probe Intensity In First Epoch',
+                tool_tip='When checked, the probe intensity will be rescaled on the first epoch',
             )
             layout.addRow(self._rescale_probe_intensity_in_first_epoch_view_controller.get_widget())
 

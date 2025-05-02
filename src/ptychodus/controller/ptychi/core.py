@@ -41,7 +41,6 @@ class PtyChiViewController(QWidget):
             case 'PIE' | 'ePIE' | 'rPIE':
                 pie_settings = model.pie_settings
 
-        # FIXME verify tooltips
         self._reconstructor_view_controller = PtyChiReconstructorViewController(
             model.settings,
             autodiff_settings,

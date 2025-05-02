@@ -41,13 +41,13 @@ class PtyChiCrossCorrelationViewController(ParameterViewController, Observer):
         super().__init__()
         self._algorithm = algorithm
         self._scale_view_controller = SpinBoxParameterViewController(
-            scale, tool_tip='Upsampling factor of the cross-correlation in real space.'
+            scale, tool_tip='Upsampling factor of the cross-correlation in real space'
         )
         self._real_space_width_view_controller = DecimalLineEditParameterViewController(
             real_space_width, tool_tip='Width of the cross-correlation in real-space'
         )
         self._probe_threshold_view_controller = DecimalSliderParameterViewController(
-            probe_threshold, tool_tip='Probe intensity threshold used to calculate the probe mask.'
+            probe_threshold, tool_tip='Probe intensity threshold used to calculate the probe mask'
         )
         self._widget = QFrame()
         self._widget.setFrameShape(QFrame.StyledPanel)
@@ -82,11 +82,11 @@ class PtyChiUpdateMagnitudeLimitViewController(ParameterViewController, Observer
         self._limit_update_magnitude_view_controller = CheckBoxParameterViewController(
             limit_update_magnitude,
             'Limit Update Magnitude:',
-            tool_tip='Whether to limit the update magnitude.',
+            tool_tip='Whether to limit the update magnitude',
         )
         self._update_magnitude_limit_view_controller = DecimalLineEditParameterViewController(
             update_magnitude_limit,
-            tool_tip='Maximum allowed magnitude of position update in each axis.',
+            tool_tip='Maximum allowed magnitude of position update in each axis',
         )
 
         limit_update_magnitude.add_observer(self)
@@ -183,7 +183,7 @@ class PtyChiConstrainAffineTransformViewController(CheckableGroupBoxParameterVie
         super().__init__(
             is_optimizable,
             'Constrain Affine Transform',
-            tool_tip='Constrain the affine transform during position correction.',
+            tool_tip='Constrain the affine transform during position correction',
         )
         self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
@@ -193,13 +193,13 @@ class PtyChiConstrainAffineTransformViewController(CheckableGroupBoxParameterVie
         )
         self._weight_update_interval_view_controller = SpinBoxParameterViewController(
             position_weight_update_interval,
-            tool_tip='Interval for updating the position weight.',
+            tool_tip='Interval for updating the position weight',
         )
         self._apply_constraint_view_controller = CheckBoxParameterViewController(
-            apply_constraint, 'Apply Constraint', tool_tip='Whether to apply the constraint.'
+            apply_constraint, 'Apply Constraint', tool_tip='Whether to apply the constraint'
         )
         self._max_expected_error_px_view_controller = DecimalLineEditParameterViewController(
-            max_expected_error_px, tool_tip='Maximum expected error in pixels.'
+            max_expected_error_px, tool_tip='Maximum expected error in pixels'
         )
 
         layout = QFormLayout()
@@ -225,7 +225,7 @@ class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewControlle
         super().__init__(
             settings.is_optimizable,
             'Optimize Probe Positions',
-            tool_tip='Whether the probe positions are optimizable.',
+            tool_tip='Whether the probe positions are optimizable',
         )
         self._optimization_plan_view_controller = PtyChiOptimizationPlanViewController(
             settings.optimization_plan_start,
@@ -242,17 +242,17 @@ class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewControlle
         self._constrain_centroid_view_controller = CheckBoxParameterViewController(
             settings.constrain_centroid,
             'Constrain Centroid',
-            tool_tip='Whether to subtract the mean from positions after updating positions.',
+            tool_tip='Whether to subtract the mean from positions after updating positions',
         )
         self._correction_type_view_controller = ComboBoxParameterViewController(
             settings.correction_type,
             enumerators.position_correction_types(),
-            tool_tip='Algorithm used to calculate the position correction update.',
+            tool_tip='Algorithm used to calculate the position correction update',
         )
         self._differentiation_method_view_controller = ComboBoxParameterViewController(
             settings.differentiation_method,
             enumerators.image_gradient_methods(),
-            tool_tip='Method for calculating the object gradient.',
+            tool_tip='Method for calculating the object gradient',
         )
         self._cross_correlation_view_controller = PtyChiCrossCorrelationViewController(
             settings.correction_type,

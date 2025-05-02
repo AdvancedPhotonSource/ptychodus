@@ -35,7 +35,7 @@ class PtyChiConstrainProbePowerViewController(CheckableGroupBoxParameterViewCont
         num_epochs: IntegerParameter,
     ) -> None:
         super().__init__(
-            constrain_power, 'Constrain Power', tool_tip='Whether to constrain probe power.'
+            constrain_power, 'Constrain Power', tool_tip='Whether to constrain probe power'
         )
         self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
@@ -60,7 +60,7 @@ class PtyChiOrthogonalizeIncoherentModesViewController(CheckableGroupBoxParamete
         super().__init__(
             orthogonalize_modes,
             'Orthogonalize Incoherent Modes',
-            tool_tip='Whether to orthogonalize incoherent probe modes.',
+            tool_tip='Whether to orthogonalize incoherent probe modes',
         )
         self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
@@ -68,7 +68,7 @@ class PtyChiOrthogonalizeIncoherentModesViewController(CheckableGroupBoxParamete
         self._method_view_controller = ComboBoxParameterViewController(
             method,
             enumerators.orthogonalization_methods(),
-            tool_tip='Method to use for incoherent mode orthogonalization.',
+            tool_tip='Method to use for incoherent mode orthogonalization',
         )
 
         layout = QFormLayout()
@@ -89,7 +89,7 @@ class PtyChiOrthogonalizeOPRModesViewController(CheckableGroupBoxParameterViewCo
         super().__init__(
             orthogonalize_modes,
             'Orthogonalize OPR Modes',
-            tool_tip='Whether to orthogonalize OPR modes.',
+            tool_tip='Whether to orthogonalize OPR modes',
         )
         self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
@@ -113,13 +113,13 @@ class PtyChiConstrainSupportViewController(CheckableGroupBoxParameterViewControl
         super().__init__(
             constrain_support,
             'Constrain Support',
-            tool_tip='When enabled, the probe will be shrinkwrapped so that small values are set to zero.',
+            tool_tip='When enabled, the probe will be shrinkwrapped so that small values are set to zero',
         )
         self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
         self._threshold_view_controller = DecimalLineEditParameterViewController(
-            threshold, tool_tip='Threshold for the probe support constraint.'
+            threshold, tool_tip='Threshold for the probe support constraint'
         )
 
         layout = QFormLayout()
@@ -140,7 +140,7 @@ class PtyChiConstrainCenterViewController(CheckableGroupBoxParameterViewControll
         super().__init__(
             constrain_center,
             'Constrain Center',
-            tool_tip='When enabled, the probe center of mass will be constrained to the center of the probe array.',
+            tool_tip='When enabled, the probe center of mass will be constrained to the center of the probe array',
         )
         self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
@@ -162,7 +162,7 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
         enumerators: PtyChiEnumerators,
     ) -> None:
         super().__init__(
-            settings.is_optimizable, 'Optimize Probe', tool_tip='Whether the probe is optimizable.'
+            settings.is_optimizable, 'Optimize Probe', tool_tip='Whether the probe is optimizable'
         )
         self._optimization_plan_view_controller = PtyChiOptimizationPlanViewController(
             settings.optimization_plan_start,
@@ -218,7 +218,7 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
         )
         self._relax_eigenmode_update_view_controller = DecimalSliderParameterViewController(
             settings.relax_eigenmode_update,
-            tool_tip='Relaxation factor for the eigenmode update.',
+            tool_tip='Relaxation factor for the eigenmode update',
         )
 
         layout = QFormLayout()
@@ -236,13 +236,14 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
 
         if dm_settings is not None:
             self._inertia_view_controller = DecimalLineEditParameterViewController(
-                dm_settings.probe_inertia, tool_tip='Inertia for the probe update.'
+                dm_settings.probe_inertia, tool_tip='Inertia for the probe update'
             )
             layout.addRow('Inertia:', self._inertia_view_controller.get_widget())
 
         if lsqml_settings is not None:
             self._optimal_step_size_scaler_view_controller = DecimalLineEditParameterViewController(
-                lsqml_settings.probe_optimal_step_size_scaler
+                lsqml_settings.probe_optimal_step_size_scaler,
+                tool_tip='Optimal step size scaler for the probe update',
             )
             layout.addRow(
                 'Optimal Step Size Scaler:',
@@ -250,7 +251,9 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
             )
 
         if pie_settings is not None:
-            self._alpha = DecimalSliderParameterViewController(pie_settings.probe_alpha)
+            self._alpha = DecimalSliderParameterViewController(
+                pie_settings.probe_alpha, tool_tip='Relaxation factor for the probe update'
+            )
             layout.addRow('Alpha:', self._alpha.get_widget())
 
         self.get_widget().setLayout(layout)
