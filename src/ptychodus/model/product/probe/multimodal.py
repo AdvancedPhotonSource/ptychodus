@@ -183,11 +183,15 @@ class MultimodalProbeBuilder(ParameterGroup):
         return opr_weights
 
     def set_identity(self) -> None:
-        pass  # FIXME verify identity case
+        self.num_coherent_modes.set_value(1)
+        self.num_incoherent_modes.set_value(1)
 
     def build(
         self, probes: ProbeSequence, geometry_provider: ProbeGeometryProvider
     ) -> ProbeSequence:
+        if self.num_coherent_modes.get_value() <= 1 and self.num_incoherent_modes.get_value() <= 1:
+            return probes
+
         array = self._init_modes(geometry_provider, probes.get_array())
 
         try:

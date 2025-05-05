@@ -30,6 +30,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
     PROBE_PHOTON_COUNT: Final[str] = 'probe_photon_count'
     EXPOSURE_TIME: Final[str] = 'exposure_time_s'
     MASS_ATTENUATION: Final[str] = 'mass_attenuation_m2_kg'
+    TOMOGRAPHY_ANGLE: Final[str] = 'tomography_angle_deg'
 
     PROBE_ARRAY: Final[str] = 'probe'
     OPR_WEIGHTS: Final[str] = 'opr_weights'
@@ -64,6 +65,13 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
             except KeyError:
                 logger.debug('Mass attenuation not found.')
 
+            tomography_angle_deg = 0.0
+
+            try:
+                tomography_angle_deg = float(npz_file[self.TOMOGRAPHY_ANGLE])
+            except KeyError:
+                logger.debug('Tomography angle not found.')
+
             metadata = ProductMetadata(
                 name=str(npz_file[self.NAME]),
                 comments=str(npz_file[self.COMMENTS]),
@@ -72,6 +80,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
                 probe_photon_count=probe_photon_count,
                 exposure_time_s=float(npz_file[self.EXPOSURE_TIME]),
                 mass_attenuation_m2_kg=mass_attenuation_m2_kg,
+                tomography_angle_deg=tomography_angle_deg,
             )
 
             scan_indexes = npz_file[self.PROBE_POSITION_INDEXES]

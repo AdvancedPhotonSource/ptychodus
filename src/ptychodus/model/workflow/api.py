@@ -157,6 +157,8 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         probe_energy_eV: float | None = None,  # noqa: N803
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
+        mass_attenuation_m2_kg: float | None = None,
+        tomography_angle_deg: float | None = None,
     ) -> WorkflowProductAPI:
         product_index = self._product_api.insert_new_product(
             name,
@@ -165,6 +167,8 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             probe_energy_eV=probe_energy_eV,
             probe_photon_count=probe_photon_count,
             exposure_time_s=exposure_time_s,
+            mass_attenuation_m2_kg=mass_attenuation_m2_kg,
+            tomography_angle_deg=tomography_angle_deg,
         )
         return self._create_product_api(product_index)
 

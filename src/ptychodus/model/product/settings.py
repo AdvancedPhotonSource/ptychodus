@@ -28,6 +28,9 @@ class ProductSettings(Observable, Observer):
         self.mass_attenuation_m2_kg = self._group.create_real_parameter(
             'MassAttenuationSquareMetersPerKilogram', 0.0, minimum=0.0
         )
+        self.tomography_angle_deg = self._group.create_real_parameter(
+            'TomographyAngleInDegrees', 0.0
+        )
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:

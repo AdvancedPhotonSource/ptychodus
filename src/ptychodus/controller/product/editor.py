@@ -32,12 +32,13 @@ class ProductPropertyTableModel(QAbstractTableModel):
             'Fresnel Number',
             'Exposure Time [s]',
             'Mass Attenuation [m\u00b2/kg]',
+            'Tomography Angle [deg]',
         ]
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
 
-        if index.isValid() and index.column() in (8, 9):
+        if index.isValid() and index.row() in (8, 9, 10):
             value |= Qt.ItemFlag.ItemIsEditable
 
         return value
@@ -84,6 +85,8 @@ class ProductPropertyTableModel(QAbstractTableModel):
                             return f'{metadata_item.exposure_time_s.get_value():.4g}'
                         case 9:
                             return f'{metadata_item.mass_attenuation_m2_kg.get_value():.4g}'
+                        case 10:
+                            return f'{metadata_item.tomography_angle_deg.get_value():.4g}'
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
@@ -105,6 +108,14 @@ class ProductPropertyTableModel(QAbstractTableModel):
                         return False
 
                     metadata_item.mass_attenuation_m2_kg.set_value(mass_attenuation_m2_kg)
+                    return True
+                case 10:
+                    try:
+                        tomography_angle_deg = float(value)
+                    except ValueError:
+                        return False
+
+                    metadata_item.tomography_angle_deg.set_value(tomography_angle_deg)
                     return True
 
         return False

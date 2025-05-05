@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 import logging
 
-from torch import Tensor
+import torch
 import numpy
 
 from ptychi.api import (
@@ -340,7 +340,8 @@ class PtyChiObjectOptionsHelper:
         return pixel_geometry.aspect_ratio
 
     def get_position_origin_coords(self, object_: Object) -> RealArrayType:
-        return numpy.zeros(2)
+        # TODO return numpy.zeros(2)
+        return torch.zeros(2)  # type: ignore
 
 
 class PtyChiProbeOptionsHelper:
@@ -552,13 +553,11 @@ class PtyChiProbePositionOptionsHelper:
     ) -> tuple[RealArrayType, RealArrayType]:
         position_x_px: list[float] = list()
         position_y_px: list[float] = list()
-        rx_px = object_geometry.width_px / 2
-        ry_px = object_geometry.height_px / 2
 
         for scan_point in scan:
             object_point = object_geometry.map_scan_point_to_object_point(scan_point)
-            position_x_px.append(object_point.position_x_px - rx_px)
-            position_y_px.append(object_point.position_y_px - ry_px)
+            position_x_px.append(object_point.position_x_px)
+            position_y_px.append(object_point.position_y_px)
 
         return numpy.array(position_x_px), numpy.array(position_y_px)
 
@@ -675,11 +674,11 @@ class PtyChiOptionsHelper:
     def create_product(
         self,
         product: Product,
-        position_x_px: Tensor | numpy.ndarray,
-        position_y_px: Tensor | numpy.ndarray,
-        probe_array: Tensor | numpy.ndarray,
-        object_array: Tensor | numpy.ndarray,
-        opr_weights: Tensor | numpy.ndarray,
+        position_x_px: torch.Tensor | numpy.ndarray,
+        position_y_px: torch.Tensor | numpy.ndarray,
+        probe_array: torch.Tensor | numpy.ndarray,
+        object_array: torch.Tensor | numpy.ndarray,
+        opr_weights: torch.Tensor | numpy.ndarray,
         costs: Sequence[float],
     ) -> Product:
         object_in = product.object_

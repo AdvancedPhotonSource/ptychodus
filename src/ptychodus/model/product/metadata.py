@@ -60,6 +60,7 @@ class MetadataRepositoryItem(ParameterGroup):
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
         mass_attenuation_m2_kg: float | None = None,
+        tomography_angle_deg: float | None = None,
     ) -> None:
         super().__init__()
         self._settings = settings
@@ -104,6 +105,13 @@ class MetadataRepositoryItem(ParameterGroup):
 
         self._add_parameter('mass_attenuation_m2_kg', self.mass_attenuation_m2_kg)
 
+        self.tomography_angle_deg = settings.tomography_angle_deg.copy()
+
+        if tomography_angle_deg is not None:
+            self.tomography_angle_deg.set_value(tomography_angle_deg)
+
+        self._add_parameter('tomography_angle_deg', self.tomography_angle_deg)
+
     def assign(self, metadata: ProductMetadata) -> None:
         self.name.set_value(metadata.name)
         self.comments.set_value(metadata.comments)
@@ -112,6 +120,7 @@ class MetadataRepositoryItem(ParameterGroup):
         self.probe_photon_count.set_value(metadata.probe_photon_count)
         self.exposure_time_s.set_value(metadata.exposure_time_s)
         self.mass_attenuation_m2_kg.set_value(metadata.mass_attenuation_m2_kg)
+        self.tomography_angle_deg.set_value(metadata.tomography_angle_deg)
 
     def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
@@ -126,4 +135,5 @@ class MetadataRepositoryItem(ParameterGroup):
             probe_photon_count=self.probe_photon_count.get_value(),
             exposure_time_s=self.exposure_time_s.get_value(),
             mass_attenuation_m2_kg=self.mass_attenuation_m2_kg.get_value(),
+            tomography_angle_deg=self.tomography_angle_deg.get_value(),
         )

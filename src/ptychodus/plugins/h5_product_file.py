@@ -30,6 +30,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
     PROBE_PHOTON_COUNT: Final[str] = 'probe_photon_count'
     EXPOSURE_TIME: Final[str] = 'exposure_time_s'
     MASS_ATTENUATION: Final[str] = 'mass_attenuation_m2_kg'
+    TOMOGRAPHY_ANGLE: Final[str] = 'tomography_angle_deg'
 
     PROBE_ARRAY: Final[str] = 'probe'
     OPR_WEIGHTS: Final[str] = 'opr_weights'
@@ -66,6 +67,13 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             except KeyError:
                 logger.debug('Mass attenuation not found.')
 
+            tomography_angle_deg = 0.0
+
+            try:
+                tomography_angle_deg = float(h5_file.attrs[self.TOMOGRAPHY_ANGLE])
+            except KeyError:
+                logger.debug('Tomography angle not found.')
+
             metadata = ProductMetadata(
                 name=str(h5_file.attrs[self.NAME]),
                 comments=str(h5_file.attrs[self.COMMENTS]),
@@ -74,6 +82,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
                 probe_photon_count=probe_photon_count,
                 exposure_time_s=float(h5_file.attrs[self.EXPOSURE_TIME]),
                 mass_attenuation_m2_kg=mass_attenuation_m2_kg,
+                tomography_angle_deg=tomography_angle_deg,
             )
 
             h5_scan_indexes = h5_file[self.PROBE_POSITION_INDEXES]

@@ -91,6 +91,8 @@ class WorkflowAPI(ABC):
         probe_energy_eV: float | None = None,  # noqa: N803
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
+        mass_attenuation_m2_kg: float | None = None,
+        tomography_angle_deg: float | None = None,
     ) -> WorkflowProductAPI:
         """creates a new product"""
         pass

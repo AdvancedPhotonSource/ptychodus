@@ -49,6 +49,7 @@ class ProductRepositoryItemFactory:
         probe_photon_count: float | None = None,
         exposure_time_s: float | None = None,
         mass_attenuation_m2_kg: float | None = None,
+        tomography_angle_deg: float | None = None,
     ) -> ProductRepositoryItem:
         metadata_item = MetadataRepositoryItem(
             self._settings,
@@ -60,6 +61,7 @@ class ProductRepositoryItemFactory:
             probe_photon_count=probe_photon_count,
             exposure_time_s=exposure_time_s,
             mass_attenuation_m2_kg=mass_attenuation_m2_kg,
+            tomography_angle_deg=tomography_angle_deg,
         )
 
         if metadata_item.probe_photon_count.get_value() <= 0:
@@ -93,6 +95,7 @@ class ProductRepositoryItemFactory:
             probe_photon_count=product.metadata.probe_photon_count,
             exposure_time_s=product.metadata.exposure_time_s,
             mass_attenuation_m2_kg=product.metadata.mass_attenuation_m2_kg,
+            tomography_angle_deg=product.metadata.tomography_angle_deg,
         )
 
         scan_item = self._scan_item_factory.create(product.positions)
