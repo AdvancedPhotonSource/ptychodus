@@ -187,86 +187,16 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
         numpy.savez(file_path, **contents)
 
 
-class NPZPositionFileReader(PositionFileReader):
-    def read(self, file_path: Path) -> PositionSequence:
-        with numpy.load(file_path) as npz_file:
-            scan_indexes = npz_file[NPZProductFileIO.PROBE_POSITION_INDEXES]
-            scan_x_m = npz_file[NPZProductFileIO.PROBE_POSITION_X]
-            scan_y_m = npz_file[NPZProductFileIO.PROBE_POSITION_Y]
-
-        point_list: list[ScanPoint] = list()
-
-        for idx, x_m, y_m in zip(scan_indexes, scan_x_m, scan_y_m):
-            point = ScanPoint(idx, x_m, y_m)
-            point_list.append(point)
-
-        return PositionSequence(point_list)
-
-
-class NPZProbeFileReader(ProbeFileReader):
-    def read(self, file_path: Path) -> ProbeSequence:
-        with numpy.load(file_path) as npz_file:
-            try:
-                opr_weights = npz_file[NPZProductFileIO.OPR_WEIGHTS]
-            except KeyError:
-                logger.debug('OPR weights not found.')
-                opr_weights = None
-
-            pixel_geometry = PixelGeometry(
-                width_m=float(npz_file[NPZProductFileIO.PROBE_PIXEL_WIDTH]),
-                height_m=float(npz_file[NPZProductFileIO.PROBE_PIXEL_HEIGHT]),
-            )
-            return ProbeSequence(
-                array=npz_file[NPZProductFileIO.PROBE_ARRAY],
-                opr_weights=opr_weights,
-                pixel_geometry=pixel_geometry,
-            )
-
-
-class NPZObjectFileReader(ObjectFileReader):
-    def read(self, file_path: Path) -> Object:
-        with numpy.load(file_path) as npz_file:
-            pixel_geometry = PixelGeometry(
-                width_m=float(npz_file[NPZProductFileIO.OBJECT_PIXEL_WIDTH]),
-                height_m=float(npz_file[NPZProductFileIO.OBJECT_PIXEL_HEIGHT]),
-            )
-            center = ObjectCenter(
-                position_x_m=float(npz_file[NPZProductFileIO.OBJECT_CENTER_X]),
-                position_y_m=float(npz_file[NPZProductFileIO.OBJECT_CENTER_Y]),
-            )
-            return Object(
-                array=npz_file[NPZProductFileIO.OBJECT_ARRAY],
-                pixel_geometry=pixel_geometry,
-                center=center,
-                layer_spacing_m=npz_file[NPZProductFileIO.OBJECT_LAYER_SPACING],
-            )
-
-
 def register_plugins(registry: PluginRegistry) -> None:
     npz_product_file_io = NPZProductFileIO()
 
-    registry.product_file_readers.register_plugin(
+    registry.register_product_file_reader_with_adapters(
         npz_product_file_io,
         simple_name=NPZProductFileIO.SIMPLE_NAME,
         display_name=NPZProductFileIO.DISPLAY_NAME,
     )
     registry.product_file_writers.register_plugin(
         npz_product_file_io,
-        simple_name=NPZProductFileIO.SIMPLE_NAME,
-        display_name=NPZProductFileIO.DISPLAY_NAME,
-    )
-    registry.position_file_readers.register_plugin(
-        NPZPositionFileReader(),
-        simple_name=NPZProductFileIO.SIMPLE_NAME,
-        display_name=NPZProductFileIO.DISPLAY_NAME,
-    )
-    registry.probe_file_readers.register_plugin(
-        NPZProbeFileReader(),
-        simple_name=NPZProductFileIO.SIMPLE_NAME,
-        display_name=NPZProductFileIO.DISPLAY_NAME,
-    )
-    registry.object_file_readers.register_plugin(
-        NPZObjectFileReader(),
         simple_name=NPZProductFileIO.SIMPLE_NAME,
         display_name=NPZProductFileIO.DISPLAY_NAME,
     )

@@ -192,7 +192,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
 def register_plugins(registry: PluginRegistry) -> None:
     h5_product_file_io = H5ProductFileIO()
 
-    registry.product_file_readers.register_plugin(
+    registry.register_product_file_reader_with_adapters(
         h5_product_file_io,
         simple_name=H5ProductFileIO.SIMPLE_NAME,
         display_name=H5ProductFileIO.DISPLAY_NAME,

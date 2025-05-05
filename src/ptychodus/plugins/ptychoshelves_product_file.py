@@ -108,7 +108,7 @@ class PtychoShelvesProductFileReader(ProductFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.product_file_readers.register_plugin(
+    registry.register_product_file_reader_with_adapters(
         PtychoShelvesProductFileReader(),
         simple_name=PtychoShelvesProductFileReader.SIMPLE_NAME,
         display_name=PtychoShelvesProductFileReader.DISPLAY_NAME,

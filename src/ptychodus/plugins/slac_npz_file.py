@@ -96,7 +96,7 @@ def register_plugins(registry: PluginRegistry) -> None:
         simple_name=SIMPLE_NAME,
         display_name=DISPLAY_NAME,
     )
-    registry.product_file_readers.register_plugin(
+    registry.register_product_file_reader_with_adapters(
         SLACProductFileReader(),
         simple_name=SIMPLE_NAME,
         display_name=DISPLAY_NAME,

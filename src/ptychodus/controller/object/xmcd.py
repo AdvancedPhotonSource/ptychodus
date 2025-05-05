@@ -29,6 +29,7 @@ class XMCDViewController(Observer):
         self._engine = engine
         self._file_dialog_factory = file_dialog_factory
         self._dialog = XMCDDialog()
+        self._dialog.setWindowTitle('X-ray Magnetic Circular Dichroism (XMCD)')
         self._dialog.parameters_view.lcirc_combo_box.setModel(tree_model)
         self._dialog.parameters_view.lcirc_combo_box.currentIndexChanged.connect(
             analyzer.set_lcirc_product
@@ -62,20 +63,8 @@ class XMCDViewController(Observer):
     def analyze(self, lcirc_product_index: int, rcirc_product_index: int) -> None:
         self._analyzer.set_lcirc_product(lcirc_product_index)
         self._analyzer.set_rcirc_product(rcirc_product_index)
-
-        try:
-            lcirc_product_name = self._analyzer.get_lcirc_product_name()
-            rcirc_product_name = self._analyzer.get_rcirc_product_name()
-        except Exception as err:
-            logger.exception(err)
-            ExceptionDialog.show_exception('Analyze XMCD', err)
-        else:
-            self._dialog.setWindowTitle(
-                f'Analyze XMCD: L: {lcirc_product_name} R: {rcirc_product_name}'
-            )
-            self._dialog.open()
-
         self._analyzer.analyze()
+        self._dialog.open()
 
     def _save_data(self) -> None:
         title = 'Save XMCD Data'

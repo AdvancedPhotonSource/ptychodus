@@ -1,6 +1,7 @@
 from __future__ import annotations
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
+from pathlib import Path
 from types import ModuleType
 from typing import Generic, TypeVar
 import importlib
@@ -14,13 +15,13 @@ from .fluorescence import (
     FluorescenceFileWriter,
     UpscalingStrategy,
 )
-from .object import ObjectFileReader, ObjectFileWriter
+from .object import ObjectFileReader, ObjectFileWriter, Object
 from .observer import Observable, Observer
 from .parametric import StringParameter
 from .patterns import DiffractionFileReader, DiffractionFileWriter
-from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter
+from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter, ProbeSequence
 from .product import ProductFileReader, ProductFileWriter
-from .scan import PositionFileReader, PositionFileWriter
+from .scan import PositionFileReader, PositionFileWriter, PositionSequence
 from .workflow import FileBasedWorkflow
 
 __all__ = [
@@ -31,6 +32,36 @@ __all__ = [
 T = TypeVar('T')
 
 logger = logging.getLogger(__name__)
+
+
+class ProductPositionFileReader(PositionFileReader):
+    def __init__(self, reader: ProductFileReader) -> None:
+        super().__init__()
+        self._reader = reader
+
+    def read(self, file_path: Path) -> PositionSequence:
+        product = self._reader.read(file_path)
+        return product.positions
+
+
+class ProductProbeFileReader(ProbeFileReader):
+    def __init__(self, reader: ProductFileReader) -> None:
+        super().__init__()
+        self._reader = reader
+
+    def read(self, file_path: Path) -> ProbeSequence:
+        product = self._reader.read(file_path)
+        return product.probes
+
+
+class ProductObjectFileReader(ObjectFileReader):
+    def __init__(self, reader: ProductFileReader) -> None:
+        super().__init__()
+        self._reader = reader
+
+    def read(self, file_path: Path) -> Object:
+        product = self._reader.read(file_path)
+        return product.object_
 
 
 @dataclass(frozen=True)
@@ -112,6 +143,22 @@ class PluginRegistry:
         self.fluorescence_file_writers = PluginChooser[FluorescenceFileWriter]()
         self.upscaling_strategies = PluginChooser[UpscalingStrategy]()
         self.deconvolution_strategies = PluginChooser[DeconvolutionStrategy]()
+
+    def register_product_file_reader_with_adapters(
+        self, strategy: ProductFileReader, *, display_name: str, simple_name: str = ''
+    ) -> None:
+        self.position_file_readers.register_plugin(
+            ProductPositionFileReader(strategy), display_name=display_name, simple_name=simple_name
+        )
+        self.probe_file_readers.register_plugin(
+            ProductProbeFileReader(strategy), display_name=display_name, simple_name=simple_name
+        )
+        self.object_file_readers.register_plugin(
+            ProductObjectFileReader(strategy), display_name=display_name, simple_name=simple_name
+        )
+        self.product_file_readers.register_plugin(
+            strategy, display_name=display_name, simple_name=simple_name
+        )
 
     @classmethod
     def load_plugins(cls) -> PluginRegistry:

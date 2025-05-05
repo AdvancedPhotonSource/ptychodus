@@ -67,11 +67,11 @@ Developer Installation
    $ conda activate ptychodus
    $ pip install -e ./ptychodus
 
-* To install the `tike`_ backend:
+* To install the `pty-chi`_ backend:
 
 .. code-block:: shell
 
-   $ conda install -n ptychodus -c conda-forge tike
+   $ pip install ptychi
 
 * To install the `PtychoNN`_ backend:
 
@@ -93,6 +93,6 @@ Reporting Bugs
 Open a bug at https://github.com/AdvancedPhotonSource/ptychodus/issues.
 
 .. _`ptychodus`: https://github.com/AdvancedPhotonSource/ptychodus
-.. _`tike`: https://github.com/tomography/tike
+.. _`pty-chi`: https://github.com/AdvancedPhotonSource/pty-chi
 .. _`PtychoNN`: https://github.com/mcherukara/PtychoNN
 .. _`PvaPy`: https://github.com/epics-base/pvaPy
