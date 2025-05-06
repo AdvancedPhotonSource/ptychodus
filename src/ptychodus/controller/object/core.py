@@ -33,7 +33,8 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         xmcd_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
         file_dialog_factory: FileDialogFactory,
-        tree_model: ObjectTreeModel,
+        *,
+        is_developer_mode_enabled: bool,
     ) -> None:
         super().__init__()
         self._repository = repository
@@ -41,77 +42,53 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self._image_controller = image_controller
         self._view = view
         self._file_dialog_factory = file_dialog_factory
-        self._tree_model = tree_model
+        self._tree_model = ObjectTreeModel(repository, api)
         self._editor_factory = ObjectEditorViewControllerFactory()
 
-        self._frc_view_controller = FourierRingCorrelationViewController(correlator, tree_model)
+        self._frc_view_controller = FourierRingCorrelationViewController(
+            correlator, self._tree_model
+        )
         self._xmcd_view_controller = XMCDViewController(
-            xmcd_analyzer, xmcd_visualization_engine, file_dialog_factory, tree_model
+            xmcd_analyzer, xmcd_visualization_engine, file_dialog_factory, self._tree_model
         )
 
-    @classmethod
-    def create_instance(
-        cls,
-        repository: ObjectRepository,
-        api: ObjectAPI,
-        image_controller: ImageController,
-        correlator: FourierRingCorrelator,
-        xmcd_analyzer: XMCDAnalyzer,
-        xmcd_visualization_engine: VisualizationEngine,
-        view: RepositoryTreeView,
-        file_dialog_factory: FileDialogFactory,
-    ) -> ObjectController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
-        tree_model = ObjectTreeModel(repository, api)
-        controller = cls(
-            repository,
-            api,
-            image_controller,
-            correlator,
-            xmcd_analyzer,
-            xmcd_visualization_engine,
-            view,
-            file_dialog_factory,
-            tree_model,
-        )
-        repository.add_observer(controller)
+        repository.add_observer(self)
 
         builder_list_model = QStringListModel()
         builder_list_model.setStringList([name for name in api.builder_names()])
         builder_item_delegate = ComboBoxItemDelegate(builder_list_model, view.tree_view)
 
-        view.tree_view.setModel(tree_model)
+        view.tree_view.setModel(self._tree_model)
         view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         view.tree_view.setItemDelegateForColumn(2, builder_item_delegate)
-        view.tree_view.selectionModel().currentChanged.connect(controller._update_view)
-        controller._update_view(QModelIndex(), QModelIndex())
+        view.tree_view.selectionModel().currentChanged.connect(self._update_view)
+        self._update_view(QModelIndex(), QModelIndex())
 
         load_from_file_action = view.button_box.load_menu.addAction('Open File...')
-        load_from_file_action.triggered.connect(controller._load_current_object_from_file)
+        load_from_file_action.triggered.connect(self._load_current_object_from_file)
 
         copy_action = view.button_box.load_menu.addAction('Copy...')
-        copy_action.triggered.connect(controller._copy_to_current_object)
+        copy_action.triggered.connect(self._copy_to_current_object)
 
         save_to_file_action = view.button_box.save_menu.addAction('Save File...')
-        save_to_file_action.triggered.connect(controller._save_current_object_to_file)
+        save_to_file_action.triggered.connect(self._save_current_object_to_file)
 
         sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
-        sync_to_settings_action.triggered.connect(controller._sync_current_object_to_settings)
+        sync_to_settings_action.triggered.connect(self._sync_current_object_to_settings)
 
         view.copier_dialog.setWindowTitle('Copy Object')
-        view.copier_dialog.source_combo_box.setModel(tree_model)
-        view.copier_dialog.destination_combo_box.setModel(tree_model)
-        view.copier_dialog.finished.connect(controller._finish_copying_object)
+        view.copier_dialog.source_combo_box.setModel(self._tree_model)
+        view.copier_dialog.destination_combo_box.setModel(self._tree_model)
+        view.copier_dialog.finished.connect(self._finish_copying_object)
 
-        view.button_box.edit_button.clicked.connect(controller._edit_current_object)
+        view.button_box.edit_button.clicked.connect(self._edit_current_object)
 
         frc_action = view.button_box.analyze_menu.addAction('Fourier Ring Correlation...')
-        frc_action.triggered.connect(controller._analyze_frc)
+        frc_action.triggered.connect(self._analyze_frc)
 
         xmcd_action = view.button_box.analyze_menu.addAction('XMCD...')
-        xmcd_action.triggered.connect(controller._analyze_xmcd)
-
-        return controller
+        xmcd_action.triggered.connect(self._analyze_xmcd)
 
     def _get_current_item_index(self) -> int:
         model_index = self._view.tree_view.currentIndex()

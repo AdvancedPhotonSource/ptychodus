@@ -26,8 +26,8 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         view: RepositoryTableView,
         plot_view: ScanPlotView,
         file_dialog_factory: FileDialogFactory,
-        table_model: ScanTableModel,
-        table_proxy_model: QSortFilterProxyModel,
+        *,
+        is_developer_mode_enabled: bool,
     ) -> None:
         super().__init__()
         self._repository = repository
@@ -35,68 +35,53 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         self._view = view
         self._plot_view = plot_view
         self._file_dialog_factory = file_dialog_factory
-        self._table_model = table_model
-        self._table_proxy_model = table_proxy_model
+        self._table_model = ScanTableModel(repository, api)
+        self._table_proxy_model = QSortFilterProxyModel()
         self._editor_factory = ScanEditorViewControllerFactory()
 
-    @classmethod
-    def create_instance(
-        cls,
-        repository: ScanRepository,
-        api: ScanAPI,
-        view: RepositoryTableView,
-        plot_view: ScanPlotView,
-        file_dialog_factory: FileDialogFactory,
-    ) -> ScanController:
-        table_model = ScanTableModel(repository, api)
-        table_proxy_model = QSortFilterProxyModel()
-        table_proxy_model.setSourceModel(table_model)
-        controller = cls(
-            repository, api, view, plot_view, file_dialog_factory, table_model, table_proxy_model
+        self._table_proxy_model.setSourceModel(self._table_model)
+        self._table_proxy_model.dataChanged.connect(
+            lambda top_left, bottom_right, roles: self._redraw_plot()
         )
-        table_proxy_model.dataChanged.connect(
-            lambda top_left, bottom_right, roles: controller._redraw_plot()
-        )
-        repository.add_observer(controller)
+        repository.add_observer(self)
 
         builder_list_model = QStringListModel()
         builder_list_model.setStringList([name for name in api.builder_names()])
         builder_item_delegate = ComboBoxItemDelegate(builder_list_model, view.table_view)
 
-        view.table_view.setModel(table_proxy_model)
+        view.table_view.setModel(self._table_proxy_model)
         view.table_view.setSortingEnabled(True)
         view.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         view.table_view.setItemDelegateForColumn(2, builder_item_delegate)
-        view.table_view.selectionModel().currentChanged.connect(controller._update_view)
-        controller._update_view(QModelIndex(), QModelIndex())
+        view.table_view.selectionModel().currentChanged.connect(self._update_view)
+        self._update_view(QModelIndex(), QModelIndex())
 
         view.table_view.horizontalHeader().sectionClicked.connect(
-            lambda logical_index: controller._redraw_plot()
+            lambda logical_index: self._redraw_plot()
         )
 
         load_from_file_action = view.button_box.load_menu.addAction('Open File...')
-        load_from_file_action.triggered.connect(controller._load_current_scan_from_file)
+        load_from_file_action.triggered.connect(self._load_current_scan_from_file)
 
         copy_action = view.button_box.load_menu.addAction('Copy...')
-        copy_action.triggered.connect(controller._copy_to_current_scan)
+        copy_action.triggered.connect(self._copy_to_current_scan)
 
         save_to_file_action = view.button_box.save_menu.addAction('Save File...')
-        save_to_file_action.triggered.connect(controller._save_current_scan_to_file)
+        save_to_file_action.triggered.connect(self._save_current_scan_to_file)
 
         sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
-        sync_to_settings_action.triggered.connect(controller._sync_current_scan_to_settings)
+        sync_to_settings_action.triggered.connect(self._sync_current_scan_to_settings)
 
         view.copier_dialog.setWindowTitle('Copy Scan')
-        view.copier_dialog.source_combo_box.setModel(table_model)
-        view.copier_dialog.destination_combo_box.setModel(table_model)
-        view.copier_dialog.finished.connect(controller._finish_copying_scan)
+        view.copier_dialog.source_combo_box.setModel(self._table_model)
+        view.copier_dialog.destination_combo_box.setModel(self._table_model)
+        view.copier_dialog.finished.connect(self._finish_copying_scan)
 
-        view.button_box.edit_button.clicked.connect(controller._edit_current_scan)
+        view.button_box.edit_button.clicked.connect(self._edit_current_scan)
 
         estimate_transform_action = view.button_box.analyze_menu.addAction('Estimate Transform...')
-        estimate_transform_action.triggered.connect(controller._estimate_transform)
-
-        return controller
+        estimate_transform_action.triggered.connect(self._estimate_transform)
+        estimate_transform_action.setEnabled(is_developer_mode_enabled)
 
     def _get_current_item_index(self) -> int:
         proxy_index = self._view.table_view.currentIndex()

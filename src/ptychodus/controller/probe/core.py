@@ -49,7 +49,8 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         fluorescence_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
         file_dialog_factory: FileDialogFactory,
-        tree_model: ProbeTreeModel,
+        *,
+        is_developer_mode_enabled: bool,
     ) -> None:
         super().__init__()
         self._repository = repository
@@ -57,7 +58,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self._image_controller = image_controller
         self._view = view
         self._file_dialog_factory = file_dialog_factory
-        self._tree_model = tree_model
+        self._tree_model = ProbeTreeModel(repository, api)
         self._editor_factory = ProbeEditorViewControllerFactory()
 
         self._propagation_view_controller = ProbePropagationViewController(
@@ -67,93 +68,60 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             stxm_simulator, stxm_visualization_engine, file_dialog_factory
         )
         self._illumination_view_controller = IlluminationViewController(
-            illumination_mapper, illumination_visualization_engine, file_dialog_factory
+            illumination_mapper,
+            illumination_visualization_engine,
+            file_dialog_factory,
+            is_developer_mode_enabled=is_developer_mode_enabled,
         )
         self._fluorescence_view_controller = FluorescenceViewController(
             fluorescence_enhancer, fluorescence_visualization_engine, file_dialog_factory
         )
 
-    @classmethod
-    def create_instance(
-        cls,
-        repository: ProbeRepository,
-        api: ProbeAPI,
-        image_controller: ImageController,
-        propagator: ProbePropagator,
-        propagator_visualization_engine: VisualizationEngine,
-        stxm_simulator: STXMSimulator,
-        stxm_visualization_engine: VisualizationEngine,
-        illumination_mapper: IlluminationMapper,
-        illumination_visualization_engine: VisualizationEngine,
-        fluorescence_enhancer: FluorescenceEnhancer,
-        fluorescence_visualization_engine: VisualizationEngine,
-        view: RepositoryTreeView,
-        file_dialog_factory: FileDialogFactory,
-    ) -> ProbeController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
-        tree_model = ProbeTreeModel(repository, api)
-        controller = cls(
-            repository,
-            api,
-            image_controller,
-            propagator,
-            propagator_visualization_engine,
-            stxm_simulator,
-            stxm_visualization_engine,
-            illumination_mapper,
-            illumination_visualization_engine,
-            fluorescence_enhancer,
-            fluorescence_visualization_engine,
-            view,
-            file_dialog_factory,
-            tree_model,
-        )
-        repository.add_observer(controller)
+        repository.add_observer(self)
 
         builder_list_model = QStringListModel()
         builder_list_model.setStringList([name for name in api.builder_names()])
         builder_item_delegate = ComboBoxItemDelegate(builder_list_model, view.tree_view)
 
-        view.tree_view.setModel(tree_model)
+        view.tree_view.setModel(self._tree_model)
         view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         power_item_delegate = ProgressBarItemDelegate(view.tree_view)
         view.tree_view.setItemDelegateForColumn(1, power_item_delegate)
         view.tree_view.setItemDelegateForColumn(2, builder_item_delegate)
-        view.tree_view.selectionModel().currentChanged.connect(controller._update_view)
-        controller._update_view(QModelIndex(), QModelIndex())
+        view.tree_view.selectionModel().currentChanged.connect(self._update_view)
+        self._update_view(QModelIndex(), QModelIndex())
 
         load_from_file_action = view.button_box.load_menu.addAction('Open File...')
-        load_from_file_action.triggered.connect(controller._load_current_probe_from_file)
+        load_from_file_action.triggered.connect(self._load_current_probe_from_file)
 
         copy_action = view.button_box.load_menu.addAction('Copy...')
-        copy_action.triggered.connect(controller._copy_to_current_probe)
+        copy_action.triggered.connect(self._copy_to_current_probe)
 
         save_to_file_action = view.button_box.save_menu.addAction('Save File...')
-        save_to_file_action.triggered.connect(controller._save_current_probe_to_file)
+        save_to_file_action.triggered.connect(self._save_current_probe_to_file)
 
         sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
-        sync_to_settings_action.triggered.connect(controller._sync_current_probe_to_settings)
+        sync_to_settings_action.triggered.connect(self._sync_current_probe_to_settings)
 
         view.copier_dialog.setWindowTitle('Copy Probe')
-        view.copier_dialog.source_combo_box.setModel(tree_model)
-        view.copier_dialog.destination_combo_box.setModel(tree_model)
-        view.copier_dialog.finished.connect(controller._finish_copying_probe)
+        view.copier_dialog.source_combo_box.setModel(self._tree_model)
+        view.copier_dialog.destination_combo_box.setModel(self._tree_model)
+        view.copier_dialog.finished.connect(self._finish_copying_probe)
 
-        view.button_box.edit_button.clicked.connect(controller._edit_current_probe)
+        view.button_box.edit_button.clicked.connect(self._edit_current_probe)
 
         propagate_action = view.button_box.analyze_menu.addAction('Propagate...')
-        propagate_action.triggered.connect(controller._propagate_probe)
+        propagate_action.triggered.connect(self._propagate_probe)
 
         stxm_action = view.button_box.analyze_menu.addAction('Simulate STXM...')
-        stxm_action.triggered.connect(controller._simulate_stxm)
+        stxm_action.triggered.connect(self._simulate_stxm)
 
         illumination_action = view.button_box.analyze_menu.addAction('Map Illumination...')
-        illumination_action.triggered.connect(controller._map_illumination)
+        illumination_action.triggered.connect(self._map_illumination)
 
         fluorescence_action = view.button_box.analyze_menu.addAction('Enhance Fluorescence...')
-        fluorescence_action.triggered.connect(controller._enhance_fluorescence)
-
-        return controller
+        fluorescence_action.triggered.connect(self._enhance_fluorescence)
 
     def _get_current_item_index(self) -> int:
         model_index = self._view.tree_view.currentIndex()

@@ -197,8 +197,30 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         return self.TRAINING_DATA_FILE_FILTER
 
     def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
-        raw_data = create_raw_data(parameters)
-        raw_data.to_file(file_path)
+        object_geometry = parameters.product.object_.get_geometry()
+        position_x_px: list[float] = list()
+        position_y_px: list[float] = list()
+
+        for scan_point in parameters.product.positions:
+            object_point = object_geometry.map_scan_point_to_object_point(scan_point)
+            position_x_px.append(object_point.position_x_px)
+            position_y_px.append(object_point.position_y_px)
+
+        xcoords = numpy.array(position_x_px)
+        ycoords = numpy.array(position_y_px)
+
+        numpy.savez(
+            file_path,
+            xcoords=xcoords,
+            ycoords=ycoords,
+            xcoords_start=xcoords,
+            ycoords_start=ycoords,
+            diff3d=parameters.patterns,
+            probeGuess=parameters.product.probes.get_probe_no_opr().get_incoherent_mode(0),
+            # assume that all patches are from the same object
+            objectGuess=parameters.product.object_.get_layer(0),
+            scan_index=numpy.zeros(len(parameters.product.positions), dtype=int),
+        )
 
     def get_training_data_path(self) -> Path:
         return self._training_settings.data_dir.get_value()

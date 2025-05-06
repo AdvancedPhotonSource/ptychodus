@@ -21,11 +21,15 @@ class IlluminationViewController(Observer):
         mapper: IlluminationMapper,
         engine: VisualizationEngine,
         file_dialog_factory: FileDialogFactory,
+        *,
+        is_developer_mode_enabled: bool,
     ) -> None:
         super().__init__()
         self._mapper = mapper
         self._file_dialog_factory = file_dialog_factory
         self._dialog = IlluminationDialog()
+        self._dialog.exposure_parameters_view.setVisible(is_developer_mode_enabled)
+        self._dialog.exposure_quantity_view.setVisible(is_developer_mode_enabled)
         self._dialog.save_button.clicked.connect(self._save_data)
         self._visualization_widget_controller = VisualizationWidgetController(
             engine,

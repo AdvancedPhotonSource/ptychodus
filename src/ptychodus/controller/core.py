@@ -74,12 +74,13 @@ class ControllerCore:
             view.product_view,
             self._file_dialog_factory,
         )
-        self._scan_controller = ScanController.create_instance(
+        self._scan_controller = ScanController(
             model.product.scan_repository,
             model.product.scan_api,
             view.scan_view,
             view.scan_plot_view,
             self._file_dialog_factory,
+            is_developer_mode_enabled=is_developer_mode_enabled,
         )
         self._probe_image_controller = ImageController(
             model.probe_visualization_engine,
@@ -87,7 +88,7 @@ class ControllerCore:
             view.statusBar(),
             self._file_dialog_factory,
         )
-        self._probe_controller = ProbeController.create_instance(
+        self._probe_controller = ProbeController(
             model.product.probe_repository,
             model.product.probe_api,
             self._probe_image_controller,
@@ -101,6 +102,7 @@ class ControllerCore:
             model.fluorescence_core.visualization_engine,
             view.probe_view,
             self._file_dialog_factory,
+            is_developer_mode_enabled=is_developer_mode_enabled,
         )
         self._object_image_controller = ImageController(
             model.object_visualization_engine,
@@ -108,7 +110,7 @@ class ControllerCore:
             view.statusBar(),
             self._file_dialog_factory,
         )
-        self._object_controller = ObjectController.create_instance(
+        self._object_controller = ObjectController(
             model.product.object_repository,
             model.product.object_api,
             self._object_image_controller,
@@ -117,6 +119,7 @@ class ControllerCore:
             model.analysis.xmcd_visualization_engine,
             view.object_view,
             self._file_dialog_factory,
+            is_developer_mode_enabled=is_developer_mode_enabled,
         )
         self._reconstructor_controller = ReconstructorController(
             model.reconstructor.presenter,
