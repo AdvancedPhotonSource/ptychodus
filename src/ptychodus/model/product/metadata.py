@@ -1,115 +1,139 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
+from abc import abstractmethod, ABC
 import logging
 
-from ptychodus.api.parametric import ParameterGroup
+from ptychodus.api.parametric import Parameter, ParameterGroup
 from ptychodus.api.product import ProductMetadata
 
-from ..patterns import ProductSettings
+from .settings import ProductSettings
 
 logger = logging.getLogger(__name__)
 
 
 class UniqueNameFactory(ABC):
     @abstractmethod
-    def createUniqueName(self, candidateName: str) -> str:
+    def create_unique_name(self, candidate_name: str) -> str:
         pass
+
+
+class UniqueStringParameter(Parameter[str]):
+    def __init__(
+        self, value: str | None, name_factory: UniqueNameFactory, parent: Parameter[str]
+    ) -> None:
+        super().__init__(parent)
+        self._value = name_factory.create_unique_name(value or parent.get_value())
+        self._name_factory = name_factory
+
+    def get_value(self) -> str:
+        return self._value
+
+    def set_value(self, value: str, *, notify: bool = True) -> None:
+        if value:
+            if self._value != value:
+                self._value = self._name_factory.create_unique_name(value)
+
+                if notify:
+                    self.notify_observers()
+        else:
+            self.notify_observers()
+
+    def get_value_as_string(self) -> str:
+        return str(self._value)
+
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(str(value))
+
+    def copy(self) -> UniqueStringParameter:
+        return UniqueStringParameter(self.get_value(), self._name_factory, self)
 
 
 class MetadataRepositoryItem(ParameterGroup):
     def __init__(
         self,
         settings: ProductSettings,
-        nameFactory: UniqueNameFactory,
+        name_factory: UniqueNameFactory,
         *,
         name: str = '',
         comments: str = '',
-        detectorDistanceInMeters: float | None = None,
-        probeEnergyInElectronVolts: float | None = None,
-        probePhotonsPerSecond: float | None = None,
-        exposureTimeInSeconds: float | None = None,
+        detector_distance_m: float | None = None,
+        probe_energy_eV: float | None = None,  # noqa: N803
+        probe_photon_count: float | None = None,
+        exposure_time_s: float | None = None,
+        mass_attenuation_m2_kg: float | None = None,
+        tomography_angle_deg: float | None = None,
     ) -> None:
         super().__init__()
         self._settings = settings
-        self._nameFactory = nameFactory
 
-        self._name = settings.name.copy()
-        self._setName(name if name else settings.name.getValue())
-        self._addParameter('name', self._name)
-        self.comments = self.createStringParameter('comments', comments)
+        self.name = UniqueStringParameter(name, name_factory, settings.name.copy())
+        self._add_parameter('name', self.name)
 
-        self.detectorDistanceInMeters = settings.detectorDistanceInMeters.copy()
+        self.comments = self.create_string_parameter('comments', comments)
 
-        if detectorDistanceInMeters is not None:
-            self.detectorDistanceInMeters.setValue(detectorDistanceInMeters)
+        self.detector_distance_m = settings.detector_distance_m.copy()
 
-        self._addParameter('detector_distance_m', self.detectorDistanceInMeters)
+        if detector_distance_m is not None:
+            self.detector_distance_m.set_value(detector_distance_m)
 
-        self.probeEnergyInElectronVolts = settings.probeEnergyInElectronVolts.copy()
+        self._add_parameter('detector_distance_m', self.detector_distance_m)
 
-        if probeEnergyInElectronVolts is not None:
-            self.probeEnergyInElectronVolts.setValue(probeEnergyInElectronVolts)
+        self.probe_energy_eV = settings.probe_energy_eV.copy()
 
-        self._addParameter('probe_energy_eV', self.probeEnergyInElectronVolts)
+        if probe_energy_eV is not None:
+            self.probe_energy_eV.set_value(probe_energy_eV)
 
-        self.probePhotonsPerSecond = settings.probePhotonsPerSecond.copy()
+        self._add_parameter('probe_energy_eV', self.probe_energy_eV)
 
-        if probePhotonsPerSecond is not None:
-            self.probePhotonsPerSecond.setValue(probePhotonsPerSecond)
+        self.probe_photon_count = settings.probe_photon_count.copy()
 
-        self._addParameter('probe_photons_per_second', self.probePhotonsPerSecond)
+        if probe_photon_count is not None:
+            self.probe_photon_count.set_value(probe_photon_count)
 
-        self.exposureTimeInSeconds = settings.exposureTimeInSeconds.copy()
+        self._add_parameter('probe_photon_count', self.probe_photon_count)
 
-        if exposureTimeInSeconds is not None:
-            self.exposureTimeInSeconds.setValue(exposureTimeInSeconds)
+        self.exposure_time_s = settings.exposure_time_s.copy()
 
-        self._addParameter('exposure_time_s', self.exposureTimeInSeconds)
+        if exposure_time_s is not None:
+            self.exposure_time_s.set_value(exposure_time_s)
 
-        self._index = -1
+        self._add_parameter('exposure_time_s', self.exposure_time_s)
 
-    def assignItem(self, item: MetadataRepositoryItem, *, notify: bool = True) -> None:
-        self.setName(item.getName())
-        self.comments.setValue(item.comments.getValue())
-        self.detectorDistanceInMeters.setValue(item.detectorDistanceInMeters.getValue())
-        self.probeEnergyInElectronVolts.setValue(item.probeEnergyInElectronVolts.getValue())
-        self.probePhotonsPerSecond.setValue(item.probePhotonsPerSecond.getValue())
-        self.exposureTimeInSeconds.setValue(item.exposureTimeInSeconds.getValue())
+        self.mass_attenuation_m2_kg = settings.mass_attenuation_m2_kg.copy()
+
+        if mass_attenuation_m2_kg is not None:
+            self.mass_attenuation_m2_kg.set_value(mass_attenuation_m2_kg)
+
+        self._add_parameter('mass_attenuation_m2_kg', self.mass_attenuation_m2_kg)
+
+        self.tomography_angle_deg = settings.tomography_angle_deg.copy()
+
+        if tomography_angle_deg is not None:
+            self.tomography_angle_deg.set_value(tomography_angle_deg)
+
+        self._add_parameter('tomography_angle_deg', self.tomography_angle_deg)
 
     def assign(self, metadata: ProductMetadata) -> None:
-        self.setName(metadata.name)
-        self.comments.setValue(metadata.comments)
-        self.detectorDistanceInMeters.setValue(metadata.detectorDistanceInMeters)
-        self.probeEnergyInElectronVolts.setValue(metadata.probeEnergyInElectronVolts)
-        self.probePhotonsPerSecond.setValue(metadata.probePhotonsPerSecond)
-        self.exposureTimeInSeconds.setValue(metadata.exposureTimeInSeconds)
+        self.name.set_value(metadata.name)
+        self.comments.set_value(metadata.comments)
+        self.detector_distance_m.set_value(metadata.detector_distance_m)
+        self.probe_energy_eV.set_value(metadata.probe_energy_eV)
+        self.probe_photon_count.set_value(metadata.probe_photon_count)
+        self.exposure_time_s.set_value(metadata.exposure_time_s)
+        self.mass_attenuation_m2_kg.set_value(metadata.mass_attenuation_m2_kg)
+        self.tomography_angle_deg.set_value(metadata.tomography_angle_deg)
 
-    def syncToSettings(self) -> None:
+    def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
-            parameter.syncValueToParent()
+            parameter.sync_value_to_parent()
 
-    def getName(self) -> str:
-        return self._name.getValue()
-
-    def _setName(self, name: str) -> None:
-        uniqueName = self._nameFactory.createUniqueName(name)
-        self._name.setValue(uniqueName)
-
-    def setName(self, name: str) -> None:
-        if name:
-            self._setName(name)
-        else:
-            self._name.notifyObservers()
-
-    def getIndex(self) -> int:
-        return self._index
-
-    def getMetadata(self) -> ProductMetadata:
+    def get_metadata(self) -> ProductMetadata:
         return ProductMetadata(
-            name=self._name.getValue(),
-            comments=self.comments.getValue(),
-            detectorDistanceInMeters=self.detectorDistanceInMeters.getValue(),
-            probeEnergyInElectronVolts=self.probeEnergyInElectronVolts.getValue(),
-            probePhotonsPerSecond=self.probePhotonsPerSecond.getValue(),
-            exposureTimeInSeconds=self.exposureTimeInSeconds.getValue(),
+            name=self.name.get_value(),
+            comments=self.comments.get_value(),
+            detector_distance_m=self.detector_distance_m.get_value(),
+            probe_energy_eV=self.probe_energy_eV.get_value(),
+            probe_photon_count=self.probe_photon_count.get_value(),
+            exposure_time_s=self.exposure_time_s.get_value(),
+            mass_attenuation_m2_kg=self.mass_attenuation_m2_kg.get_value(),
+            tomography_angle_deg=self.tomography_angle_deg.get_value(),
         )

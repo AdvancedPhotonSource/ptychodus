@@ -3,8 +3,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 import logging
 
-from PyQt5.QtCore import Qt, QAbstractItemModel
-from PyQt5.QtWidgets import QLabel, QWidget
+from PyQt5.QtCore import Qt, QAbstractItemModel, QTimer
+from PyQt5.QtWidgets import QActionGroup, QLabel, QWidget
 
 from ptychodus.api.observer import Observable, Observer
 
@@ -18,7 +18,7 @@ from ..model.product.object import ObjectRepositoryItem
 from ..model.product.probe import ProbeRepositoryItem
 from ..model.product.scan import ScanRepositoryItem
 from ..model.reconstructor import ReconstructorPresenter
-from ..view.reconstructor import ReconstructorParametersView, ReconstructorPlotView
+from ..view.reconstructor import ReconstructorView, ReconstructorPlotView
 from ..view.widgets import ExceptionDialog
 from .data import FileDialogFactory
 
@@ -28,11 +28,11 @@ logger = logging.getLogger(__name__)
 class ReconstructorViewControllerFactory(ABC):
     @property
     @abstractmethod
-    def backendName(self) -> str:
+    def backend_name(self) -> str:
         pass
 
     @abstractmethod
-    def createViewController(self, reconstructorName: str) -> QWidget:
+    def create_view_controller(self, reconstructor_name: str) -> QWidget:
         pass
 
 
@@ -40,274 +40,262 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
     def __init__(
         self,
         presenter: ReconstructorPresenter,
-        productRepository: ProductRepository,
-        view: ReconstructorParametersView,
-        plotView: ReconstructorPlotView,
-        fileDialogFactory: FileDialogFactory,
-        viewControllerFactoryList: Iterable[ReconstructorViewControllerFactory],
+        product_repository: ProductRepository,
+        view: ReconstructorView,
+        plot_view: ReconstructorPlotView,
+        product_table_model: QAbstractItemModel,
+        file_dialog_factory: FileDialogFactory,
+        view_controller_factories: Iterable[ReconstructorViewControllerFactory],
     ) -> None:
         super().__init__()
         self._presenter = presenter
-        self._productRepository = productRepository
+        self._product_repository = product_repository
         self._view = view
-        self._plotView = plotView
-        self._fileDialogFactory = fileDialogFactory
-        self._viewControllerFactoryDict: dict[str, ReconstructorViewControllerFactory] = {
-            vcf.backendName: vcf for vcf in viewControllerFactoryList
+        self._plot_view = plot_view
+        self._file_dialog_factory = file_dialog_factory
+        self._view_controller_factories: dict[str, ReconstructorViewControllerFactory] = {
+            vcf.backend_name: vcf for vcf in view_controller_factories
         }
 
-    @classmethod
-    def createInstance(
-        cls,
-        presenter: ReconstructorPresenter,
-        productRepository: ProductRepository,
-        view: ReconstructorParametersView,
-        plotView: ReconstructorPlotView,
-        fileDialogFactory: FileDialogFactory,
-        productTableModel: QAbstractItemModel,
-        viewControllerFactoryList: list[ReconstructorViewControllerFactory],
-    ) -> ReconstructorController:
-        controller = cls(
-            presenter,
-            productRepository,
-            view,
-            plotView,
-            fileDialogFactory,
-            viewControllerFactoryList,
-        )
-        presenter.addObserver(controller)
-        productRepository.addObserver(controller)
+        for name in presenter.reconstructors():
+            self._add_reconstructor(name)
 
-        for name in presenter.getReconstructorList():
-            controller._addReconstructor(name)
-
-        view.reconstructorView.algorithmComboBox.textActivated.connect(presenter.setReconstructor)
-        view.reconstructorView.algorithmComboBox.currentIndexChanged.connect(
-            view.stackedWidget.setCurrentIndex
+        view.parameters_view.algorithm_combo_box.textActivated.connect(presenter.set_reconstructor)
+        view.parameters_view.algorithm_combo_box.currentIndexChanged.connect(
+            view.stacked_widget.setCurrentIndex
         )
 
-        view.reconstructorView.productComboBox.textActivated.connect(controller._redrawPlot)
-        view.reconstructorView.productComboBox.setModel(productTableModel)
+        view.parameters_view.product_combo_box.textActivated.connect(self._redraw_plot)
+        view.parameters_view.product_combo_box.setModel(product_table_model)
 
-        openModelAction = view.reconstructorView.modelMenu.addAction('Open...')
-        openModelAction.triggered.connect(controller._openModel)
-        saveModelAction = view.reconstructorView.modelMenu.addAction('Save...')
-        saveModelAction.triggered.connect(controller._saveModel)
+        self._progress_timer = QTimer()
+        self._progress_timer.timeout.connect(self._update_progress)
+        self._progress_timer.start(5 * 1000)  # TODO customize (in milliseconds)
 
-        openTrainingDataAction = view.reconstructorView.trainerMenu.addAction(
-            'Open Training Data...'
-        )
-        openTrainingDataAction.triggered.connect(controller._openTrainingData)
-        saveTrainingDataAction = view.reconstructorView.trainerMenu.addAction(
-            'Save Training Data...'
-        )
-        saveTrainingDataAction.triggered.connect(controller._saveTrainingData)
-        ingestTrainingDataAction = view.reconstructorView.trainerMenu.addAction(
-            'Ingest Training Data'
-        )
-        ingestTrainingDataAction.triggered.connect(controller._ingestTrainingData)
-        clearTrainingDataAction = view.reconstructorView.trainerMenu.addAction(
-            'Clear Training Data'
-        )
-        clearTrainingDataAction.triggered.connect(controller._clearTrainingData)
-        view.reconstructorView.trainerMenu.addSeparator()
-        trainAction = view.reconstructorView.trainerMenu.addAction('Train')
-        trainAction.triggered.connect(controller._train)
+        view.progress_dialog.setModal(True)
+        view.progress_dialog.setWindowModality(Qt.ApplicationModal)
+        view.progress_dialog.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.CustomizeWindowHint)
+        view.progress_dialog.text_edit.setReadOnly(True)
 
-        reconstructSplitAction = view.reconstructorView.reconstructorMenu.addAction(
+        open_model_action = view.parameters_view.reconstructor_menu.addAction('Open Model...')
+        open_model_action.triggered.connect(self._open_model)
+        save_model_action = view.parameters_view.reconstructor_menu.addAction('Save Model...')
+        save_model_action.triggered.connect(self._save_model)
+
+        self._model_action_group = QActionGroup(view.parameters_view.reconstructor_menu)
+        self._model_action_group.setExclusive(False)
+        self._model_action_group.addAction(open_model_action)
+        self._model_action_group.addAction(save_model_action)
+        self._model_action_group.addAction(view.parameters_view.reconstructor_menu.addSeparator())
+
+        reconstruct_transformed_action = view.parameters_view.reconstructor_menu.addAction(
+            'Reconstruct Transformed Points'
+        )
+        reconstruct_transformed_action.triggered.connect(self._reconstruct_transformed)
+        reconstruct_split_action = view.parameters_view.reconstructor_menu.addAction(
             'Reconstruct Odd/Even Split'
         )
-        reconstructSplitAction.triggered.connect(controller._reconstructSplit)
-        reconstructAction = view.reconstructorView.reconstructorMenu.addAction('Reconstruct')
-        reconstructAction.triggered.connect(controller._reconstruct)
+        reconstruct_split_action.triggered.connect(self._reconstruct_split)
+        reconstruct_action = view.parameters_view.reconstructor_menu.addAction('Reconstruct')
+        reconstruct_action.triggered.connect(self._reconstruct)
 
-        controller._syncAlgorithmToView()
+        export_training_data_action = view.parameters_view.trainer_menu.addAction(
+            'Export Training Data...'
+        )
+        export_training_data_action.triggered.connect(self._export_training_data)
+        train_action = view.parameters_view.trainer_menu.addAction('Train')
+        train_action.triggered.connect(self._train)
 
-        return controller
+        presenter.add_observer(self)
+        product_repository.add_observer(self)
+        self._sync_model_to_view()
 
-    def _addReconstructor(self, name: str) -> None:
-        backendName, reconstructorName = name.split('/')  # TODO REDO
-        self._view.reconstructorView.algorithmComboBox.addItem(
-            name, self._view.reconstructorView.algorithmComboBox.count()
+    def _update_progress(self) -> None:
+        is_reconstructing = self._presenter.is_reconstructing
+
+        for button in self._view.progress_dialog.button_box.buttons():
+            button.setEnabled(not is_reconstructing)
+
+        for text in self._presenter.flush_log():
+            self._view.progress_dialog.text_edit.appendPlainText(text)
+
+        self._presenter.process_results(block=False)
+
+    def _add_reconstructor(self, name: str) -> None:
+        backend_name, reconstructor_name = name.split('/')  # TODO REDO
+        self._view.parameters_view.algorithm_combo_box.addItem(
+            name, self._view.parameters_view.algorithm_combo_box.count()
         )
 
-        if backendName in self._viewControllerFactoryDict:
-            viewControllerFactory = self._viewControllerFactoryDict[backendName]
-            widget = viewControllerFactory.createViewController(reconstructorName)
+        if backend_name in self._view_controller_factories:
+            view_controller_factory = self._view_controller_factories[backend_name]
+            widget = view_controller_factory.create_view_controller(reconstructor_name)
         else:
-            widget = QLabel(f'{backendName} not found!')
+            widget = QLabel(f'{backend_name} not found!')
             widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self._view.stackedWidget.addWidget(widget)
+        self._view.stacked_widget.addWidget(widget)
 
     def _reconstruct(self) -> None:
-        outputProductName = self._presenter.getReconstructor()
-        inputProductIndex = self._view.reconstructorView.productComboBox.currentIndex()
+        input_product_index = self._view.parameters_view.product_combo_box.currentIndex()
 
-        if inputProductIndex < 0:
+        if input_product_index < 0:
             return
 
         try:
-            self._presenter.reconstruct(inputProductIndex, outputProductName)
+            output_product_index = self._presenter.reconstruct(input_product_index)
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Reconstructor', err)
+            ExceptionDialog.show_exception('Reconstructor', err)
+        else:
+            self._view.parameters_view.product_combo_box.setCurrentIndex(output_product_index)
+            self._view.progress_dialog.show()
 
-    def _reconstructSplit(self) -> None:
-        outputProductName = self._presenter.getReconstructor()
-        inputProductIndex = self._view.reconstructorView.productComboBox.currentIndex()
+    def _reconstruct_split(self) -> None:
+        input_product_index = self._view.parameters_view.product_combo_box.currentIndex()
 
-        if inputProductIndex < 0:
+        if input_product_index < 0:
             return
 
         try:
-            self._presenter.reconstructSplit(inputProductIndex, outputProductName)
+            self._presenter.reconstruct_split(input_product_index)
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Split Reconstructor', err)
+            ExceptionDialog.show_exception('Split Reconstructor', err)
 
-    def _openModel(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view,
-            'Open Model',
-            nameFilters=self._presenter.getOpenModelFileFilterList(),
-            selectedNameFilter=self._presenter.getOpenModelFileFilter(),
-        )
+        self._view.progress_dialog.show()
 
-        if filePath:
-            try:
-                self._presenter.openModel(filePath)
-            except Exception as err:
-                logger.exception(err)
-                ExceptionDialog.showException('Model Reader', err)
+    def _reconstruct_transformed(self) -> None:
+        input_product_index = self._view.parameters_view.product_combo_box.currentIndex()
 
-    def _saveModel(self) -> None:
-        filePath, _ = self._fileDialogFactory.getSaveFilePath(
-            self._view,
-            'Save Model',
-            nameFilters=self._presenter.getSaveModelFileFilterList(),
-            selectedNameFilter=self._presenter.getSaveModelFileFilter(),
-        )
-
-        if filePath:
-            try:
-                self._presenter.saveModel(filePath)
-            except Exception as err:
-                logger.exception(err)
-                ExceptionDialog.showException('Model Writer', err)
-
-    def _openTrainingData(self) -> None:
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
-            self._view,
-            'Open Training Data',
-            nameFilters=self._presenter.getOpenTrainingDataFileFilterList(),
-            selectedNameFilter=self._presenter.getOpenTrainingDataFileFilter(),
-        )
-
-        if filePath:
-            try:
-                self._presenter.openTrainingData(filePath)
-            except Exception as err:
-                logger.exception(err)
-                ExceptionDialog.showException('Training Data Reader', err)
-
-    def _saveTrainingData(self) -> None:
-        filePath, _ = self._fileDialogFactory.getSaveFilePath(
-            self._view,
-            'Save Training Data',
-            nameFilters=self._presenter.getSaveTrainingDataFileFilterList(),
-            selectedNameFilter=self._presenter.getSaveTrainingDataFileFilter(),
-        )
-
-        if filePath:
-            try:
-                self._presenter.saveTrainingData(filePath)
-            except Exception as err:
-                logger.exception(err)
-                ExceptionDialog.showException('Training Data Writer', err)
-
-    def _ingestTrainingData(self) -> None:
-        inputProductIndex = self._view.reconstructorView.productComboBox.currentIndex()
-
-        if inputProductIndex < 0:
+        if input_product_index < 0:
             return
 
         try:
-            self._presenter.ingestTrainingData(inputProductIndex)
+            self._presenter.reconstruct_transformed(input_product_index)
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Ingester', err)
+            ExceptionDialog.show_exception('Split Reconstructor', err)
 
-    def _clearTrainingData(self) -> None:
-        try:
-            self._presenter.clearTrainingData()
-        except Exception as err:
-            logger.exception(err)
-            ExceptionDialog.showException('Clear', err)
+        self._view.progress_dialog.show()
+
+    def _open_model(self) -> None:
+        name_filter = self._presenter.get_model_file_filter()
+        file_path, name_filter = self._file_dialog_factory.get_open_file_path(
+            self._view, 'Open Model', name_filters=[name_filter], selected_name_filter=name_filter
+        )
+
+        if file_path:
+            try:
+                self._presenter.open_model(file_path)
+            except Exception as err:
+                logger.exception(err)
+                ExceptionDialog.show_exception('Model Reader', err)
+
+    def _save_model(self) -> None:
+        name_filter = self._presenter.get_model_file_filter()
+        file_path, _ = self._file_dialog_factory.get_save_file_path(
+            self._view, 'Save Model', name_filters=[name_filter], selected_name_filter=name_filter
+        )
+
+        if file_path:
+            try:
+                self._presenter.save_model(file_path)
+            except Exception as err:
+                logger.exception(err)
+                ExceptionDialog.show_exception('Model Writer', err)
+
+    def _export_training_data(self) -> None:
+        input_product_index = self._view.parameters_view.product_combo_box.currentIndex()
+
+        if input_product_index < 0:
+            return
+
+        name_filter = self._presenter.get_training_data_file_filter()
+        file_path, _ = self._file_dialog_factory.get_save_file_path(
+            self._view,
+            'Export Training Data',
+            name_filters=[name_filter],
+            selected_name_filter=name_filter,
+        )
+
+        if file_path:
+            try:
+                self._presenter.export_training_data(file_path, input_product_index)
+            except Exception as err:
+                logger.exception(err)
+                ExceptionDialog.show_exception('Training Data Writer', err)
 
     def _train(self) -> None:
-        try:
-            self._presenter.train()
-        except Exception as err:
-            logger.exception(err)
-            ExceptionDialog.showException('Trainer', err)
+        data_path = self._file_dialog_factory.get_existing_directory_path(
+            self._view,
+            'Choose Training Data Directory',
+            initial_directory=self._presenter.get_training_data_path(),
+        )
 
-    def _redrawPlot(self) -> None:
-        productIndex = self._view.reconstructorView.productComboBox.currentIndex()
+        if data_path:
+            try:
+                self._presenter.train(data_path)
+            except Exception as err:
+                logger.exception(err)
+                ExceptionDialog.show_exception('Trainer', err)
 
-        if productIndex < 0:
-            self._plotView.axes.clear()
+    def _redraw_plot(self) -> None:
+        product_index = self._view.parameters_view.product_combo_box.currentIndex()
+
+        if product_index < 0:
+            self._plot_view.axes.clear()
             return
 
         try:
-            item = self._productRepository[productIndex]
+            item = self._product_repository[product_index]
         except IndexError as err:
             logger.exception(err)
             return
 
-        ax = self._plotView.axes
+        ax = self._plot_view.axes
         ax.clear()
         ax.set_xlabel('Iteration')
         ax.set_ylabel('Cost')
         ax.grid(True)
-        ax.plot(item.getCosts(), '.-', label='Cost', linewidth=1.5)
-        self._plotView.figureCanvas.draw()
+        ax.plot(item.get_costs(), '.-', label='Cost', linewidth=1.5)
+        self._plot_view.figure_canvas.draw()
 
-    def _syncAlgorithmToView(self) -> None:
-        self._view.reconstructorView.algorithmComboBox.setCurrentText(
-            self._presenter.getReconstructor()
+    def _sync_model_to_view(self) -> None:
+        self._view.parameters_view.algorithm_combo_box.setCurrentText(
+            self._presenter.get_reconstructor()
         )
 
-        isTrainable = self._presenter.isTrainable
-        self._view.reconstructorView.modelButton.setVisible(isTrainable)
-        self._view.reconstructorView.trainerButton.setVisible(isTrainable)
+        is_trainable = self._presenter.is_trainable
+        self._model_action_group.setVisible(is_trainable)
+        self._view.parameters_view.trainer_button.setVisible(is_trainable)
 
-        self._redrawPlot()
+        self._redraw_plot()
 
-    def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
+    def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
         pass
 
-    def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
+    def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
         pass
 
-    def handleScanChanged(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_scan_changed(self, index: int, item: ScanRepositoryItem) -> None:
         pass
 
-    def handleProbeChanged(self, index: int, item: ProbeRepositoryItem) -> None:
+    def handle_probe_changed(self, index: int, item: ProbeRepositoryItem) -> None:
         pass
 
-    def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
+    def handle_object_changed(self, index: int, item: ObjectRepositoryItem) -> None:
         pass
 
-    def handleCostsChanged(self, index: int, costs: Sequence[float]) -> None:
-        currentIndex = self._view.reconstructorView.productComboBox.currentIndex()
+    def handle_costs_changed(self, index: int, costs: Sequence[float]) -> None:
+        current_index = self._view.parameters_view.product_combo_box.currentIndex()
 
-        if index == currentIndex:
-            self._redrawPlot()
+        if index == current_index:
+            self._redraw_plot()
 
-    def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
+    def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
         pass
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncAlgorithmToView()
+            self._sync_model_to_view()

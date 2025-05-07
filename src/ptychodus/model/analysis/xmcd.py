@@ -2,104 +2,136 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 import logging
 
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.object import ObjectArrayType
+from ptychodus.api.object import ObjectCenter
+from ptychodus.api.observer import Observable
+from ptychodus.api.typing import ComplexArrayType
 
-from ..product import ObjectRepository
+from ..product import ProductRepository
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class XMCDResult:
-    pixel_width_m: float
-    pixel_height_m: float
-    center_x_m: float
-    center_y_m: float
-    polar_difference: ObjectArrayType
-    polar_sum: ObjectArrayType
-    polar_ratio: ObjectArrayType
-
-    @property
-    def pixel_geometry(self) -> PixelGeometry:
-        return PixelGeometry(self.pixel_width_m, self.pixel_height_m)
+class XMCDData:
+    polar_difference: ComplexArrayType
+    polar_sum: ComplexArrayType
+    polar_ratio: ComplexArrayType
+    pixel_geometry: PixelGeometry
+    center: ObjectCenter
 
 
-class XMCDAnalyzer:
+class XMCDAnalyzer(Observable):
     # TODO feature request: want ability to align/add reconstructed slices
     #      of repeat scans for each polarization separately to improve statistics
 
-    def __init__(self, repository: ObjectRepository) -> None:
+    def __init__(self, repository: ProductRepository) -> None:
+        super().__init__()
         self._repository = repository
 
-    def analyze(self, lcircItemIndex: int, rcircItemIndex: int) -> XMCDResult:
-        lcircObject = self._repository[lcircItemIndex].getObject()
-        rcircObject = self._repository[rcircItemIndex].getObject()
+        self._lcirc_product_index = -1
+        self._rcirc_product_index = -1
+        self._product_data: XMCDData | None = None
 
-        if lcircObject.widthInPixels != rcircObject.widthInPixels:
+    def set_lcirc_product(self, lcirc_product_index: int) -> None:
+        if self._lcirc_product_index != lcirc_product_index:
+            self._lcirc_product_index = lcirc_product_index
+            self._lcirc_product_data = None
+            self.notify_observers()
+
+    def get_lcirc_product(self) -> int:
+        return self._lcirc_product_index
+
+    def get_lcirc_product_name(self) -> str:
+        lcirc_product = self._repository[self._lcirc_product_index]
+        return lcirc_product.get_name()
+
+    def set_rcirc_product(self, rcirc_product_index: int) -> None:
+        if self._rcirc_product_index != rcirc_product_index:
+            self._rcirc_product_index = rcirc_product_index
+            self._rcirc_product_data = None
+            self.notify_observers()
+
+    def get_rcirc_product(self) -> int:
+        return self._rcirc_product_index
+
+    def get_rcirc_product_name(self) -> str:
+        rcirc_product = self._repository[self._rcirc_product_index]
+        return rcirc_product.get_name()
+
+    def analyze(self) -> None:
+        lcirc_object = self._repository[self._lcirc_product_index].get_object_item().get_object()
+        rcirc_object = self._repository[self._rcirc_product_index].get_object_item().get_object()
+
+        lcirc_object_geometry = lcirc_object.get_geometry()
+        rcirc_object_geometry = rcirc_object.get_geometry()
+
+        if lcirc_object_geometry.width_px != rcirc_object_geometry.width_px:
             raise ValueError('Object width mismatch!')
 
-        if lcircObject.heightInPixels != rcircObject.heightInPixels:
+        if lcirc_object_geometry.height_px != rcirc_object_geometry.height_px:
             raise ValueError('Object height mismatch!')
 
-        if lcircObject.pixelWidthInMeters != rcircObject.pixelWidthInMeters:
+        if lcirc_object_geometry.pixel_width_m != rcirc_object_geometry.pixel_width_m:
             raise ValueError('Object pixel width mismatch!')
 
-        if lcircObject.pixelHeightInMeters != rcircObject.pixelHeightInMeters:
+        if lcirc_object_geometry.pixel_height_m != rcirc_object_geometry.pixel_height_m:
             raise ValueError('Object pixel height mismatch!')
 
-        # TODO align lcircArray/rcircArray
+        # TODO align lcirc_array/rcirc_array
+        lcirc_amp = numpy.absolute(lcirc_object.get_layers_flattened())
+        rcirc_amp = numpy.absolute(rcirc_object.get_layers_flattened())
 
-        lcircAmp = numpy.absolute(lcircObject.array)
-        rcircAmp = numpy.absolute(rcircObject.array)
+        ratio = numpy.divide(lcirc_amp, rcirc_amp)
+        product = numpy.multiply(lcirc_amp, rcirc_amp)
 
-        ratio = numpy.divide(lcircAmp, rcircAmp)
-        product = numpy.multiply(lcircAmp, rcircAmp)
-
-        polar_difference = numpy.log(ratio, out=numpy.zeros_like(ratio), where=(ratio > 0))
-        polar_sum = numpy.log(product, out=numpy.zeros_like(product), where=(product > 0))
+        polar_difference = numpy.log(ratio, out=numpy.zeros_like(ratio), where=(ratio > 0.0))
+        polar_sum = numpy.log(product, out=numpy.zeros_like(product), where=(product > 0.0))
         polar_ratio = numpy.divide(
             polar_difference,
             polar_sum,
             out=numpy.zeros_like(polar_sum),
-            where=(polar_sum > 0),
+            where=(polar_sum > 0.0),
         )
 
-        return XMCDResult(
-            pixel_width_m=rcircObject.pixelWidthInMeters,
-            pixel_height_m=rcircObject.pixelHeightInMeters,
-            center_x_m=rcircObject.centerXInMeters,
-            center_y_m=rcircObject.centerYInMeters,
+        self._product_data = XMCDData(
             polar_difference=polar_difference,
             polar_sum=polar_sum,
             polar_ratio=polar_ratio,
+            pixel_geometry=rcirc_object.get_pixel_geometry(),
+            center=rcirc_object.get_center(),
         )
+        self.notify_observers()
 
-    def getSaveFileFilterList(self) -> Sequence[str]:
-        return [self.getSaveFileFilter()]
+    def get_data(self) -> XMCDData:
+        if self._product_data is None:
+            raise ValueError('No analyzed data!')
 
-    def getSaveFileFilter(self) -> str:
+        return self._product_data
+
+    def get_save_file_filters(self) -> Sequence[str]:
+        return [self.get_save_file_filter()]
+
+    def get_save_file_filter(self) -> str:
         return 'NumPy Zipped Archive (*.npz)'
 
-    def saveResult(self, filePath: Path, result: XMCDResult) -> None:
-        numpy.savez(
-            filePath,
-            'pixel_height_m',
-            result.pixel_height_m,
-            'pixel_width_m',
-            result.pixel_width_m,
-            'center_x_m',
-            result.center_x_m,
-            'center_y_m',
-            result.center_y_m,
-            'polar_difference',
-            result.polar_difference,
-            'polar_sum',
-            result.polar_sum,
-            'polar_ratio',
-            result.polar_ratio,
-        )
+    def save_data(self, file_path: Path) -> None:
+        if self._product_data is None:
+            raise ValueError('No analyzed data!')
+
+        contents: dict[str, Any] = {
+            'polar_difference': self._product_data.polar_difference,
+            'polar_sum': self._product_data.polar_sum,
+            'polar_ratio': self._product_data.polar_ratio,
+            'pixel_height_m': self._product_data.pixel_geometry.height_m,
+            'pixel_width_m': self._product_data.pixel_geometry.width_m,
+            'center_x_m': self._product_data.center.position_x_m,
+            'center_y_m': self._product_data.center.position_y_m,
+        }
+
+        numpy.savez(file_path, **contents)

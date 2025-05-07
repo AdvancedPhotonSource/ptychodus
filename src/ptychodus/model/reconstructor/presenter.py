@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 import logging
 
@@ -11,7 +11,7 @@ from ptychodus.api.reconstructor import (
 )
 
 from .api import ReconstructorAPI
-from .matcher import ScanIndexFilter
+from .log import ReconstructorLogHandler
 from .settings import ReconstructorSettings
 
 logger = logging.getLogger(__name__)
@@ -21,155 +21,96 @@ class ReconstructorPresenter(Observable, Observer):
     def __init__(
         self,
         settings: ReconstructorSettings,
-        reconstructorChooser: PluginChooser[Reconstructor],
-        reconstructorAPI: ReconstructorAPI,
-        reinitObservable: Observable,
+        reconstructor_chooser: PluginChooser[Reconstructor],
+        log_handler: ReconstructorLogHandler,
+        reconstructor_api: ReconstructorAPI,
     ) -> None:
         super().__init__()
         self._settings = settings
-        self._reconstructorChooser = reconstructorChooser
-        self._reconstructorAPI = reconstructorAPI
-        self._reinitObservable = reinitObservable
+        self._reconstructor_chooser = reconstructor_chooser
+        self._log_handler = log_handler
+        self._reconstructor_api = reconstructor_api
 
-        reconstructorChooser.addObserver(self)
-        reinitObservable.addObserver(self)
-        self._syncFromSettings()
+        reconstructor_chooser.synchronize_with_parameter(settings.algorithm)
+        reconstructor_chooser.add_observer(self)
 
-    def getReconstructorList(self) -> Sequence[str]:
-        return self._reconstructorChooser.getDisplayNameList()
+    def reconstructors(self) -> Iterator[str]:
+        for plugin in self._reconstructor_chooser:
+            yield plugin.display_name
 
-    def getReconstructor(self) -> str:
-        return self._reconstructorChooser.currentPlugin.displayName
+    def get_reconstructor(self) -> str:
+        return self._reconstructor_chooser.get_current_plugin().display_name
 
-    def setReconstructor(self, name: str) -> None:
-        self._reconstructorChooser.setCurrentPluginByName(name)
+    def set_reconstructor(self, name: str) -> None:
+        self._reconstructor_chooser.set_current_plugin(name)
 
-    def _syncFromSettings(self) -> None:
-        self.setReconstructor(self._settings.algorithm.getValue())
+    def reconstruct(self, input_product_index: int) -> int:
+        return self._reconstructor_api.reconstruct(input_product_index)
 
-    def _syncToSettings(self) -> None:
-        self._settings.algorithm.setValue(self._reconstructorChooser.currentPlugin.simpleName)
+    def reconstruct_split(self, input_product_index: int) -> tuple[int, int]:
+        return self._reconstructor_api.reconstruct_split(input_product_index)
 
-    def reconstruct(
-        self,
-        inputProductIndex: int,
-        outputProductName: str,
-        indexFilter: ScanIndexFilter = ScanIndexFilter.ALL,
-    ) -> int:
-        return self._reconstructorAPI.reconstruct(inputProductIndex, outputProductName, indexFilter)
-
-    def reconstructSplit(self, inputProductIndex: int, outputProductName: str) -> tuple[int, int]:
-        return self._reconstructorAPI.reconstructSplit(inputProductIndex, outputProductName)
+    def reconstruct_transformed(self, input_product_index: int) -> Sequence[int]:
+        return self._reconstructor_api.reconstruct_transformed(input_product_index)
 
     @property
-    def isTrainable(self) -> bool:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+    def is_reconstructing(self) -> bool:
+        return self._reconstructor_api.is_reconstructing
+
+    def flush_log(self) -> Iterator[str]:
+        for text in self._log_handler.messages():
+            yield text
+
+    def process_results(self, *, block: bool) -> None:
+        self._reconstructor_api.process_results(block=block)
+
+    @property
+    def is_trainable(self) -> bool:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
         return isinstance(reconstructor, TrainableReconstructor)
 
-    def ingestTrainingData(self, inputProductIndex: int) -> None:
-        return self._reconstructorAPI.ingestTrainingData(inputProductIndex)
-
-    def getOpenTrainingDataFileFilterList(self) -> Sequence[str]:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+    def get_model_file_filter(self) -> str:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getOpenTrainingDataFileFilterList()
-        else:
-            logger.warning('Reconstructor is not trainable!')
-
-        return list()
-
-    def getOpenTrainingDataFileFilter(self) -> str:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getOpenTrainingDataFileFilter()
+            return reconstructor.get_model_file_filter()
         else:
             logger.warning('Reconstructor is not trainable!')
 
         return str()
 
-    def openTrainingData(self, filePath: Path) -> None:
-        return self._reconstructorAPI.openTrainingData(filePath)
+    def open_model(self, file_path: Path) -> None:
+        return self._reconstructor_api.open_model(file_path)
 
-    def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+    def save_model(self, file_path: Path) -> None:
+        return self._reconstructor_api.save_model(file_path)
 
-        if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getSaveTrainingDataFileFilterList()
-        else:
-            logger.warning('Reconstructor is not trainable!')
-
-        return list()
-
-    def getSaveTrainingDataFileFilter(self) -> str:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+    def get_training_data_file_filter(self) -> str:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getSaveTrainingDataFileFilter()
+            return reconstructor.get_training_data_file_filter()
         else:
             logger.warning('Reconstructor is not trainable!')
 
         return str()
 
-    def saveTrainingData(self, filePath: Path) -> None:
-        return self._reconstructorAPI.saveTrainingData(filePath)
+    def export_training_data(self, file_path: Path, input_product_index: int) -> None:
+        return self._reconstructor_api.export_training_data(file_path, input_product_index)
 
-    def train(self) -> TrainOutput:
-        return self._reconstructorAPI.train()
-
-    def clearTrainingData(self) -> None:
-        self._reconstructorAPI.clearTrainingData()
-
-    def getOpenModelFileFilterList(self) -> Sequence[str]:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+    def get_training_data_path(self) -> Path:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getOpenModelFileFilterList()
+            return reconstructor.get_training_data_path()
         else:
             logger.warning('Reconstructor is not trainable!')
 
-        return list()
+        return Path()
 
-    def getOpenModelFileFilter(self) -> str:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+    def train(self, data_path: Path) -> TrainOutput:
+        return self._reconstructor_api.train(data_path)
 
-        if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getOpenModelFileFilter()
-        else:
-            logger.warning('Reconstructor is not trainable!')
-
-        return str()
-
-    def openModel(self, filePath: Path) -> None:
-        return self._reconstructorAPI.openModel(filePath)
-
-    def getSaveModelFileFilterList(self) -> Sequence[str]:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getSaveModelFileFilterList()
-        else:
-            logger.warning('Reconstructor is not trainable!')
-
-        return list()
-
-    def getSaveModelFileFilter(self) -> str:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            return reconstructor.getSaveModelFileFilter()
-        else:
-            logger.warning('Reconstructor is not trainable!')
-
-        return str()
-
-    def saveModel(self, filePath: Path) -> None:
-        return self._reconstructorAPI.saveModel(filePath)
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._reconstructorChooser:
-            self._syncToSettings()
-            self.notifyObservers()
-        elif observable is self._reinitObservable:
-            self._syncFromSettings()
+    def _update(self, observable: Observable) -> None:
+        if observable is self._reconstructor_chooser:
+            self.notify_observers()

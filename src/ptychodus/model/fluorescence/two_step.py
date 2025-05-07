@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Sequence
+from collections.abc import Iterator
 from typing import Final
 import logging
 import time
@@ -15,6 +15,7 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product
 
+from ..analysis import BarycentricArrayInterpolator
 from .settings import FluorescenceSettings
 
 logger = logging.getLogger(__name__)
@@ -31,27 +32,22 @@ class TwoStepFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Obse
     def __init__(
         self,
         settings: FluorescenceSettings,
-        upscalingStrategyChooser: PluginChooser[UpscalingStrategy],
-        deconvolutionStrategyChooser: PluginChooser[DeconvolutionStrategy],
-        reinitObservable: Observable,
+        upscaling_strategy_chooser: PluginChooser[UpscalingStrategy],
+        deconvolution_strategy_chooser: PluginChooser[DeconvolutionStrategy],
     ) -> None:
         super().__init__()
-        self._settings = settings
-        self._upscalingStrategyChooser = upscalingStrategyChooser
-        self._deconvolutionStrategyChooser = deconvolutionStrategyChooser
-        self._reinitObservable = reinitObservable
+        self._upscaling_strategy_chooser = upscaling_strategy_chooser
+        self._deconvolution_strategy_chooser = deconvolution_strategy_chooser
 
-        self._syncUpscalingStrategyFromSettings()
-        upscalingStrategyChooser.addObserver(self)
+        upscaling_strategy_chooser.synchronize_with_parameter(settings.upscaling_strategy)
+        upscaling_strategy_chooser.add_observer(self)
 
-        self._syncDeconvolutionStrategyFromSettings()
-        deconvolutionStrategyChooser.addObserver(self)
-
-        reinitObservable.addObserver(self)
+        deconvolution_strategy_chooser.synchronize_with_parameter(settings.deconvolution_strategy)
+        deconvolution_strategy_chooser.add_observer(self)
 
     def enhance(self, dataset: FluorescenceDataset, product: Product) -> FluorescenceDataset:
-        upscaler = self._upscalingStrategyChooser.currentPlugin.strategy
-        deconvolver = self._deconvolutionStrategyChooser.currentPlugin.strategy
+        upscaler = self._upscaling_strategy_chooser.get_current_plugin().strategy
+        deconvolver = self._deconvolution_strategy_chooser.get_current_plugin().strategy
         element_maps: list[ElementMap] = list()
 
         for emap in dataset.element_maps:
@@ -70,41 +66,28 @@ class TwoStepFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Obse
             channel_names_path=dataset.channel_names_path,
         )
 
-    def getUpscalingStrategyList(self) -> Sequence[str]:
-        return self._upscalingStrategyChooser.getDisplayNameList()
+    def get_upscaling_strategies(self) -> Iterator[str]:
+        for plugin in self._upscaling_strategy_chooser:
+            yield plugin.display_name
 
-    def getUpscalingStrategy(self) -> str:
-        return self._upscalingStrategyChooser.currentPlugin.displayName
+    def get_upscaling_strategy(self) -> str:
+        return self._upscaling_strategy_chooser.get_current_plugin().display_name
 
-    def setUpscalingStrategy(self, name: str) -> None:
-        self._upscalingStrategyChooser.setCurrentPluginByName(name)
-        self._settings.upscalingStrategy.setValue(
-            self._upscalingStrategyChooser.currentPlugin.simpleName
-        )
+    def set_upscaling_strategy(self, name: str) -> None:
+        self._upscaling_strategy_chooser.set_current_plugin(name)
 
-    def _syncUpscalingStrategyFromSettings(self) -> None:
-        self.setUpscalingStrategy(self._settings.upscalingStrategy.getValue())
+    def get_deconvolution_strategies(self) -> Iterator[str]:
+        for plugin in self._deconvolution_strategy_chooser:
+            yield plugin.display_name
 
-    def getDeconvolutionStrategyList(self) -> Sequence[str]:
-        return self._deconvolutionStrategyChooser.getDisplayNameList()
+    def get_deconvolution_strategy(self) -> str:
+        return self._deconvolution_strategy_chooser.get_current_plugin().display_name
 
-    def getDeconvolutionStrategy(self) -> str:
-        return self._deconvolutionStrategyChooser.currentPlugin.displayName
+    def set_deconvolution_strategy(self, name: str) -> None:
+        self._deconvolution_strategy_chooser.set_current_plugin(name)
 
-    def setDeconvolutionStrategy(self, name: str) -> None:
-        self._deconvolutionStrategyChooser.setCurrentPluginByName(name)
-        self._settings.deconvolutionStrategy.setValue(
-            self._deconvolutionStrategyChooser.currentPlugin.simpleName
-        )
-
-    def _syncDeconvolutionStrategyFromSettings(self) -> None:
-        self.setDeconvolutionStrategy(self._settings.deconvolutionStrategy.getValue())
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._reinitObservable:
-            self._syncUpscalingStrategyFromSettings()
-            self._syncDeconvolutionStrategyFromSettings()
-        elif observable is self._upscalingStrategyChooser:
-            self.notifyObservers()
-        elif observable is self._deconvolutionStrategyChooser:
-            self.notifyObservers()
+    def _update(self, observable: Observable) -> None:
+        if observable is self._upscaling_strategy_chooser:
+            self.notify_observers()
+        elif observable is self._deconvolution_strategy_chooser:
+            self.notify_observers()

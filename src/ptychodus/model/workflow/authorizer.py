@@ -7,37 +7,37 @@ logger = logging.getLogger(__name__)
 class WorkflowAuthorizer:
     def __init__(self) -> None:
         super().__init__()
-        self._authorizeLock = threading.Lock()
-        self._authorizeCode = str()
-        self._authorizeURL = 'https://aps.anl.gov'
-        self.isAuthorizedEvent = threading.Event()
-        self.isAuthorizedEvent.set()
-        self.shutdownEvent = threading.Event()
+        self._authorize_lock = threading.Lock()
+        self._authorize_code = str()
+        self._authorize_url = 'https://aps.anl.gov'
+        self.is_authorized_event = threading.Event()
+        self.is_authorized_event.set()
+        self.shutdown_event = threading.Event()
 
     @property
-    def isAuthorized(self) -> bool:
-        return self.isAuthorizedEvent.is_set()
+    def is_authorized(self) -> bool:
+        return self.is_authorized_event.is_set()
 
-    def getAuthorizeURL(self) -> str:
-        with self._authorizeLock:
-            return self._authorizeURL
+    def get_authorize_url(self) -> str:
+        with self._authorize_lock:
+            return self._authorize_url
 
-    def setCodeFromAuthorizeURL(self, code: str) -> None:
-        with self._authorizeLock:
-            self._authorizeCode = code
-            self.isAuthorizedEvent.set()
+    def set_code_from_authorize_url(self, code: str) -> None:
+        with self._authorize_lock:
+            self._authorize_code = code
+            self.is_authorized_event.set()
 
-    def getCodeFromAuthorizeURL(self) -> str:
-        with self._authorizeLock:
-            return self._authorizeCode
+    def get_code_from_authorize_url(self) -> str:
+        with self._authorize_lock:
+            return self._authorize_code
 
-    def authenticate(self, authorizeURL: str) -> None:
-        logger.info(f'Authenticate at {authorizeURL}')
+    def authenticate(self, authorize_url: str) -> None:
+        logger.info(f'Authenticate at {authorize_url}')
 
-        with self._authorizeLock:
-            self._authorizeURL = authorizeURL
-            self.isAuthorizedEvent.clear()
+        with self._authorize_lock:
+            self._authorize_url = authorize_url
+            self.is_authorized_event.clear()
 
-        while not self.shutdownEvent.is_set():
-            if self.isAuthorizedEvent.wait(timeout=1.0):
+        while not self.shutdown_event.is_set():
+            if self.is_authorized_event.wait(timeout=1.0):
                 break

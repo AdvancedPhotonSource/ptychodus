@@ -7,35 +7,35 @@ from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.product import Product
 
-from .metadata import MetadataRepositoryItem
+from .geometry import ProductGeometry
+from .metadata import MetadataRepositoryItem, UniqueNameFactory
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
-from .productGeometry import ProductGeometry
-from .productValidator import ProductValidator
 from .scan import ScanRepositoryItem
+from .validator import ProductValidator
 
 logger = logging.getLogger(__name__)
 
 
-class ProductRepositoryItemObserver(ABC):
+class ProductRepositoryItemObserver(UniqueNameFactory):
     @abstractmethod
-    def handleMetadataChanged(self, item: ProductRepositoryItem) -> None:
+    def handle_metadata_changed(self, item: ProductRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleScanChanged(self, item: ProductRepositoryItem) -> None:
+    def handle_scan_changed(self, item: ProductRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleProbeChanged(self, item: ProductRepositoryItem) -> None:
+    def handle_probe_changed(self, item: ProductRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleObjectChanged(self, item: ProductRepositoryItem) -> None:
+    def handle_object_changed(self, item: ProductRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleCostsChanged(self, item: ProductRepositoryItem) -> None:
+    def handle_costs_changed(self, item: ProductRepositoryItem) -> None:
         pass
 
 
@@ -43,130 +43,124 @@ class ProductRepositoryItem(ParameterGroup):
     def __init__(
         self,
         parent: ProductRepositoryItemObserver,
-        metadata: MetadataRepositoryItem,
-        scan: ScanRepositoryItem,
+        metadata_item: MetadataRepositoryItem,
+        scan_item: ScanRepositoryItem,
         geometry: ProductGeometry,
-        probe: ProbeRepositoryItem,
-        object_: ObjectRepositoryItem,
+        probe_item: ProbeRepositoryItem,
+        object_item: ObjectRepositoryItem,
         validator: ProductValidator,
         costs: Sequence[float],
     ) -> None:
         super().__init__()
         self._parent = parent
-        self._metadata = metadata
-        self._scan = scan
+        self._metadata_item = metadata_item
+        self._scan_item = scan_item
         self._geometry = geometry
-        self._probe = probe
-        self._object = object_
+        self._probe_item = probe_item
+        self._object_item = object_item
         self._validator = validator
         self._costs = list(costs)
 
-        self._addGroup('metadata', self._metadata, observe=True)
-        self._addGroup('scan', self._scan, observe=True)
-        self._addGroup('probe', self._probe, observe=True)
-        self._addGroup('object', self._object, observe=True)
+        self._add_group('metadata', self._metadata_item, observe=True)
+        self._add_group('scan', self._scan_item, observe=True)
+        self._add_group('probe', self._probe_item, observe=True)
+        self._add_group('object', self._object_item, observe=True)
 
-    def assignItem(self, item: ProductRepositoryItem, *, notify: bool = True) -> None:
-        self._metadata.assignItem(item.getMetadata())
-        self._scan.assignItem(item.getScan())
-        self._probe.assignItem(item.getProbe())
-        self._object.assignItem(item.getObject())
-        self._costs = list(item.getCosts())
-
-        if notify:
-            self._parent.handleCostsChanged(self)
+        self._index = -1  # used by ProductRepository
 
     def assign(self, product: Product) -> None:
-        self._metadata.assign(product.metadata)
-        self._scan.assign(product.scan)
-        self._probe.assign(product.probe)
-        self._object.assign(product.object_)
+        self._metadata_item.assign(product.metadata)
+        self._scan_item.assign(product.positions)
+        self._probe_item.assign(product.probes)
+        self._object_item.assign(product.object_)
         self._costs = list(product.costs)
-        self._parent.handleCostsChanged(self)
+        self._parent.handle_costs_changed(self)
 
-    def syncToSettings(self) -> None:
-        self._metadata.syncToSettings()
-        self._scan.syncToSettings()
-        self._probe.syncToSettings()
-        self._object.syncToSettings()
+    def sync_to_settings(self) -> None:
+        self._metadata_item.sync_to_settings()
+        self._scan_item.sync_to_settings()
+        self._probe_item.sync_to_settings()
+        self._object_item.sync_to_settings()
 
-    def getName(self) -> str:
-        return self._metadata.getName()
+    def get_name(self) -> str:
+        return self._metadata_item.name.get_value()
 
-    def setName(self, name: str) -> None:
-        self._metadata.setName(name)
+    def set_name(self, name: str) -> None:
+        self._metadata_item.name.set_value(name)
 
-    def getMetadata(self) -> MetadataRepositoryItem:
-        return self._metadata
+    def get_metadata_item(self) -> MetadataRepositoryItem:
+        return self._metadata_item
 
-    def getScan(self) -> ScanRepositoryItem:
-        return self._scan
+    def get_scan_item(self) -> ScanRepositoryItem:
+        return self._scan_item
 
-    def getGeometry(self) -> ProductGeometry:
+    def get_geometry(self) -> ProductGeometry:
         return self._geometry
 
-    def getProbe(self) -> ProbeRepositoryItem:
-        return self._probe
+    def get_probe_item(self) -> ProbeRepositoryItem:
+        return self._probe_item
 
-    def getObject(self) -> ObjectRepositoryItem:
-        return self._object
+    def get_object_item(self) -> ObjectRepositoryItem:
+        return self._object_item
 
-    def _invalidateCosts(self) -> None:
+    def _invalidate_costs(self) -> None:
         self._costs = list()
-        self._parent.handleCostsChanged(self)
+        self._parent.handle_costs_changed(self)
 
-    def getCosts(self) -> Sequence[float]:
+    def get_costs(self) -> Sequence[float]:
         return self._costs
 
-    def getProduct(self) -> Product:
+    def get_product(self) -> Product:
         return Product(
-            metadata=self._metadata.getMetadata(),
-            scan=self._scan.getScan(),
-            probe=self._probe.getProbe(),
-            object_=self._object.getObject(),
-            costs=self.getCosts(),
+            metadata=self._metadata_item.get_metadata(),
+            positions=self._scan_item.get_scan(),
+            probes=self._probe_item.get_probes(),
+            object_=self._object_item.get_object(),
+            costs=self.get_costs(),
         )
 
-    def update(self, observable: Observable) -> None:
-        if observable is self._metadata:
-            self._invalidateCosts()
-            self._parent.handleMetadataChanged(self)
-        elif observable is self._scan:
-            self._invalidateCosts()
-            self._parent.handleScanChanged(self)
-        elif observable is self._probe:
-            self._invalidateCosts()
-            self._parent.handleProbeChanged(self)
-        elif observable is self._object:
-            self._invalidateCosts()
-            self._parent.handleObjectChanged(self)
+    def _update(self, observable: Observable) -> None:
+        if observable is self._metadata_item:
+            self._invalidate_costs()
+            self._parent.handle_metadata_changed(self)
+        elif observable is self._scan_item:
+            self._invalidate_costs()
+            self._parent.handle_scan_changed(self)
+        elif observable is self._probe_item:
+            self._invalidate_costs()
+            self._parent.handle_probe_changed(self)
+        elif observable is self._object_item:
+            self._invalidate_costs()
+            self._parent.handle_object_changed(self)
+        else:
+            super()._update(observable)
 
 
 class ProductRepositoryObserver(ABC):
     @abstractmethod
-    def handleItemInserted(self, index: int, item: ProductRepositoryItem) -> None:
+    def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleMetadataChanged(self, index: int, item: MetadataRepositoryItem) -> None:
+    def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleScanChanged(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_scan_changed(self, index: int, item: ScanRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleProbeChanged(self, index: int, item: ProbeRepositoryItem) -> None:
+    def handle_probe_changed(self, index: int, item: ProbeRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleObjectChanged(self, index: int, item: ObjectRepositoryItem) -> None:
+    def handle_object_changed(self, index: int, item: ObjectRepositoryItem) -> None:
         pass
 
     @abstractmethod
-    def handleCostsChanged(self, index: int, costs: Sequence[float]) -> None:
+    def handle_costs_changed(self, index: int, costs: Sequence[float]) -> None:
         pass
 
     @abstractmethod
-    def handleItemRemoved(self, index: int, item: ProductRepositoryItem) -> None:
+    def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
         pass

@@ -24,36 +24,36 @@ class Parameter(ABC, Generic[T], Observable):
         self._parent = parent
 
     @abstractmethod
-    def getValue(self) -> T:
+    def get_value(self) -> T:
         pass
 
     @abstractmethod
-    def setValue(self, value: T, *, notify: bool = True) -> None:
+    def set_value(self, value: T, *, notify: bool = True) -> None:
         pass
 
     @abstractmethod
-    def getValueAsString(self) -> str:
+    def get_value_as_string(self) -> str:
         pass
 
     @abstractmethod
-    def setValueFromString(self, value: str) -> None:
+    def set_value_from_string(self, value: str) -> None:
         pass
 
     @abstractmethod
     def copy(self) -> Parameter[T]:
         pass
 
-    def syncValueToParent(self) -> None:
+    def sync_value_to_parent(self) -> None:
         if self._parent is None:
-            logger.warning('syncValueToParent: parent is None!')
+            logger.warning('sync_value_to_parent: parent is None!')
         else:
-            self._parent.setValue(self.getValue())
+            self._parent.set_value(self.get_value())
 
-    def syncValueFromParent(self) -> None:
+    def sync_value_from_parent(self) -> None:
         if self._parent is None:
-            logger.warning('syncValueFromParent: parent is None!')
+            logger.warning('sync_value_from_parent: parent is None!')
         else:
-            self.setValue(self._parent.getValue())
+            self.set_value(self._parent.get_value())
 
 
 class ParameterBase(Parameter[T]):
@@ -61,17 +61,17 @@ class ParameterBase(Parameter[T]):
         super().__init__(parent)
         self._value = value
 
-    def getValue(self) -> T:
+    def get_value(self) -> T:
         return self._value
 
-    def setValue(self, value: T, *, notify: bool = True) -> None:
+    def set_value(self, value: T, *, notify: bool = True) -> None:
         if self._value != value:
             self._value = value
 
             if notify:
-                self.notifyObservers()
+                self.notify_observers()
 
-    def getValueAsString(self) -> str:
+    def get_value_as_string(self) -> str:
         return repr(self._value)
 
 
@@ -79,25 +79,25 @@ class StringParameter(ParameterBase[str]):
     def __init__(self, value: str, parent: StringParameter | None) -> None:
         super().__init__(value, parent)
 
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(str(value))
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(str(value))
 
-    def getValueAsString(self) -> str:
+    def get_value_as_string(self) -> str:
         return str(self._value)
 
     def copy(self) -> StringParameter:
-        return StringParameter(self.getValue(), self)
+        return StringParameter(self.get_value(), self)
 
 
 class PathParameter(ParameterBase[Path]):
     def __init__(self, value: Path, parent: PathParameter | None) -> None:
         super().__init__(value, parent)
 
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(Path(value))
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(Path(value))
 
-    def changePathPrefix(self, find_path_prefix: Path, replacement_path_prefix: Path) -> Path:
-        value = self.getValue()
+    def change_path_prefix(self, find_path_prefix: Path, replacement_path_prefix: Path) -> Path:
+        value = self.get_value()
 
         try:
             relative_path = value.resolve().relative_to(find_path_prefix)
@@ -108,25 +108,25 @@ class PathParameter(ParameterBase[Path]):
 
         return value
 
-    def getValueAsString(self) -> str:
+    def get_value_as_string(self) -> str:
         return str(self._value)
 
     def copy(self) -> PathParameter:
-        return PathParameter(self.getValue(), self)
+        return PathParameter(self.get_value(), self)
 
 
 class UUIDParameter(ParameterBase[UUID]):
     def __init__(self, value: UUID, parent: UUIDParameter | None) -> None:
         super().__init__(value, parent)
 
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(UUID(value))
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(UUID(value))
 
-    def getValueAsString(self) -> str:
+    def get_value_as_string(self) -> str:
         return str(self._value)
 
     def copy(self) -> UUIDParameter:
-        return UUIDParameter(self.getValue(), self)
+        return UUIDParameter(self.get_value(), self)
 
 
 class BooleanParameter(ParameterBase[bool]):
@@ -135,11 +135,11 @@ class BooleanParameter(ParameterBase[bool]):
     def __init__(self, value: bool, parent: BooleanParameter | None) -> None:
         super().__init__(value, parent)
 
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(value.lower() in BooleanParameter.TRUE_VALUES)
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(value.lower() in BooleanParameter.TRUE_VALUES)
 
     def copy(self) -> BooleanParameter:
-        return BooleanParameter(self.getValue(), self)
+        return BooleanParameter(self.get_value(), self)
 
 
 class IntegerParameter(ParameterBase[int]):
@@ -155,14 +155,14 @@ class IntegerParameter(ParameterBase[int]):
         self._minimum = minimum
         self._maximum = maximum
 
-    def getMinimum(self) -> int | None:
+    def get_minimum(self) -> int | None:
         return self._minimum
 
-    def getMaximum(self) -> int | None:
+    def get_maximum(self) -> int | None:
         return self._maximum
 
-    def getValue(self) -> int:
-        value = super().getValue()
+    def get_value(self) -> int:
+        value = super().get_value()
 
         if self._minimum is not None:
             value = max(self._minimum, value)
@@ -172,12 +172,12 @@ class IntegerParameter(ParameterBase[int]):
 
         return value
 
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(int(value))
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(int(value))
 
     def copy(self) -> IntegerParameter:
         return IntegerParameter(
-            self.getValue(), self, minimum=self.getMinimum(), maximum=self.getMaximum()
+            self.get_value(), self, minimum=self.get_minimum(), maximum=self.get_maximum()
         )
 
 
@@ -194,14 +194,14 @@ class RealParameter(ParameterBase[float]):
         self._minimum = minimum
         self._maximum = maximum
 
-    def getMinimum(self) -> float | None:
+    def get_minimum(self) -> float | None:
         return self._minimum
 
-    def getMaximum(self) -> float | None:
+    def get_maximum(self) -> float | None:
         return self._maximum
 
-    def getValue(self) -> float:
-        value = super().getValue()
+    def get_value(self) -> float:
+        value = super().get_value()
 
         if self._minimum is not None:
             value = max(self._minimum, value)
@@ -211,17 +211,66 @@ class RealParameter(ParameterBase[float]):
 
         return value
 
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(float(value))
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(float(value))
 
     def copy(self) -> RealParameter:
         return RealParameter(
-            self.getValue(), self, minimum=self.getMinimum(), maximum=self.getMaximum()
+            self.get_value(), self, minimum=self.get_minimum(), maximum=self.get_maximum()
         )
 
 
-class RealArrayParameter(ParameterBase[MutableSequence[float]]):
-    def __init__(self, value: Sequence[float], parent: RealArrayParameter | None) -> None:
+class IntegerSequenceParameter(ParameterBase[MutableSequence[int]]):
+    def __init__(self, value: Sequence[int], parent: IntegerSequenceParameter | None) -> None:
+        super().__init__(list(value), parent)
+
+    def __iter__(self) -> Iterator[int]:
+        return iter(self._value)
+
+    def __getitem__(self, index: int) -> int:
+        return self._value[index]
+
+    def __setitem__(self, index: int, value: int) -> None:
+        if self._value[index] != value:
+            self._value[index] = value
+            self.notify_observers()
+
+    def __delitem__(self, index: int) -> None:
+        del self._value[index]
+        self.notify_observers()
+
+    def insert(self, index: int, value: int) -> None:
+        self._value.insert(index, value)
+        self.notify_observers()
+
+    def __len__(self) -> int:
+        return len(self._value)
+
+    def set_value(self, value: Sequence[int], *, notify: bool = True) -> None:
+        if self._value != value:
+            self._value = list(value)
+
+            if notify:
+                self.notify_observers()
+
+    def get_value_as_string(self) -> str:
+        return ','.join(repr(value) for value in self)
+
+    def set_value_from_string(self, value: str) -> None:
+        new_value: list[int] = list()
+
+        for xstr in value.split(','):
+            if xstr:
+                new_value.append(int(xstr))
+
+        self.set_value(new_value)
+
+    def copy(self) -> IntegerSequenceParameter:
+        return IntegerSequenceParameter(self.get_value(), self)
+
+
+class RealSequenceParameter(ParameterBase[MutableSequence[float]]):
+    def __init__(self, value: Sequence[float], parent: RealSequenceParameter | None) -> None:
         super().__init__(list(value), parent)
 
     def __iter__(self) -> Iterator[float]:
@@ -233,48 +282,49 @@ class RealArrayParameter(ParameterBase[MutableSequence[float]]):
     def __setitem__(self, index: int, value: float) -> None:
         if self._value[index] != value:
             self._value[index] = value
-            self.notifyObservers()
+            self.notify_observers()
 
     def __delitem__(self, index: int) -> None:
         del self._value[index]
-        self.notifyObservers()
+        self.notify_observers()
 
     def insert(self, index: int, value: float) -> None:
         self._value.insert(index, value)
-        self.notifyObservers()
+        self.notify_observers()
 
     def __len__(self) -> int:
         return len(self._value)
 
-    def setValue(self, value: Sequence[float], *, notify: bool = True) -> None:
+    def set_value(self, value: Sequence[float], *, notify: bool = True) -> None:
         if self._value != value:
             self._value = list(value)
 
             if notify:
-                self.notifyObservers()
+                self.notify_observers()
 
-    def getValueAsString(self) -> str:
+    def get_value_as_string(self) -> str:
         return ','.join(repr(value) for value in self)
 
-    def setValueFromString(self, value: str) -> None:
+    def set_value_from_string(self, value: str) -> None:
         tmp: list[float] = list()
 
         for xstr in value.split(','):
-            try:
-                x = float(xstr)
-            except ValueError:
-                x = float('nan')
+            if xstr:
+                try:
+                    x = float(xstr)
+                except ValueError:
+                    x = float('nan')
 
-            tmp.append(x)
+                tmp.append(x)
 
-        self.setValue(tmp)
+        self.set_value(tmp)
 
-    def copy(self) -> RealArrayParameter:
-        return RealArrayParameter(self.getValue(), self)
+    def copy(self) -> RealSequenceParameter:
+        return RealSequenceParameter(self.get_value(), self)
 
 
-class ComplexArrayParameter(ParameterBase[MutableSequence[complex]]):
-    def __init__(self, value: Sequence[complex], parent: ComplexArrayParameter | None) -> None:
+class ComplexSequenceParameter(ParameterBase[MutableSequence[complex]]):
+    def __init__(self, value: Sequence[complex], parent: ComplexSequenceParameter | None) -> None:
         super().__init__(list(value), parent)
 
     def __iter__(self) -> Iterator[complex]:
@@ -286,44 +336,45 @@ class ComplexArrayParameter(ParameterBase[MutableSequence[complex]]):
     def __setitem__(self, index: int, value: complex) -> None:
         if self._value[index] != value:
             self._value[index] = value
-            self.notifyObservers()
+            self.notify_observers()
 
     def __delitem__(self, index: int) -> None:
         del self._value[index]
-        self.notifyObservers()
+        self.notify_observers()
 
     def insert(self, index: int, value: complex) -> None:
         self._value.insert(index, value)
-        self.notifyObservers()
+        self.notify_observers()
 
     def __len__(self) -> int:
         return len(self._value)
 
-    def setValue(self, value: Sequence[complex], *, notify: bool = True) -> None:
+    def set_value(self, value: Sequence[complex], *, notify: bool = True) -> None:
         if self._value != value:
             self._value = list(value)
 
             if notify:
-                self.notifyObservers()
+                self.notify_observers()
 
-    def getValueAsString(self) -> str:
+    def get_value_as_string(self) -> str:
         return ','.join(repr(value) for value in self)
 
-    def setValueFromString(self, value: str) -> None:
+    def set_value_from_string(self, value: str) -> None:
         tmp: list[complex] = list()
 
         for xstr in value.split(','):
-            try:
-                x = complex(xstr)
-            except ValueError:
-                x = float('nan') * 1j
+            if xstr:
+                try:
+                    x = complex(xstr)
+                except ValueError:
+                    x = float('nan') * 1j
 
-            tmp.append(x)
+                tmp.append(x)
 
-        self.setValue(tmp)
+        self.set_value(tmp)
 
-    def copy(self) -> ComplexArrayParameter:
-        return ComplexArrayParameter(self.getValue(), self)
+    def copy(self) -> ComplexSequenceParameter:
+        return ComplexSequenceParameter(self.get_value(), self)
 
 
 class ParameterGroup(Observable, Observer):
@@ -335,86 +386,95 @@ class ParameterGroup(Observable, Observer):
     def parameters(self) -> Mapping[str, Parameter[Any]]:
         return self._parameters
 
-    def _addParameter(self, name: str, parameter: Parameter[Any]) -> None:
+    def _add_parameter(self, name: str, parameter: Parameter[Any]) -> None:
         if self._parameters.setdefault(name, parameter) is parameter:
-            parameter.addObserver(self)
+            parameter.add_observer(self)
         else:
             raise ValueError(f'Parameter "{name}" already exists!')
 
-    def createStringParameter(self, name: str, value: str) -> StringParameter:
+    def create_string_parameter(self, name: str, value: str) -> StringParameter:
         parameter = StringParameter(value, parent=None)
-        self._addParameter(name, parameter)
+        self._add_parameter(name, parameter)
         return parameter
 
-    def createPathParameter(self, name: str, value: Path) -> PathParameter:
+    def create_path_parameter(self, name: str, value: Path) -> PathParameter:
         parameter = PathParameter(value, parent=None)
-        self._addParameter(name, parameter)
+        self._add_parameter(name, parameter)
         return parameter
 
-    def createUUIDParameter(self, name: str, value: UUID) -> UUIDParameter:
+    def create_uuid_parameter(self, name: str, value: UUID) -> UUIDParameter:
         parameter = UUIDParameter(value, parent=None)
-        self._addParameter(name, parameter)
+        self._add_parameter(name, parameter)
         return parameter
 
-    def createBooleanParameter(self, name: str, value: bool) -> BooleanParameter:
+    def create_boolean_parameter(self, name: str, value: bool) -> BooleanParameter:
         parameter = BooleanParameter(value, parent=None)
-        self._addParameter(name, parameter)
+        self._add_parameter(name, parameter)
         return parameter
 
-    def createIntegerParameter(
+    def create_integer_parameter(
         self, name: str, value: int, *, minimum: int | None = None, maximum: int | None = None
     ) -> IntegerParameter:
         parameter = IntegerParameter(value, parent=None, minimum=minimum, maximum=maximum)
-        self._addParameter(name, parameter)
+        self._add_parameter(name, parameter)
         return parameter
 
-    def createRealParameter(
+    def create_integer_sequence_parameter(
+        self, name: str, value: Sequence[int]
+    ) -> IntegerSequenceParameter:
+        parameter = IntegerSequenceParameter(value, parent=None)
+        self._add_parameter(name, parameter)
+        return parameter
+
+    def create_real_parameter(
         self, name: str, value: float, *, minimum: float | None = None, maximum: float | None = None
     ) -> RealParameter:
         parameter = RealParameter(value, parent=None, minimum=minimum, maximum=maximum)
-        self._addParameter(name, parameter)
+        self._add_parameter(name, parameter)
         return parameter
 
-    def createRealArrayParameter(self, name: str, value: Sequence[float]) -> RealArrayParameter:
-        parameter = RealArrayParameter(value, parent=None)
-        self._addParameter(name, parameter)
+    def create_real_sequence_parameter(
+        self, name: str, value: Sequence[float]
+    ) -> RealSequenceParameter:
+        parameter = RealSequenceParameter(value, parent=None)
+        self._add_parameter(name, parameter)
         return parameter
 
-    def createComplexArrayParameter(
+    def create_complex_sequence_parameter(
         self, name: str, value: Sequence[complex]
-    ) -> ComplexArrayParameter:
-        parameter = ComplexArrayParameter(value, parent=None)
-        self._addParameter(name, parameter)
+    ) -> ComplexSequenceParameter:
+        parameter = ComplexSequenceParameter(value, parent=None)
+        self._add_parameter(name, parameter)
         return parameter
 
     def groups(self) -> Mapping[str, ParameterGroup]:
         return self._groups
 
-    def _addGroup(self, name: str, group: ParameterGroup, *, observe: bool = False) -> None:
+    def _add_group(self, name: str, group: ParameterGroup, *, observe: bool = False) -> None:
         if self._groups.setdefault(name, group) is group:
             if observe:
-                group.addObserver(self)
+                group.add_observer(self)
         else:
             raise ValueError(f'Group "{name}" already exists!')
 
-    def _removeGroup(self, name: str) -> None:
+    def _remove_group(self, name: str) -> None:
         try:
             group = self._groups.pop(name)
         except KeyError:
             pass
         else:
-            group.removeObserver(self)
+            group.remove_observer(self)
 
-    def createGroup(self, name: str) -> ParameterGroup:
+    def create_group(self, name: str) -> ParameterGroup:
         group = ParameterGroup()
-        self._addGroup(name, group)
+        self._add_group(name, group)
         return group
 
-    def getGroup(self, name: str) -> ParameterGroup:
+    def get_group(self, name: str) -> ParameterGroup:
         return self._groups[name]
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable in self._parameters.values():
-            self.notifyObservers()
+            self.notify_observers()
         elif observable in self._groups.values():
-            self.notifyObservers()
+            self.notify_observers()

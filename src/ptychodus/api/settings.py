@@ -16,84 +16,93 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class PathPrefixChange:
-    findPathPrefix: Path
-    replacementPathPrefix: Path
+    find_path_prefix: Path
+    replacement_path_prefix: Path
 
 
 class SettingsRegistry(Observable):
     def __init__(self) -> None:
         super().__init__()
-        self._parameterGroup = ParameterGroup()
-        self._fileFilterList: list[str] = ['Initialization Files (*.ini)']
+        self._parameter_group = ParameterGroup()
+        self._file_filter_list: list[str] = ['Initialization Files (*.ini)']
 
-    def createGroup(self, name: str) -> ParameterGroup:
-        return self._parameterGroup.createGroup(name)
+    def create_group(self, name: str) -> ParameterGroup:
+        return self._parameter_group.create_group(name)
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self._parameterGroup.groups())
+        return iter(self._parameter_group.groups())
 
     def __getitem__(self, name: str) -> ParameterGroup:
-        return self._parameterGroup.getGroup(name)
+        return self._parameter_group.get_group(name)
 
     def __len__(self) -> int:
-        return len(self._parameterGroup.groups())
+        return len(self._parameter_group.groups())
 
-    def getOpenFileFilterList(self) -> Sequence[str]:
-        return self._fileFilterList
+    def get_open_file_filters(self) -> Sequence[str]:
+        return self._file_filter_list
 
-    def getOpenFileFilter(self) -> str:
-        return self._fileFilterList[0]
+    def get_open_file_filter(self) -> str:
+        return self._file_filter_list[0]
 
-    def openSettings(self, filePath: Path) -> None:
+    def open_settings(self, file_path: Path) -> None:
         config = configparser.ConfigParser(interpolation=None)
-        logger.debug(f'Reading settings from "{filePath}"')
-        config.read(filePath)
+        logger.debug(f'Reading settings from "{file_path}"')
+
+        try:
+            config.read(file_path)
+        except Exception as exc:
+            logger.exception(exc)
+            return
 
         # TODO generalize to support nested parameter groups
-        for groupName, group in self._parameterGroup.groups().items():
+        for group_name, group in self._parameter_group.groups().items():
             try:
-                groupConfig = config[groupName]
+                group_config = config[group_name]
             except KeyError:
                 pass
             else:
-                for parameterName, parameter in group.parameters().items():
+                for parameter_name, parameter in group.parameters().items():
                     try:
-                        valueString = groupConfig[parameterName]
+                        value_string = group_config[parameter_name]
                     except KeyError:
                         pass
                     else:
-                        parameter.setValueFromString(valueString)
+                        parameter.set_value_from_string(value_string)
 
-        self.notifyObservers()
+        self.notify_observers()
 
-    def getSaveFileFilterList(self) -> Sequence[str]:
-        return self._fileFilterList
+    def get_save_file_filters(self) -> Sequence[str]:
+        return self._file_filter_list
 
-    def getSaveFileFilter(self) -> str:
-        return self._fileFilterList[0]
+    def get_save_file_filter(self) -> str:
+        return self._file_filter_list[0]
 
-    def saveSettings(
-        self, filePath: Path, changePathPrefix: PathPrefixChange | None = None
+    def save_settings(
+        self, file_path: Path, change_path_prefix: PathPrefixChange | None = None
     ) -> None:
         config = configparser.ConfigParser(interpolation=None)
         setattr(config, 'optionxform', lambda option: option)
 
-        for groupName, group in self._parameterGroup.groups().items():
-            config.add_section(groupName)
+        for group_name, group in self._parameter_group.groups().items():
+            config.add_section(group_name)
 
-            for parameterName, parameter in group.parameters().items():
-                valueString = parameter.getValueAsString()
+            for parameter_name, parameter in group.parameters().items():
+                value_string = parameter.get_value_as_string()
 
-                if changePathPrefix and isinstance(parameter, PathParameter):
-                    modifiedPath = parameter.changePathPrefix(
-                        changePathPrefix.findPathPrefix,
-                        changePathPrefix.replacementPathPrefix,
+                if change_path_prefix and isinstance(parameter, PathParameter):
+                    modified_path = parameter.change_path_prefix(
+                        change_path_prefix.find_path_prefix,
+                        change_path_prefix.replacement_path_prefix,
                     )
-                    valueString = str(modifiedPath)
+                    value_string = str(modified_path)
 
-                config.set(groupName, parameterName, valueString)
+                config.set(group_name, parameter_name, value_string)
 
-        logger.debug(f'Writing settings to "{filePath}"')
+        logger.debug(f'Writing settings to "{file_path}"')
 
-        with filePath.open(mode='w') as configFile:
-            config.write(configFile)
+        try:
+            with file_path.open(mode='w') as config_file:
+                config.write(config_file)
+        except Exception as exc:
+            logger.exception(exc)
+            return

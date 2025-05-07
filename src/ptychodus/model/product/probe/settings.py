@@ -7,61 +7,60 @@ from ptychodus.api.settings import SettingsRegistry
 class ProbeSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = registry.createGroup('Probe')
-        self._settingsGroup.addObserver(self)
+        self._group = registry.create_group('Probe')
+        self._group.add_observer(self)
 
-        self.builder = self._settingsGroup.createStringParameter('Builder', 'Disk')
-        self.filePath = self._settingsGroup.createPathParameter(
-            'FilePath', Path('/path/to/probe.npy')
-        )
-        self.fileType = self._settingsGroup.createStringParameter('FileType', 'NPY')
+        self.builder = self._group.create_string_parameter('Builder', 'Disk')
+        self.file_path = self._group.create_path_parameter('FilePath', Path('/path/to/probe.npy'))
+        self.file_type = self._group.create_string_parameter('FileType', 'NPY')
 
-        self.numberOfModes = self._settingsGroup.createIntegerParameter(
-            'NumberOfModes', 1, minimum=1
+        self.num_incoherent_modes = self._group.create_integer_parameter(
+            'NumberOfIncoherentModes', 1, minimum=1
         )
-        self.isOrthogonalizeModesEnabled = self._settingsGroup.createBooleanParameter(
-            'OrthogonalizeModesEnabled', True
+        self.orthogonalize_incoherent_modes = self._group.create_boolean_parameter(
+            'OrthogonalizeIncoherentModes', True
         )
-        self.modeDecayType = self._settingsGroup.createStringParameter(
-            'ModeDecayType', 'Polynomial'
+        self.incoherent_mode_decay_type = self._group.create_string_parameter(
+            'IncoherentModeDecayType', 'Polynomial'
         )
-        self.modeDecayRatio = self._settingsGroup.createRealParameter(
-            'ModeDecayRatio', 1.0, minimum=0.0, maximum=1.0
+        self.incoherent_mode_decay_ratio = self._group.create_real_parameter(
+            'IncoherentModeDecayRatio', 1.0, minimum=0.0, maximum=1.0
+        )
+        self.num_coherent_modes = self._group.create_integer_parameter(
+            'NumberOfCoherentModes', 1, minimum=1
         )
 
-        self.diskDiameterInMeters = self._settingsGroup.createRealParameter(
+        self.disk_diameter_m = self._group.create_real_parameter(
             'DiskDiameterInMeters', 1e-6, minimum=0.0
         )
-        self.rectangleWidthInMeters = self._settingsGroup.createRealParameter(
+        self.rectangle_width_m = self._group.create_real_parameter(
             'RectangleWidthInMeters', 1e-6, minimum=0.0
         )
-        self.rectangleHeightInMeters = self._settingsGroup.createRealParameter(
+        self.rectangle_height_m = self._group.create_real_parameter(
             'RectangleHeightInMeters', 1e-6, minimum=0.0
         )
 
-        self.superGaussianAnnularRadiusInMeters = self._settingsGroup.createRealParameter(
+        self.super_gaussian_annular_radius_m = self._group.create_real_parameter(
             'SuperGaussianAnnularRadiusInMeters', 0, minimum=0.0
         )
-        self.superGaussianWidthInMeters = self._settingsGroup.createRealParameter(
+        self.super_gaussian_width_m = self._group.create_real_parameter(
             'SuperGaussianWidthInMeters', 400e-6, minimum=0.0
         )
-        self.superGaussianOrderParameter = self._settingsGroup.createRealParameter(
+        self.super_gaussian_order_parameter = self._group.create_real_parameter(
             'SuperGaussianOrderParameter', 1, minimum=1.0
         )
 
-        self.zonePlateDiameterInMeters = self._settingsGroup.createRealParameter(
+        self.zone_plate_diameter_m = self._group.create_real_parameter(
             'ZonePlateDiameterInMeters', 180e-6, minimum=0.0
         )
-        self.outermostZoneWidthInMeters = self._settingsGroup.createRealParameter(
+        self.outermost_zone_width_m = self._group.create_real_parameter(
             'OutermostZoneWidthInMeters', 50e-9, minimum=0.0
         )
-        self.centralBeamstopDiameterInMeters = self._settingsGroup.createRealParameter(
+        self.central_beamstop_diameter_m = self._group.create_real_parameter(
             'CentralBeamstopDiameterInMeters', 60e-6, minimum=0.0
         )
-        self.defocusDistanceInMeters = self._settingsGroup.createRealParameter(
-            'DefocusDistanceInMeters', 0.0
-        )
+        self.defocus_distance_m = self._group.create_real_parameter('DefocusDistanceInMeters', 0.0)
 
-    def update(self, observable: Observable) -> None:
-        if observable is self._settingsGroup:
-            self.notifyObservers()
+    def _update(self, observable: Observable) -> None:
+        if observable is self._group:
+            self.notify_observers()

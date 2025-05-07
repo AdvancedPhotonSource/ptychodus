@@ -17,17 +17,19 @@ logger = logging.getLogger(__name__)
 
 
 class DataDirectoryEventHandler(watchdog.events.FileSystemEventHandler):
-    def __init__(self, workflow: FileBasedWorkflow, datasetBuffer: AutomationDatasetBuffer) -> None:
+    def __init__(
+        self, workflow: FileBasedWorkflow, dataset_buffer: AutomationDatasetBuffer
+    ) -> None:
         super().__init__()
         self._workflow = workflow
-        self._datasetBuffer = datasetBuffer
+        self._dataset_buffer = dataset_buffer
 
     def on_created_or_modified(self, event: watchdog.events.FileSystemEvent) -> None:
         if not event.is_directory:
-            srcPath = Path(str(event.src_path))
+            src_path = Path(str(event.src_path))
 
-            if srcPath.match(self._workflow.getWatchFilePattern()):
-                self._datasetBuffer.put(srcPath)
+            if src_path.match(self._workflow.get_watch_file_pattern()):
+                self._dataset_buffer.put(src_path)
 
     def on_created(self, event: watchdog.events.FileSystemEvent) -> None:
         self.on_created_or_modified(event)
@@ -41,58 +43,58 @@ class DataDirectoryWatcher(Observable, Observer):
         self,
         settings: AutomationSettings,
         workflow: CurrentFileBasedWorkflow,
-        datasetBuffer: AutomationDatasetBuffer,
+        dataset_buffer: AutomationDatasetBuffer,
     ) -> None:
         super().__init__()
         self._settings = settings
         self._workflow = workflow
-        self._datasetBuffer = datasetBuffer
+        self._dataset_buffer = dataset_buffer
         self._observer: watchdog.observers.api.BaseObserver = watchdog.observers.Observer()
 
-        settings.addObserver(self)
-        workflow.addObserver(self)
+        settings.add_observer(self)
+        workflow.add_observer(self)
 
     @property
-    def isAlive(self) -> bool:
+    def is_alive(self) -> bool:
         return self._observer.is_alive()
 
-    def _updateWatch(self) -> None:
+    def _update_watch(self) -> None:
         self._observer.unschedule_all()
-        dataDirectory = self._settings.dataDirectory.getValue()
+        data_directory = self._settings.data_directory.get_value()
 
-        if dataDirectory.exists():
-            observedWatch = self._observer.schedule(
-                event_handler=DataDirectoryEventHandler(self._workflow, self._datasetBuffer),
-                path=str(dataDirectory),
-                recursive=self._workflow.isWatchRecursive,
+        if data_directory.exists():
+            observed_watch = self._observer.schedule(
+                event_handler=DataDirectoryEventHandler(self._workflow, self._dataset_buffer),
+                path=str(data_directory),
+                recursive=self._workflow.is_watch_recursive,
             )
-            logger.debug(observedWatch)
+            logger.debug(observed_watch)
         else:
-            logger.warning(f'Data directory "{dataDirectory}" does not exist!')
+            logger.warning(f'Data directory "{data_directory}" does not exist!')
 
     def start(self) -> None:
-        if self.isAlive:
+        if self.is_alive:
             logger.error('Automation watchdog thread already started!')
         else:
             logger.info('Starting automation watchdog thread...')
             self._observer = (
                 PollingObserver()
-                if self._settings.useWatchdogPollingObserver.getValue()
+                if self._settings.use_watchdog_polling_observer.get_value()
                 else watchdog.observers.Observer()
             )
             self._observer.start()
-            self._updateWatch()
+            self._update_watch()
             logger.debug('Automation watchdog thread started.')
 
     def stop(self) -> None:
-        if self.isAlive:
+        if self.is_alive:
             logger.info('Stopping automation watchdog thread...')
             self._observer.stop()
             self._observer.join()
             logger.debug('Automation watchdog thread stopped.')
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._settings:
-            self._updateWatch()
+            self._update_watch()
         elif observable is self._workflow:
-            self._updateWatch()
+            self._update_watch()

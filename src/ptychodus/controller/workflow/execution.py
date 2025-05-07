@@ -7,8 +7,8 @@ from ...model.workflow import WorkflowExecutionPresenter, WorkflowParametersPres
 from ...view.widgets import ExceptionDialog
 from ...view.workflow import WorkflowExecutionView
 from .compute import WorkflowComputeController
-from .inputData import WorkflowInputDataController
-from .outputData import WorkflowOutputDataController
+from .input_data import WorkflowInputDataController
+from .output_data import WorkflowOutputDataController
 
 logger = logging.getLogger(__name__)
 
@@ -16,44 +16,44 @@ logger = logging.getLogger(__name__)
 class WorkflowExecutionController:
     def __init__(
         self,
-        parametersPresenter: WorkflowParametersPresenter,
-        executionPresenter: WorkflowExecutionPresenter,
+        parameters_presenter: WorkflowParametersPresenter,
+        execution_presenter: WorkflowExecutionPresenter,
         view: WorkflowExecutionView,
     ) -> None:
-        self._executionPresenter = executionPresenter
+        self._execution_presenter = execution_presenter
         self._view = view
-        self._inputDataController = WorkflowInputDataController.createInstance(
-            parametersPresenter, view.inputDataView
+        self._input_data_controller = WorkflowInputDataController.create_instance(
+            parameters_presenter, view.input_data_view
         )
-        self._computeController = WorkflowComputeController.createInstance(
-            parametersPresenter, view.computeView
+        self._compute_controller = WorkflowComputeController.create_instance(
+            parameters_presenter, view.compute_view
         )
-        self._outputDataController = WorkflowOutputDataController.createInstance(
-            parametersPresenter, view.outputDataView
+        self._output_data_controller = WorkflowOutputDataController.create_instance(
+            parameters_presenter, view.output_data_view
         )
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls,
-        parametersPresenter: WorkflowParametersPresenter,
-        executionPresenter: WorkflowExecutionPresenter,
+        parameters_presenter: WorkflowParametersPresenter,
+        execution_presenter: WorkflowExecutionPresenter,
         view: WorkflowExecutionView,
-        productItemModel: QAbstractItemModel,
+        product_item_model: QAbstractItemModel,
     ) -> WorkflowExecutionController:
-        controller = cls(parametersPresenter, executionPresenter, view)
-        view.productComboBox.setModel(productItemModel)
-        view.executeButton.clicked.connect(controller._execute)
+        controller = cls(parameters_presenter, execution_presenter, view)
+        view.product_combo_box.setModel(product_item_model)
+        view.execute_button.clicked.connect(controller._execute)
         return controller
 
     def _execute(self) -> None:
-        inputProductIndex = self._view.productComboBox.currentIndex()
+        input_product_index = self._view.product_combo_box.currentIndex()
 
-        if inputProductIndex < 0:
+        if input_product_index < 0:
             logger.debug('No current index!')
             return
 
         try:
-            self._executionPresenter.runFlow(inputProductIndex)
+            self._execution_presenter.run_flow(input_product_index)
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Reconstructor', err)
+            ExceptionDialog.show_exception('Reconstructor', err)

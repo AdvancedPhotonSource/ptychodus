@@ -5,7 +5,7 @@ from pathlib import Path
 import logging
 
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.scan import Scan, ScanFileReader, ScanPoint
+from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint
 
 from .settings import ScanSettings
 
@@ -16,22 +16,22 @@ class ScanBuilder(ParameterGroup):
     def __init__(self, settings: ScanSettings, name: str) -> None:
         super().__init__()
         self._name = settings.builder.copy()
-        self._name.setValue(name)
-        self._addParameter('name', self._name)
+        self._name.set_value(name)
+        self._add_parameter('name', self._name)
 
-    def getName(self) -> str:
-        return self._name.getValue()
+    def get_name(self) -> str:
+        return self._name.get_value()
 
-    def syncToSettings(self) -> None:
+    def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
-            parameter.syncValueToParent()
+            parameter.sync_value_to_parent()
 
     @abstractmethod
     def copy(self) -> ScanBuilder:
         pass
 
     @abstractmethod
-    def build(self) -> Scan:
+    def build(self) -> PositionSequence:
         pass
 
 
@@ -39,42 +39,49 @@ class FromMemoryScanBuilder(ScanBuilder):
     def __init__(self, settings: ScanSettings, points: Sequence[ScanPoint]) -> None:
         super().__init__(settings, 'from_memory')
         self._settings = settings
-        self._scan = Scan(points)
+        self._scan = PositionSequence(points)
 
     def copy(self) -> FromMemoryScanBuilder:
         return FromMemoryScanBuilder(self._settings, self._scan)
 
-    def build(self) -> Scan:
+    def build(self) -> PositionSequence:
         return self._scan
 
 
 class FromFileScanBuilder(ScanBuilder):
     def __init__(
-        self, settings: ScanSettings, filePath: Path, fileType: str, fileReader: ScanFileReader
+        self,
+        settings: ScanSettings,
+        file_path: Path,
+        file_type: str,
+        file_reader: PositionFileReader,
     ) -> None:
         super().__init__(settings, 'from_file')
         self._settings = settings
-        self.filePath = settings.filePath.copy()
-        self.filePath.setValue(filePath)
-        self._addParameter('file_path', self.filePath)
-        self.fileType = settings.fileType.copy()
-        self.fileType.setValue(fileType)
-        self._addParameter('file_type', self.fileType)
-        self._fileReader = fileReader
+        self.file_path = settings.file_path.copy()
+        self.file_path.set_value(file_path)
+        self._add_parameter('file_path', self.file_path)
+        self.file_type = settings.file_type.copy()
+        self.file_type.set_value(file_type)
+        self._add_parameter('file_type', self.file_type)
+        self._file_reader = file_reader
 
     def copy(self) -> FromFileScanBuilder:
         return FromFileScanBuilder(
-            self._settings, self.filePath.getValue(), self.fileType.getValue(), self._fileReader
+            self._settings,
+            self.file_path.get_value(),
+            self.file_type.get_value(),
+            self._file_reader,
         )
 
-    def build(self) -> Scan:
-        filePath = self.filePath.getValue()
-        fileType = self.fileType.getValue()
-        logger.debug(f'Reading "{filePath}" as "{fileType}"')
+    def build(self) -> PositionSequence:
+        file_path = self.file_path.get_value()
+        file_type = self.file_type.get_value()
+        logger.debug(f'Reading "{file_path}" as "{file_type}"')
 
         try:
-            scan = self._fileReader.read(filePath)
+            scan = self._file_reader.read(file_path)
         except Exception as exc:
-            raise RuntimeError(f'Failed to read "{filePath}"') from exc
+            raise RuntimeError(f'Failed to read "{file_path}"') from exc
 
         return scan

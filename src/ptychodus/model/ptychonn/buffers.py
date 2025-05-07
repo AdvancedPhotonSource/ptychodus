@@ -1,31 +1,33 @@
 from __future__ import annotations
+from typing import Any, TypeAlias
 import logging
 
 import numpy
 import numpy.typing
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.object import ObjectArrayType
-from ptychodus.api.typing import Float32ArrayType
+from ptychodus.api.typing import ComplexArrayType
+
+Float32ArrayType: TypeAlias = numpy.typing.NDArray[numpy.float32]
 
 logger = logging.getLogger(__name__)
 
 
 class PatternCircularBuffer:
-    def __init__(self, extent: ImageExtent, maxSize: int) -> None:
+    def __init__(self, extent: ImageExtent, max_size: int) -> None:
         self._buffer: Float32ArrayType = numpy.zeros(
-            (maxSize, *extent.shape),
+            (max_size, *extent.shape),
             dtype=numpy.float32,
         )
         self._pos = 0
         self._full = False
 
     @classmethod
-    def createZeroSized(cls) -> PatternCircularBuffer:
+    def create_zero_sized(cls) -> PatternCircularBuffer:
         return cls(ImageExtent(0, 0), 0)
 
     @property
-    def isZeroSized(self) -> bool:
+    def is_zero_sized(self) -> bool:
         return self._buffer.size == 0
 
     def append(self, array: Float32ArrayType) -> None:
@@ -36,33 +38,33 @@ class PatternCircularBuffer:
             self._pos = 0
             self._full = True
 
-    def getBuffer(self) -> Float32ArrayType:
+    def get_buffer(self) -> Float32ArrayType:
         return self._buffer if self._full else self._buffer[: self._pos]
 
-    def setBuffer(self, array: Float32ArrayType) -> None:
+    def set_buffer(self, array: Float32ArrayType) -> None:
         self._buffer = array
         self._pos = 0
         self._full = True
 
 
 class ObjectPatchCircularBuffer:
-    def __init__(self, extent: ImageExtent, channels: int, maxSize: int) -> None:
+    def __init__(self, extent: ImageExtent, channels: int, max_size: int) -> None:
         self._buffer: Float32ArrayType = numpy.zeros(
-            (maxSize, channels, *extent.shape),
+            (max_size, channels, *extent.shape),
             dtype=numpy.float32,
         )
         self._pos = 0
         self._full = False
 
     @classmethod
-    def createZeroSized(cls) -> ObjectPatchCircularBuffer:
+    def create_zero_sized(cls) -> ObjectPatchCircularBuffer:
         return cls(ImageExtent(0, 0), 0, 0)
 
     @property
-    def isZeroSized(self) -> bool:
+    def is_zero_sized(self) -> bool:
         return self._buffer.size == 0
 
-    def append(self, array: ObjectArrayType) -> None:
+    def append(self, array: ComplexArrayType) -> None:
         self._buffer[self._pos, 0, :, :] = numpy.angle(array).astype(numpy.float32)
 
         if self._buffer.shape[1] > 1:
@@ -74,10 +76,10 @@ class ObjectPatchCircularBuffer:
             self._pos = 0
             self._full = True
 
-    def getBuffer(self) -> Float32ArrayType:
+    def get_buffer(self) -> Float32ArrayType:
         return self._buffer if self._full else self._buffer[: self._pos]
 
-    def setBuffer(self, array: Float32ArrayType) -> None:
+    def set_buffer(self, array: Float32ArrayType) -> None:
         self._buffer = array
         self._pos = 0
         self._full = True

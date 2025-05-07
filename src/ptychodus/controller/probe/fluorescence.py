@@ -36,11 +36,11 @@ class FluorescenceChannelListModel(QAbstractListModel):
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         # TODO make this a table model and show measured/enhanced count statistics
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
-            emap = self._enhancer.getMeasuredElementMap(index.row())
+            emap = self._enhancer.get_measured_element_map(index.row())
             return emap.name
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return self._enhancer.getNumberOfChannels()
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
+        return self._enhancer.get_num_channels()
 
 
 class FluorescenceTwoStepViewController(Observer):
@@ -49,33 +49,37 @@ class FluorescenceTwoStepViewController(Observer):
         self._algorithm = algorithm
         self._view = FluorescenceTwoStepParametersView()
 
-        self._upscalingModel = QStringListModel()
-        self._upscalingModel.setStringList(self._algorithm.getUpscalingStrategyList())
-        self._view.upscalingStrategyComboBox.setModel(self._upscalingModel)
-        self._view.upscalingStrategyComboBox.textActivated.connect(algorithm.setUpscalingStrategy)
-
-        self._deconvolutionModel = QStringListModel()
-        self._deconvolutionModel.setStringList(self._algorithm.getDeconvolutionStrategyList())
-        self._view.deconvolutionStrategyComboBox.setModel(self._deconvolutionModel)
-        self._view.deconvolutionStrategyComboBox.textActivated.connect(
-            algorithm.setDeconvolutionStrategy
+        self._upscaling_model = QStringListModel()
+        self._upscaling_model.setStringList(self._algorithm.get_upscaling_strategies())
+        self._view.upscaling_strategy_combo_box.setModel(self._upscaling_model)
+        self._view.upscaling_strategy_combo_box.textActivated.connect(
+            algorithm.set_upscaling_strategy
         )
 
-        self._syncModelToView()
-        algorithm.addObserver(self)
+        self._deconvolution_model = QStringListModel()
+        self._deconvolution_model.setStringList(self._algorithm.get_deconvolution_strategies())
+        self._view.deconvolution_strategy_combo_box.setModel(self._deconvolution_model)
+        self._view.deconvolution_strategy_combo_box.textActivated.connect(
+            algorithm.set_deconvolution_strategy
+        )
 
-    def getWidget(self) -> QWidget:
+        self._sync_model_to_view()
+        algorithm.add_observer(self)
+
+    def get_widget(self) -> QWidget:
         return self._view
 
-    def _syncModelToView(self) -> None:
-        self._view.upscalingStrategyComboBox.setCurrentText(self._algorithm.getUpscalingStrategy())
-        self._view.deconvolutionStrategyComboBox.setCurrentText(
-            self._algorithm.getDeconvolutionStrategy()
+    def _sync_model_to_view(self) -> None:
+        self._view.upscaling_strategy_combo_box.setCurrentText(
+            self._algorithm.get_upscaling_strategy()
+        )
+        self._view.deconvolution_strategy_combo_box.setCurrentText(
+            self._algorithm.get_deconvolution_strategy()
         )
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._algorithm:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class FluorescenceVSPIViewController(Observer):
@@ -86,26 +90,30 @@ class FluorescenceVSPIViewController(Observer):
         self._algorithm = algorithm
         self._view = FluorescenceVSPIParametersView()
 
-        self._view.dampingFactorLineEdit.valueChanged.connect(self._syncDampingFactorToModel)
-        self._view.maxIterationsSpinBox.setRange(1, self.MAX_INT)
-        self._view.maxIterationsSpinBox.valueChanged.connect(algorithm.setMaxIterations)
+        self._view.damping_factor_line_edit.value_changed.connect(
+            self._sync_damping_factor_to_model
+        )
+        self._view.max_iterations_spin_box.setRange(1, self.MAX_INT)
+        self._view.max_iterations_spin_box.valueChanged.connect(algorithm.set_max_iterations)
 
-        algorithm.addObserver(self)
-        self._syncModelToView()
+        algorithm.add_observer(self)
+        self._sync_model_to_view()
 
-    def getWidget(self) -> QWidget:
+    def get_widget(self) -> QWidget:
         return self._view
 
-    def _syncDampingFactorToModel(self, value: Decimal) -> None:
-        self._algorithm.setDampingFactor(float(value))
+    def _sync_damping_factor_to_model(self, value: Decimal) -> None:
+        self._algorithm.set_damping_factor(float(value))
 
-    def _syncModelToView(self) -> None:
-        self._view.dampingFactorLineEdit.setValue(Decimal(repr(self._algorithm.getDampingFactor())))
-        self._view.maxIterationsSpinBox.setValue(self._algorithm.getMaxIterations())
+    def _sync_model_to_view(self) -> None:
+        self._view.damping_factor_line_edit.set_value(
+            Decimal(repr(self._algorithm.get_damping_factor()))
+        )
+        self._view.max_iterations_spin_box.setValue(self._algorithm.get_max_iterations())
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._algorithm:
-            self._syncModelToView()
+            self._sync_model_to_view()
 
 
 class FluorescenceViewController(Observer):
@@ -113,168 +121,172 @@ class FluorescenceViewController(Observer):
         self,
         enhancer: FluorescenceEnhancer,
         engine: VisualizationEngine,
-        fileDialogFactory: FileDialogFactory,
+        file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._enhancer = enhancer
         self._engine = engine
-        self._fileDialogFactory = fileDialogFactory
+        self._file_dialog_factory = file_dialog_factory
         self._dialog = FluorescenceDialog()
-        self._enhancementModel = QStringListModel()
-        self._enhancementModel.setStringList(self._enhancer.getAlgorithmList())
-        self._channelListModel = FluorescenceChannelListModel(enhancer)
+        self._enhancement_model = QStringListModel()
+        self._enhancement_model.setStringList(self._enhancer.algorithms())
+        self._channel_list_model = FluorescenceChannelListModel(enhancer)
 
-        self._dialog.fluorescenceParametersView.openButton.clicked.connect(
-            self._openMeasuredDataset
+        self._dialog.fluorescence_parameters_view.open_button.clicked.connect(
+            self._open_measured_dataset
         )
 
-        twoStepViewController = FluorescenceTwoStepViewController(
-            enhancer.twoStepEnhancingAlgorithm
+        two_step_view_controller = FluorescenceTwoStepViewController(
+            enhancer.two_step_enhancing_algorithm
         )
-        self._dialog.fluorescenceParametersView.algorithmComboBox.addItem(
+        self._dialog.fluorescence_parameters_view.algorithm_combo_box.addItem(
             TwoStepFluorescenceEnhancingAlgorithm.DISPLAY_NAME,
-            self._dialog.fluorescenceParametersView.algorithmComboBox.count(),
+            self._dialog.fluorescence_parameters_view.algorithm_combo_box.count(),
         )
-        self._dialog.fluorescenceParametersView.stackedWidget.addWidget(
-            twoStepViewController.getWidget()
+        self._dialog.fluorescence_parameters_view.stacked_widget.addWidget(
+            two_step_view_controller.get_widget()
         )
 
-        vspiViewController = FluorescenceVSPIViewController(enhancer.vspiEnhancingAlgorithm)
-        self._dialog.fluorescenceParametersView.algorithmComboBox.addItem(
+        vspi_view_controller = FluorescenceVSPIViewController(enhancer.vspi_enhancing_algorithm)
+        self._dialog.fluorescence_parameters_view.algorithm_combo_box.addItem(
             VSPIFluorescenceEnhancingAlgorithm.DISPLAY_NAME,
-            self._dialog.fluorescenceParametersView.algorithmComboBox.count(),
+            self._dialog.fluorescence_parameters_view.algorithm_combo_box.count(),
         )
-        self._dialog.fluorescenceParametersView.stackedWidget.addWidget(
-            vspiViewController.getWidget()
-        )
-
-        self._dialog.fluorescenceParametersView.algorithmComboBox.textActivated.connect(
-            enhancer.setAlgorithm
-        )
-        self._dialog.fluorescenceParametersView.algorithmComboBox.currentIndexChanged.connect(
-            self._dialog.fluorescenceParametersView.stackedWidget.setCurrentIndex
-        )
-        self._dialog.fluorescenceParametersView.algorithmComboBox.setModel(self._enhancementModel)
-        self._dialog.fluorescenceParametersView.algorithmComboBox.textActivated.connect(
-            enhancer.setAlgorithm
+        self._dialog.fluorescence_parameters_view.stacked_widget.addWidget(
+            vspi_view_controller.get_widget()
         )
 
-        self._dialog.fluorescenceParametersView.enhanceButton.clicked.connect(
-            self._enhanceFluorescence
+        self._dialog.fluorescence_parameters_view.algorithm_combo_box.textActivated.connect(
+            enhancer.set_algorithm
         )
-        self._dialog.fluorescenceParametersView.saveButton.clicked.connect(
-            self._saveEnhancedDataset
+        self._dialog.fluorescence_parameters_view.algorithm_combo_box.currentIndexChanged.connect(
+            self._dialog.fluorescence_parameters_view.stacked_widget.setCurrentIndex
+        )
+        self._dialog.fluorescence_parameters_view.algorithm_combo_box.setModel(
+            self._enhancement_model
+        )
+        self._dialog.fluorescence_parameters_view.algorithm_combo_box.textActivated.connect(
+            enhancer.set_algorithm
         )
 
-        self._dialog.fluorescenceChannelListView.setModel(self._channelListModel)
-        self._dialog.fluorescenceChannelListView.selectionModel().currentChanged.connect(
-            self._updateView
+        self._dialog.fluorescence_parameters_view.enhance_button.clicked.connect(
+            self._enhance_fluorescence
+        )
+        self._dialog.fluorescence_parameters_view.save_button.clicked.connect(
+            self._save_enhanced_dataset
         )
 
-        self._measuredWidgetController = VisualizationWidgetController(
+        self._dialog.fluorescence_channel_list_view.setModel(self._channel_list_model)
+        self._dialog.fluorescence_channel_list_view.selectionModel().currentChanged.connect(
+            self._update_view
+        )
+
+        self._measured_widget_controller = VisualizationWidgetController(
             engine,
-            self._dialog.measuredWidget,
-            self._dialog.statusBar,
-            fileDialogFactory,
+            self._dialog.measured_widget,
+            self._dialog.status_bar,
+            file_dialog_factory,
         )
-        self._enhancedWidgetController = VisualizationWidgetController(
+        self._enhanced_widget_controller = VisualizationWidgetController(
             engine,
-            self._dialog.enhancedWidget,
-            self._dialog.statusBar,
-            fileDialogFactory,
+            self._dialog.enhanced_widget,
+            self._dialog.status_bar,
+            file_dialog_factory,
         )
-        self._visualizationParametersController = VisualizationParametersController.createInstance(
-            engine, self._dialog.visualizationParametersView
+        self._visualization_parameters_controller = (
+            VisualizationParametersController.create_instance(
+                engine, self._dialog.visualization_parameters_view
+            )
         )
 
-        enhancer.addObserver(self)
+        enhancer.add_observer(self)
 
-    def _openMeasuredDataset(self) -> None:
+    def _open_measured_dataset(self) -> None:
         title = 'Open Measured Fluorescence Dataset'
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
+        file_path, name_filter = self._file_dialog_factory.get_open_file_path(
             self._dialog,
             title,
-            nameFilters=self._enhancer.getOpenFileFilterList(),
-            selectedNameFilter=self._enhancer.getOpenFileFilter(),
+            name_filters=[nf for nf in self._enhancer.get_open_file_filters()],
+            selected_name_filter=self._enhancer.get_open_file_filter(),
         )
 
-        if filePath:
+        if file_path:
             try:
-                self._enhancer.openMeasuredDataset(filePath, nameFilter)
+                self._enhancer.open_measured_dataset(file_path, name_filter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException(title, err)
+                ExceptionDialog.show_exception(title, err)
 
-    def _enhanceFluorescence(self) -> None:
+    def _enhance_fluorescence(self) -> None:
         try:
-            self._enhancer.enhanceFluorescence()
+            self._enhancer.enhance_fluorescence()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Enhance Fluorescence', err)
+            ExceptionDialog.show_exception('Enhance Fluorescence', err)
 
-    def launch(self, productIndex: int) -> None:
-        self._enhancer.setProduct(productIndex)
+    def launch(self, product_index: int) -> None:
+        self._enhancer.set_product(product_index)
 
         try:
-            itemName = self._enhancer.getProductName()
+            item_name = self._enhancer.get_product_name()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Launch', err)
+            ExceptionDialog.show_exception('Launch', err)
         else:
-            self._dialog.setWindowTitle(f'Enhance Fluorescence: {itemName}')
+            self._dialog.setWindowTitle(f'Enhance Fluorescence: {item_name}')
             self._dialog.open()
 
-    def _saveEnhancedDataset(self) -> None:
+    def _save_enhanced_dataset(self) -> None:
         title = 'Save Enhanced Fluorescence Dataset'
-        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+        file_path, name_filter = self._file_dialog_factory.get_save_file_path(
             self._dialog,
             title,
-            nameFilters=self._enhancer.getSaveFileFilterList(),
-            selectedNameFilter=self._enhancer.getSaveFileFilter(),
+            name_filters=[nf for nf in self._enhancer.get_save_file_filters()],
+            selected_name_filter=self._enhancer.get_save_file_filter(),
         )
 
-        if filePath:
+        if file_path:
             try:
-                self._enhancer.saveEnhancedDataset(filePath, nameFilter)
+                self._enhancer.save_enhanced_dataset(file_path, name_filter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException(title, err)
+                ExceptionDialog.show_exception(title, err)
 
-    def _syncModelToView(self) -> None:
-        self._dialog.fluorescenceParametersView.algorithmComboBox.setCurrentText(
-            self._enhancer.getAlgorithm()
+    def _sync_model_to_view(self) -> None:
+        self._dialog.fluorescence_parameters_view.algorithm_combo_box.setCurrentText(
+            self._enhancer.get_algorithm()
         )
-        self._channelListModel.beginResetModel()
-        self._channelListModel.endResetModel()
+        self._channel_list_model.beginResetModel()
+        self._channel_list_model.endResetModel()
 
-    def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
+    def _update_view(self, current: QModelIndex, previous: QModelIndex) -> None:
         if not current.isValid():
-            self._measuredWidgetController.clearArray()
-            self._enhancedWidgetController.clearArray()
+            self._measured_widget_controller.clear_array()
+            self._enhanced_widget_controller.clear_array()
             return
 
         try:
-            emap_measured = self._enhancer.getMeasuredElementMap(current.row())
+            emap_measured = self._enhancer.get_measured_element_map(current.row())
         except Exception as err:
             logger.exception(err)
-            self._measuredWidgetController.clearArray()
-            ExceptionDialog.showException('Render Measured Element Map', err)
+            self._measured_widget_controller.clear_array()
+            ExceptionDialog.show_exception('Render Measured Element Map', err)
         else:
-            self._measuredWidgetController.setArray(
-                emap_measured.counts_per_second, self._enhancer.getPixelGeometry()
+            self._measured_widget_controller.set_array(
+                emap_measured.counts_per_second, self._enhancer.get_pixel_geometry()
             )
 
         try:
-            emap_enhanced = self._enhancer.getEnhancedElementMap(current.row())
+            emap_enhanced = self._enhancer.get_enhanced_element_map(current.row())
         except Exception as err:
             logger.exception(err)
-            self._enhancedWidgetController.clearArray()
-            ExceptionDialog.showException('Render Enhanced Element Map', err)
+            self._enhanced_widget_controller.clear_array()
+            ExceptionDialog.show_exception('Render Enhanced Element Map', err)
         else:
-            self._enhancedWidgetController.setArray(
-                emap_enhanced.counts_per_second, self._enhancer.getPixelGeometry()
+            self._enhanced_widget_controller.set_array(
+                emap_enhanced.counts_per_second, self._enhancer.get_pixel_geometry()
             )
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._enhancer:
-            self._syncModelToView()
+            self._sync_model_to_view()

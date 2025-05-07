@@ -15,45 +15,57 @@ class WorkflowComputeController(Observer):
         self._view = view
 
     @classmethod
-    def createInstance(
+    def create_instance(
         cls, presenter: WorkflowParametersPresenter, view: WorkflowComputeView
     ) -> WorkflowComputeController:
         controller = cls(presenter, view)
-        presenter.addObserver(controller)
+        presenter.add_observer(controller)
 
-        view.computeEndpointIDLineEdit.editingFinished.connect(
-            controller._syncComputeEndpointIDToModel
+        view.compute_endpoint_id_line_edit.editingFinished.connect(
+            controller._sync_compute_endpoint_id_to_model
         )
-        view.dataEndpointIDLineEdit.editingFinished.connect(controller._syncDataEndpointIDToModel)
-        view.dataGlobusPathLineEdit.editingFinished.connect(controller._syncGlobusPathToModel)
-        view.dataPosixPathLineEdit.editingFinished.connect(controller._syncPosixPathToModel)
+        view.data_endpoint_id_line_edit.editingFinished.connect(
+            controller._sync_data_endpoint_id_to_model
+        )
+        view.data_globus_path_line_edit.editingFinished.connect(
+            controller._sync_globus_path_to_model
+        )
+        view.data_posix_path_line_edit.editingFinished.connect(controller._sync_posix_path_to_model)
 
-        controller._syncModelToView()
+        controller._sync_model_to_view()
 
         return controller
 
-    def _syncComputeEndpointIDToModel(self) -> None:
-        endpointID = UUID(self._view.computeEndpointIDLineEdit.text())
-        self._presenter.setComputeEndpointID(endpointID)
+    def _sync_compute_endpoint_id_to_model(self) -> None:
+        endpoint_id = UUID(self._view.compute_endpoint_id_line_edit.text())
+        self._presenter.set_compute_endpoint_id(endpoint_id)
 
-    def _syncDataEndpointIDToModel(self) -> None:
-        endpointID = UUID(self._view.dataEndpointIDLineEdit.text())
-        self._presenter.setComputeDataEndpointID(endpointID)
+    def _sync_data_endpoint_id_to_model(self) -> None:
+        endpoint_id = UUID(self._view.data_endpoint_id_line_edit.text())
+        self._presenter.set_compute_data_endpoint_id(endpoint_id)
 
-    def _syncGlobusPathToModel(self) -> None:
-        dataPath = self._view.dataGlobusPathLineEdit.text()
-        self._presenter.setComputeDataGlobusPath(dataPath)
+    def _sync_globus_path_to_model(self) -> None:
+        data_path = self._view.data_globus_path_line_edit.text()
+        self._presenter.set_compute_data_globus_path(data_path)
 
-    def _syncPosixPathToModel(self) -> None:
-        dataPath = Path(self._view.dataPosixPathLineEdit.text())
-        self._presenter.setComputeDataPosixPath(dataPath)
+    def _sync_posix_path_to_model(self) -> None:
+        data_path = Path(self._view.data_posix_path_line_edit.text())
+        self._presenter.set_compute_data_posix_path(data_path)
 
-    def _syncModelToView(self) -> None:
-        self._view.computeEndpointIDLineEdit.setText(str(self._presenter.getComputeEndpointID()))
-        self._view.dataEndpointIDLineEdit.setText(str(self._presenter.getComputeDataEndpointID()))
-        self._view.dataGlobusPathLineEdit.setText(str(self._presenter.getComputeDataGlobusPath()))
-        self._view.dataPosixPathLineEdit.setText(str(self._presenter.getComputeDataPosixPath()))
+    def _sync_model_to_view(self) -> None:
+        self._view.compute_endpoint_id_line_edit.setText(
+            str(self._presenter.get_compute_endpoint_id())
+        )
+        self._view.data_endpoint_id_line_edit.setText(
+            str(self._presenter.get_compute_data_endpoint_id())
+        )
+        self._view.data_globus_path_line_edit.setText(
+            str(self._presenter.get_compute_data_globus_path())
+        )
+        self._view.data_posix_path_line_edit.setText(
+            str(self._presenter.get_compute_data_posix_path())
+        )
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._presenter:
-            self._syncModelToView()
+            self._sync_model_to_view()

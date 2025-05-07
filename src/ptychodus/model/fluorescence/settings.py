@@ -7,27 +7,23 @@ from ptychodus.api.settings import SettingsRegistry
 class FluorescenceSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = registry.createGroup('Fluorescence')
-        self._settingsGroup.addObserver(self)
+        self._group = registry.create_group('Fluorescence')
+        self._group.add_observer(self)
 
-        self.filePath = self._settingsGroup.createPathParameter(
-            'FilePath', Path('/path/to/dataset.h5')
-        )
-        self.fileType = self._settingsGroup.createStringParameter('FileType', 'XRF-Maps')
-        self.algorithm = self._settingsGroup.createStringParameter('Algorithm', 'VSPI')
-        self.vspiDampingFactor = self._settingsGroup.createRealParameter(
+        self.file_path = self._group.create_path_parameter('FilePath', Path('/path/to/dataset.h5'))
+        self.file_type = self._group.create_string_parameter('FileType', 'XRF-Maps')
+        self.algorithm = self._group.create_string_parameter('Algorithm', 'VSPI')
+        self.vspi_damping_factor = self._group.create_real_parameter(
             'VSPIDampingFactor', 0.0, minimum=0.0
         )
-        self.vspiMaxIterations = self._settingsGroup.createIntegerParameter(
+        self.vspi_max_iterations = self._group.create_integer_parameter(
             'VSPIMaxIterations', 100, minimum=1
         )
-        self.upscalingStrategy = self._settingsGroup.createStringParameter(
-            'UpscalingStrategy', 'Linear'
-        )
-        self.deconvolutionStrategy = self._settingsGroup.createStringParameter(
+        self.upscaling_strategy = self._group.create_string_parameter('UpscalingStrategy', 'Linear')
+        self.deconvolution_strategy = self._group.create_string_parameter(
             'DeconvolutionStrategy', 'Richardson-Lucy'
         )
 
-    def update(self, observable: Observable) -> None:
-        if observable is self._settingsGroup:
-            self.notifyObservers()
+    def _update(self, observable: Observable) -> None:
+        if observable is self._group:
+            self.notify_observers()

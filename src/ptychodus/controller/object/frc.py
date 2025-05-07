@@ -3,56 +3,56 @@ import logging
 
 from ...model.analysis import FourierRingCorrelator
 from ...view.object import FourierRingCorrelationDialog
-from .treeModel import ObjectTreeModel
+from .tree_model import ObjectTreeModel
 
 logger = logging.getLogger(__name__)
 
 
 class FourierRingCorrelationViewController:
-    def __init__(self, correlator: FourierRingCorrelator, treeModel: ObjectTreeModel) -> None:
+    def __init__(self, correlator: FourierRingCorrelator, tree_model: ObjectTreeModel) -> None:
         super().__init__()
         self._correlator = correlator
         self._dialog = FourierRingCorrelationDialog()
         self._dialog.setWindowTitle('Fourier Ring Correlation')
-        self._dialog.product1ComboBox.setModel(treeModel)
-        self._dialog.product1ComboBox.textActivated.connect(self._redrawPlot)
-        self._dialog.product2ComboBox.setModel(treeModel)
-        self._dialog.product2ComboBox.textActivated.connect(self._redrawPlot)
+        self._dialog.product1_combo_box.setModel(tree_model)
+        self._dialog.product1_combo_box.textActivated.connect(self._redraw_plot)
+        self._dialog.product2_combo_box.setModel(tree_model)
+        self._dialog.product2_combo_box.textActivated.connect(self._redraw_plot)
 
-    def analyze(self, itemIndex1: int, itemIndex2: int) -> None:
-        self._dialog.product1ComboBox.setCurrentIndex(itemIndex1)
-        self._dialog.product2ComboBox.setCurrentIndex(itemIndex2)
-        self._redrawPlot()
+    def analyze(self, item_index1: int, item_index2: int) -> None:
+        self._dialog.product1_combo_box.setCurrentIndex(item_index1)
+        self._dialog.product2_combo_box.setCurrentIndex(item_index2)
+        self._redraw_plot()
         self._dialog.open()
 
-    def _redrawPlot(self) -> None:
-        currentIndex1 = self._dialog.product1ComboBox.currentIndex()
-        currentIndex2 = self._dialog.product2ComboBox.currentIndex()
+    def _redraw_plot(self) -> None:
+        current_index1 = self._dialog.product1_combo_box.currentIndex()
+        current_index2 = self._dialog.product2_combo_box.currentIndex()
 
-        if currentIndex1 < 0 or currentIndex2 < 0:
+        if current_index1 < 0 or current_index2 < 0:
             logger.warning('Invalid item index for FRC!')
             return
 
-        frc = self._correlator.correlate(currentIndex1, currentIndex2)
-        plot2D = frc.getPlot()
-        axisX = plot2D.axisX
-        axisY = plot2D.axisY
+        frc = self._correlator.correlate(current_index1, current_index2)
+        plot2d = frc.get_plot()
+        axis_x = plot2d.axis_x
+        axis_y = plot2d.axis_y
 
         ax = self._dialog.axes
         ax.clear()
-        ax.set_xlabel(axisX.label)
-        ax.set_ylabel(axisY.label)
+        ax.set_xlabel(axis_x.label)
+        ax.set_ylabel(axis_y.label)
         ax.grid(True)
 
-        if len(axisX.series) == 1:
-            sx = axisX.series[0]
+        if len(axis_x.series) == 1:
+            sx = axis_x.series[0]
 
-            for sy in axisY.series:
+            for sy in axis_y.series:
                 ax.plot(sx.values, sy.values, '.-', label=sy.label, linewidth=1.5)
         else:
             logger.warning('Failed to broadcast plot series!')
 
-        if len(axisX.series) > 1:
+        if len(axis_x.series) > 1:
             ax.legend(loc='upper right')
 
-        self._dialog.figureCanvas.draw()
+        self._dialog.figure_canvas.draw()

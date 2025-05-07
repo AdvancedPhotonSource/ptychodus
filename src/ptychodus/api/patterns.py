@@ -2,7 +2,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
-from enum import Enum, auto
 from pathlib import Path
 from typing import overload, Any, TypeAlias
 
@@ -10,106 +9,84 @@ import numpy
 import numpy.typing
 
 from .geometry import ImageExtent, PixelGeometry
-from .observer import Observable
 from .tree import SimpleTreeNode
 
-BooleanArrayType: TypeAlias = numpy.typing.NDArray[numpy.bool_]
-DiffractionPatternArrayType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
-DiffractionPatternIndexes: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
+PatternDataType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
+PatternIndexesType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
 
 
 @dataclass(frozen=True)
 class CropCenter:
-    positionXInPixels: int
-    positionYInPixels: int
+    position_x_px: int
+    position_y_px: int
 
 
-class DiffractionPatternState(Enum):
-    UNKNOWN = auto()
-    MISSING = auto()
-    FOUND = auto()
-    LOADED = auto()
-
-
-class DiffractionPatternArray(Observable):
+class DiffractionPatternArray:
     @abstractmethod
-    def getLabel(self) -> str:
+    def get_label(self) -> str:
         pass
 
     @abstractmethod
-    def getIndex(self) -> int:
+    def get_indexes(self) -> PatternIndexesType:
         pass
 
     @abstractmethod
-    def getData(self) -> DiffractionPatternArrayType:
+    def get_data(self) -> PatternDataType:
         pass
 
-    def getNumberOfPatterns(self) -> int:
-        return self.getData().shape[0]
-
-    @abstractmethod
-    def getState(self) -> DiffractionPatternState:
-        pass
+    def get_num_patterns(self) -> int:
+        return self.get_data().shape[0]
 
 
 class SimpleDiffractionPatternArray(DiffractionPatternArray):
     def __init__(
         self,
         label: str,
-        index: int,
-        data: DiffractionPatternArrayType,
-        state: DiffractionPatternState,
+        indexes: PatternIndexesType,
+        data: PatternDataType,
     ) -> None:
         super().__init__()
         self._label = label
-        self._index = index
+        self._indexes = indexes
         self._data = data
-        self._state = state
 
-    @classmethod
-    def createNullInstance(cls) -> SimpleDiffractionPatternArray:
-        data = numpy.zeros((1, 1, 1), dtype=numpy.uint16)
-        state = DiffractionPatternState.MISSING
-        return cls('Null', 0, data, state)
-
-    def getLabel(self) -> str:
+    def get_label(self) -> str:
         return self._label
 
-    def getIndex(self) -> int:
-        return self._index
+    def get_indexes(self) -> PatternIndexesType:
+        return self._indexes
 
-    def getData(self) -> DiffractionPatternArrayType:
+    def get_data(self) -> PatternDataType:
         return self._data
-
-    def getState(self) -> DiffractionPatternState:
-        return self._state
 
 
 @dataclass(frozen=True)
 class DiffractionMetadata:
-    numberOfPatternsPerArray: int
-    numberOfPatternsTotal: int
-    patternDataType: numpy.dtype[numpy.integer[Any]]
-    detectorDistanceInMeters: float | None = None
-    detectorExtent: ImageExtent | None = None
-    detectorPixelGeometry: PixelGeometry | None = None
-    detectorBitDepth: int | None = None
-    cropCenter: CropCenter | None = None
-    probeEnergyInElectronVolts: float | None = None
-    filePath: Path | None = None
+    num_patterns_per_array: int
+    num_patterns_total: int
+    pattern_dtype: numpy.dtype[numpy.integer[Any]]
+    detector_distance_m: float | None = None
+    detector_extent: ImageExtent | None = None
+    detector_pixel_geometry: PixelGeometry | None = None
+    detector_bit_depth: int | None = None
+    crop_center: CropCenter | None = None
+    probe_photon_count: int | None = None
+    probe_energy_eV: float | None = None  # noqa: N815
+    tomography_angle_deg: float | None = None
+    file_path: Path | None = None
 
     @classmethod
-    def createNullInstance(cls, filePath: Path | None = None) -> DiffractionMetadata:
-        return cls(0, 0, numpy.dtype(numpy.ubyte), filePath=filePath)
+    def create_null(cls, file_path: Path | None = None) -> DiffractionMetadata:
+        return cls(0, 0, numpy.dtype(numpy.ubyte), file_path=file_path)
 
 
-class DiffractionDataset(Sequence[DiffractionPatternArray], Observable):
+class DiffractionDataset(Sequence[DiffractionPatternArray]):
     @abstractmethod
-    def getMetadata(self) -> DiffractionMetadata:
+    def get_metadata(self) -> DiffractionMetadata:
         pass
 
     @abstractmethod
-    def getContentsTree(self) -> SimpleTreeNode:
+    def get_contents_tree(self) -> SimpleTreeNode:
         pass
 
 
@@ -117,26 +94,26 @@ class SimpleDiffractionDataset(DiffractionDataset):
     def __init__(
         self,
         metadata: DiffractionMetadata,
-        contentsTree: SimpleTreeNode,
-        arrayList: list[DiffractionPatternArray],
+        contents_tree: SimpleTreeNode,
+        array_list: list[DiffractionPatternArray],
     ) -> None:
         super().__init__()
         self._metadata = metadata
-        self._contentsTree = contentsTree
-        self._arrayList = arrayList
+        self._contents_tree = contents_tree
+        self._array_list = array_list
 
     @classmethod
-    def createNullInstance(cls, filePath: Path | None = None) -> SimpleDiffractionDataset:
-        metadata = DiffractionMetadata.createNullInstance(filePath)
-        contentsTree = SimpleTreeNode.createRoot(list())
-        arrayList: list[DiffractionPatternArray] = list()
-        return cls(metadata, contentsTree, arrayList)
+    def create_null(cls, file_path: Path | None = None) -> SimpleDiffractionDataset:
+        metadata = DiffractionMetadata.create_null(file_path)
+        contents_tree = SimpleTreeNode.create_root(list())
+        array_list: list[DiffractionPatternArray] = list()
+        return cls(metadata, contents_tree, array_list)
 
-    def getMetadata(self) -> DiffractionMetadata:
+    def get_metadata(self) -> DiffractionMetadata:
         return self._metadata
 
-    def getContentsTree(self) -> SimpleTreeNode:
-        return self._contentsTree
+    def get_contents_tree(self) -> SimpleTreeNode:
+        return self._contents_tree
 
     @overload
     def __getitem__(self, index: int) -> DiffractionPatternArray: ...
@@ -147,17 +124,17 @@ class SimpleDiffractionDataset(DiffractionDataset):
     def __getitem__(
         self, index: int | slice
     ) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
-        return self._arrayList[index]
+        return self._array_list[index]
 
     def __len__(self) -> int:
-        return len(self._arrayList)
+        return len(self._array_list)
 
 
 class DiffractionFileReader(ABC):
     """interface for plugins that read diffraction files"""
 
     @abstractmethod
-    def read(self, filePath: Path) -> DiffractionDataset:
+    def read(self, file_path: Path) -> DiffractionDataset:
         """reads a diffraction dataset from file"""
         pass
 
@@ -166,6 +143,6 @@ class DiffractionFileWriter(ABC):
     """interface for plugins that write diffraction files"""
 
     @abstractmethod
-    def write(self, filePath: Path, dataset: DiffractionDataset) -> None:
+    def write(self, file_path: Path, dataset: DiffractionDataset) -> None:
         """writes a diffraction dataset to file"""
         pass

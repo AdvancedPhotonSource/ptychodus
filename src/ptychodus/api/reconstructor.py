@@ -4,14 +4,16 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from ptychodus.api.typing import BooleanArrayType
+
+from .patterns import PatternDataType
 from .product import Product
-from .patterns import BooleanArrayType, DiffractionPatternArrayType
 
 
 @dataclass(frozen=True)
 class ReconstructInput:
-    patterns: DiffractionPatternArrayType
-    goodPixelMask: BooleanArrayType
+    patterns: PatternDataType
+    bad_pixels: BooleanArrayType
     product: Product
 
 
@@ -33,71 +35,45 @@ class Reconstructor(ABC):
 
 
 @dataclass(frozen=True)
+class LossValue:
+    epoch: int
+    training_loss: float
+    validation_loss: float
+
+
+@dataclass(frozen=True)
 class TrainOutput:
-    trainingLoss: Sequence[float]
-    validationLoss: Sequence[float]
+    losses: Sequence[LossValue]
     result: int
 
 
 class TrainableReconstructor(Reconstructor):
     @abstractmethod
-    def ingestTrainingData(self, parameters: ReconstructInput) -> None:
+    def get_model_file_filter(self) -> str:
         pass
 
     @abstractmethod
-    def getOpenTrainingDataFileFilterList(self) -> Sequence[str]:
+    def open_model(self, file_path: Path) -> None:
         pass
 
     @abstractmethod
-    def getOpenTrainingDataFileFilter(self) -> str:
+    def save_model(self, file_path: Path) -> None:
         pass
 
     @abstractmethod
-    def openTrainingData(self, filePath: Path) -> None:
+    def get_training_data_file_filter(self) -> str:
         pass
 
     @abstractmethod
-    def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
+    def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
         pass
 
     @abstractmethod
-    def getSaveTrainingDataFileFilter(self) -> str:
+    def get_training_data_path(self) -> Path:
         pass
 
     @abstractmethod
-    def saveTrainingData(self, filePath: Path) -> None:
-        pass
-
-    @abstractmethod
-    def train(self) -> TrainOutput:
-        pass
-
-    @abstractmethod
-    def clearTrainingData(self) -> None:
-        pass
-
-    @abstractmethod
-    def getOpenModelFileFilterList(self) -> Sequence[str]:
-        pass
-
-    @abstractmethod
-    def getOpenModelFileFilter(self) -> str:
-        pass
-
-    @abstractmethod
-    def openModel(self, filePath: Path) -> None:
-        pass
-
-    @abstractmethod
-    def getSaveModelFileFilterList(self) -> Sequence[str]:
-        pass
-
-    @abstractmethod
-    def getSaveModelFileFilter(self) -> str:
-        pass
-
-    @abstractmethod
-    def saveModel(self, filePath: Path) -> None:
+    def train(self, data_path: Path) -> TrainOutput:
         pass
 
 
@@ -112,54 +88,35 @@ class NullReconstructor(TrainableReconstructor):
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         return ReconstructOutput(parameters.product, 0)
 
-    def ingestTrainingData(self, parameters: ReconstructInput) -> None:
-        pass
-
-    def getOpenTrainingDataFileFilterList(self) -> Sequence[str]:
-        return list()
-
-    def getOpenTrainingDataFileFilter(self) -> str:
+    def get_model_file_filter(self) -> str:
         return str()
 
-    def openTrainingData(self, filePath: Path) -> None:
+    def open_model(self, file_path: Path) -> None:
         pass
 
-    def getSaveTrainingDataFileFilterList(self) -> Sequence[str]:
-        return list()
+    def save_model(self, file_path: Path) -> None:
+        pass
 
-    def getSaveTrainingDataFileFilter(self) -> str:
+    def get_training_data_file_filter(self) -> str:
         return str()
 
-    def saveTrainingData(self, filePath: Path) -> None:
+    def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
         pass
 
-    def train(self) -> TrainOutput:
-        return TrainOutput([], [], 0)
+    def get_training_data_path(self) -> Path:
+        return Path()
 
-    def clearTrainingData(self) -> None:
-        pass
-
-    def getOpenModelFileFilterList(self) -> Sequence[str]:
-        return list()
-
-    def getOpenModelFileFilter(self) -> str:
-        return str()
-
-    def openModel(self, filePath: Path) -> None:
-        pass
-
-    def getSaveModelFileFilterList(self) -> Sequence[str]:
-        return list()
-
-    def getSaveModelFileFilter(self) -> str:
-        return str()
-
-    def saveModel(self, filePath: Path) -> None:
-        pass
+    def train(self, data_path: Path) -> TrainOutput:
+        return TrainOutput([], 0)
 
 
 class ReconstructorLibrary(Iterable[Reconstructor]):
     @property
     @abstractmethod
     def name(self) -> str:
+        pass
+
+    @property
+    @abstractmethod
+    def logger_name(self) -> str:
         pass

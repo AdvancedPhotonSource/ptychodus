@@ -3,21 +3,21 @@ from abc import ABC, abstractmethod
 from skimage.restoration import unwrap_phase
 import numpy
 
-from ptychodus.api.visualization import NumberArrayType, RealArrayType
+from ptychodus.api.typing import NumberArrayType, RealArrayType
 
 
 class DataArrayComponent(ABC):
-    def __init__(self, name: str, *, isCyclic: bool) -> None:
+    def __init__(self, name: str, *, is_cyclic: bool) -> None:
         self._name = name
-        self._isCyclic = isCyclic
+        self._is_cyclic = is_cyclic
 
     @property
     def name(self) -> str:
         return self._name
 
     @property
-    def isCyclic(self) -> bool:
-        return self._isCyclic
+    def is_cyclic(self) -> bool:
+        return self._is_cyclic
 
     @abstractmethod
     def calculate(self, array: NumberArrayType) -> RealArrayType:
@@ -26,7 +26,7 @@ class DataArrayComponent(ABC):
 
 class RealArrayComponent(DataArrayComponent):
     def __init__(self) -> None:
-        super().__init__('real', isCyclic=False)
+        super().__init__('real', is_cyclic=False)
 
     def calculate(self, array: NumberArrayType) -> RealArrayType:
         return numpy.real(array).astype(numpy.single)
@@ -34,7 +34,7 @@ class RealArrayComponent(DataArrayComponent):
 
 class ImaginaryArrayComponent(DataArrayComponent):
     def __init__(self) -> None:
-        super().__init__('imaginary', isCyclic=False)
+        super().__init__('imaginary', is_cyclic=False)
 
     def calculate(self, array: NumberArrayType) -> RealArrayType:
         return numpy.imag(array).astype(numpy.single)
@@ -42,7 +42,7 @@ class ImaginaryArrayComponent(DataArrayComponent):
 
 class AmplitudeArrayComponent(DataArrayComponent):
     def __init__(self) -> None:
-        super().__init__('amplitude', isCyclic=False)
+        super().__init__('amplitude', is_cyclic=False)
 
     def calculate(self, array: NumberArrayType) -> RealArrayType:
         return numpy.absolute(array).astype(numpy.single)
@@ -50,7 +50,7 @@ class AmplitudeArrayComponent(DataArrayComponent):
 
 class PhaseInRadiansArrayComponent(DataArrayComponent):
     def __init__(self) -> None:
-        super().__init__('phase', isCyclic=True)
+        super().__init__('phase', is_cyclic=True)
 
     def calculate(self, array: NumberArrayType) -> RealArrayType:
         return numpy.angle(array).astype(numpy.single)  # type: ignore
@@ -58,8 +58,8 @@ class PhaseInRadiansArrayComponent(DataArrayComponent):
 
 class UnwrappedPhaseInRadiansArrayComponent(DataArrayComponent):
     def __init__(self) -> None:
-        super().__init__('unwrapped_phase', isCyclic=False)
+        super().__init__('unwrapped_phase', is_cyclic=False)
 
     def calculate(self, array: NumberArrayType) -> RealArrayType:
-        phaseInRadians = numpy.angle(array).astype(numpy.single)  # type: ignore
-        return unwrap_phase(phaseInRadians)
+        phase_rad = numpy.angle(array).astype(numpy.single)  # type: ignore
+        return unwrap_phase(phase_rad)

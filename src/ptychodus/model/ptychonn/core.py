@@ -19,134 +19,26 @@ from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 logger = logging.getLogger(__name__)
 
 
-class PtychoNNModelPresenter(Observable, Observer):
-    MAX_INT: Final[int] = 0x7FFFFFFF
-
-    def __init__(self, settings: PtychoNNModelSettings) -> None:
-        super().__init__()
-        self._settings = settings
-
-        settings.addObserver(self)
-
-    def getNumberOfConvolutionKernelsLimits(self) -> Interval[int]:
-        return Interval[int](1, self.MAX_INT)
-
-    def getNumberOfConvolutionKernels(self) -> int:
-        limits = self.getNumberOfConvolutionKernelsLimits()
-        return limits.clamp(self._settings.numberOfConvolutionKernels.getValue())
-
-    def setNumberOfConvolutionKernels(self, value: int) -> None:
-        self._settings.numberOfConvolutionKernels.setValue(value)
-
-    def getBatchSizeLimits(self) -> Interval[int]:
-        return Interval[int](1, self.MAX_INT)
-
-    def getBatchSize(self) -> int:
-        limits = self.getBatchSizeLimits()
-        return limits.clamp(self._settings.batchSize.getValue())
-
-    def setBatchSize(self, value: int) -> None:
-        self._settings.batchSize.setValue(value)
-
-    def isBatchNormalizationEnabled(self) -> bool:
-        return self._settings.useBatchNormalization.getValue()
-
-    def setBatchNormalizationEnabled(self, enabled: bool) -> None:
-        self._settings.useBatchNormalization.setValue(enabled)
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._settings:
-            self.notifyObservers()
-
-
-class PtychoNNTrainingPresenter(Observable, Observer):
-    MAX_INT: Final[int] = 0x7FFFFFFF
-
-    def __init__(self, settings: PtychoNNTrainingSettings) -> None:
-        super().__init__()
-        self._settings = settings
-
-        settings.addObserver(self)
-
-    def getValidationSetFractionalSizeLimits(self) -> Interval[Decimal]:
-        return Interval[Decimal](Decimal(0), Decimal(1))
-
-    def getValidationSetFractionalSize(self) -> Decimal:
-        limits = self.getValidationSetFractionalSizeLimits()
-        return limits.clamp(
-            Decimal.from_float(self._settings.validationSetFractionalSize.getValue())
-        )
-
-    def setValidationSetFractionalSize(self, value: Decimal) -> None:
-        self._settings.validationSetFractionalSize.setValue(float(value))
-
-    def getMaximumLearningRateLimits(self) -> Interval[Decimal]:
-        return Interval[Decimal](Decimal(0), Decimal(1))
-
-    def getMaximumLearningRate(self) -> Decimal:
-        limits = self.getMaximumLearningRateLimits()
-        return limits.clamp(Decimal.from_float(self._settings.maximumLearningRate.getValue()))
-
-    def setMaximumLearningRate(self, value: Decimal) -> None:
-        self._settings.maximumLearningRate.setValue(float(value))
-
-    def getMinimumLearningRateLimits(self) -> Interval[Decimal]:
-        return Interval[Decimal](Decimal(0), Decimal(1))
-
-    def getMinimumLearningRate(self) -> Decimal:
-        limits = self.getMinimumLearningRateLimits()
-        return limits.clamp(Decimal.from_float(self._settings.minimumLearningRate.getValue()))
-
-    def setMinimumLearningRate(self, value: Decimal) -> None:
-        self._settings.minimumLearningRate.setValue(float(value))
-
-    def getTrainingEpochsLimits(self) -> Interval[int]:
-        return Interval[int](1, self.MAX_INT)
-
-    def getTrainingEpochs(self) -> int:
-        limits = self.getTrainingEpochsLimits()
-        return limits.clamp(self._settings.trainingEpochs.getValue())
-
-    def setTrainingEpochs(self, value: int) -> None:
-        self._settings.trainingEpochs.setValue(value)
-
-    def getStatusIntervalInEpochsLimits(self) -> Interval[int]:
-        return Interval[int](1, self.MAX_INT)
-
-    def getStatusIntervalInEpochs(self) -> int:
-        limits = self.getStatusIntervalInEpochsLimits()
-        return limits.clamp(self._settings.statusIntervalInEpochs.getValue())
-
-    def setStatusIntervalInEpochs(self, value: int) -> None:
-        self._settings.statusIntervalInEpochs.setValue(value)
-
-    def update(self, observable: Observable) -> None:
-        if observable is self._settings:
-            self.notifyObservers()
-
-
 class PtychoNNReconstructorLibrary(ReconstructorLibrary):
     def __init__(
         self,
-        modelSettings: PtychoNNModelSettings,
-        trainingSettings: PtychoNNTrainingSettings,
+        model_settings: PtychoNNModelSettings,
+        training_settings: PtychoNNTrainingSettings,
         reconstructors: Sequence[Reconstructor],
     ) -> None:
         super().__init__()
-        self._modelSettings = modelSettings
-        self._trainingSettings = trainingSettings
-        self.modelPresenter = PtychoNNModelPresenter(modelSettings)
-        self.trainingPresenter = PtychoNNTrainingPresenter(trainingSettings)
+        self.model_settings = model_settings
+        self.training_settings = training_settings
         self._reconstructors = reconstructors
 
     @classmethod
-    def createInstance(
-        cls, settingsRegistry: SettingsRegistry, isDeveloperModeEnabled: bool
+    def create_instance(
+        cls, settings_registry: SettingsRegistry, is_developer_mode_enabled: bool
     ) -> PtychoNNReconstructorLibrary:
-        modelSettings = PtychoNNModelSettings(settingsRegistry)
-        trainingSettings = PtychoNNTrainingSettings(settingsRegistry)
-        phaseOnlyReconstructor: TrainableReconstructor = NullReconstructor('PhaseOnly')
-        amplitudePhaseReconstructor: TrainableReconstructor = NullReconstructor('AmplitudePhase')
+        model_settings = PtychoNNModelSettings(settings_registry)
+        training_settings = PtychoNNTrainingSettings(settings_registry)
+        phase_only_reconstructor: TrainableReconstructor = NullReconstructor('PhaseOnly')
+        amplitude_phase_reconstructor: TrainableReconstructor = NullReconstructor('AmplitudePhase')
         reconstructors: list[TrainableReconstructor] = list()
 
         try:
@@ -155,30 +47,34 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
         except ModuleNotFoundError:
             logger.info('PtychoNN not found.')
 
-            if isDeveloperModeEnabled:
-                reconstructors.append(phaseOnlyReconstructor)
-                reconstructors.append(amplitudePhaseReconstructor)
+            if is_developer_mode_enabled:
+                reconstructors.append(phase_only_reconstructor)
+                reconstructors.append(amplitude_phase_reconstructor)
         else:
-            phaseOnlyModelProvider = PtychoNNModelProvider(
-                modelSettings, trainingSettings, enableAmplitude=False
+            phase_only_model_provider = PtychoNNModelProvider(
+                model_settings, training_settings, enable_amplitude=False
             )
-            phaseOnlyReconstructor = PtychoNNTrainableReconstructor(
-                modelSettings, trainingSettings, phaseOnlyModelProvider
+            phase_only_reconstructor = PtychoNNTrainableReconstructor(
+                model_settings, training_settings, phase_only_model_provider
             )
-            amplitudePhaseModelProvider = PtychoNNModelProvider(
-                modelSettings, trainingSettings, enableAmplitude=True
+            amplitude_phase_model_provider = PtychoNNModelProvider(
+                model_settings, training_settings, enable_amplitude=True
             )
-            amplitudePhaseReconstructor = PtychoNNTrainableReconstructor(
-                modelSettings, trainingSettings, amplitudePhaseModelProvider
+            amplitude_phase_reconstructor = PtychoNNTrainableReconstructor(
+                model_settings, training_settings, amplitude_phase_model_provider
             )
-            reconstructors.append(phaseOnlyReconstructor)
-            reconstructors.append(amplitudePhaseReconstructor)
+            reconstructors.append(phase_only_reconstructor)
+            reconstructors.append(amplitude_phase_reconstructor)
 
-        return cls(modelSettings, trainingSettings, reconstructors)
+        return cls(model_settings, training_settings, reconstructors)
 
     @property
     def name(self) -> str:
         return 'PtychoNN'
+
+    @property
+    def logger_name(self) -> str:
+        return 'ptychonn'
 
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self._reconstructors)

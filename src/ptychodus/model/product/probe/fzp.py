@@ -6,100 +6,101 @@ import numpy.typing
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.probe import FresnelZonePlate, Probe, ProbeGeometryProvider
+from ptychodus.api.probe import FresnelZonePlate, ProbeSequence, ProbeGeometryProvider
 from ptychodus.api.propagator import FresnelTransformPropagator, PropagatorParameters
 
-from .builder import ProbeBuilder
+from .builder import ProbeSequenceBuilder
 from .settings import ProbeSettings
 
 
-class FresnelZonePlateProbeBuilder(ProbeBuilder):
+class FresnelZonePlateProbeBuilder(ProbeSequenceBuilder):
     def __init__(
         self,
         settings: ProbeSettings,
-        fresnelZonePlateChooser: PluginChooser[FresnelZonePlate],
+        fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
     ) -> None:
         super().__init__(settings, 'fresnel_zone_plate')
         self._settings = settings
-        self._fresnelZonePlateChooser = fresnelZonePlateChooser
+        self._fresnel_zone_plate_chooser = fresnel_zone_plate_chooser
 
-        self.zonePlateDiameterInMeters = settings.zonePlateDiameterInMeters.copy()
-        self._addParameter('zone_plate_diameter_m', self.zonePlateDiameterInMeters)
+        self.zone_plate_diameter_m = settings.zone_plate_diameter_m.copy()
+        self._add_parameter('zone_plate_diameter_m', self.zone_plate_diameter_m)
 
-        self.outermostZoneWidthInMeters = settings.outermostZoneWidthInMeters.copy()
-        self._addParameter('outermost_zone_width_m', self.outermostZoneWidthInMeters)
+        self.outermost_zone_width_m = settings.outermost_zone_width_m.copy()
+        self._add_parameter('outermost_zone_width_m', self.outermost_zone_width_m)
 
-        self.centralBeamstopDiameterInMeters = settings.centralBeamstopDiameterInMeters.copy()
-        self._addParameter('central_beamstop_diameter_m', self.centralBeamstopDiameterInMeters)
+        self.central_beamstop_diameter_m = settings.central_beamstop_diameter_m.copy()
+        self._add_parameter('central_beamstop_diameter_m', self.central_beamstop_diameter_m)
 
         # from sample to the focal plane
-        self.defocusDistanceInMeters = settings.defocusDistanceInMeters.copy()
-        self._addParameter('defocus_distance_m', self.defocusDistanceInMeters)
+        self.defocus_distance_m = settings.defocus_distance_m.copy()
+        self._add_parameter('defocus_distance_m', self.defocus_distance_m)
 
     def copy(self) -> FresnelZonePlateProbeBuilder:
-        builder = FresnelZonePlateProbeBuilder(self._settings, self._fresnelZonePlateChooser)
+        builder = FresnelZonePlateProbeBuilder(self._settings, self._fresnel_zone_plate_chooser)
 
         for key, value in self.parameters().items():
-            builder.parameters()[key].setValue(value.getValue())
+            builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
-    def labelsForPresets(self) -> Iterator[str]:
-        for entry in self._fresnelZonePlateChooser:
-            yield entry.displayName
+    def labels_for_presets(self) -> Iterator[str]:
+        for plugin in self._fresnel_zone_plate_chooser:
+            yield plugin.display_name
 
-    def applyPresets(self, index: int) -> None:
-        fzp = self._fresnelZonePlateChooser[index].strategy
-        self.zonePlateDiameterInMeters.setValue(fzp.zonePlateDiameterInMeters)
-        self.outermostZoneWidthInMeters.setValue(fzp.outermostZoneWidthInMeters)
-        self.centralBeamstopDiameterInMeters.setValue(fzp.centralBeamstopDiameterInMeters)
+    def apply_presets(self, display_name: str) -> None:
+        self._fresnel_zone_plate_chooser.set_current_plugin(display_name)
+        fzp = self._fresnel_zone_plate_chooser.get_current_plugin().strategy
+        self.zone_plate_diameter_m.set_value(fzp.zone_plate_diameter_m)
+        self.outermost_zone_width_m.set_value(fzp.outermost_zone_width_m)
+        self.central_beamstop_diameter_m.set_value(fzp.central_beamstop_diameter_m)
 
-    def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
-        wavelengthInMeters = geometryProvider.probeWavelengthInMeters
-        zonePlate = FresnelZonePlate(
-            zonePlateDiameterInMeters=self.zonePlateDiameterInMeters.getValue(),
-            outermostZoneWidthInMeters=self.outermostZoneWidthInMeters.getValue(),
-            centralBeamstopDiameterInMeters=self.centralBeamstopDiameterInMeters.getValue(),
+    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+        wavelength_m = geometry_provider.probe_wavelength_m
+        zone_plate = FresnelZonePlate(
+            zone_plate_diameter_m=self.zone_plate_diameter_m.get_value(),
+            outermost_zone_width_m=self.outermost_zone_width_m.get_value(),
+            central_beamstop_diameter_m=self.central_beamstop_diameter_m.get_value(),
         )
-        focalLengthInMeters = zonePlate.getFocalLengthInMeters(wavelengthInMeters)
-        distanceInMeters = focalLengthInMeters + self.defocusDistanceInMeters.getValue()
-        samplePlaneGeometry = geometryProvider.getProbeGeometry()
-        fzpHalfWidth = (samplePlaneGeometry.widthInPixels + 1) // 2
-        fzpHalfHeight = (samplePlaneGeometry.heightInPixels + 1) // 2
-        fzpPlanePixelSizeNumerator = wavelengthInMeters * distanceInMeters
-        fzpPixelGeometry = PixelGeometry(
-            widthInMeters=fzpPlanePixelSizeNumerator / samplePlaneGeometry.widthInMeters,
-            heightInMeters=fzpPlanePixelSizeNumerator / samplePlaneGeometry.heightInMeters,
+        focal_length_m = zone_plate.get_focal_length_m(wavelength_m)
+        distance_m = focal_length_m + self.defocus_distance_m.get_value()
+        sample_plane_geometry = geometry_provider.get_probe_geometry()
+        fzp_half_width = (sample_plane_geometry.width_px + 1) // 2
+        fzp_half_height = (sample_plane_geometry.height_px + 1) // 2
+        fzp_plane_pixel_size_numerator = wavelength_m * distance_m
+        fzp_pixel_geometry = PixelGeometry(
+            width_m=fzp_plane_pixel_size_numerator / sample_plane_geometry.width_m,
+            height_m=fzp_plane_pixel_size_numerator / sample_plane_geometry.height_m,
         )
 
         # coordinate on FZP plane
-        lx_fzp = -fzpPixelGeometry.widthInMeters * numpy.arange(-fzpHalfWidth, fzpHalfWidth)
-        ly_fzp = -fzpPixelGeometry.heightInMeters * numpy.arange(-fzpHalfHeight, fzpHalfHeight)
+        lx_fzp = -fzp_pixel_geometry.width_m * numpy.arange(-fzp_half_width, fzp_half_width)
+        ly_fzp = -fzp_pixel_geometry.height_m * numpy.arange(-fzp_half_height, fzp_half_height)
 
-        YY_FZP, XX_FZP = numpy.meshgrid(ly_fzp, lx_fzp)
-        RR_FZP = numpy.hypot(XX_FZP, YY_FZP)
+        YY_FZP, XX_FZP = numpy.meshgrid(ly_fzp, lx_fzp)  # noqa: N806
+        RR_FZP = numpy.hypot(XX_FZP, YY_FZP)  # noqa: N806
 
         # transmission function of FZP
-        T = numpy.exp(
-            -2j * numpy.pi / wavelengthInMeters * (XX_FZP**2 + YY_FZP**2) / 2 / focalLengthInMeters
+        T = numpy.exp(  # noqa: N806
+            -2j * numpy.pi / wavelength_m * (XX_FZP**2 + YY_FZP**2) / 2 / focal_length_m
         )
-        C = RR_FZP <= zonePlate.zonePlateDiameterInMeters / 2
-        H = RR_FZP >= zonePlate.centralBeamstopDiameterInMeters / 2
-        fzpTransmissionFunction = T * C * H
+        C = RR_FZP <= zone_plate.zone_plate_diameter_m / 2  # noqa: N806
+        H = RR_FZP >= zone_plate.central_beamstop_diameter_m / 2  # noqa: N806
+        fzp_transmission_function = T * C * H
 
-        propagatorParameters = PropagatorParameters(
-            wavelength_m=wavelengthInMeters,
-            width_px=fzpTransmissionFunction.shape[-1],
-            height_px=fzpTransmissionFunction.shape[-2],
-            pixel_width_m=fzpPixelGeometry.widthInMeters,
-            pixel_height_m=fzpPixelGeometry.heightInMeters,
-            propagation_distance_m=distanceInMeters,
+        propagator_parameters = PropagatorParameters(
+            wavelength_m=wavelength_m,
+            width_px=fzp_transmission_function.shape[-1],
+            height_px=fzp_transmission_function.shape[-2],
+            pixel_width_m=fzp_pixel_geometry.width_m,
+            pixel_height_m=fzp_pixel_geometry.height_m,
+            propagation_distance_m=distance_m,
         )
-        propagator = FresnelTransformPropagator(propagatorParameters)
-        array = propagator.propagate(fzpTransmissionFunction)
+        propagator = FresnelTransformPropagator(propagator_parameters)
+        array = propagator.propagate(fzp_transmission_function)
 
-        return Probe(
+        return ProbeSequence(
             array=self.normalize(array),
-            pixelWidthInMeters=samplePlaneGeometry.pixelWidthInMeters,
-            pixelHeightInMeters=samplePlaneGeometry.pixelHeightInMeters,
+            opr_weights=None,
+            pixel_geometry=sample_plane_geometry.get_pixel_geometry(),
         )

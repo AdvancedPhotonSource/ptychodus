@@ -13,44 +13,44 @@ class ColormapParameter(Parameter[str], Observer):
     # See https://matplotlib.org/stable/gallery/color/colormap_reference.html
     CYCLIC_COLORMAPS: Final[tuple[str, ...]] = ('hsv', 'twilight', 'twilight_shifted')
 
-    def __init__(self, *, isCyclic: bool) -> None:
+    def __init__(self, *, is_cyclic: bool) -> None:
         super().__init__()
-        self._isCyclic = isCyclic
+        self._is_cyclic = is_cyclic
         self._chooser = PluginChooser[Colormap]()
 
         for name, cmap in matplotlib.colormaps.items():
-            isCyclicColormap = name in ColormapParameter.CYCLIC_COLORMAPS
+            is_cyclic_colormap = name in ColormapParameter.CYCLIC_COLORMAPS
 
-            if isCyclic == isCyclicColormap:
-                self._chooser.registerPlugin(cmap, displayName=name)
+            if is_cyclic == is_cyclic_colormap:
+                self._chooser.register_plugin(cmap, display_name=name)
 
-        self.setValue('hsv' if isCyclic else 'gray')
-        self._chooser.addObserver(self)
+        self.set_value('hsv' if is_cyclic else 'gray')
+        self._chooser.add_observer(self)
 
     def choices(self) -> Iterator[str]:
-        for name in self._chooser.getDisplayNameList():
-            yield name
+        for plugin in self._chooser:
+            yield plugin.display_name
 
-    def getValue(self) -> str:
-        return self._chooser.currentPlugin.displayName
+    def get_value(self) -> str:
+        return self._chooser.get_current_plugin().display_name
 
-    def setValue(self, value: str, *, notify: bool = True) -> None:
-        self._chooser.setCurrentPluginByName(value)
+    def set_value(self, value: str, *, notify: bool = True) -> None:
+        self._chooser.set_current_plugin(value)
 
-    def getValueAsString(self) -> str:
-        return self.getValue()
+    def get_value_as_string(self) -> str:
+        return self.get_value()
 
-    def setValueFromString(self, value: str) -> None:
-        self.setValue(value)
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(value)
 
     def copy(self) -> Parameter[str]:
-        parameter = ColormapParameter(isCyclic=self._isCyclic)
-        parameter.setValue(self.getValue())
+        parameter = ColormapParameter(is_cyclic=self._is_cyclic)
+        parameter.set_value(self.get_value())
         return parameter
 
-    def getPlugin(self) -> Colormap:
-        return self._chooser.currentPlugin.strategy
+    def get_plugin(self) -> Colormap:
+        return self._chooser.get_current_plugin().strategy
 
-    def update(self, observable: Observable) -> None:
+    def _update(self, observable: Observable) -> None:
         if observable is self._chooser:
-            self.notifyObservers()
+            self.notify_observers()

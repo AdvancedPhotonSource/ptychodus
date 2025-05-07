@@ -3,6 +3,7 @@ from collections.abc import Iterator
 
 import numpy
 
+from ptychodus.api.geometry import AffineTransform
 from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.scan import ScanPoint
 
@@ -15,92 +16,100 @@ class ScanPointTransform(ParameterGroup):
         self._rng = rng
         self._settings = settings
 
-        self.affineAX = settings.affineTransformAX.copy()
-        self._addParameter('affine_ax', self.affineAX)
+        self.affine00 = settings.affine00.copy()
+        self._add_parameter('affine00', self.affine00)
 
-        self.affineAY = settings.affineTransformAY.copy()
-        self._addParameter('affine_ay', self.affineAY)
+        self.affine01 = settings.affine01.copy()
+        self._add_parameter('affine01', self.affine01)
 
-        self.affineATInMeters = settings.affineTransformATInMeters.copy()
-        self._addParameter('affine_at_m', self.affineATInMeters)
+        self.affine02 = settings.affine02.copy()
+        self._add_parameter('affine02', self.affine02)
 
-        self.affineBX = settings.affineTransformBX.copy()
-        self._addParameter('affine_bx', self.affineBX)
+        self.affine10 = settings.affine10.copy()
+        self._add_parameter('affine10', self.affine10)
 
-        self.affineBY = settings.affineTransformBY.copy()
-        self._addParameter('affine_by', self.affineBY)
+        self.affine11 = settings.affine11.copy()
+        self._add_parameter('affine11', self.affine11)
 
-        self.affineBTInMeters = settings.affineTransformBTInMeters.copy()
-        self._addParameter('affine_bt_m', self.affineBTInMeters)
+        self.affine12 = settings.affine12.copy()
+        self._add_parameter('affine12', self.affine12)
 
-        self.jitterRadiusInMeters = settings.jitterRadiusInMeters.copy()
-        self._addParameter('jitter_radius_m', self.jitterRadiusInMeters)
+        self.jitter_radius_m = settings.jitter_radius_m.copy()
+        self._add_parameter('jitter_radius_m', self.jitter_radius_m)
 
-    def syncToSettings(self) -> None:
+    def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
-            parameter.syncValueToParent()
+            parameter.sync_value_to_parent()
 
     def copy(self) -> ScanPointTransform:
         transform = ScanPointTransform(self._rng, self._settings)
 
         for key, value in self.parameters().items():
-            transform.parameters()[key].setValue(value.getValue())
+            transform.parameters()[key].set_value(value.get_value())
 
         return transform
 
     @staticmethod
-    def negateX(preset: int) -> bool:
+    def negate_x(preset: int) -> bool:
         return preset & 0x1 != 0x0
 
     @staticmethod
-    def negateY(preset: int) -> bool:
+    def negate_y(preset: int) -> bool:
         return preset & 0x2 != 0x0
 
     @staticmethod
-    def swapXY(preset: int) -> bool:
+    def swap_xy(preset: int) -> bool:
         return preset & 0x4 != 0x0
 
-    def labelsForPresets(self) -> Iterator[str]:
+    def labels_for_presets(self) -> Iterator[str]:
         for index in range(8):
-            xp = '\u2212x' if self.negateX(index) else '\u002bx'
-            yp = '\u2212y' if self.negateY(index) else '\u002by'
-            fxy = f'{yp}, {xp}' if self.swapXY(index) else f'{xp}, {yp}'
-            yield f'(x, y) \u2192 ({fxy})'
+            yp = '\u2212y' if self.negate_y(index) else '\u002by'
+            xp = '\u2212x' if self.negate_x(index) else '\u002bx'
+            fyx = f'{xp}, {yp}' if self.swap_xy(index) else f'{yp}, {xp}'
+            yield f'(y, x) \u2192 ({fyx})'
 
-    def applyPresets(self, index: int) -> None:
-        if self.swapXY(index):
-            self.affineAY.setValue(-1 if self.negateY(index) else +1)
-            self.affineBX.setValue(-1 if self.negateX(index) else +1)
-            self.affineAX.setValue(0)
-            self.affineBY.setValue(0)
+    def apply_presets(self, index: int) -> None:
+        self.block_notifications(True)
+
+        if self.swap_xy(index):
+            self.affine00.set_value(0)
+            self.affine01.set_value(-1 if self.negate_x(index) else +1)
+            self.affine10.set_value(-1 if self.negate_y(index) else +1)
+            self.affine11.set_value(0)
         else:
-            self.affineAX.setValue(-1 if self.negateX(index) else +1)
-            self.affineBY.setValue(-1 if self.negateY(index) else +1)
-            self.affineAY.setValue(0)
-            self.affineBX.setValue(0)
+            self.affine00.set_value(-1 if self.negate_y(index) else +1)
+            self.affine01.set_value(0)
+            self.affine10.set_value(0)
+            self.affine11.set_value(-1 if self.negate_x(index) else +1)
+
+        self.block_notifications(False)
+
+    def get_transform(self) -> AffineTransform:
+        return AffineTransform(
+            a00=self.affine00.get_value(),
+            a01=self.affine01.get_value(),
+            a02=self.affine02.get_value(),
+            a10=self.affine10.get_value(),
+            a11=self.affine11.get_value(),
+            a12=self.affine12.get_value(),
+        )
+
+    def set_identity(self) -> None:
+        self.apply_presets(0)
 
     def __call__(self, point: ScanPoint) -> ScanPoint:
-        ax = self.affineAX.getValue()
-        ay = self.affineAY.getValue()
-        at_m = self.affineATInMeters.getValue()
-
-        bx = self.affineBX.getValue()
-        by = self.affineBY.getValue()
-        bt_m = self.affineBTInMeters.getValue()
-
-        posX = ax * point.positionXInMeters + ay * point.positionYInMeters + at_m
-        posY = bx * point.positionXInMeters + by * point.positionYInMeters + bt_m
-
-        rad = self.jitterRadiusInMeters.getValue()
+        transform = self.get_transform()
+        pos_y, pos_x = transform(point.position_y_m, point.position_x_m)
+        rad = self.jitter_radius_m.get_value()
 
         if rad > 0.0:
             while True:
-                dX = self._rng.uniform()
-                dY = self._rng.uniform()
+                dx = self._rng.uniform()
+                dy = self._rng.uniform()
 
-                if dX * dX + dY * dY < 1.0:
-                    posX += dX * rad
-                    posY += dY * rad
+                if dx * dx + dy * dy < 1.0:
+                    pos_x += dx * rad
+                    pos_y += dy * rad
                     break
 
-        return ScanPoint(point.index, posX, posY)
+        return ScanPoint(point.index, pos_x, pos_y)

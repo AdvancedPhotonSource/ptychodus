@@ -20,68 +20,72 @@ class STXMViewController(Observer):
         self,
         simulator: STXMSimulator,
         engine: VisualizationEngine,
-        fileDialogFactory: FileDialogFactory,
+        file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._simulator = simulator
-        self._fileDialogFactory = fileDialogFactory
-
+        self._file_dialog_factory = file_dialog_factory
         self._dialog = STXMDialog()
-        self._dialog.saveButton.clicked.connect(self._saveResult)
-
-        self._visualizationWidgetController = VisualizationWidgetController(
+        self._dialog.save_button.clicked.connect(self._save_data)
+        self._visualization_widget_controller = VisualizationWidgetController(
             engine,
-            self._dialog.visualizationWidget,
-            self._dialog.statusBar,
-            fileDialogFactory,
+            self._dialog.visualization_widget,
+            self._dialog.status_bar,
+            file_dialog_factory,
         )
-        self._visualizationParametersController = VisualizationParametersController.createInstance(
-            engine, self._dialog.visualizationParametersView
+        self._visualization_parameters_controller = (
+            VisualizationParametersController.create_instance(
+                engine, self._dialog.visualization_parameters_view
+            )
         )
 
-        simulator.addObserver(self)
+        simulator.add_observer(self)
 
-    def launch(self, productIndex: int) -> None:
-        self._simulator.setProduct(productIndex)
+    def simulate(self, product_index: int) -> None:
+        self._simulator.set_product(product_index)
 
         try:
-            itemName = self._simulator.getProductName()
+            product_name = self._simulator.get_product_name()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Launch', err)
+            ExceptionDialog.show_exception('Simulate STXM', err)
         else:
-            self._dialog.setWindowTitle(f'Simulate STXM: {itemName}')
+            self._dialog.setWindowTitle(f'Simulate STXM: {product_name}')
             self._dialog.open()
 
-        self._simulator.simulate()
-
-    def _saveResult(self) -> None:
-        title = 'Save STXM Image'
-        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
-            self._dialog,
-            title,
-            nameFilters=self._simulator.getSaveFileFilterList(),
-            selectedNameFilter=self._simulator.getSaveFileFilter(),
-        )
-
-        if filePath:
-            try:
-                self._simulator.saveImage(filePath)
-            except Exception as err:
-                logger.exception(err)
-                ExceptionDialog.showException(title, err)
-
-    def _syncModelToView(self) -> None:
         try:
-            image = self._simulator.getImage()
-        except ValueError:
-            self._visualizationWidgetController.clearArray()
+            self._simulator.simulate()
         except Exception as err:
             logger.exception(err)
-            ExceptionDialog.showException('Update Views', err)
-        else:
-            self._visualizationWidgetController.setArray(image.intensity, image.pixel_geometry)
+            ExceptionDialog.show_exception('Simulate STXM', err)
 
-    def update(self, observable: Observable) -> None:
+    def _save_data(self) -> None:
+        title = 'Save STXM Data'
+        file_path, _ = self._file_dialog_factory.get_save_file_path(
+            self._dialog,
+            title,
+            name_filters=self._simulator.get_save_file_filters(),
+            selected_name_filter=self._simulator.get_save_file_filter(),
+        )
+
+        if file_path:
+            try:
+                self._simulator.save_data(file_path)
+            except Exception as err:
+                logger.exception(err)
+                ExceptionDialog.show_exception(title, err)
+
+    def _sync_model_to_view(self) -> None:
+        try:
+            data = self._simulator.get_data()
+        except ValueError:
+            self._visualization_widget_controller.clear_array()
+        except Exception as err:
+            logger.exception(err)
+            ExceptionDialog.show_exception('Update Views', err)
+        else:
+            self._visualization_widget_controller.set_array(data.intensity, data.pixel_geometry)
+
+    def _update(self, observable: Observable) -> None:
         if observable is self._simulator:
-            self._syncModelToView()
+            self._sync_model_to_view()

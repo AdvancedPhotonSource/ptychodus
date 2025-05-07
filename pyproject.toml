@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64", "setuptools_scm>=8"]
+requires = ["setuptools>=64", "setuptools_scm[toml]>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,14 +7,17 @@ name = "ptychodus"
 description = "Ptychodus is a ptychography data analysis application."
 readme = "README.rst"
 requires-python = ">=3.10"
-license = {file = "LICENSE.txt"}
+license = {file = "LICENSE"}
 dependencies = [
-    "h5py",
+    "h5py>=3",
+    "hdf5plugin",
     "matplotlib",
     "numpy",
     "psutil",
+    "requests",
     "scikit-image",
     "scipy",
+    "tables",
     "tifffile",
     "watchdog",
 ]
@@ -24,10 +27,17 @@ dynamic = ["version"]
 ptychodus = "ptychodus.__main__:main"
 
 [project.optional-dependencies]
-globus = ["gladier", "gladier-tools"]
+globus = ["gladier", "gladier-tools>=0.5.4"]
 gui = ["PyQt5"]
 ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
 tike = ["tike==0.25.*,>=0.25.3"]
+ptychi = ["ptychi==1.*"]
+
+[tool.setuptools.package-data]
+"ptychodus" = ["py.typed"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.setuptools_scm]
 
@@ -44,6 +54,8 @@ module = [
     "hdf5plugin",
     "lightning.*",
     "parsl.*",
+    "ptychi.*",
+    "ptycho.*",
     "ptychonn.*",
     "pvaccess",
     "pvapy.*",
@@ -61,9 +73,11 @@ target-version = "py310"
 [tool.ruff.format]
 quote-style = "single"
 
-[tool.setuptools.package-data]
-"ptychodus" = ["py.typed"]
+[tool.ruff.lint]
+select = [
+    "N",
+    "NPY",
+]
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
+[tool.pyright]
+pythonVersion = "3.10"

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.scan import Scan, ScanPoint
+from ptychodus.api.scan import PositionSequence, ScanPoint
 
 from .builder import ScanBuilder
 from .settings import ScanSettings
@@ -13,55 +13,55 @@ class LissajousScanBuilder(ScanBuilder):
         super().__init__(settings, 'lissajous')
         self._settings = settings
 
-        self.numberOfPoints = settings.numberOfPointsX.copy()
-        self.numberOfPoints.setValue(
-            settings.numberOfPointsX.getValue() * settings.numberOfPointsY.getValue()
+        self.num_points = settings.num_points_x.copy()
+        self.num_points.set_value(
+            settings.num_points_x.get_value() * settings.num_points_y.get_value()
         )
-        self._addParameter('number_of_points', self.numberOfPoints)
+        self._add_parameter('num_points', self.num_points)
 
-        self._numberOfPoints = settings.numberOfPointsY.copy()
-        self._numberOfPoints.setValue(1)
-        self._addParameter('_number_of_points', self._numberOfPoints)
+        self._num_points = settings.num_points_y.copy()
+        self._num_points.set_value(1)
+        self._add_parameter('_num_points', self._num_points)
 
-        self.amplitudeXInMeters = settings.amplitudeXInMeters.copy()
-        self._addParameter('amplitude_x_m', self.amplitudeXInMeters)
+        self.amplitude_x_m = settings.amplitude_x_m.copy()
+        self._add_parameter('amplitude_x_m', self.amplitude_x_m)
 
-        self.amplitudeYInMeters = settings.amplitudeYInMeters.copy()
-        self._addParameter('amplitude_y_m', self.amplitudeYInMeters)
+        self.amplitude_y_m = settings.amplitude_y_m.copy()
+        self._add_parameter('amplitude_y_m', self.amplitude_y_m)
 
-        self.angularStepXInTurns = settings.angularStepXInTurns.copy()
-        self._addParameter('angular_step_x_tr', self.angularStepXInTurns)
+        self.angular_step_x_turns = settings.angular_step_x_turns.copy()
+        self._add_parameter('angular_step_x_tr', self.angular_step_x_turns)
 
-        self.angularStepYInTurns = settings.angularStepYInTurns.copy()
-        self._addParameter('angular_step_y_tr', self.angularStepYInTurns)
+        self.angular_step_y_turns = settings.angular_step_y_turns.copy()
+        self._add_parameter('angular_step_y_tr', self.angular_step_y_turns)
 
-        self.angularShiftInTurns = settings.angularShiftInTurns.copy()
-        self._addParameter('angular_shift_tr', self.angularShiftInTurns)
+        self.angular_shift_turns = settings.angular_shift_turns.copy()
+        self._add_parameter('angular_shift_tr', self.angular_shift_turns)
 
     def copy(self) -> LissajousScanBuilder:
         builder = LissajousScanBuilder(self._settings)
 
         for key, value in self.parameters().items():
-            builder.parameters()[key].setValue(value.getValue())
+            builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
-    def build(self) -> Scan:
-        pointList: list[ScanPoint] = list()
+    def build(self) -> PositionSequence:
+        point_list: list[ScanPoint] = list()
 
-        for index in range(self.numberOfPoints.getValue()):
-            twoPi = 2 * numpy.pi
-            thetaX = (
-                twoPi * self.angularStepXInTurns.getValue() * index
-                + self.angularShiftInTurns.getValue()
+        for index in range(self.num_points.get_value()):
+            two_pi = 2 * numpy.pi
+            theta_x = (
+                two_pi * self.angular_step_x_turns.get_value() * index
+                + self.angular_shift_turns.get_value()
             )
-            thetaY = twoPi * self.angularStepYInTurns.getValue() * index
+            theta_y = two_pi * self.angular_step_y_turns.get_value() * index
 
             point = ScanPoint(
                 index=index,
-                positionXInMeters=self.amplitudeXInMeters.getValue() * numpy.sin(thetaX),
-                positionYInMeters=self.amplitudeYInMeters.getValue() * numpy.sin(thetaY),
+                position_x_m=self.amplitude_x_m.get_value() * numpy.sin(theta_x),
+                position_y_m=self.amplitude_y_m.get_value() * numpy.sin(theta_y),
             )
-            pointList.append(point)
+            point_list.append(point)
 
-        return Scan(pointList)
+        return PositionSequence(point_list)

@@ -12,45 +12,42 @@ class IdentityDeconvolution(DeconvolutionStrategy):
 
 class RichardsonLucyDeconvolution(DeconvolutionStrategy):
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
-        cps = skimage.restoration.richardson_lucy(
-            emap.counts_per_second, product.probe.getIntensity()
-        )
+        probe_intensity = product.probes.get_probe_no_opr().get_intensity()
+        cps = skimage.restoration.richardson_lucy(emap.counts_per_second, probe_intensity)
         return ElementMap(emap.name, cps)
 
 
 class WienerDeconvolution(DeconvolutionStrategy):
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
+        probe_intensity = product.probes.get_probe_no_opr().get_intensity()
         balance = 0.05  # TODO
-        cps = skimage.restoration.wiener(
-            emap.counts_per_second, product.probe.getIntensity(), balance
-        )
+        cps = skimage.restoration.wiener(emap.counts_per_second, probe_intensity, balance)
         return ElementMap(emap.name, cps)
 
 
 class UnsupervisedWienerDeconvolution(DeconvolutionStrategy):
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
-        cps, _ = skimage.restoration.unsupervised_wiener(
-            emap.counts_per_second, product.probe.getIntensity()
-        )
+        probe_intensity = product.probes.get_probe_no_opr().get_intensity()
+        cps, _ = skimage.restoration.unsupervised_wiener(emap.counts_per_second, probe_intensity)
         return ElementMap(emap.name, cps)
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
+def register_plugins(registry: PluginRegistry) -> None:
     # NOTE See https://scikit-image.org/docs/stable/api/skimage.restoration.html
     # TODO Implement method from https://doi.org/10.1364/OE.20.018287
-    registry.deconvolutionStrategies.registerPlugin(
+    registry.deconvolution_strategies.register_plugin(
         IdentityDeconvolution(),
-        displayName='Identity',
+        display_name='Identity',
     )
-    registry.deconvolutionStrategies.registerPlugin(
+    registry.deconvolution_strategies.register_plugin(
         RichardsonLucyDeconvolution(),
-        displayName='Richardson-Lucy',
+        display_name='Richardson-Lucy',
     )
-    registry.deconvolutionStrategies.registerPlugin(
+    registry.deconvolution_strategies.register_plugin(
         WienerDeconvolution(),
-        displayName='Wiener',
+        display_name='Wiener',
     )
-    registry.deconvolutionStrategies.registerPlugin(
+    registry.deconvolution_strategies.register_plugin(
         UnsupervisedWienerDeconvolution(),
-        displayName='Unsupervised Wiener',
+        display_name='Unsupervised Wiener',
     )

@@ -16,15 +16,15 @@ class ObjectBuilder(ParameterGroup):
     def __init__(self, settings: ObjectSettings, name: str) -> None:
         super().__init__()
         self._name = settings.builder.copy()
-        self._name.setValue(name)
-        self._addParameter('name', self._name)
+        self._name.set_value(name)
+        self._add_parameter('name', self._name)
 
-    def getName(self) -> str:
-        return self._name.getValue()
+    def get_name(self) -> str:
+        return self._name.get_value()
 
-    def syncToSettings(self) -> None:
+    def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
-            parameter.syncValueToParent()
+            parameter.sync_value_to_parent()
 
     @abstractmethod
     def copy(self) -> ObjectBuilder:
@@ -33,8 +33,8 @@ class ObjectBuilder(ParameterGroup):
     @abstractmethod
     def build(
         self,
-        geometryProvider: ObjectGeometryProvider,
-        layerDistanceInMeters: Sequence[float],
+        geometry_provider: ObjectGeometryProvider,
+        layer_spacing_m: Sequence[float],
     ) -> Object:
         pass
 
@@ -50,43 +50,67 @@ class FromMemoryObjectBuilder(ObjectBuilder):
 
     def build(
         self,
-        geometryProvider: ObjectGeometryProvider,
-        layerDistanceInMeters: Sequence[float],
+        geometry_provider: ObjectGeometryProvider,
+        layer_spacing_m: Sequence[float],
     ) -> Object:
         return self._object
 
 
 class FromFileObjectBuilder(ObjectBuilder):
     def __init__(
-        self, settings: ObjectSettings, filePath: Path, fileType: str, fileReader: ObjectFileReader
+        self,
+        settings: ObjectSettings,
+        file_path: Path,
+        file_type: str,
+        file_reader: ObjectFileReader,
     ) -> None:
         super().__init__(settings, 'from_file')
         self._settings = settings
-        self.filePath = settings.filePath.copy()
-        self.filePath.setValue(filePath)
-        self._addParameter('file_path', self.filePath)
-        self.fileType = settings.fileType.copy()
-        self.fileType.setValue(fileType)
-        self._addParameter('file_type', self.fileType)
-        self._fileReader = fileReader
+        self.file_path = settings.file_path.copy()
+        self.file_path.set_value(file_path)
+        self._add_parameter('file_path', self.file_path)
+        self.file_type = settings.file_type.copy()
+        self.file_type.set_value(file_type)
+        self._add_parameter('file_type', self.file_type)
+        self._file_reader = file_reader
 
     def copy(self) -> FromFileObjectBuilder:
         return FromFileObjectBuilder(
-            self._settings, self.filePath.getValue(), self.fileType.getValue(), self._fileReader
+            self._settings,
+            self.file_path.get_value(),
+            self.file_type.get_value(),
+            self._file_reader,
         )
 
     def build(
         self,
-        geometryProvider: ObjectGeometryProvider,
-        layerDistanceInMeters: Sequence[float],
+        geometry_provider: ObjectGeometryProvider,
+        layer_spacing_m: Sequence[float],
     ) -> Object:
-        filePath = self.filePath.getValue()
-        fileType = self.fileType.getValue()
-        logger.debug(f'Reading "{filePath}" as "{fileType}"')
+        file_path = self.file_path.get_value()
+        file_type = self.file_type.get_value()
+        logger.debug(f'Reading "{file_path}" as "{file_type}"')
 
         try:
-            object_ = self._fileReader.read(filePath)
+            object_from_file = self._file_reader.read(file_path)
         except Exception as exc:
-            raise RuntimeError(f'Failed to read "{filePath}"') from exc
+            raise RuntimeError(f'Failed to read "{file_path}"') from exc
 
-        return object_
+        object_geometry = geometry_provider.get_object_geometry()
+
+        try:
+            pixel_geometry = object_from_file.get_pixel_geometry()
+        except ValueError:
+            pixel_geometry = object_geometry.get_pixel_geometry()
+
+        try:
+            center = object_from_file.get_center()
+        except ValueError:
+            center = object_geometry.get_center()
+
+        return Object(
+            object_from_file.get_array(),
+            pixel_geometry,
+            center,
+            object_from_file.layer_spacing_m,
+        )

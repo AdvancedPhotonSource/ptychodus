@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 import logging
 import time
@@ -9,8 +10,9 @@ from ptychodus.api.reconstructor import (
     TrainOutput,
 )
 
-from ..product import ProductRepository
+from ..product import ProductAPI
 from .matcher import DiffractionPatternPositionMatcher, ScanIndexFilter
+from .queue import ReconstructionQueue
 
 logger = logging.getLogger(__name__)
 
@@ -18,142 +20,138 @@ logger = logging.getLogger(__name__)
 class ReconstructorAPI:
     def __init__(
         self,
-        dataMatcher: DiffractionPatternPositionMatcher,
-        productRepository: ProductRepository,
-        reconstructorChooser: PluginChooser[Reconstructor],
+        reconstruction_queue: ReconstructionQueue,
+        data_matcher: DiffractionPatternPositionMatcher,
+        product_api: ProductAPI,
+        reconstructor_chooser: PluginChooser[Reconstructor],
     ) -> None:
-        self._dataMatcher = dataMatcher
-        self._productRepository = productRepository
-        self._reconstructorChooser = reconstructorChooser
+        self._reconstruction_queue = reconstruction_queue
+        self._data_matcher = data_matcher
+        self._product_api = product_api
+        self._reconstructor_chooser = reconstructor_chooser
+
+    @property
+    def is_reconstructing(self) -> bool:
+        return self._reconstruction_queue.is_reconstructing
+
+    def process_results(self, *, block: bool) -> None:
+        self._reconstruction_queue.process_results(block=block)
 
     def reconstruct(
         self,
-        inputProductIndex: int,
-        outputProductName: str,
-        indexFilter: ScanIndexFilter = ScanIndexFilter.ALL,
+        input_product_index: int,
+        *,
+        output_product_suffix: str = '',
+        transform: int | None = None,
+        index_filter: ScanIndexFilter = ScanIndexFilter.ALL,
     ) -> int:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-        parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(
-            inputProductIndex, indexFilter
+        reconstructor = self._reconstructor_chooser.get_current_plugin()
+        input_product_item = self._product_api.get_item(input_product_index)
+        output_product_index = self._product_api.insert_product(input_product_item.get_product())
+        output_product_item = self._product_api.get_item(output_product_index)
+        output_product_name = f'{input_product_item.get_name()}_{reconstructor.simple_name}'
+
+        if output_product_suffix:
+            output_product_name += f'_{output_product_suffix}'
+
+        output_product_item.set_name(output_product_name)
+
+        if transform is not None:
+            scan_item_transform = output_product_item.get_scan_item().get_transform()
+            scan_item_transform.apply_presets(transform)
+
+            object_item = output_product_item.get_object_item()
+            object_item.rebuild(recenter=True)
+
+        self._reconstruction_queue.put(reconstructor.strategy, output_product_index, index_filter)
+        return output_product_index
+
+    def reconstruct_split(self, input_product_index: int) -> tuple[int, int]:
+        output_product_index_odd = self.reconstruct(
+            input_product_index,
+            output_product_suffix='odd',
+            index_filter=ScanIndexFilter.ODD,
+        )
+        output_product_index_even = self.reconstruct(
+            input_product_index,
+            output_product_suffix='even',
+            index_filter=ScanIndexFilter.EVEN,
         )
 
-        outputProductIndex = self._productRepository.insertNewProduct(likeIndex=inputProductIndex)
-        outputProduct = self._productRepository[outputProductIndex]
+        return output_product_index_odd, output_product_index_even
 
-        tic = time.perf_counter()
-        result = reconstructor.reconstruct(parameters)
-        toc = time.perf_counter()
-        logger.info(f'Reconstruction time {toc - tic:.4f} seconds. (code={result.result})')
+    def reconstruct_transformed(self, input_product_index: int) -> Sequence[int]:
+        output_product_indexes: list[int] = []
+        input_product = self._product_api.get_item(input_product_index)
 
-        outputProduct.assign(result.product)
-
-        return outputProductIndex
-
-    def reconstructSplit(self, inputProductIndex: int, outputProductName: str) -> tuple[int, int]:
-        outputProductIndexOdd = self.reconstruct(
-            inputProductIndex,
-            f'{outputProductName}_odd',
-            ScanIndexFilter.ODD,
-        )
-        outputProductIndexEven = self.reconstruct(
-            inputProductIndex,
-            f'{outputProductName}_even',
-            ScanIndexFilter.EVEN,
-        )
-
-        return outputProductIndexOdd, outputProductIndexEven
-
-    def ingestTrainingData(self, inputProductIndex: int) -> None:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            logger.info('Preparing input data...')
-            tic = time.perf_counter()
-            parameters = self._dataMatcher.matchDiffractionPatternsWithPositions(
-                inputProductIndex, ScanIndexFilter.ALL
+        for preset_value, preset_label in enumerate(
+            input_product.get_scan_item().get_transform().labels_for_presets()
+        ):
+            output_product_index = self.reconstruct(
+                input_product_index,
+                output_product_suffix=preset_label,
+                transform=preset_value,
+                index_filter=ScanIndexFilter.ALL,
             )
-            toc = time.perf_counter()
-            logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
+            output_product_indexes.append(output_product_index)
 
-            logger.info('Ingesting...')
-            tic = time.perf_counter()
-            reconstructor.ingestTrainingData(parameters)
-            toc = time.perf_counter()
-            logger.info(f'Ingest time {toc - tic:.4f} seconds.')
-        else:
-            logger.warning('Reconstructor is not trainable!')
+        return output_product_indexes
 
-    def openTrainingData(self, filePath: Path) -> None:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+    def open_model(self, file_path: Path) -> None:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            logger.info('Opening training data...')
+            logger.info('Opening model...')
             tic = time.perf_counter()
-            reconstructor.openTrainingData(filePath)
+            reconstructor.open_model(file_path)
             toc = time.perf_counter()
             logger.info(f'Open time {toc - tic:.4f} seconds.')
         else:
             logger.warning('Reconstructor is not trainable!')
 
-    def saveTrainingData(self, filePath: Path) -> None:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
+    def save_model(self, file_path: Path) -> None:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
-            logger.info('Saving training data...')
+            logger.info('Saving model...')
             tic = time.perf_counter()
-            reconstructor.saveTrainingData(filePath)
+            reconstructor.save_model(file_path)
             toc = time.perf_counter()
             logger.info(f'Save time {toc - tic:.4f} seconds.')
         else:
             logger.warning('Reconstructor is not trainable!')
 
-    def train(self) -> TrainOutput:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-        result = TrainOutput([], [], -1)
+    def export_training_data(self, file_path: Path, input_product_index: int) -> None:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            logger.info('Preparing input data...')
+            tic = time.perf_counter()
+            parameters = self._data_matcher.match_diffraction_patterns_with_positions(
+                input_product_index, ScanIndexFilter.ALL
+            )
+            toc = time.perf_counter()
+            logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
+
+            logger.info('Exporting...')
+            tic = time.perf_counter()
+            reconstructor.export_training_data(file_path, parameters)
+            toc = time.perf_counter()
+            logger.info(f'Export time {toc - tic:.4f} seconds.')
+        else:
+            logger.warning('Reconstructor is not trainable!')
+
+    def train(self, data_path: Path) -> TrainOutput:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
+        result = TrainOutput([], -1)
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Training...')
             tic = time.perf_counter()
-            result = reconstructor.train()
+            result = reconstructor.train(data_path)
             toc = time.perf_counter()
             logger.info(f'Training time {toc - tic:.4f} seconds. (code={result.result})')
         else:
             logger.warning('Reconstructor is not trainable!')
 
         return result
-
-    def clearTrainingData(self) -> None:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            logger.info('Resetting...')
-            tic = time.perf_counter()
-            reconstructor.clearTrainingData()
-            toc = time.perf_counter()
-            logger.info(f'Reset time {toc - tic:.4f} seconds.')
-        else:
-            logger.warning('Reconstructor is not trainable!')
-
-    def openModel(self, filePath: Path) -> None:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            logger.info('Opening model...')
-            tic = time.perf_counter()
-            reconstructor.openModel(filePath)
-            toc = time.perf_counter()
-            logger.info(f'Open time {toc - tic:.4f} seconds.')
-        else:
-            logger.warning('Reconstructor is not trainable!')
-
-    def saveModel(self, filePath: Path) -> None:
-        reconstructor = self._reconstructorChooser.currentPlugin.strategy
-
-        if isinstance(reconstructor, TrainableReconstructor):
-            logger.info('Saving model...')
-            tic = time.perf_counter()
-            reconstructor.saveModel(filePath)
-            toc = time.perf_counter()
-            logger.info(f'Save time {toc - tic:.4f} seconds.')
-        else:
-            logger.warning('Reconstructor is not trainable!')

@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog
 from ptychodus.api.observer import SequenceObserver
 
 from ...model.analysis import (
-    ExposureAnalyzer,
+    IlluminationMapper,
     ProbePropagator,
     STXMSimulator,
 )
@@ -23,12 +23,12 @@ from ...view.widgets import (
 )
 from ..data import FileDialogFactory
 from ..image import ImageController
-from .editorFactory import ProbeEditorViewControllerFactory
-from .exposure import ExposureViewController
+from .editor_factory import ProbeEditorViewControllerFactory
+from .illumination import IlluminationViewController
 from .fluorescence import FluorescenceViewController
 from .propagator import ProbePropagationViewController
 from .stxm import STXMViewController
-from .treeModel import ProbeTreeModel
+from .tree_model import ProbeTreeModel
 
 logger = logging.getLogger(__name__)
 
@@ -38,277 +38,245 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self,
         repository: ProbeRepository,
         api: ProbeAPI,
-        imageController: ImageController,
+        image_controller: ImageController,
         propagator: ProbePropagator,
-        propagatorVisualizationEngine: VisualizationEngine,
-        stxmSimulator: STXMSimulator,
-        stxmVisualizationEngine: VisualizationEngine,
-        exposureAnalyzer: ExposureAnalyzer,
-        exposureVisualizationEngine: VisualizationEngine,
-        fluorescenceEnhancer: FluorescenceEnhancer,
-        fluorescenceVisualizationEngine: VisualizationEngine,
+        propagator_visualization_engine: VisualizationEngine,
+        stxm_simulator: STXMSimulator,
+        stxm_visualization_engine: VisualizationEngine,
+        illumination_mapper: IlluminationMapper,
+        illumination_visualization_engine: VisualizationEngine,
+        fluorescence_enhancer: FluorescenceEnhancer,
+        fluorescence_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
-        fileDialogFactory: FileDialogFactory,
-        treeModel: ProbeTreeModel,
+        file_dialog_factory: FileDialogFactory,
+        *,
+        is_developer_mode_enabled: bool,
     ) -> None:
         super().__init__()
         self._repository = repository
         self._api = api
-        self._imageController = imageController
+        self._image_controller = image_controller
         self._view = view
-        self._fileDialogFactory = fileDialogFactory
-        self._treeModel = treeModel
-        self._editorFactory = ProbeEditorViewControllerFactory()
+        self._file_dialog_factory = file_dialog_factory
+        self._tree_model = ProbeTreeModel(repository, api)
+        self._editor_factory = ProbeEditorViewControllerFactory()
 
-        self._propagationViewController = ProbePropagationViewController(
-            propagator, propagatorVisualizationEngine, fileDialogFactory
+        self._propagation_view_controller = ProbePropagationViewController(
+            propagator, propagator_visualization_engine, file_dialog_factory
         )
-        self._stxmViewController = STXMViewController(
-            stxmSimulator, stxmVisualizationEngine, fileDialogFactory
+        self._stxm_view_controller = STXMViewController(
+            stxm_simulator, stxm_visualization_engine, file_dialog_factory
         )
-        self._exposureViewController = ExposureViewController(
-            exposureAnalyzer, exposureVisualizationEngine, fileDialogFactory
+        self._illumination_view_controller = IlluminationViewController(
+            illumination_mapper,
+            illumination_visualization_engine,
+            file_dialog_factory,
+            is_developer_mode_enabled=is_developer_mode_enabled,
         )
-        self._fluorescenceViewController = FluorescenceViewController(
-            fluorescenceEnhancer, fluorescenceVisualizationEngine, fileDialogFactory
+        self._fluorescence_view_controller = FluorescenceViewController(
+            fluorescence_enhancer, fluorescence_visualization_engine, file_dialog_factory
         )
 
-    @classmethod
-    def createInstance(
-        cls,
-        repository: ProbeRepository,
-        api: ProbeAPI,
-        imageController: ImageController,
-        propagator: ProbePropagator,
-        propagatorVisualizationEngine: VisualizationEngine,
-        stxmSimulator: STXMSimulator,
-        stxmVisualizationEngine: VisualizationEngine,
-        exposureAnalyzer: ExposureAnalyzer,
-        exposureVisualizationEngine: VisualizationEngine,
-        fluorescenceEnhancer: FluorescenceEnhancer,
-        fluorescenceVisualizationEngine: VisualizationEngine,
-        view: RepositoryTreeView,
-        fileDialogFactory: FileDialogFactory,
-    ) -> ProbeController:
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
-        treeModel = ProbeTreeModel(repository, api)
-        controller = cls(
-            repository,
-            api,
-            imageController,
-            propagator,
-            propagatorVisualizationEngine,
-            stxmSimulator,
-            stxmVisualizationEngine,
-            exposureAnalyzer,
-            exposureVisualizationEngine,
-            fluorescenceEnhancer,
-            fluorescenceVisualizationEngine,
-            view,
-            fileDialogFactory,
-            treeModel,
-        )
-        repository.addObserver(controller)
+        repository.add_observer(self)
 
-        builderListModel = QStringListModel()
-        builderListModel.setStringList([name for name in api.builderNames()])
-        builderItemDelegate = ComboBoxItemDelegate(builderListModel, view.treeView)
+        builder_list_model = QStringListModel()
+        builder_list_model.setStringList([name for name in api.builder_names()])
+        builder_item_delegate = ComboBoxItemDelegate(builder_list_model, view.tree_view)
 
-        view.treeView.setModel(treeModel)
-        view.treeView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        powerItemDelegate = ProgressBarItemDelegate(view.treeView)
-        view.treeView.setItemDelegateForColumn(1, powerItemDelegate)
-        view.treeView.setItemDelegateForColumn(2, builderItemDelegate)
-        view.treeView.selectionModel().currentChanged.connect(controller._updateView)
-        controller._updateView(QModelIndex(), QModelIndex())
+        view.tree_view.setModel(self._tree_model)
+        view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        power_item_delegate = ProgressBarItemDelegate(view.tree_view)
+        view.tree_view.setItemDelegateForColumn(1, power_item_delegate)
+        view.tree_view.setItemDelegateForColumn(2, builder_item_delegate)
+        view.tree_view.selectionModel().currentChanged.connect(self._update_view)
+        self._update_view(QModelIndex(), QModelIndex())
 
-        loadFromFileAction = view.buttonBox.loadMenu.addAction('Open File...')
-        loadFromFileAction.triggered.connect(controller._loadCurrentProbeFromFile)
+        load_from_file_action = view.button_box.load_menu.addAction('Open File...')
+        load_from_file_action.triggered.connect(self._load_current_probe_from_file)
 
-        copyAction = view.buttonBox.loadMenu.addAction('Copy...')
-        copyAction.triggered.connect(controller._copyToCurrentProbe)
+        copy_action = view.button_box.load_menu.addAction('Copy...')
+        copy_action.triggered.connect(self._copy_to_current_probe)
 
-        saveToFileAction = view.buttonBox.saveMenu.addAction('Save File...')
-        saveToFileAction.triggered.connect(controller._saveCurrentProbeToFile)
+        save_to_file_action = view.button_box.save_menu.addAction('Save File...')
+        save_to_file_action.triggered.connect(self._save_current_probe_to_file)
 
-        syncToSettingsAction = view.buttonBox.saveMenu.addAction('Sync To Settings')
-        syncToSettingsAction.triggered.connect(controller._syncCurrentProbeToSettings)
+        sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
+        sync_to_settings_action.triggered.connect(self._sync_current_probe_to_settings)
 
-        view.copierDialog.setWindowTitle('Copy Probe')
-        view.copierDialog.sourceComboBox.setModel(treeModel)
-        view.copierDialog.destinationComboBox.setModel(treeModel)
-        view.copierDialog.finished.connect(controller._finishCopyingProbe)
+        view.copier_dialog.setWindowTitle('Copy Probe')
+        view.copier_dialog.source_combo_box.setModel(self._tree_model)
+        view.copier_dialog.destination_combo_box.setModel(self._tree_model)
+        view.copier_dialog.finished.connect(self._finish_copying_probe)
 
-        view.buttonBox.editButton.clicked.connect(controller._editCurrentProbe)
+        view.button_box.edit_button.clicked.connect(self._edit_current_probe)
 
-        propagateAction = view.buttonBox.analyzeMenu.addAction('Propagate...')
-        propagateAction.triggered.connect(controller._propagateProbe)
+        propagate_action = view.button_box.analyze_menu.addAction('Propagate...')
+        propagate_action.triggered.connect(self._propagate_probe)
 
-        stxmAction = view.buttonBox.analyzeMenu.addAction('Simulate STXM...')
-        stxmAction.triggered.connect(controller._simulateSTXM)
+        stxm_action = view.button_box.analyze_menu.addAction('Simulate STXM...')
+        stxm_action.triggered.connect(self._simulate_stxm)
 
-        exposureAction = view.buttonBox.analyzeMenu.addAction('Exposure...')
-        exposureAction.triggered.connect(controller._analyzeExposure)
+        illumination_action = view.button_box.analyze_menu.addAction('Map Illumination...')
+        illumination_action.triggered.connect(self._map_illumination)
 
-        fluorescenceAction = view.buttonBox.analyzeMenu.addAction('Enhance Fluorescence...')
-        fluorescenceAction.triggered.connect(controller._enhanceFluorescence)
+        fluorescence_action = view.button_box.analyze_menu.addAction('Enhance Fluorescence...')
+        fluorescence_action.triggered.connect(self._enhance_fluorescence)
 
-        return controller
+    def _get_current_item_index(self) -> int:
+        model_index = self._view.tree_view.currentIndex()
 
-    def _getCurrentItemIndex(self) -> int:
-        modelIndex = self._view.treeView.currentIndex()
-
-        if modelIndex.isValid():
-            parent = modelIndex.parent()
+        if model_index.isValid():
+            parent = model_index.parent()
 
             while parent.isValid():
-                modelIndex = parent
-                parent = modelIndex.parent()
+                model_index = parent
+                parent = model_index.parent()
 
-            return modelIndex.row()
+            return model_index.row()
 
         logger.warning('No current index!')
         return -1
 
-    def _loadCurrentProbeFromFile(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
+    def _load_current_probe_from_file(self) -> None:
+        item_index = self._get_current_item_index()
 
-        if itemIndex < 0:
+        if item_index < 0:
             return
 
-        filePath, nameFilter = self._fileDialogFactory.getOpenFilePath(
+        file_path, name_filter = self._file_dialog_factory.get_open_file_path(
             self._view,
             'Open Probe',
-            nameFilters=self._api.getOpenFileFilterList(),
-            selectedNameFilter=self._api.getOpenFileFilter(),
+            name_filters=[nf for nf in self._api.get_open_file_filters()],
+            selected_name_filter=self._api.get_open_file_filter(),
         )
 
-        if filePath:
+        if file_path:
             try:
-                self._api.openProbe(itemIndex, filePath, fileType=nameFilter)
+                self._api.open_probe(item_index, file_path, file_type=name_filter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Reader', err)
+                ExceptionDialog.show_exception('File Reader', err)
 
-    def _copyToCurrentProbe(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
+    def _copy_to_current_probe(self) -> None:
+        item_index = self._get_current_item_index()
 
-        if itemIndex >= 0:
-            self._view.copierDialog.destinationComboBox.setCurrentIndex(itemIndex)
-            self._view.copierDialog.open()
+        if item_index >= 0:
+            self._view.copier_dialog.destination_combo_box.setCurrentIndex(item_index)
+            self._view.copier_dialog.open()
 
-    def _finishCopyingProbe(self, result: int) -> None:
+    def _finish_copying_probe(self, result: int) -> None:
         if result == QDialog.DialogCode.Accepted:
-            sourceIndex = self._view.copierDialog.sourceComboBox.currentIndex()
-            destinationIndex = self._view.copierDialog.destinationComboBox.currentIndex()
-            self._api.copyProbe(sourceIndex, destinationIndex)
+            source_index = self._view.copier_dialog.source_combo_box.currentIndex()
+            destination_index = self._view.copier_dialog.destination_combo_box.currentIndex()
+            self._api.copy_probe(source_index, destination_index)
 
-    def _editCurrentProbe(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
+    def _edit_current_probe(self) -> None:
+        item_index = self._get_current_item_index()
 
-        if itemIndex < 0:
+        if item_index < 0:
             return
 
-        itemName = self._repository.getName(itemIndex)
-        item = self._repository[itemIndex]
-        dialog = self._editorFactory.createEditorDialog(itemName, item, self._view)
+        item_name = self._repository.get_name(item_index)
+        item = self._repository[item_index]
+        dialog = self._editor_factory.create_editor_dialog(item_name, item, self._view)
         dialog.open()
 
-    def _saveCurrentProbeToFile(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
+    def _save_current_probe_to_file(self) -> None:
+        item_index = self._get_current_item_index()
 
-        if itemIndex < 0:
+        if item_index < 0:
             return
 
-        filePath, nameFilter = self._fileDialogFactory.getSaveFilePath(
+        file_path, name_filter = self._file_dialog_factory.get_save_file_path(
             self._view,
             'Save Probe',
-            nameFilters=self._api.getSaveFileFilterList(),
-            selectedNameFilter=self._api.getSaveFileFilter(),
+            name_filters=[nf for nf in self._api.get_save_file_filters()],
+            selected_name_filter=self._api.get_save_file_filter(),
         )
 
-        if filePath:
+        if file_path:
             try:
-                self._api.saveProbe(itemIndex, filePath, nameFilter)
+                self._api.save_probe(item_index, file_path, name_filter)
             except Exception as err:
                 logger.exception(err)
-                ExceptionDialog.showException('File Writer', err)
+                ExceptionDialog.show_exception('File Writer', err)
 
-    def _syncCurrentProbeToSettings(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
+    def _sync_current_probe_to_settings(self) -> None:
+        item_index = self._get_current_item_index()
 
-        if itemIndex < 0:
+        if item_index < 0:
             logger.warning('No current item!')
         else:
-            item = self._repository[itemIndex]
-            item.syncToSettings()
+            item = self._repository[item_index]
+            item.sync_to_settings()
 
-    def _propagateProbe(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
+    def _propagate_probe(self) -> None:
+        item_index = self._get_current_item_index()
 
-        if itemIndex < 0:
+        if item_index < 0:
             logger.warning('No current item!')
         else:
-            self._propagationViewController.launch(itemIndex)
+            self._propagation_view_controller.launch(item_index)
 
-    def _simulateSTXM(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
+    def _simulate_stxm(self) -> None:
+        item_index = self._get_current_item_index()
 
-        if itemIndex < 0:
+        if item_index < 0:
             logger.warning('No current item!')
         else:
-            self._stxmViewController.launch(itemIndex)
+            self._stxm_view_controller.simulate(item_index)
 
-    def _analyzeExposure(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
+    def _map_illumination(self) -> None:
+        item_index = self._get_current_item_index()
 
-        if itemIndex < 0:
+        if item_index < 0:
             logger.warning('No current item!')
         else:
-            self._exposureViewController.analyze(itemIndex)
+            self._illumination_view_controller.map(item_index)
 
-    def _enhanceFluorescence(self) -> None:
-        itemIndex = self._getCurrentItemIndex()
+    def _enhance_fluorescence(self) -> None:
+        item_index = self._get_current_item_index()
 
-        if itemIndex < 0:
+        if item_index < 0:
             logger.warning('No current item!')
         else:
-            self._fluorescenceViewController.launch(itemIndex)
+            self._fluorescence_view_controller.launch(item_index)
 
-    def _updateView(self, current: QModelIndex, previous: QModelIndex) -> None:
+    def _update_view(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()
-        self._view.buttonBox.loadButton.setEnabled(enabled)
-        self._view.buttonBox.saveButton.setEnabled(enabled)
-        self._view.buttonBox.editButton.setEnabled(enabled)
-        self._view.buttonBox.analyzeButton.setEnabled(enabled)
+        self._view.button_box.load_button.setEnabled(enabled)
+        self._view.button_box.save_button.setEnabled(enabled)
+        self._view.button_box.edit_button.setEnabled(enabled)
+        self._view.button_box.analyze_button.setEnabled(enabled)
 
-        itemIndex = self._getCurrentItemIndex()
+        item_index = self._get_current_item_index()
 
-        if itemIndex < 0:
-            self._imageController.clearArray()
+        if item_index < 0:
+            self._image_controller.clear_array()
         else:
             try:
-                item = self._repository[itemIndex]
+                item = self._repository[item_index]
             except IndexError:
                 logger.warning('Unable to access item for visualization!')
             else:
-                probe = item.getProbe()
+                probe = item.get_probes().get_probe_no_opr()  # TODO OPR
                 array = (
-                    probe.getMode(current.row())
+                    probe.get_incoherent_mode(current.row())
                     if current.parent().isValid()
-                    else probe.getModesFlattened()
+                    else probe.get_incoherent_modes_flattened()
                 )
-                self._imageController.setArray(array, probe.getPixelGeometry())
+                self._image_controller.set_array(array, probe.get_pixel_geometry())
 
-    def handleItemInserted(self, index: int, item: ProbeRepositoryItem) -> None:
-        self._treeModel.insertItem(index, item)
+    def handle_item_inserted(self, index: int, item: ProbeRepositoryItem) -> None:
+        self._tree_model.insert_item(index, item)
 
-    def handleItemChanged(self, index: int, item: ProbeRepositoryItem) -> None:
-        self._treeModel.updateItem(index, item)
+    def handle_item_changed(self, index: int, item: ProbeRepositoryItem) -> None:
+        self._tree_model.update_item(index, item)
 
-        if index == self._getCurrentItemIndex():
-            currentIndex = self._view.treeView.currentIndex()
-            self._updateView(currentIndex, currentIndex)
+        if index == self._get_current_item_index():
+            current_index = self._view.tree_view.currentIndex()
+            self._update_view(current_index, current_index)
 
-    def handleItemRemoved(self, index: int, item: ProbeRepositoryItem) -> None:
-        self._treeModel.removeItem(index, item)
+    def handle_item_removed(self, index: int, item: ProbeRepositoryItem) -> None:
+        self._tree_model.remove_item(index, item)

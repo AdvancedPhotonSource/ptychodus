@@ -3,13 +3,13 @@ from collections.abc import Sequence
 from enum import auto, IntEnum
 import logging
 
-import numpy
+import numpy.random
 import scipy.linalg
 
-from ptychodus.api.parametric import (
-    ParameterGroup,
-)
-from ptychodus.api.probe import Probe, WavefieldArrayType
+from ptychodus.api.parametric import ParameterGroup
+from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
+from ptychodus.api.propagator import intensity
+from ptychodus.api.typing import ComplexArrayType, RealArrayType
 
 from .settings import ProbeSettings
 
@@ -17,8 +17,20 @@ logger = logging.getLogger(__name__)
 
 
 class ProbeModeDecayType(IntEnum):
+    NONE = auto()
     POLYNOMIAL = auto()
     EXPONENTIAL = auto()
+
+    def get_weights(self, num_modes: int, decay_ratio: float) -> Sequence[float]:
+        match self.value:
+            case ProbeModeDecayType.EXPONENTIAL:
+                b = 1.0 + (1.0 - decay_ratio) / decay_ratio
+                return [b**-n for n in range(num_modes)]
+            case ProbeModeDecayType.POLYNOMIAL:
+                b = numpy.log(decay_ratio) / numpy.log(2.0)
+                return [(n + 1) ** b for n in range(num_modes)]
+            case _:
+                return [1.0] + [0.0] * (num_modes - 1)
 
 
 class MultimodalProbeBuilder(ParameterGroup):
@@ -27,108 +39,171 @@ class MultimodalProbeBuilder(ParameterGroup):
         self._rng = rng
         self._settings = settings
 
-        self.numberOfModes = settings.numberOfModes.copy()
-        self._addParameter('number_of_modes', self.numberOfModes)
+        self.num_incoherent_modes = settings.num_incoherent_modes.copy()
+        self._add_parameter('num_incoherent_modes', self.num_incoherent_modes)
 
-        self.modeDecayType = settings.modeDecayType.copy()
-        self._addParameter('mode_decay_type', self.modeDecayType)
+        self.orthogonalize_incoherent_modes = settings.orthogonalize_incoherent_modes.copy()
+        self._add_parameter('orthogonalize_incoherent_modes', self.orthogonalize_incoherent_modes)
 
-        self.modeDecayRatio = settings.modeDecayRatio.copy()
-        self._addParameter('mode_decay_ratio', self.modeDecayRatio)
+        self.incoherent_mode_decay_type = settings.incoherent_mode_decay_type.copy()
+        self._add_parameter('incoherent_mode_decay_type', self.incoherent_mode_decay_type)
 
-        self.isOrthogonalizeModesEnabled = settings.isOrthogonalizeModesEnabled.copy()
-        self._addParameter('orthogonalize_modes', self.isOrthogonalizeModesEnabled)
+        self.incoherent_mode_decay_ratio = settings.incoherent_mode_decay_ratio.copy()
+        self._add_parameter('incoherent_mode_decay_ratio', self.incoherent_mode_decay_ratio)
 
-    def syncToSettings(self) -> None:
+        self.num_coherent_modes = settings.num_coherent_modes.copy()
+        self._add_parameter('num_coherent_modes', self.num_coherent_modes)
+
+    def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
-            parameter.syncValueToParent()
+            parameter.sync_value_to_parent()
 
     def copy(self) -> MultimodalProbeBuilder:
         builder = MultimodalProbeBuilder(self._rng, self._settings)
 
         for key, value in self.parameters().items():
-            builder.parameters()[key].setValue(value.getValue())
+            builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
-    def _initializeModes(self, probe: WavefieldArrayType) -> WavefieldArrayType:
-        modeList: list[WavefieldArrayType] = list()
+    def _orthogonalize_incoherent_modes(self, array_in: ComplexArrayType) -> ComplexArrayType:
+        array_out = array_in.copy()
 
-        if probe.ndim == 2:
-            modeList.append(probe)
-        elif probe.ndim >= 3:
-            probe3D = probe
+        if array_in.shape[-3] > 1:
+            imodes_as_rows = array_in[0].reshape(array_in.shape[-3], -1)
+            imodes_as_cols = imodes_as_rows.T
 
-            while probe3D.ndim > 3:
-                probe3D = probe3D[0]
-
-            for mode in probe3D:
-                modeList.append(mode)
-        else:
-            raise ValueError('Probe array must contain at least two dimensions.')
-
-        for mode in range(self.numberOfModes.getValue() - 1):
-            # randomly shift the first mode
-            pw = probe.shape[-1]  # TODO clean up
-            variate1 = self._rng.uniform(size=(2, 1)) - 0.5
-            variate2 = (numpy.arange(0, pw) + 0.5) / pw - 0.5
-            ps = numpy.exp(-2j * numpy.pi * variate1 * variate2)
-            phaseShift = ps[0][numpy.newaxis] * ps[1][:, numpy.newaxis]
-            mode = modeList[0] * phaseShift
-            modeList.append(mode)
-
-        return numpy.stack(modeList)
-
-    def _orthogonalizeModes(self, probe: WavefieldArrayType) -> WavefieldArrayType:
-        probeModesAsRows = probe.reshape(probe.shape[-3], -1)
-        probeModesAsCols = probeModesAsRows.T
-        probeModesAsOrthoCols = scipy.linalg.orth(probeModesAsCols)
-        probeModesAsOrthoRows = probeModesAsOrthoCols.T
-        return probeModesAsOrthoRows.reshape(*probe.shape)
-
-    def _getModeWeights(self, totalNumberOfModes: int) -> Sequence[float]:
-        modeDecayTypeText = self.modeDecayType.getValue()
-        modeDecayRatio = self.modeDecayRatio.getValue()
-
-        if modeDecayRatio > 0.0:
             try:
-                modeDecayType = ProbeModeDecayType[modeDecayTypeText.upper()]
+                imodes_as_ortho_cols = scipy.linalg.orth(imodes_as_cols)
+            except ValueError as ex:
+                logger.exception(ex)
+                return array_in.copy()
+
+            imodes_as_ortho_rows = imodes_as_ortho_cols.T
+            imodes_ortho = imodes_as_ortho_rows.reshape(*array_in.shape)
+
+            array_out[0, :, :, :] = imodes_ortho
+
+        return array_out
+
+    def _get_imode_weights(self, num_imodes: int) -> Sequence[float]:
+        imode_decay_type_text = self.incoherent_mode_decay_type.get_value()
+        imode_decay_ratio = self.incoherent_mode_decay_ratio.get_value()
+        imode_decay_type = ProbeModeDecayType.NONE
+
+        if imode_decay_ratio > 0.0:
+            try:
+                imode_decay_type = ProbeModeDecayType[imode_decay_type_text.upper()]
             except KeyError:
-                modeDecayType = ProbeModeDecayType.POLYNOMIAL
+                logger.debug(f'Unknown probe mode decay type "{imode_decay_type_text}"')
 
-            if modeDecayType == ProbeModeDecayType.EXPONENTIAL:
-                b = 1.0 + (1.0 - modeDecayRatio) / modeDecayRatio
-                return [b**-n for n in range(totalNumberOfModes)]
+        return imode_decay_type.get_weights(num_imodes, imode_decay_ratio)
+
+    def _adjust_imode_power(self, array_in: ComplexArrayType, power: float) -> ComplexArrayType:
+        imode_weights = self._get_imode_weights(array_in.shape[-3])
+        array_out = array_in.copy()
+        it = iter(array_out[0])  # iterate incoherent modes
+
+        for weight in imode_weights:
+            imode = next(it)
+            ipower = numpy.sum(numpy.square(numpy.abs(imode)))
+            imode *= numpy.sqrt(weight * power / ipower)
+
+        return array_out
+
+    def _random_phase_shift_axis(self, size: int) -> ComplexArrayType:
+        a = self._rng.uniform() - 0.5
+        b = (size - 1 - 2 * numpy.arange(size)) / size
+        return numpy.exp(1j * numpy.pi * a * b)
+
+    def _init_modes(
+        self,
+        geometry_provider: ProbeGeometryProvider,
+        array_in: ComplexArrayType,
+        normalize_cmodes: bool = True,
+    ) -> ComplexArrayType:
+        assert array_in.ndim == 4
+        num_cmodes = self.num_coherent_modes.get_value()
+        num_imodes = self.num_incoherent_modes.get_value()
+        height = array_in.shape[-2]
+        width = array_in.shape[-1]
+
+        array_out = numpy.zeros((num_cmodes, num_imodes, height, width), array_in.dtype)
+
+        for cmode in range(num_cmodes):
+            if cmode < array_in.shape[0]:
+                # copy existing cmode
+                values = array_in[cmode, 0, :, :]
             else:
-                b = numpy.log(modeDecayRatio) / numpy.log(2.0)
-                return [(n + 1) ** b for n in range(totalNumberOfModes)]
+                # randomize new cmode
+                real = self._rng.normal(0.0, 1.0, size=(height, width))
+                imag = self._rng.normal(0.0, 1.0, size=(height, width))
+                values = real + 1j * imag
 
-        return [1.0] + [0.0] * (totalNumberOfModes - 1)
+                if normalize_cmodes:
+                    values /= numpy.sqrt(numpy.mean(intensity(values)))
 
-    def _adjustRelativePower(self, probe: WavefieldArrayType) -> WavefieldArrayType:
-        modeWeights = self._getModeWeights(probe.shape[-3])
-        power0 = numpy.sum(numpy.square(numpy.abs(probe[0, ...])))
-        adjustedProbe = probe.copy()
+            array_out[cmode, 0, :, :] = values
 
-        for modeIndex, weight in enumerate(modeWeights):
-            powerN = numpy.sum(numpy.square(numpy.abs(adjustedProbe[modeIndex, ...])))
-            adjustedProbe[modeIndex, ...] *= numpy.sqrt(weight * power0 / powerN)
+        for imode in range(num_imodes):
+            if imode < array_in.shape[1]:
+                # copy existing imode
+                values = array_in[0, imode, :, :]
+            else:
+                # apply random phase shift to first imode
+                first_imode = array_in[0, 0, :, :]
+                phase_shift_y = self._random_phase_shift_axis(height)
+                phase_shift_x = self._random_phase_shift_axis(width)
+                values = first_imode * numpy.outer(phase_shift_y, phase_shift_x)
 
-        return adjustedProbe
+            array_out[0, imode, :, :] = values
 
-    def build(self, probe: Probe) -> Probe:
-        if self.numberOfModes.getValue() <= 1:
-            return probe
+        if self.orthogonalize_incoherent_modes.get_value():
+            array_out = self._orthogonalize_incoherent_modes(array_out)
 
-        array = self._initializeModes(probe.array)
+        if geometry_provider.probe_photon_count > 0.0:
+            array_out = self._adjust_imode_power(array_out, geometry_provider.probe_photon_count)
 
-        if self.isOrthogonalizeModesEnabled.getValue():
-            array = self._orthogonalizeModes(array)
+        return array_out
 
-        array = self._adjustRelativePower(array)
+    def _init_opr_weights(
+        self, geometry_provider: ProbeGeometryProvider, small_value: float = 1.0e-6
+    ) -> RealArrayType | None:
+        num_scan_points = geometry_provider.num_scan_points
+        num_cmodes = self.num_coherent_modes.get_value()
+        opr_weights: RealArrayType | None = None
 
-        return Probe(
-            array,
-            pixelWidthInMeters=probe.pixelWidthInMeters,
-            pixelHeightInMeters=probe.pixelHeightInMeters,
+        if self.num_coherent_modes.get_value() > 1:
+            opr_weights = small_value * self._rng.normal(
+                0.0, 1.0, size=(num_scan_points, num_cmodes)
+            )
+            assert opr_weights is not None  # unnecessary but makes pylance less annoying
+            opr_weights[:, 0] = 1.0
+
+        return opr_weights
+
+    def set_identity(self) -> None:
+        self.num_coherent_modes.set_value(1)
+        self.num_incoherent_modes.set_value(1)
+
+    def build(
+        self, probes: ProbeSequence, geometry_provider: ProbeGeometryProvider
+    ) -> ProbeSequence:
+        if self.num_coherent_modes.get_value() <= 1 and self.num_incoherent_modes.get_value() <= 1:
+            return probes
+
+        array = self._init_modes(geometry_provider, probes.get_array())
+
+        try:
+            opr_weights: RealArrayType | None = probes.get_opr_weights()
+        except ValueError:
+            opr_weights = self._init_opr_weights(geometry_provider)
+        else:
+            # TODO if opr_weights.shape[0] != num_scan_points: raise ValueError()
+            pass
+
+        return ProbeSequence(
+            array=array,
+            opr_weights=opr_weights,
+            pixel_geometry=probes.get_pixel_geometry(),
         )

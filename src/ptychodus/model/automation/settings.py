@@ -8,23 +8,21 @@ from ptychodus.api.settings import SettingsRegistry
 class AutomationSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._settingsGroup = registry.createGroup('Automation')
-        self._settingsGroup.addObserver(self)
+        self._group = registry.create_group('Automation')
+        self._group.add_observer(self)
 
-        self.strategy = self._settingsGroup.createStringParameter('Strategy', 'APS2ID')
-        self.dataDirectory = self._settingsGroup.createPathParameter(
+        self.strategy = self._group.create_string_parameter('Strategy', 'Autoload_Product')
+        self.data_directory = self._group.create_path_parameter(
             'DataDirectory', Path('/path/to/data')
         )
-        self.processingIntervalInSeconds = self._settingsGroup.createIntegerParameter(
+        self.processing_interval_s = self._group.create_integer_parameter(
             'ProcessingIntervalInSeconds', 0
         )
-        self.useWatchdogPollingObserver = self._settingsGroup.createBooleanParameter(
+        self.use_watchdog_polling_observer = self._group.create_boolean_parameter(
             'UseWatchdogPollingObserver', False
         )
-        self.watchdogDelayInSeconds = self._settingsGroup.createIntegerParameter(
-            'WatchdogDelayInSeconds', 15
-        )
+        self.watchdog_delay_s = self._group.create_integer_parameter('WatchdogDelayInSeconds', 15)
 
-    def update(self, observable: Observable) -> None:
-        if observable is self._settingsGroup:
-            self.notifyObservers()
+    def _update(self, observable: Observable) -> None:
+        if observable is self._group:
+            self.notify_observers()

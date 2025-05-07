@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ptychodus.api.visualization import RealArrayType
+from ptychodus.api.typing import RealArrayType
 
 from .visualization import VisualizationView
 from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
@@ -28,23 +28,23 @@ from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
 class ImageDisplayRangeDialog(QDialog):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.buttonBox = QDialogButtonBox()
-        self.minValueLineEdit = DecimalLineEdit.createInstance()
-        self.maxValueLineEdit = DecimalLineEdit.createInstance()
+        self.button_box = QDialogButtonBox()
+        self.min_value_line_edit = DecimalLineEdit.create_instance()
+        self.max_value_line_edit = DecimalLineEdit.create_instance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ImageDisplayRangeDialog:
+    def create_instance(cls, parent: QWidget | None = None) -> ImageDisplayRangeDialog:
         dialog = cls(parent)
         dialog.setWindowTitle('Set Display Range')
-        dialog.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
-        dialog.buttonBox.accepted.connect(dialog.accept)
-        dialog.buttonBox.addButton(QDialogButtonBox.StandardButton.Cancel)
-        dialog.buttonBox.rejected.connect(dialog.reject)
+        dialog.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
+        dialog.button_box.accepted.connect(dialog.accept)
+        dialog.button_box.addButton(QDialogButtonBox.StandardButton.Cancel)
+        dialog.button_box.rejected.connect(dialog.reject)
 
         layout = QFormLayout()
-        layout.addRow('Minimum Displayed Value:', dialog.minValueLineEdit)
-        layout.addRow('Maximum Displayed Value:', dialog.maxValueLineEdit)
-        layout.addRow(dialog.buttonBox)
+        layout.addRow('Minimum Displayed Value:', dialog.min_value_line_edit)
+        layout.addRow('Maximum Displayed Value:', dialog.max_value_line_edit)
+        layout.addRow(dialog.button_box)
         dialog.setLayout(layout)
 
         return dialog
@@ -53,48 +53,48 @@ class ImageDisplayRangeDialog(QDialog):
 class ImageToolsGroupBox(BottomTitledGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Tools', parent)
-        self.homeButton = QToolButton()
-        self.saveButton = QToolButton()
-        self.moveButton = QToolButton()
-        self.rulerButton = QToolButton()
-        self.rectangleButton = QToolButton()
-        self.lineCutButton = QToolButton()
+        self.home_button = QToolButton()
+        self.save_button = QToolButton()
+        self.move_button = QToolButton()
+        self.ruler_button = QToolButton()
+        self.rectangle_button = QToolButton()
+        self.line_cut_button = QToolButton()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ImageToolsGroupBox:
+    def create_instance(cls, parent: QWidget | None = None) -> ImageToolsGroupBox:
         view = cls(parent)
 
-        view.homeButton.setIcon(QIcon(':/icons/home'))
-        view.homeButton.setIconSize(QSize(32, 32))
-        view.homeButton.setToolTip('Home')
+        view.home_button.setIcon(QIcon(':/icons/home'))
+        view.home_button.setIconSize(QSize(32, 32))
+        view.home_button.setToolTip('Home')
 
-        view.saveButton.setIcon(QIcon(':/icons/save'))
-        view.saveButton.setIconSize(QSize(32, 32))
-        view.saveButton.setToolTip('Save Image')
+        view.save_button.setIcon(QIcon(':/icons/save'))
+        view.save_button.setIconSize(QSize(32, 32))
+        view.save_button.setToolTip('Save Image')
 
-        view.moveButton.setIcon(QIcon(':/icons/move'))
-        view.moveButton.setIconSize(QSize(32, 32))
-        view.moveButton.setToolTip('Move')
+        view.move_button.setIcon(QIcon(':/icons/move'))
+        view.move_button.setIconSize(QSize(32, 32))
+        view.move_button.setToolTip('Move')
 
-        view.rulerButton.setIcon(QIcon(':/icons/ruler'))
-        view.rulerButton.setIconSize(QSize(32, 32))
-        view.rulerButton.setToolTip('Ruler')
+        view.ruler_button.setIcon(QIcon(':/icons/ruler'))
+        view.ruler_button.setIconSize(QSize(32, 32))
+        view.ruler_button.setToolTip('Ruler')
 
-        view.rectangleButton.setIcon(QIcon(':/icons/rectangle'))
-        view.rectangleButton.setIconSize(QSize(32, 32))
-        view.rectangleButton.setToolTip('Rectangle')
+        view.rectangle_button.setIcon(QIcon(':/icons/rectangle'))
+        view.rectangle_button.setIconSize(QSize(32, 32))
+        view.rectangle_button.setToolTip('Rectangle')
 
-        view.lineCutButton.setIcon(QIcon(':/icons/line-cut'))
-        view.lineCutButton.setIconSize(QSize(32, 32))
-        view.lineCutButton.setToolTip('Line-Cut Profile')
+        view.line_cut_button.setIcon(QIcon(':/icons/line-cut'))
+        view.line_cut_button.setIconSize(QSize(32, 32))
+        view.line_cut_button.setToolTip('Line-Cut Profile')
 
         layout = QGridLayout()
-        layout.addWidget(view.homeButton, 0, 0)
-        layout.addWidget(view.saveButton, 0, 1)
-        layout.addWidget(view.moveButton, 0, 2)
-        layout.addWidget(view.rulerButton, 1, 0)
-        layout.addWidget(view.rectangleButton, 1, 1)
-        layout.addWidget(view.lineCutButton, 1, 2)
+        layout.addWidget(view.home_button, 0, 0)
+        layout.addWidget(view.save_button, 0, 1)
+        layout.addWidget(view.move_button, 0, 2)
+        layout.addWidget(view.ruler_button, 1, 0)
+        layout.addWidget(view.rectangle_button, 1, 1)
+        layout.addWidget(view.line_cut_button, 1, 2)
         view.setLayout(layout)
 
         view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
@@ -105,23 +105,23 @@ class ImageToolsGroupBox(BottomTitledGroupBox):
 class ImageRendererGroupBox(BottomTitledGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Colorize', parent)
-        self.rendererComboBox = QComboBox()
-        self.transformationComboBox = QComboBox()
-        self.variantComboBox = QComboBox()
+        self.renderer_combo_box = QComboBox()
+        self.transformation_combo_box = QComboBox()
+        self.variant_combo_box = QComboBox()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ImageRendererGroupBox:
+    def create_instance(cls, parent: QWidget | None = None) -> ImageRendererGroupBox:
         view = cls(parent)
 
-        view.rendererComboBox.setToolTip('Array Component')
-        view.transformationComboBox.setToolTip('Transformation')
-        view.variantComboBox.setToolTip('Variant')
+        view.renderer_combo_box.setToolTip('Array Component')
+        view.transformation_combo_box.setToolTip('Transformation')
+        view.variant_combo_box.setToolTip('Variant')
 
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 10, 10, 35)
-        layout.addWidget(view.rendererComboBox)
-        layout.addWidget(view.transformationComboBox)
-        layout.addWidget(view.variantComboBox)
+        layout.addWidget(view.renderer_combo_box)
+        layout.addWidget(view.transformation_combo_box)
+        layout.addWidget(view.variant_combo_box)
         view.setLayout(layout)
 
         view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
@@ -132,33 +132,33 @@ class ImageRendererGroupBox(BottomTitledGroupBox):
 class ImageDataRangeGroupBox(BottomTitledGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Data Range', parent)
-        self.minDisplayValueSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
-        self.maxDisplayValueSlider = DecimalSlider.createInstance(Qt.Orientation.Horizontal)
-        self.autoButton = QPushButton('Auto')
-        self.editButton = QPushButton('Edit')
-        self.colorLegendButton = QPushButton('Color Legend')
+        self.min_display_value_slider = DecimalSlider.create_instance(Qt.Orientation.Horizontal)
+        self.max_display_value_slider = DecimalSlider.create_instance(Qt.Orientation.Horizontal)
+        self.auto_button = QPushButton('Auto')
+        self.edit_button = QPushButton('Edit')
+        self.color_legend_button = QPushButton('Color Legend')
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ImageDataRangeGroupBox:
+    def create_instance(cls, parent: QWidget | None = None) -> ImageDataRangeGroupBox:
         view = cls(parent)
 
-        view.minDisplayValueSlider.setToolTip('Minimum Display Value')
-        view.maxDisplayValueSlider.setToolTip('Maximum Display Value')
-        view.autoButton.setToolTip('Rescale to Data Range')
-        view.editButton.setToolTip('Rescale to Custom Range')
-        view.colorLegendButton.setToolTip('Toggle Color Legend Visibility')
+        view.min_display_value_slider.setToolTip('Minimum Display Value')
+        view.max_display_value_slider.setToolTip('Maximum Display Value')
+        view.auto_button.setToolTip('Rescale to Data Range')
+        view.edit_button.setToolTip('Rescale to Custom Range')
+        view.color_legend_button.setToolTip('Toggle Color Legend Visibility')
 
-        buttonLayout = QHBoxLayout()
-        buttonLayout.setContentsMargins(0, 0, 0, 0)
-        buttonLayout.addWidget(view.autoButton)
-        buttonLayout.addWidget(view.editButton)
-        buttonLayout.addWidget(view.colorLegendButton)
+        button_layout = QHBoxLayout()
+        button_layout.setContentsMargins(0, 0, 0, 0)
+        button_layout.addWidget(view.auto_button)
+        button_layout.addWidget(view.edit_button)
+        button_layout.addWidget(view.color_legend_button)
 
         layout = QFormLayout()
         layout.setContentsMargins(10, 10, 10, 35)
-        layout.addRow('Min:', view.minDisplayValueSlider)
-        layout.addRow('Max:', view.maxDisplayValueSlider)
-        layout.addRow(buttonLayout)
+        layout.addRow('Min:', view.min_display_value_slider)
+        layout.addRow('Max:', view.max_display_value_slider)
+        layout.addRow(button_layout)
         view.setLayout(layout)
 
         view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
@@ -169,19 +169,19 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
 class ImageRibbon(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.imageToolsGroupBox = ImageToolsGroupBox.createInstance()
-        self.colormapGroupBox = ImageRendererGroupBox.createInstance()
-        self.dataRangeGroupBox = ImageDataRangeGroupBox.createInstance()
+        self.image_tools_group_box = ImageToolsGroupBox.create_instance()
+        self.colormap_group_box = ImageRendererGroupBox.create_instance()
+        self.data_range_group_box = ImageDataRangeGroupBox.create_instance()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ImageRibbon:
+    def create_instance(cls, parent: QWidget | None = None) -> ImageRibbon:
         view = cls(parent)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.imageToolsGroupBox)
-        layout.addWidget(view.colormapGroupBox)
-        layout.addWidget(view.dataRangeGroupBox)
+        layout.addWidget(view.image_tools_group_box)
+        layout.addWidget(view.colormap_group_box)
+        layout.addWidget(view.data_range_group_box)
         view.setLayout(layout)
 
         view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
@@ -192,118 +192,118 @@ class ImageRibbon(QWidget):
 class ImageWidget(VisualizationView):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._colorLegendMinValue = 0.0
-        self._colorLegendMaxValue = 1.0
-        self._colorLegendStopPoints: list[tuple[float, QColor]] = [
+        self._color_legend_min_value = 0.0
+        self._color_legend_max_value = 1.0
+        self._color_legend_stop_points: list[tuple[float, QColor]] = [
             (0.0, QColor(Qt.GlobalColor.green)),
             (0.5, QColor(Qt.GlobalColor.yellow)),
             (1.0, QColor(Qt.GlobalColor.red)),
         ]
-        self._colorLegendNumberOfTicks = 5  # TODO
-        self._isColorLegendVisible = False
-        self._isColorLegendCyclic = False
+        self._color_legend_num_ticks = 5  # TODO
+        self._is_color_legend_visible = False
+        self._is_color_legend_cyclic = False
 
-    def setColorLegendColors(
-        self, values: RealArrayType, rgbaArray: RealArrayType, isCyclic: bool
+    def set_color_legend_colors(
+        self, values: RealArrayType, rgba_array: RealArrayType, is_cyclic: bool
     ) -> None:
-        colorLegendStopPoints: list[tuple[float, QColor]] = list()
-        self._colorLegendMinValue = values.min()
-        self._colorLegendMaxValue = values.max()
+        color_legend_stop_points: list[tuple[float, QColor]] = list()
+        self._color_legend_min_value = values.min()
+        self._color_legend_max_value = values.max()
 
-        valueRange = self._colorLegendMaxValue - self._colorLegendMinValue
-        normalizedValues = (
-            (values - self._colorLegendMinValue) / valueRange
-            if valueRange > 0
+        value_range = self._color_legend_max_value - self._color_legend_min_value
+        normalized_values = (
+            (values - self._color_legend_min_value) / value_range
+            if value_range > 0
             else numpy.full_like(values, 0.5)
         )
 
-        for x, rgba in zip(normalizedValues.clip(0, 1), rgbaArray):
+        for x, rgba in zip(normalized_values.clip(0, 1), rgba_array):
             color = QColor()
             color.setRgbF(rgba[0], rgba[1], rgba[2], rgba[3])
-            colorLegendStopPoints.append((x, color))
+            color_legend_stop_points.append((x, color))
 
-        self._colorLegendStopPoints = colorLegendStopPoints
-        self._isColorLegendCyclic = isCyclic
+        self._color_legend_stop_points = color_legend_stop_points
+        self._is_color_legend_cyclic = is_cyclic
         self.scene().update()
 
-    def setColorLegendVisible(self, visible: bool) -> None:
-        self._isColorLegendVisible = visible
+    def set_color_legend_visible(self, visible: bool) -> None:
+        self._is_color_legend_visible = visible
         self.scene().update()
 
     @property
-    def _colorLegendTicks(self) -> Iterator[float]:
-        for tick in range(self._colorLegendNumberOfTicks):
-            a = tick / (self._colorLegendNumberOfTicks - 1)
-            yield (1.0 - a) * self._colorLegendMinValue + a * self._colorLegendMaxValue
+    def _color_legend_ticks(self) -> Iterator[float]:
+        for tick in range(self._color_legend_num_ticks):
+            a = tick / (self._color_legend_num_ticks - 1)
+            yield (1.0 - a) * self._color_legend_min_value + a * self._color_legend_max_value
 
-    def drawForeground(self, painter: QPainter, rect: QRectF) -> None:
-        if not self._isColorLegendVisible:
+    def drawForeground(self, painter: QPainter, rect: QRectF) -> None:  # noqa: N802
+        if not self._is_color_legend_visible:
             return
 
-        fgPainter = QPainter(self.viewport())
+        fg_painter = QPainter(self.viewport())
 
         pen = QPen()
         pen.setWidth(3)
-        fgPainter.setPen(pen)
+        fg_painter.setPen(pen)
 
-        fontMetrics = fgPainter.fontMetrics()
-        dx = fontMetrics.horizontalAdvance('m')
-        dy = fontMetrics.lineSpacing()
+        font_metrics = fg_painter.fontMetrics()
+        dx = font_metrics.horizontalAdvance('m')
+        dy = font_metrics.lineSpacing()
 
-        widgetRect = self.viewport().rect()
+        widget_rect = self.viewport().rect()
 
-        if self._isColorLegendCyclic:
-            legendDiameter = 6 * dx
-            legendMargin = 2 * dx
+        if self._is_color_legend_cyclic:
+            legend_diameter = 6 * dx
+            legend_margin = 2 * dx
 
-            legendRect = QRect(0, 0, legendDiameter, legendDiameter)
-            legendRect.moveRight(widgetRect.right() - legendMargin)
-            legendRect.moveBottom(widgetRect.height() - legendMargin)
+            legend_rect = QRect(0, 0, legend_diameter, legend_diameter)
+            legend_rect.moveRight(widget_rect.right() - legend_margin)
+            legend_rect.moveBottom(widget_rect.height() - legend_margin)
 
-            cgradient = QConicalGradient(legendRect.center(), 90.0)
-            cgradient.setStops(self._colorLegendStopPoints)
-            fgPainter.setBrush(cgradient)
-            fgPainter.drawEllipse(legendRect)
+            cgradient = QConicalGradient(legend_rect.center(), 90.0)
+            cgradient.setStops(self._color_legend_stop_points)
+            fg_painter.setBrush(cgradient)
+            fg_painter.drawEllipse(legend_rect)
         else:
-            tickLabels = [f'{tick:5g}' for tick in self._colorLegendTicks]
-            tickLabelWidth = max(fontMetrics.width(label) for label in tickLabels)
+            tick_labels = [f'{tick:5g}' for tick in self._color_legend_ticks]
+            tick_label_width = max(font_metrics.width(label) for label in tick_labels)
 
-            legendWidth = 2 * dx
-            legendHeight = (2 * len(tickLabels) - 1) * dy
-            legendMargin = tickLabelWidth + 2 * dx
+            legend_width = 2 * dx
+            legend_height = (2 * len(tick_labels) - 1) * dy
+            legend_margin = tick_label_width + 2 * dx
 
-            legendRect = QRect(0, 0, legendWidth, legendHeight)
-            legendRect.moveRight(widgetRect.right() - legendMargin)
-            legendRect.moveTop((widgetRect.height() - legendHeight) // 2)
+            legend_rect = QRect(0, 0, legend_width, legend_height)
+            legend_rect.moveRight(widget_rect.right() - legend_margin)
+            legend_rect.moveTop((widget_rect.height() - legend_height) // 2)
 
-            lgradient = QLinearGradient(legendRect.bottomLeft(), legendRect.topLeft())
-            lgradient.setStops(self._colorLegendStopPoints)
-            fgPainter.setBrush(lgradient)
-            fgPainter.drawRect(legendRect)
+            lgradient = QLinearGradient(legend_rect.bottomLeft(), legend_rect.topLeft())
+            lgradient.setStops(self._color_legend_stop_points)
+            fg_painter.setBrush(lgradient)
+            fg_painter.drawRect(legend_rect)
 
-            tickX0 = legendRect.right() + dx
-            tickY0 = legendRect.bottom() + fontMetrics.strikeOutPos()
+            tick_x0 = legend_rect.right() + dx
+            tick_y0 = legend_rect.bottom() + font_metrics.strikeOutPos()
 
-            for tickIndex, tickLabel in enumerate(tickLabels):
-                tickDY = (tickIndex * legendRect.height()) // (len(tickLabels) - 1)
-                viewportPoint = QPoint(tickX0, tickY0 - tickDY)
-                fgPainter.drawText(viewportPoint, tickLabel)
+            for tick_index, tick_label in enumerate(tick_labels):
+                tick_dy = (tick_index * legend_rect.height()) // (len(tick_labels) - 1)
+                viewport_point = QPoint(tick_x0, tick_y0 - tick_dy)
+                fg_painter.drawText(viewport_point, tick_label)
 
 
 class ImageView(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.imageRibbon = ImageRibbon.createInstance()
-        self.imageWidget = ImageWidget()
+        self.image_ribbon = ImageRibbon.create_instance()
+        self.image_widget = ImageWidget()
 
     @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ImageView:
+    def create_instance(cls, parent: QWidget | None = None) -> ImageView:
         view = cls(parent)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setMenuBar(view.imageRibbon)
-        layout.addWidget(view.imageWidget)
+        layout.setMenuBar(view.image_ribbon)
+        layout.addWidget(view.image_widget)
         view.setLayout(layout)
 
         view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from PyQt5.QtWidgets import (
     QComboBox,
     QDialog,
@@ -22,106 +20,81 @@ from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as Navigation
 from matplotlib.figure import Figure
 
 
-class ReconstructorView(QGroupBox):
-    def __init__(self, parent: QWidget | None) -> None:
+class ReconstructorParametersView(QGroupBox):
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Parameters', parent)
-        self.algorithmComboBox = QComboBox()
-        self.productComboBox = QComboBox()
-        self.modelButton = QPushButton('Model')
-        self.modelMenu = QMenu()
-        self.trainerButton = QPushButton('Trainer')
-        self.trainerMenu = QMenu()
-        self.reconstructorButton = QPushButton('Reconstructor')
-        self.reconstructorMenu = QMenu()
+        self.algorithm_combo_box = QComboBox()
+        self.product_combo_box = QComboBox()
 
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ReconstructorView:
-        view = cls(parent)
+        self.reconstructor_menu = QMenu()
+        self.reconstructor_button = QPushButton('Reconstructor')
+        self.reconstructor_button.setMenu(self.reconstructor_menu)
 
-        view.modelButton.setMenu(view.modelMenu)
-        view.trainerButton.setMenu(view.trainerMenu)
-        view.reconstructorButton.setMenu(view.reconstructorMenu)
+        self.trainer_menu = QMenu()
+        self.trainer_button = QPushButton('Trainer')
+        self.trainer_button.setMenu(self.trainer_menu)
 
-        actionLayout = QHBoxLayout()
-        actionLayout.setContentsMargins(0, 0, 0, 0)
-        actionLayout.addWidget(view.modelButton)
-        actionLayout.addWidget(view.trainerButton)
-        actionLayout.addWidget(view.reconstructorButton)
+        action_layout = QHBoxLayout()
+        action_layout.setContentsMargins(0, 0, 0, 0)
+        action_layout.addWidget(self.reconstructor_button)
+        action_layout.addWidget(self.trainer_button)
 
         layout = QFormLayout()
-        layout.addRow('Algorithm:', view.algorithmComboBox)
-        layout.addRow('Product:', view.productComboBox)
-        layout.addRow('Action:', actionLayout)
-        view.setLayout(layout)
-
-        return view
+        layout.addRow('Algorithm:', self.algorithm_combo_box)
+        layout.addRow('Product:', self.product_combo_box)
+        layout.addRow('Action:', action_layout)
+        self.setLayout(layout)
 
 
 class ReconstructorProgressDialog(QDialog):
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.textEdit = QPlainTextEdit()
-        self.progressBar = QProgressBar()
-        self.buttonBox = QDialogButtonBox()
+        self.text_edit = QPlainTextEdit()
+        self.progress_bar = QProgressBar()
+        self.button_box = QDialogButtonBox()
 
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ReconstructorProgressDialog:
-        dialog = cls(parent)
-        dialog.setWindowTitle('Reconstruction Progress')
-        dialog.buttonBox.addButton(QDialogButtonBox.Ok)
-        dialog.buttonBox.accepted.connect(dialog.accept)
-        dialog.buttonBox.addButton(QDialogButtonBox.Cancel)
-        dialog.buttonBox.rejected.connect(dialog.reject)
+        self.setWindowTitle('Reconstruction Progress')
+        self.button_box.addButton(QDialogButtonBox.Ok)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.addButton(QDialogButtonBox.Cancel)
+        self.button_box.rejected.connect(self.reject)
 
         layout = QVBoxLayout()
-        layout.addWidget(dialog.textEdit)
-        layout.addWidget(dialog.progressBar)
-        layout.addWidget(dialog.buttonBox)
-        dialog.setLayout(layout)
-
-        return dialog
+        layout.addWidget(self.text_edit)
+        layout.addWidget(self.progress_bar)
+        layout.addWidget(self.button_box)
+        self.setLayout(layout)
 
 
-class ReconstructorParametersView(QWidget):
-    def __init__(self, parent: QWidget | None) -> None:
+class ReconstructorView(QWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.reconstructorView = ReconstructorView.createInstance()
-        self.stackedWidget = QStackedWidget()
-        self.scrollArea = QScrollArea()
-        self.progressDialog = ReconstructorProgressDialog.createInstance()  # TODO use this
+        self.parameters_view = ReconstructorParametersView()
 
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ReconstructorParametersView:
-        view = cls(parent)
+        self.stacked_widget = QStackedWidget()
+        self.stacked_widget.layout().setContentsMargins(0, 0, 0, 0)
 
-        view.scrollArea.setWidgetResizable(True)
-        view.scrollArea.setWidget(view.stackedWidget)
-
-        view.stackedWidget.layout().setContentsMargins(0, 0, 0, 0)
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setWidget(self.stacked_widget)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.reconstructorView)
-        layout.addWidget(view.scrollArea)
-        view.setLayout(layout)
+        layout.addWidget(self.parameters_view)
+        layout.addWidget(self.scroll_area)
+        self.setLayout(layout)
 
-        return view
+        self.progress_dialog = ReconstructorProgressDialog()
 
 
 class ReconstructorPlotView(QWidget):
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.figure = Figure()
-        self.figureCanvas = FigureCanvasQTAgg(self.figure)
-        self.navigationToolbar = NavigationToolbar(self.figureCanvas, self)
+        self.figure_canvas = FigureCanvasQTAgg(self.figure)
+        self.navigation_toolbar = NavigationToolbar(self.figure_canvas, self)
         self.axes = self.figure.add_subplot(111)
 
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> ReconstructorPlotView:
-        view = cls(parent)
-
         layout = QVBoxLayout()
-        layout.addWidget(view.navigationToolbar)
-        layout.addWidget(view.figureCanvas)
-        view.setLayout(layout)
-
-        return view
+        layout.addWidget(self.navigation_toolbar)
+        layout.addWidget(self.figure_canvas)
+        self.setLayout(layout)

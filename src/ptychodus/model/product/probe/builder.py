@@ -9,11 +9,11 @@ import numpy.typing
 
 from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.probe import (
-    Probe,
+    ProbeSequence,
     ProbeFileReader,
     ProbeGeometry,
     ProbeGeometryProvider,
-    WavefieldArrayType,
+    ComplexArrayType,
 )
 from ptychodus.api.typing import RealArrayType
 
@@ -24,55 +24,55 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ProbeTransverseCoordinates:
-    positionXInMeters: RealArrayType
-    positionYInMeters: RealArrayType
+    position_x_m: RealArrayType
+    position_y_m: RealArrayType
 
     @property
-    def positionRInMeters(self) -> RealArrayType:
-        return numpy.hypot(self.positionXInMeters, self.positionYInMeters)
+    def position_r_m(self) -> RealArrayType:
+        return numpy.hypot(self.position_x_m, self.position_y_m)
 
 
-class ProbeBuilder(ParameterGroup):
+class ProbeSequenceBuilder(ParameterGroup):
     def __init__(self, settings: ProbeSettings, name: str) -> None:
         super().__init__()
         self._name = settings.builder.copy()
-        self._name.setValue(name)
-        self._addParameter('name', self._name)
+        self._name.set_value(name)
+        self._add_parameter('name', self._name)
 
-    def getTransverseCoordinates(self, geometry: ProbeGeometry) -> ProbeTransverseCoordinates:
-        Y, X = numpy.mgrid[: geometry.heightInPixels, : geometry.widthInPixels]
-        positionXInPixels = X - (geometry.widthInPixels - 1) / 2
-        positionYInPixels = Y - (geometry.heightInPixels - 1) / 2
+    def get_transverse_coordinates(self, geometry: ProbeGeometry) -> ProbeTransverseCoordinates:
+        Y, X = numpy.mgrid[: geometry.height_px, : geometry.width_px]  # noqa: N806
+        position_x_px = X - (geometry.width_px - 1) / 2
+        position_y_px = Y - (geometry.height_px - 1) / 2
 
-        positionXInMeters = positionXInPixels * geometry.pixelWidthInMeters
-        positionYInMeters = positionYInPixels * geometry.pixelHeightInMeters
+        position_x_m = position_x_px * geometry.pixel_width_m
+        position_y_m = position_y_px * geometry.pixel_height_m
 
         return ProbeTransverseCoordinates(
-            positionXInMeters=positionXInMeters,
-            positionYInMeters=positionYInMeters,
+            position_x_m=position_x_m,
+            position_y_m=position_y_m,
         )
 
-    def normalize(self, array: WavefieldArrayType) -> WavefieldArrayType:
-        return array / numpy.sqrt(numpy.sum(numpy.abs(array) ** 2))
+    def normalize(self, array: ComplexArrayType) -> ComplexArrayType:
+        return array / numpy.sqrt(numpy.sum(numpy.square(numpy.abs(array))))
 
-    def getName(self) -> str:
-        return self._name.getValue()
+    def get_name(self) -> str:
+        return self._name.get_value()
 
-    def syncToSettings(self) -> None:
+    def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
-            parameter.syncValueToParent()
+            parameter.sync_value_to_parent()
 
     @abstractmethod
-    def copy(self) -> ProbeBuilder:
+    def copy(self) -> ProbeSequenceBuilder:
         pass
 
     @abstractmethod
-    def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
+    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
         pass
 
 
-class FromMemoryProbeBuilder(ProbeBuilder):
-    def __init__(self, settings: ProbeSettings, probe: Probe) -> None:
+class FromMemoryProbeBuilder(ProbeSequenceBuilder):
+    def __init__(self, settings: ProbeSettings, probe: ProbeSequence) -> None:
         super().__init__(settings, 'from_memory')
         self._settings = settings
         self._probe = probe.copy()
@@ -80,37 +80,57 @@ class FromMemoryProbeBuilder(ProbeBuilder):
     def copy(self) -> FromMemoryProbeBuilder:
         return FromMemoryProbeBuilder(self._settings, self._probe)
 
-    def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
+    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
         return self._probe
 
 
-class FromFileProbeBuilder(ProbeBuilder):
+class FromFileProbeBuilder(ProbeSequenceBuilder):
     def __init__(
-        self, settings: ProbeSettings, filePath: Path, fileType: str, fileReader: ProbeFileReader
+        self, settings: ProbeSettings, file_path: Path, file_type: str, file_reader: ProbeFileReader
     ) -> None:
         super().__init__(settings, 'from_file')
         self._settings = settings
-        self.filePath = settings.filePath.copy()
-        self.filePath.setValue(filePath)
-        self._addParameter('file_path', self.filePath)
-        self.fileType = settings.fileType.copy()
-        self.fileType.setValue(fileType)
-        self._addParameter('file_type', self.fileType)
-        self._fileReader = fileReader
+        self.file_path = settings.file_path.copy()
+        self.file_path.set_value(file_path)
+        self._add_parameter('file_path', self.file_path)
+        self.file_type = settings.file_type.copy()
+        self.file_type.set_value(file_type)
+        self._add_parameter('file_type', self.file_type)
+        self._file_reader = file_reader
 
     def copy(self) -> FromFileProbeBuilder:
         return FromFileProbeBuilder(
-            self._settings, self.filePath.getValue(), self.fileType.getValue(), self._fileReader
+            self._settings,
+            self.file_path.get_value(),
+            self.file_type.get_value(),
+            self._file_reader,
         )
 
-    def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
-        filePath = self.filePath.getValue()
-        fileType = self.fileType.getValue()
-        logger.debug(f'Reading "{filePath}" as "{fileType}"')
+    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+        file_path = self.file_path.get_value()
+        file_type = self.file_type.get_value()
+        logger.debug(f'Reading "{file_path}" as "{file_type}"')
 
         try:
-            probe = self._fileReader.read(filePath)
+            probe_from_file = self._file_reader.read(file_path)
         except Exception as exc:
-            raise RuntimeError(f'Failed to read "{filePath}"') from exc
+            raise RuntimeError(f'Failed to read "{file_path}"') from exc
 
-        return probe
+        probe_geometry = geometry_provider.get_probe_geometry()
+
+        try:
+            pixel_geometry = probe_from_file.get_pixel_geometry()
+        except ValueError:
+            pixel_geometry = probe_geometry.get_pixel_geometry()
+
+        try:
+            opr_weights = probe_from_file.get_opr_weights()
+        except ValueError:
+            opr_weights = None
+
+        # TODO regrid probe as needed based on probe geometry from file/provider
+        return ProbeSequence(
+            probe_from_file.get_array(),
+            opr_weights,
+            pixel_geometry,
+        )

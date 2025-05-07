@@ -16,17 +16,17 @@ class GridDataUpscaling(UpscalingStrategy):
         self._method = method
 
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
-        objectGeometry = product.object_.getGeometry()
-        scanCoordinatesInPixels: list[float] = list()
+        object_geometry = product.object_.get_geometry()
+        scan_coords_px: list[float] = list()
 
-        for scanPoint in product.scan:
-            objectPoint = objectGeometry.mapScanPointToObjectPoint(scanPoint)
-            scanCoordinatesInPixels.append(objectPoint.positionYInPixels)
-            scanCoordinatesInPixels.append(objectPoint.positionXInPixels)
+        for scan_point in product.positions:
+            object_point = object_geometry.map_scan_point_to_object_point(scan_point)
+            scan_coords_px.append(object_point.position_y_px)
+            scan_coords_px.append(object_point.position_x_px)
 
-        points = numpy.reshape(scanCoordinatesInPixels, (-1, 2))
+        points = numpy.reshape(scan_coords_px, (-1, 2))
         values = emap.counts_per_second.flat
-        YY, XX = numpy.mgrid[: objectGeometry.heightInPixels, : objectGeometry.widthInPixels]
+        YY, XX = numpy.mgrid[: object_geometry.height_px, : object_geometry.width_px]  # noqa: N806
         query_points = numpy.transpose((YY.flat, XX.flat))
 
         cps = griddata(points, values, query_points, method=self._method, fill_value=0.0).reshape(
@@ -51,77 +51,77 @@ class RadialBasisFunctionUpscaling(UpscalingStrategy):
         self._degree = degree
 
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
-        objectGeometry = product.object_.getGeometry()
-        scanCoordinatesInPixels: list[float] = list()
+        object_geometry = product.object_.get_geometry()
+        scan_coords_px: list[float] = list()
 
-        for scanPoint in product.scan:
-            objectPoint = objectGeometry.mapScanPointToObjectPoint(scanPoint)
-            scanCoordinatesInPixels.append(objectPoint.positionYInPixels)
-            scanCoordinatesInPixels.append(objectPoint.positionXInPixels)
+        for scan_point in product.positions:
+            object_point = object_geometry.map_scan_point_to_object_point(scan_point)
+            scan_coords_px.append(object_point.position_y_px)
+            scan_coords_px.append(object_point.position_x_px)
 
         interpolator = RBFInterpolator(
-            numpy.reshape(scanCoordinatesInPixels, (-1, 2)),
+            numpy.reshape(scan_coords_px, (-1, 2)),
             emap.counts_per_second.flat,
             kernel=self._kernel,
             neighbors=self._neighbors,
             epsilon=self._epsilon,
             degree=self._degree,
         )
-        YY, XX = numpy.mgrid[: objectGeometry.heightInPixels, : objectGeometry.widthInPixels]
+        YY, XX = numpy.mgrid[: object_geometry.height_px, : object_geometry.width_px]  # noqa: N806
         cps = interpolator(numpy.transpose((YY.flat, XX.flat)))
         return ElementMap(emap.name, cps.astype(emap.counts_per_second.dtype).reshape(XX.shape))
 
 
-def registerPlugins(registry: PluginRegistry) -> None:
+def register_plugins(registry: PluginRegistry) -> None:
     # TODO natural neighbor
     # TODO kriging
     # TODO inverse distance weighting
 
-    registry.upscalingStrategies.registerPlugin(
+    registry.upscaling_strategies.register_plugin(
         IdentityUpscaling(),
-        displayName='Identity',
+        display_name='Identity',
     )
-    registry.upscalingStrategies.registerPlugin(
+    registry.upscaling_strategies.register_plugin(
         GridDataUpscaling('nearest'),
-        displayName='Nearest Neighbor',
+        display_name='Nearest Neighbor',
     )
-    registry.upscalingStrategies.registerPlugin(
+    registry.upscaling_strategies.register_plugin(
         GridDataUpscaling('linear'),
-        displayName='Linear',
+        display_name='Linear',
     )
-    registry.upscalingStrategies.registerPlugin(
+    registry.upscaling_strategies.register_plugin(
         GridDataUpscaling('cubic'),
-        displayName='Cubic',
+        display_name='Cubic',
     )
-    registry.upscalingStrategies.registerPlugin(
+    registry.upscaling_strategies.register_plugin(
         RadialBasisFunctionUpscaling('linear'),
-        displayName='Linear RBF',
+        display_name='Linear RBF',
     )
-    registry.upscalingStrategies.registerPlugin(
+    registry.upscaling_strategies.register_plugin(
         RadialBasisFunctionUpscaling('thin_plate_spline'),
-        displayName='Thin Plate Spline RBF',
+        display_name='Thin Plate Spline RBF',
     )
-    registry.upscalingStrategies.registerPlugin(
+    registry.upscaling_strategies.register_plugin(
         RadialBasisFunctionUpscaling('cubic'),
-        displayName='Cubic RBF',
+        display_name='Cubic RBF',
     )
-    registry.upscalingStrategies.registerPlugin(
+    registry.upscaling_strategies.register_plugin(
         RadialBasisFunctionUpscaling('quintic'),
-        displayName='Quintic RBF',
+        display_name='Quintic RBF',
     )
-    registry.upscalingStrategies.registerPlugin(
+    registry.upscaling_strategies.register_plugin(
         RadialBasisFunctionUpscaling('multiquadric'),
-        displayName='Multiquadric RBF',
+        display_name='Multiquadric RBF',
     )
-    registry.upscalingStrategies.registerPlugin(
+    registry.upscaling_strategies.register_plugin(
         RadialBasisFunctionUpscaling('inverse_multiquadric'),
-        displayName='Inverse Multiquadric RBF',
+        display_name='Inverse Multiquadric RBF',
     )
-    registry.upscalingStrategies.registerPlugin(
+    registry.upscaling_strategies.register_plugin(
         RadialBasisFunctionUpscaling('inverse_quadratic'),
-        displayName='Inverse Quadratic RBF',
+        display_name='Inverse Quadratic RBF',
     )
-    registry.upscalingStrategies.registerPlugin(
+    registry.upscaling_strategies.register_plugin(
         RadialBasisFunctionUpscaling('gaussian'),
-        displayName='Gaussian RBF',
+        display_name='Gaussian RBF',
     )

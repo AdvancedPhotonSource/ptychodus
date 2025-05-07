@@ -1,5 +1,6 @@
 from __future__ import annotations
 from collections.abc import Iterator
+from importlib.metadata import version
 import logging
 
 from ptychodus.api.reconstructor import (
@@ -21,21 +22,21 @@ logger = logging.getLogger(__name__)
 
 
 class TikeReconstructorLibrary(ReconstructorLibrary):
-    def __init__(self, settingsRegistry: SettingsRegistry) -> None:
+    def __init__(self, settings_registry: SettingsRegistry) -> None:
         super().__init__()
-        self.settings = TikeSettings(settingsRegistry)
-        self.multigridSettings = TikeMultigridSettings(settingsRegistry)
-        self.positionCorrectionSettings = TikePositionCorrectionSettings(settingsRegistry)
-        self.probeCorrectionSettings = TikeProbeCorrectionSettings(settingsRegistry)
-        self.objectCorrectionSettings = TikeObjectCorrectionSettings(settingsRegistry)
+        self.settings = TikeSettings(settings_registry)
+        self.multigrid_settings = TikeMultigridSettings(settings_registry)
+        self.position_correction_settings = TikePositionCorrectionSettings(settings_registry)
+        self.probe_correction_settings = TikeProbeCorrectionSettings(settings_registry)
+        self.object_correction_settings = TikeObjectCorrectionSettings(settings_registry)
 
-        self.reconstructorList: list[Reconstructor] = list()
+        self.reconstructor_list: list[Reconstructor] = list()
 
     @classmethod
-    def createInstance(
-        cls, settingsRegistry: SettingsRegistry, isDeveloperModeEnabled: bool
+    def create_instance(
+        cls, settings_registry: SettingsRegistry, is_developer_mode_enabled: bool
     ) -> TikeReconstructorLibrary:
-        core = cls(settingsRegistry)
+        core = cls(settings_registry)
 
         try:
             from .reconstructor import IterativeLeastSquaresReconstructor
@@ -44,19 +45,22 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
         except ModuleNotFoundError:
             logger.info('Tike not found.')
 
-            if isDeveloperModeEnabled:
-                core.reconstructorList.append(NullReconstructor('rpie'))
-                core.reconstructorList.append(NullReconstructor('lstsq_grad'))
+            if is_developer_mode_enabled:
+                core.reconstructor_list.append(NullReconstructor('rpie'))
+                core.reconstructor_list.append(NullReconstructor('lstsq_grad'))
         else:
-            tikeReconstructor = TikeReconstructor(
+            tike_version = version('tike')
+            logger.info(f'Tike {tike_version}')
+
+            tike_reconstructor = TikeReconstructor(
                 core.settings,
-                core.multigridSettings,
-                core.positionCorrectionSettings,
-                core.probeCorrectionSettings,
-                core.objectCorrectionSettings,
+                core.multigrid_settings,
+                core.position_correction_settings,
+                core.probe_correction_settings,
+                core.object_correction_settings,
             )
-            core.reconstructorList.append(RegularizedPIEReconstructor(tikeReconstructor))
-            core.reconstructorList.append(IterativeLeastSquaresReconstructor(tikeReconstructor))
+            core.reconstructor_list.append(RegularizedPIEReconstructor(tike_reconstructor))
+            core.reconstructor_list.append(IterativeLeastSquaresReconstructor(tike_reconstructor))
 
         return core
 
@@ -64,5 +68,9 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
     def name(self) -> str:
         return 'Tike'
 
+    @property
+    def logger_name(self) -> str:
+        return 'tike'
+
     def __iter__(self) -> Iterator[Reconstructor]:
-        return iter(self.reconstructorList)
+        return iter(self.reconstructor_list)

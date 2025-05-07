@@ -5,17 +5,16 @@ import psutil
 
 @dataclass(frozen=True)
 class MemoryStatistics:
-    totalMemoryInBytes: int
-    availableMemoryInBytes: int
-    memoryUsagePercent: float
+    total_physical_memory_bytes: int
+    available_memory_bytes: int
+    percent_usage: float
 
 
 class MemoryPresenter:
-    def getStatistics(self) -> MemoryStatistics:
+    def get_statistics(self) -> MemoryStatistics:
         mem = psutil.virtual_memory()
-        stats = MemoryStatistics(
-            totalMemoryInBytes=mem.total,
-            availableMemoryInBytes=mem.available,
-            memoryUsagePercent=mem.percent,
+        return MemoryStatistics(
+            total_physical_memory_bytes=mem.total,
+            available_memory_bytes=mem.available,
+            percent_usage=mem.percent,
         )
-        return stats

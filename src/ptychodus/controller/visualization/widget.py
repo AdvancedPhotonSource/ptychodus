@@ -3,7 +3,7 @@ from __future__ import annotations
 from PyQt5.QtWidgets import QStatusBar
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.visualization import NumberArrayType
+from ptychodus.api.typing import NumberArrayType
 
 from ...model.visualization import VisualizationEngine
 from ...view.visualization import VisualizationWidget
@@ -16,23 +16,23 @@ class VisualizationWidgetController:
         self,
         engine: VisualizationEngine,
         widget: VisualizationWidget,
-        statusBar: QStatusBar,
-        fileDialogFactory: FileDialogFactory,
+        status_bar: QStatusBar,
+        file_dialog_factory: FileDialogFactory,
     ) -> None:
         self._widget = widget
-        self._controller = VisualizationController.createInstance(
-            engine, widget.visualizationView, statusBar, fileDialogFactory
+        self._controller = VisualizationController.create_instance(
+            engine, widget.visualization_view, status_bar, file_dialog_factory
         )
 
-        self._widget.homeAction.triggered.connect(self._controller.zoomToFit)
-        self._widget.saveAction.triggered.connect(self._controller.saveImage)
-        self._widget.autoscaleAction.triggered.connect(self._autoDisplayRange)
+        self._widget.home_action.triggered.connect(self._controller.zoom_to_fit)
+        self._widget.save_action.triggered.connect(self._controller.save_image)
+        self._widget.autoscale_action.triggered.connect(self._auto_display_range)
 
-    def _autoDisplayRange(self) -> None:
-        self._controller.rerenderImage(autoscaleColorAxis=True)
+    def _auto_display_range(self) -> None:
+        self._controller.rerender_image(autoscale_color_axis=True)
 
-    def setArray(self, array: NumberArrayType, pixelGeometry: PixelGeometry) -> None:
-        self._controller.setArray(array, pixelGeometry)
+    def set_array(self, array: NumberArrayType, pixel_geometry: PixelGeometry) -> None:
+        self._controller.set_array(array, pixel_geometry)
 
-    def clearArray(self) -> None:
-        self._controller.clearArray()
+    def clear_array(self) -> None:
+        self._controller.clear_array()

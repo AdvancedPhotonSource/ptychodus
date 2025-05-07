@@ -6,10 +6,10 @@ import numpy
 import numpy.typing
 import scipy.special
 
-from ptychodus.api.probe import Probe, ProbeGeometryProvider
+from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
 from ptychodus.api.typing import RealArrayType
 
-from .builder import ProbeBuilder
+from .builder import ProbeSequenceBuilder
 from .settings import ProbeSettings
 
 logger = logging.getLogger(__name__)
@@ -73,29 +73,29 @@ class ZernikePolynomial:
         return f'$Z_{{{self.radial_degree}}}^{{{self.angular_frequency:+d}}}$'
 
 
-class ZernikeProbeBuilder(ProbeBuilder):
+class ZernikeProbeBuilder(ProbeSequenceBuilder):
     def __init__(self, settings: ProbeSettings) -> None:
         super().__init__(settings, 'zernike')
         self._settings = settings
         self._polynomials: list[ZernikePolynomial] = list()
         self._order = 0
 
-        self.diameterInMeters = settings.diskDiameterInMeters.copy()
-        self._addParameter('diameter_m', self.diameterInMeters)
+        self.diameter_m = settings.disk_diameter_m.copy()
+        self._add_parameter('diameter_m', self.diameter_m)
 
         # TODO init zernike coefficients from settings
-        self.coefficients = self.createComplexArrayParameter('coefficients', [1 + 0j])
+        self.coefficients = self.create_complex_sequence_parameter('coefficients', [1 + 0j])
 
-        self.setOrder(1)
+        self.set_order(1)
 
     def copy(self) -> ZernikeProbeBuilder:
         builder = ZernikeProbeBuilder(self._settings)
-        builder.diameterInMeters.setValue(self.diameterInMeters.getValue())
-        builder.coefficients.setValue(self.coefficients.getValue())
-        builder.setOrder(self.getOrder())
+        builder.diameter_m.set_value(self.diameter_m.get_value())
+        builder.coefficients.set_value(self.coefficients.get_value())
+        builder.set_order(self.get_order())
         return builder
 
-    def setOrder(self, order: int) -> None:
+    def set_order(self, order: int) -> None:
         if order < 1:
             logger.warning('Order must be strictly positive!')
             return
@@ -114,42 +114,42 @@ class ZernikeProbeBuilder(ProbeBuilder):
         ncoef = len(self.coefficients)
 
         if ncoef < npoly:
-            coef = list(self.coefficients.getValue())
+            coef = list(self.coefficients.get_value())
             coef += [0j] * (npoly - ncoef)
-            self.coefficients.setValue(coef)
+            self.coefficients.set_value(coef)
 
         self._order = order
-        self.notifyObservers()
+        self.notify_observers()
 
-    def getOrder(self) -> int:
+    def get_order(self) -> int:
         return self._order
 
-    def setCoefficient(self, idx: int, value: complex) -> None:
+    def set_coefficient(self, idx: int, value: complex) -> None:
         self.coefficients[idx] = value
 
-    def getCoefficient(self, idx: int) -> complex:
+    def get_coefficient(self, idx: int) -> complex:
         return self.coefficients[idx]
 
-    def getPolynomial(self, idx: int) -> ZernikePolynomial:
+    def get_polynomial(self, idx: int) -> ZernikePolynomial:
         return self._polynomials[idx]
 
     def __len__(self) -> int:
         return min(len(self.coefficients), len(self._polynomials))
 
-    def build(self, geometryProvider: ProbeGeometryProvider) -> Probe:
-        geometry = geometryProvider.getProbeGeometry()
-        coords = self.getTransverseCoordinates(geometry)
+    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+        geometry = geometry_provider.get_probe_geometry()
+        coords = self.get_transverse_coordinates(geometry)
 
-        radius = self.diameterInMeters.getValue() / 2.0
-        distance = numpy.hypot(coords.positionYInMeters, coords.positionXInMeters) / radius
-        angle = numpy.arctan2(coords.positionYInMeters, coords.positionXInMeters)
+        radius = self.diameter_m.get_value() / 2.0
+        distance = numpy.hypot(coords.position_y_m, coords.position_x_m) / radius
+        angle = numpy.arctan2(coords.position_y_m, coords.position_x_m)
         array = numpy.zeros_like(distance, dtype=complex)
 
         for coef, poly in zip(self.coefficients, self._polynomials):
             array += numpy.multiply(coef, poly(distance, angle))
 
-        return Probe(
+        return ProbeSequence(
             array=self.normalize(array),
-            pixelWidthInMeters=geometry.pixelWidthInMeters,
-            pixelHeightInMeters=geometry.pixelHeightInMeters,
+            opr_weights=None,
+            pixel_geometry=geometry.get_pixel_geometry(),
         )

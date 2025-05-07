@@ -21,49 +21,49 @@ class AutomationDatasetRepository(Observable):
     def __init__(self, settings: AutomationSettings) -> None:
         super().__init__()
         self._settings = settings
-        self._fileList: list[Path] = list()
-        self._fileState: dict[Path, AutomationDatasetState] = dict()
+        self._file_list: list[Path] = list()
+        self._file_state: dict[Path, AutomationDatasetState] = dict()
         self._lock = threading.Lock()
-        self._changedEvent = threading.Event()
+        self._changed_event = threading.Event()
 
-    def put(self, filePath: Path, state: AutomationDatasetState) -> None:
+    def put(self, file_path: Path, state: AutomationDatasetState) -> None:
         with self._lock:
             try:
-                priorState = self._fileState[filePath]
+                prior_state = self._file_state[file_path]
             except KeyError:
                 if state == AutomationDatasetState.EXISTS:
-                    self._fileList.append(filePath)
-                    self._fileState[filePath] = state
+                    self._file_list.append(file_path)
+                    self._file_state[file_path] = state
                 else:
-                    logger.error(f'{filePath}: UNKNOWN -> {state}')
+                    logger.error(f'{file_path}: UNKNOWN -> {state}')
             else:
-                logger.debug(f'{filePath}: {priorState} -> {state}')
-                self._fileState[filePath] = state
+                logger.debug(f'{file_path}: {prior_state} -> {state}')
+                self._file_state[file_path] = state
 
-            self._changedEvent.set()
+            self._changed_event.set()
 
     def clear(self) -> None:
         with self._lock:
-            self._fileList.clear()
-            self._fileState.clear()
+            self._file_list.clear()
+            self._file_state.clear()
 
-            self._changedEvent.set()
+            self._changed_event.set()
 
-    def getLabel(self, index: int) -> str:
+    def get_label(self, index: int) -> str:
         with self._lock:
-            filePath = self._fileList[index]
-            return str(filePath.relative_to(self._settings.dataDirectory.getValue()))
+            file_path = self._file_list[index]
+            return str(file_path.relative_to(self._settings.data_directory.get_value()))
 
-    def getState(self, index: int) -> AutomationDatasetState:
+    def get_state(self, index: int) -> AutomationDatasetState:
         with self._lock:
-            filePath = self._fileList[index]
-            return self._fileState[filePath]
+            file_path = self._file_list[index]
+            return self._file_state[file_path]
 
     def __len__(self) -> int:
         with self._lock:
-            return len(self._fileList)
+            return len(self._file_list)
 
-    def notifyObserversIfRepositoryChanged(self) -> None:
-        if self._changedEvent.is_set():
-            self._changedEvent.clear()
-            self.notifyObservers()
+    def notify_observers_if_repository_changed(self) -> None:
+        if self._changed_event.is_set():
+            self._changed_event.clear()
+            self.notify_observers()

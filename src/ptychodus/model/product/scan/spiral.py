@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.scan import Scan, ScanPoint
+from ptychodus.api.scan import PositionSequence, ScanPoint
 
 from .builder import ScanBuilder
 from .settings import ScanSettings
@@ -15,40 +15,40 @@ class SpiralScanBuilder(ScanBuilder):
         super().__init__(settings, 'spiral')
         self._settings = settings
 
-        self.numberOfPoints = settings.numberOfPointsX.copy()
-        self.numberOfPoints.setValue(
-            settings.numberOfPointsX.getValue() * settings.numberOfPointsY.getValue()
+        self.num_points = settings.num_points_x.copy()
+        self.num_points.set_value(
+            settings.num_points_x.get_value() * settings.num_points_y.get_value()
         )
-        self._addParameter('number_of_points', self.numberOfPoints)
+        self._add_parameter('num_points', self.num_points)
 
-        self._numberOfPoints = settings.numberOfPointsY.copy()
-        self._numberOfPoints.setValue(1)
-        self._addParameter('_number_of_points', self._numberOfPoints)
+        self._num_points = settings.num_points_y.copy()
+        self._num_points.set_value(1)
+        self._add_parameter('_num_points', self._num_points)
 
-        self.radiusScalarInMeters = settings.radiusScalarInMeters.copy()
-        self._addParameter('radius_scalar_m', self.radiusScalarInMeters)
+        self.radius_scalar_m = settings.radius_scalar_m.copy()
+        self._add_parameter('radius_scalar_m', self.radius_scalar_m)
 
     def copy(self) -> SpiralScanBuilder:
         builder = SpiralScanBuilder(self._settings)
 
         for key, value in self.parameters().items():
-            builder.parameters()[key].setValue(value.getValue())
+            builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
-    def build(self) -> Scan:
-        pointList: list[ScanPoint] = list()
+    def build(self) -> PositionSequence:
+        point_list: list[ScanPoint] = list()
 
-        for index in range(self.numberOfPoints.getValue()):
-            radiusInMeters = self.radiusScalarInMeters.getValue() * numpy.sqrt(index)
-            divergenceAngleInRadians = (3.0 - numpy.sqrt(5)) * numpy.pi
-            thetaInRadians = divergenceAngleInRadians * index
+        for index in range(self.num_points.get_value()):
+            radius_m = self.radius_scalar_m.get_value() * numpy.sqrt(index)
+            divergence_angle_rad = (3.0 - numpy.sqrt(5)) * numpy.pi
+            theta_rad = divergence_angle_rad * index
 
             point = ScanPoint(
                 index=index,
-                positionXInMeters=radiusInMeters * numpy.cos(thetaInRadians),
-                positionYInMeters=radiusInMeters * numpy.sin(thetaInRadians),
+                position_x_m=radius_m * numpy.cos(theta_rad),
+                position_y_m=radius_m * numpy.sin(theta_rad),
             )
-            pointList.append(point)
+            point_list.append(point)
 
-        return Scan(pointList)
+        return PositionSequence(point_list)

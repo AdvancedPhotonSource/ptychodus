@@ -4,22 +4,16 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QAbstractButton,
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
-    QFormLayout,
-    QGridLayout,
     QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
-    QLineEdit,
     QPushButton,
-    QSpinBox,
-    QTableView,
     QTreeView,
     QVBoxLayout,
     QWidget,
-    QWizard,
     QWizardPage,
 )
 
@@ -32,272 +26,100 @@ class DetectorView(QGroupBox):
 class PatternsButtonBox(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.openButton = QPushButton('Open')
-        self.saveButton = QPushButton('Save')
-        self.infoButton = QPushButton('Info')
-        self.closeButton = QPushButton('Close')
+        self.open_button = QPushButton('Open')
+        self.save_button = QPushButton('Save')
+        self.info_button = QPushButton('Info')
+        self.close_button = QPushButton('Close')
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.openButton)
-        layout.addWidget(self.saveButton)
-        layout.addWidget(self.infoButton)
-        layout.addWidget(self.closeButton)
+        layout.addWidget(self.open_button)
+        layout.addWidget(self.save_button)
+        layout.addWidget(self.info_button)
+        layout.addWidget(self.close_button)
         self.setLayout(layout)
 
 
 class OpenDatasetWizardPage(QWizardPage):
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._isComplete = False
+        self._is_complete = False
 
-    def isComplete(self) -> bool:
-        return self._isComplete
+    def isComplete(self) -> bool:  # noqa: N802
+        """Overrides QWizardPage.isComplete()"""
+        return self._is_complete
 
-    def _setComplete(self, complete: bool) -> None:
-        if self._isComplete != complete:
-            self._isComplete = complete
+    def _set_complete(self, complete: bool) -> None:
+        if self._is_complete != complete:
+            self._is_complete = complete
             self.completeChanged.emit()
 
 
-class OpenDatasetWizardFilesPage(OpenDatasetWizardPage):
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__(parent)
-        self.directoryComboBox = QComboBox()
-        self.fileSystemTableView = QTableView()
-        self.fileTypeLabel = QLabel('Choose File Type:')
-        self.fileTypeComboBox = QComboBox()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> OpenDatasetWizardFilesPage:
-        view = cls(parent)
-        view.setTitle('Choose Dataset File(s)')
-
-        layout = QVBoxLayout()
-        layout.addWidget(view.directoryComboBox)
-        layout.addWidget(view.fileSystemTableView)
-        layout.addWidget(view.fileTypeLabel)
-        layout.addWidget(view.fileTypeComboBox)
-        view.setLayout(layout)
-
-        return view
-
-
 class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.detectorPixelCountCheckBox = QCheckBox('Detector Pixel Count')
-        self.detectorPixelSizeCheckBox = QCheckBox('Detector Pixel Size')
-        self.detectorBitDepthCheckBox = QCheckBox('Detector Bit Depth')
-        self.detectorDistanceCheckBox = QCheckBox('Detector Distance')
-        self.patternCropCenterCheckBox = QCheckBox('Pattern Crop Center')
-        self.patternCropExtentCheckBox = QCheckBox('Pattern Crop Extent')
-        self.probeEnergyCheckBox = QCheckBox('Probe Energy')
+        self.detector_extent_check_box = QCheckBox('Detector Extent')
+        self.detector_pixel_size_check_box = QCheckBox('Detector Pixel Size')
+        self.detector_bit_depth_check_box = QCheckBox('Detector Bit Depth')
+        self.detector_distance_check_box = QCheckBox('Detector Distance')
+        self.pattern_crop_center_check_box = QCheckBox('Pattern Crop Center')
+        self.pattern_crop_extent_check_box = QCheckBox('Pattern Crop Extent')
+        self.probe_photon_count_check_box = QCheckBox('Probe Photon Count')
+        self.probe_energy_check_box = QCheckBox('Probe Energy')
 
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> OpenDatasetWizardMetadataPage:
-        view = cls(parent)
-        view.setTitle('Import Metadata')
+        self.setTitle('Import Metadata')
 
         layout = QVBoxLayout()
-        layout.addWidget(view.detectorPixelCountCheckBox)
-        layout.addWidget(view.detectorPixelSizeCheckBox)
-        layout.addWidget(view.detectorBitDepthCheckBox)
-        layout.addWidget(view.detectorDistanceCheckBox)
-        layout.addWidget(view.patternCropCenterCheckBox)
-        layout.addWidget(view.patternCropExtentCheckBox)
-        layout.addWidget(view.probeEnergyCheckBox)
+        layout.addWidget(self.detector_extent_check_box)
+        layout.addWidget(self.detector_pixel_size_check_box)
+        layout.addWidget(self.detector_bit_depth_check_box)
+        layout.addWidget(self.detector_distance_check_box)
+        layout.addWidget(self.pattern_crop_center_check_box)
+        layout.addWidget(self.pattern_crop_extent_check_box)
+        layout.addWidget(self.probe_photon_count_check_box)
+        layout.addWidget(self.probe_energy_check_box)
         layout.addStretch()
-        view.setLayout(layout)
-
-        return view
-
-
-class OpenDatasetWizardPatternLoadView(QGroupBox):
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__('Load', parent)
-        self.numberOfThreadsSpinBox = QSpinBox()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> OpenDatasetWizardPatternLoadView:
-        view = cls(parent)
-
-        layout = QFormLayout()
-        layout.addRow('Number of Data Threads:', view.numberOfThreadsSpinBox)
-        view.setLayout(layout)
-
-        return view
-
-
-class OpenDatasetWizardPatternCropView(QGroupBox):
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__('Crop', parent)
-        self.centerLabel = QLabel('Center [px]:')
-        self.centerXSpinBox = QSpinBox()
-        self.centerYSpinBox = QSpinBox()
-        self.extentLabel = QLabel('Extent [px]:')
-        self.extentXSpinBox = QSpinBox()
-        self.extentYSpinBox = QSpinBox()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> OpenDatasetWizardPatternCropView:
-        view = cls(parent)
-
-        layout = QGridLayout()
-        layout.addWidget(view.centerLabel, 0, 0)
-        layout.addWidget(view.centerXSpinBox, 0, 1)
-        layout.addWidget(view.centerYSpinBox, 0, 2)
-        layout.addWidget(view.extentLabel, 1, 0)
-        layout.addWidget(view.extentXSpinBox, 1, 1)
-        layout.addWidget(view.extentYSpinBox, 1, 2)
-        layout.setColumnStretch(1, 1)
-        layout.setColumnStretch(2, 1)
-        view.setLayout(layout)
-
-        return view
-
-
-class OpenDatasetWizardPatternTransformView(QGroupBox):
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__('Transform', parent)
-        self.valueLowerBoundCheckBox = QCheckBox('Value Lower Bound:')
-        self.valueLowerBoundSpinBox = QSpinBox()
-        self.valueUpperBoundCheckBox = QCheckBox('Value Upper Bound:')
-        self.valueUpperBoundSpinBox = QSpinBox()
-        self.axesLabel = QLabel('Axes:')
-        self.flipXCheckBox = QCheckBox('Flip X')
-        self.flipYCheckBox = QCheckBox('Flip Y')
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> OpenDatasetWizardPatternTransformView:
-        view = cls(parent)
-
-        layout = QGridLayout()
-        layout.addWidget(view.valueLowerBoundCheckBox, 0, 0)
-        layout.addWidget(view.valueLowerBoundSpinBox, 0, 1, 1, 2)
-        layout.addWidget(view.valueUpperBoundCheckBox, 1, 0)
-        layout.addWidget(view.valueUpperBoundSpinBox, 1, 1, 1, 2)
-        layout.addWidget(view.axesLabel, 2, 0)
-        layout.addWidget(view.flipXCheckBox, 2, 1, Qt.AlignmentFlag.AlignHCenter)
-        layout.addWidget(view.flipYCheckBox, 2, 2, Qt.AlignmentFlag.AlignHCenter)
-        layout.setColumnStretch(2, 1)
-        layout.setColumnStretch(3, 1)
-        view.setLayout(layout)
-
-        return view
-
-
-class OpenDatasetWizardPatternMemoryMapView(QGroupBox):
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__('Memory Map Diffraction Data', parent)
-        self.scratchDirectoryLabel = QLabel('Scratch Directory:')
-        self.scratchDirectoryLineEdit = QLineEdit()
-        self.scratchDirectoryBrowseButton = QPushButton('Browse')
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> OpenDatasetWizardPatternMemoryMapView:
-        view = cls(parent)
-
-        layout = QGridLayout()
-        layout.addWidget(view.scratchDirectoryLabel, 1, 0)
-        layout.addWidget(view.scratchDirectoryLineEdit, 1, 1)
-        layout.addWidget(view.scratchDirectoryBrowseButton, 1, 2)
-        layout.setColumnStretch(1, 1)
-        view.setLayout(layout)
-
-        return view
-
-
-class OpenDatasetWizardPatternsPage(OpenDatasetWizardPage):
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__(parent)
-        self.loadView = OpenDatasetWizardPatternLoadView.createInstance()
-        self.memoryMapView = OpenDatasetWizardPatternMemoryMapView.createInstance()
-        self.cropView = OpenDatasetWizardPatternCropView.createInstance()
-        self.transformView = OpenDatasetWizardPatternTransformView.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> OpenDatasetWizardPatternsPage:
-        view = cls(parent)
-        view.setTitle('Pattern Processing')
-
-        layout = QVBoxLayout()
-        layout.addWidget(view.loadView)
-        layout.addWidget(view.memoryMapView)
-        layout.addWidget(view.cropView)
-        layout.addWidget(view.transformView)
-        layout.addStretch()
-        view.setLayout(layout)
-
-        return view
-
-
-class OpenDatasetWizard(QWizard):
-    def __init__(self, parent: QWidget | None) -> None:
-        super().__init__(parent)
-        self.filesPage = OpenDatasetWizardFilesPage.createInstance()
-        self.metadataPage = OpenDatasetWizardMetadataPage.createInstance()
-        self.patternsPage = OpenDatasetWizardPatternsPage.createInstance()
-
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> OpenDatasetWizard:
-        view = cls(parent)
-
-        view.setWindowTitle('Open Dataset')
-        view.addPage(view.filesPage)
-        view.addPage(view.metadataPage)
-        view.addPage(view.patternsPage)
-
-        return view
+        self.setLayout(layout)
 
 
 class PatternsInfoDialog(QDialog):
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.treeView = QTreeView()
-        self.buttonBox = QDialogButtonBox()
+        self.tree_view = QTreeView()
+        self.button_box = QDialogButtonBox()
 
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> PatternsInfoDialog:
-        view = cls(parent)
-        view.treeView.header().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        tree_header = self.tree_view.header()
+        tree_header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        tree_header.setSectionResizeMode(QHeaderView.ResizeToContents)
 
-        view.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
-        view.buttonBox.clicked.connect(view._handleButtonBoxClicked)
+        self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
+        self.button_box.clicked.connect(self._handle_button_box_clicked)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.treeView)
-        layout.addWidget(view.buttonBox)
-        view.setLayout(layout)
+        layout.addWidget(self.tree_view)
+        layout.addWidget(self.button_box)
+        self.setLayout(layout)
 
-        return view
-
-    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
+    def _handle_button_box_clicked(self, button: QAbstractButton) -> None:
+        if self.button_box.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
             self.accept()
         else:
             self.reject()
 
 
 class PatternsView(QWidget):
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.detectorView = DetectorView()
-        self.treeView = QTreeView()
-        self.infoLabel = QLabel()
-        self.buttonBox = PatternsButtonBox()
-        self.openDatasetWizard = OpenDatasetWizard.createInstance(self)
+        self.detector_view = DetectorView()
+        self.tree_view = QTreeView()
+        self.info_label = QLabel()
+        self.button_box = PatternsButtonBox()
 
-    @classmethod
-    def createInstance(cls, parent: QWidget | None = None) -> PatternsView:
-        view = cls(parent)
-        view.treeView.header().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.tree_view.header().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout = QVBoxLayout()
-        layout.addWidget(view.detectorView)
-        layout.addWidget(view.treeView)
-        layout.addWidget(view.infoLabel)
-        layout.addWidget(view.buttonBox)
-        view.setLayout(layout)
-
-        return view
+        layout.addWidget(self.detector_view)
+        layout.addWidget(self.tree_view)
+        layout.addWidget(self.info_label)
+        layout.addWidget(self.button_box)
+        self.setLayout(layout)

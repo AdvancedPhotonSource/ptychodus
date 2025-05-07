@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.scan import Scan, ScanPoint
+from ptychodus.api.scan import PositionSequence, ScanPoint
 
 from .builder import ScanBuilder
 from .settings import ScanSettings
@@ -15,48 +15,48 @@ class ConcentricScanBuilder(ScanBuilder):
         super().__init__(settings, 'concentric')
         self._settings = settings
 
-        self.radialStepSizeInMeters = settings.radialStepSizeInMeters.copy()
-        self._addParameter('radial_step_size_m', self.radialStepSizeInMeters)
+        self.radial_step_size_m = settings.radial_step_size_m.copy()
+        self._add_parameter('radial_step_size_m', self.radial_step_size_m)
 
-        self.numberOfShells = settings.numberOfShells.copy()
-        self._addParameter('number_of_shells', self.numberOfShells)
+        self.num_shells = settings.num_shells.copy()
+        self._add_parameter('num_shells', self.num_shells)
 
-        self.numberOfPointsInFirstShell = settings.numberOfPointsInFirstShell.copy()
-        self._addParameter('number_of_points_1st_shell', self.numberOfPointsInFirstShell)
+        self.num_points_1st_shell = settings.num_points_in_first_shell.copy()
+        self._add_parameter('num_points_1st_shell', self.num_points_1st_shell)
 
     def copy(self) -> ConcentricScanBuilder:
         builder = ConcentricScanBuilder(self._settings)
 
         for key, value in self.parameters().items():
-            builder.parameters()[key].setValue(value.getValue())
+            builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
     @property
-    def _numberOfPoints(self) -> int:
-        numberOfShells = self.numberOfShells.getValue()
-        triangle = (numberOfShells * (numberOfShells + 1)) // 2
-        return triangle * self.numberOfPointsInFirstShell.getValue()
+    def _num_points(self) -> int:
+        num_shells = self.num_shells.get_value()
+        triangle = (num_shells * (num_shells + 1)) // 2
+        return triangle * self.num_points_1st_shell.get_value()
 
-    def build(self) -> Scan:
-        pointList: list[ScanPoint] = list()
+    def build(self) -> PositionSequence:
+        point_list: list[ScanPoint] = list()
 
-        for index in range(self._numberOfPoints):
-            triangle = index // self.numberOfPointsInFirstShell.getValue()
-            shellIndex = int((1 + numpy.sqrt(1 + 8 * triangle)) / 2) - 1  # see OEIS A002024
-            shellTriangle = (shellIndex * (shellIndex + 1)) // 2
-            firstIndexInShell = self.numberOfPointsInFirstShell.getValue() * shellTriangle
-            pointIndexInShell = index - firstIndexInShell
+        for index in range(self._num_points):
+            triangle = index // self.num_points_1st_shell.get_value()
+            shell_index = int((1 + numpy.sqrt(1 + 8 * triangle)) / 2) - 1  # see OEIS A002024
+            shell_triangle = (shell_index * (shell_index + 1)) // 2
+            first_index_in_shell = self.num_points_1st_shell.get_value() * shell_triangle
+            point_index_in_shell = index - first_index_in_shell
 
-            radiusInMeters = self.radialStepSizeInMeters.getValue() * (shellIndex + 1)
-            numberOfPointsInShell = self.numberOfPointsInFirstShell.getValue() * (shellIndex + 1)
-            thetaInRadians = 2 * numpy.pi * pointIndexInShell / numberOfPointsInShell
+            radius_m = self.radial_step_size_m.get_value() * (shell_index + 1)
+            num_points_in_shell = self.num_points_1st_shell.get_value() * (shell_index + 1)
+            theta_rad = 2 * numpy.pi * point_index_in_shell / num_points_in_shell
 
             point = ScanPoint(
                 index=index,
-                positionXInMeters=radiusInMeters * numpy.cos(thetaInRadians),
-                positionYInMeters=radiusInMeters * numpy.sin(thetaInRadians),
+                position_x_m=radius_m * numpy.cos(theta_rad),
+                position_y_m=radius_m * numpy.sin(theta_rad),
             )
-            pointList.append(point)
+            point_list.append(point)
 
-        return Scan(pointList)
+        return PositionSequence(point_list)

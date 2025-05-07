@@ -20,46 +20,46 @@ from PyQt5.QtWidgets import (
 class RepositoryButtonBox(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.loadButton = QPushButton('Load')
-        self.loadMenu = QMenu()
-        self.saveButton = QPushButton('Save')
-        self.saveMenu = QMenu()
-        self.editButton = QPushButton('Edit')
-        self.analyzeButton = QPushButton('Analyze')
-        self.analyzeMenu = QMenu()
+        self.load_button = QPushButton('Load')
+        self.load_menu = QMenu()
+        self.save_button = QPushButton('Save')
+        self.save_menu = QMenu()
+        self.edit_button = QPushButton('Edit')
+        self.analyze_button = QPushButton('Analyze')
+        self.analyze_menu = QMenu()
 
-        self.loadButton.setMenu(self.loadMenu)
-        self.saveButton.setMenu(self.saveMenu)
-        self.analyzeButton.setMenu(self.analyzeMenu)
+        self.load_button.setMenu(self.load_menu)
+        self.save_button.setMenu(self.save_menu)
+        self.analyze_button.setMenu(self.analyze_menu)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.loadButton)
-        layout.addWidget(self.saveButton)
-        layout.addWidget(self.editButton)
-        layout.addWidget(self.analyzeButton)
+        layout.addWidget(self.load_button)
+        layout.addWidget(self.save_button)
+        layout.addWidget(self.edit_button)
+        layout.addWidget(self.analyze_button)
         self.setLayout(layout)
 
 
 class RepositoryItemCopierDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.sourceComboBox = QComboBox()
-        self.destinationComboBox = QComboBox()
-        self.buttonBox = QDialogButtonBox()
+        self.source_combo_box = QComboBox()
+        self.destination_combo_box = QComboBox()
+        self.button_box = QDialogButtonBox()
 
-        self.buttonBox.addButton(QDialogButtonBox.StandardButton.Ok)
-        self.buttonBox.addButton(QDialogButtonBox.StandardButton.Cancel)
-        self.buttonBox.clicked.connect(self._handleButtonBoxClicked)
+        self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
+        self.button_box.addButton(QDialogButtonBox.StandardButton.Cancel)
+        self.button_box.clicked.connect(self._handle_button_box_clicked)
 
         layout = QFormLayout()
-        layout.addRow('From:', self.sourceComboBox)
-        layout.addRow('To:', self.destinationComboBox)
-        layout.addRow(self.buttonBox)
+        layout.addRow('From:', self.source_combo_box)
+        layout.addRow('To:', self.destination_combo_box)
+        layout.addRow(self.button_box)
         self.setLayout(layout)
 
-    def _handleButtonBoxClicked(self, button: QAbstractButton) -> None:
-        if self.buttonBox.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
+    def _handle_button_box_clicked(self, button: QAbstractButton) -> None:
+        if self.button_box.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
             self.accept()
         else:
             self.reject()
@@ -68,26 +68,26 @@ class RepositoryItemCopierDialog(QDialog):
 class RepositoryTableView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.tableView = QTableView()
-        self.buttonBox = RepositoryButtonBox()
-        self.copierDialog = RepositoryItemCopierDialog()
+        self.table_view = QTableView()
+        self.button_box = RepositoryButtonBox()
+        self.copier_dialog = RepositoryItemCopierDialog()
 
         layout = QVBoxLayout()
-        layout.addWidget(self.tableView)
-        layout.addWidget(self.buttonBox)
+        layout.addWidget(self.table_view)
+        layout.addWidget(self.button_box)
         self.setLayout(layout)
 
 
 class RepositoryTreeView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.treeView = QTreeView()
-        self.buttonBox = RepositoryButtonBox()
-        self.copierDialog = RepositoryItemCopierDialog()
+        self.tree_view = QTreeView()
+        self.button_box = RepositoryButtonBox()
+        self.copier_dialog = RepositoryItemCopierDialog()
 
-        self.treeView.header().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.tree_view.header().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout = QVBoxLayout()
-        layout.addWidget(self.treeView)
-        layout.addWidget(self.buttonBox)
+        layout.addWidget(self.tree_view)
+        layout.addWidget(self.button_box)
         self.setLayout(layout)
