@@ -697,16 +697,14 @@ class PtyChiOptionsHelper:
 
         corrected_scan_points: list[ScanPoint] = list()
         object_geometry = object_in.get_geometry()
-        rx_px = object_geometry.width_px / 2
-        ry_px = object_geometry.height_px / 2
 
         for uncorrected_point, pos_x_px, pos_y_px in zip(
             product.positions, position_x_px, position_y_px
         ):
             object_point = ObjectPoint(
                 index=uncorrected_point.index,
-                position_x_px=float(pos_x_px + rx_px),
-                position_y_px=float(pos_y_px + ry_px),
+                position_x_px=float(pos_x_px),
+                position_y_px=float(pos_y_px),
             )
             scan_point = object_geometry.map_object_point_to_scan_point(object_point)
             corrected_scan_points.append(scan_point)
