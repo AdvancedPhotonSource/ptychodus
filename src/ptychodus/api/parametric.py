@@ -211,7 +211,7 @@ class RealParameter(ParameterBase[float]):
 
         return value
 
-    def set_value(self, value: T, *, notify: bool = True) -> None:
+    def set_value(self, value: float, *, notify: bool = True) -> None:
         super().set_value(float(value), notify=notify)
 
     def set_value_from_string(self, value: str) -> None:

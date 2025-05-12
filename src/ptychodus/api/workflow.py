@@ -52,6 +52,10 @@ class WorkflowProductAPI(ABC):
     def save_product(self, file_path: Path, *, file_type: str | None = None) -> None:
         pass
 
+    @abstractmethod
+    def export_training_data(self, file_path: Path) -> None:
+        pass
+
 
 class WorkflowAPI(ABC):
     @abstractmethod
@@ -101,6 +105,10 @@ class WorkflowAPI(ABC):
     def save_settings(
         self, file_path: Path, change_path_prefix: PathPrefixChange | None = None
     ) -> None:
+        pass
+
+    @abstractmethod
+    def set_reconstructor(self, reconstructor_name: str) -> None:
         pass
 
 

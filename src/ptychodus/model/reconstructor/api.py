@@ -155,3 +155,6 @@ class ReconstructorAPI:
             logger.warning('Reconstructor is not trainable!')
 
         return result
+
+    def set_reconstructor(self, name: str) -> None:
+        self._reconstructor_chooser.set_current_plugin(name)

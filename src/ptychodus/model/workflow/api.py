@@ -90,6 +90,9 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
     def save_product(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._product_api.save_product(self._product_index, file_path, file_type=file_type)
 
+    def export_training_data(self, file_path: Path) -> None:
+        self._reconstructor_api.export_training_data(file_path, self._product_index)
+
 
 class ConcreteWorkflowAPI(WorkflowAPI):
     def __init__(
@@ -176,3 +179,6 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         self, file_path: Path, change_path_prefix: PathPrefixChange | None = None
     ) -> None:
         self._settings_registry.save_settings(file_path, change_path_prefix)
+
+    def set_reconstructor(self, reconstructor_name: str) -> None:
+        self._reconstructor_api.set_reconstructor(reconstructor_name)
