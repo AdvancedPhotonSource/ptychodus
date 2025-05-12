@@ -69,9 +69,10 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         else:
             self._object_api.build_object(self._product_index, builder_name, builder_parameters)
 
-    def reconstruct_local(self) -> WorkflowProductAPI:
+    def reconstruct_local(self, block: bool = False) -> WorkflowProductAPI:
         logger.debug(f'Reconstruct: index={self._product_index}')
         output_product_index = self._reconstructor_api.reconstruct(self._product_index)
+        self._reconstructor_api.process_results(block=block)
 
         return ConcreteWorkflowProductAPI(
             self._product_api,
@@ -181,4 +182,5 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         self._settings_registry.save_settings(file_path, change_path_prefix)
 
     def set_reconstructor(self, reconstructor_name: str) -> None:
-        self._reconstructor_api.set_reconstructor(reconstructor_name)
+        reconstructor = self._reconstructor_api.set_reconstructor(reconstructor_name)
+        logger.debug(f'{reconstructor=}')

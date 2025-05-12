@@ -47,7 +47,7 @@ class PatternsCore(Observer):
         pass
 
     def stop(self) -> None:
-        self.dataset.finish_loading(block=False)
+        self.patterns_api.finish_assembling_diffraction_patterns(block=False)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._reinit_observable:
@@ -55,4 +55,5 @@ class PatternsCore(Observer):
                 file_path=self.pattern_settings.file_path.get_value(),
                 file_type=self.pattern_settings.file_type.get_value(),
             )
-            self.dataset.start_loading()
+            self.patterns_api.start_assembling_diffraction_patterns()
+            self.patterns_api.finish_assembling_diffraction_patterns(block=True)

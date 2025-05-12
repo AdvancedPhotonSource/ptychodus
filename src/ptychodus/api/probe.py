@@ -276,6 +276,9 @@ class ProbeSequence(Sequence[Probe]):
     def __len__(self) -> int:
         return 1 if self._opr_weights is None else self._opr_weights.shape[0]
 
+    def __repr__(self) -> str:
+        return f'{self._array.dtype}{self._array.shape}'
+
 
 class ProbeFileReader(ABC):
     @abstractmethod

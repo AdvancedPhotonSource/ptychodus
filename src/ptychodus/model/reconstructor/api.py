@@ -156,5 +156,6 @@ class ReconstructorAPI:
 
         return result
 
-    def set_reconstructor(self, name: str) -> None:
+    def set_reconstructor(self, name: str) -> str:
         self._reconstructor_chooser.set_current_plugin(name)
+        return self._reconstructor_chooser.get_current_plugin().simple_name

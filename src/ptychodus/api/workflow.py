@@ -41,7 +41,7 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def reconstruct_local(self) -> WorkflowProductAPI:
+    def reconstruct_local(self, block: bool = False) -> WorkflowProductAPI:
         pass
 
     @abstractmethod
