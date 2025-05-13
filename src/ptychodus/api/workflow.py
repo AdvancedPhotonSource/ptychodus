@@ -11,6 +11,10 @@ from ptychodus.api.settings import PathPrefixChange
 
 class WorkflowProductAPI(ABC):
     @abstractmethod
+    def get_product_index(self) -> int:
+        pass
+
+    @abstractmethod
     def open_scan(self, file_path: Path, *, file_type: str | None = None) -> None:
         pass
 

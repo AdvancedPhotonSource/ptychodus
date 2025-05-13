@@ -36,6 +36,9 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         self._executor = executor
         self._product_index = product_index
 
+    def get_product_index(self) -> int:
+        return self._product_index
+
     def open_scan(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._scan_api.open_scan(self._product_index, file_path, file_type=file_type)
 
@@ -70,9 +73,10 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
             self._object_api.build_object(self._product_index, builder_name, builder_parameters)
 
     def reconstruct_local(self, block: bool = False) -> WorkflowProductAPI:
-        logger.debug(f'Reconstruct: index={self._product_index}')
+        logger.info('Reconstructing...')
         output_product_index = self._reconstructor_api.reconstruct(self._product_index)
         self._reconstructor_api.process_results(block=block)
+        logger.info('Reconstruction complete.')
 
         return ConcreteWorkflowProductAPI(
             self._product_api,
@@ -150,6 +154,10 @@ class ConcreteWorkflowAPI(WorkflowAPI):
 
     def open_product(self, file_path: Path, *, file_type: str | None = None) -> WorkflowProductAPI:
         product_index = self._product_api.open_product(file_path, file_type=file_type)
+
+        if product_index < 0:
+            raise RuntimeError(f'Failed to open product "{file_path}"!')
+
         return self._create_product_api(product_index)
 
     def create_product(

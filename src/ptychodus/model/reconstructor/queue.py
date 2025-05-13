@@ -83,11 +83,15 @@ class ReconstructionQueue:
                 input_task = self._input_queue.get(block=True, timeout=1)
 
                 try:
+                    logger.debug('Reconstructing...')
                     output_task = input_task.execute()
+                    logger.debug('Reconstruction finished.')
                 except Exception:
                     logger.exception('Reconstructor error!')
                 else:
+                    logger.debug('Adding reconstruction result to output queue...')
                     self._output_queue.put(output_task)
+                    logger.debug('Reconstruction result added to output queue.')
                 finally:
                     self._input_queue.task_done()
             except queue.Empty:
@@ -102,17 +106,27 @@ class ReconstructionQueue:
         task = ExecuteReconstructorTask(
             self._data_matcher, reconstructor, product_index, index_filter
         )
+        logger.debug('Adding reconstruction task to queue...')
         self._input_queue.put(task)
+        logger.debug('Reconstruction task added to queue.')
 
     def process_results(self, *, block: bool) -> None:
         while True:
             try:
+                logger.debug('Waiting for reconstruction result...')
                 task = self._output_queue.get(block=block)
+                logger.debug('Reconstruction result received.')
 
                 try:
+                    logger.debug('Processing reconstruction result...')
                     task.execute()
+                    logger.debug('Reconstruction result processed.')
                 finally:
                     self._output_queue.task_done()
+
+                    if block and self._output_queue.empty():
+                        logger.debug('No more results to process.')
+                        break
             except queue.Empty:
                 break
 

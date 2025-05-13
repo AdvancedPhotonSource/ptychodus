@@ -231,7 +231,6 @@ class ModelCore:
         input_path: Path,
         output_path: Path,
         *,
-        product_file_type: str = 'NPZ',
         fluorescence_input_file_path: Path | None = None,
         fluorescence_output_file_path: Path | None = None,
     ) -> int:
@@ -241,39 +240,20 @@ class ModelCore:
             self.reconstructor.reconstructor_api.save_model(output_path)
             return output.result
 
-        input_product_index = self.product.product_api.open_product(
-            input_path, file_type=product_file_type
-        )
-
-        if input_product_index < 0:
-            logger.error(f'Failed to open product "{input_path}"!')
-            return -1
-
         if action.lower() == 'reconstruct':
-            logger.info('Reconstructing...')
-            output_product_index = self.reconstructor.reconstructor_api.reconstruct(
-                input_product_index
-            )
-            self.reconstructor.reconstructor_api.process_results(block=True)
-            logger.info('Reconstruction complete.')
-
-            self.product.product_api.save_product(
-                output_product_index, output_path, file_type=product_file_type
-            )
+            input_product_api = self.workflow.workflow_api.open_product(input_path)
+            output_product_api = input_product_api.reconstruct_local(block=True)
+            output_product_api.save_product(output_path)
 
             if (
                 fluorescence_input_file_path is not None
                 and fluorescence_output_file_path is not None
             ):
                 self.fluorescence_core.enhance_fluorescence(
-                    output_product_index,
+                    output_product_api.get_product_index(),
                     fluorescence_input_file_path,
                     fluorescence_output_file_path,
                 )
-        elif action.lower() == 'prepare_training_data':
-            self.reconstructor.reconstructor_api.export_training_data(
-                output_path, input_product_index
-            )
         else:
             logger.error(f'Unknown batch mode action "{action}"!')
             return -1
