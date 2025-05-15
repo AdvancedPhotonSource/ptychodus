@@ -136,7 +136,7 @@ class ProductRepositoryItemFactory:
         probe_item = self._probe_item_factory.create_from_settings(geometry)
         object_item = self._object_item_factory.create_from_settings(geometry)
 
-        return ProductRepositoryItem(
+        item = ProductRepositoryItem(
             parent=self._repository,
             metadata_item=metadata_item,
             scan_item=scan_item,
@@ -146,3 +146,5 @@ class ProductRepositoryItemFactory:
             validator=ProductValidator(self._dataset, scan_item, geometry, probe_item, object_item),
             costs=list(),
         )
+        logger.debug(f'Created product from settings: {item.get_name()}')
+        return item

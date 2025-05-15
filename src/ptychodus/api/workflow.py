@@ -85,6 +85,11 @@ class WorkflowAPI(ABC):
         pass
 
     @abstractmethod
+    def get_product(self, product_index: int) -> WorkflowProductAPI:
+        """returns a product by index"""
+        pass
+
+    @abstractmethod
     def open_product(self, file_path: Path, *, file_type: str | None = None) -> WorkflowProductAPI:
         """opens product from file"""
         pass

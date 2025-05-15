@@ -120,20 +120,6 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         self._reconstructor_api = reconstructor_api
         self._executor = executor
 
-    def _create_product_api(self, product_index: int) -> WorkflowProductAPI:
-        if product_index < 0:
-            raise ValueError(f'Bad product index ({product_index=})!')
-
-        return ConcreteWorkflowProductAPI(
-            self._product_api,
-            self._scan_api,
-            self._probe_api,
-            self._object_api,
-            self._reconstructor_api,
-            self._executor,
-            product_index,
-        )
-
     def open_patterns(
         self,
         file_path: Path,
@@ -152,13 +138,27 @@ class ConcreteWorkflowAPI(WorkflowAPI):
     def export_assembled_patterns(self, file_path: Path) -> None:
         self._patterns_api.export_assembled_patterns(file_path)
 
+    def get_product(self, product_index: int) -> WorkflowProductAPI:
+        if product_index < 0:
+            raise ValueError(f'Bad product index ({product_index=})!')
+
+        return ConcreteWorkflowProductAPI(
+            self._product_api,
+            self._scan_api,
+            self._probe_api,
+            self._object_api,
+            self._reconstructor_api,
+            self._executor,
+            product_index,
+        )
+
     def open_product(self, file_path: Path, *, file_type: str | None = None) -> WorkflowProductAPI:
         product_index = self._product_api.open_product(file_path, file_type=file_type)
 
         if product_index < 0:
             raise RuntimeError(f'Failed to open product "{file_path}"!')
 
-        return self._create_product_api(product_index)
+        return self.get_product(product_index)
 
     def create_product(
         self,
@@ -182,7 +182,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             mass_attenuation_m2_kg=mass_attenuation_m2_kg,
             tomography_angle_deg=tomography_angle_deg,
         )
-        return self._create_product_api(product_index)
+        return self.get_product(product_index)
 
     def save_settings(
         self, file_path: Path, change_path_prefix: PathPrefixChange | None = None

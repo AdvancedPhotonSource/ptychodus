@@ -53,7 +53,7 @@ class DiffractionPatternPositionMatcher:
     ) -> ReconstructInput:
         input_product_item = self._product_api.get_item(input_product_index)
         input_product = input_product_item.get_product()
-        data_indexes = self._dataset.get_assembled_indexes()
+        data_indexes = [int(index) for index in self._dataset.get_assembled_indexes()]
         scan_indexes = [
             point.index for point in input_product.positions if index_filter(point.index)
         ]
