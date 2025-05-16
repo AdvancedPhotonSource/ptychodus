@@ -11,6 +11,10 @@ from ptychodus.api.settings import PathPrefixChange
 
 class WorkflowProductAPI(ABC):
     @abstractmethod
+    def get_product_index(self) -> int:
+        pass
+
+    @abstractmethod
     def open_scan(self, file_path: Path, *, file_type: str | None = None) -> None:
         pass
 
@@ -41,7 +45,7 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def reconstruct_local(self) -> WorkflowProductAPI:
+    def reconstruct_local(self, block: bool = False) -> WorkflowProductAPI:
         pass
 
     @abstractmethod
@@ -50,6 +54,10 @@ class WorkflowProductAPI(ABC):
 
     @abstractmethod
     def save_product(self, file_path: Path, *, file_type: str | None = None) -> None:
+        pass
+
+    @abstractmethod
+    def export_training_data(self, file_path: Path) -> None:
         pass
 
 
@@ -77,6 +85,11 @@ class WorkflowAPI(ABC):
         pass
 
     @abstractmethod
+    def get_product(self, product_index: int) -> WorkflowProductAPI:
+        """returns a product by index"""
+        pass
+
+    @abstractmethod
     def open_product(self, file_path: Path, *, file_type: str | None = None) -> WorkflowProductAPI:
         """opens product from file"""
         pass
@@ -101,6 +114,10 @@ class WorkflowAPI(ABC):
     def save_settings(
         self, file_path: Path, change_path_prefix: PathPrefixChange | None = None
     ) -> None:
+        pass
+
+    @abstractmethod
+    def set_reconstructor(self, reconstructor_name: str) -> None:
         pass
 
 

@@ -203,6 +203,9 @@ class Object:
     def get_total_thickness_m(self) -> float:
         return sum(self._layer_spacing_m)
 
+    def __repr__(self) -> str:
+        return f'{self._array.dtype}{self._array.shape}'
+
 
 class ObjectFileReader(ABC):
     @abstractmethod

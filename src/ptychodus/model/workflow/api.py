@@ -36,6 +36,9 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         self._executor = executor
         self._product_index = product_index
 
+    def get_product_index(self) -> int:
+        return self._product_index
+
     def open_scan(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._scan_api.open_scan(self._product_index, file_path, file_type=file_type)
 
@@ -69,9 +72,11 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         else:
             self._object_api.build_object(self._product_index, builder_name, builder_parameters)
 
-    def reconstruct_local(self) -> WorkflowProductAPI:
-        logger.debug(f'Reconstruct: index={self._product_index}')
+    def reconstruct_local(self, block: bool = False) -> WorkflowProductAPI:
+        logger.info('Reconstructing...')
         output_product_index = self._reconstructor_api.reconstruct(self._product_index)
+        self._reconstructor_api.process_results(block=block)
+        logger.info('Reconstruction complete.')
 
         return ConcreteWorkflowProductAPI(
             self._product_api,
@@ -89,6 +94,9 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
 
     def save_product(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._product_api.save_product(self._product_index, file_path, file_type=file_type)
+
+    def export_training_data(self, file_path: Path) -> None:
+        self._reconstructor_api.export_training_data(file_path, self._product_index)
 
 
 class ConcreteWorkflowAPI(WorkflowAPI):
@@ -112,20 +120,6 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         self._reconstructor_api = reconstructor_api
         self._executor = executor
 
-    def _create_product_api(self, product_index: int) -> WorkflowProductAPI:
-        if product_index < 0:
-            raise ValueError(f'Bad product index ({product_index=})!')
-
-        return ConcreteWorkflowProductAPI(
-            self._product_api,
-            self._scan_api,
-            self._probe_api,
-            self._object_api,
-            self._reconstructor_api,
-            self._executor,
-            product_index,
-        )
-
     def open_patterns(
         self,
         file_path: Path,
@@ -144,9 +138,27 @@ class ConcreteWorkflowAPI(WorkflowAPI):
     def export_assembled_patterns(self, file_path: Path) -> None:
         self._patterns_api.export_assembled_patterns(file_path)
 
+    def get_product(self, product_index: int) -> WorkflowProductAPI:
+        if product_index < 0:
+            raise ValueError(f'Bad product index ({product_index=})!')
+
+        return ConcreteWorkflowProductAPI(
+            self._product_api,
+            self._scan_api,
+            self._probe_api,
+            self._object_api,
+            self._reconstructor_api,
+            self._executor,
+            product_index,
+        )
+
     def open_product(self, file_path: Path, *, file_type: str | None = None) -> WorkflowProductAPI:
         product_index = self._product_api.open_product(file_path, file_type=file_type)
-        return self._create_product_api(product_index)
+
+        if product_index < 0:
+            raise RuntimeError(f'Failed to open product "{file_path}"!')
+
+        return self.get_product(product_index)
 
     def create_product(
         self,
@@ -170,9 +182,13 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             mass_attenuation_m2_kg=mass_attenuation_m2_kg,
             tomography_angle_deg=tomography_angle_deg,
         )
-        return self._create_product_api(product_index)
+        return self.get_product(product_index)
 
     def save_settings(
         self, file_path: Path, change_path_prefix: PathPrefixChange | None = None
     ) -> None:
         self._settings_registry.save_settings(file_path, change_path_prefix)
+
+    def set_reconstructor(self, reconstructor_name: str) -> None:
+        reconstructor = self._reconstructor_api.set_reconstructor(reconstructor_name)
+        logger.debug(f'{reconstructor=}')

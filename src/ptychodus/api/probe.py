@@ -169,10 +169,19 @@ class ProbeSequence(Sequence[Probe]):
             self._opr_weights = None
         elif numpy.issubdtype(opr_weights.dtype, numpy.floating):
             if opr_weights.ndim == 2:
-                if opr_weights.shape[1] == self._array.shape[0]:
+                num_weights_actual = opr_weights.shape[1]
+                num_weights_expected = self._array.shape[0]
+
+                if num_weights_actual == num_weights_expected:
                     self._opr_weights = opr_weights
                 else:
-                    raise ValueError('opr_weights do not match the number of coherent probe modes')
+                    raise ValueError(
+                        (
+                            'inconsistent number of opr weights!'
+                            f' actual={num_weights_actual}'
+                            f' expected={num_weights_expected}'
+                        )
+                    )
             else:
                 raise ValueError('opr_weights must be 2-dimensional ndarray')
         else:
@@ -266,6 +275,9 @@ class ProbeSequence(Sequence[Probe]):
 
     def __len__(self) -> int:
         return 1 if self._opr_weights is None else self._opr_weights.shape[0]
+
+    def __repr__(self) -> str:
+        return f'{self._array.dtype}{self._array.shape}'
 
 
 class ProbeFileReader(ABC):

@@ -87,6 +87,9 @@ class PositionSequence(Sequence[ScanPoint]):
     def nbytes(self) -> int:
         return self._coordinates_m.nbytes
 
+    def __repr__(self) -> str:
+        return f'{self._coordinates_m.dtype}{self._coordinates_m.shape}'
+
 
 class ScanPointParseError(Exception):
     """raised when the scan file cannot be parsed"""

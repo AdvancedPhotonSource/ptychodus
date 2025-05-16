@@ -79,7 +79,7 @@ class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
             self.INDEXES: numpy.concatenate([array.get_indexes() for array in dataset]),
             self.PATTERNS: numpy.concatenate([array.get_data() for array in dataset]),
         }
-        numpy.savez(file_path, **contents)
+        numpy.savez_compressed(file_path, **contents)
 
 
 def register_plugins(registry: PluginRegistry) -> None:
