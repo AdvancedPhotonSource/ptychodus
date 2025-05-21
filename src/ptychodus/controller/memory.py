@@ -9,7 +9,7 @@ class MemoryController:
         self._presenter = presenter
         self._widget = widget
         self._widget.setSegmentStyle(QLCDNumber.SegmentStyle.Flat)
-        self._widget.setFrameStyle(QFrame.Panel | QFrame.Sunken)
+        self._widget.setFrameStyle(QFrame.Shape.Panel | QFrame.Shadow.Sunken)
         self._widget.setDigitCount(6)
         self._widget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
         self._timer = QTimer()

@@ -90,7 +90,7 @@ class PatternsInfoDialog(QDialog):
 
         tree_header = self.tree_view.header()
         tree_header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
-        tree_header.setSectionResizeMode(QHeaderView.ResizeToContents)
+        tree_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
 
         self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
         self.button_box.clicked.connect(self._handle_button_box_clicked)

@@ -58,7 +58,9 @@ class LYNXSoftGlueZynqPositionFileReader(PositionFileReader):
                 X = 1  # noqa: N806
                 Y = 3  # noqa: N806
             else:
-                raise ScanPointParseError('Bad header!')
+                raise ScanPointParseError(
+                    f'Bad LYNX SoftGlueZynq header!\nFound:    {column_header_row}\n'
+                )
 
             for row in csv_iterator:
                 if row[0].startswith('#'):
@@ -69,8 +71,8 @@ class LYNXSoftGlueZynqPositionFileReader(PositionFileReader):
 
                 point = ScanPoint(
                     int(row[DETECTOR_COUNT]),
-                    -float(row[X]) * LYNXSoftGlueZynqPositionFileReader.MICRONS_TO_METERS,
-                    -float(row[Y]) * LYNXSoftGlueZynqPositionFileReader.MICRONS_TO_METERS,
+                    -float(row[X]) * self.MICRONS_TO_METERS,
+                    -float(row[Y]) * self.MICRONS_TO_METERS,
                 )
                 point_list.append(point)
 

@@ -44,7 +44,7 @@ class ScanTransformViewController(ParameterViewController):
             action.triggered.connect(lambda _, index=index: transform.apply_presets(index))
 
         self._label_ye = QLabel('y\u2032 =')
-        self._label_ye.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._label_ye.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self._affine00_view_controller = DecimalLineEditParameterViewController(
             transform.affine00, is_signed=True
         )
@@ -58,7 +58,7 @@ class ScanTransformViewController(ParameterViewController):
         )
 
         self._label_xe = QLabel('x\u2032 =')
-        self._label_xe.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._label_xe.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self._affine10_view_controller = DecimalLineEditParameterViewController(
             transform.affine10, is_signed=True
         )
@@ -224,6 +224,6 @@ class ScanEditorViewControllerFactory:
             QMessageBox.Icon.Information,
             title,
             f'"{builder_name}" has no editable parameters!',
-            QMessageBox.Ok,
+            QMessageBox.StandardButton.Ok,
             parent,
         )

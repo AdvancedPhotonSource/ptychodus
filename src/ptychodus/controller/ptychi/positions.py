@@ -50,7 +50,7 @@ class PtyChiCrossCorrelationViewController(ParameterViewController, Observer):
             probe_threshold, tool_tip='Probe intensity threshold used to calculate the probe mask'
         )
         self._widget = QFrame()
-        self._widget.setFrameShape(QFrame.StyledPanel)
+        self._widget.setFrameShape(QFrame.Shape.StyledPanel)
 
         layout = QFormLayout()
         layout.addRow('Scale:', self._scale_view_controller.get_widget())

@@ -22,7 +22,9 @@ class AgentInputView(QFrame):
         super().__init__(parent)
         self.text_edit = QPlainTextEdit()
 
-        send_button_size_policy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        send_button_size_policy = QSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
+        )
         self.send_button = QPushButton(QIcon(':/icons/send'), 'Send')
         self.send_button.setSizePolicy(send_button_size_policy)
 

@@ -74,6 +74,6 @@ class ObjectEditorViewControllerFactory:
             QMessageBox.Icon.Information,
             title,
             f'"{builder_name}" has no editable parameters!',
-            QMessageBox.Ok,
+            QMessageBox.StandardButton.Ok,
             parent,
         )

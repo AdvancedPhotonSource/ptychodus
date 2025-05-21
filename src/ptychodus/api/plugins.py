@@ -179,7 +179,12 @@ class PluginRegistry:
                 logger.info(f'Skipping {module_info.name}')
                 logger.warning(exc)
             else:
-                logger.info(f'Registering {module_info.name}')
-                module.register_plugins(registry)
+                try:
+                    module.register_plugins(registry)
+                except AttributeError as exc:
+                    logger.info(f'Failed to register {module_info.name}')
+                    logger.warning(exc)
+                else:
+                    logger.info(f'Registered {module_info.name}')
 
         return registry

@@ -24,7 +24,11 @@ class AgentMessageListModel(QAbstractListModel):
                 case Qt.ItemDataRole.DisplayRole:
                     return message.content
                 case Qt.ItemDataRole.TextAlignmentRole:
-                    return Qt.AlignRight if message.role == ChatRole.USER else Qt.AlignLeft
+                    return (
+                        Qt.AlignmentFlag.AlignRight
+                        if message.role == ChatRole.USER
+                        else Qt.AlignmentFlag.AlignLeft
+                    )
                 case Qt.ItemDataRole.BackgroundRole:
                     return self.LIGHT_BLUE if message.role == ChatRole.USER else self.LIGHT_GREEN
                 case Qt.ItemDataRole.ForegroundRole:

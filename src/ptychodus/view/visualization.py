@@ -235,11 +235,11 @@ class RectangleView(QGroupBox):
         line_edit = QLineEdit()
 
         palette = line_edit.palette()
-        palette.setColor(QPalette.Base, palette.color(QPalette.Window))
-        palette.setColor(QPalette.Text, palette.color(QPalette.WindowText))
+        palette.setColor(QPalette.ColorRole.Base, palette.color(QPalette.ColorRole.Window))
+        palette.setColor(QPalette.ColorRole.Text, palette.color(QPalette.ColorRole.WindowText))
         line_edit.setPalette(palette)
 
-        line_edit.setFocusPolicy(Qt.NoFocus)
+        line_edit.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         line_edit.setReadOnly(True)
 
         return line_edit
@@ -314,7 +314,7 @@ class VisualizationWidget(QGroupBox):
     @classmethod
     def create_instance(cls, title: str, parent: QWidget | None = None) -> VisualizationWidget:
         view = cls(title, parent)
-        view.setAlignment(Qt.AlignHCenter)
+        view.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
         view.tool_bar.setFloatable(False)
         view.tool_bar.setIconSize(QSize(32, 32))

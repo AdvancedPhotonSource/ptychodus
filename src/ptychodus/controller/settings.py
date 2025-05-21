@@ -105,7 +105,7 @@ class SettingsController(Observer):
         if not current.isValid():
             return
 
-        group_name = self._list_model.data(current, Qt.DisplayRole)
+        group_name = self._list_model.data(current, Qt.ItemDataRole.DisplayRole)
         group = self._settings_registry[group_name]
         names: list[str] = list()
         values: list[str] = list()

@@ -163,7 +163,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             self.PATTERNS_KW: parameters.patterns.astype(numpy.float32),
             self.PATCHES_KW: patches,
         }
-        numpy.savez_compressed(file_path, **training_data)
+        numpy.savez_compressed(file_path, allow_pickle=False, **training_data)
 
     def get_training_data_path(self) -> Path:
         return self._training_settings.training_data_path.get_value()

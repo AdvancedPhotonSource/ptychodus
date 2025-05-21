@@ -23,7 +23,7 @@ class ExceptionDialog(QMessageBox):
     def event(self, event: QEvent) -> bool:
         result = super().event(event)
 
-        if event.type() == QEvent.LayoutRequest or event.type() == QEvent.Resize:
+        if event.type() == QEvent.Type.LayoutRequest or event.type() == QEvent.Type.Resize:
             self.setMinimumHeight(self.MIN_SIZE)
             self.setMaximumHeight(self.MAX_SIZE)
             self.setMinimumWidth(self.MIN_SIZE)

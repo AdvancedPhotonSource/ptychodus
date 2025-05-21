@@ -85,7 +85,7 @@ class XRFMapsFileIO(FluorescenceFileReader, FluorescenceFileWriter):
 class NPZFluorescenceFileWriter(FluorescenceFileWriter):
     def write(self, file_path: Path, dataset: FluorescenceDataset) -> None:
         element_maps = {emap.name: emap.counts_per_second for emap in dataset.element_maps}
-        numpy.savez_compressed(file_path, **element_maps)
+        numpy.savez_compressed(file_path, allow_pickle=False, **element_maps)
 
 
 def register_plugins(registry: PluginRegistry) -> None:

@@ -7,8 +7,13 @@ from typing import Any, Final, Generic, TypeVar
 import logging
 import sys
 import typing
-import xdrlib
 import yaml
+
+try:
+    # xdrlib removed from the standard library in Python 3.13
+    import xdrlib
+except ModuleNotFoundError:
+    from ._xdrlib import xdrlib  # type: ignore[no-redef]
 
 import numpy
 import numpy.typing
@@ -505,7 +510,7 @@ def register_plugins(registry: PluginRegistry) -> None:
     )
     registry.position_file_readers.register_plugin(
         MDAPositionFileReader(scale_to_meters=1.0e-3),
-        simple_name='APS_2IDE',
+        simple_name='APS_2IDE',  # 2-ID-E XFM instrument
         display_name='APS 2-ID-E Microprobe Files (*.mda)',
     )
     registry.position_file_readers.register_plugin(

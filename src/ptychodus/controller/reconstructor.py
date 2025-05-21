@@ -73,8 +73,10 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._progress_timer.start(5 * 1000)  # TODO customize (in milliseconds)
 
         view.progress_dialog.setModal(True)
-        view.progress_dialog.setWindowModality(Qt.ApplicationModal)
-        view.progress_dialog.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.CustomizeWindowHint)
+        view.progress_dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+        view.progress_dialog.setWindowFlags(
+            Qt.WindowType.Window | Qt.WindowType.WindowTitleHint | Qt.WindowType.CustomizeWindowHint
+        )
         view.progress_dialog.text_edit.setReadOnly(True)
 
         open_model_action = view.parameters_view.reconstructor_menu.addAction('Open Model...')
