@@ -50,17 +50,21 @@ class ScanBoundingBox:
 
 class PositionSequence(Sequence[ScanPoint]):
     def __init__(self, point_seq: Sequence[ScanPoint] | None = None) -> None:
+        indexes: list[int] = []
         coordinates_m: list[float] = []
 
         if point_seq is not None:
             for point in point_seq:
+                indexes.append(point.index)
                 coordinates_m.append(point.position_y_m)
                 coordinates_m.append(point.position_x_m)
 
+        self._indexes = numpy.array(indexes)
         self._coordinates_m = numpy.reshape(coordinates_m, (-1, 2))
 
     def copy(self) -> PositionSequence:
         seq = PositionSequence()
+        seq._indexes = self._indexes.copy()
         seq._coordinates_m = self._coordinates_m.copy()
         return seq
 
@@ -75,17 +79,17 @@ class PositionSequence(Sequence[ScanPoint]):
             return [self[idx] for idx in range(index.start, index.stop, index.step)]
 
         return ScanPoint(
-            index=index,
+            index=self._indexes[index],
             position_x_m=self._coordinates_m[index, -1],
             position_y_m=self._coordinates_m[index, -2],
         )
 
     def __len__(self) -> int:
-        return self._coordinates_m.shape[0]
+        return self._indexes.size
 
     @property
     def nbytes(self) -> int:
-        return self._coordinates_m.nbytes
+        return self._indexes.nbytes + self._coordinates_m.nbytes
 
     def __repr__(self) -> str:
         return f'{self._coordinates_m.dtype}{self._coordinates_m.shape}'

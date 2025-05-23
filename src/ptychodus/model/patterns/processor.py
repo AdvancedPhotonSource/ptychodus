@@ -75,7 +75,9 @@ class DiffractionPatternProcessor:
     def __call__(self, array: DiffractionPatternArray) -> DiffractionPatternArray:
         data = array.get_data()
 
-        if data.ndim != 3:
+        if data.ndim == 2:
+            data = data[numpy.newaxis, ...]
+        elif data.ndim != 3:
             raise ValueError(f'Invalid diffraction pattern dimensions! (shape={data.shape})')
 
         if self.crop is not None:

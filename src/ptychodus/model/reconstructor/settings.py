@@ -8,7 +8,7 @@ class ReconstructorSettings(Observable, Observer):
         self._group = registry.create_group('Reconstructor')
         self._group.add_observer(self)
 
-        self.algorithm = self._group.create_string_parameter('Algorithm', 'Tike/lstsq_grad')
+        self.algorithm = self._group.create_string_parameter('Algorithm', 'pty-chi/LSQML')
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:

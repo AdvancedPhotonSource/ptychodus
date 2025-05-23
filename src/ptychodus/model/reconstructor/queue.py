@@ -113,9 +113,7 @@ class ReconstructionQueue:
     def process_results(self, *, block: bool) -> None:
         while True:
             try:
-                logger.debug('Waiting for reconstruction result...')
                 task = self._output_queue.get(block=block)
-                logger.debug('Reconstruction result received.')
 
                 try:
                     logger.debug('Processing reconstruction result...')

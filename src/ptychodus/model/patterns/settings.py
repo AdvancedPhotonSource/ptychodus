@@ -31,7 +31,7 @@ class PatternSettings(Observable, Observer):
         self._group = registry.create_group('Patterns')
         self._group.add_observer(self)
 
-        self.file_type = self._group.create_string_parameter('FileType', 'NeXus')
+        self.file_type = self._group.create_string_parameter('FileType', 'NPZ')
         self.file_path = self._group.create_path_parameter('FilePath', Path('/path/to/data.h5'))
         self.is_memmap_enabled = self._group.create_boolean_parameter('MemmapEnabled', False)
         self.scratch_directory = self._group.create_path_parameter(
