@@ -40,9 +40,9 @@ class ISNDiffractionFileReader(DiffractionFileReader):
 
                 try:
                     configs = h5_file['configs']
-                    num_patterns_per_array = int(configs['num_images'][()])
-                    num_patterns_total = 50 * num_patterns_per_array  # TODO generalize
-                    detector_distance_mm = float(configs['det_dist_mm'])
+                    num_images = int(configs['num_images'][()])
+                    num_exposures_per_image = int(configs['num_exposures_per_img'][()])
+                    detector_distance_mm = float(configs['det_dist_mm'][()])
                     detector_width = int(configs['det_size_x'][()])
                     detector_height = int(configs['det_size_y'][()])
                     pixel_width_m = float(configs['pix_size_x'][()])
@@ -53,8 +53,8 @@ class ISNDiffractionFileReader(DiffractionFileReader):
                     return dataset
 
                 metadata = DiffractionMetadata(
-                    num_patterns_per_array=num_patterns_per_array,
-                    num_patterns_total=num_patterns_total,
+                    num_patterns_per_array=num_exposures_per_image,
+                    num_patterns_total=num_exposures_per_image * num_images,
                     pattern_dtype=numpy.dtype('u4'),
                     detector_distance_m=self.ONE_MILLIMETER_M * detector_distance_mm,
                     detector_extent=ImageExtent(detector_width, detector_height),
@@ -77,7 +77,7 @@ class ISNDiffractionFileReader(DiffractionFileReader):
                         data_path = '/entry/data/data'  # TODO str(h5_item.path)
                         array = H5DiffractionPatternArray(
                             label=name,
-                            indexes=numpy.arange(num_patterns_per_array) + offset,
+                            indexes=numpy.arange(metadata.num_patterns_per_array) + offset,
                             file_path=file_path.parent / h5_item.filename,
                             data_path=data_path,
                         )

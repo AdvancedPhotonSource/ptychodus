@@ -320,8 +320,14 @@ class AssembledDiffractionDataset(DiffractionDataset):
             self._indexes[array_slice] = task.array.get_indexes()
             pattern_indexes = self._indexes[array_slice]
             pattern_indexes.flags.writeable = False
+            task_array_data = task.array.get_data()
 
-            self._data[array_slice, :, :] = task.array.get_data()
+            try:
+                self._data[array_slice, :, :] = task_array_data
+            except ValueError as exc:
+                logger.exception(exc)
+                return
+
             pattern_data = self._data[array_slice, :, :]
             pattern_data.flags.writeable = False
 
