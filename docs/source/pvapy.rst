@@ -1,13 +1,13 @@
-Streaming Demonstration
-=======================
+PvaPy Streaming Workflow
+========================
 
-* To install the `PvaPy`_ backend:
+* To install the `PvaPy <https://github.com/epics-base/pvaPy>`_
 
 .. code-block:: shell
 
    $ conda install -n ptychodus -c apsu pvapy
 
-* In terminal 1:
+* In Terminal 1:
 
 .. code-block:: shell
 
@@ -21,7 +21,7 @@ Streaming Demonstration
        --report-period 10 \
        --log-level debug
 
-* In terminal 2:
+* In Terminal 2:
 
 .. code-block:: shell
 

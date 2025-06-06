@@ -1,85 +1,51 @@
 Ptychodus
 =========
 
-`ptychodus`_ is a ptychography analysis application that supports multiple reconstruction libraries.
+`Ptychodus <https://github.com/AdvancedPhotonSource/ptychodus>`_
+is a ptychography data analysis application that reads instrument data,
+prepares the data for processing, and supports calling several reconstruction
+libraries for phase retrieval. Ptychodus can be used interactively or
+integrated into a data pipeline.
 
 
 Standard Installation
 ---------------------
 
-1. Install `miniforge <https://github.com/conda-forge/miniforge>`_.
+To install ptychodus from PyPI with the most common optional dependencies:
 
-2. Install ptychodus.
+.. code-block:: shell
 
-   * To install `ptychodus` with the GUI and all optional packages:
+    $ python -m pip install ptychodus[globus,gui,ptychi]
 
-     .. code-block:: shell
-
-           $ conda create -c conda-forge -n ptychodus ptychodus-all
-
-   * To install `ptychodus` with the GUI and no optional packages:
-
-     .. code-block:: shell
-
-           $ conda create -c conda-forge -n ptychodus ptychodus
-
-   * To install `ptychodus` without the GUI or optional packages:
-
-     .. code-block:: shell
-
-           $ conda create -c conda-forge -n ptychodus ptychodus-core
-
-3. Activate the `ptychodus` conda environment to run ptychodus.
-
-   .. code-block:: shell
-
-       $ conda activate ptychodus
-       $ ptychodus -h
-
-       usage: ptychodus [-h] [-b {reconstruct,train}] [-f FILE_PREFIX] [-s SETTINGS_FILE] [-v] [-w OUTPUT_DIR]
-
-       ptychodus is a ptychography analysis application
-
-       options:
-         -h, --help            show this help message and exit
-         -b {reconstruct,train}, --batch {reconstruct,train}
-                               run action non-interactively
-         -f FILE_PREFIX, --file-prefix FILE_PREFIX
-                               replace file path prefix in settings
-         -s SETTINGS_FILE, --settings SETTINGS_FILE
-                               use settings from file
-         -v, --version         show program's version number and exit
-         -w OUTPUT_DIR, --write OUTPUT_DIR
-                               stage reconstruction inputs to directory
-
-       $ ptychodus
+Instructions for installing in containers and from conda-forge are provided in
+the ``docs`` directory.
 
 
 Developer Installation
 ----------------------
 
-* For a developer installation:
+- For a developer installation:
 
 .. code-block:: shell
 
    $ git clone https://github.com/AdvancedPhotonSource/ptychodus.git
-   $ conda create -c conda-forge -n ptychodus --file ptychodus/requirements-dev.txt
+   $ conda create -n ptychodus --file ptychodus/requirements-dev.txt
    $ conda activate ptychodus
    $ pip install -e ./ptychodus
 
-* To install the `pty-chi`_ backend:
+- To install `pty-chi <https://github.com/AdvancedPhotonSource/pty-chi>`_
 
 .. code-block:: shell
 
    $ pip install ptychi
 
-* To install the `PtychoNN`_ backend:
+- To install `PtychoNN <https://github.com/mcherukara/PtychoNN>`_
 
 .. code-block:: shell
 
-   $ conda install -n ptychodus -c conda-forge ptychonn
+   $ conda install -n ptychodus ptychonn
 
-* Launch `ptychodus`:
+- Launch `ptychodus`:
 
 .. code-block:: shell
 
@@ -91,8 +57,3 @@ Reporting Bugs
 --------------
 
 Open a bug at https://github.com/AdvancedPhotonSource/ptychodus/issues.
-
-.. _`ptychodus`: https://github.com/AdvancedPhotonSource/ptychodus
-.. _`pty-chi`: https://github.com/AdvancedPhotonSource/pty-chi
-.. _`PtychoNN`: https://github.com/mcherukara/PtychoNN
-.. _`PvaPy`: https://github.com/epics-base/pvaPy

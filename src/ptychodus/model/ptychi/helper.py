@@ -533,7 +533,7 @@ class PtyChiProbePositionOptionsHelper:
             degrees_of_freedom.append(AffineDegreesOfFreedom.SHEAR)
 
         if self._affine_dof.is_bit_set(PtyChiAffineDegreesOfFreedom.ASYMMETRY):
-            degrees_of_freedom.append(AffineDegreesOfFreedom.ASSYMETRY)
+            degrees_of_freedom.append(AffineDegreesOfFreedom.ASYMMETRY)
 
         return PositionAffineTransformConstraintOptions(
             enabled=self._settings.constrain_affine_transform.get_value(),
