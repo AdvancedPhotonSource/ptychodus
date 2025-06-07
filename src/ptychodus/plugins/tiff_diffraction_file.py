@@ -74,28 +74,23 @@ class TiffDiffractionFileReader(DiffractionFileReader):
             contents_tree.create_child([array.get_label(), 'TIFF', str(idx)])
             array_list.append(array)
 
-        try:
-            with TiffFile(file_path) as tiff:
-                data = tiff.asarray()
-        except OSError:
-            logger.warning(f'Unable to read file "{file_path}".')
-        else:
-            if data.ndim == 2:
-                data = data[numpy.newaxis, :, :]
+        with TiffFile(file_path) as tiff:
+            data = tiff.asarray()
 
-            num_patterns_per_array, detector_height, detector_width = data.shape
+        if data.ndim == 2:
+            data = data[numpy.newaxis, :, :]
 
-            metadata = DiffractionMetadata(
-                num_patterns_per_array=num_patterns_per_array,
-                num_patterns_total=num_patterns_per_array * len(array_list),
-                pattern_dtype=data.dtype,
-                detector_extent=ImageExtent(detector_width, detector_height),
-                file_path=file_path.parent / file_pattern,
-            )
+        num_patterns_per_array, detector_height, detector_width = data.shape
 
-            dataset = SimpleDiffractionDataset(metadata, contents_tree, array_list)
+        metadata = DiffractionMetadata(
+            num_patterns_per_array=num_patterns_per_array,
+            num_patterns_total=num_patterns_per_array * len(array_list),
+            pattern_dtype=data.dtype,
+            detector_extent=ImageExtent(detector_width, detector_height),
+            file_path=file_path.parent / file_pattern,
+        )
 
-        return dataset
+        return SimpleDiffractionDataset(metadata, contents_tree, array_list)
 
 
 def register_plugins(registry: PluginRegistry) -> None:

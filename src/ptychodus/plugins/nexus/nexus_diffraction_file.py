@@ -226,61 +226,58 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
     def read(self, file_path: Path) -> DiffractionDataset:
         dataset: DiffractionDataset = SimpleDiffractionDataset.create_null(file_path)
 
-        try:
-            with h5py.File(file_path, 'r') as h5_file:
-                metadata = DiffractionMetadata.create_null(file_path)
-                contents_tree = self._tree_builder.build(h5_file)
+        with h5py.File(file_path, 'r') as h5_file:
+            metadata = DiffractionMetadata.create_null(file_path)
+            contents_tree = self._tree_builder.build(h5_file)
 
-                try:
-                    h5_dataset = h5_file['/entry/data/data_000001']
-                except KeyError:
-                    logger.error(f'File {file_path} is not a NeXus data file.')
-                    raise
+            try:
+                h5_dataset = h5_file['/entry/data/data_000001']
+            except KeyError:
+                logger.error(f'File {file_path} is not a NeXus data file.')
+                raise
 
-                num_patterns_per_array = h5_dataset.shape[0]
-                pattern_dtype = h5_dataset.dtype
+            num_patterns_per_array = h5_dataset.shape[0]
+            pattern_dtype = h5_dataset.dtype
 
-                try:
-                    entry = EntryGroup.read(h5_file['entry'], num_patterns_per_array)
-                except KeyError:
-                    logger.error(f'File {file_path} is not a NeXus data file.')
-                    raise
+            try:
+                entry = EntryGroup.read(h5_file['entry'], num_patterns_per_array)
+            except KeyError:
+                logger.error(f'File {file_path} is not a NeXus data file.')
+                raise
 
-                detector = entry.instrument.detector
-                detector_pixel_geometry = PixelGeometry(
-                    detector.x_pixel_size_m,
-                    detector.y_pixel_size_m,
-                )
-                crop_center = CropCenter(
-                    detector.beam_center_x_px,
-                    detector.beam_center_y_px,
-                )
+            detector = entry.instrument.detector
+            detector_pixel_geometry = PixelGeometry(
+                detector.x_pixel_size_m,
+                detector.y_pixel_size_m,
+            )
+            crop_center = CropCenter(
+                detector.beam_center_x_px,
+                detector.beam_center_y_px,
+            )
 
-                detector_specific = detector.detector_specific
-                detector_extent = ImageExtent(
-                    detector_specific.x_pixels_in_detector,
-                    detector_specific.y_pixels_in_detector,
-                )
-                probe_energy_eV = detector_specific.photon_energy_eV  # noqa: N806
+            detector_specific = detector.detector_specific
+            detector_extent = ImageExtent(
+                detector_specific.x_pixels_in_detector,
+                detector_specific.y_pixels_in_detector,
+            )
+            probe_energy_eV = detector_specific.photon_energy_eV  # noqa: N806
 
-                metadata = DiffractionMetadata(
-                    num_patterns_per_array=num_patterns_per_array,
-                    num_patterns_total=detector_specific.num_patterns_total,
-                    pattern_dtype=pattern_dtype,
-                    detector_distance_m=detector.detector_distance_m,
-                    detector_extent=detector_extent,
-                    detector_pixel_geometry=detector_pixel_geometry,
-                    detector_bit_depth=detector.bit_depth_readout,
-                    crop_center=crop_center,
-                    probe_energy_eV=probe_energy_eV,
-                    file_path=file_path,
-                )
+            metadata = DiffractionMetadata(
+                num_patterns_per_array=num_patterns_per_array,
+                num_patterns_total=detector_specific.num_patterns_total,
+                pattern_dtype=pattern_dtype,
+                detector_distance_m=detector.detector_distance_m,
+                detector_extent=detector_extent,
+                detector_pixel_geometry=detector_pixel_geometry,
+                detector_bit_depth=detector.bit_depth_readout,
+                crop_center=crop_center,
+                probe_energy_eV=probe_energy_eV,
+                file_path=file_path,
+            )
 
-                dataset = NeXusDiffractionDataset(metadata, contents_tree, entry)
+            dataset = NeXusDiffractionDataset(metadata, contents_tree, entry)
 
-                # vvv TODO This is a hack; remove when able! vvv
-                self.stage_rotation_deg = entry.sample.goniometer.chi_deg
-        except OSError:
-            logger.warning(f'Unable to read file "{file_path}".')
+            # vvv TODO This is a hack; remove when able! vvv
+            self.stage_rotation_deg = entry.sample.goniometer.chi_deg
 
         return dataset

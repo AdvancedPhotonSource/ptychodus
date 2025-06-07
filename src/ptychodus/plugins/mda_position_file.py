@@ -420,21 +420,18 @@ class MDAFile:
     def read(cls, file_path: Path) -> MDAFile:
         extra_pvs: list[MDAProcessVariable[Any]] = list()
 
-        try:
-            with file_path.open(mode='rb') as fp:
-                header = MDAHeader.read(fp)
-                scan = MDAScan.read(fp)
+        with file_path.open(mode='rb') as fp:
+            header = MDAHeader.read(fp)
+            scan = MDAScan.read(fp)
 
-                if header.has_extra_pvs:
-                    fp.seek(header.extra_pvs_offset)
-                    unpacker = xdrlib.Unpacker(fp.read())
-                    number_pvs = unpacker.unpack_int()
+            if header.has_extra_pvs:
+                fp.seek(header.extra_pvs_offset)
+                unpacker = xdrlib.Unpacker(fp.read())
+                number_pvs = unpacker.unpack_int()
 
-                    for pvidx in range(number_pvs):
-                        pv = cls._read_pv(unpacker)
-                        extra_pvs.append(pv)
-        except OSError as err:
-            logger.exception(err)
+                for pvidx in range(number_pvs):
+                    pv = cls._read_pv(unpacker)
+                    extra_pvs.append(pv)
 
         return cls(header, scan, extra_pvs)
 

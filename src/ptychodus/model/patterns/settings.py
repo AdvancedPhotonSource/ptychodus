@@ -63,8 +63,9 @@ class PatternSettings(Observable, Observer):
         self.pad_x = self._group.create_integer_parameter('PadX', 0, minimum=0)
         self.pad_y = self._group.create_integer_parameter('PadY', 0, minimum=0)
 
-        self.is_flip_x_enabled = self._group.create_boolean_parameter('FlipXEnabled', False)
-        self.is_flip_y_enabled = self._group.create_boolean_parameter('FlipYEnabled', False)
+        self.hflip = self._group.create_boolean_parameter('FlipHorizontal', False)
+        self.vflip = self._group.create_boolean_parameter('FlipVertical', False)
+        self.transpose = self._group.create_boolean_parameter('Transpose', False)
 
         self.is_value_lower_bound_enabled = self._group.create_boolean_parameter(
             'ValueLowerBoundEnabled', False

@@ -69,8 +69,9 @@ class DiffractionPatternProcessor:
     filter_values: DiffractionPatternFilterValues | None
     binning: DiffractionPatternBinning | None
     padding: DiffractionPatternPadding | None
-    flip_x: bool
-    flip_y: bool
+    hflip: bool
+    vflip: bool
+    transpose: bool
 
     def __call__(self, array: DiffractionPatternArray) -> DiffractionPatternArray:
         data = array.get_data()
@@ -93,10 +94,13 @@ class DiffractionPatternProcessor:
         if self.padding is not None:
             data = self.padding.apply(data)
 
-        if self.flip_y:
+        if self.hflip:
+            data = numpy.flip(data, axis=-1)
+
+        if self.vflip:
             data = numpy.flip(data, axis=-2)
 
-        if self.flip_x:
-            data = numpy.flip(data, axis=-1)
+        if self.transpose:
+            data = numpy.transpose(data, axes=(0, 2, 1))
 
         return SimpleDiffractionPatternArray(array.get_label(), array.get_indexes(), data)

@@ -28,12 +28,7 @@ class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
 
     def read(self, file_path: Path) -> DiffractionDataset:
         dataset = SimpleDiffractionDataset.create_null(file_path)
-
-        try:
-            contents = numpy.load(file_path)
-        except OSError:
-            logger.warning(f'Unable to read file "{file_path}".')
-            return dataset
+        contents = numpy.load(file_path)
 
         try:
             patterns = contents[self.PATTERNS]
