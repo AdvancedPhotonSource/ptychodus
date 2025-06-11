@@ -79,6 +79,7 @@ class LSQMLReconstructor(Reconstructor):
             momentum_acceleration_gain=self._settings.momentum_acceleration_gain.get_value(),
             momentum_acceleration_gradient_mixing_factor=momentum_acceleration_gradient_mixing_factor,
             rescale_probe_intensity_in_first_epoch=self._settings.rescale_probe_intensity_in_first_epoch.get_value(),
+            preconditioning_damping_factor=self._settings.preconditioning_damping_factor.get_value(),
         )
 
     def _create_object_options(self, object_: Object) -> LSQMLObjectOptions:

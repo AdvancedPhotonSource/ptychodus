@@ -53,7 +53,24 @@ class FromMemoryObjectBuilder(ObjectBuilder):
         geometry_provider: ObjectGeometryProvider,
         layer_spacing_m: Sequence[float],
     ) -> Object:
-        return self._object
+        object_geometry = geometry_provider.get_object_geometry()
+
+        try:
+            pixel_geometry = self._object.get_pixel_geometry()
+        except ValueError:
+            pixel_geometry = object_geometry.get_pixel_geometry()
+
+        try:
+            center = self._object.get_center()
+        except ValueError:
+            center = object_geometry.get_center()
+
+        return Object(
+            self._object.get_array(),
+            pixel_geometry,
+            center,
+            self._object.layer_spacing_m,
+        )
 
 
 class FromFileObjectBuilder(ObjectBuilder):

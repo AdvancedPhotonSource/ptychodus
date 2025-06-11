@@ -56,7 +56,7 @@ class DiffractionPatternPositionMatcher:
         pattern_indexes = [int(index) for index in self._dataset.get_assembled_indexes()]
         logger.debug(f'{pattern_indexes=}')
         position_indexes = [
-            point.index for point in input_product.positions if index_filter(point.index)
+            int(point.index) for point in input_product.positions if index_filter(point.index)
         ]
         logger.debug(f'{position_indexes=}')
         common_indexes = sorted(set(pattern_indexes).intersection(position_indexes))

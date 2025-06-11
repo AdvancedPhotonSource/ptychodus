@@ -57,6 +57,7 @@ class ExecuteReconstructorTask(ReconstructionTask):
         toc = time.perf_counter()
         logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
 
+        logger.debug(parameters)
         tic = time.perf_counter()
         result = self._reconstructor.reconstruct(parameters)
         toc = time.perf_counter()
