@@ -75,7 +75,7 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         APS2IDDiffractionFileReader(),
         simple_name='APS_2IDD',
-        display_name='APS 2-ID-D Files (*.h5 *.hdf5)',
+        display_name='APS 2-ID-D Microprobe Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_readers.register_plugin(
         APS2IDDiffractionFileReader(),
@@ -85,5 +85,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         APS2IDDiffractionFileReader(),
         simple_name='APS_BNP',
-        display_name='APS Bionanoprobe Files (*.h5 *.hdf5)',
+        display_name='APS 2-ID-D Bionanoprobe Files (*.h5 *.hdf5)',
     )

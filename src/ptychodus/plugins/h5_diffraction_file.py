@@ -191,17 +191,17 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(data_path='/entry/data/data'),
         simple_name='APS_Polar',
-        display_name='APS Polar Files (*.h5 *.hdf5)',
+        display_name='APS 4-ID Polar Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(data_path='/exchange/data'),
         simple_name='APS_CSSI',
-        display_name='APS CSSI Files (*.h5 *.hdf5)',
+        display_name='APS 9-ID CSSI Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(data_path='/entry/data/data'),
         simple_name='APS_HXN',
-        display_name='CNM/APS HXN Files (*.h5 *.hdf5)',
+        display_name='CNM/APS 26-ID Hard X-ray Nanoprobe Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(data_path='/entry/measurement/Eiger/data'),

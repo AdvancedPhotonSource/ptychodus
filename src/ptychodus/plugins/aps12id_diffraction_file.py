@@ -101,6 +101,6 @@ class APS12IDDiffractionFileReader(DiffractionFileReader):
 def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         APS12IDDiffractionFileReader(),
-        simple_name='APS_12ID',
-        display_name='APS 12-ID Files (*.h5 *.hdf5)',
+        simple_name='APS_PtychoSAXS',
+        display_name='APS 12-ID PtychoSAXS Files (*.h5 *.hdf5)',
     )

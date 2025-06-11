@@ -60,5 +60,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         LYNXDiffractionFileReader(),
         simple_name='APS_LYNX',
-        display_name='APS LYNX Files (*.h5 *.hdf5)',
+        display_name='APS 31-ID-E LYNX Files (*.h5 *.hdf5)',
     )

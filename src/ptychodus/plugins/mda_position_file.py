@@ -503,22 +503,22 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.position_file_readers.register_plugin(
         MDAPositionFileReader(scale_to_meters=1.0e-3),
         simple_name='APS_2IDD',
-        display_name='APS 2-ID-D Files (*.mda)',
+        display_name='APS 2-ID-D Microprobe Files (*.mda)',
     )
     registry.position_file_readers.register_plugin(
         MDAPositionFileReader(scale_to_meters=1.0e-3),
-        simple_name='APS_2IDE',  # 2-ID-E XFM instrument
+        simple_name='APS_2IDE',
         display_name='APS 2-ID-E Microprobe Files (*.mda)',
     )
     registry.position_file_readers.register_plugin(
         MDAPositionFileReader(scale_to_meters=1.0e-6),
         simple_name='APS_BNP',
-        display_name='APS Bionanoprobe Files (*.h5 *.hdf5)',
+        display_name='APS 2-ID-D Bionanoprobe Files (*.h5 *.hdf5)',
     )
     registry.position_file_readers.register_plugin(
         HXNPositionFileReader(),
         simple_name='CNM_APS_HXN',
-        display_name='CNM/APS HXN Files (*.mda)',
+        display_name='CNM/APS Hard X-ray Nanoprobe Files (*.mda)',
     )
 
 

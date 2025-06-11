@@ -9,16 +9,16 @@ def register_plugins(registry: PluginRegistry) -> None:
 
     registry.diffraction_file_readers.register_plugin(
         nexus_file_reader,
-        simple_name='NeXus',
-        display_name='NeXus Master Files (*.h5 *.hdf5)',
+        simple_name='APS_Velociprobe',
+        display_name='APS 33-ID Velociprobe Files (*.h5 *.hdf5)',
     )
     registry.position_file_readers.register_plugin(
         VelociprobePositionFileReader.create_laser_interferometer_instance(nexus_file_reader),
-        simple_name='APS_Velociprobe-LI',
-        display_name='APS Velociprobe Files - Laser Interferometer (*.txt)',
+        simple_name='APS_Velociprobe_LI',
+        display_name='APS 33-ID Velociprobe Files - Laser Interferometer (*.txt)',
     )
     registry.position_file_readers.register_plugin(
         VelociprobePositionFileReader.create_position_encoder_instance(nexus_file_reader),
-        simple_name='APS_Velociprobe-PE',
-        display_name='APS Velociprobe Files - Position Encoder (*.txt)',
+        simple_name='APS_Velociprobe_PE',
+        display_name='APS 33-ID Velociprobe Files - Position Encoder (*.txt)',
     )

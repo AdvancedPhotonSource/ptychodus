@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 
 class NSLSIIDiffractionFileReader(DiffractionFileReader):
-    SIMPLE_NAME: Final[str] = 'NSLS-II'
-    DISPLAY_NAME: Final[str] = 'NSLS-II Files (*.mat)'
+    SIMPLE_NAME: Final[str] = 'NSLS_II'
+    DISPLAY_NAME: Final[str] = 'NSLS-II MATLAB Files (*.mat)'
     ONE_MICRON_M: Final[float] = 1e-6
 
     def __init__(self) -> None:

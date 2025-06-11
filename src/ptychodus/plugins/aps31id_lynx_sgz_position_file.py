@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class LYNXSoftGlueZynqPositionFileReader(PositionFileReader):
     SIMPLE_NAME: Final[str] = 'APS_LYNX_SoftGlueZynq'
-    DISPLAY_NAME: Final[str] = 'APS LYNX SoftGlueZynq Files (*.dat)'
+    DISPLAY_NAME: Final[str] = 'APS 31-ID-E LYNX SoftGlueZynq Files (*.dat)'
     MICRONS_TO_METERS: Final[float] = 1.0e-6
 
     EXPECTED_HEADER_RAW: Final[list[str]] = [

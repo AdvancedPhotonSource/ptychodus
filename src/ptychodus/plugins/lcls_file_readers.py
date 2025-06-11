@@ -143,7 +143,7 @@ class LCLSPositionFileReader(PositionFileReader):
 
 def register_plugins(registry: PluginRegistry) -> None:
     SIMPLE_NAME: Final[str] = 'LCLS_XPP'  # noqa: N806
-    DISPLAY_NAME: Final[str] = 'LCLS XPP Files (*.h5 *.hdf5)'  # noqa: N806
+    DISPLAY_NAME: Final[str] = 'LCLS X-ray Pump Probe Files (*.h5 *.hdf5)'  # noqa: N806
 
     registry.diffraction_file_readers.register_plugin(
         LCLSDiffractionFileReader(),

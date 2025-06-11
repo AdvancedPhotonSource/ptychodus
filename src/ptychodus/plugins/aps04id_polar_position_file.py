@@ -43,5 +43,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.position_file_readers.register_plugin(
         PolarPositionFileReader(),
         simple_name='APS_Polar',
-        display_name='APS Polar Files (*.h5 *.hdf5)',
+        display_name='APS 4-ID Polar Files (*.h5 *.hdf5)',
     )

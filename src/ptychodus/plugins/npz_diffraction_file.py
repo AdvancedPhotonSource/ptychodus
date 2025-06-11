@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
     SIMPLE_NAME: Final[str] = 'NPZ'
-    DISPLAY_NAME: Final[str] = 'NumPy Zipped Archive (*.npz)'
+    DISPLAY_NAME: Final[str] = 'Ptychodus NumPy Zipped Archive (*.npz)'
 
     INDEXES: Final[str] = 'indexes'
     PATTERNS: Final[str] = 'patterns'

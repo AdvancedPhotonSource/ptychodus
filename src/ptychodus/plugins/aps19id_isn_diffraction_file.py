@@ -93,5 +93,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         ISNDiffractionFileReader(),
         simple_name='APS_ISN',
-        display_name='APS ISN Files (*.h5 *.hdf5)',
+        display_name='APS 19-ID In-Situ Nanoprobe Files (*.h5 *.hdf5)',
     )
