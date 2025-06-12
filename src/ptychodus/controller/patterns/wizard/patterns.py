@@ -233,7 +233,13 @@ class PatternPaddingViewController(CheckableGroupBoxParameterViewController):
 
 
 class PatternTransformViewController:
-    def __init__(self, settings: PatternSettings) -> None:
+    def __init__(self, settings: PatternSettings, file_dialog_factory: FileDialogFactory) -> None:
+        self._bad_pixels_view_controller = PathParameterViewController.create_file_opener(
+            settings.bad_pixels_file_path,
+            file_dialog_factory,
+            # FIXME name_filters=name_filters,
+            # FIXME selected_name_filter=settings.bad_pixels_file_type.get_value(),
+        )
         self._hflip_view_controller = CheckBoxParameterViewController(
             settings.hflip, 'Flip Horizontal'
         )
@@ -257,14 +263,16 @@ class PatternTransformViewController:
         )
 
         layout = QGridLayout()
-        layout.addWidget(QLabel('Axes:'), 0, 0)
-        layout.addWidget(self._hflip_view_controller.get_widget(), 0, 1)
-        layout.addWidget(self._vflip_view_controller.get_widget(), 0, 2)
-        layout.addWidget(self._transpose_view_controller.get_widget(), 0, 3)
-        layout.addWidget(self._lower_bound_enabled_view_controller.get_widget(), 1, 0)
-        layout.addWidget(self._lower_bound_view_controller.get_widget(), 1, 1, 1, 3)
-        layout.addWidget(self._upper_bound_enabled_view_controller.get_widget(), 2, 0)
-        layout.addWidget(self._upper_bound_view_controller.get_widget(), 2, 1, 1, 3)
+        layout.addWidget(QLabel('Bad Pixels:'), 0, 0)
+        layout.addWidget(self._bad_pixels_view_controller.get_widget(), 0, 1, 1, 3)
+        layout.addWidget(QLabel('Axes:'), 1, 0)
+        layout.addWidget(self._hflip_view_controller.get_widget(), 1, 1)
+        layout.addWidget(self._vflip_view_controller.get_widget(), 1, 2)
+        layout.addWidget(self._transpose_view_controller.get_widget(), 1, 3)
+        layout.addWidget(self._lower_bound_enabled_view_controller.get_widget(), 2, 0)
+        layout.addWidget(self._lower_bound_view_controller.get_widget(), 2, 1, 1, 3)
+        layout.addWidget(self._upper_bound_enabled_view_controller.get_widget(), 3, 0)
+        layout.addWidget(self._upper_bound_view_controller.get_widget(), 3, 1, 1, 3)
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
         layout.setColumnStretch(3, 1)
@@ -287,7 +295,9 @@ class OpenDatasetWizardPatternsViewController(ParameterViewController):
         self._crop_view_controller = PatternCropViewController(settings, sizer)
         self._binning_view_controller = PatternBinningViewController(settings, sizer)
         self._padding_view_controller = PatternPaddingViewController(settings, sizer)
-        self._transform_view_controller = PatternTransformViewController(settings)
+        self._transform_view_controller = PatternTransformViewController(
+            settings, file_dialog_factory
+        )
 
         layout = QVBoxLayout()
         layout.addWidget(self._load_view_controller.get_widget())

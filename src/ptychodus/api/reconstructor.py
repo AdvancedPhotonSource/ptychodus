@@ -4,16 +4,14 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from ptychodus.api.typing import BooleanArrayType
-
-from .patterns import PatternDataType
+from .patterns import BadPixelsArray, PatternDataType
 from .product import Product
 
 
 @dataclass(frozen=True)
 class ReconstructInput:
     patterns: PatternDataType
-    bad_pixels: BooleanArrayType
+    bad_pixels: BadPixelsArray
     product: Product
 
 

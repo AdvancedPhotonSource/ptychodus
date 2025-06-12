@@ -11,6 +11,7 @@ import numpy.typing
 from .geometry import ImageExtent, PixelGeometry
 from .tree import SimpleTreeNode
 
+BadPixelsArray: TypeAlias = numpy.typing.NDArray[numpy.bool_]
 PatternDataType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
 PatternIndexesType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
 
@@ -145,4 +146,13 @@ class DiffractionFileWriter(ABC):
     @abstractmethod
     def write(self, file_path: Path, dataset: DiffractionDataset) -> None:
         """writes a diffraction dataset to file"""
+        pass
+
+
+class BadPixelsFileReader(ABC):
+    """interface for plugins that read bad pixel files"""
+
+    @abstractmethod
+    def read(self, file_path: Path) -> BadPixelsArray:
+        """reads a bad pixels array from file"""
         pass

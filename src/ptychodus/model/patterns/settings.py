@@ -31,8 +31,8 @@ class PatternSettings(Observable, Observer):
         self._group = registry.create_group('Patterns')
         self._group.add_observer(self)
 
-        self.file_type = self._group.create_string_parameter('FileType', 'NPZ')
-        self.file_path = self._group.create_path_parameter('FilePath', Path('/path/to/data.h5'))
+        self.file_type = self._group.create_string_parameter('FileType', 'NPY')
+        self.file_path = self._group.create_path_parameter('FilePath', Path('/path/to/data.npy'))
         self.is_memmap_enabled = self._group.create_boolean_parameter('MemmapEnabled', False)
         self.scratch_directory = self._group.create_path_parameter(
             'ScratchDirectory', Path.home() / '.ptychodus'
@@ -41,6 +41,12 @@ class PatternSettings(Observable, Observer):
             'NumberOfDataThreads', 8, minimum=1, maximum=64
         )
 
+        self.bad_pixels_file_type = self._group.create_string_parameter(
+            'BadPixelsFileType', 'NPY_Bad_Pixels'
+        )
+        self.bad_pixels_file_path = self._group.create_path_parameter(
+            'BadPixelsFilePath', Path('/path/to/bad_pixels.npy')
+        )
         self.is_crop_enabled = self._group.create_boolean_parameter('CropEnabled', True)
         self.crop_center_x_px = self._group.create_integer_parameter(
             'CropCenterXInPixels', 32, minimum=0

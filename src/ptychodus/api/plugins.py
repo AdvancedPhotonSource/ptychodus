@@ -18,7 +18,7 @@ from .fluorescence import (
 from .object import ObjectFileReader, ObjectFileWriter, Object
 from .observer import Observable, Observer
 from .parametric import StringParameter
-from .patterns import DiffractionFileReader, DiffractionFileWriter
+from .patterns import BadPixelsFileReader, DiffractionFileReader, DiffractionFileWriter
 from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter, ProbeSequence
 from .product import ProductFileReader, ProductFileWriter
 from .scan import PositionFileReader, PositionFileWriter, PositionSequence
@@ -127,6 +127,7 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
 
 class PluginRegistry:
     def __init__(self) -> None:
+        self.bad_pixels_file_readers = PluginChooser[BadPixelsFileReader]()
         self.diffraction_file_readers = PluginChooser[DiffractionFileReader]()
         self.diffraction_file_writers = PluginChooser[DiffractionFileWriter]()
         self.position_file_readers = PluginChooser[PositionFileReader]()

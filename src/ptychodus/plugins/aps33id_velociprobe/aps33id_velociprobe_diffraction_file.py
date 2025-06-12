@@ -185,7 +185,7 @@ class EntryGroup:
         return cls(data, instrument, sample)
 
 
-class NeXusDiffractionDataset(DiffractionDataset):
+class VelociprobeDiffractionDataset(DiffractionDataset):
     def __init__(
         self,
         metadata: DiffractionMetadata,
@@ -217,7 +217,7 @@ class NeXusDiffractionDataset(DiffractionDataset):
         return len(self._entry.data)
 
 
-class NeXusDiffractionFileReader(DiffractionFileReader):
+class VelociprobeDiffractionFileReader(DiffractionFileReader):
     def __init__(self) -> None:
         super().__init__()
         self._tree_builder = H5DiffractionFileTreeBuilder()
@@ -233,7 +233,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
             try:
                 h5_dataset = h5_file['/entry/data/data_000001']
             except KeyError:
-                logger.error(f'File {file_path} is not a NeXus data file.')
+                logger.error(f'File {file_path} is not a Velociprobe data file.')
                 raise
 
             num_patterns_per_array = h5_dataset.shape[0]
@@ -242,7 +242,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
             try:
                 entry = EntryGroup.read(h5_file['entry'], num_patterns_per_array)
             except KeyError:
-                logger.error(f'File {file_path} is not a NeXus data file.')
+                logger.error(f'File {file_path} is not a Velociprobe data file.')
                 raise
 
             detector = entry.instrument.detector
@@ -275,7 +275,7 @@ class NeXusDiffractionFileReader(DiffractionFileReader):
                 file_path=file_path,
             )
 
-            dataset = NeXusDiffractionDataset(metadata, contents_tree, entry)
+            dataset = VelociprobeDiffractionDataset(metadata, contents_tree, entry)
 
             # vvv TODO This is a hack; remove when able! vvv
             self.stage_rotation_deg = entry.sample.goniometer.chi_deg
