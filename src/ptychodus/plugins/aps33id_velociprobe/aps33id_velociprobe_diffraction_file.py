@@ -10,6 +10,7 @@ import numpy
 
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.patterns import (
+    BadPixelsArray,
     CropCenter,
     DiffractionDataset,
     DiffractionFileReader,
@@ -201,6 +202,9 @@ class VelociprobeDiffractionDataset(DiffractionDataset):
 
     def get_contents_tree(self) -> SimpleTreeNode:
         return self._contents_tree
+
+    def get_bad_pixels(self) -> BadPixelsArray | None:
+        return None
 
     @overload
     def __getitem__(self, index: int) -> DiffractionPatternArray: ...

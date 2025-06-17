@@ -81,14 +81,13 @@ class DiffractionPatternProcessor:
         elif data.ndim != 3:
             raise ValueError(f'Invalid diffraction pattern dimensions! (shape={data.shape})')
 
-        if self.crop is not None:
-            data = self.crop.apply(data)
-
         if self.filter_values is not None:
             data = self.filter_values.apply(data)
 
+        if self.crop is not None:
+            data = self.crop.apply(data)
+
         if self.binning is not None:
-            # TODO handle binning with bad pixels
             data = self.binning.apply(data)
 
         if self.padding is not None:

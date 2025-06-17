@@ -20,6 +20,13 @@ class DetectorSettings(Observable, Observer):
         )
         self.bit_depth = self._group.create_integer_parameter('BitDepth', 8, minimum=1)
 
+        self.bad_pixels_file_type = self._group.create_string_parameter(
+            'BadPixelsFileType', 'NPY_Bad_Pixels'
+        )
+        self.bad_pixels_file_path = self._group.create_path_parameter(
+            'BadPixelsFilePath', Path('/path/to/bad_pixels.npy')
+        )
+
     def _update(self, observable: Observable) -> None:
         if observable is self._group:
             self.notify_observers()
@@ -41,12 +48,6 @@ class PatternSettings(Observable, Observer):
             'NumberOfDataThreads', 8, minimum=1, maximum=64
         )
 
-        self.bad_pixels_file_type = self._group.create_string_parameter(
-            'BadPixelsFileType', 'NPY_Bad_Pixels'
-        )
-        self.bad_pixels_file_path = self._group.create_path_parameter(
-            'BadPixelsFilePath', Path('/path/to/bad_pixels.npy')
-        )
         self.is_crop_enabled = self._group.create_boolean_parameter('CropEnabled', True)
         self.crop_center_x_px = self._group.create_integer_parameter(
             'CropCenterXInPixels', 32, minimum=0

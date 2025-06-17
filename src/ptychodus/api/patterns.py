@@ -90,6 +90,10 @@ class DiffractionDataset(Sequence[DiffractionPatternArray]):
     def get_contents_tree(self) -> SimpleTreeNode:
         pass
 
+    @abstractmethod
+    def get_bad_pixels(self) -> BadPixelsArray | None:
+        pass
+
 
 class SimpleDiffractionDataset(DiffractionDataset):
     def __init__(
@@ -97,11 +101,13 @@ class SimpleDiffractionDataset(DiffractionDataset):
         metadata: DiffractionMetadata,
         contents_tree: SimpleTreeNode,
         array_list: list[DiffractionPatternArray],
+        bad_pixels: BadPixelsArray | None = None,
     ) -> None:
         super().__init__()
         self._metadata = metadata
         self._contents_tree = contents_tree
         self._array_list = array_list
+        self._bad_pixels = bad_pixels
 
     @classmethod
     def create_null(cls, file_path: Path | None = None) -> SimpleDiffractionDataset:
@@ -115,6 +121,9 @@ class SimpleDiffractionDataset(DiffractionDataset):
 
     def get_contents_tree(self) -> SimpleTreeNode:
         return self._contents_tree
+
+    def get_bad_pixels(self) -> BadPixelsArray | None:
+        return self._bad_pixels
 
     @overload
     def __getitem__(self, index: int) -> DiffractionPatternArray: ...

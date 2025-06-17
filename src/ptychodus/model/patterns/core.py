@@ -2,6 +2,7 @@ import logging
 
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.patterns import (
+    BadPixelsFileReader,
     DiffractionFileReader,
     DiffractionFileWriter,
 )
@@ -20,6 +21,7 @@ class PatternsCore(Observer):
     def __init__(
         self,
         settings_registry: SettingsRegistry,
+        bad_pixels_file_reader_chooser: PluginChooser[BadPixelsFileReader],
         file_reader_chooser: PluginChooser[DiffractionFileReader],
         file_writer_chooser: PluginChooser[DiffractionFileWriter],
         reinit_observable: Observable,
@@ -33,10 +35,14 @@ class PatternsCore(Observer):
             self.pattern_settings,
             self.detector_settings,
             self.dataset,
+            bad_pixels_file_reader_chooser,
             file_reader_chooser,
             file_writer_chooser,
         )
 
+        bad_pixels_file_reader_chooser.synchronize_with_parameter(
+            self.detector_settings.bad_pixels_file_type
+        )
         file_reader_chooser.synchronize_with_parameter(self.pattern_settings.file_type)
         file_writer_chooser.set_current_plugin(self.pattern_settings.file_type.get_value())
 
@@ -51,6 +57,10 @@ class PatternsCore(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._reinit_observable:
+            self.patterns_api.load_bad_pixels(
+                file_path=self.detector_settings.bad_pixels_file_path.get_value(),
+                file_type=self.detector_settings.bad_pixels_file_type.get_value(),
+            )
             self.patterns_api.open_patterns(
                 file_path=self.pattern_settings.file_path.get_value(),
                 file_type=self.pattern_settings.file_type.get_value(),

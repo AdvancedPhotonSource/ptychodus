@@ -19,7 +19,7 @@ from ..data import FileDialogFactory
 from ..image import ImageController
 from ..parametric import LengthWidgetParameterViewController, SpinBoxParameterViewController
 from .dataset import DatasetTreeModel
-from .info import PatternsInfoViewController
+from .dataset_file_layout import DatasetFileLayoutViewController
 from .wizard import OpenDatasetWizardController
 
 logger = logging.getLogger(__name__)
@@ -83,12 +83,19 @@ class PatternsController(DiffractionDatasetObserver):
         view.tree_view.selectionModel().currentChanged.connect(self._update_view)
         self._update_view(QModelIndex(), QModelIndex())
 
-        view.button_box.open_button.clicked.connect(self._wizard_controller.open_dataset)
-        view.button_box.save_button.clicked.connect(self._save_dataset)
-        view.button_box.info_button.clicked.connect(self._open_patterns_info)
-        view.button_box.close_button.clicked.connect(self._close_dataset)
-        dataset.add_observer(self)
+        open_bad_pixels_action = view.button_box.load_menu.addAction('Open Bad Pixels...')
+        open_bad_pixels_action.triggered.connect(self._open_bad_pixels)
 
+        open_dataset_action = view.button_box.load_menu.addAction('Open Dataset...')
+        open_dataset_action.triggered.connect(self._wizard_controller.open_dataset)
+
+        view.button_box.save_button.clicked.connect(self._save_dataset)
+        view.button_box.close_button.clicked.connect(self._close_dataset)
+
+        file_layout_action = view.button_box.analyze_menu.addAction('Dataset File Layout...')
+        file_layout_action.triggered.connect(self._show_file_layout)
+
+        dataset.add_observer(self)
         self._sync_model_to_view()
 
     def _update_view(self, current: QModelIndex, previous: QModelIndex) -> None:
@@ -99,6 +106,23 @@ class PatternsController(DiffractionDatasetObserver):
             self._image_controller.set_array(data, pixel_geometry)
         else:
             self._image_controller.clear_array()
+
+    def _open_bad_pixels(self) -> None:
+        file_reader_chooser = self._patterns_api.get_bad_pixels_file_reader_chooser()
+        current_plugin = file_reader_chooser.get_current_plugin()
+        file_path, name_filter = self._file_dialog_factory.get_open_file_path(
+            self._view,
+            'Open Bad Pixels File',
+            name_filters=[plugin.simple_name for plugin in file_reader_chooser],
+            selected_name_filter=current_plugin.simple_name,
+        )
+
+        if file_path:
+            try:
+                self._patterns_api.load_bad_pixels(file_path, file_type=name_filter)
+            except Exception as exc:
+                logger.exception(exc)
+                ExceptionDialog.show_exception('Bad Pixels File Reader', exc)
 
     def _save_dataset(self) -> None:
         file_writer_chooser = self._patterns_api.get_file_writer_chooser()
@@ -112,12 +136,12 @@ class PatternsController(DiffractionDatasetObserver):
         if file_path:
             try:
                 self._patterns_api.save_patterns(file_path, name_filter)
-            except Exception as err:
-                logger.exception(err)
-                ExceptionDialog.show_exception('File Writer', err)
+            except Exception as exc:
+                logger.exception(exc)
+                ExceptionDialog.show_exception('File Writer', exc)
 
-    def _open_patterns_info(self) -> None:
-        PatternsInfoViewController.show_info(self._dataset, self._view)
+    def _show_file_layout(self) -> None:
+        DatasetFileLayoutViewController.show_dialog(self._dataset, self._view)
 
     def _close_dataset(self) -> None:
         button = QMessageBox.question(

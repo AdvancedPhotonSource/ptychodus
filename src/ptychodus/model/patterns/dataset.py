@@ -224,6 +224,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
         self._data: PatternDataType = numpy.zeros((0, 0, 0), dtype=int)
         self._arrays: list[AssembledDiffractionPatternArray] = list()
         self._array_counter = 0
+        self._bad_pixels: BadPixelsArray | None = None
 
     @property
     def queue_size(self) -> int:
@@ -269,8 +270,16 @@ class AssembledDiffractionDataset(DiffractionDataset):
     def get_metadata(self) -> DiffractionMetadata:
         return self._metadata
 
+    def set_bad_pixels(self, bad_pixels: BadPixelsArray) -> None:
+        self._bad_pixels = bad_pixels
+
+    def get_bad_pixels(self) -> BadPixelsArray | None:
+        return self._bad_pixels
+
     def get_processed_bad_pixels(self) -> BadPixelsArray:
-        # FIXME support loading from file; keep consistent with processed patterns
+        # FIXME where are the patterns file_path and bad pixels file_path sync'd to settings?
+        processor = self._sizer.get_processor()
+        # FIXME return processor.process_bad_pixels(self._bad_pixels)
         pattern_extent = self._sizer.get_processed_image_extent()
         return numpy.full(pattern_extent.shape, False)
 
@@ -303,7 +312,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
     def append_array(self, array: DiffractionPatternArray) -> None:
         """Load a new array into the dataset. Assumes that arrays arrive in order."""
-        task = ArrayLoaderTask(array, int(self._array_counter))
+        task = ArrayLoaderTask(array, self._array_counter)
         self._array_counter += 1
         self._loader.submit_task(task)
 
@@ -379,6 +388,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
             self._indexes = contents['indexes']
             self._data = contents['patterns']
+            self._bad_pixels = contents.get('bad_pixels', None)
             num_patterns, detector_height, detector_width = self._data.shape
 
             self._contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
