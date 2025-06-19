@@ -28,56 +28,51 @@ class CXIDiffractionFileReader(DiffractionFileReader):
         self._tree_builder = H5DiffractionFileTreeBuilder()
 
     def read(self, file_path: Path) -> DiffractionDataset:
-        dataset = SimpleDiffractionDataset.create_null(file_path)
+        with h5py.File(file_path, 'r') as h5_file:
+            contents_tree = self._tree_builder.build(h5_file)
 
-        try:
-            with h5py.File(file_path, 'r') as h5_file:
-                contents_tree = self._tree_builder.build(h5_file)
+            try:
+                data = h5_file[self._data_path]
+            except KeyError:
+                logger.warning('Unable to load data.')
+            else:
+                num_patterns, detector_height, detector_width = data.shape
 
-                try:
-                    data = h5_file[self._data_path]
-                except KeyError:
-                    logger.warning('Unable to load data.')
-                else:
-                    num_patterns, detector_height, detector_width = data.shape
+                detector_extent = ImageExtent(detector_width, detector_height)
+                detector_distance_m = float(
+                    h5_file['/entry_1/instrument_1/detector_1/distance'][()]
+                )
+                detector_pixel_geometry = PixelGeometry(
+                    float(h5_file['/entry_1/instrument_1/detector_1/x_pixel_size'][()]),
+                    float(h5_file['/entry_1/instrument_1/detector_1/y_pixel_size'][()]),
+                )
+                probe_energy_J = float(h5_file['/entry_1/instrument_1/source_1/energy'][()])  # noqa: N806
+                probe_energy_eV = probe_energy_J / ELECTRON_VOLT_J  # noqa: N806
 
-                    detector_extent = ImageExtent(detector_width, detector_height)
-                    detector_distance_m = float(
-                        h5_file['/entry_1/instrument_1/detector_1/distance'][()]
-                    )
-                    detector_pixel_geometry = PixelGeometry(
-                        float(h5_file['/entry_1/instrument_1/detector_1/x_pixel_size'][()]),
-                        float(h5_file['/entry_1/instrument_1/detector_1/y_pixel_size'][()]),
-                    )
-                    probe_energy_J = float(h5_file['/entry_1/instrument_1/source_1/energy'][()])  # noqa: N806
-                    probe_energy_eV = probe_energy_J / ELECTRON_VOLT_J  # noqa: N806
+                # TODO load detector mask; zeros are good pixels
+                # /entry_1/instrument_1/detector_1/mask Dataset {512, 512}
 
-                    # TODO load detector mask; zeros are good pixels
-                    # /entry_1/instrument_1/detector_1/mask Dataset {512, 512}
+                metadata = DiffractionMetadata(
+                    num_patterns_per_array=num_patterns,
+                    num_patterns_total=num_patterns,
+                    pattern_dtype=data.dtype,
+                    detector_distance_m=detector_distance_m,
+                    detector_extent=detector_extent,
+                    detector_pixel_geometry=detector_pixel_geometry,
+                    probe_energy_eV=probe_energy_eV,
+                    file_path=file_path,
+                )
 
-                    metadata = DiffractionMetadata(
-                        num_patterns_per_array=num_patterns,
-                        num_patterns_total=num_patterns,
-                        pattern_dtype=data.dtype,
-                        detector_distance_m=detector_distance_m,
-                        detector_extent=detector_extent,
-                        detector_pixel_geometry=detector_pixel_geometry,
-                        probe_energy_eV=probe_energy_eV,
-                        file_path=file_path,
-                    )
+                array = H5DiffractionPatternArray(
+                    label=file_path.stem,
+                    indexes=numpy.arange(num_patterns),
+                    file_path=file_path,
+                    data_path=self._data_path,
+                )
 
-                    array = H5DiffractionPatternArray(
-                        label=file_path.stem,
-                        indexes=numpy.arange(num_patterns),
-                        file_path=file_path,
-                        data_path=self._data_path,
-                    )
+                return SimpleDiffractionDataset(metadata, contents_tree, [array])
 
-                    dataset = SimpleDiffractionDataset(metadata, contents_tree, [array])
-        except OSError:
-            logger.warning(f'Unable to read file "{file_path}".')
-
-        return dataset
+        return SimpleDiffractionDataset.create_null(file_path)
 
 
 class CXIPositionFileReader(PositionFileReader):

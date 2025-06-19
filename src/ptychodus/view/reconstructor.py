@@ -54,9 +54,9 @@ class ReconstructorProgressDialog(QDialog):
         self.button_box = QDialogButtonBox()
 
         self.setWindowTitle('Reconstruction Progress')
-        self.button_box.addButton(QDialogButtonBox.Ok)
+        self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
         self.button_box.accepted.connect(self.accept)
-        self.button_box.addButton(QDialogButtonBox.Cancel)
+        self.button_box.addButton(QDialogButtonBox.StandardButton.Cancel)
         self.button_box.rejected.connect(self.reject)
 
         layout = QVBoxLayout()

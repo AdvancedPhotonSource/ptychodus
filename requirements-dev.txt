@@ -15,6 +15,9 @@ scikit-image
 scipy
 setuptools>=64
 setuptools_scm>=8
+sphinx
+sphinx-copybutton
+sphinx-rtd-theme
 tifffile
 toml
 watchdog

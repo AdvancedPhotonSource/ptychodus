@@ -6,7 +6,7 @@ from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 from ptychodus.api.tree import SimpleTreeNode
 
 from ...model.patterns import AssembledDiffractionDataset, DiffractionDatasetObserver
-from ...view.patterns import PatternsInfoDialog
+from ...view.patterns import DatasetFileLayoutDialog
 
 
 class SimpleTreeModel(QAbstractItemModel):
@@ -91,20 +91,20 @@ class SimpleTreeModel(QAbstractItemModel):
         return len(node.item_data)
 
 
-class PatternsInfoViewController(DiffractionDatasetObserver):
+class DatasetLayoutViewController(DiffractionDatasetObserver):
     def __init__(self, dataset: AssembledDiffractionDataset, tree_model: SimpleTreeModel) -> None:
         super().__init__()
         self._dataset = dataset
         self._tree_model = tree_model
 
     @classmethod
-    def show_info(cls, dataset: AssembledDiffractionDataset, parent: QWidget) -> None:
+    def show_dialog(cls, dataset: AssembledDiffractionDataset, parent: QWidget) -> None:
         tree_model = SimpleTreeModel(dataset.get_contents_tree())
         controller = cls(dataset, tree_model)
         dataset.add_observer(controller)
 
-        dialog = PatternsInfoDialog(parent)
-        dialog.setWindowTitle('Patterns Info')
+        dialog = DatasetFileLayoutDialog(parent)
+        dialog.setWindowTitle('Dataset File Layout')
         dialog.tree_view.setModel(tree_model)
 
         controller._sync_model_to_view()
@@ -112,6 +112,9 @@ class PatternsInfoViewController(DiffractionDatasetObserver):
 
     def _sync_model_to_view(self) -> None:
         self._tree_model.set_root_node(self._dataset.get_contents_tree())
+
+    def handle_bad_pixels_changed(self, num_bad_pixels: int) -> None:
+        pass
 
     def handle_array_inserted(self, index: int) -> None:
         pass

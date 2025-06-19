@@ -5,6 +5,7 @@ import numpy
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.patterns import (
+    BadPixelsArray,
     CropCenter,
     DiffractionPatternArray,
     PatternDataType,
@@ -37,6 +38,9 @@ class DiffractionPatternCrop:
         radius_y = extent.height_px // 2
         self.slice_y = slice(center_y - radius_y, center_y + radius_y)
 
+    def apply_bool(self, data: BadPixelsArray) -> BadPixelsArray:
+        return data[self.slice_y, self.slice_x]
+
     def apply(self, data: PatternDataType) -> PatternDataType:
         return data[:, self.slice_y, self.slice_x]
 
@@ -45,6 +49,12 @@ class DiffractionPatternCrop:
 class DiffractionPatternBinning:
     bin_size_x: int
     bin_size_y: int
+
+    def apply_bool(self, data: BadPixelsArray) -> BadPixelsArray:
+        binned_width = data.shape[-1] // self.bin_size_x
+        binned_height = data.shape[-2] // self.bin_size_y
+        shape = (binned_height, self.bin_size_y, binned_width, self.bin_size_x)
+        return numpy.logical_and.reduce(data.reshape(shape), axis=(-3, -1), keepdims=False)
 
     def apply(self, data: PatternDataType) -> PatternDataType:
         binned_width = data.shape[-1] // self.bin_size_x
@@ -58,6 +68,10 @@ class DiffractionPatternPadding:
     pad_x: int
     pad_y: int
 
+    def apply_bool(self, data: BadPixelsArray) -> BadPixelsArray:
+        pad_width = (self.pad_y, self.pad_y, self.pad_x, self.pad_x)
+        return numpy.pad(data, pad_width, mode='constant', constant_values=False)
+
     def apply(self, data: PatternDataType) -> PatternDataType:
         pad_width = (0, 0, self.pad_y, self.pad_y, self.pad_x, self.pad_x)
         return numpy.pad(data, pad_width, mode='constant', constant_values=0)
@@ -69,32 +83,63 @@ class DiffractionPatternProcessor:
     filter_values: DiffractionPatternFilterValues | None
     binning: DiffractionPatternBinning | None
     padding: DiffractionPatternPadding | None
-    flip_x: bool
-    flip_y: bool
+    hflip: bool
+    vflip: bool
+    transpose: bool
+
+    def process_bad_pixels(self, bad_pixels: BadPixelsArray) -> BadPixelsArray:
+        if bad_pixels.ndim != 2:
+            raise ValueError(f'Invalid bad_pixel dimensions! (shape={bad_pixels.shape})')
+
+        processed_bad_pixels = bad_pixels.copy()
+
+        if self.crop is not None:
+            processed_bad_pixels = self.crop.apply_bool(processed_bad_pixels)
+
+        if self.binning is not None:
+            processed_bad_pixels = self.binning.apply_bool(processed_bad_pixels)
+
+        if self.padding is not None:
+            processed_bad_pixels = self.padding.apply_bool(processed_bad_pixels)
+
+        if self.hflip:
+            processed_bad_pixels = numpy.flip(processed_bad_pixels, axis=-1)
+
+        if self.vflip:
+            processed_bad_pixels = numpy.flip(processed_bad_pixels, axis=-2)
+
+        if self.transpose:
+            processed_bad_pixels = numpy.transpose(processed_bad_pixels, axes=(0, 2, 1))
+
+        return processed_bad_pixels
 
     def __call__(self, array: DiffractionPatternArray) -> DiffractionPatternArray:
         data = array.get_data()
 
-        if data.ndim != 3:
+        if data.ndim == 2:
+            data = data[numpy.newaxis, ...]
+        elif data.ndim != 3:
             raise ValueError(f'Invalid diffraction pattern dimensions! (shape={data.shape})')
-
-        if self.crop is not None:
-            data = self.crop.apply(data)
 
         if self.filter_values is not None:
             data = self.filter_values.apply(data)
 
+        if self.crop is not None:
+            data = self.crop.apply(data)
+
         if self.binning is not None:
-            # TODO handle binning with bad pixels
             data = self.binning.apply(data)
 
         if self.padding is not None:
             data = self.padding.apply(data)
 
-        if self.flip_y:
+        if self.hflip:
+            data = numpy.flip(data, axis=-1)
+
+        if self.vflip:
             data = numpy.flip(data, axis=-2)
 
-        if self.flip_x:
-            data = numpy.flip(data, axis=-1)
+        if self.transpose:
+            data = numpy.transpose(data, axes=(0, 2, 1))
 
         return SimpleDiffractionPatternArray(array.get_label(), array.get_indexes(), data)

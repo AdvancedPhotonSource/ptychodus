@@ -31,7 +31,7 @@ engine:
         scheduler_options: "#PBS -l filesystems=home:grand:eagle"
 
         # Node setup: activate necessary conda environment and such
-        worker_init: "source ~/miniconda3/etc/profile.d/conda.sh; conda activate ptychodus",
+        worker_init: "source ~/miniforge3/etc/profile.d/conda.sh; conda activate ptychodus"
 
         walltime: 01:00:00
         nodes_per_block: 1

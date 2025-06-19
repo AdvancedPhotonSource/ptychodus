@@ -48,10 +48,10 @@ class ChatBubbleItemDelegate(QStyledItemDelegate):
     def _create_text_document(
         self, option: QStyleOptionViewItem, index: QModelIndex
     ) -> QTextDocument:
-        text = index.model().data(index, Qt.DisplayRole)
+        text = index.model().data(index, Qt.ItemDataRole.DisplayRole)
 
         text_option = QTextOption()
-        text_option.setWrapMode(QTextOption.WordWrap)
+        text_option.setWrapMode(QTextOption.WrapMode.WordWrap)
         text_option.setTextDirection(option.direction)
 
         doc = QTextDocument()
@@ -77,10 +77,10 @@ class ChatBubbleItemDelegate(QStyledItemDelegate):
             doc_size.height() + 2 * metrics.mbp_px,
         )
         layout_rect = QStyle.alignedRect(
-            Qt.LayoutDirectionAuto,
+            Qt.LayoutDirection.LayoutDirectionAuto,
             alignment,
             item_size.toSize(),
-            style.subElementRect(QStyle.SE_ItemViewItemText, option),
+            style.subElementRect(QStyle.SubElement.SE_ItemViewItemText, option),
         )
         bubble_rect = QRectF(
             layout_rect.left() + metrics.margin_px,
@@ -103,7 +103,7 @@ class ChatBubbleItemDelegate(QStyledItemDelegate):
         bubble_pen = QPen(index.data(Qt.ItemDataRole.ForegroundRole))
         bubble_pen.setWidth(metrics.border_px)
 
-        style.drawControl(QStyle.CE_ItemViewItem, option, painter, option.widget)
+        style.drawControl(QStyle.ControlElement.CE_ItemViewItem, option, painter, option.widget)
 
         painter.save()
         painter.setPen(bubble_pen)

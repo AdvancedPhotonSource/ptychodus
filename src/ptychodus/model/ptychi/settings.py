@@ -334,13 +334,14 @@ class PtyChiProbePositionSettings(Observable, Observer):
             'OptimizationPlanStride', 1, minimum=1
         )
         self.optimizer = self._group.create_string_parameter('Optimizer', 'SGD')
-        self.step_size = self._group.create_real_parameter('StepSize', 1.0, minimum=0.0)
+        self.step_size = self._group.create_real_parameter('StepSize', 0.3, minimum=0.0)
 
         self.constrain_centroid = self._group.create_boolean_parameter('ConstrainCentroid', False)
 
+        # correction_options
         self.correction_type = self._group.create_string_parameter('CorrectionType', 'GRADIENT')
         self.differentiation_method = self._group.create_string_parameter(
-            'DifferentiationMethod', 'GAUSSIAN'
+            'DifferentiationMethod', 'FOURIER_DIFFERENTIATION'
         )
         self.cross_correlation_scale = self._group.create_integer_parameter(
             'CrossCorrelationScale', 20000, minimum=1
@@ -351,14 +352,23 @@ class PtyChiProbePositionSettings(Observable, Observer):
         self.cross_correlation_probe_threshold = self._group.create_real_parameter(
             'CrossCorrelationProbeThreshold', 0.1, minimum=0.0, maximum=1.0
         )
-
+        self.choose_slice_for_correction = self._group.create_boolean_parameter(
+            'ChooseSliceForCorrection', False
+        )
+        self.slice_for_correction = self._group.create_integer_parameter(
+            'SliceForCorrection', 0, minimum=0
+        )
+        self.clip_update_magnitude_by_mad = self._group.create_boolean_parameter(
+            'ClipUpdateMagnitudeByMAD', True
+        )
         self.limit_update_magnitude = self._group.create_boolean_parameter(
             'LimitUpdateMagnitude', False
         )
         self.update_magnitude_limit = self._group.create_real_parameter(
-            'UpdateMagnitudeLimit', 1.0, minimum=0.0
+            'UpdateMagnitudeLimit', 0.1, minimum=0.0
         )
 
+        # affine_transform_constraint
         self.constrain_affine_transform = self._group.create_boolean_parameter(
             'ConstrainAffineTransform', False
         )
@@ -513,6 +523,9 @@ class PtyChiLSQMLSettings(Observable, Observer):
         )
         self.rescale_probe_intensity_in_first_epoch = self._group.create_boolean_parameter(
             'RescaleProbeIntensityInFirstEpoch', True
+        )
+        self.preconditioning_damping_factor = self._group.create_real_parameter(
+            'PreconditioningDampingFactor', 0.1, minimum=0.0
         )
 
         self.object_optimal_step_size_scaler = self._group.create_real_parameter(

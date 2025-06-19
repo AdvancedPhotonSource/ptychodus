@@ -22,6 +22,7 @@ from ..parametric import (
     ComboBoxParameterViewController,
     DecimalLineEditParameterViewController,
     DecimalSliderParameterViewController,
+    IntegerLineEditParameterViewController,
     ParameterViewController,
     SpinBoxParameterViewController,
 )
@@ -50,7 +51,7 @@ class PtyChiCrossCorrelationViewController(ParameterViewController, Observer):
             probe_threshold, tool_tip='Probe intensity threshold used to calculate the probe mask'
         )
         self._widget = QFrame()
-        self._widget.setFrameShape(QFrame.StyledPanel)
+        self._widget.setFrameShape(QFrame.Shape.StyledPanel)
 
         layout = QFormLayout()
         layout.addRow('Scale:', self._scale_view_controller.get_widget())
@@ -105,6 +106,42 @@ class PtyChiUpdateMagnitudeLimitViewController(ParameterViewController, Observer
 
     def _update(self, observable: Observable) -> None:
         if observable is self._limit_update_magnitude:
+            self._sync_model_to_view()
+
+
+class PtyChiSliceForCorrectionViewController(ParameterViewController, Observer):
+    def __init__(
+        self,
+        choose_slice_for_correction: BooleanParameter,
+        slice_for_correction: IntegerParameter,
+    ) -> None:
+        self._choose_slice_for_correction = choose_slice_for_correction
+        self._choose_slice_for_correction_view_controller = CheckBoxParameterViewController(
+            choose_slice_for_correction,
+            'Slice For Correction:',
+            tool_tip='Whether to specify the slice that is used for position correction',
+        )
+        self._slice_for_correction_view_controller = IntegerLineEditParameterViewController(
+            slice_for_correction,
+            tool_tip='Slice that is used for position correction (0-based index)',
+        )
+
+        choose_slice_for_correction.add_observer(self)
+        self._sync_model_to_view()
+
+    def get_label(self) -> QWidget:
+        return self._choose_slice_for_correction_view_controller.get_widget()
+
+    def get_widget(self) -> QWidget:
+        return self._slice_for_correction_view_controller.get_widget()
+
+    def _sync_model_to_view(self) -> None:
+        self._slice_for_correction_view_controller.get_widget().setEnabled(
+            self._choose_slice_for_correction.get_value()
+        )
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._choose_slice_for_correction:
             self._sync_model_to_view()
 
 
@@ -260,6 +297,15 @@ class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewControlle
             settings.cross_correlation_real_space_width,
             settings.cross_correlation_probe_threshold,
         )
+        self._slice_for_correction_view_controller = PtyChiSliceForCorrectionViewController(
+            settings.choose_slice_for_correction,
+            settings.slice_for_correction,
+        )
+        self._clip_update_magnitude_by_mad_view_controller = CheckBoxParameterViewController(
+            settings.clip_update_magnitude_by_mad,
+            'Clip Update Magnitude by MAD',
+            tool_tip='Whether to clip the update magnitude by the median absolute deviation',
+        )
         self._update_magnitude_limit_view_controller = PtyChiUpdateMagnitudeLimitViewController(
             settings.limit_update_magnitude,
             settings.update_magnitude_limit,
@@ -288,6 +334,11 @@ class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewControlle
             'Differentiation Method:', self._differentiation_method_view_controller.get_widget()
         )
         layout.addRow(self._cross_correlation_view_controller.get_widget())
+        layout.addRow(
+            self._slice_for_correction_view_controller.get_label(),
+            self._slice_for_correction_view_controller.get_widget(),
+        )
+        layout.addRow(self._clip_update_magnitude_by_mad_view_controller.get_widget())
         layout.addRow(
             self._update_magnitude_limit_view_controller.get_label(),
             self._update_magnitude_limit_view_controller.get_widget(),

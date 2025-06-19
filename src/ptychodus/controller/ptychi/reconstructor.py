@@ -307,6 +307,17 @@ class PtyChiReconstructorViewController(ParameterViewController):
             )
             layout.addRow(self._rescale_probe_intensity_in_first_epoch_view_controller.get_widget())
 
+            self._preconditioning_damping_factor_view_controller = (
+                DecimalLineEditParameterViewController(
+                    lsqml_settings.preconditioning_damping_factor,
+                    tool_tip='Damping factor for preconditioning the object update',
+                )
+            )
+            layout.addRow(
+                'Preconditioning Damping Factor:',
+                self._preconditioning_damping_factor_view_controller.get_widget(),
+            )
+
         self._widget.setLayout(layout)
 
     def get_widget(self) -> QWidget:

@@ -20,6 +20,13 @@ class DetectorSettings(Observable, Observer):
         )
         self.bit_depth = self._group.create_integer_parameter('BitDepth', 8, minimum=1)
 
+        self.bad_pixels_file_type = self._group.create_string_parameter(
+            'BadPixelsFileType', 'NPY_Bad_Pixels'
+        )
+        self.bad_pixels_file_path = self._group.create_path_parameter(
+            'BadPixelsFilePath', Path('/path/to/bad_pixels.npy')
+        )
+
     def _update(self, observable: Observable) -> None:
         if observable is self._group:
             self.notify_observers()
@@ -31,8 +38,8 @@ class PatternSettings(Observable, Observer):
         self._group = registry.create_group('Patterns')
         self._group.add_observer(self)
 
-        self.file_type = self._group.create_string_parameter('FileType', 'NeXus')
-        self.file_path = self._group.create_path_parameter('FilePath', Path('/path/to/data.h5'))
+        self.file_type = self._group.create_string_parameter('FileType', 'NPY')
+        self.file_path = self._group.create_path_parameter('FilePath', Path('/path/to/data.npy'))
         self.is_memmap_enabled = self._group.create_boolean_parameter('MemmapEnabled', False)
         self.scratch_directory = self._group.create_path_parameter(
             'ScratchDirectory', Path.home() / '.ptychodus'
@@ -63,8 +70,9 @@ class PatternSettings(Observable, Observer):
         self.pad_x = self._group.create_integer_parameter('PadX', 0, minimum=0)
         self.pad_y = self._group.create_integer_parameter('PadY', 0, minimum=0)
 
-        self.is_flip_x_enabled = self._group.create_boolean_parameter('FlipXEnabled', False)
-        self.is_flip_y_enabled = self._group.create_boolean_parameter('FlipYEnabled', False)
+        self.hflip = self._group.create_boolean_parameter('FlipHorizontal', False)
+        self.vflip = self._group.create_boolean_parameter('FlipVertical', False)
+        self.transpose = self._group.create_boolean_parameter('Transpose', False)
 
         self.is_value_lower_bound_enabled = self._group.create_boolean_parameter(
             'ValueLowerBoundEnabled', False

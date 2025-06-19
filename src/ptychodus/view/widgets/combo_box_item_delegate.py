@@ -27,7 +27,7 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
         if self._paint_combo_box and index.flags() & Qt.ItemFlag.ItemIsEditable:
             opt = QStyleOptionComboBox()
             opt.rect = option.rect
-            opt.currentText = index.data(Qt.DisplayRole)
+            opt.currentText = index.data(Qt.ItemDataRole.DisplayRole)
             QApplication.style().drawComplexControl(QStyle.ComplexControl.CC_ComboBox, opt, painter)
             QApplication.style().drawControl(QStyle.ControlElement.CE_ComboBoxLabel, opt, painter)
         else:
@@ -43,7 +43,7 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
 
     def setEditorData(self, editor: QWidget, index: QModelIndex) -> None:  # noqa: N802
         if isinstance(editor, QComboBox):
-            current_text = str(index.data(Qt.EditRole))
+            current_text = str(index.data(Qt.ItemDataRole.EditRole))
             combo_box_index = editor.findText(current_text)
 
             if combo_box_index >= 0:
@@ -55,7 +55,7 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
 
     def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex) -> None:  # noqa: N802
         if isinstance(editor, QComboBox):
-            model.setData(index, editor.currentText(), Qt.EditRole)
+            model.setData(index, editor.currentText(), Qt.ItemDataRole.EditRole)
         else:
             super().setModelData(editor, model, index)
 

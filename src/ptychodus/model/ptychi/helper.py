@@ -498,12 +498,17 @@ class PtyChiProbePositionOptionsHelper:
             logger.warning(
                 f'Failed to parse differentiation method "{differentiation_method_str}"!'
             )
-            differentiation_method = ImageGradientMethods.GAUSSIAN
+            differentiation_method = ImageGradientMethods.FOURIER_DIFFERENTIATION
 
+        slice_for_correction = (
+            self._settings.slice_for_correction.get_value()
+            if self._settings.choose_slice_for_correction.get_value()
+            else None
+        )
         update_magnitude_limit = (
             self._settings.update_magnitude_limit.get_value()
             if self._settings.limit_update_magnitude.get_value()
-            else float('inf')
+            else None
         )
 
         return PositionCorrectionOptions(
@@ -512,7 +517,8 @@ class PtyChiProbePositionOptionsHelper:
             cross_correlation_scale=self._settings.cross_correlation_scale.get_value(),
             cross_correlation_real_space_width=self._settings.cross_correlation_real_space_width.get_value(),
             cross_correlation_probe_threshold=self._settings.cross_correlation_probe_threshold.get_value(),
-            slice_for_correction=0,  # TODO
+            slice_for_correction=slice_for_correction,  # type: ignore
+            clip_update_magnitude_by_mad=self._settings.clip_update_magnitude_by_mad.get_value(),
             update_magnitude_limit=update_magnitude_limit,
         )
 
@@ -533,7 +539,7 @@ class PtyChiProbePositionOptionsHelper:
             degrees_of_freedom.append(AffineDegreesOfFreedom.SHEAR)
 
         if self._affine_dof.is_bit_set(PtyChiAffineDegreesOfFreedom.ASYMMETRY):
-            degrees_of_freedom.append(AffineDegreesOfFreedom.ASSYMETRY)
+            degrees_of_freedom.append(AffineDegreesOfFreedom.ASYMMETRY)
 
         return PositionAffineTransformConstraintOptions(
             enabled=self._settings.constrain_affine_transform.get_value(),

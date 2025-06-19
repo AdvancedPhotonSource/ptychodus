@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class LYNXSoftGlueZynqPositionFileReader(PositionFileReader):
     SIMPLE_NAME: Final[str] = 'APS_LYNX_SoftGlueZynq'
-    DISPLAY_NAME: Final[str] = 'APS LYNX SoftGlueZynq Files (*.dat)'
+    DISPLAY_NAME: Final[str] = 'APS 31-ID-E LYNX SoftGlueZynq Files (*.dat)'
     MICRONS_TO_METERS: Final[float] = 1.0e-6
 
     EXPECTED_HEADER_RAW: Final[list[str]] = [
@@ -58,7 +58,9 @@ class LYNXSoftGlueZynqPositionFileReader(PositionFileReader):
                 X = 1  # noqa: N806
                 Y = 3  # noqa: N806
             else:
-                raise ScanPointParseError('Bad header!')
+                raise ScanPointParseError(
+                    f'Bad LYNX SoftGlueZynq header!\nFound:    {column_header_row}\n'
+                )
 
             for row in csv_iterator:
                 if row[0].startswith('#'):
@@ -69,8 +71,8 @@ class LYNXSoftGlueZynqPositionFileReader(PositionFileReader):
 
                 point = ScanPoint(
                     int(row[DETECTOR_COUNT]),
-                    -float(row[X]) * LYNXSoftGlueZynqPositionFileReader.MICRONS_TO_METERS,
-                    -float(row[Y]) * LYNXSoftGlueZynqPositionFileReader.MICRONS_TO_METERS,
+                    -float(row[X]) * self.MICRONS_TO_METERS,
+                    -float(row[Y]) * self.MICRONS_TO_METERS,
                 )
                 point_list.append(point)
 

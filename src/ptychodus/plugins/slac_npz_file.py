@@ -88,7 +88,7 @@ class SLACProductFileReader(ProductFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    SIMPLE_NAME: Final[str] = 'SLAC'  # noqa: N806
+    SIMPLE_NAME: Final[str] = 'SLAC_NPZ'  # noqa: N806
     DISPLAY_NAME: Final[str] = 'SLAC NumPy Zipped Archive (*.npz)'  # noqa: N806
 
     registry.diffraction_file_readers.register_plugin(

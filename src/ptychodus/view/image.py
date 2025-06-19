@@ -3,7 +3,7 @@ from collections.abc import Iterator
 
 import numpy
 
-from PyQt5.QtCore import Qt, QPoint, QRect, QRectF, QSize
+from PyQt5.QtCore import Qt, QPointF, QRect, QRectF, QSize
 from PyQt5.QtGui import QColor, QConicalGradient, QIcon, QLinearGradient, QPainter, QPen
 from PyQt5.QtWidgets import (
     QComboBox,
@@ -256,7 +256,7 @@ class ImageWidget(VisualizationView):
             legend_diameter = 6 * dx
             legend_margin = 2 * dx
 
-            legend_rect = QRect(0, 0, legend_diameter, legend_diameter)
+            legend_rect = QRectF(0.0, 0.0, legend_diameter, legend_diameter)
             legend_rect.moveRight(widget_rect.right() - legend_margin)
             legend_rect.moveBottom(widget_rect.height() - legend_margin)
 
@@ -272,7 +272,7 @@ class ImageWidget(VisualizationView):
             legend_height = (2 * len(tick_labels) - 1) * dy
             legend_margin = tick_label_width + 2 * dx
 
-            legend_rect = QRect(0, 0, legend_width, legend_height)
+            legend_rect = QRectF(0.0, 0.0, legend_width, legend_height)
             legend_rect.moveRight(widget_rect.right() - legend_margin)
             legend_rect.moveTop((widget_rect.height() - legend_height) // 2)
 
@@ -286,7 +286,7 @@ class ImageWidget(VisualizationView):
 
             for tick_index, tick_label in enumerate(tick_labels):
                 tick_dy = (tick_index * legend_rect.height()) // (len(tick_labels) - 1)
-                viewport_point = QPoint(tick_x0, tick_y0 - tick_dy)
+                viewport_point = QPointF(tick_x0, tick_y0 - tick_dy)
                 fg_painter.drawText(viewport_point, tick_label)
 
 

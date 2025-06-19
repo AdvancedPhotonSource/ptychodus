@@ -49,7 +49,7 @@ class AgentInputController(QObject):
             is_shift_pressed = bool(a1.modifiers() & Qt.KeyboardModifier.ShiftModifier)
 
             # require shift+enter for new line, otherwise send on enter
-            if a1.key() in (Qt.Key_Enter, Qt.Key_Return) and not is_shift_pressed:
+            if a1.key() in (Qt.Key.Key_Enter, Qt.Key.Key_Return) and not is_shift_pressed:
                 self._send_message()
                 return True
 
@@ -70,7 +70,7 @@ class AgentChatController(ChatObserver):
         view.message_list_view.setModel(self._message_list_model)
         view.message_list_view.setItemDelegate(ChatBubbleItemDelegate())
         view.message_list_view.setResizeMode(QListView.ResizeMode.Adjust)
-        view.message_list_view.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        view.message_list_view.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
 
         history.add_observer(self)
 

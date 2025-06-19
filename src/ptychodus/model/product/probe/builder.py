@@ -81,7 +81,24 @@ class FromMemoryProbeBuilder(ProbeSequenceBuilder):
         return FromMemoryProbeBuilder(self._settings, self._probe)
 
     def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
-        return self._probe
+        probe_geometry = geometry_provider.get_probe_geometry()
+
+        try:
+            pixel_geometry = self._probe.get_pixel_geometry()
+        except ValueError:
+            pixel_geometry = probe_geometry.get_pixel_geometry()
+
+        try:
+            opr_weights = self._probe.get_opr_weights()
+        except ValueError:
+            opr_weights = None
+
+        # TODO regrid probe as needed based on probe geometry from file/provider
+        return ProbeSequence(
+            self._probe.get_array(),
+            opr_weights,
+            pixel_geometry,
+        )
 
 
 class FromFileProbeBuilder(ProbeSequenceBuilder):

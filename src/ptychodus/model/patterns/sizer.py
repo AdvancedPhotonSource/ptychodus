@@ -148,6 +148,12 @@ class PatternSizer(Observable, Observer):
         self.axis_x.add_observer(self)
         self.axis_y.add_observer(self)
 
+    def get_detector_extent(self) -> ImageExtent:
+        return ImageExtent(
+            width_px=self.axis_x.get_detector_size(),
+            height_px=self.axis_y.get_detector_size(),
+        )
+
     def get_processed_width_m(self) -> float:
         return self.axis_x.get_processed_size_m()
 
@@ -215,8 +221,9 @@ class PatternSizer(Observable, Observer):
             crop=crop,
             binning=binning,
             padding=padding,
-            flip_x=self._pattern_settings.is_flip_x_enabled.get_value(),
-            flip_y=self._pattern_settings.is_flip_y_enabled.get_value(),
+            hflip=self._pattern_settings.hflip.get_value(),
+            vflip=self._pattern_settings.vflip.get_value(),
+            transpose=self._pattern_settings.transpose.get_value(),
         )
 
     def _update(self, observable: Observable) -> None:

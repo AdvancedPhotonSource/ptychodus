@@ -44,8 +44,8 @@ class CenterBoxMeanPhaseCenteringStrategy:  # TODO USE
 class PtychoNNTrainableReconstructor(TrainableReconstructor):
     MODEL_FILE_FILTER: Final[str] = 'PyTorch Lightning Checkpoint Files (*.ckpt)'
     TRAINING_DATA_FILE_FILTER: Final[str] = 'NumPy Zipped Archive (*.npz)'
-    PATCHES_KW: Final[str] = 'real'
-    PATTERNS_KW: Final[str] = 'reciprocal'
+    PATCHES_KEY: Final[str] = 'real'
+    PATTERNS_KEY: Final[str] = 'reciprocal'
 
     def __init__(
         self,
@@ -159,11 +159,11 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
                 patches[index, 1, :, :] = numpy.absolute(patch)
 
         logger.debug(f'Writing "{file_path}" as "NPZ"')
-        training_data = {
-            self.PATTERNS_KW: parameters.patterns.astype(numpy.float32),
-            self.PATCHES_KW: patches,
+        contents = {
+            self.PATTERNS_KEY: parameters.patterns.astype(numpy.float32),
+            self.PATCHES_KEY: patches,
         }
-        numpy.savez_compressed(file_path, **training_data)
+        numpy.savez_compressed(file_path, allow_pickle=False, **contents)
 
     def get_training_data_path(self) -> Path:
         return self._training_settings.training_data_path.get_value()
@@ -182,8 +182,8 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             model=model,
             batch_size=self._model_settings.batch_size.get_value(),
             out_dir=None,
-            X_train=training_data[self.PATTERNS_KW],
-            Y_train=training_data[self.PATCHES_KW],
+            X_train=training_data[self.PATTERNS_KEY],
+            Y_train=training_data[self.PATCHES_KEY],
             epochs=self._training_settings.training_epochs.get_value(),
             training_fraction=float(training_set_fractional_size),
             log_frequency=self._training_settings.status_interval_in_epochs.get_value(),

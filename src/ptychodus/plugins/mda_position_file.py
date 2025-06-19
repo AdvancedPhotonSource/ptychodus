@@ -7,8 +7,13 @@ from typing import Any, Final, Generic, TypeVar
 import logging
 import sys
 import typing
-import xdrlib
 import yaml
+
+try:
+    # xdrlib removed from the standard library in Python 3.13
+    import xdrlib
+except ModuleNotFoundError:
+    from ._xdrlib import xdrlib  # type: ignore[no-redef]
 
 import numpy
 import numpy.typing
@@ -415,21 +420,18 @@ class MDAFile:
     def read(cls, file_path: Path) -> MDAFile:
         extra_pvs: list[MDAProcessVariable[Any]] = list()
 
-        try:
-            with file_path.open(mode='rb') as fp:
-                header = MDAHeader.read(fp)
-                scan = MDAScan.read(fp)
+        with file_path.open(mode='rb') as fp:
+            header = MDAHeader.read(fp)
+            scan = MDAScan.read(fp)
 
-                if header.has_extra_pvs:
-                    fp.seek(header.extra_pvs_offset)
-                    unpacker = xdrlib.Unpacker(fp.read())
-                    number_pvs = unpacker.unpack_int()
+            if header.has_extra_pvs:
+                fp.seek(header.extra_pvs_offset)
+                unpacker = xdrlib.Unpacker(fp.read())
+                number_pvs = unpacker.unpack_int()
 
-                    for pvidx in range(number_pvs):
-                        pv = cls._read_pv(unpacker)
-                        extra_pvs.append(pv)
-        except OSError as err:
-            logger.exception(err)
+                for pvidx in range(number_pvs):
+                    pv = cls._read_pv(unpacker)
+                    extra_pvs.append(pv)
 
         return cls(header, scan, extra_pvs)
 
@@ -501,7 +503,7 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.position_file_readers.register_plugin(
         MDAPositionFileReader(scale_to_meters=1.0e-3),
         simple_name='APS_2IDD',
-        display_name='APS 2-ID-D Files (*.mda)',
+        display_name='APS 2-ID-D Microprobe Files (*.mda)',
     )
     registry.position_file_readers.register_plugin(
         MDAPositionFileReader(scale_to_meters=1.0e-3),
@@ -511,12 +513,12 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.position_file_readers.register_plugin(
         MDAPositionFileReader(scale_to_meters=1.0e-6),
         simple_name='APS_BNP',
-        display_name='APS Bionanoprobe Files (*.h5 *.hdf5)',
+        display_name='APS 2-ID-D Bionanoprobe Files (*.h5 *.hdf5)',
     )
     registry.position_file_readers.register_plugin(
         HXNPositionFileReader(),
         simple_name='CNM_APS_HXN',
-        display_name='CNM/APS HXN Files (*.mda)',
+        display_name='CNM/APS Hard X-ray Nanoprobe Files (*.mda)',
     )
 
 

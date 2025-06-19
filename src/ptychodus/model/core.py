@@ -100,6 +100,7 @@ class ModelCore:
 
         self.patterns = PatternsCore(
             self.settings_registry,
+            self._plugin_registry.bad_pixels_file_readers,
             self._plugin_registry.diffraction_file_readers,
             self._plugin_registry.diffraction_file_writers,
             self.settings_registry,

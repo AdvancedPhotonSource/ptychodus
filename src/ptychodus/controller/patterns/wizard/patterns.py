@@ -2,7 +2,6 @@ from typing import Final
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
-    QCheckBox,
     QFormLayout,
     QGridLayout,
     QGroupBox,
@@ -70,8 +69,6 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
         self._center_y_spin_box = QSpinBox()
         self._width_spin_box = QSpinBox()
         self._height_spin_box = QSpinBox()
-        self._flip_x_check_box = QCheckBox('Flip X')
-        self._flip_y_check_box = QCheckBox('Flip Y')
 
         layout = QGridLayout()
         layout.addWidget(QLabel('Center:'), 0, 0)
@@ -80,9 +77,6 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
         layout.addWidget(QLabel('Extent:'), 1, 0)
         layout.addWidget(self._width_spin_box, 1, 1)
         layout.addWidget(self._height_spin_box, 1, 2)
-        layout.addWidget(QLabel('Axes:'), 2, 0)
-        layout.addWidget(self._flip_x_check_box, 2, 1, Qt.AlignmentFlag.AlignHCenter)
-        layout.addWidget(self._flip_y_check_box, 2, 2, Qt.AlignmentFlag.AlignHCenter)
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
         self.get_widget().setLayout(layout)
@@ -93,8 +87,6 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
         self._center_y_spin_box.valueChanged.connect(settings.crop_center_y_px.set_value)
         self._width_spin_box.valueChanged.connect(settings.crop_width_px.set_value)
         self._height_spin_box.valueChanged.connect(settings.crop_height_px.set_value)
-        self._flip_x_check_box.toggled.connect(settings.is_flip_x_enabled.set_value)
-        self._flip_y_check_box.toggled.connect(settings.is_flip_y_enabled.set_value)
 
         sizer.add_observer(self)
 
@@ -128,9 +120,6 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
         self._height_spin_box.setRange(height_limits.lower, height_limits.upper)
         self._height_spin_box.setValue(height)
         self._height_spin_box.blockSignals(False)
-
-        self._flip_x_check_box.setChecked(self._settings.is_flip_x_enabled.get_value())
-        self._flip_y_check_box.setChecked(self._settings.is_flip_y_enabled.get_value())
 
     def _update(self, observable: Observable) -> None:
         if observable is self._sizer:
@@ -243,7 +232,16 @@ class PatternPaddingViewController(CheckableGroupBoxParameterViewController):
 
 
 class PatternTransformViewController:
-    def __init__(self, settings: PatternSettings) -> None:
+    def __init__(self, settings: PatternSettings, file_dialog_factory: FileDialogFactory) -> None:
+        self._hflip_view_controller = CheckBoxParameterViewController(
+            settings.hflip, 'Flip Horizontal'
+        )
+        self._vflip_view_controller = CheckBoxParameterViewController(
+            settings.vflip, 'Flip Vertical'
+        )
+        self._transpose_view_controller = CheckBoxParameterViewController(
+            settings.transpose, 'Transpose'
+        )
         self._lower_bound_enabled_view_controller = CheckBoxParameterViewController(
             settings.is_value_lower_bound_enabled, 'Value Lower Bound:'
         )
@@ -258,10 +256,15 @@ class PatternTransformViewController:
         )
 
         layout = QGridLayout()
-        layout.addWidget(self._lower_bound_enabled_view_controller.get_widget(), 0, 0)
-        layout.addWidget(self._lower_bound_view_controller.get_widget(), 0, 1, 1, 2)
-        layout.addWidget(self._upper_bound_enabled_view_controller.get_widget(), 1, 0)
-        layout.addWidget(self._upper_bound_view_controller.get_widget(), 1, 1, 1, 2)
+        layout.addWidget(QLabel('Axes:'), 0, 0)
+        layout.addWidget(self._hflip_view_controller.get_widget(), 0, 1)
+        layout.addWidget(self._vflip_view_controller.get_widget(), 0, 2)
+        layout.addWidget(self._transpose_view_controller.get_widget(), 0, 3)
+        layout.addWidget(self._lower_bound_enabled_view_controller.get_widget(), 1, 0)
+        layout.addWidget(self._lower_bound_view_controller.get_widget(), 1, 1, 1, 3)
+        layout.addWidget(self._upper_bound_enabled_view_controller.get_widget(), 2, 0)
+        layout.addWidget(self._upper_bound_view_controller.get_widget(), 2, 1, 1, 3)
+        layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
         layout.setColumnStretch(3, 1)
 
@@ -283,7 +286,9 @@ class OpenDatasetWizardPatternsViewController(ParameterViewController):
         self._crop_view_controller = PatternCropViewController(settings, sizer)
         self._binning_view_controller = PatternBinningViewController(settings, sizer)
         self._padding_view_controller = PatternPaddingViewController(settings, sizer)
-        self._transform_view_controller = PatternTransformViewController(settings)
+        self._transform_view_controller = PatternTransformViewController(
+            settings, file_dialog_factory
+        )
 
         layout = QVBoxLayout()
         layout.addWidget(self._load_view_controller.get_widget())

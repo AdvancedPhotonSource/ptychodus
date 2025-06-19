@@ -10,29 +10,23 @@ from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint, 
 logger = logging.getLogger(__name__)
 
 
-class NanoMaxPositionFileReader(PositionFileReader):
-    MICRONS_TO_METERS: Final[float] = 1.0e-6
+class CSSIPositionFileReader(PositionFileReader):
+    ONE_MILLIMETER_M: Final[float] = 1e-3
 
     def read(self, file_path: Path) -> PositionSequence:
         point_list: list[ScanPoint] = list()
 
         with h5py.File(file_path, 'r') as h5_file:
             try:
-                position_x = h5_file['/entry/measurement/pseudo/x'][()]
-                position_y = h5_file['/entry/measurement/pseudo/y'][()]
+                h5_positions = h5_file['/exchange/motor_pos']
             except KeyError:
                 logger.exception('Unable to load scan.')
             else:
-                if position_x.shape == position_y.shape:
-                    logger.debug(f'Coordinate arrays have shape {position_x.shape}.')
-                else:
-                    raise ScanPointParseError('Coordinate array shape mismatch!')
-
-                for idx, (x, y) in enumerate(zip(position_x, position_y)):
+                for idx, row in enumerate(h5_positions):
                     point = ScanPoint(
                         idx,
-                        x * self.MICRONS_TO_METERS,
-                        y * self.MICRONS_TO_METERS,
+                        row[0] * self.ONE_MILLIMETER_M,
+                        row[1] * self.ONE_MILLIMETER_M,
                     )
                     point_list.append(point)
 
@@ -41,7 +35,7 @@ class NanoMaxPositionFileReader(PositionFileReader):
 
 def register_plugins(registry: PluginRegistry) -> None:
     registry.position_file_readers.register_plugin(
-        NanoMaxPositionFileReader(),
-        simple_name='MAX_IV_NanoMAX',
-        display_name='MAX IV NanoMAX DiffractionEndStation Files (*.h5 *.hdf5)',
+        CSSIPositionFileReader(),
+        simple_name='APS_CSSI',
+        display_name='APS 9-ID CSSI Files (*.h5 *.hdf5)',
     )

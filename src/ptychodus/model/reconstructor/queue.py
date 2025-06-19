@@ -57,6 +57,7 @@ class ExecuteReconstructorTask(ReconstructionTask):
         toc = time.perf_counter()
         logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
 
+        logger.debug(parameters)
         tic = time.perf_counter()
         result = self._reconstructor.reconstruct(parameters)
         toc = time.perf_counter()
@@ -113,9 +114,7 @@ class ReconstructionQueue:
     def process_results(self, *, block: bool) -> None:
         while True:
             try:
-                logger.debug('Waiting for reconstruction result...')
                 task = self._output_queue.get(block=block)
-                logger.debug('Reconstruction result received.')
 
                 try:
                     logger.debug('Processing reconstruction result...')

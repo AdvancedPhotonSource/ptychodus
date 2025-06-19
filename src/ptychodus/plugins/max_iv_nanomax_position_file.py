@@ -10,23 +10,29 @@ from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint, 
 logger = logging.getLogger(__name__)
 
 
-class CSSIPositionFileReader(PositionFileReader):
-    ONE_MILLIMETER_M: Final[float] = 1e-3
+class NanoMaxPositionFileReader(PositionFileReader):
+    MICRONS_TO_METERS: Final[float] = 1.0e-6
 
     def read(self, file_path: Path) -> PositionSequence:
         point_list: list[ScanPoint] = list()
 
         with h5py.File(file_path, 'r') as h5_file:
             try:
-                h5_positions = h5_file['/exchange/motor_pos']
+                position_x = h5_file['/entry/measurement/pseudo/x'][()]
+                position_y = h5_file['/entry/measurement/pseudo/y'][()]
             except KeyError:
                 logger.exception('Unable to load scan.')
             else:
-                for idx, row in enumerate(h5_positions):
+                if position_x.shape == position_y.shape:
+                    logger.debug(f'Coordinate arrays have shape {position_x.shape}.')
+                else:
+                    raise ScanPointParseError('Coordinate array shape mismatch!')
+
+                for idx, (x, y) in enumerate(zip(position_x, position_y)):
                     point = ScanPoint(
                         idx,
-                        row[0] * self.ONE_MILLIMETER_M,
-                        row[1] * self.ONE_MILLIMETER_M,
+                        x * self.MICRONS_TO_METERS,
+                        y * self.MICRONS_TO_METERS,
                     )
                     point_list.append(point)
 
@@ -35,7 +41,7 @@ class CSSIPositionFileReader(PositionFileReader):
 
 def register_plugins(registry: PluginRegistry) -> None:
     registry.position_file_readers.register_plugin(
-        CSSIPositionFileReader(),
-        simple_name='APS_CSSI',
-        display_name='APS CSSI Files (*.h5 *.hdf5)',
+        NanoMaxPositionFileReader(),
+        simple_name='MAX_IV_NanoMAX',
+        display_name='MAX IV NanoMAX Diffraction Endstation Files (*.h5 *.hdf5)',
     )

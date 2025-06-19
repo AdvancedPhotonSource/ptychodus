@@ -30,9 +30,9 @@ class PowerTwoSpinBox(QSpinBox):
                 is_pow2 = (value & (value - 1)) == 0
 
                 if is_pow2:
-                    return QValidator.Acceptable, input, pos
+                    return QValidator.State.Acceptable, input, pos
 
-        return QValidator.Intermediate, input, pos
+        return QValidator.State.Intermediate, input, pos
 
 
 class PowerTwoSpinBoxParameterViewController(ParameterViewController, Observer):

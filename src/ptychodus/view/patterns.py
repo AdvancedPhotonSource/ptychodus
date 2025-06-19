@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QMenu,
     QPushButton,
     QTreeView,
     QVBoxLayout,
@@ -26,17 +27,22 @@ class DetectorView(QGroupBox):
 class PatternsButtonBox(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.open_button = QPushButton('Open')
+        self.load_button = QPushButton('Load')
+        self.load_menu = QMenu()
         self.save_button = QPushButton('Save')
-        self.info_button = QPushButton('Info')
         self.close_button = QPushButton('Close')
+        self.analyze_button = QPushButton('Analyze')
+        self.analyze_menu = QMenu()
+
+        self.load_button.setMenu(self.load_menu)
+        self.analyze_button.setMenu(self.analyze_menu)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.open_button)
+        layout.addWidget(self.load_button)
         layout.addWidget(self.save_button)
-        layout.addWidget(self.info_button)
         layout.addWidget(self.close_button)
+        layout.addWidget(self.analyze_button)
         self.setLayout(layout)
 
 
@@ -82,7 +88,7 @@ class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
         self.setLayout(layout)
 
 
-class PatternsInfoDialog(QDialog):
+class DatasetFileLayoutDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.tree_view = QTreeView()
@@ -90,7 +96,7 @@ class PatternsInfoDialog(QDialog):
 
         tree_header = self.tree_view.header()
         tree_header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
-        tree_header.setSectionResizeMode(QHeaderView.ResizeToContents)
+        tree_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
 
         self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
         self.button_box.clicked.connect(self._handle_button_box_clicked)

@@ -135,4 +135,4 @@ class IlluminationMapper(Observable):
             'center_y_m': self._product_data.center.position_y_m,
         }
 
-        numpy.savez(file_path, **contents)
+        numpy.savez_compressed(file_path, allow_pickle=False, **contents)

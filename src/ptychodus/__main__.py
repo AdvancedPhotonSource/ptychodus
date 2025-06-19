@@ -23,7 +23,7 @@ def verify_all_arguments_parsed(parser: argparse.ArgumentParser, argv: list[str]
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog=ptychodus.__name__.lower(),
-        description=f'{ptychodus.__name__} is a ptychography analysis application',
+        description=f'{ptychodus.__name__} is a ptychography data analysis application',
     )
     parser.add_argument(
         '-b',

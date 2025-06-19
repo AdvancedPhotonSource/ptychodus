@@ -165,7 +165,9 @@ class OpenDatasetWizardFilePathViewController(Observer):
         self._widget.setModel(self._proxy_model)
         self._widget.setSortingEnabled(True)
         self._widget.sortByColumn(0, Qt.SortOrder.AscendingOrder)
-        self._widget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self._widget.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
         self._widget.verticalHeader().hide()
         self._widget.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._widget.doubleClicked.connect(self._handle_table_double_clicked)

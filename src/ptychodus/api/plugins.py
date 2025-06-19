@@ -18,7 +18,7 @@ from .fluorescence import (
 from .object import ObjectFileReader, ObjectFileWriter, Object
 from .observer import Observable, Observer
 from .parametric import StringParameter
-from .patterns import DiffractionFileReader, DiffractionFileWriter
+from .patterns import BadPixelsFileReader, DiffractionFileReader, DiffractionFileWriter
 from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter, ProbeSequence
 from .product import ProductFileReader, ProductFileWriter
 from .scan import PositionFileReader, PositionFileWriter, PositionSequence
@@ -84,7 +84,7 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
 
         plugin = Plugin[T](strategy, simple_name, display_name)
         self._registered_plugins.append(plugin)
-        self._registered_plugins.sort(key=lambda x: x.simple_name)
+        self._registered_plugins.sort(key=lambda x: x.display_name)
         self.notify_observers()
 
     def get_current_plugin(self) -> Plugin[T]:
@@ -127,6 +127,7 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
 
 class PluginRegistry:
     def __init__(self) -> None:
+        self.bad_pixels_file_readers = PluginChooser[BadPixelsFileReader]()
         self.diffraction_file_readers = PluginChooser[DiffractionFileReader]()
         self.diffraction_file_writers = PluginChooser[DiffractionFileWriter]()
         self.position_file_readers = PluginChooser[PositionFileReader]()
@@ -179,7 +180,12 @@ class PluginRegistry:
                 logger.info(f'Skipping {module_info.name}')
                 logger.warning(exc)
             else:
-                logger.info(f'Registering {module_info.name}')
-                module.register_plugins(registry)
+                try:
+                    module.register_plugins(registry)
+                except AttributeError as exc:
+                    logger.info(f'Failed to register {module_info.name}')
+                    logger.warning(exc)
+                else:
+                    logger.info(f'Registered {module_info.name}')
 
         return registry

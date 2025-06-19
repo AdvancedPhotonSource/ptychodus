@@ -61,42 +61,36 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
         self._tree_builder = H5DiffractionFileTreeBuilder()
 
     def read(self, file_path: Path) -> DiffractionDataset:
-        dataset = SimpleDiffractionDataset.create_null(file_path)
         metadata = DiffractionMetadata.create_null(file_path)
 
-        try:
-            with tables.open_file(file_path, mode='r') as h5_file:
-                try:
-                    data = h5_file.get_node(self._data_path)
-                except tables.NoSuchNodeError:
-                    logger.debug('Unable to find data.')
-                    return dataset
+        with tables.open_file(file_path, mode='r') as h5_file:
+            try:
+                data = h5_file.get_node(self._data_path)
+            except tables.NoSuchNodeError:
+                logger.debug('Unable to find data.')
+                return SimpleDiffractionDataset.create_null(file_path)
 
-                data_shape = h5_file.root.jungfrau1M.image_img.shape
-                num_patterns, detector_height, detector_width = data_shape
+            data_shape = h5_file.root.jungfrau1M.image_img.shape
+            num_patterns, detector_height, detector_width = data_shape
 
-                array = PyTablesDiffractionPatternArray(
-                    label=file_path.stem,
-                    num_patterns=num_patterns,
-                    file_path=file_path,
-                    data_path=self._data_path,
-                )
-                metadata = DiffractionMetadata(
-                    num_patterns_per_array=num_patterns,
-                    num_patterns_total=num_patterns,
-                    pattern_dtype=data.dtype,
-                    detector_extent=ImageExtent(detector_width, detector_height),
-                    file_path=file_path,
-                )
+            array = PyTablesDiffractionPatternArray(
+                label=file_path.stem,
+                num_patterns=num_patterns,
+                file_path=file_path,
+                data_path=self._data_path,
+            )
+            metadata = DiffractionMetadata(
+                num_patterns_per_array=num_patterns,
+                num_patterns_total=num_patterns,
+                pattern_dtype=data.dtype,
+                detector_extent=ImageExtent(detector_width, detector_height),
+                file_path=file_path,
+            )
 
-            with h5py.File(file_path, 'r') as h5_file:
-                contents_tree = self._tree_builder.build(h5_file)
+        with h5py.File(file_path, 'r') as h5_file:
+            contents_tree = self._tree_builder.build(h5_file)
 
-            dataset = SimpleDiffractionDataset(metadata, contents_tree, [array])
-        except OSError:
-            logger.debug(f'Unable to read file "{file_path}".')
-
-        return dataset
+        return SimpleDiffractionDataset(metadata, contents_tree, [array])
 
 
 class LCLSPositionFileReader(PositionFileReader):
@@ -149,7 +143,7 @@ class LCLSPositionFileReader(PositionFileReader):
 
 def register_plugins(registry: PluginRegistry) -> None:
     SIMPLE_NAME: Final[str] = 'LCLS_XPP'  # noqa: N806
-    DISPLAY_NAME: Final[str] = 'LCLS XPP Files (*.h5 *.hdf5)'  # noqa: N806
+    DISPLAY_NAME: Final[str] = 'LCLS X-ray Pump Probe Files (*.h5 *.hdf5)'  # noqa: N806
 
     registry.diffraction_file_readers.register_plugin(
         LCLSDiffractionFileReader(),

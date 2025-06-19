@@ -14,6 +14,7 @@ dependencies = [
     "matplotlib",
     "numpy",
     "psutil",
+    "pyyaml",
     "requests",
     "scikit-image",
     "scipy",
@@ -31,7 +32,7 @@ globus = ["gladier", "gladier-tools>=0.5.4"]
 gui = ["PyQt5"]
 ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
 tike = ["tike==0.25.*,>=0.25.3"]
-ptychi = ["ptychi==1.*"]
+ptychi = ["ptychi==1.*,>=1.1.0"]
 
 [tool.setuptools.package-data]
 "ptychodus" = ["py.typed"]
@@ -40,9 +41,6 @@ ptychi = ["ptychi==1.*"]
 where = ["src"]
 
 [tool.setuptools_scm]
-
-[tool.mypy]
-plugins = "numpy.typing.mypy_plugin"
 
 [[tool.mypy.overrides]]
 module = [

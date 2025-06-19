@@ -4,6 +4,7 @@ import logging
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.patterns import (
+    BadPixelsFileReader,
     CropCenter,
     DiffractionFileReader,
     DiffractionFileWriter,
@@ -48,6 +49,7 @@ class PatternsAPI:
         pattern_settings: PatternSettings,
         detector_settings: DetectorSettings,
         dataset: AssembledDiffractionDataset,
+        bad_pixels_file_reader_chooser: PluginChooser[BadPixelsFileReader],
         file_reader_chooser: PluginChooser[DiffractionFileReader],
         file_writer_chooser: PluginChooser[DiffractionFileWriter],
     ) -> None:
@@ -55,11 +57,37 @@ class PatternsAPI:
         self._pattern_settings = pattern_settings
         self._detector_settings = detector_settings
         self._dataset = dataset
+        self._bad_pixels_file_reader_chooser = bad_pixels_file_reader_chooser
         self._file_reader_chooser = file_reader_chooser
         self._file_writer_chooser = file_writer_chooser
 
     def create_streaming_context(self, metadata: DiffractionMetadata) -> PatternsStreamingContext:
         return PatternsStreamingContext(self._dataset, metadata)
+
+    def get_bad_pixels_file_reader_chooser(self) -> PluginChooser[BadPixelsFileReader]:
+        return self._bad_pixels_file_reader_chooser
+
+    def open_bad_pixels(self, file_path: Path, *, file_type: str | None = None) -> None:
+        if file_path.is_file():
+            if file_type is not None:
+                self._bad_pixels_file_reader_chooser.set_current_plugin(file_type)
+
+            plugin = self._bad_pixels_file_reader_chooser.get_current_plugin()
+            logger.debug(f'Reading "{file_path}" as "{plugin.simple_name}"')
+
+            try:
+                bad_pixels = plugin.strategy.read(file_path)
+            except Exception as exc:
+                raise RuntimeError(f'Failed to read "{file_path}"') from exc
+            else:
+                self._dataset.set_bad_pixels(bad_pixels)
+                self._detector_settings.bad_pixels_file_path.set_value(file_path)
+        else:
+            logger.warning(f'Refusing to read invalid file path {file_path}')
+
+    def clear_bad_pixels(self) -> None:
+        self._dataset.set_bad_pixels(None)
+        self._detector_settings.bad_pixels_file_path.set_value('/path/to/bad_pixels.npy')
 
     def get_file_reader_chooser(self) -> PluginChooser[DiffractionFileReader]:
         return self._file_reader_chooser
@@ -89,12 +117,11 @@ class PatternsAPI:
             if file_type is not None:
                 self._file_reader_chooser.set_current_plugin(file_type)
 
-            file_type = self._file_reader_chooser.get_current_plugin().simple_name
-            logger.debug(f'Reading "{file_path}" as "{file_type}"')
-            file_reader = self._file_reader_chooser.get_current_plugin().strategy
+            plugin = self._file_reader_chooser.get_current_plugin()
+            logger.debug(f'Reading "{file_path}" as "{plugin.simple_name}"')
 
             try:
-                dataset = file_reader.read(file_path)
+                dataset = plugin.strategy.read(file_path)
             except Exception as exc:
                 raise RuntimeError(f'Failed to read "{file_path}"') from exc
             else:

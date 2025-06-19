@@ -7,7 +7,7 @@ import csv
 import numpy
 
 from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint, ScanPointParseError
-from .nexus_diffraction_file import NeXusDiffractionFileReader
+from .aps33id_velociprobe_diffraction_file import VelociprobeDiffractionFileReader
 
 __all__ = [
     'VelociprobePositionFileReader',
@@ -24,24 +24,24 @@ class VelociprobePositionFileColumn(IntEnum):
 class VelociprobePositionFileReader(PositionFileReader):
     NANOMETERS_TO_METERS: Final[float] = 1.0e-9
 
-    def __init__(self, nexus_reader: NeXusDiffractionFileReader, y_column: int) -> None:
-        self._nexus_reader = nexus_reader
+    def __init__(self, diffraction_reader: VelociprobeDiffractionFileReader, y_column: int) -> None:
+        self._diffraction_reader = diffraction_reader
         self._y_column = y_column
 
     @classmethod
     def create_laser_interferometer_instance(
-        cls, nexus_reader: NeXusDiffractionFileReader
+        cls, diffraction_reader: VelociprobeDiffractionFileReader
     ) -> VelociprobePositionFileReader:
-        return cls(nexus_reader, VelociprobePositionFileColumn.LASER_INTERFEROMETER_Y)
+        return cls(diffraction_reader, VelociprobePositionFileColumn.LASER_INTERFEROMETER_Y)
 
     @classmethod
     def create_position_encoder_instance(
-        cls, nexus_reader: NeXusDiffractionFileReader
+        cls, diffraction_reader: VelociprobeDiffractionFileReader
     ) -> VelociprobePositionFileReader:
-        return cls(nexus_reader, VelociprobePositionFileColumn.POSITION_ENCODER_Y)
+        return cls(diffraction_reader, VelociprobePositionFileColumn.POSITION_ENCODER_Y)
 
     def _apply_transform(self, positions: PositionSequence) -> PositionSequence:
-        stage_rotation_rad = numpy.deg2rad(self._nexus_reader.stage_rotation_deg)
+        stage_rotation_rad = numpy.deg2rad(self._diffraction_reader.stage_rotation_deg)
         stage_rotation_cos = numpy.cos(stage_rotation_rad)
 
         x_mean = sum(p.position_x_m for p in positions) / len(positions)
