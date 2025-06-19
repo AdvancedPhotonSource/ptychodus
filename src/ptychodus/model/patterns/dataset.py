@@ -39,6 +39,10 @@ __all__ = [
 
 class DiffractionDatasetObserver(ABC):
     @abstractmethod
+    def handle_bad_pixels_changed(self, num_bad_pixels: int) -> None:
+        pass
+
+    @abstractmethod
     def handle_array_inserted(self, index: int) -> None:
         pass
 
@@ -275,7 +279,24 @@ class AssembledDiffractionDataset(DiffractionDataset):
         return self._metadata
 
     def set_bad_pixels(self, bad_pixels: BadPixelsArray | None) -> None:
+        if bad_pixels is not None:
+            if bad_pixels.ndim != 2:
+                raise ValueError(f'Bad pixels array must be 2D, got {bad_pixels.ndim}D.')
+
+            actual_extent = ImageExtent(
+                width_px=bad_pixels.shape[-1], height_px=bad_pixels.shape[-2]
+            )
+            expected_extent = self._sizer.get_detector_extent()
+
+            if actual_extent != expected_extent:
+                raise ValueError(f'Shape mismatch: {actual_extent=} {expected_extent=}')
+
         self._bad_pixels = bad_pixels
+
+        num_bad_pixels = 0 if self._bad_pixels is None else numpy.count_nonzero(self._bad_pixels)
+
+        for observer in self._observer_list:
+            observer.handle_bad_pixels_changed(num_bad_pixels)
 
     def get_bad_pixels(self) -> BadPixelsArray | None:
         return self._bad_pixels

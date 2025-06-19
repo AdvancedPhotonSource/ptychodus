@@ -91,7 +91,7 @@ class SimpleTreeModel(QAbstractItemModel):
         return len(node.item_data)
 
 
-class DatasetFileLayoutViewController(DiffractionDatasetObserver):
+class DatasetLayoutViewController(DiffractionDatasetObserver):
     def __init__(self, dataset: AssembledDiffractionDataset, tree_model: SimpleTreeModel) -> None:
         super().__init__()
         self._dataset = dataset
@@ -112,6 +112,9 @@ class DatasetFileLayoutViewController(DiffractionDatasetObserver):
 
     def _sync_model_to_view(self) -> None:
         self._tree_model.set_root_node(self._dataset.get_contents_tree())
+
+    def handle_bad_pixels_changed(self, num_bad_pixels: int) -> None:
+        pass
 
     def handle_array_inserted(self, index: int) -> None:
         pass

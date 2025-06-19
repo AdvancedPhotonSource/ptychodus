@@ -67,7 +67,7 @@ class PatternsAPI:
     def get_bad_pixels_file_reader_chooser(self) -> PluginChooser[BadPixelsFileReader]:
         return self._bad_pixels_file_reader_chooser
 
-    def load_bad_pixels(self, file_path: Path, *, file_type: str | None = None) -> None:
+    def open_bad_pixels(self, file_path: Path, *, file_type: str | None = None) -> None:
         if file_path.is_file():
             if file_type is not None:
                 self._bad_pixels_file_reader_chooser.set_current_plugin(file_type)
@@ -83,6 +83,9 @@ class PatternsAPI:
                 self._dataset.set_bad_pixels(bad_pixels)
         else:
             logger.warning(f'Refusing to read invalid file path {file_path}')
+
+    def clear_bad_pixels(self) -> None:
+        self._dataset.set_bad_pixels(None)
 
     def get_file_reader_chooser(self) -> PluginChooser[DiffractionFileReader]:
         return self._file_reader_chooser

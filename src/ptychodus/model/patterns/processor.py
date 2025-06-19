@@ -88,7 +88,6 @@ class DiffractionPatternProcessor:
     transpose: bool
 
     def process_bad_pixels(self, bad_pixels: BadPixelsArray) -> BadPixelsArray:
-        # FIXME sync bad pixels file_path to settings in controller?
         if bad_pixels.ndim != 2:
             raise ValueError(f'Invalid bad_pixel dimensions! (shape={bad_pixels.shape})')
 

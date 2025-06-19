@@ -57,7 +57,7 @@ class PatternsCore(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._reinit_observable:
-            self.patterns_api.load_bad_pixels(
+            self.patterns_api.open_bad_pixels(
                 file_path=self.detector_settings.bad_pixels_file_path.get_value(),
                 file_type=self.detector_settings.bad_pixels_file_type.get_value(),
             )
