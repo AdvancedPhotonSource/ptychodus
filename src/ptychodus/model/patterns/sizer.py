@@ -148,6 +148,12 @@ class PatternSizer(Observable, Observer):
         self.axis_x.add_observer(self)
         self.axis_y.add_observer(self)
 
+    def get_detector_extent(self) -> ImageExtent:
+        return ImageExtent(
+            width_px=self.axis_x.get_detector_size(),
+            height_px=self.axis_y.get_detector_size(),
+        )
+
     def get_processed_width_m(self) -> float:
         return self.axis_x.get_processed_size_m()
 

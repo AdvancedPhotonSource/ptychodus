@@ -84,7 +84,7 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
 
         plugin = Plugin[T](strategy, simple_name, display_name)
         self._registered_plugins.append(plugin)
-        self._registered_plugins.sort(key=lambda x: x.simple_name)
+        self._registered_plugins.sort(key=lambda x: x.display_name)
         self.notify_observers()
 
     def get_current_plugin(self) -> Plugin[T]:

@@ -277,11 +277,10 @@ class AssembledDiffractionDataset(DiffractionDataset):
         return self._bad_pixels
 
     def get_processed_bad_pixels(self) -> BadPixelsArray:
-        # FIXME where are the patterns file_path and bad pixels file_path sync'd to settings?
         processor = self._sizer.get_processor()
-        # FIXME return processor.process_bad_pixels(self._bad_pixels)
-        pattern_extent = self._sizer.get_processed_image_extent()
-        return numpy.full(pattern_extent.shape, False)
+        detector_extent = self._sizer.get_detector_extent()
+        bad_pixels = self._bad_pixels or numpy.full(detector_extent.shape, False)
+        return processor.process_bad_pixels(bad_pixels)
 
     def get_assembled_indexes(self) -> PatternIndexesType:
         return self._indexes[self._indexes >= 0]
@@ -416,6 +415,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
     def export_assembled_patterns(self, file_path: Path) -> None:
         logger.debug(f'Writing processed patterns to "{file_path}"')
+        # FIXME bad_pixels
         numpy.savez(
             file_path,
             indexes=self.get_assembled_indexes(),
