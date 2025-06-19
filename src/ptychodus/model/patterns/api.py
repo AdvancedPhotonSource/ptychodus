@@ -81,11 +81,13 @@ class PatternsAPI:
                 raise RuntimeError(f'Failed to read "{file_path}"') from exc
             else:
                 self._dataset.set_bad_pixels(bad_pixels)
+                self._detector_settings.bad_pixels_file_path.set_value(file_path)
         else:
             logger.warning(f'Refusing to read invalid file path {file_path}')
 
     def clear_bad_pixels(self) -> None:
         self._dataset.set_bad_pixels(None)
+        self._detector_settings.bad_pixels_file_path.set_value('/path/to/bad_pixels.npy')
 
     def get_file_reader_chooser(self) -> PluginChooser[DiffractionFileReader]:
         return self._file_reader_chooser
