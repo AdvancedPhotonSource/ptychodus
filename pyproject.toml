@@ -42,9 +42,6 @@ where = ["src"]
 
 [tool.setuptools_scm]
 
-[tool.mypy]
-plugins = "numpy.typing.mypy_plugin"
-
 [[tool.mypy.overrides]]
 module = [
     "fair_research_login",

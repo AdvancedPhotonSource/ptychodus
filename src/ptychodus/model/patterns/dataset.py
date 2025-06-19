@@ -4,7 +4,7 @@ from bisect import bisect
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import overload
+from typing import overload, Final
 import logging
 import queue
 import tempfile
@@ -211,6 +211,10 @@ class ArrayLoader:
 
 
 class AssembledDiffractionDataset(DiffractionDataset):
+    PATTERNS_KEY: Final[str] = 'patterns'
+    INDEXES_KEY: Final[str] = 'indexes'
+    BAD_PIXELS_KEY: Final[str] = 'bad_pixels'
+
     def __init__(self, settings: PatternSettings, sizer: PatternSizer) -> None:
         super().__init__()
         self._settings = settings
@@ -270,7 +274,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
     def get_metadata(self) -> DiffractionMetadata:
         return self._metadata
 
-    def set_bad_pixels(self, bad_pixels: BadPixelsArray) -> None:
+    def set_bad_pixels(self, bad_pixels: BadPixelsArray | None) -> None:
         self._bad_pixels = bad_pixels
 
     def get_bad_pixels(self) -> BadPixelsArray | None:
@@ -385,9 +389,9 @@ class AssembledDiffractionDataset(DiffractionDataset):
             except Exception as exc:
                 raise RuntimeError(f'Failed to read "{file_path}"') from exc
 
-            self._indexes = contents['indexes']
-            self._data = contents['patterns']
-            self._bad_pixels = contents.get('bad_pixels', None)
+            self._indexes = contents[self.INDEXES_KEY]
+            self._data = contents[self.PATTERNS_KEY]
+            self._bad_pixels = contents.get(self.BAD_PIXELS_KEY, None)
             num_patterns, detector_height, detector_width = self._data.shape
 
             self._contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
@@ -415,12 +419,16 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
     def export_assembled_patterns(self, file_path: Path) -> None:
         logger.debug(f'Writing processed patterns to "{file_path}"')
-        # FIXME bad_pixels
-        numpy.savez(
-            file_path,
-            indexes=self.get_assembled_indexes(),
-            patterns=self.get_assembled_patterns(),
-        )
+
+        contents: dict[str, numpy.typing.NDArray] = {
+            self.PATTERNS_KEY: self.get_assembled_patterns(),
+            self.INDEXES_KEY: self.get_assembled_indexes(),
+        }
+
+        if self._bad_pixels is not None:
+            contents[self.BAD_PIXELS_KEY] = self._bad_pixels
+
+        numpy.savez_compressed(file_path, allow_pickle=False, **contents)
 
     def get_info_text(self) -> str:
         file_path = self._metadata.file_path

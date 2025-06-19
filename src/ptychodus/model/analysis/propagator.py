@@ -155,4 +155,4 @@ class ProbePropagator(Observable):
             contents['pixel_height_m'] = pixel_geometry.height_m
             contents['pixel_width_m'] = pixel_geometry.width_m
 
-        numpy.savez(file_path, **contents)
+        numpy.savez_compressed(file_path, allow_pickle=False, **contents)

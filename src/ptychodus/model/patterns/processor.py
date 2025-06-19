@@ -39,7 +39,7 @@ class DiffractionPatternCrop:
         self.slice_y = slice(center_y - radius_y, center_y + radius_y)
 
     def apply_bool(self, data: BadPixelsArray) -> BadPixelsArray:
-        return data[:, self.slice_y, self.slice_x]
+        return data[self.slice_y, self.slice_x]
 
     def apply(self, data: PatternDataType) -> PatternDataType:
         return data[:, self.slice_y, self.slice_x]
@@ -53,8 +53,8 @@ class DiffractionPatternBinning:
     def apply_bool(self, data: BadPixelsArray) -> BadPixelsArray:
         binned_width = data.shape[-1] // self.bin_size_x
         binned_height = data.shape[-2] // self.bin_size_y
-        shape = (-1, binned_height, self.bin_size_y, binned_width, self.bin_size_x)
-        return numpy.sum(data.reshape(shape), axis=(-3, -1), keepdims=False)  # FIXME
+        shape = (binned_height, self.bin_size_y, binned_width, self.bin_size_x)
+        return numpy.logical_and.reduce(data.reshape(shape), axis=(-3, -1), keepdims=False)
 
     def apply(self, data: PatternDataType) -> PatternDataType:
         binned_width = data.shape[-1] // self.bin_size_x
@@ -69,7 +69,7 @@ class DiffractionPatternPadding:
     pad_y: int
 
     def apply_bool(self, data: BadPixelsArray) -> BadPixelsArray:
-        pad_width = (0, 0, self.pad_y, self.pad_y, self.pad_x, self.pad_x)
+        pad_width = (self.pad_y, self.pad_y, self.pad_x, self.pad_x)
         return numpy.pad(data, pad_width, mode='constant', constant_values=False)
 
     def apply(self, data: PatternDataType) -> PatternDataType:
