@@ -1,5 +1,6 @@
 from __future__ import annotations
 from collections.abc import Iterator
+
 from matplotlib.colors import Normalize
 import numpy
 
@@ -47,16 +48,13 @@ class CylindricalColorModelRenderer(Renderer):
     def is_cyclic(self) -> bool:
         return True
 
-    def _colorize(
-        self, amplitude_transformed: RealArrayType, phase_rad: RealArrayType
-    ) -> RealArrayType:
+    def _colorize(self, amplitude: RealArrayType, phase_rad: RealArrayType) -> RealArrayType:
         vrange = self._color_axis.get_range()
         norm = Normalize(vmin=vrange.lower, vmax=vrange.upper, clip=False)
 
-        model = numpy.vectorize(self._color_model.get_plugin())
+        model = self._color_model.get_plugin()
         h = (phase_rad + numpy.pi) / (2 * numpy.pi)
-        r, g, b, a = model(h, norm(amplitude_transformed))
-        return numpy.stack((r, g, b, a), axis=-1)
+        return model(h, norm(amplitude))
 
     def colorize(self, array: NumberArrayType) -> RealArrayType:
         amplitude = self._amplitude_component.calculate(array)

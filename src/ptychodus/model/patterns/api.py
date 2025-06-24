@@ -87,7 +87,7 @@ class PatternsAPI:
 
     def clear_bad_pixels(self) -> None:
         self._dataset.set_bad_pixels(None)
-        self._detector_settings.bad_pixels_file_path.set_value('/path/to/bad_pixels.npy')
+        self._detector_settings.bad_pixels_file_path.set_value(Path('/path/to/bad_pixels.npy'))
 
     def get_file_reader_chooser(self) -> PluginChooser[DiffractionFileReader]:
         return self._file_reader_chooser

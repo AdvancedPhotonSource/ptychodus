@@ -94,7 +94,7 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
 
 
 class LCLSPositionFileReader(PositionFileReader):
-    MICRONS_TO_METERS: Final[float] = 1e-6
+    ONE_MICRON_M: Final[float] = 1e-6
 
     def __init__(
         self,
@@ -122,13 +122,13 @@ class LCLSPositionFileReader(PositionFileReader):
                 logger.exception('Unable to load scan.')
             else:
                 # vertical coordinate is always pi_z
-                ycoords = -pi_z * self.MICRONS_TO_METERS
+                ycoords = -pi_z * self.ONE_MICRON_M
 
                 # horizontal coordinate may be a combination of pi_x and pi_y
                 tomography_angle_rad = numpy.deg2rad(self._tomography_angle_deg)
                 cos_angle = numpy.cos(tomography_angle_rad)
                 sin_angle = numpy.sin(tomography_angle_rad)
-                xcoords = (cos_angle * pi_x + sin_angle * pi_y) * self.MICRONS_TO_METERS
+                xcoords = (cos_angle * pi_x + sin_angle * pi_y) * self.ONE_MICRON_M
 
                 for index, (ipm, x, y) in enumerate(zip(ipm2, xcoords, ycoords)):
                     if self._ipm2_low_threshold <= ipm and ipm < self._ipm2_high_threshold:
@@ -153,8 +153,8 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.position_file_readers.register_plugin(
         LCLSPositionFileReader(
             tomography_angle_deg=180.0,
-            ipm2_low_threshold=2500.0,
-            ipm2_high_threshold=6000.0,
+            ipm2_low_threshold=2000.0,
+            ipm2_high_threshold=3000.0,
         ),
         simple_name=SIMPLE_NAME,
         display_name=DISPLAY_NAME,

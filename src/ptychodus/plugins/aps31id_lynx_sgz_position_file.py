@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class LYNXSoftGlueZynqPositionFileReader(PositionFileReader):
     SIMPLE_NAME: Final[str] = 'APS_LYNX_SoftGlueZynq'
     DISPLAY_NAME: Final[str] = 'APS 31-ID-E LYNX SoftGlueZynq Files (*.dat)'
-    MICRONS_TO_METERS: Final[float] = 1.0e-6
+    ONE_MICRON_M: Final[float] = 1.0e-6
 
     EXPECTED_HEADER_RAW: Final[list[str]] = [
         'DataPoint',
@@ -71,8 +71,8 @@ class LYNXSoftGlueZynqPositionFileReader(PositionFileReader):
 
                 point = ScanPoint(
                     int(row[DETECTOR_COUNT]),
-                    -float(row[X]) * self.MICRONS_TO_METERS,
-                    -float(row[Y]) * self.MICRONS_TO_METERS,
+                    -float(row[X]) * self.ONE_MICRON_M,
+                    -float(row[Y]) * self.ONE_MICRON_M,
                 )
                 point_list.append(point)
 

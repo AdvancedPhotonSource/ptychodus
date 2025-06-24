@@ -1,10 +1,14 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-import colorsys
+from typing import Final
+
+import matplotlib.colors
+import numpy
 
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import Parameter
 from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.typing import RealArrayType
 
 __all__ = [
     'CylindricalColorModel',
@@ -12,40 +16,92 @@ __all__ = [
 ]
 
 
+def hsva_to_rgba(
+    hue: RealArrayType, saturation: RealArrayType, value: RealArrayType, alpha: RealArrayType
+) -> RealArrayType:
+    hsv = numpy.stack((hue, saturation, value), axis=-1)
+    rgb = matplotlib.colors.hsv_to_rgb(hsv)
+
+    if alpha.ndim == 1:
+        return numpy.column_stack((rgb, alpha))
+
+    return numpy.dstack((rgb, alpha))
+
+
+def _v(m1: RealArrayType, m2: RealArrayType, hue: RealArrayType) -> RealArrayType:
+    """Adapted from colorsys._v in the Python standard library."""
+    if m1.shape != hue.shape or m2.shape != hue.shape:
+        raise ValueError('Shape mismatch: m1, m2, and hue must have the same shape.')
+
+    hue = hue % 1.0
+
+    return numpy.select(
+        [hue < 1.0 / 6.0, hue < 0.5, hue < 2.0 / 3.0],
+        [m1 + (m2 - m1) * hue * 6.0, m2, m1 + (m2 - m1) * (2.0 / 3.0 - hue) * 6.0],
+        default=m1,
+    )
+
+
+def hlsa_to_rgba(
+    hue: RealArrayType, lightness: RealArrayType, saturation: RealArrayType, alpha: RealArrayType
+) -> RealArrayType:
+    """Adapted from colorsys.hls_to_rgb in the Python standard library."""
+    one_third: Final[float] = 1.0 / 3.0
+
+    m2 = numpy.where(
+        lightness <= 0.5,
+        lightness * (1.0 + saturation),
+        lightness + saturation - (lightness * saturation),
+    )
+    m1 = 2.0 * lightness - m2
+
+    red = numpy.where(saturation > 0.0, _v(m1, m2, hue + one_third), lightness)
+    green = numpy.where(saturation > 0.0, _v(m1, m2, hue), lightness)
+    blue = numpy.where(saturation > 0.0, _v(m1, m2, hue - one_third), lightness)
+
+    return numpy.stack((red, green, blue, alpha), axis=-1)
+
+
 class CylindricalColorModel(ABC):
     @abstractmethod
-    def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
+    def __call__(self, h: RealArrayType, x: RealArrayType) -> RealArrayType:
         pass
 
 
 class HSVSaturationColorModel(CylindricalColorModel):
-    def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
-        return *colorsys.hsv_to_rgb(h, x, 1.0), 1.0
+    def __call__(self, h: RealArrayType, x: RealArrayType) -> RealArrayType:
+        ones = numpy.ones_like(h)
+        return hsva_to_rgba(h, x, ones, ones)
 
 
 class HSVValueColorModel(CylindricalColorModel):
-    def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
-        return *colorsys.hsv_to_rgb(h, 1.0, x), 1.0
+    def __call__(self, h: RealArrayType, x: RealArrayType) -> RealArrayType:
+        ones = numpy.ones_like(h)
+        return hsva_to_rgba(h, ones, x, ones)
 
 
 class HSVAlphaColorModel(CylindricalColorModel):
-    def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
-        return *colorsys.hsv_to_rgb(h, 1.0, 1.0), x
+    def __call__(self, h: RealArrayType, x: RealArrayType) -> RealArrayType:
+        ones = numpy.ones_like(h)
+        return hsva_to_rgba(h, ones, ones, x)
 
 
 class HLSLightnessColorModel(CylindricalColorModel):
-    def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
-        return *colorsys.hls_to_rgb(h, x, 1.0), 1.0
+    def __call__(self, h: RealArrayType, x: RealArrayType) -> RealArrayType:
+        ones = numpy.ones_like(h)
+        return hlsa_to_rgba(h, x, ones, ones)
 
 
 class HLSSaturationColorModel(CylindricalColorModel):
-    def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
-        return *colorsys.hls_to_rgb(h, 0.5, x), 1.0
+    def __call__(self, h: RealArrayType, x: RealArrayType) -> RealArrayType:
+        ones = numpy.ones_like(h)
+        return hlsa_to_rgba(h, ones / 2.0, x, ones)
 
 
 class HLSAlphaColorModel(CylindricalColorModel):
-    def __call__(self, h: float, x: float) -> tuple[float, float, float, float]:
-        return *colorsys.hls_to_rgb(h, 0.5, 1.0), x
+    def __call__(self, h: RealArrayType, x: RealArrayType) -> RealArrayType:
+        ones = numpy.ones_like(h)
+        return hlsa_to_rgba(h, ones / 2.0, ones, x)
 
 
 class CylindricalColorModelParameter(Parameter[str], Observer):

@@ -293,7 +293,9 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
         self._bad_pixels = bad_pixels
 
-        num_bad_pixels = 0 if self._bad_pixels is None else numpy.count_nonzero(self._bad_pixels)
+        num_bad_pixels = (
+            0 if self._bad_pixels is None else numpy.count_nonzero(self._bad_pixels).item()
+        )
 
         for observer in self._observer_list:
             observer.handle_bad_pixels_changed(num_bad_pixels)
