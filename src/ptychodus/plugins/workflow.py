@@ -16,10 +16,10 @@ class PtychodusAutoloadProductFileBasedWorkflow(FileBasedWorkflow):
         return True
 
     def get_watch_file_pattern(self) -> str:
-        return 'product-out.npz'
+        return 'product-out.h5'
 
     def execute(self, api: WorkflowAPI, file_path: Path) -> None:
-        api.open_product(file_path, file_type='NPZ')
+        api.open_product(file_path)
 
 
 class APS2IDFileBasedWorkflow(FileBasedWorkflow):
@@ -35,9 +35,9 @@ class APS2IDFileBasedWorkflow(FileBasedWorkflow):
         scan_id = int(re.findall(r'\d+', scan_name)[-1])
 
         diffraction_file_path = file_path.parents[1] / 'raw_data' / f'scan{scan_id}_master.h5'
-        api.open_patterns(diffraction_file_path, file_type='NeXus')
+        api.open_patterns(diffraction_file_path)
         product_api = api.create_product(f'scan{scan_id}')
-        product_api.open_scan(file_path, file_type='CSV')
+        product_api.open_scan(file_path)
         product_api.build_probe()
         product_api.build_object()
         product_api.reconstruct_remote()
@@ -63,9 +63,9 @@ class APS26IDFileBasedWorkflow(FileBasedWorkflow):
             if digits != 0:
                 break
 
-        api.open_patterns(diffraction_file_path, file_type='HDF5')
+        api.open_patterns(diffraction_file_path)
         product_api = api.create_product(f'scan_{scan_id}')
-        product_api.open_scan(file_path, file_type='MDA')
+        product_api.open_scan(file_path)
         product_api.build_probe()
         product_api.build_object()
         product_api.reconstruct_remote()
@@ -142,16 +142,14 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
             logger.warning(f'Failed to locate label for {row_no}!')
         else:
             product_name = f'scan{scan_num:05d}_' + metadata.label
-            api.open_patterns(file_path, file_type='LYNX')
+            api.open_patterns(file_path)
             input_product_api = api.create_product(product_name, comments=str(metadata))
-            input_product_api.open_scan(scan_file, file_type='LYNXOrchestra')
+            input_product_api.open_scan(scan_file)
             input_product_api.build_probe()
             input_product_api.build_object()
             # TODO would prefer to write instructions and submit to queue
             output_product_api = input_product_api.reconstruct_local()
-            output_product_api.save_product(
-                experiment_dir / 'ptychodus' / f'{product_name}.h5', file_type='HDF5'
-            )
+            output_product_api.save_product(experiment_dir / 'ptychodus' / f'{product_name}.h5')
 
 
 def register_plugins(registry: PluginRegistry) -> None:

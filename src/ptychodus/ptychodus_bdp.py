@@ -222,7 +222,7 @@ def main() -> int:
         staging_dir.mkdir(parents=True, exist_ok=True)
         model.workflow_api.save_settings(staging_dir / 'settings.ini', change_path_prefix)
         model.workflow_api.export_assembled_patterns(staging_dir / 'patterns.npz')
-        workflow_product_api.save_product(staging_dir / 'product-in.npz', file_type='NPZ')
+        workflow_product_api.save_product(staging_dir / 'product-in.npz', file_type='HDF5')
 
     return 0
 

@@ -59,9 +59,9 @@ class WorkflowExecutor:
         output_data_globus_path = f'{self._output_data_locator.get_globus_path()}/{flow_label}'
 
         settings_file = 'settings.ini'
-        patterns_file = 'patterns.npz'
-        input_file = 'product-in.npz'
-        output_file = 'product-out.npz'
+        patterns_file = 'patterns.h5'
+        input_file = 'product-in.h5'
+        output_file = 'product-out.h5'
 
         try:
             input_data_posix_path.mkdir(mode=0o755, parents=True, exist_ok=True)
@@ -73,7 +73,7 @@ class WorkflowExecutor:
         self._settings_registry.save_settings(input_data_posix_path / settings_file)
         self._patterns_api.export_assembled_patterns(input_data_posix_path / patterns_file)
         self._product_api.save_product(
-            input_product_index, input_data_posix_path / input_file, file_type='NPZ'
+            input_product_index, input_data_posix_path / input_file, file_type='HDF5'
         )
 
         flow_input = {

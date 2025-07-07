@@ -403,6 +403,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
             self.append_array(array)
 
     def import_assembled_patterns(self, file_path: Path) -> None:
+        # FIXME NPZ -> H5
         if file_path.is_file():
             self.clear()
             logger.debug(f'Reading processed patterns from "{file_path}"')
@@ -441,6 +442,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
             logger.warning(f'Refusing to read invalid file path {file_path}')
 
     def export_assembled_patterns(self, file_path: Path) -> None:
+        # FIXME NPZ -> H5
         logger.debug(f'Writing processed patterns to "{file_path}"')
 
         contents: dict[str, numpy.typing.NDArray] = {
