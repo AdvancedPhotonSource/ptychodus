@@ -6,7 +6,7 @@ import queue
 
 from ptychodus.api.settings import SettingsRegistry
 
-from ..patterns import PatternsAPI
+from ..diffraction import PatternsAPI
 from ..product import ProductAPI
 from .locator import DataLocator
 from .settings import WorkflowSettings

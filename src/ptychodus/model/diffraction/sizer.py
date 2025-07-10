@@ -1,7 +1,7 @@
 from ptychodus.api.geometry import ImageExtent, Interval, PixelGeometry
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import BooleanParameter, IntegerParameter, RealParameter
-from ptychodus.api.patterns import CropCenter
+from ptychodus.api.diffraction import CropCenter
 
 from .processor import (
     DiffractionPatternBinning,

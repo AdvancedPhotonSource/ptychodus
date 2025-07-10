@@ -38,8 +38,8 @@ class APS12IDPositionFileReader(PositionFileReader):
 
         logger.debug(f'{lines=}')
         lines_min = min(lines)
-        lines_max = max(lines)
-        lines_num = lines_max - lines_min + 1
+        # lines_max = max(lines)
+        # lines_num = lines_max - lines_min + 1
         logger.debug(f'{points=}')
         points_min = min(points)
         points_max = max(points)

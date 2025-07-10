@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy
 
-from ptychodus.api.patterns import BadPixelsArray, BadPixelsFileReader
+from ptychodus.api.diffraction import BadPixelsArray, BadPixelsFileReader
 from ptychodus.api.plugins import PluginRegistry
 
 

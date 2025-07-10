@@ -9,13 +9,13 @@ import h5py
 import numpy
 
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.patterns import (
+from ptychodus.api.diffraction import (
     BadPixelsArray,
     CropCenter,
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionMetadata,
-    DiffractionPatternArray,
+    DiffractionArray,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.tree import SimpleTreeNode
@@ -27,11 +27,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class DataGroup:
-    array_list: list[DiffractionPatternArray] = field(default_factory=list)
+    array_list: list[DiffractionArray] = field(default_factory=list)
 
     @classmethod
     def read(cls, group: h5py.Group, num_patterns_per_array: int) -> DataGroup:
-        array_list: list[DiffractionPatternArray] = list()
+        array_list: list[DiffractionArray] = list()
         master_file_path = Path(group.file.filename)
 
         for name, h5_item in sorted(group.items()):
@@ -49,18 +49,16 @@ class DataGroup:
 
         return cls(array_list)
 
-    def __iter__(self) -> Iterator[DiffractionPatternArray]:
+    def __iter__(self) -> Iterator[DiffractionArray]:
         return iter(self.array_list)
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionPatternArray: ...
+    def __getitem__(self, index: int) -> DiffractionArray: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]: ...
+    def __getitem__(self, index: slice) -> Sequence[DiffractionArray]: ...
 
-    def __getitem__(
-        self, index: int | slice
-    ) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
+    def __getitem__(self, index: int | slice) -> DiffractionArray | Sequence[DiffractionArray]:
         return self.array_list[index]
 
     def __len__(self) -> int:
@@ -207,14 +205,12 @@ class VelociprobeDiffractionDataset(DiffractionDataset):
         return None
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionPatternArray: ...
+    def __getitem__(self, index: int) -> DiffractionArray: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]: ...
+    def __getitem__(self, index: slice) -> Sequence[DiffractionArray]: ...
 
-    def __getitem__(
-        self, index: int | slice
-    ) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
+    def __getitem__(self, index: int | slice) -> DiffractionArray | Sequence[DiffractionArray]:
         return self._entry.data[index]
 
     def __len__(self) -> int:

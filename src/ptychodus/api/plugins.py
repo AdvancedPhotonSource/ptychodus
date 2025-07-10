@@ -18,7 +18,7 @@ from .fluorescence import (
 from .object import ObjectFileReader, ObjectFileWriter, Object
 from .observer import Observable, Observer
 from .parametric import StringParameter
-from .patterns import BadPixelsFileReader, DiffractionFileReader, DiffractionFileWriter
+from .diffraction import BadPixelsFileReader, DiffractionFileReader, DiffractionFileWriter
 from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter, ProbeSequence
 from .product import ProductFileReader, ProductFileWriter
 from .scan import PositionFileReader, PositionFileWriter, PositionSequence

@@ -12,8 +12,8 @@ from .geometry import ImageExtent, PixelGeometry
 from .tree import SimpleTreeNode
 
 BadPixelsArray: TypeAlias = numpy.typing.NDArray[numpy.bool_]
-PatternDataType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
-PatternIndexesType: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
+DiffractionData: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
+DiffractionIndexes: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
 
 
 @dataclass(frozen=True)
@@ -22,29 +22,29 @@ class CropCenter:
     position_y_px: int
 
 
-class DiffractionPatternArray:
+class DiffractionArray:
     @abstractmethod
     def get_label(self) -> str:
         pass
 
     @abstractmethod
-    def get_indexes(self) -> PatternIndexesType:
+    def get_indexes(self) -> DiffractionIndexes:
         pass
 
     @abstractmethod
-    def get_data(self) -> PatternDataType:
+    def get_data(self) -> DiffractionData:
         pass
 
     def get_num_patterns(self) -> int:
         return self.get_data().shape[0]
 
 
-class SimpleDiffractionPatternArray(DiffractionPatternArray):
+class SimpleDiffractionArray(DiffractionArray):
     def __init__(
         self,
         label: str,
-        indexes: PatternIndexesType,
-        data: PatternDataType,
+        indexes: DiffractionIndexes,
+        data: DiffractionData,
     ) -> None:
         super().__init__()
         self._label = label
@@ -54,17 +54,16 @@ class SimpleDiffractionPatternArray(DiffractionPatternArray):
     def get_label(self) -> str:
         return self._label
 
-    def get_indexes(self) -> PatternIndexesType:
+    def get_indexes(self) -> DiffractionIndexes:
         return self._indexes
 
-    def get_data(self) -> PatternDataType:
+    def get_data(self) -> DiffractionData:
         return self._data
 
 
 @dataclass(frozen=True)
 class DiffractionMetadata:
-    num_patterns_per_array: int
-    num_patterns_total: int
+    num_patterns_per_array: Sequence[int]
     pattern_dtype: numpy.dtype[numpy.integer[Any]]
     detector_distance_m: float | None = None
     detector_extent: ImageExtent | None = None
@@ -78,10 +77,10 @@ class DiffractionMetadata:
 
     @classmethod
     def create_null(cls, file_path: Path | None = None) -> DiffractionMetadata:
-        return cls(0, 0, numpy.dtype(numpy.ubyte), file_path=file_path)
+        return cls([], numpy.dtype(numpy.ubyte), file_path=file_path)
 
 
-class DiffractionDataset(Sequence[DiffractionPatternArray]):
+class DiffractionDataset(Sequence[DiffractionArray]):
     @abstractmethod
     def get_metadata(self) -> DiffractionMetadata:
         pass
@@ -100,7 +99,7 @@ class SimpleDiffractionDataset(DiffractionDataset):
         self,
         metadata: DiffractionMetadata,
         contents_tree: SimpleTreeNode,
-        array_list: list[DiffractionPatternArray],
+        array_list: list[DiffractionArray],
         bad_pixels: BadPixelsArray | None = None,
     ) -> None:
         super().__init__()
@@ -113,7 +112,7 @@ class SimpleDiffractionDataset(DiffractionDataset):
     def create_null(cls, file_path: Path | None = None) -> SimpleDiffractionDataset:
         metadata = DiffractionMetadata.create_null(file_path)
         contents_tree = SimpleTreeNode.create_root(list())
-        array_list: list[DiffractionPatternArray] = list()
+        array_list: list[DiffractionArray] = list()
         return cls(metadata, contents_tree, array_list)
 
     def get_metadata(self) -> DiffractionMetadata:
@@ -126,14 +125,12 @@ class SimpleDiffractionDataset(DiffractionDataset):
         return self._bad_pixels
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionPatternArray: ...
+    def __getitem__(self, index: int) -> DiffractionArray: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]: ...
+    def __getitem__(self, index: slice) -> Sequence[DiffractionArray]: ...
 
-    def __getitem__(
-        self, index: int | slice
-    ) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
+    def __getitem__(self, index: int | slice) -> DiffractionArray | Sequence[DiffractionArray]:
         return self._array_list[index]
 
     def __len__(self) -> int:

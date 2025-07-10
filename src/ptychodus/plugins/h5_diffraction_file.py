@@ -5,14 +5,14 @@ import h5py
 import numpy
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (
+from ptychodus.api.diffraction import (
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionFileWriter,
     DiffractionMetadata,
-    DiffractionPatternArray,
-    PatternDataType,
-    PatternIndexesType,
+    DiffractionArray,
+    DiffractionData,
+    DiffractionIndexes,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
@@ -21,9 +21,9 @@ from ptychodus.api.tree import SimpleTreeNode
 logger = logging.getLogger(__name__)
 
 
-class H5DiffractionPatternArray(DiffractionPatternArray):
+class H5DiffractionPatternArray(DiffractionArray):
     def __init__(
-        self, label: str, indexes: PatternIndexesType, file_path: Path, data_path: str
+        self, label: str, indexes: DiffractionIndexes, file_path: Path, data_path: str
     ) -> None:
         super().__init__()
         self._label = label
@@ -34,10 +34,10 @@ class H5DiffractionPatternArray(DiffractionPatternArray):
     def get_label(self) -> str:
         return self._label
 
-    def get_indexes(self) -> PatternIndexesType:
+    def get_indexes(self) -> DiffractionIndexes:
         return self._indexes
 
-    def get_data(self) -> PatternDataType:
+    def get_data(self) -> DiffractionData:
         with h5py.File(self._file_path, 'r') as h5_file:
             try:
                 item = h5_file[self._data_path]

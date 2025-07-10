@@ -5,7 +5,7 @@ import queue
 import threading
 import time
 
-from ptychodus.api.reconstructor import Reconstructor, ReconstructInput, ReconstructOutput
+from ptychodus.api.reconstructor import Reconstructor, ReconstructOutput
 
 from ..product import ProductRepositoryItem
 from .matcher import DiffractionPatternPositionMatcher, ScanIndexFilter

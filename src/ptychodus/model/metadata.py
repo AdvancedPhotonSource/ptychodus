@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from ptychodus.api.observer import Observable
-from ptychodus.api.patterns import DiffractionMetadata
+from ptychodus.api.diffraction import DiffractionMetadata
 
-from .patterns import (
+from .diffraction import (
     DetectorSettings,
     DiffractionDatasetObserver,
     AssembledDiffractionDataset,

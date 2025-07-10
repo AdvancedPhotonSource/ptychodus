@@ -1,7 +1,7 @@
 import logging
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.patterns import (
+from ptychodus.api.diffraction import (
     BadPixelsFileReader,
     DiffractionFileReader,
     DiffractionFileWriter,

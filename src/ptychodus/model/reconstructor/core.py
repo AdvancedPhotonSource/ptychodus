@@ -9,7 +9,7 @@ from ptychodus.api.reconstructor import (
 )
 from ptychodus.api.settings import SettingsRegistry
 
-from ..patterns import AssembledDiffractionDataset
+from ..diffraction import AssembledDiffractionDataset
 from ..product import ProductAPI
 from .api import ReconstructorAPI
 from .log import ReconstructorLogHandler

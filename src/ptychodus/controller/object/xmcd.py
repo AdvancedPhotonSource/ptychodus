@@ -2,7 +2,7 @@ import logging
 
 from ptychodus.api.observer import Observable, Observer
 
-from ...model.analysis import XMCDAnalyzer, XMCDData
+from ...model.analysis import XMCDAnalyzer
 from ...model.visualization import VisualizationEngine
 from ...view.object import XMCDDialog
 from ...view.widgets import ExceptionDialog

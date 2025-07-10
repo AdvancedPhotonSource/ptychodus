@@ -3,13 +3,13 @@ import logging
 
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (
+from ptychodus.api.diffraction import (
     BadPixelsFileReader,
     CropCenter,
     DiffractionFileReader,
     DiffractionFileWriter,
     DiffractionMetadata,
-    DiffractionPatternArray,
+    DiffractionArray,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginChooser
@@ -32,7 +32,7 @@ class PatternsStreamingContext:
         self._dataset.reload(stream_dataset)
         self._dataset.start_loading()
 
-    def append_array(self, array: DiffractionPatternArray) -> None:
+    def append_array(self, array: DiffractionArray) -> None:
         self._dataset.append_array(array)
 
     def get_queue_size(self) -> int:

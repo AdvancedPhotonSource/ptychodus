@@ -20,7 +20,7 @@ from . import resources  # noqa
 from .agent import AgentView, AgentChatView
 from .automation import AutomationView
 from .image import ImageView
-from .patterns import PatternsView
+from .diffraction import PatternsView
 from .product import ProductView
 from .reconstructor import ReconstructorView, ReconstructorPlotView
 from .repository import RepositoryTableView, RepositoryTreeView

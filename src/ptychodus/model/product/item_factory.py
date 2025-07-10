@@ -3,7 +3,7 @@ import logging
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product, ProductFileReader
 
-from ..patterns import AssembledDiffractionDataset, PatternSizer
+from ..diffraction import AssembledDiffractionDataset, PatternSizer
 from .geometry import ProductGeometry
 from .item import ProductRepositoryItem
 from .metadata import MetadataRepositoryItem

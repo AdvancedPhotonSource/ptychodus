@@ -1,6 +1,5 @@
 from typing import Final
 
-from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QFormLayout,
     QGridLayout,
@@ -14,8 +13,8 @@ from PyQt5.QtWidgets import (
 
 from ptychodus.api.observer import Observable
 
-from ....model.patterns import PatternSettings, PatternSizer
-from ....view.patterns import OpenDatasetWizardPage
+from ....model.diffraction import PatternSettings, PatternSizer
+from ....view.diffraction import OpenDatasetWizardPage
 
 from ...data import FileDialogFactory
 from ...parametric import (

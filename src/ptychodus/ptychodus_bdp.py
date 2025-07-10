@@ -6,7 +6,7 @@ import logging
 import sys
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import CropCenter
+from ptychodus.api.diffraction import CropCenter
 from ptychodus.api.settings import PathPrefixChange
 from ptychodus.model import ModelCore
 import ptychodus

@@ -49,7 +49,7 @@ from ptychodus.api.reconstructor import ReconstructInput
 from ptychodus.api.scan import PositionSequence, ScanPoint
 from ptychodus.api.typing import ComplexArrayType, RealArrayType
 
-from ..patterns import PatternSizer
+from ..diffraction import PatternSizer
 from .affine import PtyChiAffineDegreesOfFreedom, PtyChiAffineDegreesOfFreedomBitField
 from .settings import (
     PtyChiOPRSettings,

@@ -9,7 +9,7 @@ from ptychodus.api.reconstructor import (
 )
 from ptychodus.api.settings import SettingsRegistry
 
-from ..patterns import PatternSizer
+from ..diffraction import PatternSizer
 from .device import PtyChiDeviceRepository
 from .enums import PtyChiEnumerators
 from .settings import (

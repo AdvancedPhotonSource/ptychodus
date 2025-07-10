@@ -84,7 +84,7 @@ class ObjectRepositoryItem(ParameterGroup):
     def rebuild(self, *, recenter: bool = False) -> None:
         try:
             object_ = self._builder.build(self._geometry_provider, self.layer_spacing_m.get_value())
-        except Exception as exc:
+        except Exception:
             logger.exception('Failed to rebuild object!')
             return
 

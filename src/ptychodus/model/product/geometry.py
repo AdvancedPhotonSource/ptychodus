@@ -10,7 +10,7 @@ from ptychodus.api.product import (
     PLANCK_CONSTANT_J_PER_HZ,
 )
 
-from ..patterns import PatternSizer
+from ..diffraction import PatternSizer
 from .metadata import MetadataRepositoryItem
 from .scan import ScanRepositoryItem
 

@@ -1,11 +1,7 @@
 from __future__ import annotations
 from collections.abc import Iterator, Sequence
-from decimal import Decimal
-from typing import Final
 import logging
 
-from ptychodus.api.geometry import Interval
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.reconstructor import (
     NullReconstructor,
     Reconstructor,

@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import QWizardPage
 from ptychodus.api.observer import Observable, Observer
 
 from ....model.metadata import MetadataPresenter
-from ....view.patterns import OpenDatasetWizardMetadataPage
+from ....view.diffraction import OpenDatasetWizardMetadataPage
 
 
 class OpenDatasetWizardMetadataViewController(Observer):

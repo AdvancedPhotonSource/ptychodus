@@ -5,13 +5,13 @@ import logging
 import numpy
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (
+from ptychodus.api.diffraction import (
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionFileWriter,
     DiffractionMetadata,
     SimpleDiffractionDataset,
-    SimpleDiffractionPatternArray,
+    SimpleDiffractionArray,
 )
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
@@ -62,7 +62,7 @@ class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
             ]
         )
 
-        array = SimpleDiffractionPatternArray(
+        array = SimpleDiffractionArray(
             label=file_path.stem,
             indexes=indexes,
             data=patterns,

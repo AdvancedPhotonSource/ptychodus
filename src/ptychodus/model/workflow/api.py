@@ -5,11 +5,11 @@ from typing import Any
 import logging
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import CropCenter
+from ptychodus.api.diffraction import CropCenter
 from ptychodus.api.settings import PathPrefixChange, SettingsRegistry
 from ptychodus.api.workflow import WorkflowAPI, WorkflowProductAPI
 
-from ..patterns import PatternsAPI
+from ..diffraction import PatternsAPI
 from ..product import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
 from ..reconstructor import ReconstructorAPI
 from .executor import WorkflowExecutor

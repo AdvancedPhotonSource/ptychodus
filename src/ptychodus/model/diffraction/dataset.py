@@ -14,13 +14,13 @@ import numpy
 import numpy.typing
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (
+from ptychodus.api.diffraction import (
     BadPixelsArray,
     DiffractionDataset,
     DiffractionMetadata,
-    DiffractionPatternArray,
-    PatternDataType,
-    PatternIndexesType,
+    DiffractionArray,
+    DiffractionData,
+    DiffractionIndexes,
 )
 from ptychodus.api.tree import SimpleTreeNode
 from ptychodus.api.units import BYTES_PER_MEGABYTE
@@ -55,12 +55,12 @@ class DiffractionDatasetObserver(ABC):
         pass
 
 
-class AssembledDiffractionPatternArray(DiffractionPatternArray):
+class AssembledDiffractionPatternArray(DiffractionArray):
     def __init__(
         self,
         label: str,
-        indexes: PatternIndexesType,
-        data: PatternDataType,
+        indexes: DiffractionIndexes,
+        data: DiffractionData,
         bad_pixels: BadPixelsArray,
         array_index: int,
     ) -> None:
@@ -81,23 +81,23 @@ class AssembledDiffractionPatternArray(DiffractionPatternArray):
     def get_label(self) -> str:
         return self._label
 
-    def get_indexes(self) -> PatternIndexesType:
+    def get_indexes(self) -> DiffractionIndexes:
         return self._indexes
 
-    def get_data(self) -> PatternDataType:
+    def get_data(self) -> DiffractionData:
         return self._data
 
-    def get_pattern(self, index: int) -> PatternDataType:
+    def get_pattern(self, index: int) -> DiffractionData:
         return self._data[index]
 
     def get_pattern_counts(self, index: int) -> int:
         pattern = self._data[index]
         return pattern[self._good_pixels].sum()
 
-    def get_average_pattern(self) -> PatternDataType:
+    def get_average_pattern(self) -> DiffractionData:
         return self._data.mean(axis=0)
 
-    def _get_total_counts(self) -> PatternDataType:
+    def _get_total_counts(self) -> DiffractionData:
         loaded_data = self._data[self._indexes >= 0]
         return numpy.sum(loaded_data[:, self._good_pixels], axis=-1)
 
@@ -113,7 +113,7 @@ class AssembledDiffractionPatternArray(DiffractionPatternArray):
 
 @dataclass(frozen=True)
 class ArrayLoaderTask:
-    array: DiffractionPatternArray
+    array: DiffractionArray
     index: int
 
 
@@ -228,8 +228,8 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
         self._contents_tree = SimpleTreeNode.create_root([])
         self._metadata = DiffractionMetadata.create_null()
-        self._indexes: PatternIndexesType = numpy.zeros((), dtype=int)
-        self._data: PatternDataType = numpy.zeros((0, 0, 0), dtype=int)
+        self._indexes: DiffractionIndexes = numpy.zeros((), dtype=int)
+        self._data: DiffractionData = numpy.zeros((0, 0, 0), dtype=int)
         self._arrays: list[AssembledDiffractionPatternArray] = list()
         self._array_counter = 0
         self._bad_pixels: BadPixelsArray | None = None
@@ -309,10 +309,10 @@ class AssembledDiffractionDataset(DiffractionDataset):
         bad_pixels = self._bad_pixels or numpy.full(detector_extent.shape, False)
         return processor.process_bad_pixels(bad_pixels)
 
-    def get_assembled_indexes(self) -> PatternIndexesType:
+    def get_assembled_indexes(self) -> DiffractionIndexes:
         return self._indexes[self._indexes >= 0]
 
-    def get_assembled_patterns(self) -> PatternDataType:
+    def get_assembled_patterns(self) -> DiffractionData:
         return self._data[self._indexes >= 0]
 
     def get_maximum_pattern_counts(self) -> int:
@@ -336,7 +336,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
     def __len__(self) -> int:
         return len(self._arrays)
 
-    def append_array(self, array: DiffractionPatternArray) -> None:
+    def append_array(self, array: DiffractionArray) -> None:
         """Load a new array into the dataset. Assumes that arrays arrive in order."""
         task = ArrayLoaderTask(array, self._array_counter)
         self._array_counter += 1
@@ -344,8 +344,10 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
     def assemble_patterns(self) -> None:
         for task in self._loader.completed_tasks():
-            array_size = self._metadata.num_patterns_per_array
-            array_slice = slice(task.index * array_size, (task.index + 1) * array_size)
+            offset = sum(self._metadata.num_patterns_per_array[: task.index])
+            array_slice = slice(
+                offset, offset + self._metadata.num_patterns_per_array[task.index + 1]
+            )
 
             self._indexes[array_slice] = task.array.get_indexes()
             pattern_indexes = self._indexes[array_slice]
@@ -394,7 +396,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
         self.clear()
         self._contents_tree = dataset.get_contents_tree()
         self._metadata = dataset.get_metadata()
-        self._indexes = -numpy.ones(self._metadata.num_patterns_total, dtype=int)
+        self._indexes = -numpy.ones(sum(self._metadata.num_patterns_per_array), dtype=int)
 
         for observer in self._observer_list:
             observer.handle_dataset_reloaded()
@@ -420,8 +422,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
             self._contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
             self._metadata = DiffractionMetadata(
-                num_patterns_per_array=num_patterns,
-                num_patterns_total=num_patterns,
+                num_patterns_per_array=[num_patterns],
                 pattern_dtype=self._data.dtype,
                 detector_extent=ImageExtent(detector_width, detector_height),
             )

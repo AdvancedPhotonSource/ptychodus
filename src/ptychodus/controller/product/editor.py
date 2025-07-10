@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import QWidget
 
 from ptychodus.api.observer import Observable, Observer
 
-from ...model.patterns import AssembledDiffractionDataset
+from ...model.diffraction import AssembledDiffractionDataset
 from ...model.product import ProductRepositoryItem
 from ...view.product import ProductEditorDialog
 

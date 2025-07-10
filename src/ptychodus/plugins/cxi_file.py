@@ -7,7 +7,7 @@ import numpy
 
 from .h5_diffraction_file import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.patterns import (
+from ptychodus.api.diffraction import (
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionMetadata,

@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.parametric import PathParameter, StringParameter
 
 from ...model.metadata import MetadataPresenter
-from ...model.patterns import (
+from ...model.diffraction import (
     AssembledDiffractionDataset,
     DetectorSettings,
     DiffractionDatasetObserver,
@@ -23,7 +23,7 @@ from ...model.patterns import (
     PatternSizer,
     PatternsAPI,
 )
-from ...view.patterns import DetectorView, PatternsView
+from ...view.diffraction import DetectorView, PatternsView
 from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate
 from ..data import FileDialogFactory
 from ..image import ImageController
@@ -130,7 +130,7 @@ class DetectorController:
         self._bad_pixels_view_controller.set_num_bad_pixels(num_bad_pixels)
 
 
-class PatternsController(DiffractionDatasetObserver):
+class DiffractionController(DiffractionDatasetObserver):
     def __init__(
         self,
         detector_settings: DetectorSettings,

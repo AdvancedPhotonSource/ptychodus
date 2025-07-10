@@ -4,13 +4,13 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from .patterns import BadPixelsArray, PatternDataType
+from .diffraction import BadPixelsArray, DiffractionData
 from .product import Product
 
 
 @dataclass(frozen=True)
 class ReconstructInput:
-    patterns: PatternDataType
+    patterns: DiffractionData
     bad_pixels: BadPixelsArray
     product: Product
 

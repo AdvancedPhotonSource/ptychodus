@@ -3,7 +3,7 @@ import logging
 from PyQt5.QtWidgets import QWizard
 
 from ....model.metadata import MetadataPresenter
-from ....model.patterns import PatternSettings, PatternSizer, PatternsAPI
+from ....model.diffraction import PatternSettings, PatternSizer, PatternsAPI
 
 from ...data import FileDialogFactory
 from .files import OpenDatasetWizardFilesViewController

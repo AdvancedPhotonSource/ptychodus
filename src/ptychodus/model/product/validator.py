@@ -1,6 +1,6 @@
 from ptychodus.api.observer import Observable, Observer
 
-from ..patterns import AssembledDiffractionDataset
+from ..diffraction import AssembledDiffractionDataset
 from .geometry import ProductGeometry
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem

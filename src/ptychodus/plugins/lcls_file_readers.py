@@ -7,13 +7,13 @@ import numpy
 import tables
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (
+from ptychodus.api.diffraction import (
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionMetadata,
-    DiffractionPatternArray,
-    PatternDataType,
-    PatternIndexesType,
+    DiffractionArray,
+    DiffractionData,
+    DiffractionIndexes,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
@@ -24,7 +24,7 @@ from .h5_diffraction_file import H5DiffractionFileTreeBuilder
 logger = logging.getLogger(__name__)
 
 
-class PyTablesDiffractionPatternArray(DiffractionPatternArray):
+class PyTablesDiffractionPatternArray(DiffractionArray):
     def __init__(self, label: str, num_patterns: int, file_path: Path, data_path: str) -> None:
         super().__init__()
         self._label = label
@@ -35,10 +35,10 @@ class PyTablesDiffractionPatternArray(DiffractionPatternArray):
     def get_label(self) -> str:
         return self._label
 
-    def get_indexes(self) -> PatternIndexesType:
+    def get_indexes(self) -> DiffractionIndexes:
         return self._indexes
 
-    def get_data(self) -> PatternDataType:
+    def get_data(self) -> DiffractionData:
         with tables.open_file(self._file_path, mode='r') as h5_file:
             try:
                 item = h5_file.get_node(self._data_path)

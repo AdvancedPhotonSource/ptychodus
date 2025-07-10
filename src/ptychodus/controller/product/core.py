@@ -20,7 +20,7 @@ from ...model.product import (
     ProductRepositoryItem,
     ProductRepositoryObserver,
 )
-from ...model.patterns import AssembledDiffractionDataset
+from ...model.diffraction import AssembledDiffractionDataset
 from ...model.product.metadata import MetadataRepositoryItem
 from ...model.product.object import ObjectRepositoryItem
 from ...model.product.probe import ProbeRepositoryItem

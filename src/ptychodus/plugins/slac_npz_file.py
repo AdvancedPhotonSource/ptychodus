@@ -6,12 +6,12 @@ import numpy
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.object import Object
-from ptychodus.api.patterns import (
+from ptychodus.api.diffraction import (
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionMetadata,
     SimpleDiffractionDataset,
-    SimpleDiffractionPatternArray,
+    SimpleDiffractionArray,
 )
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeSequence
@@ -42,7 +42,7 @@ class SLACDiffractionFileReader(DiffractionFileReader):
             [file_path.stem, type(patterns).__name__, f'{patterns.dtype}{patterns.shape}']
         )
 
-        array = SimpleDiffractionPatternArray(
+        array = SimpleDiffractionArray(
             label=file_path.stem,
             indexes=numpy.arange(num_patterns),
             data=patterns,

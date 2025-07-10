@@ -5,8 +5,8 @@ from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
 from ptychodus.api.tree import SimpleTreeNode
 
-from ...model.patterns import AssembledDiffractionDataset, DiffractionDatasetObserver
-from ...view.patterns import DatasetFileLayoutDialog
+from ...model.diffraction import AssembledDiffractionDataset, DiffractionDatasetObserver
+from ...view.diffraction import DatasetFileLayoutDialog
 
 
 class SimpleTreeModel(QAbstractItemModel):

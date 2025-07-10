@@ -76,7 +76,7 @@ class ProbeRepositoryItem(ParameterGroup):
     def _rebuild(self) -> None:
         try:
             probe = self._builder.build(self._geometry_provider)
-        except Exception as exc:
+        except Exception:
             logger.exception('Failed to rebuild probe!')
             return
 

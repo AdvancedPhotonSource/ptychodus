@@ -74,6 +74,7 @@ quote-style = "single"
 
 [tool.ruff.lint]
 select = [
+    "F",
     "N",
     "NPY",
 ]

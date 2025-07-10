@@ -16,7 +16,7 @@ except ModuleNotFoundError:
 import h5py
 import numpy
 
-from ptychodus.api.patterns import DiffractionMetadata, DiffractionPatternArray
+from ptychodus.api.diffraction import DiffractionMetadata, DiffractionArray
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.workflow import WorkflowAPI
@@ -27,7 +27,7 @@ from .automation import AutomationCore
 from .fluorescence import FluorescenceCore
 from .memory import MemoryPresenter
 from .metadata import MetadataPresenter
-from .patterns import PatternsCore, PatternsStreamingContext
+from .diffraction import PatternsCore, PatternsStreamingContext
 from .product import PositionsStreamingContext, ProductCore
 from .ptychi import PtyChiReconstructorLibrary
 from .ptychonn import PtychoNNReconstructorLibrary
@@ -76,7 +76,7 @@ class PtychodusStreamingContext:
     def append_positions_y(self, values_m: Sequence[float], trigger_counts: Sequence[int]) -> None:
         self._positions_context.append_positions_y(values_m, trigger_counts)
 
-    def append_array(self, array: DiffractionPatternArray) -> None:
+    def append_array(self, array: DiffractionArray) -> None:
         self._patterns_context.append_array(array)
 
     def get_queue_size(self) -> int:

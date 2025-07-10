@@ -11,7 +11,7 @@ from .data import FileDialogFactory
 from .image import ImageController
 from .memory import MemoryController
 from .object import ObjectController
-from .patterns import PatternsController
+from .diffraction import DiffractionController
 from .probe import ProbeController
 from .product import ProductController
 from .ptychi import PtyChiViewControllerFactory
@@ -56,7 +56,7 @@ class ControllerCore:
             view.statusBar(),
             self._file_dialog_factory,
         )
-        self._patterns_controller = PatternsController(
+        self._patterns_controller = DiffractionController(
             model.patterns.detector_settings,
             model.patterns.pattern_settings,
             model.patterns.pattern_sizer,

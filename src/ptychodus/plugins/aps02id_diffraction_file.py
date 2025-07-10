@@ -7,11 +7,11 @@ import h5py
 import numpy
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (
+from ptychodus.api.diffraction import (
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionMetadata,
-    DiffractionPatternArray,
+    DiffractionArray,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
@@ -60,7 +60,7 @@ class APS2IDDiffractionFileReader(DiffractionFileReader):
                 )
 
         contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
-        array_list: list[DiffractionPatternArray] = list()
+        array_list: list[DiffractionArray] = list()
 
         for idx, fp in sorted(file_path_mapping.items()):
             indexes = numpy.arange(num_patterns_per_array) + idx * num_patterns_per_array

@@ -4,12 +4,12 @@ from dataclasses import dataclass
 import numpy
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (
+from ptychodus.api.diffraction import (
     BadPixelsArray,
     CropCenter,
-    DiffractionPatternArray,
-    PatternDataType,
-    SimpleDiffractionPatternArray,
+    DiffractionArray,
+    DiffractionData,
+    SimpleDiffractionArray,
 )
 
 
@@ -18,7 +18,7 @@ class DiffractionPatternFilterValues:
     lower_bound: int | None
     upper_bound: int | None
 
-    def apply(self, data: PatternDataType) -> PatternDataType:
+    def apply(self, data: DiffractionData) -> DiffractionData:
         if self.lower_bound is not None:
             data[data < self.lower_bound] = 0
 
@@ -41,7 +41,7 @@ class DiffractionPatternCrop:
     def apply_bool(self, data: BadPixelsArray) -> BadPixelsArray:
         return data[self.slice_y, self.slice_x]
 
-    def apply(self, data: PatternDataType) -> PatternDataType:
+    def apply(self, data: DiffractionData) -> DiffractionData:
         return data[:, self.slice_y, self.slice_x]
 
 
@@ -56,7 +56,7 @@ class DiffractionPatternBinning:
         shape = (binned_height, self.bin_size_y, binned_width, self.bin_size_x)
         return numpy.logical_and.reduce(data.reshape(shape), axis=(-3, -1), keepdims=False)
 
-    def apply(self, data: PatternDataType) -> PatternDataType:
+    def apply(self, data: DiffractionData) -> DiffractionData:
         binned_width = data.shape[-1] // self.bin_size_x
         binned_height = data.shape[-2] // self.bin_size_y
         shape = (-1, binned_height, self.bin_size_y, binned_width, self.bin_size_x)
@@ -72,7 +72,7 @@ class DiffractionPatternPadding:
         pad_width = (self.pad_y, self.pad_y, self.pad_x, self.pad_x)
         return numpy.pad(data, pad_width, mode='constant', constant_values=False)
 
-    def apply(self, data: PatternDataType) -> PatternDataType:
+    def apply(self, data: DiffractionData) -> DiffractionData:
         pad_width = (0, 0, self.pad_y, self.pad_y, self.pad_x, self.pad_x)
         return numpy.pad(data, pad_width, mode='constant', constant_values=0)
 
@@ -113,7 +113,7 @@ class DiffractionPatternProcessor:
 
         return processed_bad_pixels
 
-    def __call__(self, array: DiffractionPatternArray) -> DiffractionPatternArray:
+    def __call__(self, array: DiffractionArray) -> DiffractionArray:
         data = array.get_data()
 
         if data.ndim == 2:
@@ -142,4 +142,4 @@ class DiffractionPatternProcessor:
         if self.transpose:
             data = numpy.transpose(data, axes=(0, 2, 1))
 
-        return SimpleDiffractionPatternArray(array.get_label(), array.get_indexes(), data)
+        return SimpleDiffractionArray(array.get_label(), array.get_indexes(), data)

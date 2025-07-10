@@ -10,7 +10,7 @@ from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
-from ..patterns import PatternsAPI
+from ..diffraction import PatternsAPI
 from ..product import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
 from ..reconstructor import ReconstructorAPI
 from .api import ConcreteWorkflowAPI
