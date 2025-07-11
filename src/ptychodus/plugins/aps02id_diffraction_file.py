@@ -44,31 +44,28 @@ class APS2IDDiffractionFileReader(DiffractionFileReader):
         data_path = '/entry/data/data'
 
         with h5py.File(file_path, 'r') as h5_file:
-            try:
-                h5data = h5_file[data_path]
-            except KeyError:
-                logger.warning(f'File {file_path} is not an APS 2-ID data file.')
-                return SimpleDiffractionDataset.create_null(file_path)
-            else:
+            h5data = h5_file[data_path]
+
+            if isinstance(h5data, h5py.Dataset):
                 num_patterns_per_array, detector_height, detector_width = h5data.shape
                 metadata = DiffractionMetadata(
-                    num_patterns_per_array=num_patterns_per_array,
-                    num_patterns_total=num_patterns_per_array * len(file_path_mapping),
+                    num_patterns_per_array=[num_patterns_per_array] * len(file_path_mapping),
                     pattern_dtype=h5data.dtype,
                     detector_extent=ImageExtent(detector_width, detector_height),
                     file_path=file_path.parent / file_pattern,
                 )
+                contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+                array_list: list[DiffractionArray] = list()
 
-        contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
-        array_list: list[DiffractionArray] = list()
+                for idx, fp in sorted(file_path_mapping.items()):
+                    indexes = numpy.arange(num_patterns_per_array) + idx * num_patterns_per_array
+                    array = H5DiffractionPatternArray(fp.stem, indexes, fp, data_path)
+                    contents_tree.create_child([array.get_label(), 'HDF5', str(idx)])
+                    array_list.append(array)
 
-        for idx, fp in sorted(file_path_mapping.items()):
-            indexes = numpy.arange(num_patterns_per_array) + idx * num_patterns_per_array
-            array = H5DiffractionPatternArray(fp.stem, indexes, fp, data_path)
-            contents_tree.create_child([array.get_label(), 'HDF5', str(idx)])
-            array_list.append(array)
-
-        return SimpleDiffractionDataset(metadata, contents_tree, array_list)
+                return SimpleDiffractionDataset(metadata, contents_tree, array_list)
+            else:
+                raise ValueError(f'Expected dataset at "{data_path}"; found {type(h5data)}.')
 
 
 def register_plugins(registry: PluginRegistry) -> None:

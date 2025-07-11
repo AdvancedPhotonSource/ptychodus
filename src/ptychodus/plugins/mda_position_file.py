@@ -11,7 +11,7 @@ import yaml
 
 try:
     # xdrlib removed from the standard library in Python 3.13
-    import xdrlib
+    import xdrlib  # type: ignore[import-not-found]
 except ModuleNotFoundError:
     from ._xdrlib import xdrlib  # type: ignore[no-redef]
 

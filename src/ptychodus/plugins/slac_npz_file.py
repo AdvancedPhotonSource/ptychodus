@@ -30,8 +30,7 @@ class SLACDiffractionFileReader(DiffractionFileReader):
         num_patterns, detector_height, detector_width = patterns.shape
 
         metadata = DiffractionMetadata(
-            num_patterns_per_array=num_patterns,
-            num_patterns_total=num_patterns,
+            num_patterns_per_array=[num_patterns],
             pattern_dtype=patterns.dtype,
             detector_extent=ImageExtent(detector_width, detector_height),
             file_path=file_path,

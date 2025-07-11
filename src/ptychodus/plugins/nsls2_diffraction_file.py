@@ -45,8 +45,7 @@ class NSLSIIDiffractionFileReader(DiffractionFileReader):
                 )
 
                 metadata = DiffractionMetadata(
-                    num_patterns_per_array=num_patterns,
-                    num_patterns_total=num_patterns,
+                    num_patterns_per_array=[num_patterns],
                     pattern_dtype=data.dtype,
                     detector_extent=ImageExtent(detector_width, detector_height),
                     detector_pixel_geometry=PixelGeometry(pixel_size_m, pixel_size_m),

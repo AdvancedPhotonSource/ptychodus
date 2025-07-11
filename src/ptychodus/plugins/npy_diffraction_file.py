@@ -32,8 +32,7 @@ class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
         num_patterns, detector_height, detector_width = data.shape
 
         metadata = DiffractionMetadata(
-            num_patterns_per_array=num_patterns,
-            num_patterns_total=num_patterns,
+            num_patterns_per_array=[num_patterns],
             pattern_dtype=data.dtype,
             detector_extent=ImageExtent(detector_width, detector_height),
             file_path=file_path,

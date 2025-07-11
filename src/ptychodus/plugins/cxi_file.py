@@ -31,11 +31,9 @@ class CXIDiffractionFileReader(DiffractionFileReader):
         with h5py.File(file_path, 'r') as h5_file:
             contents_tree = self._tree_builder.build(h5_file)
 
-            try:
-                data = h5_file[self._data_path]
-            except KeyError:
-                logger.warning('Unable to load data.')
-            else:
+            data = h5_file[self._data_path]
+
+            if isinstance(data, h5py.Dataset):
                 num_patterns, detector_height, detector_width = data.shape
 
                 detector_extent = ImageExtent(detector_width, detector_height)
@@ -53,8 +51,7 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                 # /entry_1/instrument_1/detector_1/mask Dataset {512, 512}
 
                 metadata = DiffractionMetadata(
-                    num_patterns_per_array=num_patterns,
-                    num_patterns_total=num_patterns,
+                    num_patterns_per_array=[num_patterns],
                     pattern_dtype=data.dtype,
                     detector_distance_m=detector_distance_m,
                     detector_extent=detector_extent,
@@ -71,8 +68,8 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                 )
 
                 return SimpleDiffractionDataset(metadata, contents_tree, [array])
-
-        return SimpleDiffractionDataset.create_null(file_path)
+            else:
+                raise ValueError(f'Expected dataset at {self._data_path}, got {type(data)}.')
 
 
 class CXIPositionFileReader(PositionFileReader):

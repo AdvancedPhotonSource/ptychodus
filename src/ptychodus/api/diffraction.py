@@ -12,7 +12,7 @@ from .geometry import ImageExtent, PixelGeometry
 from .tree import SimpleTreeNode
 
 BadPixelsArray: TypeAlias = numpy.typing.NDArray[numpy.bool_]
-DiffractionData: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
+DiffractionData: TypeAlias = numpy.typing.NDArray[numpy.integer[Any] | numpy.floating[Any]]
 DiffractionIndexes: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
 
 
@@ -64,7 +64,7 @@ class SimpleDiffractionArray(DiffractionArray):
 @dataclass(frozen=True)
 class DiffractionMetadata:
     num_patterns_per_array: Sequence[int]
-    pattern_dtype: numpy.dtype[numpy.integer[Any]]
+    pattern_dtype: numpy.dtype[numpy.integer[Any] | numpy.floating[Any]]
     detector_distance_m: float | None = None
     detector_extent: ImageExtent | None = None
     detector_pixel_geometry: PixelGeometry | None = None

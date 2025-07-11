@@ -81,8 +81,7 @@ class APS12IDDiffractionFileReader(DiffractionFileReader):
                 detector_height, detector_width = h5_data.shape
 
                 metadata = DiffractionMetadata(
-                    num_patterns_per_array=1,
-                    num_patterns_total=lines_num * points_num,
+                    num_patterns_per_array=[1] * lines_num * points_num,
                     pattern_dtype=h5_data.dtype,
                     detector_extent=ImageExtent(detector_width, detector_height),
                     file_path=file_path,

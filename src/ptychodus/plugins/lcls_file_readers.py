@@ -39,20 +39,13 @@ class PyTablesDiffractionPatternArray(DiffractionArray):
         return self._indexes
 
     def get_data(self) -> DiffractionData:
-        with tables.open_file(self._file_path, mode='r') as h5_file:
-            try:
-                item = h5_file.get_node(self._data_path)
-            except tables.NoSuchNodeError:
-                raise ValueError(f'Symlink {self._file_path}:{self._data_path} is broken!')
-            else:
-                if not isinstance(item, tables.EArray):
-                    raise ValueError(
-                        f'Symlink {self._file_path}:{self._data_path} is not a tables File!'
-                    )
+        with tables.open_file(str(self._file_path), mode='r') as h5_file:
+            item = h5_file.get_node(self._data_path)
 
-            data = item[:]
+            if isinstance(item, tables.EArray):
+                return item[:]
 
-        return data
+        raise ValueError(f'Symlink {self._file_path}:{self._data_path} is not a tables file!')
 
 
 class LCLSDiffractionFileReader(DiffractionFileReader):
@@ -62,14 +55,10 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
 
     def read(self, file_path: Path) -> DiffractionDataset:
         metadata = DiffractionMetadata.create_null(file_path)
+        array_list: list[DiffractionArray] = list()
 
-        with tables.open_file(file_path, mode='r') as h5_file:
-            try:
-                data = h5_file.get_node(self._data_path)
-            except tables.NoSuchNodeError:
-                logger.debug('Unable to find data.')
-                return SimpleDiffractionDataset.create_null(file_path)
-
+        with tables.open_file(str(file_path), mode='r') as h5_file:
+            data = h5_file.get_node(self._data_path)
             data_shape = h5_file.root.jungfrau1M.image_img.shape
             num_patterns, detector_height, detector_width = data_shape
 
@@ -79,9 +68,9 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
                 file_path=file_path,
                 data_path=self._data_path,
             )
+            array_list.append(array)
             metadata = DiffractionMetadata(
-                num_patterns_per_array=num_patterns,
-                num_patterns_total=num_patterns,
+                num_patterns_per_array=[num_patterns],
                 pattern_dtype=data.dtype,
                 detector_extent=ImageExtent(detector_width, detector_height),
                 file_path=file_path,
@@ -90,7 +79,7 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
         with h5py.File(file_path, 'r') as h5_file:
             contents_tree = self._tree_builder.build(h5_file)
 
-        return SimpleDiffractionDataset(metadata, contents_tree, [array])
+        return SimpleDiffractionDataset(metadata, contents_tree, array_list)
 
 
 class LCLSPositionFileReader(PositionFileReader):
@@ -109,7 +98,7 @@ class LCLSPositionFileReader(PositionFileReader):
     def read(self, file_path: Path) -> PositionSequence:
         point_list: list[ScanPoint] = list()
 
-        with tables.open_file(file_path, mode='r') as h5_file:
+        with tables.open_file(str(file_path), mode='r') as h5_file:
             try:
                 # piezo stage positions are in microns
                 pi_x = h5_file.get_node('/lmc/ch03')[:]

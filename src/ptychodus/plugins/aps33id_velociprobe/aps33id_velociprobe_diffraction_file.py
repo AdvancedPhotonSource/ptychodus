@@ -227,24 +227,11 @@ class VelociprobeDiffractionFileReader(DiffractionFileReader):
         dataset: DiffractionDataset = SimpleDiffractionDataset.create_null(file_path)
 
         with h5py.File(file_path, 'r') as h5_file:
-            metadata = DiffractionMetadata.create_null(file_path)
-            contents_tree = self._tree_builder.build(h5_file)
-
-            try:
-                h5_dataset = h5_file['/entry/data/data_000001']
-            except KeyError:
-                logger.error(f'File {file_path} is not a Velociprobe data file.')
-                raise
-
+            h5_dataset = h5_file['/entry/data/data_000001']
             num_patterns_per_array = h5_dataset.shape[0]
             pattern_dtype = h5_dataset.dtype
 
-            try:
-                entry = EntryGroup.read(h5_file['entry'], num_patterns_per_array)
-            except KeyError:
-                logger.error(f'File {file_path} is not a Velociprobe data file.')
-                raise
-
+            entry = EntryGroup.read(h5_file['entry'], num_patterns_per_array)
             detector = entry.instrument.detector
             detector_pixel_geometry = PixelGeometry(
                 detector.x_pixel_size_m,
@@ -254,17 +241,16 @@ class VelociprobeDiffractionFileReader(DiffractionFileReader):
                 detector.beam_center_x_px,
                 detector.beam_center_y_px,
             )
-
             detector_specific = detector.detector_specific
             detector_extent = ImageExtent(
                 detector_specific.x_pixels_in_detector,
                 detector_specific.y_pixels_in_detector,
             )
             probe_energy_eV = detector_specific.photon_energy_eV  # noqa: N806
+            num_arrays = detector_specific.num_patterns_total // num_patterns_per_array
 
             metadata = DiffractionMetadata(
-                num_patterns_per_array=num_patterns_per_array,
-                num_patterns_total=detector_specific.num_patterns_total,
+                num_patterns_per_array=[num_patterns_per_array] * num_arrays,
                 pattern_dtype=pattern_dtype,
                 detector_distance_m=detector.detector_distance_m,
                 detector_extent=detector_extent,
@@ -274,7 +260,7 @@ class VelociprobeDiffractionFileReader(DiffractionFileReader):
                 probe_energy_eV=probe_energy_eV,
                 file_path=file_path,
             )
-
+            contents_tree = self._tree_builder.build(h5_file)
             dataset = VelociprobeDiffractionDataset(metadata, contents_tree, entry)
 
             # vvv TODO This is a hack; remove when able! vvv
