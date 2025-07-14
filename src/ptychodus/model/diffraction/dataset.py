@@ -404,11 +404,11 @@ class AssembledDiffractionDataset(DiffractionDataset):
             self.append_array(array)
 
     def import_assembled_patterns(self, file_path: Path) -> None:
-        # FIXME NPZ -> H5
         if file_path.is_file():
             self.clear()
             logger.debug(f'Reading processed patterns from "{file_path}"')
 
+            # FIXME BEGIN NPZ -> H5
             try:
                 contents = numpy.load(file_path)
             except Exception as exc:
@@ -418,6 +418,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
             self._data = contents[self.PATTERNS_KEY]
             self._bad_pixels = contents.get(self.BAD_PIXELS_KEY, None)
             num_patterns, detector_height, detector_width = self._data.shape
+            # FIXME END
 
             self._contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
             self._metadata = DiffractionMetadata(
@@ -442,9 +443,9 @@ class AssembledDiffractionDataset(DiffractionDataset):
             logger.warning(f'Refusing to read invalid file path {file_path}')
 
     def export_assembled_patterns(self, file_path: Path) -> None:
-        # FIXME NPZ -> H5
         logger.debug(f'Writing processed patterns to "{file_path}"')
 
+        # FIXME BEGIN NPZ -> H5
         contents: dict[str, numpy.typing.NDArray] = {
             self.PATTERNS_KEY: self.get_assembled_patterns(),
             self.INDEXES_KEY: self.get_assembled_indexes(),
@@ -454,6 +455,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
             contents[self.BAD_PIXELS_KEY] = self._bad_pixels
 
         numpy.savez_compressed(file_path, allow_pickle=False, **contents)
+        # FIXME END
 
     def get_info_text(self) -> str:
         file_path = self._metadata.file_path

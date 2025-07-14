@@ -26,6 +26,8 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
         self._dataset = dataset
         self._product_settings = product_settings
 
+        # FIXME sync exposure_time_s
+
         dataset.add_observer(self)
 
     @property
