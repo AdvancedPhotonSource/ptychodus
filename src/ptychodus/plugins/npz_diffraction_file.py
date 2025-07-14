@@ -64,7 +64,7 @@ class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
         array = SimpleDiffractionArray(
             label=file_path.stem,
             indexes=indexes,
-            data=patterns,
+            patterns=patterns,
         )
 
         return SimpleDiffractionDataset(
@@ -74,7 +74,7 @@ class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
     def write(self, file_path: Path, dataset: DiffractionDataset) -> None:
         contents = {
             self.INDEXES: numpy.concatenate([array.get_indexes() for array in dataset]),
-            self.PATTERNS: numpy.concatenate([array.get_data() for array in dataset]),
+            self.PATTERNS: numpy.concatenate([array.get_patterns() for array in dataset]),
         }
 
         bad_pixels = dataset.get_bad_pixels()

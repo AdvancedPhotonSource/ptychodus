@@ -12,6 +12,7 @@ from PyQt5.QtCore import (
 )
 from PyQt5.QtWidgets import QAbstractItemView, QAction
 
+from ptychodus.api.product import LossValue
 from ptychodus.api.units import BYTES_PER_MEGABYTE
 
 from ...model.product import (
@@ -332,7 +333,7 @@ class ProductController(ProductRepositoryObserver):
     def handle_object_changed(self, index: int, item: ObjectRepositoryItem) -> None:
         self._update_info_text()
 
-    def handle_costs_changed(self, index: int, costs: Sequence[float]) -> None:
+    def handle_losses_changed(self, index: int, costs: Sequence[LossValue]) -> None:
         self._update_info_text()
 
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:

@@ -99,7 +99,7 @@ class DatasetLayoutViewController(DiffractionDatasetObserver):
 
     @classmethod
     def show_dialog(cls, dataset: AssembledDiffractionDataset, parent: QWidget) -> None:
-        tree_model = SimpleTreeModel(dataset.get_contents_tree())
+        tree_model = SimpleTreeModel(dataset.get_layout())
         controller = cls(dataset, tree_model)
         dataset.add_observer(controller)
 
@@ -111,7 +111,7 @@ class DatasetLayoutViewController(DiffractionDatasetObserver):
         dialog.open()
 
     def _sync_model_to_view(self) -> None:
-        self._tree_model.set_root_node(self._dataset.get_contents_tree())
+        self._tree_model.set_root_node(self._dataset.get_layout())
 
     def handle_bad_pixels_changed(self, num_bad_pixels: int) -> None:
         pass

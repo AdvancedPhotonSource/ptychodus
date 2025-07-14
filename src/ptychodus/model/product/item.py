@@ -5,7 +5,7 @@ import logging
 
 from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.product import Product
+from ptychodus.api.product import LossValue, Product
 
 from .geometry import ProductGeometry
 from .metadata import MetadataRepositoryItem, UniqueNameFactory
@@ -35,7 +35,7 @@ class ProductRepositoryItemObserver(UniqueNameFactory):
         pass
 
     @abstractmethod
-    def handle_costs_changed(self, item: ProductRepositoryItem) -> None:
+    def handle_losses_changed(self, item: ProductRepositoryItem) -> None:
         pass
 
 
@@ -49,7 +49,7 @@ class ProductRepositoryItem(ParameterGroup):
         probe_item: ProbeRepositoryItem,
         object_item: ObjectRepositoryItem,
         validator: ProductValidator,
-        costs: Sequence[float],
+        losses: Sequence[LossValue],
     ) -> None:
         super().__init__()
         self._parent = parent
@@ -59,7 +59,7 @@ class ProductRepositoryItem(ParameterGroup):
         self._probe_item = probe_item
         self._object_item = object_item
         self._validator = validator
-        self._costs = list(costs)
+        self._losses = list(losses)
 
         self._add_group('metadata', self._metadata_item, observe=True)
         self._add_group('scan', self._scan_item, observe=True)
@@ -73,8 +73,8 @@ class ProductRepositoryItem(ParameterGroup):
         self._scan_item.assign(product.positions)
         self._probe_item.assign(product.probes)
         self._object_item.assign(product.object_)
-        self._costs = list(product.costs)
-        self._parent.handle_costs_changed(self)
+        self._losses = list(product.losses)
+        self._parent.handle_losses_changed(self)
 
     def sync_to_settings(self) -> None:
         self._metadata_item.sync_to_settings()
@@ -103,12 +103,12 @@ class ProductRepositoryItem(ParameterGroup):
     def get_object_item(self) -> ObjectRepositoryItem:
         return self._object_item
 
-    def _invalidate_costs(self) -> None:
-        self._costs = list()
-        self._parent.handle_costs_changed(self)
+    def _invalidate_losses(self) -> None:
+        self._losses = list()
+        self._parent.handle_losses_changed(self)
 
-    def get_costs(self) -> Sequence[float]:
-        return self._costs
+    def get_losses(self) -> Sequence[LossValue]:
+        return self._losses
 
     def get_product(self) -> Product:
         return Product(
@@ -116,21 +116,21 @@ class ProductRepositoryItem(ParameterGroup):
             positions=self._scan_item.get_scan(),
             probes=self._probe_item.get_probes(),
             object_=self._object_item.get_object(),
-            costs=self.get_costs(),
+            losses=self.get_losses(),
         )
 
     def _update(self, observable: Observable) -> None:
         if observable is self._metadata_item:
-            self._invalidate_costs()
+            self._invalidate_losses()
             self._parent.handle_metadata_changed(self)
         elif observable is self._scan_item:
-            self._invalidate_costs()
+            self._invalidate_losses()
             self._parent.handle_scan_changed(self)
         elif observable is self._probe_item:
-            self._invalidate_costs()
+            self._invalidate_losses()
             self._parent.handle_probe_changed(self)
         elif observable is self._object_item:
-            self._invalidate_costs()
+            self._invalidate_losses()
             self._parent.handle_object_changed(self)
         else:
             super()._update(observable)
@@ -158,7 +158,7 @@ class ProductRepositoryObserver(ABC):
         pass
 
     @abstractmethod
-    def handle_costs_changed(self, index: int, costs: Sequence[float]) -> None:
+    def handle_losses_changed(self, index: int, losses: Sequence[LossValue]) -> None:
         pass
 
     @abstractmethod

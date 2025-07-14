@@ -5,9 +5,10 @@ import time
 
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.reconstructor import (
+    ReconstructInput,
     Reconstructor,
-    TrainableReconstructor,
     TrainOutput,
+    TrainableReconstructor,
 )
 
 from ..product import ProductAPI
@@ -36,6 +37,16 @@ class ReconstructorAPI:
 
     def process_results(self, *, block: bool) -> None:
         self._reconstruction_queue.process_results(block=block)
+
+    def get_reconstruct_input(
+        self,
+        input_product_index: int,
+        *,
+        index_filter: ScanIndexFilter = ScanIndexFilter.ALL,
+    ) -> ReconstructInput:
+        return self._data_matcher.match_diffraction_patterns_with_positions(
+            input_product_index, index_filter=index_filter
+        )
 
     def reconstruct(
         self,
@@ -143,7 +154,7 @@ class ReconstructorAPI:
 
     def train(self, data_path: Path) -> TrainOutput:
         reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
-        result = TrainOutput([], -1)
+        result = TrainOutput([], [], -1)
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Training...')

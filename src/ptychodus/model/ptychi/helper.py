@@ -44,7 +44,7 @@ from ptychi.api.options.base import (
 
 from ptychodus.api.object import Object, ObjectGeometry, ObjectPoint
 from ptychodus.api.probe import ProbeSequence
-from ptychodus.api.product import Product, ProductMetadata
+from ptychodus.api.product import LossValue, Product, ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput
 from ptychodus.api.scan import PositionSequence, ScanPoint
 from ptychodus.api.typing import ComplexArrayType, RealArrayType
@@ -668,7 +668,7 @@ class PtyChiOptionsHelper:
             else metadata.detector_distance_m
         )
         return PtychographyDataOptions(
-            data=parameters.patterns,
+            data=parameters.diffraction_patterns,
             free_space_propagation_distance_m=free_space_propagation_distance_m,
             wavelength_m=metadata.probe_wavelength_m,
             fft_shift=self._reconstructor_settings.fft_shift_diffraction_patterns.get_value(),
@@ -685,7 +685,7 @@ class PtyChiOptionsHelper:
         probe_array: torch.Tensor | numpy.ndarray,
         object_array: torch.Tensor | numpy.ndarray,
         opr_weights: torch.Tensor | numpy.ndarray,
-        costs: Sequence[float],
+        losses: Sequence[LossValue],
     ) -> Product:
         object_in = product.object_
         object_out = Object(
@@ -722,5 +722,5 @@ class PtyChiOptionsHelper:
             positions=scan_out,
             probes=probe_out,
             object_=object_out,
-            costs=costs,
+            losses=losses,
         )

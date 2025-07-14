@@ -60,7 +60,7 @@ class STXMSimulator(Observable):
         )
 
         for pattern, scan_point, probe in zip(
-            reconstruct_input.patterns, product.positions, product.probes
+            reconstruct_input.diffraction_patterns, product.positions, product.probes
         ):
             probe_intensity = probe.get_intensity()
             rescaled_probe_intensity = probe_intensity * (pattern.sum() / probe_intensity.sum())

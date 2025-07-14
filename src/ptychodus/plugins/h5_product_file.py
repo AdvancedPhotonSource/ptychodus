@@ -136,7 +136,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             positions=PositionSequence(point_list),
             probes=probe,
             object_=object_,
-            costs=costs,
+            losses=costs,
         )
 
     def write(self, file_path: Path, product: Product) -> None:
@@ -186,7 +186,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             h5_object.attrs[self.OBJECT_PIXEL_HEIGHT] = object_geometry.pixel_height_m
             h5_file.create_dataset(self.OBJECT_LAYER_SPACING, data=object_.layer_spacing_m)
 
-            h5_file.create_dataset(self.COSTS_ARRAY, data=product.costs)
+            h5_file.create_dataset(self.COSTS_ARRAY, data=product.losses)
 
 
 def register_plugins(registry: PluginRegistry) -> None:

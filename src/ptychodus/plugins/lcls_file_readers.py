@@ -12,7 +12,7 @@ from ptychodus.api.diffraction import (
     DiffractionFileReader,
     DiffractionMetadata,
     DiffractionArray,
-    DiffractionData,
+    DiffractionPatterns,
     DiffractionIndexes,
     SimpleDiffractionDataset,
 )
@@ -38,7 +38,7 @@ class PyTablesDiffractionPatternArray(DiffractionArray):
     def get_indexes(self) -> DiffractionIndexes:
         return self._indexes
 
-    def get_data(self) -> DiffractionData:
+    def get_patterns(self) -> DiffractionPatterns:
         with tables.open_file(str(self._file_path), mode='r') as h5_file:
             item = h5_file.get_node(self._data_path)
 

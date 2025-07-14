@@ -126,7 +126,7 @@ class PtychodusAdImageProcessor(AdImageProcessor):
             array = ptychodus.api.diffraction.SimpleDiffractionArray(
                 label=f'Frame{frame_id}',
                 indexes=numpy.array([frame_id]),
-                data=image3d,
+                patterns=image3d,
             )
             self._ptychodus_streaming_context.append_array(array)
 

@@ -11,8 +11,8 @@ import numpy.typing
 from .geometry import ImageExtent, PixelGeometry
 from .tree import SimpleTreeNode
 
-BadPixelsArray: TypeAlias = numpy.typing.NDArray[numpy.bool_]
-DiffractionData: TypeAlias = numpy.typing.NDArray[numpy.integer[Any] | numpy.floating[Any]]
+BadPixels: TypeAlias = numpy.typing.NDArray[numpy.bool_]
+DiffractionPatterns: TypeAlias = numpy.typing.NDArray[numpy.integer[Any] | numpy.floating[Any]]
 DiffractionIndexes: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
 
 
@@ -32,11 +32,11 @@ class DiffractionArray:
         pass
 
     @abstractmethod
-    def get_data(self) -> DiffractionData:
+    def get_patterns(self) -> DiffractionPatterns:
         pass
 
     def get_num_patterns(self) -> int:
-        return self.get_data().shape[0]
+        return self.get_patterns().shape[0]
 
 
 class SimpleDiffractionArray(DiffractionArray):
@@ -44,12 +44,12 @@ class SimpleDiffractionArray(DiffractionArray):
         self,
         label: str,
         indexes: DiffractionIndexes,
-        data: DiffractionData,
+        patterns: DiffractionPatterns,
     ) -> None:
         super().__init__()
         self._label = label
         self._indexes = indexes
-        self._data = data
+        self._patterns = patterns
 
     def get_label(self) -> str:
         return self._label
@@ -57,8 +57,8 @@ class SimpleDiffractionArray(DiffractionArray):
     def get_indexes(self) -> DiffractionIndexes:
         return self._indexes
 
-    def get_data(self) -> DiffractionData:
-        return self._data
+    def get_patterns(self) -> DiffractionPatterns:
+        return self._patterns
 
 
 @dataclass(frozen=True)
@@ -86,11 +86,11 @@ class DiffractionDataset(Sequence[DiffractionArray]):
         pass
 
     @abstractmethod
-    def get_contents_tree(self) -> SimpleTreeNode:
+    def get_layout(self) -> SimpleTreeNode:
         pass
 
     @abstractmethod
-    def get_bad_pixels(self) -> BadPixelsArray | None:
+    def get_bad_pixels(self) -> BadPixels | None:
         pass
 
 
@@ -99,8 +99,8 @@ class SimpleDiffractionDataset(DiffractionDataset):
         self,
         metadata: DiffractionMetadata,
         contents_tree: SimpleTreeNode,
-        array_list: list[DiffractionArray],
-        bad_pixels: BadPixelsArray | None = None,
+        array_list: Sequence[DiffractionArray],
+        bad_pixels: BadPixels | None = None,
     ) -> None:
         super().__init__()
         self._metadata = metadata
@@ -118,10 +118,10 @@ class SimpleDiffractionDataset(DiffractionDataset):
     def get_metadata(self) -> DiffractionMetadata:
         return self._metadata
 
-    def get_contents_tree(self) -> SimpleTreeNode:
+    def get_layout(self) -> SimpleTreeNode:
         return self._contents_tree
 
-    def get_bad_pixels(self) -> BadPixelsArray | None:
+    def get_bad_pixels(self) -> BadPixels | None:
         return self._bad_pixels
 
     @overload
@@ -159,6 +159,6 @@ class BadPixelsFileReader(ABC):
     """interface for plugins that read bad pixel files"""
 
     @abstractmethod
-    def read(self, file_path: Path) -> BadPixelsArray:
+    def read(self, file_path: Path) -> BadPixels:
         """reads a bad pixels array from file"""
         pass

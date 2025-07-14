@@ -103,7 +103,7 @@ class PtychoShelvesProductFileReader(ProductFileReader):
             positions=PositionSequence(point_list),
             probes=probe,
             object_=object_,
-            costs=costs,
+            losses=costs,
         )
 
 

@@ -7,7 +7,7 @@ from .diffraction import (
     DetectorSettings,
     DiffractionDatasetObserver,
     AssembledDiffractionDataset,
-    PatternSettings,
+    DiffractionSettings,
 )
 from .product import ProductSettings
 
@@ -16,13 +16,13 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
     def __init__(
         self,
         detector_settings: DetectorSettings,
-        pattern_settings: PatternSettings,
+        diffraction_settings: DiffractionSettings,
         dataset: AssembledDiffractionDataset,
         product_settings: ProductSettings,
     ) -> None:
         super().__init__()
         self._detector_settings = detector_settings
-        self._pattern_settings = pattern_settings
+        self._diffraction_settings = diffraction_settings
         self._dataset = dataset
         self._product_settings = product_settings
 
@@ -72,19 +72,19 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
             crop_center = self._metadata.crop_center
 
             if crop_center:
-                self._pattern_settings.crop_center_x_px.set_value(crop_center.position_x_px)
-                self._pattern_settings.crop_center_y_px.set_value(crop_center.position_y_px)
+                self._diffraction_settings.crop_center_x_px.set_value(crop_center.position_x_px)
+                self._diffraction_settings.crop_center_y_px.set_value(crop_center.position_y_px)
             elif self._metadata.detector_extent:
-                self._pattern_settings.crop_center_x_px.set_value(
+                self._diffraction_settings.crop_center_x_px.set_value(
                     int(self._metadata.detector_extent.width_px) // 2
                 )
-                self._pattern_settings.crop_center_y_px.set_value(
+                self._diffraction_settings.crop_center_y_px.set_value(
                     int(self._metadata.detector_extent.height_px) // 2
                 )
 
         if sync_extent and self._metadata.detector_extent:
-            center_x = self._pattern_settings.crop_center_x_px.get_value()
-            center_y = self._pattern_settings.crop_center_y_px.get_value()
+            center_x = self._diffraction_settings.crop_center_x_px.get_value()
+            center_y = self._diffraction_settings.crop_center_y_px.get_value()
 
             extent_x = int(self._metadata.detector_extent.width_px)
             extent_y = int(self._metadata.detector_extent.height_px)
@@ -97,8 +97,8 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
             while crop_diameter < max_radius:
                 crop_diameter <<= 1
 
-            self._pattern_settings.crop_width_px.set_value(crop_diameter)
-            self._pattern_settings.crop_height_px.set_value(crop_diameter)
+            self._diffraction_settings.crop_width_px.set_value(crop_diameter)
+            self._diffraction_settings.crop_height_px.set_value(crop_diameter)
 
     def can_sync_probe_photon_count(self) -> bool:
         return self._metadata.probe_photon_count is not None

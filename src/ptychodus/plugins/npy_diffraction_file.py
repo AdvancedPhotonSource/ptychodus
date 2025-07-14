@@ -46,13 +46,13 @@ class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
         array = SimpleDiffractionArray(
             label=file_path.stem,
             indexes=numpy.arange(num_patterns),
-            data=data,
+            patterns=data,
         )
 
         return SimpleDiffractionDataset(metadata, contents_tree, [array])
 
     def write(self, file_path: Path, dataset: DiffractionDataset) -> None:
-        patterns = numpy.concatenate([array.get_data() for array in dataset])
+        patterns = numpy.concatenate([array.get_patterns() for array in dataset])
         numpy.save(file_path, patterns)
 
 

@@ -16,7 +16,7 @@ from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.tree import SimpleTreeNode
 
 from .dataset import AssembledDiffractionDataset
-from .settings import DetectorSettings, PatternSettings
+from .settings import DetectorSettings, DiffractionSettings
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +43,10 @@ class PatternsStreamingContext:
         self._dataset.assemble_patterns()
 
 
-class PatternsAPI:
+class DiffractionAPI:
     def __init__(
         self,
-        pattern_settings: PatternSettings,
+        diffraction_settings: DiffractionSettings,
         detector_settings: DetectorSettings,
         dataset: AssembledDiffractionDataset,
         bad_pixels_file_reader_chooser: PluginChooser[BadPixelsFileReader],
@@ -54,7 +54,7 @@ class PatternsAPI:
         file_writer_chooser: PluginChooser[DiffractionFileWriter],
     ) -> None:
         super().__init__()
-        self._pattern_settings = pattern_settings
+        self._diffraction_settings = diffraction_settings
         self._detector_settings = detector_settings
         self._dataset = dataset
         self._bad_pixels_file_reader_chooser = bad_pixels_file_reader_chooser
@@ -102,12 +102,12 @@ class PatternsAPI:
         detector_extent: ImageExtent | None = None,
     ) -> int:
         if crop_center is not None:
-            self._pattern_settings.crop_center_x_px.set_value(crop_center.position_x_px)
-            self._pattern_settings.crop_center_y_px.set_value(crop_center.position_y_px)
+            self._diffraction_settings.crop_center_x_px.set_value(crop_center.position_x_px)
+            self._diffraction_settings.crop_center_y_px.set_value(crop_center.position_y_px)
 
         if crop_extent is not None:
-            self._pattern_settings.crop_width_px.set_value(crop_extent.width_px)
-            self._pattern_settings.crop_height_px.set_value(crop_extent.height_px)
+            self._diffraction_settings.crop_width_px.set_value(crop_extent.width_px)
+            self._diffraction_settings.crop_height_px.set_value(crop_extent.height_px)
 
         if detector_extent is not None:
             self._detector_settings.width_px.set_value(detector_extent.width_px)

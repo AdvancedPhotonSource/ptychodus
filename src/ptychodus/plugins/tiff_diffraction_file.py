@@ -13,7 +13,7 @@ from ptychodus.api.diffraction import (
     DiffractionFileReader,
     DiffractionMetadata,
     DiffractionArray,
-    DiffractionData,
+    DiffractionPatterns,
     DiffractionIndexes,
     SimpleDiffractionDataset,
 )
@@ -35,7 +35,7 @@ class TiffDiffractionPatternArray(DiffractionArray):
     def get_indexes(self) -> DiffractionIndexes:
         return self._indexes
 
-    def get_data(self) -> DiffractionData:
+    def get_patterns(self) -> DiffractionPatterns:
         with TiffFile(self._file_path) as tiff:
             data = tiff.asarray()
 

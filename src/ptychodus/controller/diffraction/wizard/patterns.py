@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
 
 from ptychodus.api.observer import Observable
 
-from ....model.diffraction import PatternSettings, PatternSizer
+from ....model.diffraction import DiffractionSettings, PatternSizer
 from ....view.diffraction import OpenDatasetWizardPage
 
 from ...data import FileDialogFactory
@@ -27,7 +27,7 @@ from ...parametric import (
 
 
 class PatternLoadViewController(ParameterViewController):
-    def __init__(self, settings: PatternSettings) -> None:
+    def __init__(self, settings: DiffractionSettings) -> None:
         super().__init__()
         self._view_controller = SpinBoxParameterViewController(
             settings.num_data_threads,
@@ -43,7 +43,9 @@ class PatternLoadViewController(ParameterViewController):
 
 
 class PatternMemoryMapViewController(CheckableGroupBoxParameterViewController):
-    def __init__(self, settings: PatternSettings, file_dialog_factory: FileDialogFactory) -> None:
+    def __init__(
+        self, settings: DiffractionSettings, file_dialog_factory: FileDialogFactory
+    ) -> None:
         super().__init__(settings.is_memmap_enabled, 'Memory Map Diffraction Data')
         self._view_controller = PathParameterViewController.create_directory_chooser(
             settings.scratch_directory, file_dialog_factory
@@ -57,7 +59,7 @@ class PatternMemoryMapViewController(CheckableGroupBoxParameterViewController):
 class PatternCropViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
-        settings: PatternSettings,
+        settings: DiffractionSettings,
         sizer: PatternSizer,
     ) -> None:
         super().__init__(settings.is_crop_enabled, 'Crop')
@@ -130,7 +132,7 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
 class PatternBinningViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
-        settings: PatternSettings,
+        settings: DiffractionSettings,
         sizer: PatternSizer,
     ) -> None:
         super().__init__(settings.is_binning_enabled, 'Bin Pixels')
@@ -184,7 +186,7 @@ class PatternPaddingViewController(CheckableGroupBoxParameterViewController):
 
     def __init__(
         self,
-        settings: PatternSettings,
+        settings: DiffractionSettings,
         sizer: PatternSizer,
     ) -> None:
         super().__init__(settings.is_padding_enabled, 'Pad')
@@ -231,7 +233,12 @@ class PatternPaddingViewController(CheckableGroupBoxParameterViewController):
 
 
 class PatternTransformViewController:
-    def __init__(self, settings: PatternSettings, file_dialog_factory: FileDialogFactory) -> None:
+    def __init__(
+        self, settings: DiffractionSettings, file_dialog_factory: FileDialogFactory
+    ) -> None:
+        self._ifftshift_view_controller = CheckBoxParameterViewController(
+            settings.ifftshift, 'IFFT Shift'
+        )
         self._hflip_view_controller = CheckBoxParameterViewController(
             settings.hflip, 'Flip Horizontal'
         )
@@ -276,7 +283,10 @@ class PatternTransformViewController:
 
 class OpenDatasetWizardPatternsViewController(ParameterViewController):
     def __init__(
-        self, settings: PatternSettings, sizer: PatternSizer, file_dialog_factory: FileDialogFactory
+        self,
+        settings: DiffractionSettings,
+        sizer: PatternSizer,
+        file_dialog_factory: FileDialogFactory,
     ) -> None:
         self._load_view_controller = PatternLoadViewController(settings)
         self._memory_map_view_controller = PatternMemoryMapViewController(

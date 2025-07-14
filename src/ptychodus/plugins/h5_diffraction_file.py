@@ -11,7 +11,7 @@ from ptychodus.api.diffraction import (
     DiffractionFileWriter,
     DiffractionMetadata,
     DiffractionArray,
-    DiffractionData,
+    DiffractionPatterns,
     DiffractionIndexes,
     SimpleDiffractionDataset,
 )
@@ -37,7 +37,7 @@ class H5DiffractionPatternArray(DiffractionArray):
     def get_indexes(self) -> DiffractionIndexes:
         return self._indexes
 
-    def get_data(self) -> DiffractionData:
+    def get_patterns(self) -> DiffractionPatterns:
         with h5py.File(self._file_path, 'r') as h5_file:
             item = h5_file[self._data_path]
 
@@ -174,7 +174,7 @@ class H5DiffractionFileWriter(DiffractionFileWriter):
         self._data_path = data_path
 
     def write(self, file_path: Path, dataset: DiffractionDataset) -> None:
-        data = numpy.concatenate([array.get_data() for array in dataset])
+        data = numpy.concatenate([array.get_patterns() for array in dataset])
 
         with h5py.File(file_path, 'w') as h5_file:
             h5_file.create_dataset(self._data_path, data=data, compression='gzip')

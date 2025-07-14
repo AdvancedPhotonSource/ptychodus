@@ -18,10 +18,10 @@ from ...model.metadata import MetadataPresenter
 from ...model.diffraction import (
     AssembledDiffractionDataset,
     DetectorSettings,
+    DiffractionAPI,
     DiffractionDatasetObserver,
-    PatternSettings,
+    DiffractionSettings,
     PatternSizer,
-    PatternsAPI,
 )
 from ...view.diffraction import DetectorView, PatternsView
 from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate
@@ -44,12 +44,12 @@ class BadPixelsViewController(ParameterViewController):
         self,
         bad_pixels_file_path: PathParameter,
         bad_pixels_file_type: StringParameter,
-        patterns_api: PatternsAPI,
+        diffraction_api: DiffractionAPI,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         self._bad_pixels_file_path = bad_pixels_file_path
         self._bad_pixels_file_type = bad_pixels_file_type
-        self._patterns_api = patterns_api
+        self._diffraction_api = diffraction_api
         self._file_dialog_factory = file_dialog_factory
 
         self._line_edit = QLineEdit()
@@ -57,7 +57,7 @@ class BadPixelsViewController(ParameterViewController):
         self._browse_button = QPushButton('Browse...')
         self._browse_button.clicked.connect(self._open_bad_pixels)
         self._clear_button = QPushButton('Clear')
-        self._clear_button.clicked.connect(self._patterns_api.clear_bad_pixels)
+        self._clear_button.clicked.connect(self._diffraction_api.clear_bad_pixels)
         self._widget = QWidget()
 
         layout = QHBoxLayout()
@@ -70,7 +70,7 @@ class BadPixelsViewController(ParameterViewController):
         self.set_num_bad_pixels(0)
 
     def _open_bad_pixels(self) -> None:
-        file_reader_chooser = self._patterns_api.get_bad_pixels_file_reader_chooser()
+        file_reader_chooser = self._diffraction_api.get_bad_pixels_file_reader_chooser()
         current_plugin = file_reader_chooser.get_current_plugin()
         file_path, name_filter = self._file_dialog_factory.get_open_file_path(
             self._widget,
@@ -81,7 +81,7 @@ class BadPixelsViewController(ParameterViewController):
 
         if file_path:
             try:
-                self._patterns_api.open_bad_pixels(file_path, file_type=name_filter)
+                self._diffraction_api.open_bad_pixels(file_path, file_type=name_filter)
             except Exception as exc:
                 logger.exception(exc)
                 ExceptionDialog.show_exception('Bad Pixels File Reader', exc)
@@ -97,7 +97,7 @@ class DetectorController:
     def __init__(
         self,
         settings: DetectorSettings,
-        patterns_api: PatternsAPI,
+        diffraction_api: DiffractionAPI,
         view: DetectorView,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
@@ -113,7 +113,7 @@ class DetectorController:
         self._bad_pixels_view_controller = BadPixelsViewController(
             settings.bad_pixels_file_path,
             settings.bad_pixels_file_type,
-            patterns_api,
+            diffraction_api,
             file_dialog_factory,
         )
 
@@ -134,9 +134,9 @@ class DiffractionController(DiffractionDatasetObserver):
     def __init__(
         self,
         detector_settings: DetectorSettings,
-        pattern_settings: PatternSettings,
+        diffraction_settings: DiffractionSettings,
         pattern_sizer: PatternSizer,
-        patterns_api: PatternsAPI,
+        diffraction_api: DiffractionAPI,
         dataset: AssembledDiffractionDataset,
         metadata_presenter: MetadataPresenter,
         view: PatternsView,
@@ -145,18 +145,18 @@ class DiffractionController(DiffractionDatasetObserver):
     ) -> None:
         super().__init__()
         self._pattern_sizer = pattern_sizer
-        self._patterns_api = patterns_api
+        self._diffraction_api = diffraction_api
         self._dataset = dataset
         self._view = view
         self._image_controller = image_controller
         self._file_dialog_factory = file_dialog_factory
         self._detector_controller = DetectorController(
-            detector_settings, patterns_api, view.detector_view, file_dialog_factory
+            detector_settings, diffraction_api, view.detector_view, file_dialog_factory
         )
         self._wizard_controller = OpenDatasetWizardController(
-            pattern_settings,
+            diffraction_settings,
             pattern_sizer,
-            patterns_api,
+            diffraction_api,
             metadata_presenter,
             file_dialog_factory,
         )
@@ -191,7 +191,7 @@ class DiffractionController(DiffractionDatasetObserver):
             self._image_controller.clear_array()
 
     def _save_dataset(self) -> None:
-        file_writer_chooser = self._patterns_api.get_file_writer_chooser()
+        file_writer_chooser = self._diffraction_api.get_file_writer_chooser()
         file_path, name_filter = self._file_dialog_factory.get_save_file_path(
             self._view,
             'Save Diffraction File',
@@ -201,7 +201,7 @@ class DiffractionController(DiffractionDatasetObserver):
 
         if file_path:
             try:
-                self._patterns_api.save_patterns(file_path, name_filter)
+                self._diffraction_api.save_patterns(file_path, name_filter)
             except Exception as exc:
                 logger.exception(exc)
                 ExceptionDialog.show_exception('File Writer', exc)
@@ -217,7 +217,7 @@ class DiffractionController(DiffractionDatasetObserver):
         )
 
         if button == QMessageBox.StandardButton.Yes:
-            self._patterns_api.close_patterns()
+            self._diffraction_api.close_patterns()
 
     def _sync_model_to_view(self) -> None:
         self._tree_model.clear()

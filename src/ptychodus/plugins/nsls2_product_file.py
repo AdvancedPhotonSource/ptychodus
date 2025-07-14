@@ -7,7 +7,7 @@ from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeSequence
-from ptychodus.api.product import Product, ProductFileReader, ProductMetadata
+from ptychodus.api.product import LossValue, Product, ProductFileReader, ProductMetadata
 from ptychodus.api.scan import PositionSequence, ScanPoint
 
 
@@ -58,14 +58,14 @@ class NSLSIIProductFileReader(ProductFileReader):
                 pixel_geometry=pixel_geometry,
                 center=None,
             )
-            costs: Sequence[float] = list()
+            loss: Sequence[LossValue] = list()
 
         return Product(
             metadata=metadata,
             positions=PositionSequence(point_list),
             probes=probes,
             object_=object_,
-            costs=costs,
+            losses=loss,
         )
 
 

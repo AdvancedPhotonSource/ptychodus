@@ -86,7 +86,7 @@ class DiffractionPatternPositionMatcher:
             positions=PositionSequence(point_list),
             probes=probe,
             object_=input_product.object_,
-            costs=input_product.costs,
+            losses=input_product.losses,
         )
 
         return ReconstructInput(patterns, self._dataset.get_processed_bad_pixels(), product)

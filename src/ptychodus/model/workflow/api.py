@@ -4,12 +4,13 @@ from pathlib import Path
 from typing import Any
 import logging
 
-from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.diffraction import CropCenter
+from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.reconstructor import ReconstructInput, TrainOutput
 from ptychodus.api.settings import PathPrefixChange, SettingsRegistry
 from ptychodus.api.workflow import WorkflowAPI, WorkflowProductAPI
 
-from ..diffraction import PatternsAPI
+from ..diffraction import DiffractionAPI
 from ..product import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
 from ..reconstructor import ReconstructorAPI
 from .executor import WorkflowExecutor
@@ -72,6 +73,9 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         else:
             self._object_api.build_object(self._product_index, builder_name, builder_parameters)
 
+    def get_reconstruct_input(self) -> ReconstructInput:
+        return self._reconstructor_api.get_reconstruct_input(self._product_index)
+
     def reconstruct_local(self, block: bool = False) -> WorkflowProductAPI:
         logger.info('Reconstructing...')
         output_product_index = self._reconstructor_api.reconstruct(self._product_index)
@@ -103,7 +107,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
     def __init__(
         self,
         settings_registry: SettingsRegistry,
-        patterns_api: PatternsAPI,
+        diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
         scan_api: ScanAPI,
         probe_api: ProbeAPI,
@@ -112,7 +116,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         executor: WorkflowExecutor,
     ) -> None:
         self._settings_registry = settings_registry
-        self._patterns_api = patterns_api
+        self._diffraction_api = diffraction_api
         self._product_api = product_api
         self._scan_api = scan_api
         self._probe_api = probe_api
@@ -128,15 +132,15 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         crop_center: CropCenter | None = None,
         crop_extent: ImageExtent | None = None,
     ) -> None:
-        self._patterns_api.open_patterns(
+        self._diffraction_api.open_patterns(
             file_path, file_type=file_type, crop_center=crop_center, crop_extent=crop_extent
         )
 
     def import_assembled_patterns(self, file_path: Path) -> None:
-        self._patterns_api.import_assembled_patterns(file_path)
+        self._diffraction_api.import_assembled_patterns(file_path)
 
     def export_assembled_patterns(self, file_path: Path) -> None:
-        self._patterns_api.export_assembled_patterns(file_path)
+        self._diffraction_api.export_assembled_patterns(file_path)
 
     def get_product(self, product_index: int) -> WorkflowProductAPI:
         if product_index < 0:
@@ -192,3 +196,8 @@ class ConcreteWorkflowAPI(WorkflowAPI):
     def set_reconstructor(self, reconstructor_name: str) -> None:
         reconstructor = self._reconstructor_api.set_reconstructor(reconstructor_name)
         logger.debug(f'{reconstructor=}')
+
+    def train_reconstructor(self, input_path: Path, output_path: Path) -> TrainOutput:
+        output = self._reconstructor_api.train(input_path)
+        self._reconstructor_api.save_model(output_path)
+        return output

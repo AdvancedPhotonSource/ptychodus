@@ -57,18 +57,18 @@ class ControllerCore:
             self._file_dialog_factory,
         )
         self._patterns_controller = DiffractionController(
-            model.patterns.detector_settings,
-            model.patterns.pattern_settings,
-            model.patterns.pattern_sizer,
-            model.patterns.patterns_api,
-            model.patterns.dataset,
+            model.diffraction.detector_settings,
+            model.diffraction.diffraction_settings,
+            model.diffraction.pattern_sizer,
+            model.diffraction.diffraction_api,
+            model.diffraction.dataset,
             model.metadata_presenter,
             view.patterns_view,
             self._patterns_image_controller,
             self._file_dialog_factory,
         )
         self._product_controller = ProductController.create_instance(
-            model.patterns.dataset,
+            model.diffraction.dataset,
             model.product.product_repository,
             model.product.product_api,
             view.product_view,

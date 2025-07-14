@@ -22,7 +22,7 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import PathParameter
 
-from ....model.diffraction import PatternsAPI, PatternSettings
+from ....model.diffraction import DiffractionAPI, DiffractionSettings
 from ....view.diffraction import OpenDatasetWizardPage
 from ....view.widgets import ExceptionDialog
 from ...data import FileDialogFactory
@@ -218,7 +218,7 @@ class OpenDatasetWizardFilePathViewController(Observer):
 
 
 class OpenDatasetWizardFileTypeViewController(Observable, Observer):
-    def __init__(self, api: PatternsAPI) -> None:
+    def __init__(self, api: DiffractionAPI) -> None:
         super().__init__()
         self._file_reader_chooser = api.get_file_reader_chooser()
         self._file_reader_chooser.add_observer(self)
@@ -252,7 +252,10 @@ class OpenDatasetWizardFileTypeViewController(Observable, Observer):
 
 class OpenDatasetWizardFilesViewController(Observer):
     def __init__(
-        self, settings: PatternSettings, api: PatternsAPI, file_dialog_factory: FileDialogFactory
+        self,
+        settings: DiffractionSettings,
+        api: DiffractionAPI,
+        file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._settings = settings

@@ -27,7 +27,7 @@ from .automation import AutomationCore
 from .fluorescence import FluorescenceCore
 from .memory import MemoryPresenter
 from .metadata import MetadataPresenter
-from .diffraction import PatternsCore, PatternsStreamingContext
+from .diffraction import DiffractionCore, PatternsStreamingContext
 from .product import PositionsStreamingContext, ProductCore
 from .ptychi import PtyChiReconstructorLibrary
 from .ptychonn import PtychoNNReconstructorLibrary
@@ -98,7 +98,7 @@ class ModelCore:
         self.memory_presenter = MemoryPresenter()
         self.settings_registry = SettingsRegistry()
 
-        self.patterns = PatternsCore(
+        self.diffraction = DiffractionCore(
             self.settings_registry,
             self._plugin_registry.bad_pixels_file_readers,
             self._plugin_registry.diffraction_file_readers,
@@ -108,8 +108,8 @@ class ModelCore:
         self.product = ProductCore(
             self.rng,
             self.settings_registry,
-            self.patterns.pattern_sizer,
-            self.patterns.dataset,
+            self.diffraction.pattern_sizer,
+            self.diffraction.dataset,
             self._plugin_registry.position_file_readers,
             self._plugin_registry.position_file_writers,
             self._plugin_registry.fresnel_zone_plates,
@@ -122,9 +122,9 @@ class ModelCore:
             self.settings_registry,
         )
         self.metadata_presenter = MetadataPresenter(
-            self.patterns.detector_settings,
-            self.patterns.pattern_settings,
-            self.patterns.dataset,
+            self.diffraction.detector_settings,
+            self.diffraction.diffraction_settings,
+            self.diffraction.dataset,
             self.product.settings,
         )
 
@@ -133,7 +133,7 @@ class ModelCore:
         self.object_visualization_engine = VisualizationEngine(is_complex=True)
 
         self.ptychi_reconstructor_library = PtyChiReconstructorLibrary(
-            self.settings_registry, self.patterns.pattern_sizer, is_developer_mode_enabled
+            self.settings_registry, self.diffraction.pattern_sizer, is_developer_mode_enabled
         )
         self.tike_reconstructor_library = TikeReconstructorLibrary.create_instance(
             self.settings_registry, is_developer_mode_enabled
@@ -146,7 +146,7 @@ class ModelCore:
         )
         self.reconstructor = ReconstructorCore(
             self.settings_registry,
-            self.patterns.dataset,
+            self.diffraction.dataset,
             self.product.product_api,
             [
                 self.ptychi_reconstructor_library,
@@ -171,7 +171,7 @@ class ModelCore:
         )
         self.workflow = WorkflowCore(
             self.settings_registry,
-            self.patterns.patterns_api,
+            self.diffraction.diffraction_api,
             self.product.product_api,
             self.product.scan_api,
             self.product.probe_api,
@@ -189,7 +189,7 @@ class ModelCore:
             self.settings_registry.open_settings(settings_file)
 
     def __enter__(self) -> ModelCore:
-        self.patterns.start()
+        self.diffraction.start()
         self.reconstructor.start()
         self.workflow.start()
         self.automation.start()
@@ -215,16 +215,16 @@ class ModelCore:
         self.automation.stop()
         self.workflow.stop()
         self.reconstructor.stop()
-        self.patterns.stop()
+        self.diffraction.stop()
 
     def create_streaming_context(self, metadata: DiffractionMetadata) -> PtychodusStreamingContext:
         return PtychodusStreamingContext(
             self.product.scan_api.create_streaming_context(),
-            self.patterns.patterns_api.create_streaming_context(metadata),
+            self.diffraction.diffraction_api.create_streaming_context(metadata),
         )
 
     def refresh_active_dataset(self) -> None:
-        self.patterns.dataset.assemble_patterns()
+        self.diffraction.dataset.assemble_patterns()
 
     def batch_mode_execute(
         self,
@@ -235,14 +235,13 @@ class ModelCore:
         fluorescence_input_file_path: Path | None = None,
         fluorescence_output_file_path: Path | None = None,
     ) -> int:
-        # TODO add enum for actions; implement using workflow API
+        # TODO add enum for actions
         if action.lower() == 'train':
-            output = self.reconstructor.reconstructor_api.train(input_path)
-            self.reconstructor.reconstructor_api.save_model(output_path)
+            output = self.workflow_api.train_reconstructor(input_path, output_path)
             return output.result
 
         if action.lower() == 'reconstruct':
-            input_product_api = self.workflow.workflow_api.open_product(input_path)
+            input_product_api = self.workflow_api.open_product(input_path)
             output_product_api = input_product_api.reconstruct_local(block=True)
             output_product_api.save_product(output_path)
 
@@ -250,6 +249,7 @@ class ModelCore:
                 fluorescence_input_file_path is not None
                 and fluorescence_output_file_path is not None
             ):
+                # TODO implement using workflow API
                 self.fluorescence_core.enhance_fluorescence(
                     output_product_api.get_product_index(),
                     fluorescence_input_file_path,

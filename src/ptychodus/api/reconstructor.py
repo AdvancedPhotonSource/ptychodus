@@ -4,14 +4,14 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from .diffraction import BadPixelsArray, DiffractionData
-from .product import Product
+from .diffraction import BadPixels, DiffractionPatterns
+from .product import LossValue, Product
 
 
 @dataclass(frozen=True)
 class ReconstructInput:
-    patterns: DiffractionData
-    bad_pixels: BadPixelsArray
+    diffraction_patterns: DiffractionPatterns
+    bad_pixels: BadPixels
     product: Product
 
 
@@ -33,15 +33,9 @@ class Reconstructor(ABC):
 
 
 @dataclass(frozen=True)
-class LossValue:
-    epoch: int
-    training_loss: float
-    validation_loss: float
-
-
-@dataclass(frozen=True)
 class TrainOutput:
-    losses: Sequence[LossValue]
+    training_loss: Sequence[LossValue]
+    validation_loss: Sequence[LossValue]
     result: int
 
 
@@ -105,7 +99,7 @@ class NullReconstructor(TrainableReconstructor):
         return Path()
 
     def train(self, data_path: Path) -> TrainOutput:
-        return TrainOutput([], 0)
+        return TrainOutput([], [], 0)
 
 
 class ReconstructorLibrary(Iterable[Reconstructor]):

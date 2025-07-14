@@ -5,10 +5,10 @@ import numpy
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.diffraction import (
-    BadPixelsArray,
+    BadPixels,
     CropCenter,
     DiffractionArray,
-    DiffractionData,
+    DiffractionPatterns,
     SimpleDiffractionArray,
 )
 
@@ -18,7 +18,7 @@ class DiffractionPatternFilterValues:
     lower_bound: int | None
     upper_bound: int | None
 
-    def apply(self, data: DiffractionData) -> DiffractionData:
+    def apply(self, data: DiffractionPatterns) -> DiffractionPatterns:
         if self.lower_bound is not None:
             data[data < self.lower_bound] = 0
 
@@ -38,10 +38,10 @@ class DiffractionPatternCrop:
         radius_y = extent.height_px // 2
         self.slice_y = slice(center_y - radius_y, center_y + radius_y)
 
-    def apply_bool(self, data: BadPixelsArray) -> BadPixelsArray:
+    def apply_bool(self, data: BadPixels) -> BadPixels:
         return data[self.slice_y, self.slice_x]
 
-    def apply(self, data: DiffractionData) -> DiffractionData:
+    def apply(self, data: DiffractionPatterns) -> DiffractionPatterns:
         return data[:, self.slice_y, self.slice_x]
 
 
@@ -50,13 +50,13 @@ class DiffractionPatternBinning:
     bin_size_x: int
     bin_size_y: int
 
-    def apply_bool(self, data: BadPixelsArray) -> BadPixelsArray:
+    def apply_bool(self, data: BadPixels) -> BadPixels:
         binned_width = data.shape[-1] // self.bin_size_x
         binned_height = data.shape[-2] // self.bin_size_y
         shape = (binned_height, self.bin_size_y, binned_width, self.bin_size_x)
         return numpy.logical_and.reduce(data.reshape(shape), axis=(-3, -1), keepdims=False)
 
-    def apply(self, data: DiffractionData) -> DiffractionData:
+    def apply(self, data: DiffractionPatterns) -> DiffractionPatterns:
         binned_width = data.shape[-1] // self.bin_size_x
         binned_height = data.shape[-2] // self.bin_size_y
         shape = (-1, binned_height, self.bin_size_y, binned_width, self.bin_size_x)
@@ -68,17 +68,18 @@ class DiffractionPatternPadding:
     pad_x: int
     pad_y: int
 
-    def apply_bool(self, data: BadPixelsArray) -> BadPixelsArray:
+    def apply_bool(self, data: BadPixels) -> BadPixels:
         pad_width = (self.pad_y, self.pad_y, self.pad_x, self.pad_x)
         return numpy.pad(data, pad_width, mode='constant', constant_values=False)
 
-    def apply(self, data: DiffractionData) -> DiffractionData:
+    def apply(self, data: DiffractionPatterns) -> DiffractionPatterns:
         pad_width = (0, 0, self.pad_y, self.pad_y, self.pad_x, self.pad_x)
         return numpy.pad(data, pad_width, mode='constant', constant_values=0)
 
 
 @dataclass(frozen=True)
 class DiffractionPatternProcessor:
+    ifftshift: bool
     crop: DiffractionPatternCrop | None
     filter_values: DiffractionPatternFilterValues | None
     binning: DiffractionPatternBinning | None
@@ -87,11 +88,14 @@ class DiffractionPatternProcessor:
     vflip: bool
     transpose: bool
 
-    def process_bad_pixels(self, bad_pixels: BadPixelsArray) -> BadPixelsArray:
+    def process_bad_pixels(self, bad_pixels: BadPixels) -> BadPixels:
         if bad_pixels.ndim != 2:
             raise ValueError(f'Invalid bad_pixel dimensions! (shape={bad_pixels.shape})')
 
         processed_bad_pixels = bad_pixels.copy()
+
+        if self.ifftshift:
+            processed_bad_pixels = numpy.fft.ifftshift(processed_bad_pixels)
 
         if self.crop is not None:
             processed_bad_pixels = self.crop.apply_bool(processed_bad_pixels)
@@ -114,7 +118,7 @@ class DiffractionPatternProcessor:
         return processed_bad_pixels
 
     def __call__(self, array: DiffractionArray) -> DiffractionArray:
-        data = array.get_data()
+        data = array.get_patterns()
 
         if data.ndim == 2:
             data = data[numpy.newaxis, ...]

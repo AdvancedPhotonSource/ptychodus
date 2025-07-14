@@ -4,8 +4,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.diffraction import CropCenter
+from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.reconstructor import ReconstructInput, TrainOutput
 from ptychodus.api.settings import PathPrefixChange
 
 
@@ -42,6 +43,10 @@ class WorkflowProductAPI(ABC):
     def build_object(
         self, builder_name: str | None = None, builder_parameters: Mapping[str, Any] = {}
     ) -> None:
+        pass
+
+    @abstractmethod
+    def get_reconstruct_input(self) -> ReconstructInput:
         pass
 
     @abstractmethod
@@ -118,6 +123,10 @@ class WorkflowAPI(ABC):
 
     @abstractmethod
     def set_reconstructor(self, reconstructor_name: str) -> None:
+        pass
+
+    @abstractmethod
+    def train_reconstructor(self, input_path: Path, output_path: Path) -> TrainOutput:
         pass
 
 
