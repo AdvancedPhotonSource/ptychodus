@@ -128,11 +128,11 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
     def handle_losses_changed(self, item: ProductRepositoryItem) -> None:
         index = item._index
-        costs = item.get_losses()
+        losses = item.get_losses()
 
         if index < 0:
             logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
         for observer in self._observer_list:
-            observer.handle_losses_changed(index, costs)
+            observer.handle_losses_changed(index, losses)

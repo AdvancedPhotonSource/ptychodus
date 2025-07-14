@@ -47,7 +47,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
     OBJECT_PIXEL_HEIGHT: Final[str] = 'object_pixel_height_m'
     OBJECT_PIXEL_WIDTH: Final[str] = 'object_pixel_width_m'
 
-    COSTS_ARRAY: Final[str] = 'costs'
+    LOSSES_ARRAY: Final[str] = 'losses'
 
     def read(self, file_path: Path) -> Product:
         with numpy.load(file_path) as npz_file:
@@ -119,7 +119,10 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
                 layer_spacing_m=npz_file[self.OBJECT_LAYER_SPACING],
             )
 
-            costs = npz_file[self.COSTS_ARRAY]
+            try:
+                losses = npz_file[self.LOSSES_ARRAY]
+            except KeyError:
+                losses = npz_file['costs']
 
         point_list: list[ScanPoint] = list()
 
@@ -132,7 +135,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
             positions=PositionSequence(point_list),
             probes=probe,
             object_=object_,
-            losses=costs,
+            losses=losses,
         )
 
     def write(self, file_path: Path, product: Product) -> None:
@@ -182,7 +185,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
         contents[self.OBJECT_PIXEL_HEIGHT] = object_geometry.pixel_height_m
         contents[self.OBJECT_LAYER_SPACING] = object_.layer_spacing_m
 
-        contents[self.COSTS_ARRAY] = product.losses
+        contents[self.LOSSES_ARRAY] = product.losses
 
         numpy.savez(file_path, **contents)
 

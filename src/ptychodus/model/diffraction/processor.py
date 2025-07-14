@@ -95,7 +95,7 @@ class DiffractionPatternProcessor:
         processed_bad_pixels = bad_pixels.copy()
 
         if self.ifftshift:
-            processed_bad_pixels = numpy.fft.ifftshift(processed_bad_pixels)
+            processed_bad_pixels = numpy.fft.ifftshift(processed_bad_pixels, axes=(-2, -1))
 
         if self.crop is not None:
             processed_bad_pixels = self.crop.apply_bool(processed_bad_pixels)

@@ -333,7 +333,7 @@ class ProductController(ProductRepositoryObserver):
     def handle_object_changed(self, index: int, item: ObjectRepositoryItem) -> None:
         self._update_info_text()
 
-    def handle_losses_changed(self, index: int, costs: Sequence[LossValue]) -> None:
+    def handle_losses_changed(self, index: int, losses: Sequence[LossValue]) -> None:
         self._update_info_text()
 
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:

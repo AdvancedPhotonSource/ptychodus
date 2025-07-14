@@ -96,14 +96,14 @@ class PtychoShelvesProductFileReader(ProductFileReader):
             center=None,
             layer_spacing_m=layer_spacing_m,
         )
-        costs = outputs_struct['fourier_error_out']
+        losses = outputs_struct['fourier_error_out']
 
         return Product(
             metadata=metadata,
             positions=PositionSequence(point_list),
             probes=probe,
             object_=object_,
-            losses=costs,
+            losses=losses,
         )
 
 

@@ -346,9 +346,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
     def assemble_patterns(self) -> None:
         for task in self._loader.completed_tasks():
             offset = sum(self._metadata.num_patterns_per_array[: task.index])
-            array_slice = slice(
-                offset, offset + self._metadata.num_patterns_per_array[task.index + 1]
-            )
+            array_slice = slice(offset, offset + self._metadata.num_patterns_per_array[task.index])
 
             self._indexes[array_slice] = task.array.get_indexes()
             pattern_indexes = self._indexes[array_slice]
