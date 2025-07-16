@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class NSLS2Style1PositionFileReader(PositionFileReader):
-    ONE_MICRON_M: Final[float] = 1.0e-6  # FIXME verify units
+    ONE_MICRON_M: Final[float] = 1.0e-6
 
     def read(self, file_path: Path) -> PositionSequence:
         point_list: list[ScanPoint] = list()
@@ -19,7 +19,7 @@ class NSLS2Style1PositionFileReader(PositionFileReader):
         with h5py.File(file_path, 'r') as h5_file:
             h5_positions = h5_file['/scan/scan_positions']
 
-            for idx, row in enumerate(h5_positions):
+            for idx, row in enumerate(h5_positions[()].T):
                 point = ScanPoint(
                     idx,
                     row[0] * self.ONE_MICRON_M,
@@ -31,7 +31,7 @@ class NSLS2Style1PositionFileReader(PositionFileReader):
 
 
 class NSLS2Style2PositionFileReader(PositionFileReader):
-    ONE_MICRON_M: Final[float] = 1.0e-6  # FIXME verify units
+    ONE_MICRON_M: Final[float] = 1.0e-6
 
     def read(self, file_path: Path) -> PositionSequence:
         point_list: list[ScanPoint] = list()
@@ -39,7 +39,7 @@ class NSLS2Style2PositionFileReader(PositionFileReader):
         with h5py.File(file_path, 'r') as h5_file:
             h5_positions = h5_file['/points']
 
-            for idx, row in enumerate(h5_positions):
+            for idx, row in enumerate(h5_positions[()].T):
                 point = ScanPoint(
                     idx,
                     row[0] * self.ONE_MICRON_M,
