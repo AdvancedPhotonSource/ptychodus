@@ -34,11 +34,14 @@ class OpenDatasetWizardMetadataViewController(Observer):
             sync_extent=self._page.pattern_crop_extent_check_box.isChecked(),
         )
 
+        if self._page.probe_energy_check_box.isChecked():
+            self._presenter.sync_probe_energy()
+
         if self._page.probe_photon_count_check_box.isChecked():
             self._presenter.sync_probe_photon_count()
 
-        if self._page.probe_energy_check_box.isChecked():
-            self._presenter.sync_probe_energy()
+        if self._page.exposure_time_check_box.isChecked():
+            self._presenter.sync_exposure_time()
 
     def _sync_model_to_view(self) -> None:
         can_sync_detector_extent = self._presenter.can_sync_detector_extent()
@@ -65,13 +68,17 @@ class OpenDatasetWizardMetadataViewController(Observer):
         self._page.pattern_crop_extent_check_box.setVisible(can_sync_pattern_crop_extent)
         self._page.pattern_crop_extent_check_box.setChecked(can_sync_pattern_crop_extent)
 
+        can_sync_probe_energy = self._presenter.can_sync_probe_energy()
+        self._page.probe_energy_check_box.setVisible(can_sync_probe_energy)
+        self._page.probe_energy_check_box.setChecked(can_sync_probe_energy)
+
         can_sync_probe_photon_count = self._presenter.can_sync_probe_photon_count()
         self._page.probe_photon_count_check_box.setVisible(can_sync_probe_photon_count)
         self._page.probe_photon_count_check_box.setChecked(can_sync_probe_photon_count)
 
-        can_sync_probe_energy = self._presenter.can_sync_probe_energy()
-        self._page.probe_energy_check_box.setVisible(can_sync_probe_energy)
-        self._page.probe_energy_check_box.setChecked(can_sync_probe_energy)
+        can_sync_exposure_time = self._presenter.can_sync_exposure_time()
+        self._page.exposure_time_check_box.setVisible(can_sync_exposure_time)
+        self._page.exposure_time_check_box.setChecked(can_sync_exposure_time)
 
     def get_widget(self) -> QWizardPage:
         return self._page

@@ -26,8 +26,6 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
         self._dataset = dataset
         self._product_settings = product_settings
 
-        # FIXME sync exposure_time_s
-
         dataset.add_observer(self)
 
     @property
@@ -102,6 +100,15 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
             self._diffraction_settings.crop_width_px.set_value(crop_diameter)
             self._diffraction_settings.crop_height_px.set_value(crop_diameter)
 
+    def can_sync_probe_energy(self) -> bool:
+        return self._metadata.probe_energy_eV is not None
+
+    def sync_probe_energy(self) -> None:
+        energy_eV = self._metadata.probe_energy_eV  # noqa: N806
+
+        if energy_eV:
+            self._product_settings.probe_energy_eV.set_value(energy_eV)
+
     def can_sync_probe_photon_count(self) -> bool:
         return self._metadata.probe_photon_count is not None
 
@@ -111,14 +118,14 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
         if photon_count:
             self._product_settings.probe_photon_count.set_value(photon_count)
 
-    def can_sync_probe_energy(self) -> bool:
-        return self._metadata.probe_energy_eV is not None
+    def can_sync_exposure_time(self) -> bool:
+        return self._metadata.exposure_time_s is not None
 
-    def sync_probe_energy(self) -> None:
-        energy_eV = self._metadata.probe_energy_eV  # noqa: N806
+    def sync_exposure_time(self) -> None:
+        exposure_time_s = self._metadata.exposure_time_s
 
-        if energy_eV:
-            self._product_settings.probe_energy_eV.set_value(energy_eV)
+        if exposure_time_s:
+            self._product_settings.exposure_time_s.set_value(exposure_time_s)
 
     def can_sync_detector_distance(self) -> bool:
         return self._metadata.detector_distance_m is not None

@@ -70,9 +70,9 @@ class DiffractionMetadata:
     detector_pixel_geometry: PixelGeometry | None = None
     detector_bit_depth: int | None = None
     crop_center: CropCenter | None = None
-    probe_photon_count: int | None = None
     probe_energy_eV: float | None = None  # noqa: N815
-    exposure_time_s: float | None = None  # FIXME use
+    probe_photon_count: int | None = None
+    exposure_time_s: float | None = None
     tomography_angle_deg: float | None = None
     file_path: Path | None = None
 

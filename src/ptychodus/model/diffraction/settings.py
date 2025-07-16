@@ -48,8 +48,6 @@ class DiffractionSettings(Observable, Observer):
             'NumberOfDataThreads', 8, minimum=1, maximum=64
         )
 
-        self.ifftshift = self._group.create_boolean_parameter('IFFTShift', False)
-
         self.is_crop_enabled = self._group.create_boolean_parameter('CropEnabled', True)
         self.crop_center_x_px = self._group.create_integer_parameter(
             'CropCenterXInPixels', 32, minimum=0

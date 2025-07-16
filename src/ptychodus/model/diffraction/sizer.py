@@ -217,7 +217,6 @@ class PatternSizer(Observable, Observer):
             )
 
         return DiffractionPatternProcessor(
-            ifftshift=self._diffraction_settings.ifftshift.get_value(),
             filter_values=filter_values,
             crop=crop,
             binning=binning,

@@ -14,7 +14,7 @@ from ptychodus.api.scan import PositionSequence, ScanPoint
 class NSLSIIProductFileReader(ProductFileReader):
     SIMPLE_NAME: Final[str] = 'NSLS_II'
     DISPLAY_NAME: Final[str] = 'NSLS-II MATLAB Files (*.mat)'
-    ONE_MICRON_M: Final[float] = 1e-6
+    ONE_MICRON_M: Final[float] = 1.0e-6
 
     def read(self, file_path: Path) -> Product:
         point_list: list[ScanPoint] = list()

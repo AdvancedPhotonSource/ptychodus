@@ -236,9 +236,6 @@ class PatternTransformViewController:
     def __init__(
         self, settings: DiffractionSettings, file_dialog_factory: FileDialogFactory
     ) -> None:
-        self._ifftshift_view_controller = CheckBoxParameterViewController(
-            settings.ifftshift, 'IFFT Shift'
-        )
         self._hflip_view_controller = CheckBoxParameterViewController(
             settings.hflip, 'Flip Horizontal'
         )
