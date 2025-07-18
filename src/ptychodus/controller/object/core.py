@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ptychodus.api.observer import SequenceObserver
 
-from ...model.analysis import FourierRingCorrelator, XMCDAnalyzer
+from ...model.analysis import FourierAnalyzer, FourierRingCorrelator, XMCDAnalyzer
 from ...model.product import ObjectAPI, ObjectRepository
 from ...model.product.object import ObjectRepositoryItem
 from ...model.visualization import VisualizationEngine
@@ -15,6 +15,7 @@ from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .editor_factory import ObjectEditorViewControllerFactory
+from .fourier import FourierAnalysisViewController
 from .frc import FourierRingCorrelationViewController
 from .tree_model import ObjectTreeModel
 from .xmcd import XMCDViewController
@@ -29,6 +30,8 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         api: ObjectAPI,
         image_controller: ImageController,
         correlator: FourierRingCorrelator,
+        fourier_analyzer: FourierAnalyzer,
+        fourier_visualization_engine: VisualizationEngine,
         xmcd_analyzer: XMCDAnalyzer,
         xmcd_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
@@ -47,6 +50,10 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
         self._frc_view_controller = FourierRingCorrelationViewController(
             correlator, self._tree_model
+        )
+        self._fourier_view_controller = FourierAnalysisViewController(
+            fourier_analyzer,
+            fourier_visualization_engine,
         )
         self._xmcd_view_controller = XMCDViewController(
             xmcd_analyzer, xmcd_visualization_engine, file_dialog_factory, self._tree_model
@@ -86,6 +93,10 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
         frc_action = view.button_box.analyze_menu.addAction('Fourier Ring Correlation...')
         frc_action.triggered.connect(self._analyze_frc)
+
+        fourier_action = view.button_box.analyze_menu.addAction('Fourier Analysis...')
+        fourier_action.triggered.connect(self._analyze_fourier)
+        fourier_action.setVisible(is_developer_mode_enabled)
 
         xmcd_action = view.button_box.analyze_menu.addAction('XMCD...')
         xmcd_action.triggered.connect(self._analyze_xmcd)
@@ -185,6 +196,14 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
             logger.warning('No current item!')
         else:
             self._frc_view_controller.analyze(item_index, item_index)
+
+    def _analyze_fourier(self) -> None:
+        item_index = self._get_current_item_index()
+
+        if item_index < 0:
+            logger.warning('No current item!')
+        else:
+            self._fourier_view_controller.analyze(item_index)
 
     def _analyze_xmcd(self) -> None:
         item_index = self._get_current_item_index()

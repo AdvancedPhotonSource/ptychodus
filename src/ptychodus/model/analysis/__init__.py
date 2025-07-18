@@ -1,5 +1,6 @@
 from .barycentric import BarycentricArrayInterpolator, BarycentricArrayStitcher
 from .core import AnalysisCore
+from .fourier import FourierAnalyzer
 from .frc import FourierRingCorrelator
 from .illumination import IlluminationMapper, IlluminationMap
 from .propagator import ProbePropagator
@@ -10,6 +11,7 @@ __all__ = [
     'AnalysisCore',
     'BarycentricArrayInterpolator',
     'BarycentricArrayStitcher',
+    'FourierAnalyzer',
     'FourierRingCorrelator',
     'IlluminationMap',
     'IlluminationMapper',

@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (
     QFormLayout,
     QGridLayout,
     QGroupBox,
+    QHBoxLayout,
     QLabel,
     QPushButton,
     QStatusBar,
@@ -42,6 +43,23 @@ class FourierRingCorrelationDialog(QDialog):
         layout.addWidget(self.navigation_toolbar)
         layout.addWidget(self.figure_canvas)
         layout.addLayout(parameters_layout)
+        self.setLayout(layout)
+
+
+class FourierAnalysisDialog(QDialog):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.real_space_widget = VisualizationWidget.create_instance('Real Space')
+        self.reciprocal_space_widget = VisualizationWidget.create_instance('Reciprocal Space')
+        self.status_bar = QStatusBar()
+
+        contents_layout = QHBoxLayout()
+        contents_layout.addWidget(self.real_space_widget)
+        contents_layout.addWidget(self.reciprocal_space_widget)
+
+        layout = QVBoxLayout()
+        layout.addLayout(contents_layout)
+        layout.addWidget(self.status_bar)
         self.setLayout(layout)
 
 

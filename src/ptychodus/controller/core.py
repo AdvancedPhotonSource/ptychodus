@@ -115,6 +115,8 @@ class ControllerCore:
             model.product.object_api,
             self._object_image_controller,
             model.analysis.fourier_ring_correlator,
+            model.analysis.fourier_analyzer,
+            model.analysis.fourier_visualization_engine,
             model.analysis.xmcd_analyzer,
             model.analysis.xmcd_visualization_engine,
             view.object_view,
