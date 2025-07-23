@@ -54,6 +54,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self._fourier_view_controller = FourierAnalysisViewController(
             fourier_analyzer,
             fourier_visualization_engine,
+            file_dialog_factory,
         )
         self._xmcd_view_controller = XMCDViewController(
             xmcd_analyzer, xmcd_visualization_engine, file_dialog_factory, self._tree_model

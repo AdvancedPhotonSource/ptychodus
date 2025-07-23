@@ -19,6 +19,23 @@ def calculate_support_frac(x: float, n: int) -> tuple[slice, float]:
     return slice(whole, whole + n + 1), lower - whole
 
 
+class NearestNeighborArrayInterpolator(Generic[InexactDType]):
+    def __init__(self, array: NDArray[InexactDType]) -> None:
+        super().__init__()
+        self._array = array
+
+    def get_patch(
+        self, center_x: float, center_y: float, width: int, height: int
+    ) -> NDArray[InexactDType]:
+        x_lower = int(center_x - width / 2)
+        x_support = slice(x_lower, x_lower + width)
+
+        y_lower = int(center_y - height / 2)
+        y_support = slice(y_lower, y_lower + height)
+
+        return self._array[..., y_support, x_support]
+
+
 class BarycentricArrayInterpolator(Generic[InexactDType]):
     def __init__(self, array: NDArray[InexactDType]) -> None:
         super().__init__()

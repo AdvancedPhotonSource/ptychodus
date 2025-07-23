@@ -42,7 +42,7 @@ class ReconstructorCore:
                     display_name=f'{library.name}/{reconstructor.name}',
                 )
 
-            library_logger = logging.getLogger(library.logger_name)
+            library_logger = library.get_logger()
             library_logger.addHandler(self._log_handler)
 
         if not self._plugin_chooser:

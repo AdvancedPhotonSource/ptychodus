@@ -34,7 +34,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         pattern_sizer: PatternSizer,
         is_developer_mode_enabled: bool,
     ) -> None:
-        super().__init__()
+        super().__init__('ptychi')
         self.autodiff_settings = PtyChiAutodiffSettings(settings_registry)
         self.dm_settings = PtyChiDMSettings(settings_registry)
         self.lsqml_settings = PtyChiLSQMLSettings(settings_registry)
@@ -89,10 +89,6 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
     @property
     def name(self) -> str:
         return 'pty-chi'
-
-    @property
-    def logger_name(self) -> str:
-        return 'ptychi'
 
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self.reconstructor_list)

@@ -105,6 +105,21 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         area_m2 = width_m * height_m
         return area_m2 / self._lambda_z_m2
 
+    @property
+    def _detector_numerical_aperture_sq(self) -> float:
+        two_z_m = 2 * self.detector_distance_m
+        NA_x = self._pattern_sizer.get_processed_width_m() / two_z_m  # noqa: N806
+        NA_y = self._pattern_sizer.get_processed_height_m() / two_z_m  # noqa: N806
+        return NA_x * NA_y
+
+    @property
+    def detector_numerical_aperture(self) -> float:
+        return numpy.sqrt(self._detector_numerical_aperture_sq)
+
+    @property
+    def depth_of_field_m(self) -> float:
+        return self.probe_wavelength_m / self._detector_numerical_aperture_sq
+
     def get_probe_geometry(self) -> ProbeGeometry:
         extent = self._pattern_sizer.get_processed_image_extent()
         return ProbeGeometry(

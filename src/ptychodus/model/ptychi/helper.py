@@ -15,7 +15,6 @@ from ptychi.api import (
     LossFunctions,
     OPRWeightSmoothingMethods,
     ObjectPosOriginCoordsMethods,
-    OptimizationPlan,
     Optimizers,
     OrthogonalizationMethods,
     PatchInterpolationMethods,
@@ -30,6 +29,7 @@ from ptychi.api.options.base import (
     ObjectMultisliceRegularizationOptions,
     ObjectSmoothnessConstraintOptions,
     ObjectTotalVariationOptions,
+    OptimizationPlan,
     PositionAffineTransformConstraintOptions,
     PositionCorrectionOptions,
     ProbeCenterConstraintOptions,
@@ -424,6 +424,7 @@ class PtyChiProbeOptionsHelper:
                 self._settings.constrain_center_stop.get_value(),
                 self._settings.constrain_center_stride.get_value(),
             ),
+            use_intensity_for_com=self._settings.use_intensity_for_mass_centroid.get_value(),
         )
 
     @property
@@ -609,10 +610,10 @@ class PtyChiOPROptionsHelper:
         method_str = self._settings.smoothing_method.get_value()
 
         try:
-            method: OPRWeightSmoothingMethods | None = OPRWeightSmoothingMethods[method_str.upper()]
+            method: OPRWeightSmoothingMethods = OPRWeightSmoothingMethods[method_str.upper()]
         except KeyError:
             logger.debug('OPR weight smoothing method is None.')
-            method = None
+            method = OPRWeightSmoothingMethods.MEDIAN
 
         return OPRModeWeightsSmoothingOptions(
             enabled=self._settings.smooth_mode_weights.get_value(),

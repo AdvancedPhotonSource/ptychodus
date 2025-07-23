@@ -307,6 +307,9 @@ class PtyChiProbeSettings(Observable, Observer):
         self.constrain_center_stride = self._group.create_integer_parameter(
             'ConstrainCenterStride', 1, minimum=1
         )
+        self.use_intensity_for_mass_centroid = self._group.create_boolean_parameter(
+            'UseIntensityForMassCentroid', False
+        )
 
         self.relax_eigenmode_update = self._group.create_real_parameter(
             'RelaxEigenmodeUpdate', 1.0, minimum=0.0, maximum=1.0

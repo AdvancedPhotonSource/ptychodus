@@ -73,15 +73,11 @@ class NSLS2Style2DiffractionFileReader(DiffractionFileReader):
             if isinstance(data, h5py.Dataset):
                 num_patterns, detector_height, detector_width = data.shape
 
-                # FIXME display DoF
-
                 pixel_size_m = float(h5_file['/ccd_pixel_um'][()]) * self.ONE_MICRON_M
-
-                # FIXME BEGIN
                 wavelength_m = float(h5_file['/lambda_nm'][()]) * self.ONE_NANOMETER_M
                 hc_Jm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S  # noqa: N806
-                probe_energy_eV = wavelength_m  # FIXME probe_energy_J / ELECTRON_VOLT_J
-                # FIXME END
+                hc_eVm = hc_Jm / ELECTRON_VOLT_J  # noqa: N806
+                probe_energy_eV = hc_eVm / wavelength_m  # noqa: N806
 
                 metadata = DiffractionMetadata(
                     num_patterns_per_array=[num_patterns],

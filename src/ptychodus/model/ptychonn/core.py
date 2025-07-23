@@ -22,7 +22,7 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
         training_settings: PtychoNNTrainingSettings,
         reconstructors: Sequence[Reconstructor],
     ) -> None:
-        super().__init__()
+        super().__init__('ptychonn')
         self.model_settings = model_settings
         self.training_settings = training_settings
         self._reconstructors = reconstructors
@@ -67,10 +67,6 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
     @property
     def name(self) -> str:
         return 'PtychoNN'
-
-    @property
-    def logger_name(self) -> str:
-        return 'ptychonn'
 
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self._reconstructors)

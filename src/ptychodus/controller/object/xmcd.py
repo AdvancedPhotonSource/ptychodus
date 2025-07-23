@@ -90,7 +90,7 @@ class XMCDViewController(Observer):
         self._dialog.parameters_view.rcirc_combo_box.setCurrentIndex(rcirc_product_index)
 
         try:
-            data = self._analyzer.get_data()
+            data = self._analyzer.get_result()
         except ValueError:
             self._difference_visualization_widget_controller.clear_array()
             self._sum_visualization_widget_controller.clear_array()

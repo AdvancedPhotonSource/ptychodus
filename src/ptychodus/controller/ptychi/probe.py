@@ -136,6 +136,7 @@ class PtyChiConstrainCenterViewController(CheckableGroupBoxParameterViewControll
         stop: IntegerParameter,
         stride: IntegerParameter,
         num_epochs: IntegerParameter,
+        use_intensity_for_mass_centroid: BooleanParameter,
     ) -> None:
         super().__init__(
             constrain_center,
@@ -145,9 +146,15 @@ class PtyChiConstrainCenterViewController(CheckableGroupBoxParameterViewControll
         self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
+        self._use_intensity_for_mass_centroid_view_controller = CheckableGroupBoxParameterViewController(
+            use_intensity_for_mass_centroid,
+            'Use Intensity for Mass Centroid',
+            tool_tip='When enabled, the mass centroid will be calculated using the intensity of the probe',
+        )
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        layout.addRow(self._use_intensity_for_mass_centroid_view_controller.get_widget())
         self.get_widget().setLayout(layout)
 
 
@@ -215,6 +222,7 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
             settings.constrain_center_stop,
             settings.constrain_center_stride,
             num_epochs,
+            settings.use_intensity_for_mass_centroid,
         )
         self._relax_eigenmode_update_view_controller = DecimalSliderParameterViewController(
             settings.relax_eigenmode_update,

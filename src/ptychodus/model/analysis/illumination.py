@@ -13,7 +13,7 @@ from ptychodus.api.observer import Observable
 from ptychodus.api.typing import RealArrayType
 
 from ..product import ProductRepository
-from .barycentric import BarycentricArrayStitcher
+from .interpolators import BarycentricArrayStitcher
 
 
 __all__ = [

@@ -1,11 +1,11 @@
-from .barycentric import BarycentricArrayInterpolator, BarycentricArrayStitcher
+from .interpolators import BarycentricArrayInterpolator, BarycentricArrayStitcher
 from .core import AnalysisCore
 from .fourier import FourierAnalyzer
 from .frc import FourierRingCorrelator
 from .illumination import IlluminationMapper, IlluminationMap
 from .propagator import ProbePropagator
 from .stxm import STXMSimulator
-from .xmcd import XMCDAnalyzer, XMCDData
+from .xmcd import XMCDAnalyzer, XMCDResult
 
 __all__ = [
     'AnalysisCore',
@@ -18,5 +18,5 @@ __all__ = [
     'ProbePropagator',
     'STXMSimulator',
     'XMCDAnalyzer',
-    'XMCDData',
+    'XMCDResult',
 ]

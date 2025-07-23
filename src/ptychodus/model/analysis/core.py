@@ -38,7 +38,7 @@ class AnalysisCore:
 
         self.fourier_ring_correlator = FourierRingCorrelator(object_repository)
 
-        self.fourier_analyzer = FourierAnalyzer(object_repository)
+        self.fourier_analyzer = FourierAnalyzer(product_repository)
         self.fourier_visualization_engine = VisualizationEngine(is_complex=True)
 
         self.xmcd_analyzer = XMCDAnalyzer(product_repository)

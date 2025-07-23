@@ -13,7 +13,7 @@ from ptychodus.api.observer import Observable
 from ptychodus.api.typing import RealArrayType
 
 from ..reconstructor import DiffractionPatternPositionMatcher
-from .barycentric import BarycentricArrayStitcher
+from .interpolators import BarycentricArrayStitcher
 
 __all__ = [
     'STXMSimulator',
