@@ -10,6 +10,7 @@ import queue
 import tempfile
 import threading
 
+import h5py
 import numpy
 import numpy.typing
 
@@ -406,29 +407,43 @@ class AssembledDiffractionDataset(DiffractionDataset):
     def import_assembled_patterns(self, file_path: Path) -> None:
         if file_path.is_file():
             self.clear()
-            logger.debug(f'Reading processed patterns from "{file_path}"')
+            logger.info(f'Importing assembled dataset from "{file_path}"')
 
-            # FIXME BEGIN NPZ -> H5
-            try:
-                contents = numpy.load(file_path)
-            except Exception as exc:
-                raise RuntimeError(f'Failed to read "{file_path}"') from exc
+            with h5py.File(file_path, 'r') as h5_file:
+                h5_indexes = h5_file[self.INDEXES_KEY]
 
-            self._indexes = contents[self.INDEXES_KEY]
-            self._data = contents[self.PATTERNS_KEY]
-            self._bad_pixels = contents.get(self.BAD_PIXELS_KEY, None)
+                if isinstance(h5_indexes, h5py.Dataset):
+                    self._indexes = h5_indexes[()]
+                else:
+                    raise ValueError('Indexes are not a dataset!')
+
+                h5_patterns = h5_file[self.PATTERNS_KEY]
+
+                if isinstance(h5_patterns, h5py.Dataset):
+                    self._data = h5_patterns[()]
+                else:
+                    raise ValueError('Patterns are not a dataset!')
+
+                self._bad_pixels = None
+
+                if self.BAD_PIXELS_KEY in h5_file:
+                    h5_bad_pixels = h5_file[self.BAD_PIXELS_KEY]
+
+                    if isinstance(h5_bad_pixels, h5py.Dataset):
+                        self._bad_pixels = h5_bad_pixels[()]
+
             num_patterns, detector_height, detector_width = self._data.shape
-            # FIXME END
 
             self._contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
             self._metadata = DiffractionMetadata(
                 num_patterns_per_array=[num_patterns],
                 pattern_dtype=self._data.dtype,
                 detector_extent=ImageExtent(detector_width, detector_height),
+                file_path=file_path,
             )
             self._arrays = [
                 AssembledDiffractionPatternArray(
-                    label='Imported',
+                    label=file_path.stem,
                     indexes=self._indexes,
                     data=self._data,
                     bad_pixels=self.get_processed_bad_pixels(),
@@ -443,19 +458,20 @@ class AssembledDiffractionDataset(DiffractionDataset):
             logger.warning(f'Refusing to read invalid file path {file_path}')
 
     def export_assembled_patterns(self, file_path: Path) -> None:
-        logger.debug(f'Writing processed patterns to "{file_path}"')
+        logger.info(f'Exporting assembled dataset to "{file_path}"')
 
-        # FIXME BEGIN NPZ -> H5
-        contents: dict[str, numpy.typing.NDArray] = {
-            self.PATTERNS_KEY: self.get_assembled_patterns(),
-            self.INDEXES_KEY: self.get_assembled_indexes(),
-        }
+        with h5py.File(file_path, 'w') as h5_file:
+            h5_file.create_dataset(
+                self.PATTERNS_KEY, data=self.get_assembled_patterns(), compression='gzip'
+            )
+            h5_file.create_dataset(
+                self.INDEXES_KEY, data=self.get_assembled_indexes(), compression='gzip'
+            )
 
-        if self._bad_pixels is not None:
-            contents[self.BAD_PIXELS_KEY] = self._bad_pixels
-
-        numpy.savez_compressed(file_path, allow_pickle=False, **contents)
-        # FIXME END
+            if self._bad_pixels is not None:
+                h5_file.create_dataset(
+                    self.BAD_PIXELS_KEY, data=self._bad_pixels, compression='gzip'
+                )
 
     def get_info_text(self) -> str:
         file_path = self._metadata.file_path
