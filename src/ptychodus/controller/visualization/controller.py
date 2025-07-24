@@ -42,8 +42,8 @@ class VisualizationController(Observer):
         self._item = item
         self._status_bar = status_bar
         self._file_dialog_factory = file_dialog_factory
-        self._line_cut_dialog = LineCutDialog.create_instance(view)
-        self._histogram_dialog = HistogramDialog.create_instance(view)
+        self._line_cut_dialog = LineCutDialog(view)
+        self._histogram_dialog = HistogramDialog(view)
 
     @classmethod
     def create_instance(

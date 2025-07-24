@@ -291,21 +291,15 @@ class ImageWidget(VisualizationView):
 
 
 class ImageView(QWidget):
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.image_ribbon = ImageRibbon.create_instance()
         self.image_widget = ImageWidget()
 
-    @classmethod
-    def create_instance(cls, parent: QWidget | None = None) -> ImageView:
-        view = cls(parent)
-
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setMenuBar(view.image_ribbon)
-        layout.addWidget(view.image_widget)
-        view.setLayout(layout)
+        layout.setMenuBar(self.image_ribbon)
+        layout.addWidget(self.image_widget)
+        self.setLayout(layout)
 
-        view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
-
-        return view
+        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
