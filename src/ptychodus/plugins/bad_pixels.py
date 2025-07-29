@@ -2,17 +2,17 @@ from pathlib import Path
 
 import numpy
 
-from ptychodus.api.patterns import BadPixelsArray, BadPixelsFileReader
+from ptychodus.api.diffraction import BadPixels, BadPixelsFileReader
 from ptychodus.api.plugins import PluginRegistry
 
 
 class NPYBadPixelsFileReader(BadPixelsFileReader):
-    def read(self, file_path: Path) -> BadPixelsArray:
+    def read(self, file_path: Path) -> BadPixels:
         return numpy.load(file_path)
 
 
 class NPYGoodPixelsFileReader(BadPixelsFileReader):
-    def read(self, file_path: Path) -> BadPixelsArray:
+    def read(self, file_path: Path) -> BadPixels:
         return numpy.logical_not(numpy.load(file_path))
 
 

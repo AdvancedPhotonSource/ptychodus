@@ -11,7 +11,7 @@ from .data import FileDialogFactory
 from .image import ImageController
 from .memory import MemoryController
 from .object import ObjectController
-from .patterns import PatternsController
+from .diffraction import DiffractionController
 from .probe import ProbeController
 from .product import ProductController
 from .ptychi import PtyChiViewControllerFactory
@@ -56,19 +56,19 @@ class ControllerCore:
             view.statusBar(),
             self._file_dialog_factory,
         )
-        self._patterns_controller = PatternsController(
-            model.patterns.detector_settings,
-            model.patterns.pattern_settings,
-            model.patterns.pattern_sizer,
-            model.patterns.patterns_api,
-            model.patterns.dataset,
+        self._patterns_controller = DiffractionController(
+            model.diffraction.detector_settings,
+            model.diffraction.diffraction_settings,
+            model.diffraction.pattern_sizer,
+            model.diffraction.diffraction_api,
+            model.diffraction.dataset,
             model.metadata_presenter,
             view.patterns_view,
             self._patterns_image_controller,
             self._file_dialog_factory,
         )
         self._product_controller = ProductController.create_instance(
-            model.patterns.dataset,
+            model.diffraction.dataset,
             model.product.product_repository,
             model.product.product_api,
             view.product_view,
@@ -115,6 +115,8 @@ class ControllerCore:
             model.product.object_api,
             self._object_image_controller,
             model.analysis.fourier_ring_correlator,
+            model.analysis.fourier_analyzer,
+            model.analysis.fourier_visualization_engine,
             model.analysis.xmcd_analyzer,
             model.analysis.xmcd_visualization_engine,
             view.object_view,

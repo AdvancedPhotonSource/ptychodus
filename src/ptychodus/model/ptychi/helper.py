@@ -15,7 +15,6 @@ from ptychi.api import (
     LossFunctions,
     OPRWeightSmoothingMethods,
     ObjectPosOriginCoordsMethods,
-    OptimizationPlan,
     Optimizers,
     OrthogonalizationMethods,
     PatchInterpolationMethods,
@@ -30,6 +29,7 @@ from ptychi.api.options.base import (
     ObjectMultisliceRegularizationOptions,
     ObjectSmoothnessConstraintOptions,
     ObjectTotalVariationOptions,
+    OptimizationPlan,
     PositionAffineTransformConstraintOptions,
     PositionCorrectionOptions,
     ProbeCenterConstraintOptions,
@@ -44,12 +44,12 @@ from ptychi.api.options.base import (
 
 from ptychodus.api.object import Object, ObjectGeometry, ObjectPoint
 from ptychodus.api.probe import ProbeSequence
-from ptychodus.api.product import Product, ProductMetadata
+from ptychodus.api.product import LossValue, Product, ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput
 from ptychodus.api.scan import PositionSequence, ScanPoint
 from ptychodus.api.typing import ComplexArrayType, RealArrayType
 
-from ..patterns import PatternSizer
+from ..diffraction import PatternSizer
 from .affine import PtyChiAffineDegreesOfFreedom, PtyChiAffineDegreesOfFreedomBitField
 from .settings import (
     PtyChiOPRSettings,
@@ -424,6 +424,7 @@ class PtyChiProbeOptionsHelper:
                 self._settings.constrain_center_stop.get_value(),
                 self._settings.constrain_center_stride.get_value(),
             ),
+            use_intensity_for_com=self._settings.use_intensity_for_mass_centroid.get_value(),
         )
 
     @property
@@ -609,10 +610,10 @@ class PtyChiOPROptionsHelper:
         method_str = self._settings.smoothing_method.get_value()
 
         try:
-            method: OPRWeightSmoothingMethods | None = OPRWeightSmoothingMethods[method_str.upper()]
+            method: OPRWeightSmoothingMethods = OPRWeightSmoothingMethods[method_str.upper()]
         except KeyError:
             logger.debug('OPR weight smoothing method is None.')
-            method = None
+            method = OPRWeightSmoothingMethods.MEDIAN
 
         return OPRModeWeightsSmoothingOptions(
             enabled=self._settings.smooth_mode_weights.get_value(),
@@ -668,7 +669,7 @@ class PtyChiOptionsHelper:
             else metadata.detector_distance_m
         )
         return PtychographyDataOptions(
-            data=parameters.patterns,
+            data=parameters.diffraction_patterns,
             free_space_propagation_distance_m=free_space_propagation_distance_m,
             wavelength_m=metadata.probe_wavelength_m,
             fft_shift=self._reconstructor_settings.fft_shift_diffraction_patterns.get_value(),
@@ -685,7 +686,7 @@ class PtyChiOptionsHelper:
         probe_array: torch.Tensor | numpy.ndarray,
         object_array: torch.Tensor | numpy.ndarray,
         opr_weights: torch.Tensor | numpy.ndarray,
-        costs: Sequence[float],
+        losses: Sequence[LossValue],
     ) -> Product:
         object_in = product.object_
         object_out = Object(
@@ -722,5 +723,5 @@ class PtyChiOptionsHelper:
             positions=scan_out,
             probes=probe_out,
             object_=object_out,
-            costs=costs,
+            losses=losses,
         )

@@ -23,7 +23,7 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
     def __init__(
         self, settings_registry: SettingsRegistry, is_developer_mode_enabled: bool
     ) -> None:
-        super().__init__()
+        super().__init__('ptychopinn')
         self.model_settings = PtychoPINNModelSettings(settings_registry)
         self.training_settings = PtychoPINNTrainingSettings(settings_registry)
         self.inference_settings = PtychoPINNInferenceSettings(settings_registry)
@@ -56,10 +56,6 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
     @property
     def name(self) -> str:
         return 'PtychoPINN'
-
-    @property
-    def logger_name(self) -> str:
-        return 'ptychopinn'
 
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self._reconstructors)

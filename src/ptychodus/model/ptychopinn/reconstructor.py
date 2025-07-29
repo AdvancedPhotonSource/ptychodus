@@ -6,7 +6,6 @@ from typing import Any, Final
 import logging
 
 import numpy
-import numpy.typing
 
 from ptycho.config.config import InferenceConfig, ModelConfig, TrainingConfig, update_legacy_dict
 from ptycho.raw_data import RawData
@@ -50,7 +49,7 @@ def create_raw_data(parameters: ReconstructInput) -> RawData:
     return RawData.from_coords_without_pc(
         xcoords=numpy.array(position_x_px),
         ycoords=numpy.array(position_y_px),
-        diff3d=parameters.patterns,
+        diff3d=parameters.diffraction_patterns,
         probeGuess=parameters.product.probes.get_probe_no_opr().get_incoherent_mode(0),
         # assume that all patches are from the same object
         scan_index=numpy.zeros(len(parameters.product.positions), dtype=int),
@@ -115,9 +114,9 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         return diffraction_to_obj.predict([test_data.X * intensity_scale, test_data.local_offsets])
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        model_size = parameters.patterns.shape[-1]
+        model_size = parameters.diffraction_patterns.shape[-1]
 
-        if parameters.patterns.shape[-2] != model_size:
+        if parameters.diffraction_patterns.shape[-2] != model_size:
             raise ValueError('Model requires square diffraction patterns!')
 
         if self._model_dict is None:
@@ -166,14 +165,14 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             pixel_geometry=object_in.get_pixel_geometry(),
             center=object_in.get_center(),
         )
-        costs: Sequence[float] = list()
+        losses: Sequence[LossValue] = list()
 
         product = Product(
             metadata=parameters.product.metadata,
             positions=parameters.product.positions,
             probes=parameters.product.probes,
             object_=object_out,
-            costs=costs,
+            losses=losses,
         )
 
         return ReconstructOutput(product, 0)
@@ -215,7 +214,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             ycoords=ycoords,
             xcoords_start=xcoords,
             ycoords_start=ycoords,
-            diff3d=parameters.patterns,
+            diff3d=parameters.diffraction_patterns,
             probeGuess=parameters.product.probes.get_probe_no_opr().get_incoherent_mode(0),
             # assume that all patches are from the same object
             objectGuess=parameters.product.object_.get_layer(0),
@@ -269,5 +268,6 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         # dict_keys(['history', 'model_instance', 'reconstructed_obj', 'pred_amp', 'reconstructed_obj_cdi', 'stitched_obj', 'train_container', 'test_container', 'obj_tensor_full', 'global_offsets', 'recon_amp', 'recon_phase'])
         # TODO self._model_dict = train_results
 
-        losses: Sequence[LossValue] = []
-        return TrainOutput(losses, 0)  # TODO
+        training_loss: Sequence[LossValue] = []
+        validation_loss: Sequence[LossValue] = []
+        return TrainOutput(training_loss, validation_loss, 0)  # TODO

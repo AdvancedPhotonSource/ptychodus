@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class NanoMaxPositionFileReader(PositionFileReader):
-    MICRONS_TO_METERS: Final[float] = 1.0e-6
+    ONE_MICRON_M: Final[float] = 1.0e-6
 
     def read(self, file_path: Path) -> PositionSequence:
         point_list: list[ScanPoint] = list()
@@ -31,8 +31,8 @@ class NanoMaxPositionFileReader(PositionFileReader):
                 for idx, (x, y) in enumerate(zip(position_x, position_y)):
                     point = ScanPoint(
                         idx,
-                        x * self.MICRONS_TO_METERS,
-                        y * self.MICRONS_TO_METERS,
+                        x * self.ONE_MICRON_M,
+                        y * self.ONE_MICRON_M,
                     )
                     point_list.append(point)
 

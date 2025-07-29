@@ -3,15 +3,16 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+import logging
 
-from .patterns import BadPixelsArray, PatternDataType
-from .product import Product
+from .diffraction import BadPixels, DiffractionPatterns
+from .product import LossValue, Product
 
 
 @dataclass(frozen=True)
 class ReconstructInput:
-    patterns: PatternDataType
-    bad_pixels: BadPixelsArray
+    diffraction_patterns: DiffractionPatterns
+    bad_pixels: BadPixels
     product: Product
 
 
@@ -33,15 +34,9 @@ class Reconstructor(ABC):
 
 
 @dataclass(frozen=True)
-class LossValue:
-    epoch: int
-    training_loss: float
-    validation_loss: float
-
-
-@dataclass(frozen=True)
 class TrainOutput:
-    losses: Sequence[LossValue]
+    training_loss: Sequence[LossValue]
+    validation_loss: Sequence[LossValue]
     result: int
 
 
@@ -105,16 +100,35 @@ class NullReconstructor(TrainableReconstructor):
         return Path()
 
     def train(self, data_path: Path) -> TrainOutput:
-        return TrainOutput([], 0)
+        return TrainOutput([], [], 0)
 
 
 class ReconstructorLibrary(Iterable[Reconstructor]):
+    def __init__(self, logger_name: str) -> None:
+        self._logger = logging.getLogger(logger_name)
+
     @property
     @abstractmethod
     def name(self) -> str:
         pass
 
-    @property
-    @abstractmethod
-    def logger_name(self) -> str:
-        pass
+    def log_levels(self) -> Iterable[str]:
+        return ('CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG')
+
+    def get_logger(self) -> logging.Logger:
+        return self._logger
+
+    def get_log_level(self) -> str:
+        level = self._logger.getEffectiveLevel()
+        return logging.getLevelName(level)
+
+    def set_log_level(self, name: str) -> None:
+        name_before = self.get_log_level()
+
+        try:
+            self._logger.setLevel(name)
+        except ValueError:
+            self._logger.error(f'Bad log level "{name}".')
+
+        name_after = self.get_log_level()
+        self._logger.info(f'Changed {self.name} logging level {name_before} -> {name_after}')

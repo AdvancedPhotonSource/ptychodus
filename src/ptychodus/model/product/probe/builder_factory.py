@@ -10,7 +10,7 @@ from ptychodus.api.probe import (
     ProbeFileWriter,
 )
 
-from ...patterns import AssembledDiffractionDataset
+from ...diffraction import AssembledDiffractionDataset
 from .average_pattern import AveragePatternProbeBuilder
 from .builder import FromFileProbeBuilder, ProbeSequenceBuilder
 from .disk import DiskProbeBuilder

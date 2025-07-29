@@ -5,13 +5,13 @@ import logging
 import numpy
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (
+from ptychodus.api.diffraction import (
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionFileWriter,
     DiffractionMetadata,
     SimpleDiffractionDataset,
-    SimpleDiffractionPatternArray,
+    SimpleDiffractionArray,
 )
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.tree import SimpleTreeNode
@@ -32,8 +32,7 @@ class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
         num_patterns, detector_height, detector_width = data.shape
 
         metadata = DiffractionMetadata(
-            num_patterns_per_array=num_patterns,
-            num_patterns_total=num_patterns,
+            num_patterns_per_array=[num_patterns],
             pattern_dtype=data.dtype,
             detector_extent=ImageExtent(detector_width, detector_height),
             file_path=file_path,
@@ -44,16 +43,16 @@ class NPYDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
             [file_path.stem, type(data).__name__, f'{data.dtype}{data.shape}']
         )
 
-        array = SimpleDiffractionPatternArray(
+        array = SimpleDiffractionArray(
             label=file_path.stem,
             indexes=numpy.arange(num_patterns),
-            data=data,
+            patterns=data,
         )
 
         return SimpleDiffractionDataset(metadata, contents_tree, [array])
 
     def write(self, file_path: Path, dataset: DiffractionDataset) -> None:
-        patterns = numpy.concatenate([array.get_data() for array in dataset])
+        patterns = numpy.concatenate([array.get_patterns() for array in dataset])
         numpy.save(file_path, patterns)
 
 

@@ -53,12 +53,18 @@ class ProductMetadata:
 
 
 @dataclass(frozen=True)
+class LossValue:
+    epoch: int
+    value: float
+
+
+@dataclass(frozen=True)
 class Product:
     metadata: ProductMetadata
     positions: PositionSequence
     probes: ProbeSequence
     object_: Object
-    costs: Sequence[float]
+    losses: Sequence[LossValue]
 
     @property
     def nbytes(self) -> int:

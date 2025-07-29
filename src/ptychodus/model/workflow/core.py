@@ -10,7 +10,7 @@ from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
-from ..patterns import PatternsAPI
+from ..diffraction import DiffractionAPI
 from ..product import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
 from ..reconstructor import ReconstructorAPI
 from .api import ConcreteWorkflowAPI
@@ -189,7 +189,7 @@ class WorkflowCore:
     def __init__(
         self,
         settings_registry: SettingsRegistry,
-        patterns_api: PatternsAPI,
+        diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
         scan_api: ScanAPI,
         probe_api: ProbeAPI,
@@ -210,12 +210,12 @@ class WorkflowCore:
             self._compute_data_locator,
             self._output_data_locator,
             settings_registry,
-            patterns_api,
+            diffraction_api,
             product_api,
         )
         self.workflow_api = ConcreteWorkflowAPI(
             settings_registry,
-            patterns_api,
+            diffraction_api,
             product_api,
             scan_api,
             probe_api,

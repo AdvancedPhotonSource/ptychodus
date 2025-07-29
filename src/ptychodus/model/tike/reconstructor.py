@@ -9,7 +9,7 @@ import tike.ptycho
 
 from ptychodus.api.object import Object, ObjectPoint
 from ptychodus.api.probe import ProbeSequence
-from ptychodus.api.product import Product
+from ptychodus.api.product import LossValue, Product
 from ptychodus.api.reconstructor import (
     Reconstructor,
     ReconstructInput,
@@ -121,7 +121,7 @@ class TikeReconstructor:
         parameters: ReconstructInput,
         algorithm_options: tike.ptycho.solvers.IterativeOptions,
     ) -> ReconstructOutput:
-        patterns_array = numpy.fft.ifftshift(parameters.patterns, axes=(-2, -1))
+        patterns_array = numpy.fft.ifftshift(parameters.diffraction_patterns, axes=(-2, -1))
 
         object_input = parameters.product.object_
         object_geometry = object_input.get_geometry()
@@ -229,12 +229,18 @@ class TikeReconstructor:
         else:
             object_output = object_input.copy()
 
+        losses: list[LossValue] = list()
+
+        for epoch, values in enumerate(result.algorithm_options.costs):
+            loss = LossValue(epoch=epoch, value=float(numpy.mean(values)))
+            losses.append(loss)
+
         product = Product(
             metadata=parameters.product.metadata,
             positions=scan_output,
             probes=probe_output,
             object_=object_output,
-            costs=[float(numpy.mean(values)) for values in result.algorithm_options.costs],
+            losses=losses,
         )
         return ReconstructOutput(product, 0)
 

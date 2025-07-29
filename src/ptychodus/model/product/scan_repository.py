@@ -3,6 +3,7 @@ from typing import overload
 import logging
 
 from ptychodus.api.observer import ObservableSequence
+from ptychodus.api.product import LossValue
 
 from .item import ProductRepositoryItem, ProductRepositoryObserver
 from .metadata import MetadataRepositoryItem
@@ -56,7 +57,7 @@ class ScanRepository(ObservableSequence[ScanRepositoryItem], ProductRepositoryOb
     def handle_object_changed(self, index: int, item: ObjectRepositoryItem) -> None:
         pass
 
-    def handle_costs_changed(self, index: int, costs: Sequence[float]) -> None:
+    def handle_losses_changed(self, index: int, losses: Sequence[LossValue]) -> None:
         pass
 
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:

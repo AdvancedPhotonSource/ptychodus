@@ -9,7 +9,7 @@ from ptychodus.api.reconstructor import (
 )
 from ptychodus.api.settings import SettingsRegistry
 
-from ..patterns import AssembledDiffractionDataset
+from ..diffraction import AssembledDiffractionDataset
 from ..product import ProductAPI
 from .api import ReconstructorAPI
 from .log import ReconstructorLogHandler
@@ -42,7 +42,7 @@ class ReconstructorCore:
                     display_name=f'{library.name}/{reconstructor.name}',
                 )
 
-            library_logger = logging.getLogger(library.logger_name)
+            library_logger = library.get_logger()
             library_logger.addHandler(self._log_handler)
 
         if not self._plugin_chooser:

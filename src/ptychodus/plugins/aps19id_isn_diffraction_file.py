@@ -6,13 +6,11 @@ import h5py
 import numpy
 
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.patterns import (
+from ptychodus.api.diffraction import (
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionMetadata,
-    DiffractionPatternArray,
-    PatternDataType,
-    PatternIndexesType,
+    DiffractionArray,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
@@ -29,64 +27,56 @@ class ISNDiffractionFileReader(DiffractionFileReader):
         self._tree_builder = H5DiffractionFileTreeBuilder()
 
     def read(self, file_path: Path) -> DiffractionDataset:
-        dataset = SimpleDiffractionDataset.create_null(file_path)
+        array_list: list[DiffractionArray] = []
 
         with h5py.File(file_path, 'r') as h5_file:
-            metadata = DiffractionMetadata.create_null(file_path)
-            contents_tree = self._tree_builder.build(h5_file)
-            array_list: list[DiffractionPatternArray] = []
-            dataset = SimpleDiffractionDataset(metadata, contents_tree, array_list)
+            configs = h5_file['configs']
 
-            try:
-                configs = h5_file['configs']
+            if isinstance(configs, h5py.Group):
                 num_images = int(configs['num_images'][()])
                 num_exposures_per_image = int(configs['num_exposures_per_img'][()])
-                detector_distance_mm = float(configs['det_dist_mm'][()])
-                detector_width = int(configs['det_size_x'][()])
-                detector_height = int(configs['det_size_y'][()])
-                pixel_width_m = float(configs['pix_size_x'][()])
-                pixel_height_m = float(configs['pix_size_y'][()])
-                probe_energy_eV = float(configs['photon_energy_eV'][()])  # noqa: N806
-            except KeyError:
-                logger.warning('Unable to find metadata.')
-                return dataset
 
-            metadata = DiffractionMetadata(
-                num_patterns_per_array=num_exposures_per_image,
-                num_patterns_total=num_exposures_per_image * num_images,
-                pattern_dtype=numpy.dtype('u4'),
-                detector_distance_m=self.ONE_MILLIMETER_M * detector_distance_mm,
-                detector_extent=ImageExtent(detector_width, detector_height),
-                detector_pixel_geometry=PixelGeometry(pixel_width_m, pixel_height_m),
-                probe_energy_eV=probe_energy_eV,
-                file_path=file_path,
-            )
+                metadata = DiffractionMetadata(
+                    num_patterns_per_array=[num_exposures_per_image] * num_images,
+                    pattern_dtype=numpy.dtype('u4'),  # TODO from data
+                    detector_distance_m=float(configs['det_dist_mm'][()]) * self.ONE_MILLIMETER_M,
+                    detector_extent=ImageExtent(
+                        int(configs['det_size_x'][()]), int(configs['det_size_y'][()])
+                    ),
+                    detector_pixel_geometry=PixelGeometry(
+                        float(configs['pix_size_x'][()]), float(configs['pix_size_y'][()])
+                    ),
+                    probe_energy_eV=float(configs['photon_energy_eV'][()]),  # noqa: N806
+                    file_path=file_path,
+                )
+            else:
+                raise KeyError('configs is not a group!')
 
-            try:
-                ptycho = h5_file['PTYCHO']
-            except KeyError:
-                logger.warning('Unable to find data.')
-                return dataset
+            contents_tree = self._tree_builder.build(h5_file)
+            ptycho = h5_file['PTYCHO']
 
-            for name, h5_item in sorted(ptycho.items()):
-                h5_item = ptycho.get(name, getlink=True)
+            if isinstance(ptycho, h5py.Group):
+                offset = 0
 
-                if isinstance(h5_item, h5py.ExternalLink):
-                    offset = len(array_list) * metadata.num_patterns_per_array
-                    data_path = '/entry/data/data'  # TODO str(h5_item.path)
-                    array = H5DiffractionPatternArray(
-                        label=name,
-                        indexes=numpy.arange(metadata.num_patterns_per_array) + offset,
-                        file_path=file_path.parent / h5_item.filename,
-                        data_path=data_path,
-                    )
-                    array_list.append(array)
-                else:
-                    logger.debug(f'Skipping "{name}": not an external link.')
+                for name in sorted(ptycho):
+                    h5_item = ptycho.get(name, getlink=True)
 
-            dataset = SimpleDiffractionDataset(metadata, contents_tree, array_list)
+                    if isinstance(h5_item, h5py.ExternalLink):
+                        data_path = '/entry/data/data'  # TODO str(h5_item.path)
+                        array = H5DiffractionPatternArray(
+                            label=name,
+                            indexes=numpy.arange(num_exposures_per_image) + offset,
+                            file_path=file_path.parent / h5_item.filename,
+                            data_path=data_path,
+                        )
+                        array_list.append(array)
+                        offset += num_exposures_per_image
+                    else:
+                        logger.debug(f'Skipping "{name}": not an external link.')
+            else:
+                raise KeyError('PTYCHO is not a group!')
 
-        return dataset
+            return SimpleDiffractionDataset(metadata, contents_tree, array_list)
 
 
 def register_plugins(registry: PluginRegistry) -> None:

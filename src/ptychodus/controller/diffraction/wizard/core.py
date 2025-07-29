@@ -3,7 +3,7 @@ import logging
 from PyQt5.QtWidgets import QWizard
 
 from ....model.metadata import MetadataPresenter
-from ....model.patterns import PatternSettings, PatternSizer, PatternsAPI
+from ....model.diffraction import DiffractionSettings, PatternSizer, DiffractionAPI
 
 from ...data import FileDialogFactory
 from .files import OpenDatasetWizardFilesViewController
@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 class OpenDatasetWizardController:
     def __init__(
         self,
-        settings: PatternSettings,
+        settings: DiffractionSettings,
         sizer: PatternSizer,
-        api: PatternsAPI,
+        api: DiffractionAPI,
         metadata_presenter: MetadataPresenter,
         file_dialog_factory: FileDialogFactory,
     ) -> None:

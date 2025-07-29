@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy
 
-from .geometry import ImageExtent, PixelGeometry
+from .geometry import PixelGeometry
 from .scan import ScanPoint
 from .typing import ComplexArrayType
 

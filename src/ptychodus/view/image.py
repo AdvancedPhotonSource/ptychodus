@@ -3,7 +3,7 @@ from collections.abc import Iterator
 
 import numpy
 
-from PyQt5.QtCore import Qt, QPointF, QRect, QRectF, QSize
+from PyQt5.QtCore import Qt, QPointF, QRectF, QSize
 from PyQt5.QtGui import QColor, QConicalGradient, QIcon, QLinearGradient, QPainter, QPen
 from PyQt5.QtWidgets import (
     QComboBox,

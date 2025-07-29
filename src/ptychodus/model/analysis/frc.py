@@ -4,7 +4,6 @@ from dataclasses import dataclass
 import logging
 
 import numpy
-import numpy.typing
 import scipy.fft
 
 from ptychodus.api.typing import ComplexArrayType, IntegerArrayType

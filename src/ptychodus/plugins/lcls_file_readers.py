@@ -7,13 +7,13 @@ import numpy
 import tables
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (
+from ptychodus.api.diffraction import (
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionMetadata,
-    DiffractionPatternArray,
-    PatternDataType,
-    PatternIndexesType,
+    DiffractionArray,
+    DiffractionPatterns,
+    DiffractionIndexes,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
@@ -24,7 +24,7 @@ from .h5_diffraction_file import H5DiffractionFileTreeBuilder
 logger = logging.getLogger(__name__)
 
 
-class PyTablesDiffractionPatternArray(DiffractionPatternArray):
+class PyTablesDiffractionPatternArray(DiffractionArray):
     def __init__(self, label: str, num_patterns: int, file_path: Path, data_path: str) -> None:
         super().__init__()
         self._label = label
@@ -35,24 +35,17 @@ class PyTablesDiffractionPatternArray(DiffractionPatternArray):
     def get_label(self) -> str:
         return self._label
 
-    def get_indexes(self) -> PatternIndexesType:
+    def get_indexes(self) -> DiffractionIndexes:
         return self._indexes
 
-    def get_data(self) -> PatternDataType:
-        with tables.open_file(self._file_path, mode='r') as h5_file:
-            try:
-                item = h5_file.get_node(self._data_path)
-            except tables.NoSuchNodeError:
-                raise ValueError(f'Symlink {self._file_path}:{self._data_path} is broken!')
-            else:
-                if not isinstance(item, tables.EArray):
-                    raise ValueError(
-                        f'Symlink {self._file_path}:{self._data_path} is not a tables File!'
-                    )
+    def get_patterns(self) -> DiffractionPatterns:
+        with tables.open_file(str(self._file_path), mode='r') as h5_file:
+            item = h5_file.get_node(self._data_path)
 
-            data = item[:]
+            if isinstance(item, tables.EArray):
+                return item[:]
 
-        return data
+        raise ValueError(f'Symlink {self._file_path}:{self._data_path} is not a tables file!')
 
 
 class LCLSDiffractionFileReader(DiffractionFileReader):
@@ -62,14 +55,10 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
 
     def read(self, file_path: Path) -> DiffractionDataset:
         metadata = DiffractionMetadata.create_null(file_path)
+        array_list: list[DiffractionArray] = list()
 
-        with tables.open_file(file_path, mode='r') as h5_file:
-            try:
-                data = h5_file.get_node(self._data_path)
-            except tables.NoSuchNodeError:
-                logger.debug('Unable to find data.')
-                return SimpleDiffractionDataset.create_null(file_path)
-
+        with tables.open_file(str(file_path), mode='r') as h5_file:
+            data = h5_file.get_node(self._data_path)
             data_shape = h5_file.root.jungfrau1M.image_img.shape
             num_patterns, detector_height, detector_width = data_shape
 
@@ -79,9 +68,9 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
                 file_path=file_path,
                 data_path=self._data_path,
             )
+            array_list.append(array)
             metadata = DiffractionMetadata(
-                num_patterns_per_array=num_patterns,
-                num_patterns_total=num_patterns,
+                num_patterns_per_array=[num_patterns],
                 pattern_dtype=data.dtype,
                 detector_extent=ImageExtent(detector_width, detector_height),
                 file_path=file_path,
@@ -90,11 +79,11 @@ class LCLSDiffractionFileReader(DiffractionFileReader):
         with h5py.File(file_path, 'r') as h5_file:
             contents_tree = self._tree_builder.build(h5_file)
 
-        return SimpleDiffractionDataset(metadata, contents_tree, [array])
+        return SimpleDiffractionDataset(metadata, contents_tree, array_list)
 
 
 class LCLSPositionFileReader(PositionFileReader):
-    MICRONS_TO_METERS: Final[float] = 1e-6
+    ONE_MICRON_M: Final[float] = 1e-6
 
     def __init__(
         self,
@@ -109,7 +98,7 @@ class LCLSPositionFileReader(PositionFileReader):
     def read(self, file_path: Path) -> PositionSequence:
         point_list: list[ScanPoint] = list()
 
-        with tables.open_file(file_path, mode='r') as h5_file:
+        with tables.open_file(str(file_path), mode='r') as h5_file:
             try:
                 # piezo stage positions are in microns
                 pi_x = h5_file.get_node('/lmc/ch03')[:]
@@ -122,13 +111,13 @@ class LCLSPositionFileReader(PositionFileReader):
                 logger.exception('Unable to load scan.')
             else:
                 # vertical coordinate is always pi_z
-                ycoords = -pi_z * self.MICRONS_TO_METERS
+                ycoords = -pi_z * self.ONE_MICRON_M
 
                 # horizontal coordinate may be a combination of pi_x and pi_y
                 tomography_angle_rad = numpy.deg2rad(self._tomography_angle_deg)
                 cos_angle = numpy.cos(tomography_angle_rad)
                 sin_angle = numpy.sin(tomography_angle_rad)
-                xcoords = (cos_angle * pi_x + sin_angle * pi_y) * self.MICRONS_TO_METERS
+                xcoords = (cos_angle * pi_x + sin_angle * pi_y) * self.ONE_MICRON_M
 
                 for index, (ipm, x, y) in enumerate(zip(ipm2, xcoords, ycoords)):
                     if self._ipm2_low_threshold <= ipm and ipm < self._ipm2_high_threshold:
@@ -153,8 +142,8 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.position_file_readers.register_plugin(
         LCLSPositionFileReader(
             tomography_angle_deg=180.0,
-            ipm2_low_threshold=2500.0,
-            ipm2_high_threshold=6000.0,
+            ipm2_low_threshold=2000.0,
+            ipm2_high_threshold=3000.0,
         ),
         simple_name=SIMPLE_NAME,
         display_name=DISPLAY_NAME,

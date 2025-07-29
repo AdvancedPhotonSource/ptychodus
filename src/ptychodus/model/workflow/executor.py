@@ -6,7 +6,7 @@ import queue
 
 from ptychodus.api.settings import SettingsRegistry
 
-from ..patterns import PatternsAPI
+from ..diffraction import DiffractionAPI
 from ..product import ProductAPI
 from .locator import DataLocator
 from .settings import WorkflowSettings
@@ -28,7 +28,7 @@ class WorkflowExecutor:
         compute_data_locator: DataLocator,
         output_data_locator: DataLocator,
         settings_registry: SettingsRegistry,
-        patterns_api: PatternsAPI,
+        diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
     ) -> None:
         super().__init__()
@@ -38,7 +38,7 @@ class WorkflowExecutor:
         self._output_data_locator = output_data_locator
         self._product_api = product_api
         self._settings_registry = settings_registry
-        self._patterns_api = patterns_api
+        self._diffraction_api = diffraction_api
         self.job_queue: queue.Queue[WorkflowJob] = queue.Queue()
 
     def run_flow(self, input_product_index: int) -> None:
@@ -59,9 +59,9 @@ class WorkflowExecutor:
         output_data_globus_path = f'{self._output_data_locator.get_globus_path()}/{flow_label}'
 
         settings_file = 'settings.ini'
-        patterns_file = 'patterns.npz'
-        input_file = 'product-in.npz'
-        output_file = 'product-out.npz'
+        patterns_file = 'patterns.h5'
+        input_file = 'product-in.h5'
+        output_file = 'product-out.h5'
 
         try:
             input_data_posix_path.mkdir(mode=0o755, parents=True, exist_ok=True)
@@ -71,9 +71,9 @@ class WorkflowExecutor:
 
         # TODO use workflow API
         self._settings_registry.save_settings(input_data_posix_path / settings_file)
-        self._patterns_api.export_assembled_patterns(input_data_posix_path / patterns_file)
+        self._diffraction_api.export_assembled_patterns(input_data_posix_path / patterns_file)
         self._product_api.save_product(
-            input_product_index, input_data_posix_path / input_file, file_type='NPZ'
+            input_product_index, input_data_posix_path / input_file, file_type='HDF5'
         )
 
         flow_input = {

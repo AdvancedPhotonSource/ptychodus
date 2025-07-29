@@ -8,7 +8,7 @@ from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import ReconstructInput
 from ptychodus.api.scan import PositionSequence, ScanPoint
 
-from ..patterns import AssembledDiffractionDataset
+from ..diffraction import AssembledDiffractionDataset
 from ..product import ProductAPI, ProductRepositoryItem
 
 logger = logging.getLogger(__name__)
@@ -86,7 +86,7 @@ class DiffractionPatternPositionMatcher:
             positions=PositionSequence(point_list),
             probes=probe,
             object_=input_product.object_,
-            costs=input_product.costs,
+            losses=input_product.losses,
         )
 
         return ReconstructInput(patterns, self._dataset.get_processed_bad_pixels(), product)

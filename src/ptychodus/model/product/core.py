@@ -8,7 +8,7 @@ from ptychodus.api.product import ProductFileReader, ProductFileWriter
 from ptychodus.api.scan import PositionFileReader, PositionFileWriter
 from ptychodus.api.settings import SettingsRegistry
 
-from ..patterns import AssembledDiffractionDataset, PatternSizer
+from ..diffraction import AssembledDiffractionDataset, PatternSizer
 from .api import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
 from .item_factory import ProductRepositoryItemFactory
 from .object import ObjectBuilderFactory, ObjectRepositoryItemFactory, ObjectSettings

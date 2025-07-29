@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import QWidget
 
 from ptychodus.api.observer import Observable, Observer
 
-from ...model.patterns import AssembledDiffractionDataset
+from ...model.diffraction import AssembledDiffractionDataset
 from ...model.product import ProductRepositoryItem
 from ...view.product import ProductEditorDialog
 
@@ -29,16 +29,18 @@ class ProductPropertyTableModel(QAbstractTableModel):
             'Probe Power [W]',
             'Object Plane Pixel Width [nm]',
             'Object Plane Pixel Height [nm]',
-            'Fresnel Number',
             'Exposure Time [s]',
             'Mass Attenuation [m\u00b2/kg]',
             'Tomography Angle [deg]',
+            'Fresnel Number',
+            'Detector Numerical Aperture',
+            'Depth of Field [nm]',
         ]
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
 
-        if index.isValid() and index.row() in (8, 9, 10):
+        if index.isValid() and index.row() in (7, 8, 9):
             value |= Qt.ItemFlag.ItemIsEditable
 
         return value
@@ -77,23 +79,33 @@ class ProductPropertyTableModel(QAbstractTableModel):
                         case 6:
                             return f'{geometry.object_plane_pixel_height_m * 1e9:.4g}'
                         case 7:
+                            return f'{metadata_item.exposure_time_s.get_value():.4g}'
+                        case 8:
+                            return f'{metadata_item.mass_attenuation_m2_kg.get_value():.4g}'
+                        case 9:
+                            return f'{metadata_item.tomography_angle_deg.get_value():.4g}'
+                        case 10:
                             try:
                                 return f'{geometry.fresnel_number:.4g}'
                             except ZeroDivisionError:
                                 return 'inf'
-                        case 8:
-                            return f'{metadata_item.exposure_time_s.get_value():.4g}'
-                        case 9:
-                            return f'{metadata_item.mass_attenuation_m2_kg.get_value():.4g}'
-                        case 10:
-                            return f'{metadata_item.tomography_angle_deg.get_value():.4g}'
+                        case 11:
+                            try:
+                                return f'{geometry.detector_numerical_aperture:.4g}'
+                            except ZeroDivisionError:
+                                return 'inf'
+                        case 12:
+                            try:
+                                return f'{geometry.depth_of_field_m * 1e9:.4g}'
+                            except ZeroDivisionError:
+                                return 'inf'
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
             metadata_item = self._product_item.get_metadata_item()
 
             match index.row():
-                case 8:
+                case 7:
                     try:
                         exposure_time_s = float(value)
                     except ValueError:
@@ -101,7 +113,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
                     metadata_item.exposure_time_s.set_value(exposure_time_s)
                     return True
-                case 9:
+                case 8:
                     try:
                         mass_attenuation_m2_kg = float(value)
                     except ValueError:
@@ -109,7 +121,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
                     metadata_item.mass_attenuation_m2_kg.set_value(mass_attenuation_m2_kg)
                     return True
-                case 10:
+                case 9:
                     try:
                         tomography_angle_deg = float(value)
                     except ValueError:

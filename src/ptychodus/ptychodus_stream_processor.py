@@ -100,13 +100,12 @@ class PtychodusAdImageProcessor(AdImageProcessor):
 
     def configure(self, config_dict: dict[str, Any]) -> None:
         """Configures user processor"""
-        num_patterns_total = config_dict['nPatternsTotal']
-        num_patterns_per_array = config_dict.get('nPatternsPerArray', 1)
-        pattern_dtype = config_dict.get('PatternDataType', 'uint16')
+        num_arrays = config_dict['num_arrays']
+        num_patterns_per_array = config_dict.get('num_patterns_per_array', 1)
+        pattern_dtype = config_dict.get('pattern_dtype', 'uint16')
 
-        metadata = ptychodus.api.patterns.DiffractionMetadata(
-            num_patterns_per_array=int(num_patterns_per_array),
-            num_patterns_total=int(num_patterns_total),
+        metadata = ptychodus.api.diffraction.DiffractionMetadata(
+            num_patterns_per_array=[int(num_patterns_per_array)] * int(num_arrays),
             pattern_dtype=numpy.dtype(pattern_dtype),
         )
         self._ptychodus_streaming_context = self._ptychodus.create_streaming_context(metadata)
@@ -124,10 +123,10 @@ class PtychodusAdImageProcessor(AdImageProcessor):
         else:
             self.logger.debug(f'Frame id {frame_id} time stamp {frame_time_stamp}')
             image3d = image[numpy.newaxis, :, :].copy()
-            array = ptychodus.api.patterns.SimpleDiffractionPatternArray(
+            array = ptychodus.api.diffraction.SimpleDiffractionArray(
                 label=f'Frame{frame_id}',
                 indexes=numpy.array([frame_id]),
-                data=image3d,
+                patterns=image3d,
             )
             self._ptychodus_streaming_context.append_array(array)
 

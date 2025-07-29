@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 class TikeReconstructorLibrary(ReconstructorLibrary):
     def __init__(self, settings_registry: SettingsRegistry) -> None:
-        super().__init__()
+        super().__init__('tike')
         self.settings = TikeSettings(settings_registry)
         self.multigrid_settings = TikeMultigridSettings(settings_registry)
         self.position_correction_settings = TikePositionCorrectionSettings(settings_registry)
@@ -67,10 +67,6 @@ class TikeReconstructorLibrary(ReconstructorLibrary):
     @property
     def name(self) -> str:
         return 'Tike'
-
-    @property
-    def logger_name(self) -> str:
-        return 'tike'
 
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self.reconstructor_list)

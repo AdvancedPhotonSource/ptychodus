@@ -5,7 +5,7 @@ import numpy
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
 from ptychodus.api.propagator import FresnelTransformPropagator, PropagatorParameters
 
-from ...patterns import AssembledDiffractionDataset
+from ...diffraction import AssembledDiffractionDataset
 from .builder import ProbeSequenceBuilder
 from .settings import ProbeSettings
 

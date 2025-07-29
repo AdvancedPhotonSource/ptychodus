@@ -22,7 +22,7 @@ class VelociprobePositionFileColumn(IntEnum):
 
 
 class VelociprobePositionFileReader(PositionFileReader):
-    NANOMETERS_TO_METERS: Final[float] = 1.0e-9
+    ONE_NANOMETER_M: Final[float] = 1.0e-9
 
     def __init__(self, diffraction_reader: VelociprobeDiffractionFileReader, y_column: int) -> None:
         self._diffraction_reader = diffraction_reader
@@ -81,8 +81,8 @@ class VelociprobePositionFileReader(PositionFileReader):
 
                 point = ScanPoint(
                     trigger,
-                    x_nm * self.NANOMETERS_TO_METERS,
-                    y_nm * self.NANOMETERS_TO_METERS,
+                    x_nm * self.ONE_NANOMETER_M,
+                    y_nm * self.ONE_NANOMETER_M,
                 )
                 point_list.append(point)
 

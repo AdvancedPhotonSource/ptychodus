@@ -7,11 +7,11 @@ import h5py
 import numpy
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (
+from ptychodus.api.diffraction import (
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionMetadata,
-    DiffractionPatternArray,
+    DiffractionArray,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
@@ -63,7 +63,7 @@ class APS12IDDiffractionFileReader(DiffractionFileReader):
                 logger.warning(f'Line {line} is missing points {missing_points}')
 
         contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Line', 'Point'])
-        array_list: list[DiffractionPatternArray] = list()
+        array_list: list[DiffractionArray] = list()
 
         with h5py.File(file_path, 'r') as h5_file:
             try:
@@ -81,8 +81,7 @@ class APS12IDDiffractionFileReader(DiffractionFileReader):
                 detector_height, detector_width = h5_data.shape
 
                 metadata = DiffractionMetadata(
-                    num_patterns_per_array=1,
-                    num_patterns_total=lines_num * points_num,
+                    num_patterns_per_array=[1] * lines_num * points_num,
                     pattern_dtype=h5_data.dtype,
                     detector_extent=ImageExtent(detector_width, detector_height),
                     file_path=file_path,

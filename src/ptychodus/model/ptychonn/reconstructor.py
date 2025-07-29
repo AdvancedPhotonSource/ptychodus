@@ -4,7 +4,6 @@ from typing import Final
 import logging
 
 import numpy
-import numpy.typing
 import ptychonn
 
 from ptychodus.api.geometry import ImageExtent
@@ -66,7 +65,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         # TODO data size/shape requirements to GUI
-        data = parameters.patterns
+        data = parameters.diffraction_patterns
         data_size = data.shape[-1]
 
         if data_size != data.shape[-2]:
@@ -115,7 +114,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             positions=parameters.product.positions,
             probes=parameters.product.probes,
             object_=object_,
-            costs=list(),  # TODO put something here?
+            losses=list(),  # TODO put something here?
         )
 
         return ReconstructOutput(product, 0)
@@ -160,7 +159,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
         logger.debug(f'Writing "{file_path}" as "NPZ"')
         contents = {
-            self.PATTERNS_KEY: parameters.patterns.astype(numpy.float32),
+            self.PATTERNS_KEY: parameters.diffraction_patterns.astype(numpy.float32),
             self.PATCHES_KEY: patches,
         }
         numpy.savez_compressed(file_path, allow_pickle=False, **contents)
@@ -191,18 +190,21 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         )
         self._model_provider.set_trainer(trainer)
 
-        losses: list[LossValue] = []
+        training_loss: list[LossValue] = []
+        validation_loss: list[LossValue] = []
 
         for epoch, entry in enumerate(trainer_log.logs):
             try:
-                tloss = entry['training_loss']
-                vloss = entry['validation_loss']
+                tloss = LossValue(epoch, entry['training_loss'])
+                vloss = LossValue(epoch, entry['validation_loss'])
             except KeyError:
                 pass
             else:
-                losses.append(LossValue(epoch=epoch, training_loss=tloss, validation_loss=vloss))
+                training_loss.append(tloss)
+                training_loss.append(vloss)
 
         return TrainOutput(
-            losses=losses,
+            training_loss=training_loss,
+            validation_loss=validation_loss,
             result=0,
         )

@@ -7,14 +7,14 @@ from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeSequence
-from ptychodus.api.product import Product, ProductFileReader, ProductMetadata
+from ptychodus.api.product import LossValue, Product, ProductFileReader, ProductMetadata
 from ptychodus.api.scan import PositionSequence, ScanPoint
 
 
 class NSLSIIProductFileReader(ProductFileReader):
     SIMPLE_NAME: Final[str] = 'NSLS_II'
     DISPLAY_NAME: Final[str] = 'NSLS-II MATLAB Files (*.mat)'
-    ONE_MICRON_M: Final[float] = 1e-6
+    ONE_MICRON_M: Final[float] = 1.0e-6
 
     def read(self, file_path: Path) -> Product:
         point_list: list[ScanPoint] = list()
@@ -58,14 +58,14 @@ class NSLSIIProductFileReader(ProductFileReader):
                 pixel_geometry=pixel_geometry,
                 center=None,
             )
-            costs: Sequence[float] = list()
+            loss: Sequence[LossValue] = list()
 
         return Product(
             metadata=metadata,
             positions=PositionSequence(point_list),
             probes=probes,
             object_=object_,
-            costs=costs,
+            losses=loss,
         )
 
 

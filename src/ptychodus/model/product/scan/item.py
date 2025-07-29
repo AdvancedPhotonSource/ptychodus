@@ -133,7 +133,7 @@ class ScanRepositoryItem(ParameterGroup):
     def _rebuild(self) -> None:
         try:
             scan = self._builder.build()
-        except Exception as exc:
+        except Exception:
             logger.exception('Failed to rebuild scan!')
             return
 

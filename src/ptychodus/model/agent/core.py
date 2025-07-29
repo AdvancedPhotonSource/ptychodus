@@ -1,5 +1,4 @@
 from collections.abc import Iterator, Sequence
-from dataclasses import dataclass
 import logging
 
 from ptychodus.api.settings import SettingsRegistry

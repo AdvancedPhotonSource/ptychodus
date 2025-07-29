@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class XMCDData:
+class XMCDResult:
     polar_difference: ComplexArrayType
     polar_sum: ComplexArrayType
     polar_ratio: ComplexArrayType
@@ -36,7 +36,7 @@ class XMCDAnalyzer(Observable):
 
         self._lcirc_product_index = -1
         self._rcirc_product_index = -1
-        self._product_data: XMCDData | None = None
+        self._result: XMCDResult | None = None
 
     def set_lcirc_product(self, lcirc_product_index: int) -> None:
         if self._lcirc_product_index != lcirc_product_index:
@@ -99,7 +99,7 @@ class XMCDAnalyzer(Observable):
             where=(polar_sum > 0.0),
         )
 
-        self._product_data = XMCDData(
+        self._result = XMCDResult(
             polar_difference=polar_difference,
             polar_sum=polar_sum,
             polar_ratio=polar_ratio,
@@ -108,11 +108,11 @@ class XMCDAnalyzer(Observable):
         )
         self.notify_observers()
 
-    def get_data(self) -> XMCDData:
-        if self._product_data is None:
+    def get_result(self) -> XMCDResult:
+        if self._result is None:
             raise ValueError('No analyzed data!')
 
-        return self._product_data
+        return self._result
 
     def get_save_file_filters(self) -> Sequence[str]:
         return [self.get_save_file_filter()]
@@ -121,17 +121,17 @@ class XMCDAnalyzer(Observable):
         return 'NumPy Zipped Archive (*.npz)'
 
     def save_data(self, file_path: Path) -> None:
-        if self._product_data is None:
+        if self._result is None:
             raise ValueError('No analyzed data!')
 
         contents: dict[str, Any] = {
-            'polar_difference': self._product_data.polar_difference,
-            'polar_sum': self._product_data.polar_sum,
-            'polar_ratio': self._product_data.polar_ratio,
-            'pixel_height_m': self._product_data.pixel_geometry.height_m,
-            'pixel_width_m': self._product_data.pixel_geometry.width_m,
-            'center_x_m': self._product_data.center.position_x_m,
-            'center_y_m': self._product_data.center.position_y_m,
+            'polar_difference': self._result.polar_difference,
+            'polar_sum': self._result.polar_sum,
+            'polar_ratio': self._result.polar_ratio,
+            'pixel_height_m': self._result.pixel_geometry.height_m,
+            'pixel_width_m': self._result.pixel_geometry.width_m,
+            'center_x_m': self._result.center.position_x_m,
+            'center_y_m': self._result.center.position_y_m,
         }
 
         numpy.savez_compressed(file_path, allow_pickle=False, **contents)

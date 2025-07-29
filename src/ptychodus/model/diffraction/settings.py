@@ -32,10 +32,10 @@ class DetectorSettings(Observable, Observer):
             self.notify_observers()
 
 
-class PatternSettings(Observable, Observer):
+class DiffractionSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._group = registry.create_group('Patterns')
+        self._group = registry.create_group('Diffraction')
         self._group.add_observer(self)
 
         self.file_type = self._group.create_string_parameter('FileType', 'NPY')

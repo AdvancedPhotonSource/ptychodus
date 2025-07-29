@@ -7,6 +7,7 @@ from PyQt5.QtCore import Qt, QAbstractItemModel, QTimer
 from PyQt5.QtWidgets import QActionGroup, QLabel, QWidget
 
 from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.product import LossValue
 
 from ..model.product import (
     ProductRepository,
@@ -255,12 +256,15 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             logger.exception(err)
             return
 
+        epoch = [loss.epoch for loss in item.get_losses()]
+        losses = [loss.value for loss in item.get_losses()]
+
         ax = self._plot_view.axes
         ax.clear()
         ax.set_xlabel('Iteration')
-        ax.set_ylabel('Cost')
+        ax.set_ylabel('Loss')
         ax.grid(True)
-        ax.plot(item.get_costs(), '.-', label='Cost', linewidth=1.5)
+        ax.plot(epoch, losses, '.-', label='Loss', linewidth=1.5)
         self._plot_view.figure_canvas.draw()
 
     def _sync_model_to_view(self) -> None:
@@ -289,7 +293,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
     def handle_object_changed(self, index: int, item: ObjectRepositoryItem) -> None:
         pass
 
-    def handle_costs_changed(self, index: int, costs: Sequence[float]) -> None:
+    def handle_losses_changed(self, index: int, losses: Sequence[LossValue]) -> None:
         current_index = self._view.parameters_view.product_combo_box.currentIndex()
 
         if index == current_index:

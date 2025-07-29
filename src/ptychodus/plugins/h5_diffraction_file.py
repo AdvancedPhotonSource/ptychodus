@@ -5,14 +5,14 @@ import h5py
 import numpy
 
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.patterns import (
+from ptychodus.api.diffraction import (
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionFileWriter,
     DiffractionMetadata,
-    DiffractionPatternArray,
-    PatternDataType,
-    PatternIndexesType,
+    DiffractionArray,
+    DiffractionPatterns,
+    DiffractionIndexes,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
@@ -21,9 +21,9 @@ from ptychodus.api.tree import SimpleTreeNode
 logger = logging.getLogger(__name__)
 
 
-class H5DiffractionPatternArray(DiffractionPatternArray):
+class H5DiffractionPatternArray(DiffractionArray):
     def __init__(
-        self, label: str, indexes: PatternIndexesType, file_path: Path, data_path: str
+        self, label: str, indexes: DiffractionIndexes, file_path: Path, data_path: str
     ) -> None:
         super().__init__()
         self._label = label
@@ -34,24 +34,17 @@ class H5DiffractionPatternArray(DiffractionPatternArray):
     def get_label(self) -> str:
         return self._label
 
-    def get_indexes(self) -> PatternIndexesType:
+    def get_indexes(self) -> DiffractionIndexes:
         return self._indexes
 
-    def get_data(self) -> PatternDataType:
+    def get_patterns(self) -> DiffractionPatterns:
         with h5py.File(self._file_path, 'r') as h5_file:
-            try:
-                item = h5_file[self._data_path]
-            except KeyError:
-                raise ValueError(f'Symlink {self._file_path}:{self._data_path} is broken!')
+            item = h5_file[self._data_path]
+
+            if isinstance(item, h5py.Dataset):
+                return item[()]
             else:
-                if not isinstance(item, h5py.Dataset):
-                    raise ValueError(
-                        f'Symlink {self._file_path}:{self._data_path} is not a dataset!'
-                    )
-
-            data = item[()]
-
-        return data
+                raise ValueError(f'Path {self._file_path}:{self._data_path} is not a dataset!')
 
 
 class H5DiffractionFileTreeBuilder:
@@ -59,6 +52,8 @@ class H5DiffractionFileTreeBuilder:
         self, tree_node: SimpleTreeNode, attribute_manager: h5py.AttributeManager
     ) -> None:
         for name, value in attribute_manager.items():
+            item_details = ''
+
             if isinstance(value, str):
                 item_details = f'STRING = "{value}"'
             elif isinstance(value, h5py.Empty):
@@ -80,7 +75,7 @@ class H5DiffractionFileTreeBuilder:
 
     def build(self, h5_file: h5py.File) -> SimpleTreeNode:
         root_node = self.create_root_node()
-        unvisited = [(root_node, h5_file)]
+        unvisited: list[tuple[SimpleTreeNode, h5py.Group]] = [(root_node, h5_file)]
 
         while unvisited:
             parent_item, h5_group = unvisited.pop()
@@ -150,30 +145,28 @@ class H5DiffractionFileReader(DiffractionFileReader):
             metadata = DiffractionMetadata.create_null(file_path)
             contents_tree = self._tree_builder.build(h5_file)
 
-            try:
-                data = h5_file[self._data_path]
-            except KeyError:
-                logger.warning('Unable to find data.')
-                return SimpleDiffractionDataset.create_null(file_path)
+            data = h5_file[self._data_path]
 
-            num_patterns, detector_height, detector_width = data.shape
+            if isinstance(data, h5py.Dataset):
+                num_patterns, detector_height, detector_width = data.shape
 
-            metadata = DiffractionMetadata(
-                num_patterns_per_array=num_patterns,
-                num_patterns_total=num_patterns,
-                pattern_dtype=data.dtype,
-                detector_extent=ImageExtent(detector_width, detector_height),
-                file_path=file_path,
-            )
+                metadata = DiffractionMetadata(
+                    num_patterns_per_array=[num_patterns],
+                    pattern_dtype=data.dtype,
+                    detector_extent=ImageExtent(detector_width, detector_height),
+                    file_path=file_path,
+                )
 
-            array = H5DiffractionPatternArray(
-                label=file_path.stem,
-                indexes=numpy.arange(num_patterns),
-                file_path=file_path,
-                data_path=self._data_path,
-            )
+                array = H5DiffractionPatternArray(
+                    label=file_path.stem,
+                    indexes=numpy.arange(num_patterns),
+                    file_path=file_path,
+                    data_path=self._data_path,
+                )
 
-        return SimpleDiffractionDataset(metadata, contents_tree, [array])
+                return SimpleDiffractionDataset(metadata, contents_tree, [array])
+            else:
+                raise ValueError(f'Expected {self._data_path} to be a dataset; got {type(data)}.')
 
 
 class H5DiffractionFileWriter(DiffractionFileWriter):
@@ -181,7 +174,7 @@ class H5DiffractionFileWriter(DiffractionFileWriter):
         self._data_path = data_path
 
     def write(self, file_path: Path, dataset: DiffractionDataset) -> None:
-        data = numpy.concatenate([array.get_data() for array in dataset])
+        data = numpy.concatenate([array.get_patterns() for array in dataset])
 
         with h5py.File(file_path, 'w') as h5_file:
             h5_file.create_dataset(self._data_path, data=data, compression='gzip')

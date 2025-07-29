@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class LYNXOrchestraPositionFileReader(PositionFileReader):
     SIMPLE_NAME: Final[str] = 'APS_LYNX_Orchestra'
     DISPLAY_NAME: Final[str] = 'APS 31-ID-E LYNX Orchestra Files (*.dat)'
-    MICRONS_TO_METERS: Final[float] = 1.0e-6
+    ONE_MICRON_M: Final[float] = 1.0e-6
     DATA_POINT_COLUMN: Final[int] = 0
     X_COLUMN: Final[int] = 3
     Y_COLUMN: Final[int] = 6
@@ -73,8 +73,8 @@ class LYNXOrchestraPositionFileReader(PositionFileReader):
 
                 point = ScanPoint(
                     int(row[self.DATA_POINT_COLUMN]),
-                    -float(row[self.X_COLUMN]) * self.MICRONS_TO_METERS,
-                    -float(row[self.Y_COLUMN]) * self.MICRONS_TO_METERS,
+                    -float(row[self.X_COLUMN]) * self.ONE_MICRON_M,
+                    -float(row[self.Y_COLUMN]) * self.ONE_MICRON_M,
                 )
                 point_list.append(point)
 

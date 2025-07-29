@@ -70,8 +70,9 @@ class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
         self.detector_distance_check_box = QCheckBox('Detector Distance')
         self.pattern_crop_center_check_box = QCheckBox('Pattern Crop Center')
         self.pattern_crop_extent_check_box = QCheckBox('Pattern Crop Extent')
-        self.probe_photon_count_check_box = QCheckBox('Probe Photon Count')
         self.probe_energy_check_box = QCheckBox('Probe Energy')
+        self.probe_photon_count_check_box = QCheckBox('Probe Photon Count')
+        self.exposure_time_check_box = QCheckBox('Exposure Time')
 
         self.setTitle('Import Metadata')
 
@@ -82,8 +83,9 @@ class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
         layout.addWidget(self.detector_distance_check_box)
         layout.addWidget(self.pattern_crop_center_check_box)
         layout.addWidget(self.pattern_crop_extent_check_box)
-        layout.addWidget(self.probe_photon_count_check_box)
         layout.addWidget(self.probe_energy_check_box)
+        layout.addWidget(self.probe_photon_count_check_box)
+        layout.addWidget(self.exposure_time_check_box)
         layout.addStretch()
         self.setLayout(layout)
 

@@ -15,7 +15,6 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product
 
-from ..analysis import BarycentricArrayInterpolator
 from .settings import FluorescenceSettings
 
 logger = logging.getLogger(__name__)

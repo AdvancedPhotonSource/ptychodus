@@ -5,8 +5,9 @@ from ptychodus.api.settings import SettingsRegistry
 from ..product import ObjectRepository, ProductRepository
 from ..reconstructor import DiffractionPatternPositionMatcher
 from ..visualization import VisualizationEngine
-from .illumination import IlluminationMapper
+from .fourier import FourierAnalyzer
 from .frc import FourierRingCorrelator
+from .illumination import IlluminationMapper
 from .propagator import ProbePropagator
 from .settings import ProbePropagationSettings
 from .stxm import STXMSimulator
@@ -36,6 +37,9 @@ class AnalysisCore:
         self.exposure_visualization_engine = VisualizationEngine(is_complex=False)
 
         self.fourier_ring_correlator = FourierRingCorrelator(object_repository)
+
+        self.fourier_analyzer = FourierAnalyzer(product_repository)
+        self.fourier_visualization_engine = VisualizationEngine(is_complex=True)
 
         self.xmcd_analyzer = XMCDAnalyzer(product_repository)
         self.xmcd_visualization_engine = VisualizationEngine(is_complex=False)

@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 import logging
 
 
@@ -14,7 +13,7 @@ from ptychi.api.task import PtychographyTask
 
 from ptychodus.api.object import Object, ObjectGeometry
 from ptychodus.api.probe import ProbeSequence
-from ptychodus.api.product import ProductMetadata
+from ptychodus.api.product import LossValue, ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Reconstructor
 from ptychodus.api.scan import PositionSequence
 
@@ -149,15 +148,16 @@ class RPIEReconstructor(Reconstructor):
         task = PtychographyTask(task_options)
         task.run()  # TODO (n_epochs: int | None = None)
 
-        costs: Sequence[float] = list()
+        losses: list[LossValue] = list()
         task_reconstructor = task.reconstructor
 
         if task_reconstructor is not None:
             loss_tracker = task_reconstructor.loss_tracker
-            # TODO update api to include epoch and loss
-            # epoch = loss_tracker.table['epoch'].to_numpy()
-            loss = loss_tracker.table['loss'].to_numpy()
-            costs = [float(x) for x in loss.flatten()]
+            epoch_array = loss_tracker.table['epoch'].to_numpy()
+            loss_array = loss_tracker.table['loss'].to_numpy()
+
+            for epoch, loss in zip(epoch_array.flat, loss_array.flat):
+                losses.append(LossValue(epoch=epoch, value=loss.item()))
 
         product = self._options_helper.create_product(
             product=parameters.product,
@@ -166,6 +166,6 @@ class RPIEReconstructor(Reconstructor):
             probe_array=task.get_data_to_cpu('probe', as_numpy=True),
             object_array=task.get_data_to_cpu('object', as_numpy=True),
             opr_weights=task.get_data_to_cpu('opr_mode_weights', as_numpy=True),
-            costs=costs,
+            losses=losses,
         )
         return ReconstructOutput(product, 0)

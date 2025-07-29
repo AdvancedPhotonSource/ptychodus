@@ -6,16 +6,16 @@ import numpy
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.object import Object
-from ptychodus.api.patterns import (
+from ptychodus.api.diffraction import (
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionMetadata,
     SimpleDiffractionDataset,
-    SimpleDiffractionPatternArray,
+    SimpleDiffractionArray,
 )
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeSequence
-from ptychodus.api.product import Product, ProductFileReader, ProductMetadata
+from ptychodus.api.product import LossValue, Product, ProductFileReader, ProductMetadata
 from ptychodus.api.scan import PositionSequence, ScanPoint
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -30,8 +30,7 @@ class SLACDiffractionFileReader(DiffractionFileReader):
         num_patterns, detector_height, detector_width = patterns.shape
 
         metadata = DiffractionMetadata(
-            num_patterns_per_array=num_patterns,
-            num_patterns_total=num_patterns,
+            num_patterns_per_array=[num_patterns],
             pattern_dtype=patterns.dtype,
             detector_extent=ImageExtent(detector_width, detector_height),
             file_path=file_path,
@@ -42,10 +41,10 @@ class SLACDiffractionFileReader(DiffractionFileReader):
             [file_path.stem, type(patterns).__name__, f'{patterns.dtype}{patterns.shape}']
         )
 
-        array = SimpleDiffractionPatternArray(
+        array = SimpleDiffractionArray(
             label=file_path.stem,
             indexes=numpy.arange(num_patterns),
-            data=patterns,
+            patterns=patterns,
         )
 
         return SimpleDiffractionDataset(metadata, contents_tree, [array])
@@ -76,14 +75,14 @@ class SLACProductFileReader(ProductFileReader):
             point = ScanPoint(idx, x_m, y_m)
             point_list.append(point)
 
-        costs: Sequence[float] = list()  # not included in file
+        loss: Sequence[LossValue] = list()  # not included in file
 
         return Product(
             metadata=metadata,
             positions=PositionSequence(point_list),
             probes=ProbeSequence(array=probe_array, opr_weights=None, pixel_geometry=None),
             object_=Object(array=object_array, pixel_geometry=None, center=None),
-            costs=costs,
+            losses=loss,
         )
 
 

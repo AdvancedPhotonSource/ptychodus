@@ -9,13 +9,13 @@ import h5py
 import numpy
 
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.patterns import (
-    BadPixelsArray,
+from ptychodus.api.diffraction import (
+    BadPixels,
     CropCenter,
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionMetadata,
-    DiffractionPatternArray,
+    DiffractionArray,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.tree import SimpleTreeNode
@@ -27,11 +27,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class DataGroup:
-    array_list: list[DiffractionPatternArray] = field(default_factory=list)
+    array_list: list[DiffractionArray] = field(default_factory=list)
 
     @classmethod
     def read(cls, group: h5py.Group, num_patterns_per_array: int) -> DataGroup:
-        array_list: list[DiffractionPatternArray] = list()
+        array_list: list[DiffractionArray] = list()
         master_file_path = Path(group.file.filename)
 
         for name, h5_item in sorted(group.items()):
@@ -49,18 +49,16 @@ class DataGroup:
 
         return cls(array_list)
 
-    def __iter__(self) -> Iterator[DiffractionPatternArray]:
+    def __iter__(self) -> Iterator[DiffractionArray]:
         return iter(self.array_list)
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionPatternArray: ...
+    def __getitem__(self, index: int) -> DiffractionArray: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]: ...
+    def __getitem__(self, index: slice) -> Sequence[DiffractionArray]: ...
 
-    def __getitem__(
-        self, index: int | slice
-    ) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
+    def __getitem__(self, index: int | slice) -> DiffractionArray | Sequence[DiffractionArray]:
         return self.array_list[index]
 
     def __len__(self) -> int:
@@ -200,21 +198,19 @@ class VelociprobeDiffractionDataset(DiffractionDataset):
     def get_metadata(self) -> DiffractionMetadata:
         return self._metadata
 
-    def get_contents_tree(self) -> SimpleTreeNode:
+    def get_layout(self) -> SimpleTreeNode:
         return self._contents_tree
 
-    def get_bad_pixels(self) -> BadPixelsArray | None:
+    def get_bad_pixels(self) -> BadPixels | None:
         return None
 
     @overload
-    def __getitem__(self, index: int) -> DiffractionPatternArray: ...
+    def __getitem__(self, index: int) -> DiffractionArray: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[DiffractionPatternArray]: ...
+    def __getitem__(self, index: slice) -> Sequence[DiffractionArray]: ...
 
-    def __getitem__(
-        self, index: int | slice
-    ) -> DiffractionPatternArray | Sequence[DiffractionPatternArray]:
+    def __getitem__(self, index: int | slice) -> DiffractionArray | Sequence[DiffractionArray]:
         return self._entry.data[index]
 
     def __len__(self) -> int:
@@ -231,24 +227,11 @@ class VelociprobeDiffractionFileReader(DiffractionFileReader):
         dataset: DiffractionDataset = SimpleDiffractionDataset.create_null(file_path)
 
         with h5py.File(file_path, 'r') as h5_file:
-            metadata = DiffractionMetadata.create_null(file_path)
-            contents_tree = self._tree_builder.build(h5_file)
-
-            try:
-                h5_dataset = h5_file['/entry/data/data_000001']
-            except KeyError:
-                logger.error(f'File {file_path} is not a Velociprobe data file.')
-                raise
-
+            h5_dataset = h5_file['/entry/data/data_000001']
             num_patterns_per_array = h5_dataset.shape[0]
             pattern_dtype = h5_dataset.dtype
 
-            try:
-                entry = EntryGroup.read(h5_file['entry'], num_patterns_per_array)
-            except KeyError:
-                logger.error(f'File {file_path} is not a Velociprobe data file.')
-                raise
-
+            entry = EntryGroup.read(h5_file['entry'], num_patterns_per_array)
             detector = entry.instrument.detector
             detector_pixel_geometry = PixelGeometry(
                 detector.x_pixel_size_m,
@@ -258,17 +241,16 @@ class VelociprobeDiffractionFileReader(DiffractionFileReader):
                 detector.beam_center_x_px,
                 detector.beam_center_y_px,
             )
-
             detector_specific = detector.detector_specific
             detector_extent = ImageExtent(
                 detector_specific.x_pixels_in_detector,
                 detector_specific.y_pixels_in_detector,
             )
             probe_energy_eV = detector_specific.photon_energy_eV  # noqa: N806
+            num_arrays = detector_specific.num_patterns_total // num_patterns_per_array
 
             metadata = DiffractionMetadata(
-                num_patterns_per_array=num_patterns_per_array,
-                num_patterns_total=detector_specific.num_patterns_total,
+                num_patterns_per_array=[num_patterns_per_array] * num_arrays,
                 pattern_dtype=pattern_dtype,
                 detector_distance_m=detector.detector_distance_m,
                 detector_extent=detector_extent,
@@ -278,7 +260,7 @@ class VelociprobeDiffractionFileReader(DiffractionFileReader):
                 probe_energy_eV=probe_energy_eV,
                 file_path=file_path,
             )
-
+            contents_tree = self._tree_builder.build(h5_file)
             dataset = VelociprobeDiffractionDataset(metadata, contents_tree, entry)
 
             # vvv TODO This is a hack; remove when able! vvv

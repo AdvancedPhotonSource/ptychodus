@@ -11,7 +11,7 @@ import yaml
 
 try:
     # xdrlib removed from the standard library in Python 3.13
-    import xdrlib
+    import xdrlib  # type: ignore[import-not-found]
 except ModuleNotFoundError:
     from ._xdrlib import xdrlib  # type: ignore[no-redef]
 
@@ -473,7 +473,7 @@ class MDAPositionFileReader(PositionFileReader):
 
 
 class HXNPositionFileReader(PositionFileReader):
-    MICRONS_TO_METERS: Final[float] = 1.0e-6
+    ONE_MICRON_M: Final[float] = 1.0e-6
 
     def read(self, file_path: Path) -> PositionSequence:
         point_list = list()
@@ -486,8 +486,8 @@ class HXNPositionFileReader(PositionFileReader):
         for idx, (x, y) in enumerate(zip(xarray, yarray)):
             point = ScanPoint(
                 index=idx,
-                position_x_m=float(x) * self.MICRONS_TO_METERS,
-                position_y_m=float(y) * self.MICRONS_TO_METERS,
+                position_x_m=float(x) * self.ONE_MICRON_M,
+                position_y_m=float(y) * self.ONE_MICRON_M,
             )
             point_list.append(point)
 

@@ -3,7 +3,7 @@ import logging
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product, ProductFileReader
 
-from ..patterns import AssembledDiffractionDataset, PatternSizer
+from ..diffraction import AssembledDiffractionDataset, PatternSizer
 from .geometry import ProductGeometry
 from .item import ProductRepositoryItem
 from .metadata import MetadataRepositoryItem
@@ -81,7 +81,7 @@ class ProductRepositoryItemFactory:
             probe_item=probe_item,
             object_item=object_item,
             validator=validator,
-            costs=list(),
+            losses=list(),
         )
 
     def create_from_product(self, product: Product) -> ProductRepositoryItem:
@@ -112,7 +112,7 @@ class ProductRepositoryItemFactory:
             probe_item=probe_item,
             object_item=object_item,
             validator=validator,
-            costs=product.costs,
+            losses=product.losses,
         )
 
     def create_from_settings(self) -> ProductRepositoryItem:
@@ -144,7 +144,7 @@ class ProductRepositoryItemFactory:
             probe_item=probe_item,
             object_item=object_item,
             validator=ProductValidator(self._dataset, scan_item, geometry, probe_item, object_item),
-            costs=list(),
+            losses=list(),
         )
         logger.debug(f'Created product from settings: {item.get_name()}')
         return item
