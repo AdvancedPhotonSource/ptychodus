@@ -42,6 +42,39 @@ class H5DiffractionPatternArray(DiffractionArray):
             item = h5_file[self._data_path]
 
             if isinstance(item, h5py.Dataset):
+                logger.debug(f'Reading "{item.name}"...')
+                logger.debug(f'\tcompression = {item.compression}')
+                logger.debug(f'\tcompression_opts = {item.compression_opts}')
+
+                dataset_id = item.id
+                dataset_creation_properties = dataset_id.get_create_plist()
+                nfilters = dataset_creation_properties.get_nfilters()
+                missing_filter_names: list[str] = []
+
+                if nfilters > 0:
+                    logger.debug('\tfilters = [')
+
+                    for filter_idx in range(nfilters):
+                        filter_ = dataset_creation_properties.get_filter(filter_idx)
+                        filter_code = filter_[0]
+                        flags = filter_[1]
+                        aux_data = filter_[2]
+                        name = filter_[3].decode()
+                        logger.debug(
+                            f'\t\t({filter_idx}) {filter_code=}, {flags=}, {aux_data=}, {name=}'
+                        )
+
+                        if not h5py.h5z.filter_avail(filter_code):
+                            missing_filter_names.append(name)
+
+                    logger.debug('\t]')
+                else:
+                    logger.debug('\tfilters = []')
+
+                if missing_filter_names:
+                    names = ' '.join(missing_filter_names)
+                    raise RuntimeError(f'Missing filters needed to read dataset: {names}!')
+
                 return item[:]
             else:
                 raise ValueError(f'Path {self._file_path}:{self._data_path} is not a dataset!')
@@ -150,7 +183,6 @@ class H5DiffractionFileReader(DiffractionFileReader):
             data = h5_file[self._data_path]
 
             if isinstance(data, h5py.Dataset):
-                logger.debug(f'Dataset compression for "{data.name}" is "{data.compression}".')
                 num_patterns, detector_height, detector_width = data.shape
 
                 metadata = DiffractionMetadata(
