@@ -42,7 +42,7 @@ class H5DiffractionPatternArray(DiffractionArray):
             item = h5_file[self._data_path]
 
             if isinstance(item, h5py.Dataset):
-                return item[()]
+                return item[:]
             else:
                 raise ValueError(f'Path {self._file_path}:{self._data_path} is not a dataset!')
 
@@ -85,7 +85,7 @@ class H5DiffractionFileTreeBuilder:
                 item_details = ''
                 h5_item = h5_group.get(item_name, getlink=True)
 
-                tree_node = parent_item.create_child(list())
+                tree_node = parent_item.create_child([])
 
                 if isinstance(h5_item, h5py.HardLink):
                     item_type = 'Hard Link'
@@ -117,8 +117,12 @@ class H5DiffractionFileTreeBuilder:
                                 else:
                                     item_details = f'SCALAR {value.dtype} = {value}'
                         elif h5_item.size == 1:
-                            value = h5_item[()]
-                            item_details = f'DATASET {value.dtype} = {value}'
+                            try:
+                                value = h5_item[()]
+                            except Exception:
+                                item_details = f'{h5_item.shape} {h5_item.dtype}'
+                            else:
+                                item_details = f'DATASET {value.dtype} = {value}'
                         else:
                             item_details = f'{h5_item.shape} {h5_item.dtype}'
                 elif isinstance(h5_item, h5py.SoftLink):
@@ -142,12 +146,11 @@ class H5DiffractionFileReader(DiffractionFileReader):
 
     def read(self, file_path: Path) -> DiffractionDataset:
         with h5py.File(file_path, 'r') as h5_file:
-            metadata = DiffractionMetadata.create_null(file_path)
             contents_tree = self._tree_builder.build(h5_file)
-
             data = h5_file[self._data_path]
 
             if isinstance(data, h5py.Dataset):
+                logger.debug(f'Dataset compression for "{data.name}" is "{data.compression}".')
                 num_patterns, detector_height, detector_width = data.shape
 
                 metadata = DiffractionMetadata(

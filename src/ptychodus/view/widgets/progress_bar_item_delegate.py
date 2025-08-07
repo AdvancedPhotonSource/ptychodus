@@ -14,7 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 class ProgressBarItemDelegate(QStyledItemDelegate):
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
+    def paint(
+        self, painter: QPainter | None, option: QStyleOptionViewItem, index: QModelIndex
+    ) -> None:
         text = index.data(Qt.ItemDataRole.DisplayRole)
         progress = index.data(Qt.ItemDataRole.UserRole)
 

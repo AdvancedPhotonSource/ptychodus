@@ -236,7 +236,7 @@ class ImageWidget(VisualizationView):
             a = tick / (self._color_legend_num_ticks - 1)
             yield (1.0 - a) * self._color_legend_min_value + a * self._color_legend_max_value
 
-    def drawForeground(self, painter: QPainter, rect: QRectF) -> None:  # noqa: N802
+    def drawForeground(self, painter: QPainter | None, rect: QRectF) -> None:  # noqa: N802
         if not self._is_color_legend_visible:
             return
 
