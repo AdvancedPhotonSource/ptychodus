@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 class ImageItemEvents(QObject):
     rectangle_finished = pyqtSignal(QRectF)
     line_cut_finished = pyqtSignal(QLineF)
+    fourier_finished = pyqtSignal(QRectF)
 
 
 class ImageMouseTool(Enum):
@@ -47,6 +48,7 @@ class ImageMouseTool(Enum):
     RULER_TOOL = auto()
     RECTANGLE_TOOL = auto()
     LINE_CUT_TOOL = auto()
+    FOURIER_TOOL = auto()
 
 
 class ImageItem(QGraphicsPixmapItem):
@@ -56,11 +58,29 @@ class ImageItem(QGraphicsPixmapItem):
         self._status_bar = status_bar
         self._product: VisualizationProduct | None = None
         self._mouse_tool = ImageMouseTool.MOVE_TOOL
+
+        pen = QPen(Qt.PenStyle.DashLine)
+        pen.setCapStyle(Qt.PenCapStyle.FlatCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
+        pen.setCosmetic(True)
+
         self._line_item = QGraphicsLineItem(self)
+        self._line_item.setPen(pen)
         self._line_item.hide()
+        self._line_item.setZValue(100)
+
         self._rectangle_item = QGraphicsRectItem(self)
+        self._rectangle_item.setPen(pen)
         self._rectangle_item.hide()
+        self._rectangle_item.setZValue(100)
         self._rectangle_origin = QPointF()
+
+        self._fourier_item = QGraphicsRectItem(self)
+        self._fourier_item.setPen(pen)
+        self._fourier_item.hide()
+        self._fourier_item.setZValue(100)
+        self._fourier_origin = QPointF()
+
         self.setTransformationMode(Qt.TransformationMode.FastTransformation)
         self.setAcceptedMouseButtons(Qt.MouseButton.LeftButton)
         self.setAcceptHoverEvents(True)
@@ -94,6 +114,7 @@ class ImageItem(QGraphicsPixmapItem):
         self.setPixmap(QPixmap())
 
     def set_mouse_tool(self, mouse_tool: ImageMouseTool) -> None:
+        self._fourier_item.setVisible(mouse_tool == ImageMouseTool.FOURIER_TOOL)
         self._mouse_tool = mouse_tool
 
     def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent) -> None:  # noqa: N802
@@ -133,14 +154,6 @@ class ImageItem(QGraphicsPixmapItem):
         if app:
             app.changeOverrideCursor(cursor)  # type: ignore
 
-    @staticmethod
-    def _create_pen(color: Qt.GlobalColor) -> QPen:
-        pen = QPen(color)
-        pen.setCapStyle(Qt.PenCapStyle.FlatCap)
-        pen.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
-        pen.setCosmetic(True)
-        return pen
-
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:  # noqa: N802
         match self._mouse_tool:
             case ImageMouseTool.MOVE_TOOL:
@@ -149,21 +162,24 @@ class ImageItem(QGraphicsPixmapItem):
                 line = QLineF(event.pos(), event.pos())
                 self.prepareGeometryChange()
                 self._line_item.setLine(line)
-                self._line_item.setPen(self._create_pen(Qt.GlobalColor.cyan))
                 self._line_item.show()
             case ImageMouseTool.RECTANGLE_TOOL:
                 self._rectangle_origin = event.pos()
                 rect = QRectF(self._rectangle_origin, QSizeF())
                 self.prepareGeometryChange()
                 self._rectangle_item.setRect(rect)
-                self._rectangle_item.setPen(self._create_pen(Qt.GlobalColor.cyan))
                 self._rectangle_item.show()
             case ImageMouseTool.LINE_CUT_TOOL:
                 line = QLineF(event.pos(), event.pos())
                 self.prepareGeometryChange()
                 self._line_item.setLine(line)
-                self._line_item.setPen(self._create_pen(Qt.GlobalColor.magenta))
                 self._line_item.show()
+            case ImageMouseTool.FOURIER_TOOL:
+                self._fourier_origin = event.pos()
+                rect = QRectF(self._fourier_origin, QSizeF())
+                self.prepareGeometryChange()
+                self._fourier_item.setRect(rect)
+                self._fourier_item.show()
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:  # noqa: N802
         match self._mouse_tool:
@@ -193,6 +209,14 @@ class ImageItem(QGraphicsPixmapItem):
                 message1 = f'{line.length():.1f} pixels, {line.angle():.2f}\u00b0'
                 message2 = f'{line.dx():.1f} \u00d7 {line.dy():.1f}'
                 self._status_bar.showMessage(f'{message1} ({message2})')
+            case ImageMouseTool.FOURIER_TOOL:
+                rect = QRectF(self._fourier_origin, event.pos()).normalized()
+                center = rect.center()
+                self.prepareGeometryChange()
+                self._fourier_item.setRect(rect)
+                message1 = f'{rect.width():.1f} \u00d7 {rect.height():.1f}'
+                message2 = f'{center.x():.1f}, {center.y():.1f}'
+                self._status_bar.showMessage(f'Rectangle: {message1} (Center: {message2})')
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:  # noqa: N802
         match self._mouse_tool:
@@ -209,6 +233,8 @@ class ImageItem(QGraphicsPixmapItem):
                 self._events.line_cut_finished.emit(self._line_item.line())
                 self._line_item.setLine(QLineF())
                 self._line_item.hide()
+            case ImageMouseTool.FOURIER_TOOL:
+                self._events.fourier_finished.emit(self._fourier_item.rect())
 
 
 class LineCutDialog(QDialog):
@@ -290,12 +316,21 @@ class VisualizationView(QGraphicsView):
 
 
 class VisualizationWidget(QGroupBox):
-    def __init__(self, title: str, parent: QWidget | None = None) -> None:
+    def __init__(
+        self, title: str, parent: QWidget | None = None, *, add_fourier_tool: bool = False
+    ) -> None:
         super().__init__(title, parent)
         self.tool_bar = QToolBar('Tools')
         self.home_action = QAction(QIcon(':/icons/home'), 'Home')
         self.save_action = QAction(QIcon(':/icons/save'), 'Save Image')
         self.autoscale_action = QAction(QIcon(':/icons/autoscale'), 'Autoscale Color Axis')
+
+        self.move_action = QAction(QIcon(':/icons/move'), 'Move')
+        self.ruler_action = QAction(QIcon(':/icons/ruler'), 'Ruler')
+        self.rectangle_action = QAction(QIcon(':/icons/rectangle'), 'Rectangle')
+        self.line_cut_action = QAction(QIcon(':/icons/line-cut'), 'Line-Cut Profile')
+        self.fourier_action = QAction(QIcon(':/icons/fourier'), 'Fourier Transform')
+
         self.visualization_view = VisualizationView()
 
         self.setAlignment(Qt.AlignmentFlag.AlignHCenter)
@@ -305,6 +340,16 @@ class VisualizationWidget(QGroupBox):
         self.tool_bar.addAction(self.home_action)
         self.tool_bar.addAction(self.save_action)
         self.tool_bar.addAction(self.autoscale_action)
+        self.tool_bar.addSeparator()
+        self.tool_bar.addAction(self.move_action)
+        self.tool_bar.addAction(self.ruler_action)
+        self.tool_bar.addAction(self.rectangle_action)
+        self.tool_bar.addAction(self.line_cut_action)
+
+        if add_fourier_tool:
+            self.tool_bar.addAction(self.fourier_action)
+
+        self.tool_bar.addSeparator()
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)

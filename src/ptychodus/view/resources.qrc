@@ -3,6 +3,7 @@
     <qresource prefix="icons">
         <file alias="automate">Font-Awesome-6.7.2/svgs/solid/robot.svg</file>
         <file alias="autoscale">Font-Awesome-6.7.2/svgs/solid/arrows-left-right-to-line.svg</file>
+        <file alias="fourier">Font-Awesome-6.7.2/svgs/solid/f.svg</file>
         <file alias="home">Font-Awesome-6.7.2/svgs/solid/house-chimney.svg</file>
         <file alias="line-cut">Font-Awesome-6.7.2/svgs/solid/chart-line.svg</file>
         <file alias="move">Font-Awesome-6.7.2/svgs/solid/arrows-up-down-left-right.svg</file>

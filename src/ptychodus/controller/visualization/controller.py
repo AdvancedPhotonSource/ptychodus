@@ -32,43 +32,30 @@ class VisualizationController(Observer):
         self,
         engine: VisualizationEngine,
         view: VisualizationView,
-        item: ImageItem,
         status_bar: QStatusBar,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._engine = engine
         self._view = view
-        self._item = item
         self._status_bar = status_bar
         self._file_dialog_factory = file_dialog_factory
         self._line_cut_dialog = LineCutDialog(view)
         self._histogram_dialog = HistogramDialog(view)
 
-    @classmethod
-    def create_instance(
-        cls,
-        engine: VisualizationEngine,
-        view: VisualizationView,
-        status_bar: QStatusBar,
-        file_dialog_factory: FileDialogFactory,
-    ) -> VisualizationController:
         item_events = ImageItemEvents()
-        item = ImageItem(item_events, status_bar)
-        controller = cls(engine, view, item, status_bar, file_dialog_factory)
-        engine.add_observer(controller)
+        item_events.line_cut_finished.connect(self._analyze_line_cut)
+        item_events.rectangle_finished.connect(self._analyze_region)
 
-        item_events.line_cut_finished.connect(controller._analyze_line_cut)
-        item_events.rectangle_finished.connect(controller._analyze_region)
+        self._item = ImageItem(item_events, status_bar)
+        engine.add_observer(self)
 
         scene = QGraphicsScene()
-        scene.addItem(item)
+        scene.addItem(self._item)
         view.setScene(scene)
 
         view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-
-        return controller
 
     def set_array(
         self,

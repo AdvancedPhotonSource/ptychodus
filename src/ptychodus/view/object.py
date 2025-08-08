@@ -49,7 +49,7 @@ class FourierRingCorrelationDialog(QDialog):
 class FourierAnalysisDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.real_space_widget = VisualizationWidget('Real Space')
+        self.real_space_widget = VisualizationWidget('Real Space', add_fourier_tool=True)
         self.reciprocal_space_widget = VisualizationWidget('Reciprocal Space')
         self.status_bar = QStatusBar()
 
