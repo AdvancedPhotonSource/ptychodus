@@ -4,12 +4,13 @@ from typing import Any
 import logging
 
 from PyQt5.QtCore import (
-    Qt,
     QAbstractTableModel,
     QModelIndex,
     QObject,
     QSortFilterProxyModel,
+    Qt,
 )
+from PyQt5.QtGui import QBrush
 from PyQt5.QtWidgets import QAbstractItemView, QAction
 
 from ptychodus.api.product import LossValue
@@ -93,6 +94,9 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                     case 6:
                         product = item.get_product()
                         return f'{product.nbytes / BYTES_PER_MEGABYTE:.2f}'
+            elif role == Qt.ItemDataRole.BackgroundRole: # FIXME test
+                if index.flags() & Qt.ItemFlag.ItemIsEditable:
+                    return QBrush(Qt.GlobalColor.lightGray)
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
         if index.isValid() and role == Qt.ItemDataRole.EditRole:

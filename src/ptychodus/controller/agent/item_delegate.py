@@ -65,7 +65,9 @@ class ChatBubbleItemDelegate(QStyledItemDelegate):
 
         return doc
 
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
+    def paint(
+        self, painter: QPainter | None, option: QStyleOptionViewItem, index: QModelIndex
+    ) -> None:
         style = option.widget.style() if option.widget else QApplication.style()
         doc = self._create_text_document(option, index)
         metrics = BubbleMetrics.from_document(doc)

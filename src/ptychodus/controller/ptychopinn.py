@@ -20,7 +20,7 @@ class PowerTwoSpinBox(QSpinBox):
         elif steps > 0:
             self.setValue(self.value() * (1 << steps))
 
-    def validate(self, input: str, pos: int) -> tuple[QValidator.State, str, int]:
+    def validate(self, input: str | None, pos: int) -> tuple[QValidator.State, str, int]:
         try:
             value = int(input)
         except ValueError:

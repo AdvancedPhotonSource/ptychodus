@@ -151,8 +151,6 @@ class ArrayLoader:
                 processed_array = processor(task.array)
             except FileNotFoundError:
                 logger.warning(f'File not found for array index={task.index}.')
-            except OSError:
-                logger.error(f'OS error while reading array index={task.index}.')
             except Exception:
                 logger.exception(f'Error while loading array index={task.index}!')
             else:

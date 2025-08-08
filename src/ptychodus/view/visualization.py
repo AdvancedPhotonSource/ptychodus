@@ -27,7 +27,7 @@ from PyQt5.QtWidgets import (
 )
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
 from ptychodus.api.visualization import VisualizationProduct
@@ -117,7 +117,7 @@ class ImageItem(QGraphicsPixmapItem):
         self._fourier_item.setVisible(mouse_tool == ImageMouseTool.FOURIER_TOOL)
         self._mouse_tool = mouse_tool
 
-    def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent) -> None:  # noqa: N802
+    def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent | None) -> None:  # noqa: N802
         app = QApplication.instance()
 
         if app:
@@ -130,7 +130,7 @@ class ImageItem(QGraphicsPixmapItem):
 
         super().hoverEnterEvent(event)
 
-    def hoverMoveEvent(self, event: QGraphicsSceneHoverEvent) -> None:  # noqa: N802
+    def hoverMoveEvent(self, event: QGraphicsSceneHoverEvent | None) -> None:  # noqa: N802
         pos = event.pos()
 
         if self._product is not None:
@@ -139,7 +139,7 @@ class ImageItem(QGraphicsPixmapItem):
 
         super().hoverMoveEvent(event)
 
-    def hoverLeaveEvent(self, event: QGraphicsSceneHoverEvent) -> None:  # noqa: N802
+    def hoverLeaveEvent(self, event: QGraphicsSceneHoverEvent | None) -> None:  # noqa: N802
         app = QApplication.instance()
 
         if app:
@@ -154,7 +154,7 @@ class ImageItem(QGraphicsPixmapItem):
         if app:
             app.changeOverrideCursor(cursor)  # type: ignore
 
-    def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:  # noqa: N802
+    def mousePressEvent(self, event: QGraphicsSceneMouseEvent | None) -> None:  # noqa: N802
         match self._mouse_tool:
             case ImageMouseTool.MOVE_TOOL:
                 self._change_override_cursor(Qt.CursorShape.ClosedHandCursor)
@@ -181,7 +181,7 @@ class ImageItem(QGraphicsPixmapItem):
                 self._fourier_item.setRect(rect)
                 self._fourier_item.show()
 
-    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:  # noqa: N802
+    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent | None) -> None:  # noqa: N802
         match self._mouse_tool:
             case ImageMouseTool.MOVE_TOOL:
                 self.setPos(self.scenePos() + event.scenePos() - event.lastScenePos())
@@ -218,7 +218,7 @@ class ImageItem(QGraphicsPixmapItem):
                 message2 = f'{center.x():.1f}, {center.y():.1f}'
                 self._status_bar.showMessage(f'Rectangle: {message1} (Center: {message2})')
 
-    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:  # noqa: N802
+    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent | None) -> None:  # noqa: N802
         match self._mouse_tool:
             case ImageMouseTool.MOVE_TOOL:
                 self._change_override_cursor(Qt.CursorShape.OpenHandCursor)
@@ -302,7 +302,7 @@ class HistogramDialog(QDialog):
 
 
 class VisualizationView(QGraphicsView):
-    def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802
+    def wheelEvent(self, event: QWheelEvent | None) -> None:  # noqa: N802
         old_position = self.mapToScene(event.pos())
 
         zoom_base = 1.25

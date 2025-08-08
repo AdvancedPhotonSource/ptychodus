@@ -23,7 +23,9 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
         self._model = model
         self._paint_combo_box = False
 
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
+    def paint(
+        self, painter: QPainter | None, option: QStyleOptionViewItem, index: QModelIndex
+    ) -> None:
         if self._paint_combo_box and index.flags() & Qt.ItemFlag.ItemIsEditable:
             opt = QStyleOptionComboBox()
             opt.rect = option.rect
@@ -34,14 +36,14 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
             super().paint(painter, option, index)
 
     def createEditor(  # noqa: N802
-        self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex
+        self, parent: QWidget | None, option: QStyleOptionViewItem, index: QModelIndex
     ) -> QWidget:
         combo_box = QComboBox(parent)
         combo_box.activated.connect(self._commit_data_and_close_editor)
         combo_box.setModel(self._model)
         return combo_box
 
-    def setEditorData(self, editor: QWidget, index: QModelIndex) -> None:  # noqa: N802
+    def setEditorData(self, editor: QWidget | None, index: QModelIndex) -> None:  # noqa: N802
         if isinstance(editor, QComboBox):
             current_text = str(index.data(Qt.ItemDataRole.EditRole))
             combo_box_index = editor.findText(current_text)
@@ -53,14 +55,16 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
         else:
             super().setEditorData(editor, index)
 
-    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex) -> None:  # noqa: N802
+    def setModelData(  # noqa: N802
+        self, editor: QWidget | None, model: QAbstractItemModel | None, index: QModelIndex
+    ) -> None:
         if isinstance(editor, QComboBox):
             model.setData(index, editor.currentText(), Qt.ItemDataRole.EditRole)
         else:
             super().setModelData(editor, model, index)
 
     def updateEditorGeometry(  # noqa: N802
-        self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex
+        self, editor: QWidget | None, option: QStyleOptionViewItem, index: QModelIndex
     ) -> None:
         editor.setGeometry(option.rect)
 

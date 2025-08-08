@@ -7,7 +7,6 @@ numpy
 psutil
 pyqt
 pyqt-stubs
-pytables
 pytest
 python>=3.10
 ruff
