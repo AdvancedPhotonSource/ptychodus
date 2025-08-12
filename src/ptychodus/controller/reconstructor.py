@@ -147,9 +147,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
         try:
             output_product_index = self._presenter.reconstruct(input_product_index)
-        except Exception as err:
-            logger.exception(err)
-            ExceptionDialog.show_exception('Reconstructor', err)
+        except Exception as exc:
+            logger.exception(exc)
+            ExceptionDialog.show_exception('Reconstructor', exc)
         else:
             self._view.parameters_view.product_combo_box.setCurrentIndex(output_product_index)
             self._view.progress_dialog.show()
@@ -162,9 +162,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
         try:
             self._presenter.reconstruct_split(input_product_index)
-        except Exception as err:
-            logger.exception(err)
-            ExceptionDialog.show_exception('Split Reconstructor', err)
+        except Exception as exc:
+            logger.exception(exc)
+            ExceptionDialog.show_exception('Split Reconstructor', exc)
 
         self._view.progress_dialog.show()
 
@@ -176,9 +176,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
         try:
             self._presenter.reconstruct_transformed(input_product_index)
-        except Exception as err:
-            logger.exception(err)
-            ExceptionDialog.show_exception('Split Reconstructor', err)
+        except Exception as exc:
+            logger.exception(exc)
+            ExceptionDialog.show_exception('Split Reconstructor', exc)
 
         self._view.progress_dialog.show()
 
@@ -191,9 +191,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         if file_path:
             try:
                 self._presenter.open_model(file_path)
-            except Exception as err:
-                logger.exception(err)
-                ExceptionDialog.show_exception('Model Reader', err)
+            except Exception as exc:
+                logger.exception(exc)
+                ExceptionDialog.show_exception('Model Reader', exc)
 
     def _save_model(self) -> None:
         name_filter = self._presenter.get_model_file_filter()
@@ -204,9 +204,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         if file_path:
             try:
                 self._presenter.save_model(file_path)
-            except Exception as err:
-                logger.exception(err)
-                ExceptionDialog.show_exception('Model Writer', err)
+            except Exception as exc:
+                logger.exception(exc)
+                ExceptionDialog.show_exception('Model Writer', exc)
 
     def _export_training_data(self) -> None:
         input_product_index = self._view.parameters_view.product_combo_box.currentIndex()
@@ -225,9 +225,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         if file_path:
             try:
                 self._presenter.export_training_data(file_path, input_product_index)
-            except Exception as err:
-                logger.exception(err)
-                ExceptionDialog.show_exception('Training Data Writer', err)
+            except Exception as exc:
+                logger.exception(exc)
+                ExceptionDialog.show_exception('Training Data Writer', exc)
 
     def _train(self) -> None:
         data_path = self._file_dialog_factory.get_existing_directory_path(
@@ -239,9 +239,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         if data_path:
             try:
                 self._presenter.train(data_path)
-            except Exception as err:
-                logger.exception(err)
-                ExceptionDialog.show_exception('Trainer', err)
+            except Exception as exc:
+                logger.exception(exc)
+                ExceptionDialog.show_exception('Trainer', exc)
 
     def _redraw_plot(self) -> None:
         product_index = self._view.parameters_view.product_combo_box.currentIndex()
@@ -252,8 +252,8 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
         try:
             item = self._product_repository[product_index]
-        except IndexError as err:
-            logger.exception(err)
+        except IndexError as exc:
+            logger.exception(exc)
             return
 
         epoch = [loss.epoch for loss in item.get_losses()]

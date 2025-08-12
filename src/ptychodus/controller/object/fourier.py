@@ -19,20 +19,23 @@ class FourierAnalysisViewController(Observer):
     def __init__(
         self,
         analyzer: FourierAnalyzer,
-        engine: VisualizationEngine,
+        real_space_engine: VisualizationEngine,
+        reciprocal_space_engine: VisualizationEngine,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._analyzer = analyzer
-        self._engine = engine
         self._dialog = FourierAnalysisDialog()
         self._dialog.setWindowTitle('Fourier Analysis')
 
         self._real_space_widget_controller = VisualizationWidgetController(
-            engine, self._dialog.real_space_widget, self._dialog.status_bar, file_dialog_factory
+            real_space_engine,
+            self._dialog.real_space_widget,
+            self._dialog.status_bar,
+            file_dialog_factory,
         )
         self._reciprocal_space_widget_controller = VisualizationWidgetController(
-            engine,
+            reciprocal_space_engine,
             self._dialog.reciprocal_space_widget,
             self._dialog.status_bar,
             file_dialog_factory,
@@ -48,7 +51,7 @@ class FourierAnalysisViewController(Observer):
         self._analyzer.set_product(item_index)
         self._dialog.open()
 
-    def _analyze_fourier(self, rect: QRectF) -> None: # FIXME test
+    def _analyze_fourier(self, rect: QRectF) -> None:
         if rect.isEmpty():
             logger.debug('QRectF is empty!')
             return
@@ -60,14 +63,18 @@ class FourierAnalysisViewController(Observer):
             height=rect.height(),
         )
 
-        self._analyzer.analyze_roi(box)
+        try:
+            self._analyzer.analyze_roi(box)
+        except ValueError as exc:
+            logger.exception(exc)
+            ExceptionDialog.show_exception('Fourier Analysis', exc)
 
     def _sync_model_to_view(self) -> None:
         try:
             object_ = self._analyzer.get_object()
-        except Exception as err:
-            logger.exception(err)
-            ExceptionDialog.show_exception('Fourier Analysis', err)
+        except Exception as exc:
+            logger.exception(exc)
+            ExceptionDialog.show_exception('Fourier Analysis', exc)
         else:
             self._real_space_widget_controller.set_array(
                 object_.get_layer(0), object_.get_pixel_geometry()
@@ -77,9 +84,9 @@ class FourierAnalysisViewController(Observer):
             result = self._analyzer.get_result()
         except ValueError:
             self._reciprocal_space_widget_controller.clear_array()
-        except Exception as err:
-            logger.exception(err)
-            ExceptionDialog.show_exception('Fourier Analysis', err)
+        except Exception as exc:
+            logger.exception(exc)
+            ExceptionDialog.show_exception('Fourier Analysis', exc)
         else:
             self._reciprocal_space_widget_controller.set_array(
                 result.transformed_roi, result.pixel_geometry

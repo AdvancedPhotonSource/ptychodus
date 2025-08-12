@@ -94,12 +94,20 @@ class Box2D:
         return self.x
 
     @property
+    def x_center(self) -> float:
+        return self.x + self.width / 2
+
+    @property
     def x_end(self) -> float:
         return self.x + self.width
 
     @property
     def y_begin(self) -> float:
         return self.y
+
+    @property
+    def y_center(self) -> float:
+        return self.y + self.height / 2
 
     @property
     def y_end(self) -> float:

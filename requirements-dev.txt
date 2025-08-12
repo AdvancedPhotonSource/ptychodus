@@ -6,7 +6,6 @@ mypy
 numpy
 psutil
 pyqt
-pyqt-stubs
 pytest
 python>=3.10
 ruff

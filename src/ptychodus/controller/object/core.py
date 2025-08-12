@@ -31,7 +31,8 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         image_controller: ImageController,
         correlator: FourierRingCorrelator,
         fourier_analyzer: FourierAnalyzer,
-        fourier_visualization_engine: VisualizationEngine,
+        fourier_real_space_visualization_engine: VisualizationEngine,
+        fourier_reciprocal_space_visualization_engine: VisualizationEngine,
         xmcd_analyzer: XMCDAnalyzer,
         xmcd_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
@@ -53,7 +54,8 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         )
         self._fourier_view_controller = FourierAnalysisViewController(
             fourier_analyzer,
-            fourier_visualization_engine,
+            fourier_real_space_visualization_engine,
+            fourier_reciprocal_space_visualization_engine,
             file_dialog_factory,
         )
         self._xmcd_view_controller = XMCDViewController(
