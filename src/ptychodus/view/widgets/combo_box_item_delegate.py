@@ -26,6 +26,9 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
     def paint(
         self, painter: QPainter | None, option: QStyleOptionViewItem, index: QModelIndex
     ) -> None:
+        if painter is None:
+            return
+
         if self._paint_combo_box and index.flags() & Qt.ItemFlag.ItemIsEditable:
             opt = QStyleOptionComboBox()
             opt.rect = option.rect
@@ -44,6 +47,9 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
         return combo_box
 
     def setEditorData(self, editor: QWidget | None, index: QModelIndex) -> None:  # noqa: N802
+        if editor is None:
+            return
+
         if isinstance(editor, QComboBox):
             current_text = str(index.data(Qt.ItemDataRole.EditRole))
             combo_box_index = editor.findText(current_text)
@@ -58,6 +64,9 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
     def setModelData(  # noqa: N802
         self, editor: QWidget | None, model: QAbstractItemModel | None, index: QModelIndex
     ) -> None:
+        if editor is None or model is None:
+            return
+
         if isinstance(editor, QComboBox):
             model.setData(index, editor.currentText(), Qt.ItemDataRole.EditRole)
         else:
@@ -66,6 +75,9 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
     def updateEditorGeometry(  # noqa: N802
         self, editor: QWidget | None, option: QStyleOptionViewItem, index: QModelIndex
     ) -> None:
+        if editor is None:
+            return
+
         editor.setGeometry(option.rect)
 
     def _commit_data_and_close_editor(self) -> None:

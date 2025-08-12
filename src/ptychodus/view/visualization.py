@@ -37,7 +37,7 @@ from .widgets import DecimalLineEdit
 logger = logging.getLogger(__name__)
 
 
-class ImageItemEvents(QObject):
+class ImageItemSignals(QObject):
     rectangle_finished = pyqtSignal(QRectF)
     line_cut_finished = pyqtSignal(QLineF)
     fourier_finished = pyqtSignal(QRectF)
@@ -52,9 +52,9 @@ class ImageMouseTool(Enum):
 
 
 class ImageItem(QGraphicsPixmapItem):
-    def __init__(self, events: ImageItemEvents, status_bar: QStatusBar) -> None:
+    def __init__(self, signals: ImageItemSignals, status_bar: QStatusBar) -> None:
         super().__init__()
-        self._events = events
+        self._signals = signals
         self._status_bar = status_bar
         self._product: VisualizationProduct | None = None
         self._mouse_tool = ImageMouseTool.MOVE_TOOL
@@ -84,6 +84,9 @@ class ImageItem(QGraphicsPixmapItem):
         self.setTransformationMode(Qt.TransformationMode.FastTransformation)
         self.setAcceptedMouseButtons(Qt.MouseButton.LeftButton)
         self.setAcceptHoverEvents(True)
+
+    def get_signals(self) -> ImageItemSignals:
+        return self._signals
 
     def get_product(self) -> VisualizationProduct | None:
         return self._product
@@ -118,6 +121,9 @@ class ImageItem(QGraphicsPixmapItem):
         self._mouse_tool = mouse_tool
 
     def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent | None) -> None:  # noqa: N802
+        if event is None:
+            return
+
         app = QApplication.instance()
 
         if app:
@@ -131,6 +137,9 @@ class ImageItem(QGraphicsPixmapItem):
         super().hoverEnterEvent(event)
 
     def hoverMoveEvent(self, event: QGraphicsSceneHoverEvent | None) -> None:  # noqa: N802
+        if event is None:
+            return
+
         pos = event.pos()
 
         if self._product is not None:
@@ -140,6 +149,9 @@ class ImageItem(QGraphicsPixmapItem):
         super().hoverMoveEvent(event)
 
     def hoverLeaveEvent(self, event: QGraphicsSceneHoverEvent | None) -> None:  # noqa: N802
+        if event is None:
+            return
+
         app = QApplication.instance()
 
         if app:
@@ -155,6 +167,9 @@ class ImageItem(QGraphicsPixmapItem):
             app.changeOverrideCursor(cursor)  # type: ignore
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent | None) -> None:  # noqa: N802
+        if event is None:
+            return
+
         match self._mouse_tool:
             case ImageMouseTool.MOVE_TOOL:
                 self._change_override_cursor(Qt.CursorShape.ClosedHandCursor)
@@ -182,6 +197,9 @@ class ImageItem(QGraphicsPixmapItem):
                 self._fourier_item.show()
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent | None) -> None:  # noqa: N802
+        if event is None:
+            return
+
         match self._mouse_tool:
             case ImageMouseTool.MOVE_TOOL:
                 self.setPos(self.scenePos() + event.scenePos() - event.lastScenePos())
@@ -226,15 +244,15 @@ class ImageItem(QGraphicsPixmapItem):
                 self._line_item.setLine(QLineF())
                 self._line_item.hide()
             case ImageMouseTool.RECTANGLE_TOOL:
-                self._events.rectangle_finished.emit(self._rectangle_item.rect())
+                self._signals.rectangle_finished.emit(self._rectangle_item.rect())
                 self._rectangle_item.setRect(QRectF())
                 self._rectangle_item.hide()
             case ImageMouseTool.LINE_CUT_TOOL:
-                self._events.line_cut_finished.emit(self._line_item.line())
+                self._signals.line_cut_finished.emit(self._line_item.line())
                 self._line_item.setLine(QLineF())
                 self._line_item.hide()
             case ImageMouseTool.FOURIER_TOOL:
-                self._events.fourier_finished.emit(self._fourier_item.rect())
+                self._signals.fourier_finished.emit(self._fourier_item.rect())
 
 
 class LineCutDialog(QDialog):
@@ -303,6 +321,9 @@ class HistogramDialog(QDialog):
 
 class VisualizationView(QGraphicsView):
     def wheelEvent(self, event: QWheelEvent | None) -> None:  # noqa: N802
+        if event is None:
+            return
+
         old_position = self.mapToScene(event.pos())
 
         zoom_base = 1.25

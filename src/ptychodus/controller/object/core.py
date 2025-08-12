@@ -97,7 +97,6 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
 
         fourier_action = view.button_box.analyze_menu.addAction('Fourier Analysis...')
         fourier_action.triggered.connect(self._analyze_fourier)
-        fourier_action.setVisible(is_developer_mode_enabled)
 
         xmcd_action = view.button_box.analyze_menu.addAction('XMCD...')
         xmcd_action.triggered.connect(self._analyze_xmcd)

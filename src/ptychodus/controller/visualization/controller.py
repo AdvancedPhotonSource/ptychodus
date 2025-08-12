@@ -14,7 +14,7 @@ from ...model.visualization import VisualizationEngine
 from ...view.visualization import (
     HistogramDialog,
     ImageItem,
-    ImageItemEvents,
+    ImageItemSignals,
     ImageMouseTool,
     LineCutDialog,
     VisualizationView,
@@ -43,11 +43,11 @@ class VisualizationController(Observer):
         self._line_cut_dialog = LineCutDialog(view)
         self._histogram_dialog = HistogramDialog(view)
 
-        item_events = ImageItemEvents()
-        item_events.line_cut_finished.connect(self._analyze_line_cut)
-        item_events.rectangle_finished.connect(self._analyze_region)
+        item_signals = ImageItemSignals()
+        item_signals.line_cut_finished.connect(self._analyze_line_cut)
+        item_signals.rectangle_finished.connect(self._analyze_region)
 
-        self._item = ImageItem(item_events, status_bar)
+        self._item = ImageItem(item_signals, status_bar)
         engine.add_observer(self)
 
         scene = QGraphicsScene()
@@ -56,6 +56,9 @@ class VisualizationController(Observer):
 
         view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+    def get_item(self) -> ImageItem:
+        return self._item
 
     def set_array(
         self,

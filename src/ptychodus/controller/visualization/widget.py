@@ -6,7 +6,7 @@ from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.typing import NumberArrayType
 
 from ...model.visualization import VisualizationEngine
-from ...view.visualization import ImageMouseTool, VisualizationWidget
+from ...view.visualization import ImageItem, ImageMouseTool, VisualizationWidget
 from ..data import FileDialogFactory
 from .controller import VisualizationController
 
@@ -51,6 +51,9 @@ class VisualizationWidgetController:
         self._mouse_tool_action_group.addAction(widget.line_cut_action)
         self._mouse_tool_action_group.addAction(widget.fourier_action)
         self._mouse_tool_action_group.triggered.connect(self._set_mouse_tool)
+
+    def get_item(self) -> ImageItem:
+        return self._controller.get_item()
 
     def _auto_display_range(self) -> None:
         self._controller.rerender_image(autoscale_color_axis=True)

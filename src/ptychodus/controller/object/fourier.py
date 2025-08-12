@@ -1,5 +1,8 @@
 import logging
 
+from PyQt5.QtCore import QRectF
+
+from ptychodus.api.geometry import Box2D
 from ptychodus.api.observer import Observable, Observer
 
 from ...model.analysis import FourierAnalyzer
@@ -22,12 +25,11 @@ class FourierAnalysisViewController(Observer):
         super().__init__()
         self._analyzer = analyzer
         self._engine = engine
-
         self._dialog = FourierAnalysisDialog()
         self._dialog.setWindowTitle('Fourier Analysis')
 
         self._real_space_widget_controller = VisualizationWidgetController(
-            engine, self._dialog.real_space_widget, self._dialog.status_bar, FileDialogFactory()
+            engine, self._dialog.real_space_widget, self._dialog.status_bar, file_dialog_factory
         )
         self._reciprocal_space_widget_controller = VisualizationWidgetController(
             engine,
@@ -35,14 +37,30 @@ class FourierAnalysisViewController(Observer):
             self._dialog.status_bar,
             file_dialog_factory,
         )
+        self._dialog.real_space_widget
 
-        # FIXME call from vis tool: self._analyzer.analyze_roi(bounding_box)
+        item_signals = self._real_space_widget_controller.get_item().get_signals()
+        item_signals.fourier_finished.connect(self._analyze_fourier)
 
         analyzer.add_observer(self)
 
     def analyze(self, item_index: int) -> None:
         self._analyzer.set_product(item_index)
         self._dialog.open()
+
+    def _analyze_fourier(self, rect: QRectF) -> None: # FIXME test
+        if rect.isEmpty():
+            logger.debug('QRectF is empty!')
+            return
+
+        box = Box2D(
+            x=rect.x(),
+            y=rect.y(),
+            width=rect.width(),
+            height=rect.height(),
+        )
+
+        self._analyzer.analyze_roi(box)
 
     def _sync_model_to_view(self) -> None:
         try:

@@ -17,6 +17,9 @@ class ProgressBarItemDelegate(QStyledItemDelegate):
     def paint(
         self, painter: QPainter | None, option: QStyleOptionViewItem, index: QModelIndex
     ) -> None:
+        if painter is None:
+            return
+
         text = index.data(Qt.ItemDataRole.DisplayRole)
         progress = index.data(Qt.ItemDataRole.UserRole)
 
