@@ -96,7 +96,7 @@ class PtychoShelvesProductFileReader(ProductFileReader):
             center=None,
             layer_spacing_m=layer_spacing_m,
         )
-        losses = outputs_struct['fourier_error_out']
+        losses = outputs_struct['fourier_error_out']  # FIXME
 
         return Product(
             metadata=metadata,

@@ -10,7 +10,7 @@ from PyQt5.QtCore import (
     QSortFilterProxyModel,
     Qt,
 )
-from PyQt5.QtGui import QBrush
+from PyQt5.QtGui import QBrush, QPalette
 from PyQt5.QtWidgets import QAbstractItemView, QAction
 
 from ptychodus.api.product import LossValue
@@ -36,9 +36,15 @@ logger = logging.getLogger(__name__)
 
 
 class ProductRepositoryTableModel(QAbstractTableModel):
-    def __init__(self, repository: ProductRepository, parent: QObject | None = None) -> None:
+    def __init__(
+        self,
+        repository: ProductRepository,
+        editable_item_brush: QBrush,
+        parent: QObject | None = None,
+    ) -> None:
         super().__init__(parent)
         self._repository = repository
+        self._editable_item_brush = editable_item_brush
         self._header = [
             'Name',
             'Detector-Object\nDistance [m]',
@@ -96,7 +102,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                         return f'{product.nbytes / BYTES_PER_MEGABYTE:.2f}'
             elif role == Qt.ItemDataRole.BackgroundRole:  # FIXME test
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
-                    return QBrush(Qt.GlobalColor.lightGray)
+                    return self._editable_item_brush
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
@@ -182,7 +188,12 @@ class ProductController(ProductRepositoryObserver):
         save_file_action = view.button_box.save_menu.addAction('Save File...')
         sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
 
-        table_model = ProductRepositoryTableModel(repository)
+        #table_view_palette = view.table_view.palette()
+        #alternate_base_color = table_view_palette.color(QPalette.AlternateBase)
+        #editable_item_brush = QBrush(alternate_base_color)
+        editable_item_brush = QBrush(Qt.GlobalColor.lightGray) # FIXME
+
+        table_model = ProductRepositoryTableModel(repository, editable_item_brush)
         table_proxy_model = QSortFilterProxyModel()
         table_proxy_model.setSourceModel(table_model)
 

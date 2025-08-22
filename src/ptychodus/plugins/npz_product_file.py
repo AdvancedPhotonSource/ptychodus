@@ -135,7 +135,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
             positions=PositionSequence(point_list),
             probes=probe,
             object_=object_,
-            losses=losses,
+            losses=losses,  # FIXME
         )
 
     def write(self, file_path: Path, product: Product) -> None:
@@ -185,7 +185,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
         contents[self.OBJECT_PIXEL_HEIGHT] = object_geometry.pixel_height_m
         contents[self.OBJECT_LAYER_SPACING] = object_.layer_spacing_m
 
-        contents[self.LOSSES_ARRAY] = product.losses
+        contents[self.LOSSES_ARRAY] = product.losses  # FIXME
 
         numpy.savez(file_path, **contents)
 
