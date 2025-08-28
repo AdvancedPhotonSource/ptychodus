@@ -209,7 +209,10 @@ class FluorescenceParametersView(QGroupBox):
         self.enhance_button = QPushButton('Enhance')
         self.save_button = QPushButton('Save Enhanced Dataset')
 
-        self.stacked_widget.layout().setContentsMargins(0, 0, 0, 0)
+        stacked_widget_layout = self.stacked_widget.layout()
+
+        if stacked_widget_layout is not None:
+            stacked_widget_layout.setContentsMargins(0, 0, 0, 0)
 
         layout = QFormLayout()
         layout.addRow(self.open_button)

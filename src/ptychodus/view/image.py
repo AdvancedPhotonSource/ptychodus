@@ -224,11 +224,17 @@ class ImageWidget(VisualizationView):
 
         self._color_legend_stop_points = color_legend_stop_points
         self._is_color_legend_cyclic = is_cyclic
-        self.scene().update()
+        scene = self.scene()
+
+        if scene is not None:
+            scene.update()
 
     def set_color_legend_visible(self, visible: bool) -> None:
         self._is_color_legend_visible = visible
-        self.scene().update()
+        scene = self.scene()
+
+        if scene is not None:
+            scene.update()
 
     @property
     def _color_legend_ticks(self) -> Iterator[float]:
@@ -250,7 +256,12 @@ class ImageWidget(VisualizationView):
         dx = font_metrics.horizontalAdvance('m')
         dy = font_metrics.lineSpacing()
 
-        widget_rect = self.viewport().rect()
+        viewport = self.viewport()
+
+        if viewport is None:
+            return
+
+        widget_rect = viewport.rect()
 
         if self._is_color_legend_cyclic:
             legend_diameter = 6 * dx

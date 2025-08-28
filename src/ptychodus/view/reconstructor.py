@@ -72,7 +72,11 @@ class ReconstructorView(QWidget):
         self.parameters_view = ReconstructorParametersView()
 
         self.stacked_widget = QStackedWidget()
-        self.stacked_widget.layout().setContentsMargins(0, 0, 0, 0)
+
+        stacked_widget_layout = self.stacked_widget.layout()
+
+        if stacked_widget_layout is not None:
+            stacked_widget_layout.setContentsMargins(0, 0, 0, 0)
 
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)

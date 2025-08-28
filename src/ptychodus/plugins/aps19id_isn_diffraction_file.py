@@ -62,7 +62,7 @@ class ISNDiffractionFileReader(DiffractionFileReader):
                     h5_item = ptycho.get(name, getlink=True)
 
                     if isinstance(h5_item, h5py.ExternalLink):
-                        data_path = '/entry/data/data'  # TODO str(h5_item.path)
+                        data_path = '/entry/data/data'  # FIXME str(h5_item.path)
                         array = H5DiffractionPatternArray(
                             label=name,
                             indexes=numpy.arange(num_exposures_per_image) + offset,

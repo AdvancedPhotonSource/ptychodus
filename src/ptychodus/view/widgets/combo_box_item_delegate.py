@@ -33,8 +33,11 @@ class ComboBoxItemDelegate(QStyledItemDelegate):
             opt = QStyleOptionComboBox()
             opt.rect = option.rect
             opt.currentText = index.data(Qt.ItemDataRole.DisplayRole)
-            QApplication.style().drawComplexControl(QStyle.ComplexControl.CC_ComboBox, opt, painter)
-            QApplication.style().drawControl(QStyle.ControlElement.CE_ComboBoxLabel, opt, painter)
+            style = QApplication.style()
+
+            if style is not None:
+                style.drawComplexControl(QStyle.ComplexControl.CC_ComboBox, opt, painter)
+                style.drawControl(QStyle.ControlElement.CE_ComboBoxLabel, opt, painter)
         else:
             super().paint(painter, option, index)
 

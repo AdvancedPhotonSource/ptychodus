@@ -33,4 +33,7 @@ class ProgressBarItemDelegate(QStyledItemDelegate):
             opt.progress = int(progress)
             opt.text = text
             opt.textVisible = True
-            QApplication.style().drawControl(QStyle.ControlElement.CE_ProgressBar, opt, painter)
+            style = QApplication.style()
+
+            if style is not None:
+                style.drawControl(QStyle.ControlElement.CE_ProgressBar, opt, painter)

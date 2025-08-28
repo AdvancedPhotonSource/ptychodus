@@ -14,6 +14,7 @@ from ptychodus.api.product import (
     ProductFileWriter,
     ProductMetadata,
 )
+from ptychodus.api.reconstructor import LossValue
 from ptychodus.api.scan import PositionSequence, ScanPoint
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,8 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
     OBJECT_PIXEL_HEIGHT: Final[str] = 'object_pixel_height_m'
     OBJECT_PIXEL_WIDTH: Final[str] = 'object_pixel_width_m'
 
-    LOSSES_ARRAY: Final[str] = 'losses'
+    LOSS_EPOCHS: Final[str] = 'loss_epochs'
+    LOSS_VALUES: Final[str] = 'loss_values'
 
     def read(self, file_path: Path) -> Product:
         with numpy.load(file_path) as npz_file:
@@ -120,29 +122,40 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
             )
 
             try:
-                losses = npz_file[self.LOSSES_ARRAY]
+                loss_values = npz_file[self.LOSS_VALUES]
             except KeyError:
-                losses = npz_file['costs']
+                loss_values = npz_file['costs']
 
-        point_list: list[ScanPoint] = list()
+            try:
+                loss_epochs = npz_file[self.LOSS_EPOCHS]
+            except KeyError:
+                loss_epochs = numpy.arange(len(loss_values))
+
+        point_list: list[ScanPoint] = []
 
         for idx, x_m, y_m in zip(scan_indexes, scan_x_m, scan_y_m):
             point = ScanPoint(idx, x_m, y_m)
             point_list.append(point)
+
+        losses: list[LossValue] = []
+
+        for epoch, value in zip(loss_epochs, loss_values):
+            loss = LossValue(epoch, value)
+            losses.append(loss)
 
         return Product(
             metadata=metadata,
             positions=PositionSequence(point_list),
             probes=probe,
             object_=object_,
-            losses=losses,  # FIXME
+            losses=losses,
         )
 
     def write(self, file_path: Path, product: Product) -> None:
         contents: dict[str, Any] = dict()
-        scan_indexes: list[int] = list()
-        scan_x_m: list[float] = list()
-        scan_y_m: list[float] = list()
+        scan_indexes: list[int] = []
+        scan_x_m: list[float] = []
+        scan_y_m: list[float] = []
 
         for point in product.positions:
             scan_indexes.append(point.index)
@@ -185,7 +198,15 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
         contents[self.OBJECT_PIXEL_HEIGHT] = object_geometry.pixel_height_m
         contents[self.OBJECT_LAYER_SPACING] = object_.layer_spacing_m
 
-        contents[self.LOSSES_ARRAY] = product.losses  # FIXME
+        loss_epochs: list[int] = []
+        loss_values: list[float] = []
+
+        for loss in product.losses:
+            loss_epochs.append(loss.epoch)
+            loss_values.append(loss.value)
+
+        contents[self.LOSS_EPOCHS] = loss_epochs
+        contents[self.LOSS_VALUES] = loss_values
 
         numpy.savez(file_path, **contents)
 

@@ -3,6 +3,7 @@ from typing import Final
 import logging
 
 import h5py
+import numpy
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
@@ -14,6 +15,7 @@ from ptychodus.api.product import (
     ProductFileWriter,
     ProductMetadata,
 )
+from ptychodus.api.reconstructor import LossValue
 from ptychodus.api.scan import PositionSequence, ScanPoint
 
 logger = logging.getLogger(__name__)
@@ -47,10 +49,11 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
     OBJECT_PIXEL_HEIGHT: Final[str] = 'pixel_height_m'
     OBJECT_PIXEL_WIDTH: Final[str] = 'pixel_width_m'
 
-    LOSSES_ARRAY: Final[str] = 'losses'
+    LOSS_EPOCHS: Final[str] = 'loss_epochs'
+    LOSS_VALUES: Final[str] = 'loss_values'
 
     def read(self, file_path: Path) -> Product:
-        point_list: list[ScanPoint] = list()
+        point_list: list[ScanPoint] = []
 
         with h5py.File(file_path, 'r') as h5_file:
             probe_photon_count = 0.0
@@ -129,24 +132,35 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             )
 
             try:
-                h5_losses = h5_file[self.LOSSES_ARRAY]
+                h5_loss_values = h5_file[self.LOSS_VALUES]
             except KeyError:
-                h5_losses = h5_file['costs']
+                h5_loss_values = h5_file['costs']
 
-            losses = h5_losses[()]
+            loss_values = h5_loss_values[()]
+
+            try:
+                loss_epochs = h5_file[self.LOSS_EPOCHS][()]
+            except KeyError:
+                loss_epochs = numpy.arange(len(loss_values))
+
+            losses: list[LossValue] = []
+
+            for epoch, value in zip(loss_epochs, loss_values):
+                loss = LossValue(epoch, value)
+                losses.append(loss)
 
         return Product(
             metadata=metadata,
             positions=PositionSequence(point_list),
             probes=probe,
             object_=object_,
-            losses=losses,  # FIXME
+            losses=losses,
         )
 
     def write(self, file_path: Path, product: Product) -> None:
-        scan_indexes: list[int] = list()
-        scan_x_m: list[float] = list()
-        scan_y_m: list[float] = list()
+        scan_indexes: list[int] = []
+        scan_x_m: list[float] = []
+        scan_y_m: list[float] = []
 
         for point in product.positions:
             scan_indexes.append(point.index)
@@ -190,7 +204,15 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             h5_object.attrs[self.OBJECT_PIXEL_HEIGHT] = object_geometry.pixel_height_m
             h5_file.create_dataset(self.OBJECT_LAYER_SPACING, data=object_.layer_spacing_m)
 
-            h5_file.create_dataset(self.LOSSES_ARRAY, data=product.losses)  # FIXME
+            loss_epochs: list[int] = []
+            loss_values: list[float] = []
+
+            for loss in product.losses:
+                loss_epochs.append(loss.epoch)
+                loss_values.append(loss.value)
+
+            h5_file.create_dataset(self.LOSS_EPOCHS, data=loss_epochs)
+            h5_file.create_dataset(self.LOSS_VALUES, data=loss_values)
 
 
 def register_plugins(registry: PluginRegistry) -> None:

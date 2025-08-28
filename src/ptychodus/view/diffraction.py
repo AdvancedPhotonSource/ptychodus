@@ -97,8 +97,10 @@ class DatasetFileLayoutDialog(QDialog):
         self.button_box = QDialogButtonBox()
 
         tree_header = self.tree_view.header()
-        tree_header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
-        tree_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+
+        if tree_header is not None:
+            tree_header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+            tree_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
 
         self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
         self.button_box.clicked.connect(self._handle_button_box_clicked)
@@ -123,7 +125,10 @@ class PatternsView(QWidget):
         self.info_label = QLabel()
         self.button_box = PatternsButtonBox()
 
-        self.tree_view.header().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        tree_view_header = self.tree_view.header()
+
+        if tree_view_header is not None:
+            tree_view_header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout = QVBoxLayout()
         layout.addWidget(self.detector_view)

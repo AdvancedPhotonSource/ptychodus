@@ -13,7 +13,8 @@ try:
     # xdrlib removed from the standard library in Python 3.13
     import xdrlib  # type: ignore[import-not-found]
 except ModuleNotFoundError:
-    from ._xdrlib import xdrlib  # type: ignore[no-redef]
+    # use full module path to make this file usable as an entry point
+    from ptychodus.plugins._xdrlib import xdrlib  # type: ignore[no-redef]
 
 import numpy
 import numpy.typing
@@ -514,6 +515,11 @@ def register_plugins(registry: PluginRegistry) -> None:
         MDAPositionFileReader(scale_to_meters=1.0e-6),
         simple_name='APS_BNP',
         display_name='APS 2-ID-D Bionanoprobe Files (*.h5 *.hdf5)',
+    )
+    registry.position_file_readers.register_plugin(
+        MDAPositionFileReader(scale_to_meters=1.0e-3),
+        simple_name='APS_ISN_MDA',
+        display_name='APS 19-ID In-Situ Nanoprobe Files (*.mda)',
     )
     registry.position_file_readers.register_plugin(
         HXNPositionFileReader(),

@@ -1631,7 +1631,7 @@ qt_resource_struct_v2 = b'\
 \x00\x00\x01\x97\x92\x9d\x92\xd0\
 '
 
-qt_version = [int(v) for v in QtCore.qVersion().split('.')]
+qt_version = [int(v) for v in QtCore.qVersion().split('.')]  # type: ignore[union-attr]
 if qt_version < [5, 8, 0]:
     rcc_version = 1
     qt_resource_struct = qt_resource_struct_v1
