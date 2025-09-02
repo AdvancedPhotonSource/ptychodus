@@ -139,6 +139,10 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
         self._view.stacked_widget.addWidget(widget)
 
+    def _show_progress_dialog(self) -> None:
+        self._view.progress_dialog.show()
+        self._update_progress()
+
     def _reconstruct(self) -> None:
         input_product_index = self._view.parameters_view.product_combo_box.currentIndex()
 
@@ -152,7 +156,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             ExceptionDialog.show_exception('Reconstructor', exc)
         else:
             self._view.parameters_view.product_combo_box.setCurrentIndex(output_product_index)
-            self._view.progress_dialog.show()
+            self._show_progress_dialog()
 
     def _reconstruct_split(self) -> None:
         input_product_index = self._view.parameters_view.product_combo_box.currentIndex()
@@ -166,7 +170,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             logger.exception(exc)
             ExceptionDialog.show_exception('Split Reconstructor', exc)
 
-        self._view.progress_dialog.show()
+        self._show_progress_dialog()
 
     def _reconstruct_transformed(self) -> None:
         input_product_index = self._view.parameters_view.product_combo_box.currentIndex()
@@ -180,7 +184,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             logger.exception(exc)
             ExceptionDialog.show_exception('Split Reconstructor', exc)
 
-        self._view.progress_dialog.show()
+        self._show_progress_dialog()
 
     def _open_model(self) -> None:
         name_filter = self._presenter.get_model_file_filter()

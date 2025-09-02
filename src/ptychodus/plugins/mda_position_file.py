@@ -473,22 +473,22 @@ class MDAPositionFileReader(PositionFileReader):
         return PositionSequence(point_list)
 
 
-class HXNPositionFileReader(PositionFileReader):
-    ONE_MICRON_M: Final[float] = 1.0e-6
+class MDAFlatScanPositionFileReader(PositionFileReader):
+    def __init__(self, scale_to_meters: float) -> None:
+        self._scale_to_meters = scale_to_meters
 
     def read(self, file_path: Path) -> PositionSequence:
         point_list = list()
 
         mda_file = MDAFile.read(file_path)
-
         xarray = mda_file.scan.data.readback_array[0, :]
         yarray = mda_file.scan.data.readback_array[1, :]
 
         for idx, (x, y) in enumerate(zip(xarray, yarray)):
             point = ScanPoint(
                 index=idx,
-                position_x_m=float(x) * self.ONE_MICRON_M,
-                position_y_m=float(y) * self.ONE_MICRON_M,
+                position_x_m=float(x) * self._scale_to_meters,
+                position_y_m=float(y) * self._scale_to_meters,
             )
             point_list.append(point)
 
@@ -517,12 +517,12 @@ def register_plugins(registry: PluginRegistry) -> None:
         display_name='APS 2-ID-D Bionanoprobe Files (*.h5 *.hdf5)',
     )
     registry.position_file_readers.register_plugin(
-        MDAPositionFileReader(scale_to_meters=1.0e-3),
+        MDAFlatScanPositionFileReader(scale_to_meters=1.0e-3),
         simple_name='APS_ISN_MDA',
         display_name='APS 19-ID In-Situ Nanoprobe Files (*.mda)',
     )
     registry.position_file_readers.register_plugin(
-        HXNPositionFileReader(),
+        MDAFlatScanPositionFileReader(scale_to_meters=1.0e-6),
         simple_name='CNM_APS_HXN',
         display_name='CNM/APS Hard X-ray Nanoprobe Files (*.mda)',
     )

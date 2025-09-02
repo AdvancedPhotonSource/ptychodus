@@ -188,10 +188,10 @@ class ProductController(ProductRepositoryObserver):
         save_file_action = view.button_box.save_menu.addAction('Save File...')
         sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
 
-        #table_view_palette = view.table_view.palette()
-        #alternate_base_color = table_view_palette.color(QPalette.AlternateBase)
-        #editable_item_brush = QBrush(alternate_base_color)
-        editable_item_brush = QBrush(Qt.GlobalColor.lightGray) # FIXME
+        # table_view_palette = view.table_view.palette()
+        # alternate_base_color = table_view_palette.color(QPalette.AlternateBase)
+        # editable_item_brush = QBrush(alternate_base_color)
+        editable_item_brush = QBrush(Qt.GlobalColor.lightGray)  # FIXME
 
         table_model = ProductRepositoryTableModel(repository, editable_item_brush)
         table_proxy_model = QSortFilterProxyModel()

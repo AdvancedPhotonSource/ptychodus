@@ -12,7 +12,7 @@ from ptychodus.api.scan import (
 
 
 class DelimitedPositionFileReader(PositionFileReader):
-    def __init__(self, delimiter: str, swap_xy: bool) -> None:
+    def __init__(self, delimiter: str, *, swap_xy: bool) -> None:
         self._delimiter = delimiter
         self._swap_xy = swap_xy
 
