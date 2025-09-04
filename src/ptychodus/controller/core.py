@@ -29,6 +29,10 @@ class ControllerCore:
         self, model: ModelCore, view: ViewCore, *, is_developer_mode_enabled: bool = False
     ) -> None:
         self.view = view
+        self._status_bar = view.statusBar()
+
+        if self._status_bar is None:
+            raise ValueError('QStatusBar is None!')
 
         self._memory_controller = MemoryController(model.memory_presenter, view.memory_widget)
         self._file_dialog_factory = FileDialogFactory()
@@ -53,7 +57,7 @@ class ControllerCore:
         self._patterns_image_controller = ImageController(
             model.pattern_visualization_engine,
             view.patterns_image_view,
-            view.statusBar(),
+            self._status_bar,
             self._file_dialog_factory,
         )
         self._patterns_controller = DiffractionController(
@@ -85,7 +89,7 @@ class ControllerCore:
         self._probe_image_controller = ImageController(
             model.probe_visualization_engine,
             view.probe_image_view,
-            view.statusBar(),
+            self._status_bar,
             self._file_dialog_factory,
         )
         self._probe_controller = ProbeController(
@@ -107,7 +111,7 @@ class ControllerCore:
         self._object_image_controller = ImageController(
             model.object_visualization_engine,
             view.object_image_view,
-            view.statusBar(),
+            self._status_bar,
             self._file_dialog_factory,
         )
         self._object_controller = ObjectController(
@@ -180,7 +184,10 @@ class ControllerCore:
         self.view.setWindowTitle(window_title)
         self.view.show()
 
-    def _swap_central_widgets(self, action: QAction) -> None:
+    def _swap_central_widgets(self, action: QAction | None) -> None:
+        if action is None:
+            raise ValueError('QAction is None!')
+
         index = action.data()
         self.view.left_panel.setCurrentIndex(index)
         self.view.right_panel.setCurrentIndex(index)

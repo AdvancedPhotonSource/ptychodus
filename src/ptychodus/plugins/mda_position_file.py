@@ -3,7 +3,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
-from typing import Any, Final, Generic, TypeVar
+from typing import Any, Generic, TypeVar
 import logging
 import sys
 import typing

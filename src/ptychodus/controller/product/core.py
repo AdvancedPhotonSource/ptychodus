@@ -30,6 +30,7 @@ from ...model.product.scan import ScanRepositoryItem
 from ...view.product import ProductView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
+from ..helpers import connect_triggered_signal
 from .editor import ProductEditorViewController
 
 logger = logging.getLogger(__name__)
@@ -218,11 +219,13 @@ class ProductController(ProductRepositoryObserver):
         view.table_view.selectionModel().currentChanged.connect(controller._update_enabled_buttons)
         controller._update_enabled_buttons(QModelIndex(), QModelIndex())
 
-        open_file_action.triggered.connect(controller._open_product_from_file)
-        create_new_action.triggered.connect(controller._create_new_product)
-        duplicate_action.triggered.connect(controller._duplicate_current_product)
-        save_file_action.triggered.connect(controller._save_current_product_to_file)
-        sync_to_settings_action.triggered.connect(controller._sync_current_product_to_settings)
+        connect_triggered_signal(open_file_action, controller._open_product_from_file)
+        connect_triggered_signal(create_new_action, controller._create_new_product)
+        connect_triggered_signal(duplicate_action, controller._duplicate_current_product)
+        connect_triggered_signal(save_file_action, controller._save_current_product_to_file)
+        connect_triggered_signal(
+            sync_to_settings_action, controller._sync_current_product_to_settings
+        )
 
         view.button_box.edit_button.clicked.connect(controller._edit_current_product)
         view.button_box.remove_button.clicked.connect(controller._remove_current_product)

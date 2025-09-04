@@ -12,6 +12,7 @@ from ...view.repository import RepositoryTableView
 from ...view.scan import ScanPlotView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
+from ..helpers import connect_triggered_signal
 from .editor_factory import ScanEditorViewControllerFactory
 from .table_model import ScanTableModel
 
@@ -61,16 +62,16 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         )
 
         load_from_file_action = view.button_box.load_menu.addAction('Open File...')
-        load_from_file_action.triggered.connect(self._load_current_scan_from_file)
+        connect_triggered_signal(load_from_file_action, self._load_current_scan_from_file)
 
         copy_action = view.button_box.load_menu.addAction('Copy...')
-        copy_action.triggered.connect(self._copy_to_current_scan)
+        connect_triggered_signal(copy_action, self._copy_to_current_scan)
 
         save_to_file_action = view.button_box.save_menu.addAction('Save File...')
-        save_to_file_action.triggered.connect(self._save_current_scan_to_file)
+        connect_triggered_signal(save_to_file_action, self._save_current_scan_to_file)
 
         sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
-        sync_to_settings_action.triggered.connect(self._sync_current_scan_to_settings)
+        connect_triggered_signal(sync_to_settings_action, self._sync_current_scan_to_settings)
 
         view.copier_dialog.setWindowTitle('Copy Scan')
         view.copier_dialog.source_combo_box.setModel(self._table_model)
@@ -80,7 +81,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         view.button_box.edit_button.clicked.connect(self._edit_current_scan)
 
         estimate_transform_action = view.button_box.analyze_menu.addAction('Estimate Transform...')
-        estimate_transform_action.triggered.connect(self._estimate_transform)
+        connect_triggered_signal(estimate_transform_action, self._estimate_transform)
         estimate_transform_action.setEnabled(is_developer_mode_enabled)
 
     def _get_current_item_index(self) -> int:

@@ -22,6 +22,7 @@ from ..model.reconstructor import ReconstructorPresenter
 from ..view.reconstructor import ReconstructorView, ReconstructorPlotView
 from ..view.widgets import ExceptionDialog
 from .data import FileDialogFactory
+from .helpers import connect_triggered_signal
 
 logger = logging.getLogger(__name__)
 
@@ -81,9 +82,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         view.progress_dialog.text_edit.setReadOnly(True)
 
         open_model_action = view.parameters_view.reconstructor_menu.addAction('Open Model...')
-        open_model_action.triggered.connect(self._open_model)
+        connect_triggered_signal(open_model_action, self._open_model)
         save_model_action = view.parameters_view.reconstructor_menu.addAction('Save Model...')
-        save_model_action.triggered.connect(self._save_model)
+        connect_triggered_signal(save_model_action, self._save_model)
 
         self._model_action_group = QActionGroup(view.parameters_view.reconstructor_menu)
         self._model_action_group.setExclusive(False)
@@ -94,20 +95,20 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         reconstruct_transformed_action = view.parameters_view.reconstructor_menu.addAction(
             'Reconstruct Transformed Points'
         )
-        reconstruct_transformed_action.triggered.connect(self._reconstruct_transformed)
+        connect_triggered_signal(reconstruct_transformed_action, self._reconstruct_transformed)
         reconstruct_split_action = view.parameters_view.reconstructor_menu.addAction(
             'Reconstruct Odd/Even Split'
         )
-        reconstruct_split_action.triggered.connect(self._reconstruct_split)
+        connect_triggered_signal(reconstruct_split_action, self._reconstruct_split)
         reconstruct_action = view.parameters_view.reconstructor_menu.addAction('Reconstruct')
-        reconstruct_action.triggered.connect(self._reconstruct)
+        connect_triggered_signal(reconstruct_action, self._reconstruct)
 
         export_training_data_action = view.parameters_view.trainer_menu.addAction(
             'Export Training Data...'
         )
-        export_training_data_action.triggered.connect(self._export_training_data)
+        connect_triggered_signal(export_training_data_action, self._export_training_data)
         train_action = view.parameters_view.trainer_menu.addAction('Train')
-        train_action.triggered.connect(self._train)
+        connect_triggered_signal(train_action, self._train)
 
         presenter.add_observer(self)
         product_repository.add_observer(self)
