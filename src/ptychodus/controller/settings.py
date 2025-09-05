@@ -70,7 +70,12 @@ class SettingsController(Observer):
         settings_registry.add_observer(self)
 
         view.list_view.setModel(self._list_model)
-        view.list_view.selectionModel().currentChanged.connect(self._update_view)
+        selection_model = view.list_view.selectionModel()
+
+        if selection_model is None:
+            raise ValueError('selection_model is None!')
+        else:
+            selection_model.currentChanged.connect(self._update_view)
 
         self._table_view.setModel(self._table_model)
 

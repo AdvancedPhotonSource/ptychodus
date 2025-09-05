@@ -1,6 +1,7 @@
 from typing import Any
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject
+from PyQt5.QtGui import QBrush
 
 from ptychodus.api.units import BYTES_PER_MEGABYTE
 
@@ -10,11 +11,16 @@ from ...model.product.scan import ScanRepositoryItem
 
 class ScanTableModel(QAbstractTableModel):
     def __init__(
-        self, repository: ScanRepository, api: ScanAPI, parent: QObject | None = None
+        self,
+        repository: ScanRepository,
+        api: ScanAPI,
+        editable_item_brush: QBrush,
+        parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._repository = repository
         self._api = api
+        self._editable_item_brush = editable_item_brush
         self._header = ['Name', 'Plot', 'Builder', 'Points', 'Length [m]', 'Size [MB]']
         self._checked_item_indexes: set[int] = set()
 
@@ -70,6 +76,9 @@ class ScanTableModel(QAbstractTableModel):
                     if index.row() in self._checked_item_indexes
                     else Qt.CheckState.Unchecked
                 )
+        elif role == Qt.ItemDataRole.BackgroundRole:
+            if index.flags() & Qt.ItemFlag.ItemIsEditable:
+                return self._editable_item_brush
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)

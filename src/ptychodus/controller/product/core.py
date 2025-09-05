@@ -10,7 +10,7 @@ from PyQt5.QtCore import (
     QSortFilterProxyModel,
     Qt,
 )
-from PyQt5.QtGui import QBrush, QPalette
+from PyQt5.QtGui import QBrush
 from PyQt5.QtWidgets import QAbstractItemView, QAction
 
 from ptychodus.api.product import LossValue
@@ -30,7 +30,11 @@ from ...model.product.scan import ScanRepositoryItem
 from ...view.product import ProductView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
-from ..helpers import connect_triggered_signal
+from ..helpers import (
+    connect_current_changed_signal,
+    connect_triggered_signal,
+    create_brush_for_editable_cell,
+)
 from .editor import ProductEditorViewController
 
 logger = logging.getLogger(__name__)
@@ -101,7 +105,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                     case 6:
                         product = item.get_product()
                         return f'{product.nbytes / BYTES_PER_MEGABYTE:.2f}'
-            elif role == Qt.ItemDataRole.BackgroundRole:  # FIXME test
+            elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush
 
@@ -189,12 +193,9 @@ class ProductController(ProductRepositoryObserver):
         save_file_action = view.button_box.save_menu.addAction('Save File...')
         sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
 
-        # table_view_palette = view.table_view.palette()
-        # alternate_base_color = table_view_palette.color(QPalette.AlternateBase)
-        # editable_item_brush = QBrush(alternate_base_color)
-        editable_item_brush = QBrush(Qt.GlobalColor.lightGray)  # FIXME
-
+        editable_item_brush = create_brush_for_editable_cell(view.table_view)
         table_model = ProductRepositoryTableModel(repository, editable_item_brush)
+
         table_proxy_model = QSortFilterProxyModel()
         table_proxy_model.setSourceModel(table_model)
 
@@ -216,7 +217,7 @@ class ProductController(ProductRepositoryObserver):
         view.table_view.sortByColumn(0, Qt.SortOrder.AscendingOrder)
         view.table_view.verticalHeader().hide()
         view.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        view.table_view.selectionModel().currentChanged.connect(controller._update_enabled_buttons)
+        connect_current_changed_signal(view.table_view, controller._update_enabled_buttons)
         controller._update_enabled_buttons(QModelIndex(), QModelIndex())
 
         connect_triggered_signal(open_file_action, controller._open_product_from_file)

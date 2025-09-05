@@ -162,6 +162,10 @@ class VisualizationController(Observer):
     def zoom_to_fit(self) -> None:
         self._item.setPos(0, 0)
         scene = self._view.scene()
+
+        if scene is None:
+            raise ValueError('scene is None!')
+
         bounding_rect = scene.itemsBoundingRect()
         scene.setSceneRect(bounding_rect)
         self._view.fitInView(scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)

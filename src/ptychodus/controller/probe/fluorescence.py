@@ -20,6 +20,7 @@ from ...view.probe import (
 )
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
+from ..helpers import connect_current_changed_signal
 from ..visualization import (
     VisualizationParametersController,
     VisualizationWidgetController,
@@ -177,8 +178,8 @@ class FluorescenceViewController(Observer):
         )
 
         self._dialog.fluorescence_channel_list_view.setModel(self._channel_list_model)
-        self._dialog.fluorescence_channel_list_view.selectionModel().currentChanged.connect(
-            self._update_view
+        connect_current_changed_signal(
+            self._dialog.fluorescence_channel_list_view, self._update_view
         )
 
         self._measured_widget_controller = VisualizationWidgetController(

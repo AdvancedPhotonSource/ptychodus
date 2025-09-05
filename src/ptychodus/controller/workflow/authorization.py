@@ -16,19 +16,9 @@ class WorkflowAuthorizationController:
         self._presenter = presenter
         self._dialog = dialog
 
-    @classmethod
-    def create_instance(
-        cls,
-        presenter: WorkflowAuthorizationPresenter,
-        dialog: WorkflowAuthorizationDialog,
-    ) -> WorkflowAuthorizationController:
-        controller = cls(presenter, dialog)
-
-        dialog.finished.connect(controller._finish_authorization)
-        dialog.line_edit.textChanged.connect(controller._set_dialog_buttons_enabled)
-        controller._set_dialog_buttons_enabled()
-
-        return controller
+        dialog.finished.connect(self._finish_authorization)
+        dialog.line_edit.textChanged.connect(self._set_dialog_buttons_enabled)
+        self._set_dialog_buttons_enabled()
 
     def _set_dialog_buttons_enabled(self) -> None:
         text = self._dialog.line_edit.text()

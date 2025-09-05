@@ -48,7 +48,7 @@ class ChatBubbleItemDelegate(QStyledItemDelegate):
     def _create_text_document(
         self, option: QStyleOptionViewItem, index: QModelIndex
     ) -> QTextDocument:
-        text = index.model().data(index, Qt.ItemDataRole.DisplayRole)
+        text = index.data(Qt.ItemDataRole.DisplayRole)
 
         text_option = QTextOption()
         text_option.setWrapMode(QTextOption.WrapMode.WordWrap)
@@ -72,6 +72,10 @@ class ChatBubbleItemDelegate(QStyledItemDelegate):
             return
 
         style = option.widget.style() if option.widget else QApplication.style()
+
+        if style is None:
+            raise ValueError('style is None!')
+
         doc = self._create_text_document(option, index)
         metrics = BubbleMetrics.from_document(doc)
         alignment = Qt.Alignment(index.data(Qt.ItemDataRole.TextAlignmentRole))

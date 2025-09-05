@@ -22,7 +22,7 @@ from ...view.widgets import (
     ProgressBarItemDelegate,
 )
 from ..data import FileDialogFactory
-from ..helpers import connect_triggered_signal
+from ..helpers import connect_triggered_signal, create_brush_for_editable_cell
 from ..image import ImageController
 from .editor_factory import ProbeEditorViewControllerFactory
 from .fluorescence import FluorescenceViewController
@@ -59,7 +59,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self._image_controller = image_controller
         self._view = view
         self._file_dialog_factory = file_dialog_factory
-        self._tree_model = ProbeTreeModel(repository, api)
+        self._tree_model = ProbeTreeModel(repository, api, create_brush_for_editable_cell(view))
         self._editor_factory = ProbeEditorViewControllerFactory()
 
         self._propagation_view_controller = ProbePropagationViewController(
@@ -90,7 +90,13 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         power_item_delegate = ProgressBarItemDelegate(view.tree_view)
         view.tree_view.setItemDelegateForColumn(1, power_item_delegate)
         view.tree_view.setItemDelegateForColumn(2, builder_item_delegate)
-        view.tree_view.selectionModel().currentChanged.connect(self._update_view)
+        selection_model = view.tree_view.selectionModel()
+
+        if selection_model is None:
+            raise ValueError('selection_model is None!')
+        else:
+            selection_model.currentChanged.connect(self._update_view)
+
         self._update_view(QModelIndex(), QModelIndex())
 
         load_from_file_action = view.button_box.load_menu.addAction('Open File...')

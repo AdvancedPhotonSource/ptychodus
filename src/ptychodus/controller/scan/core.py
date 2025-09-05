@@ -12,7 +12,11 @@ from ...view.repository import RepositoryTableView
 from ...view.scan import ScanPlotView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
-from ..helpers import connect_triggered_signal
+from ..helpers import (
+    connect_current_changed_signal,
+    connect_triggered_signal,
+    create_brush_for_editable_cell,
+)
 from .editor_factory import ScanEditorViewControllerFactory
 from .table_model import ScanTableModel
 
@@ -36,7 +40,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         self._view = view
         self._plot_view = plot_view
         self._file_dialog_factory = file_dialog_factory
-        self._table_model = ScanTableModel(repository, api)
+        self._table_model = ScanTableModel(repository, api, create_brush_for_editable_cell(view))
         self._table_proxy_model = QSortFilterProxyModel()
         self._editor_factory = ScanEditorViewControllerFactory()
 
@@ -54,7 +58,7 @@ class ScanController(SequenceObserver[ScanRepositoryItem]):
         view.table_view.setSortingEnabled(True)
         view.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         view.table_view.setItemDelegateForColumn(2, builder_item_delegate)
-        view.table_view.selectionModel().currentChanged.connect(self._update_view)
+        connect_current_changed_signal(view.table_view, self._update_view)
         self._update_view(QModelIndex(), QModelIndex())
 
         view.table_view.horizontalHeader().sectionClicked.connect(

@@ -77,7 +77,7 @@ class ISNDiffractionFileReader(DiffractionFileReader):
 
                 metadata = DiffractionMetadata(
                     num_patterns_per_array=num_patterns_per_array,
-                    pattern_dtype=numpy.uint32,
+                    pattern_dtype=numpy.dtype(numpy.uint32),
                     detector_distance_m=detector_distance_m,
                     detector_extent=ImageExtent(detector_width_px, detector_height_px),
                     detector_pixel_geometry=PixelGeometry(pixel_width_m, pixel_height_m),

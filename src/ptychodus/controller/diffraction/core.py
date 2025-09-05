@@ -167,7 +167,13 @@ class DiffractionController(DiffractionDatasetObserver):
         view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         counts_item_delegate = ProgressBarItemDelegate(view.tree_view)
         view.tree_view.setItemDelegateForColumn(1, counts_item_delegate)
-        view.tree_view.selectionModel().currentChanged.connect(self._update_view)
+        selection_model = view.tree_view.selectionModel()
+
+        if selection_model is None:
+            raise ValueError('selection_model is None!')
+        else:
+            selection_model.currentChanged.connect(self._update_view)
+
         self._update_view(QModelIndex(), QModelIndex())
 
         open_dataset_action = view.button_box.load_menu.addAction('Open File...')

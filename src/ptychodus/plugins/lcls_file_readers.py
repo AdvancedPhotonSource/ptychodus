@@ -1,14 +1,18 @@
 from pathlib import Path
 from typing import Final
 import logging
+import sys
 
+from scipy.stats import gaussian_kde
 import h5py
+import matplotlib.pyplot as plt
 import numpy
 
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint
 
-from .h5_diffraction_file import H5DiffractionFileReader
+# use full module path to make this file usable as an entry point
+from ptychodus.plugins.h5_diffraction_file import H5DiffractionFileReader
 
 logger = logging.getLogger(__name__)
 
@@ -73,3 +77,43 @@ def register_plugins(registry: PluginRegistry) -> None:
         simple_name=LCLSPositionFileReader.SIMPLE_NAME,
         display_name=LCLSPositionFileReader.DISPLAY_NAME,
     )
+
+
+if __name__ == '__main__':
+    file_path = Path(sys.argv[1])
+
+    with h5py.File(file_path, 'r') as h5_file:
+        ipm2 = h5_file['/ipm2/sum'][:]
+
+    q0 = numpy.min(ipm2)
+    q1, q2, q3 = numpy.quantile(ipm2, [0.25, 0.50, 0.75])
+    q4 = numpy.max(ipm2)
+
+    print(f'ipm2: {ipm2.dtype}{ipm2.shape}')
+    print(f'min = {q0}')
+    print(f'Q1 = {q1}')
+    print(f'Q2 = {q2}')
+    print(f'Q3 = {q3}')
+    print(f'max = {q4}')
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(ipm2, '.', linewidth=1.5)
+    ax.set_title('IPM2')
+    ax.set_xlabel('Position')
+    ax.set_ylabel('Value')
+    ax.grid(True)
+    plt.show()
+
+    values = numpy.linspace(q0, q4, 1000)
+    kde = gaussian_kde(ipm2)
+    density = kde(values)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(values, density, '.-', linewidth=1.5)
+    ax.set_title('IPM2')
+    ax.set_xlabel('Value')
+    ax.set_ylabel('Density')
+    ax.grid(True)
+    plt.show()
