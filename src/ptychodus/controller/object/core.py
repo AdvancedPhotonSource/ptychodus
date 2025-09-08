@@ -13,7 +13,7 @@ from ...model.visualization import VisualizationEngine
 from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
-from ..helpers import connect_triggered_signal
+from ..helpers import connect_triggered_signal, create_brush_for_editable_cell
 from ..image import ImageController
 from .editor_factory import ObjectEditorViewControllerFactory
 from .fourier import FourierAnalysisViewController
@@ -47,7 +47,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self._image_controller = image_controller
         self._view = view
         self._file_dialog_factory = file_dialog_factory
-        self._tree_model = ObjectTreeModel(repository, api) # FIXME editable brush
+        self._tree_model = ObjectTreeModel(repository, api, create_brush_for_editable_cell(view))
         self._editor_factory = ObjectEditorViewControllerFactory()
 
         self._frc_view_controller = FourierRingCorrelationViewController(

@@ -22,7 +22,10 @@ class WorkflowAuthorizationController:
 
     def _set_dialog_buttons_enabled(self) -> None:
         text = self._dialog.line_edit.text()
-        self._dialog.ok_button.setEnabled(len(text) > 0)
+        ok_button = self._dialog.ok_button
+
+        if ok_button is not None:
+            ok_button.setEnabled(len(text) > 0)
 
     def start_authorization_if_needed(self) -> None:
         if not (self._presenter.is_authorized or self._dialog.isVisible()):

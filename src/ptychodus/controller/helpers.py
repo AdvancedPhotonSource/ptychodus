@@ -1,6 +1,6 @@
 from typing import Callable
 
-from PyQt5.QtCore import QMetaObject, Qt, pyqtBoundSignal
+from PyQt5.QtCore import QMetaObject, pyqtBoundSignal
 from PyQt5.QtGui import QBrush, QPalette
 from PyQt5.QtWidgets import QAbstractItemView, QAction, QWidget
 
@@ -26,7 +26,6 @@ def connect_triggered_signal(
 
 
 def create_brush_for_editable_cell(widget: QWidget) -> QBrush:
-    return QBrush(Qt.GlobalColor.yellow)  # FIXME
     palette = widget.palette()
     alternate_base_color = palette.color(QPalette.AlternateBase)
     return QBrush(alternate_base_color)
