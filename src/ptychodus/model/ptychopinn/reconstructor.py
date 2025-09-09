@@ -9,6 +9,7 @@ import numpy
 
 from ptycho.config.config import InferenceConfig, ModelConfig, TrainingConfig, update_legacy_dict
 from ptycho.raw_data import RawData
+from ptycho.workflows.components import load_inference_bundle
 import ptycho.loader
 import ptycho.model_manager
 import ptycho.params
@@ -58,12 +59,9 @@ def create_raw_data(parameters: ReconstructInput) -> RawData:
 
 
 class PtychoPINNTrainableReconstructor(TrainableReconstructor):
+    MODEL_FILE_NAME: Final[str] = 'wts.h5.zip'
     MODEL_FILE_FILTER: Final[str] = 'Zipped Archive (*.zip)'
     TRAINING_DATA_FILE_FILTER: Final[str] = 'NumPy Zipped Archive (*.npz)'
-
-    # TODO datasets for testing: xpp, "u", ALS
-    # TODO normalize data in preprocessing step (see note in slack)
-    # TODO ptychodus stitches
 
     def __init__(
         self,
@@ -71,15 +69,17 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         model_settings: PtychoPINNModelSettings,
         inference_settings: PtychoPINNInferenceSettings,
         training_settings: PtychoPINNTrainingSettings,
-        *in_developer_mode: bool,
+        *,
+        is_developer_mode_enabled: bool,
     ) -> None:
         super().__init__()
         self._name = name
         self._model_settings = model_settings
         self._inference_settings = inference_settings
         self._training_settings = training_settings
-        self._model_dict: dict[str, Any] | None = None
-        self._in_developer_mode = in_developer_mode
+        self.__model: Any = None
+        self._config: dict[str, Any] = dict()
+        self._is_developer_mode_enabled = is_developer_mode_enabled
 
         ptychopinn_version = version('ptychopinn')
         logger.info(f'\tPtychoPINN {ptychopinn_version}')
@@ -103,15 +103,18 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     def name(self) -> str:
         return self._name
 
-    def _reconstruct_image(self, test_data: ptycho.loader.PtychoDataContainer) -> Any:
-        if self._model_dict is None:
+    @property
+    def _model(self) -> Any:  # TODO tensorflow.keras.Model | None
+        if self.__model is None:
             raise RuntimeError('Model not loaded!')
 
+        return self.__model
+
+    def _reconstruct_image(self, test_data: ptycho.loader.PtychoDataContainer) -> Any:
         import ptycho.model
 
-        diffraction_to_obj = self._model_dict['diffraction_to_obj']  # tf.keras.Model
         intensity_scale = ptycho.model.params()['intensity_scale']
-        return diffraction_to_obj.predict([test_data.X * intensity_scale, test_data.local_offsets])
+        return self._model.predict([test_data.X * intensity_scale, test_data.local_offsets])
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         model_size = parameters.diffraction_patterns.shape[-1]
@@ -119,15 +122,12 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         if parameters.diffraction_patterns.shape[-2] != model_size:
             raise ValueError('Model requires square diffraction patterns!')
 
-        if self._model_dict is None:
-            raise ValueError('Model not loaded.')
-
         model_config = self._create_model_config(model_size)
         inference_config = InferenceConfig(
             model=model_config,
             model_path=Path(),  # not used
             test_data_file=Path(),  # not used
-            debug=self._in_developer_mode,
+            debug=self._is_developer_mode_enabled,
             output_dir=Path(),  # not used
         )
 
@@ -153,7 +153,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         # Perform reconstruction
         obj_tensor_full = self._reconstruct_image(test_data_container)
 
-        # Process the reconstructed image
+        # Process the reconstructed image (TODO: ptychodus stitches)
         object_out_array = ptycho.tf_helper.reassemble_position(
             obj_tensor_full, test_data_container.global_offsets, M=20
         )
@@ -181,13 +181,15 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         return self.MODEL_FILE_FILTER
 
     def open_model(self, file_path: Path) -> None:
+        if file_path.name != self.MODEL_FILE_NAME:
+            logger.warning(f"PtychoPINN expects the file name '{self.MODEL_FILE_NAME}'.")
+
         # TODO model path to/from settings
         self._inference_settings.model_path.set_value(file_path)
-        # ModelManager updates global config (ptycho.params.cfg) when loading
-        self._model_dict = ptycho.model_manager.ModelManager.load_multiple_models(
-            file_path.parent / file_path.stem
-        )
-        # TODO update settings from ptycho.params.cfg after loading
+
+        # global config (ptycho.params.cfg) updated during load
+        self.__model, self._config = load_inference_bundle(file_path.parent)
+        # TODO sync ptycho.params.cfg with settings after load
 
     def save_model(self, file_path: Path) -> None:
         ptycho.model_manager.save(file_path)
@@ -264,9 +266,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         output_dir = self._training_settings.output_dir.get_value()
         self.save_model(output_dir)
         save_outputs(recon_amp, recon_phase, train_results, str(output_dir))
-        print(train_results.keys())  # TODO remove
-        # dict_keys(['history', 'model_instance', 'reconstructed_obj', 'pred_amp', 'reconstructed_obj_cdi', 'stitched_obj', 'train_container', 'test_container', 'obj_tensor_full', 'global_offsets', 'recon_amp', 'recon_phase'])
-        # TODO self._model_dict = train_results
+        self.open_model(output_dir)
 
         training_loss: Sequence[LossValue] = []
         validation_loss: Sequence[LossValue] = []
