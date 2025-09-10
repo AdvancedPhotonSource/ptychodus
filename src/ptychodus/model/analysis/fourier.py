@@ -53,6 +53,7 @@ class FourierAnalyzer(Observable):
         roi = interpolator.get_patch(bounding_box.x_center, bounding_box.y_center, width, height)
         logger.debug(f'roi: {roi.dtype}{roi.shape}')
 
+        # FIXME choose fft scaling
         self._result = FourierAnalysisResult(
             transformed_roi=fftshift(fft2(ifftshift(roi))),
             pixel_geometry=object_.get_pixel_geometry(),

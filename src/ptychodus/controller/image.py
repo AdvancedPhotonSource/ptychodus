@@ -20,7 +20,7 @@ from ..view.image import (
     ImageView,
     ImageWidget,
 )
-from ..view.visualization import ImageMouseTool
+from ..view.visualization import ImageItem, ImageMouseTool
 from .data import FileDialogFactory
 from .visualization import VisualizationController
 
@@ -42,12 +42,16 @@ class ImageToolsController:
         view.save_button.clicked.connect(visualization_controller.save_image)
         view.move_button.setCheckable(True)
         view.move_button.setChecked(True)
+        view.fourier_button.setCheckable(True)
         view.ruler_button.setCheckable(True)
         view.rectangle_button.setCheckable(True)
         view.line_cut_button.setCheckable(True)
 
         self._mouse_tool_button_group = QButtonGroup()
         self._mouse_tool_button_group.addButton(view.move_button, ImageMouseTool.MOVE_TOOL.value)
+        self._mouse_tool_button_group.addButton(
+            view.fourier_button, ImageMouseTool.FOURIER_TOOL.value
+        )
         self._mouse_tool_button_group.addButton(view.ruler_button, ImageMouseTool.RULER_TOOL.value)
         self._mouse_tool_button_group.addButton(
             view.rectangle_button, ImageMouseTool.RECTANGLE_TOOL.value
@@ -117,7 +121,7 @@ class ImageDataRangeController(Observer):
         self._engine = engine
         self._view = view
         self._image_widget = image_widget
-        self._display_range_dialog = ImageDisplayRangeDialog.create_instance(view)
+        self._display_range_dialog = ImageDisplayRangeDialog(view)
         self._visualization_controller = visualization_controller
         self._display_range_is_locked = True
 
@@ -207,6 +211,9 @@ class ImageController:
             view.image_widget,
             self._visualization_controller,
         )
+
+    def get_item(self) -> ImageItem:
+        return self._visualization_controller.get_item()
 
     def set_array(self, array: NumberArrayType, pixel_geometry: PixelGeometry) -> None:
         self._visualization_controller.set_array(array, pixel_geometry)

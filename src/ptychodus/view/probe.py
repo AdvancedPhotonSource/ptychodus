@@ -26,8 +26,8 @@ from .widgets import DecimalLineEdit, LengthWidget
 class ProbePropagationParametersView(QGroupBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Parameters', parent)
-        self.begin_coordinate_widget = LengthWidget.create_instance(is_signed=True)
-        self.end_coordinate_widget = LengthWidget.create_instance(is_signed=True)
+        self.begin_coordinate_widget = LengthWidget(is_signed=True)
+        self.end_coordinate_widget = LengthWidget(is_signed=True)
         self.num_steps_spin_box = QSpinBox()
         self.visualization_parameters_view = VisualizationParametersView()
 

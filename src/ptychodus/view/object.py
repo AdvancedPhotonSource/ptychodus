@@ -16,6 +16,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
+from .image import ImageView
 from .visualization import VisualizationParametersView, VisualizationWidget
 
 
@@ -49,13 +50,15 @@ class FourierRingCorrelationDialog(QDialog):
 class FourierAnalysisDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.real_space_widget = VisualizationWidget('Real Space', add_fourier_tool=True)
-        self.reciprocal_space_widget = VisualizationWidget('Reciprocal Space')
+        self.real_space_view = ImageView(add_fourier_tool=True)
+        # FIXME self.real_space_widget = VisualizationWidget('Real Space', add_fourier_tool=True)
+        self.reciprocal_space_view = ImageView()
+        # FIXME self.reciprocal_space_widget = VisualizationWidget('Reciprocal Space')
         self.status_bar = QStatusBar()
 
         contents_layout = QHBoxLayout()
-        contents_layout.addWidget(self.real_space_widget)
-        contents_layout.addWidget(self.reciprocal_space_widget)
+        contents_layout.addWidget(self.real_space_view)
+        contents_layout.addWidget(self.reciprocal_space_view)
 
         layout = QVBoxLayout()
         layout.addLayout(contents_layout)

@@ -26,111 +26,103 @@ from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
 
 
 class ImageDisplayRangeDialog(QDialog):
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.button_box = QDialogButtonBox()
         self.min_value_line_edit = DecimalLineEdit.create_instance()
         self.max_value_line_edit = DecimalLineEdit.create_instance()
 
-    @classmethod
-    def create_instance(cls, parent: QWidget | None = None) -> ImageDisplayRangeDialog:
-        dialog = cls(parent)
-        dialog.setWindowTitle('Set Display Range')
-        dialog.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
-        dialog.button_box.accepted.connect(dialog.accept)
-        dialog.button_box.addButton(QDialogButtonBox.StandardButton.Cancel)
-        dialog.button_box.rejected.connect(dialog.reject)
+        self.setWindowTitle('Set Display Range')
+        self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.addButton(QDialogButtonBox.StandardButton.Cancel)
+        self.button_box.rejected.connect(self.reject)
 
         layout = QFormLayout()
-        layout.addRow('Minimum Displayed Value:', dialog.min_value_line_edit)
-        layout.addRow('Maximum Displayed Value:', dialog.max_value_line_edit)
-        layout.addRow(dialog.button_box)
-        dialog.setLayout(layout)
-
-        return dialog
+        layout.addRow('Minimum Displayed Value:', self.min_value_line_edit)
+        layout.addRow('Maximum Displayed Value:', self.max_value_line_edit)
+        layout.addRow(self.button_box)
+        self.setLayout(layout)
 
 
 class ImageToolsGroupBox(BottomTitledGroupBox):
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, add_fourier_tool: bool = False) -> None:
         super().__init__('Tools', parent)
         self.home_button = QToolButton()
         self.save_button = QToolButton()
         self.move_button = QToolButton()
+        self.fourier_button = QToolButton()
         self.ruler_button = QToolButton()
         self.rectangle_button = QToolButton()
         self.line_cut_button = QToolButton()
 
-    @classmethod
-    def create_instance(cls, parent: QWidget | None = None) -> ImageToolsGroupBox:
-        view = cls(parent)
+        self.home_button.setIcon(QIcon(':/icons/home'))
+        self.home_button.setIconSize(QSize(32, 32))
+        self.home_button.setToolTip('Home')
 
-        view.home_button.setIcon(QIcon(':/icons/home'))
-        view.home_button.setIconSize(QSize(32, 32))
-        view.home_button.setToolTip('Home')
+        self.save_button.setIcon(QIcon(':/icons/save'))
+        self.save_button.setIconSize(QSize(32, 32))
+        self.save_button.setToolTip('Save Image')
 
-        view.save_button.setIcon(QIcon(':/icons/save'))
-        view.save_button.setIconSize(QSize(32, 32))
-        view.save_button.setToolTip('Save Image')
+        self.move_button.setIcon(QIcon(':/icons/move'))
+        self.move_button.setIconSize(QSize(32, 32))
+        self.move_button.setToolTip('Move')
 
-        view.move_button.setIcon(QIcon(':/icons/move'))
-        view.move_button.setIconSize(QSize(32, 32))
-        view.move_button.setToolTip('Move')
+        self.fourier_button.setIcon(QIcon(':/icons/fourier'))
+        self.fourier_button.setIconSize(QSize(32, 32))
+        self.fourier_button.setToolTip('Fourier Transform')
 
-        view.ruler_button.setIcon(QIcon(':/icons/ruler'))
-        view.ruler_button.setIconSize(QSize(32, 32))
-        view.ruler_button.setToolTip('Ruler')
+        self.ruler_button.setIcon(QIcon(':/icons/ruler'))
+        self.ruler_button.setIconSize(QSize(32, 32))
+        self.ruler_button.setToolTip('Ruler')
 
-        view.rectangle_button.setIcon(QIcon(':/icons/rectangle'))
-        view.rectangle_button.setIconSize(QSize(32, 32))
-        view.rectangle_button.setToolTip('Rectangle')
+        self.rectangle_button.setIcon(QIcon(':/icons/rectangle'))
+        self.rectangle_button.setIconSize(QSize(32, 32))
+        self.rectangle_button.setToolTip('Rectangle')
 
-        view.line_cut_button.setIcon(QIcon(':/icons/line-cut'))
-        view.line_cut_button.setIconSize(QSize(32, 32))
-        view.line_cut_button.setToolTip('Line-Cut Profile')
+        self.line_cut_button.setIcon(QIcon(':/icons/line-cut'))
+        self.line_cut_button.setIconSize(QSize(32, 32))
+        self.line_cut_button.setToolTip('Line-Cut Profile')
 
         layout = QGridLayout()
-        layout.addWidget(view.home_button, 0, 0)
-        layout.addWidget(view.save_button, 0, 1)
-        layout.addWidget(view.move_button, 0, 2)
-        layout.addWidget(view.ruler_button, 1, 0)
-        layout.addWidget(view.rectangle_button, 1, 1)
-        layout.addWidget(view.line_cut_button, 1, 2)
-        view.setLayout(layout)
+        layout.addWidget(self.home_button, 0, 0)
+        layout.addWidget(self.save_button, 0, 1)
+        layout.addWidget(self.move_button, 0, 2)
 
-        view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
+        if add_fourier_tool:
+            layout.addWidget(self.fourier_button, 0, 3)
 
-        return view
+        layout.addWidget(self.ruler_button, 1, 0)
+        layout.addWidget(self.rectangle_button, 1, 1)
+        layout.addWidget(self.line_cut_button, 1, 2)
+        self.setLayout(layout)
+
+        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
 
 
 class ImageRendererGroupBox(BottomTitledGroupBox):
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Colorize', parent)
         self.renderer_combo_box = QComboBox()
         self.transformation_combo_box = QComboBox()
         self.variant_combo_box = QComboBox()
 
-    @classmethod
-    def create_instance(cls, parent: QWidget | None = None) -> ImageRendererGroupBox:
-        view = cls(parent)
-
-        view.renderer_combo_box.setToolTip('Array Component')
-        view.transformation_combo_box.setToolTip('Transformation')
-        view.variant_combo_box.setToolTip('Variant')
+        self.renderer_combo_box.setToolTip('Array Component')
+        self.transformation_combo_box.setToolTip('Transformation')
+        self.variant_combo_box.setToolTip('Variant')
 
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 10, 10, 35)
-        layout.addWidget(view.renderer_combo_box)
-        layout.addWidget(view.transformation_combo_box)
-        layout.addWidget(view.variant_combo_box)
-        view.setLayout(layout)
+        layout.addWidget(self.renderer_combo_box)
+        layout.addWidget(self.transformation_combo_box)
+        layout.addWidget(self.variant_combo_box)
+        self.setLayout(layout)
 
-        view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
-
-        return view
+        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
 
 
 class ImageDataRangeGroupBox(BottomTitledGroupBox):
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Data Range', parent)
         self.min_display_value_slider = DecimalSlider.create_instance(Qt.Orientation.Horizontal)
         self.max_display_value_slider = DecimalSlider.create_instance(Qt.Orientation.Horizontal)
@@ -138,55 +130,43 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
         self.edit_button = QPushButton('Edit')
         self.color_legend_button = QPushButton('Color Legend')
 
-    @classmethod
-    def create_instance(cls, parent: QWidget | None = None) -> ImageDataRangeGroupBox:
-        view = cls(parent)
-
-        view.min_display_value_slider.setToolTip('Minimum Display Value')
-        view.max_display_value_slider.setToolTip('Maximum Display Value')
-        view.auto_button.setToolTip('Rescale to Data Range')
-        view.edit_button.setToolTip('Rescale to Custom Range')
-        view.color_legend_button.setToolTip('Toggle Color Legend Visibility')
+        self.min_display_value_slider.setToolTip('Minimum Display Value')
+        self.max_display_value_slider.setToolTip('Maximum Display Value')
+        self.auto_button.setToolTip('Rescale to Data Range')
+        self.edit_button.setToolTip('Rescale to Custom Range')
+        self.color_legend_button.setToolTip('Toggle Color Legend Visibility')
 
         button_layout = QHBoxLayout()
         button_layout.setContentsMargins(0, 0, 0, 0)
-        button_layout.addWidget(view.auto_button)
-        button_layout.addWidget(view.edit_button)
-        button_layout.addWidget(view.color_legend_button)
+        button_layout.addWidget(self.auto_button)
+        button_layout.addWidget(self.edit_button)
+        button_layout.addWidget(self.color_legend_button)
 
         layout = QFormLayout()
         layout.setContentsMargins(10, 10, 10, 35)
-        layout.addRow('Min:', view.min_display_value_slider)
-        layout.addRow('Max:', view.max_display_value_slider)
+        layout.addRow('Min:', self.min_display_value_slider)
+        layout.addRow('Max:', self.max_display_value_slider)
         layout.addRow(button_layout)
-        view.setLayout(layout)
+        self.setLayout(layout)
 
-        view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-
-        return view
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
 
 class ImageRibbon(QWidget):
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, add_fourier_tool: bool = False) -> None:
         super().__init__(parent)
-        self.image_tools_group_box = ImageToolsGroupBox.create_instance()
-        self.colormap_group_box = ImageRendererGroupBox.create_instance()
-        self.data_range_group_box = ImageDataRangeGroupBox.create_instance()
-
-    @classmethod
-    def create_instance(cls, parent: QWidget | None = None) -> ImageRibbon:
-        view = cls(parent)
+        self.image_tools_group_box = ImageToolsGroupBox(add_fourier_tool=add_fourier_tool)
+        self.colormap_group_box = ImageRendererGroupBox()
+        self.data_range_group_box = ImageDataRangeGroupBox()
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.image_tools_group_box)
-        layout.addWidget(view.colormap_group_box)
-        layout.addWidget(view.data_range_group_box)
-        view.setLayout(layout)
+        layout.addWidget(self.image_tools_group_box)
+        layout.addWidget(self.colormap_group_box)
+        layout.addWidget(self.data_range_group_box)
+        self.setLayout(layout)
 
-        view.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-
-        return view
+        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
 
 class ImageWidget(VisualizationView):
@@ -302,9 +282,9 @@ class ImageWidget(VisualizationView):
 
 
 class ImageView(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, add_fourier_tool: bool = False) -> None:
         super().__init__(parent)
-        self.image_ribbon = ImageRibbon.create_instance()
+        self.image_ribbon = ImageRibbon(add_fourier_tool=add_fourier_tool)
         self.image_widget = ImageWidget()
 
         layout = QVBoxLayout()

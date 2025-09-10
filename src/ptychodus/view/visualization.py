@@ -337,9 +337,7 @@ class VisualizationView(QGraphicsView):
 
 
 class VisualizationWidget(QGroupBox):
-    def __init__(
-        self, title: str, parent: QWidget | None = None, *, add_fourier_tool: bool = False
-    ) -> None:
+    def __init__(self, title: str, parent: QWidget | None = None) -> None:
         super().__init__(title, parent)
         self.tool_bar = QToolBar('Tools')
         self.home_action = QAction(QIcon(':/icons/home'), 'Home')
@@ -350,7 +348,6 @@ class VisualizationWidget(QGroupBox):
         self.ruler_action = QAction(QIcon(':/icons/ruler'), 'Ruler')
         self.rectangle_action = QAction(QIcon(':/icons/rectangle'), 'Rectangle')
         self.line_cut_action = QAction(QIcon(':/icons/line-cut'), 'Line-Cut Profile')
-        self.fourier_action = QAction(QIcon(':/icons/fourier'), 'Fourier Transform')
 
         self.visualization_view = VisualizationView()
 
@@ -366,10 +363,6 @@ class VisualizationWidget(QGroupBox):
         self.tool_bar.addAction(self.ruler_action)
         self.tool_bar.addAction(self.rectangle_action)
         self.tool_bar.addAction(self.line_cut_action)
-
-        if add_fourier_tool:
-            self.tool_bar.addAction(self.fourier_action)
-
         self.tool_bar.addSeparator()
 
         layout = QVBoxLayout()

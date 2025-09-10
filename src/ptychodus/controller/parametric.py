@@ -463,7 +463,7 @@ class LengthWidgetParameterViewController(ParameterViewController, Observer):
     ) -> None:
         super().__init__()
         self._parameter = parameter
-        self._widget = LengthWidget.create_instance(is_signed=is_signed)
+        self._widget = LengthWidget(is_signed=is_signed)
 
         if tool_tip:
             self._widget.setToolTip(tool_tip)
@@ -490,7 +490,7 @@ class AngleWidgetParameterViewController(ParameterViewController, Observer):
     def __init__(self, parameter: RealParameter, tool_tip: str = '') -> None:
         super().__init__()
         self._parameter = parameter
-        self._widget = AngleWidget.create_instance()
+        self._widget = AngleWidget()
 
         if tool_tip:
             self._widget.setToolTip(tool_tip)

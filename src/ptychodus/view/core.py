@@ -49,7 +49,7 @@ class ViewCore(QMainWindow):
         self.settings_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/settings'), 'Settings'
         )
-        self.settings_view = SettingsView.create_instance()
+        self.settings_view = SettingsView()
         self.settings_table_view = QTableView()
 
         self.patterns_action = self.navigation_tool_bar.addAction(

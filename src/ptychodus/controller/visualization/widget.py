@@ -41,15 +41,11 @@ class VisualizationWidgetController:
         widget.line_cut_action.setData(ImageMouseTool.LINE_CUT_TOOL.value)
         widget.line_cut_action.setCheckable(True)
 
-        widget.fourier_action.setData(ImageMouseTool.FOURIER_TOOL.value)
-        widget.fourier_action.setCheckable(True)
-
         self._mouse_tool_action_group = QActionGroup(widget.tool_bar)
         self._mouse_tool_action_group.addAction(widget.move_action)
         self._mouse_tool_action_group.addAction(widget.ruler_action)
         self._mouse_tool_action_group.addAction(widget.rectangle_action)
         self._mouse_tool_action_group.addAction(widget.line_cut_action)
-        self._mouse_tool_action_group.addAction(widget.fourier_action)
         self._mouse_tool_action_group.triggered.connect(self._set_mouse_tool)
 
     def get_item(self) -> ImageItem:

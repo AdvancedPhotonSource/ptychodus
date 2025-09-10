@@ -215,7 +215,11 @@ class ProductController(ProductRepositoryObserver):
         view.table_view.setModel(table_proxy_model)
         view.table_view.setSortingEnabled(True)
         view.table_view.sortByColumn(0, Qt.SortOrder.AscendingOrder)
-        view.table_view.verticalHeader().hide()
+        vertical_header = view.table_view.verticalHeader()
+
+        if vertical_header is not None:
+            vertical_header.hide()
+
         view.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         connect_current_changed_signal(view.table_view, controller._update_enabled_buttons)
         controller._update_enabled_buttons(QModelIndex(), QModelIndex())
