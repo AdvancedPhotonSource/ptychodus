@@ -39,7 +39,12 @@ class H5DiffractionPatternArray(DiffractionArray):
 
     def get_patterns(self) -> DiffractionPatterns:
         with h5py.File(self._file_path, 'r') as h5_file:
-            item = h5_file[self._data_path]
+            try:
+                item = h5_file[self._data_path]
+            except KeyError:
+                raise ValueError(
+                    f'Failed to find diffraction pattern array at "{self._data_path}"!'
+                )
 
             if isinstance(item, h5py.Dataset):
                 logger.debug(f'Reading "{item.name}"...')
@@ -225,11 +230,6 @@ def register_plugins(registry: PluginRegistry) -> None:
         H5DiffractionFileReader(data_path='/entry/data/data'),
         simple_name='APS_HXN',
         display_name='CNM/APS 26-ID Hard X-ray Nanoprobe Files (*.h5 *.hdf5)',
-    )
-    registry.diffraction_file_readers.register_plugin(
-        H5DiffractionFileReader(data_path='/entry/measurement/Eiger/data'),
-        simple_name='MAX_IV_NanoMax',
-        display_name='MAX IV NanoMax Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(data_path='/dp'),
