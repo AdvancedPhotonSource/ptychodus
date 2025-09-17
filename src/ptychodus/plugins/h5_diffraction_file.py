@@ -39,10 +39,48 @@ class H5DiffractionPatternArray(DiffractionArray):
 
     def get_patterns(self) -> DiffractionPatterns:
         with h5py.File(self._file_path, 'r') as h5_file:
-            item = h5_file[self._data_path]
+            try:
+                item = h5_file[self._data_path]
+            except KeyError:
+                raise ValueError(
+                    f'Failed to find diffraction pattern array at "{self._data_path}"!'
+                )
 
             if isinstance(item, h5py.Dataset):
-                return item[()]
+                logger.debug(f'Reading "{item.name}"...')
+                logger.debug(f'\tcompression = {item.compression}')
+                logger.debug(f'\tcompression_opts = {item.compression_opts}')
+
+                dataset_id = item.id
+                dataset_creation_properties = dataset_id.get_create_plist()
+                nfilters = dataset_creation_properties.get_nfilters()
+                missing_filter_names: list[str] = []
+
+                if nfilters > 0:
+                    logger.debug('\tfilters = [')
+
+                    for filter_idx in range(nfilters):
+                        filter_ = dataset_creation_properties.get_filter(filter_idx)
+                        filter_code = filter_[0]
+                        flags = filter_[1]
+                        aux_data = filter_[2]
+                        name = filter_[3].decode()
+                        logger.debug(
+                            f'\t\t({filter_idx}) {filter_code=}, {flags=}, {aux_data=}, {name=}'
+                        )
+
+                        if not h5py.h5z.filter_avail(filter_code):
+                            missing_filter_names.append(name)
+
+                    logger.debug('\t]')
+                else:
+                    logger.debug('\tfilters = []')
+
+                if missing_filter_names:
+                    names = ' '.join(missing_filter_names)
+                    raise RuntimeError(f'Missing filters needed to read dataset: {names}!')
+
+                return item[:]
             else:
                 raise ValueError(f'Path {self._file_path}:{self._data_path} is not a dataset!')
 
@@ -85,7 +123,7 @@ class H5DiffractionFileTreeBuilder:
                 item_details = ''
                 h5_item = h5_group.get(item_name, getlink=True)
 
-                tree_node = parent_item.create_child(list())
+                tree_node = parent_item.create_child([])
 
                 if isinstance(h5_item, h5py.HardLink):
                     item_type = 'Hard Link'
@@ -117,8 +155,12 @@ class H5DiffractionFileTreeBuilder:
                                 else:
                                     item_details = f'SCALAR {value.dtype} = {value}'
                         elif h5_item.size == 1:
-                            value = h5_item[()]
-                            item_details = f'DATASET {value.dtype} = {value}'
+                            try:
+                                value = h5_item[()]
+                            except Exception:
+                                item_details = f'{h5_item.shape} {h5_item.dtype}'
+                            else:
+                                item_details = f'DATASET {value.dtype} = {value}'
                         else:
                             item_details = f'{h5_item.shape} {h5_item.dtype}'
                 elif isinstance(h5_item, h5py.SoftLink):
@@ -142,9 +184,7 @@ class H5DiffractionFileReader(DiffractionFileReader):
 
     def read(self, file_path: Path) -> DiffractionDataset:
         with h5py.File(file_path, 'r') as h5_file:
-            metadata = DiffractionMetadata.create_null(file_path)
             contents_tree = self._tree_builder.build(h5_file)
-
             data = h5_file[self._data_path]
 
             if isinstance(data, h5py.Dataset):
@@ -182,11 +222,6 @@ class H5DiffractionFileWriter(DiffractionFileWriter):
 
 def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
-        H5DiffractionFileReader(data_path='/entry/data/data'),
-        simple_name='APS_Polar',
-        display_name='APS 4-ID Polar Files (*.h5 *.hdf5)',
-    )
-    registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(data_path='/exchange/data'),
         simple_name='APS_CSSI',
         display_name='APS 9-ID CSSI Files (*.h5 *.hdf5)',
@@ -195,11 +230,6 @@ def register_plugins(registry: PluginRegistry) -> None:
         H5DiffractionFileReader(data_path='/entry/data/data'),
         simple_name='APS_HXN',
         display_name='CNM/APS 26-ID Hard X-ray Nanoprobe Files (*.h5 *.hdf5)',
-    )
-    registry.diffraction_file_readers.register_plugin(
-        H5DiffractionFileReader(data_path='/entry/measurement/Eiger/data'),
-        simple_name='MAX_IV_NanoMax',
-        display_name='MAX IV NanoMax Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(data_path='/dp'),

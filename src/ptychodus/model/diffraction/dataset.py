@@ -72,6 +72,10 @@ class AssembledDiffractionPatternArray(DiffractionArray):
         self._good_pixels = numpy.logical_not(bad_pixels)
         self._array_index = array_index
 
+        self._average_pattern = data.mean(axis=0)
+        loaded_data = data[indexes >= 0]
+        self._total_counts = numpy.sum(loaded_data[:, self._good_pixels], axis=-1)
+
     @classmethod
     def create_null(cls) -> AssembledDiffractionPatternArray:
         indexes = numpy.array([0])
@@ -96,17 +100,13 @@ class AssembledDiffractionPatternArray(DiffractionArray):
         return pattern[self._good_pixels].sum()
 
     def get_average_pattern(self) -> DiffractionPatterns:
-        return self._data.mean(axis=0)
-
-    def _get_total_counts(self) -> DiffractionPatterns:
-        loaded_data = self._data[self._indexes >= 0]
-        return numpy.sum(loaded_data[:, self._good_pixels], axis=-1)
+        return self._average_pattern
 
     def get_mean_pattern_counts(self) -> float:
-        return self._get_total_counts().mean()
+        return self._total_counts.mean()
 
     def get_max_pattern_counts(self) -> int:
-        return self._get_total_counts().max()
+        return self._total_counts.max()
 
     def get_array_index(self) -> int:
         return self._array_index
@@ -151,8 +151,6 @@ class ArrayLoader:
                 processed_array = processor(task.array)
             except FileNotFoundError:
                 logger.warning(f'File not found for array index={task.index}.')
-            except OSError:
-                logger.error(f'OS error while reading array index={task.index}.')
             except Exception:
                 logger.exception(f'Error while loading array index={task.index}!')
             else:

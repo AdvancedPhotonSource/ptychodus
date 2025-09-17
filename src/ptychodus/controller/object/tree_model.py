@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Any, overload
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
+from PyQt5.QtGui import QBrush
 
 from ptychodus.api.units import BYTES_PER_MEGABYTE
 
@@ -31,11 +32,13 @@ class ObjectTreeModel(QAbstractItemModel):
         self,
         repository: ObjectRepository,
         api: ObjectAPI,
+        editable_item_brush: QBrush,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._repository = repository
         self._api = api
+        self._editable_item_brush = editable_item_brush
         self._tree_root = ObjectTreeNode()
         self._header = [
             'Name',
@@ -146,32 +149,40 @@ class ObjectTreeModel(QAbstractItemModel):
             item = self._repository[parent.row()]
 
             if role == Qt.ItemDataRole.DisplayRole:
-                if index.column() == 0:
-                    return f'Layer {index.row() + 1}'
-                elif index.column() == 1:
-                    try:
-                        return item.layer_spacing_m[index.row()]
-                    except IndexError:
-                        return float('inf')
+                match index.column():
+                    case 0:
+                        return f'Layer {index.row() + 1}'
+                    case 1:
+                        try:
+                            return item.layer_spacing_m[index.row()]
+                        except IndexError:
+                            return float('inf')
+            elif role == Qt.ItemDataRole.BackgroundRole:
+                if index.flags() & Qt.ItemFlag.ItemIsEditable:
+                    return self._editable_item_brush
         else:
             item = self._repository[index.row()]
             object_ = item.get_object()
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
-                if index.column() == 0:
-                    return self._repository.get_name(index.row())
-                elif index.column() == 1:
-                    return object_.get_total_thickness_m()
-                elif index.column() == 2:
-                    return item.get_builder().get_name()
-                elif index.column() == 3:
-                    return str(object_.dtype)
-                elif index.column() == 4:
-                    return object_.width_px
-                elif index.column() == 5:
-                    return object_.height_px
-                elif index.column() == 6:
-                    return f'{object_.nbytes / BYTES_PER_MEGABYTE:.2f}'
+                match index.column():
+                    case 0:
+                        return self._repository.get_name(index.row())
+                    case 1:
+                        return object_.get_total_thickness_m()
+                    case 2:
+                        return item.get_builder().get_name()
+                    case 3:
+                        return str(object_.dtype)
+                    case 4:
+                        return object_.width_px
+                    case 5:
+                        return object_.height_px
+                    case 6:
+                        return f'{object_.nbytes / BYTES_PER_MEGABYTE:.2f}'
+            elif role == Qt.ItemDataRole.BackgroundRole:
+                if index.flags() & Qt.ItemFlag.ItemIsEditable:
+                    return self._editable_item_brush
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)

@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Final
 import logging
 
 import h5py
@@ -21,8 +20,6 @@ logger = logging.getLogger(__name__)
 
 
 class ISNDiffractionFileReader(DiffractionFileReader):
-    ONE_MILLIMETER_M: Final[float] = 1.0e-3
-
     def __init__(self) -> None:
         self._tree_builder = H5DiffractionFileTreeBuilder()
 
@@ -30,51 +27,67 @@ class ISNDiffractionFileReader(DiffractionFileReader):
         array_list: list[DiffractionArray] = []
 
         with h5py.File(file_path, 'r') as h5_file:
-            configs = h5_file['configs']
-
-            if isinstance(configs, h5py.Group):
-                num_images = int(configs['num_images'][()])
-                num_exposures_per_image = int(configs['num_exposures_per_img'][()])
-
-                metadata = DiffractionMetadata(
-                    num_patterns_per_array=[num_exposures_per_image] * num_images,
-                    pattern_dtype=numpy.dtype('u4'),  # TODO from data
-                    detector_distance_m=float(configs['det_dist_mm'][()]) * self.ONE_MILLIMETER_M,
-                    detector_extent=ImageExtent(
-                        int(configs['det_size_x'][()]), int(configs['det_size_y'][()])
-                    ),
-                    detector_pixel_geometry=PixelGeometry(
-                        float(configs['pix_size_x'][()]), float(configs['pix_size_y'][()])
-                    ),
-                    probe_energy_eV=float(configs['photon_energy_eV'][()]),  # noqa: N806
-                    file_path=file_path,
-                )
-            else:
-                raise KeyError('configs is not a group!')
-
-            contents_tree = self._tree_builder.build(h5_file)
             ptycho = h5_file['PTYCHO']
+            configs = h5_file['configs']
+            num_patterns_per_array: list[int] = []
 
             if isinstance(ptycho, h5py.Group):
+                data_path = '/entry/data/data'
                 offset = 0
 
                 for name in sorted(ptycho):
                     h5_item = ptycho.get(name, getlink=True)
 
                     if isinstance(h5_item, h5py.ExternalLink):
-                        data_path = '/entry/data/data'  # TODO str(h5_item.path)
+                        data_file_path = file_path.parent / h5_item.filename
+
+                        with h5py.File(data_file_path) as h5_data_file:
+                            h5_data = h5_data_file[data_path]
+
+                            if isinstance(h5_data, h5py.Dataset):
+                                num_patterns, _, _ = h5_data.shape
+                                num_patterns_per_array.append(num_patterns)
+                            else:
+                                raise ValueError(
+                                    f'Expected {data_file_path}:{data_path} to be a dataset.'
+                                )
+
                         array = H5DiffractionPatternArray(
                             label=name,
-                            indexes=numpy.arange(num_exposures_per_image) + offset,
-                            file_path=file_path.parent / h5_item.filename,
+                            indexes=numpy.arange(num_patterns) + offset,
+                            file_path=data_file_path,
                             data_path=data_path,
                         )
                         array_list.append(array)
-                        offset += num_exposures_per_image
+                        offset += num_patterns
                     else:
                         logger.debug(f'Skipping "{name}": not an external link.')
             else:
                 raise KeyError('PTYCHO is not a group!')
+
+            if isinstance(configs, h5py.Group):
+                detector_distance_m = float(
+                    configs['det_dist_mm'][()]
+                )  # file units are m; typo in dataset name
+                detector_width_px = int(configs['det_size_x'][()])
+                detector_height_px = int(configs['det_size_y'][()])
+                pixel_width_m = float(configs['pix_size_x'][()])
+                pixel_height_m = float(configs['pix_size_y'][()])
+                probe_energy_eV = float(configs['photon_energy_eV'][()])  # noqa: N806
+
+                metadata = DiffractionMetadata(
+                    num_patterns_per_array=num_patterns_per_array,
+                    pattern_dtype=numpy.dtype(numpy.uint32),
+                    detector_distance_m=detector_distance_m,
+                    detector_extent=ImageExtent(detector_width_px, detector_height_px),
+                    detector_pixel_geometry=PixelGeometry(pixel_width_m, pixel_height_m),
+                    probe_energy_eV=probe_energy_eV,
+                    file_path=file_path,
+                )
+            else:
+                raise KeyError('configs is not a group!')
+
+            contents_tree = self._tree_builder.build(h5_file)
 
             return SimpleDiffractionDataset(metadata, contents_tree, array_list)
 

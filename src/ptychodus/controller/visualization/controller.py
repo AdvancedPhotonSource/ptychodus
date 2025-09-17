@@ -14,7 +14,7 @@ from ...model.visualization import VisualizationEngine
 from ...view.visualization import (
     HistogramDialog,
     ImageItem,
-    ImageItemEvents,
+    ImageItemSignals,
     ImageMouseTool,
     LineCutDialog,
     VisualizationView,
@@ -32,43 +32,33 @@ class VisualizationController(Observer):
         self,
         engine: VisualizationEngine,
         view: VisualizationView,
-        item: ImageItem,
         status_bar: QStatusBar,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._engine = engine
         self._view = view
-        self._item = item
         self._status_bar = status_bar
         self._file_dialog_factory = file_dialog_factory
-        self._line_cut_dialog = LineCutDialog.create_instance(view)
-        self._histogram_dialog = HistogramDialog.create_instance(view)
+        self._line_cut_dialog = LineCutDialog(view)
+        self._histogram_dialog = HistogramDialog(view)
 
-    @classmethod
-    def create_instance(
-        cls,
-        engine: VisualizationEngine,
-        view: VisualizationView,
-        status_bar: QStatusBar,
-        file_dialog_factory: FileDialogFactory,
-    ) -> VisualizationController:
-        item_events = ImageItemEvents()
-        item = ImageItem(item_events, status_bar)
-        controller = cls(engine, view, item, status_bar, file_dialog_factory)
-        engine.add_observer(controller)
+        item_signals = ImageItemSignals()
+        item_signals.line_cut_finished.connect(self._analyze_line_cut)
+        item_signals.rectangle_finished.connect(self._analyze_region)
 
-        item_events.line_cut_finished.connect(controller._analyze_line_cut)
-        item_events.rectangle_finished.connect(controller._analyze_region)
+        self._item = ImageItem(item_signals, status_bar)
+        engine.add_observer(self)
 
         scene = QGraphicsScene()
-        scene.addItem(item)
+        scene.addItem(self._item)
         view.setScene(scene)
 
         view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
-        return controller
+    def get_item(self) -> ImageItem:
+        return self._item
 
     def set_array(
         self,
@@ -172,6 +162,10 @@ class VisualizationController(Observer):
     def zoom_to_fit(self) -> None:
         self._item.setPos(0, 0)
         scene = self._view.scene()
+
+        if scene is None:
+            raise ValueError('scene is None!')
+
         bounding_rect = scene.itemsBoundingRect()
         scene.setSceneRect(bounding_rect)
         self._view.fitInView(scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)

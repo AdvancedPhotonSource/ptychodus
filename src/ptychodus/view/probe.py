@@ -26,10 +26,10 @@ from .widgets import DecimalLineEdit, LengthWidget
 class ProbePropagationParametersView(QGroupBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Parameters', parent)
-        self.begin_coordinate_widget = LengthWidget.create_instance(is_signed=True)
-        self.end_coordinate_widget = LengthWidget.create_instance(is_signed=True)
+        self.begin_coordinate_widget = LengthWidget(is_signed=True)
+        self.end_coordinate_widget = LengthWidget(is_signed=True)
         self.num_steps_spin_box = QSpinBox()
-        self.visualization_parameters_view = VisualizationParametersView.create_instance()
+        self.visualization_parameters_view = VisualizationParametersView()
 
         propagation_layout = QFormLayout()
         propagation_layout.addRow('Begin Coordinate:', self.begin_coordinate_widget)
@@ -49,10 +49,10 @@ class ProbePropagationParametersView(QGroupBox):
 class ProbePropagationDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.xy_view = VisualizationWidget.create_instance('XY Plane')
-        self.zx_view = VisualizationWidget.create_instance('ZX Plane')
+        self.xy_view = VisualizationWidget('XY Plane')
+        self.zx_view = VisualizationWidget('ZX Plane')
         self.parameters_view = ProbePropagationParametersView()
-        self.zy_view = VisualizationWidget.create_instance('ZY Plane')
+        self.zy_view = VisualizationWidget('ZY Plane')
         self.propagate_button = QPushButton('Propagate')
         self.save_button = QPushButton('Save')
         self.coordinate_slider = QSlider(Qt.Orientation.Horizontal)
@@ -87,8 +87,8 @@ class ProbePropagationDialog(QDialog):
 class STXMDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.visualization_widget = VisualizationWidget.create_instance('Transmission')
-        self.visualization_parameters_view = VisualizationParametersView.create_instance()
+        self.visualization_widget = VisualizationWidget('Transmission')
+        self.visualization_parameters_view = VisualizationParametersView()
         self.save_button = QPushButton('Save')
         self.status_bar = QStatusBar()
 
@@ -150,10 +150,10 @@ class IlluminationQuantityView(QGroupBox):
 class IlluminationDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.visualization_widget = VisualizationWidget.create_instance('Visualization')
+        self.visualization_widget = VisualizationWidget('Visualization')
         self.exposure_parameters_view = IlluminationParametersView()
         self.exposure_quantity_view = IlluminationQuantityView()
-        self.visualization_parameters_view = VisualizationParametersView.create_instance()
+        self.visualization_parameters_view = VisualizationParametersView()
         self.save_button = QPushButton('Save')
         self.status_bar = QStatusBar()
 
@@ -209,7 +209,10 @@ class FluorescenceParametersView(QGroupBox):
         self.enhance_button = QPushButton('Enhance')
         self.save_button = QPushButton('Save Enhanced Dataset')
 
-        self.stacked_widget.layout().setContentsMargins(0, 0, 0, 0)
+        stacked_widget_layout = self.stacked_widget.layout()
+
+        if stacked_widget_layout is not None:
+            stacked_widget_layout.setContentsMargins(0, 0, 0, 0)
 
         layout = QFormLayout()
         layout.addRow(self.open_button)
@@ -223,11 +226,11 @@ class FluorescenceParametersView(QGroupBox):
 class FluorescenceDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.measured_widget = VisualizationWidget.create_instance('Measured')
-        self.enhanced_widget = VisualizationWidget.create_instance('Enhanced')
+        self.measured_widget = VisualizationWidget('Measured')
+        self.enhanced_widget = VisualizationWidget('Enhanced')
         self.fluorescence_parameters_view = FluorescenceParametersView()
         self.fluorescence_channel_list_view = QListView()
-        self.visualization_parameters_view = VisualizationParametersView.create_instance()
+        self.visualization_parameters_view = VisualizationParametersView()
         self.status_bar = QStatusBar()
 
         parameter_layout = QVBoxLayout()

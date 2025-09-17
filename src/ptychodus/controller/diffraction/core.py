@@ -26,6 +26,7 @@ from ...model.diffraction import (
 from ...view.diffraction import DetectorView, PatternsView
 from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate
 from ..data import FileDialogFactory
+from ..helpers import connect_triggered_signal
 from ..image import ImageController
 from ..parametric import (
     LengthWidgetParameterViewController,
@@ -166,17 +167,23 @@ class DiffractionController(DiffractionDatasetObserver):
         view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         counts_item_delegate = ProgressBarItemDelegate(view.tree_view)
         view.tree_view.setItemDelegateForColumn(1, counts_item_delegate)
-        view.tree_view.selectionModel().currentChanged.connect(self._update_view)
+        selection_model = view.tree_view.selectionModel()
+
+        if selection_model is None:
+            raise ValueError('selection_model is None!')
+        else:
+            selection_model.currentChanged.connect(self._update_view)
+
         self._update_view(QModelIndex(), QModelIndex())
 
         open_dataset_action = view.button_box.load_menu.addAction('Open File...')
-        open_dataset_action.triggered.connect(self._wizard_controller.open_dataset)
+        connect_triggered_signal(open_dataset_action, self._wizard_controller.open_dataset)
 
         view.button_box.save_button.clicked.connect(self._save_dataset)
         view.button_box.close_button.clicked.connect(self._close_dataset)
 
         dataset_layout_action = view.button_box.analyze_menu.addAction('Dataset Layout...')
-        dataset_layout_action.triggered.connect(self._show_dataset_layout)
+        connect_triggered_signal(dataset_layout_action, self._show_dataset_layout)
 
         dataset.add_observer(self)
         self._sync_model_to_view()

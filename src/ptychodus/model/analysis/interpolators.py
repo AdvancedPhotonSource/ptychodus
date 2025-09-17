@@ -1,4 +1,5 @@
 from typing import Generic, TypeVar
+import logging
 
 from numpy.typing import NDArray
 import numpy
@@ -8,9 +9,12 @@ from ptychodus.api.typing import RealArrayType
 __all__ = [
     'BarycentricArrayInterpolator',
     'BarycentricArrayStitcher',
+    'NearestNeighborArrayInterpolator',
 ]
 
 InexactDType = TypeVar('InexactDType', bound=numpy.inexact)
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_support_frac(x: float, n: int) -> tuple[slice, float]:
@@ -27,11 +31,13 @@ class NearestNeighborArrayInterpolator(Generic[InexactDType]):
     def get_patch(
         self, center_x: float, center_y: float, width: int, height: int
     ) -> NDArray[InexactDType]:
-        x_lower = int(center_x - width / 2)
-        x_support = slice(x_lower, x_lower + width)
-
         y_lower = int(center_y - height / 2)
         y_support = slice(y_lower, y_lower + height)
+        logger.debug(f'{y_support=}')
+
+        x_lower = int(center_x - width / 2)
+        x_support = slice(x_lower, x_lower + width)
+        logger.debug(f'{x_support=}')
 
         return self._array[..., y_support, x_support]
 

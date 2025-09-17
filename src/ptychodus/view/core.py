@@ -49,14 +49,14 @@ class ViewCore(QMainWindow):
         self.settings_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/settings'), 'Settings'
         )
-        self.settings_view = SettingsView.create_instance()
+        self.settings_view = SettingsView()
         self.settings_table_view = QTableView()
 
         self.patterns_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/patterns'), 'Patterns'
         )
         self.patterns_view = PatternsView()
-        self.patterns_image_view = ImageView.create_instance()
+        self.patterns_image_view = ImageView()
 
         self.product_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/products'), 'Products'
@@ -70,11 +70,11 @@ class ViewCore(QMainWindow):
 
         self.probe_action = self.navigation_tool_bar.addAction(QIcon(':/icons/probe'), 'Probe')
         self.probe_view = RepositoryTreeView()
-        self.probe_image_view = ImageView.create_instance()
+        self.probe_image_view = ImageView()
 
         self.object_action = self.navigation_tool_bar.addAction(QIcon(':/icons/object'), 'Object')
         self.object_view = RepositoryTreeView()
-        self.object_image_view = ImageView.create_instance()
+        self.object_image_view = ImageView()
 
         self.reconstructor_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/reconstructor'), 'Reconstructor'
@@ -145,9 +145,15 @@ class ViewCore(QMainWindow):
 
         self.setCentralWidget(self.splitter)
 
-        desktop_size = QApplication.desktop().availableGeometry().size()
-        preferred_height = desktop_size.height() * 2 // 3
-        preferred_width = min(desktop_size.width() * 2 // 3, 2 * preferred_height)
-        self.resize(preferred_width, preferred_height)
+        application_desktop = QApplication.desktop()
 
-        self.statusBar().addPermanentWidget(self.memory_widget)
+        if application_desktop is not None:
+            desktop_size = application_desktop.availableGeometry().size()
+            preferred_height = desktop_size.height() * 2 // 3
+            preferred_width = min(desktop_size.width() * 2 // 3, 2 * preferred_height)
+            self.resize(preferred_width, preferred_height)
+
+        status_bar = self.statusBar()
+
+        if status_bar is not None:
+            status_bar.addPermanentWidget(self.memory_widget)

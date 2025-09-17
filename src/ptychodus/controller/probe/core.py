@@ -22,10 +22,11 @@ from ...view.widgets import (
     ProgressBarItemDelegate,
 )
 from ..data import FileDialogFactory
+from ..helpers import connect_triggered_signal, create_brush_for_editable_cell
 from ..image import ImageController
 from .editor_factory import ProbeEditorViewControllerFactory
-from .illumination import IlluminationViewController
 from .fluorescence import FluorescenceViewController
+from .illumination import IlluminationViewController
 from .propagator import ProbePropagationViewController
 from .stxm import STXMViewController
 from .tree_model import ProbeTreeModel
@@ -58,7 +59,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self._image_controller = image_controller
         self._view = view
         self._file_dialog_factory = file_dialog_factory
-        self._tree_model = ProbeTreeModel(repository, api)
+        self._tree_model = ProbeTreeModel(repository, api, create_brush_for_editable_cell(view))
         self._editor_factory = ProbeEditorViewControllerFactory()
 
         self._propagation_view_controller = ProbePropagationViewController(
@@ -89,20 +90,26 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         power_item_delegate = ProgressBarItemDelegate(view.tree_view)
         view.tree_view.setItemDelegateForColumn(1, power_item_delegate)
         view.tree_view.setItemDelegateForColumn(2, builder_item_delegate)
-        view.tree_view.selectionModel().currentChanged.connect(self._update_view)
+        selection_model = view.tree_view.selectionModel()
+
+        if selection_model is None:
+            raise ValueError('selection_model is None!')
+        else:
+            selection_model.currentChanged.connect(self._update_view)
+
         self._update_view(QModelIndex(), QModelIndex())
 
         load_from_file_action = view.button_box.load_menu.addAction('Open File...')
-        load_from_file_action.triggered.connect(self._load_current_probe_from_file)
+        connect_triggered_signal(load_from_file_action, self._load_current_probe_from_file)
 
         copy_action = view.button_box.load_menu.addAction('Copy...')
-        copy_action.triggered.connect(self._copy_to_current_probe)
+        connect_triggered_signal(copy_action, self._copy_to_current_probe)
 
         save_to_file_action = view.button_box.save_menu.addAction('Save File...')
-        save_to_file_action.triggered.connect(self._save_current_probe_to_file)
+        connect_triggered_signal(save_to_file_action, self._save_current_probe_to_file)
 
         sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
-        sync_to_settings_action.triggered.connect(self._sync_current_probe_to_settings)
+        connect_triggered_signal(sync_to_settings_action, self._sync_current_probe_to_settings)
 
         view.copier_dialog.setWindowTitle('Copy Probe')
         view.copier_dialog.source_combo_box.setModel(self._tree_model)
@@ -112,16 +119,16 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         view.button_box.edit_button.clicked.connect(self._edit_current_probe)
 
         propagate_action = view.button_box.analyze_menu.addAction('Propagate...')
-        propagate_action.triggered.connect(self._propagate_probe)
+        connect_triggered_signal(propagate_action, self._propagate_probe)
 
         stxm_action = view.button_box.analyze_menu.addAction('Simulate STXM...')
-        stxm_action.triggered.connect(self._simulate_stxm)
+        connect_triggered_signal(stxm_action, self._simulate_stxm)
 
         illumination_action = view.button_box.analyze_menu.addAction('Map Illumination...')
-        illumination_action.triggered.connect(self._map_illumination)
+        connect_triggered_signal(illumination_action, self._map_illumination)
 
         fluorescence_action = view.button_box.analyze_menu.addAction('Enhance Fluorescence...')
-        fluorescence_action.triggered.connect(self._enhance_fluorescence)
+        connect_triggered_signal(fluorescence_action, self._enhance_fluorescence)
 
     def _get_current_item_index(self) -> int:
         model_index = self._view.tree_view.currentIndex()

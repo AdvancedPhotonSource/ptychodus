@@ -19,6 +19,7 @@ class WorkflowExecutionController:
         parameters_presenter: WorkflowParametersPresenter,
         execution_presenter: WorkflowExecutionPresenter,
         view: WorkflowExecutionView,
+        product_item_model: QAbstractItemModel,
     ) -> None:
         self._execution_presenter = execution_presenter
         self._view = view
@@ -32,18 +33,8 @@ class WorkflowExecutionController:
             parameters_presenter, view.output_data_view
         )
 
-    @classmethod
-    def create_instance(
-        cls,
-        parameters_presenter: WorkflowParametersPresenter,
-        execution_presenter: WorkflowExecutionPresenter,
-        view: WorkflowExecutionView,
-        product_item_model: QAbstractItemModel,
-    ) -> WorkflowExecutionController:
-        controller = cls(parameters_presenter, execution_presenter, view)
         view.product_combo_box.setModel(product_item_model)
-        view.execute_button.clicked.connect(controller._execute)
-        return controller
+        view.execute_button.clicked.connect(self._execute)
 
     def _execute(self) -> None:
         input_product_index = self._view.product_combo_box.currentIndex()

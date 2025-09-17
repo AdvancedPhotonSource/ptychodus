@@ -37,12 +37,19 @@ class OpenDatasetWizardController:
         self._wizard.addPage(self._metadata_view_controller.get_widget())
         self._wizard.addPage(self._patterns_view_controller.get_widget())
 
-        self._wizard.button(QWizard.WizardButton.NextButton).clicked.connect(
-            self._execute_next_button_action
-        )
-        self._wizard.button(QWizard.WizardButton.FinishButton).clicked.connect(
-            self._execute_finish_button_action
-        )
+        next_button = self._wizard.button(QWizard.WizardButton.NextButton)
+
+        if next_button is None:
+            raise ValueError('next_button is None!')
+        else:
+            next_button.clicked.connect(self._execute_next_button_action)
+
+        finish_button = self._wizard.button(QWizard.WizardButton.FinishButton)
+
+        if finish_button is None:
+            raise ValueError('finish_button is None!')
+        else:
+            finish_button.clicked.connect(self._execute_finish_button_action)
 
     def _execute_next_button_action(self) -> None:
         page = self._wizard.currentPage()

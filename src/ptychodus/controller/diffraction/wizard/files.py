@@ -26,6 +26,7 @@ from ....model.diffraction import DiffractionAPI, DiffractionSettings
 from ....view.diffraction import OpenDatasetWizardPage
 from ....view.widgets import ExceptionDialog
 from ...data import FileDialogFactory
+from ...helpers import connect_current_changed_signal
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +172,8 @@ class OpenDatasetWizardFilePathViewController(Observer):
         self._widget.verticalHeader().hide()
         self._widget.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._widget.doubleClicked.connect(self._handle_table_double_clicked)
-        self._widget.selectionModel().currentChanged.connect(self._handle_current_changed)
+
+        connect_current_changed_signal(self._widget, self._handle_current_changed)
 
         self._sync_model_to_view()
         file_path.add_observer(self)

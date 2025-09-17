@@ -85,7 +85,10 @@ class RepositoryTreeView(QWidget):
         self.button_box = RepositoryButtonBox()
         self.copier_dialog = RepositoryItemCopierDialog()
 
-        self.tree_view.header().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        header = self.tree_view.header()
+
+        if header is not None:
+            header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout = QVBoxLayout()
         layout.addWidget(self.tree_view)

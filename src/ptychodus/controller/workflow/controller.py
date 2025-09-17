@@ -28,13 +28,13 @@ class WorkflowController:
         self._authorization_presenter = authorization_presenter
         self._execution_presenter = execution_presenter
         self._parameters_view = parameters_view
-        self._authorization_controller = WorkflowAuthorizationController.create_instance(
+        self._authorization_controller = WorkflowAuthorizationController(
             authorization_presenter, parameters_view.authorization_dialog
         )
         self._status_controller = WorkflowStatusController(
             status_presenter, parameters_view.status_view, table_view
         )
-        self._execution_controller = WorkflowExecutionController.create_instance(
+        self._execution_controller = WorkflowExecutionController(
             parameters_presenter,
             execution_presenter,
             parameters_view.execution_view,

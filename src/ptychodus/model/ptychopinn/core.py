@@ -41,7 +41,11 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
         else:
             self._reconstructors.append(
                 PtychoPINNTrainableReconstructor(
-                    'PINN', self.model_settings, self.inference_settings, self.training_settings
+                    'PINN',
+                    self.model_settings,
+                    self.inference_settings,
+                    self.training_settings,
+                    is_developer_mode_enabled=is_developer_mode_enabled,
                 )
             )
             self._reconstructors.append(
@@ -50,6 +54,7 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
                     self.model_settings,
                     self.inference_settings,
                     self.training_settings,
+                    is_developer_mode_enabled=is_developer_mode_enabled,
                 )
             )
 

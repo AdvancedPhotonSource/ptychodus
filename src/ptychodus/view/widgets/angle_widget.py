@@ -11,30 +11,24 @@ from .decimal_line_edit import DecimalLineEdit
 class AngleWidget(QWidget):
     angle_changed = pyqtSignal(Decimal)
 
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.angle_in_turns = Decimal()
         self.angle_line_edit = DecimalLineEdit.create_instance(is_signed=False)
         self.units_combo_box = QComboBox()
 
-    @classmethod
-    def create_instance(cls, parent: QWidget | None = None) -> AngleWidget:
-        widget = cls(parent)
+        self.angle_line_edit.value_changed.connect(self._set_angle_in_turns_from_widgets)
 
-        widget.angle_line_edit.value_changed.connect(widget._set_angle_in_turns_from_widgets)
-
-        widget.units_combo_box.addItem('turn', Decimal(1))
-        widget.units_combo_box.addItem('deg', Decimal(360))
-        widget.units_combo_box.addItem('rad', 2 * Decimal.from_float(numpy.pi))
-        widget.units_combo_box.activated.connect(widget._update_display)
+        self.units_combo_box.addItem('turn', Decimal(1))
+        self.units_combo_box.addItem('deg', Decimal(360))
+        self.units_combo_box.addItem('rad', 2 * Decimal.from_float(numpy.pi))
+        self.units_combo_box.activated.connect(self._update_display)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(widget.angle_line_edit)
-        layout.addWidget(widget.units_combo_box)
-        widget.setLayout(layout)
-
-        return widget
+        layout.addWidget(self.angle_line_edit)
+        layout.addWidget(self.units_combo_box)
+        self.setLayout(layout)
 
     def is_read_only(self) -> bool:
         return self.angle_line_edit.is_read_only()

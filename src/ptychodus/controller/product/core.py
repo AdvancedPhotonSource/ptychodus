@@ -4,12 +4,13 @@ from typing import Any
 import logging
 
 from PyQt5.QtCore import (
-    Qt,
     QAbstractTableModel,
     QModelIndex,
     QObject,
     QSortFilterProxyModel,
+    Qt,
 )
+from PyQt5.QtGui import QBrush
 from PyQt5.QtWidgets import QAbstractItemView, QAction
 
 from ptychodus.api.product import LossValue
@@ -29,15 +30,26 @@ from ...model.product.scan import ScanRepositoryItem
 from ...view.product import ProductView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
+from ..helpers import (
+    connect_current_changed_signal,
+    connect_triggered_signal,
+    create_brush_for_editable_cell,
+)
 from .editor import ProductEditorViewController
 
 logger = logging.getLogger(__name__)
 
 
 class ProductRepositoryTableModel(QAbstractTableModel):
-    def __init__(self, repository: ProductRepository, parent: QObject | None = None) -> None:
+    def __init__(
+        self,
+        repository: ProductRepository,
+        editable_item_brush: QBrush,
+        parent: QObject | None = None,
+    ) -> None:
         super().__init__(parent)
         self._repository = repository
+        self._editable_item_brush = editable_item_brush
         self._header = [
             'Name',
             'Detector-Object\nDistance [m]',
@@ -93,6 +105,9 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                     case 6:
                         product = item.get_product()
                         return f'{product.nbytes / BYTES_PER_MEGABYTE:.2f}'
+            elif role == Qt.ItemDataRole.BackgroundRole:
+                if index.flags() & Qt.ItemFlag.ItemIsEditable:
+                    return self._editable_item_brush
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
         if index.isValid() and role == Qt.ItemDataRole.EditRole:
@@ -178,7 +193,9 @@ class ProductController(ProductRepositoryObserver):
         save_file_action = view.button_box.save_menu.addAction('Save File...')
         sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
 
-        table_model = ProductRepositoryTableModel(repository)
+        editable_item_brush = create_brush_for_editable_cell(view.table_view)
+        table_model = ProductRepositoryTableModel(repository, editable_item_brush)
+
         table_proxy_model = QSortFilterProxyModel()
         table_proxy_model.setSourceModel(table_model)
 
@@ -198,16 +215,22 @@ class ProductController(ProductRepositoryObserver):
         view.table_view.setModel(table_proxy_model)
         view.table_view.setSortingEnabled(True)
         view.table_view.sortByColumn(0, Qt.SortOrder.AscendingOrder)
-        view.table_view.verticalHeader().hide()
+        vertical_header = view.table_view.verticalHeader()
+
+        if vertical_header is not None:
+            vertical_header.hide()
+
         view.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        view.table_view.selectionModel().currentChanged.connect(controller._update_enabled_buttons)
+        connect_current_changed_signal(view.table_view, controller._update_enabled_buttons)
         controller._update_enabled_buttons(QModelIndex(), QModelIndex())
 
-        open_file_action.triggered.connect(controller._open_product_from_file)
-        create_new_action.triggered.connect(controller._create_new_product)
-        duplicate_action.triggered.connect(controller._duplicate_current_product)
-        save_file_action.triggered.connect(controller._save_current_product_to_file)
-        sync_to_settings_action.triggered.connect(controller._sync_current_product_to_settings)
+        connect_triggered_signal(open_file_action, controller._open_product_from_file)
+        connect_triggered_signal(create_new_action, controller._create_new_product)
+        connect_triggered_signal(duplicate_action, controller._duplicate_current_product)
+        connect_triggered_signal(save_file_action, controller._save_current_product_to_file)
+        connect_triggered_signal(
+            sync_to_settings_action, controller._sync_current_product_to_settings
+        )
 
         view.button_box.edit_button.clicked.connect(controller._edit_current_product)
         view.button_box.remove_button.clicked.connect(controller._remove_current_product)

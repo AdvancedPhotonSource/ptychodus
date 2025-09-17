@@ -45,7 +45,11 @@ class FresnelZonePlateViewController(ParameterViewController):
 
         for label in probe_builder.labels_for_presets():
             action = self._widget.presets_menu.addAction(label)
-            action.triggered.connect(lambda _, label=label: probe_builder.apply_presets(label))
+
+            if action is None:
+                raise ValueError('action is None!')
+            else:
+                action.triggered.connect(lambda _, label=label: probe_builder.apply_presets(label))
 
         self._zone_plate_diameter_view_controller = LengthWidgetParameterViewController(
             probe_builder.zone_plate_diameter_m
@@ -162,7 +166,11 @@ class DecayTypeParameterViewController(ParameterViewController, Observer):
             decay_type = ProbeModeDecayType.POLYNOMIAL
 
         button = self._button_group.button(decay_type.value)
-        button.setChecked(True)
+
+        if button is None:
+            raise ValueError('button is None!')
+        else:
+            button.setChecked(True)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:

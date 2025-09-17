@@ -24,7 +24,7 @@ Upload to PyPI
 
 .. code-block:: shell
 
-   $ python3 -m twine upload --verbose dist/*
+   $ python -m twine upload --verbose dist/*
 
 
 Conda-Forge

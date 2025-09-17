@@ -16,6 +16,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
+from .image import ImageView
 from .visualization import VisualizationParametersView, VisualizationWidget
 
 
@@ -49,13 +50,15 @@ class FourierRingCorrelationDialog(QDialog):
 class FourierAnalysisDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.real_space_widget = VisualizationWidget.create_instance('Real Space')
-        self.reciprocal_space_widget = VisualizationWidget.create_instance('Reciprocal Space')
+        self.real_space_view = ImageView(add_fourier_tool=True)
+        # FIXME self.real_space_widget = VisualizationWidget('Real Space', add_fourier_tool=True)
+        self.reciprocal_space_view = ImageView()
+        # FIXME self.reciprocal_space_widget = VisualizationWidget('Reciprocal Space')
         self.status_bar = QStatusBar()
 
         contents_layout = QHBoxLayout()
-        contents_layout.addWidget(self.real_space_widget)
-        contents_layout.addWidget(self.reciprocal_space_widget)
+        contents_layout.addWidget(self.real_space_view)
+        contents_layout.addWidget(self.reciprocal_space_view)
 
         layout = QVBoxLayout()
         layout.addLayout(contents_layout)
@@ -71,7 +74,7 @@ class XMCDParametersView(QGroupBox):
         self.lcirc_combo_box = QComboBox()
         self.rcirc_combo_box = QComboBox()
         self.save_button = QPushButton('Save')
-        self.visualization_parameters_view = VisualizationParametersView.create_instance()
+        self.visualization_parameters_view = VisualizationParametersView()
 
         polarization_layout = QFormLayout()
         polarization_layout.addRow('Left Circular:', self.lcirc_combo_box)
@@ -89,9 +92,9 @@ class XMCDParametersView(QGroupBox):
 class XMCDDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.difference_widget = VisualizationWidget.create_instance('Difference')
-        self.ratio_widget = VisualizationWidget.create_instance('Ratio')
-        self.sum_widget = VisualizationWidget.create_instance('Sum')
+        self.difference_widget = VisualizationWidget('Difference')
+        self.ratio_widget = VisualizationWidget('Ratio')
+        self.sum_widget = VisualizationWidget('Sum')
         self.parameters_view = XMCDParametersView()
         self.status_bar = QStatusBar()
 

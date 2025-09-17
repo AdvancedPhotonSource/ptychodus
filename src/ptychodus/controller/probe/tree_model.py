@@ -4,6 +4,7 @@ from typing import Any, overload
 import numpy
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
+from PyQt5.QtGui import QBrush
 
 from ptychodus.api.probe import Probe
 from ptychodus.api.units import BYTES_PER_MEGABYTE
@@ -48,11 +49,16 @@ def calc_coherent_percent(probe: Probe) -> int:
 
 class ProbeTreeModel(QAbstractItemModel):
     def __init__(
-        self, repository: ProbeRepository, api: ProbeAPI, parent: QObject | None = None
+        self,
+        repository: ProbeRepository,
+        api: ProbeAPI,
+        editable_item_brush: QBrush,
+        parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._repository = repository
         self._api = api
+        self._editable_item_brush = editable_item_brush
         self._tree_root = ProbeTreeNode()
         self._header = [
             'Name',
@@ -170,6 +176,9 @@ class ProbeTreeModel(QAbstractItemModel):
                         probe = item.get_probes().get_probe_no_opr()  # TODO OPR
                         power_percent = calc_relative_power_percent(probe, index.row())
                         return f'{power_percent}%'
+            elif role == Qt.ItemDataRole.BackgroundRole:
+                if index.flags() & Qt.ItemFlag.ItemIsEditable:
+                    return self._editable_item_brush
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
                 probe = item.get_probes().get_probe_no_opr()  # TODO OPR
                 return calc_relative_power_percent(probe, index.row())
@@ -195,6 +204,9 @@ class ProbeTreeModel(QAbstractItemModel):
                         return probe.height_px
                     case 6:
                         return f'{probes.nbytes / BYTES_PER_MEGABYTE:.2f}'
+            elif role == Qt.ItemDataRole.BackgroundRole:
+                if index.flags() & Qt.ItemFlag.ItemIsEditable:
+                    return self._editable_item_brush
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
                 probe = item.get_probes().get_probe_no_opr()  # TODO OPR
                 return calc_coherent_percent(probe)

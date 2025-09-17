@@ -90,7 +90,9 @@ class PtyChiPrecisionParameterViewController(ParameterViewController, Observer):
 
     def _sync_model_to_view(self) -> None:
         button = self._button_group.button(2 if self._use_double_precision.get_value() else 1)
-        button.setChecked(True)
+
+        if button is not None:
+            button.setChecked(True)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._use_double_precision:

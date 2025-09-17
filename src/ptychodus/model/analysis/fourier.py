@@ -44,13 +44,16 @@ class FourierAnalyzer(Observable):
         return product.get_object_item().get_object()
 
     def analyze_roi(self, bounding_box: Box2D) -> None:
+        logger.debug(f'bounding_box: {bounding_box}')
         object_ = self.get_object()
         interpolator = NearestNeighborArrayInterpolator(object_.get_layer(0))
 
         width = int(bounding_box.width + 0.5)
         height = int(bounding_box.height + 0.5)
-        roi = interpolator.get_patch(bounding_box.x, bounding_box.y, width, height)
+        roi = interpolator.get_patch(bounding_box.x_center, bounding_box.y_center, width, height)
+        logger.debug(f'roi: {roi.dtype}{roi.shape}')
 
+        # FIXME choose fft scaling
         self._result = FourierAnalysisResult(
             transformed_roi=fftshift(fft2(ifftshift(roi))),
             pixel_geometry=object_.get_pixel_geometry(),

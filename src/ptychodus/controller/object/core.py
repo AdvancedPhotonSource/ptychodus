@@ -13,6 +13,7 @@ from ...model.visualization import VisualizationEngine
 from ...view.repository import RepositoryTreeView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
+from ..helpers import connect_triggered_signal, create_brush_for_editable_cell
 from ..image import ImageController
 from .editor_factory import ObjectEditorViewControllerFactory
 from .fourier import FourierAnalysisViewController
@@ -31,7 +32,8 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         image_controller: ImageController,
         correlator: FourierRingCorrelator,
         fourier_analyzer: FourierAnalyzer,
-        fourier_visualization_engine: VisualizationEngine,
+        fourier_real_space_visualization_engine: VisualizationEngine,
+        fourier_reciprocal_space_visualization_engine: VisualizationEngine,
         xmcd_analyzer: XMCDAnalyzer,
         xmcd_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
@@ -45,7 +47,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         self._image_controller = image_controller
         self._view = view
         self._file_dialog_factory = file_dialog_factory
-        self._tree_model = ObjectTreeModel(repository, api)
+        self._tree_model = ObjectTreeModel(repository, api, create_brush_for_editable_cell(view))
         self._editor_factory = ObjectEditorViewControllerFactory()
 
         self._frc_view_controller = FourierRingCorrelationViewController(
@@ -53,7 +55,8 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         )
         self._fourier_view_controller = FourierAnalysisViewController(
             fourier_analyzer,
-            fourier_visualization_engine,
+            fourier_real_space_visualization_engine,
+            fourier_reciprocal_space_visualization_engine,
             file_dialog_factory,
         )
         self._xmcd_view_controller = XMCDViewController(
@@ -70,20 +73,26 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         view.tree_view.setModel(self._tree_model)
         view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         view.tree_view.setItemDelegateForColumn(2, builder_item_delegate)
-        view.tree_view.selectionModel().currentChanged.connect(self._update_view)
+        selection_model = view.tree_view.selectionModel()
+
+        if selection_model is None:
+            raise ValueError('selection_model is None!')
+        else:
+            selection_model.currentChanged.connect(self._update_view)
+
         self._update_view(QModelIndex(), QModelIndex())
 
         load_from_file_action = view.button_box.load_menu.addAction('Open File...')
-        load_from_file_action.triggered.connect(self._load_current_object_from_file)
+        connect_triggered_signal(load_from_file_action, self._load_current_object_from_file)
 
         copy_action = view.button_box.load_menu.addAction('Copy...')
-        copy_action.triggered.connect(self._copy_to_current_object)
+        connect_triggered_signal(copy_action, self._copy_to_current_object)
 
         save_to_file_action = view.button_box.save_menu.addAction('Save File...')
-        save_to_file_action.triggered.connect(self._save_current_object_to_file)
+        connect_triggered_signal(save_to_file_action, self._save_current_object_to_file)
 
         sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
-        sync_to_settings_action.triggered.connect(self._sync_current_object_to_settings)
+        connect_triggered_signal(sync_to_settings_action, self._sync_current_object_to_settings)
 
         view.copier_dialog.setWindowTitle('Copy Object')
         view.copier_dialog.source_combo_box.setModel(self._tree_model)
@@ -93,14 +102,14 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         view.button_box.edit_button.clicked.connect(self._edit_current_object)
 
         frc_action = view.button_box.analyze_menu.addAction('Fourier Ring Correlation...')
-        frc_action.triggered.connect(self._analyze_frc)
+        connect_triggered_signal(frc_action, self._analyze_frc)
 
         fourier_action = view.button_box.analyze_menu.addAction('Fourier Analysis...')
-        fourier_action.triggered.connect(self._analyze_fourier)
         fourier_action.setVisible(is_developer_mode_enabled)
+        connect_triggered_signal(fourier_action, self._analyze_fourier)
 
         xmcd_action = view.button_box.analyze_menu.addAction('XMCD...')
-        xmcd_action.triggered.connect(self._analyze_xmcd)
+        connect_triggered_signal(xmcd_action, self._analyze_xmcd)
 
     def _get_current_item_index(self) -> int:
         model_index = self._view.tree_view.currentIndex()
