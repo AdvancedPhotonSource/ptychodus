@@ -89,4 +89,9 @@ class DiffractionPatternPositionMatcher:
             losses=input_product.losses,
         )
 
-        return ReconstructInput(patterns, self._dataset.get_processed_bad_pixels(), product)
+        bad_pixels = self._dataset.get_bad_pixels()
+
+        if bad_pixels is None:
+            raise ValueError('bad_pixels is None!')
+
+        return ReconstructInput(patterns, bad_pixels, product)

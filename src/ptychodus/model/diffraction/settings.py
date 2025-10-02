@@ -44,9 +44,6 @@ class DiffractionSettings(Observable, Observer):
         self.scratch_directory = self._group.create_path_parameter(
             'ScratchDirectory', Path.home() / '.ptychodus'
         )
-        self.num_data_threads = self._group.create_integer_parameter(
-            'NumberOfDataThreads', 8, minimum=1, maximum=64
-        )
 
         self.is_crop_enabled = self._group.create_boolean_parameter('CropEnabled', True)
         self.crop_center_x_px = self._group.create_integer_parameter(

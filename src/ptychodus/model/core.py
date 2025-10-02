@@ -24,15 +24,16 @@ from ptychodus.api.workflow import WorkflowAPI
 from .agent import AgentCore
 from .analysis import AnalysisCore
 from .automation import AutomationCore
+from .diffraction import DiffractionCore, PatternsStreamingContext
 from .fluorescence import FluorescenceCore
 from .memory import MemoryPresenter
 from .metadata import MetadataPresenter
-from .diffraction import DiffractionCore, PatternsStreamingContext
 from .product import PositionsStreamingContext, ProductCore
 from .ptychi import PtyChiReconstructorLibrary
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopinn import PtychoPINNReconstructorLibrary
 from .reconstructor import ReconstructorCore
+from .task_manager import TaskManager
 from .tike import TikeReconstructorLibrary
 from .visualization import VisualizationEngine
 from .workflow import WorkflowCore
@@ -80,7 +81,7 @@ class PtychodusStreamingContext:
         self._patterns_context.append_array(array)
 
     def get_queue_size(self) -> int:
-        return self._patterns_context.get_queue_size()
+        return 0  # FIXME get_queue_size
 
     def stop(self) -> None:
         self._patterns_context.stop()
@@ -94,6 +95,7 @@ class ModelCore:
         configure_logger(is_developer_mode_enabled)
         self.rng = numpy.random.default_rng()
         self._plugin_registry = PluginRegistry.load_plugins()
+        self._task_manager = TaskManager()
 
         self.memory_presenter = MemoryPresenter()
         self.settings_registry = SettingsRegistry()
@@ -103,6 +105,7 @@ class ModelCore:
             self._plugin_registry.bad_pixels_file_readers,
             self._plugin_registry.diffraction_file_readers,
             self._plugin_registry.diffraction_file_writers,
+            self._task_manager,
             self.settings_registry,
         )
         self.product = ProductCore(
@@ -189,7 +192,7 @@ class ModelCore:
             self.settings_registry.open_settings(settings_file)
 
     def __enter__(self) -> ModelCore:
-        self.diffraction.start()
+        self._task_manager.start()
         self.reconstructor.start()
         self.workflow.start()
         self.automation.start()
@@ -215,7 +218,7 @@ class ModelCore:
         self.automation.stop()
         self.workflow.stop()
         self.reconstructor.stop()
-        self.diffraction.stop()
+        self._task_manager.stop(await_finish=False)
 
     def create_streaming_context(self, metadata: DiffractionMetadata) -> PtychodusStreamingContext:
         return PtychodusStreamingContext(
@@ -223,8 +226,8 @@ class ModelCore:
             self.diffraction.diffraction_api.create_streaming_context(metadata),
         )
 
-    def refresh_active_dataset(self) -> None:
-        self.diffraction.dataset.assemble_patterns()
+    def run_foreground_tasks(self) -> None:
+        self._task_manager.run_foreground_tasks()
 
     def batch_mode_execute(
         self,

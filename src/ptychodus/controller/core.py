@@ -165,9 +165,9 @@ class ControllerCore:
             model.agent.chat_history, model.agent.presenter, view.agent_chat_view
         )
 
-        self._refresh_data_timer = QTimer()
-        self._refresh_data_timer.timeout.connect(model.refresh_active_dataset)
-        self._refresh_data_timer.start(1000)  # TODO make configurable
+        self._run_foreground_tasks_timer = QTimer()
+        self._run_foreground_tasks_timer.timeout.connect(model.run_foreground_tasks)
+        self._run_foreground_tasks_timer.start(1000)  # TODO make configurable
 
         view.workflow_action.setVisible(model.workflow.is_supported)
 

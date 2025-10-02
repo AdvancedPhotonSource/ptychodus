@@ -32,8 +32,9 @@ class FourierAnalyzer(Observable):
     def set_product(self, product_index: int) -> None:
         if self._product_index != product_index:
             self._product_index = product_index
-            self._result = None
-            self.notify_observers()
+
+            object_ = self.get_object()
+            self._analyze(object_.get_layer(0))
 
     def get_product_name(self) -> str:
         product = self._repository[self._product_index]
@@ -42,6 +43,15 @@ class FourierAnalyzer(Observable):
     def get_object(self) -> Object:
         product = self._repository[self._product_index]
         return product.get_object_item().get_object()
+
+    def _analyze(self, array: ComplexArrayType) -> None:
+        # FIXME choose fft scaling
+        object_ = self.get_object()
+        self._result = FourierAnalysisResult(
+            transformed_roi=fftshift(fft2(ifftshift(array))),
+            pixel_geometry=object_.get_pixel_geometry(),
+        )
+        self.notify_observers()
 
     def analyze_roi(self, bounding_box: Box2D) -> None:
         logger.debug(f'bounding_box: {bounding_box}')
@@ -52,13 +62,7 @@ class FourierAnalyzer(Observable):
         height = int(bounding_box.height + 0.5)
         roi = interpolator.get_patch(bounding_box.x_center, bounding_box.y_center, width, height)
         logger.debug(f'roi: {roi.dtype}{roi.shape}')
-
-        # FIXME choose fft scaling
-        self._result = FourierAnalysisResult(
-            transformed_roi=fftshift(fft2(ifftshift(roi))),
-            pixel_geometry=object_.get_pixel_geometry(),
-        )
-        self.notify_observers()
+        self._analyze(roi)
 
     def get_result(self) -> FourierAnalysisResult:
         if self._result is None:

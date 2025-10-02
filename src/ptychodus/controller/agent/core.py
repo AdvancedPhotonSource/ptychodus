@@ -44,7 +44,7 @@ class AgentInputController(QObject):
         self._presenter.send_message(text)
         self._view.text_edit.clear()
 
-    def eventFilter(self, a0: QObject | None, a1: QEvent | None) -> bool:  # noqa: N802
+    def eventFilter(self, a0: QObject, a1: QEvent) -> bool:  # noqa: N802
         if a0 == self._view.text_edit and isinstance(a1, QKeyEvent):
             is_shift_pressed = bool(a1.modifiers() & Qt.KeyboardModifier.ShiftModifier)
 

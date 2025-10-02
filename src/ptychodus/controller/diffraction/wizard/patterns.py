@@ -26,22 +26,6 @@ from ...parametric import (
 )
 
 
-class PatternLoadViewController(ParameterViewController):
-    def __init__(self, settings: DiffractionSettings) -> None:
-        super().__init__()
-        self._view_controller = SpinBoxParameterViewController(
-            settings.num_data_threads,
-        )
-        self._widget = QGroupBox('Load')
-
-        layout = QFormLayout()
-        layout.addRow('Number of Data Threads:', self._view_controller.get_widget())
-        self._widget.setLayout(layout)
-
-    def get_widget(self) -> QWidget:
-        return self._widget
-
-
 class PatternMemoryMapViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self, settings: DiffractionSettings, file_dialog_factory: FileDialogFactory
@@ -285,7 +269,6 @@ class OpenDatasetWizardPatternsViewController(ParameterViewController):
         sizer: PatternSizer,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
-        self._load_view_controller = PatternLoadViewController(settings)
         self._memory_map_view_controller = PatternMemoryMapViewController(
             settings, file_dialog_factory
         )
@@ -297,7 +280,6 @@ class OpenDatasetWizardPatternsViewController(ParameterViewController):
         )
 
         layout = QVBoxLayout()
-        layout.addWidget(self._load_view_controller.get_widget())
         layout.addWidget(self._memory_map_view_controller.get_widget())
         layout.addWidget(self._crop_view_controller.get_widget())
         layout.addWidget(self._binning_view_controller.get_widget())

@@ -60,10 +60,9 @@ class OpenDatasetWizardController:
             self._metadata_view_controller.import_metadata()
 
     def _execute_finish_button_action(self) -> None:
-        self._api.start_assembling_diffraction_patterns()
+        self._api.load_all_arrays()
 
     def open_dataset(self) -> None:
-        self._api.finish_assembling_diffraction_patterns(block=False)
         self._wizard.restart()
         self._file_view_controller.restart()
         self._wizard.show()

@@ -68,7 +68,7 @@ class BadPixelsViewController(ParameterViewController):
         layout.addWidget(self._clear_button)
         self._widget.setLayout(layout)
 
-        self.set_num_bad_pixels(0)
+        self.set_num_bad_pixels(0)  # FIXME bad_pixels_provider
 
     def _open_bad_pixels(self) -> None:
         file_reader_chooser = self._diffraction_api.get_bad_pixels_file_reader_chooser()
@@ -91,6 +91,7 @@ class BadPixelsViewController(ParameterViewController):
         return self._widget
 
     def set_num_bad_pixels(self, num_bad_pixels: int) -> None:
+        # FIXME bad_pixels_provider
         self._line_edit.setText(str(num_bad_pixels))
 
 
@@ -114,7 +115,7 @@ class DetectorController:
         self._bad_pixels_view_controller = BadPixelsViewController(
             settings.bad_pixels_file_path,
             settings.bad_pixels_file_type,
-            diffraction_api,
+            diffraction_api,  # FIXME bad_pixels_provider
             file_dialog_factory,
         )
 
@@ -126,9 +127,6 @@ class DetectorController:
         layout.addRow('Bit Depth:', self._bit_depth_view_controller.get_widget())
         layout.addRow('Bad Pixels:', self._bad_pixels_view_controller.get_widget())
         view.setLayout(layout)
-
-    def set_num_bad_pixels(self, num_bad_pixels: int) -> None:
-        self._bad_pixels_view_controller.set_num_bad_pixels(num_bad_pixels)
 
 
 class DiffractionController(DiffractionDatasetObserver):
@@ -234,9 +232,6 @@ class DiffractionController(DiffractionDatasetObserver):
 
         info_text = self._dataset.get_info_text()
         self._view.info_label.setText(info_text)
-
-    def handle_bad_pixels_changed(self, num_bad_pixels: int) -> None:
-        self._detector_controller.set_num_bad_pixels(num_bad_pixels)
 
     def handle_array_inserted(self, index: int) -> None:
         self._tree_model.insert_array(index, self._dataset[index])
