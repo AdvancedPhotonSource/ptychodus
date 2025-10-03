@@ -1,4 +1,5 @@
 from .api import DiffractionAPI, PatternsStreamingContext
+from .bad_pixels import BadPixelsProvider
 from .core import DiffractionCore
 from .dataset import (
     AssembledDiffractionArray,
@@ -11,6 +12,7 @@ from .sizer import PatternSizer
 __all__ = [
     'AssembledDiffractionArray',
     'AssembledDiffractionDataset',
+    'BadPixelsProvider',
     'DetectorSettings',
     'DiffractionAPI',
     'DiffractionCore',

@@ -38,8 +38,6 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         xmcd_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
         file_dialog_factory: FileDialogFactory,
-        *,
-        is_developer_mode_enabled: bool,
     ) -> None:
         super().__init__()
         self._repository = repository

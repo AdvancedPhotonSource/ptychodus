@@ -64,6 +64,7 @@ class ControllerCore:
             model.diffraction.detector_settings,
             model.diffraction.diffraction_settings,
             model.diffraction.pattern_sizer,
+            model.diffraction.bad_pixels_provider,
             model.diffraction.diffraction_api,
             model.diffraction.dataset,
             model.metadata_presenter,
@@ -126,7 +127,6 @@ class ControllerCore:
             model.analysis.xmcd_visualization_engine,
             view.object_view,
             self._file_dialog_factory,
-            is_developer_mode_enabled=is_developer_mode_enabled,
         )
         self._reconstructor_controller = ReconstructorController(
             model.reconstructor.presenter,

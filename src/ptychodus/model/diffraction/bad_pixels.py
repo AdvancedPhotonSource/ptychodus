@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 class BadPixelsProvider(Observable, Observer):
     def __init__(self, settings: DetectorSettings) -> None:
+        super().__init__()
         self._settings = settings
         self._bad_pixels: BadPixels | None = None
 
