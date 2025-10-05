@@ -34,7 +34,6 @@ from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopinn import PtychoPINNReconstructorLibrary
 from .reconstructor import ReconstructorCore
 from .task_manager import TaskManager
-from .tike import TikeReconstructorLibrary
 from .visualization import VisualizationEngine
 from .workflow import WorkflowCore
 
@@ -101,11 +100,11 @@ class ModelCore:
         self.settings_registry = SettingsRegistry()
 
         self.diffraction = DiffractionCore(
+            self._task_manager,
             self.settings_registry,
             self._plugin_registry.bad_pixels_file_readers,
             self._plugin_registry.diffraction_file_readers,
             self._plugin_registry.diffraction_file_writers,
-            self._task_manager,
             self.settings_registry,
         )
         self.product = ProductCore(
@@ -138,9 +137,6 @@ class ModelCore:
         self.ptychi_reconstructor_library = PtyChiReconstructorLibrary(
             self.settings_registry, self.diffraction.pattern_sizer, is_developer_mode_enabled
         )
-        self.tike_reconstructor_library = TikeReconstructorLibrary.create_instance(
-            self.settings_registry, is_developer_mode_enabled
-        )
         self.ptychonn_reconstructor_library = PtychoNNReconstructorLibrary.create_instance(
             self.settings_registry, is_developer_mode_enabled
         )
@@ -148,12 +144,12 @@ class ModelCore:
             self.settings_registry, is_developer_mode_enabled
         )
         self.reconstructor = ReconstructorCore(
+            self._task_manager,
             self.settings_registry,
             self.diffraction.dataset,
             self.product.product_api,
             [
                 self.ptychi_reconstructor_library,
-                self.tike_reconstructor_library,
                 self.ptychonn_reconstructor_library,
                 self.ptychopinn_reconstructor_library,
             ],
@@ -193,7 +189,6 @@ class ModelCore:
 
     def __enter__(self) -> ModelCore:
         self._task_manager.start()
-        self.reconstructor.start()
         self.workflow.start()
         self.automation.start()
         return self
@@ -217,7 +212,6 @@ class ModelCore:
     ) -> None:
         self.automation.stop()
         self.workflow.stop()
-        self.reconstructor.stop()
         self._task_manager.stop(await_finish=False)
 
     def create_streaming_context(self, metadata: DiffractionMetadata) -> PtychodusStreamingContext:

@@ -123,7 +123,15 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         for text in self._presenter.flush_log():
             self._view.progress_dialog.text_edit.appendPlainText(text)
 
-        self._presenter.process_results(block=False)
+        num_iterations = self._presenter.get_num_iterations()
+        progress_bar = self._view.progress_dialog.progress_bar
+
+        if num_iterations > 0:
+            progress_bar.show()
+            progress_bar.setRange(0, num_iterations)
+            progress_bar.setValue(self._presenter.get_iteration())
+        else:
+            progress_bar.hide()
 
     def _add_reconstructor(self, name: str) -> None:
         backend_name, reconstructor_name = name.split('/')  # TODO REDO

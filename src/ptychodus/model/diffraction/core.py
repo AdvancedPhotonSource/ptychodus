@@ -22,11 +22,11 @@ logger = logging.getLogger(__name__)
 class DiffractionCore(Observer):
     def __init__(
         self,
+        task_manager: TaskManager,
         settings_registry: SettingsRegistry,
         bad_pixels_file_reader_chooser: PluginChooser[BadPixelsFileReader],
         file_reader_chooser: PluginChooser[DiffractionFileReader],
         file_writer_chooser: PluginChooser[DiffractionFileWriter],
-        task_manager: TaskManager,
         reinit_observable: Observable,
     ) -> None:
         super().__init__()

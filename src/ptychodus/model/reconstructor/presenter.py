@@ -57,12 +57,17 @@ class ReconstructorPresenter(Observable, Observer):
     def is_reconstructing(self) -> bool:
         return self._reconstructor_api.is_reconstructing
 
+    def get_num_iterations(self) -> int:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
+        return reconstructor.get_num_iterations()
+
+    def get_iteration(self) -> int:
+        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
+        return reconstructor.get_iteration()
+
     def flush_log(self) -> Iterator[str]:
         for text in self._log_handler.messages():
             yield text
-
-    def process_results(self, *, block: bool) -> None:
-        self._reconstructor_api.process_results(block=block)
 
     @property
     def is_trainable(self) -> bool:

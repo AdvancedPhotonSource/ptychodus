@@ -11,17 +11,18 @@ from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import AssembledDiffractionDataset
 from ..product import ProductAPI
+from ..task_manager import TaskManager
 from .api import ReconstructorAPI
 from .log import ReconstructorLogHandler
 from .matcher import DiffractionPatternPositionMatcher
 from .presenter import ReconstructorPresenter
-from .queue import ReconstructionQueue
 from .settings import ReconstructorSettings
 
 
 class ReconstructorCore:
     def __init__(
         self,
+        task_manager: TaskManager,
         settings_registry: SettingsRegistry,
         dataset: AssembledDiffractionDataset,
         product_api: ProductAPI,
@@ -51,9 +52,8 @@ class ReconstructorCore:
             )
 
         self.data_matcher = DiffractionPatternPositionMatcher(dataset, product_api)
-        self._reconstruction_queue = ReconstructionQueue(self.data_matcher)
         self.reconstructor_api = ReconstructorAPI(
-            self._reconstruction_queue, self.data_matcher, product_api, self._plugin_chooser
+            task_manager, self.data_matcher, product_api, self._plugin_chooser
         )
         self.presenter = ReconstructorPresenter(
             self.settings,
@@ -61,9 +61,3 @@ class ReconstructorCore:
             self._log_handler,
             self.reconstructor_api,
         )
-
-    def start(self) -> None:
-        self._reconstruction_queue.start()
-
-    def stop(self) -> None:
-        self._reconstruction_queue.stop()

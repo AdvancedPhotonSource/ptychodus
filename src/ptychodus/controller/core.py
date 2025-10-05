@@ -20,7 +20,6 @@ from .ptychopinn import PtychoPINNViewControllerFactory
 from .reconstructor import ReconstructorController
 from .scan import ScanController
 from .settings import SettingsController
-from .tike import TikeViewControllerFactory
 from .workflow import WorkflowController
 
 
@@ -44,9 +43,6 @@ class ControllerCore:
         )
         self._ptychopinn_view_controller_factory = PtychoPINNViewControllerFactory(
             model.ptychopinn_reconstructor_library, self._file_dialog_factory
-        )
-        self._tike_view_controller_factory = TikeViewControllerFactory(
-            model.tike_reconstructor_library
         )
         self._settings_controller = SettingsController(
             model.settings_registry,
@@ -139,7 +135,6 @@ class ControllerCore:
                 self._ptychi_view_controller_factory,
                 self._ptychopinn_view_controller_factory,
                 self._ptychonn_view_controller_factory,
-                self._tike_view_controller_factory,
             ],
         )
         self._workflow_controller = WorkflowController(

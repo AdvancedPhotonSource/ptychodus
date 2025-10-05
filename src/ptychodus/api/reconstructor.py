@@ -32,6 +32,14 @@ class Reconstructor(ABC):
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         pass
 
+    @abstractmethod
+    def get_num_iterations(self) -> int:
+        pass
+
+    @abstractmethod
+    def get_iteration(self) -> int:
+        pass
+
 
 @dataclass(frozen=True)
 class TrainOutput:
@@ -80,6 +88,12 @@ class NullReconstructor(TrainableReconstructor):
 
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         return ReconstructOutput(parameters.product, 0)
+
+    def get_num_iterations(self) -> int:
+        return 0
+
+    def get_iteration(self) -> int:
+        return 0
 
     def get_model_file_filter(self) -> str:
         return str()

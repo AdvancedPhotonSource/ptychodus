@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from pathlib import Path
 import logging
+import threading
 import time
 
 from ptychodus.api.plugins import PluginChooser
@@ -12,8 +13,9 @@ from ptychodus.api.reconstructor import (
 )
 
 from ..product import ProductAPI
+from ..task_manager import TaskManager
+from ._tasks import ReconstructTask
 from .matcher import DiffractionPatternPositionMatcher, ScanIndexFilter
-from .queue import ReconstructionQueue
 
 logger = logging.getLogger(__name__)
 
@@ -21,22 +23,20 @@ logger = logging.getLogger(__name__)
 class ReconstructorAPI:
     def __init__(
         self,
-        reconstruction_queue: ReconstructionQueue,
+        task_manager: TaskManager,
         data_matcher: DiffractionPatternPositionMatcher,
         product_api: ProductAPI,
         reconstructor_chooser: PluginChooser[Reconstructor],
     ) -> None:
-        self._reconstruction_queue = reconstruction_queue
+        self._task_manager = task_manager
         self._data_matcher = data_matcher
         self._product_api = product_api
         self._reconstructor_chooser = reconstructor_chooser
+        self._is_reconstructing = threading.Event()
 
     @property
     def is_reconstructing(self) -> bool:
-        return self._reconstruction_queue.is_reconstructing
-
-    def process_results(self, *, block: bool) -> None:
-        self._reconstruction_queue.process_results(block=block)
+        return self._is_reconstructing.is_set()
 
     def get_reconstruct_input(
         self,
@@ -55,6 +55,7 @@ class ReconstructorAPI:
         output_product_suffix: str = '',
         transform: int | None = None,
         index_filter: ScanIndexFilter = ScanIndexFilter.ALL,
+        block: bool = False,
     ) -> int:
         reconstructor = self._reconstructor_chooser.get_current_plugin()
         input_product_item = self._product_api.get_item(input_product_index)
@@ -74,7 +75,19 @@ class ReconstructorAPI:
             object_item = output_product_item.get_object_item()
             object_item.rebuild(recenter=True)
 
-        self._reconstruction_queue.put(reconstructor.strategy, output_product_index, index_filter)
+        task = ReconstructTask(
+            self._is_reconstructing,
+            self._task_manager,
+            self._data_matcher,
+            reconstructor.strategy,
+            output_product_index,
+            index_filter=index_filter,
+        )
+        self._task_manager.put_background_task(task)
+
+        if block:
+            pass  # FIXME wait until finished
+
         return output_product_index
 
     def reconstruct_split(self, input_product_index: int) -> tuple[int, int]:

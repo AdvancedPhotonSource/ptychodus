@@ -78,8 +78,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
 
     def reconstruct_local(self, block: bool = False) -> WorkflowProductAPI:
         logger.info('Reconstructing...')
-        output_product_index = self._reconstructor_api.reconstruct(self._product_index)
-        self._reconstructor_api.process_results(block=block)
+        output_product_index = self._reconstructor_api.reconstruct(self._product_index, block=block)
         logger.info('Reconstruction complete.')
 
         return ConcreteWorkflowProductAPI(
