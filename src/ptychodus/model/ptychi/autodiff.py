@@ -200,8 +200,9 @@ class AutodiffReconstructor(Reconstructor):
         )
         return ReconstructOutput(product, 0)
 
-    def get_num_iterations(self) -> int:
-        return 0  # FIXME
+    def get_num_epochs(self) -> int:
+        helper = self._options_helper.reconstructor_helper
+        return helper.num_epochs
 
-    def get_iteration(self) -> int:
+    def get_epoch(self) -> int:
         return 0  # FIXME

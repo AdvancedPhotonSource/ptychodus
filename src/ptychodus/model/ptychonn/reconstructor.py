@@ -119,10 +119,10 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
         return ReconstructOutput(product, 0)
 
-    def get_num_iterations(self) -> int:
+    def get_num_epochs(self) -> int:
         return 0
 
-    def get_iteration(self) -> int:
+    def get_epoch(self) -> int:
         return 0
 
     def get_model_file_filter(self) -> str:

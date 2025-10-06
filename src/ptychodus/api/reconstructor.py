@@ -33,11 +33,11 @@ class Reconstructor(ABC):
         pass
 
     @abstractmethod
-    def get_num_iterations(self) -> int:
+    def get_num_epochs(self) -> int:
         pass
 
     @abstractmethod
-    def get_iteration(self) -> int:
+    def get_epoch(self) -> int:
         pass
 
 
@@ -89,10 +89,10 @@ class NullReconstructor(TrainableReconstructor):
     def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
         return ReconstructOutput(parameters.product, 0)
 
-    def get_num_iterations(self) -> int:
+    def get_num_epochs(self) -> int:
         return 0
 
-    def get_iteration(self) -> int:
+    def get_epoch(self) -> int:
         return 0
 
     def get_model_file_filter(self) -> str:
