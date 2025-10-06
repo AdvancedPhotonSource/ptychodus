@@ -41,7 +41,7 @@ class ReconstructTask:
         self._product_index = product_index
         self._index_filter = index_filter
 
-    def _update_object(
+    def _update_product(
         self, product_item: ProductRepositoryItem, result: ReconstructOutput
     ) -> None:
         task = UpdateProductTask(product_item, result.product)
@@ -66,13 +66,13 @@ class ReconstructTask:
         # FIXME Use spawn or forkserver, which ensures a clean initialization of each process.
         # FIXME Explicitly set the start method using torch.multiprocessing.set_start_method('spawn', force=True) or 'forkserver'.
         #       This should be done at the beginning of your program, typically within an if __name__ == "__main__": block.
-        result = self._reconstructor.reconstruct(parameters)  # FIXME _update_object
+        for result in self._reconstructor.reconstruct(parameters):
+            self._update_product(product_item, result.product)
+
         toc = time.perf_counter()
         logger.info(f'Reconstruction time {toc - tic:.4f} seconds. (code={result.result})')
 
         self._is_reconstructing.clear()
-
-        return UpdateProductTask(product_item, result.product)
 
 
 class TrainTask:  # TODO

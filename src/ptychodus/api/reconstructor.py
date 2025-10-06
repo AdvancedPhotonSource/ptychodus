@@ -19,7 +19,8 @@ class ReconstructInput:
 @dataclass(frozen=True)
 class ReconstructOutput:
     product: Product
-    result: int
+    epoch: int = 0
+    result: int = 0
 
 
 class Reconstructor(ABC):
@@ -29,15 +30,7 @@ class Reconstructor(ABC):
         pass
 
     @abstractmethod
-    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        pass
-
-    @abstractmethod
-    def get_num_epochs(self) -> int:
-        pass
-
-    @abstractmethod
-    def get_epoch(self) -> int:
+    def reconstruct(self, parameters: ReconstructInput) -> Iterable[ReconstructOutput]:
         pass
 
 
@@ -86,14 +79,8 @@ class NullReconstructor(TrainableReconstructor):
     def name(self) -> str:
         return self._name
 
-    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
-        return ReconstructOutput(parameters.product, 0)
-
-    def get_num_epochs(self) -> int:
-        return 0
-
-    def get_epoch(self) -> int:
-        return 0
+    def reconstruct(self, parameters: ReconstructInput) -> Iterable[ReconstructOutput]:
+        return ()
 
     def get_model_file_filter(self) -> str:
         return str()

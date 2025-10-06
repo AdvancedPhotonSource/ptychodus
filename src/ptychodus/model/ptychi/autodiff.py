@@ -199,10 +199,3 @@ class AutodiffReconstructor(Reconstructor):
             losses=losses,
         )
         return ReconstructOutput(product, 0)
-
-    def get_num_epochs(self) -> int:
-        helper = self._options_helper.reconstructor_helper
-        return helper.num_epochs
-
-    def get_epoch(self) -> int:
-        return 0  # FIXME
