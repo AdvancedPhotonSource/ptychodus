@@ -4,7 +4,7 @@ import threading
 import time
 
 from ptychodus.api.product import Product
-from ptychodus.api.reconstructor import Reconstructor, ReconstructOutput
+from ptychodus.api.reconstructor import Reconstructor
 
 from ..product import ProductRepositoryItem
 from .matcher import DiffractionPatternPositionMatcher, ScanIndexFilter
@@ -41,10 +41,8 @@ class ReconstructTask:
         self._product_index = product_index
         self._index_filter = index_filter
 
-    def _update_product(
-        self, product_item: ProductRepositoryItem, result: ReconstructOutput
-    ) -> None:
-        task = UpdateProductTask(product_item, result.product)
+    def _update_product(self, product_item: ProductRepositoryItem, product: Product) -> None:
+        task = UpdateProductTask(product_item, product)
         self._foreground_task_manager.put_foreground_task(task)
 
     def __call__(self) -> ForegroundTask | None:
@@ -73,6 +71,8 @@ class ReconstructTask:
         logger.info(f'Reconstruction time {toc - tic:.4f} seconds. (code={result.result})')
 
         self._is_reconstructing.clear()
+
+        return None
 
 
 class TrainTask:  # TODO

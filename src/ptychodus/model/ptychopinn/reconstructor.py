@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterator, Sequence
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Final
@@ -116,7 +116,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         intensity_scale = ptycho.model.params()['intensity_scale']
         return self._model.predict([test_data.X * intensity_scale, test_data.local_offsets])
 
-    def reconstruct(self, parameters: ReconstructInput) -> Iterable[ReconstructOutput]:  # FIXME
+    def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:  # FIXME
         model_size = parameters.diffraction_patterns.shape[-1]
 
         if parameters.diffraction_patterns.shape[-2] != model_size:
@@ -175,7 +175,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             losses=losses,
         )
 
-        return ReconstructOutput(product, 0)
+        yield ReconstructOutput(product)
 
     def get_model_file_filter(self) -> str:
         return self.MODEL_FILE_FILTER

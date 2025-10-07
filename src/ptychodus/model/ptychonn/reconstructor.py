@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Iterator
 from importlib.metadata import version
 from pathlib import Path
 from typing import Final
@@ -64,7 +64,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
     def name(self) -> str:
         return self._model_provider.get_model_name()
 
-    def reconstruct(self, parameters: ReconstructInput) -> Iterable[ReconstructOutput]:
+    def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
         # TODO data size/shape requirements to GUI
         data = parameters.diffraction_patterns
         data_size = data.shape[-1]
@@ -118,7 +118,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             losses=list(),  # TODO put something here?
         )
 
-        return ReconstructOutput(product, 0)
+        yield ReconstructOutput(product)
 
     def get_model_file_filter(self) -> str:
         return self.MODEL_FILE_FILTER

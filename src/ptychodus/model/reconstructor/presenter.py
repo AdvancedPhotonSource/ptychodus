@@ -57,13 +57,11 @@ class ReconstructorPresenter(Observable, Observer):
     def is_reconstructing(self) -> bool:
         return self._reconstructor_api.is_reconstructing
 
-    def get_num_iterations(self) -> int:
-        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
-        return reconstructor.get_num_epochs()
+    def get_num_epochs(self) -> int:
+        return 0  # FIXME
 
-    def get_iteration(self) -> int:
-        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
-        return reconstructor.get_epoch()
+    def get_epoch(self) -> int:
+        return 0  # FIXME
 
     def flush_log(self) -> Iterator[str]:
         for text in self._log_handler.messages():

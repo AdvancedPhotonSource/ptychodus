@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 import logging
@@ -30,7 +30,7 @@ class Reconstructor(ABC):
         pass
 
     @abstractmethod
-    def reconstruct(self, parameters: ReconstructInput) -> Iterable[ReconstructOutput]:
+    def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
         pass
 
 
@@ -79,8 +79,8 @@ class NullReconstructor(TrainableReconstructor):
     def name(self) -> str:
         return self._name
 
-    def reconstruct(self, parameters: ReconstructInput) -> Iterable[ReconstructOutput]:
-        return ()
+    def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
+        yield from ()
 
     def get_model_file_filter(self) -> str:
         return str()

@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 import logging
 
 
@@ -183,14 +184,15 @@ class LSQMLReconstructor(Reconstructor):
     def get_epoch(self) -> int:  # FIXME
         return self._epoch
 
-    def reconstruct(self, parameters: ReconstructInput) -> Iterable[ReconstructOutput]:
-        # FIXME to background task
+    def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
         task_options = self._create_task_options(parameters)
         num_epochs = task_options.reconstructor_options.num_epochs
 
-        with PtychographyTask(task_options) as task:
+        task = PtychographyTask(task_options)
+
+        with task:
             self._epoch = 0
-            step_epochs = 5  # FIXME
+            step_epochs = 2  # FIXME
 
             task_reconstructor = task.reconstructor
 
@@ -224,4 +226,3 @@ class LSQMLReconstructor(Reconstructor):
                 step_epochs = min(step_epochs, num_epochs - self._epoch)
 
                 yield ReconstructOutput(product=product, epoch=self._epoch, result=0)
-

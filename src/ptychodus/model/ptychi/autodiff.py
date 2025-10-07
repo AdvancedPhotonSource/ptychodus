@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 import logging
 
 
@@ -32,6 +33,7 @@ class AutodiffReconstructor(Reconstructor):
         super().__init__()
         self._options_helper = options_helper
         self._settings = settings
+        self._epoch = 0
 
     @property
     def name(self) -> str:
@@ -173,29 +175,52 @@ class AutodiffReconstructor(Reconstructor):
             opr_mode_weight_options=self._create_opr_mode_weight_options(product.probes),
         )
 
-    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
+    def get_num_epochs(self) -> int:  # FIXME
+        helper = self._options_helper.reconstructor_helper
+        return helper.num_epochs
+
+    def get_epoch(self) -> int:  # FIXME
+        return self._epoch
+
+    def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
         task_options = self._create_task_options(parameters)
+        num_epochs = task_options.reconstructor_options.num_epochs
+
         task = PtychographyTask(task_options)
-        task.run()  # TODO (n_epochs: int | None = None)
 
-        losses: list[LossValue] = list()
-        task_reconstructor = task.reconstructor
+        with task:
+            self._epoch = 0
+            step_epochs = 5  # FIXME
 
-        if task_reconstructor is not None:
+            task_reconstructor = task.reconstructor
+
+            if task_reconstructor is None:
+                raise RuntimeError('Task reconstructor is None!')
+
             loss_tracker = task_reconstructor.loss_tracker
-            epoch_array = loss_tracker.table['epoch'].to_numpy()
-            loss_array = loss_tracker.table['loss'].to_numpy()
 
-            for epoch, loss in zip(epoch_array.flat, loss_array.flat):
-                losses.append(LossValue(epoch=epoch, value=loss.item()))
+            while self._epoch < num_epochs:
+                task.run(step_epochs)
 
-        product = self._options_helper.create_product(
-            product=parameters.product,
-            position_x_px=task.get_probe_positions_x(as_numpy=True),
-            position_y_px=task.get_probe_positions_y(as_numpy=True),
-            probe_array=task.get_data_to_cpu('probe', as_numpy=True),
-            object_array=task.get_data_to_cpu('object', as_numpy=True),
-            opr_weights=task.get_data_to_cpu('opr_mode_weights', as_numpy=True),
-            losses=losses,
-        )
-        return ReconstructOutput(product, 0)
+                losses: list[LossValue] = list()
+                epoch_array = loss_tracker.table['epoch'].to_numpy()
+                loss_array = loss_tracker.table['loss'].to_numpy()
+
+                for epoch, loss in zip(epoch_array.flat, loss_array.flat):
+                    loss_value = LossValue(epoch=epoch, value=loss.item())
+                    losses.append(loss_value)
+
+                product = self._options_helper.create_product(
+                    product=parameters.product,
+                    position_x_px=task.get_probe_positions_x(as_numpy=True),
+                    position_y_px=task.get_probe_positions_y(as_numpy=True),
+                    probe_array=task.get_data_to_cpu('probe', as_numpy=True),
+                    object_array=task.get_data_to_cpu('object', as_numpy=True),
+                    opr_weights=task.get_data_to_cpu('opr_mode_weights', as_numpy=True),
+                    losses=losses,
+                )
+
+                self._epoch += step_epochs
+                step_epochs = min(step_epochs, num_epochs - self._epoch)
+
+                yield ReconstructOutput(product=product, epoch=self._epoch, result=0)
