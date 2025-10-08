@@ -123,13 +123,13 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         for text in self._presenter.flush_log():
             self._view.progress_dialog.text_edit.appendPlainText(text)
 
-        num_iterations = self._presenter.get_num_epochs()
+        progress_goal = self._presenter.get_progress_goal()
         progress_bar = self._view.progress_dialog.progress_bar
 
-        if num_iterations > 0:
+        if progress_goal > 0:
             progress_bar.show()
-            progress_bar.setRange(0, num_iterations)
-            progress_bar.setValue(self._presenter.get_epoch())
+            progress_bar.setRange(0, progress_goal)
+            progress_bar.setValue(self._presenter.get_progress())
         else:
             progress_bar.hide()
 

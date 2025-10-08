@@ -61,9 +61,7 @@ class ReconstructTask:
 
         logger.debug(parameters)
         tic = time.perf_counter()
-        # FIXME Use spawn or forkserver, which ensures a clean initialization of each process.
-        # FIXME Explicitly set the start method using torch.multiprocessing.set_start_method('spawn', force=True) or 'forkserver'.
-        #       This should be done at the beginning of your program, typically within an if __name__ == "__main__": block.
+
         for result in self._reconstructor.reconstruct(parameters):
             self._update_product(product_item, result.product)
 

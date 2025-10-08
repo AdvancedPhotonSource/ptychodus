@@ -25,14 +25,12 @@ class FourierAnalyzer(Observable):
     def __init__(self, repository: ProductRepository) -> None:
         super().__init__()
         self._repository = repository
-
         self._product_index = -1
         self._result: FourierAnalysisResult | None = None
 
     def set_product(self, product_index: int) -> None:
         if self._product_index != product_index:
             self._product_index = product_index
-
             object_ = self.get_object()
             self._analyze(object_.get_layer(0))
 
@@ -45,10 +43,10 @@ class FourierAnalyzer(Observable):
         return product.get_object_item().get_object()
 
     def _analyze(self, array: ComplexArrayType) -> None:
-        # FIXME choose fft scaling
+        norm = 'forward'  # TODO let user choose norm
         object_ = self.get_object()
         self._result = FourierAnalysisResult(
-            transformed_roi=fftshift(fft2(ifftshift(array))),
+            transformed_roi=fftshift(fft2(ifftshift(array), norm=norm)),
             pixel_geometry=object_.get_pixel_geometry(),
         )
         self.notify_observers()

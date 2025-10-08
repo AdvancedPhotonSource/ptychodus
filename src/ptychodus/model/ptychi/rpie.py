@@ -149,9 +149,6 @@ class RPIEReconstructor(Reconstructor):
         helper = self._options_helper.reconstructor_helper
         return helper.num_epochs
 
-    def get_epoch(self) -> int:  # FIXME
-        return self._epoch
-
     def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
         task_options = self._create_task_options(parameters)
         num_epochs = task_options.reconstructor_options.num_epochs

@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from importlib.metadata import version
 from pathlib import Path
 from typing import Final
@@ -109,13 +109,14 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             center=object_geometry.get_center(),
             layer_spacing_m=parameters.product.object_.layer_spacing_m,
         )
+        losses: Sequence[LossValue] = list()
 
         product = Product(
             metadata=parameters.product.metadata,
             positions=parameters.product.positions,
             probes=parameters.product.probes,
             object_=object_,
-            losses=list(),  # TODO put something here?
+            losses=losses,
         )
 
         yield ReconstructOutput(product)

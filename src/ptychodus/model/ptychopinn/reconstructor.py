@@ -116,7 +116,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         intensity_scale = ptycho.model.params()['intensity_scale']
         return self._model.predict([test_data.X * intensity_scale, test_data.local_offsets])
 
-    def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:  # FIXME
+    def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
         model_size = parameters.diffraction_patterns.shape[-1]
 
         if parameters.diffraction_patterns.shape[-2] != model_size:

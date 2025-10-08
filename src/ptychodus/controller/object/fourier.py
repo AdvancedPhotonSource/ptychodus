@@ -48,7 +48,6 @@ class FourierAnalysisViewController(Observer):
 
     def analyze(self, item_index: int) -> None:
         self._analyzer.set_product(item_index)
-        # FIXME initialize to FT of entire object
         self._dialog.open()
 
     def _analyze_fourier(self, rect: QRectF) -> None:

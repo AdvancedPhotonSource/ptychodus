@@ -57,10 +57,10 @@ class ReconstructorPresenter(Observable, Observer):
     def is_reconstructing(self) -> bool:
         return self._reconstructor_api.is_reconstructing
 
-    def get_num_epochs(self) -> int:
+    def get_progress_goal(self) -> int:
         return 0  # FIXME
 
-    def get_epoch(self) -> int:
+    def get_progress(self) -> int:
         return 0  # FIXME
 
     def flush_log(self) -> Iterator[str]:
