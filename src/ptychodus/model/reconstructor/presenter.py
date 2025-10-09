@@ -55,7 +55,7 @@ class ReconstructorPresenter(Observable, Observer):
 
     @property
     def is_reconstructing(self) -> bool:
-        return self._reconstructor_api.is_reconstructing
+        return self._reconstructor_api.is_reconstructing  # FIXME
 
     def get_progress_goal(self) -> int:
         return 0  # FIXME

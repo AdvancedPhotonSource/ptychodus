@@ -99,9 +99,11 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             gaussian_smoothing_sigma=self._model_settings.gaussian_smoothing_sigma.get_value(),
         )
 
-    @property
-    def name(self) -> str:
+    def get_name(self) -> str:
         return self._name
+
+    def get_progress_goal(self) -> int:
+        return 0
 
     @property
     def _model(self) -> Any:  # TODO tensorflow.keras.Model | None

@@ -60,9 +60,11 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         ptychonn_version = version('ptychonn')
         logger.info(f'\tPtychoNN {ptychonn_version}')
 
-    @property
-    def name(self) -> str:
+    def get_name(self) -> str:
         return self._model_provider.get_model_name()
+
+    def get_progress_goal(self) -> int:
+        return 0
 
     def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
         # TODO data size/shape requirements to GUI

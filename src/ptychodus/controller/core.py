@@ -95,8 +95,6 @@ class ControllerCore:
             self._probe_image_controller,
             model.analysis.probe_propagator,
             model.analysis.probe_propagator_visualization_engine,
-            model.analysis.stxm_simulator,
-            model.analysis.stxm_visualization_engine,
             model.analysis.exposure_analyzer,
             model.analysis.exposure_visualization_engine,
             model.fluorescence_core.enhancer,

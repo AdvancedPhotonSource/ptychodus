@@ -32,8 +32,7 @@ class LSQMLReconstructor(Reconstructor):
         self._settings = settings
         self._epoch = 0
 
-    @property
-    def name(self) -> str:
+    def get_name(self) -> str:
         return 'LSQML'
 
     def _create_reconstructor_options(self) -> LSQMLReconstructorOptions:
@@ -177,7 +176,7 @@ class LSQMLReconstructor(Reconstructor):
             opr_mode_weight_options=self._create_opr_mode_weight_options(product.probes),
         )
 
-    def get_num_epochs(self) -> int:  # FIXME
+    def get_progress_goal(self) -> int:
         helper = self._options_helper.reconstructor_helper
         return helper.num_epochs
 
@@ -222,4 +221,4 @@ class LSQMLReconstructor(Reconstructor):
                 self._epoch += step_epochs
                 step_epochs = min(step_epochs, num_epochs - self._epoch)
 
-                yield ReconstructOutput(product=product, epoch=self._epoch, result=0)
+                yield ReconstructOutput(product=product, progress=self._epoch, result=0)

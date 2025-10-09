@@ -19,14 +19,17 @@ class ReconstructInput:
 @dataclass(frozen=True)
 class ReconstructOutput:
     product: Product
-    epoch: int = 0
+    progress: int = 0
     result: int = 0
 
 
 class Reconstructor(ABC):
-    @property
     @abstractmethod
-    def name(self) -> str:
+    def get_name(self) -> str:
+        pass
+
+    @abstractmethod
+    def get_progress_goal(self) -> int:
         pass
 
     @abstractmethod
@@ -75,9 +78,11 @@ class NullReconstructor(TrainableReconstructor):
     def __init__(self, name: str) -> None:
         self._name = name
 
-    @property
-    def name(self) -> str:
+    def get_name(self) -> str:
         return self._name
+
+    def get_progress_goal(self) -> int:
+        return 0
 
     def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
         yield from ()

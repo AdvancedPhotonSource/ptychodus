@@ -1,7 +1,6 @@
 from collections.abc import Sequence
 from pathlib import Path
 import logging
-import threading
 import time
 
 from ptychodus.api.plugins import PluginChooser
@@ -14,7 +13,7 @@ from ptychodus.api.reconstructor import (
 
 from ..product import ProductAPI
 from ..task_manager import TaskManager
-from ._tasks import ReconstructTask
+from .context import ReconstructBackgroundTask, ReconstructorContext
 from .matcher import DiffractionPatternPositionMatcher, ScanIndexFilter
 
 logger = logging.getLogger(__name__)
@@ -26,17 +25,18 @@ class ReconstructorAPI:
         task_manager: TaskManager,
         data_matcher: DiffractionPatternPositionMatcher,
         product_api: ProductAPI,
+        context: ReconstructorContext,
         reconstructor_chooser: PluginChooser[Reconstructor],
     ) -> None:
         self._task_manager = task_manager
         self._data_matcher = data_matcher
         self._product_api = product_api
+        self._context = context
         self._reconstructor_chooser = reconstructor_chooser
-        self._is_reconstructing = threading.Event()
 
     @property
     def is_reconstructing(self) -> bool:
-        return self._is_reconstructing.is_set()
+        return self._context.is_reconstructing
 
     def get_reconstruct_input(
         self,
@@ -44,8 +44,9 @@ class ReconstructorAPI:
         *,
         index_filter: ScanIndexFilter = ScanIndexFilter.ALL,
     ) -> ReconstructInput:
+        input_product_item = self._product_api.get_item(input_product_index)
         return self._data_matcher.match_diffraction_patterns_with_positions(
-            input_product_index, index_filter=index_filter
+            input_product_item, index_filter=index_filter
         )
 
     def reconstruct(
@@ -75,18 +76,26 @@ class ReconstructorAPI:
             object_item = output_product_item.get_object_item()
             object_item.rebuild(recenter=True)
 
-        task = ReconstructTask(
-            self._is_reconstructing,
-            self._task_manager,
-            self._data_matcher,
-            reconstructor.strategy,
-            output_product_index,
-            index_filter=index_filter,
+        logger.info(f'Preparing input data for {output_product_item.get_name()}...')
+        tic = time.perf_counter()
+        parameters = self._data_matcher.match_diffraction_patterns_with_positions(
+            output_product_item, index_filter
         )
-        self._task_manager.put_background_task(task)
+        toc = time.perf_counter()
+        logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
+
+        logger.debug(parameters)
+
+        background_task = ReconstructBackgroundTask(
+            self._context,
+            reconstructor.strategy,
+            parameters,
+            output_product_item,
+        )
+        self._task_manager.put_background_task(background_task)
 
         if block:
-            pass  # FIXME wait until finished
+            pass  # FIXME context.wait_for_reconstruction
 
         return output_product_index
 
@@ -151,8 +160,9 @@ class ReconstructorAPI:
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Preparing input data...')
             tic = time.perf_counter()
+            input_product_item = self._product_api.get_item(input_product_index)
             parameters = self._data_matcher.match_diffraction_patterns_with_positions(
-                input_product_index, ScanIndexFilter.ALL
+                input_product_item, ScanIndexFilter.ALL
             )
             toc = time.perf_counter()
             logger.info(f'Data preparation time {toc - tic:.4f} seconds.')

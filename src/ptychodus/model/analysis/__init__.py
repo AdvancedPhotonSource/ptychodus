@@ -4,7 +4,6 @@ from .fourier import FourierAnalyzer
 from .frc import FourierRingCorrelator
 from .illumination import IlluminationMapper, IlluminationMap
 from .propagator import ProbePropagator
-from .stxm import STXMSimulator
 from .xmcd import XMCDAnalyzer, XMCDResult
 
 __all__ = [
@@ -16,7 +15,6 @@ __all__ = [
     'IlluminationMap',
     'IlluminationMapper',
     'ProbePropagator',
-    'STXMSimulator',
     'XMCDAnalyzer',
     'XMCDResult',
 ]
