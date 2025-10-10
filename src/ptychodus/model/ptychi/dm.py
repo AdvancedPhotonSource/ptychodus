@@ -148,8 +148,7 @@ class DMReconstructor(Reconstructor):
         )
 
     def get_progress_goal(self) -> int:
-        helper = self._options_helper.reconstructor_helper
-        return helper.num_epochs
+        return self._options_helper.num_epochs
 
     def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
         task_options = self._create_task_options(parameters)
@@ -159,7 +158,7 @@ class DMReconstructor(Reconstructor):
 
         with task:
             self._epoch = 0
-            step_epochs = 2  # FIXME
+            step_epochs = self._options_helper.num_sync_epochs
 
             task_reconstructor = task.reconstructor
 

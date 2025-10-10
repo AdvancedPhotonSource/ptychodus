@@ -10,6 +10,8 @@ class PtyChiSettings(Observable, Observer):
 
         # ReconstructorOptions
         self.num_epochs = self._group.create_integer_parameter('NumEpochs', 100, minimum=1)
+        # FIXME vvv 10
+        self.num_sync_epochs = self._group.create_integer_parameter('NumSyncEpochs', 2, minimum=1)
         self.batch_size = self._group.create_integer_parameter('BatchSize', 100, minimum=1)
         self.batching_mode = self._group.create_string_parameter('BatchingMode', 'random')
         self.compact_mode_update_clustering = self._group.create_integer_parameter(

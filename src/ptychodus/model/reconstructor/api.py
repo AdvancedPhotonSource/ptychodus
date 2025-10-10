@@ -13,7 +13,7 @@ from ptychodus.api.reconstructor import (
 
 from ..product import ProductAPI
 from ..task_manager import TaskManager
-from .context import ReconstructBackgroundTask, ReconstructorContext
+from .context import ReconstructBackgroundTask, ReconstructorContext, ReconstructorProgressMonitor
 from .matcher import DiffractionPatternPositionMatcher, ScanIndexFilter
 
 logger = logging.getLogger(__name__)
@@ -34,9 +34,8 @@ class ReconstructorAPI:
         self._context = context
         self._reconstructor_chooser = reconstructor_chooser
 
-    @property
-    def is_reconstructing(self) -> bool:
-        return self._context.is_reconstructing
+    def get_progress_monitor(self) -> ReconstructorProgressMonitor:
+        return self._context.get_progress_monitor()
 
     def get_reconstruct_input(
         self,

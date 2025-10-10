@@ -57,27 +57,27 @@ class ControllerCore:
             self._file_dialog_factory,
         )
         self._patterns_controller = DiffractionController(
-            model.diffraction.detector_settings,
-            model.diffraction.diffraction_settings,
-            model.diffraction.pattern_sizer,
-            model.diffraction.bad_pixels_provider,
-            model.diffraction.diffraction_api,
-            model.diffraction.dataset,
+            model.diffraction_core.detector_settings,
+            model.diffraction_core.diffraction_settings,
+            model.diffraction_core.pattern_sizer,
+            model.diffraction_core.bad_pixels_provider,
+            model.diffraction_core.diffraction_api,
+            model.diffraction_core.dataset,
             model.metadata_presenter,
             view.patterns_view,
             self._patterns_image_controller,
             self._file_dialog_factory,
         )
         self._product_controller = ProductController.create_instance(
-            model.diffraction.dataset,
-            model.product.product_repository,
-            model.product.product_api,
+            model.diffraction_core.dataset,
+            model.product_core.product_repository,
+            model.product_core.product_api,
             view.product_view,
             self._file_dialog_factory,
         )
         self._scan_controller = ScanController(
-            model.product.scan_repository,
-            model.product.scan_api,
+            model.product_core.scan_repository,
+            model.product_core.scan_api,
             view.scan_view,
             view.scan_plot_view,
             self._file_dialog_factory,
@@ -90,13 +90,13 @@ class ControllerCore:
             self._file_dialog_factory,
         )
         self._probe_controller = ProbeController(
-            model.product.probe_repository,
-            model.product.probe_api,
+            model.product_core.probe_repository,
+            model.product_core.probe_api,
             self._probe_image_controller,
-            model.analysis.probe_propagator,
-            model.analysis.probe_propagator_visualization_engine,
-            model.analysis.exposure_analyzer,
-            model.analysis.exposure_visualization_engine,
+            model.analysis_core.probe_propagator,
+            model.analysis_core.probe_propagator_visualization_engine,
+            model.analysis_core.exposure_analyzer,
+            model.analysis_core.exposure_visualization_engine,
             model.fluorescence_core.enhancer,
             model.fluorescence_core.visualization_engine,
             view.probe_view,
@@ -110,21 +110,22 @@ class ControllerCore:
             self._file_dialog_factory,
         )
         self._object_controller = ObjectController(
-            model.product.object_repository,
-            model.product.object_api,
+            model.product_core.object_repository,
+            model.product_core.object_api,
             self._object_image_controller,
-            model.analysis.fourier_ring_correlator,
-            model.analysis.fourier_analyzer,
-            model.analysis.fourier_real_space_visualization_engine,
-            model.analysis.fourier_reciprocal_space_visualization_engine,
-            model.analysis.xmcd_analyzer,
-            model.analysis.xmcd_visualization_engine,
+            model.analysis_core.fourier_ring_correlator,
+            model.analysis_core.fourier_analyzer,
+            model.analysis_core.fourier_real_space_visualization_engine,
+            model.analysis_core.fourier_reciprocal_space_visualization_engine,
+            model.analysis_core.xmcd_analyzer,
+            model.analysis_core.xmcd_visualization_engine,
             view.object_view,
             self._file_dialog_factory,
         )
         self._reconstructor_controller = ReconstructorController(
-            model.reconstructor.presenter,
-            model.product.product_repository,
+            model.reconstructor_core.reconstructor_api.get_progress_monitor(),
+            model.reconstructor_core.presenter,
+            model.product_core.product_repository,
             view.reconstructor_view,
             view.reconstructor_plot_view,
             self._product_controller.table_model,
@@ -136,33 +137,33 @@ class ControllerCore:
             ],
         )
         self._workflow_controller = WorkflowController(
-            model.workflow.parameters_presenter,
-            model.workflow.authorization_presenter,
-            model.workflow.status_presenter,
-            model.workflow.execution_presenter,
+            model.workflow_core.parameters_presenter,
+            model.workflow_core.authorization_presenter,
+            model.workflow_core.status_presenter,
+            model.workflow_core.execution_presenter,
             view.workflow_parameters_view,
             view.workflow_table_view,
             self._product_controller.table_model,
         )
         self._automation_controller = AutomationController.create_instance(
-            model.automation,
-            model.automation.presenter,
-            model.automation.processing_presenter,
+            model.automation_core,
+            model.automation_core.presenter,
+            model.automation_core.processing_presenter,
             view.automation_view,
             self._file_dialog_factory,
         )
         self._agent_controller = AgentController(
-            model.agent.settings, model.agent.presenter, view.agent_view
+            model.agent_core.settings, model.agent_core.presenter, view.agent_view
         )
         self._agent_chat_controller = AgentChatController(
-            model.agent.chat_history, model.agent.presenter, view.agent_chat_view
+            model.agent_core.chat_history, model.agent_core.presenter, view.agent_chat_view
         )
 
         self._run_foreground_tasks_timer = QTimer()
-        self._run_foreground_tasks_timer.timeout.connect(model.run_foreground_tasks)
+        self._run_foreground_tasks_timer.timeout.connect(model.run_tasks)
         self._run_foreground_tasks_timer.start(1000)  # TODO make configurable
 
-        view.workflow_action.setVisible(model.workflow.is_supported)
+        view.workflow_action.setVisible(model.workflow_core.is_supported)
 
         self._swap_central_widgets(view.patterns_action)
         view.patterns_action.setChecked(True)

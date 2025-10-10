@@ -54,20 +54,6 @@ class ReconstructorPresenter(Observable, Observer):
         return self._reconstructor_api.reconstruct_transformed(input_product_index)
 
     @property
-    def is_reconstructing(self) -> bool:
-        return self._reconstructor_api.is_reconstructing  # FIXME
-
-    def get_progress_goal(self) -> int:
-        return 0  # FIXME
-
-    def get_progress(self) -> int:
-        return 0  # FIXME
-
-    def flush_log(self) -> Iterator[str]:
-        for text in self._log_handler.messages():
-            yield text
-
-    @property
     def is_trainable(self) -> bool:
         reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
         return isinstance(reconstructor, TrainableReconstructor)

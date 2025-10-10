@@ -35,7 +35,7 @@ class ReconstructorCore:
         self._log_handler.setFormatter(
             logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s')
         )
-        self._context = ReconstructorContext(task_manager)
+        self._context = ReconstructorContext(self._log_handler, task_manager)
 
         for library in library_seq:
             for reconstructor in library:
@@ -64,3 +64,6 @@ class ReconstructorCore:
             self._log_handler,
             self.reconstructor_api,
         )
+
+    def notify_observers_if_progress_changed(self) -> None:
+        self._context.notify_observers_if_progress_changed()

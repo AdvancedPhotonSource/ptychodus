@@ -99,7 +99,7 @@ class ModelCore:
         self.memory_presenter = MemoryPresenter()
         self.settings_registry = SettingsRegistry()
 
-        self.diffraction = DiffractionCore(
+        self.diffraction_core = DiffractionCore(
             self._task_manager,
             self.settings_registry,
             self._plugin_registry.bad_pixels_file_readers,
@@ -107,11 +107,11 @@ class ModelCore:
             self._plugin_registry.diffraction_file_writers,
             self.settings_registry,
         )
-        self.product = ProductCore(
+        self.product_core = ProductCore(
             self.rng,
             self.settings_registry,
-            self.diffraction.pattern_sizer,
-            self.diffraction.dataset,
+            self.diffraction_core.pattern_sizer,
+            self.diffraction_core.dataset,
             self._plugin_registry.position_file_readers,
             self._plugin_registry.position_file_writers,
             self._plugin_registry.fresnel_zone_plates,
@@ -124,10 +124,10 @@ class ModelCore:
             self.settings_registry,
         )
         self.metadata_presenter = MetadataPresenter(
-            self.diffraction.detector_settings,
-            self.diffraction.diffraction_settings,
-            self.diffraction.dataset,
-            self.product.settings,
+            self.diffraction_core.detector_settings,
+            self.diffraction_core.diffraction_settings,
+            self.diffraction_core.dataset,
+            self.product_core.settings,
         )
 
         self.pattern_visualization_engine = VisualizationEngine(is_complex=False)
@@ -135,7 +135,7 @@ class ModelCore:
         self.object_visualization_engine = VisualizationEngine(is_complex=True)
 
         self.ptychi_reconstructor_library = PtyChiReconstructorLibrary(
-            self.settings_registry, self.diffraction.pattern_sizer, is_developer_mode_enabled
+            self.settings_registry, self.diffraction_core.pattern_sizer, is_developer_mode_enabled
         )
         self.ptychonn_reconstructor_library = PtychoNNReconstructorLibrary.create_instance(
             self.settings_registry, is_developer_mode_enabled
@@ -143,11 +143,11 @@ class ModelCore:
         self.ptychopinn_reconstructor_library = PtychoPINNReconstructorLibrary(
             self.settings_registry, is_developer_mode_enabled
         )
-        self.reconstructor = ReconstructorCore(
+        self.reconstructor_core = ReconstructorCore(
             self._task_manager,
             self.settings_registry,
-            self.diffraction.dataset,
-            self.product.product_api,
+            self.diffraction_core.dataset,
+            self.product_core.product_api,
             [
                 self.ptychi_reconstructor_library,
                 self.ptychonn_reconstructor_library,
@@ -156,41 +156,41 @@ class ModelCore:
         )
         self.fluorescence_core = FluorescenceCore(
             self.settings_registry,
-            self.product.product_repository,
+            self.product_core.product_repository,
             self._plugin_registry.upscaling_strategies,
             self._plugin_registry.deconvolution_strategies,
             self._plugin_registry.fluorescence_file_readers,
             self._plugin_registry.fluorescence_file_writers,
         )
-        self.analysis = AnalysisCore(
+        self.analysis_core = AnalysisCore(
             self.settings_registry,
-            self.reconstructor.data_matcher,
-            self.product.product_repository,
-            self.product.object_repository,
+            self.reconstructor_core.data_matcher,
+            self.product_core.product_repository,
+            self.product_core.object_repository,
         )
-        self.workflow = WorkflowCore(
+        self.workflow_core = WorkflowCore(
             self.settings_registry,
-            self.diffraction.diffraction_api,
-            self.product.product_api,
-            self.product.scan_api,
-            self.product.probe_api,
-            self.product.object_api,
-            self.reconstructor.reconstructor_api,
+            self.diffraction_core.diffraction_api,
+            self.product_core.product_api,
+            self.product_core.scan_api,
+            self.product_core.probe_api,
+            self.product_core.object_api,
+            self.reconstructor_core.reconstructor_api,
         )
-        self.automation = AutomationCore(
+        self.automation_core = AutomationCore(
             self.settings_registry,
-            self.workflow.workflow_api,
+            self.workflow_core.workflow_api,
             self._plugin_registry.file_based_workflows,
         )
-        self.agent = AgentCore(self.settings_registry)
+        self.agent_core = AgentCore(self.settings_registry)
 
         if settings_file:
             self.settings_registry.open_settings(settings_file)
 
     def __enter__(self) -> ModelCore:
         self._task_manager.start()
-        self.workflow.start()
-        self.automation.start()
+        self.workflow_core.start()
+        self.automation_core.start()
         return self
 
     @overload
@@ -210,18 +210,19 @@ class ModelCore:
         exception_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        self.automation.stop()
-        self.workflow.stop()
+        self.automation_core.stop()
+        self.workflow_core.stop()
         self._task_manager.stop(await_finish=False)
 
     def create_streaming_context(self, metadata: DiffractionMetadata) -> PtychodusStreamingContext:
         return PtychodusStreamingContext(
-            self.product.scan_api.create_streaming_context(),
-            self.diffraction.diffraction_api.create_streaming_context(metadata),
+            self.product_core.scan_api.create_streaming_context(),
+            self.diffraction_core.diffraction_api.create_streaming_context(metadata),
         )
 
-    def run_foreground_tasks(self) -> None:
+    def run_tasks(self) -> None:
         self._task_manager.run_foreground_tasks()
+        self.reconstructor_core.notify_observers_if_progress_changed()
 
     def batch_mode_execute(
         self,
@@ -260,4 +261,4 @@ class ModelCore:
 
     @property
     def workflow_api(self) -> WorkflowAPI:
-        return self.workflow.workflow_api
+        return self.workflow_core.workflow_api

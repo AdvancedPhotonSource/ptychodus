@@ -88,6 +88,10 @@ class PtyChiReconstructorOptionsHelper:
         return self._settings.num_epochs.get_value()
 
     @property
+    def num_sync_epochs(self) -> int:
+        return self._settings.num_sync_epochs.get_value()
+
+    @property
     def batch_size(self) -> int:
         return self._settings.batch_size.get_value()
 
@@ -725,3 +729,11 @@ class PtyChiOptionsHelper:
             object_=object_out,
             losses=losses,
         )
+
+    @property
+    def num_epochs(self) -> int:
+        return self.reconstructor_helper.num_epochs
+
+    @property
+    def num_sync_epochs(self) -> int:
+        return self.reconstructor_helper.num_sync_epochs
