@@ -306,7 +306,11 @@ class AssembledDiffractionDataset(DiffractionDataset):
     def get_processed_bad_pixels(self) -> BadPixels:
         processor = self._sizer.get_processor()
         detector_extent = self._sizer.get_detector_extent()
-        bad_pixels = self._bad_pixels or numpy.full(detector_extent.shape, False)
+        bad_pixels = (
+            numpy.full(detector_extent.shape, False)
+            if self._bad_pixels is None
+            else self._bad_pixels
+        )
         return processor.process_bad_pixels(bad_pixels)
 
     def get_assembled_indexes(self) -> DiffractionIndexes:
