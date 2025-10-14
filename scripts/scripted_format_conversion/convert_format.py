@@ -3,13 +3,17 @@
 r"""Convert ptychography data format using Ptychodus.
 
 Example usage:
-python convert_ptychoshelves_to_ptychodus.py \
-    --patterns data/ptychoshelves/data_roi0_dp.hdf5 \
-    --scan data/ptychoshelves/data_roi0_para.hdf5 \
-    --product-name ptychodus \
-    --output-dir outputs \
-    --diffraction-reader PtychoShelves \
-    --scan-reader PtychoShelves
+python convert_format.py \
+    --patterns "data/ptychoshelves/velo_19c2_Jun_IC_fly145/data_roi0_dp.hdf5" \
+    --probe "data/ptychoshelves/velo_19c2_Jun_IC_fly145/Niter100.mat" \
+    --probe-positions "data/ptychoshelves/velo_19c2_Jun_IC_fly145/data_roi0_para.hdf5" \
+    --metadata "data/ptychoshelves/velo_19c2_Jun_IC_fly145/data_roi0_para.hdf5" \
+    --product-name "ptychodus" \
+    --output-dir "outputs" \
+    --diffraction-reader "PtychoShelves" \
+    --probe-reader "PtychoShelves" \
+    --probe-position-reader "PtychoShelves"
+ 
 """
 from __future__ import annotations
 
@@ -17,57 +21,12 @@ import argparse
 from pathlib import Path
 from typing import Literal, Optional
 
-from ptychodus.model import ModelCore
+import h5py
 
-DiffractionReaderChoices = (
-    "APS_CSSI",
-    "APS_HXN",
-    "PtychoShelves",
-    "CXI",
-    "TIFF",
-    "LCLS_XPP",
-    "APS_2IDD",
-    "APS_2IDE",
-    "APS_BNP",
-    "APS_LYNX",
-    "NPZ",
-    "SLAC_NPZ",
-    "SLS_cSAXS",
-    "APS_ISN",
-    "APS_Velociprobe",
-    "NPY",
-    "MAX_IV_NanoMax",
-    "APS_PtychoSAXS",
-    "NSLS_II_1",
-    "NSLS_II_2",
-    "NSLS_II_MATLAB",
-    "APS_Polar",
-)
-DiffractionWriterChoices = ("PtychoShelves", "NPZ", "NPY")
-ScanReaderChoices = (
-    "MDA",
-    "APS_2IDD",
-    "APS_2IDE",
-    "APS_BNP",
-    "APS_ISN_MDA",
-    "CNM_APS_HXN",
-    "APS_LYNX_Orchestra",
-    "APS_PtychoSAXS",
-    "APS_CSSI",
-    "APS_Velociprobe_LI",
-    "APS_Velociprobe_PE",
-    "PtychoShelves",
-    "APS_Polar",
-    "APS_LYNX_SoftGlueZynq",
-    "LCLS_XPP",
-    "NSLS_II_1",
-    "NSLS_II_2",
-    "MAX_IV_NanoMAX",
-    "TXT",
-    "CSV",
-    "CXI",
-)
-ProductWriterChoices = ("HDF5", "NPZ")
+from ptychodus.model import ModelCore
+from ptychodus.api.diffraction import CropCenter
+from ptychodus.api.geometry import ImageExtent
+
 
 DiffractionReaderName = Literal[
     "APS_CSSI",
@@ -94,7 +53,30 @@ DiffractionReaderName = Literal[
     "APS_Polar",
 ]
 DiffractionWriterName = Literal["PtychoShelves", "NPZ", "NPY"]
-ScanReaderName = Literal[
+ProbeReaderName = Literal[
+    "MDA",
+    "APS_2IDD",
+    "APS_2IDE",
+    "APS_BNP",
+    "APS_ISN_MDA",
+    "CNM_APS_HXN",
+    "APS_LYNX_Orchestra",
+    "APS_PtychoSAXS",
+    "APS_CSSI",
+    "APS_Velociprobe_LI",
+    "APS_Velociprobe_PE",
+    "PtychoShelves",
+    "APS_Polar",
+    "APS_LYNX_SoftGlueZynq",
+    "LCLS_XPP",
+    "NSLS_II_1",
+    "NSLS_II_2",
+    "MAX_IV_NanoMAX",
+    "TXT",
+    "CSV",
+    "CXI",
+]
+ProbePositionReaderName = Literal[
     "MDA",
     "APS_2IDD",
     "APS_2IDE",
@@ -119,6 +101,12 @@ ScanReaderName = Literal[
 ]
 ProductWriterName = Literal["HDF5", "NPZ"]
 
+DiffractionReaderChoices = list(DiffractionReaderName.__args__)
+DiffractionWriterChoices = list(DiffractionWriterName.__args__)
+ProbeReaderChoices = list(ProbeReaderName.__args__)
+ProbePositionReaderChoices = list(ProbePositionReaderName.__args__)
+ProductWriterChoices = list(ProductWriterName.__args__)
+
 
 def _metadata_kwargs(metadata) -> dict[str, float]:
     """Collect optional metadata fields that match create_product() parameters."""
@@ -142,20 +130,49 @@ def _metadata_kwargs(metadata) -> dict[str, float]:
     return values
 
 
+def _get_pixel_size(
+    metadata_file_path: Path | None = None,
+    metadata_type: str | None = None,
+    asserted_pixel_size: float | None = None,
+) -> float | None:
+    if asserted_pixel_size is not None:
+        return asserted_pixel_size
+    if metadata_file_path is not None:
+        if metadata_type == "PtychoShelves":
+            with h5py.File(metadata_file_path, "r") as f:
+                pixel_size_m = float(f["dx"][0])
+        else:
+            raise ValueError(f"Unsupported metadata type: {metadata_type}")
+    return pixel_size_m
+
+
+def _get_diffraction_pattern_size(
+    diffraction_pattern_path: Path,
+    diffraction_reader: DiffractionReaderName,
+) -> tuple[int, int]:
+    if diffraction_reader == "PtychoShelves":
+        with h5py.File(diffraction_pattern_path, "r") as f:
+            return f["dp"].shape[-2:]
+    else:
+        raise ValueError(f"Unsupported diffraction reader: {diffraction_reader}")
+
+
 def convert_data(
-    patterns_path: Path,
+    diffraction_pattern_path: Path,
     *,
-    scan_path: Path | None,
+    probe_path: Path | None,
+    probe_position_path: Path | None,
+    metadata_path: Path | None,
     diffraction_output: Path,
     product_output: Path,
     product_name: str | None,
     diffraction_reader: DiffractionReaderName,
-    scan_reader: ScanReaderName | None,
+    probe_reader: ProbeReaderName | None,
+    probe_position_reader: ProbePositionReaderName | None,
     diffraction_writer: DiffractionWriterName = "PtychoShelves",
     product_writer: ProductWriterName = "HDF5",
     settings_file: Optional[Path] = None,
-    build_probe: Optional[bool] = True,
-    build_object: Optional[bool] = True,
+    asserted_pixel_size: Optional[float] = None,
 ) -> tuple[Path, Path]:
     """Convert an external diffraction dataset into Ptychodus outputs.
 
@@ -164,9 +181,15 @@ def convert_data(
     patterns_path : Path
         Path to the diffraction file that should be opened via the specified
         `diffraction_reader` plugin.
-    scan_path : Path or None
+    probe_path : Path or None
+        Optional path to a probe file. When provided, it is opened
+        with `probe_reader` before the probe/object builders are invoked.
+    probe_positions_path : Path or None
         Optional path to a scan or position file. When provided, it is opened
-        with `scan_reader` before the probe/object builders are invoked.
+        with `probe_position_reader` before the probe/object builders are invoked.
+    metadata_path : Path or None
+        Optional path to a metadata file. When provided, it is used to
+        override the pixel size from data files.
     diffraction_output : Path
         Destination filename for the converted diffraction data.
     product_output : Path
@@ -188,10 +211,10 @@ def convert_data(
     settings_file : Path or None
         Optional ``settings.ini`` loaded into :class:`ptychodus.model.ModelCore`
         before performing the conversion.
-    build_probe : bool
-        Whether to execute :meth:`build_probe` on the workflow product.
-    build_object : bool
-        Whether to execute :meth:`build_object` on the workflow product.
+    asserted_pixel_size : float or None
+        Optional pixel size in meters. If provided, it is used to override
+        the pixel size from data files. This parameter needs to be provided
+        if pixel size is not available in the data files.
 
     Returns
     -------
@@ -203,19 +226,26 @@ def convert_data(
     FileNotFoundError
         Raised when either the diffraction file or the scan file is missing.
     """
-    if not patterns_path.is_file():
-        raise FileNotFoundError(f"Diffraction patterns file not found: {patterns_path}")
+    if not diffraction_pattern_path.is_file():
+        raise FileNotFoundError(f"Diffraction patterns file not found: {diffraction_pattern_path}")
 
-    if scan_path is not None and not scan_path.exists():
-        raise FileNotFoundError(f"Scan file not found: {scan_path}")
+    if probe_position_path is not None and not probe_position_path.exists():
+        raise FileNotFoundError(f"Scan file not found: {probe_position_path}")
 
     diffraction_output.parent.mkdir(parents=True, exist_ok=True)
     product_output.parent.mkdir(parents=True, exist_ok=True)
 
-    product_basename = product_name or patterns_path.stem
+    product_basename = product_name or diffraction_pattern_path.stem
 
     with ModelCore(settings_file) as model:
-        model.workflow_api.open_patterns(patterns_path, file_type=diffraction_reader)
+        dp_size = _get_diffraction_pattern_size(diffraction_pattern_path, diffraction_reader)
+        
+        model.workflow_api.open_patterns(
+            diffraction_pattern_path, 
+            file_type=diffraction_reader,
+            crop_center=CropCenter(position_x_px=dp_size[1] // 2, position_y_px=dp_size[0] // 2),
+            crop_extent=ImageExtent(width_px=dp_size[1], height_px=dp_size[0]),
+        )
         model.diffraction.diffraction_api.start_assembling_diffraction_patterns()
         model.diffraction.diffraction_api.finish_assembling_diffraction_patterns(block=True)
 
@@ -224,17 +254,26 @@ def convert_data(
 
         workflow_product = model.workflow_api.create_product(product_basename, **product_kwargs)
 
-        if scan_path is not None:
-            workflow_product.open_scan(scan_path, file_type=scan_reader or None)
+        if probe_position_path is not None:
+            workflow_product.open_scan(probe_position_path, file_type=probe_position_reader or None)
 
-        if build_probe:
-            workflow_product.build_probe()
-
-        if build_object:
-            workflow_product.build_object()
+        if probe_path is not None:
+            workflow_product.open_probe(probe_path, file_type=probe_reader or None)
 
         model.diffraction.diffraction_api.save_patterns(diffraction_output, diffraction_writer)
         workflow_product.save_product(product_output, file_type=product_writer)
+        
+        # Supplement pixel size
+        if metadata_path is not None:
+            pixel_size_m = _get_pixel_size(
+                metadata_path, 
+                metadata_type=diffraction_reader, 
+                asserted_pixel_size=asserted_pixel_size
+            )
+            if pixel_size_m is not None:
+                with h5py.File(product_output, "r+") as f:
+                    f["object"].attrs["pixel_height_m"] = pixel_size_m
+                    f["object"].attrs["pixel_width_m"] = pixel_size_m
 
     return diffraction_output, product_output
 
@@ -289,10 +328,22 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
-        "--scan",
+        "--probe",
         type=Path,
         default=None,
-        help="Optional scan/position file path required by many plugins.",
+        help="Optional probe file path required by many plugins.",
+    )
+    parser.add_argument(
+        "--probe-positions",
+        type=Path,
+        default=None,
+        help="Optional probe positions file path required by many plugins.",
+    )
+    parser.add_argument(
+        "--metadata",
+        type=Path,
+        default=None,
+        help="Optional metadata file path required by many plugins.",
     )
     parser.add_argument(
         "--output-dir",
@@ -335,10 +386,16 @@ def main(argv: list[str] | None = None) -> int:
         help="Diffraction file writer plugin to use when saving the converted dataset.",
     )
     parser.add_argument(
-        "--scan-reader",
+        "--probe-reader",
         default="PtychoShelves",
-        choices=sorted(ScanReaderChoices),
-        help="Scan reader plugin to use when a scan file is provided.",
+        choices=sorted(ProbeReaderChoices),
+        help="Probe reader plugin to use when a probe file is provided.",
+    )
+    parser.add_argument(
+        "--probe-position-reader",
+        default="PtychoShelves",
+        choices=sorted(ProbePositionReaderChoices),
+        help="Probe position reader plugin to use when a probe position file is provided.",
     )
     parser.add_argument(
         "--product-writer",
@@ -347,14 +404,10 @@ def main(argv: list[str] | None = None) -> int:
         help="Product file writer plugin to use for the converted parameter file.",
     )
     parser.add_argument(
-        "--skip-probe",
-        action="store_true",
-        help="Skip building the probe after loading the scan.",
-    )
-    parser.add_argument(
-        "--skip-object",
-        action="store_true",
-        help="Skip building the object after loading the scan.",
+        "--asserted-pixel-size",
+        type=float,
+        default=None,
+        help="Optional pixel size in meters. If provided, it is used to override the pixel size from data files.",
     )
     parser.add_argument(
         "--list-plugins",
@@ -365,10 +418,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.list_plugins:
-        print("Diffraction readers :", ", ".join(sorted(DiffractionReaderChoices)))
-        print("Diffraction writers :", ", ".join(sorted(DiffractionWriterChoices)))
-        print("Scan readers        :", ", ".join(sorted(ScanReaderChoices)))
-        print("Product writers     :", ", ".join(sorted(ProductWriterChoices)))
+        print("Diffraction readers   : ", ", ".join(sorted(DiffractionReaderChoices)))
+        print("Diffraction writers   : ", ", ".join(sorted(DiffractionWriterChoices)))
+        print("Probe readers         : ", ", ".join(sorted(ProbeReaderChoices)))
+        print("Probe position readers: ", ", ".join(sorted(ProbePositionReaderChoices)))
+        print("Product writers       : ", ", ".join(sorted(ProductWriterChoices)))
         return 0
 
     if args.diffraction_writer is not None and args.diffraction_writer not in DiffractionWriterChoices:
@@ -394,17 +448,19 @@ def main(argv: list[str] | None = None) -> int:
 
     diffraction_path, product_path = convert_data(
         args.patterns,
-        scan_path=args.scan,
+        probe_path=args.probe,
+        probe_position_path=args.probe_positions,
+        metadata_path=args.metadata,
         diffraction_output=diffraction_output,
         product_output=product_output,
         product_name=args.product_name,
         diffraction_reader=args.diffraction_reader,
         diffraction_writer=args.diffraction_writer,
-        scan_reader=args.scan_reader,
+        probe_reader=args.probe_reader,
+        probe_position_reader=args.probe_position_reader,
         product_writer=args.product_writer,
         settings_file=args.settings,
-        build_probe=not args.skip_probe,
-        build_object=not args.skip_object,
+        asserted_pixel_size=args.asserted_pixel_size,
     )
 
     print(f"Wrote diffraction data to {diffraction_path}")
