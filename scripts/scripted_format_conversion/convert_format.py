@@ -4,16 +4,17 @@ r"""Convert ptychography data format using Ptychodus.
 
 Example usage:
 python convert_format.py \
-    --patterns "data/ptychoshelves/velo_19c2_Jun_IC_fly145/data_roi0_dp.hdf5" \
-    --probe "data/ptychoshelves/velo_19c2_Jun_IC_fly145/Niter100.mat" \
-    --probe-positions "data/ptychoshelves/velo_19c2_Jun_IC_fly145/data_roi0_para.hdf5" \
-    --metadata "data/ptychoshelves/velo_19c2_Jun_IC_fly145/data_roi0_para.hdf5" \
+    --patterns "data/ptychoshelves/data_roi0_dp.hdf5" \
+    --probe "data/ptychoshelves/Niter100.mat" \
+    --probe-positions "data/ptychoshelves/data_roi0_para.hdf5" \
+    --object "data/ptychoshelves/Niter100.mat" \
+    --metadata "data/ptychoshelves/data_roi0_para.hdf5" \
     --product-name "ptychodus" \
     --output-dir "outputs" \
     --diffraction-reader "PtychoShelves" \
     --probe-reader "PtychoShelves" \
-    --probe-position-reader "PtychoShelves"
- 
+    --probe-position-reader "PtychoShelves" \
+    --object-reader "PtychoShelves"
 """
 from __future__ import annotations
 
@@ -99,12 +100,14 @@ ProbePositionReaderName = Literal[
     "CSV",
     "CXI",
 ]
+ObjectReaderName = ProbeReaderName
 ProductWriterName = Literal["HDF5", "NPZ"]
 
 DiffractionReaderChoices = list(DiffractionReaderName.__args__)
 DiffractionWriterChoices = list(DiffractionWriterName.__args__)
 ProbeReaderChoices = list(ProbeReaderName.__args__)
 ProbePositionReaderChoices = list(ProbePositionReaderName.__args__)
+ObjectReaderChoices = list(ObjectReaderName.__args__)
 ProductWriterChoices = list(ProductWriterName.__args__)
 
 
@@ -162,6 +165,7 @@ def convert_data(
     *,
     probe_path: Path | None,
     probe_position_path: Path | None,
+    object_path: Path | None,
     metadata_path: Path | None,
     diffraction_output: Path,
     product_output: Path,
@@ -169,6 +173,7 @@ def convert_data(
     diffraction_reader: DiffractionReaderName,
     probe_reader: ProbeReaderName | None,
     probe_position_reader: ProbePositionReaderName | None,
+    object_reader: ObjectReaderName | None,
     diffraction_writer: DiffractionWriterName = "PtychoShelves",
     product_writer: ProductWriterName = "HDF5",
     settings_file: Optional[Path] = None,
@@ -187,6 +192,9 @@ def convert_data(
     probe_positions_path : Path or None
         Optional path to a scan or position file. When provided, it is opened
         with `probe_position_reader` before the probe/object builders are invoked.
+    object_path : Path or None
+        Optional path to a object file. When provided, it is opened
+        with `object_reader` before the probe/object builders are invoked.
     metadata_path : Path or None
         Optional path to a metadata file. When provided, it is used to
         override the pixel size from data files.
@@ -259,6 +267,9 @@ def convert_data(
 
         if probe_path is not None:
             workflow_product.open_probe(probe_path, file_type=probe_reader or None)
+
+        if object_path is not None:
+            workflow_product.open_object(object_path, file_type=object_reader or None)
 
         model.diffraction.diffraction_api.save_patterns(diffraction_output, diffraction_writer)
         workflow_product.save_product(product_output, file_type=product_writer)
@@ -340,6 +351,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Optional probe positions file path required by many plugins.",
     )
     parser.add_argument(
+        "--object",
+        type=Path,
+        default=None,
+        help="Optional object file path required by many plugins.",
+    )
+    parser.add_argument(
         "--metadata",
         type=Path,
         default=None,
@@ -398,6 +415,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Probe position reader plugin to use when a probe position file is provided.",
     )
     parser.add_argument(
+        "--object-reader",
+        default="PtychoShelves",
+        choices=sorted(ObjectReaderChoices),
+        help="Object reader plugin to use when a object file is provided.",
+    )
+    parser.add_argument(
         "--product-writer",
         default="HDF5",
         choices=sorted(ProductWriterChoices),
@@ -422,6 +445,7 @@ def main(argv: list[str] | None = None) -> int:
         print("Diffraction writers   : ", ", ".join(sorted(DiffractionWriterChoices)))
         print("Probe readers         : ", ", ".join(sorted(ProbeReaderChoices)))
         print("Probe position readers: ", ", ".join(sorted(ProbePositionReaderChoices)))
+        print("Object readers        : ", ", ".join(sorted(ObjectReaderChoices)))
         print("Product writers       : ", ", ".join(sorted(ProductWriterChoices)))
         return 0
 
@@ -450,6 +474,7 @@ def main(argv: list[str] | None = None) -> int:
         args.patterns,
         probe_path=args.probe,
         probe_position_path=args.probe_positions,
+        object_path=args.object,
         metadata_path=args.metadata,
         diffraction_output=diffraction_output,
         product_output=product_output,
@@ -458,6 +483,7 @@ def main(argv: list[str] | None = None) -> int:
         diffraction_writer=args.diffraction_writer,
         probe_reader=args.probe_reader,
         probe_position_reader=args.probe_position_reader,
+        object_reader=args.object_reader,
         product_writer=args.product_writer,
         settings_file=args.settings,
         asserted_pixel_size=args.asserted_pixel_size,
