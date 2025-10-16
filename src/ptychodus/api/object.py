@@ -99,6 +99,10 @@ class ObjectGeometry:
 
 class ObjectGeometryProvider(ABC):
     @abstractmethod
+    def get_probe_positions(self) -> Sequence[ScanPoint]:
+        pass
+
+    @abstractmethod
     def get_object_geometry(self) -> ObjectGeometry:
         pass
 

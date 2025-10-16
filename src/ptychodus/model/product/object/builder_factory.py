@@ -10,6 +10,7 @@ from ptychodus.api.plugins import PluginChooser
 from .builder import FromFileObjectBuilder, ObjectBuilder
 from .random import RandomObjectBuilder
 from .settings import ObjectSettings
+from .stxm import STXMObjectBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class ObjectBuilderFactory(Iterable[str]):
         self._file_writer_chooser = file_writer_chooser
         self._builders: Mapping[str, Callable[[], ObjectBuilder]] = {
             'random': lambda: RandomObjectBuilder(rng, settings),
+            'stxm': lambda: STXMObjectBuilder(settings),
         }
 
     def __iter__(self) -> Iterator[str]:

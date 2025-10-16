@@ -121,7 +121,6 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         view.parameters_view.product_combo_box.textActivated.connect(self._redraw_plot)
         view.parameters_view.product_combo_box.setModel(product_table_model)
 
-        # FIXME widget for num_sync_epochs
         # FIXME verify progress monitor implementation threading
         # 2025-10-09 22:29:34,011 [INFO] ptychodus.model.reconstructor.context: Reconstruction time 84.6574 seconds.
         # QObject::connect: Cannot queue arguments of type 'QTextBlock'

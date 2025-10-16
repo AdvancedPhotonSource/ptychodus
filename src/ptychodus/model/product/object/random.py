@@ -16,6 +16,7 @@ class RandomObjectBuilder(ObjectBuilder):
         self._rng = rng
         self._settings = settings
 
+        # TODO extract and share extra padding with other object builders
         self.extra_padding_x = settings.extra_padding_x.copy()
         self._add_parameter('extra_padding_x', self.extra_padding_x)
         self.extra_padding_y = settings.extra_padding_y.copy()

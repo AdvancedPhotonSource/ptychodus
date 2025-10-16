@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
@@ -9,6 +11,7 @@ from ptychodus.api.product import (
     LIGHT_SPEED_M_PER_S,
     PLANCK_CONSTANT_J_PER_HZ,
 )
+from ptychodus.api.scan import ScanPoint
 
 from ..diffraction import PatternSizer
 from .metadata import MetadataRepositoryItem
@@ -134,6 +137,9 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         width_is_valid = geometry.pixel_width_m > 0.0 and geometry.width_m == expected.width_m
         height_is_valid = geometry.pixel_height_m > 0.0 and geometry.height_m == expected.height_m
         return width_is_valid and height_is_valid
+
+    def get_probe_positions(self) -> Sequence[ScanPoint]:
+        return self._scan_item.get_scan()
 
     def get_object_geometry(self) -> ObjectGeometry:
         probe_geometry = self.get_probe_geometry()

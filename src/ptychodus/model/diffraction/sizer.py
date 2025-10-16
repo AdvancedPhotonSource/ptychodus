@@ -125,23 +125,23 @@ class PatternSizer(Observable, Observer):
         self.axis_x = PatternAxisSizer(
             detector_settings.width_px,
             detector_settings.pixel_width_m,
-            diffraction_settings.is_crop_enabled,
+            diffraction_settings.crop_enabled,
             diffraction_settings.crop_width_px,
             diffraction_settings.crop_center_x_px,
-            diffraction_settings.is_binning_enabled,
+            diffraction_settings.binning_enabled,
             diffraction_settings.bin_size_x,
-            diffraction_settings.is_padding_enabled,
+            diffraction_settings.padding_enabled,
             diffraction_settings.pad_x,
         )
         self.axis_y = PatternAxisSizer(
             detector_settings.height_px,
             detector_settings.pixel_height_m,
-            diffraction_settings.is_crop_enabled,
+            diffraction_settings.crop_enabled,
             diffraction_settings.crop_height_px,
             diffraction_settings.crop_center_y_px,
-            diffraction_settings.is_binning_enabled,
+            diffraction_settings.binning_enabled,
             diffraction_settings.bin_size_y,
-            diffraction_settings.is_padding_enabled,
+            diffraction_settings.padding_enabled,
             diffraction_settings.pad_y,
         )
 
@@ -179,10 +179,10 @@ class PatternSizer(Observable, Observer):
         binning: DiffractionPatternBinning | None = None
         padding: DiffractionPatternPadding | None = None
 
-        if self._diffraction_settings.is_value_upper_bound_enabled.get_value():
+        if self._diffraction_settings.value_upper_bound_enabled.get_value():
             value_lower_bound = self._diffraction_settings.value_lower_bound.get_value()
 
-        if self._diffraction_settings.is_value_upper_bound_enabled.get_value():
+        if self._diffraction_settings.value_upper_bound_enabled.get_value():
             value_upper_bound = self._diffraction_settings.value_upper_bound.get_value()
 
         filter_values = DiffractionPatternFilterValues(
@@ -190,7 +190,7 @@ class PatternSizer(Observable, Observer):
             upper_bound=value_upper_bound,
         )
 
-        if self._diffraction_settings.is_crop_enabled.get_value():
+        if self._diffraction_settings.crop_enabled.get_value():
             crop = DiffractionPatternCrop(
                 center=CropCenter(
                     self.axis_x.get_crop_center(),
@@ -202,7 +202,7 @@ class PatternSizer(Observable, Observer):
                 ),
             )
 
-        if self._diffraction_settings.is_binning_enabled.get_value():
+        if self._diffraction_settings.binning_enabled.get_value():
             self.axis_x.validate_bin_size()
             self.axis_y.validate_bin_size()
             binning = DiffractionPatternBinning(
@@ -210,7 +210,7 @@ class PatternSizer(Observable, Observer):
                 bin_size_y=self.axis_y.get_bin_size(),
             )
 
-        if self._diffraction_settings.is_padding_enabled.get_value():
+        if self._diffraction_settings.padding_enabled.get_value():
             padding = DiffractionPatternPadding(
                 pad_x=self.axis_x.get_pad_size(),
                 pad_y=self.axis_y.get_pad_size(),

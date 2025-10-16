@@ -30,7 +30,7 @@ class PatternMemoryMapViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self, settings: DiffractionSettings, file_dialog_factory: FileDialogFactory
     ) -> None:
-        super().__init__(settings.is_memmap_enabled, 'Memory Map Diffraction Data')
+        super().__init__(settings.memmap_enabled, 'Memory Map Diffraction Data')
         self._view_controller = PathParameterViewController.create_directory_chooser(
             settings.scratch_directory, file_dialog_factory
         )
@@ -46,7 +46,7 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
         settings: DiffractionSettings,
         sizer: PatternSizer,
     ) -> None:
-        super().__init__(settings.is_crop_enabled, 'Crop')
+        super().__init__(settings.crop_enabled, 'Crop')
         self._settings = settings
         self._sizer = sizer
 
@@ -119,7 +119,7 @@ class PatternBinningViewController(CheckableGroupBoxParameterViewController):
         settings: DiffractionSettings,
         sizer: PatternSizer,
     ) -> None:
-        super().__init__(settings.is_binning_enabled, 'Bin Pixels')
+        super().__init__(settings.binning_enabled, 'Bin Pixels')
         self._settings = settings
         self._sizer = sizer
 
@@ -173,7 +173,7 @@ class PatternPaddingViewController(CheckableGroupBoxParameterViewController):
         settings: DiffractionSettings,
         sizer: PatternSizer,
     ) -> None:
-        super().__init__(settings.is_padding_enabled, 'Pad')
+        super().__init__(settings.padding_enabled, 'Pad')
         self._settings = settings
         self._sizer = sizer
 
@@ -230,13 +230,13 @@ class PatternTransformViewController:
             settings.transpose, 'Transpose'
         )
         self._lower_bound_enabled_view_controller = CheckBoxParameterViewController(
-            settings.is_value_lower_bound_enabled, 'Value Lower Bound:'
+            settings.value_lower_bound_enabled, 'Value Lower Bound:'
         )
         self._lower_bound_view_controller = SpinBoxParameterViewController(
             settings.value_lower_bound
         )
         self._upper_bound_enabled_view_controller = CheckBoxParameterViewController(
-            settings.is_value_upper_bound_enabled, 'Value upper Bound:'
+            settings.value_upper_bound_enabled, 'Value upper Bound:'
         )
         self._upper_bound_view_controller = SpinBoxParameterViewController(
             settings.value_upper_bound

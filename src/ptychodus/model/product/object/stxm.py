@@ -1,6 +1,7 @@
 from __future__ import annotations
 from collections.abc import Sequence
 
+from scipy.interpolate import griddata
 import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
@@ -28,10 +29,25 @@ class STXMObjectBuilder(ObjectBuilder):
         layer_spacing_m: Sequence[float],
     ) -> Object:
         geometry = geometry_provider.get_object_geometry()
-        height_px = geometry.height_px  # FIXME + 2 * self.extra_padding_y.get_value()
-        width_px = geometry.width_px  # FIXME + 2 * self.extra_padding_x.get_value()
-        object_shape = (1 + len(layer_spacing_m), height_px, width_px)
-        array = numpy.zeros(object_shape) + 0j
+        coordinates_px: list[float] = list()
+        values: list[float] = list()
+
+        for scan_point in geometry_provider.get_probe_positions():
+            object_point = geometry.map_scan_point_to_object_point(scan_point)
+            coordinates_px.append(object_point.position_y_px)
+            coordinates_px.append(object_point.position_x_px)
+            values.append(scan_point.index % 10)  # FIXME from patterns
+
+        points = numpy.reshape(coordinates_px, (-1, 2))
+        YY, XX = numpy.mgrid[: geometry.height_px, : geometry.width_px]  # noqa: N806
+        query_points = numpy.transpose((YY.flat, XX.flat))
+
+        # FIXME add padding and extra
+
+        intensity = griddata(points, values, query_points, method='linear', fill_value=0.0).reshape(
+            XX.shape
+        )
+        array = numpy.tile(numpy.sqrt(intensity), (1 + len(layer_spacing_m), 1, 1)) + 0j
 
         return Object(
             array=array,

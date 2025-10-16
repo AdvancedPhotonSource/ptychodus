@@ -75,6 +75,7 @@ class WorkflowAPI(ABC):
         file_type: str | None = None,
         crop_center: CropCenter | None = None,
         crop_extent: ImageExtent | None = None,
+        detector_extent: ImageExtent | None = None,
     ) -> None:
         """opens diffraction patterns from file"""
         pass

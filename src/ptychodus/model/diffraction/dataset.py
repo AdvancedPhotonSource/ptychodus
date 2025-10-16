@@ -258,7 +258,7 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         patterns_dtype = metadata.pattern_dtype
         pattern_counts = numpy.zeros(num_patterns_total, dtype=patterns_dtype)
 
-        if self._settings.is_memmap_enabled.get_value():
+        if self._settings.memmap_enabled.get_value():
             scratch_dir = self._settings.scratch_directory.get_value()
             scratch_dir.mkdir(mode=0o755, parents=True, exist_ok=True)
             npy_tmp_file = tempfile.NamedTemporaryFile(dir=scratch_dir, suffix='.npy')
