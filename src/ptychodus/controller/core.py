@@ -8,10 +8,11 @@ from ..view import ViewCore
 from .agent import AgentChatController, AgentController
 from .automation import AutomationController
 from .data import FileDialogFactory
+from .diffraction import DiffractionController
+from .globus import GlobusController
 from .image import ImageController
 from .memory import MemoryController
 from .object import ObjectController
-from .diffraction import DiffractionController
 from .probe import ProbeController
 from .product import ProductController
 from .ptychi import PtyChiViewControllerFactory
@@ -20,7 +21,6 @@ from .ptychopinn import PtychoPINNViewControllerFactory
 from .reconstructor import ReconstructorController
 from .scan import ScanController
 from .settings import SettingsController
-from .workflow import WorkflowController
 
 
 class ControllerCore:
@@ -136,13 +136,13 @@ class ControllerCore:
                 self._ptychonn_view_controller_factory,
             ],
         )
-        self._workflow_controller = WorkflowController(
-            model.workflow_core.parameters_presenter,
-            model.workflow_core.authorization_presenter,
-            model.workflow_core.status_presenter,
-            model.workflow_core.execution_presenter,
-            view.workflow_parameters_view,
-            view.workflow_table_view,
+        self._globus_controller = GlobusController(
+            model.globus_core.parameters_presenter,
+            model.globus_core.authorization_presenter,
+            model.globus_core.status_presenter,
+            model.globus_core.execution_presenter,
+            view.globus_parameters_view,
+            view.globus_table_view,
             self._product_controller.table_model,
         )
         self._automation_controller = AutomationController.create_instance(
@@ -163,7 +163,7 @@ class ControllerCore:
         self._run_foreground_tasks_timer.timeout.connect(model.run_tasks)
         self._run_foreground_tasks_timer.start(1000)  # TODO make configurable
 
-        view.workflow_action.setVisible(model.workflow_core.is_supported)
+        view.globus_action.setVisible(model.globus_core.is_supported)
 
         self._swap_central_widgets(view.patterns_action)
         view.patterns_action.setChecked(True)

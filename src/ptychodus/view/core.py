@@ -19,14 +19,14 @@ from PyQt5.QtWidgets import (
 from . import resources  # noqa
 from .agent import AgentView, AgentChatView
 from .automation import AutomationView
-from .image import ImageView
 from .diffraction import PatternsView
+from .globus import GlobusParametersView
+from .image import ImageView
 from .product import ProductView
 from .reconstructor import ReconstructorView, ReconstructorPlotView
 from .repository import RepositoryTableView, RepositoryTreeView
 from .scan import ScanPlotView
 from .settings import SettingsView
-from .workflow import WorkflowParametersView
 
 logger = logging.getLogger(__name__)
 
@@ -82,11 +82,12 @@ class ViewCore(QMainWindow):
         self.reconstructor_view = ReconstructorView()
         self.reconstructor_plot_view = ReconstructorPlotView()
 
-        self.workflow_action = self.navigation_tool_bar.addAction(
-            QIcon(':/icons/workflow'), 'Workflow'
+        self.globus_action = self.navigation_tool_bar.addAction(
+            QIcon(':/icons/workflow'),
+            'Globus',
         )
-        self.workflow_parameters_view = WorkflowParametersView.create_instance()
-        self.workflow_table_view = QTableView()
+        self.globus_parameters_view = GlobusParametersView.create_instance()
+        self.globus_table_view = QTableView()
 
         self.automation_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/automate'), 'Automation'
@@ -123,7 +124,7 @@ class ViewCore(QMainWindow):
         self.left_panel.addWidget(self.probe_view)
         self.left_panel.addWidget(self.object_view)
         self.left_panel.addWidget(self.reconstructor_view)
-        self.left_panel.addWidget(self.workflow_parameters_view)
+        self.left_panel.addWidget(self.globus_parameters_view)
         self.left_panel.addWidget(self.automation_view)
         self.left_panel.addWidget(self.agent_view)
         self.left_panel.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
@@ -137,7 +138,7 @@ class ViewCore(QMainWindow):
         self.right_panel.addWidget(self.probe_image_view)
         self.right_panel.addWidget(self.object_image_view)
         self.right_panel.addWidget(self.reconstructor_plot_view)
-        self.right_panel.addWidget(self.workflow_table_view)
+        self.right_panel.addWidget(self.globus_table_view)
         self.right_panel.addWidget(self.automation_widget)
         self.right_panel.addWidget(self.agent_chat_view)
         self.right_panel.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)

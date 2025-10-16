@@ -121,13 +121,6 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         view.parameters_view.product_combo_box.textActivated.connect(self._redraw_plot)
         view.parameters_view.product_combo_box.setModel(product_table_model)
 
-        # FIXME verify progress monitor implementation threading
-        # 2025-10-09 22:29:34,011 [INFO] ptychodus.model.reconstructor.context: Reconstruction time 84.6574 seconds.
-        # QObject::connect: Cannot queue arguments of type 'QTextBlock'
-        # (Make sure 'QTextBlock' is registered using qRegisterMetaType().)
-        # QObject::connect: Cannot queue arguments of type 'QTextCursor'
-        # (Make sure 'QTextCursor' is registered using qRegisterMetaType().)
-
         self._progress_controller = ReconstructorProgressController(
             progress_monitor, view.progress_dialog
         )

@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from PyQt5.QtWidgets import QDialog
 
-from ...model.workflow import WorkflowAuthorizationPresenter
-from ...view.workflow import WorkflowAuthorizationDialog
+from ...model.globus import GlobusAuthorizationPresenter
+from ...view.globus import GlobusAuthorizationDialog
 
 
-class WorkflowAuthorizationController:
+class GlobusAuthorizationController:
     def __init__(
         self,
-        presenter: WorkflowAuthorizationPresenter,
-        dialog: WorkflowAuthorizationDialog,
+        presenter: GlobusAuthorizationPresenter,
+        dialog: GlobusAuthorizationDialog,
     ) -> None:
         super().__init__()
         self._presenter = presenter

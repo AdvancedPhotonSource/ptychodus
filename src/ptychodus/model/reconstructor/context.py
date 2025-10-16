@@ -47,12 +47,14 @@ class ReconstructorProgressMonitor(Observable):
         self._changed = threading.Event()
 
     def _set_reconstructing(self, is_reconstructing: bool) -> None:
-        self._is_reconstructing = is_reconstructing
-        self.notify_observers()
+        with self._lock:
+            self._is_reconstructing = is_reconstructing
+            self._changed.set()
 
     @property
     def is_reconstructing(self) -> bool:
-        return self._is_reconstructing
+        with self._lock:
+            return self._is_reconstructing
 
     def message_log(self) -> Iterator[str]:
         return self._log_handler.messages()

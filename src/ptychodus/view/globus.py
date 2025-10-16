@@ -20,7 +20,7 @@ from PyQt5.QtWidgets import (
 from .widgets import UUIDLineEdit
 
 
-class WorkflowAuthorizationDialog(QDialog):
+class GlobusAuthorizationDialog(QDialog):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.label = QLabel()
@@ -30,7 +30,7 @@ class WorkflowAuthorizationDialog(QDialog):
         self.cancel_button = self.button_box.addButton(QDialogButtonBox.StandardButton.Cancel)
 
     @classmethod
-    def create_instance(cls, parent: QWidget | None = None) -> WorkflowAuthorizationDialog:
+    def create_instance(cls, parent: QWidget | None = None) -> GlobusAuthorizationDialog:
         view = cls(parent)
 
         view.setWindowTitle('Authorize Workflow')
@@ -55,7 +55,7 @@ class WorkflowAuthorizationDialog(QDialog):
             self.reject()
 
 
-class WorkflowInputDataView(QGroupBox):
+class GlobusInputDataView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Input Data', parent)
         self.endpoint_id_line_edit = UUIDLineEdit()
@@ -63,7 +63,7 @@ class WorkflowInputDataView(QGroupBox):
         self.posix_path_line_edit = QLineEdit()
 
     @classmethod
-    def create_instance(cls, parent: QWidget | None = None) -> WorkflowInputDataView:
+    def create_instance(cls, parent: QWidget | None = None) -> GlobusInputDataView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -75,7 +75,7 @@ class WorkflowInputDataView(QGroupBox):
         return view
 
 
-class WorkflowOutputDataView(QGroupBox):
+class GlobusOutputDataView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Output Data', parent)
         self.round_trip_check_box = QCheckBox('Round Trip')
@@ -84,7 +84,7 @@ class WorkflowOutputDataView(QGroupBox):
         self.posix_path_line_edit = QLineEdit()
 
     @classmethod
-    def create_instance(cls, parent: QWidget | None = None) -> WorkflowOutputDataView:
+    def create_instance(cls, parent: QWidget | None = None) -> GlobusOutputDataView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -97,7 +97,7 @@ class WorkflowOutputDataView(QGroupBox):
         return view
 
 
-class WorkflowComputeView(QGroupBox):
+class GlobusComputeView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Compute', parent)
         self.compute_endpoint_id_line_edit = UUIDLineEdit()
@@ -106,7 +106,7 @@ class WorkflowComputeView(QGroupBox):
         self.data_posix_path_line_edit = QLineEdit()
 
     @classmethod
-    def create_instance(cls, parent: QWidget | None = None) -> WorkflowComputeView:
+    def create_instance(cls, parent: QWidget | None = None) -> GlobusComputeView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -119,17 +119,17 @@ class WorkflowComputeView(QGroupBox):
         return view
 
 
-class WorkflowExecutionView(QGroupBox):
+class GlobusExecutionView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Execution', parent)
         self.product_combo_box = QComboBox()
-        self.input_data_view = WorkflowInputDataView.create_instance()
-        self.compute_view = WorkflowComputeView.create_instance()
-        self.output_data_view = WorkflowOutputDataView.create_instance()
+        self.input_data_view = GlobusInputDataView.create_instance()
+        self.compute_view = GlobusComputeView.create_instance()
+        self.output_data_view = GlobusOutputDataView.create_instance()
         self.execute_button = QPushButton('Execute')
 
     @classmethod
-    def create_instance(cls, parent: QWidget | None = None) -> WorkflowExecutionView:
+    def create_instance(cls, parent: QWidget | None = None) -> GlobusExecutionView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -143,7 +143,7 @@ class WorkflowExecutionView(QGroupBox):
         return view
 
 
-class WorkflowStatusView(QGroupBox):
+class GlobusStatusView(QGroupBox):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__('Status', parent)
         self.auto_refresh_check_box = QCheckBox('Auto Refresh [sec]:')
@@ -151,7 +151,7 @@ class WorkflowStatusView(QGroupBox):
         self.refresh_button = QPushButton('Refresh')
 
     @classmethod
-    def create_instance(cls, parent: QWidget | None = None) -> WorkflowStatusView:
+    def create_instance(cls, parent: QWidget | None = None) -> GlobusStatusView:
         view = cls(parent)
 
         layout = QFormLayout()
@@ -162,15 +162,15 @@ class WorkflowStatusView(QGroupBox):
         return view
 
 
-class WorkflowParametersView(QWidget):
+class GlobusParametersView(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.execution_view = WorkflowExecutionView.create_instance()
-        self.status_view = WorkflowStatusView.create_instance()
-        self.authorization_dialog = WorkflowAuthorizationDialog.create_instance(self)
+        self.execution_view = GlobusExecutionView.create_instance()
+        self.status_view = GlobusStatusView.create_instance()
+        self.authorization_dialog = GlobusAuthorizationDialog.create_instance(self)
 
     @classmethod
-    def create_instance(cls, parent: QWidget | None = None) -> WorkflowParametersView:
+    def create_instance(cls, parent: QWidget | None = None) -> GlobusParametersView:
         view = cls(parent)
 
         layout = QVBoxLayout()

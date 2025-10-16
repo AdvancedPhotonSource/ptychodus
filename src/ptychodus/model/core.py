@@ -26,6 +26,7 @@ from .analysis import AnalysisCore
 from .automation import AutomationCore
 from .diffraction import DiffractionCore, PatternsStreamingContext
 from .fluorescence import FluorescenceCore
+from .globus import GlobusCore
 from .memory import MemoryPresenter
 from .metadata import MetadataPresenter
 from .product import PositionsStreamingContext, ProductCore
@@ -35,7 +36,7 @@ from .ptychopinn import PtychoPINNReconstructorLibrary
 from .reconstructor import ReconstructorCore
 from .task_manager import TaskManager
 from .visualization import VisualizationEngine
-from .workflow import WorkflowCore
+from .workflow import ConcreteWorkflowAPI
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +169,12 @@ class ModelCore:
             self.product_core.product_repository,
             self.product_core.object_repository,
         )
-        self.workflow_core = WorkflowCore(
+        self.globus_core = GlobusCore(
+            self.settings_registry,
+            self.diffraction_core.diffraction_api,
+            self.product_core.product_api,
+        )
+        self.workflow_api: WorkflowAPI = ConcreteWorkflowAPI(
             self.settings_registry,
             self.diffraction_core.diffraction_api,
             self.product_core.product_api,
@@ -176,10 +182,11 @@ class ModelCore:
             self.product_core.probe_api,
             self.product_core.object_api,
             self.reconstructor_core.reconstructor_api,
+            self.globus_core.executor,
         )
         self.automation_core = AutomationCore(
             self.settings_registry,
-            self.workflow_core.workflow_api,
+            self.workflow_api,
             self._plugin_registry.file_based_workflows,
         )
         self.agent_core = AgentCore(self.settings_registry)
@@ -189,7 +196,7 @@ class ModelCore:
 
     def __enter__(self) -> ModelCore:
         self._task_manager.start()
-        self.workflow_core.start()
+        self.globus_core.start()
         self.automation_core.start()
         return self
 
@@ -211,7 +218,7 @@ class ModelCore:
         traceback: TracebackType | None,
     ) -> None:
         self.automation_core.stop()
-        self.workflow_core.stop()
+        self.globus_core.stop()
         self._task_manager.stop(await_finish=False)
 
     def create_streaming_context(self, metadata: DiffractionMetadata) -> PtychodusStreamingContext:
@@ -258,7 +265,3 @@ class ModelCore:
             return -1
 
         return 0
-
-    @property
-    def workflow_api(self) -> WorkflowAPI:
-        return self.workflow_core.workflow_api

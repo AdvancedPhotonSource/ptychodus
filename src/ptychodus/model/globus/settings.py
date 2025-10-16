@@ -5,10 +5,10 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
 
-class WorkflowSettings(Observable, Observer):
+class GlobusSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._group = registry.create_group('Workflow')
+        self._group = registry.create_group('Globus')
         self._group.add_observer(self)
 
         self.compute_endpoint_id = self._group.create_uuid_parameter(

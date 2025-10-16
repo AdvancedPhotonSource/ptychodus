@@ -4,22 +4,20 @@ from uuid import UUID
 
 from ptychodus.api.observer import Observable, Observer
 
-from ...model.workflow import WorkflowParametersPresenter
-from ...view.workflow import WorkflowOutputDataView
+from ...model.globus import GlobusParametersPresenter
+from ...view.globus import GlobusOutputDataView
 
 
-class WorkflowOutputDataController(Observer):
-    def __init__(
-        self, presenter: WorkflowParametersPresenter, view: WorkflowOutputDataView
-    ) -> None:
+class GlobusOutputDataController(Observer):
+    def __init__(self, presenter: GlobusParametersPresenter, view: GlobusOutputDataView) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
 
     @classmethod
     def create_instance(
-        cls, presenter: WorkflowParametersPresenter, view: WorkflowOutputDataView
-    ) -> WorkflowOutputDataController:
+        cls, presenter: GlobusParametersPresenter, view: GlobusOutputDataView
+    ) -> GlobusOutputDataController:
         controller = cls(presenter, view)
         presenter.add_observer(controller)
 

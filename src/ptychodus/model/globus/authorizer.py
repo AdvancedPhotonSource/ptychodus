@@ -4,7 +4,7 @@ import threading
 logger = logging.getLogger(__name__)
 
 
-class WorkflowAuthorizer:
+class GlobusAuthorizer:
     def __init__(self) -> None:
         super().__init__()
         self._authorize_lock = threading.Lock()

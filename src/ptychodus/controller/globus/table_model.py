@@ -3,11 +3,11 @@ from typing import Any
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QUrl
 from PyQt5.QtGui import QColor, QFont
 
-from ...model.workflow import WorkflowStatusPresenter
+from ...model.globus import GlobusStatusPresenter
 
 
-class WorkflowTableModel(QAbstractTableModel):
-    def __init__(self, presenter: WorkflowStatusPresenter, parent: QObject | None = None) -> None:
+class GlobusTableModel(QAbstractTableModel):
+    def __init__(self, presenter: GlobusStatusPresenter, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
         self._section_headers = [

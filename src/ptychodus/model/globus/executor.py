@@ -9,21 +9,21 @@ from ptychodus.api.settings import SettingsRegistry
 from ..diffraction import DiffractionAPI
 from ..product import ProductAPI
 from .locator import DataLocator
-from .settings import WorkflowSettings
+from .settings import GlobusSettings
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class WorkflowJob:
+class GlobusJob:
     flow_label: str
     flow_input: Mapping[str, Any]
 
 
-class WorkflowExecutor:
+class GlobusExecutor:
     def __init__(
         self,
-        settings: WorkflowSettings,
+        settings: GlobusSettings,
         input_data_locator: DataLocator,
         compute_data_locator: DataLocator,
         output_data_locator: DataLocator,
@@ -39,7 +39,7 @@ class WorkflowExecutor:
         self._product_api = product_api
         self._settings_registry = settings_registry
         self._diffraction_api = diffraction_api
-        self.job_queue: queue.Queue[WorkflowJob] = queue.Queue()
+        self.job_queue: queue.Queue[GlobusJob] = queue.Queue()
 
     def run_flow(self, input_product_index: int) -> None:
         transfer_sync_level = 3  # Copy files if checksums of the source and destination mismatch
@@ -69,7 +69,6 @@ class WorkflowExecutor:
             logger.warning('Input data POSIX path must be a directory!')
             return
 
-        # TODO use workflow API
         self._settings_registry.save_settings(input_data_posix_path / settings_file)
         self._diffraction_api.export_assembled_patterns(input_data_posix_path / patterns_file)
         self._product_api.save_product(
@@ -102,5 +101,5 @@ class WorkflowExecutor:
             'output_data_transfer_recursive': False,
         }
 
-        input_ = WorkflowJob(flow_label, flow_input)
+        input_ = GlobusJob(flow_label, flow_input)
         self.job_queue.put(input_)

@@ -6,25 +6,25 @@ from PyQt5.QtGui import QDesktopServices
 
 from ptychodus.api.observer import Observable, Observer
 
-from ...model.workflow import WorkflowStatusPresenter
-from ...view.workflow import WorkflowStatusView
-from .table_model import WorkflowTableModel
+from ...model.globus import GlobusStatusPresenter
+from ...view.globus import GlobusStatusView
+from .table_model import GlobusTableModel
 
 logger = logging.getLogger(__name__)
 
 
-class WorkflowStatusController(Observer):
+class GlobusStatusController(Observer):
     def __init__(
         self,
-        presenter: WorkflowStatusPresenter,
-        view: WorkflowStatusView,
+        presenter: GlobusStatusPresenter,
+        view: GlobusStatusView,
         table_view: QTableView,
     ) -> None:
         super().__init__()
         self._presenter = presenter
         self._view = view
         self._table_view = table_view
-        self._table_model = WorkflowTableModel(presenter)
+        self._table_model = GlobusTableModel(presenter)
         self._proxy_model = QSortFilterProxyModel()
         self._proxy_model.setSourceModel(self._table_model)
         self._timer = QTimer()

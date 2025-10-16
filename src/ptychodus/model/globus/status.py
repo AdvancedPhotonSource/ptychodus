@@ -6,7 +6,7 @@ import threading
 
 
 @dataclass(frozen=True)
-class WorkflowStatus:
+class GlobusStatus:
     label: str
     start_time: datetime
     completion_time: datetime | None
@@ -16,21 +16,21 @@ class WorkflowStatus:
     run_url: str
 
 
-class WorkflowStatusRepository(Sequence[WorkflowStatus]):
+class GlobusStatusRepository(Sequence[GlobusStatus]):
     def __init__(self) -> None:
         super().__init__()
         self._status_lock = threading.Lock()
-        self._status_list: list[WorkflowStatus] = list()
+        self._status_list: list[GlobusStatus] = list()
         self._status_date_time = datetime.min
         self.refresh_status_event = threading.Event()
 
     @overload
-    def __getitem__(self, index: int) -> WorkflowStatus: ...
+    def __getitem__(self, index: int) -> GlobusStatus: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[WorkflowStatus]: ...
+    def __getitem__(self, index: slice) -> Sequence[GlobusStatus]: ...
 
-    def __getitem__(self, index: int | slice) -> WorkflowStatus | Sequence[WorkflowStatus]:
+    def __getitem__(self, index: int | slice) -> GlobusStatus | Sequence[GlobusStatus]:
         with self._status_lock:
             return self._status_list[index]
 
@@ -45,7 +45,7 @@ class WorkflowStatusRepository(Sequence[WorkflowStatus]):
     def refresh_status(self) -> None:
         self.refresh_status_event.set()
 
-    def update(self, status_sequence: Sequence[WorkflowStatus]) -> None:
+    def update(self, status_sequence: Sequence[GlobusStatus]) -> None:
         with self._status_lock:
             self._status_date_time = datetime.now(timezone.utc)
             self._status_list = list(status_sequence)

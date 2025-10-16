@@ -10,10 +10,10 @@ from ptychodus.api.reconstructor import ReconstructInput, TrainOutput
 from ptychodus.api.settings import PathPrefixChange, SettingsRegistry
 from ptychodus.api.workflow import WorkflowAPI, WorkflowProductAPI
 
-from ..diffraction import DiffractionAPI
-from ..product import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
-from ..reconstructor import ReconstructorAPI
-from .executor import WorkflowExecutor
+from .diffraction import DiffractionAPI
+from .globus import GlobusExecutor
+from .product import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
+from .reconstructor import ReconstructorAPI
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         probe_api: ProbeAPI,
         object_api: ObjectAPI,
         reconstructor_api: ReconstructorAPI,
-        executor: WorkflowExecutor,
+        executor: GlobusExecutor,
         product_index: int,
     ) -> None:
         self._product_api = product_api
@@ -112,7 +112,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         probe_api: ProbeAPI,
         object_api: ObjectAPI,
         reconstructor_api: ReconstructorAPI,
-        executor: WorkflowExecutor,
+        executor: GlobusExecutor,
     ) -> None:
         self._settings_registry = settings_registry
         self._diffraction_api = diffraction_api

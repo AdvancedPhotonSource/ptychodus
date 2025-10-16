@@ -16,9 +16,9 @@ import gladier
 import gladier.managers
 import globus_sdk
 
-from .authorizer import WorkflowAuthorizer
-from .executor import WorkflowExecutor
-from .status import WorkflowStatus, WorkflowStatusRepository
+from .authorizer import GlobusAuthorizer
+from .executor import GlobusExecutor
+from .status import GlobusStatus, GlobusStatusRepository
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ class PtychodusClient(gladier.GladierBaseClient):
 
 
 class CustomCodeHandler(fair_research_login.CodeHandler):
-    def __init__(self, authorizer: WorkflowAuthorizer) -> None:
+    def __init__(self, authorizer: GlobusAuthorizer) -> None:
         super().__init__()
         self._authorizer = authorizer
         self.set_browser_enabled(False)
@@ -89,7 +89,7 @@ class PtychodusClientBuilder(ABC):
 
 
 class NativePtychodusClientBuilder(PtychodusClientBuilder):
-    def __init__(self, authorizer: WorkflowAuthorizer) -> None:
+    def __init__(self, authorizer: GlobusAuthorizer) -> None:
         super().__init__()
         self._auth_client = fair_research_login.NativeClient(
             client_id=PTYCHODUS_CLIENT_ID,
@@ -151,12 +151,12 @@ class ConfidentialPtychodusClientBuilder(PtychodusClientBuilder):
         return PtychodusClient(login_manager=login_manager, flows_manager=flows_manager)
 
 
-class GlobusWorkflowThread(threading.Thread):
+class GlobusThread(threading.Thread):
     def __init__(
         self,
-        authorizer: WorkflowAuthorizer,
-        status_repository: WorkflowStatusRepository,
-        executor: WorkflowExecutor,
+        authorizer: GlobusAuthorizer,
+        status_repository: GlobusStatusRepository,
+        executor: GlobusExecutor,
         client_builder: PtychodusClientBuilder,
     ) -> None:
         super().__init__()
@@ -174,10 +174,10 @@ class GlobusWorkflowThread(threading.Thread):
     @classmethod
     def create_instance(
         cls,
-        authorizer: WorkflowAuthorizer,
-        status_repository: WorkflowStatusRepository,
-        executor: WorkflowExecutor,
-    ) -> GlobusWorkflowThread:
+        authorizer: GlobusAuthorizer,
+        status_repository: GlobusStatusRepository,
+        executor: GlobusExecutor,
+    ) -> GlobusThread:
         try:
             client_id = os.environ['CLIENT_ID']
         except KeyError:
@@ -231,7 +231,7 @@ class GlobusWorkflowThread(threading.Thread):
         return action
 
     def _refresh_status(self) -> None:
-        status_list: list[WorkflowStatus] = list()
+        status_list: list[GlobusStatus] = list()
         flows_manager = self._gladier_client.flows_manager
         flow_id = flows_manager.get_flow_id()
         flows_client = flows_manager.flows_client
@@ -259,7 +259,7 @@ class GlobusWorkflowThread(threading.Thread):
             except ValueError:
                 completion_time = None
 
-            run = WorkflowStatus(
+            run = GlobusStatus(
                 label=run_dict.get('label', ''),
                 start_time=start_time,
                 completion_time=completion_time,

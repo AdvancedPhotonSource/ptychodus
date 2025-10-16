@@ -3,33 +3,33 @@ import logging
 
 from PyQt5.QtCore import QAbstractItemModel
 
-from ...model.workflow import WorkflowExecutionPresenter, WorkflowParametersPresenter
+from ...model.globus import GlobusExecutionPresenter, GlobusParametersPresenter
 from ...view.widgets import ExceptionDialog
-from ...view.workflow import WorkflowExecutionView
-from .compute import WorkflowComputeController
-from .input_data import WorkflowInputDataController
-from .output_data import WorkflowOutputDataController
+from ...view.globus import GlobusExecutionView
+from .compute import GlobusComputeController
+from .input_data import GlobusInputDataController
+from .output_data import GlobusOutputDataController
 
 logger = logging.getLogger(__name__)
 
 
-class WorkflowExecutionController:
+class GlobusExecutionController:
     def __init__(
         self,
-        parameters_presenter: WorkflowParametersPresenter,
-        execution_presenter: WorkflowExecutionPresenter,
-        view: WorkflowExecutionView,
+        parameters_presenter: GlobusParametersPresenter,
+        execution_presenter: GlobusExecutionPresenter,
+        view: GlobusExecutionView,
         product_item_model: QAbstractItemModel,
     ) -> None:
         self._execution_presenter = execution_presenter
         self._view = view
-        self._input_data_controller = WorkflowInputDataController.create_instance(
+        self._input_data_controller = GlobusInputDataController.create_instance(
             parameters_presenter, view.input_data_view
         )
-        self._compute_controller = WorkflowComputeController.create_instance(
+        self._compute_controller = GlobusComputeController.create_instance(
             parameters_presenter, view.compute_view
         )
-        self._output_data_controller = WorkflowOutputDataController.create_instance(
+        self._output_data_controller = GlobusOutputDataController.create_instance(
             parameters_presenter, view.output_data_view
         )
 
