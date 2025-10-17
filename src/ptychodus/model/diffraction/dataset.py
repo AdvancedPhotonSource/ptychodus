@@ -121,7 +121,6 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         self._task_manager = task_manager
         self._observer_list: list[DiffractionDatasetObserver] = []
 
-        # FIXME crop center/extent defaults from settings
         self._dataset = SimpleDiffractionDataset.create_null()
         self._data = AssembledDiffractionData.create_null()
         self._array_list: list[AssembledDiffractionArray] = list()

@@ -60,10 +60,14 @@ class PatternAxisSizer(Observable, Observer):
 
         return self.get_detector_size()
 
-    def get_crop_center_limits(self) -> Interval[int]:
+    def _get_safe_crop_center(self) -> int:
         xmin = (self.get_crop_size() + 1) // 2
         xmax = self.get_detector_size() - 1 - xmin
-        return Interval[int](xmin, xmax)
+        limits = Interval[int](xmin, xmax)
+        return limits.clamp(self._crop_center.get_value())
+
+    def get_crop_center_limits(self) -> Interval[int]:
+        return Interval[int](1, self.get_detector_size())
 
     def get_crop_center(self) -> int:
         limits = self.get_crop_center_limits()
@@ -193,8 +197,8 @@ class PatternSizer(Observable, Observer):
         if self._diffraction_settings.crop_enabled.get_value():
             crop = DiffractionPatternCrop(
                 center=CropCenter(
-                    self.axis_x.get_crop_center(),
-                    self.axis_y.get_crop_center(),
+                    self.axis_x._get_safe_crop_center(),
+                    self.axis_y._get_safe_crop_center(),
                 ),
                 extent=ImageExtent(
                     self.axis_x.get_crop_size(),
