@@ -10,7 +10,7 @@ from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItemFactory
 from .probe import ProbeRepositoryItemFactory
 from .repository import ProductRepository
-from .scan import ScanRepositoryItemFactory
+from .positions import ScanRepositoryItemFactory
 from .settings import ProductSettings
 from .validator import ProductValidator
 

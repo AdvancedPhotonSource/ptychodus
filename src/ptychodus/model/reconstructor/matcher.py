@@ -5,7 +5,7 @@ import numpy
 
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import ReconstructInput
-from ptychodus.api.scan import PositionSequence, ScanPoint
+from ptychodus.api.positions import PositionSequence, ScanPoint
 
 from ..diffraction import AssembledDiffractionDataset
 from ..product import ProductRepositoryItem

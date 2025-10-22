@@ -2,7 +2,7 @@ import logging
 
 import numpy.random
 
-from ptychodus.api.scan import PositionSequence
+from ptychodus.api.positions import PositionSequence
 
 from .builder import FromMemoryScanBuilder
 from .builder_factory import ScanBuilderFactory

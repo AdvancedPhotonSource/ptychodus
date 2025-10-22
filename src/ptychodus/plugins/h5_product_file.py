@@ -16,7 +16,7 @@ from ptychodus.api.product import (
     ProductMetadata,
 )
 from ptychodus.api.reconstructor import LossValue
-from ptychodus.api.scan import PositionSequence, ScanPoint
+from ptychodus.api.positions import PositionSequence, ScanPoint
 
 logger = logging.getLogger(__name__)
 

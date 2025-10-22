@@ -2,7 +2,7 @@ from pathlib import Path
 import csv
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import (
+from ptychodus.api.positions import (
     PositionSequence,
     PositionFileReader,
     PositionFileWriter,

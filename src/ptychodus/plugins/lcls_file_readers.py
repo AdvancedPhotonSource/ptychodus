@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint
+from ptychodus.api.positions import PositionSequence, PositionFileReader, ScanPoint
 
 # use full module path to make this file usable as an entry point
 from ptychodus.plugins.h5_diffraction_file import H5DiffractionFileReader

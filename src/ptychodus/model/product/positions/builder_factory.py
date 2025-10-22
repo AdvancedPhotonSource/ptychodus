@@ -3,7 +3,7 @@ from pathlib import Path
 import logging
 
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.scan import PositionSequence, PositionFileReader, PositionFileWriter
+from ptychodus.api.positions import PositionSequence, PositionFileReader, PositionFileWriter
 
 from .builder import FromFileScanBuilder, ScanBuilder
 from .cartesian import CartesianScanBuilder, CartesianScanVariant

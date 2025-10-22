@@ -16,7 +16,7 @@ from ptychodus.api.object import Object, ObjectGeometry
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import LossValue, ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Reconstructor
-from ptychodus.api.scan import PositionSequence
+from ptychodus.api.positions import PositionSequence
 
 from .helper import PtyChiOptionsHelper
 from .settings import PtyChiPIESettings

@@ -7,9 +7,9 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog, QMessageBox
 from ptychodus.api.observer import SequenceObserver
 
 from ...model.product import ScanAPI, ScanRepository
-from ...model.product.scan import ScanRepositoryItem
+from ...model.product.positions import ScanRepositoryItem
 from ...view.repository import RepositoryTableView
-from ...view.scan import ScanPlotView
+from ...view.positions import PositionsPlotView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
 from ..helpers import (
@@ -23,13 +23,13 @@ from .table_model import ScanTableModel
 logger = logging.getLogger(__name__)
 
 
-class ScanController(SequenceObserver[ScanRepositoryItem]):
+class PositionsController(SequenceObserver[ScanRepositoryItem]):
     def __init__(
         self,
         repository: ScanRepository,
         api: ScanAPI,
         view: RepositoryTableView,
-        plot_view: ScanPlotView,
+        plot_view: PositionsPlotView,
         file_dialog_factory: FileDialogFactory,
         *,
         is_developer_mode_enabled: bool,

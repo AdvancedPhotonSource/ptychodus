@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ...model.product.scan import (
+from ...model.product.positions import (
     CartesianScanBuilder,
     ConcentricScanBuilder,
     FromFileScanBuilder,

@@ -1,6 +1,6 @@
 import numpy
 
-from ptychodus.api.scan import ScanBoundingBox, ScanPoint
+from ptychodus.api.positions import ScanBoundingBox, ScanPoint
 
 
 class ScanBoundingBoxBuilder:

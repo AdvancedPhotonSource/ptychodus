@@ -25,7 +25,7 @@ from .image import ImageView
 from .product import ProductView
 from .reconstructor import ReconstructorView, ReconstructorPlotView
 from .repository import RepositoryTableView, RepositoryTreeView
-from .scan import ScanPlotView
+from .positions import PositionsPlotView
 from .settings import SettingsView
 
 logger = logging.getLogger(__name__)
@@ -64,9 +64,11 @@ class ViewCore(QMainWindow):
         self.product_view = ProductView()
         self.product_diagram_view = QWidget()
 
-        self.scan_action = self.navigation_tool_bar.addAction(QIcon(':/icons/scan'), 'Positions')
-        self.scan_view = RepositoryTableView()
-        self.scan_plot_view = ScanPlotView.create_instance()
+        self.positions_action = self.navigation_tool_bar.addAction(
+            QIcon(':/icons/positions'), 'Positions'
+        )
+        self.positions_view = RepositoryTableView()
+        self.positions_plot_view = PositionsPlotView.create_instance()
 
         self.probe_action = self.navigation_tool_bar.addAction(QIcon(':/icons/probe'), 'Probe')
         self.probe_view = RepositoryTreeView()
@@ -83,7 +85,7 @@ class ViewCore(QMainWindow):
         self.reconstructor_plot_view = ReconstructorPlotView()
 
         self.globus_action = self.navigation_tool_bar.addAction(
-            QIcon(':/icons/workflow'),
+            QIcon(':/icons/globus'),
             'Globus',
         )
         self.globus_parameters_view = GlobusParametersView.create_instance()
@@ -120,7 +122,7 @@ class ViewCore(QMainWindow):
         self.left_panel.addWidget(self.settings_view)
         self.left_panel.addWidget(self.patterns_view)
         self.left_panel.addWidget(self.product_view)
-        self.left_panel.addWidget(self.scan_view)
+        self.left_panel.addWidget(self.positions_view)
         self.left_panel.addWidget(self.probe_view)
         self.left_panel.addWidget(self.object_view)
         self.left_panel.addWidget(self.reconstructor_view)
@@ -134,7 +136,7 @@ class ViewCore(QMainWindow):
         self.right_panel.addWidget(self.settings_table_view)
         self.right_panel.addWidget(self.patterns_image_view)
         self.right_panel.addWidget(self.product_diagram_view)
-        self.right_panel.addWidget(self.scan_plot_view)
+        self.right_panel.addWidget(self.positions_plot_view)
         self.right_panel.addWidget(self.probe_image_view)
         self.right_panel.addWidget(self.object_image_view)
         self.right_panel.addWidget(self.reconstructor_plot_view)

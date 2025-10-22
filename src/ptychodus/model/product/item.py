@@ -11,7 +11,7 @@ from .geometry import ProductGeometry
 from .metadata import MetadataRepositoryItem, UniqueNameFactory
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
-from .scan import ScanRepositoryItem
+from .positions import ScanRepositoryItem
 from .validator import ProductValidator
 
 logger = logging.getLogger(__name__)

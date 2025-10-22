@@ -6,7 +6,7 @@ from PyQt5.QtGui import QBrush
 from ptychodus.api.units import BYTES_PER_MEGABYTE
 
 from ...model.product import ScanAPI, ScanRepository
-from ...model.product.scan import ScanRepositoryItem
+from ...model.product.positions import ScanRepositoryItem
 
 
 class ScanTableModel(QAbstractTableModel):

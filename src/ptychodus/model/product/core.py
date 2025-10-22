@@ -5,7 +5,7 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter
 from ptychodus.api.product import ProductFileReader, ProductFileWriter
-from ptychodus.api.scan import PositionFileReader, PositionFileWriter
+from ptychodus.api.positions import PositionFileReader, PositionFileWriter
 from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import AssembledDiffractionDataset, PatternSizer
@@ -16,7 +16,7 @@ from .object_repository import ObjectRepository
 from .probe import ProbeBuilderFactory, ProbeRepositoryItemFactory, ProbeSettings
 from .probe_repository import ProbeRepository
 from .repository import ProductRepository
-from .scan import ScanBuilderFactory, ScanRepositoryItemFactory, ScanSettings
+from .positions import ScanBuilderFactory, ScanRepositoryItemFactory, ScanSettings
 from .scan_repository import ScanRepository
 from .settings import ProductSettings
 

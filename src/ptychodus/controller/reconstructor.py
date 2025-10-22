@@ -17,7 +17,7 @@ from ..model.product import (
 from ..model.product.metadata import MetadataRepositoryItem
 from ..model.product.object import ObjectRepositoryItem
 from ..model.product.probe import ProbeRepositoryItem
-from ..model.product.scan import ScanRepositoryItem
+from ..model.product.positions import ScanRepositoryItem
 from ..model.reconstructor import ReconstructorPresenter, ReconstructorProgressMonitor
 from ..view.reconstructor import (
     ReconstructorPlotView,

@@ -5,7 +5,7 @@ import numpy
 
 from ptychodus.api.geometry import AffineTransform
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.scan import ScanPoint
+from ptychodus.api.positions import ScanPoint
 
 from .settings import ScanSettings
 

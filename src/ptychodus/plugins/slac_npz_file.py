@@ -16,7 +16,7 @@ from ptychodus.api.diffraction import (
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import LossValue, Product, ProductFileReader, ProductMetadata
-from ptychodus.api.scan import PositionSequence, ScanPoint
+from ptychodus.api.positions import PositionSequence, ScanPoint
 from ptychodus.api.tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)

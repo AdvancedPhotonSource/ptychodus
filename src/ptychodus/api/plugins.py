@@ -21,7 +21,7 @@ from .observer import Observable, Observer
 from .parametric import StringParameter
 from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter, ProbeSequence
 from .product import ProductFileReader, ProductFileWriter
-from .scan import PositionFileReader, PositionFileWriter, PositionSequence
+from .positions import PositionFileReader, PositionFileWriter, PositionSequence
 from .workflow import FileBasedWorkflow
 
 __all__ = [

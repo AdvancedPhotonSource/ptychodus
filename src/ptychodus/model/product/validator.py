@@ -4,7 +4,7 @@ from ..diffraction import AssembledDiffractionDataset
 from .geometry import ProductGeometry
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
-from .scan import ScanRepositoryItem
+from .positions import ScanRepositoryItem
 
 
 class ProductValidator(Observable, Observer):  # TODO display

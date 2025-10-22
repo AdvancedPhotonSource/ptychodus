@@ -16,7 +16,7 @@ from ptychodus.api.diffraction import (
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeSequence, ProbeFileReader
 from ptychodus.api.product import ELECTRON_VOLT_J
-from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint
+from ptychodus.api.positions import PositionSequence, PositionFileReader, ScanPoint
 from ptychodus.api.typing import ComplexArrayType
 
 logger = logging.getLogger(__name__)

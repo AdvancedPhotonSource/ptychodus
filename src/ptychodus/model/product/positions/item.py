@@ -6,7 +6,7 @@ import numpy
 
 from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.scan import PositionSequence, ScanBoundingBox, ScanPoint
+from ptychodus.api.positions import PositionSequence, ScanBoundingBox, ScanPoint
 
 from .bounding_box import ScanBoundingBoxBuilder
 from .builder import FromMemoryScanBuilder, ScanBuilder

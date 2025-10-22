@@ -19,7 +19,7 @@ from .ptychi import PtyChiViewControllerFactory
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopinn import PtychoPINNViewControllerFactory
 from .reconstructor import ReconstructorController
-from .scan import ScanController
+from .positions import PositionsController
 from .settings import SettingsController
 
 
@@ -75,11 +75,11 @@ class ControllerCore:
             view.product_view,
             self._file_dialog_factory,
         )
-        self._scan_controller = ScanController(
+        self._scan_controller = PositionsController(
             model.product_core.scan_repository,
             model.product_core.scan_api,
-            view.scan_view,
-            view.scan_plot_view,
+            view.positions_view,
+            view.positions_plot_view,
             self._file_dialog_factory,
             is_developer_mode_enabled=is_developer_mode_enabled,
         )
@@ -172,7 +172,7 @@ class ControllerCore:
         )
 
         view.agent_action.setVisible(is_developer_mode_enabled)
-        view.scan_view.button_box.analyze_button.setEnabled(is_developer_mode_enabled)
+        view.positions_view.button_box.analyze_button.setEnabled(is_developer_mode_enabled)
 
     def show_main_window(self, window_title: str) -> None:
         self.view.setWindowTitle(window_title)

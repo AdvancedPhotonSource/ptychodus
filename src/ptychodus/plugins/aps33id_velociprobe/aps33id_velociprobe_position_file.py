@@ -6,7 +6,12 @@ import csv
 
 import numpy
 
-from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint, ScanPointParseError
+from ptychodus.api.positions import (
+    PositionSequence,
+    PositionFileReader,
+    ScanPoint,
+    ScanPointParseError,
+)
 from .aps33id_velociprobe_diffraction_file import VelociprobeDiffractionFileReader
 
 __all__ = [

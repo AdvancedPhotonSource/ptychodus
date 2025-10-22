@@ -20,7 +20,7 @@ import numpy
 import numpy.typing
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint
+from ptychodus.api.positions import PositionSequence, PositionFileReader, ScanPoint
 
 T = TypeVar('T')
 

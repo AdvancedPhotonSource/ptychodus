@@ -16,7 +16,7 @@ from ptychodus.api.product import (
     ProductFileReader,
     ProductMetadata,
 )
-from ptychodus.api.scan import PositionSequence, ScanPoint
+from ptychodus.api.positions import PositionSequence, ScanPoint
 
 
 class PtychoShelvesProductFileReader(ProductFileReader):

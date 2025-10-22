@@ -8,7 +8,7 @@ from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import LossValue, Product, ProductFileReader, ProductMetadata
-from ptychodus.api.scan import PositionSequence, ScanPoint
+from ptychodus.api.positions import PositionSequence, ScanPoint
 
 
 class NSLSIIProductFileReader(ProductFileReader):

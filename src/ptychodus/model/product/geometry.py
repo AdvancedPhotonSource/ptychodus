@@ -11,11 +11,11 @@ from ptychodus.api.product import (
     LIGHT_SPEED_M_PER_S,
     PLANCK_CONSTANT_J_PER_HZ,
 )
-from ptychodus.api.scan import ScanPoint
+from ptychodus.api.positions import ScanPoint
 
 from ..diffraction import PatternSizer
 from .metadata import MetadataRepositoryItem
-from .scan import ScanRepositoryItem
+from .positions import ScanRepositoryItem
 
 
 class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable, Observer):

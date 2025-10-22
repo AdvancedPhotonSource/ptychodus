@@ -40,10 +40,10 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
     def get_product_index(self) -> int:
         return self._product_index
 
-    def open_scan(self, file_path: Path, *, file_type: str | None = None) -> None:
+    def open_probe_positions(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._scan_api.open_scan(self._product_index, file_path, file_type=file_type)
 
-    def build_scan(
+    def generate_probe_positions(
         self, builder_name: str | None = None, builder_parameters: Mapping[str, Any] = {}
     ) -> None:
         if builder_name is None:
@@ -54,7 +54,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
     def open_probe(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._probe_api.open_probe(self._product_index, file_path, file_type=file_type)
 
-    def build_probe(
+    def generate_probe(
         self, builder_name: str | None = None, builder_parameters: Mapping[str, Any] = {}
     ) -> None:
         if builder_name is None:
@@ -65,7 +65,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
     def open_object(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._object_api.open_object(self._product_index, file_path, file_type=file_type)
 
-    def build_object(
+    def generate_object(
         self, builder_name: str | None = None, builder_parameters: Mapping[str, Any] = {}
     ) -> None:
         if builder_name is None:

@@ -5,7 +5,12 @@ import logging
 import h5py
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint, ScanPointParseError
+from ptychodus.api.positions import (
+    PositionSequence,
+    PositionFileReader,
+    ScanPoint,
+    ScanPointParseError,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -214,9 +214,9 @@ def main() -> int:
             probe_photon_count=args.probe_photon_count,
             exposure_time_s=args.exposure_time_s,
         )
-        workflow_product_api.open_scan(Path(args.scan_file_path.name))
-        workflow_product_api.build_probe()
-        workflow_product_api.build_object()
+        workflow_product_api.open_probe_positions(Path(args.scan_file_path.name))
+        workflow_product_api.generate_probe()
+        workflow_product_api.generate_object()
 
         staging_dir = args.output_directory
         staging_dir.mkdir(parents=True, exist_ok=True)

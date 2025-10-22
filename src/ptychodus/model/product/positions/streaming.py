@@ -2,7 +2,7 @@ from collections.abc import Sequence
 
 # TODO from pvaccess import Channel, PvObjectQueue
 
-from ptychodus.api.scan import PositionSequence, ScanPoint
+from ptychodus.api.positions import PositionSequence, ScanPoint
 
 from .builder import ScanBuilder
 from .settings import ScanSettings

@@ -7,7 +7,7 @@ from sys import getsizeof
 
 from .object import Object
 from .probe import ProbeSequence
-from .scan import PositionSequence
+from .positions import PositionSequence
 
 # Source: https://physics.nist.gov/cuu/Constants/index.html
 ELECTRON_VOLT_J: Final[float] = 1.602176634e-19

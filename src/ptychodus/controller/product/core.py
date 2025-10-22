@@ -26,7 +26,7 @@ from ...model.diffraction import AssembledDiffractionDataset
 from ...model.product.metadata import MetadataRepositoryItem
 from ...model.product.object import ObjectRepositoryItem
 from ...model.product.probe import ProbeRepositoryItem
-from ...model.product.scan import ScanRepositoryItem
+from ...model.product.positions import ScanRepositoryItem
 from ...view.product import ProductView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory

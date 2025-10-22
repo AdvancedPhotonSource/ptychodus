@@ -5,7 +5,7 @@ from pathlib import Path
 import logging
 
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint
+from ptychodus.api.positions import PositionSequence, PositionFileReader, ScanPoint
 
 from .settings import ScanSettings
 

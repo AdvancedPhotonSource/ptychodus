@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.scan import PositionSequence, ScanPoint
+from ptychodus.api.positions import PositionSequence, ScanPoint
 
 from .builder import ScanBuilder
 from .settings import ScanSettings

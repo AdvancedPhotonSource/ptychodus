@@ -10,7 +10,7 @@ from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
 from .repository import ProductRepository
-from .scan import ScanRepositoryItem
+from .positions import ScanRepositoryItem
 
 logger = logging.getLogger(__name__)
 

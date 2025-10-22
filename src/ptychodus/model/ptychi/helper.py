@@ -46,7 +46,7 @@ from ptychodus.api.object import Object, ObjectGeometry, ObjectPoint
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import LossValue, Product, ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput
-from ptychodus.api.scan import PositionSequence, ScanPoint
+from ptychodus.api.positions import PositionSequence, ScanPoint
 from ptychodus.api.typing import ComplexArrayType, RealArrayType
 
 from ..diffraction import PatternSizer

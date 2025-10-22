@@ -15,8 +15,8 @@ from .probe.builder_factory import ProbeBuilderFactory
 from .probe.settings import ProbeSettings
 from .probe_repository import ProbeRepository
 from .repository import ProductRepository
-from .scan.builder_factory import ScanBuilderFactory
-from .scan.settings import ScanSettings
+from .positions.builder_factory import ScanBuilderFactory
+from .positions.settings import ScanSettings
 from .scan_repository import ScanRepository
 from .settings import ProductSettings
 

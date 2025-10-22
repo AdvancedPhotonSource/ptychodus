@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy
 
 from .geometry import PixelGeometry
-from .scan import ScanPoint
+from .positions import ScanPoint
 from .typing import ComplexArrayType
 
 
