@@ -45,7 +45,7 @@ class FluorescenceFileWriter(ABC):
 
 
 class UpscalingStrategy(ABC):
-    """Uses ptychography-corrected scan positions to remap element
+    """Uses ptychography-corrected probe positions to remap element
     concentrations from the regular scan grid to the upscaled grid"""
 
     @abstractmethod

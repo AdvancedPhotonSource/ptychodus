@@ -9,10 +9,10 @@ import numpy
 
 
 @dataclass(frozen=True)
-class ScanPoint:
+class ProbePosition:
     index: int
-    position_x_m: float
-    position_y_m: float
+    coordinate_x_m: float
+    coordinate_y_m: float
 
 
 @dataclass(frozen=True)
@@ -47,40 +47,40 @@ class ScanBoundingBox:
         )
 
 
-class PositionSequence(Sequence[ScanPoint]):
-    def __init__(self, point_seq: Sequence[ScanPoint] | None = None) -> None:
+class ProbePositionSequence(Sequence[ProbePosition]):
+    def __init__(self, point_seq: Sequence[ProbePosition] | None = None) -> None:
         indexes: list[int] = []
         coordinates_m: list[float] = []
 
         if point_seq is not None:
             for point in point_seq:
                 indexes.append(point.index)
-                coordinates_m.append(point.position_y_m)
-                coordinates_m.append(point.position_x_m)
+                coordinates_m.append(point.coordinate_y_m)
+                coordinates_m.append(point.coordinate_x_m)
 
         self._indexes = numpy.array(indexes)
         self._coordinates_m = numpy.reshape(coordinates_m, (-1, 2))
 
-    def copy(self) -> PositionSequence:
-        seq = PositionSequence()
+    def copy(self) -> ProbePositionSequence:
+        seq = ProbePositionSequence()
         seq._indexes = self._indexes.copy()
         seq._coordinates_m = self._coordinates_m.copy()
         return seq
 
     @overload
-    def __getitem__(self, index: int) -> ScanPoint: ...
+    def __getitem__(self, index: int) -> ProbePosition: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[ScanPoint]: ...
+    def __getitem__(self, index: slice) -> Sequence[ProbePosition]: ...
 
-    def __getitem__(self, index: int | slice) -> ScanPoint | Sequence[ScanPoint]:
+    def __getitem__(self, index: int | slice) -> ProbePosition | Sequence[ProbePosition]:
         if isinstance(index, slice):
             return [self[idx] for idx in range(index.start, index.stop, index.step)]
 
-        return ScanPoint(
+        return ProbePosition(
             index=self._indexes[index],
-            position_x_m=self._coordinates_m[index, -1],
-            position_y_m=self._coordinates_m[index, -2],
+            coordinate_x_m=self._coordinates_m[index, -1],
+            coordinate_y_m=self._coordinates_m[index, -2],
         )
 
     def __len__(self) -> int:
@@ -94,25 +94,25 @@ class PositionSequence(Sequence[ScanPoint]):
         return f'{self._coordinates_m.dtype}{self._coordinates_m.shape}'
 
 
-class ScanPointParseError(Exception):
+class ProbePositionParseError(Exception):
     """raised when the scan file cannot be parsed"""
 
     pass
 
 
-class PositionFileReader(ABC):
+class ProbePositionsFileReader(ABC):
     """interface for plugins that read position files"""
 
     @abstractmethod
-    def read(self, file_path: Path) -> PositionSequence:
+    def read(self, file_path: Path) -> ProbePositionSequence:
         """reads positions from file"""
         pass
 
 
-class PositionFileWriter(ABC):
+class ProbePositionsFileWriter(ABC):
     """interface for plugins that write position files"""
 
     @abstractmethod
-    def write(self, file_path: Path, positions: PositionSequence) -> None:
+    def write(self, file_path: Path, positions: ProbePositionSequence) -> None:
         """writes positions to file"""
         pass

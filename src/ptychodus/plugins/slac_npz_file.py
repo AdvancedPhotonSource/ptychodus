@@ -16,7 +16,7 @@ from ptychodus.api.diffraction import (
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import LossValue, Product, ProductFileReader, ProductMetadata
-from ptychodus.api.positions import PositionSequence, ScanPoint
+from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 from ptychodus.api.tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)
@@ -69,17 +69,17 @@ class SLACProductFileReader(ProductFileReader):
             tomography_angle_deg=0.0,  # not included in file
         )
 
-        point_list: list[ScanPoint] = list()
+        point_list: list[ProbePosition] = list()
 
         for idx, (x_m, y_m) in enumerate(zip(scan_x_m, scan_y_m)):
-            point = ScanPoint(idx, x_m, y_m)
+            point = ProbePosition(idx, x_m, y_m)
             point_list.append(point)
 
         loss: Sequence[LossValue] = list()  # not included in file
 
         return Product(
             metadata=metadata,
-            positions=PositionSequence(point_list),
+            probe_positions=ProbePositionSequence(point_list),
             probes=ProbeSequence(array=probe_array, opr_weights=None, pixel_geometry=None),
             object_=Object(array=object_array, pixel_geometry=None, center=None),
             losses=loss,

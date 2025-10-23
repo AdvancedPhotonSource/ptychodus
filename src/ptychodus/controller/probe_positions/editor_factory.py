@@ -10,15 +10,15 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ...model.product.positions import (
-    CartesianScanBuilder,
-    ConcentricScanBuilder,
-    FromFileScanBuilder,
-    FromMemoryScanBuilder,
-    LissajousScanBuilder,
-    ScanPointTransform,
-    ScanRepositoryItem,
-    SpiralScanBuilder,
+from ...model.product.probe_positions import (
+    CartesianProbePositionsBuilder,
+    ConcentricProbePositionsBuilder,
+    FromFileProbePositionsBuilder,
+    FromMemoryProbePositionsBuilder,
+    LissajousProbePositionsBuilder,
+    ProbePositionTransform,
+    ProbePositionsRepositoryItem,
+    SpiralProbePositionsBuilder,
 )
 from ..parametric import (
     CheckableGroupBoxParameterViewController,
@@ -30,12 +30,12 @@ from ..parametric import (
 from ...view.widgets import GroupBoxWithPresets
 
 __all__ = [
-    'ScanEditorViewControllerFactory',
+    'ProbePositionsEditorViewControllerFactory',
 ]
 
 
-class ScanTransformViewController(ParameterViewController):
-    def __init__(self, transform: ScanPointTransform) -> None:
+class ProbePositionsTransformViewController(ParameterViewController):
+    def __init__(self, transform: ProbePositionTransform) -> None:
         super().__init__()
         self._widget = GroupBoxWithPresets('Transformation')
 
@@ -101,7 +101,7 @@ class ScanTransformViewController(ParameterViewController):
 
 
 class ScanBoundingBoxViewController(CheckableGroupBoxParameterViewController):
-    def __init__(self, item: ScanRepositoryItem) -> None:
+    def __init__(self, item: ProbePositionsRepositoryItem) -> None:
         super().__init__(item.expand_bbox, 'Expand Bounding Box')
         self._xmin_controller = LengthWidgetParameterViewController(
             item.expand_bbox_xmin_m, is_signed=True
@@ -124,98 +124,126 @@ class ScanBoundingBoxViewController(CheckableGroupBoxParameterViewController):
         self.get_widget().setLayout(layout)
 
 
-class ScanEditorViewControllerFactory:
+class ProbePositionsEditorViewControllerFactory:
     def _append_common_controls(
-        self, dialog_builder: ParameterViewBuilder, item: ScanRepositoryItem
+        self, dialog_builder: ParameterViewBuilder, item: ProbePositionsRepositoryItem
     ) -> None:
         transform = item.get_transform()
 
         if transform is not None:
-            dialog_builder.add_view_controller_to_bottom(ScanTransformViewController(transform))
+            dialog_builder.add_view_controller_to_bottom(
+                ProbePositionsTransformViewController(transform)
+            )
 
         dialog_builder.add_view_controller_to_bottom(ScanBoundingBoxViewController(item))
 
     def create_editor_dialog(
-        self, item_name: str, item: ScanRepositoryItem, parent: QWidget
+        self, item_name: str, item: ProbePositionsRepositoryItem, parent: QWidget
     ) -> QDialog:
-        scan_builder = item.get_builder()
-        builder_name = scan_builder.get_name()
-        base_scan_group = 'Base Scan'
+        probe_positions_builder = item.get_builder()
+        builder_name = probe_positions_builder.get_name()
+        base_probe_positions_group = 'Base Probe Positions'
         title = f'{item_name} [{builder_name}]'
 
-        if isinstance(scan_builder, CartesianScanBuilder):
+        if isinstance(probe_positions_builder, CartesianProbePositionsBuilder):
             dialog_builder = ParameterViewBuilder()
             dialog_builder.add_spin_box(
-                scan_builder.num_points_x, 'Number of Points X:', group=base_scan_group
+                probe_positions_builder.num_points_x,
+                'Number of Points X:',
+                group=base_probe_positions_group,
             )
             dialog_builder.add_spin_box(
-                scan_builder.num_points_y, 'Number of Points Y:', group=base_scan_group
+                probe_positions_builder.num_points_y,
+                'Number of Points Y:',
+                group=base_probe_positions_group,
             )
             dialog_builder.add_length_widget(
-                scan_builder.step_size_x_m, 'Step Size X:', group=base_scan_group
+                probe_positions_builder.step_size_x_m,
+                'Step Size X:',
+                group=base_probe_positions_group,
             )
 
-            if not scan_builder.is_equilateral:
+            if not probe_positions_builder.is_equilateral:
                 dialog_builder.add_length_widget(
-                    scan_builder.step_size_y_m, 'Step Size Y:', group=base_scan_group
+                    probe_positions_builder.step_size_y_m,
+                    'Step Size Y:',
+                    group=base_probe_positions_group,
                 )
 
             self._append_common_controls(dialog_builder, item)
             return dialog_builder.build_dialog(title, parent)
-        elif isinstance(scan_builder, ConcentricScanBuilder):
+        elif isinstance(probe_positions_builder, ConcentricProbePositionsBuilder):
             dialog_builder = ParameterViewBuilder()
             dialog_builder.add_spin_box(
-                scan_builder.num_shells, 'Number of Shells:', group=base_scan_group
+                probe_positions_builder.num_shells,
+                'Number of Shells:',
+                group=base_probe_positions_group,
             )
             dialog_builder.add_spin_box(
-                scan_builder.num_points_1st_shell,
+                probe_positions_builder.num_points_1st_shell,
                 'Number of Points in First Shell:',
-                group=base_scan_group,
+                group=base_probe_positions_group,
             )
             dialog_builder.add_length_widget(
-                scan_builder.radial_step_size_m,
+                probe_positions_builder.radial_step_size_m,
                 'Radial Step Size:',
-                group=base_scan_group,
+                group=base_probe_positions_group,
             )
             self._append_common_controls(dialog_builder, item)
             return dialog_builder.build_dialog(title, parent)
-        elif isinstance(scan_builder, FromFileScanBuilder):
+        elif isinstance(probe_positions_builder, FromFileProbePositionsBuilder):
             dialog_builder = ParameterViewBuilder()
             self._append_common_controls(dialog_builder, item)
             return dialog_builder.build_dialog(title, parent)
-        elif isinstance(scan_builder, FromMemoryScanBuilder):
+        elif isinstance(probe_positions_builder, FromMemoryProbePositionsBuilder):
             dialog_builder = ParameterViewBuilder()
             self._append_common_controls(dialog_builder, item)
             return dialog_builder.build_dialog(title, parent)
-        elif isinstance(scan_builder, SpiralScanBuilder):
-            dialog_builder = ParameterViewBuilder()
-            dialog_builder.add_spin_box(
-                scan_builder.num_points, 'Number of Points:', group=base_scan_group
-            )
-            dialog_builder.add_length_widget(
-                scan_builder.radius_scalar_m, 'Radius Scalar:', group=base_scan_group
-            )
-            self._append_common_controls(dialog_builder, item)
-            return dialog_builder.build_dialog(title, parent)
-        elif isinstance(scan_builder, LissajousScanBuilder):
+        elif isinstance(probe_positions_builder, SpiralProbePositionsBuilder):
             dialog_builder = ParameterViewBuilder()
             dialog_builder.add_spin_box(
-                scan_builder.num_points, 'Number of Points:', group=base_scan_group
+                probe_positions_builder.num_points,
+                'Number of Points:',
+                group=base_probe_positions_group,
             )
             dialog_builder.add_length_widget(
-                scan_builder.amplitude_x_m, 'Amplitude X:', group=base_scan_group
+                probe_positions_builder.radius_scalar_m,
+                'Radius Scalar:',
+                group=base_probe_positions_group,
+            )
+            self._append_common_controls(dialog_builder, item)
+            return dialog_builder.build_dialog(title, parent)
+        elif isinstance(probe_positions_builder, LissajousProbePositionsBuilder):
+            dialog_builder = ParameterViewBuilder()
+            dialog_builder.add_spin_box(
+                probe_positions_builder.num_points,
+                'Number of Points:',
+                group=base_probe_positions_group,
             )
             dialog_builder.add_length_widget(
-                scan_builder.amplitude_y_m, 'Amplitude Y:', group=base_scan_group
+                probe_positions_builder.amplitude_x_m,
+                'Amplitude X:',
+                group=base_probe_positions_group,
+            )
+            dialog_builder.add_length_widget(
+                probe_positions_builder.amplitude_y_m,
+                'Amplitude Y:',
+                group=base_probe_positions_group,
             )
             dialog_builder.add_angle_widget(
-                scan_builder.angular_step_x_turns, 'Angular Step X:', group=base_scan_group
+                probe_positions_builder.angular_step_x_turns,
+                'Angular Step X:',
+                group=base_probe_positions_group,
             )
             dialog_builder.add_angle_widget(
-                scan_builder.angular_step_y_turns, 'Angular Step Y:', group=base_scan_group
+                probe_positions_builder.angular_step_y_turns,
+                'Angular Step Y:',
+                group=base_probe_positions_group,
             )
             dialog_builder.add_angle_widget(
-                scan_builder.angular_shift_turns, 'Angular Shift:', group=base_scan_group
+                probe_positions_builder.angular_shift_turns,
+                'Angular Shift:',
+                group=base_probe_positions_group,
             )
             self._append_common_controls(dialog_builder, item)
             return dialog_builder.build_dialog(title, parent)

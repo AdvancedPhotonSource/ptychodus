@@ -26,7 +26,7 @@ from ...model.diffraction import AssembledDiffractionDataset
 from ...model.product.metadata import MetadataRepositoryItem
 from ...model.product.object import ObjectRepositoryItem
 from ...model.product.probe import ProbeRepositoryItem
-from ...model.product.positions import ScanRepositoryItem
+from ...model.product.probe_positions import ProbePositionsRepositoryItem
 from ...view.product import ProductView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
@@ -347,7 +347,9 @@ class ProductController(ProductRepositoryObserver):
         self._table_model.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole])
         self._update_info_text()
 
-    def handle_scan_changed(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_probe_positions_changed(
+        self, index: int, item: ProbePositionsRepositoryItem
+    ) -> None:
         self._update_info_text()
 
     def handle_probe_changed(self, index: int, item: ProbeRepositoryItem) -> None:

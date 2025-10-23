@@ -33,9 +33,9 @@ class STXMObjectBuilder(ObjectBuilder):
         values: list[float] = list()
 
         for scan_point in geometry_provider.get_probe_positions():
-            object_point = geometry.map_scan_point_to_object_point(scan_point)
-            coordinates_px.append(object_point.position_y_px)
-            coordinates_px.append(object_point.position_x_px)
+            object_point = geometry.map_coordinates_probe_to_object(scan_point)
+            coordinates_px.append(object_point.coordinate_y_px)
+            coordinates_px.append(object_point.coordinate_x_px)
             values.append(scan_point.index % 10)  # FIXME from patterns
 
         points = numpy.reshape(coordinates_px, (-1, 2))

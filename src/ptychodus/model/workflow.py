@@ -12,7 +12,7 @@ from ptychodus.api.workflow import WorkflowAPI, WorkflowProductAPI
 
 from .diffraction import DiffractionAPI
 from .globus import GlobusExecutor
-from .product import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
+from .product import ObjectAPI, ProbeAPI, ProductAPI, ProbePositionsAPI
 from .reconstructor import ReconstructorAPI
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
     def __init__(
         self,
         product_api: ProductAPI,
-        scan_api: ScanAPI,
+        probe_positions_api: ProbePositionsAPI,
         probe_api: ProbeAPI,
         object_api: ObjectAPI,
         reconstructor_api: ReconstructorAPI,
@@ -30,7 +30,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         product_index: int,
     ) -> None:
         self._product_api = product_api
-        self._scan_api = scan_api
+        self._probe_positions_api = probe_positions_api
         self._probe_api = probe_api
         self._object_api = object_api
         self._reconstructor_api = reconstructor_api
@@ -40,38 +40,45 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
     def get_product_index(self) -> int:
         return self._product_index
 
+    def rename_product(self, new_name: str) -> None:
+        self._product_api.rename_product(self._product_index, new_name)
+
     def open_probe_positions(self, file_path: Path, *, file_type: str | None = None) -> None:
-        self._scan_api.open_scan(self._product_index, file_path, file_type=file_type)
+        self._probe_positions_api.open_probe_positions(
+            self._product_index, file_path, file_type=file_type
+        )
 
     def generate_probe_positions(
-        self, builder_name: str | None = None, builder_parameters: Mapping[str, Any] = {}
+        self, generator_name: str | None = None, generator_parameters: Mapping[str, Any] = {}
     ) -> None:
-        if builder_name is None:
-            self._scan_api.build_scan_from_settings(self._product_index)
+        if generator_name is None:
+            self._probe_positions_api.build_probe_positions_from_settings(self._product_index)
         else:
-            self._scan_api.build_scan(self._product_index, builder_name, builder_parameters)
+            self._probe_positions_api.build_probe_positions(
+                self._product_index, generator_name, generator_parameters
+            )
 
     def open_probe(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._probe_api.open_probe(self._product_index, file_path, file_type=file_type)
 
     def generate_probe(
-        self, builder_name: str | None = None, builder_parameters: Mapping[str, Any] = {}
+        self, generator_name: str | None = None, generator_parameters: Mapping[str, Any] = {}
     ) -> None:
-        if builder_name is None:
+        if generator_name is None:
             self._probe_api.build_probe_from_settings(self._product_index)
         else:
-            self._probe_api.build_probe(self._product_index, builder_name, builder_parameters)
+            self._probe_api.build_probe(self._product_index, generator_name, generator_parameters)
 
     def open_object(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._object_api.open_object(self._product_index, file_path, file_type=file_type)
 
     def generate_object(
-        self, builder_name: str | None = None, builder_parameters: Mapping[str, Any] = {}
+        self, generator_name: str | None = None, generator_parameters: Mapping[str, Any] = {}
     ) -> None:
-        if builder_name is None:
+        if generator_name is None:
             self._object_api.build_object_from_settings(self._product_index)
         else:
-            self._object_api.build_object(self._product_index, builder_name, builder_parameters)
+            self._object_api.build_object(self._product_index, generator_name, generator_parameters)
 
     def get_reconstruct_input(self) -> ReconstructInput:
         return self._reconstructor_api.get_reconstruct_input(self._product_index)
@@ -83,7 +90,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
 
         return ConcreteWorkflowProductAPI(
             self._product_api,
-            self._scan_api,
+            self._probe_positions_api,
             self._probe_api,
             self._object_api,
             self._reconstructor_api,
@@ -108,7 +115,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         settings_registry: SettingsRegistry,
         diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
-        scan_api: ScanAPI,
+        scan_api: ProbePositionsAPI,
         probe_api: ProbeAPI,
         object_api: ObjectAPI,
         reconstructor_api: ReconstructorAPI,

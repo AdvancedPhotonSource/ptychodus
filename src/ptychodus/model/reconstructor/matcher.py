@@ -5,7 +5,7 @@ import numpy
 
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import ReconstructInput
-from ptychodus.api.positions import PositionSequence, ScanPoint
+from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 
 from ..diffraction import AssembledDiffractionDataset
 from ..product import ProductRepositoryItem
@@ -13,7 +13,7 @@ from ..product import ProductRepositoryItem
 logger = logging.getLogger(__name__)
 
 
-class ScanIndexFilter(Enum):
+class PositionIndexFilter(Enum):
     """filters scan points by index"""
 
     ALL = auto()
@@ -22,9 +22,9 @@ class ScanIndexFilter(Enum):
 
     def __call__(self, index: int) -> bool:
         """include scan point if true, exclude otherwise"""
-        if self is ScanIndexFilter.ODD:
+        if self is PositionIndexFilter.ODD:
             return index & 1 != 0
-        elif self is ScanIndexFilter.EVEN:
+        elif self is PositionIndexFilter.EVEN:
             return index & 1 == 0
 
         return True
@@ -40,13 +40,13 @@ class DiffractionPatternPositionMatcher:
     def match_diffraction_patterns_with_positions(
         self,
         product_item: ProductRepositoryItem,
-        index_filter: ScanIndexFilter = ScanIndexFilter.ALL,
+        index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
     ) -> ReconstructInput:
         product = product_item.get_product()
         pattern_indexes = [int(index) for index in self._dataset.get_assembled_indexes()]
         logger.debug(f'{pattern_indexes=}')
         position_indexes = [
-            int(point.index) for point in product.positions if index_filter(point.index)
+            int(point.index) for point in product.probe_positions if index_filter(point.index)
         ]
         logger.debug(f'{position_indexes=}')
         common_indexes = sorted(set(pattern_indexes).intersection(position_indexes))
@@ -58,8 +58,8 @@ class DiffractionPatternPositionMatcher:
             axis=0,
         )
 
-        point_list: list[ScanPoint] = list()
-        point_iterator = iter(product.positions)
+        point_list: list[ProbePosition] = list()
+        point_iterator = iter(product.probe_positions)
 
         for index in common_indexes:
             while True:
@@ -73,7 +73,7 @@ class DiffractionPatternPositionMatcher:
 
         product = Product(
             metadata=product.metadata,
-            positions=PositionSequence(point_list),
+            probe_positions=ProbePositionSequence(point_list),
             probes=probe,
             object_=product.object_,
             losses=product.losses,

@@ -16,7 +16,7 @@ from ptychodus.api.product import (
     ProductFileReader,
     ProductMetadata,
 )
-from ptychodus.api.positions import PositionSequence, ScanPoint
+from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 
 
 class PtychoShelvesProductFileReader(ProductFileReader):
@@ -24,7 +24,7 @@ class PtychoShelvesProductFileReader(ProductFileReader):
     DISPLAY_NAME: Final[str] = 'PtychoShelves Files (*.mat)'
 
     def read(self, file_path: Path) -> Product:
-        point_list: list[ScanPoint] = list()
+        point_list: list[ProbePosition] = list()
 
         hc_eVm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S / ELECTRON_VOLT_J  # noqa: N806
         mat_dict = scipy.io.loadmat(file_path, simplify_cells=True)
@@ -51,7 +51,7 @@ class PtychoShelvesProductFileReader(ProductFileReader):
         probe_positions = outputs_struct['probe_positions']
 
         for idx, pos_px in enumerate(probe_positions):
-            point = ScanPoint(
+            point = ProbePosition(
                 idx,
                 pos_px[0] * pixel_width_m,
                 pos_px[1] * pixel_height_m,
@@ -100,7 +100,7 @@ class PtychoShelvesProductFileReader(ProductFileReader):
 
         return Product(
             metadata=metadata,
-            positions=PositionSequence(point_list),
+            probe_positions=ProbePositionSequence(point_list),
             probes=probe,
             object_=object_,
             losses=losses,

@@ -17,7 +17,7 @@ from ..model.product import (
 from ..model.product.metadata import MetadataRepositoryItem
 from ..model.product.object import ObjectRepositoryItem
 from ..model.product.probe import ProbeRepositoryItem
-from ..model.product.positions import ScanRepositoryItem
+from ..model.product.probe_positions import ProbePositionsRepositoryItem
 from ..model.reconstructor import ReconstructorPresenter, ReconstructorProgressMonitor
 from ..view.reconstructor import (
     ReconstructorPlotView,
@@ -295,7 +295,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
         ax = self._plot_view.axes
         ax.clear()
-        ax.set_xlabel('Iteration')
+        ax.set_xlabel('Epoch')
         ax.set_ylabel('Loss')
         ax.grid(True)
         ax.plot(epoch, losses, '.-', label='Loss', linewidth=1.5)
@@ -318,7 +318,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
     def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
         pass
 
-    def handle_scan_changed(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_probe_positions_changed(
+        self, index: int, item: ProbePositionsRepositoryItem
+    ) -> None:
         pass
 
     def handle_probe_changed(self, index: int, item: ProbeRepositoryItem) -> None:

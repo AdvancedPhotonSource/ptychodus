@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.positions import PositionSequence, ScanPoint
+from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 
-from .builder import ScanBuilder
-from .settings import ScanSettings
+from .builder import ProbePositionsBuilder
+from .settings import ProbePositionsSettings
 
 
-class ConcentricScanBuilder(ScanBuilder):
+class ConcentricProbePositionsBuilder(ProbePositionsBuilder):
     """https://doi.org/10.1088/1367-2630/12/3/035017"""
 
-    def __init__(self, settings: ScanSettings) -> None:
+    def __init__(self, settings: ProbePositionsSettings) -> None:
         super().__init__(settings, 'concentric')
         self._settings = settings
 
@@ -24,8 +24,8 @@ class ConcentricScanBuilder(ScanBuilder):
         self.num_points_1st_shell = settings.num_points_in_first_shell.copy()
         self._add_parameter('num_points_1st_shell', self.num_points_1st_shell)
 
-    def copy(self) -> ConcentricScanBuilder:
-        builder = ConcentricScanBuilder(self._settings)
+    def copy(self) -> ConcentricProbePositionsBuilder:
+        builder = ConcentricProbePositionsBuilder(self._settings)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
@@ -38,8 +38,8 @@ class ConcentricScanBuilder(ScanBuilder):
         triangle = (num_shells * (num_shells + 1)) // 2
         return triangle * self.num_points_1st_shell.get_value()
 
-    def build(self) -> PositionSequence:
-        point_list: list[ScanPoint] = list()
+    def build(self) -> ProbePositionSequence:
+        point_list: list[ProbePosition] = list()
 
         for index in range(self._num_points):
             triangle = index // self.num_points_1st_shell.get_value()
@@ -52,11 +52,11 @@ class ConcentricScanBuilder(ScanBuilder):
             num_points_in_shell = self.num_points_1st_shell.get_value() * (shell_index + 1)
             theta_rad = 2 * numpy.pi * point_index_in_shell / num_points_in_shell
 
-            point = ScanPoint(
+            point = ProbePosition(
                 index=index,
-                position_x_m=radius_m * numpy.cos(theta_rad),
-                position_y_m=radius_m * numpy.sin(theta_rad),
+                coordinate_x_m=radius_m * numpy.cos(theta_rad),
+                coordinate_y_m=radius_m * numpy.sin(theta_rad),
             )
             point_list.append(point)
 
-        return PositionSequence(point_list)
+        return ProbePositionSequence(point_list)

@@ -6,10 +6,10 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog, QMessageBox
 
 from ptychodus.api.observer import SequenceObserver
 
-from ...model.product import ScanAPI, ScanRepository
-from ...model.product.positions import ScanRepositoryItem
+from ...model.product import ProbePositionsAPI, ProbePositionsRepository
+from ...model.product.probe_positions import ProbePositionsRepositoryItem
 from ...view.repository import RepositoryTableView
-from ...view.positions import PositionsPlotView
+from ...view.probe_positions import ProbePositionsPlotView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
 from ..helpers import (
@@ -17,19 +17,19 @@ from ..helpers import (
     connect_triggered_signal,
     create_brush_for_editable_cell,
 )
-from .editor_factory import ScanEditorViewControllerFactory
-from .table_model import ScanTableModel
+from .editor_factory import ProbePositionsEditorViewControllerFactory
+from .table_model import ProbePositionsTableModel
 
 logger = logging.getLogger(__name__)
 
 
-class PositionsController(SequenceObserver[ScanRepositoryItem]):
+class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
     def __init__(
         self,
-        repository: ScanRepository,
-        api: ScanAPI,
+        repository: ProbePositionsRepository,
+        api: ProbePositionsAPI,
         view: RepositoryTableView,
-        plot_view: PositionsPlotView,
+        plot_view: ProbePositionsPlotView,
         file_dialog_factory: FileDialogFactory,
         *,
         is_developer_mode_enabled: bool,
@@ -40,9 +40,11 @@ class PositionsController(SequenceObserver[ScanRepositoryItem]):
         self._view = view
         self._plot_view = plot_view
         self._file_dialog_factory = file_dialog_factory
-        self._table_model = ScanTableModel(repository, api, create_brush_for_editable_cell(view))
+        self._table_model = ProbePositionsTableModel(
+            repository, api, create_brush_for_editable_cell(view)
+        )
         self._table_proxy_model = QSortFilterProxyModel()
-        self._editor_factory = ScanEditorViewControllerFactory()
+        self._editor_factory = ProbePositionsEditorViewControllerFactory()
 
         self._table_proxy_model.setSourceModel(self._table_model)
         self._table_proxy_model.dataChanged.connect(
@@ -113,7 +115,7 @@ class PositionsController(SequenceObserver[ScanRepositoryItem]):
 
         if file_path:
             try:
-                self._api.open_scan(item_index, file_path, file_type=name_filter)
+                self._api.open_probe_positions(item_index, file_path, file_type=name_filter)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.show_exception('File Reader', err)
@@ -180,9 +182,9 @@ class PositionsController(SequenceObserver[ScanRepositoryItem]):
 
             if self._table_model.is_item_checked(item_index):
                 item_name = self._repository.get_name(item_index)
-                scan = self._repository[item_index].get_scan()
-                x = [point.position_x_m for point in scan]
-                y = [point.position_y_m for point in scan]
+                probe_positions = self._repository[item_index].get_probe_positions()
+                x = [point.coordinate_x_m for point in probe_positions]
+                y = [point.coordinate_y_m for point in probe_positions]
                 self._plot_view.axes.plot(x, y, '.-', label=item_name, linewidth=1.5)
 
         self._plot_view.axes.invert_yaxis()
@@ -217,14 +219,14 @@ class PositionsController(SequenceObserver[ScanRepositoryItem]):
         self._view.button_box.analyze_button.setEnabled(enabled)
         self._redraw_plot()
 
-    def handle_item_inserted(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_item_inserted(self, index: int, item: ProbePositionsRepositoryItem) -> None:
         self._table_model.insert_item(index, item)
 
-    def handle_item_changed(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_item_changed(self, index: int, item: ProbePositionsRepositoryItem) -> None:
         self._table_model.update_item(index, item)
 
         if self._table_model.is_item_checked(index):
             self._redraw_plot()
 
-    def handle_item_removed(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_item_removed(self, index: int, item: ProbePositionsRepositoryItem) -> None:
         self._table_model.remove_item(index, item)

@@ -11,11 +11,11 @@ from ptychodus.api.product import (
     LIGHT_SPEED_M_PER_S,
     PLANCK_CONSTANT_J_PER_HZ,
 )
-from ptychodus.api.positions import ScanPoint
+from ptychodus.api.probe_positions import ProbePosition
 
 from ..diffraction import PatternSizer
 from .metadata import MetadataRepositoryItem
-from .positions import ScanRepositoryItem
+from .probe_positions import ProbePositionsRepositoryItem
 
 
 class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable, Observer):
@@ -23,7 +23,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         self,
         pattern_sizer: PatternSizer,
         metadata_item: MetadataRepositoryItem,
-        scan_item: ScanRepositoryItem,
+        scan_item: ProbePositionsRepositoryItem,
     ) -> None:
         super().__init__()
         self._pattern_sizer = pattern_sizer
@@ -74,7 +74,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     @property
     def num_scan_points(self) -> int:
-        return len(self._scan_item.get_scan())
+        return len(self._scan_item.get_probe_positions())
 
     @property
     def detector_distance_m(self) -> float:
@@ -138,8 +138,8 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         height_is_valid = geometry.pixel_height_m > 0.0 and geometry.height_m == expected.height_m
         return width_is_valid and height_is_valid
 
-    def get_probe_positions(self) -> Sequence[ScanPoint]:
-        return self._scan_item.get_scan()
+    def get_probe_positions(self) -> Sequence[ProbePosition]:
+        return self._scan_item.get_probe_positions()
 
     def get_object_geometry(self) -> ObjectGeometry:
         probe_geometry = self.get_probe_geometry()

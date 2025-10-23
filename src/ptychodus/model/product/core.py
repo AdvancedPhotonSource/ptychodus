@@ -5,19 +5,23 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter
 from ptychodus.api.product import ProductFileReader, ProductFileWriter
-from ptychodus.api.positions import PositionFileReader, PositionFileWriter
+from ptychodus.api.probe_positions import ProbePositionsFileReader, ProbePositionsFileWriter
 from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import AssembledDiffractionDataset, PatternSizer
-from .api import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI
+from .api import ObjectAPI, ProbeAPI, ProductAPI, ProbePositionsAPI
 from .item_factory import ProductRepositoryItemFactory
 from .object import ObjectBuilderFactory, ObjectRepositoryItemFactory, ObjectSettings
 from .object_repository import ObjectRepository
 from .probe import ProbeBuilderFactory, ProbeRepositoryItemFactory, ProbeSettings
 from .probe_repository import ProbeRepository
 from .repository import ProductRepository
-from .positions import ScanBuilderFactory, ScanRepositoryItemFactory, ScanSettings
-from .scan_repository import ScanRepository
+from .probe_positions import (
+    ProbePositionsBuilderFactory,
+    ProbePositionsRepositoryItemFactory,
+    ProbePositionsSettings,
+)
+from .scan_repository import ProbePositionsRepository
 from .settings import ProductSettings
 
 
@@ -28,8 +32,8 @@ class ProductCore(Observer):
         settings_registry: SettingsRegistry,
         pattern_sizer: PatternSizer,
         dataset: AssembledDiffractionDataset,
-        scan_file_reader_chooser: PluginChooser[PositionFileReader],
-        scan_file_writer_chooser: PluginChooser[PositionFileWriter],
+        scan_file_reader_chooser: PluginChooser[ProbePositionsFileReader],
+        scan_file_writer_chooser: PluginChooser[ProbePositionsFileWriter],
         fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
         probe_file_reader_chooser: PluginChooser[ProbeFileReader],
         probe_file_writer_chooser: PluginChooser[ProbeFileWriter],
@@ -42,11 +46,11 @@ class ProductCore(Observer):
         super().__init__()
         self.settings = ProductSettings(settings_registry)
 
-        self._scan_settings = ScanSettings(settings_registry)
-        self._scan_builder_factory = ScanBuilderFactory(
+        self._scan_settings = ProbePositionsSettings(settings_registry)
+        self._scan_builder_factory = ProbePositionsBuilderFactory(
             self._scan_settings, scan_file_reader_chooser, scan_file_writer_chooser
         )
-        self._scan_repository_item_factory = ScanRepositoryItemFactory(
+        self._scan_repository_item_factory = ProbePositionsRepositoryItemFactory(
             rng, self._scan_settings, self._scan_builder_factory
         )
 
@@ -88,9 +92,9 @@ class ProductCore(Observer):
             product_file_reader_chooser,
             product_file_writer_chooser,
         )
-        self.scan_repository = ScanRepository(self.product_repository)
-        self.scan_api = ScanAPI(
-            self._scan_settings, self.scan_repository, self._scan_builder_factory
+        self.probe_positions_repository = ProbePositionsRepository(self.product_repository)
+        self.probe_positions_api = ProbePositionsAPI(
+            self._scan_settings, self.probe_positions_repository, self._scan_builder_factory
         )
         self.probe_repository = ProbeRepository(self.product_repository)
         self.probe_api = ProbeAPI(

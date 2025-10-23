@@ -5,13 +5,13 @@ import numpy
 
 from ptychodus.api.geometry import AffineTransform
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.positions import ScanPoint
+from ptychodus.api.probe_positions import ProbePosition
 
-from .settings import ScanSettings
+from .settings import ProbePositionsSettings
 
 
-class ScanPointTransform(ParameterGroup):
-    def __init__(self, rng: numpy.random.Generator, settings: ScanSettings) -> None:
+class ProbePositionTransform(ParameterGroup):
+    def __init__(self, rng: numpy.random.Generator, settings: ProbePositionsSettings) -> None:
         super().__init__()
         self._rng = rng
         self._settings = settings
@@ -41,8 +41,8 @@ class ScanPointTransform(ParameterGroup):
         for parameter in self.parameters().values():
             parameter.sync_value_to_parent()
 
-    def copy(self) -> ScanPointTransform:
-        transform = ScanPointTransform(self._rng, self._settings)
+    def copy(self) -> ProbePositionTransform:
+        transform = ProbePositionTransform(self._rng, self._settings)
 
         for key, value in self.parameters().items():
             transform.parameters()[key].set_value(value.get_value())
@@ -97,9 +97,9 @@ class ScanPointTransform(ParameterGroup):
     def set_identity(self) -> None:
         self.apply_presets(0)
 
-    def __call__(self, point: ScanPoint) -> ScanPoint:
+    def __call__(self, point: ProbePosition) -> ProbePosition:
         transform = self.get_transform()
-        pos_y, pos_x = transform(point.position_y_m, point.position_x_m)
+        pos_y, pos_x = transform(point.coordinate_y_m, point.coordinate_x_m)
         rad = self.jitter_radius_m.get_value()
 
         if rad > 0.0:
@@ -112,4 +112,4 @@ class ScanPointTransform(ParameterGroup):
                     pos_y += dy * rad
                     break
 
-        return ScanPoint(point.index, pos_x, pos_y)
+        return ProbePosition(point.index, pos_x, pos_y)

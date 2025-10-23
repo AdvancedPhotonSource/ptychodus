@@ -7,7 +7,7 @@ from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as Navigation
 from matplotlib.figure import Figure
 
 
-class PositionsPlotView(QWidget):
+class ProbePositionsPlotView(QWidget):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
         self.figure = Figure()
@@ -16,7 +16,7 @@ class PositionsPlotView(QWidget):
         self.axes = self.figure.add_subplot(111)
 
     @classmethod
-    def create_instance(cls, parent: QWidget | None = None) -> PositionsPlotView:
+    def create_instance(cls, parent: QWidget | None = None) -> ProbePositionsPlotView:
         view = cls(parent)
 
         layout = QVBoxLayout()

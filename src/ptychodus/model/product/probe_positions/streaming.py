@@ -2,25 +2,27 @@ from collections.abc import Sequence
 
 # TODO from pvaccess import Channel, PvObjectQueue
 
-from ptychodus.api.positions import PositionSequence, ScanPoint
+from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 
-from .builder import ScanBuilder
-from .settings import ScanSettings
+from .builder import ProbePositionsBuilder
+from .settings import ProbePositionsSettings
 
 
-class StreamingScanBuilder(ScanBuilder):
-    def __init__(self, settings: ScanSettings, point_seq: Sequence[ScanPoint]) -> None:
+class StreamingScanBuilder(ProbePositionsBuilder):
+    def __init__(
+        self, settings: ProbePositionsSettings, point_seq: Sequence[ProbePosition]
+    ) -> None:
         super().__init__(settings, 'Streaming')
         self._point_list = list(point_seq)
 
-    def append(self, point: ScanPoint) -> None:
+    def append(self, point: ProbePosition) -> None:
         self._point_list.append(point)
 
-    def extend(self, point_seq: Sequence[ScanPoint]) -> None:
+    def extend(self, point_seq: Sequence[ProbePosition]) -> None:
         self._point_list.extend(point_seq)
 
-    def build(self) -> PositionSequence:
-        return PositionSequence(self._point_list)
+    def build(self) -> ProbePositionSequence:
+        return ProbePositionSequence(self._point_list)
 
 
 # TODO def echo(self, value: int = 125) -> None:

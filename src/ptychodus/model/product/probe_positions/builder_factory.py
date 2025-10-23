@@ -3,44 +3,48 @@ from pathlib import Path
 import logging
 
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.positions import PositionSequence, PositionFileReader, PositionFileWriter
+from ptychodus.api.probe_positions import (
+    ProbePositionSequence,
+    ProbePositionsFileReader,
+    ProbePositionsFileWriter,
+)
 
-from .builder import FromFileScanBuilder, ScanBuilder
-from .cartesian import CartesianScanBuilder, CartesianScanVariant
-from .concentric import ConcentricScanBuilder
-from .lissajous import LissajousScanBuilder
-from .settings import ScanSettings
-from .spiral import SpiralScanBuilder
+from .builder import FromFileProbePositionsBuilder, ProbePositionsBuilder
+from .cartesian import CartesianProbePositionsBuilder, CartesianProbePositionsVariant
+from .concentric import ConcentricProbePositionsBuilder
+from .lissajous import LissajousProbePositionsBuilder
+from .settings import ProbePositionsSettings
+from .spiral import SpiralProbePositionsBuilder
 
 logger = logging.getLogger(__name__)
 
 
-class ScanBuilderFactory(Iterable[str]):
+class ProbePositionsBuilderFactory(Iterable[str]):
     def __init__(
         self,
-        settings: ScanSettings,
-        file_reader_chooser: PluginChooser[PositionFileReader],
-        file_writer_chooser: PluginChooser[PositionFileWriter],
+        settings: ProbePositionsSettings,
+        file_reader_chooser: PluginChooser[ProbePositionsFileReader],
+        file_writer_chooser: PluginChooser[ProbePositionsFileWriter],
     ) -> None:
         self._settings = settings
         self._file_reader_chooser = file_reader_chooser
         self._file_writer_chooser = file_writer_chooser
-        self._builders: dict[str, Callable[[], ScanBuilder]] = {
-            variant.name.lower(): lambda variant=variant: CartesianScanBuilder(variant, settings)  # type: ignore
-            for variant in CartesianScanVariant
+        self._builders: dict[str, Callable[[], ProbePositionsBuilder]] = {
+            variant.name.lower(): lambda var=variant: CartesianProbePositionsBuilder(var, settings)  # type: ignore
+            for variant in CartesianProbePositionsVariant
         }
         self._builders.update(
             {
-                'concentric': lambda: ConcentricScanBuilder(settings),
-                'spiral': lambda: SpiralScanBuilder(settings),
-                'lissajous': lambda: LissajousScanBuilder(settings),
+                'concentric': lambda: ConcentricProbePositionsBuilder(settings),
+                'spiral': lambda: SpiralProbePositionsBuilder(settings),
+                'lissajous': lambda: LissajousProbePositionsBuilder(settings),
             }
         )
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._builders)
 
-    def create(self, name: str) -> ScanBuilder:
+    def create(self, name: str) -> ProbePositionsBuilder:
         try:
             factory = self._builders[name]
         except KeyError as exc:
@@ -48,10 +52,10 @@ class ScanBuilderFactory(Iterable[str]):
 
         return factory()
 
-    def create_default(self) -> ScanBuilder:
+    def create_default(self) -> ProbePositionsBuilder:
         return next(iter(self._builders.values()))()
 
-    def create_from_settings(self) -> ScanBuilder:
+    def create_from_settings(self) -> ProbePositionsBuilder:
         name = self._settings.builder.get_value()
         name_repaired = name.casefold()
 
@@ -70,11 +74,11 @@ class ScanBuilderFactory(Iterable[str]):
     def get_open_file_filter(self) -> str:
         return self._file_reader_chooser.get_current_plugin().display_name
 
-    def create_scan_from_file(self, file_path: Path, file_type: str) -> ScanBuilder:
+    def create_scan_from_file(self, file_path: Path, file_type: str) -> ProbePositionsBuilder:
         self._file_reader_chooser.set_current_plugin(file_type)
         file_type = self._file_reader_chooser.get_current_plugin().simple_name
         file_reader = self._file_reader_chooser.get_current_plugin().strategy
-        return FromFileScanBuilder(self._settings, file_path, file_type, file_reader)
+        return FromFileProbePositionsBuilder(self._settings, file_path, file_type, file_reader)
 
     def get_save_file_filters(self) -> Iterator[str]:
         for plugin in self._file_writer_chooser:
@@ -83,7 +87,7 @@ class ScanBuilderFactory(Iterable[str]):
     def get_save_file_filter(self) -> str:
         return self._file_writer_chooser.get_current_plugin().display_name
 
-    def save_scan(self, file_path: Path, file_type: str, scan: PositionSequence) -> None:
+    def save_scan(self, file_path: Path, file_type: str, scan: ProbePositionSequence) -> None:
         self._file_writer_chooser.set_current_plugin(file_type)
         file_type = self._file_writer_chooser.get_current_plugin().simple_name
         logger.debug(f'Writing "{file_path}" as "{file_type}"')

@@ -7,7 +7,7 @@ from ptychodus.api.geometry import AffineTransform
 from ptychodus.api.observer import Observable
 from ptychodus.api.typing import RealArrayType
 
-from ..product import ScanRepository
+from ..product import ProbePositionsRepository
 from .settings import AffineTransformEstimatorSettings
 
 __all__ = ['AffineTransformEstimator']
@@ -59,7 +59,7 @@ class AffineTransformEstimator(Observable):
         self,
         rng: numpy.random.Generator,
         settings: AffineTransformEstimatorSettings,
-        repository: ScanRepository,
+        repository: ProbePositionsRepository,
     ) -> None:
         self._rng = rng
         self._settings = settings
@@ -69,11 +69,11 @@ class AffineTransformEstimator(Observable):
         coordinate_list: list[float] = []
 
         for product_index in product_indexes:
-            positions = self._repository[product_index].get_scan()
+            positions = self._repository[product_index].get_probe_positions()
 
             for point in positions:
-                coordinate_list.append(point.position_y_m)
-                coordinate_list.append(point.position_x_m)
+                coordinate_list.append(point.coordinate_y_m)
+                coordinate_list.append(point.coordinate_x_m)
 
         coordinates = numpy.reshape(coordinate_list, (-1, 2))
 

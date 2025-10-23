@@ -11,7 +11,7 @@ from ...model.ptychi import (
 from ..reconstructor import ReconstructorViewControllerFactory
 from .object import PtyChiObjectViewController
 from .opr import PtyChiOPRViewController
-from .positions import PtyChiProbePositionsViewController
+from .probe_positions import PtyChiProbePositionsViewController
 from .probe import PtyChiProbeViewController
 from .reconstructor import PtyChiReconstructorViewController
 

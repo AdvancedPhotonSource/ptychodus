@@ -16,6 +16,10 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
+    def rename_product(self, new_name: str) -> None:
+        pass
+
+    @abstractmethod
     def open_probe_positions(self, file_path: Path, *, file_type: str | None = None) -> None:
         pass
 

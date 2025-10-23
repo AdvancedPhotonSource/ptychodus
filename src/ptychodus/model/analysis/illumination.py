@@ -87,11 +87,11 @@ class IlluminationMapper(Observable):
             numpy.zeros((object_geometry.height_px, object_geometry.width_px))
         )
 
-        for scan_point, probe in zip(product.positions, product.probes):
-            object_point = object_geometry.map_scan_point_to_object_point(scan_point)
+        for scan_point, probe in zip(product.probe_positions, product.probes):
+            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
             stitcher.add_patch(
-                object_point.position_x_px,
-                object_point.position_y_px,
+                object_point.coordinate_x_px,
+                object_point.coordinate_y_px,
                 probe.get_intensity(),
             )
 
@@ -131,8 +131,8 @@ class IlluminationMapper(Observable):
             'dose_rate_Gy_s': self._product_data.dose_rate_Gy_s,
             'pixel_height_m': self._product_data.pixel_geometry.height_m,
             'pixel_width_m': self._product_data.pixel_geometry.width_m,
-            'center_x_m': self._product_data.center.position_x_m,
-            'center_y_m': self._product_data.center.position_y_m,
+            'center_x_m': self._product_data.center.coordinate_x_m,
+            'center_y_m': self._product_data.center.coordinate_y_m,
         }
 
         numpy.savez_compressed(file_path, allow_pickle=False, **contents)

@@ -16,7 +16,7 @@ from ptychodus.api.product import (
     ProductMetadata,
 )
 from ptychodus.api.reconstructor import LossValue
-from ptychodus.api.positions import PositionSequence, ScanPoint
+from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
     LOSS_VALUES: Final[str] = 'loss_values'
 
     def read(self, file_path: Path) -> Product:
-        point_list: list[ScanPoint] = []
+        point_list: list[ProbePosition] = []
 
         with h5py.File(file_path, 'r') as h5_file:
             probe_photon_count = 0.0
@@ -93,7 +93,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
             h5_scan_y = h5_file[self.PROBE_POSITION_Y]
 
             for idx, x_m, y_m in zip(h5_scan_indexes[()], h5_scan_x[()], h5_scan_y[()]):
-                point = ScanPoint(idx, x_m, y_m)
+                point = ProbePosition(idx, x_m, y_m)
                 point_list.append(point)
 
             h5_probe = h5_file[self.PROBE_ARRAY]
@@ -120,8 +120,8 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
                 height_m=float(h5_object.attrs[self.OBJECT_PIXEL_HEIGHT]),
             )
             object_center = ObjectCenter(
-                position_x_m=float(h5_object.attrs[self.OBJECT_CENTER_X]),
-                position_y_m=float(h5_object.attrs[self.OBJECT_CENTER_Y]),
+                coordinate_x_m=float(h5_object.attrs[self.OBJECT_CENTER_X]),
+                coordinate_y_m=float(h5_object.attrs[self.OBJECT_CENTER_Y]),
             )
             h5_object_layer_spacing = h5_file[self.OBJECT_LAYER_SPACING]
             object_ = Object(
@@ -151,7 +151,7 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
 
         return Product(
             metadata=metadata,
-            positions=PositionSequence(point_list),
+            probe_positions=ProbePositionSequence(point_list),
             probes=probe,
             object_=object_,
             losses=losses,
@@ -162,10 +162,10 @@ class H5ProductFileIO(ProductFileReader, ProductFileWriter):
         scan_x_m: list[float] = []
         scan_y_m: list[float] = []
 
-        for point in product.positions:
+        for point in product.probe_positions:
             scan_indexes.append(point.index)
-            scan_x_m.append(point.position_x_m)
-            scan_y_m.append(point.position_y_m)
+            scan_x_m.append(point.coordinate_x_m)
+            scan_y_m.append(point.coordinate_y_m)
 
         with h5py.File(file_path, 'w') as h5_file:
             metadata = product.metadata

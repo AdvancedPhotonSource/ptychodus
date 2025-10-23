@@ -11,7 +11,7 @@ from .geometry import ProductGeometry
 from .metadata import MetadataRepositoryItem, UniqueNameFactory
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
-from .positions import ScanRepositoryItem
+from .probe_positions import ProbePositionsRepositoryItem
 from .validator import ProductValidator
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ class ProductRepositoryItemObserver(UniqueNameFactory):
         pass
 
     @abstractmethod
-    def handle_scan_changed(self, item: ProductRepositoryItem) -> None:
+    def handle_probe_positions_changed(self, item: ProductRepositoryItem) -> None:
         pass
 
     @abstractmethod
@@ -44,7 +44,7 @@ class ProductRepositoryItem(ParameterGroup):
         self,
         parent: ProductRepositoryItemObserver,
         metadata_item: MetadataRepositoryItem,
-        scan_item: ScanRepositoryItem,
+        probe_positions_item: ProbePositionsRepositoryItem,
         geometry: ProductGeometry,
         probe_item: ProbeRepositoryItem,
         object_item: ObjectRepositoryItem,
@@ -54,7 +54,7 @@ class ProductRepositoryItem(ParameterGroup):
         super().__init__()
         self._parent = parent
         self._metadata_item = metadata_item
-        self._scan_item = scan_item
+        self._probe_positions_item = probe_positions_item
         self._geometry = geometry
         self._probe_item = probe_item
         self._object_item = object_item
@@ -62,7 +62,7 @@ class ProductRepositoryItem(ParameterGroup):
         self._losses = list(losses)
 
         self._add_group('metadata', self._metadata_item, observe=True)
-        self._add_group('scan', self._scan_item, observe=True)
+        self._add_group('probe_positions', self._probe_positions_item, observe=True)
         self._add_group('probe', self._probe_item, observe=True)
         self._add_group('object', self._object_item, observe=True)
 
@@ -70,7 +70,7 @@ class ProductRepositoryItem(ParameterGroup):
 
     def assign(self, product: Product) -> None:
         self._metadata_item.assign(product.metadata)
-        self._scan_item.assign(product.positions)
+        self._probe_positions_item.assign(product.probe_positions)
         self._probe_item.assign(product.probes)
         self._object_item.assign(product.object_)
         self._losses = list(product.losses)
@@ -78,7 +78,7 @@ class ProductRepositoryItem(ParameterGroup):
 
     def sync_to_settings(self) -> None:
         self._metadata_item.sync_to_settings()
-        self._scan_item.sync_to_settings()
+        self._probe_positions_item.sync_to_settings()
         self._probe_item.sync_to_settings()
         self._object_item.sync_to_settings()
 
@@ -91,8 +91,8 @@ class ProductRepositoryItem(ParameterGroup):
     def get_metadata_item(self) -> MetadataRepositoryItem:
         return self._metadata_item
 
-    def get_scan_item(self) -> ScanRepositoryItem:
-        return self._scan_item
+    def get_probe_positions_item(self) -> ProbePositionsRepositoryItem:
+        return self._probe_positions_item
 
     def get_geometry(self) -> ProductGeometry:
         return self._geometry
@@ -113,7 +113,7 @@ class ProductRepositoryItem(ParameterGroup):
     def get_product(self) -> Product:
         return Product(
             metadata=self._metadata_item.get_metadata(),
-            positions=self._scan_item.get_scan(),
+            probe_positions=self._probe_positions_item.get_probe_positions(),
             probes=self._probe_item.get_probes(),
             object_=self._object_item.get_object(),
             losses=self.get_losses(),
@@ -123,9 +123,9 @@ class ProductRepositoryItem(ParameterGroup):
         if observable is self._metadata_item:
             self._invalidate_losses()
             self._parent.handle_metadata_changed(self)
-        elif observable is self._scan_item:
+        elif observable is self._probe_positions_item:
             self._invalidate_losses()
-            self._parent.handle_scan_changed(self)
+            self._parent.handle_probe_positions_changed(self)
         elif observable is self._probe_item:
             self._invalidate_losses()
             self._parent.handle_probe_changed(self)
@@ -146,7 +146,9 @@ class ProductRepositoryObserver(ABC):
         pass
 
     @abstractmethod
-    def handle_scan_changed(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_probe_positions_changed(
+        self, index: int, item: ProbePositionsRepositoryItem
+    ) -> None:
         pass
 
     @abstractmethod

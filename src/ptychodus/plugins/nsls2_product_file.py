@@ -8,7 +8,7 @@ from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import LossValue, Product, ProductFileReader, ProductMetadata
-from ptychodus.api.positions import PositionSequence, ScanPoint
+from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 
 
 class NSLSIIProductFileReader(ProductFileReader):
@@ -17,7 +17,7 @@ class NSLSIIProductFileReader(ProductFileReader):
     ONE_MICRON_M: Final[float] = 1.0e-6
 
     def read(self, file_path: Path) -> Product:
-        point_list: list[ScanPoint] = list()
+        point_list: list[ProbePosition] = list()
 
         with h5py.File(file_path, 'r') as h5_file:
             detector_distance_m = float(h5_file['det_dist'][()]) * self.ONE_MICRON_M
@@ -40,10 +40,10 @@ class NSLSIIProductFileReader(ProductFileReader):
             positions_m = h5_file['pos_xy'][()].T * self.ONE_MICRON_M
 
             for index, _xy in enumerate(positions_m):
-                point = ScanPoint(
+                point = ProbePosition(
                     index=index,
-                    position_x_m=_xy[1],
-                    position_y_m=_xy[2],
+                    coordinate_x_m=_xy[1],
+                    coordinate_y_m=_xy[2],
                 )
                 point_list.append(point)
 
@@ -62,7 +62,7 @@ class NSLSIIProductFileReader(ProductFileReader):
 
         return Product(
             metadata=metadata,
-            positions=PositionSequence(point_list),
+            probe_positions=ProbePositionSequence(point_list),
             probes=probes,
             object_=object_,
             losses=loss,

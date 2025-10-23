@@ -10,7 +10,7 @@ from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
 from .repository import ProductRepository
-from .positions import ScanRepositoryItem
+from .probe_positions import ProbePositionsRepositoryItem
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,9 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductReposito
     def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
         pass
 
-    def handle_scan_changed(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_probe_positions_changed(
+        self, index: int, item: ProbePositionsRepositoryItem
+    ) -> None:
         pass
 
     def handle_probe_changed(self, index: int, item: ProbeRepositoryItem) -> None:

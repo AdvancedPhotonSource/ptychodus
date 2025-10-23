@@ -1,10 +1,10 @@
-from .api import ObjectAPI, ProbeAPI, ProductAPI, ScanAPI, PositionsStreamingContext
+from .api import ObjectAPI, ProbeAPI, ProductAPI, ProbePositionsAPI, PositionsStreamingContext
 from .core import ProductCore
 from .item import ProductRepositoryItem, ProductRepositoryObserver
 from .object_repository import ObjectRepository
 from .probe_repository import ProbeRepository
 from .repository import ProductRepository
-from .scan_repository import ScanRepository
+from .scan_repository import ProbePositionsRepository
 from .settings import ProductSettings
 
 __all__ = [
@@ -19,6 +19,6 @@ __all__ = [
     'ProductRepositoryItem',
     'ProductRepositoryObserver',
     'ProductSettings',
-    'ScanAPI',
-    'ScanRepository',
+    'ProbePositionsAPI',
+    'ProbePositionsRepository',
 ]

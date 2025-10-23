@@ -42,11 +42,11 @@ from ptychi.api.options.base import (
     SliceSpacingOptions,
 )
 
-from ptychodus.api.object import Object, ObjectGeometry, ObjectPoint
+from ptychodus.api.object import Object, ObjectGeometry, ObjectPosition
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import LossValue, Product, ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput
-from ptychodus.api.positions import PositionSequence, ScanPoint
+from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 from ptychodus.api.typing import ComplexArrayType, RealArrayType
 
 from ..diffraction import PatternSizer
@@ -560,15 +560,15 @@ class PtyChiProbePositionOptionsHelper:
         )
 
     def get_positions_px(
-        self, scan: PositionSequence, object_geometry: ObjectGeometry
+        self, scan: ProbePositionSequence, object_geometry: ObjectGeometry
     ) -> tuple[RealArrayType, RealArrayType]:
         position_x_px: list[float] = list()
         position_y_px: list[float] = list()
 
         for scan_point in scan:
-            object_point = object_geometry.map_scan_point_to_object_point(scan_point)
-            position_x_px.append(object_point.position_x_px)
-            position_y_px.append(object_point.position_y_px)
+            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
+            position_x_px.append(object_point.coordinate_x_px)
+            position_y_px.append(object_point.coordinate_y_px)
 
         return numpy.array(position_x_px), numpy.array(position_y_px)
 
@@ -706,25 +706,25 @@ class PtyChiOptionsHelper:
             pixel_geometry=product.probes.get_pixel_geometry(),
         )
 
-        corrected_scan_points: list[ScanPoint] = list()
+        corrected_scan_points: list[ProbePosition] = list()
         object_geometry = object_in.get_geometry()
 
         for uncorrected_point, pos_x_px, pos_y_px in zip(
-            product.positions, position_x_px, position_y_px
+            product.probe_positions, position_x_px, position_y_px
         ):
-            object_point = ObjectPoint(
+            object_point = ObjectPosition(
                 index=uncorrected_point.index,
-                position_x_px=float(pos_x_px),
-                position_y_px=float(pos_y_px),
+                coordinate_x_px=float(pos_x_px),
+                coordinate_y_px=float(pos_y_px),
             )
-            scan_point = object_geometry.map_object_point_to_scan_point(object_point)
+            scan_point = object_geometry.map_coordinates_object_to_probe(object_point)
             corrected_scan_points.append(scan_point)
 
-        scan_out = PositionSequence(corrected_scan_points)
+        scan_out = ProbePositionSequence(corrected_scan_points)
 
         return Product(
             metadata=product.metadata,
-            positions=scan_out,
+            probe_positions=scan_out,
             probes=probe_out,
             object_=object_out,
             losses=losses,

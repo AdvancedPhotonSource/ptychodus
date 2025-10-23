@@ -5,15 +5,15 @@ from PyQt5.QtGui import QBrush
 
 from ptychodus.api.units import BYTES_PER_MEGABYTE
 
-from ...model.product import ScanAPI, ScanRepository
-from ...model.product.positions import ScanRepositoryItem
+from ...model.product import ProbePositionsAPI, ProbePositionsRepository
+from ...model.product.probe_positions import ProbePositionsRepositoryItem
 
 
-class ScanTableModel(QAbstractTableModel):
+class ProbePositionsTableModel(QAbstractTableModel):
     def __init__(
         self,
-        repository: ScanRepository,
-        api: ScanAPI,
+        repository: ProbePositionsRepository,
+        api: ProbePositionsAPI,
         editable_item_brush: QBrush,
         parent: QObject | None = None,
     ) -> None:
@@ -24,16 +24,16 @@ class ScanTableModel(QAbstractTableModel):
         self._header = ['Name', 'Plot', 'Builder', 'Points', 'Length [m]', 'Size [MB]']
         self._checked_item_indexes: set[int] = set()
 
-    def insert_item(self, index: int, item: ScanRepositoryItem) -> None:
+    def insert_item(self, index: int, item: ProbePositionsRepositoryItem) -> None:
         self.beginInsertRows(QModelIndex(), index, index)
         self.endInsertRows()
 
-    def update_item(self, index: int, item: ScanRepositoryItem) -> None:
+    def update_item(self, index: int, item: ProbePositionsRepositoryItem) -> None:
         top_left = self.index(index, 0)
         bottom_right = self.index(index, len(self._header))
         self.dataChanged.emit(top_left, bottom_right)
 
-    def remove_item(self, index: int, item: ScanRepositoryItem) -> None:
+    def remove_item(self, index: int, item: ProbePositionsRepositoryItem) -> None:
         self.beginRemoveRows(QModelIndex(), index, index)
         self.endRemoveRows()
 
@@ -54,7 +54,7 @@ class ScanTableModel(QAbstractTableModel):
             return None
 
         item = self._repository[index.row()]
-        scan = item.get_scan()
+        probe_positions = item.get_probe_positions()
 
         if role == Qt.ItemDataRole.DisplayRole:
             if index.column() == 0:
@@ -64,11 +64,11 @@ class ScanTableModel(QAbstractTableModel):
             elif index.column() == 2:
                 return item.get_builder().get_name()
             elif index.column() == 3:
-                return len(scan)
+                return len(probe_positions)
             elif index.column() == 4:
                 return f'{item.get_length_m():.6f}'
             elif index.column() == 5:
-                return f'{scan.nbytes / BYTES_PER_MEGABYTE:.2f}'
+                return f'{probe_positions.nbytes / BYTES_PER_MEGABYTE:.2f}'
         elif role == Qt.ItemDataRole.CheckStateRole:
             if index.column() == 1:
                 return (
@@ -101,7 +101,7 @@ class ScanTableModel(QAbstractTableModel):
                 self._repository.set_name(index.row(), str(value))
                 return True
             elif index.column() == 2:
-                self._api.build_scan(index.row(), str(value))
+                self._api.build_probe_positions(index.row(), str(value))
                 return True
         elif role == Qt.ItemDataRole.CheckStateRole:
             if index.column() == 1:

@@ -15,9 +15,9 @@ from .probe.builder_factory import ProbeBuilderFactory
 from .probe.settings import ProbeSettings
 from .probe_repository import ProbeRepository
 from .repository import ProductRepository
-from .positions.builder_factory import ScanBuilderFactory
-from .positions.settings import ScanSettings
-from .scan_repository import ScanRepository
+from .probe_positions.builder_factory import ProbePositionsBuilderFactory
+from .probe_positions.settings import ProbePositionsSettings
+from .scan_repository import ProbePositionsRepository
 from .settings import ProductSettings
 
 logger = logging.getLogger(__name__)
@@ -48,12 +48,12 @@ class PositionsStreamingContext:
         pass  # TODO
 
 
-class ScanAPI:
+class ProbePositionsAPI:
     def __init__(
         self,
-        settings: ScanSettings,
-        repository: ScanRepository,
-        builder_factory: ScanBuilderFactory,
+        settings: ProbePositionsSettings,
+        repository: ProbePositionsRepository,
+        builder_factory: ProbePositionsBuilderFactory,
     ) -> None:
         self._settings = settings
         self._repository = repository
@@ -65,7 +65,7 @@ class ScanAPI:
     def builder_names(self) -> Iterator[str]:
         return iter(self._builder_factory)
 
-    def build_scan(
+    def build_probe_positions(
         self, index: int, builder_name: str, builder_parameters: Mapping[str, Any] = {}
     ) -> None:
         try:
@@ -92,7 +92,7 @@ class ScanAPI:
 
         item.set_builder(builder)
 
-    def build_scan_from_settings(self, index: int) -> None:
+    def build_probe_positions_from_settings(self, index: int) -> None:
         try:
             item = self._repository[index]
         except IndexError:
@@ -113,7 +113,9 @@ class ScanAPI:
     def get_open_file_filter(self) -> str:
         return self._builder_factory.get_open_file_filter()
 
-    def open_scan(self, index: int, file_path: Path, *, file_type: str | None = None) -> None:
+    def open_probe_positions(
+        self, index: int, file_path: Path, *, file_type: str | None = None
+    ) -> None:
         builder = self._builder_factory.create_scan_from_file(
             file_path,
             self._settings.file_type.get_value() if file_type is None else file_type,
@@ -155,7 +157,7 @@ class ScanAPI:
         except IndexError:
             logger.warning(f'Failed to save scan {index}!')
         else:
-            self._builder_factory.save_scan(file_path, file_type, item.get_scan())
+            self._builder_factory.save_scan(file_path, file_type, item.get_probe_positions())
 
 
 class ProbeAPI:
@@ -451,6 +453,15 @@ class ProductAPI:
             logger.warning(f'Refusing to create product with invalid file path "{file_path}"')
 
         return -1
+
+    def rename_product(self, product_index: int, new_name: str) -> None:
+        try:
+            item = self._repository[product_index]
+        except IndexError:
+            logger.warning(f'Failed to access product {product_index} for renaming!')
+            return
+
+        item.set_name(new_name)
 
     def get_save_file_filters(self) -> Iterator[str]:
         for plugin in self._file_writer_chooser:

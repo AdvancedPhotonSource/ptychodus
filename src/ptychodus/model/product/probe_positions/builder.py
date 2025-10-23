@@ -5,15 +5,19 @@ from pathlib import Path
 import logging
 
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.positions import PositionSequence, PositionFileReader, ScanPoint
+from ptychodus.api.probe_positions import (
+    ProbePositionSequence,
+    ProbePositionsFileReader,
+    ProbePosition,
+)
 
-from .settings import ScanSettings
+from .settings import ProbePositionsSettings
 
 logger = logging.getLogger(__name__)
 
 
-class ScanBuilder(ParameterGroup):
-    def __init__(self, settings: ScanSettings, name: str) -> None:
+class ProbePositionsBuilder(ParameterGroup):
+    def __init__(self, settings: ProbePositionsSettings, name: str) -> None:
         super().__init__()
         self._name = settings.builder.copy()
         self._name.set_value(name)
@@ -27,34 +31,34 @@ class ScanBuilder(ParameterGroup):
             parameter.sync_value_to_parent()
 
     @abstractmethod
-    def copy(self) -> ScanBuilder:
+    def copy(self) -> ProbePositionsBuilder:
         pass
 
     @abstractmethod
-    def build(self) -> PositionSequence:
+    def build(self) -> ProbePositionSequence:
         pass
 
 
-class FromMemoryScanBuilder(ScanBuilder):
-    def __init__(self, settings: ScanSettings, points: Sequence[ScanPoint]) -> None:
+class FromMemoryProbePositionsBuilder(ProbePositionsBuilder):
+    def __init__(self, settings: ProbePositionsSettings, points: Sequence[ProbePosition]) -> None:
         super().__init__(settings, 'from_memory')
         self._settings = settings
-        self._scan = PositionSequence(points)
+        self._scan = ProbePositionSequence(points)
 
-    def copy(self) -> FromMemoryScanBuilder:
-        return FromMemoryScanBuilder(self._settings, self._scan)
+    def copy(self) -> FromMemoryProbePositionsBuilder:
+        return FromMemoryProbePositionsBuilder(self._settings, self._scan)
 
-    def build(self) -> PositionSequence:
+    def build(self) -> ProbePositionSequence:
         return self._scan
 
 
-class FromFileScanBuilder(ScanBuilder):
+class FromFileProbePositionsBuilder(ProbePositionsBuilder):
     def __init__(
         self,
-        settings: ScanSettings,
+        settings: ProbePositionsSettings,
         file_path: Path,
         file_type: str,
-        file_reader: PositionFileReader,
+        file_reader: ProbePositionsFileReader,
     ) -> None:
         super().__init__(settings, 'from_file')
         self._settings = settings
@@ -66,15 +70,15 @@ class FromFileScanBuilder(ScanBuilder):
         self._add_parameter('file_type', self.file_type)
         self._file_reader = file_reader
 
-    def copy(self) -> FromFileScanBuilder:
-        return FromFileScanBuilder(
+    def copy(self) -> FromFileProbePositionsBuilder:
+        return FromFileProbePositionsBuilder(
             self._settings,
             self.file_path.get_value(),
             self.file_type.get_value(),
             self._file_reader,
         )
 
-    def build(self) -> PositionSequence:
+    def build(self) -> ProbePositionSequence:
         file_path = self.file_path.get_value()
         file_type = self.file_type.get_value()
         logger.debug(f'Reading "{file_path}" as "{file_type}"')

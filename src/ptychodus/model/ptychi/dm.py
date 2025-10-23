@@ -16,7 +16,7 @@ from ptychodus.api.object import Object, ObjectGeometry
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import LossValue, ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Reconstructor
-from ptychodus.api.positions import PositionSequence
+from ptychodus.api.probe_positions import ProbePositionSequence
 
 from .helper import PtyChiOptionsHelper
 from .settings import PtyChiDMSettings
@@ -102,7 +102,7 @@ class DMReconstructor(Reconstructor):
         )
 
     def _create_probe_position_options(
-        self, scan: PositionSequence, object_geometry: ObjectGeometry
+        self, scan: ProbePositionSequence, object_geometry: ObjectGeometry
     ) -> DMProbePositionOptions:
         helper = self._options_helper.probe_position_helper
         position_x_px, position_y_px = helper.get_positions_px(scan, object_geometry)
@@ -142,7 +142,7 @@ class DMReconstructor(Reconstructor):
             object_options=self._create_object_options(product.object_),
             probe_options=self._create_probe_options(product.probes, product.metadata),
             probe_position_options=self._create_probe_position_options(
-                product.positions, product.object_.get_geometry()
+                product.probe_positions, product.object_.get_geometry()
             ),
             opr_mode_weight_options=self._create_opr_mode_weight_options(product.probes),
         )

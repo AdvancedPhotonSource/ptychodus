@@ -16,7 +16,11 @@ from ptychodus.api.diffraction import (
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeSequence, ProbeFileReader
 from ptychodus.api.product import ELECTRON_VOLT_J
-from ptychodus.api.positions import PositionSequence, PositionFileReader, ScanPoint
+from ptychodus.api.probe_positions import (
+    ProbePositionSequence,
+    ProbePositionsFileReader,
+    ProbePosition,
+)
 from ptychodus.api.typing import ComplexArrayType
 
 logger = logging.getLogger(__name__)
@@ -72,18 +76,18 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                 raise ValueError(f'Expected dataset at {self._data_path}, got {type(data)}.')
 
 
-class CXIPositionFileReader(PositionFileReader):
-    def read(self, file_path: Path) -> PositionSequence:
-        point_list: list[ScanPoint] = list()
+class CXIPositionFileReader(ProbePositionsFileReader):
+    def read(self, file_path: Path) -> ProbePositionSequence:
+        point_list: list[ProbePosition] = list()
 
         with h5py.File(file_path, 'r') as h5_file:
             xyz_m = h5_file['/entry_1/data_1/translation'][()]
 
             for idx, (x, y, z) in enumerate(xyz_m):
-                point = ScanPoint(idx, x, y)
+                point = ProbePosition(idx, x, y)
                 point_list.append(point)
 
-        return PositionSequence(point_list)
+        return ProbePositionSequence(point_list)
 
 
 class CXIProbeFileReader(ProbeFileReader):
@@ -105,7 +109,7 @@ def register_plugins(registry: PluginRegistry) -> None:
         simple_name=SIMPLE_NAME,
         display_name=DISPLAY_NAME,
     )
-    registry.position_file_readers.register_plugin(
+    registry.probe_positions_file_readers.register_plugin(
         CXIPositionFileReader(),
         simple_name=SIMPLE_NAME,
         display_name=DISPLAY_NAME,

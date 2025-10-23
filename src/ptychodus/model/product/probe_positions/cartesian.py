@@ -3,13 +3,13 @@ from enum import IntEnum
 
 import numpy
 
-from ptychodus.api.positions import PositionSequence, ScanPoint
+from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 
-from .builder import ScanBuilder
-from .settings import ScanSettings
+from .builder import ProbePositionsBuilder
+from .settings import ProbePositionsSettings
 
 
-class CartesianScanVariant(IntEnum):
+class CartesianProbePositionsVariant(IntEnum):
     RECTANGULAR_RASTER = 0x0
     RECTANGULAR_SNAKE = 0x1
     TRIANGULAR_RASTER = 0x2
@@ -32,8 +32,10 @@ class CartesianScanVariant(IntEnum):
         return self.value & 4 != 0
 
 
-class CartesianScanBuilder(ScanBuilder):
-    def __init__(self, variant: CartesianScanVariant, settings: ScanSettings) -> None:
+class CartesianProbePositionsBuilder(ProbePositionsBuilder):
+    def __init__(
+        self, variant: CartesianProbePositionsVariant, settings: ProbePositionsSettings
+    ) -> None:
         super().__init__(settings, variant.name.lower())
         self._variant = variant
         self._settings = settings
@@ -50,8 +52,8 @@ class CartesianScanBuilder(ScanBuilder):
         self.step_size_y_m = settings.step_size_y_m.copy()
         self._add_parameter('step_size_y_m', self.step_size_y_m)
 
-    def copy(self) -> CartesianScanBuilder:
-        builder = CartesianScanBuilder(self._variant, self._settings)
+    def copy(self) -> CartesianProbePositionsBuilder:
+        builder = CartesianProbePositionsBuilder(self._variant, self._settings)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
@@ -62,7 +64,7 @@ class CartesianScanBuilder(ScanBuilder):
     def is_equilateral(self) -> bool:
         return self._variant.is_equilateral
 
-    def build(self) -> PositionSequence:
+    def build(self) -> ProbePositionSequence:
         nx = self.num_points_x.get_value()
         ny = self.num_points_y.get_value()
         dx = self.step_size_x_m.get_value()
@@ -75,7 +77,7 @@ class CartesianScanBuilder(ScanBuilder):
         else:
             dy = self.step_size_y_m.get_value()
 
-        point_list: list[ScanPoint] = list()
+        point_list: list[ProbePosition] = list()
 
         for index in range(nx * ny):
             y, x = divmod(index, nx)
@@ -96,11 +98,11 @@ class CartesianScanBuilder(ScanBuilder):
                 else:
                     xf -= dx / 4
 
-            point = ScanPoint(
+            point = ProbePosition(
                 index=index,
-                position_x_m=xf,
-                position_y_m=yf,
+                coordinate_x_m=xf,
+                coordinate_y_m=yf,
             )
             point_list.append(point)
 
-        return PositionSequence(point_list)
+        return ProbePositionSequence(point_list)

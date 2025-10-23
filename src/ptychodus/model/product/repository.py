@@ -93,16 +93,16 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
         for observer in self._observer_list:
             observer.handle_metadata_changed(index, metadata)
 
-    def handle_scan_changed(self, item: ProductRepositoryItem) -> None:
+    def handle_probe_positions_changed(self, item: ProductRepositoryItem) -> None:
         index = item._index
-        scan = item.get_scan_item()
+        scan = item.get_probe_positions_item()
 
         if index < 0:
             logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
 
         for observer in self._observer_list:
-            observer.handle_scan_changed(index, scan)
+            observer.handle_probe_positions_changed(index, scan)
 
     def handle_probe_changed(self, item: ProductRepositoryItem) -> None:
         index = item._index

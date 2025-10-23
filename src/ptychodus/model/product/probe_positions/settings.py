@@ -4,10 +4,10 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
 
-class ScanSettings(Observable, Observer):
+class ProbePositionsSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._group = registry.create_group('Scan')
+        self._group = registry.create_group('ProbePositions')
         self._group.add_observer(self)
 
         self.builder = self._group.create_string_parameter('Builder', 'rectangular_raster')

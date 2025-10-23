@@ -25,7 +25,7 @@ from .image import ImageView
 from .product import ProductView
 from .reconstructor import ReconstructorView, ReconstructorPlotView
 from .repository import RepositoryTableView, RepositoryTreeView
-from .positions import PositionsPlotView
+from .probe_positions import ProbePositionsPlotView
 from .settings import SettingsView
 
 logger = logging.getLogger(__name__)
@@ -67,8 +67,8 @@ class ViewCore(QMainWindow):
         self.positions_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/positions'), 'Positions'
         )
-        self.positions_view = RepositoryTableView()
-        self.positions_plot_view = PositionsPlotView.create_instance()
+        self.probe_positions_view = RepositoryTableView()
+        self.probe_positions_plot_view = ProbePositionsPlotView.create_instance()
 
         self.probe_action = self.navigation_tool_bar.addAction(QIcon(':/icons/probe'), 'Probe')
         self.probe_view = RepositoryTreeView()
@@ -122,7 +122,7 @@ class ViewCore(QMainWindow):
         self.left_panel.addWidget(self.settings_view)
         self.left_panel.addWidget(self.patterns_view)
         self.left_panel.addWidget(self.product_view)
-        self.left_panel.addWidget(self.positions_view)
+        self.left_panel.addWidget(self.probe_positions_view)
         self.left_panel.addWidget(self.probe_view)
         self.left_panel.addWidget(self.object_view)
         self.left_panel.addWidget(self.reconstructor_view)
@@ -136,7 +136,7 @@ class ViewCore(QMainWindow):
         self.right_panel.addWidget(self.settings_table_view)
         self.right_panel.addWidget(self.patterns_image_view)
         self.right_panel.addWidget(self.product_diagram_view)
-        self.right_panel.addWidget(self.positions_plot_view)
+        self.right_panel.addWidget(self.probe_positions_plot_view)
         self.right_panel.addWidget(self.probe_image_view)
         self.right_panel.addWidget(self.object_image_view)
         self.right_panel.addWidget(self.reconstructor_plot_view)

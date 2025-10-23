@@ -7,7 +7,7 @@ from sys import getsizeof
 
 from .object import Object
 from .probe import ProbeSequence
-from .positions import PositionSequence
+from .probe_positions import ProbePositionSequence
 
 # Source: https://physics.nist.gov/cuu/Constants/index.html
 ELECTRON_VOLT_J: Final[float] = 1.602176634e-19
@@ -61,7 +61,7 @@ class LossValue:
 @dataclass(frozen=True)
 class Product:
     metadata: ProductMetadata
-    positions: PositionSequence
+    probe_positions: ProbePositionSequence
     probes: ProbeSequence
     object_: Object
     losses: Sequence[LossValue]
@@ -69,7 +69,7 @@ class Product:
     @property
     def nbytes(self) -> int:
         sz = self.metadata.nbytes
-        sz += self.positions.nbytes
+        sz += self.probe_positions.nbytes
         sz += self.probes.nbytes
         sz += self.object_.nbytes
         return sz

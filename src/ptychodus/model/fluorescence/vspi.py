@@ -11,7 +11,7 @@ from ptychodus.api.fluorescence import (
     FluorescenceDataset,
     FluorescenceEnhancingAlgorithm,
 )
-from ptychodus.api.object import ObjectPoint
+from ptychodus.api.object import ObjectPosition
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.product import Product
 from ptychodus.api.typing import RealArrayType
@@ -26,10 +26,10 @@ __all__ = [
 
 
 class ArrayPatchInterpolator:
-    def __init__(self, array: RealArrayType, point: ObjectPoint, shape: tuple[int, ...]) -> None:
+    def __init__(self, array: RealArrayType, point: ObjectPosition, shape: tuple[int, ...]) -> None:
         # top left corner of object support
-        xmin = point.position_x_px - shape[-1] / 2
-        ymin = point.position_y_px - shape[-2] / 2
+        xmin = point.coordinate_x_px - shape[-1] / 2
+        ymin = point.coordinate_y_px - shape[-2] / 2
 
         # whole components (pixel indexes)
         xmin_wh = int(xmin)
@@ -82,7 +82,7 @@ class VSPILinearOperator(LinearOperator):
         A[M,N] * X[N,P] = B[M,P]
         """
         object_geometry = product.object_.get_geometry()
-        M = len(product.positions)  # noqa: N806
+        M = len(product.probe_positions)  # noqa: N806
         N = object_geometry.height_px * object_geometry.width_px  # noqa: N806
         super().__init__(float, (M, N))
         self._product = product
@@ -90,12 +90,12 @@ class VSPILinearOperator(LinearOperator):
     def _matvec(self, x: RealArrayType) -> RealArrayType:  # noqa: N803
         object_geometry = self._product.object_.get_geometry()
         object_array = x.reshape((object_geometry.height_px, object_geometry.width_px))
-        AX = numpy.zeros(len(self._product.positions))  # noqa: N806
+        AX = numpy.zeros(len(self._product.probe_positions))  # noqa: N806
 
         for index, (scan_point, probe) in enumerate(
-            zip(self._product.positions, self._product.probes)
+            zip(self._product.probe_positions, self._product.probes)
         ):
-            object_point = object_geometry.map_scan_point_to_object_point(scan_point)
+            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
             probe_intensity = probe.get_intensity()
             psf = probe_intensity / probe_intensity.sum()
             interpolator = ArrayPatchInterpolator(object_array, object_point, psf.shape)
@@ -108,9 +108,9 @@ class VSPILinearOperator(LinearOperator):
         object_array = numpy.zeros((object_geometry.height_px, object_geometry.width_px))
 
         for index, (scan_point, probe) in enumerate(
-            zip(self._product.positions, self._product.probes)
+            zip(self._product.probe_positions, self._product.probes)
         ):
-            object_point = object_geometry.map_scan_point_to_object_point(scan_point)
+            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
             probe_intensity = probe.get_intensity()
             psf = probe_intensity / probe_intensity.sum()
             interpolator = ArrayPatchInterpolator(object_array, object_point, psf.shape)

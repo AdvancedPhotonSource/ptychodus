@@ -113,8 +113,8 @@ class ModelCore:
             self.settings_registry,
             self.diffraction_core.pattern_sizer,
             self.diffraction_core.dataset,
-            self._plugin_registry.position_file_readers,
-            self._plugin_registry.position_file_writers,
+            self._plugin_registry.probe_positions_file_readers,
+            self._plugin_registry.probe_positions_file_writers,
             self._plugin_registry.fresnel_zone_plates,
             self._plugin_registry.probe_file_readers,
             self._plugin_registry.probe_file_writers,
@@ -178,7 +178,7 @@ class ModelCore:
             self.settings_registry,
             self.diffraction_core.diffraction_api,
             self.product_core.product_api,
-            self.product_core.scan_api,
+            self.product_core.probe_positions_api,
             self.product_core.probe_api,
             self.product_core.object_api,
             self.reconstructor_core.reconstructor_api,
@@ -223,7 +223,7 @@ class ModelCore:
 
     def create_streaming_context(self, metadata: DiffractionMetadata) -> PtychodusStreamingContext:
         return PtychodusStreamingContext(
-            self.product_core.scan_api.create_streaming_context(),
+            self.product_core.probe_positions_api.create_streaming_context(),
             self.diffraction_core.diffraction_api.create_streaming_context(metadata),
         )
 

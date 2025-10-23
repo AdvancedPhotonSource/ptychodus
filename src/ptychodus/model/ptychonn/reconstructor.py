@@ -94,7 +94,9 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             upper=numpy.zeros_like(object_array), lower=numpy.zeros_like(object_array, dtype=float)
         )
 
-        for scan_point, object_patch_channels in zip(parameters.product.positions, object_patches):
+        for scan_point, object_patch_channels in zip(
+            parameters.product.probe_positions, object_patches
+        ):
             patch_array = numpy.exp(1j * object_patch_channels[0])
 
             if object_patch_channels.shape[0] == 2:
@@ -102,8 +104,10 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             else:
                 patch_array *= 0.5
 
-            object_point = object_geometry.map_scan_point_to_object_point(scan_point)
-            stitcher.add_patch(object_point.position_x_px, object_point.position_y_px, patch_array)
+            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
+            stitcher.add_patch(
+                object_point.coordinate_x_px, object_point.coordinate_y_px, patch_array
+            )
 
         object_ = Object(
             array=stitcher.stitch(),
@@ -115,7 +119,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
         product = Product(
             metadata=parameters.product.metadata,
-            positions=parameters.product.positions,
+            probe_positions=parameters.product.probe_positions,
             probes=parameters.product.probes,
             object_=object_,
             losses=losses,
@@ -144,15 +148,15 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             height_px=parameters.product.probes.height_px,
         )
         patches = numpy.zeros(
-            (len(parameters.product.positions), num_channels, *probe_extent.shape),
+            (len(parameters.product.probe_positions), num_channels, *probe_extent.shape),
             dtype=numpy.float32,
         )
 
-        for index, scan_point in enumerate(parameters.product.positions):
-            object_point = object_geometry.map_scan_point_to_object_point(scan_point)
+        for index, scan_point in enumerate(parameters.product.probe_positions):
+            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
             patch = interpolator.get_patch(
-                object_point.position_x_px,
-                object_point.position_y_px,
+                object_point.coordinate_x_px,
+                object_point.coordinate_y_px,
                 probe_extent.width_px,
                 probe_extent.height_px,
             )

@@ -4,14 +4,14 @@ from ..diffraction import AssembledDiffractionDataset
 from .geometry import ProductGeometry
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
-from .positions import ScanRepositoryItem
+from .probe_positions import ProbePositionsRepositoryItem
 
 
 class ProductValidator(Observable, Observer):  # TODO display
     def __init__(
         self,
         dataset: AssembledDiffractionDataset,
-        scan: ScanRepositoryItem,
+        scan: ProbePositionsRepositoryItem,
         geometry: ProductGeometry,
         probe: ProbeRepositoryItem,
         object_: ObjectRepositoryItem,
@@ -36,7 +36,7 @@ class ProductValidator(Observable, Observer):  # TODO display
         return self._is_object_valid
 
     def _validate_scan(self) -> None:
-        scan = self._scan.get_scan()
+        scan = self._scan.get_probe_positions()
         scan_indexes = set(point.index for point in scan)
         pattern_indexes = set(self._dataset.get_assembled_indexes())
         are_positions_valid_now = not scan_indexes.isdisjoint(pattern_indexes)

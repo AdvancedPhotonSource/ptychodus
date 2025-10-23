@@ -247,7 +247,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
 
             self._chunk_length_view_controller = SpinBoxParameterViewController(
                 dm_settings.chunk_length,
-                tool_tip='Number of scan positions used in each chunk of the exit wave update loop',
+                tool_tip='Number of probe positions used in each chunk of the exit wave update loop',
             )
             layout.addRow('Chunk Length:', self._chunk_length_view_controller.get_widget())
 

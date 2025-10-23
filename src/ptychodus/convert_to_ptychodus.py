@@ -62,6 +62,12 @@ def main() -> int:
         help='List available diffraction and scan plugins, then exit.',
     )
     parser.add_argument(
+        '--override-object',
+        metavar='OBJECT_FILE',
+        type=argparse.FileType('r'),
+        help='Path to the object file.',
+    )
+    parser.add_argument(
         '--override-probe',
         metavar='PROBE_FILE',
         type=argparse.FileType('r'),
@@ -137,7 +143,11 @@ def main() -> int:
             args.product_input.name, file_type=PRODUCT_FILE_TYPE
         )
 
-        # FIXME optionally rename product
+        if args.rename_product is not None:
+            product_api.rename_product(args.rename_product)
+
+        if args.override_object is not None:
+            product_api.open_object(Path(args.override_object.name))
 
         if args.override_probe is not None:
             product_api.open_probe(Path(args.override_probe.name))

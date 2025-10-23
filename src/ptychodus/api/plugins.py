@@ -21,7 +21,11 @@ from .observer import Observable, Observer
 from .parametric import StringParameter
 from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter, ProbeSequence
 from .product import ProductFileReader, ProductFileWriter
-from .positions import PositionFileReader, PositionFileWriter, PositionSequence
+from .probe_positions import (
+    ProbePositionsFileReader,
+    ProbePositionsFileWriter,
+    ProbePositionSequence,
+)
 from .workflow import FileBasedWorkflow
 
 __all__ = [
@@ -34,14 +38,14 @@ T = TypeVar('T')
 logger = logging.getLogger(__name__)
 
 
-class ProductPositionFileReader(PositionFileReader):
+class ProductProbePositionsFileReader(ProbePositionsFileReader):
     def __init__(self, reader: ProductFileReader) -> None:
         super().__init__()
         self._reader = reader
 
-    def read(self, file_path: Path) -> PositionSequence:
+    def read(self, file_path: Path) -> ProbePositionSequence:
         product = self._reader.read(file_path)
-        return product.positions
+        return product.probe_positions
 
 
 class ProductProbeFileReader(ProbeFileReader):
@@ -130,8 +134,8 @@ class PluginRegistry:
         self.bad_pixels_file_readers = PluginChooser[BadPixelsFileReader]()
         self.diffraction_file_readers = PluginChooser[DiffractionFileReader]()
         self.diffraction_file_writers = PluginChooser[DiffractionFileWriter]()
-        self.position_file_readers = PluginChooser[PositionFileReader]()
-        self.position_file_writers = PluginChooser[PositionFileWriter]()
+        self.probe_positions_file_readers = PluginChooser[ProbePositionsFileReader]()
+        self.probe_positions_file_writers = PluginChooser[ProbePositionsFileWriter]()
         self.fresnel_zone_plates = PluginChooser[FresnelZonePlate]()
         self.probe_file_readers = PluginChooser[ProbeFileReader]()
         self.probe_file_writers = PluginChooser[ProbeFileWriter]()
@@ -148,8 +152,10 @@ class PluginRegistry:
     def register_product_file_reader_with_adapters(
         self, strategy: ProductFileReader, *, display_name: str, simple_name: str = ''
     ) -> None:
-        self.position_file_readers.register_plugin(
-            ProductPositionFileReader(strategy), display_name=display_name, simple_name=simple_name
+        self.probe_positions_file_readers.register_plugin(
+            ProductProbePositionsFileReader(strategy),
+            display_name=display_name,
+            simple_name=simple_name,
         )
         self.probe_file_readers.register_plugin(
             ProductProbeFileReader(strategy), display_name=display_name, simple_name=simple_name

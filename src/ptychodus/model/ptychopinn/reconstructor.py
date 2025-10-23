@@ -42,10 +42,10 @@ def create_raw_data(parameters: ReconstructInput) -> RawData:
     position_x_px: list[float] = list()
     position_y_px: list[float] = list()
 
-    for scan_point in parameters.product.positions:
-        object_point = object_geometry.map_scan_point_to_object_point(scan_point)
-        position_x_px.append(object_point.position_x_px)
-        position_y_px.append(object_point.position_y_px)
+    for scan_point in parameters.product.probe_positions:
+        object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
+        position_x_px.append(object_point.coordinate_x_px)
+        position_y_px.append(object_point.coordinate_y_px)
 
     return RawData.from_coords_without_pc(
         xcoords=numpy.array(position_x_px),
@@ -53,7 +53,7 @@ def create_raw_data(parameters: ReconstructInput) -> RawData:
         diff3d=parameters.diffraction_patterns,
         probeGuess=parameters.product.probes.get_probe_no_opr().get_incoherent_mode(0),
         # assume that all patches are from the same object
-        scan_index=numpy.zeros(len(parameters.product.positions), dtype=int),
+        scan_index=numpy.zeros(len(parameters.product.probe_positions), dtype=int),
         objectGuess=parameters.product.object_.get_layer(0),
     )
 
@@ -171,7 +171,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
         product = Product(
             metadata=parameters.product.metadata,
-            positions=parameters.product.positions,
+            probe_positions=parameters.product.probe_positions,
             probes=parameters.product.probes,
             object_=object_out,
             losses=losses,
@@ -204,10 +204,10 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         position_x_px: list[float] = list()
         position_y_px: list[float] = list()
 
-        for scan_point in parameters.product.positions:
-            object_point = object_geometry.map_scan_point_to_object_point(scan_point)
-            position_x_px.append(object_point.position_x_px)
-            position_y_px.append(object_point.position_y_px)
+        for scan_point in parameters.product.probe_positions:
+            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
+            position_x_px.append(object_point.coordinate_x_px)
+            position_y_px.append(object_point.coordinate_y_px)
 
         xcoords = numpy.array(position_x_px)
         ycoords = numpy.array(position_y_px)
@@ -222,7 +222,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             probeGuess=parameters.product.probes.get_probe_no_opr().get_incoherent_mode(0),
             # assume that all patches are from the same object
             objectGuess=parameters.product.object_.get_layer(0),
-            scan_index=numpy.zeros(len(parameters.product.positions), dtype=int),
+            scan_index=numpy.zeros(len(parameters.product.probe_positions), dtype=int),
         )
 
     def get_training_data_path(self) -> Path:

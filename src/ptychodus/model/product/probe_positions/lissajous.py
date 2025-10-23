@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.positions import PositionSequence, ScanPoint
+from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 
-from .builder import ScanBuilder
-from .settings import ScanSettings
+from .builder import ProbePositionsBuilder
+from .settings import ProbePositionsSettings
 
 
-class LissajousScanBuilder(ScanBuilder):
-    def __init__(self, settings: ScanSettings) -> None:
+class LissajousProbePositionsBuilder(ProbePositionsBuilder):
+    def __init__(self, settings: ProbePositionsSettings) -> None:
         super().__init__(settings, 'lissajous')
         self._settings = settings
 
@@ -38,16 +38,16 @@ class LissajousScanBuilder(ScanBuilder):
         self.angular_shift_turns = settings.angular_shift_turns.copy()
         self._add_parameter('angular_shift_tr', self.angular_shift_turns)
 
-    def copy(self) -> LissajousScanBuilder:
-        builder = LissajousScanBuilder(self._settings)
+    def copy(self) -> LissajousProbePositionsBuilder:
+        builder = LissajousProbePositionsBuilder(self._settings)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
-    def build(self) -> PositionSequence:
-        point_list: list[ScanPoint] = list()
+    def build(self) -> ProbePositionSequence:
+        point_list: list[ProbePosition] = list()
 
         for index in range(self.num_points.get_value()):
             two_pi = 2 * numpy.pi
@@ -57,11 +57,11 @@ class LissajousScanBuilder(ScanBuilder):
             )
             theta_y = two_pi * self.angular_step_y_turns.get_value() * index
 
-            point = ScanPoint(
+            point = ProbePosition(
                 index=index,
-                position_x_m=self.amplitude_x_m.get_value() * numpy.sin(theta_x),
-                position_y_m=self.amplitude_y_m.get_value() * numpy.sin(theta_y),
+                coordinate_x_m=self.amplitude_x_m.get_value() * numpy.sin(theta_x),
+                coordinate_y_m=self.amplitude_y_m.get_value() * numpy.sin(theta_y),
             )
             point_list.append(point)
 
-        return PositionSequence(point_list)
+        return ProbePositionSequence(point_list)

@@ -6,29 +6,29 @@ import numpy
 
 from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.positions import PositionSequence, ScanBoundingBox, ScanPoint
+from ptychodus.api.probe_positions import ProbePositionSequence, ScanBoundingBox, ProbePosition
 
 from .bounding_box import ScanBoundingBoxBuilder
-from .builder import FromMemoryScanBuilder, ScanBuilder
-from .settings import ScanSettings
-from .transform import ScanPointTransform
+from .builder import FromMemoryProbePositionsBuilder, ProbePositionsBuilder
+from .settings import ProbePositionsSettings
+from .transform import ProbePositionTransform
 
 logger = logging.getLogger(__name__)
 
 
-class ScanRepositoryItem(ParameterGroup):
+class ProbePositionsRepositoryItem(ParameterGroup):
     def __init__(
         self,
-        settings: ScanSettings,
-        builder: ScanBuilder,
-        transform: ScanPointTransform,
+        settings: ProbePositionsSettings,
+        builder: ProbePositionsBuilder,
+        transform: ProbePositionTransform,
     ) -> None:
         super().__init__()
         self._settings = settings
         self._builder = builder
         self._transform = transform
-        self._untransformed_scan = PositionSequence()
-        self._transformed_scan = PositionSequence()
+        self._untransformed_scan = ProbePositionSequence()
+        self._transformed_scan = ProbePositionSequence()
         self._bbox_builder = ScanBoundingBoxBuilder()
         self._length_m = 0.0
 
@@ -52,7 +52,7 @@ class ScanRepositoryItem(ParameterGroup):
 
         self._rebuild()
 
-    def assign_item(self, item: ScanRepositoryItem) -> None:
+    def assign_item(self, item: ProbePositionsRepositoryItem) -> None:
         group = 'transform'
 
         self._remove_group(group)
@@ -67,8 +67,8 @@ class ScanRepositoryItem(ParameterGroup):
         self.set_builder(item.get_builder().copy())
         self._rebuild()
 
-    def assign(self, scan: PositionSequence) -> None:
-        builder = FromMemoryScanBuilder(self._settings, scan)
+    def assign(self, scan: ProbePositionSequence) -> None:
+        builder = FromMemoryProbePositionsBuilder(self._settings, scan)
         self.set_builder(builder)
 
     def sync_to_settings(self) -> None:
@@ -78,13 +78,13 @@ class ScanRepositoryItem(ParameterGroup):
         self._builder.sync_to_settings()
         self._transform.sync_to_settings()
 
-    def get_scan(self) -> PositionSequence:
+    def get_probe_positions(self) -> ProbePositionSequence:
         return self._transformed_scan
 
-    def get_builder(self) -> ScanBuilder:
+    def get_builder(self) -> ProbePositionsBuilder:
         return self._builder
 
-    def set_builder(self, builder: ScanBuilder) -> None:
+    def set_builder(self, builder: ProbePositionsBuilder) -> None:
         group = 'builder'
         self._remove_group(group)
         self._builder.remove_observer(self)
@@ -111,7 +111,7 @@ class ScanRepositoryItem(ParameterGroup):
         return self._length_m
 
     def _transform_scan(self) -> None:
-        transformed_points: list[ScanPoint] = list()
+        transformed_points: list[ProbePosition] = list()
         bbox_builder = ScanBoundingBoxBuilder()
         length_m = 0.0
 
@@ -121,11 +121,11 @@ class ScanRepositoryItem(ParameterGroup):
             bbox_builder.hull(transformed_point)
 
         for point_l, point_r in pairwise(transformed_points):
-            dx = point_r.position_x_m - point_l.position_x_m
-            dy = point_r.position_y_m - point_l.position_y_m
+            dx = point_r.coordinate_x_m - point_l.coordinate_x_m
+            dy = point_r.coordinate_y_m - point_l.coordinate_y_m
             length_m += numpy.hypot(dx, dy)
 
-        self._transformed_scan = PositionSequence(transformed_points)
+        self._transformed_scan = ProbePositionSequence(transformed_points)
         self._bbox_builder = bbox_builder
         self._length_m = length_m
         self.notify_observers()
@@ -140,7 +140,7 @@ class ScanRepositoryItem(ParameterGroup):
         self._untransformed_scan = scan
         self._transform_scan()
 
-    def get_transform(self) -> ScanPointTransform:
+    def get_transform(self) -> ProbePositionTransform:
         return self._transform
 
     def _update(self, observable: Observable) -> None:
