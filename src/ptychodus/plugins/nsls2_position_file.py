@@ -7,14 +7,14 @@ import h5py
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
-    ProbePositionsFileReader,
+    ProbePositionFileReader,
     ProbePosition,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class NSLS2Style1PositionFileReader(ProbePositionsFileReader):
+class NSLS2Style1PositionFileReader(ProbePositionFileReader):
     ONE_MICRON_M: Final[float] = 1.0e-6
 
     def read(self, file_path: Path) -> ProbePositionSequence:
@@ -34,7 +34,7 @@ class NSLS2Style1PositionFileReader(ProbePositionsFileReader):
         return ProbePositionSequence(point_list)
 
 
-class NSLS2Style2PositionFileReader(ProbePositionsFileReader):
+class NSLS2Style2PositionFileReader(ProbePositionFileReader):
     ONE_MICRON_M: Final[float] = 1.0e-6
 
     def read(self, file_path: Path) -> ProbePositionSequence:
@@ -55,12 +55,12 @@ class NSLS2Style2PositionFileReader(ProbePositionsFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         NSLS2Style1PositionFileReader(),
         simple_name='NSLS_II_1',
         display_name='NSLS-II Style 1 Files (*.h5 *.hdf5)',
     )
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         NSLS2Style2PositionFileReader(),
         simple_name='NSLS_II_2',
         display_name='NSLS-II Style 2 Files (*.h5 *.hdf5)',

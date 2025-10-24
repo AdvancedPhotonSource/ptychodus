@@ -7,7 +7,7 @@ import logging
 from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
-    ProbePositionsFileReader,
+    ProbePositionFileReader,
     ProbePosition,
 )
 
@@ -58,7 +58,7 @@ class FromFileProbePositionsBuilder(ProbePositionsBuilder):
         settings: ProbePositionsSettings,
         file_path: Path,
         file_type: str,
-        file_reader: ProbePositionsFileReader,
+        file_reader: ProbePositionFileReader,
     ) -> None:
         super().__init__(settings, 'from_file')
         self._settings = settings

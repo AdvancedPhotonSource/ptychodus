@@ -22,7 +22,7 @@ import numpy.typing
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
-    ProbePositionsFileReader,
+    ProbePositionFileReader,
     ProbePosition,
 )
 
@@ -451,7 +451,7 @@ class MDAFile:
         return yaml.safe_dump(self.to_mapping(), sort_keys=False)
 
 
-class MDAPositionFileReader(ProbePositionsFileReader):
+class MDAPositionFileReader(ProbePositionFileReader):
     def __init__(self, scale_to_meters: float) -> None:
         self._scale_to_meters = scale_to_meters
 
@@ -477,7 +477,7 @@ class MDAPositionFileReader(ProbePositionsFileReader):
         return ProbePositionSequence(point_list)
 
 
-class MDAFlatScanPositionFileReader(ProbePositionsFileReader):
+class MDAFlatScanPositionFileReader(ProbePositionFileReader):
     def __init__(self, scale_to_meters: float) -> None:
         self._scale_to_meters = scale_to_meters
 
@@ -500,32 +500,32 @@ class MDAFlatScanPositionFileReader(ProbePositionsFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         MDAPositionFileReader(scale_to_meters=1.0e-6),
         simple_name='MDA',
         display_name='EPICS MDA Files (*.mda)',
     )
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         MDAPositionFileReader(scale_to_meters=1.0e-3),
         simple_name='APS_2IDD',
         display_name='APS 2-ID-D Microprobe Files (*.mda)',
     )
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         MDAPositionFileReader(scale_to_meters=1.0e-3),
         simple_name='APS_2IDE',
         display_name='APS 2-ID-E Microprobe Files (*.mda)',
     )
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         MDAPositionFileReader(scale_to_meters=1.0e-6),
         simple_name='APS_BNP',
         display_name='APS 2-ID-D Bionanoprobe Files (*.h5 *.hdf5)',
     )
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         MDAFlatScanPositionFileReader(scale_to_meters=1.0e-3),
         simple_name='APS_ISN_MDA',
         display_name='APS 19-ID In-Situ Nanoprobe Files (*.mda)',
     )
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         MDAFlatScanPositionFileReader(scale_to_meters=1.0e-6),
         simple_name='CNM_APS_HXN',
         display_name='CNM/APS Hard X-ray Nanoprobe Files (*.mda)',

@@ -77,6 +77,7 @@ class WorkflowAPI(ABC):
         file_path: Path,
         *,
         file_type: str | None = None,
+        process_patterns: bool | None = None,
         crop_center: CropCenter | None = None,
         crop_extent: ImageExtent | None = None,
         detector_extent: ImageExtent | None = None,

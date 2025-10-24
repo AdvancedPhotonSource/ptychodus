@@ -8,7 +8,7 @@ import numpy
 
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
-    ProbePositionsFileReader,
+    ProbePositionFileReader,
     ProbePosition,
     ProbePositionParseError,
 )
@@ -26,7 +26,7 @@ class VelociprobePositionFileColumn(IntEnum):
     TRIGGER = 7
 
 
-class VelociprobePositionFileReader(ProbePositionsFileReader):
+class VelociprobePositionFileReader(ProbePositionFileReader):
     ONE_NANOMETER_M: Final[float] = 1.0e-9
 
     def __init__(self, diffraction_reader: VelociprobeDiffractionFileReader, y_column: int) -> None:

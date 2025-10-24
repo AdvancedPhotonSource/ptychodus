@@ -41,12 +41,12 @@ from .workflow import ConcreteWorkflowAPI
 logger = logging.getLogger(__name__)
 
 
-def configure_logger(is_developer_mode_enabled: bool) -> None:
+def configure_logger(*, log_level: int) -> None:
     logging.basicConfig(
         format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
         stream=sys.stdout,
         encoding='utf-8',
-        level=logging.DEBUG if is_developer_mode_enabled else logging.INFO,
+        level=log_level,
     )
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
@@ -90,11 +90,12 @@ class PtychodusStreamingContext:
 
 class ModelCore:
     def __init__(
-        self, settings_file: Path | None = None, *, is_developer_mode_enabled: bool = False
+        self, settings_file: Path | None = None, *, log_level: int = logging.WARNING
     ) -> None:
-        configure_logger(is_developer_mode_enabled)
+        configure_logger(log_level=log_level)
+
         self.rng = numpy.random.default_rng()
-        self._plugin_registry = PluginRegistry.load_plugins()
+        self.plugin_registry = PluginRegistry.load_plugins()
         self._task_manager = TaskManager()
 
         self.memory_presenter = MemoryPresenter()
@@ -103,9 +104,9 @@ class ModelCore:
         self.diffraction_core = DiffractionCore(
             self._task_manager,
             self.settings_registry,
-            self._plugin_registry.bad_pixels_file_readers,
-            self._plugin_registry.diffraction_file_readers,
-            self._plugin_registry.diffraction_file_writers,
+            self.plugin_registry.bad_pixels_file_readers,
+            self.plugin_registry.diffraction_file_readers,
+            self.plugin_registry.diffraction_file_writers,
             self.settings_registry,
         )
         self.product_core = ProductCore(
@@ -113,15 +114,15 @@ class ModelCore:
             self.settings_registry,
             self.diffraction_core.pattern_sizer,
             self.diffraction_core.dataset,
-            self._plugin_registry.probe_positions_file_readers,
-            self._plugin_registry.probe_positions_file_writers,
-            self._plugin_registry.fresnel_zone_plates,
-            self._plugin_registry.probe_file_readers,
-            self._plugin_registry.probe_file_writers,
-            self._plugin_registry.object_file_readers,
-            self._plugin_registry.object_file_writers,
-            self._plugin_registry.product_file_readers,
-            self._plugin_registry.product_file_writers,
+            self.plugin_registry.probe_position_file_readers,
+            self.plugin_registry.probe_position_file_writers,
+            self.plugin_registry.fresnel_zone_plates,
+            self.plugin_registry.probe_file_readers,
+            self.plugin_registry.probe_file_writers,
+            self.plugin_registry.object_file_readers,
+            self.plugin_registry.object_file_writers,
+            self.plugin_registry.product_file_readers,
+            self.plugin_registry.product_file_writers,
             self.settings_registry,
         )
         self.metadata_presenter = MetadataPresenter(
@@ -136,13 +137,15 @@ class ModelCore:
         self.object_visualization_engine = VisualizationEngine(is_complex=True)
 
         self.ptychi_reconstructor_library = PtyChiReconstructorLibrary(
-            self.settings_registry, self.diffraction_core.pattern_sizer, is_developer_mode_enabled
+            self.settings_registry,
+            self.diffraction_core.pattern_sizer,
+            self.is_developer_mode_enabled,
         )
         self.ptychonn_reconstructor_library = PtychoNNReconstructorLibrary.create_instance(
-            self.settings_registry, is_developer_mode_enabled
+            self.settings_registry, self.is_developer_mode_enabled
         )
         self.ptychopinn_reconstructor_library = PtychoPINNReconstructorLibrary(
-            self.settings_registry, is_developer_mode_enabled
+            self.settings_registry, self.is_developer_mode_enabled
         )
         self.reconstructor_core = ReconstructorCore(
             self._task_manager,
@@ -158,10 +161,10 @@ class ModelCore:
         self.fluorescence_core = FluorescenceCore(
             self.settings_registry,
             self.product_core.product_repository,
-            self._plugin_registry.upscaling_strategies,
-            self._plugin_registry.deconvolution_strategies,
-            self._plugin_registry.fluorescence_file_readers,
-            self._plugin_registry.fluorescence_file_writers,
+            self.plugin_registry.upscaling_strategies,
+            self.plugin_registry.deconvolution_strategies,
+            self.plugin_registry.fluorescence_file_readers,
+            self.plugin_registry.fluorescence_file_writers,
         )
         self.analysis_core = AnalysisCore(
             self.settings_registry,
@@ -187,7 +190,7 @@ class ModelCore:
         self.automation_core = AutomationCore(
             self.settings_registry,
             self.workflow_api,
-            self._plugin_registry.file_based_workflows,
+            self.plugin_registry.file_based_workflows,
         )
         self.agent_core = AgentCore(self.settings_registry)
 
@@ -265,3 +268,7 @@ class ModelCore:
             return -1
 
         return 0
+
+    @property
+    def is_developer_mode_enabled(self) -> bool:
+        return logger.getEffectiveLevel() <= logging.DEBUG

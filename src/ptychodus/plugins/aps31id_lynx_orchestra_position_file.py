@@ -6,7 +6,7 @@ import logging
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
-    ProbePositionsFileReader,
+    ProbePositionFileReader,
     ProbePosition,
     ProbePositionParseError,
 )
@@ -14,7 +14,7 @@ from ptychodus.api.probe_positions import (
 logger = logging.getLogger(__name__)
 
 
-class LYNXOrchestraPositionFileReader(ProbePositionsFileReader):
+class LYNXOrchestraPositionFileReader(ProbePositionFileReader):
     SIMPLE_NAME: Final[str] = 'APS_LYNX_Orchestra'
     DISPLAY_NAME: Final[str] = 'APS 31-ID-E LYNX Orchestra Files (*.dat)'
     ONE_MICRON_M: Final[float] = 1.0e-6
@@ -87,7 +87,7 @@ class LYNXOrchestraPositionFileReader(ProbePositionsFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         LYNXOrchestraPositionFileReader(),
         simple_name=LYNXOrchestraPositionFileReader.SIMPLE_NAME,
         display_name=LYNXOrchestraPositionFileReader.DISPLAY_NAME,

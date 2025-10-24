@@ -217,7 +217,7 @@ class H5DiffractionFileWriter(DiffractionFileWriter):
         data = numpy.concatenate([array.get_patterns() for array in dataset])
 
         with h5py.File(file_path, 'w') as h5_file:
-            h5_file.create_dataset(self._data_path, data=data, compression='gzip')
+            h5_file.create_dataset(self._data_path, data=data, compression='lzf')
 
 
 def register_plugins(registry: PluginRegistry) -> None:

@@ -4,14 +4,14 @@ import csv
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
-    ProbePositionsFileReader,
-    ProbePositionsFileWriter,
+    ProbePositionFileReader,
+    ProbePositionFileWriter,
     ProbePosition,
     ProbePositionParseError,
 )
 
 
-class DelimitedPositionFileReader(ProbePositionsFileReader):
+class DelimitedPositionFileReader(ProbePositionFileReader):
     def __init__(self, delimiter: str, *, swap_xy: bool) -> None:
         self._delimiter = delimiter
         self._swap_xy = swap_xy
@@ -42,7 +42,7 @@ class DelimitedPositionFileReader(ProbePositionsFileReader):
         return ProbePositionSequence(point_list)
 
 
-class DelimitedPositionFileWriter(ProbePositionsFileWriter):
+class DelimitedPositionFileWriter(ProbePositionFileWriter):
     def __init__(self, delimiter: str, swap_xy: bool) -> None:
         self._delimiter = delimiter
         self._swap_xy = swap_xy
@@ -59,22 +59,22 @@ class DelimitedPositionFileWriter(ProbePositionsFileWriter):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         DelimitedPositionFileReader(' ', swap_xy=False),
         simple_name='TXT',
         display_name='Space-Separated Values Files (*.txt)',
     )
-    registry.probe_positions_file_writers.register_plugin(
+    registry.probe_position_file_writers.register_plugin(
         DelimitedPositionFileWriter(' ', swap_xy=False),
         simple_name='TXT',
         display_name='Space-Separated Values Files (*.txt)',
     )
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         DelimitedPositionFileReader(',', swap_xy=True),
         simple_name='CSV',
         display_name='Comma-Separated Values Files (*.csv)',
     )
-    registry.probe_positions_file_writers.register_plugin(
+    registry.probe_position_file_writers.register_plugin(
         DelimitedPositionFileWriter(',', swap_xy=True),
         simple_name='CSV',
         display_name='Comma-Separated Values Files (*.csv)',

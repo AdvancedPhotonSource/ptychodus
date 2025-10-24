@@ -5,8 +5,8 @@ import logging
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
-    ProbePositionsFileReader,
-    ProbePositionsFileWriter,
+    ProbePositionFileReader,
+    ProbePositionFileWriter,
 )
 
 from .builder import FromFileProbePositionsBuilder, ProbePositionsBuilder
@@ -23,8 +23,8 @@ class ProbePositionsBuilderFactory(Iterable[str]):
     def __init__(
         self,
         settings: ProbePositionsSettings,
-        file_reader_chooser: PluginChooser[ProbePositionsFileReader],
-        file_writer_chooser: PluginChooser[ProbePositionsFileWriter],
+        file_reader_chooser: PluginChooser[ProbePositionFileReader],
+        file_writer_chooser: PluginChooser[ProbePositionFileWriter],
     ) -> None:
         self._settings = settings
         self._file_reader_chooser = file_reader_chooser

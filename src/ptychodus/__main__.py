@@ -29,13 +29,7 @@ def main() -> int:
         '-b',
         '--batch',
         choices=('reconstruct', 'train'),
-        help='run action non-interactively',
-    )
-    parser.add_argument(
-        '-d',
-        '--dev',
-        action='store_true',
-        help=argparse.SUPPRESS,
+        help='Run action non-interactively',
     )
     parser.add_argument(
         '--fluorescence-input',
@@ -50,24 +44,27 @@ def main() -> int:
         help=argparse.SUPPRESS,
     )
     parser.add_argument(
-        '-i',
-        '--input',
+        '--batch-input',
         metavar='INPUT_FILE',
         type=argparse.FileType('r'),
-        help='input file (batch mode)',
+        help='Path to the input file (batch mode)',
     )
     parser.add_argument(
-        '-o',
-        '--output',
+        '--log-level',
+        type=int,
+        default=logging.INFO,
+        help='Set Python logging level.',
+    )
+    parser.add_argument(
+        '--batch-output',
         metavar='OUTPUT_FILE',
         type=argparse.FileType('w'),
-        help='output file (batch mode)',
+        help='Path to the output file (batch mode)',
     )
     parser.add_argument(
         # preprocessed diffraction patterns file (batch mode)
-        '-p',
-        '--patterns',
-        metavar='PATTERNS_FILE',
+        '--diffraction-input',
+        metavar='DIFFRACTION_INPUT_FILE',
         type=argparse.FileType('r'),
         help=argparse.SUPPRESS,
     )
@@ -75,7 +72,7 @@ def main() -> int:
         '-s',
         '--settings',
         metavar='SETTINGS_FILE',
-        help='use settings from file',
+        help='Path to the settings file.',
         type=argparse.FileType('r'),
     )
     parser.add_argument(
@@ -88,21 +85,21 @@ def main() -> int:
     parsed_args, unparsed_args = parser.parse_known_args()
     settings_file = Path(parsed_args.settings.name) if parsed_args.settings else None
 
-    with ModelCore(settings_file, is_developer_mode_enabled=parsed_args.dev) as model:
-        if parsed_args.patterns is not None:
-            patterns_file_path = Path(parsed_args.patterns.name)
-            model.workflow_api.import_assembled_patterns(patterns_file_path)
+    with ModelCore(settings_file, log_level=parsed_args.log_level) as model:
+        if parsed_args.diffraction_input is not None:
+            diffraction_file_path = Path(parsed_args.diffraction_input.name)
+            model.workflow_api.import_assembled_patterns(diffraction_file_path)
 
         if parsed_args.batch is not None:
             verify_all_arguments_parsed(parser, unparsed_args)
 
-            if parsed_args.input is None or parsed_args.output is None:
+            if parsed_args.batch_input is None or parsed_args.batch_output is None:
                 parser.error('Batch mode requires input and output arguments!')
                 return -1
 
             action = parsed_args.batch
-            input_file_path = Path(parsed_args.input.name)
-            output_file_path = Path(parsed_args.output.name)
+            input_file_path = Path(parsed_args.batch_input.name)
+            output_file_path = Path(parsed_args.batch_output.name)
             fluorescence_input_file_path: Path | None = None
             fluorescence_output_file_path: Path | None = None
 
@@ -136,7 +133,9 @@ def main() -> int:
 
         from ptychodus.controller import ControllerCore
 
-        controller = ControllerCore(model, view, is_developer_mode_enabled=parsed_args.dev)
+        controller = ControllerCore(
+            model, view, is_developer_mode_enabled=model.is_developer_mode_enabled
+        )
         controller.show_main_window(version_string())
 
         return app.exec()

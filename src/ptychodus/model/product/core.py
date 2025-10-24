@@ -5,7 +5,7 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter
 from ptychodus.api.product import ProductFileReader, ProductFileWriter
-from ptychodus.api.probe_positions import ProbePositionsFileReader, ProbePositionsFileWriter
+from ptychodus.api.probe_positions import ProbePositionFileReader, ProbePositionFileWriter
 from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import AssembledDiffractionDataset, PatternSizer
@@ -32,8 +32,8 @@ class ProductCore(Observer):
         settings_registry: SettingsRegistry,
         pattern_sizer: PatternSizer,
         dataset: AssembledDiffractionDataset,
-        scan_file_reader_chooser: PluginChooser[ProbePositionsFileReader],
-        scan_file_writer_chooser: PluginChooser[ProbePositionsFileWriter],
+        scan_file_reader_chooser: PluginChooser[ProbePositionFileReader],
+        scan_file_writer_chooser: PluginChooser[ProbePositionFileWriter],
         fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
         probe_file_reader_chooser: PluginChooser[ProbeFileReader],
         probe_file_writer_chooser: PluginChooser[ProbeFileWriter],

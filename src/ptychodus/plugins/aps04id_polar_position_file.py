@@ -7,7 +7,7 @@ import h5py
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
-    ProbePositionsFileReader,
+    ProbePositionFileReader,
     ProbePosition,
     ProbePositionParseError,
 )
@@ -15,7 +15,7 @@ from ptychodus.api.probe_positions import (
 logger = logging.getLogger(__name__)
 
 
-class PolarPositionFileReader(ProbePositionsFileReader):
+class PolarPositionFileReader(ProbePositionFileReader):
     ONE_MICRON_M: Final[float] = 1.0e-6
 
     def read(self, file_path: Path) -> ProbePositionSequence:
@@ -45,7 +45,7 @@ class PolarPositionFileReader(ProbePositionsFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         PolarPositionFileReader(),
         simple_name='APS_Polar',
         display_name='APS 4-ID Polar Files (*.h5 *.hdf5)',

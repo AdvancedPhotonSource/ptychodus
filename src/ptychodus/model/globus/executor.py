@@ -59,7 +59,7 @@ class GlobusExecutor:
         output_data_globus_path = f'{self._output_data_locator.get_globus_path()}/{flow_label}'
 
         settings_file = 'settings.ini'
-        patterns_file = 'patterns.h5'
+        diffraction_file = 'diffraction.h5'
         input_file = 'product-in.h5'
         output_file = 'product-out.h5'
 
@@ -70,7 +70,7 @@ class GlobusExecutor:
             return
 
         self._settings_registry.save_settings(input_data_posix_path / settings_file)
-        self._diffraction_api.export_assembled_patterns(input_data_posix_path / patterns_file)
+        self._diffraction_api.export_assembled_patterns(input_data_posix_path / diffraction_file)
         self._product_api.save_product(
             input_product_index, input_data_posix_path / input_file, file_type='HDF5'
         )
@@ -87,7 +87,7 @@ class GlobusExecutor:
             'compute_endpoint': str(self._settings.compute_endpoint_id.get_value()),
             'ptychodus_action': ptychodus_action,
             'ptychodus_settings_file': str(compute_data_posix_path / settings_file),
-            'ptychodus_patterns_file': str(compute_data_posix_path / patterns_file),
+            'ptychodus_diffraction_file': str(compute_data_posix_path / diffraction_file),
             'ptychodus_input_file': str(compute_data_posix_path / input_file),
             'ptychodus_output_file': str(compute_data_posix_path / output_file),
             'output_data_transfer_source_endpoint': str(

@@ -7,7 +7,7 @@ import numpy
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
-    ProbePositionsFileReader,
+    ProbePositionFileReader,
     ProbePosition,
     ProbePositionParseError,
 )
@@ -15,7 +15,7 @@ from ptychodus.api.probe_positions import (
 logger = logging.getLogger(__name__)
 
 
-class PtychoShelvesPositionFileReader(ProbePositionsFileReader):
+class PtychoShelvesPositionFileReader(ProbePositionFileReader):
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
 
@@ -39,7 +39,7 @@ class PtychoShelvesPositionFileReader(ProbePositionsFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         PtychoShelvesPositionFileReader(),
         simple_name='PtychoShelves',
         display_name='PtychoShelves Files (*.h5 *.hdf5)',

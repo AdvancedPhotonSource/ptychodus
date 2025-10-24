@@ -30,7 +30,7 @@ class PatternsStreamingContext:
     def start(self) -> None:
         contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
         stream_dataset = SimpleDiffractionDataset(self._metadata, contents_tree, [])
-        self._dataset.reload(stream_dataset)
+        self._dataset.reload(stream_dataset, process_patterns=True)
         self._dataset.load_all_arrays()
 
     def append_array(self, array: DiffractionArray) -> None:
@@ -96,6 +96,7 @@ class DiffractionAPI:
         file_path: Path,
         *,
         file_type: str | None = None,
+        process_patterns: bool | None = None,
         crop_center: CropCenter | None = None,
         crop_extent: ImageExtent | None = None,
         detector_extent: ImageExtent | None = None,
@@ -124,7 +125,7 @@ class DiffractionAPI:
             except Exception as exc:
                 raise RuntimeError(f'Failed to read "{file_path}"') from exc
             else:
-                self._dataset.reload(dataset)
+                self._dataset.reload(dataset, process_patterns=False)
                 return 0
         else:
             logger.warning(f'Refusing to read invalid file path {file_path}')

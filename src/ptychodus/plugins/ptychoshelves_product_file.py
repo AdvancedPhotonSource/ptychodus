@@ -17,6 +17,7 @@ from ptychodus.api.product import (
     ProductMetadata,
 )
 from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
+from ptychodus.api.reconstructor import LossValue
 
 
 class PtychoShelvesProductFileReader(ProductFileReader):
@@ -96,7 +97,13 @@ class PtychoShelvesProductFileReader(ProductFileReader):
             center=None,
             layer_spacing_m=layer_spacing_m,
         )
-        losses = outputs_struct['fourier_error_out']  # FIXME
+
+        fourier_error_out = outputs_struct['fourier_error_out']
+        losses: list[LossValue] = []
+
+        for epoch, value in enumerate(fourier_error_out):
+            loss = LossValue(epoch, value)
+            losses.append(loss)
 
         return Product(
             metadata=metadata,

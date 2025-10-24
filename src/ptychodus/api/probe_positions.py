@@ -100,7 +100,7 @@ class ProbePositionParseError(Exception):
     pass
 
 
-class ProbePositionsFileReader(ABC):
+class ProbePositionFileReader(ABC):
     """interface for plugins that read position files"""
 
     @abstractmethod
@@ -109,7 +109,7 @@ class ProbePositionsFileReader(ABC):
         pass
 
 
-class ProbePositionsFileWriter(ABC):
+class ProbePositionFileWriter(ABC):
     """interface for plugins that write position files"""
 
     @abstractmethod

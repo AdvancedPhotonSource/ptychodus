@@ -156,8 +156,11 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
             center_x_m = scan_bbox.center_x_m
             center_y_m = scan_bbox.center_y_m
 
-        width_px = width_m / self.object_plane_pixel_width_m
-        height_px = height_m / self.object_plane_pixel_height_m
+        pixel_width_m = self.object_plane_pixel_width_m
+        width_px = width_m / pixel_width_m if pixel_width_m > 0.0 else 0.0
+
+        pixel_height_m = self.object_plane_pixel_height_m
+        height_px = height_m / pixel_height_m if pixel_height_m > 0.0 else 0.0
 
         return ObjectGeometry(
             width_px=int(numpy.ceil(width_px)),

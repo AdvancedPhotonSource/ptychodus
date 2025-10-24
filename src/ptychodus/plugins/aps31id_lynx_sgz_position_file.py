@@ -6,7 +6,7 @@ import logging
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
-    ProbePositionsFileReader,
+    ProbePositionFileReader,
     ProbePosition,
     ProbePositionParseError,
 )
@@ -14,7 +14,7 @@ from ptychodus.api.probe_positions import (
 logger = logging.getLogger(__name__)
 
 
-class LYNXSoftGlueZynqPositionFileReader(ProbePositionsFileReader):
+class LYNXSoftGlueZynqPositionFileReader(ProbePositionFileReader):
     SIMPLE_NAME: Final[str] = 'APS_LYNX_SoftGlueZynq'
     DISPLAY_NAME: Final[str] = 'APS 31-ID-E LYNX SoftGlueZynq Files (*.dat)'
     ONE_MICRON_M: Final[float] = 1.0e-6
@@ -85,7 +85,7 @@ class LYNXSoftGlueZynqPositionFileReader(ProbePositionsFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         LYNXSoftGlueZynqPositionFileReader(),
         simple_name=LYNXSoftGlueZynqPositionFileReader.SIMPLE_NAME,
         display_name=LYNXSoftGlueZynqPositionFileReader.DISPLAY_NAME,

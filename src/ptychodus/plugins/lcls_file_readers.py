@@ -11,7 +11,7 @@ import numpy
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
-    ProbePositionsFileReader,
+    ProbePositionFileReader,
     ProbePosition,
 )
 
@@ -21,7 +21,7 @@ from ptychodus.plugins.h5_diffraction_file import H5DiffractionFileReader
 logger = logging.getLogger(__name__)
 
 
-class LCLSPositionFileReader(ProbePositionsFileReader):
+class LCLSPositionFileReader(ProbePositionFileReader):
     SIMPLE_NAME: Final[str] = 'LCLS_XPP'  # noqa: N806
     DISPLAY_NAME: Final[str] = 'LCLS X-ray Pump Probe Files (*.h5 *.hdf5)'  # noqa: N806
     ONE_MICRON_M: Final[float] = 1e-6
@@ -76,7 +76,7 @@ def register_plugins(registry: PluginRegistry) -> None:
         simple_name=LCLSPositionFileReader.SIMPLE_NAME,
         display_name=LCLSPositionFileReader.DISPLAY_NAME,
     )
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         LCLSPositionFileReader(),
         simple_name=LCLSPositionFileReader.SIMPLE_NAME,
         display_name=LCLSPositionFileReader.DISPLAY_NAME,

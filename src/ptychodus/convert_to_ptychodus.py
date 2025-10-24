@@ -1,27 +1,26 @@
 #!/usr/bin/env python
 """
-Convert ptychography data format using Ptychodus.
+Convert PtychoShelves datasets to Ptychodus format
 
 Example usage:
-python convert_format.py \
-    --patterns "data/ptychoshelves/velo_19c2_Jun_IC_fly145/data_roi0_dp.hdf5" \
-    --probe "data/ptychoshelves/velo_19c2_Jun_IC_fly145/Niter100.mat" \
-    --probe-positions "data/ptychoshelves/velo_19c2_Jun_IC_fly145/data_roi0_para.hdf5" \
-    --metadata "data/ptychoshelves/velo_19c2_Jun_IC_fly145/data_roi0_para.hdf5" \
-    --product-name "ptychodus" \
-    --output-dir "outputs" \
 
+python convert_to_ptychodus.py \
+    --diffraction-input "data/ptychoshelves/velo_19c2_Jun_IC_fly145/data_roi0_dp.hdf5" \
+    --diffraction-output "data/velo_19c2_Jun_IC_fly145_diffraction.h5" \
+    --product-input "data/ptychoshelves/velo_19c2_Jun_IC_fly145/Niter100.mat" \
+    --product-output "data/velo_19c2_Jun_IC_fly145_product.h5"
+    --rename-product "velo_19c2_Jun_IC_fly145" \
 """
-# FIXME update example usage
 
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Any, Final
 import argparse
+import json
 import logging
 import sys
-from typing import Final
 
-from ptychodus.api.diffraction import CropCenter
-from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.plugins import PluginChooser
 from ptychodus.model import ModelCore
 import ptychodus
 
@@ -32,34 +31,31 @@ def version_string() -> str:
     return f'{ptychodus.__name__.title()} ({ptychodus.__version__})'
 
 
+def list_plugin_names(plugin_chooser: PluginChooser[Any]) -> str:
+    return ', '.join(sorted(plugin.simple_name for plugin in plugin_chooser))
+
+
 def main() -> int:
+    prog = Path(__file__).stem.lower()
     parser = argparse.ArgumentParser(
-        description='Convert PtychoShelves reconstructions to the Ptychodus HDF5 format.'
-    )
-    parser.add_argument(
-        '-d',
-        '--dev',
-        action='store_true',
-        help=argparse.SUPPRESS,
+        prog=prog, description=f'{prog} repackages ptychoshelves datasets in ptychodus formats.'
     )
     parser.add_argument(
         '--diffraction-input',
         metavar='DIFFRACTION_INPUT_FILE',
         type=argparse.FileType('r'),
         help='Path to the diffraction input file.',
-        required=True,
     )
     parser.add_argument(
         '--diffraction-output',
         metavar='DIFFRACTION_OUTPUT_FILE',
         type=argparse.FileType('w'),
         help='Path to the diffraction output file.',
-        required=True,
     )
     parser.add_argument(
         '--list-plugins',
         action='store_true',
-        help='List available diffraction and scan plugins, then exit.',
+        help='List available file reader plugins, then exit.',
     )
     parser.add_argument(
         '--override-object',
@@ -80,10 +76,19 @@ def main() -> int:
         help='Path to the probe positions file.',
     )
     parser.add_argument(
+        '--product-comment',
+        default='',
+        help='Data product comment',
+    )
+    parser.add_argument(
         '--product-input',
         metavar='PRODUCT_INPUT_FILE',
         type=argparse.FileType('r'),
         help='Path to the product input file.',
+    )
+    parser.add_argument(
+        '--product-name',
+        help='Data product name',
         required=True,
     )
     parser.add_argument(
@@ -91,11 +96,6 @@ def main() -> int:
         metavar='PRODUCT_OUTPUT_FILE',
         type=argparse.FileType('w'),
         help='Path to the product output file.',
-        required=True,
-    )
-    parser.add_argument(
-        '--rename-product',
-        help='Changes the data product name.',
     )
     parser.add_argument(
         '-s',
@@ -117,25 +117,48 @@ def main() -> int:
     DIFFRACTION_FILE_TYPE: Final[str] = 'PtychoShelves'  # noqa: N806
     PRODUCT_FILE_TYPE: Final[str] = 'PtychoShelves'  # noqa: N806
 
-    with ModelCore(settings_file, is_developer_mode_enabled=args.dev) as model:
+    with ModelCore(settings_file) as model:
         if args.list_plugins:
-            # FIXME print('Diffraction readers   : ', ', '.join(sorted(DiffractionReaderChoices)))
-            # FIXME print('Diffraction writers   : ', ', '.join(sorted(DiffractionWriterChoices)))
-            # FIXME print('Probe readers         : ', ', '.join(sorted(ProbeReaderChoices)))
-            # FIXME print('Probe position readers: ', ', '.join(sorted(ProbePositionReaderChoices)))
-            # FIXME print('Product writers       : ', ', '.join(sorted(ProductWriterChoices)))
+            plugins: dict[str, Sequence[str]] = dict()
+            plugins['diffraction_readers'] = list_plugin_names(
+                model.plugin_registry.diffraction_file_readers
+            )
+            plugins['product_readers'] = list_plugin_names(
+                model.plugin_registry.product_file_readers
+            )
+            plugins['probe_position_readers'] = list_plugin_names(
+                model.plugin_registry.probe_position_file_readers
+            )
+            plugins['probe_readers'] = list_plugin_names(model.plugin_registry.probe_file_readers)
+            plugins['object_readers'] = list_plugin_names(model.plugin_registry.object_file_readers)
+
+            print(json.dumps(plugins, indent=4))
+
             return 0
 
-        dp_size = (0, 0)  # FIXME
+        missing_args: list[str] = []
 
-        # FIXME support cropping or disable cropping
+        if args.diffraction_input is None:
+            missing_args.append('--diffraction-input')
+
+        if args.diffraction_output is None:
+            missing_args.append('--diffraction-output')
+
+        if args.product_input is None:
+            missing_args.append('--product-input')
+
+        if args.product_output is None:
+            missing_args.append('--product-output')
+
+        if missing_args:
+            missing_args_str = ', '.join(missing_args)
+            parser.error(f'the following arguments are required: {missing_args_str}')
+
         model.workflow_api.open_patterns(
-            args.diffraction_input.name,
-            file_type=DIFFRACTION_FILE_TYPE,
-            crop_center=CropCenter(position_x_px=dp_size[1] // 2, position_y_px=dp_size[0] // 2),
-            crop_extent=ImageExtent(width_px=dp_size[1], height_px=dp_size[0]),
+            args.diffraction_input.name, file_type=DIFFRACTION_FILE_TYPE, process_patterns=False
         )
         # FIXME wait for patterns to load?
+        # FIXME ptychodus diffraction reader/writer
         model.workflow_api.export_assembled_patterns(args.diffraction_output.name)
         logger.info(f'Wrote diffraction data to {args.diffraction_output.name}')
 
@@ -157,6 +180,7 @@ def main() -> int:
 
         product_api.save_product(args.product_output.name, file_type='HDF5')
         logger.info(f'Wrote product data to {args.product_output.name}')
+
     return 0
 
 

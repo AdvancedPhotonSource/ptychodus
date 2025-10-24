@@ -18,7 +18,7 @@ from ptychodus.api.probe import ProbeSequence, ProbeFileReader
 from ptychodus.api.product import ELECTRON_VOLT_J
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
-    ProbePositionsFileReader,
+    ProbePositionFileReader,
     ProbePosition,
 )
 from ptychodus.api.typing import ComplexArrayType
@@ -76,7 +76,7 @@ class CXIDiffractionFileReader(DiffractionFileReader):
                 raise ValueError(f'Expected dataset at {self._data_path}, got {type(data)}.')
 
 
-class CXIPositionFileReader(ProbePositionsFileReader):
+class CXIPositionFileReader(ProbePositionFileReader):
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
 
@@ -109,7 +109,7 @@ def register_plugins(registry: PluginRegistry) -> None:
         simple_name=SIMPLE_NAME,
         display_name=DISPLAY_NAME,
     )
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         CXIPositionFileReader(),
         simple_name=SIMPLE_NAME,
         display_name=DISPLAY_NAME,

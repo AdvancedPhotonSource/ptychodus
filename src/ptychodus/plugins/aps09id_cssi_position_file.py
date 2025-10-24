@@ -7,14 +7,14 @@ import h5py
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
-    ProbePositionsFileReader,
+    ProbePositionFileReader,
     ProbePosition,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class CSSIPositionFileReader(ProbePositionsFileReader):
+class CSSIPositionFileReader(ProbePositionFileReader):
     ONE_MILLIMETER_M: Final[float] = 1e-3
 
     def read(self, file_path: Path) -> ProbePositionSequence:
@@ -38,7 +38,7 @@ class CSSIPositionFileReader(ProbePositionsFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         CSSIPositionFileReader(),
         simple_name='APS_CSSI',
         display_name='APS 9-ID CSSI Files (*.h5 *.hdf5)',

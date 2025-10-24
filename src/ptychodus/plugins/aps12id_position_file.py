@@ -8,14 +8,14 @@ import numpy
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
-    ProbePositionsFileReader,
+    ProbePositionFileReader,
     ProbePosition,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class APS12IDPositionFileReader(ProbePositionsFileReader):
+class APS12IDPositionFileReader(ProbePositionFileReader):
     ONE_NANOMETER_M: Final[float] = 1.0e-9
 
     def read(self, file_path: Path) -> ProbePositionSequence:
@@ -73,7 +73,7 @@ class APS12IDPositionFileReader(ProbePositionsFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.probe_positions_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         APS12IDPositionFileReader(),
         simple_name='APS_PtychoSAXS',
         display_name='APS 12-ID PtychoSAXS Files (*.dat)',

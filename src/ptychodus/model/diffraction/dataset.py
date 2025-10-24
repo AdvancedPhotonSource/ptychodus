@@ -239,7 +239,8 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         for observer in self._observer_list:
             observer.handle_dataset_reloaded()
 
-    def reload(self, dataset: DiffractionDataset) -> None:
+    def reload(self, dataset: DiffractionDataset, *, process_patterns: bool) -> None:
+        # FIXME process_patterns
         self.clear()
 
         metadata = dataset.get_metadata()

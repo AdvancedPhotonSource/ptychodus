@@ -22,8 +22,8 @@ from .parametric import StringParameter
 from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter, ProbeSequence
 from .product import ProductFileReader, ProductFileWriter
 from .probe_positions import (
-    ProbePositionsFileReader,
-    ProbePositionsFileWriter,
+    ProbePositionFileReader,
+    ProbePositionFileWriter,
     ProbePositionSequence,
 )
 from .workflow import FileBasedWorkflow
@@ -38,7 +38,7 @@ T = TypeVar('T')
 logger = logging.getLogger(__name__)
 
 
-class ProductProbePositionsFileReader(ProbePositionsFileReader):
+class ProductProbePositionFileReader(ProbePositionFileReader):
     def __init__(self, reader: ProductFileReader) -> None:
         super().__init__()
         self._reader = reader
@@ -134,8 +134,8 @@ class PluginRegistry:
         self.bad_pixels_file_readers = PluginChooser[BadPixelsFileReader]()
         self.diffraction_file_readers = PluginChooser[DiffractionFileReader]()
         self.diffraction_file_writers = PluginChooser[DiffractionFileWriter]()
-        self.probe_positions_file_readers = PluginChooser[ProbePositionsFileReader]()
-        self.probe_positions_file_writers = PluginChooser[ProbePositionsFileWriter]()
+        self.probe_position_file_readers = PluginChooser[ProbePositionFileReader]()
+        self.probe_position_file_writers = PluginChooser[ProbePositionFileWriter]()
         self.fresnel_zone_plates = PluginChooser[FresnelZonePlate]()
         self.probe_file_readers = PluginChooser[ProbeFileReader]()
         self.probe_file_writers = PluginChooser[ProbeFileWriter]()
@@ -152,8 +152,8 @@ class PluginRegistry:
     def register_product_file_reader_with_adapters(
         self, strategy: ProductFileReader, *, display_name: str, simple_name: str = ''
     ) -> None:
-        self.probe_positions_file_readers.register_plugin(
-            ProductProbePositionsFileReader(strategy),
+        self.probe_position_file_readers.register_plugin(
+            ProductProbePositionFileReader(strategy),
             display_name=display_name,
             simple_name=simple_name,
         )
