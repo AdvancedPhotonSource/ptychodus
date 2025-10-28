@@ -4,9 +4,14 @@ from collections.abc import Sequence
 from pathlib import Path
 import logging
 
-from ptychodus.api.object import Object, ObjectFileReader, ObjectGeometryProvider
-from ptychodus.api.parametric import ParameterGroup
+import numpy
 
+from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.object import Object, ObjectCenter, ObjectFileReader, ObjectGeometryProvider
+from ptychodus.api.parametric import ParameterGroup
+from ptychodus.api.typing import ComplexArrayType
+
+from ...phase_unwrapper import PhaseUnwrapper
 from .settings import ObjectSettings
 
 logger = logging.getLogger(__name__)
@@ -18,6 +23,11 @@ class ObjectBuilder(ParameterGroup):
         self._name = settings.builder.copy()
         self._name.set_value(name)
         self._add_parameter('name', self._name)
+
+        self.extra_padding_x = settings.extra_padding_x.copy()
+        self._add_parameter('extra_padding_x', self.extra_padding_x)
+        self.extra_padding_y = settings.extra_padding_y.copy()
+        self._add_parameter('extra_padding_y', self.extra_padding_y)
 
     def get_name(self) -> str:
         return self._name.get_value()
@@ -37,6 +47,52 @@ class ObjectBuilder(ParameterGroup):
         layer_spacing_m: Sequence[float],
     ) -> Object:
         pass
+
+    def _create_object(
+        self,
+        array: ComplexArrayType,
+        pixel_geometry: PixelGeometry,
+        center: ObjectCenter,
+        layer_spacing_m: Sequence[float],
+    ) -> Object:
+        """Create an object from an existing object with a potentially
+        different number of slices.
+
+        If the new object is supposed to be a multislice object with a
+        different number of slices than the existing object, the object is
+        created as
+        `abs(o) ** (1 / nSlices) * exp(i * unwrapPhase(o) / nSlices)`.
+        Otherwise, the object is copied as is.
+        """
+        num_slices = 1 + len(layer_spacing_m)
+
+        if array.ndim < 2:
+            raise ValueError('Array must have at least 2 dimensions')
+        elif array.ndim == 2:
+            array = numpy.expand_dims(array, axis=0)
+        elif array.ndim > 3:
+            raise ValueError('Array must have at most 3 dimensions')
+
+        if num_slices < array.shape[0]:  # FIXME test
+            array = array[0:num_slices]
+        elif num_slices > array.shape[0]:  # FIXME test
+            amplitude = numpy.absolute(array[0:1]) ** (1.0 / num_slices)
+            amplitude = amplitude.repeat(num_slices, axis=0)
+            phase = PhaseUnwrapper().unwrap(array[0])[None, ...] / num_slices
+            phase = phase.repeat(num_slices, axis=0)
+            array = numpy.clip(amplitude, 0.0, 1.0) * numpy.exp(1j * phase)
+
+        pad_width = [
+            (0, 0),
+            (self.extra_padding_y.get_value(), self.extra_padding_y.get_value()),
+            (self.extra_padding_x.get_value(), self.extra_padding_x.get_value()),
+        ]
+        return Object(
+            array=numpy.pad(array, pad_width),
+            layer_spacing_m=layer_spacing_m,
+            pixel_geometry=pixel_geometry,
+            center=center,
+        )
 
 
 class FromMemoryObjectBuilder(ObjectBuilder):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import concurrent.futures
 import logging
@@ -45,6 +45,18 @@ class AssembledDiffractionData:
             patterns=patterns,
             pattern_counts=numpy.sum(patterns[:, good_pixels], axis=-1),
         )
+
+    def get_assembled_indexes(self) -> DiffractionIndexes:
+        return self.indexes[self.indexes >= 0]
+
+    def get_assembled_patterns(self) -> DiffractionPatterns:
+        return self.patterns[self.indexes >= 0]
+
+    def get_assembled_pattern_counts(self) -> DiffractionPatterns:
+        return self.pattern_counts[self.indexes >= 0]
+
+    def get_pattern_counts_lut(self) -> Mapping[int, int]:
+        return dict(zip(self.get_assembled_indexes(), self.get_assembled_pattern_counts()))
 
     def get_info_text(self, label: str) -> str:
         number, height, width = self.patterns.shape

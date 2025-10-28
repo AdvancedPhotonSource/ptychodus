@@ -68,7 +68,11 @@ class ProductCore(Observer):
 
         self._object_settings = ObjectSettings(settings_registry)
         self._object_builder_factory = ObjectBuilderFactory(
-            rng, self._object_settings, object_file_reader_chooser, object_file_writer_chooser
+            rng,
+            self._object_settings,
+            dataset,
+            object_file_reader_chooser,
+            object_file_writer_chooser,
         )
         self._object_repository_item_factory = ObjectRepositoryItemFactory(
             rng, self._object_settings, self._object_builder_factory

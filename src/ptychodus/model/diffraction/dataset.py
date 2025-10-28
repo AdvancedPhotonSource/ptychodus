@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from bisect import bisect
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import overload, Final
 import logging
@@ -147,13 +147,16 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         return self._dataset.get_bad_pixels()
 
     def get_assembled_indexes(self) -> DiffractionIndexes:
-        return self._data.indexes[self._data.indexes >= 0]
+        return self._data.get_assembled_indexes()
 
     def get_assembled_patterns(self) -> DiffractionPatterns:
-        return self._data.patterns[self._data.indexes >= 0]
+        return self._data.get_assembled_patterns()
 
     def get_maximum_pattern_counts(self) -> int:
-        return self._data.pattern_counts[self._data.indexes >= 0].max()
+        return self._data.get_assembled_pattern_counts().max()
+
+    def get_pattern_counts_lut(self) -> Mapping[int, int]:
+        return self._data.get_pattern_counts_lut()
 
     @overload
     def __getitem__(self, index: int) -> AssembledDiffractionArray: ...
