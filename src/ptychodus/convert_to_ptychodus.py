@@ -4,12 +4,12 @@ Convert PtychoShelves datasets to Ptychodus format
 
 Example usage:
 
-python convert_to_ptychodus.py \
+convert-to-ptychodus \
     --diffraction-input "data/ptychoshelves/velo_19c2_Jun_IC_fly145/data_roi0_dp.hdf5" \
     --diffraction-output "data/velo_19c2_Jun_IC_fly145_diffraction.h5" \
     --product-input "data/ptychoshelves/velo_19c2_Jun_IC_fly145/Niter100.mat" \
-    --product-output "data/velo_19c2_Jun_IC_fly145_product.h5"
-    --rename-product "velo_19c2_Jun_IC_fly145" \
+    --product-output "data/velo_19c2_Jun_IC_fly145_product.h5" \
+    --product-name "velo_19c2_Jun_IC_fly145"
 """
 
 from collections.abc import Sequence
@@ -155,15 +155,16 @@ def main() -> int:
             parser.error(f'the following arguments are required: {missing_args_str}')
 
         model.workflow_api.open_patterns(
-            args.diffraction_input.name, file_type=DIFFRACTION_FILE_TYPE, process_patterns=False
+            Path(args.diffraction_input.name),
+            file_type=DIFFRACTION_FILE_TYPE,
+            process_patterns=False,
+            block=True,
         )
-        # FIXME wait for patterns to load?
-        # FIXME ptychodus diffraction reader/writer
         model.workflow_api.export_assembled_patterns(args.diffraction_output.name)
         logger.info(f'Wrote diffraction data to {args.diffraction_output.name}')
 
         product_api = model.workflow_api.open_product(
-            args.product_input.name, file_type=PRODUCT_FILE_TYPE
+            Path(args.product_input.name), file_type=PRODUCT_FILE_TYPE
         )
 
         if args.rename_product is not None:
@@ -178,7 +179,7 @@ def main() -> int:
         if args.override_probe_positions is not None:
             product_api.open_probe_positions(Path(args.override_probe_positions.name))
 
-        product_api.save_product(args.product_output.name, file_type='HDF5')
+        product_api.save_product(Path(args.product_output.name), file_type='HDF5')
         logger.info(f'Wrote product data to {args.product_output.name}')
 
     return 0

@@ -25,7 +25,9 @@ dependencies = [
 dynamic = ["version"]
 
 [project.scripts]
+convert-to-ptychodus = "ptychodus.convert_to_ptychodus:main"
 ptychodus = "ptychodus.__main__:main"
+ptychodus-bdp = "ptychodus.ptychodus_bdp:main"
 
 [project.optional-dependencies]
 globus = ["gladier", "gladier-tools>=0.5.4"]

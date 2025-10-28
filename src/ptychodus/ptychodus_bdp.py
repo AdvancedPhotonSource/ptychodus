@@ -174,8 +174,8 @@ def main() -> int:
             Path(args.diffraction_input.name),
             crop_center=crop_center,
             crop_extent=crop_extent,
+            block=True,
         )
-
         workflow_product_api = model.workflow_api.create_product(
             name=args.product_name,
             comments=args.product_comment,
@@ -197,4 +197,5 @@ def main() -> int:
     return 0
 
 
-sys.exit(main())
+if __name__ == '__main__':
+    sys.exit(main())

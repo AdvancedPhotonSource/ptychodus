@@ -135,18 +135,20 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         file_path: Path,
         *,
         file_type: str | None = None,
-        process_patterns: bool | None = None,
         crop_center: CropCenter | None = None,
         crop_extent: ImageExtent | None = None,
         detector_extent: ImageExtent | None = None,
+        process_patterns: bool = True,
+        block: bool = False,
     ) -> None:
         self._diffraction_api.open_patterns(
             file_path,
             file_type=file_type,
-            process_patterns=process_patterns,
             crop_center=crop_center,
             crop_extent=crop_extent,
             detector_extent=detector_extent,
+            process_patterns=process_patterns,
+            block=block,
         )
 
     def import_assembled_patterns(self, file_path: Path) -> None:

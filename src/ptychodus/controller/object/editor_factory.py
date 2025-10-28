@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QDialog, QMessageBox, QSpinBox, QWidget
 
 from ptychodus.api.observer import Observable, Observer
 
-from ...model.product.object import ObjectRepositoryItem, RandomObjectBuilder
+from ...model.product.object import ObjectRepositoryItem, RandomObjectBuilder, STXMObjectBuilder
 from ..parametric import ParameterViewBuilder, ParameterViewController
 
 
@@ -62,6 +62,21 @@ class ObjectEditorViewControllerFactory:
             )
             dialog_builder.add_decimal_slider(
                 object_builder.phase_deviation, 'Phase Deviation:', group=first_layer_group
+            )
+            dialog_builder.add_view_controller(
+                MultisliceViewController(item),
+                'Number of Layers:',
+                group=additional_layers_group,
+            )
+            return dialog_builder.build_dialog(title, parent)
+        elif isinstance(object_builder, STXMObjectBuilder):
+            # FIXME test
+            dialog_builder = ParameterViewBuilder()
+            dialog_builder.add_spin_box(
+                object_builder.extra_padding_x, 'Extra Padding X:', group=first_layer_group
+            )
+            dialog_builder.add_spin_box(
+                object_builder.extra_padding_y, 'Extra Padding Y:', group=first_layer_group
             )
             dialog_builder.add_view_controller(
                 MultisliceViewController(item),

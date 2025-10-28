@@ -67,7 +67,9 @@ class AssembledDiffractionData:
 
 class ArrayAssembler(ABC):
     @abstractmethod
-    def _create_array_loader(self, array: DiffractionArray) -> BackgroundTask:
+    def _create_array_loader(
+        self, array: DiffractionArray, *, process_patterns: bool
+    ) -> BackgroundTask:
         pass
 
     @abstractmethod
@@ -123,25 +125,26 @@ class LoadAllArrays:
     def __init__(
         self,
         array_seq: Sequence[DiffractionArray],
-        processor: DiffractionPatternProcessor,
-        processed_bad_pixels: BadPixels,
         assembler: ArrayAssembler,
         foreground_task_manager: ForegroundTaskManager,
+        *,
+        process_patterns: bool,
     ) -> None:
         super().__init__()
         self._array_seq = array_seq
-        self._processor = processor
-        self._processed_bad_pixels = processed_bad_pixels
         self._assembler = assembler
         self._foreground_task_manager = foreground_task_manager
-
-    def _load(self, task: BackgroundTask) -> ForegroundTask | None:
-        return task()
+        self._process_patterns = process_patterns
 
     def __call__(self) -> None:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future_list = [
-                executor.submit(self._load, self._assembler._create_array_loader(array))
+                executor.submit(
+                    lambda loader_task: loader_task(),
+                    self._assembler._create_array_loader(
+                        array, process_patterns=self._process_patterns
+                    ),
+                )
                 for array in self._array_seq
             ]
 

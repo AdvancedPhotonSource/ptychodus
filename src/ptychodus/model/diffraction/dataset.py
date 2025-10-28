@@ -172,7 +172,9 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
     def __len__(self) -> int:
         return len(self._array_list)
 
-    def _create_array_loader(self, array: DiffractionArray) -> BackgroundTask:
+    def _create_array_loader(
+        self, array: DiffractionArray, *, process_patterns: bool
+    ) -> BackgroundTask:
         """Load a new array into the dataset. Assumes that arrays arrive in order."""
         bad_pixels = self._dataset.get_bad_pixels()
 
@@ -185,8 +187,8 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         processor = self._sizer.get_processor()
         return LoadArray(array_index, array, bad_pixels, processor, self)
 
-    def append_array(self, array: DiffractionArray) -> None:
-        task = self._create_array_loader(array)
+    def append_array(self, array: DiffractionArray, *, process_patterns: bool = True) -> None:
+        task = self._create_array_loader(array, process_patterns=process_patterns)
         self._task_manager.put_background_task(task)
 
     def _insert_array(self, array: AssembledDiffractionArray) -> None:
@@ -242,8 +244,7 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         for observer in self._observer_list:
             observer.handle_dataset_reloaded()
 
-    def reload(self, dataset: DiffractionDataset, *, process_patterns: bool) -> None:
-        # FIXME process_patterns
+    def reload(self, dataset: DiffractionDataset, *, process_patterns: bool = True) -> None:
         self.clear()
 
         metadata = dataset.get_metadata()
@@ -285,15 +286,18 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
             observer.handle_dataset_reloaded()
 
         self._array_loader = LoadAllArrays(
-            dataset, processor, processed_bad_pixels, self, self._task_manager
+            dataset, self, self._task_manager, process_patterns=process_patterns
         )
 
-    def load_all_arrays(self) -> None:
+    def load_all_arrays(self, *, block: bool) -> None:
         if self._array_loader is None:
             logger.warning('Arrays have already been loaded!')
         else:
             self._task_manager.put_background_task(self._array_loader)
             self._array_loader = None
+
+            if block:  # FIXME wait for finish
+                pass
 
     def import_assembled_patterns(self, file_path: Path) -> None:
         if file_path.is_file():
