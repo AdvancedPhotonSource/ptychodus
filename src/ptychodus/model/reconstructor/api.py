@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from pathlib import Path
 import logging
+import threading
 import time
 
 from ptychodus.api.plugins import PluginChooser
@@ -85,16 +86,21 @@ class ReconstructorAPI:
 
         logger.debug(parameters)
 
+        reconstruction_finished_event = threading.Event()
+
         background_task = ReconstructBackgroundTask(
             self._context,
             reconstructor.strategy,
             parameters,
             output_product_item,
+            reconstruction_finished_event,
         )
         self._task_manager.put_background_task(background_task)
 
         if block:
-            pass  # FIXME context.wait_for_reconstruction
+            while not self._task_manager.is_stopping:
+                if reconstruction_finished_event.wait(timeout=TaskManager.WAIT_TIME_S):
+                    break
 
         return output_product_index
 

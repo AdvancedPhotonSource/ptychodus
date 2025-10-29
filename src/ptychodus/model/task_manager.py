@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, TypeAlias
+from typing import Callable, Final, TypeAlias
 import logging
 import queue
 import threading
@@ -35,12 +35,18 @@ class BackgroundTaskManager(ABC):
 
 
 class TaskManager(BackgroundTaskManager, ForegroundTaskManager):
+    WAIT_TIME_S: Final[float] = 1.0
+
     def __init__(self) -> None:
         super().__init__()
         self._background_queue: queue.Queue[BackgroundTask] = queue.Queue()
         self._foreground_queue: queue.Queue[ForegroundTask] = queue.Queue()
         self._stop_event = threading.Event()
         self._worker: threading.Thread | None = None
+
+    @property
+    def is_stopping(self) -> bool:
+        return self._stop_event.is_set()
 
     def put_background_task(self, task: BackgroundTask) -> None:
         self._background_queue.put(task)
@@ -52,7 +58,7 @@ class TaskManager(BackgroundTaskManager, ForegroundTaskManager):
     def _run_background_tasks(self) -> None:
         while not self._stop_event.is_set():
             try:
-                background_task = self._background_queue.get(block=True, timeout=1)
+                background_task = self._background_queue.get(block=True, timeout=self.WAIT_TIME_S)
             except queue.Empty:
                 continue
 

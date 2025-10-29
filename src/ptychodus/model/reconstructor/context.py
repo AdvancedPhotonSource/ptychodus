@@ -92,11 +92,6 @@ class ReconstructorContext:
     ) -> None:
         self._foreground_task_manager = foreground_task_manager
         self._progress_monitor = ReconstructorProgressMonitor(log_handler)
-        self._is_idle = threading.Event()
-        self._is_idle.set()
-
-    def wait_for_reconstruction(self, timeout_sec: float | None = None) -> None:
-        self._is_idle.wait(timeout_sec)
 
     def get_progress_monitor(self) -> ReconstructorProgressMonitor:
         return self._progress_monitor
@@ -112,7 +107,6 @@ class ReconstructorContext:
         self._progress_monitor.notify_observers_if_changed()
 
     def __enter__(self) -> ReconstructorContext:
-        self._is_idle.clear()
         self._progress_monitor._set_reconstructing(True)
         return self
 
@@ -134,7 +128,6 @@ class ReconstructorContext:
         traceback: TracebackType | None,
     ) -> None:
         self._progress_monitor._set_reconstructing(False)
-        self._is_idle.set()
 
 
 @dataclass(frozen=True)
@@ -143,6 +136,7 @@ class ReconstructBackgroundTask:
     reconstructor: Reconstructor
     parameters: ReconstructInput
     product_item: ProductRepositoryItem
+    reconstruction_finished_event: threading.Event
 
     def __call__(self) -> None:
         with self.context as context:
@@ -155,6 +149,8 @@ class ReconstructBackgroundTask:
 
             toc = time.perf_counter()
             logger.info(f'Reconstruction time {toc - tic:.4f} seconds.')
+
+        self.reconstruction_finished_event.set()
 
 
 class TrainBackgroundTask:  # TODO
