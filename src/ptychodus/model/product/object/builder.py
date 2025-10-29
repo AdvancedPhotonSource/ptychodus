@@ -73,12 +73,12 @@ class ObjectBuilder(ParameterGroup):
         elif array.ndim > 3:
             raise ValueError('Array must have at most 3 dimensions')
 
-        if num_slices < array.shape[0]:  # FIXME test
-            array = array[0:num_slices]
-        elif num_slices > array.shape[0]:  # FIXME test
-            amplitude = numpy.absolute(array[0:1]) ** (1.0 / num_slices)
+        if num_slices < array.shape[0]:
+            array = array[:num_slices]
+        elif num_slices > array.shape[0]:
+            amplitude = numpy.absolute(array[:1]) ** (1.0 / num_slices)
             amplitude = amplitude.repeat(num_slices, axis=0)
-            phase = PhaseUnwrapper().unwrap(array[0])[None, ...] / num_slices
+            phase = PhaseUnwrapper().unwrap(array[0])[numpy.newaxis, ...] / num_slices
             phase = phase.repeat(num_slices, axis=0)
             array = numpy.clip(amplitude, 0.0, 1.0) * numpy.exp(1j * phase)
 
@@ -87,6 +87,7 @@ class ObjectBuilder(ParameterGroup):
             (self.extra_padding_y.get_value(), self.extra_padding_y.get_value()),
             (self.extra_padding_x.get_value(), self.extra_padding_x.get_value()),
         ]
+
         return Object(
             array=numpy.pad(array, pad_width),
             layer_spacing_m=layer_spacing_m,

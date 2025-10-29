@@ -4,6 +4,7 @@ from .item import ObjectRepositoryItem
 from .item_factory import ObjectRepositoryItemFactory
 from .random import RandomObjectBuilder
 from .settings import ObjectSettings
+from .stxm import STXMObjectBuilder
 
 __all__ = [
     'ObjectBuilder',
@@ -12,4 +13,5 @@ __all__ = [
     'ObjectRepositoryItemFactory',
     'ObjectSettings',
     'RandomObjectBuilder',
+    'STXMObjectBuilder',
 ]

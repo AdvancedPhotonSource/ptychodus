@@ -70,7 +70,6 @@ class ObjectEditorViewControllerFactory:
             )
             return dialog_builder.build_dialog(title, parent)
         elif isinstance(object_builder, STXMObjectBuilder):
-            # FIXME test
             dialog_builder = ParameterViewBuilder()
             dialog_builder.add_spin_box(
                 object_builder.extra_padding_x, 'Extra Padding X:', group=first_layer_group
