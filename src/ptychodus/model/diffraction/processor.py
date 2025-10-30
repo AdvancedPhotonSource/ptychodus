@@ -114,32 +114,32 @@ class DiffractionPatternProcessor:
         return processed_bad_pixels
 
     def __call__(self, array: DiffractionArray) -> DiffractionArray:
-        data = array.get_patterns()
+        patterns = array.get_patterns()
 
-        if data.ndim == 2:
-            data = data[numpy.newaxis, ...]
-        elif data.ndim != 3:
-            raise ValueError(f'Invalid diffraction pattern dimensions! (shape={data.shape})')
+        if patterns.ndim == 2:
+            patterns = patterns[numpy.newaxis, ...]
+        elif patterns.ndim != 3:
+            raise ValueError(f'Invalid diffraction pattern dimensions! (shape={patterns.shape})')
 
         if self.filter_values is not None:
-            data = self.filter_values.apply(data)
+            patterns = self.filter_values.apply(patterns)
 
         if self.crop is not None:
-            data = self.crop.apply(data)
+            patterns = self.crop.apply(patterns)
 
         if self.binning is not None:
-            data = self.binning.apply(data)
+            patterns = self.binning.apply(patterns)
 
         if self.padding is not None:
-            data = self.padding.apply(data)
+            patterns = self.padding.apply(patterns)
 
         if self.hflip:
-            data = numpy.flip(data, axis=-1)
+            patterns = numpy.flip(patterns, axis=-1)
 
         if self.vflip:
-            data = numpy.flip(data, axis=-2)
+            patterns = numpy.flip(patterns, axis=-2)
 
         if self.transpose:
-            data = numpy.transpose(data, axes=(0, 2, 1))
+            patterns = numpy.transpose(patterns, axes=(0, 2, 1))
 
-        return SimpleDiffractionArray(array.get_label(), array.get_indexes(), data)
+        return SimpleDiffractionArray(array.get_label(), array.get_indexes(), patterns)

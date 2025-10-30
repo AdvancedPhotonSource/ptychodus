@@ -30,7 +30,18 @@ class FoldSliceProductFileReader(ProductFileReader):
         hc_eVm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S / ELECTRON_VOLT_J  # noqa: N806
         mat_dict = scipy.io.loadmat(file_path, simplify_cells=True)
         p_struct = mat_dict['p']
-        probe_energy_eV = hc_eVm / p_struct['lambda']  # noqa: N806
+
+        try:
+            wavelength_m = p_struct['lambda']
+        except KeyError:
+            probe_energy_eV = 0.0  # noqa: N806
+        else:
+            probe_energy_eV = hc_eVm / wavelength_m  # noqa: N806
+
+        try:
+            tomography_angle_deg = p_struct['angle']
+        except KeyError:
+            tomography_angle_deg = 0.0
 
         metadata = ProductMetadata(
             name=file_path.stem,
@@ -40,7 +51,7 @@ class FoldSliceProductFileReader(ProductFileReader):
             probe_photon_count=0.0,  # not included in file
             exposure_time_s=0.0,  # not included in file
             mass_attenuation_m2_kg=0.0,  # not included in file
-            tomography_angle_deg=0.0,  # not included in file
+            tomography_angle_deg=tomography_angle_deg,
         )
 
         dx_spec = p_struct['dx_spec']

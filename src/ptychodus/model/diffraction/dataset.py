@@ -185,7 +185,9 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         self._array_counter += 1
 
         processor = self._sizer.get_processor()
-        return LoadArray(array_index, array, bad_pixels, processor, self)
+        return LoadArray(
+            array_index, array, bad_pixels, processor, self, process_patterns=process_patterns
+        )
 
     def append_array(self, array: DiffractionArray, *, process_patterns: bool = True) -> None:
         task = self._create_array_loader(array, process_patterns=process_patterns)
@@ -332,7 +334,7 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
                     bad_pixels=bad_pixels,
                 )
 
-            # FIXME deconflict detector size with bad_pixels_provider
+            # TODO deconflict detector size with bad_pixels_provider
             num_patterns, detector_height, detector_width = self._data.patterns.shape
             metadata = DiffractionMetadata(
                 num_patterns_per_array=[num_patterns],

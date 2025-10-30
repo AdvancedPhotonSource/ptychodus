@@ -15,7 +15,7 @@ from ptychodus.api.probe_positions import (
 logger = logging.getLogger(__name__)
 
 
-class NanoMaxPositionFileReader(ProbePositionFileReader):
+class NanoMAXPositionFileReader(ProbePositionFileReader):
     ONE_MICRON_M: Final[float] = 1.0e-6
 
     def read(self, file_path: Path) -> ProbePositionSequence:
@@ -46,7 +46,7 @@ class NanoMaxPositionFileReader(ProbePositionFileReader):
 
 def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
-        NanoMaxPositionFileReader(),
+        NanoMAXPositionFileReader(),
         simple_name='MAX_IV_NanoMAX',
         display_name='MAX IV NanoMAX Diffraction Endstation Files (*.h5 *.hdf5)',
     )

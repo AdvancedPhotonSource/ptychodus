@@ -12,7 +12,7 @@ from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 
 
 class NSLSIIProductFileReader(ProductFileReader):
-    SIMPLE_NAME: Final[str] = 'NSLS_II'
+    SIMPLE_NAME: Final[str] = 'NSLS_II_MATLAB'
     DISPLAY_NAME: Final[str] = 'NSLS-II MATLAB Files (*.mat)'
     ONE_MICRON_M: Final[float] = 1.0e-6
 

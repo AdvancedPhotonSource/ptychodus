@@ -38,7 +38,7 @@ def list_plugin_names(plugin_chooser: PluginChooser[Any]) -> str:
 def main() -> int:
     prog = Path(__file__).stem.lower()
     parser = argparse.ArgumentParser(
-        prog=prog, description=f'{prog} repackages ptychoshelves datasets in ptychodus formats.'
+        prog=prog, description=f'{prog} repackages fold_slice datasets in ptychodus formats.'
     )
     parser.add_argument(
         '--diffraction-input',
@@ -56,6 +56,12 @@ def main() -> int:
         '--list-plugins',
         action='store_true',
         help='List available file reader plugins, then exit.',
+    )
+    parser.add_argument(
+        '--log-level',
+        type=int,
+        default=logging.WARNING,
+        help='Set Python logging level.',
     )
     parser.add_argument(
         '--override-object',
@@ -89,7 +95,6 @@ def main() -> int:
     parser.add_argument(
         '--product-name',
         help='Data product name',
-        required=True,
     )
     parser.add_argument(
         '--product-output',
@@ -117,7 +122,7 @@ def main() -> int:
     DIFFRACTION_FILE_TYPE: Final[str] = 'fold_slice'  # noqa: N806
     PRODUCT_FILE_TYPE: Final[str] = 'fold_slice'  # noqa: N806
 
-    with ModelCore(settings_file) as model:
+    with ModelCore(settings_file, log_level=args.log_level) as model:
         if args.list_plugins:
             plugins: dict[str, Sequence[str]] = dict()
             plugins['diffraction_readers'] = list_plugin_names(
@@ -167,8 +172,8 @@ def main() -> int:
             Path(args.product_input.name), file_type=PRODUCT_FILE_TYPE
         )
 
-        if args.rename_product is not None:
-            product_api.rename_product(args.rename_product)
+        if args.product_name is not None:
+            product_api.rename_product(args.product_name)
 
         if args.override_object is not None:
             product_api.open_object(Path(args.override_object.name))

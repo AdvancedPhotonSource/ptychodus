@@ -13,6 +13,7 @@ from ptychodus.api.diffraction import (
     DiffractionArray,
     DiffractionIndexes,
     DiffractionPatterns,
+    SimpleDiffractionArray,
 )
 from ptychodus.api.units import BYTES_PER_MEGABYTE
 
@@ -91,6 +92,8 @@ class LoadArray:
         bad_pixels: BadPixels,
         processor: DiffractionPatternProcessor,
         assembler: ArrayAssembler,
+        *,
+        process_patterns: bool,
     ) -> None:
         super().__init__()
         self._array_index = array_index
@@ -98,24 +101,31 @@ class LoadArray:
         self._bad_pixels = bad_pixels
         self._processor = processor
         self._assembler = assembler
+        self._process_patterns = process_patterns
 
     def __call__(self) -> ForegroundTask | None:
         label = self._array.get_label()
 
         try:
-            processed_array = self._processor(self._array)
+            loaded_array = SimpleDiffractionArray(
+                label,
+                self._array.get_indexes(),
+                self._array.get_patterns(),
+            )
         except FileNotFoundError:
             logger.warning(f'File not found for "{label}"!')
         else:
-            patterns = processed_array.get_patterns()
+            processed_array = (
+                self._processor(loaded_array) if self._process_patterns else loaded_array
+            )
             data = AssembledDiffractionData.create_pattern_counts(
                 indexes=processed_array.get_indexes(),
-                patterns=patterns,
+                patterns=processed_array.get_patterns(),
                 bad_pixels=self._bad_pixels,
             )
             self._assembler._assemble_array(
                 self._array_index,
-                processed_array.get_label(),
+                label,
                 data,
             )
 
