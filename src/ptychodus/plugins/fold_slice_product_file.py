@@ -20,9 +20,9 @@ from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 from ptychodus.api.reconstructor import LossValue
 
 
-class PtychoShelvesProductFileReader(ProductFileReader):
-    SIMPLE_NAME: Final[str] = 'PtychoShelves'
-    DISPLAY_NAME: Final[str] = 'PtychoShelves Files (*.mat)'
+class FoldSliceProductFileReader(ProductFileReader):
+    SIMPLE_NAME: Final[str] = 'fold_slice'
+    DISPLAY_NAME: Final[str] = 'fold_slice Files (*.mat)'
 
     def read(self, file_path: Path) -> Product:
         point_list: list[ProbePosition] = list()
@@ -116,7 +116,7 @@ class PtychoShelvesProductFileReader(ProductFileReader):
 
 def register_plugins(registry: PluginRegistry) -> None:
     registry.register_product_file_reader_with_adapters(
-        PtychoShelvesProductFileReader(),
-        simple_name=PtychoShelvesProductFileReader.SIMPLE_NAME,
-        display_name=PtychoShelvesProductFileReader.DISPLAY_NAME,
+        FoldSliceProductFileReader(),
+        simple_name=FoldSliceProductFileReader.SIMPLE_NAME,
+        display_name=FoldSliceProductFileReader.DISPLAY_NAME,
     )

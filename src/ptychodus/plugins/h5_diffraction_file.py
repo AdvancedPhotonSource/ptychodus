@@ -233,11 +233,11 @@ def register_plugins(registry: PluginRegistry) -> None:
     )
     registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(data_path='/dp'),
-        simple_name='PtychoShelves',
-        display_name='PtychoShelves Files (*.h5 *.hdf5)',
+        simple_name='fold_slice',
+        display_name='fold_slice Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_writers.register_plugin(
         H5DiffractionFileWriter(data_path='/dp'),
-        simple_name='PtychoShelves',
-        display_name='PtychoShelves Files (*.h5 *.hdf5)',
+        simple_name='fold_slice',
+        display_name='fold_slice Files (*.h5 *.hdf5)',
     )

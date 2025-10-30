@@ -15,7 +15,7 @@ from ptychodus.api.probe_positions import (
 logger = logging.getLogger(__name__)
 
 
-class PtychoShelvesPositionFileReader(ProbePositionFileReader):
+class FoldSlicePositionFileReader(ProbePositionFileReader):
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
 
@@ -40,7 +40,7 @@ class PtychoShelvesPositionFileReader(ProbePositionFileReader):
 
 def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
-        PtychoShelvesPositionFileReader(),
-        simple_name='PtychoShelves',
-        display_name='PtychoShelves Files (*.h5 *.hdf5)',
+        FoldSlicePositionFileReader(),
+        simple_name='fold_slice',
+        display_name='fold_slice Files (*.h5 *.hdf5)',
     )

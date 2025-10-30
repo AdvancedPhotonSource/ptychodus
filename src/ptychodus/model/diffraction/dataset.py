@@ -293,11 +293,14 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         if self._array_loader is None:
             logger.warning('Arrays have already been loaded!')
         else:
+            finished_event = self._array_loader.get_finished_event()
             self._task_manager.put_background_task(self._array_loader)
             self._array_loader = None
 
-            if block:  # FIXME wait for finish
-                pass
+            if block:
+                while not self._task_manager.is_stopping:
+                    if finished_event.wait(timeout=TaskManager.WAIT_TIME_S):
+                        break
 
     def import_assembled_patterns(self, file_path: Path) -> None:
         if file_path.is_file():

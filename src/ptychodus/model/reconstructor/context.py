@@ -136,7 +136,7 @@ class ReconstructBackgroundTask:
     reconstructor: Reconstructor
     parameters: ReconstructInput
     product_item: ProductRepositoryItem
-    reconstruction_finished_event: threading.Event
+    finished_event: threading.Event
 
     def __call__(self) -> None:
         with self.context as context:
@@ -150,7 +150,7 @@ class ReconstructBackgroundTask:
             toc = time.perf_counter()
             logger.info(f'Reconstruction time {toc - tic:.4f} seconds.')
 
-        self.reconstruction_finished_event.set()
+        self.finished_event.set()
 
 
 class TrainBackgroundTask:  # TODO

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Convert PtychoShelves datasets to Ptychodus format
+Convert fold_slice datasets to ptychodus format
 
 Example usage:
 
@@ -114,8 +114,8 @@ def main() -> int:
     args = parser.parse_args()
     settings_file = Path(args.settings.name) if args.settings else None
 
-    DIFFRACTION_FILE_TYPE: Final[str] = 'PtychoShelves'  # noqa: N806
-    PRODUCT_FILE_TYPE: Final[str] = 'PtychoShelves'  # noqa: N806
+    DIFFRACTION_FILE_TYPE: Final[str] = 'fold_slice'  # noqa: N806
+    PRODUCT_FILE_TYPE: Final[str] = 'fold_slice'  # noqa: N806
 
     with ModelCore(settings_file) as model:
         if args.list_plugins:

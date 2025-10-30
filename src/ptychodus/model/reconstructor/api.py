@@ -86,20 +86,20 @@ class ReconstructorAPI:
 
         logger.debug(parameters)
 
-        reconstruction_finished_event = threading.Event()
+        finished_event = threading.Event()
 
         background_task = ReconstructBackgroundTask(
             self._context,
             reconstructor.strategy,
             parameters,
             output_product_item,
-            reconstruction_finished_event,
+            finished_event,
         )
         self._task_manager.put_background_task(background_task)
 
         if block:
             while not self._task_manager.is_stopping:
-                if reconstruction_finished_event.wait(timeout=TaskManager.WAIT_TIME_S):
+                if finished_event.wait(timeout=TaskManager.WAIT_TIME_S):
                     break
 
         return output_product_index

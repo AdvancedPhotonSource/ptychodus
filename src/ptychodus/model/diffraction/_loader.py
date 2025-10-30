@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import concurrent.futures
 import logging
+import threading
 
 import numpy
 
@@ -135,6 +136,10 @@ class LoadAllArrays:
         self._assembler = assembler
         self._foreground_task_manager = foreground_task_manager
         self._process_patterns = process_patterns
+        self._finished_event = threading.Event()
+
+    def get_finished_event(self) -> threading.Event:
+        return self._finished_event
 
     def __call__(self) -> None:
         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -156,3 +161,5 @@ class LoadAllArrays:
                 else:
                     if task is not None:
                         self._foreground_task_manager.put_foreground_task(task)
+
+        self._finished_event.set()
