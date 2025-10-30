@@ -240,6 +240,7 @@ class DiffractionController(DiffractionDatasetObserver):
 
         if button == QMessageBox.StandardButton.Yes:
             self._diffraction_api.close_patterns()
+            self._update_view(QModelIndex(), QModelIndex())
 
     def _sync_model_to_view(self) -> None:
         self._tree_model.clear()
