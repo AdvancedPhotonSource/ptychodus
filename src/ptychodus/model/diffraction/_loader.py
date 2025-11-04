@@ -29,6 +29,31 @@ class AssembledDiffractionData:
     patterns: DiffractionPatterns
     pattern_counts: DiffractionPatterns
 
+    def __post_init__(self) -> None:
+        if self.indexes.ndim != 1:
+            raise ValueError(
+                'Unexpected number of dimensions for indexes!'
+                f' (actual={self.indexes.ndim} expected=1)'
+            )
+
+        if self.patterns.ndim != 3:
+            raise ValueError(
+                'Unexpected number of dimensions for patterns!'
+                f' (actual={self.patterns.ndim} expected=3)'
+            )
+
+        if self.pattern_counts.ndim != 1:
+            raise ValueError(
+                'Unexpected number of dimensions for pattern counts!'
+                f' (actual={self.pattern_counts.ndim} expected=1)'
+            )
+
+        if self.indexes.shape[0] != self.patterns.shape[0]:
+            raise ValueError('Number of indexes does not match number of patterns!')
+
+        if self.pattern_counts.shape[0] != self.patterns.shape[0]:
+            raise ValueError('Number of patterns does not match number of pattern counts!')
+
     @classmethod
     def create_null(cls) -> AssembledDiffractionData:
         return cls(
@@ -90,10 +115,8 @@ class LoadArray:
         array_index: int,
         array: DiffractionArray,
         bad_pixels: BadPixels,
-        processor: DiffractionPatternProcessor,
+        processor: DiffractionPatternProcessor | None,
         assembler: ArrayAssembler,
-        *,
-        process_patterns: bool,
     ) -> None:
         super().__init__()
         self._array_index = array_index
@@ -101,7 +124,6 @@ class LoadArray:
         self._bad_pixels = bad_pixels
         self._processor = processor
         self._assembler = assembler
-        self._process_patterns = process_patterns
 
     def __call__(self) -> ForegroundTask | None:
         label = self._array.get_label()
@@ -116,7 +138,7 @@ class LoadArray:
             logger.warning(f'File not found for "{label}"!')
         else:
             processed_array = (
-                self._processor(loaded_array) if self._process_patterns else loaded_array
+                loaded_array if self._processor is None else self._processor(loaded_array)
             )
             data = AssembledDiffractionData.create_pattern_counts(
                 indexes=processed_array.get_indexes(),

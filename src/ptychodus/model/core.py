@@ -81,7 +81,7 @@ class PtychodusStreamingContext:
         self._patterns_context.append_array(array)
 
     def get_queue_size(self) -> int:
-        return 0  # FIXME get_queue_size
+        return 0  # TODO get_queue_size
 
     def stop(self) -> None:
         self._patterns_context.stop()

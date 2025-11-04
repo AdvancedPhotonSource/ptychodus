@@ -186,7 +186,7 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
 
         processor = self._sizer.get_processor()
         return LoadArray(
-            array_index, array, bad_pixels, processor, self, process_patterns=process_patterns
+            array_index, array, bad_pixels, processor if process_patterns else None, self
         )
 
     def append_array(self, array: DiffractionArray, *, process_patterns: bool = True) -> None:
@@ -251,16 +251,22 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
 
         metadata = dataset.get_metadata()
         layout = dataset.get_layout()
-        processor = self._sizer.get_processor()
+
+        if not process_patterns and metadata.detector_extent is not None:
+            self._bad_pixels_provider.set_detector_extent(metadata.detector_extent)
+
         bad_pixels = self._bad_pixels_provider.get_bad_pixels()
-        processed_bad_pixels = processor.process_bad_pixels(bad_pixels)
-        self._dataset = SimpleDiffractionDataset(metadata, layout, [], processed_bad_pixels)
+
+        if process_patterns:
+            processor = self._sizer.get_processor()
+            bad_pixels = processor.process_bad_pixels(bad_pixels)
+
+        self._dataset = SimpleDiffractionDataset(metadata, layout, [], bad_pixels)
 
         num_patterns_total = sum(metadata.num_patterns_per_array)
         indexes = -numpy.ones(num_patterns_total, dtype=int)
 
-        patterns_extent = self._sizer.get_processed_image_extent()
-        patterns_shape = num_patterns_total, *patterns_extent.shape
+        patterns_shape = num_patterns_total, *bad_pixels.shape
         patterns_dtype = metadata.pattern_dtype
         pattern_counts = numpy.zeros(num_patterns_total, dtype=patterns_dtype)
 

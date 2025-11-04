@@ -3,6 +3,7 @@ import logging
 import numpy
 
 from ptychodus.api.diffraction import BadPixels
+from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.observer import Observable, Observer
 
 from .settings import DetectorSettings
@@ -18,6 +19,10 @@ class BadPixelsProvider(Observable, Observer):
 
         settings.height_px.add_observer(self)
         settings.width_px.add_observer(self)
+
+    def set_detector_extent(self, extent: ImageExtent) -> None:
+        self._settings.height_px.set_value(extent.height_px)
+        self._settings.width_px.set_value(extent.width_px)
 
     def clear_bad_pixels(self) -> None:
         self._bad_pixels = None
