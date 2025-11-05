@@ -82,6 +82,9 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
         self._current_index = 0
         self._parameter: StringParameter | None = None
 
+    def stringify_plugin_names(self) -> str:
+        return ', '.join(sorted(plugin.simple_name for plugin in self._registered_plugins))
+
     def register_plugin(self, strategy: T, *, display_name: str, simple_name: str = '') -> None:
         if not simple_name:
             simple_name = re.sub(r'\W+', '', display_name)

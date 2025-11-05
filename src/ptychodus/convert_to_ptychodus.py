@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Convert fold_slice datasets to ptychodus format
+Convert prepared datasets to ptychodus format
 
 Example usage:
 
@@ -14,31 +14,26 @@ convert-to-ptychodus \
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Final
 import argparse
 import json
 import logging
 import sys
 
-from ptychodus.api.plugins import PluginChooser
 from ptychodus.model import ModelCore
 import ptychodus
 
 logger = logging.getLogger(__name__)
 
 
-def version_string() -> str:
-    return f'{ptychodus.__name__.title()} ({ptychodus.__version__})'
-
-
-def list_plugin_names(plugin_chooser: PluginChooser[Any]) -> str:
-    return ', '.join(sorted(plugin.simple_name for plugin in plugin_chooser))
-
-
 def main() -> int:
     prog = Path(__file__).stem.lower()
     parser = argparse.ArgumentParser(
-        prog=prog, description=f'{prog} repackages fold_slice datasets in ptychodus formats.'
+        prog=prog, description=f'{prog} repackages prepared datasets into ptychodus formats.'
+    )
+    parser.add_argument(
+        '--diffraction-input-type',
+        default='fold_slice',
+        help='Diffraction input file type.',
     )
     parser.add_argument(
         '--diffraction-input',
@@ -64,10 +59,22 @@ def main() -> int:
         help='Set Python logging level.',
     )
     parser.add_argument(
+        '--override-object-type',
+        metavar='OBJECT_FILE_TYPE',
+        default='fold_slice',
+        help='Override object file type.',
+    )
+    parser.add_argument(
         '--override-object',
         metavar='OBJECT_FILE',
         type=argparse.FileType('r'),
         help='Path to the object file.',
+    )
+    parser.add_argument(
+        '--override-probe-type',
+        metavar='PROBE_FILE_TYPE',
+        default='fold_slice',
+        help='Override probe file type.',
     )
     parser.add_argument(
         '--override-probe',
@@ -76,15 +83,21 @@ def main() -> int:
         help='Path to the probe file.',
     )
     parser.add_argument(
+        '--override-probe-positions-type',
+        metavar='PROBE_POSITIONS_FILE_TYPE',
+        default='fold_slice',
+        help='Override probe positions file type.',
+    )
+    parser.add_argument(
         '--override-probe-positions',
         metavar='PROBE_POSITIONS_FILE',
         type=argparse.FileType('r'),
         help='Path to the probe positions file.',
     )
     parser.add_argument(
-        '--product-comment',
-        default='',
-        help='Data product comment',
+        '--product-input-type',
+        default='fold_slice',
+        help='Product input file type.',
     )
     parser.add_argument(
         '--product-input',
@@ -113,29 +126,25 @@ def main() -> int:
         '-v',
         '--version',
         action='version',
-        version=version_string(),
+        version=ptychodus.VERSION_STRING,
     )
 
     args = parser.parse_args()
     settings_file = Path(args.settings.name) if args.settings else None
 
-    DIFFRACTION_FILE_TYPE: Final[str] = 'fold_slice'  # noqa: N806
-    PRODUCT_FILE_TYPE: Final[str] = 'fold_slice'  # noqa: N806
-
     with ModelCore(settings_file, log_level=args.log_level) as model:
         if args.list_plugins:
             plugins: dict[str, Sequence[str]] = dict()
-            plugins['diffraction_readers'] = list_plugin_names(
-                model.plugin_registry.diffraction_file_readers
+            registry = model.plugin_registry
+            plugins['diffraction_readers'] = (
+                registry.diffraction_file_readers.stringify_plugin_names()
             )
-            plugins['product_readers'] = list_plugin_names(
-                model.plugin_registry.product_file_readers
+            plugins['product_readers'] = registry.product_file_readers.stringify_plugin_names()
+            plugins['probe_position_readers'] = (
+                registry.probe_position_file_readers.stringify_plugin_names()
             )
-            plugins['probe_position_readers'] = list_plugin_names(
-                model.plugin_registry.probe_position_file_readers
-            )
-            plugins['probe_readers'] = list_plugin_names(model.plugin_registry.probe_file_readers)
-            plugins['object_readers'] = list_plugin_names(model.plugin_registry.object_file_readers)
+            plugins['probe_readers'] = registry.probe_file_readers.stringify_plugin_names()
+            plugins['object_readers'] = registry.object_file_readers.stringify_plugin_names()
 
             print(json.dumps(plugins, indent=4))
 
@@ -161,7 +170,7 @@ def main() -> int:
 
         model.workflow_api.open_patterns(
             Path(args.diffraction_input.name),
-            file_type=DIFFRACTION_FILE_TYPE,
+            file_type=args.diffraction_input_type,
             process_patterns=False,
             block=True,
         )
@@ -169,20 +178,28 @@ def main() -> int:
         logger.info(f'Wrote diffraction data to {args.diffraction_output.name}')
 
         product_api = model.workflow_api.open_product(
-            Path(args.product_input.name), file_type=PRODUCT_FILE_TYPE
+            Path(args.product_input.name),
+            file_type=args.product_input_type,
         )
 
         if args.product_name is not None:
             product_api.rename_product(args.product_name)
 
         if args.override_object is not None:
-            product_api.open_object(Path(args.override_object.name))
+            product_api.open_object(
+                Path(args.override_object.name), file_type=args.override_object_type
+            )
 
         if args.override_probe is not None:
-            product_api.open_probe(Path(args.override_probe.name))
+            product_api.open_probe(
+                Path(args.override_probe.name), file_type=args.override_probe_type
+            )
 
         if args.override_probe_positions is not None:
-            product_api.open_probe_positions(Path(args.override_probe_positions.name))
+            product_api.open_probe_positions(
+                Path(args.override_probe_positions.name),
+                file_type=args.override_probe_positions_type,
+            )
 
         product_api.save_product(Path(args.product_output.name), file_type='HDF5')
         logger.info(f'Wrote product data to {args.product_output.name}')

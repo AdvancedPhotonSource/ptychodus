@@ -35,14 +35,11 @@ def ptychodus_reconstruct(**data: str) -> None:
     from ptychodus.model import ModelCore
 
     action = data['ptychodus_action']
-    diffraction_file = Path(data['ptychodus_diffraction_file'])
-    input_file = Path(data['ptychodus_input_file'])
-    output_file = Path(data['ptychodus_output_file'])
-    settings_file = Path(data['ptychodus_settings_file'])
+    input_directory = Path(data['ptychodus_input_directory'])
+    output_directory = Path(data['ptychodus_output_directory'])
 
-    with ModelCore(settings_file) as model:
-        model.workflow_api.import_assembled_patterns(diffraction_file)
-        model.batch_mode_execute(action, input_file, output_file)
+    with ModelCore() as model:
+        model.batch_mode_execute(action, input_directory, output_directory)
 
 
 @gladier.generate_flow_definition
@@ -50,10 +47,8 @@ class PtychodusReconstruct(gladier.GladierBaseTool):
     compute_functions = [ptychodus_reconstruct]
     required_input = [
         'ptychodus_action',
-        'ptychodus_diffraction_file',
-        'ptychodus_input_file',
-        'ptychodus_output_file',
-        'ptychodus_settings_file',
+        'ptychodus_input_directory',
+        'ptychodus_output_directory',
     ]
 
 

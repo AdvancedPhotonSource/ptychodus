@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ptychodus"
-description = "Ptychodus is a ptychography data analysis application."
+description = "Ptychodus is a ptychography data pipeline application."
 readme = "README.rst"
 requires-python = ">=3.10"
 license = "BSD-3-Clause"

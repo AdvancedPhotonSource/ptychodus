@@ -8,29 +8,14 @@ import argparse
 import logging
 import sys
 
-from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.diffraction import CropCenter
+from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.io import StandardFileLayout
+from ptychodus.cli import DirectoryType
 from ptychodus.model import ModelCore
 import ptychodus
 
 logger = logging.getLogger(__name__)
-
-
-def version_string() -> str:
-    return f'{ptychodus.__name__.title()} ({ptychodus.__version__})'
-
-
-class DirectoryType:
-    def __init__(self, *, must_exist: bool) -> None:
-        self._must_exist = must_exist
-
-    def __call__(self, string: str) -> Path:
-        path = Path(string)
-
-        if self._must_exist and not path.is_dir():
-            raise argparse.ArgumentTypeError(f'"{string}" is not a directory!')
-
-        return path
 
 
 def main() -> int:
@@ -93,9 +78,9 @@ def main() -> int:
     )
     parser.add_argument(
         '--log-level',
-        type=int,
         default=logging.INFO,
         help='Python logging level.',
+        type=int,
     )
     parser.add_argument(
         '-o',
@@ -137,15 +122,21 @@ def main() -> int:
         '-s',
         '--settings',
         metavar='SETTINGS_FILE',
-        help='use default settings from file',
+        help='Use default settings from file',
         type=argparse.FileType('r'),
         required=True,
+    )
+    parser.add_argument(
+        '--tomography-angle-deg',
+        metavar='ANGLE',
+        help='Tomography angle in degrees',
+        type=float,
     )
     parser.add_argument(
         '-v',
         '--version',
         action='version',
-        version=version_string(),
+        version=ptychodus.VERSION_STRING,
     )
 
     args = parser.parse_args()
@@ -183,6 +174,7 @@ def main() -> int:
             probe_energy_eV=args.probe_energy_eV,
             probe_photon_count=args.probe_photon_count,
             exposure_time_s=args.exposure_time_s,
+            tomography_angle_deg=args.tomography_angle_deg,
         )
         workflow_product_api.open_probe_positions(Path(args.probe_position_input.name))
         workflow_product_api.generate_probe()
@@ -190,9 +182,11 @@ def main() -> int:
 
         staging_dir = args.output_directory
         staging_dir.mkdir(parents=True, exist_ok=True)
-        model.workflow_api.save_settings(staging_dir / 'settings.ini')
-        model.workflow_api.export_assembled_patterns(staging_dir / 'diffraction.h5')
-        workflow_product_api.save_product(staging_dir / 'product-in.h5', file_type='HDF5')
+        model.workflow_api.save_settings(staging_dir / StandardFileLayout.SETTINGS)
+        model.workflow_api.export_assembled_patterns(staging_dir / StandardFileLayout.DIFFRACTION)
+        workflow_product_api.save_product(
+            staging_dir / StandardFileLayout.PRODUCT_IN, file_type='HDF5'
+        )
 
     return 0
 

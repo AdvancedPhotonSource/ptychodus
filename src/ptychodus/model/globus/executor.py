@@ -4,6 +4,7 @@ from typing import Any
 import logging
 import queue
 
+from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import DiffractionAPI
@@ -58,21 +59,20 @@ class GlobusExecutor:
         compute_data_globus_path = f'{self._compute_data_locator.get_globus_path()}/{flow_label}'
         output_data_globus_path = f'{self._output_data_locator.get_globus_path()}/{flow_label}'
 
-        settings_file = 'settings.ini'
-        diffraction_file = 'diffraction.h5'
-        input_file = 'product-in.h5'
-        output_file = 'product-out.h5'
-
         try:
             input_data_posix_path.mkdir(mode=0o755, parents=True, exist_ok=True)
         except FileExistsError:
             logger.warning('Input data POSIX path must be a directory!')
             return
 
-        self._settings_registry.save_settings(input_data_posix_path / settings_file)
-        self._diffraction_api.export_assembled_patterns(input_data_posix_path / diffraction_file)
+        self._settings_registry.save_settings(input_data_posix_path / StandardFileLayout.SETTINGS)
+        self._diffraction_api.export_assembled_patterns(
+            input_data_posix_path / StandardFileLayout.DIFFRACTION
+        )
         self._product_api.save_product(
-            input_product_index, input_data_posix_path / input_file, file_type='HDF5'
+            input_product_index,
+            input_data_posix_path / StandardFileLayout.PRODUCT_IN,
+            file_type='HDF5',
         )
 
         flow_input = {
@@ -86,18 +86,20 @@ class GlobusExecutor:
             'input_data_transfer_sync_level': transfer_sync_level,
             'compute_endpoint': str(self._settings.compute_endpoint_id.get_value()),
             'ptychodus_action': ptychodus_action,
-            'ptychodus_settings_file': str(compute_data_posix_path / settings_file),
-            'ptychodus_diffraction_file': str(compute_data_posix_path / diffraction_file),
-            'ptychodus_input_file': str(compute_data_posix_path / input_file),
-            'ptychodus_output_file': str(compute_data_posix_path / output_file),
+            'ptychodus_settings_file': str(compute_data_posix_path / StandardFileLayout.SETTINGS),
+            'ptychodus_diffraction_file': str(
+                compute_data_posix_path / StandardFileLayout.DIFFRACTION
+            ),
+            'ptychodus_input_file': str(compute_data_posix_path / StandardFileLayout.PRODUCT_IN),
+            'ptychodus_output_file': str(compute_data_posix_path / StandardFileLayout.PRODUCT_OUT),
             'output_data_transfer_source_endpoint': str(
                 self._compute_data_locator.get_endpoint_id()
             ),
-            'output_data_transfer_source_path': f'{compute_data_globus_path}/{output_file}',
+            'output_data_transfer_source_path': f'{compute_data_globus_path}/{StandardFileLayout.PRODUCT_OUT}',
             'output_data_transfer_destination_endpoint': str(
                 self._output_data_locator.get_endpoint_id()
             ),
-            'output_data_transfer_destination_path': f'{output_data_globus_path}/{output_file}',
+            'output_data_transfer_destination_path': f'{output_data_globus_path}/{StandardFileLayout.PRODUCT_OUT}',
             'output_data_transfer_recursive': False,
         }
 

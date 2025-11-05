@@ -5,25 +5,17 @@ import argparse
 import logging
 import sys
 
+from ptychodus.cli import DirectoryType, verify_all_arguments_parsed
 from ptychodus.model import ModelCore
 import ptychodus
 
 logger = logging.getLogger(__name__)
 
 
-def version_string() -> str:
-    return f'{ptychodus.__name__.title()} ({ptychodus.__version__})'
-
-
-def verify_all_arguments_parsed(parser: argparse.ArgumentParser, argv: list[str]) -> None:
-    if argv:
-        parser.error('unrecognized arguments: %s' % ' '.join(argv))
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog=ptychodus.__name__.lower(),
-        description=f'{ptychodus.__name__} is a ptychography data analysis application',
+        description=f'{ptychodus.__name__} is a ptychography data pipeline application',
     )
     parser.add_argument(
         '-b',
@@ -32,22 +24,11 @@ def main() -> int:
         help='Run action non-interactively',
     )
     parser.add_argument(
-        '--fluorescence-input',
-        metavar='FLUORESCENCE_INPUT_FILE',
-        type=argparse.FileType('r'),
-        help=argparse.SUPPRESS,
-    )
-    parser.add_argument(
-        '--fluorescence-output',
-        metavar='FLUORESCENCE_OUTPUT_FILE',
-        type=argparse.FileType('w'),
-        help=argparse.SUPPRESS,
-    )
-    parser.add_argument(
-        '--batch-input',
-        metavar='INPUT_FILE',
-        type=argparse.FileType('r'),
-        help='Path to the input file (batch mode)',
+        '-i',
+        '--input-directory',
+        metavar='INPUT_DIR',
+        type=DirectoryType(must_exist=True),
+        help='Path to the input data directory (batch mode only)',
     )
     parser.add_argument(
         '--log-level',
@@ -56,17 +37,11 @@ def main() -> int:
         help='Set Python logging level.',
     )
     parser.add_argument(
-        '--batch-output',
-        metavar='OUTPUT_FILE',
-        type=argparse.FileType('w'),
-        help='Path to the output file (batch mode)',
-    )
-    parser.add_argument(
-        # preprocessed diffraction patterns file (batch mode)
-        '--diffraction-input',
-        metavar='DIFFRACTION_INPUT_FILE',
-        type=argparse.FileType('r'),
-        help=argparse.SUPPRESS,
+        '-o',
+        '--output-directory',
+        metavar='OUTPUT_DIR',
+        type=DirectoryType(must_exist=False),
+        help='Path to the output data directory (batch mode only)',
     )
     parser.add_argument(
         '-s',
@@ -79,42 +54,22 @@ def main() -> int:
         '-v',
         '--version',
         action='version',
-        version=version_string(),
+        version=ptychodus.VERSION_STRING,
     )
 
     parsed_args, unparsed_args = parser.parse_known_args()
     settings_file = Path(parsed_args.settings.name) if parsed_args.settings else None
 
     with ModelCore(settings_file, log_level=parsed_args.log_level) as model:
-        if parsed_args.diffraction_input is not None:
-            diffraction_file_path = Path(parsed_args.diffraction_input.name)
-            model.workflow_api.import_assembled_patterns(diffraction_file_path)
-
         if parsed_args.batch is not None:
             verify_all_arguments_parsed(parser, unparsed_args)
 
-            if parsed_args.batch_input is None or parsed_args.batch_output is None:
+            if parsed_args.input_directory is None or parsed_args.output_directory is None:
                 parser.error('Batch mode requires input and output arguments!')
                 return -1
 
-            action = parsed_args.batch
-            input_file_path = Path(parsed_args.batch_input.name)
-            output_file_path = Path(parsed_args.batch_output.name)
-            fluorescence_input_file_path: Path | None = None
-            fluorescence_output_file_path: Path | None = None
-
-            if parsed_args.fluorescence_input is not None:
-                fluorescence_input_file_path = Path(parsed_args.fluorescence_input.name)
-
-            if parsed_args.fluorescence_output is not None:
-                fluorescence_output_file_path = Path(parsed_args.fluorescence_output.name)
-
             return model.batch_mode_execute(
-                action,
-                input_file_path,
-                output_file_path,
-                fluorescence_input_file_path=fluorescence_input_file_path,
-                fluorescence_output_file_path=fluorescence_output_file_path,
+                parsed_args.batch, parsed_args.input_directory, parsed_args.output_directory
             )
 
         try:
@@ -136,7 +91,7 @@ def main() -> int:
         controller = ControllerCore(
             model, view, is_developer_mode_enabled=model.is_developer_mode_enabled
         )
-        controller.show_main_window(version_string())
+        controller.show_main_window(ptychodus.VERSION_STRING)
 
         return app.exec()
 

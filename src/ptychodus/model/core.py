@@ -17,6 +17,7 @@ import h5py
 import numpy
 
 from ptychodus.api.diffraction import DiffractionMetadata, DiffractionArray
+from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.workflow import WorkflowAPI
@@ -234,40 +235,77 @@ class ModelCore:
         self._task_manager.run_foreground_tasks()
         self.reconstructor_core.notify_observers_if_progress_changed()
 
-    def batch_mode_execute(
-        self,
-        action: str,
-        input_path: Path,
-        output_path: Path,
-        *,
-        fluorescence_input_file_path: Path | None = None,
-        fluorescence_output_file_path: Path | None = None,
-    ) -> int:
-        # TODO add enum for actions
-        if action.lower() == 'train':
-            output = self.workflow_api.train_reconstructor(input_path, output_path)
-            return output.result
+    def _batch_mode_train(self, input_directory: Path, output_directory: Path) -> int:
+        output = self.workflow_api.train_reconstructor(input_directory, output_directory)
+        return output.result
 
-        if action.lower() == 'reconstruct':
-            input_product_api = self.workflow_api.open_product(input_path)
-            output_product_api = input_product_api.reconstruct_local(block=True)
-            output_product_api.save_product(output_path)
+    def _batch_mode_reconstruct(self, input_directory: Path, output_directory: Path) -> int:
+        settings_path = input_directory / StandardFileLayout.SETTINGS
 
-            if (
-                fluorescence_input_file_path is not None
-                and fluorescence_output_file_path is not None
-            ):
-                # TODO implement using workflow API
-                self.fluorescence_core.enhance_fluorescence(
-                    output_product_api.get_product_index(),
-                    fluorescence_input_file_path,
-                    fluorescence_output_file_path,
-                )
+        if settings_path.is_file():
+            self.settings_registry.open_settings(settings_path)
         else:
-            logger.error(f'Unknown batch mode action "{action}"!')
+            logger.warning('Settings file not found! Proceeding with defaults.')
+
+        diffraction_path = input_directory / StandardFileLayout.DIFFRACTION
+
+        if diffraction_path.is_file():
+            self.workflow_api.import_assembled_patterns(diffraction_path)
+        else:
+            logger.error('Diffraction data is not a file!')
             return -1
 
+        product_in_path = input_directory / StandardFileLayout.PRODUCT_IN
+
+        if product_in_path.is_file():
+            product_out_path = output_directory / StandardFileLayout.PRODUCT_OUT
+
+            if product_out_path.is_file():
+                logger.warning('Output product file will be overwritten!')
+
+            input_product_api = self.workflow_api.open_product(product_in_path)
+            output_product_api = input_product_api.reconstruct_local(block=True)
+            output_product_api.save_product(product_out_path)
+        else:
+            logger.error('Input product is not a file!')
+            return -1
+
+        fluorescence_in_path = input_directory / StandardFileLayout.FLUORESCENCE_IN
+
+        if fluorescence_in_path.is_file():
+            fluorescence_out_path = output_directory / StandardFileLayout.FLUORESCENCE_OUT
+
+            if fluorescence_out_path.is_file():
+                logger.warning('Output fluorescence file will be overwritten!')
+
+            logger.info('Enhancing fluorescence...')
+
+            # TODO add to workflow API
+            self.fluorescence_core.enhance_fluorescence(
+                output_product_api.get_product_index(),
+                fluorescence_in_path,
+                fluorescence_out_path,
+            )
+        else:
+            logger.info('No fluorescence data to enhance.')
+
         return 0
+
+    def batch_mode_execute(self, action: str, input_directory: Path, output_directory: Path) -> int:
+        if not input_directory.is_dir():
+            raise ValueError('Input path is not a directory!')
+
+        output_directory.mkdir(parents=True, exist_ok=True)
+
+        # TODO add enum for actions
+        match action.lower():
+            case 'train':
+                return self._batch_mode_train(input_directory, output_directory)
+            case 'reconstruct':
+                return self._batch_mode_reconstruct(input_directory, output_directory)
+
+        logger.error(f'Unknown batch mode action "{action}"!')
+        return -1
 
     @property
     def is_developer_mode_enabled(self) -> bool:
