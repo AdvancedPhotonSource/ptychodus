@@ -47,6 +47,8 @@ class ObjectTreeModel(QAbstractItemModel):
             'Data Type',
             'Width [px]',
             'Height [px]',
+            'Pixel Width\n[nm]',
+            'Pixel Height\n[nm]',
             'Size [MB]',
         ]
 
@@ -163,6 +165,7 @@ class ObjectTreeModel(QAbstractItemModel):
         else:
             item = self._repository[index.row()]
             object_ = item.get_object()
+            pixel_geometry = object_.get_pixel_geometry()
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 match index.column():
@@ -179,6 +182,10 @@ class ObjectTreeModel(QAbstractItemModel):
                     case 5:
                         return object_.height_px
                     case 6:
+                        return f'{pixel_geometry.width_m * 1e9:.4g}'
+                    case 7:
+                        return f'{pixel_geometry.height_m * 1e9:.4g}'
+                    case 8:
                         return f'{object_.nbytes / BYTES_PER_MEGABYTE:.2f}'
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:

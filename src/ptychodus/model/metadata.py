@@ -136,9 +136,6 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
         if distance_m:
             self._product_settings.detector_distance_m.set_value(distance_m)
 
-    def handle_bad_pixels_changed(self, num_bad_pixels: int) -> None:
-        pass
-
     def handle_array_inserted(self, index: int) -> None:
         pass
 

@@ -9,7 +9,9 @@ from ptychodus.api.diffraction import (
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 
+from ..task_manager import TaskManager
 from .api import DiffractionAPI
+from .bad_pixels import BadPixelsProvider
 from .dataset import AssembledDiffractionDataset
 from .settings import DetectorSettings, DiffractionSettings
 from .sizer import PatternSizer
@@ -20,6 +22,7 @@ logger = logging.getLogger(__name__)
 class DiffractionCore(Observer):
     def __init__(
         self,
+        task_manager: TaskManager,
         settings_registry: SettingsRegistry,
         bad_pixels_file_reader_chooser: PluginChooser[BadPixelsFileReader],
         file_reader_chooser: PluginChooser[DiffractionFileReader],
@@ -30,10 +33,14 @@ class DiffractionCore(Observer):
         self.detector_settings = DetectorSettings(settings_registry)
         self.diffraction_settings = DiffractionSettings(settings_registry)
         self.pattern_sizer = PatternSizer(self.detector_settings, self.diffraction_settings)
-        self.dataset = AssembledDiffractionDataset(self.diffraction_settings, self.pattern_sizer)
+        self.bad_pixels_provider = BadPixelsProvider(self.detector_settings)
+        self.dataset = AssembledDiffractionDataset(
+            self.diffraction_settings, self.pattern_sizer, self.bad_pixels_provider, task_manager
+        )
         self.diffraction_api = DiffractionAPI(
             self.diffraction_settings,
             self.detector_settings,
+            self.bad_pixels_provider,
             self.dataset,
             bad_pixels_file_reader_chooser,
             file_reader_chooser,
@@ -49,12 +56,6 @@ class DiffractionCore(Observer):
         self._reinit_observable = reinit_observable
         reinit_observable.add_observer(self)
 
-    def start(self) -> None:
-        pass
-
-    def stop(self) -> None:
-        self.diffraction_api.finish_assembling_diffraction_patterns(block=False)
-
     def _update(self, observable: Observable) -> None:
         if observable is self._reinit_observable:
             self.diffraction_api.open_bad_pixels(
@@ -65,5 +66,4 @@ class DiffractionCore(Observer):
                 file_path=self.diffraction_settings.file_path.get_value(),
                 file_type=self.diffraction_settings.file_type.get_value(),
             )
-            self.diffraction_api.start_assembling_diffraction_patterns()
-            self.diffraction_api.finish_assembling_diffraction_patterns(block=True)
+            self.diffraction_api.load_all_arrays()

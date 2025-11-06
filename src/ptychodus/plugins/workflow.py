@@ -37,9 +37,9 @@ class APS2IDFileBasedWorkflow(FileBasedWorkflow):
         diffraction_file_path = file_path.parents[1] / 'raw_data' / f'scan{scan_id}_master.h5'
         api.open_patterns(diffraction_file_path)
         product_api = api.create_product(f'scan{scan_id}')
-        product_api.open_scan(file_path)
-        product_api.build_probe()
-        product_api.build_object()
+        product_api.open_probe_positions(file_path)
+        product_api.generate_probe()
+        product_api.generate_object()
         product_api.reconstruct_remote()
 
 
@@ -65,9 +65,9 @@ class APS26IDFileBasedWorkflow(FileBasedWorkflow):
 
         api.open_patterns(diffraction_file_path)
         product_api = api.create_product(f'scan_{scan_id}')
-        product_api.open_scan(file_path)
-        product_api.build_probe()
-        product_api.build_object()
+        product_api.open_probe_positions(file_path)
+        product_api.generate_probe()
+        product_api.generate_object()
         product_api.reconstruct_remote()
 
 
@@ -144,9 +144,9 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
             product_name = f'scan{scan_num:05d}_' + metadata.label
             api.open_patterns(file_path)
             input_product_api = api.create_product(product_name, comments=str(metadata))
-            input_product_api.open_scan(scan_file)
-            input_product_api.build_probe()
-            input_product_api.build_object()
+            input_product_api.open_probe_positions(scan_file)
+            input_product_api.generate_probe()
+            input_product_api.generate_object()
             # TODO would prefer to write instructions and submit to queue
             output_product_api = input_product_api.reconstruct_local()
             output_product_api.save_product(experiment_dir / 'ptychodus' / f'{product_name}.h5')

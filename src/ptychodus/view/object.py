@@ -1,3 +1,4 @@
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QComboBox,
     QDialog,
@@ -48,17 +49,30 @@ class FourierRingCorrelationDialog(QDialog):
 
 
 class FourierAnalysisDialog(QDialog):
+    @staticmethod
+    def _box_widget(title: str, widget: QWidget) -> QWidget:
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(widget)
+
+        box = QGroupBox(title)
+        box.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        box.setLayout(layout)
+
+        return box
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.real_space_view = ImageView(add_fourier_tool=True)
-        # FIXME self.real_space_widget = VisualizationWidget('Real Space', add_fourier_tool=True)
         self.reciprocal_space_view = ImageView()
-        # FIXME self.reciprocal_space_widget = VisualizationWidget('Reciprocal Space')
         self.status_bar = QStatusBar()
 
+        real_space_box = self._box_widget('Real Space', self.real_space_view)
+        reciprocal_space_box = self._box_widget('Reciprocal Space', self.reciprocal_space_view)
+
         contents_layout = QHBoxLayout()
-        contents_layout.addWidget(self.real_space_view)
-        contents_layout.addWidget(self.reciprocal_space_view)
+        contents_layout.addWidget(real_space_box)
+        contents_layout.addWidget(reciprocal_space_box)
 
         layout = QVBoxLayout()
         layout.addLayout(contents_layout)

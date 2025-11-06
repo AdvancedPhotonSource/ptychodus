@@ -35,3 +35,16 @@ be happy to add file readers to support more ptychography instruments.
     - Ptychodus Product (*.h5, *.npz)
     - Space-Separated Values (*.txt)
     - Tagged Image File Format (*.tif, *.tiff)
+
+Good/Bad Pixel Masks
+====================
+
+Currently there are two numpy (NPY) file formats that can be used to indicate
+detector pixels that are usable ("good pixels") or unusable ("bad pixels") for
+processing. Both file types contain a 2-D boolean array with the same dimensions
+as an unprocessed detector frame. For the "good pixels" format, True indicates a
+usable pixel and False indicates an unusable pixel. For the "bad pixels" format,
+True indicates an unusable pixel and False indicates a usable pixel. When one of
+these files is provided, Ptychodus will zero bad pixels and provide the mask to
+processing algorithms that support pixel masks. When one of these files is not
+provided, Ptychodus assumes that all pixels should be used for processing.

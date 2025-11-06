@@ -16,12 +16,16 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def open_scan(self, file_path: Path, *, file_type: str | None = None) -> None:
+    def rename_product(self, new_name: str) -> None:
         pass
 
     @abstractmethod
-    def build_scan(
-        self, builder_name: str | None = None, builder_parameters: Mapping[str, Any] = {}
+    def open_probe_positions(self, file_path: Path, *, file_type: str | None = None) -> None:
+        pass
+
+    @abstractmethod
+    def generate_probe_positions(
+        self, generator_name: str | None = None, generator_parameters: Mapping[str, Any] = {}
     ) -> None:
         pass
 
@@ -30,8 +34,8 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def build_probe(
-        self, builder_name: str | None = None, builder_parameters: Mapping[str, Any] = {}
+    def generate_probe(
+        self, generator_name: str | None = None, generator_parameters: Mapping[str, Any] = {}
     ) -> None:
         pass
 
@@ -40,8 +44,8 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def build_object(
-        self, builder_name: str | None = None, builder_parameters: Mapping[str, Any] = {}
+    def generate_object(
+        self, generator_name: str | None = None, generator_parameters: Mapping[str, Any] = {}
     ) -> None:
         pass
 
@@ -75,6 +79,9 @@ class WorkflowAPI(ABC):
         file_type: str | None = None,
         crop_center: CropCenter | None = None,
         crop_extent: ImageExtent | None = None,
+        detector_extent: ImageExtent | None = None,
+        process_patterns: bool = True,
+        block: bool = False,
     ) -> None:
         """opens diffraction patterns from file"""
         pass

@@ -70,6 +70,6 @@ class NanoMAXDiffractionFileReader(DiffractionFileReader):
 def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         NanoMAXDiffractionFileReader(),
-        simple_name='MAX_IV_NanoMax',
-        display_name='MAX IV NanoMax Files (*.h5 *.hdf5)',
+        simple_name='MAX_IV_NanoMAX',
+        display_name='MAX IV NanoMAX Files (*.h5 *.hdf5)',
     )

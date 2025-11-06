@@ -11,17 +11,19 @@ from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import AssembledDiffractionDataset
 from ..product import ProductAPI
+from ..task_manager import TaskManager
 from .api import ReconstructorAPI
+from .context import ReconstructorContext
 from .log import ReconstructorLogHandler
 from .matcher import DiffractionPatternPositionMatcher
 from .presenter import ReconstructorPresenter
-from .queue import ReconstructionQueue
 from .settings import ReconstructorSettings
 
 
 class ReconstructorCore:
     def __init__(
         self,
+        task_manager: TaskManager,
         settings_registry: SettingsRegistry,
         dataset: AssembledDiffractionDataset,
         product_api: ProductAPI,
@@ -33,13 +35,15 @@ class ReconstructorCore:
         self._log_handler.setFormatter(
             logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s')
         )
+        self._context = ReconstructorContext(self._log_handler, task_manager)
 
         for library in library_seq:
             for reconstructor in library:
+                reconstructor_name = reconstructor.get_name()
                 self._plugin_chooser.register_plugin(
                     reconstructor,
-                    simple_name=f'{library.name}_{reconstructor.name}',
-                    display_name=f'{library.name}/{reconstructor.name}',
+                    simple_name=f'{library.name}_{reconstructor_name}',
+                    display_name=f'{library.name}/{reconstructor_name}',
                 )
 
             library_logger = library.get_logger()
@@ -50,10 +54,9 @@ class ReconstructorCore:
                 NullReconstructor('None'), display_name='None/None'
             )
 
-        self.data_matcher = DiffractionPatternPositionMatcher(dataset, product_api)
-        self._reconstruction_queue = ReconstructionQueue(self.data_matcher)
+        self.data_matcher = DiffractionPatternPositionMatcher(dataset)
         self.reconstructor_api = ReconstructorAPI(
-            self._reconstruction_queue, self.data_matcher, product_api, self._plugin_chooser
+            task_manager, self.data_matcher, product_api, self._context, self._plugin_chooser
         )
         self.presenter = ReconstructorPresenter(
             self.settings,
@@ -62,8 +65,5 @@ class ReconstructorCore:
             self.reconstructor_api,
         )
 
-    def start(self) -> None:
-        self._reconstruction_queue.start()
-
-    def stop(self) -> None:
-        self._reconstruction_queue.stop()
+    def notify_observers_if_progress_changed(self) -> None:
+        self._context.notify_observers_if_progress_changed()

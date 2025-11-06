@@ -6,15 +6,19 @@ import logging
 import numpy
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint
+from ptychodus.api.probe_positions import (
+    ProbePositionSequence,
+    ProbePositionFileReader,
+    ProbePosition,
+)
 
 logger = logging.getLogger(__name__)
 
 
-class APS12IDPositionFileReader(PositionFileReader):
+class APS12IDPositionFileReader(ProbePositionFileReader):
     ONE_NANOMETER_M: Final[float] = 1.0e-9
 
-    def read(self, file_path: Path) -> PositionSequence:
+    def read(self, file_path: Path) -> ProbePositionSequence:
         stem_parts = file_path.stem.split('_')
         stem_prefix = '_'.join(stem_parts[:-2])
         logger.debug(f'{stem_prefix=}')
@@ -51,25 +55,25 @@ class APS12IDPositionFileReader(PositionFileReader):
             if missing_points:
                 logger.warning(f'Line {line} is missing points {missing_points}')
 
-        scan_point_list: list[ScanPoint] = list()
+        scan_point_list: list[ProbePosition] = list()
 
         for (line, point), fp in sorted(file_dict.items()):
             index = (point - points_min) + (line - lines_min) * points_num
             position_data = numpy.genfromtxt(fp)
 
             for row in position_data:
-                scan_point = ScanPoint(
+                scan_point = ProbePosition(
                     index=index,
-                    position_x_m=-self.ONE_NANOMETER_M * row[2],
-                    position_y_m=+self.ONE_NANOMETER_M * row[1],
+                    coordinate_x_m=-self.ONE_NANOMETER_M * row[2],
+                    coordinate_y_m=+self.ONE_NANOMETER_M * row[1],
                 )
                 scan_point_list.append(scan_point)
 
-        return PositionSequence(scan_point_list)
+        return ProbePositionSequence(scan_point_list)
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.position_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         APS12IDPositionFileReader(),
         simple_name='APS_PtychoSAXS',
         display_name='APS 12-ID PtychoSAXS Files (*.dat)',

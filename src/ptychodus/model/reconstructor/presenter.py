@@ -54,17 +54,6 @@ class ReconstructorPresenter(Observable, Observer):
         return self._reconstructor_api.reconstruct_transformed(input_product_index)
 
     @property
-    def is_reconstructing(self) -> bool:
-        return self._reconstructor_api.is_reconstructing
-
-    def flush_log(self) -> Iterator[str]:
-        for text in self._log_handler.messages():
-            yield text
-
-    def process_results(self, *, block: bool) -> None:
-        self._reconstructor_api.process_results(block=block)
-
-    @property
     def is_trainable(self) -> bool:
         reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
         return isinstance(reconstructor, TrainableReconstructor)

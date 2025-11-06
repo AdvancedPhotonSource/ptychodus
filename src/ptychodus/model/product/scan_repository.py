@@ -10,12 +10,14 @@ from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
 from .repository import ProductRepository
-from .scan import ScanRepositoryItem
+from .probe_positions import ProbePositionsRepositoryItem
 
 logger = logging.getLogger(__name__)
 
 
-class ScanRepository(ObservableSequence[ScanRepositoryItem], ProductRepositoryObserver):
+class ProbePositionsRepository(
+    ObservableSequence[ProbePositionsRepositoryItem], ProductRepositoryObserver
+):
     def __init__(self, repository: ProductRepository) -> None:
         super().__init__()
         self._repository = repository
@@ -28,27 +30,31 @@ class ScanRepository(ObservableSequence[ScanRepositoryItem], ProductRepositoryOb
         self._repository[index].set_name(name)
 
     @overload
-    def __getitem__(self, index: int) -> ScanRepositoryItem: ...
+    def __getitem__(self, index: int) -> ProbePositionsRepositoryItem: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Sequence[ScanRepositoryItem]: ...
+    def __getitem__(self, index: slice) -> Sequence[ProbePositionsRepositoryItem]: ...
 
-    def __getitem__(self, index: int | slice) -> ScanRepositoryItem | Sequence[ScanRepositoryItem]:
+    def __getitem__(
+        self, index: int | slice
+    ) -> ProbePositionsRepositoryItem | Sequence[ProbePositionsRepositoryItem]:
         if isinstance(index, slice):
-            return [item.get_scan_item() for item in self._repository[index]]
+            return [item.get_probe_positions_item() for item in self._repository[index]]
         else:
-            return self._repository[index].get_scan_item()
+            return self._repository[index].get_probe_positions_item()
 
     def __len__(self) -> int:
         return len(self._repository)
 
     def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notify_observers_item_inserted(index, item.get_scan_item())
+        self.notify_observers_item_inserted(index, item.get_probe_positions_item())
 
     def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
         pass
 
-    def handle_scan_changed(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_probe_positions_changed(
+        self, index: int, item: ProbePositionsRepositoryItem
+    ) -> None:
         self.notify_observers_item_changed(index, item)
 
     def handle_probe_changed(self, index: int, item: ProbeRepositoryItem) -> None:
@@ -61,4 +67,4 @@ class ScanRepository(ObservableSequence[ScanRepositoryItem], ProductRepositoryOb
         pass
 
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
-        self.notify_observers_item_removed(index, item.get_scan_item())
+        self.notify_observers_item_removed(index, item.get_probe_positions_item())

@@ -6,11 +6,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ptychodus.api.observer import SequenceObserver
 
-from ...model.analysis import (
-    IlluminationMapper,
-    ProbePropagator,
-    STXMSimulator,
-)
+from ...model.analysis import IlluminationMapper, ProbePropagator
 from ...model.fluorescence import FluorescenceEnhancer
 from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
@@ -28,7 +24,6 @@ from .editor_factory import ProbeEditorViewControllerFactory
 from .fluorescence import FluorescenceViewController
 from .illumination import IlluminationViewController
 from .propagator import ProbePropagationViewController
-from .stxm import STXMViewController
 from .tree_model import ProbeTreeModel
 
 logger = logging.getLogger(__name__)
@@ -42,8 +37,6 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         image_controller: ImageController,
         propagator: ProbePropagator,
         propagator_visualization_engine: VisualizationEngine,
-        stxm_simulator: STXMSimulator,
-        stxm_visualization_engine: VisualizationEngine,
         illumination_mapper: IlluminationMapper,
         illumination_visualization_engine: VisualizationEngine,
         fluorescence_enhancer: FluorescenceEnhancer,
@@ -64,9 +57,6 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         self._propagation_view_controller = ProbePropagationViewController(
             propagator, propagator_visualization_engine, file_dialog_factory
-        )
-        self._stxm_view_controller = STXMViewController(
-            stxm_simulator, stxm_visualization_engine, file_dialog_factory
         )
         self._illumination_view_controller = IlluminationViewController(
             illumination_mapper,
@@ -120,9 +110,6 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         propagate_action = view.button_box.analyze_menu.addAction('Propagate...')
         connect_triggered_signal(propagate_action, self._propagate_probe)
-
-        stxm_action = view.button_box.analyze_menu.addAction('Simulate STXM...')
-        connect_triggered_signal(stxm_action, self._simulate_stxm)
 
         illumination_action = view.button_box.analyze_menu.addAction('Map Illumination...')
         connect_triggered_signal(illumination_action, self._map_illumination)
@@ -225,14 +212,6 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             logger.warning('No current item!')
         else:
             self._propagation_view_controller.launch(item_index)
-
-    def _simulate_stxm(self) -> None:
-        item_index = self._get_current_item_index()
-
-        if item_index < 0:
-            logger.warning('No current item!')
-        else:
-            self._stxm_view_controller.simulate(item_index)
 
     def _map_illumination(self) -> None:
         item_index = self._get_current_item_index()

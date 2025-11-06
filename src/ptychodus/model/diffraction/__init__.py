@@ -1,16 +1,18 @@
 from .api import DiffractionAPI, PatternsStreamingContext
+from .bad_pixels import BadPixelsProvider
 from .core import DiffractionCore
 from .dataset import (
+    AssembledDiffractionArray,
     AssembledDiffractionDataset,
-    AssembledDiffractionPatternArray,
     DiffractionDatasetObserver,
 )
 from .settings import DetectorSettings, DiffractionSettings
 from .sizer import PatternSizer
 
 __all__ = [
+    'AssembledDiffractionArray',
     'AssembledDiffractionDataset',
-    'AssembledDiffractionPatternArray',
+    'BadPixelsProvider',
     'DetectorSettings',
     'DiffractionAPI',
     'DiffractionCore',

@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 import logging
 
-from PyQt5.QtCore import Qt, QAbstractItemModel, QTimer
+from PyQt5.QtCore import Qt, QAbstractItemModel
 from PyQt5.QtWidgets import QActionGroup, QLabel, QWidget
 
 from ptychodus.api.observer import Observable, Observer
@@ -17,9 +17,13 @@ from ..model.product import (
 from ..model.product.metadata import MetadataRepositoryItem
 from ..model.product.object import ObjectRepositoryItem
 from ..model.product.probe import ProbeRepositoryItem
-from ..model.product.scan import ScanRepositoryItem
-from ..model.reconstructor import ReconstructorPresenter
-from ..view.reconstructor import ReconstructorView, ReconstructorPlotView
+from ..model.product.probe_positions import ProbePositionsRepositoryItem
+from ..model.reconstructor import ReconstructorPresenter, ReconstructorProgressMonitor
+from ..view.reconstructor import (
+    ReconstructorPlotView,
+    ReconstructorProgressDialog,
+    ReconstructorView,
+)
 from ..view.widgets import ExceptionDialog
 from .data import FileDialogFactory
 from .helpers import connect_triggered_signal
@@ -38,9 +42,56 @@ class ReconstructorViewControllerFactory(ABC):
         pass
 
 
+class ReconstructorProgressController(Observer):
+    def __init__(
+        self, monitor: ReconstructorProgressMonitor, dialog: ReconstructorProgressDialog
+    ) -> None:
+        super().__init__()
+        self._monitor = monitor
+        self._dialog = dialog
+
+        dialog.setModal(True)
+        dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+        dialog.setWindowFlags(
+            Qt.WindowType.Window | Qt.WindowType.WindowTitleHint | Qt.WindowType.CustomizeWindowHint
+        )
+        dialog.text_edit.setReadOnly(True)
+
+        self._sync_model_to_view()
+        monitor.add_observer(self)
+
+    def _sync_model_to_view(self) -> None:
+        is_reconstructing = self._monitor.is_reconstructing
+
+        for button in self._dialog.button_box.buttons():
+            button.setEnabled(not is_reconstructing)
+
+        for text in self._monitor.message_log():
+            self._dialog.text_edit.appendPlainText(text)
+
+        progress_goal = self._monitor.get_progress_goal()
+        progress_bar = self._dialog.progress_bar
+
+        if progress_goal > 0:
+            progress_bar.show()
+            progress_bar.setRange(0, progress_goal)
+            progress_bar.setValue(self._monitor.get_progress())
+        else:
+            progress_bar.hide()
+
+    def show_dialog(self) -> None:
+        self._sync_model_to_view()
+        self._dialog.show()
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._monitor:
+            self._sync_model_to_view()
+
+
 class ReconstructorController(ProductRepositoryObserver, Observer):
     def __init__(
         self,
+        progress_monitor: ReconstructorProgressMonitor,
         presenter: ReconstructorPresenter,
         product_repository: ProductRepository,
         view: ReconstructorView,
@@ -70,16 +121,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         view.parameters_view.product_combo_box.textActivated.connect(self._redraw_plot)
         view.parameters_view.product_combo_box.setModel(product_table_model)
 
-        self._progress_timer = QTimer()
-        self._progress_timer.timeout.connect(self._update_progress)
-        self._progress_timer.start(5 * 1000)  # TODO customize (in milliseconds)
-
-        view.progress_dialog.setModal(True)
-        view.progress_dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
-        view.progress_dialog.setWindowFlags(
-            Qt.WindowType.Window | Qt.WindowType.WindowTitleHint | Qt.WindowType.CustomizeWindowHint
+        self._progress_controller = ReconstructorProgressController(
+            progress_monitor, view.progress_dialog
         )
-        view.progress_dialog.text_edit.setReadOnly(True)
 
         open_model_action = view.parameters_view.reconstructor_menu.addAction('Open Model...')
         connect_triggered_signal(open_model_action, self._open_model)
@@ -114,17 +158,6 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         product_repository.add_observer(self)
         self._sync_model_to_view()
 
-    def _update_progress(self) -> None:
-        is_reconstructing = self._presenter.is_reconstructing
-
-        for button in self._view.progress_dialog.button_box.buttons():
-            button.setEnabled(not is_reconstructing)
-
-        for text in self._presenter.flush_log():
-            self._view.progress_dialog.text_edit.appendPlainText(text)
-
-        self._presenter.process_results(block=False)
-
     def _add_reconstructor(self, name: str) -> None:
         backend_name, reconstructor_name = name.split('/')  # TODO REDO
         self._view.parameters_view.algorithm_combo_box.addItem(
@@ -140,10 +173,6 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
         self._view.stacked_widget.addWidget(widget)
 
-    def _show_progress_dialog(self) -> None:
-        self._view.progress_dialog.show()
-        self._update_progress()
-
     def _reconstruct(self) -> None:
         input_product_index = self._view.parameters_view.product_combo_box.currentIndex()
 
@@ -157,7 +186,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             ExceptionDialog.show_exception('Reconstructor', exc)
         else:
             self._view.parameters_view.product_combo_box.setCurrentIndex(output_product_index)
-            self._show_progress_dialog()
+            self._progress_controller.show_dialog()
 
     def _reconstruct_split(self) -> None:
         input_product_index = self._view.parameters_view.product_combo_box.currentIndex()
@@ -171,7 +200,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             logger.exception(exc)
             ExceptionDialog.show_exception('Split Reconstructor', exc)
 
-        self._show_progress_dialog()
+        self._progress_controller.show_dialog()
 
     def _reconstruct_transformed(self) -> None:
         input_product_index = self._view.parameters_view.product_combo_box.currentIndex()
@@ -185,7 +214,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             logger.exception(exc)
             ExceptionDialog.show_exception('Split Reconstructor', exc)
 
-        self._show_progress_dialog()
+        self._progress_controller.show_dialog()
 
     def _open_model(self) -> None:
         name_filter = self._presenter.get_model_file_filter()
@@ -266,7 +295,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
         ax = self._plot_view.axes
         ax.clear()
-        ax.set_xlabel('Iteration')
+        ax.set_xlabel('Epoch')
         ax.set_ylabel('Loss')
         ax.grid(True)
         ax.plot(epoch, losses, '.-', label='Loss', linewidth=1.5)
@@ -289,7 +318,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
     def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
         pass
 
-    def handle_scan_changed(self, index: int, item: ScanRepositoryItem) -> None:
+    def handle_probe_positions_changed(
+        self, index: int, item: ProbePositionsRepositoryItem
+    ) -> None:
         pass
 
     def handle_probe_changed(self, index: int, item: ProbeRepositoryItem) -> None:

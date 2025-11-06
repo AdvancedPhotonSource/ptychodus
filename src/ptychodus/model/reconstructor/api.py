@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from pathlib import Path
 import logging
+import threading
 import time
 
 from ptychodus.api.plugins import PluginChooser
@@ -12,8 +13,9 @@ from ptychodus.api.reconstructor import (
 )
 
 from ..product import ProductAPI
-from .matcher import DiffractionPatternPositionMatcher, ScanIndexFilter
-from .queue import ReconstructionQueue
+from ..task_manager import TaskManager
+from .context import ReconstructBackgroundTask, ReconstructorContext, ReconstructorProgressMonitor
+from .matcher import DiffractionPatternPositionMatcher, PositionIndexFilter
 
 logger = logging.getLogger(__name__)
 
@@ -21,31 +23,30 @@ logger = logging.getLogger(__name__)
 class ReconstructorAPI:
     def __init__(
         self,
-        reconstruction_queue: ReconstructionQueue,
+        task_manager: TaskManager,
         data_matcher: DiffractionPatternPositionMatcher,
         product_api: ProductAPI,
+        context: ReconstructorContext,
         reconstructor_chooser: PluginChooser[Reconstructor],
     ) -> None:
-        self._reconstruction_queue = reconstruction_queue
+        self._task_manager = task_manager
         self._data_matcher = data_matcher
         self._product_api = product_api
+        self._context = context
         self._reconstructor_chooser = reconstructor_chooser
 
-    @property
-    def is_reconstructing(self) -> bool:
-        return self._reconstruction_queue.is_reconstructing
-
-    def process_results(self, *, block: bool) -> None:
-        self._reconstruction_queue.process_results(block=block)
+    def get_progress_monitor(self) -> ReconstructorProgressMonitor:
+        return self._context.get_progress_monitor()
 
     def get_reconstruct_input(
         self,
         input_product_index: int,
         *,
-        index_filter: ScanIndexFilter = ScanIndexFilter.ALL,
+        index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
     ) -> ReconstructInput:
+        input_product_item = self._product_api.get_item(input_product_index)
         return self._data_matcher.match_diffraction_patterns_with_positions(
-            input_product_index, index_filter=index_filter
+            input_product_item, index_filter=index_filter
         )
 
     def reconstruct(
@@ -54,7 +55,8 @@ class ReconstructorAPI:
         *,
         output_product_suffix: str = '',
         transform: int | None = None,
-        index_filter: ScanIndexFilter = ScanIndexFilter.ALL,
+        index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
+        block: bool = False,
     ) -> int:
         reconstructor = self._reconstructor_chooser.get_current_plugin()
         input_product_item = self._product_api.get_item(input_product_index)
@@ -68,25 +70,50 @@ class ReconstructorAPI:
         output_product_item.set_name(output_product_name)
 
         if transform is not None:
-            scan_item_transform = output_product_item.get_scan_item().get_transform()
+            scan_item_transform = output_product_item.get_probe_positions_item().get_transform()
             scan_item_transform.apply_presets(transform)
 
             object_item = output_product_item.get_object_item()
             object_item.rebuild(recenter=True)
 
-        self._reconstruction_queue.put(reconstructor.strategy, output_product_index, index_filter)
+        logger.info(f'Preparing input data for {output_product_item.get_name()}...')
+        tic = time.perf_counter()
+        parameters = self._data_matcher.match_diffraction_patterns_with_positions(
+            output_product_item, index_filter
+        )
+        toc = time.perf_counter()
+        logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
+
+        logger.debug(parameters)
+
+        finished_event = threading.Event()
+
+        background_task = ReconstructBackgroundTask(
+            self._context,
+            reconstructor.strategy,
+            parameters,
+            output_product_item,
+            finished_event,
+        )
+        self._task_manager.put_background_task(background_task)
+
+        if block:
+            while not self._task_manager.is_stopping:
+                if finished_event.wait(timeout=TaskManager.WAIT_TIME_S):
+                    break
+
         return output_product_index
 
     def reconstruct_split(self, input_product_index: int) -> tuple[int, int]:
         output_product_index_odd = self.reconstruct(
             input_product_index,
             output_product_suffix='odd',
-            index_filter=ScanIndexFilter.ODD,
+            index_filter=PositionIndexFilter.ODD,
         )
         output_product_index_even = self.reconstruct(
             input_product_index,
             output_product_suffix='even',
-            index_filter=ScanIndexFilter.EVEN,
+            index_filter=PositionIndexFilter.EVEN,
         )
 
         return output_product_index_odd, output_product_index_even
@@ -96,13 +123,13 @@ class ReconstructorAPI:
         input_product = self._product_api.get_item(input_product_index)
 
         for preset_value, preset_label in enumerate(
-            input_product.get_scan_item().get_transform().labels_for_presets()
+            input_product.get_probe_positions_item().get_transform().labels_for_presets()
         ):
             output_product_index = self.reconstruct(
                 input_product_index,
                 output_product_suffix=preset_label,
                 transform=preset_value,
-                index_filter=ScanIndexFilter.ALL,
+                index_filter=PositionIndexFilter.ALL,
             )
             output_product_indexes.append(output_product_index)
 
@@ -138,8 +165,9 @@ class ReconstructorAPI:
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Preparing input data...')
             tic = time.perf_counter()
+            input_product_item = self._product_api.get_item(input_product_index)
             parameters = self._data_matcher.match_diffraction_patterns_with_positions(
-                input_product_index, ScanIndexFilter.ALL
+                input_product_item, PositionIndexFilter.ALL
             )
             toc = time.perf_counter()
             logger.info(f'Data preparation time {toc - tic:.4f} seconds.')

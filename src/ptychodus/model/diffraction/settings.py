@@ -40,15 +40,12 @@ class DiffractionSettings(Observable, Observer):
 
         self.file_type = self._group.create_string_parameter('FileType', 'NPY')
         self.file_path = self._group.create_path_parameter('FilePath', Path('/path/to/data.npy'))
-        self.is_memmap_enabled = self._group.create_boolean_parameter('MemmapEnabled', False)
+        self.memmap_enabled = self._group.create_boolean_parameter('MemmapEnabled', False)
         self.scratch_directory = self._group.create_path_parameter(
             'ScratchDirectory', Path.home() / '.ptychodus'
         )
-        self.num_data_threads = self._group.create_integer_parameter(
-            'NumberOfDataThreads', 8, minimum=1, maximum=64
-        )
 
-        self.is_crop_enabled = self._group.create_boolean_parameter('CropEnabled', True)
+        self.crop_enabled = self._group.create_boolean_parameter('CropEnabled', True)
         self.crop_center_x_px = self._group.create_integer_parameter(
             'CropCenterXInPixels', 32, minimum=0
         )
@@ -62,11 +59,11 @@ class DiffractionSettings(Observable, Observer):
             'CropHeightInPixels', 64, minimum=1
         )
 
-        self.is_binning_enabled = self._group.create_boolean_parameter('BinningEnabled', False)
+        self.binning_enabled = self._group.create_boolean_parameter('BinningEnabled', False)
         self.bin_size_x = self._group.create_integer_parameter('BinSizeX', 1, minimum=1)
         self.bin_size_y = self._group.create_integer_parameter('BinSizeY', 1, minimum=1)
 
-        self.is_padding_enabled = self._group.create_boolean_parameter('PaddingEnabled', False)
+        self.padding_enabled = self._group.create_boolean_parameter('PaddingEnabled', False)
         self.pad_x = self._group.create_integer_parameter('PadX', 0, minimum=0)
         self.pad_y = self._group.create_integer_parameter('PadY', 0, minimum=0)
 
@@ -74,13 +71,13 @@ class DiffractionSettings(Observable, Observer):
         self.vflip = self._group.create_boolean_parameter('FlipVertical', False)
         self.transpose = self._group.create_boolean_parameter('Transpose', False)
 
-        self.is_value_lower_bound_enabled = self._group.create_boolean_parameter(
+        self.value_lower_bound_enabled = self._group.create_boolean_parameter(
             'ValueLowerBoundEnabled', False
         )
         self.value_lower_bound = self._group.create_integer_parameter(
             'ValueLowerBound', 0, minimum=0
         )
-        self.is_value_upper_bound_enabled = self._group.create_boolean_parameter(
+        self.value_upper_bound_enabled = self._group.create_boolean_parameter(
             'ValueUpperBoundEnabled', False
         )
         self.value_upper_bound = self._group.create_integer_parameter(

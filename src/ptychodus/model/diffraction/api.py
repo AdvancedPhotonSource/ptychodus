@@ -15,6 +15,7 @@ from ptychodus.api.diffraction import (
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.tree import SimpleTreeNode
 
+from .bad_pixels import BadPixelsProvider
 from .dataset import AssembledDiffractionDataset
 from .settings import DetectorSettings, DiffractionSettings
 
@@ -29,18 +30,14 @@ class PatternsStreamingContext:
     def start(self) -> None:
         contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
         stream_dataset = SimpleDiffractionDataset(self._metadata, contents_tree, [])
-        self._dataset.reload(stream_dataset)
-        self._dataset.start_loading()
+        self._dataset.reload(stream_dataset, process_patterns=True)
+        self._dataset.load_all_arrays(block=True)
 
     def append_array(self, array: DiffractionArray) -> None:
-        self._dataset.append_array(array)
-
-    def get_queue_size(self) -> int:
-        return self._dataset.queue_size
+        self._dataset.append_array(array, process_patterns=True)
 
     def stop(self) -> None:
-        self._dataset.finish_loading(block=True)
-        self._dataset.assemble_patterns()
+        pass
 
 
 class DiffractionAPI:
@@ -48,6 +45,7 @@ class DiffractionAPI:
         self,
         diffraction_settings: DiffractionSettings,
         detector_settings: DetectorSettings,
+        bad_pixels_provider: BadPixelsProvider,
         dataset: AssembledDiffractionDataset,
         bad_pixels_file_reader_chooser: PluginChooser[BadPixelsFileReader],
         file_reader_chooser: PluginChooser[DiffractionFileReader],
@@ -56,6 +54,7 @@ class DiffractionAPI:
         super().__init__()
         self._diffraction_settings = diffraction_settings
         self._detector_settings = detector_settings
+        self._bad_pixels_provider = bad_pixels_provider
         self._dataset = dataset
         self._bad_pixels_file_reader_chooser = bad_pixels_file_reader_chooser
         self._file_reader_chooser = file_reader_chooser
@@ -80,13 +79,13 @@ class DiffractionAPI:
             except Exception as exc:
                 raise RuntimeError(f'Failed to read "{file_path}"') from exc
             else:
-                self._dataset.set_bad_pixels(bad_pixels)
+                self._bad_pixels_provider.set_bad_pixels(bad_pixels)
                 self._detector_settings.bad_pixels_file_path.set_value(file_path)
         else:
             logger.warning(f'Refusing to read invalid file path {file_path}')
 
     def clear_bad_pixels(self) -> None:
-        self._dataset.set_bad_pixels(None)
+        self._bad_pixels_provider.clear_bad_pixels()
         self._detector_settings.bad_pixels_file_path.set_value(Path('/path/to/bad_pixels.npy'))
 
     def get_file_reader_chooser(self) -> PluginChooser[DiffractionFileReader]:
@@ -100,6 +99,8 @@ class DiffractionAPI:
         crop_center: CropCenter | None = None,
         crop_extent: ImageExtent | None = None,
         detector_extent: ImageExtent | None = None,
+        process_patterns: bool = True,
+        block: bool = False,
     ) -> int:
         if crop_center is not None:
             self._diffraction_settings.crop_center_x_px.set_value(crop_center.position_x_px)
@@ -125,21 +126,19 @@ class DiffractionAPI:
             except Exception as exc:
                 raise RuntimeError(f'Failed to read "{file_path}"') from exc
             else:
-                self._dataset.reload(dataset)
+                self._dataset.reload(dataset, process_patterns=process_patterns)
+
+                if block:
+                    self._dataset.load_all_arrays(block=True)
+
                 return 0
         else:
             logger.warning(f'Refusing to read invalid file path {file_path}')
 
         return -1
 
-    def start_assembling_diffraction_patterns(self) -> None:
-        self._dataset.start_loading()
-
-    def finish_assembling_diffraction_patterns(self, *, block: bool) -> None:
-        self._dataset.finish_loading(block=block)
-
-        if block:
-            self._dataset.assemble_patterns()
+    def load_all_arrays(self, block: bool = False) -> None:
+        self._dataset.load_all_arrays(block=block)
 
     def close_patterns(self) -> None:
         self._dataset.clear()

@@ -15,7 +15,7 @@ from ptychodus.api.product import (
     ProductMetadata,
 )
 from ptychodus.api.reconstructor import LossValue
-from ptychodus.api.scan import PositionSequence, ScanPoint
+from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 
 logger = logging.getLogger(__name__)
 
@@ -111,8 +111,8 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
                 height_m=float(npz_file[self.OBJECT_PIXEL_HEIGHT]),
             )
             object_center = ObjectCenter(
-                position_x_m=float(npz_file[self.OBJECT_CENTER_X]),
-                position_y_m=float(npz_file[self.OBJECT_CENTER_Y]),
+                coordinate_x_m=float(npz_file[self.OBJECT_CENTER_X]),
+                coordinate_y_m=float(npz_file[self.OBJECT_CENTER_Y]),
             )
             object_ = Object(
                 array=npz_file[self.OBJECT_ARRAY],
@@ -131,10 +131,10 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
             except KeyError:
                 loss_epochs = numpy.arange(len(loss_values))
 
-        point_list: list[ScanPoint] = []
+        point_list: list[ProbePosition] = []
 
         for idx, x_m, y_m in zip(scan_indexes, scan_x_m, scan_y_m):
-            point = ScanPoint(idx, x_m, y_m)
+            point = ProbePosition(idx, x_m, y_m)
             point_list.append(point)
 
         losses: list[LossValue] = []
@@ -145,7 +145,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
 
         return Product(
             metadata=metadata,
-            positions=PositionSequence(point_list),
+            probe_positions=ProbePositionSequence(point_list),
             probes=probe,
             object_=object_,
             losses=losses,
@@ -157,10 +157,10 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
         scan_x_m: list[float] = []
         scan_y_m: list[float] = []
 
-        for point in product.positions:
+        for point in product.probe_positions:
             scan_indexes.append(point.index)
-            scan_x_m.append(point.position_x_m)
-            scan_y_m.append(point.position_y_m)
+            scan_x_m.append(point.coordinate_x_m)
+            scan_y_m.append(point.coordinate_y_m)
 
         metadata = product.metadata
         contents[self.NAME] = metadata.name

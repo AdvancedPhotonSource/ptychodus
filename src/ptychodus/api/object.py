@@ -7,27 +7,27 @@ from pathlib import Path
 import numpy
 
 from .geometry import PixelGeometry
-from .scan import ScanPoint
+from .probe_positions import ProbePosition
 from .typing import ComplexArrayType
 
 
 @dataclass(frozen=True)
 class ObjectCenter:
-    position_x_m: float
-    position_y_m: float
+    coordinate_x_m: float
+    coordinate_y_m: float
 
     def copy(self) -> ObjectCenter:
         return ObjectCenter(
-            position_x_m=float(self.position_x_m),
-            position_y_m=float(self.position_y_m),
+            coordinate_x_m=float(self.coordinate_x_m),
+            coordinate_y_m=float(self.coordinate_y_m),
         )
 
 
 @dataclass(frozen=True)
-class ObjectPoint:
+class ObjectPosition:
     index: int
-    position_x_px: float
-    position_y_px: float
+    coordinate_x_px: float
+    coordinate_y_px: float
 
 
 @dataclass(frozen=True)
@@ -63,31 +63,31 @@ class ObjectGeometry:
 
     def get_center(self) -> ObjectCenter:
         return ObjectCenter(
-            position_x_m=self.center_x_m,
-            position_y_m=self.center_y_m,
+            coordinate_x_m=self.center_x_m,
+            coordinate_y_m=self.center_y_m,
         )
 
-    def map_object_point_to_scan_point(self, point: ObjectPoint) -> ScanPoint:
+    def map_coordinates_object_to_probe(self, position: ObjectPosition) -> ProbePosition:
         rx_px = self.width_px / 2
         ry_px = self.height_px / 2
         dx_m = self.pixel_width_m
         dy_m = self.pixel_height_m
 
-        x_m = self.center_x_m + dx_m * (point.position_x_px - rx_px)
-        y_m = self.center_y_m + dy_m * (point.position_y_px - ry_px)
+        x_m = self.center_x_m + dx_m * (position.coordinate_x_px - rx_px)
+        y_m = self.center_y_m + dy_m * (position.coordinate_y_px - ry_px)
 
-        return ScanPoint(point.index, x_m, y_m)
+        return ProbePosition(position.index, x_m, y_m)
 
-    def map_scan_point_to_object_point(self, point: ScanPoint) -> ObjectPoint:
+    def map_coordinates_probe_to_object(self, position: ProbePosition) -> ObjectPosition:
         rx_px = self.width_px / 2
         ry_px = self.height_px / 2
         dx_m = self.pixel_width_m
         dy_m = self.pixel_height_m
 
-        x_px = (point.position_x_m - self.center_x_m) / dx_m + rx_px
-        y_px = (point.position_y_m - self.center_y_m) / dy_m + ry_px
+        x_px = (position.coordinate_x_m - self.center_x_m) / dx_m + rx_px
+        y_px = (position.coordinate_y_m - self.center_y_m) / dy_m + ry_px
 
-        return ObjectPoint(point.index, x_px, y_px)
+        return ObjectPosition(position.index, x_px, y_px)
 
     def contains(self, geometry: ObjectGeometry) -> bool:
         dx = self.center_x_m - geometry.center_x_m
@@ -98,6 +98,10 @@ class ObjectGeometry:
 
 
 class ObjectGeometryProvider(ABC):
+    @abstractmethod
+    def get_probe_positions(self) -> Sequence[ProbePosition]:
+        pass
+
     @abstractmethod
     def get_object_geometry(self) -> ObjectGeometry:
         pass
@@ -186,8 +190,8 @@ class Object:
             height_px=self.height_px,
             pixel_width_m=pixel_geometry.width_m,
             pixel_height_m=pixel_geometry.height_m,
-            center_x_m=center.position_x_m,
-            center_y_m=center.position_y_m,
+            center_x_m=center.coordinate_x_m,
+            center_y_m=center.coordinate_y_m,
         )
 
     def get_layer(self, number: int) -> ComplexArrayType:

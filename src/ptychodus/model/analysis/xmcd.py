@@ -130,8 +130,8 @@ class XMCDAnalyzer(Observable):
             'polar_ratio': self._result.polar_ratio,
             'pixel_height_m': self._result.pixel_geometry.height_m,
             'pixel_width_m': self._result.pixel_geometry.width_m,
-            'center_x_m': self._result.center.position_x_m,
-            'center_y_m': self._result.center.position_y_m,
+            'center_x_m': self._result.center.coordinate_x_m,
+            'center_y_m': self._result.center.coordinate_y_m,
         }
 
         numpy.savez_compressed(file_path, allow_pickle=False, **contents)

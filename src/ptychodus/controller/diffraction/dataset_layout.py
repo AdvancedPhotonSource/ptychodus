@@ -113,9 +113,6 @@ class DatasetLayoutViewController(DiffractionDatasetObserver):
     def _sync_model_to_view(self) -> None:
         self._tree_model.set_root_node(self._dataset.get_layout())
 
-    def handle_bad_pixels_changed(self, num_bad_pixels: int) -> None:
-        pass
-
     def handle_array_inserted(self, index: int) -> None:
         pass
 

@@ -10,7 +10,7 @@ from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItemFactory
 from .probe import ProbeRepositoryItemFactory
 from .repository import ProductRepository
-from .scan import ScanRepositoryItemFactory
+from .probe_positions import ProbePositionsRepositoryItemFactory
 from .settings import ProductSettings
 from .validator import ProductValidator
 
@@ -23,7 +23,7 @@ class ProductRepositoryItemFactory:
         settings: ProductSettings,
         pattern_sizer: PatternSizer,
         dataset: AssembledDiffractionDataset,
-        scan_item_factory: ScanRepositoryItemFactory,
+        scan_item_factory: ProbePositionsRepositoryItemFactory,
         probe_item_factory: ProbeRepositoryItemFactory,
         object_item_factory: ObjectRepositoryItemFactory,
         repository: ProductRepository,
@@ -76,7 +76,7 @@ class ProductRepositoryItemFactory:
         return ProductRepositoryItem(
             parent=self._repository,
             metadata_item=metadata_item,
-            scan_item=scan_item,
+            probe_positions_item=scan_item,
             geometry=geometry,
             probe_item=probe_item,
             object_item=object_item,
@@ -98,7 +98,7 @@ class ProductRepositoryItemFactory:
             tomography_angle_deg=product.metadata.tomography_angle_deg,
         )
 
-        scan_item = self._scan_item_factory.create(product.positions)
+        scan_item = self._scan_item_factory.create(product.probe_positions)
         geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
         probe_item = self._probe_item_factory.create(geometry, product.probes)
         object_item = self._object_item_factory.create(geometry, product.object_)
@@ -107,7 +107,7 @@ class ProductRepositoryItemFactory:
         return ProductRepositoryItem(
             parent=self._repository,
             metadata_item=metadata_item,
-            scan_item=scan_item,
+            probe_positions_item=scan_item,
             geometry=geometry,
             probe_item=probe_item,
             object_item=object_item,
@@ -139,7 +139,7 @@ class ProductRepositoryItemFactory:
         item = ProductRepositoryItem(
             parent=self._repository,
             metadata_item=metadata_item,
-            scan_item=scan_item,
+            probe_positions_item=scan_item,
             geometry=geometry,
             probe_item=probe_item,
             object_item=object_item,

@@ -137,6 +137,9 @@ class PtyChiReconstructorViewController(ParameterViewController):
         self._num_epochs_view_controller = SpinBoxParameterViewController(
             settings.num_epochs, tool_tip='Number of epochs to run'
         )
+        self._num_sync_epochs_view_controller = SpinBoxParameterViewController(
+            settings.num_sync_epochs, tool_tip='Number of epochs between updates'
+        )
         self._batch_size_view_controller = SpinBoxParameterViewController(
             settings.batch_size, tool_tip='Number of data to process in each minibatch'
         )
@@ -193,6 +196,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
 
         layout = QFormLayout()
         layout.addRow('Number of Epochs:', self._num_epochs_view_controller.get_widget())
+        layout.addRow('Update Interval:', self._num_sync_epochs_view_controller.get_widget())
 
         if dm_settings is None:
             layout.addRow('Batch Size:', self._batch_size_view_controller.get_widget())
@@ -243,7 +247,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
 
             self._chunk_length_view_controller = SpinBoxParameterViewController(
                 dm_settings.chunk_length,
-                tool_tip='Number of scan positions used in each chunk of the exit wave update loop',
+                tool_tip='Number of probe positions used in each chunk of the exit wave update loop',
             )
             layout.addRow('Chunk Length:', self._chunk_length_view_controller.get_widget())
 

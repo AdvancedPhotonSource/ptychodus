@@ -7,9 +7,11 @@ import numpy
 from ptychodus.api.object import Object, ObjectFileReader, ObjectFileWriter
 from ptychodus.api.plugins import PluginChooser
 
+from ...diffraction import AssembledDiffractionDataset
 from .builder import FromFileObjectBuilder, ObjectBuilder
 from .random import RandomObjectBuilder
 from .settings import ObjectSettings
+from .stxm import STXMObjectBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,7 @@ class ObjectBuilderFactory(Iterable[str]):
         self,
         rng: numpy.random.Generator,
         settings: ObjectSettings,
+        dataset: AssembledDiffractionDataset,
         file_reader_chooser: PluginChooser[ObjectFileReader],
         file_writer_chooser: PluginChooser[ObjectFileWriter],
     ) -> None:
@@ -27,6 +30,7 @@ class ObjectBuilderFactory(Iterable[str]):
         self._file_writer_chooser = file_writer_chooser
         self._builders: Mapping[str, Callable[[], ObjectBuilder]] = {
             'random': lambda: RandomObjectBuilder(rng, settings),
+            'stxm': lambda: STXMObjectBuilder(settings, dataset),
         }
 
     def __iter__(self) -> Iterator[str]:

@@ -1,12 +1,11 @@
 Ptychodus
 =========
 
-`Ptychodus <https://github.com/AdvancedPhotonSource/ptychodus>`_
-is a ptychography data analysis application that reads instrument data,
-prepares the data for processing, and supports calling several reconstruction
-libraries for phase retrieval. Ptychodus can be used interactively or
-integrated into a data pipeline.
-
+`Ptychodus <https://github.com/AdvancedPhotonSource/ptychodus>`_ is a
+ptychography data analysis application that extracts, loads, and transforms
+instrument data for processing. It integrates several reconstruction libraries
+for phase retrieval. Ptychodus can be used interactively or integrated into
+beamline data pipelines.
 
 Standard Installation
 ---------------------

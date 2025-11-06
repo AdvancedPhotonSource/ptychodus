@@ -77,7 +77,7 @@ class FresnelZonePlateProbeBuilder(ProbeSequenceBuilder):
         lx_fzp = -fzp_pixel_geometry.width_m * numpy.arange(-fzp_half_width, fzp_half_width)
         ly_fzp = -fzp_pixel_geometry.height_m * numpy.arange(-fzp_half_height, fzp_half_height)
 
-        YY_FZP, XX_FZP = numpy.meshgrid(ly_fzp, lx_fzp)  # noqa: N806
+        XX_FZP, YY_FZP = numpy.meshgrid(lx_fzp, ly_fzp)  # noqa: N806
         RR_FZP = numpy.hypot(XX_FZP, YY_FZP)  # noqa: N806
 
         # transmission function of FZP

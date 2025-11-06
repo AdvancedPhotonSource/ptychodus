@@ -19,14 +19,14 @@ from PyQt5.QtWidgets import (
 from . import resources  # noqa
 from .agent import AgentView, AgentChatView
 from .automation import AutomationView
-from .image import ImageView
 from .diffraction import PatternsView
+from .globus import GlobusParametersView
+from .image import ImageView
 from .product import ProductView
 from .reconstructor import ReconstructorView, ReconstructorPlotView
 from .repository import RepositoryTableView, RepositoryTreeView
-from .scan import ScanPlotView
+from .probe_positions import ProbePositionsPlotView
 from .settings import SettingsView
-from .workflow import WorkflowParametersView
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +64,11 @@ class ViewCore(QMainWindow):
         self.product_view = ProductView()
         self.product_diagram_view = QWidget()
 
-        self.scan_action = self.navigation_tool_bar.addAction(QIcon(':/icons/scan'), 'Positions')
-        self.scan_view = RepositoryTableView()
-        self.scan_plot_view = ScanPlotView.create_instance()
+        self.positions_action = self.navigation_tool_bar.addAction(
+            QIcon(':/icons/positions'), 'Positions'
+        )
+        self.probe_positions_view = RepositoryTableView()
+        self.probe_positions_plot_view = ProbePositionsPlotView.create_instance()
 
         self.probe_action = self.navigation_tool_bar.addAction(QIcon(':/icons/probe'), 'Probe')
         self.probe_view = RepositoryTreeView()
@@ -82,11 +84,12 @@ class ViewCore(QMainWindow):
         self.reconstructor_view = ReconstructorView()
         self.reconstructor_plot_view = ReconstructorPlotView()
 
-        self.workflow_action = self.navigation_tool_bar.addAction(
-            QIcon(':/icons/workflow'), 'Workflow'
+        self.globus_action = self.navigation_tool_bar.addAction(
+            QIcon(':/icons/globus'),
+            'Globus',
         )
-        self.workflow_parameters_view = WorkflowParametersView.create_instance()
-        self.workflow_table_view = QTableView()
+        self.globus_parameters_view = GlobusParametersView.create_instance()
+        self.globus_table_view = QTableView()
 
         self.automation_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/automate'), 'Automation'
@@ -119,11 +122,11 @@ class ViewCore(QMainWindow):
         self.left_panel.addWidget(self.settings_view)
         self.left_panel.addWidget(self.patterns_view)
         self.left_panel.addWidget(self.product_view)
-        self.left_panel.addWidget(self.scan_view)
+        self.left_panel.addWidget(self.probe_positions_view)
         self.left_panel.addWidget(self.probe_view)
         self.left_panel.addWidget(self.object_view)
         self.left_panel.addWidget(self.reconstructor_view)
-        self.left_panel.addWidget(self.workflow_parameters_view)
+        self.left_panel.addWidget(self.globus_parameters_view)
         self.left_panel.addWidget(self.automation_view)
         self.left_panel.addWidget(self.agent_view)
         self.left_panel.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
@@ -133,11 +136,11 @@ class ViewCore(QMainWindow):
         self.right_panel.addWidget(self.settings_table_view)
         self.right_panel.addWidget(self.patterns_image_view)
         self.right_panel.addWidget(self.product_diagram_view)
-        self.right_panel.addWidget(self.scan_plot_view)
+        self.right_panel.addWidget(self.probe_positions_plot_view)
         self.right_panel.addWidget(self.probe_image_view)
         self.right_panel.addWidget(self.object_image_view)
         self.right_panel.addWidget(self.reconstructor_plot_view)
-        self.right_panel.addWidget(self.workflow_table_view)
+        self.right_panel.addWidget(self.globus_table_view)
         self.right_panel.addWidget(self.automation_widget)
         self.right_panel.addWidget(self.agent_chat_view)
         self.right_panel.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)

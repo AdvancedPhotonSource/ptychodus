@@ -6,7 +6,12 @@ import csv
 
 import numpy
 
-from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint, ScanPointParseError
+from ptychodus.api.probe_positions import (
+    ProbePositionSequence,
+    ProbePositionFileReader,
+    ProbePosition,
+    ProbePositionParseError,
+)
 from .aps33id_velociprobe_diffraction_file import VelociprobeDiffractionFileReader
 
 __all__ = [
@@ -21,7 +26,7 @@ class VelociprobePositionFileColumn(IntEnum):
     TRIGGER = 7
 
 
-class VelociprobePositionFileReader(PositionFileReader):
+class VelociprobePositionFileReader(ProbePositionFileReader):
     ONE_NANOMETER_M: Final[float] = 1.0e-9
 
     def __init__(self, diffraction_reader: VelociprobeDiffractionFileReader, y_column: int) -> None:
@@ -40,26 +45,26 @@ class VelociprobePositionFileReader(PositionFileReader):
     ) -> VelociprobePositionFileReader:
         return cls(diffraction_reader, VelociprobePositionFileColumn.POSITION_ENCODER_Y)
 
-    def _apply_transform(self, positions: PositionSequence) -> PositionSequence:
+    def _apply_transform(self, positions: ProbePositionSequence) -> ProbePositionSequence:
         stage_rotation_rad = numpy.deg2rad(self._diffraction_reader.stage_rotation_deg)
         stage_rotation_cos = numpy.cos(stage_rotation_rad)
 
-        x_mean = sum(p.position_x_m for p in positions) / len(positions)
-        y_mean = sum(p.position_y_m for p in positions) / len(positions)
-        point_list: list[ScanPoint] = list()
+        x_mean = sum(p.coordinate_x_m for p in positions) / len(positions)
+        y_mean = sum(p.coordinate_y_m for p in positions) / len(positions)
+        point_list: list[ProbePosition] = list()
 
         for untransformed_point in positions:
-            point = ScanPoint(
+            point = ProbePosition(
                 untransformed_point.index,
-                (untransformed_point.position_x_m - x_mean) * stage_rotation_cos,
-                (untransformed_point.position_y_m - y_mean),
+                (untransformed_point.coordinate_x_m - x_mean) * stage_rotation_cos,
+                (untransformed_point.coordinate_y_m - y_mean),
             )
             point_list.append(point)
 
-        return PositionSequence(point_list)
+        return ProbePositionSequence(point_list)
 
-    def read(self, file_path: Path) -> PositionSequence:
-        point_list: list[ScanPoint] = list()
+    def read(self, file_path: Path) -> ProbePositionSequence:
+        point_list: list[ProbePosition] = list()
         minimum_column_count = max(col.value for col in VelociprobePositionFileColumn) + 1
 
         with file_path.open(newline='') as csv_file:
@@ -70,7 +75,7 @@ class VelociprobePositionFileReader(PositionFileReader):
                     continue
 
                 if len(row) < minimum_column_count:
-                    raise ScanPointParseError('Bad number of columns!')
+                    raise ProbePositionParseError('Bad number of columns!')
 
                 trigger = int(row[VelociprobePositionFileColumn.TRIGGER])
                 x_nm = int(row[VelociprobePositionFileColumn.X])
@@ -79,13 +84,13 @@ class VelociprobePositionFileReader(PositionFileReader):
                 if self._y_column == VelociprobePositionFileColumn.POSITION_ENCODER_Y:
                     y_nm = -y_nm
 
-                point = ScanPoint(
+                point = ProbePosition(
                     trigger,
                     x_nm * self.ONE_NANOMETER_M,
                     y_nm * self.ONE_NANOMETER_M,
                 )
                 point_list.append(point)
 
-        raw_positions = PositionSequence(point_list)
+        raw_positions = ProbePositionSequence(point_list)
 
         return self._apply_transform(raw_positions)

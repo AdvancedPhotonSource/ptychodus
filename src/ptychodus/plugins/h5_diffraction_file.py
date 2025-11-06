@@ -217,7 +217,7 @@ class H5DiffractionFileWriter(DiffractionFileWriter):
         data = numpy.concatenate([array.get_patterns() for array in dataset])
 
         with h5py.File(file_path, 'w') as h5_file:
-            h5_file.create_dataset(self._data_path, data=data, compression='gzip')
+            h5_file.create_dataset(self._data_path, data=data, compression='lzf')
 
 
 def register_plugins(registry: PluginRegistry) -> None:
@@ -228,16 +228,16 @@ def register_plugins(registry: PluginRegistry) -> None:
     )
     registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(data_path='/entry/data/data'),
-        simple_name='APS_HXN',
+        simple_name='CNM_APS_HXN',
         display_name='CNM/APS 26-ID Hard X-ray Nanoprobe Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(data_path='/dp'),
-        simple_name='PtychoShelves',
-        display_name='PtychoShelves Files (*.h5 *.hdf5)',
+        simple_name='fold_slice',
+        display_name='fold_slice Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_writers.register_plugin(
         H5DiffractionFileWriter(data_path='/dp'),
-        simple_name='PtychoShelves',
-        display_name='PtychoShelves Files (*.h5 *.hdf5)',
+        simple_name='fold_slice',
+        display_name='fold_slice Files (*.h5 *.hdf5)',
     )

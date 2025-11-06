@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 import logging
 
 
@@ -15,7 +16,7 @@ from ptychodus.api.object import Object, ObjectGeometry
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import LossValue, ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Reconstructor
-from ptychodus.api.scan import PositionSequence
+from ptychodus.api.probe_positions import ProbePositionSequence
 
 from .helper import PtyChiOptionsHelper
 from .settings import PtyChiPIESettings
@@ -28,9 +29,9 @@ class PIEReconstructor(Reconstructor):
         super().__init__()
         self._options_helper = options_helper
         self._settings = settings
+        self._epoch = 0
 
-    @property
-    def name(self) -> str:
+    def get_name(self) -> str:
         return 'PIE'
 
     def _create_reconstructor_options(self) -> PIEReconstructorOptions:
@@ -98,7 +99,7 @@ class PIEReconstructor(Reconstructor):
         )
 
     def _create_probe_position_options(
-        self, scan: PositionSequence, object_geometry: ObjectGeometry
+        self, scan: ProbePositionSequence, object_geometry: ObjectGeometry
     ) -> PIEProbePositionOptions:
         helper = self._options_helper.probe_position_helper
         position_x_px, position_y_px = helper.get_positions_px(scan, object_geometry)
@@ -138,34 +139,53 @@ class PIEReconstructor(Reconstructor):
             object_options=self._create_object_options(product.object_),
             probe_options=self._create_probe_options(product.probes, product.metadata),
             probe_position_options=self._create_probe_position_options(
-                product.positions, product.object_.get_geometry()
+                product.probe_positions, product.object_.get_geometry()
             ),
             opr_mode_weight_options=self._create_opr_mode_weight_options(product.probes),
         )
 
-    def reconstruct(self, parameters: ReconstructInput) -> ReconstructOutput:
+    def get_progress_goal(self) -> int:
+        return self._options_helper.num_epochs
+
+    def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
         task_options = self._create_task_options(parameters)
+        num_epochs = task_options.reconstructor_options.num_epochs
+
         task = PtychographyTask(task_options)
-        task.run()  # TODO (n_epochs: int | None = None)
 
-        losses: list[LossValue] = list()
-        task_reconstructor = task.reconstructor
+        with task:
+            self._epoch = 0
+            step_epochs = self._options_helper.num_sync_epochs
 
-        if task_reconstructor is not None:
+            task_reconstructor = task.reconstructor
+
+            if task_reconstructor is None:
+                raise RuntimeError('Task reconstructor is None!')
+
             loss_tracker = task_reconstructor.loss_tracker
-            epoch_array = loss_tracker.table['epoch'].to_numpy()
-            loss_array = loss_tracker.table['loss'].to_numpy()
 
-            for epoch, loss in zip(epoch_array.flat, loss_array.flat):
-                losses.append(LossValue(epoch=epoch, value=loss.item()))
+            while self._epoch < num_epochs:
+                task.run(step_epochs)
 
-        product = self._options_helper.create_product(
-            product=parameters.product,
-            position_x_px=task.get_probe_positions_x(as_numpy=True),
-            position_y_px=task.get_probe_positions_y(as_numpy=True),
-            probe_array=task.get_data_to_cpu('probe', as_numpy=True),
-            object_array=task.get_data_to_cpu('object', as_numpy=True),
-            opr_weights=task.get_data_to_cpu('opr_mode_weights', as_numpy=True),
-            losses=losses,
-        )
-        return ReconstructOutput(product, 0)
+                losses: list[LossValue] = list()
+                epoch_array = loss_tracker.table['epoch'].to_numpy()
+                loss_array = loss_tracker.table['loss'].to_numpy()
+
+                for epoch, loss in zip(epoch_array.flat, loss_array.flat):
+                    loss_value = LossValue(epoch=epoch, value=loss.item())
+                    losses.append(loss_value)
+
+                product = self._options_helper.create_product(
+                    product=parameters.product,
+                    position_x_px=task.get_probe_positions_x(as_numpy=True),
+                    position_y_px=task.get_probe_positions_y(as_numpy=True),
+                    probe_array=task.get_data_to_cpu('probe', as_numpy=True),
+                    object_array=task.get_data_to_cpu('object', as_numpy=True),
+                    opr_weights=task.get_data_to_cpu('opr_mode_weights', as_numpy=True),
+                    losses=losses,
+                )
+
+                self._epoch += step_epochs
+                step_epochs = min(step_epochs, num_epochs - self._epoch)
+
+                yield ReconstructOutput(product=product, progress=self._epoch, result=0)

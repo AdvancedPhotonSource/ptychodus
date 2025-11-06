@@ -20,10 +20,10 @@ class ExceptionDialog(QMessageBox):
         dialog.setDetailedText(traceback.format_exc())
         _ = dialog.exec()
 
-    def event(self, e: QEvent | None) -> bool:
+    def event(self, e: QEvent) -> bool:
         result = super().event(e)
 
-        if e is not None and e.type() in (QEvent.Type.LayoutRequest, QEvent.Type.Resize):
+        if e.type() in (QEvent.Type.LayoutRequest, QEvent.Type.Resize):
             self.setMinimumHeight(self.MIN_SIZE)
             self.setMaximumHeight(self.MAX_SIZE)
             self.setMinimumWidth(self.MIN_SIZE)

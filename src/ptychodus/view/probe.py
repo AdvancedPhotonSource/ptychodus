@@ -84,29 +84,6 @@ class ProbePropagationDialog(QDialog):
         self.setLayout(layout)
 
 
-class STXMDialog(QDialog):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.visualization_widget = VisualizationWidget('Transmission')
-        self.visualization_parameters_view = VisualizationParametersView()
-        self.save_button = QPushButton('Save')
-        self.status_bar = QStatusBar()
-
-        parameter_layout = QVBoxLayout()
-        parameter_layout.addWidget(self.visualization_parameters_view)
-        parameter_layout.addStretch()
-        parameter_layout.addWidget(self.save_button)
-
-        contents_layout = QHBoxLayout()
-        contents_layout.addWidget(self.visualization_widget, 1)
-        contents_layout.addLayout(parameter_layout)
-
-        layout = QVBoxLayout()
-        layout.addLayout(contents_layout)
-        layout.addWidget(self.status_bar)
-        self.setLayout(layout)
-
-
 class IlluminationParametersView(QGroupBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Parameters', parent)

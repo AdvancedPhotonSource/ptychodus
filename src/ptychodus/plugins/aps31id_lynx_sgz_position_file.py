@@ -4,12 +4,17 @@ import csv
 import logging
 
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.scan import PositionSequence, PositionFileReader, ScanPoint, ScanPointParseError
+from ptychodus.api.probe_positions import (
+    ProbePositionSequence,
+    ProbePositionFileReader,
+    ProbePosition,
+    ProbePositionParseError,
+)
 
 logger = logging.getLogger(__name__)
 
 
-class LYNXSoftGlueZynqPositionFileReader(PositionFileReader):
+class LYNXSoftGlueZynqPositionFileReader(ProbePositionFileReader):
     SIMPLE_NAME: Final[str] = 'APS_LYNX_SoftGlueZynq'
     DISPLAY_NAME: Final[str] = 'APS 31-ID-E LYNX SoftGlueZynq Files (*.dat)'
     ONE_MICRON_M: Final[float] = 1.0e-6
@@ -30,8 +35,8 @@ class LYNXSoftGlueZynqPositionFileReader(PositionFileReader):
         'Stdev_y_st_fzp',
     ]
 
-    def read(self, file_path: Path) -> PositionSequence:
-        point_list: list[ScanPoint] = list()
+    def read(self, file_path: Path) -> ProbePositionSequence:
+        point_list: list[ProbePosition] = list()
         scan_name = self.SIMPLE_NAME
 
         with file_path.open(newline='') as csv_file:
@@ -43,7 +48,7 @@ class LYNXSoftGlueZynqPositionFileReader(PositionFileReader):
             try:
                 scan_name = ' '.join(title_row).split(',', maxsplit=1)[0]
             except IndexError:
-                raise ScanPointParseError('Bad scan name!')
+                raise ProbePositionParseError('Bad scan name!')
 
             column_header_row = next(csv_iterator)
 
@@ -58,7 +63,7 @@ class LYNXSoftGlueZynqPositionFileReader(PositionFileReader):
                 X = 1  # noqa: N806
                 Y = 3  # noqa: N806
             else:
-                raise ScanPointParseError(
+                raise ProbePositionParseError(
                     f'Bad LYNX SoftGlueZynq header!\nFound:    {column_header_row}\n'
                 )
 
@@ -67,20 +72,20 @@ class LYNXSoftGlueZynqPositionFileReader(PositionFileReader):
                     continue
 
                 if len(row) != len(column_header_row):
-                    raise ScanPointParseError('Bad number of columns!')
+                    raise ProbePositionParseError('Bad number of columns!')
 
-                point = ScanPoint(
+                point = ProbePosition(
                     int(row[DETECTOR_COUNT]),
                     -float(row[X]) * self.ONE_MICRON_M,
                     -float(row[Y]) * self.ONE_MICRON_M,
                 )
                 point_list.append(point)
 
-        return PositionSequence(point_list)
+        return ProbePositionSequence(point_list)
 
 
 def register_plugins(registry: PluginRegistry) -> None:
-    registry.position_file_readers.register_plugin(
+    registry.probe_position_file_readers.register_plugin(
         LYNXSoftGlueZynqPositionFileReader(),
         simple_name=LYNXSoftGlueZynqPositionFileReader.SIMPLE_NAME,
         display_name=LYNXSoftGlueZynqPositionFileReader.DISPLAY_NAME,

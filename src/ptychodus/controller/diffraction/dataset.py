@@ -6,7 +6,7 @@ from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 from ptychodus.api.diffraction import DiffractionPatterns
 from ptychodus.api.units import BYTES_PER_MEGABYTE
 
-from ptychodus.model.diffraction import AssembledDiffractionPatternArray
+from ptychodus.model.diffraction import AssembledDiffractionArray
 
 __all__ = ['DatasetTreeModel']
 
@@ -15,7 +15,7 @@ class DatasetTreeNode:
     def __init__(
         self,
         parent_node: DatasetTreeNode | None,
-        array: AssembledDiffractionPatternArray,
+        array: AssembledDiffractionArray,
         frame_index: int,
     ) -> None:
         self.parent_node = parent_node
@@ -25,9 +25,9 @@ class DatasetTreeNode:
 
     @classmethod
     def create_root(cls) -> DatasetTreeNode:
-        return cls(None, AssembledDiffractionPatternArray.create_null(), -1)
+        return cls(None, AssembledDiffractionArray.create_null(), -1)
 
-    def insert_child(self, pos: int, array: AssembledDiffractionPatternArray) -> DatasetTreeNode:
+    def insert_child(self, pos: int, array: AssembledDiffractionArray) -> DatasetTreeNode:
         child = DatasetTreeNode(self, array, -1)
 
         for frame_index in range(array.get_num_patterns()):
@@ -81,7 +81,7 @@ class DatasetTreeModel(QAbstractItemModel):
         self._max_counts = 1
         self.endResetModel()
 
-    def insert_array(self, row: int, array: AssembledDiffractionPatternArray) -> None:
+    def insert_array(self, row: int, array: AssembledDiffractionArray) -> None:
         max_counts = array.get_max_pattern_counts()
 
         if self._max_counts < max_counts:
@@ -164,7 +164,7 @@ class DatasetTreeModel(QAbstractItemModel):
                         return f'{node.get_nbytes() / BYTES_PER_MEGABYTE:.2f}'
             elif role == Qt.ItemDataRole.UserRole:
                 if index.column() == 1:
-                    return (100 * node.get_counts()) // self._max_counts
+                    return int(100 * node.get_counts()) // int(self._max_counts)
 
     def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
         if self.hasIndex(row, column, parent):

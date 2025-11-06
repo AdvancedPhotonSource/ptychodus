@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
@@ -9,10 +11,11 @@ from ptychodus.api.product import (
     LIGHT_SPEED_M_PER_S,
     PLANCK_CONSTANT_J_PER_HZ,
 )
+from ptychodus.api.probe_positions import ProbePosition
 
 from ..diffraction import PatternSizer
 from .metadata import MetadataRepositoryItem
-from .scan import ScanRepositoryItem
+from .probe_positions import ProbePositionsRepositoryItem
 
 
 class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable, Observer):
@@ -20,7 +23,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         self,
         pattern_sizer: PatternSizer,
         metadata_item: MetadataRepositoryItem,
-        scan_item: ScanRepositoryItem,
+        scan_item: ProbePositionsRepositoryItem,
     ) -> None:
         super().__init__()
         self._pattern_sizer = pattern_sizer
@@ -71,7 +74,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     @property
     def num_scan_points(self) -> int:
-        return len(self._scan_item.get_scan())
+        return len(self._scan_item.get_probe_positions())
 
     @property
     def detector_distance_m(self) -> float:
@@ -135,6 +138,9 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         height_is_valid = geometry.pixel_height_m > 0.0 and geometry.height_m == expected.height_m
         return width_is_valid and height_is_valid
 
+    def get_probe_positions(self) -> Sequence[ProbePosition]:
+        return self._scan_item.get_probe_positions()
+
     def get_object_geometry(self) -> ObjectGeometry:
         probe_geometry = self.get_probe_geometry()
         width_m = probe_geometry.width_m
@@ -150,8 +156,11 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
             center_x_m = scan_bbox.center_x_m
             center_y_m = scan_bbox.center_y_m
 
-        width_px = width_m / self.object_plane_pixel_width_m
-        height_px = height_m / self.object_plane_pixel_height_m
+        pixel_width_m = self.object_plane_pixel_width_m
+        width_px = width_m / pixel_width_m if pixel_width_m > 0.0 else 0.0
+
+        pixel_height_m = self.object_plane_pixel_height_m
+        height_px = height_m / pixel_height_m if pixel_height_m > 0.0 else 0.0
 
         return ObjectGeometry(
             width_px=int(numpy.ceil(width_px)),
