@@ -5,8 +5,8 @@ import logging
 import numpy
 import numpy.typing
 
+from ptychodus.api.common import ComplexArrayType
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.typing import ComplexArrayType
 
 Float32ArrayType: TypeAlias = numpy.typing.NDArray[numpy.float32]
 

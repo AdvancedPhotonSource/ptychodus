@@ -3,7 +3,7 @@ from typing import Any
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject
 from PyQt5.QtGui import QBrush
 
-from ptychodus.api.units import BYTES_PER_MEGABYTE
+from ptychodus.api.common import BYTES_PER_MEGABYTE
 
 from ...model.product import ProbePositionsAPI, ProbePositionsRepository
 from ...model.product.probe_positions import ProbePositionsRepositoryItem

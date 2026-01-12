@@ -3,8 +3,8 @@ from typing import Any, overload
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
+from ptychodus.api.common import BYTES_PER_MEGABYTE
 from ptychodus.api.diffraction import DiffractionPatterns
-from ptychodus.api.units import BYTES_PER_MEGABYTE
 
 from ptychodus.model.diffraction import AssembledDiffractionArray
 

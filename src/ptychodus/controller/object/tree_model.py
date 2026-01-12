@@ -4,7 +4,7 @@ from typing import Any, overload
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 from PyQt5.QtGui import QBrush
 
-from ptychodus.api.units import BYTES_PER_MEGABYTE
+from ptychodus.api.common import BYTES_PER_MEGABYTE
 
 from ...model.product import ObjectAPI, ObjectRepository
 from ...model.product.object import ObjectRepositoryItem

@@ -42,12 +42,12 @@ from ptychi.api.options.base import (
     SliceSpacingOptions,
 )
 
+from ptychodus.api.common import ComplexArrayType, RealArrayType
 from ptychodus.api.object import Object, ObjectGeometry, ObjectPosition
 from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 from ptychodus.api.product import LossValue, Product, ProductMetadata
 from ptychodus.api.reconstructor import ReconstructInput
-from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
-from ptychodus.api.typing import ComplexArrayType, RealArrayType
 
 from ..diffraction import PatternSizer
 from .affine import PtyChiAffineDegreesOfFreedom, PtyChiAffineDegreesOfFreedomBitField

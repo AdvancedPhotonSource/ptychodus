@@ -11,6 +11,7 @@ import h5py
 import numpy
 import numpy.typing
 
+from ptychodus.api.common import BYTES_PER_MEGABYTE
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.diffraction import (
     BadPixels,
@@ -22,7 +23,6 @@ from ptychodus.api.diffraction import (
     SimpleDiffractionDataset,
 )
 from ptychodus.api.tree import SimpleTreeNode
-from ptychodus.api.units import BYTES_PER_MEGABYTE
 
 from ..task_manager import BackgroundTask, TaskManager
 from ._loader import ArrayAssembler, AssembledDiffractionData, LoadAllArrays, LoadArray

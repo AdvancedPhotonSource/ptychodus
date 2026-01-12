@@ -15,13 +15,12 @@ from ptychodus.api.diffraction import (
 )
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeSequence, ProbeFileReader
-from ptychodus.api.product import ELECTRON_VOLT_J
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
     ProbePositionFileReader,
     ProbePosition,
 )
-from ptychodus.api.typing import ComplexArrayType
+from ptychodus.api.common import ComplexArrayType, ELECTRON_VOLT_J
 
 logger = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ import logging
 import numpy
 import scipy.fft
 
-from ptychodus.api.typing import ComplexArrayType, IntegerArrayType
+from ptychodus.api.common import ComplexArrayType, IntegerArrayType
 from ptychodus.api.visualization import Plot2D, PlotAxis, PlotSeries
 
 from ..product import ObjectRepository

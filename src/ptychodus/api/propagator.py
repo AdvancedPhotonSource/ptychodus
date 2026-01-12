@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from scipy.fft import fft2, fftfreq, fftshift, ifft2, ifftshift
 import numpy
 
-from .typing import ComplexArrayType, RealArrayType
+from .common import ComplexArrayType, RealArrayType
 
 
 def intensity(wavefield: ComplexArrayType) -> RealArrayType:

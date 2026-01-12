@@ -13,8 +13,8 @@ from PyQt5.QtCore import (
 from PyQt5.QtGui import QBrush
 from PyQt5.QtWidgets import QAbstractItemView, QAction
 
+from ptychodus.api.common import BYTES_PER_MEGABYTE
 from ptychodus.api.product import LossValue
-from ptychodus.api.units import BYTES_PER_MEGABYTE
 
 from ...model.product import (
     ProductAPI,

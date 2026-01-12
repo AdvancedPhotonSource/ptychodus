@@ -7,10 +7,10 @@ import logging
 
 import numpy
 
+from ptychodus.api.common import ComplexArrayType
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import ObjectCenter
 from ptychodus.api.observer import Observable
-from ptychodus.api.typing import ComplexArrayType
 
 from ..product import ProductRepository
 

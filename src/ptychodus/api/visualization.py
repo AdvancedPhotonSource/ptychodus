@@ -6,8 +6,8 @@ from typing import Final
 from scipy.stats import gaussian_kde
 import numpy
 
+from .common import NumberArrayType, RealArrayType
 from .geometry import Box2D, Interval, Line2D, PixelGeometry
-from .typing import NumberArrayType, RealArrayType
 
 
 @dataclass(frozen=True)

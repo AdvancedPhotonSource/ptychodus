@@ -4,7 +4,7 @@ import logging
 from numpy.typing import NDArray
 import numpy
 
-from ptychodus.api.typing import RealArrayType
+from ptychodus.api.common import RealArrayType
 
 __all__ = [
     'BarycentricArrayInterpolator',

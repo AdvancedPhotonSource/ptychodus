@@ -6,9 +6,9 @@ from pathlib import Path
 
 import numpy
 
+from .common import ComplexArrayType
 from .geometry import PixelGeometry
 from .probe_positions import ProbePosition
-from .typing import ComplexArrayType
 
 
 @dataclass(frozen=True)

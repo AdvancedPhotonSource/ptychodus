@@ -2,9 +2,9 @@ import logging
 
 import numpy
 
+from ptychodus.api.common import RealArrayType
 from ptychodus.api.geometry import Interval
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.typing import RealArrayType
 
 logger = logging.getLogger(__name__)
 

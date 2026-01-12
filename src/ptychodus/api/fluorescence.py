@@ -3,8 +3,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from .common import RealArrayType
 from .product import Product
-from .typing import RealArrayType
 
 
 @dataclass(frozen=True)

@@ -6,10 +6,10 @@ import logging
 import numpy.random
 import scipy.linalg
 
+from ptychodus.api.common import ComplexArrayType, RealArrayType
 from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
 from ptychodus.api.propagator import intensity
-from ptychodus.api.typing import ComplexArrayType, RealArrayType
 
 from .settings import ProbeSettings
 

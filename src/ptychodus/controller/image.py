@@ -7,9 +7,9 @@ import numpy
 from PyQt5.QtCore import QStringListModel
 from PyQt5.QtWidgets import QButtonGroup, QDialog, QStatusBar
 
+from ptychodus.api.common import NumberArrayType
 from ptychodus.api.geometry import Interval, PixelGeometry
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.typing import NumberArrayType
 
 from ..model.visualization import VisualizationEngine
 from ..view.image import (

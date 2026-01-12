@@ -3,9 +3,9 @@ from dataclasses import dataclass
 
 import numpy
 
+from ptychodus.api.common import RealArrayType
 from ptychodus.api.geometry import AffineTransform
 from ptychodus.api.observer import Observable
-from ptychodus.api.typing import RealArrayType
 
 from ..product import ProbePositionsRepository
 from .settings import AffineTransformEstimatorSettings

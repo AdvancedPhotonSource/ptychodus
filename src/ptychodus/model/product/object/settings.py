@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import numpy
-
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
@@ -28,8 +26,35 @@ class ObjectSettings(Observable, Observer):
         self.amplitude_deviation = self._group.create_real_parameter(
             'AmplitudeDeviation', 0.0, minimum=0.0, maximum=1.0
         )
-        self.phase_deviation = self._group.create_real_parameter(
-            'PhaseDeviation', 0.0, minimum=0.0, maximum=numpy.pi
+        self.phase_deviation_turns = self._group.create_real_parameter(
+            'PhaseDeviationInTurns', 0.0, minimum=0.0, maximum=1.0
+        )
+        self.blur_deviation_px = self._group.create_real_parameter(
+            'BlurDeviation', 0.0, minimum=0.0
+        )
+
+        self.leaf_radius_lower_px = self._group.create_real_parameter(
+            'LeafRadiusLowerInPixels', 2.0, minimum=0.0
+        )
+        self.leaf_radius_upper_px = self._group.create_real_parameter(
+            'LeafRadiusUpperInPixels', 999.0, minimum=0.0
+        )
+        self.leaf_radius_power_law_exponent = self._group.create_real_parameter(
+            'LeafRadiusPowerLawExponent', 3.0, minimum=1.0
+        )
+        self.leaf_amplitude_lower = self._group.create_real_parameter(
+            'LeafAmplitudeLower', 0.0, minimum=0.0, maximum=1.0
+        )
+        self.leaf_amplitude_upper = self._group.create_real_parameter(
+            'LeafAmplitudeUpper', 1.0, minimum=0.0, maximum=1.0
+        )
+        self.leaf_phase_lower_turns = self._group.create_real_parameter(
+            'LeafPhaseLowerInTurns',
+            -0.5,
+        )
+        self.leaf_phase_upper_turns = self._group.create_real_parameter(
+            'LeafPhaseUpperInTurns',
+            0.5,
         )
 
     def _update(self, observable: Observable) -> None:

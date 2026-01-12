@@ -7,9 +7,9 @@ from typing import overload
 
 import numpy
 
+from .common import ComplexArrayType, RealArrayType
 from .geometry import PixelGeometry
 from .propagator import intensity
-from .typing import ComplexArrayType, RealArrayType
 
 
 @dataclass(frozen=True)

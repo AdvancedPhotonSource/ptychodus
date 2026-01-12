@@ -3,10 +3,10 @@ from collections.abc import Iterator
 
 import numpy
 
+from ptychodus.api.common import RealArrayType
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import Parameter
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.typing import RealArrayType
 
 __all__ = [
     'ScalarTransformation',

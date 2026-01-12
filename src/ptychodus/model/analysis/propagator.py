@@ -6,6 +6,7 @@ import logging
 
 import numpy
 
+from ptychodus.api.common import RealArrayType
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.observer import Observable
 from ptychodus.api.probe import ProbeSequence
@@ -15,7 +16,6 @@ from ptychodus.api.propagator import (
     ComplexArrayType,
     intensity,
 )
-from ptychodus.api.typing import RealArrayType
 
 from ..product import ProductRepository
 from .settings import ProbePropagationSettings

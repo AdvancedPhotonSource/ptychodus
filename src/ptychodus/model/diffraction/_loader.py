@@ -8,6 +8,7 @@ import threading
 
 import numpy
 
+from ptychodus.api.common import BYTES_PER_MEGABYTE
 from ptychodus.api.diffraction import (
     BadPixels,
     DiffractionArray,
@@ -15,7 +16,6 @@ from ptychodus.api.diffraction import (
     DiffractionPatterns,
     SimpleDiffractionArray,
 )
-from ptychodus.api.units import BYTES_PER_MEGABYTE
 
 from ..task_manager import BackgroundTask, ForegroundTask, ForegroundTaskManager
 from .processor import DiffractionPatternProcessor
