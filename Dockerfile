@@ -1,5 +1,5 @@
-#FROM python:3.12-slim-bullseye
-FROM pytorch/pytorch:2.7.0-cuda12.6-cudnn9-runtime
+#FROM python:3.14-slim-trixie
+FROM pytorch/pytorch:2.9.1-cuda12.6-cudnn9-runtime
 
 # Set the working directory in the container
 WORKDIR /app

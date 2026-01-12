@@ -9,7 +9,6 @@ import tempfile
 
 import h5py
 import numpy
-import numpy.typing
 
 from ptychodus.api.common import BYTES_PER_MEGABYTE
 from ptychodus.api.geometry import ImageExtent
@@ -246,13 +245,22 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         for observer in self._observer_list:
             observer.handle_dataset_reloaded()
 
-    def reload(self, dataset: DiffractionDataset, *, process_patterns: bool = True) -> None:
+    def reload(self, dataset: DiffractionDataset) -> None:
         self.clear()
+        self._dataset = SimpleDiffractionDataset(dataset.get_metadata(), dataset.get_layout(), [])
+        self._array_loader = LoadAllArrays(dataset, self, self._task_manager)
 
-        metadata = dataset.get_metadata()
-        layout = dataset.get_layout()
+        for observer in self._observer_list:
+            observer.handle_dataset_reloaded()
 
-        if not process_patterns and metadata.detector_extent is not None:
+    def load_all_arrays(self, *, process_patterns: bool, block: bool) -> None:
+        if self._array_loader is None:
+            logger.warning('Arrays have already been loaded!')
+            return
+
+        metadata = self._dataset.get_metadata()
+
+        if metadata.detector_extent is not None:
             self._bad_pixels_provider.set_detector_extent(metadata.detector_extent)
 
         bad_pixels = self._bad_pixels_provider.get_bad_pixels()
@@ -260,8 +268,11 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         if process_patterns:
             processor = self._sizer.get_processor()
             bad_pixels = processor.process_bad_pixels(bad_pixels)
+            self._array_loader.enable_pattern_processing()
 
-        self._dataset = SimpleDiffractionDataset(metadata, layout, [], bad_pixels)
+        self._dataset = SimpleDiffractionDataset(
+            metadata, self._dataset.get_layout(), [], bad_pixels
+        )
 
         num_patterns_total = sum(metadata.num_patterns_per_array)
         indexes = -numpy.ones(num_patterns_total, dtype=int)
@@ -290,25 +301,15 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
             pattern_counts=pattern_counts,
         )
 
-        for observer in self._observer_list:
-            observer.handle_dataset_reloaded()
+        # load all arrays in background
+        finished_event = self._array_loader.get_finished_event()
+        self._task_manager.put_background_task(self._array_loader)
+        self._array_loader = None
 
-        self._array_loader = LoadAllArrays(
-            dataset, self, self._task_manager, process_patterns=process_patterns
-        )
-
-    def load_all_arrays(self, *, block: bool) -> None:
-        if self._array_loader is None:
-            logger.warning('Arrays have already been loaded!')
-        else:
-            finished_event = self._array_loader.get_finished_event()
-            self._task_manager.put_background_task(self._array_loader)
-            self._array_loader = None
-
-            if block:
-                while not self._task_manager.is_stopping:
-                    if finished_event.wait(timeout=TaskManager.WAIT_TIME_S):
-                        break
+        if block:
+            while not self._task_manager.is_stopping:
+                if finished_event.wait(timeout=TaskManager.WAIT_TIME_S):
+                    break
 
     def import_assembled_patterns(self, file_path: Path) -> None:
         if file_path.is_file():

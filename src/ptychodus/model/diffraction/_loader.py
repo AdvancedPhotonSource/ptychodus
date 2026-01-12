@@ -160,15 +160,16 @@ class LoadAllArrays:
         array_seq: Sequence[DiffractionArray],
         assembler: ArrayAssembler,
         foreground_task_manager: ForegroundTaskManager,
-        *,
-        process_patterns: bool,
     ) -> None:
         super().__init__()
         self._array_seq = array_seq
         self._assembler = assembler
         self._foreground_task_manager = foreground_task_manager
-        self._process_patterns = process_patterns
+        self._process_patterns = False
         self._finished_event = threading.Event()
+
+    def enable_pattern_processing(self) -> None:
+        self._process_patterns = True
 
     def get_finished_event(self) -> threading.Event:
         return self._finished_event
@@ -179,7 +180,8 @@ class LoadAllArrays:
                 executor.submit(
                     lambda loader_task: loader_task(),
                     self._assembler._create_array_loader(
-                        array, process_patterns=self._process_patterns
+                        array,
+                        process_patterns=self._process_patterns,
                     ),
                 )
                 for array in self._array_seq

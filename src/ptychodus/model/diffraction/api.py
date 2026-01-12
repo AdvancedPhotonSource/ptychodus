@@ -30,8 +30,8 @@ class PatternsStreamingContext:
     def start(self) -> None:
         contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
         stream_dataset = SimpleDiffractionDataset(self._metadata, contents_tree, [])
-        self._dataset.reload(stream_dataset, process_patterns=True)
-        self._dataset.load_all_arrays(block=True)
+        self._dataset.reload(stream_dataset)
+        self._dataset.load_all_arrays(process_patterns=True, block=True)
 
     def append_array(self, array: DiffractionArray) -> None:
         self._dataset.append_array(array, process_patterns=True)
@@ -126,10 +126,10 @@ class DiffractionAPI:
             except Exception as exc:
                 raise RuntimeError(f'Failed to read "{file_path}"') from exc
             else:
-                self._dataset.reload(dataset, process_patterns=process_patterns)
+                self._dataset.reload(dataset)
 
                 if block:
-                    self._dataset.load_all_arrays(block=True)
+                    self._dataset.load_all_arrays(process_patterns=process_patterns, block=True)
 
                 return 0
         else:
@@ -137,8 +137,8 @@ class DiffractionAPI:
 
         return -1
 
-    def load_all_arrays(self, block: bool = False) -> None:
-        self._dataset.load_all_arrays(block=block)
+    def load_all_arrays(self, *, process_patterns: bool = True, block: bool = False) -> None:
+        self._dataset.load_all_arrays(process_patterns=process_patterns, block=block)
 
     def close_patterns(self) -> None:
         self._dataset.clear()
