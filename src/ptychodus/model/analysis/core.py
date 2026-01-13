@@ -5,6 +5,7 @@ from ptychodus.api.settings import SettingsRegistry
 from ..product import ObjectRepository, ProductRepository
 from ..reconstructor import DiffractionPatternPositionMatcher
 from ..visualization import VisualizationEngine
+from .diffraction import DiffractionSimulator
 from .fourier import FourierAnalyzer
 from .frc import FourierRingCorrelator
 from .illumination import IlluminationMapper
@@ -23,6 +24,7 @@ class AnalysisCore:
         product_repository: ProductRepository,
         object_repository: ObjectRepository,
     ) -> None:
+        self.diffraction_simulator = DiffractionSimulator()
         self._probe_propagation_settings = ProbePropagationSettings(settings_registry)
         self.probe_propagator = ProbePropagator(
             self._probe_propagation_settings, product_repository

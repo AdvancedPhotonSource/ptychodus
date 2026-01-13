@@ -1,9 +1,11 @@
+from typing import Any
 import logging
 
 
-from PyQt5.QtCore import QModelIndex
+from PyQt5.QtCore import QAbstractListModel, QModelIndex, QObject, Qt
 from PyQt5.QtWidgets import (
     QAbstractItemView,
+    QDialog,
     QFormLayout,
     QHBoxLayout,
     QLineEdit,
@@ -15,7 +17,7 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import PathParameter, StringParameter
 
-from ...model.metadata import MetadataPresenter
+from ...model.analysis import DiffractionSimulator
 from ...model.diffraction import (
     AssembledDiffractionDataset,
     BadPixelsProvider,
@@ -25,6 +27,8 @@ from ...model.diffraction import (
     DiffractionSettings,
     PatternSizer,
 )
+from ...model.metadata import MetadataPresenter
+from ...model.product import ProductRepository
 from ...view.diffraction import DetectorView, PatternsView
 from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate
 from ..data import FileDialogFactory
@@ -141,6 +145,28 @@ class DetectorController:
         view.setLayout(layout)
 
 
+class ProductRepositoryListModel(QAbstractListModel):
+    def __init__(
+        self,
+        repository: ProductRepository,
+        parent: QObject | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._repository = repository
+
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+        if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
+            try:
+                item = self._repository[index.row()]
+            except IndexError as err:
+                logger.exception(err)
+            else:
+                return item.get_name()
+
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
+        return len(self._repository)
+
+
 class DiffractionController(DiffractionDatasetObserver):
     def __init__(
         self,
@@ -151,6 +177,8 @@ class DiffractionController(DiffractionDatasetObserver):
         diffraction_api: DiffractionAPI,
         dataset: AssembledDiffractionDataset,
         metadata_presenter: MetadataPresenter,
+        product_repository: ProductRepository,
+        diffraction_simulator: DiffractionSimulator,
         view: PatternsView,
         image_controller: ImageController,
         file_dialog_factory: FileDialogFactory,
@@ -159,6 +187,8 @@ class DiffractionController(DiffractionDatasetObserver):
         self._pattern_sizer = pattern_sizer
         self._diffraction_api = diffraction_api
         self._dataset = dataset
+        self._product_list_model = ProductRepositoryListModel(product_repository)
+        self._diffraction_simulator = diffraction_simulator
         self._view = view
         self._image_controller = image_controller
         self._file_dialog_factory = file_dialog_factory
@@ -199,6 +229,11 @@ class DiffractionController(DiffractionDatasetObserver):
 
         dataset_layout_action = view.button_box.analyze_menu.addAction('Dataset Layout...')
         connect_triggered_signal(dataset_layout_action, self._show_dataset_layout)
+        simulate_action = view.button_box.analyze_menu.addAction('Simulate Diffraction...')
+        connect_triggered_signal(simulate_action, self._choose_product_for_simulation)
+
+        view.simulate_dialog.product_combo_box.setModel(self._product_list_model)
+        view.simulate_dialog.finished.connect(self._simulate_diffraction)
 
         dataset.add_observer(self)
         self._sync_model_to_view()
@@ -230,6 +265,16 @@ class DiffractionController(DiffractionDatasetObserver):
 
     def _show_dataset_layout(self) -> None:
         DatasetLayoutViewController.show_dialog(self._dataset, self._view)
+
+    def _choose_product_for_simulation(self) -> None:
+        self._product_list_model.beginResetModel()
+        self._product_list_model.endResetModel()
+        self._view.simulate_dialog.open()
+
+    def _simulate_diffraction(self, result: int) -> None:
+        if result == QDialog.DialogCode.Accepted:
+            item_index = self._view.simulate_dialog.product_combo_box.currentIndex()
+            self._diffraction_simulator.simulate(item_index)
 
     def _close_dataset(self) -> None:
         button = QMessageBox.question(
