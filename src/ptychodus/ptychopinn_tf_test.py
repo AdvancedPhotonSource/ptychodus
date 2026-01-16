@@ -128,7 +128,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         '--nepochs',
         type=int,
-        default=1,
+        default=50,
         help='Number of training epochs.',
     )
     parser.add_argument(
@@ -142,6 +142,12 @@ def _parse_args() -> argparse.Namespace:
         type=int,
         default=1,
         help='PtychoPINN gridsize setting.',
+    )
+    parser.add_argument(
+        '--test-samples',
+        type=int,
+        default=512,
+        help='Number of inference samples to use.',
     )
     parser.add_argument(
         '--reconstructor',
@@ -219,6 +225,9 @@ def main() -> int:
             training_settings.batch_size.set_value(args.batch_size)
             training_settings.data_dir.set_value(train_dir)
             training_settings.output_dir.set_value(model_out_dir)
+
+            inference_settings = model.ptychopinn_reconstructor_library.inference_settings
+            inference_settings.n_samples.set_value(args.test_samples)
 
             model.workflow_api.train_reconstructor(train_dir, model_out_dir)
 
