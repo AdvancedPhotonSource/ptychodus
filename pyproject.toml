@@ -38,7 +38,7 @@ ptychi = ["ptychi==1.*,>=1.2.0"]
 synaps-i = ["torch"]
 
 [tool.setuptools.package-data]
-"ptychodus" = ["py.typed", "model/synaps_i/assets/*.pkl"]
+"ptychodus" = ["py.typed"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
