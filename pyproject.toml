@@ -35,9 +35,10 @@ globus = ["gladier", "gladier-tools>=0.5.4"]
 gui = ["PyQt5"]
 ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
 ptychi = ["ptychi==1.*,>=1.2.0"]
+synaps-i = ["torch"]
 
 [tool.setuptools.package-data]
-"ptychodus" = ["py.typed"]
+"ptychodus" = ["py.typed", "model/synaps_i/assets/*.pkl"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -18,6 +18,7 @@ from .product import ProductController
 from .ptychi import PtyChiViewControllerFactory
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopinn import PtychoPINNViewControllerFactory
+from .synaps_i import SynapsIViewControllerFactory
 from .reconstructor import ReconstructorController
 from .probe_positions import ProbePositionsController
 from .settings import SettingsController
@@ -43,6 +44,9 @@ class ControllerCore:
         )
         self._ptychopinn_view_controller_factory = PtychoPINNViewControllerFactory(
             model.ptychopinn_reconstructor_library, self._file_dialog_factory
+        )
+        self._synaps_i_view_controller_factory = SynapsIViewControllerFactory(
+            model.synaps_i_reconstructor_library, self._file_dialog_factory
         )
         self._settings_controller = SettingsController(
             model.settings_registry,
@@ -136,6 +140,7 @@ class ControllerCore:
                 self._ptychi_view_controller_factory,
                 self._ptychopinn_view_controller_factory,
                 self._ptychonn_view_controller_factory,
+                self._synaps_i_view_controller_factory,
             ],
         )
         self._globus_controller = GlobusController(

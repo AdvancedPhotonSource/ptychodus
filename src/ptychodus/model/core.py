@@ -34,6 +34,7 @@ from .product import PositionsStreamingContext, ProductCore
 from .ptychi import PtyChiReconstructorLibrary
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopinn import PtychoPINNReconstructorLibrary
+from .synaps_i import SynapsIReconstructorLibrary
 from .reconstructor import ReconstructorCore
 from .task_manager import TaskManager
 from .visualization import VisualizationEngine
@@ -148,6 +149,9 @@ class ModelCore:
         self.ptychopinn_reconstructor_library = PtychoPINNReconstructorLibrary(
             self.settings_registry, self.is_developer_mode_enabled
         )
+        self.synaps_i_reconstructor_library = SynapsIReconstructorLibrary(
+            self.settings_registry, self.is_developer_mode_enabled
+        )
         self.reconstructor_core = ReconstructorCore(
             self._task_manager,
             self.settings_registry,
@@ -157,6 +161,7 @@ class ModelCore:
                 self.ptychi_reconstructor_library,
                 self.ptychonn_reconstructor_library,
                 self.ptychopinn_reconstructor_library,
+                self.synaps_i_reconstructor_library,
             ],
         )
         self.fluorescence_core = FluorescenceCore(
