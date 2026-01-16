@@ -28,6 +28,7 @@ dynamic = ["version"]
 convert-to-ptychodus = "ptychodus.convert_to_ptychodus:main"
 ptychodus = "ptychodus.__main__:main"
 ptychodus-bdp = "ptychodus.ptychodus_bdp:main"
+ptychodus-ptychopinn-tf-test = "ptychodus.scripts.ptychopinn_tf_test:main"
 
 [project.optional-dependencies]
 globus = ["gladier", "gladier-tools>=0.5.4"]

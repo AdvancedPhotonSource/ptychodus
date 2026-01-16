@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections.abc import Iterator, Sequence
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, Final
 import logging
@@ -81,7 +81,14 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         self._config: dict[str, Any] = dict()
         self._is_developer_mode_enabled = is_developer_mode_enabled
 
-        ptychopinn_version = version('ptychopinn')
+        try:
+            ptychopinn_version = version('ptychopinn')
+        except PackageNotFoundError:
+            try:
+                ptychopinn_version = version('ptycho')
+            except PackageNotFoundError:
+                ptychopinn_version = 'unknown'
+
         logger.info(f'\tPtychoPINN {ptychopinn_version}')
 
     def _create_model_config(self, model_size: int) -> ModelConfig:
@@ -113,9 +120,10 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         return self.__model
 
     def _reconstruct_image(self, test_data: ptycho.loader.PtychoDataContainer) -> Any:
-        import ptycho.model
-
-        intensity_scale = ptycho.model.params()['intensity_scale']
+        try:
+            intensity_scale = ptycho.params.get('intensity_scale')
+        except KeyError as exc:
+            raise RuntimeError('Missing intensity_scale in ptycho.params.cfg') from exc
         return self._model.predict([test_data.X * intensity_scale, test_data.local_offsets])
 
     def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
@@ -266,9 +274,11 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             train_raw_data, test_raw_data, training_config
         )
         output_dir = self._training_settings.output_dir.get_value()
+        output_dir.mkdir(parents=True, exist_ok=True)
+        model_path = output_dir / self.MODEL_FILE_NAME
         self.save_model(output_dir)
         save_outputs(recon_amp, recon_phase, train_results, str(output_dir))
-        self.open_model(output_dir)
+        self.open_model(model_path)
 
         training_loss: Sequence[LossValue] = []
         validation_loss: Sequence[LossValue] = []
