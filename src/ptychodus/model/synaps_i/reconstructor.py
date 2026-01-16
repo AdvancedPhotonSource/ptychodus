@@ -5,7 +5,6 @@ from typing import Any, Final
 import logging
 
 import numpy
-import pickle
 import yaml
 
 from ptychodus.api.object import Object
@@ -91,7 +90,6 @@ class SynapsITrainableReconstructor(TrainableReconstructor):
         self._model: PtychoViT | None = None
         self._model_config: dict[str, Any] | None = None
         self._model_size: int | None = None
-        self._normalization_dict: dict[str, float] | None = None
         self._is_developer_mode_enabled = is_developer_mode_enabled
 
         try:
@@ -179,67 +177,21 @@ class SynapsITrainableReconstructor(TrainableReconstructor):
         self._model = model
         self._model_config = model_config
         self._model_size = model_size
-        self._normalization_dict = None
-
-    def _load_normalization_dict(self) -> dict[str, float] | None:
-        dict_path = self._inference_settings.normalization_dict_path.get_value()
-        if not dict_path.exists():
-            return None
-        if self._normalization_dict is not None:
-            return self._normalization_dict
-
-        with dict_path.open('rb') as handle:
-            normalization_dict = pickle.load(handle)
-        if not isinstance(normalization_dict, dict):
-            raise ValueError('Normalization dict must be a pickled dictionary.')
-
-        self._normalization_dict = {
-            str(key): float(value) for key, value in normalization_dict.items()
-        }
-        return self._normalization_dict
-
     def _resolve_normalization(self, parameters: ReconstructInput) -> float:
         """Return normalization scalar for the current product.
 
-        Uses the bundled normalization dict if available. If the product name
-        matches a dict entry, that value is returned. If there is a single entry
-        in the dict and no name match, that sole value is used. Otherwise the
-        configured default normalization setting is returned.
+        When "Specify Normalization" is enabled, this returns the user-provided
+        value. Otherwise, it uses the maximum intensity in the diffraction
+        patterns.
         """
-        normalization = float(self._inference_settings.normalization.get_value())
-        normalization_dict = self._load_normalization_dict()
-        if not normalization_dict:
-            logger.info(
-                'No normalization dict found; using given normalization value %s.',
-                normalization,
-            )
+        if self._inference_settings.specify_normalization.get_value():
+            normalization = float(self._inference_settings.normalization.get_value())
+            logger.info('Using specified normalization value %s.', normalization)
             return normalization
 
-        object_name = self._strip_reconstructor_suffix(
-            parameters.product.metadata.name,
-            self.get_name(),
-        )
-        if object_name in normalization_dict:
-            return normalization_dict[object_name]
-
-        if len(normalization_dict) == 1:
-            return next(iter(normalization_dict.values()))
-
-        logger.warning(
-            'Normalization key "%s" not found; using default %s.',
-            object_name,
-            normalization,
-        )
+        normalization = float(numpy.max(parameters.diffraction_patterns))
+        logger.info('Using max diffraction value %s for normalization.', normalization)
         return normalization
-
-    @staticmethod
-    def _strip_reconstructor_suffix(name: str, reconstructor_name: str) -> str:
-        suffix = f'_{reconstructor_name}'
-        while name.endswith(suffix):
-            name = name[: -len(suffix)]
-        if name.endswith('_para'):
-            name = name[: -len('_para')]
-        return name
 
     @staticmethod
     def _get_project_root() -> Path:

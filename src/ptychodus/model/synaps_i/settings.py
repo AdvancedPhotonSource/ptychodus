@@ -21,11 +21,11 @@ class SynapsIInferenceSettings(Observable, Observer):
         self.max_probe_modes = self._group.create_integer_parameter(
             'MaxProbeModes', 8, minimum=1
         )
+        self.specify_normalization = self._group.create_boolean_parameter(
+            'SpecifyNormalization', False
+        )
         self.normalization = self._group.create_real_parameter(
             'Normalization', 100000.0, minimum=0.0
-        )
-        self.normalization_dict_path = self._group.create_path_parameter(
-            'NormalizationDictPath', Path('/path/to/normalization.pkl')
         )
         self.scale = self._group.create_real_parameter('Scale', 10000.0, minimum=0.0)
 

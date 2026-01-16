@@ -1,9 +1,51 @@
+from decimal import Decimal
+
 from PyQt5.QtWidgets import QWidget
+
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.parametric import BooleanParameter, RealParameter
 
 from ..model.synaps_i import SynapsIReconstructorLibrary
 from .data import FileDialogFactory
-from .parametric import ParameterViewBuilder
+from .parametric import ParameterViewBuilder, ParameterViewController
 from .reconstructor import ReconstructorViewControllerFactory
+from ..view.widgets import DecimalLineEdit
+
+
+class NormalizationValueController(ParameterViewController, Observer):
+    def __init__(
+        self,
+        normalization: RealParameter,
+        specify_normalization: BooleanParameter,
+        *,
+        tool_tip: str = '',
+    ) -> None:
+        super().__init__()
+        self._normalization = normalization
+        self._specify_normalization = specify_normalization
+        self._widget = DecimalLineEdit.create_instance(is_signed=False)
+
+        if tool_tip:
+            self._widget.setToolTip(tool_tip)
+
+        self._sync_model_to_view()
+        self._widget.value_changed.connect(self._sync_view_to_model)
+        normalization.add_observer(self)
+        specify_normalization.add_observer(self)
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+    def _sync_view_to_model(self, value: Decimal) -> None:
+        self._normalization.set_value(float(value))
+
+    def _sync_model_to_view(self) -> None:
+        self._widget.set_value(Decimal(str(self._normalization.get_value())))
+        self._widget.setEnabled(self._specify_normalization.get_value())
+
+    def _update(self, observable: Observable) -> None:
+        if observable in (self._normalization, self._specify_normalization):
+            self._sync_model_to_view()
 
 
 class SynapsIViewControllerFactory(ReconstructorViewControllerFactory):
@@ -46,17 +88,17 @@ class SynapsIViewControllerFactory(ReconstructorViewControllerFactory):
             'Max Probe Modes:',
             group=inference_group,
         )
-        builder.add_decimal_line_edit(
-            inference_settings.normalization,
-            'Normalization:',
+        builder.add_check_box(
+            inference_settings.specify_normalization,
+            'Specify Normalization',
             group=inference_group,
         )
-        builder.add_file_opener(
-            inference_settings.normalization_dict_path,
-            'Normalization Dict:',
-            caption='Open Normalization Dict',
-            name_filters=['Pickle Files (*.pkl)'],
-            selected_name_filter='Pickle Files (*.pkl)',
+        builder.add_view_controller(
+            NormalizationValueController(
+                inference_settings.normalization,
+                inference_settings.specify_normalization,
+            ),
+            'Normalization:',
             group=inference_group,
         )
         builder.add_decimal_line_edit(
