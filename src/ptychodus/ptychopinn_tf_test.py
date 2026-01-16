@@ -150,11 +150,6 @@ def _parse_args() -> argparse.Namespace:
         help='Number of inference samples to use.',
     )
     parser.add_argument(
-        '--positions-in-pixels',
-        action='store_true',
-        help='Interpret probe positions as object pixel coordinates.',
-    )
-    parser.add_argument(
         '--reconstructor',
         default='PtychoPINN/PINN',
         help='Reconstructor name to use.',
@@ -214,6 +209,9 @@ def main() -> int:
             )
             _configure_metadata(model, product_api.get_product_index(), args)
 
+            model_settings = model.ptychopinn_reconstructor_library.model_settings
+            model_settings.gridsize.set_value(args.gridsize)
+
             train_data_path = train_dir / 'train_data.npz'
             product_api.export_training_data(train_data_path)
             test_data_path = train_dir / 'test_data.npz'
@@ -221,10 +219,6 @@ def main() -> int:
 
             _validate_npz_keys(train_data_path, REQUIRED_TRAIN_KEYS, 'train_data.npz')
             _validate_npz_keys(test_data_path, REQUIRED_TRAIN_KEYS, 'test_data.npz')
-
-            model_settings = model.ptychopinn_reconstructor_library.model_settings
-            model_settings.gridsize.set_value(args.gridsize)
-            model_settings.positions_in_pixels.set_value(args.positions_in_pixels)
 
             training_settings = model.ptychopinn_reconstructor_library.training_settings
             training_settings.nepochs.set_value(args.nepochs)
