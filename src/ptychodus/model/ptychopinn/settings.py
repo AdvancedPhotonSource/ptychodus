@@ -23,6 +23,9 @@ class PtychoPINNModelSettings(Observable, Observer):
         self.gaussian_smoothing_sigma = self._group.create_real_parameter(
             'GaussianSmoothingSigma', 0.0, minimum=0.0
         )
+        self.positions_in_pixels = self._group.create_boolean_parameter(
+            'PositionsInPixels', False
+        )
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:

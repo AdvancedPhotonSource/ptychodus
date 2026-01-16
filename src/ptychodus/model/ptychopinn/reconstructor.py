@@ -37,15 +37,19 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-def create_raw_data(parameters: ReconstructInput) -> RawData:
+def create_raw_data(parameters: ReconstructInput, *, positions_in_pixels: bool) -> RawData:
     object_geometry = parameters.product.object_.get_geometry()
     position_x_px: list[float] = list()
     position_y_px: list[float] = list()
 
     for scan_point in parameters.product.probe_positions:
-        object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        position_x_px.append(object_point.coordinate_x_px)
-        position_y_px.append(object_point.coordinate_y_px)
+        if positions_in_pixels:
+            position_x_px.append(float(scan_point.coordinate_x_m))
+            position_y_px.append(float(scan_point.coordinate_y_m))
+        else:
+            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
+            position_x_px.append(object_point.coordinate_x_px)
+            position_y_px.append(object_point.coordinate_y_px)
 
     return RawData.from_coords_without_pc(
         xcoords=numpy.array(position_x_px),
@@ -126,6 +130,9 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             raise RuntimeError('Missing intensity_scale in ptycho.params.cfg') from exc
         return self._model.predict([test_data.X * intensity_scale, test_data.local_offsets])
 
+    def _positions_in_pixels(self) -> bool:
+        return self._model_settings.positions_in_pixels.get_value()
+
     def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
         model_size = parameters.diffraction_patterns.shape[-1]
 
@@ -145,7 +152,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         update_legacy_dict(ptycho.params.cfg, inference_config)
 
         # Create RawData
-        test_raw_data = create_raw_data(parameters)
+        test_raw_data = create_raw_data(parameters, positions_in_pixels=self._positions_in_pixels())
         ptycho.probe.set_probe_guess(None, test_raw_data.probeGuess)
 
         # Group overlapping scan positions
@@ -213,9 +220,13 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         position_y_px: list[float] = list()
 
         for scan_point in parameters.product.probe_positions:
-            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-            position_x_px.append(object_point.coordinate_x_px)
-            position_y_px.append(object_point.coordinate_y_px)
+            if self._positions_in_pixels():
+                position_x_px.append(float(scan_point.coordinate_x_m))
+                position_y_px.append(float(scan_point.coordinate_y_m))
+            else:
+                object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
+                position_x_px.append(object_point.coordinate_x_px)
+                position_y_px.append(object_point.coordinate_y_px)
 
         xcoords = numpy.array(position_x_px)
         ycoords = numpy.array(position_y_px)

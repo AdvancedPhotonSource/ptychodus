@@ -134,7 +134,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         '--batch-size',
         type=int,
-        default=4,
+        default=16,
         help='Training batch size.',
     )
     parser.add_argument(
@@ -148,6 +148,11 @@ def _parse_args() -> argparse.Namespace:
         type=int,
         default=512,
         help='Number of inference samples to use.',
+    )
+    parser.add_argument(
+        '--positions-in-pixels',
+        action='store_true',
+        help='Interpret probe positions as object pixel coordinates.',
     )
     parser.add_argument(
         '--reconstructor',
@@ -219,6 +224,7 @@ def main() -> int:
 
             model_settings = model.ptychopinn_reconstructor_library.model_settings
             model_settings.gridsize.set_value(args.gridsize)
+            model_settings.positions_in_pixels.set_value(args.positions_in_pixels)
 
             training_settings = model.ptychopinn_reconstructor_library.training_settings
             training_settings.nepochs.set_value(args.nepochs)
