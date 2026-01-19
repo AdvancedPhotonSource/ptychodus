@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "ptychodus"
 description = "Ptychodus is a ptychography data pipeline application."
 readme = "README.rst"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 dependencies = [
@@ -32,7 +32,7 @@ ptychodus-bdp = "ptychodus.ptychodus_bdp:main"
 [project.optional-dependencies]
 globus = ["gladier", "gladier-tools>=0.5.4"]
 gui = ["PyQt5"]
-ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
+#ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
 ptychi = ["ptychi==1.*,>=1.2.0"]
 
 [tool.setuptools.package-data]
@@ -65,7 +65,7 @@ ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.format]
 quote-style = "single"
@@ -78,4 +78,16 @@ select = [
 ]
 
 [tool.pyright]
-pythonVersion = "3.10"
+pythonVersion = "3.11"
+
+[dependency-groups]
+dev = [
+    "build",
+    "mypy",
+    "pyqt5-stubs",
+    "pytest",
+    "ruff",
+    "types-psutil",
+    "types-pyyaml",
+    "types-requests",
+]

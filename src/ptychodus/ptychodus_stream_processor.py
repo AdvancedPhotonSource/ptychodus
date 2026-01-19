@@ -14,6 +14,7 @@ import pvapy
 
 from ptychodus.model import ModelCore
 import ptychodus
+import ptychodus.api
 
 
 class ReconstructionThread(threading.Thread):

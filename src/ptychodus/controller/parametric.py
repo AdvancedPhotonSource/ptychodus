@@ -4,6 +4,7 @@ from collections.abc import Iterable, Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import Final
+from uuid import UUID
 import logging
 
 from PyQt5.QtCore import Qt
@@ -32,6 +33,7 @@ from ptychodus.api.parametric import (
     PathParameter,
     RealParameter,
     StringParameter,
+    UUIDParameter,
 )
 
 from ..view.widgets import AngleWidget, DecimalLineEdit, DecimalSlider, LengthWidget
@@ -457,6 +459,33 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
             self.__sync_model_to_view()
 
 
+class UUIDLineEditParameterViewController(ParameterViewController, Observer):
+    def __init__(self, parameter: UUIDParameter, *, tool_tip: str = '') -> None:
+        super().__init__()
+        self._parameter = parameter
+        self._widget = QLineEdit()
+
+        if tool_tip:
+            self._widget.setToolTip(tool_tip)
+
+        self.__sync_model_to_view()
+        self._widget.editingFinished.connect(self.__sync_view_to_model)
+        parameter.add_observer(self)
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+    def __sync_view_to_model(self) -> None:
+        self._parameter.set_value(UUID(self._widget.text()))
+
+    def __sync_model_to_view(self) -> None:
+        self._widget.setText(str(self._parameter.get_value()))
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self.__sync_model_to_view()
+
+
 class LengthWidgetParameterViewController(ParameterViewController, Observer):
     def __init__(
         self, parameter: RealParameter, *, is_signed: bool = False, tool_tip: str = ''
@@ -650,6 +679,20 @@ class ParameterViewBuilder:
         view_controller = SpinBoxParameterViewController(parameter, tool_tip=tool_tip)
         self.add_view_controller(view_controller, label, group=group)
 
+    def add_line_edit(
+        self,
+        parameter: StringParameter,
+        label: str,
+        *,
+        validator: QValidator | None = None,
+        tool_tip: str = '',
+        group: str = '',
+    ) -> None:
+        view_controller = LineEditParameterViewController(
+            parameter, validator=validator, tool_tip=tool_tip
+        )
+        self.add_view_controller(view_controller, label, group=group)
+
     def add_integer_line_edit(
         self,
         parameter: IntegerParameter,
@@ -681,6 +724,17 @@ class ParameterViewBuilder:
         group: str = '',
     ) -> None:
         view_controller = DecimalSliderParameterViewController(parameter, tool_tip=tool_tip)
+        self.add_view_controller(view_controller, label, group=group)
+
+    def add_uuid_line_edit(
+        self,
+        parameter: UUIDParameter,
+        label: str,
+        *,
+        tool_tip: str = '',
+        group: str = '',
+    ) -> None:
+        view_controller = UUIDLineEditParameterViewController(parameter, tool_tip=tool_tip)
         self.add_view_controller(view_controller, label, group=group)
 
     def add_length_widget(

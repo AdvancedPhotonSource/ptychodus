@@ -9,7 +9,6 @@ from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import DiffractionAPI
 from ..product import ProductAPI
-from .locator import DataLocator
 from .settings import GlobusSettings
 
 logger = logging.getLogger(__name__)
@@ -25,22 +24,16 @@ class GlobusExecutor:
     def __init__(
         self,
         settings: GlobusSettings,
-        input_data_locator: DataLocator,
-        compute_data_locator: DataLocator,
-        output_data_locator: DataLocator,
         settings_registry: SettingsRegistry,
         diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
     ) -> None:
         super().__init__()
         self._settings = settings
-        self._input_data_locator = input_data_locator
-        self._compute_data_locator = compute_data_locator
-        self._output_data_locator = output_data_locator
-        self._product_api = product_api
         self._settings_registry = settings_registry
         self._diffraction_api = diffraction_api
-        self.job_queue: queue.Queue[GlobusJob] = queue.Queue()
+        self._product_api = product_api
+        self.job_queue: queue.Queue[GlobusJob] = queue.Queue()  # FIXME replace
 
     def run_flow(self, input_product_index: int) -> None:
         transfer_sync_level = 3  # Copy files if checksums of the source and destination mismatch
@@ -52,12 +45,16 @@ class GlobusExecutor:
             logger.warning(f'Failed access product for flow ({input_product_index=})!')
             return
 
-        input_data_posix_path = self._input_data_locator.get_posix_path() / flow_label
-        compute_data_posix_path = self._compute_data_locator.get_posix_path() / flow_label
+        input_data_posix_path = self._settings.input_data_posix_path.get_value() / flow_label
+        compute_data_posix_path = self._settings.compute_data_posix_path.get_value() / flow_label
 
-        input_data_globus_path = f'{self._input_data_locator.get_globus_path()}/{flow_label}'
-        compute_data_globus_path = f'{self._compute_data_locator.get_globus_path()}/{flow_label}'
-        output_data_globus_path = f'{self._output_data_locator.get_globus_path()}/{flow_label}'
+        input_data_globus_path = f'{self._settings.input_data_globus_path.get_value()}/{flow_label}'
+        compute_data_globus_path = (
+            f'{self._settings.compute_data_globus_path.get_value()}/{flow_label}'
+        )
+        output_data_globus_path = (
+            f'{self._settings.output_data_globus_path.get_value()}/{flow_label}'
+        )
 
         try:
             input_data_posix_path.mkdir(mode=0o755, parents=True, exist_ok=True)
@@ -76,10 +73,12 @@ class GlobusExecutor:
         )
 
         flow_input = {
-            'input_data_transfer_source_endpoint': str(self._input_data_locator.get_endpoint_id()),
+            'input_data_transfer_source_endpoint': str(
+                self._settings.input_data_endpoint_id.get_value()
+            ),
             'input_data_transfer_source_path': input_data_globus_path,
             'input_data_transfer_destination_endpoint': str(
-                self._compute_data_locator.get_endpoint_id()
+                self._settings.compute_data_endpoint_id.get_value()
             ),
             'input_data_transfer_destination_path': compute_data_globus_path,
             'input_data_transfer_recursive': True,
@@ -93,11 +92,11 @@ class GlobusExecutor:
             'ptychodus_input_file': str(compute_data_posix_path / StandardFileLayout.PRODUCT_IN),
             'ptychodus_output_file': str(compute_data_posix_path / StandardFileLayout.PRODUCT_OUT),
             'output_data_transfer_source_endpoint': str(
-                self._compute_data_locator.get_endpoint_id()
+                self._settings.compute_data_endpoint_id.get_value()
             ),
             'output_data_transfer_source_path': f'{compute_data_globus_path}/{StandardFileLayout.PRODUCT_OUT}',
             'output_data_transfer_destination_endpoint': str(
-                self._output_data_locator.get_endpoint_id()
+                self._settings.output_data_endpoint_id.get_value()
             ),
             'output_data_transfer_destination_path': f'{output_data_globus_path}/{StandardFileLayout.PRODUCT_OUT}',
             'output_data_transfer_recursive': False,

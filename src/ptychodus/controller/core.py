@@ -139,13 +139,12 @@ class ControllerCore:
             ],
         )
         self._globus_controller = GlobusController(
-            model.globus_core.parameters_presenter,
-            model.globus_core.authorization_presenter,
-            model.globus_core.status_presenter,
-            model.globus_core.execution_presenter,
-            view.globus_parameters_view,
-            view.globus_table_view,
-            self._product_controller.table_model,
+            model.globus_core.settings,
+            model.globus_core.authorizer,
+            model.globus_core.status_repository,
+            view.globus_view,
+            view.globus_status_table_view,
+            self._file_dialog_factory,
         )
         self._automation_controller = AutomationController.create_instance(
             model.automation_core,
