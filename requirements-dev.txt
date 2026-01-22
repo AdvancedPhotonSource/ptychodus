@@ -5,9 +5,8 @@ matplotlib
 mypy
 numpy
 psutil
-pyqt
+pyqt5
 pytest
-python>=3.10
 ruff
 scikit-image
 scipy
