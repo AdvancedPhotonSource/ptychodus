@@ -14,21 +14,22 @@ class DiffractionSimulator:
         super().__init__()
         self._repository = repository
 
-    def simulate(self, product_index: int) -> None:  # FIXME
+    def simulate(self, product_index: int) -> None:
         product = self._repository[product_index].get_product()
+        # TODO also support multislice
         interpolator = BarycentricArrayInterpolator(product.object_.get_layer(0))
-
         probe_geometry = product.probes.get_geometry()
 
         propagator_parameters = PropagatorParameters(
             wavelength_m=product.metadata.probe_wavelength_m,
             width_px=probe_geometry.width_px,
             height_px=probe_geometry.height_px,
-            pixel_width_m=probe_geometry.pixel_width_m,  # FIXME VERIFY
-            pixel_height_m=probe_geometry.pixel_height_m,  # FIXME VERIFY
+            pixel_width_m=probe_geometry.pixel_width_m,
+            pixel_height_m=probe_geometry.pixel_height_m,
             propagation_distance_m=product.metadata.detector_distance_m,
         )
-        # TODO support near-field propagation
+
+        # TODO also support near-field propagation
         propagator = FraunhoferPropagator(propagator_parameters)
 
         for probe_position, probe in zip(product.probe_positions, product.probes):
