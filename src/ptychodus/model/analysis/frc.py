@@ -101,4 +101,6 @@ class FourierRingCorrelator:
         # TODO replace NaNs with interpolated values
 
         rnyquist = numpy.min(array1.shape) // 2 + 1
-        return FourierRingCorrelation(spatial_frequency_per_m[:rnyquist], correlation[:rnyquist])
+        return FourierRingCorrelation(
+            spatial_frequency_per_m[:rnyquist].tolist(), correlation[:rnyquist].tolist()
+        )

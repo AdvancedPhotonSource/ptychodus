@@ -1,14 +1,15 @@
 import logging
-import threading
 
 from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import DiffractionAPI
 from ..product import ProductAPI
+from ..task_manager import TaskManager
 from .authorizer import GlobusAuthorizer
 from .executor import GlobusExecutor
 from .settings import GlobusSettings
 from .status import GlobusStatusRepository
+from .client import FakeGlobusClient, GlobusClient
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 class GlobusCore:
     def __init__(
         self,
+        task_manager: TaskManager,
         settings_registry: SettingsRegistry,
         diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
@@ -23,41 +25,25 @@ class GlobusCore:
         self.settings = GlobusSettings(settings_registry)
         self.authorizer = GlobusAuthorizer()
         self.status_repository = GlobusStatusRepository()
-        self.executor = GlobusExecutor(
-            self.settings,
-            settings_registry,
-            diffraction_api,
-            product_api,
-        )
-        self._thread: threading.Thread | None = None
 
         try:
-            from .globus import GlobusThread
+            from ._globus_client import RealGlobusClient
         except ModuleNotFoundError:
             logger.info('Globus not found.')
+            self._client: GlobusClient = FakeGlobusClient()
         else:
-            self._thread = GlobusThread.create_instance(
-                self.authorizer, self.status_repository, self.executor
-            )
+            self._client = RealGlobusClient(task_manager, self.authorizer, self.status_repository)
+
+        self.executor = GlobusExecutor(
+            self.settings, settings_registry, diffraction_api, product_api, self._client
+        )
 
     @property
     def is_supported(self) -> bool:
-        return self._thread is not None
+        return self._client.is_supported
 
     def start(self) -> None:
-        logger.info('Starting Globus thread...')
-
-        if self._thread:
-            self._thread.start()
-
-        logger.info('Globus thread started.')
+        self._client.start()
 
     def stop(self) -> None:
-        logger.info('Stopping Globus thread...')
-        self.executor.job_queue.join()
-        self.authorizer.shutdown_event.set()
-
-        if self._thread:
-            self._thread.join()
-
-        logger.info('Globus thread stopped.')
+        self._client.stop()

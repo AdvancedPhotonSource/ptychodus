@@ -4,12 +4,12 @@ import threading
 logger = logging.getLogger(__name__)
 
 
-class GlobusAuthorizer:
+class GlobusAuthorizer:  # FIXME clean up threading
     def __init__(self) -> None:
         super().__init__()
         self._authorize_lock = threading.Lock()
         self._authorize_code = str()
-        self._authorize_url = 'https://aps.anl.gov'  # FIXME generalize
+        self._authorize_url = 'http://localhost'
         self.is_authorized_event = threading.Event()
         self.is_authorized_event.set()
         self.shutdown_event = threading.Event()

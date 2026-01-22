@@ -83,7 +83,6 @@ pythonVersion = "3.11"
 
 [dependency-groups]
 dev = [
-    "build",
     "mypy",
     "pyqt5-stubs",
     "pytest",

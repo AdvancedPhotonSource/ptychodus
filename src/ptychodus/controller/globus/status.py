@@ -24,7 +24,7 @@ class GlobusStatusViewController(ParameterViewController):
         self._status_refresh_interval_s = status_refresh_interval_s
         self._status_repository = status_repository
         self._timer = QTimer()
-        self._timer.timeout.connect(status_repository.refresh_status)
+        # FIXME (to model) self._timer.timeout.connect(status_repository.refresh_status)
 
         self._auto_refresh_check_box = QCheckBox('Auto Refresh [sec]:')
         self._auto_refresh_check_box.toggled.connect(self._auto_refresh_status)
@@ -32,7 +32,7 @@ class GlobusStatusViewController(ParameterViewController):
             status_refresh_interval_s
         )
         self._refresh_button = QPushButton('Refresh')
-        self._refresh_button.clicked.connect(status_repository.refresh_status)
+        # FIXME self._refresh_button.clicked.connect(status_repository.refresh_status)
 
         layout = QFormLayout()
         layout.addRow(

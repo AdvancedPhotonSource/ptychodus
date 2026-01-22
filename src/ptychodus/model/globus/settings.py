@@ -12,6 +12,20 @@ class GlobusSettings(Observable, Observer):
         self._group = registry.create_group('Globus')
         self._group.add_observer(self)
 
+        # Transfer copies only those files where the source file differs from
+        # the destination file. The sync level is an integer in the 0-3 range,
+        # and it controls what checks are used to determine if a file is
+        # different. Higher levels include the checks from lower levels. Delete
+        # tasks are always null:
+        #
+        # 0 Copy files that do not exist at the destination.
+        # 1 Copy files if the size of the destination does not match the size of the source.
+        # 2 Copy files if the timestamp of the destination is older than the timestamp of the source.
+        # 3 Copy files if checksums of the source and destination do not match.
+        self.transfer_sync_level = self._group.create_integer_parameter(
+            'TransferSyncLevel', 3, minimum=0, maximum=3
+        )
+
         self.input_data_endpoint_id = self._group.create_uuid_parameter(
             'InputDataEndpointID', UUID(int=0)
         )

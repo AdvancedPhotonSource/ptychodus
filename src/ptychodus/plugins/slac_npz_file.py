@@ -93,9 +93,7 @@ class SLACProductFileReader(ProductFileReader):
             )
             probe_energy_ev = _get_scalar(npz_file, 'probe_energy_eV', DEFAULT_PROBE_ENERGY_EV)
             if probe_energy_ev == DEFAULT_PROBE_ENERGY_EV:
-                probe_energy_ev = _get_scalar(
-                    npz_file, 'probe_energy_ev', DEFAULT_PROBE_ENERGY_EV
-                )
+                probe_energy_ev = _get_scalar(npz_file, 'probe_energy_ev', DEFAULT_PROBE_ENERGY_EV)
             detector_pixel_size_m = _get_scalar(
                 npz_file, 'detector_pixel_size_m', DEFAULT_DETECTOR_PIXEL_SIZE_M
             )
@@ -115,9 +113,7 @@ class SLACProductFileReader(ProductFileReader):
                 scan_x_m = scan_x * pixel_size_m
                 scan_y_m = scan_y * pixel_size_m
             else:
-                logger.warning(
-                    'SLAC NPZ coordinate scaling skipped (invalid pixel size).'
-                )
+                logger.warning('SLAC NPZ coordinate scaling skipped (invalid pixel size).')
 
         metadata = ProductMetadata(
             name=file_path.stem,

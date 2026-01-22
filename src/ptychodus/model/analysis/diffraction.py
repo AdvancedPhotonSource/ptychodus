@@ -18,14 +18,16 @@ class DiffractionSimulator:
         product = self._repository[product_index].get_product()
         interpolator = BarycentricArrayInterpolator(product.object_.get_layer(0))
 
-        # propagator_parameters = PropagatorParameters(
-        #    wavelength_m=product.metadata.wavelength_m,
-        #    width_px=probe.width_px,
-        #    height_px=probe.height_px,
-        #    pixel_width_m=pixel_geometry.width_m,
-        #    pixel_height_m=pixel_geometry.height_m,
-        #    propagation_distance_m=float(z_m),
-        # )
+        probe_geometry = product.probes.get_geometry()
+
+        propagator_parameters = PropagatorParameters(
+            wavelength_m=product.metadata.probe_wavelength_m,
+            width_px=probe_geometry.width_px,
+            height_px=probe_geometry.height_px,
+            pixel_width_m=probe_geometry.pixel_width_m,  # FIXME VERIFY
+            pixel_height_m=probe_geometry.pixel_height_m,  # FIXME VERIFY
+            propagation_distance_m=product.metadata.detector_distance_m,
+        )
         # TODO support near-field propagation
         propagator = FraunhoferPropagator(propagator_parameters)
 

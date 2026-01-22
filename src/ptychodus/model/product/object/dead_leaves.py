@@ -116,7 +116,7 @@ class DeadLeavesObjectBuilder(ObjectBuilder):
             phase_turns = lerp(phase_turns, leaf_phase_turns, leaf_coverage)
 
             is_covered |= leaf_counts == num_samples
-            num_covered_pixels = numpy.count_nonzero(is_covered)
+            num_covered_pixels = numpy.count_nonzero(is_covered).item()
 
             covered_pct = 100 * num_covered_pixels / is_covered.size
             logger.info(f'leaves = {leaf}, covered = {covered_pct:.2f}%')

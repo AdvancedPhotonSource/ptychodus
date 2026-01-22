@@ -173,6 +173,7 @@ class ModelCore:
             self.product_core.object_repository,
         )
         self.globus_core = GlobusCore(
+            self._task_manager,
             self.settings_registry,
             self.diffraction_core.diffraction_api,
             self.product_core.product_api,
@@ -296,11 +297,12 @@ class ModelCore:
 
         output_directory.mkdir(parents=True, exist_ok=True)
 
-        # TODO add enum for actions
         match action.lower():
+            case 'reconstruct':
+                return self._batch_mode_reconstruct(input_directory, output_directory)
             case 'train':
                 return self._batch_mode_train(input_directory, output_directory)
-            case 'reconstruct':
+            case 'infer':
                 return self._batch_mode_reconstruct(input_directory, output_directory)
 
         logger.error(f'Unknown batch mode action "{action}"!')
