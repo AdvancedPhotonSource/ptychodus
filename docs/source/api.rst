@@ -46,14 +46,6 @@ Parametric
    :undoc-members:
    :show-inheritance:
 
-Patterns
---------
-
-.. automodule:: ptychodus.api.patterns
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 Plugins
 -------
 
@@ -90,14 +82,6 @@ Reconstructor
 -------------
 
 .. automodule:: ptychodus.api.reconstructor
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Scan
-----
-
-.. automodule:: ptychodus.api.scan
    :members:
    :undoc-members:
    :show-inheritance:
