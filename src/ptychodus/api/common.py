@@ -1,4 +1,4 @@
-from typing import Any, Final, TypeAlias
+from typing import Any, Final, TypeAlias, overload
 
 import numpy
 import numpy.typing
@@ -22,7 +22,21 @@ LIGHT_SPEED_M_PER_S: Final[float] = 299792458
 PLANCK_CONSTANT_J_PER_HZ: Final[float] = 6.62607015e-34
 
 
+@overload
+def lerp(lower: float, upper: float, frac: float) -> float: ...
+@overload
+def lerp(lower: complex, upper: complex, frac: float) -> complex: ...
+@overload
+def lerp(lower: RealArrayType, upper: RealArrayType, frac: float) -> RealArrayType: ...
+@overload
+def lerp(lower: RealArrayType, upper: RealArrayType, frac: RealArrayType) -> RealArrayType: ...
+@overload
+def lerp(lower: float, upper: float, frac: RealArrayType) -> RealArrayType: ...
+
+
 def lerp(
-    lower: InexactArrayType | complex, upper: InexactArrayType | complex, frac: RealArrayType
-) -> NumberArrayType:
+    lower: InexactArrayType | complex,
+    upper: InexactArrayType | complex,
+    frac: RealArrayType | float,
+) -> InexactArrayType | complex:
     return (1.0 - frac) * lower + frac * upper

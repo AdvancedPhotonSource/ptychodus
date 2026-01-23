@@ -92,12 +92,15 @@ class DeadLeavesObjectBuilder(ObjectBuilder):
                 -leaf_radius_px, geometry.height_px + leaf_radius_px
             )
             leaf_phase_turns = self._rng.uniform(
-                self.leaf_phase_lower_turns.get_value(), self.leaf_phase_upper_turns.get_value()
+                self.leaf_phase_lower_turns.get_value(),
+                self.leaf_phase_upper_turns.get_value(),
+                size=(1, 1),
             )
             leaf_amplitude = numpy.sqrt(
                 self._rng.uniform(
                     self.leaf_amplitude_lower.get_value() ** 2,
                     self.leaf_amplitude_upper.get_value() ** 2,
+                    size=(1, 1),
                 )
             )
 

@@ -6,6 +6,22 @@ API Reference
    :caption: Contents
 
 
+Common
+------
+
+.. automodule:: ptychodus.api.common
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Diffraction
+-----------
+
+.. automodule:: ptychodus.api.diffraction
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Fluorescence
 ------------
 
@@ -18,6 +34,14 @@ Geometry
 --------
 
 .. automodule:: ptychodus.api.geometry
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Input/Output (I/O)
+------------------
+
+.. automodule:: ptychodus.api.io
    :members:
    :undoc-members:
    :show-inheritance:
@@ -62,6 +86,14 @@ Probe
    :undoc-members:
    :show-inheritance:
 
+Probe Positions
+---------------
+
+.. automodule:: ptychodus.api.probe_positions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Product
 -------
 
@@ -98,22 +130,6 @@ Tree
 ----
 
 .. automodule:: ptychodus.api.tree
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Typing
-------
-
-.. automodule:: ptychodus.api.typing
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Units
------
-
-.. automodule:: ptychodus.api.units
    :members:
    :undoc-members:
    :show-inheritance:
