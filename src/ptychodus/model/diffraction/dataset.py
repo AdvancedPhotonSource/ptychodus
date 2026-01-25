@@ -288,38 +288,41 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
                 if finished_event.wait(timeout=TaskManager.WAIT_TIME_S):
                     break
 
+    def _generate_dataset_for_assembled_data(self, file_path: Path | None = None) -> None:
+        # TODO deconflict detector size with bad_pixels_provider
+        num_patterns, detector_height, detector_width = self._data.get_patterns_shape()
+        metadata = DiffractionMetadata(
+            num_patterns_per_array=[num_patterns],
+            pattern_dtype=self._data.get_patterns_dtype(),
+            detector_extent=ImageExtent(detector_width, detector_height),
+            file_path=file_path,
+        )
+        contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+        array = AssembledDiffractionArray(
+            array_index=0,
+            label='In-Memory' if file_path is None else file_path.stem,
+            data=self._data,
+        )
+        bad_pixels = self._data.get_bad_pixels()
+
+        self._dataset = SimpleDiffractionDataset(metadata, contents_tree, [], bad_pixels)
+        self._array_list = [array]
+        self._array_counter = 1
+
+        for observer in self._observer_list:
+            observer.handle_dataset_reloaded()
+
     def set_assembled_patterns(self, data: AssembledDiffractionData) -> None:
-        pass  # FIXME
+        self.clear()
+        self._data = data
+        self._generate_dataset_for_assembled_data(file_path=None)
 
     def import_assembled_patterns(self, file_path: Path) -> None:
         if file_path.is_file():
             self.clear()
             logger.info(f'Importing assembled dataset from "{file_path}"')
-            self._data = AssembledDiffractionData.read_from_file(file_path)
-
-            # TODO deconflict detector size with bad_pixels_provider
-            num_patterns, detector_height, detector_width = self._data.get_patterns_shape()
-            metadata = DiffractionMetadata(
-                num_patterns_per_array=[num_patterns],
-                pattern_dtype=self._data.get_patterns_dtype(),
-                detector_extent=ImageExtent(detector_width, detector_height),
-                file_path=file_path,
-            )
-            contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
-            array = AssembledDiffractionArray(
-                array_index=0,
-                label=file_path.stem,
-                data=self._data,
-            )
-
-            self._dataset = SimpleDiffractionDataset(
-                metadata, contents_tree, [], self._data.get_bad_pixels()
-            )
-            self._array_list = [array]
-            self._array_counter = 1
-
-            for observer in self._observer_list:
-                observer.handle_dataset_reloaded()
+            self._data.read_from_file(file_path)
+            self._generate_dataset_for_assembled_data(file_path=file_path)
         else:
             logger.warning(f'Refusing to read invalid file path {file_path}')
 

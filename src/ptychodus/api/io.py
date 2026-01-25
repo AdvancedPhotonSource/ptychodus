@@ -67,41 +67,33 @@ class AssembledDiffractionData:
             bad_pixels=numpy.zeros((1, 1), dtype=bool),
         )
 
-    @classmethod
-    def read_from_file(cls, file_path: Path) -> AssembledDiffractionData:
+    def read_from_file(self, file_path: Path) -> None:
         with h5py.File(file_path, 'r') as h5_file:
-            h5_indexes = h5_file[cls.INDEXES_KEY]
+            h5_indexes = h5_file[self.INDEXES_KEY]
 
             if not isinstance(h5_indexes, h5py.Dataset):
                 raise ValueError('Indexes are not a dataset!')
 
-            h5_patterns = h5_file[cls.PATTERNS_KEY]
+            h5_patterns = h5_file[self.PATTERNS_KEY]
 
             if not isinstance(h5_patterns, h5py.Dataset):
                 raise ValueError('Patterns are not a dataset!')
 
-            h5_bad_pixels = h5_file[cls.BAD_PIXELS_KEY]
+            h5_bad_pixels = h5_file[self.BAD_PIXELS_KEY]
 
             if not isinstance(h5_bad_pixels, h5py.Dataset):
                 raise ValueError('Bad pixels are not a dataset!')
 
-            bad_pixels = h5_bad_pixels[()]
-            return cls(
-                indexes=h5_indexes[()],
-                patterns=h5_patterns[()],  # TODO support memmap
-                bad_pixels=bad_pixels,
-            )
+            self._indexes = h5_indexes[()]
+            self._patterns = h5_patterns[()]  # TODO support memmap
+            self._bad_pixels = h5_bad_pixels[()]
 
     def write_to_file(self, file_path: Path, compression: str = 'lzf') -> None:
         with h5py.File(file_path, 'w') as h5_file:
+            h5_file.create_dataset(self.INDEXES_KEY, data=self._indexes, compression=compression)
+            h5_file.create_dataset(self.PATTERNS_KEY, data=self._patterns, compression=compression)
             h5_file.create_dataset(
-                self.PATTERNS_KEY, data=self.get_assembled_patterns(), compression=compression
-            )
-            h5_file.create_dataset(
-                self.INDEXES_KEY, data=self.get_assembled_indexes(), compression=compression
-            )
-            h5_file.create_dataset(
-                self.BAD_PIXELS_KEY, data=self.get_bad_pixels(), compression=compression
+                self.BAD_PIXELS_KEY, data=self._bad_pixels, compression=compression
             )
 
     def get_patterns_shape(self) -> tuple[int, int, int]:
