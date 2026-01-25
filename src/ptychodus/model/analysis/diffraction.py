@@ -1,17 +1,21 @@
 import numpy
 
+from ptychodus.api.diffraction import BadPixels, DiffractionIndexes, DiffractionPatterns
+from ptychodus.api.io import AssembledDiffractionData
 from ptychodus.api.propagator import (
     FraunhoferPropagator,
     PropagatorParameters,
 )
 
+from ..diffraction import AssembledDiffractionDataset
 from ..product import ProductRepository
 from .interpolators import BarycentricArrayInterpolator
 
 
 class DiffractionSimulator:
-    def __init__(self, repository: ProductRepository) -> None:
+    def __init__(self, dataset: AssembledDiffractionDataset, repository: ProductRepository) -> None:
         super().__init__()
+        self._dataset = dataset
         self._repository = repository
 
     def simulate(self, product_index: int) -> None:
@@ -32,7 +36,19 @@ class DiffractionSimulator:
         # TODO also support near-field propagation
         propagator = FraunhoferPropagator(propagator_parameters)
 
-        for probe_position, probe in zip(product.probe_positions, product.probes):
+        num_positions = len(product.probe_positions)
+        indexes: DiffractionIndexes = numpy.array(num_positions, dtype=int)
+        patterns: DiffractionPatterns = numpy.zeros(
+            (num_positions, probe_geometry.height_px, probe_geometry.width_px),
+            dtype=float,
+        )
+        bad_pixels: BadPixels = numpy.full(
+            (probe_geometry.height_px, probe_geometry.width_px), False
+        )
+
+        for index, (probe_position, probe) in enumerate(
+            zip(product.probe_positions, product.probes)
+        ):
             object_geometry = product.object_.get_geometry()
             object_position = object_geometry.map_coordinates_probe_to_object(probe_position)
 
@@ -44,11 +60,16 @@ class DiffractionSimulator:
                 probe_geometry.height_px,
             )
 
-            intensity = numpy.zeros((probe_geometry.height_px, probe_geometry.width_px))
-
             for imode in range(probe.num_incoherent_modes):
                 exit_wave = probe.get_incoherent_mode(imode) * object_patch
                 wavefield = propagator.propagate(exit_wave)
-                intensity += numpy.square(numpy.abs(wavefield))
+                patterns[index, :, :] += numpy.square(numpy.abs(wavefield))
 
-            print(intensity.sum())  # FIXME apply simulated diffraction patterns
+            indexes[index] = object_position.index
+
+        data = AssembledDiffractionData(
+            indexes=indexes,
+            patterns=patterns,
+            bad_pixels=bad_pixels,
+        )
+        self._dataset.set_assembled_patterns(data)

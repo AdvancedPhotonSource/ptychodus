@@ -17,8 +17,8 @@ except ModuleNotFoundError:
     from ptychodus.plugins._xdrlib import xdrlib  # type: ignore[no-redef]
 
 import numpy
-import numpy.typing
 
+from ptychodus.api.common import RealArrayType
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -304,8 +304,8 @@ class MDAScanInfo:
 
 @dataclass(frozen=True)
 class MDAScanData:
-    readback_array: numpy.typing.NDArray[numpy.floating[Any]]  # double, shape: np x npts
-    detector_array: numpy.typing.NDArray[numpy.floating[Any]]  # float, shape: nd x npts
+    readback_array: RealArrayType  # double, shape: np x npts
+    detector_array: RealArrayType  # float, shape: nd x npts
 
     @classmethod
     def read(

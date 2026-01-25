@@ -169,6 +169,7 @@ class ModelCore:
         )
         self.analysis_core = AnalysisCore(
             self.settings_registry,
+            self.diffraction_core.dataset,
             self.product_core.product_repository,
             self.product_core.object_repository,
         )

@@ -6,14 +6,16 @@ from pathlib import Path
 from typing import overload, Any, TypeAlias
 
 import numpy
-import numpy.typing
 
 from .geometry import ImageExtent, PixelGeometry
 from .tree import SimpleTreeNode
 
-BadPixels: TypeAlias = numpy.typing.NDArray[numpy.bool_]
-DiffractionPatterns: TypeAlias = numpy.typing.NDArray[numpy.integer[Any] | numpy.floating[Any]]
-DiffractionIndexes: TypeAlias = numpy.typing.NDArray[numpy.integer[Any]]
+BadPixels: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.bool_]]
+DiffractionPatternDType: TypeAlias = numpy.dtype[numpy.integer[Any] | numpy.floating[Any]]
+DiffractionPatternCounts: TypeAlias = numpy.ndarray[tuple[int], DiffractionPatternDType]
+DiffractionPattern: TypeAlias = numpy.ndarray[tuple[int, int], DiffractionPatternDType]
+DiffractionPatterns: TypeAlias = numpy.ndarray[tuple[int, int, int], DiffractionPatternDType]
+DiffractionIndexes: TypeAlias = numpy.ndarray[tuple[int], numpy.dtype[numpy.integer[Any]]]
 
 
 @dataclass(frozen=True)
@@ -64,7 +66,7 @@ class SimpleDiffractionArray(DiffractionArray):
 @dataclass(frozen=True)
 class DiffractionMetadata:
     num_patterns_per_array: Sequence[int]
-    pattern_dtype: numpy.dtype[numpy.integer[Any] | numpy.floating[Any]]
+    pattern_dtype: DiffractionPatternDType
     detector_distance_m: float | None = None
     detector_extent: ImageExtent | None = None
     detector_pixel_geometry: PixelGeometry | None = None

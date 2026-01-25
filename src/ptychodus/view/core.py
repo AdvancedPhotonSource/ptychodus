@@ -67,7 +67,7 @@ class ViewCore(QMainWindow):
             QIcon(':/icons/positions'), 'Positions'
         )
         self.probe_positions_view = RepositoryTableView()
-        self.probe_positions_plot_view = ProbePositionsPlotView.create_instance()
+        self.probe_positions_plot_view = ProbePositionsPlotView()
 
         self.probe_action = self.navigation_tool_bar.addAction(QIcon(':/icons/probe'), 'Probe')
         self.probe_view = RepositoryTreeView()

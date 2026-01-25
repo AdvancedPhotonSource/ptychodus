@@ -8,21 +8,15 @@ from matplotlib.figure import Figure
 
 
 class ProbePositionsPlotView(QWidget):
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.figure = Figure()
         self.figure_canvas = FigureCanvasQTAgg(self.figure)
         self.navigation_toolbar = NavigationToolbar(self.figure_canvas, self)
         self.axes = self.figure.add_subplot(111)
 
-    @classmethod
-    def create_instance(cls, parent: QWidget | None = None) -> ProbePositionsPlotView:
-        view = cls(parent)
-
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(view.navigation_toolbar)
-        layout.addWidget(view.figure_canvas)
-        view.setLayout(layout)
-
-        return view
+        layout.addWidget(self.navigation_toolbar)
+        layout.addWidget(self.figure_canvas)
+        self.setLayout(layout)

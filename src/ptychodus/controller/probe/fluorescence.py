@@ -194,10 +194,8 @@ class FluorescenceViewController(Observer):
             self._dialog.status_bar,
             file_dialog_factory,
         )
-        self._visualization_parameters_controller = (
-            VisualizationParametersController.create_instance(
-                engine, self._dialog.visualization_parameters_view
-            )
+        self._visualization_parameters_controller = VisualizationParametersController(
+            engine, self._dialog.visualization_parameters_view
         )
 
         enhancer.add_observer(self)

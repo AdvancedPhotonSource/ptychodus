@@ -18,14 +18,9 @@ class VisualizationParametersController(Observer):
         self._transformation_model = QStringListModel()
         self._variant_model = QStringListModel()
 
-    @classmethod
-    def create_instance(
-        cls, engine: VisualizationEngine, view: VisualizationParametersView
-    ) -> VisualizationParametersController:
-        controller = cls(engine, view)
-        view.renderer_combo_box.setModel(controller._renderer_model)
-        view.transformation_combo_box.setModel(controller._transformation_model)
-        view.variant_combo_box.setModel(controller._variant_model)
+        view.renderer_combo_box.setModel(self._renderer_model)
+        view.transformation_combo_box.setModel(self._transformation_model)
+        view.variant_combo_box.setModel(self._variant_model)
 
         view.min_display_value_line_edit.value_changed.connect(
             lambda value: engine.set_min_display_value(float(value))
@@ -34,14 +29,12 @@ class VisualizationParametersController(Observer):
             lambda value: engine.set_max_display_value(float(value))
         )
 
-        controller._sync_model_to_view()
-        engine.add_observer(controller)
+        self._sync_model_to_view()
+        engine.add_observer(self)
 
         view.renderer_combo_box.textActivated.connect(engine.set_renderer)
         view.transformation_combo_box.textActivated.connect(engine.set_transformation)
         view.variant_combo_box.textActivated.connect(engine.set_variant)
-
-        return controller
 
     def _sync_model_to_view(self) -> None:
         self._view.renderer_combo_box.blockSignals(True)
