@@ -74,7 +74,7 @@ class GlobusController:
             tool_tip='POSIX path on the output data endpoint where data will be stored.',
         )
         self._status_controller = GlobusStatusViewController(
-            settings.status_refresh_interval_s, status_repository
+            settings.status_auto_refresh, settings.status_refresh_interval_s, status_repository
         )
 
         self._status_table_model = GlobusStatusTableModel(status_repository)

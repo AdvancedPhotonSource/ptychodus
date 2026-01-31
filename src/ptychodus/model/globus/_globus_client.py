@@ -10,10 +10,13 @@ import threading
 import fair_research_login
 import gladier
 
+from ptychodus.api.observer import Observable, Observer
+
 from ..task_manager import TaskManager
 from ._gladier_client import PtychodusClient
 from .authorizer import GlobusAuthorizer
 from .client import GlobusClient, GlobusJob
+from .settings import GlobusSettings
 from .status import GlobusStatus, GlobusStatusRepository, UpdateGlobusStatusRepository
 
 __all__ = ['RealGlobusClient']
@@ -53,15 +56,17 @@ class RunGlobusFlow:
             logger.info(f'Run Flow Response: {json.dumps(response, indent=4)}')
 
 
-class RealGlobusClient(GlobusClient):
+class RealGlobusClient(GlobusClient, Observer):
     def __init__(
         self,
         task_manager: TaskManager,
+        settings: GlobusSettings,
         authorizer: GlobusAuthorizer,
         status_repository: GlobusStatusRepository,
     ) -> None:
         super().__init__()
         self._task_manager = task_manager
+        self._settings = settings
         self._authorizer = authorizer
         self._status_repository = status_repository
 
@@ -70,11 +75,19 @@ class RealGlobusClient(GlobusClient):
         logger.info('\tGladier ' + version('gladier'))
 
         self._stop_event = threading.Event()
-        self._update_status_event = threading.Event()
-        self._status_date_time = datetime.min
         self._job_queue: queue.Queue[GlobusJob] = queue.Queue()
         self._worker: threading.Thread | None = None
         self.__gladier_client: gladier.GladierBaseClient | None = None
+
+        self._update_status_event = threading.Event()
+        self._status_date_time = datetime.min
+        self._status_lock = threading.Lock()
+        self._status_auto_refresh = False
+        self._status_refresh_interval_s = 0
+
+        self._sync_status_refresh_interval()
+        settings.status_auto_refresh.add_observer(self)
+        settings.status_refresh_interval_s.add_observer(self)
 
     @property
     def _gladier_client(self) -> gladier.GladierBaseClient:
@@ -84,6 +97,37 @@ class RealGlobusClient(GlobusClient):
             )
 
         return self.__gladier_client
+
+    @property
+    def is_supported(self) -> bool:
+        return True
+
+    def start(self) -> None:
+        if self._worker is None:
+            logger.info('Starting Globus thread...')
+            self._stop_event.clear()
+            self._worker = threading.Thread(target=self._run_tasks)
+            self._worker.start()
+            logger.info('Globus thread started.')
+        else:
+            logger.warning('Worker already started!')
+
+    def stop(self) -> None:
+        if self._stop_event.is_set():
+            logger.info('Globus thread already stopped.')
+        else:
+            logger.info('Finishing tasks...')
+            self._job_queue.join()
+            logger.info('Tasks finished.')
+
+            if self._worker is None:
+                logger.warning('Worker is None!')
+            else:
+                logger.info('Stopping Globus thread...')
+                self._stop_event.set()
+                self._worker.join()
+                self._worker = None
+                logger.info('Globus thread stopped.')
 
     def request_status_update(self) -> None:
         self._update_status_event.set()
@@ -159,10 +203,15 @@ class RealGlobusClient(GlobusClient):
         self._task_manager.put_foreground_task(status_update)
 
     def _run_tasks(self) -> None:
-        # FIXME status & auth run in dedicated queue
-        # FIXME timer for status refresh
-        # FIXME rate limit status updates; status interval to settings
         while not self._stop_event.is_set():
+            with self._status_lock:
+                if self._status_auto_refresh:
+                    status_time_delta = datetime.now(timezone.utc) - self._status_date_time
+                    status_age_s = status_time_delta.total_seconds()
+
+                    if status_age_s >= self._status_refresh_interval_s:
+                        self._update_status_event.set()
+
             if self._update_status_event.is_set():
                 self._refresh_status()
                 self._update_status_event.clear()
@@ -170,40 +219,20 @@ class RealGlobusClient(GlobusClient):
             try:
                 job = self._job_queue.get(block=True, timeout=1)
             except queue.Empty:
-                continue
+                pass
+            else:
+                task = RunGlobusFlow(self._gladier_client, job)
+                self._task_manager.put_background_task(task)
+                self._job_queue.task_done()
 
-            task = RunGlobusFlow(self._gladier_client, job)
-            self._task_manager.put_background_task(task)
-            self._job_queue.task_done()
+    def _sync_status_refresh_interval(self) -> None:
+        with self._status_lock:
+            self._status_auto_refresh = self._settings.status_auto_refresh.get_value()
+            self._status_refresh_interval_s = self._settings.status_refresh_interval_s.get_value()
 
-    @property
-    def is_supported(self) -> bool:
-        return True
-
-    def start(self) -> None:
-        if self._worker is None:
-            logger.info('Starting Globus thread...')
-            self._stop_event.clear()
-            self._worker = threading.Thread(target=self._run_tasks)
-            self._worker.start()
-            logger.info('Globus thread started.')
-        else:
-            logger.warning('Worker already started!')
-
-    def stop(self) -> None:
-        if self._stop_event.is_set():
-            logger.info('Globus thread already stopped.')
-            return
-
-        logger.info('Finishing tasks...')
-        self._job_queue.join()
-        logger.info('Tasks finished.')
-
-        if self._worker is None:
-            logger.warning('Worker is None!')
-        else:
-            logger.info('Stopping Globus thread...')
-            self._stop_event.set()
-            self._worker.join()
-            self._worker = None
-            logger.info('Globus thread stopped.')
+    def _update(self, observable: Observable) -> None:
+        if observable in (
+            self._settings.status_auto_refresh,
+            self._settings.status_refresh_interval_s,
+        ):
+            self._sync_status_refresh_interval()

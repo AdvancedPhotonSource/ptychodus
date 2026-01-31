@@ -100,6 +100,7 @@ class ReconstructorAPI:
         if block:
             while not self._task_manager.is_stopping:
                 if finished_event.wait(timeout=TaskManager.WAIT_TIME_S):
+                    self._task_manager.run_foreground_tasks()
                     break
 
         return output_product_index

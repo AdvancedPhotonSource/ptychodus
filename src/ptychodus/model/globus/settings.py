@@ -48,6 +48,8 @@ class GlobusSettings(Observable, Observer):
         self.compute_data_posix_path = self._group.create_path_parameter(
             'ComputeDataPosixPath', Path('/path/to/compute/data')
         )
+
+        self.status_auto_refresh = self._group.create_boolean_parameter('StatusAutoRefresh', False)
         self.status_refresh_interval_s = self._group.create_integer_parameter(
             'StatusRefreshIntervalInSeconds', 10, minimum=10, maximum=86400
         )

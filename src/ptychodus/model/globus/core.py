@@ -32,7 +32,9 @@ class GlobusCore:
             logger.info('Globus not found.')
             self._client: GlobusClient = FakeGlobusClient()
         else:
-            self._client = RealGlobusClient(task_manager, self.authorizer, self.status_repository)
+            self._client = RealGlobusClient(
+                task_manager, self.settings, self.authorizer, self.status_repository
+            )
 
         self.executor = GlobusExecutor(
             self.settings, settings_registry, diffraction_api, product_api, self._client
