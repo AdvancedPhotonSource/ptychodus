@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import overload
+import threading
 
 from ptychodus.api.observer import ObservableSequence
 
@@ -25,6 +26,7 @@ class GlobusStatusRepository(ObservableSequence[GlobusStatus]):
     def __init__(self) -> None:
         super().__init__()
         self._status_list: list[GlobusStatus] = list()
+        self._refresh_status_event = threading.Event()
 
     @overload
     def __getitem__(self, index: int) -> GlobusStatus: ...
@@ -37,6 +39,15 @@ class GlobusStatusRepository(ObservableSequence[GlobusStatus]):
 
     def __len__(self) -> int:
         return len(self._status_list)
+
+    def needs_status_refresh(self) -> bool:
+        return self._refresh_status_event.is_set()
+
+    def refresh_status(self) -> None:
+        self._refresh_status_event.set()
+
+    def _status_refreshed(self) -> None:
+        self._refresh_status_event.clear()
 
     def _insert_sorted(self, status: GlobusStatus) -> None:
         index = bisect(self._status_list, status.start_time, key=lambda x: x.start_time)
@@ -78,3 +89,5 @@ class UpdateGlobusStatusRepository:
 
         for new_status in run_id_to_new_status_map.values():
             self._status_repository._insert_sorted(new_status)
+
+        self._status_repository._status_refreshed()

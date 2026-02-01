@@ -1,3 +1,4 @@
+from pathlib import Path
 import logging
 
 from ptychodus.api.io import StandardFileLayout
@@ -5,6 +6,7 @@ from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import DiffractionAPI
 from ..product import ProductAPI
+from ..reconstructor import ReconstructorAPI
 from .client import GlobusClient, GlobusJob
 from .settings import GlobusSettings
 
@@ -18,6 +20,7 @@ class GlobusExecutor:
         settings_registry: SettingsRegistry,
         diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
+        reconstructor_api: ReconstructorAPI,
         client: GlobusClient,
     ) -> None:
         super().__init__()
@@ -25,41 +28,40 @@ class GlobusExecutor:
         self._settings_registry = settings_registry
         self._diffraction_api = diffraction_api
         self._product_api = product_api
+        self._reconstructor_api = reconstructor_api
         self._client = client
 
-    def _run_flow(self, flow_input: dict[str, object], label: str) -> None:
-        flow_tags = ['aps', 'ptychography']
-        job = GlobusJob(flow_input, label, flow_tags)
-        self._client.run_flow(job)
-
-    def reconstruct(self, input_product_index: int) -> None:
+    def populate_input_directory(self, input_product_index: int) -> Path:
         try:
             product_item = self._product_api.get_item(input_product_index)
         except IndexError:
-            logger.warning(f'Failed access product for flow ({input_product_index=})!')
-            return
+            logger.exception(f'Failed access product for flow ({input_product_index=})!')
+            raise
 
-        flow_label = product_item.get_name()
-        input_data_posix_path = self._settings.input_data_posix_path.get_value() / flow_label
-        compute_data_posix_path = self._settings.compute_data_posix_path.get_value() / flow_label
+        input_directory = self._settings.input_data_posix_path.get_value() / product_item.get_name()
 
         try:
-            input_data_posix_path.mkdir(mode=0o755, parents=True, exist_ok=True)
+            input_directory.mkdir(mode=0o755, parents=True, exist_ok=True)
         except FileExistsError:
-            logger.warning('Input data POSIX path must be a directory!')
-            return
+            logger.exception('Input data POSIX path must be a directory!')
+            raise
 
-        self._settings_registry.save_settings(input_data_posix_path / StandardFileLayout.SETTINGS)
+        self._settings_registry.save_settings(input_directory / StandardFileLayout.SETTINGS)
         self._diffraction_api.export_assembled_patterns(
-            input_data_posix_path / StandardFileLayout.DIFFRACTION
+            input_directory / StandardFileLayout.DIFFRACTION
         )
         self._product_api.save_product(
             input_product_index,
-            input_data_posix_path / StandardFileLayout.PRODUCT_IN,
+            input_directory / StandardFileLayout.PRODUCT_IN,
             file_type='HDF5',
         )
 
+        return input_directory
+
+    def _run_flow(self, ptychodus_action: str, flow_label: str) -> None:
         input_data_globus_path = f'{self._settings.input_data_globus_path.get_value()}/{flow_label}'
+
+        compute_data_posix_path = self._settings.compute_data_posix_path.get_value() / flow_label
         compute_data_globus_path = (
             f'{self._settings.compute_data_globus_path.get_value()}/{flow_label}'
         )
@@ -79,7 +81,7 @@ class GlobusExecutor:
             'input_data_transfer_recursive': True,
             'input_data_transfer_sync_level': self._settings.transfer_sync_level.get_value(),
             'compute_endpoint': str(self._settings.compute_endpoint_id.get_value()),
-            'ptychodus_action': 'reconstruct',
+            'ptychodus_action': ptychodus_action,
             'ptychodus_input_directory': str(compute_data_posix_path),
             'ptychodus_output_directory': str(compute_data_posix_path),
             'output_data_transfer_source_endpoint': str(
@@ -94,10 +96,20 @@ class GlobusExecutor:
             'output_data_transfer_sync_level': self._settings.transfer_sync_level.get_value(),
         }
 
-        self._run_flow(flow_input, flow_label)
+        flow_tags = ['aps', 'ptychography']
+        job = GlobusJob(flow_input, flow_label, flow_tags)
+        self._client.run_flow(job)
 
-    def train(self, input_product_index: int) -> None:  # TODO
-        pass
+    def reconstruct(self, input_product_index: int) -> None:
+        input_directory = self.populate_input_directory(input_product_index)
+        self._run_flow('reconstruct', input_directory.name)
 
-    def infer(self, input_product_index: int) -> None:  # TODO
-        pass
+    def train(self, input_product_index: int) -> None:
+        # TODO  MLflow
+        input_directory = self.populate_input_directory(input_product_index)
+        self._run_flow('train', input_directory.name)
+
+    def infer(self, input_product_index: int) -> None:
+        # TODO  MLflow
+        input_directory = self.populate_input_directory(input_product_index)
+        self._run_flow('infer', input_directory.name)

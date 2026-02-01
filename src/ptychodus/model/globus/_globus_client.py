@@ -14,7 +14,7 @@ from ptychodus.api.observer import Observable, Observer
 
 from ..task_manager import TaskManager
 from ._gladier_client import PtychodusClient
-from .authorizer import GlobusAuthorizer
+from .authorizer import AuthorizeWithGlobus, GlobusAuthorizer
 from .client import GlobusClient, GlobusJob
 from .settings import GlobusSettings
 from .status import GlobusStatus, GlobusStatusRepository, UpdateGlobusStatusRepository
@@ -25,17 +25,44 @@ logger = logging.getLogger(__name__)
 
 
 class CustomCodeHandler(fair_research_login.CodeHandler):
-    def __init__(self, authorizer: GlobusAuthorizer) -> None:
+    def __init__(
+        self, task_manager: TaskManager, stop_event: threading.Event, authorizer: GlobusAuthorizer
+    ) -> None:
         super().__init__()
+        self._task_manager = task_manager
+        self._stop_event = stop_event
         self._authorizer = authorizer
+
+        self._user_provided_code = threading.Event()
+        self._code_lock = threading.Lock()
+        self._code = ''
+
         self.set_browser_enabled(False)
 
     def authenticate(self, url: str) -> str:
-        self._authorizer.authenticate(url)
+        self._user_provided_code.clear()
+
+        with self._code_lock:
+            self._code = ''
+
+        task = AuthorizeWithGlobus(self._authorizer, url)
+        self._task_manager.put_foreground_task(task)
+
+        while not self._stop_event.is_set():
+            if self._user_provided_code.wait(timeout=1.0):
+                break
+
         return self.get_code()
 
+    def set_code_from_user(self, code: str) -> None:
+        with self._code_lock:
+            self._code = code
+
+        self._user_provided_code.set()
+
     def get_code(self) -> str:
-        return self._authorizer.get_code_from_authorize_url()
+        with self._code_lock:
+            return self._code
 
 
 class RunGlobusFlow:
@@ -79,7 +106,9 @@ class RealGlobusClient(GlobusClient, Observer):
         self._worker: threading.Thread | None = None
         self.__gladier_client: gladier.GladierBaseClient | None = None
 
-        self._update_status_event = threading.Event()
+        self._code_handler = CustomCodeHandler(task_manager, self._stop_event, authorizer)
+        authorizer.add_observer(self)
+
         self._status_date_time = datetime.min
         self._status_lock = threading.Lock()
         self._status_auto_refresh = False
@@ -92,9 +121,7 @@ class RealGlobusClient(GlobusClient, Observer):
     @property
     def _gladier_client(self) -> gladier.GladierBaseClient:
         if self.__gladier_client is None:
-            self.__gladier_client = PtychodusClient.create_client(
-                [CustomCodeHandler(self._authorizer)]
-            )
+            self.__gladier_client = PtychodusClient.create_client([self._code_handler])
 
         return self.__gladier_client
 
@@ -128,9 +155,6 @@ class RealGlobusClient(GlobusClient, Observer):
                 self._worker.join()
                 self._worker = None
                 logger.info('Globus thread stopped.')
-
-    def request_status_update(self) -> None:
-        self._update_status_event.set()
 
     def run_flow(self, job: GlobusJob) -> None:
         self._job_queue.put(job)
@@ -210,11 +234,11 @@ class RealGlobusClient(GlobusClient, Observer):
                     status_age_s = status_time_delta.total_seconds()
 
                     if status_age_s >= self._status_refresh_interval_s:
-                        self._update_status_event.set()
+                        self._status_repository.refresh_status()
 
-            if self._update_status_event.is_set():
+            if self._status_repository.needs_status_refresh():
+                self._status_repository._status_refreshed()
                 self._refresh_status()
-                self._update_status_event.clear()
 
             try:
                 job = self._job_queue.get(block=True, timeout=1)
@@ -231,7 +255,10 @@ class RealGlobusClient(GlobusClient, Observer):
             self._status_refresh_interval_s = self._settings.status_refresh_interval_s.get_value()
 
     def _update(self, observable: Observable) -> None:
-        if observable in (
+        if observable is self._authorizer:
+            if self._authorizer.has_authorize_code:
+                self._code_handler.set_code_from_user(self._authorizer.get_authorize_code())
+        elif observable in (
             self._settings.status_auto_refresh,
             self._settings.status_refresh_interval_s,
         ):

@@ -32,7 +32,7 @@ class GlobusStatusViewController(ParameterViewController, Observer):
             status_refresh_interval_s
         )
         self._refresh_button = QPushButton('Refresh')
-        # FIXME self._refresh_button.clicked.connect(status_repository.refresh_status)
+        self._refresh_button.clicked.connect(status_repository.refresh_status)
 
         layout = QFormLayout()
         layout.addRow(

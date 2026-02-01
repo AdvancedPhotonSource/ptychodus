@@ -26,10 +26,6 @@ class GlobusClient(ABC):
         pass
 
     @abstractmethod
-    def request_status_update(self) -> None:
-        pass
-
-    @abstractmethod
     def run_flow(self, job: GlobusJob) -> None:
         pass
 
@@ -43,9 +39,6 @@ class FakeGlobusClient(GlobusClient):
         pass
 
     def stop(self) -> None:
-        pass
-
-    def request_status_update(self) -> None:
         pass
 
     def run_flow(self, job: GlobusJob) -> None:

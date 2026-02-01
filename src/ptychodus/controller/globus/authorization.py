@@ -1,9 +1,41 @@
 from __future__ import annotations
 
-from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QWidget
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QLabel,
+    QLineEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ...model.globus import GlobusAuthorizer
-from ...view.globus import GlobusAuthorizationDialog
+
+
+class GlobusAuthorizationDialog(QDialog):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.label = QLabel()
+        self.line_edit = QLineEdit()
+        self.button_box = QDialogButtonBox()
+
+        self.label.setTextFormat(Qt.TextFormat.RichText)
+        self.label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        self.label.setOpenExternalLinks(True)
+
+        self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.addButton(QDialogButtonBox.StandardButton.Cancel)
+        self.button_box.rejected.connect(self.reject)
+
+        self.setWindowTitle('Authorize Workflow')
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.label)
+        layout.addWidget(self.line_edit)
+        layout.addWidget(self.button_box)
+        self.setLayout(layout)
 
 
 class GlobusAuthorizationController:
@@ -21,11 +53,11 @@ class GlobusAuthorizationController:
         ok_button.setEnabled(len(self._dialog.line_edit.text()) > 0)
 
     def start_authorization_if_needed(self) -> None:
-        if self._authorizer.is_authorized:
+        if self._authorizer.has_authorize_code:
             # authorization completed
             return
 
-        if self._dialog.isVisible():
+        if self._authorizer.needs_authorize_code:
             # authorization in progress
             return
 
@@ -43,3 +75,5 @@ class GlobusAuthorizationController:
         if result == QDialog.DialogCode.Accepted:
             auth_code = self._dialog.line_edit.text()
             self._authorizer.set_code_from_authorize_url(auth_code)
+        else:
+            self._authorizer.cancel_authorization()

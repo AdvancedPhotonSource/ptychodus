@@ -178,6 +178,7 @@ class ModelCore:
             self.settings_registry,
             self.diffraction_core.diffraction_api,
             self.product_core.product_api,
+            self.reconstructor_core.reconstructor_api,
         )
         self.workflow_api: WorkflowAPI = ConcreteWorkflowAPI(
             self.settings_registry,

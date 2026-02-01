@@ -1,7 +1,7 @@
 from pathlib import Path
 import logging
 
-from PyQt5.QtCore import QModelIndex, QSortFilterProxyModel, QTimer, Qt
+from PyQt5.QtCore import QModelIndex, QSortFilterProxyModel, Qt
 from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import (
     QAbstractItemView,
@@ -11,10 +11,10 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.observer import Observable, Observer, SequenceObserver
 from ptychodus.api.parametric import PathParameter
 
-from ...model.globus import GlobusAuthorizer, GlobusSettings, GlobusStatusRepository
+from ...model.globus import GlobusAuthorizer, GlobusSettings, GlobusStatus, GlobusStatusRepository
 from ..data import FileDialogFactory
 from ..parametric import ParameterViewBuilder, ParameterViewController
 from .authorization import GlobusAuthorizationController
@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 
 
 class PathLineEditParameterViewController(ParameterViewController, Observer):
+    # TODO: to ptychodus.controller.parametric
+
     def __init__(self, parameter: PathParameter, *, tool_tip: str = '') -> None:
         super().__init__()
         self._parameter = parameter
@@ -51,7 +53,7 @@ class PathLineEditParameterViewController(ParameterViewController, Observer):
             self.__sync_model_to_view()
 
 
-class GlobusController:
+class GlobusController(SequenceObserver[GlobusStatus]):
     def __init__(
         self,
         settings: GlobusSettings,
@@ -86,9 +88,7 @@ class GlobusController:
         status_table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         status_table_view.clicked.connect(self._handle_table_view_clicked)
 
-        self._process_events_timer = QTimer()
-        self._process_events_timer.timeout.connect(self._process_events)
-        self._process_events_timer.start(5 * 1000)  # TODO customize
+        status_repository.add_observer(self)
 
         # FIXME option for launching Globus in reconstructor view:
         #       workflow_api.get_product(product_index).reconstruct_remote()
@@ -145,9 +145,19 @@ class GlobusController:
             logger.info(f'Opening URL: "{url.toString()}"')
             QDesktopServices.openUrl(url)
 
-    def _process_events(self) -> None:
+    def run_tasks(self) -> None:
+        # FIXME remove; modal dialog; use authorizer.needs_authorization
         self._auth_controller.start_authorization_if_needed()
 
-        # TODO only reset if changed
-        self._status_table_model.beginResetModel()
-        self._status_table_model.endResetModel()
+    def handle_item_inserted(self, index: int, item: GlobusStatus) -> None:
+        self._status_table_model.beginInsertRows(QModelIndex(), index, index)
+        self._status_table_model.endInsertRows()
+
+    def handle_item_changed(self, index: int, item: GlobusStatus) -> None:
+        top_left = self._status_table_model.index(index, 0)
+        bottom_right = self._status_table_model.index(index, self._status_table_model.columnCount())
+        self._status_table_model.dataChanged.emit(top_left, bottom_right)
+
+    def handle_item_removed(self, index: int, item: GlobusStatus) -> None:
+        self._status_table_model.beginRemoveRows(QModelIndex(), index, index)
+        self._status_table_model.endRemoveRows()

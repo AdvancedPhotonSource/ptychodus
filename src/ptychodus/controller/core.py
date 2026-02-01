@@ -27,6 +27,7 @@ class ControllerCore:
     def __init__(
         self, model: ModelCore, view: ViewCore, *, is_developer_mode_enabled: bool = False
     ) -> None:
+        self.model = model
         self.view = view
         self._status_bar = view.statusBar()
 
@@ -160,9 +161,9 @@ class ControllerCore:
             model.agent_core.chat_history, model.agent_core.presenter, view.agent_chat_view
         )
 
-        self._run_foreground_tasks_timer = QTimer()
-        self._run_foreground_tasks_timer.timeout.connect(model.run_tasks)
-        self._run_foreground_tasks_timer.start(1000)  # TODO make configurable
+        self._run_tasks_timer = QTimer()
+        self._run_tasks_timer.timeout.connect(self._run_tasks)
+        self._run_tasks_timer.start(1000)  # TODO make configurable
 
         view.globus_action.setVisible(model.globus_core.is_supported)
 
@@ -186,3 +187,7 @@ class ControllerCore:
         index = action.data()
         self.view.left_panel.setCurrentIndex(index)
         self.view.right_panel.setCurrentIndex(index)
+
+    def _run_tasks(self) -> None:
+        self.model.run_tasks()
+        self._globus_controller.run_tasks()

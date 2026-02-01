@@ -4,12 +4,13 @@ from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import DiffractionAPI
 from ..product import ProductAPI
+from ..reconstructor import ReconstructorAPI
 from ..task_manager import TaskManager
 from .authorizer import GlobusAuthorizer
+from .client import FakeGlobusClient, GlobusClient
 from .executor import GlobusExecutor
 from .settings import GlobusSettings
 from .status import GlobusStatusRepository
-from .client import FakeGlobusClient, GlobusClient
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class GlobusCore:
         settings_registry: SettingsRegistry,
         diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
+        reconstructor_api: ReconstructorAPI,
     ) -> None:
         self.settings = GlobusSettings(settings_registry)
         self.authorizer = GlobusAuthorizer()
@@ -37,7 +39,12 @@ class GlobusCore:
             )
 
         self.executor = GlobusExecutor(
-            self.settings, settings_registry, diffraction_api, product_api, self._client
+            self.settings,
+            settings_registry,
+            diffraction_api,
+            product_api,
+            reconstructor_api,
+            self._client,
         )
 
     @property

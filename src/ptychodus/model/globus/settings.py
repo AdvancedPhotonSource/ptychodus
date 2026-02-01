@@ -51,7 +51,7 @@ class GlobusSettings(Observable, Observer):
 
         self.status_auto_refresh = self._group.create_boolean_parameter('StatusAutoRefresh', False)
         self.status_refresh_interval_s = self._group.create_integer_parameter(
-            'StatusRefreshIntervalInSeconds', 10, minimum=10, maximum=86400
+            'StatusRefreshIntervalInSeconds', 30, minimum=10, maximum=86400
         )
 
         self.output_data_endpoint_id = self._group.create_uuid_parameter(
