@@ -183,6 +183,9 @@ class RealGlobusClient(GlobusClient, Observer):
 
     def _refresh_status(self) -> None:
         status_list: list[GlobusStatus] = list()
+
+        logger.debug('Refreshing status.')
+
         flows_manager = self._gladier_client.flows_manager
         flow_id = flows_manager.get_flow_id()
         flows_client = flows_manager.flows_client

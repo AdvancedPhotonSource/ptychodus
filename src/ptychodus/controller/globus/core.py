@@ -146,8 +146,7 @@ class GlobusController(SequenceObserver[GlobusStatus]):
             QDesktopServices.openUrl(url)
 
     def run_tasks(self) -> None:
-        # FIXME remove; modal dialog; use authorizer.needs_authorization
-        self._auth_controller.start_authorization_if_needed()
+        self._auth_controller.authorize_as_needed()
 
     def handle_item_inserted(self, index: int, item: GlobusStatus) -> None:
         self._status_table_model.beginInsertRows(QModelIndex(), index, index)

@@ -52,16 +52,9 @@ class GlobusAuthorizationController:
         ok_button = self._dialog.button_box.button(QDialogButtonBox.StandardButton.Ok)
         ok_button.setEnabled(len(self._dialog.line_edit.text()) > 0)
 
-    def start_authorization_if_needed(self) -> None:
-        if self._authorizer.has_authorize_code:
-            # authorization completed
-            return
-
-        if self._authorizer.needs_authorize_code:
-            # authorization in progress
-            return
-
-        self._start_authorization()
+    def authorize_as_needed(self) -> None:
+        if self._authorizer.needs_authorize_code and not self._dialog.isVisible():
+            self._start_authorization()
 
     def _start_authorization(self) -> None:
         authorize_url = self._authorizer.get_authorize_url()
@@ -69,6 +62,7 @@ class GlobusAuthorizationController:
 
         self._dialog.label.setText(text)
         self._dialog.line_edit.clear()
+        self._dialog.setModal(True)
         self._dialog.open()
 
     def _finish_authorization(self, result: int) -> None:
