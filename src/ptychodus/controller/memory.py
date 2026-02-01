@@ -1,10 +1,13 @@
-from PyQt5.QtCore import QTimer
+from typing import Final
+
 from PyQt5.QtWidgets import QFrame, QLCDNumber, QSizePolicy
 
 from ..model.memory import MemoryPresenter
 
 
 class MemoryController:
+    UPDATE_INTERVAL_S: Final[int] = 10
+
     def __init__(self, presenter: MemoryPresenter, widget: QLCDNumber) -> None:
         self._presenter = presenter
         self._widget = widget
@@ -12,13 +15,11 @@ class MemoryController:
         self._widget.setFrameStyle(QFrame.Shape.Panel | QFrame.Shadow.Sunken)
         self._widget.setDigitCount(6)
         self._widget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
-        self._timer = QTimer()
-        self._timer.timeout.connect(self._update_widget)
 
-        self._update_widget()
-        self._timer.start(10 * 1000)  # TODO customize (in milliseconds)
+    def run_tasks(self, one_second_counter: int) -> None:
+        if one_second_counter % MemoryController.UPDATE_INTERVAL_S != 0:
+            return
 
-    def _update_widget(self) -> None:
         stats = self._presenter.get_statistics()
         total_MB = int(stats.total_physical_memory_bytes / 1e6)  # noqa: N806
         total_str = f'Total Memory: {total_MB} MB'

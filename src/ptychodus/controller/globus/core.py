@@ -145,7 +145,7 @@ class GlobusController(SequenceObserver[GlobusStatus]):
             logger.info(f'Opening URL: "{url.toString()}"')
             QDesktopServices.openUrl(url)
 
-    def run_tasks(self) -> None:
+    def run_tasks(self, one_second_counter: int) -> None:
         self._auth_controller.authorize_as_needed()
 
     def handle_item_inserted(self, index: int, item: GlobusStatus) -> None:

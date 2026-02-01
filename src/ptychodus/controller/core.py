@@ -161,9 +161,10 @@ class ControllerCore:
             model.agent_core.chat_history, model.agent_core.presenter, view.agent_chat_view
         )
 
+        self._one_second_counter = 0
         self._run_tasks_timer = QTimer()
         self._run_tasks_timer.timeout.connect(self._run_tasks)
-        self._run_tasks_timer.start(1000)  # TODO make configurable
+        self._run_tasks_timer.start(1000)
 
         view.globus_action.setVisible(model.globus_core.is_supported)
 
@@ -190,4 +191,9 @@ class ControllerCore:
 
     def _run_tasks(self) -> None:
         self.model.run_tasks()
-        self._globus_controller.run_tasks()
+        self._memory_controller.run_tasks(self._one_second_counter)
+        self._globus_controller.run_tasks(self._one_second_counter)
+        self._one_second_counter += 1
+
+        if self._one_second_counter > 3600:
+            self._one_second_counter -= 3600
