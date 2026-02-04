@@ -18,7 +18,6 @@ from PyQt5.QtWidgets import (
 
 from . import resources  # noqa
 from .agent import AgentView, AgentChatView
-from .automation import AutomationView
 from .diffraction import PatternsView
 from .image import ImageView
 from .product import ProductView
@@ -93,7 +92,7 @@ class ViewCore(QMainWindow):
         self.automation_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/automate'), 'Automation'
         )
-        self.automation_view = AutomationView.create_instance()
+        self.automation_view = QWidget()
         self.automation_widget = QWidget()
 
         self.agent_action = self.navigation_tool_bar.addAction(

@@ -1,9 +1,11 @@
+from collections.abc import Sequence
+from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
+from typing import overload
 import logging
-import threading
 
-from ptychodus.api.observer import Observable
+from ptychodus.api.observer import ObservableSequence
 
 from .settings import AutomationSettings
 
@@ -11,59 +13,75 @@ logger = logging.getLogger(__name__)
 
 
 class AutomationDatasetState(Enum):
-    EXISTS = auto()
+    FOUND = auto()
     WAITING = auto()
-    PROCESSING = auto()
+    RUNNING = auto()
     COMPLETE = auto()
 
 
-class AutomationDatasetRepository(Observable):
+@dataclass(frozen=True)
+class AutomationDataset:
+    file_path: Path
+    state: AutomationDatasetState
+    label: str
+
+
+class AutomationDatasetRepository(ObservableSequence[AutomationDataset]):
     def __init__(self, settings: AutomationSettings) -> None:
         super().__init__()
         self._settings = settings
-        self._file_list: list[Path] = list()
-        self._file_state: dict[Path, AutomationDatasetState] = dict()
-        self._lock = threading.Lock()
-        self._changed_event = threading.Event()
+        self._dataset_list: list[AutomationDataset] = list()
 
-    def put(self, file_path: Path, state: AutomationDatasetState) -> None:
-        with self._lock:
-            try:
-                prior_state = self._file_state[file_path]
-            except KeyError:
-                if state == AutomationDatasetState.EXISTS:
-                    self._file_list.append(file_path)
-                    self._file_state[file_path] = state
-                else:
-                    logger.error(f'{file_path}: UNKNOWN -> {state}')
-            else:
-                logger.debug(f'{file_path}: {prior_state} -> {state}')
-                self._file_state[file_path] = state
+    @overload
+    def __getitem__(self, index: int) -> AutomationDataset: ...
 
-            self._changed_event.set()
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[AutomationDataset]: ...
 
-    def clear(self) -> None:
-        with self._lock:
-            self._file_list.clear()
-            self._file_state.clear()
-
-            self._changed_event.set()
-
-    def get_label(self, index: int) -> str:
-        with self._lock:
-            file_path = self._file_list[index]
-            return str(file_path.relative_to(self._settings.data_directory.get_value()))
-
-    def get_state(self, index: int) -> AutomationDatasetState:
-        with self._lock:
-            file_path = self._file_list[index]
-            return self._file_state[file_path]
+    def __getitem__(self, index: int | slice) -> AutomationDataset | Sequence[AutomationDataset]:
+        return self._dataset_list[index]
 
     def __len__(self) -> int:
-        with self._lock:
-            return len(self._file_list)
+        return len(self._dataset_list)
 
-    def notify_observers_if_repository_changed(self) -> None:
-        if self._changed_event.is_set():
-            self._changed_event.clear()
-            self.notify_observers()
+    def upsert(self, file_path: Path, state: AutomationDatasetState) -> None:
+        try:
+            index = next(
+                idx for idx, item in enumerate(self._dataset_list) if item.file_path == file_path
+            )
+        except StopIteration:
+            index = len(self._dataset_list)
+            label = str(file_path.relative_to(self._settings.data_directory.get_value()))
+            dataset = AutomationDataset(file_path, state, label)
+            self._dataset_list.append(dataset)
+            self.notify_observers_item_inserted(index, dataset)
+        else:
+            old_dataset = self._dataset_list[index]
+            new_dataset = AutomationDataset(file_path, state, old_dataset.label)
+            logger.debug(f'{file_path}: {old_dataset.state} -> {new_dataset.state}')
+            self._dataset_list[index] = new_dataset
+            self.notify_observers_item_changed(index, new_dataset)
+
+    def clear(self) -> None:
+        while True:
+            try:
+                dataset = self._dataset_list.pop()
+            except IndexError:
+                break
+            else:
+                self.notify_observers_item_removed(len(self._dataset_list), dataset)
+
+
+class UpdateAutomationDatasetRepository:
+    def __init__(
+        self,
+        repository: AutomationDatasetRepository,
+        file_path: Path,
+        state: AutomationDatasetState,
+    ) -> None:
+        self._repository = repository
+        self._file_path = file_path
+        self._state = state
+
+    def __call__(self) -> None:
+        self._repository.upsert(self._file_path, self._state)

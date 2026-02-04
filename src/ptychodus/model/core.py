@@ -142,7 +142,7 @@ class ModelCore:
             self.diffraction_core.pattern_sizer,
             self.is_developer_mode_enabled,
         )
-        self.ptychonn_reconstructor_library = PtychoNNReconstructorLibrary.create_instance(
+        self.ptychonn_reconstructor_library = PtychoNNReconstructorLibrary(
             self.settings_registry, self.is_developer_mode_enabled
         )
         self.ptychopinn_reconstructor_library = PtychoPINNReconstructorLibrary(
@@ -191,6 +191,7 @@ class ModelCore:
             self.globus_core.executor,
         )
         self.automation_core = AutomationCore(
+            self._task_manager,
             self.settings_registry,
             self.workflow_api,
             self.plugin_registry.file_based_workflows,

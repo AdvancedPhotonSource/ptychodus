@@ -147,10 +147,10 @@ class ControllerCore:
             view.globus_status_table_view,
             self._file_dialog_factory,
         )
-        self._automation_controller = AutomationController.create_instance(
-            model.automation_core,
+        self._automation_controller = AutomationController(
+            model.automation_core.settings,
+            model.automation_core.repository,
             model.automation_core.presenter,
-            model.automation_core.processing_presenter,
             view.automation_view,
             self._file_dialog_factory,
         )
