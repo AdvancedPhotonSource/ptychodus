@@ -5,7 +5,6 @@ from PyQt5.QtWidgets import (
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
-    QMenu,
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
@@ -16,7 +15,7 @@ from PyQt5.QtWidgets import (
 )
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
 
@@ -25,23 +24,20 @@ class ReconstructorParametersView(QGroupBox):
         super().__init__('Parameters', parent)
         self.algorithm_combo_box = QComboBox()
         self.product_combo_box = QComboBox()
+        self.compute_combo_box = QComboBox()
 
-        self.reconstructor_menu = QMenu()
-        self.reconstructor_button = QPushButton('Reconstructor')
-        self.reconstructor_button.setMenu(self.reconstructor_menu)
-
-        self.trainer_menu = QMenu()
-        self.trainer_button = QPushButton('Trainer')
-        self.trainer_button.setMenu(self.trainer_menu)
+        self.reconstruct_button = QPushButton()
+        self.train_button = QPushButton('Train')
 
         action_layout = QHBoxLayout()
         action_layout.setContentsMargins(0, 0, 0, 0)
-        action_layout.addWidget(self.reconstructor_button)
-        action_layout.addWidget(self.trainer_button)
+        action_layout.addWidget(self.reconstruct_button)
+        action_layout.addWidget(self.train_button)
 
         layout = QFormLayout()
         layout.addRow('Algorithm:', self.algorithm_combo_box)
         layout.addRow('Product:', self.product_combo_box)
+        layout.addRow('Compute:', self.compute_combo_box)
         layout.addRow('Action:', action_layout)
         self.setLayout(layout)
 

@@ -82,6 +82,7 @@ class ReconstructorProgressMonitor(Observable):
             return self._progress
 
     def notify_observers_if_changed(self) -> None:
+        # FIXME to TaskManager
         # only call this method from the main thread
         if self._changed.is_set():
             self._changed.clear()

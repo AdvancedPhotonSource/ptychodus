@@ -125,6 +125,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
             progress_monitor, view.progress_dialog
         )
 
+# FIXME BEGIN
         open_model_action = view.parameters_view.reconstructor_menu.addAction('Open Model...')
         connect_triggered_signal(open_model_action, self._open_model)
         save_model_action = view.parameters_view.reconstructor_menu.addAction('Save Model...')
@@ -153,6 +154,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         connect_triggered_signal(export_training_data_action, self._export_training_data)
         train_action = view.parameters_view.trainer_menu.addAction('Train')
         connect_triggered_signal(train_action, self._train)
+# FIXME END
 
         presenter.add_observer(self)
         product_repository.add_observer(self)
