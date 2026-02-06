@@ -447,8 +447,7 @@ class ProductAPI:
             except Exception as exc:
                 raise RuntimeError(f'Failed to read "{file_path}"') from exc
             else:
-                item = self._item_factory.create_from_product(product)
-                return self._repository.insert_product(item)
+                return self.insert_product(product)
         else:
             logger.warning(f'Refusing to create product with invalid file path "{file_path}"')
 

@@ -22,7 +22,7 @@ from ptychodus.api.diffraction import (
     DiffractionPatterns,
     SimpleDiffractionDataset,
 )
-from ptychodus.api.io import AssembledDiffractionData
+from ptychodus.api.io import AssembledDiffractionData, load_diffraction_data, save_diffraction_data
 from ptychodus.api.tree import SimpleTreeNode
 
 from ..task_manager import BackgroundTask, TaskManager
@@ -321,14 +321,14 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         if file_path.is_file():
             self.clear()
             logger.info(f'Importing assembled dataset from "{file_path}"')
-            self._data.read_from_file(file_path)
+            self._data = load_diffraction_data(file_path)
             self._generate_dataset_for_assembled_data(file_path=file_path)
         else:
             logger.warning(f'Refusing to read invalid file path {file_path}')
 
     def export_assembled_patterns(self, file_path: Path, compression: str = 'lzf') -> None:
         logger.info(f'Exporting assembled dataset to "{file_path}"')
-        self._data.write_to_file(file_path, compression=compression)
+        save_diffraction_data(file_path, self._data, compression=compression)
 
     def get_info_text(self) -> str:
         file_path = self.get_metadata().file_path

@@ -101,6 +101,9 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
         return '*.h5'
 
     def execute(self, api: WorkflowAPI, file_path: Path) -> None:
+        if file_path.parent.name != 'eiger_4':
+            return
+
         experiment_dir = file_path.parents[3]
         scan_num = int(re.findall(r'\d+', file_path.stem)[0])
         scan_file = experiment_dir / 'scan_positions' / f'scan_{scan_num:05d}.dat'
@@ -124,22 +127,21 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
                 except ValueError:
                     logger.warning('Failed to parse row ID in tomography_scannumbers.txt!')
                     logger.debug(row[0])
-                    continue
-
-                if row_no == scan_num:
-                    metadata = APS31IDEMetadata(
-                        scan_no=scan_num,
-                        golden_angle=str(row[1]),
-                        encoder_angle=str(row[2]),
-                        measurement_id=str(row[3]),
-                        subtomo_no=str(row[4]),
-                        detector_position=str(row[5]),
-                        label=str(row[6]),
-                    )
-                    break
+                else:
+                    if row_no == scan_num:
+                        metadata = APS31IDEMetadata(
+                            scan_no=scan_num,
+                            golden_angle=str(row[1]),
+                            encoder_angle=str(row[2]),
+                            measurement_id=str(row[3]),
+                            subtomo_no=str(row[4]),
+                            detector_position=str(row[5]),
+                            label=str(row[6]),
+                        )
+                        break
 
         if metadata is None:
-            logger.warning(f'Failed to locate label for {row_no}!')
+            logger.warning(f'Failed to locate metadata for {scan_num}!')
         else:
             product_name = f'scan{scan_num:05d}_' + metadata.label
             api.open_patterns(file_path)
@@ -148,8 +150,8 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
             input_product_api.generate_probe()
             input_product_api.generate_object()
             # TODO would prefer to write instructions and submit to queue
-            output_product_api = input_product_api.reconstruct_local()
-            output_product_api.save_product(experiment_dir / 'ptychodus' / f'{product_name}.h5')
+            output_product_file = experiment_dir / 'ptychodus' / f'{product_name}.h5'
+            input_product_api.reconstruct_local(output_product_file=output_product_file)
 
 
 def register_plugins(registry: PluginRegistry) -> None:

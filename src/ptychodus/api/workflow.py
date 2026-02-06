@@ -6,6 +6,7 @@ from typing import Any
 
 from ptychodus.api.diffraction import CropCenter
 from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import ReconstructInput, TrainOutput
 from ptychodus.api.settings import PathPrefixChange
 
@@ -54,7 +55,9 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def reconstruct_local(self, block: bool = False) -> WorkflowProductAPI:
+    def reconstruct_local(
+        self, *, output_product_file: Path | None = None, block: bool = False
+    ) -> WorkflowProductAPI:
         pass
 
     @abstractmethod
@@ -99,6 +102,10 @@ class WorkflowAPI(ABC):
     @abstractmethod
     def get_product(self, product_index: int) -> WorkflowProductAPI:
         """returns a product by index"""
+        pass
+
+    @abstractmethod
+    def register_product(self, product: Product) -> WorkflowProductAPI:
         pass
 
     @abstractmethod

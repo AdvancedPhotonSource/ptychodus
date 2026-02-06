@@ -56,6 +56,7 @@ class ReconstructorAPI:
         output_product_suffix: str = '',
         transform: int | None = None,
         index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
+        output_product_file: Path | None = None,
         block: bool = False,
     ) -> int:
         reconstructor = self._reconstructor_chooser.get_current_plugin()
@@ -94,6 +95,7 @@ class ReconstructorAPI:
             parameters,
             output_product_item,
             finished_event,
+            output_product_file,
         )
         self._task_manager.put_background_task(background_task)
 

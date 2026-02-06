@@ -1,12 +1,14 @@
 from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
+from pathlib import Path
 from types import TracebackType
 from typing import overload
 import logging
 import threading
 import time
 
+from ptychodus.api.io import save_product
 from ptychodus.api.observer import Observable
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Reconstructor
@@ -137,6 +139,7 @@ class ReconstructBackgroundTask:
     parameters: ReconstructInput
     product_item: ProductRepositoryItem
     finished_event: threading.Event
+    output_product_file: Path | None
 
     def __call__(self) -> None:
         with self.context as context:
@@ -146,6 +149,11 @@ class ReconstructBackgroundTask:
 
             for result in self.reconstructor.reconstruct(self.parameters):
                 context.update_progress(self.product_item, result)
+                of = self.output_product_file
+
+                if of is not None:
+                    of = of.parent / f'{of.stem}.{result.progress:06d}.{of.suffix}'
+                    save_product(of, result.product)
 
             toc = time.perf_counter()
             logger.info(f'Reconstruction time {toc - tic:.4f} seconds.')

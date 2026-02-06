@@ -6,6 +6,7 @@ import logging
 
 from ptychodus.api.diffraction import CropCenter
 from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import ReconstructInput, TrainOutput
 from ptychodus.api.settings import PathPrefixChange, SettingsRegistry
 from ptychodus.api.workflow import WorkflowAPI, WorkflowProductAPI
@@ -83,10 +84,12 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
     def get_reconstruct_input(self) -> ReconstructInput:
         return self._reconstructor_api.get_reconstruct_input(self._product_index)
 
-    def reconstruct_local(self, block: bool = False) -> WorkflowProductAPI:
-        logger.info('Reconstructing...')
-        output_product_index = self._reconstructor_api.reconstruct(self._product_index, block=block)
-        logger.info('Reconstruction complete.')
+    def reconstruct_local(
+        self, *, output_product_file: Path | None = None, block: bool = False
+    ) -> WorkflowProductAPI:
+        output_product_index = self._reconstructor_api.reconstruct(
+            self._product_index, output_product_file=output_product_file, block=block
+        )
 
         return ConcreteWorkflowProductAPI(
             self._product_api,
@@ -170,6 +173,10 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             self._executor,
             product_index,
         )
+
+    def register_product(self, product: Product) -> WorkflowProductAPI:
+        product_index = self._product_api.insert_product(product)
+        return self.get_product(product_index)
 
     def open_product(self, file_path: Path, *, file_type: str | None = None) -> WorkflowProductAPI:
         product_index = self._product_api.open_product(file_path, file_type=file_type)
