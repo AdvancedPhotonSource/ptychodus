@@ -7,7 +7,7 @@ from typing import Any
 from ptychodus.api.diffraction import CropCenter
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.product import Product
-from ptychodus.api.reconstructor import AssembledDiffractionData, ReconstructInput, TrainOutput
+from ptychodus.api.reconstructor import AssembledDiffractionData, ReconstructInput
 from ptychodus.api.settings import PathPrefixChange
 
 
@@ -90,7 +90,7 @@ class WorkflowProductAPI(ABC):
         *,
         algorithm: str | None = None,
         block: bool = False,
-    ) -> TrainOutput:
+    ) -> None:
         pass
 
     @abstractmethod

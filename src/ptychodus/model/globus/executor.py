@@ -101,18 +101,22 @@ class GlobusExecutor:
         self._client.run_flow(job)
 
     def reconstruct(self, input_product_index: int, *, algorithm: str | None = None) -> None:
-        # FIXME algorithm
+        if algorithm is not None:
+            self._processing_api.set_reconstructor(algorithm)
+
         input_directory = self.populate_input_directory(input_product_index)
         self._run_flow('reconstruct', input_directory.name)
 
     def train(self, input_product_index: int, *, algorithm: str | None = None) -> None:
-        # FIXME algorithm
-        # TODO  MLflow
+        if algorithm is not None:
+            self._processing_api.set_reconstructor(algorithm)
+
         input_directory = self.populate_input_directory(input_product_index)
-        self._run_flow('train', input_directory.name)
+        self._run_flow('train', input_directory.name)  # TODO  MLflow
 
     def infer(self, input_product_index: int, *, algorithm: str | None = None) -> None:
-        # FIXME algorithm
-        # TODO  MLflow
+        if algorithm is not None:
+            self._processing_api.set_reconstructor(algorithm)
+
         input_directory = self.populate_input_directory(input_product_index)
-        self._run_flow('infer', input_directory.name)
+        self._run_flow('infer', input_directory.name)  # TODO  MLflow

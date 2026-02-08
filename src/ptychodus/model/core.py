@@ -247,8 +247,8 @@ class ModelCore:
                 logger.warning('Output product file will be overwritten!')
 
             input_product_api = self.workflow_api.load_product(product_in_path)
-            output = input_product_api.train_reconstructor_local(input_directory, output_directory)
-            return output.result
+            input_product_api.train_reconstructor_local(input_directory, output_directory)
+            return 0
         else:
             logger.error('Input product is not a file!')
             return -1

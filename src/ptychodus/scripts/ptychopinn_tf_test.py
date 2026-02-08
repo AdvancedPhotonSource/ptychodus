@@ -183,7 +183,8 @@ def main() -> int:
             input_product_api.load_probe(dataset_path, file_type='SLAC_NPZ')
             input_product_api.load_object(dataset_path, file_type='SLAC_NPZ')
 
-            model_settings = model.ptychopinn_reconstructor_library.model_settings  # TODO: clean up
+            # TODO: find better way to change settings via Python API
+            model_settings = model.ptychopinn_reconstructor_library.model_settings
             model_settings.gridsize.set_value(args.gridsize)
 
             train_data_path = train_dir / 'train_data.npz'
@@ -194,17 +195,13 @@ def main() -> int:
             _validate_npz_keys(train_data_path, REQUIRED_TRAIN_KEYS, 'train_data.npz')
             _validate_npz_keys(test_data_path, REQUIRED_TRAIN_KEYS, 'test_data.npz')
 
-            training_settings = (
-                model.ptychopinn_reconstructor_library.training_settings
-            )  # TODO: clean up
+            # TODO: find better way to change settings via Python API
+            training_settings = model.ptychopinn_reconstructor_library.training_settings
             training_settings.nepochs.set_value(args.nepochs)
             training_settings.batch_size.set_value(args.batch_size)
-            training_settings.data_dir.set_value(train_dir)
-            training_settings.output_dir.set_value(model_out_dir)
 
-            inference_settings = (
-                model.ptychopinn_reconstructor_library.inference_settings
-            )  # TODO: clean up
+            # TODO: find better way to change settings via Python API
+            inference_settings = model.ptychopinn_reconstructor_library.inference_settings
             inference_settings.n_samples.set_value(args.test_samples)
 
             input_product_api.train_reconstructor_local(

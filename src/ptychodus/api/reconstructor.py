@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import auto, Enum
 from pathlib import Path
 import logging
@@ -53,9 +53,9 @@ class Reconstructor(ABC):
 
 @dataclass(frozen=True)
 class TrainOutput:
-    training_loss: Sequence[LossValue]
-    validation_loss: Sequence[LossValue]
-    result: int
+    training_loss: Sequence[LossValue] = field(default_factory=list)
+    validation_loss: Sequence[LossValue] = field(default_factory=list)
+    result: int = 0
 
 
 class TrainableReconstructor(Reconstructor):
@@ -64,11 +64,7 @@ class TrainableReconstructor(Reconstructor):
         pass
 
     @abstractmethod
-    def open_model(self, file_path: Path) -> None:
-        pass
-
-    @abstractmethod
-    def save_model(self, file_path: Path) -> None:
+    def load_model_from_file(self, file_path: Path) -> None:
         pass
 
     @abstractmethod
@@ -80,11 +76,7 @@ class TrainableReconstructor(Reconstructor):
         pass
 
     @abstractmethod
-    def get_training_data_path(self) -> Path:
-        pass
-
-    @abstractmethod
-    def train(self, data_path: Path) -> TrainOutput:
+    def train(self, input_path: Path, output_path: Path) -> Iterator[TrainOutput]:
         pass
 
 
@@ -104,10 +96,7 @@ class NullReconstructor(TrainableReconstructor):
     def get_model_file_filter(self) -> str:
         return str()
 
-    def open_model(self, file_path: Path) -> None:
-        pass
-
-    def save_model(self, file_path: Path) -> None:
+    def load_model_from_file(self, file_path: Path) -> None:
         pass
 
     def get_training_data_file_filter(self) -> str:
@@ -116,11 +105,8 @@ class NullReconstructor(TrainableReconstructor):
     def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
         pass
 
-    def get_training_data_path(self) -> Path:
-        return Path()
-
-    def train(self, data_path: Path) -> TrainOutput:
-        return TrainOutput([], [], 0)
+    def train(self, input_path: Path, output_path: Path) -> Iterator[TrainOutput]:
+        yield from ()
 
 
 class ReconstructorLibrary(Iterable[Reconstructor]):

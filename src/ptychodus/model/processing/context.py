@@ -12,7 +12,12 @@ import time
 from ptychodus.api.io import save_product
 from ptychodus.api.observer import Observable
 from ptychodus.api.product import Product
-from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Reconstructor
+from ptychodus.api.reconstructor import (
+    ReconstructInput,
+    ReconstructOutput,
+    Reconstructor,
+    TrainableReconstructor,
+)
 
 from ..product import ProductRepositoryItem
 from ..task_manager import ForegroundTaskManager
@@ -190,6 +195,25 @@ class ReconstructBackgroundTask:
         self.finished_event.set()
 
 
-class TrainBackgroundTask:  # FIXME
+@dataclass(frozen=True)
+class TrainBackgroundTask:
+    context: ProcessingContext
+    trainer: TrainableReconstructor
+    reconstruct_input: ReconstructInput
+    finished_event: threading.Event
+    input_path: Path
+    output_path: Path
+
     def __call__(self) -> None:
-        pass
+        with self.context as context:
+            progress_monitor = context.get_progress_monitor()
+            progress_monitor.set_progress_goal(self.trainer.get_progress_goal())
+            tic = time.perf_counter()
+
+            for result in self.trainer.train(self.input_path, self.output_path):
+                progress_monitor.set_progress(len(result.training_loss))
+
+            toc = time.perf_counter()
+            logger.info(f'Training time {toc - tic:.4f} seconds.')
+
+        self.finished_event.set()

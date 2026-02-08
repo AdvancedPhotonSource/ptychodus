@@ -130,8 +130,8 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
     def get_model_file_filter(self) -> str:
         return self.MODEL_FILE_FILTER
 
-    def open_model(self, file_path: Path) -> None:
-        self._model_provider.open_model(file_path)
+    def load_model_from_file(self, file_path: Path) -> None:
+        self._model_provider.load_model_from_file(file_path)
 
     def save_model(self, file_path: Path) -> None:
         self._model_provider.save_model(file_path)
@@ -172,13 +172,9 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         }
         numpy.savez_compressed(file_path, allow_pickle=False, **contents)
 
-    def get_training_data_path(self) -> Path:
-        return self._training_settings.training_data_path.get_value()
-
-    def train(self, data_path: Path) -> TrainOutput:
-        logger.debug(f'Reading "{data_path}" as "NPZ"')
-        training_data = numpy.load(data_path)
-        self._training_settings.training_data_path.set_value(data_path)
+    def train(self, input_path: Path, output_path: Path) -> Iterator[TrainOutput]:
+        logger.debug(f'Reading "{input_path}" as "NPZ"')
+        training_data = numpy.load(input_path)
 
         model = self._model_provider.get_model()
         logger.debug('Training...')
@@ -211,8 +207,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
                 training_loss.append(tloss)
                 training_loss.append(vloss)
 
-        return TrainOutput(
+        yield TrainOutput(
             training_loss=training_loss,
             validation_loss=validation_loss,
-            result=0,
         )

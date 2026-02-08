@@ -190,7 +190,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     def get_model_file_filter(self) -> str:
         return self.MODEL_FILE_FILTER
 
-    def open_model(self, file_path: Path) -> None:
+    def load_model_from_file(self, file_path: Path) -> None:
         if file_path.name != self.MODEL_FILE_NAME:
             logger.warning(f"PtychoPINN expects the file name '{self.MODEL_FILE_NAME}'.")
 
@@ -200,9 +200,6 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         # global config (ptycho.params.cfg) updated during load
         self.__model, self._config = load_inference_bundle(file_path.parent)
         # TODO sync ptycho.params.cfg with settings after load
-
-    def save_model(self, file_path: Path) -> None:
-        ptycho.model_manager.save(file_path)
 
     def get_training_data_file_filter(self) -> str:
         return self.TRAINING_DATA_FILE_FILTER
@@ -233,14 +230,9 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             scan_index=numpy.zeros(len(parameters.product.probe_positions), dtype=int),
         )
 
-    def get_training_data_path(self) -> Path:
-        return self._training_settings.data_dir.get_value()
-
-    def train(self, data_path: Path) -> TrainOutput:
-        self._training_settings.data_dir.set_value(data_path)
-
-        test_raw_data = RawData.from_file(data_path / 'test_data.npz')  # TODO RawData | None
-        train_raw_data = RawData.from_file(data_path / 'train_data.npz')
+    def train(self, input_path: Path, output_path: Path) -> Iterator[TrainOutput]:
+        test_raw_data = RawData.from_file(input_path / 'test_data.npz')  # TODO RawData | None
+        train_raw_data = RawData.from_file(input_path / 'train_data.npz')
 
         model_size = train_raw_data.diff3d.shape[-1]
 
@@ -273,13 +265,9 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         recon_amp, recon_phase, train_results = run_cdi_example(
             train_raw_data, test_raw_data, training_config
         )
-        output_dir = self._training_settings.output_dir.get_value()
-        output_dir.mkdir(parents=True, exist_ok=True)
-        model_path = output_dir / self.MODEL_FILE_NAME
-        self.save_model(output_dir)
-        save_outputs(recon_amp, recon_phase, train_results, str(output_dir))
-        self.open_model(model_path)
+        model_path = output_path / self.MODEL_FILE_NAME
+        ptycho.model_manager.save(output_path)
+        save_outputs(recon_amp, recon_phase, train_results, str(output_path))
+        self.load_model_from_file(model_path)
 
-        training_loss: Sequence[LossValue] = []
-        validation_loss: Sequence[LossValue] = []
-        return TrainOutput(training_loss, validation_loss, 0)  # TODO
+        yield TrainOutput()  # TODO yield losses

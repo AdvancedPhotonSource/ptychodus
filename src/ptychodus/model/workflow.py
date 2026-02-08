@@ -7,7 +7,7 @@ import logging
 from ptychodus.api.diffraction import CropCenter
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.product import Product
-from ptychodus.api.reconstructor import AssembledDiffractionData, ReconstructInput, TrainOutput
+from ptychodus.api.reconstructor import AssembledDiffractionData, ReconstructInput
 from ptychodus.api.settings import PathPrefixChange, SettingsRegistry
 from ptychodus.api.workflow import WorkflowAPI, WorkflowDiffractionAPI, WorkflowProductAPI
 
@@ -133,15 +133,14 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         *,
         algorithm: str | None = None,
         block: bool = False,
-    ) -> TrainOutput:
-        output = self._processing_api.train(
-            self._product_index, input_path, algorithm=algorithm, block=block
+    ) -> None:
+        # FIXME how to handle mlflow?
+        self._processing_api.train(
+            self._product_index, input_path, output_path, algorithm=algorithm, block=block
         )
-        self._processing_api.save_model(output_path)  # FIXME how to handle mlflow?
-        return output
 
     def train_reconstructor_remote(self, *, algorithm: str | None = None) -> None:
-        # FIXME how to handle mlflow with model saving?
+        # FIXME how to handle mlflow?
         self._executor.train(self._product_index, algorithm=algorithm)
 
     def export_training_data(self, file_path: Path, *, algorithm: str | None = None) -> None:
