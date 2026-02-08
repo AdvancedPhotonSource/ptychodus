@@ -4,26 +4,15 @@ from pathlib import Path
 import logging
 
 import h5py
-import numpy
 
-from .common import BYTES_PER_MEGABYTE
-from .diffraction import (
-    BadPixels,
-    DiffractionIndexes,
-    DiffractionPattern,
-    DiffractionPatternCounts,
-    DiffractionPatternDType,
-    DiffractionPatterns,
-)
 from .geometry import PixelGeometry
 from .object import Object, ObjectCenter
 from .probe import ProbeSequence
 from .probe_positions import ProbePositionSequence, ProbePosition
 from .product import Product, ProductMetadata
-from .reconstructor import LossValue
+from .reconstructor import AssembledDiffractionData, LossValue
 
 __all__ = [
-    'AssembledDiffractionData',
     'StandardFileLayout',
     'load_diffraction_data',
     'load_product',
@@ -43,95 +32,6 @@ class StandardFileLayout(StrEnum):
     SETTINGS = 'settings.ini'
 
 
-class AssembledDiffractionData:
-    def __init__(
-        self, indexes: DiffractionIndexes, patterns: DiffractionPatterns, bad_pixels: BadPixels
-    ) -> None:
-        self._indexes = indexes
-        self._patterns = patterns
-        self._bad_pixels = bad_pixels
-
-        if indexes.ndim != 1:
-            raise ValueError(
-                f'Unexpected number of dimensions for indexes! (actual={indexes.ndim} expected=1)'
-            )
-
-        if patterns.ndim != 3:
-            raise ValueError(
-                f'Unexpected number of dimensions for patterns! (actual={patterns.ndim} expected=3)'
-            )
-
-        if bad_pixels.ndim != 2:
-            raise ValueError(
-                f'Unexpected number of dimensions for bad pixels! (actual={bad_pixels.ndim} expected=2)'
-            )
-
-        if indexes.shape[0] != patterns.shape[0]:
-            raise ValueError('Number of indexes does not match number of patterns!')
-
-        if patterns.shape[1:] != bad_pixels.shape:
-            raise ValueError('Patterns shape does not match bad pixels shape!')
-
-    @classmethod
-    def create_null(cls) -> AssembledDiffractionData:
-        return cls(
-            indexes=numpy.zeros(1, dtype=int),
-            patterns=numpy.zeros((1, 1, 1), dtype=int),
-            bad_pixels=numpy.zeros((1, 1), dtype=bool),
-        )
-
-    def get_patterns_shape(self) -> tuple[int, int, int]:
-        return self._patterns.shape
-
-    def get_patterns_dtype(self) -> DiffractionPatternDType:
-        return self._patterns.dtype
-
-    def get_pattern(self, index: int) -> DiffractionPattern:
-        return self._patterns[index]
-
-    def get_bad_pixels(self) -> BadPixels:
-        return self._bad_pixels
-
-    def assemble(self, data: AssembledDiffractionData, offset: int) -> AssembledDiffractionData:
-        assembled_indexes = slice(offset, offset + len(data._indexes))
-
-        self._indexes[assembled_indexes] = data._indexes
-        indexes_view = self._indexes[assembled_indexes]
-        indexes_view.flags.writeable = False
-
-        self._patterns[assembled_indexes, :, :] = data._patterns
-        patterns_view = self._patterns[assembled_indexes, :, :]
-        patterns_view.flags.writeable = False
-
-        return AssembledDiffractionData(
-            indexes=indexes_view,
-            patterns=patterns_view,
-            bad_pixels=data._bad_pixels,
-        )
-
-    def get_assembled_indexes(self) -> DiffractionIndexes:
-        return self._indexes[self._indexes >= 0]
-
-    def get_assembled_patterns(self) -> DiffractionPatterns:
-        return self._patterns[self._indexes >= 0]
-
-    def get_assembled_pattern_counts(self) -> DiffractionPatternCounts:
-        good_pixels = numpy.logical_not(self._bad_pixels)
-        assembled_patterns = self.get_assembled_patterns()
-        pattern_counts = numpy.sum(assembled_patterns[:, good_pixels], axis=-1)
-        return pattern_counts
-
-    def get_average_pattern(self) -> DiffractionPattern:
-        assembled_patterns = self.get_assembled_patterns()
-        return numpy.mean(assembled_patterns, axis=0)
-
-    def __str__(self) -> str:
-        number, height, width = self._patterns.shape
-        dtype = str(self._patterns.dtype)
-        size_MB = self._patterns.nbytes / BYTES_PER_MEGABYTE  # noqa: N806
-        return f'{number} x {height}H x {width}W {dtype} [{size_MB:.2f}MB]'
-
-
 class DiffractionFileKeys(StrEnum):
     PATTERNS = 'patterns'
     INDEXES = 'indexes'
@@ -139,6 +39,9 @@ class DiffractionFileKeys(StrEnum):
 
 
 def load_diffraction_data(file: Path, *, mmap_file: Path | None = None) -> AssembledDiffractionData:
+    if mmap_file is not None:
+        raise NotImplementedError('Load to memory map not implemented yet!')
+
     with h5py.File(file, 'r') as h5_file:
         h5_indexes = h5_file[DiffractionFileKeys.INDEXES]
 
@@ -157,7 +60,7 @@ def load_diffraction_data(file: Path, *, mmap_file: Path | None = None) -> Assem
 
         return AssembledDiffractionData(
             h5_indexes[()],
-            h5_patterns[()],  # FIXME support memmap
+            h5_patterns[()],
             h5_bad_pixels[()],
         )
 
@@ -214,8 +117,6 @@ def load_product(file: Path) -> Product:
         mass_attenuation_m2_kg = float(h5_file.attrs.get(ProductFileKeys.MASS_ATTENUATION, 0.0))
         tomography_angle_deg = float(h5_file.attrs.get(ProductFileKeys.TOMOGRAPHY_ANGLE, 0.0))
 
-        # FIXME probe pixel height/width from object
-
         metadata = ProductMetadata(
             name=name,
             comments=comments,
@@ -227,33 +128,11 @@ def load_product(file: Path) -> Product:
             tomography_angle_deg=tomography_angle_deg,
         )
 
-        h5_scan_indexes = h5_file[ProductFileKeys.PROBE_POSITION_INDEXES]
-        h5_scan_x = h5_file[ProductFileKeys.PROBE_POSITION_X]
-        h5_scan_y = h5_file[ProductFileKeys.PROBE_POSITION_Y]
-
-        for idx, x_m, y_m in zip(h5_scan_indexes[()], h5_scan_x[()], h5_scan_y[()]):
-            point = ProbePosition(idx, x_m, y_m)
-            point_list.append(point)
-
-        h5_probe = h5_file[ProductFileKeys.PROBE_ARRAY]
-        probe_pixel_geometry = PixelGeometry(
-            width_m=float(h5_probe.attrs[ProductFileKeys.PROBE_PIXEL_WIDTH]),
-            height_m=float(h5_probe.attrs[ProductFileKeys.PROBE_PIXEL_HEIGHT]),
-        )
-
-        try:
-            opr_weights = h5_probe.attrs[ProductFileKeys.OPR_WEIGHTS]
-        except KeyError:
-            logger.debug('OPR weights not found.')
-            opr_weights = None
-
-        probe = ProbeSequence(
-            array=h5_probe[()],
-            opr_weights=opr_weights,
-            pixel_geometry=probe_pixel_geometry,
-        )
-
         h5_object = h5_file[ProductFileKeys.OBJECT_ARRAY]
+
+        if not isinstance(h5_object, h5py.Dataset):
+            raise ValueError('Object array is not a dataset!')
+
         object_pixel_geometry = PixelGeometry(
             width_m=float(h5_object.attrs[ProductFileKeys.OBJECT_PIXEL_WIDTH]),
             height_m=float(h5_object.attrs[ProductFileKeys.OBJECT_PIXEL_HEIGHT]),
@@ -264,9 +143,15 @@ def load_product(file: Path) -> Product:
         )
 
         try:
-            layer_spacing_m = h5_file[ProductFileKeys.OBJECT_LAYER_SPACING][()]
+            h5_object_layer_spacing = h5_file[ProductFileKeys.OBJECT_LAYER_SPACING]
         except KeyError:
+            logger.debug('Object layer spacing not found.')
             layer_spacing_m = []
+        else:
+            if isinstance(h5_object_layer_spacing, h5py.Dataset):
+                layer_spacing_m = h5_object_layer_spacing[()]
+            else:
+                raise ValueError('Object layer spacing is not a dataset!')
 
         object_ = Object(
             array=h5_object[()],
@@ -275,15 +160,73 @@ def load_product(file: Path) -> Product:
             layer_spacing_m=layer_spacing_m,
         )
 
+        h5_probe = h5_file[ProductFileKeys.PROBE_ARRAY]
+
+        if not isinstance(h5_probe, h5py.Dataset):
+            raise ValueError('Probe array is not a dataset!')
+
+        probe_pixel_geometry = PixelGeometry(
+            width_m=float(
+                h5_probe.attrs.get(ProductFileKeys.PROBE_PIXEL_WIDTH, object_pixel_geometry.width_m)
+            ),
+            height_m=float(
+                h5_probe.attrs.get(
+                    ProductFileKeys.PROBE_PIXEL_HEIGHT, object_pixel_geometry.height_m
+                )
+            ),
+        )
+
+        try:
+            h5_opr_weights = h5_file[ProductFileKeys.OPR_WEIGHTS]
+        except KeyError:
+            logger.debug('OPR weights not found.')
+            opr_weights = None
+        else:
+            if isinstance(h5_opr_weights, h5py.Dataset):
+                opr_weights = h5_opr_weights[()]
+            else:
+                raise ValueError('OPR weights is not a dataset!')
+
+        probe = ProbeSequence(
+            array=h5_probe[()],
+            opr_weights=opr_weights,
+            pixel_geometry=probe_pixel_geometry,
+        )
+
+        h5_position_indexes = h5_file[ProductFileKeys.PROBE_POSITION_INDEXES]
+
+        if not isinstance(h5_position_indexes, h5py.Dataset):
+            raise ValueError('Probe position indexes is not a dataset!')
+
+        h5_position_x = h5_file[ProductFileKeys.PROBE_POSITION_X]
+
+        if not isinstance(h5_position_x, h5py.Dataset):
+            raise ValueError('Probe position X is not a dataset!')
+
+        h5_position_y = h5_file[ProductFileKeys.PROBE_POSITION_Y]
+
+        if not isinstance(h5_position_y, h5py.Dataset):
+            raise ValueError('Probe position Y is not a dataset!')
+
+        for idx, x_m, y_m in zip(h5_position_indexes[()], h5_position_x[()], h5_position_y[()]):
+            point = ProbePosition(idx, x_m, y_m)
+            point_list.append(point)
+
         losses: list[LossValue] = []
 
         try:
-            loss_epochs = h5_file[ProductFileKeys.LOSS_EPOCHS][()]
-            loss_values = h5_file[ProductFileKeys.LOSS_VALUES][()]
+            h5_loss_epochs = h5_file[ProductFileKeys.LOSS_EPOCHS]
+            h5_loss_values = h5_file[ProductFileKeys.LOSS_VALUES]
         except KeyError:
             logger.debug('Losses not found!')
         else:
-            for epoch, value in zip(loss_epochs, loss_values):
+            if not isinstance(h5_loss_epochs, h5py.Dataset):
+                raise ValueError('Loss epochs are not a dataset!')
+
+            if not isinstance(h5_loss_values, h5py.Dataset):
+                raise ValueError('Loss values are not a dataset!')
+
+            for epoch, value in zip(h5_loss_epochs[()], h5_loss_values[()]):
                 loss = LossValue(epoch, value)
                 losses.append(loss)
 

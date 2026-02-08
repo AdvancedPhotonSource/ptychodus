@@ -12,30 +12,25 @@ from ptychodus.api.settings import SettingsRegistry
 from ..diffraction import AssembledDiffractionDataset
 from ..product import ProductAPI
 from ..task_manager import TaskManager
-from .api import ReconstructorAPI
-from .context import ReconstructorContext
-from .log import ReconstructorLogHandler
-from .matcher import DiffractionPatternPositionMatcher
-from .presenter import ReconstructorPresenter
-from .settings import ReconstructorSettings
+from .api import ProcessingAPI
+from .context import ProcessingContext
+from .settings import ProcessingSettings
+
+logger = logging.getLogger(__name__)
 
 
-class ReconstructorCore:
+class ProcessingCore:
     def __init__(
         self,
         task_manager: TaskManager,
         settings_registry: SettingsRegistry,
-        dataset: AssembledDiffractionDataset,
+        diffraction_dataset: AssembledDiffractionDataset,
         product_api: ProductAPI,
         library_seq: Sequence[ReconstructorLibrary],
     ) -> None:
-        self.settings = ReconstructorSettings(settings_registry)
+        self.settings = ProcessingSettings(settings_registry)
         self._plugin_chooser = PluginChooser[Reconstructor]()
-        self._log_handler = ReconstructorLogHandler()
-        self._log_handler.setFormatter(
-            logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s')
-        )
-        self._context = ReconstructorContext(self._log_handler, task_manager)
+        self._context = ProcessingContext(task_manager)
 
         for library in library_seq:
             for reconstructor in library:
@@ -47,23 +42,18 @@ class ReconstructorCore:
                 )
 
             library_logger = library.get_logger()
-            library_logger.addHandler(self._log_handler)
+            library_logger.addHandler(self._context.get_log_handler())
 
         if not self._plugin_chooser:
             self._plugin_chooser.register_plugin(
                 NullReconstructor('None'), display_name='None/None'
             )
 
-        self.data_matcher = DiffractionPatternPositionMatcher(dataset)
-        self.reconstructor_api = ReconstructorAPI(
-            task_manager, self.data_matcher, product_api, self._context, self._plugin_chooser
-        )
-        self.presenter = ReconstructorPresenter(
+        self.processing_api = ProcessingAPI(
+            task_manager,
+            diffraction_dataset,
+            product_api,
             self.settings,
+            self._context,
             self._plugin_chooser,
-            self._log_handler,
-            self.reconstructor_api,
         )
-
-    def notify_observers_if_progress_changed(self) -> None:
-        self._context.notify_observers_if_progress_changed()

@@ -126,8 +126,8 @@ class ControllerCore:
             self._file_dialog_factory,
         )
         self._reconstructor_controller = ReconstructorController(
-            model.reconstructor_core.reconstructor_api.get_progress_monitor(),
-            model.reconstructor_core.presenter,
+            model.processing_core.processing_api.get_progress_monitor(),
+            model.processing_core.presenter,
             model.product_core.product_repository,
             view.reconstructor_view,
             view.reconstructor_plot_view,

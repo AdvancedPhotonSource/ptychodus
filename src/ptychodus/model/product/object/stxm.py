@@ -41,8 +41,9 @@ class STXMObjectBuilder(ObjectBuilder):
         coordinates_px: list[float] = list()
         values: list[float] = list()
 
-        assembled_indexes = self._dataset.get_assembled_indexes().tolist()
-        assembled_pattern_counts = self._dataset.get_assembled_pattern_counts().tolist()
+        assembled_data = self._dataset.get_assembled_data()
+        assembled_indexes = assembled_data.get_indexes().tolist()
+        assembled_pattern_counts = assembled_data.get_pattern_counts().tolist()
         pattern_counts_lut = dict(zip(assembled_indexes, assembled_pattern_counts))
 
         for scan_point in geometry_provider.get_probe_positions():

@@ -214,7 +214,8 @@ class ProductEditorViewController(Observer):
 
     def _estimate_probe_photon_count(self) -> None:
         metadata = self._product.get_metadata_item()
-        metadata.probe_photon_count.set_value(self._dataset.get_maximum_pattern_counts())
+        assembled_data = self._dataset.get_assembled_data()
+        metadata.probe_photon_count.set_value(assembled_data.get_pattern_counts().max())
 
         self._table_model.beginResetModel()
         self._table_model.endResetModel()

@@ -5,6 +5,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import overload
 import logging
+import queue
 import threading
 import time
 
@@ -15,16 +16,23 @@ from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Rec
 
 from ..product import ProductRepositoryItem
 from ..task_manager import ForegroundTaskManager
-from .log import ReconstructorLogHandler
 
 __all__ = [
-    'ReconstructorProgressMonitor',
-    'ReconstructorContext',
+    'ProcessingProgressMonitor',
+    'ProcessingContext',
     'ReconstructBackgroundTask',
     'TrainBackgroundTask',
 ]
 
 logger = logging.getLogger(__name__)
+
+
+class NotifyObserversTask:
+    def __init__(self, observable: Observable) -> None:
+        self._observable = observable
+
+    def __call__(self) -> None:
+        self._observable.notify_observers()
 
 
 class UpdateProductTask:
@@ -38,34 +46,63 @@ class UpdateProductTask:
         self._product_item.set_name(name)
 
 
-class ReconstructorProgressMonitor(Observable):
-    def __init__(self, log_handler: ReconstructorLogHandler) -> None:
+class ProcessingLogHandler(logging.Handler):
+    def __init__(self) -> None:
         super().__init__()
-        self._log_handler = log_handler
-        self._is_reconstructing = False
+        self._log: queue.Queue[str] = queue.Queue()
+
+    def messages(self) -> Iterator[str]:
+        while True:
+            try:
+                yield self._log.get(block=False)
+                self._log.task_done()
+            except queue.Empty:
+                break
+
+    def emit(self, record: logging.LogRecord) -> None:
+        text = self.format(record)
+        self._log.put(text)
+
+
+class ProcessingProgressMonitor(Observable):
+    def __init__(self, foreground_task_manager: ForegroundTaskManager) -> None:
+        super().__init__()
+        self._foreground_task_manager = foreground_task_manager
+        self._log_handler = ProcessingLogHandler()
+        self._log_handler.setFormatter(
+            logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s')
+        )
+        self._is_processing = False
         self._progress_goal = 0
         self._progress = 0
         self._lock = threading.Lock()
         self._changed = threading.Event()
 
-    def _set_reconstructing(self, is_reconstructing: bool) -> None:
+    def get_log_handler(self) -> logging.Handler:
+        return self._log_handler
+
+    def _notify_observers_foreground(self) -> None:
+        task = NotifyObserversTask(self)
+        self._foreground_task_manager.put_foreground_task(task)
+
+    def _set_processing(self, is_processing: bool) -> None:
         with self._lock:
-            self._is_reconstructing = is_reconstructing
-            self._changed.set()
+            self._is_processing = is_processing
+            self._notify_observers_foreground()
 
     @property
-    def is_reconstructing(self) -> bool:
+    def is_processing(self) -> bool:
         with self._lock:
-            return self._is_reconstructing
+            return self._is_processing
 
-    def message_log(self) -> Iterator[str]:
+    def messages(self) -> Iterator[str]:
         return self._log_handler.messages()
 
     def set_progress_goal(self, progress_goal: int) -> None:
         with self._lock:
             if self._progress_goal != progress_goal:
                 self._progress_goal = progress_goal
-                self._changed.set()
+                self._notify_observers_foreground()
 
     def get_progress_goal(self) -> int:
         with self._lock:
@@ -75,29 +112,23 @@ class ReconstructorProgressMonitor(Observable):
         with self._lock:
             if self._progress != progress:
                 self._progress = progress
-                self._changed.set()
+                self._notify_observers_foreground()
 
     def get_progress(self) -> int:
         with self._lock:
             return self._progress
 
-    def notify_observers_if_changed(self) -> None:
-        # FIXME to TaskManager
-        # only call this method from the main thread
-        if self._changed.is_set():
-            self._changed.clear()
-            self.notify_observers()
 
-
-class ReconstructorContext:
-    def __init__(
-        self, log_handler: ReconstructorLogHandler, foreground_task_manager: ForegroundTaskManager
-    ) -> None:
+class ProcessingContext:
+    def __init__(self, foreground_task_manager: ForegroundTaskManager) -> None:
         self._foreground_task_manager = foreground_task_manager
-        self._progress_monitor = ReconstructorProgressMonitor(log_handler)
+        self._progress_monitor = ProcessingProgressMonitor(foreground_task_manager)
 
-    def get_progress_monitor(self) -> ReconstructorProgressMonitor:
+    def get_progress_monitor(self) -> ProcessingProgressMonitor:
         return self._progress_monitor
+
+    def get_log_handler(self) -> logging.Handler:
+        return self._progress_monitor.get_log_handler()
 
     def update_progress(
         self, product_item: ProductRepositoryItem, result: ReconstructOutput
@@ -106,11 +137,8 @@ class ReconstructorContext:
         self._foreground_task_manager.put_foreground_task(task)
         self._progress_monitor.set_progress(result.progress)
 
-    def notify_observers_if_progress_changed(self) -> None:
-        self._progress_monitor.notify_observers_if_changed()
-
-    def __enter__(self) -> ReconstructorContext:
-        self._progress_monitor._set_reconstructing(True)
+    def __enter__(self) -> ProcessingContext:
+        self._progress_monitor._set_processing(True)
         return self
 
     @overload
@@ -130,12 +158,12 @@ class ReconstructorContext:
         exception_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        self._progress_monitor._set_reconstructing(False)
+        self._progress_monitor._set_processing(False)
 
 
 @dataclass(frozen=True)
 class ReconstructBackgroundTask:
-    context: ReconstructorContext
+    context: ProcessingContext
     reconstructor: Reconstructor
     parameters: ReconstructInput
     product_item: ProductRepositoryItem
@@ -162,6 +190,6 @@ class ReconstructBackgroundTask:
         self.finished_event.set()
 
 
-class TrainBackgroundTask:  # TODO
+class TrainBackgroundTask:  # FIXME
     def __call__(self) -> None:
         pass

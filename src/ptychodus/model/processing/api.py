@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Iterator
 from pathlib import Path
 import logging
 import threading
@@ -6,36 +6,41 @@ import time
 
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.reconstructor import (
+    PositionIndexFilter,
     ReconstructInput,
     Reconstructor,
     TrainOutput,
     TrainableReconstructor,
 )
 
+from ..diffraction import AssembledDiffractionDataset
 from ..product import ProductAPI
 from ..task_manager import TaskManager
-from .context import ReconstructBackgroundTask, ReconstructorContext, ReconstructorProgressMonitor
-from .matcher import DiffractionPatternPositionMatcher, PositionIndexFilter
+from .context import ReconstructBackgroundTask, ProcessingContext, ProcessingProgressMonitor
+from .settings import ProcessingSettings
 
 logger = logging.getLogger(__name__)
 
 
-class ReconstructorAPI:
+class ProcessingAPI:
     def __init__(
         self,
         task_manager: TaskManager,
-        data_matcher: DiffractionPatternPositionMatcher,
+        diffraction_dataset: AssembledDiffractionDataset,
         product_api: ProductAPI,
-        context: ReconstructorContext,
-        reconstructor_chooser: PluginChooser[Reconstructor],
+        settings: ProcessingSettings,
+        context: ProcessingContext,
+        algorithm_chooser: PluginChooser[Reconstructor],
     ) -> None:
         self._task_manager = task_manager
-        self._data_matcher = data_matcher
+        self._diffraction_dataset = diffraction_dataset
         self._product_api = product_api
         self._context = context
-        self._reconstructor_chooser = reconstructor_chooser
+        self._algorithm_chooser = algorithm_chooser
 
-    def get_progress_monitor(self) -> ReconstructorProgressMonitor:
+        algorithm_chooser.synchronize_with_parameter(settings.algorithm)
+
+    def get_progress_monitor(self) -> ProcessingProgressMonitor:
         return self._context.get_progress_monitor()
 
     def get_reconstruct_input(
@@ -44,22 +49,21 @@ class ReconstructorAPI:
         *,
         index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
     ) -> ReconstructInput:
-        input_product_item = self._product_api.get_item(input_product_index)
-        return self._data_matcher.match_diffraction_patterns_with_positions(
-            input_product_item, index_filter=index_filter
-        )
+        input_product = self._product_api.get_item(input_product_index).get_product()
+        assembled_data = self._diffraction_dataset.get_assembled_data()
+        return assembled_data.prepare_reconstruct_input(input_product, index_filter=index_filter)
 
     def reconstruct(
         self,
         input_product_index: int,
         *,
+        algorithm: str | None = None,
         output_product_suffix: str = '',
-        transform: int | None = None,
         index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
         output_product_file: Path | None = None,
         block: bool = False,
     ) -> int:
-        reconstructor = self._reconstructor_chooser.get_current_plugin()
+        reconstructor = self._algorithm_chooser.get_current_plugin()  # FIXME algorithm
         input_product_item = self._product_api.get_item(input_product_index)
         output_product_index = self._product_api.insert_product(input_product_item.get_product())
         output_product_item = self._product_api.get_item(output_product_index)
@@ -70,29 +74,23 @@ class ReconstructorAPI:
 
         output_product_item.set_name(output_product_name)
 
-        if transform is not None:
-            scan_item_transform = output_product_item.get_probe_positions_item().get_transform()
-            scan_item_transform.apply_presets(transform)
-
-            object_item = output_product_item.get_object_item()
-            object_item.rebuild(recenter=True)
-
         logger.info(f'Preparing input data for {output_product_item.get_name()}...')
         tic = time.perf_counter()
-        parameters = self._data_matcher.match_diffraction_patterns_with_positions(
-            output_product_item, index_filter
+        assembled_data = self._diffraction_dataset.get_assembled_data()
+        reconstruct_input = assembled_data.prepare_reconstruct_input(
+            output_product_item.get_product(), index_filter
         )
         toc = time.perf_counter()
         logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
 
-        logger.debug(parameters)
+        logger.debug(reconstruct_input)
 
         finished_event = threading.Event()
 
         background_task = ReconstructBackgroundTask(
             self._context,
             reconstructor.strategy,
-            parameters,
+            reconstruct_input,
             output_product_item,
             finished_event,
             output_product_file,
@@ -121,25 +119,8 @@ class ReconstructorAPI:
 
         return output_product_index_odd, output_product_index_even
 
-    def reconstruct_transformed(self, input_product_index: int) -> Sequence[int]:
-        output_product_indexes: list[int] = []
-        input_product = self._product_api.get_item(input_product_index)
-
-        for preset_value, preset_label in enumerate(
-            input_product.get_probe_positions_item().get_transform().labels_for_presets()
-        ):
-            output_product_index = self.reconstruct(
-                input_product_index,
-                output_product_suffix=preset_label,
-                transform=preset_value,
-                index_filter=PositionIndexFilter.ALL,
-            )
-            output_product_indexes.append(output_product_index)
-
-        return output_product_indexes
-
     def open_model(self, file_path: Path) -> None:
-        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
+        reconstructor = self._algorithm_chooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Opening model...')
@@ -151,7 +132,7 @@ class ReconstructorAPI:
             logger.warning('Reconstructor is not trainable!')
 
     def save_model(self, file_path: Path) -> None:
-        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
+        reconstructor = self._algorithm_chooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Saving model...')
@@ -162,29 +143,39 @@ class ReconstructorAPI:
         else:
             logger.warning('Reconstructor is not trainable!')
 
-    def export_training_data(self, file_path: Path, input_product_index: int) -> None:
-        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
+    def export_training_data(
+        self, file_path: Path, input_product_index: int, algorithm: str | None = None
+    ) -> None:
+        # FIXME algorithm
+        reconstructor = self._algorithm_chooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Preparing input data...')
             tic = time.perf_counter()
-            input_product_item = self._product_api.get_item(input_product_index)
-            parameters = self._data_matcher.match_diffraction_patterns_with_positions(
-                input_product_item, PositionIndexFilter.ALL
-            )
+            reconstruct_input = self.get_reconstruct_input(input_product_index)
             toc = time.perf_counter()
             logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
 
             logger.info('Exporting...')
             tic = time.perf_counter()
-            reconstructor.export_training_data(file_path, parameters)
+            reconstructor.export_training_data(file_path, reconstruct_input)
             toc = time.perf_counter()
             logger.info(f'Export time {toc - tic:.4f} seconds.')
         else:
             logger.warning('Reconstructor is not trainable!')
 
-    def train(self, data_path: Path) -> TrainOutput:
-        reconstructor = self._reconstructor_chooser.get_current_plugin().strategy
+    def train(
+        self,
+        input_product_index: int,
+        data_path: Path,
+        *,
+        algorithm: str | None = None,
+        block: bool = False,
+    ) -> TrainOutput:
+        # FIXME input_product_index
+        # FIXME algorithm
+        # FIXME block
+        reconstructor = self._algorithm_chooser.get_current_plugin().strategy
         result = TrainOutput([], [], -1)
 
         if isinstance(reconstructor, TrainableReconstructor):
@@ -198,6 +189,11 @@ class ReconstructorAPI:
 
         return result
 
-    def set_reconstructor(self, name: str) -> str:
-        self._reconstructor_chooser.set_current_plugin(name)
-        return self._reconstructor_chooser.get_current_plugin().simple_name
+    def available_reconstructors(self, *, trainable: bool) -> Iterator[str]:
+        # FIXME trainable
+        for plugin in self._algorithm_chooser:
+            yield plugin.display_name
+
+    def set_reconstructor(self, name: str) -> str:  # FIXME remove
+        self._algorithm_chooser.set_current_plugin(name)
+        return self._algorithm_chooser.get_current_plugin().simple_name

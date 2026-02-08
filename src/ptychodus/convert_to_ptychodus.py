@@ -168,16 +168,16 @@ def main() -> int:
             missing_args_str = ', '.join(missing_args)
             parser.error(f'the following arguments are required: {missing_args_str}')
 
-        model.workflow_api.open_patterns(
+        workflow_diffraction_api = model.workflow_api.load_diffraction_data(
             Path(args.diffraction_input.name),
             file_type=args.diffraction_input_type,
             process_patterns=False,
             block=True,
         )
-        model.workflow_api.export_assembled_patterns(args.diffraction_output.name)
+        workflow_diffraction_api.save_assembled_data(args.diffraction_output.name)
         logger.info(f'Wrote diffraction data to {args.diffraction_output.name}')
 
-        product_api = model.workflow_api.open_product(
+        product_api = model.workflow_api.load_product(
             Path(args.product_input.name),
             file_type=args.product_input_type,
         )
@@ -186,17 +186,17 @@ def main() -> int:
             product_api.rename_product(args.product_name)
 
         if args.override_object is not None:
-            product_api.open_object(
+            product_api.load_object(
                 Path(args.override_object.name), file_type=args.override_object_type
             )
 
         if args.override_probe is not None:
-            product_api.open_probe(
+            product_api.load_probe(
                 Path(args.override_probe.name), file_type=args.override_probe_type
             )
 
         if args.override_probe_positions is not None:
-            product_api.open_probe_positions(
+            product_api.load_probe_positions(
                 Path(args.override_probe_positions.name),
                 file_type=args.override_probe_positions_type,
             )

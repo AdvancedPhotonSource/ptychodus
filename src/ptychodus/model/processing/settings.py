@@ -2,10 +2,10 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
 
-class ReconstructorSettings(Observable, Observer):
+class ProcessingSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
-        self._group = registry.create_group('Reconstructor')
+        self._group = registry.create_group('Processing')
         self._group.add_observer(self)
 
         self.algorithm = self._group.create_string_parameter('Algorithm', 'pty-chi/LSQML')

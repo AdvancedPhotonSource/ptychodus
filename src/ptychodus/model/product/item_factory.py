@@ -65,7 +65,9 @@ class ProductRepositoryItemFactory:
         )
 
         if metadata_item.probe_photon_count.get_value() <= 0:
-            metadata_item.probe_photon_count.set_value(self._dataset.get_maximum_pattern_counts())
+            assembled_data = self._dataset.get_assembled_data()
+            max_pattern_counts = assembled_data.get_pattern_counts().max()
+            metadata_item.probe_photon_count.set_value(max_pattern_counts)
 
         scan_item = self._scan_item_factory.create()
         geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
