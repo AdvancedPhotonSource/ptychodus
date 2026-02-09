@@ -155,7 +155,6 @@ class DiffractionAPI:
         writer.write(file_path, self._dataset)
 
     def get_assembled_data(self) -> AssembledDiffractionData:
-        # FIXME migrate other modules from dataset to this method
         return self._dataset.get_assembled_data()
 
     def import_assembled_patterns(self, file_path: Path) -> None:

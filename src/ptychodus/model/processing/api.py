@@ -12,7 +12,7 @@ from ptychodus.api.reconstructor import (
     TrainableReconstructor,
 )
 
-from ..diffraction import AssembledDiffractionDataset
+from ..diffraction import DiffractionAPI
 from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .context import (
@@ -30,14 +30,14 @@ class ProcessingAPI:
     def __init__(
         self,
         task_manager: TaskManager,
-        diffraction_dataset: AssembledDiffractionDataset,
+        diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
         settings: ProcessingSettings,
         context: ProcessingContext,
         algorithm_chooser: PluginChooser[Reconstructor],
     ) -> None:
         self._task_manager = task_manager
-        self._diffraction_dataset = diffraction_dataset
+        self._diffraction_api = diffraction_api
         self._product_api = product_api
         self._context = context
         self._algorithm_chooser = algorithm_chooser
@@ -56,7 +56,7 @@ class ProcessingAPI:
         product = self._product_api.get_item(product_index).get_product()
         logger.info(f'Preparing input data for {product.metadata.name}...')
         tic = time.perf_counter()
-        assembled_data = self._diffraction_dataset.get_assembled_data()
+        assembled_data = self._diffraction_api.get_assembled_data()
         reconstruct_input = assembled_data.prepare_reconstruct_input(
             product, index_filter=index_filter
         )
@@ -74,9 +74,7 @@ class ProcessingAPI:
         output_product_file: Path | None = None,
         block: bool = False,
     ) -> int:
-        if algorithm is not None:
-            self._algorithm_chooser.set_current_plugin(algorithm)
-
+        self.set_algorithm_if_provided(algorithm)
         algorithm_plugin = self._algorithm_chooser.get_current_plugin()
         input_product_item = self._product_api.get_item(input_product_index)
         output_product_index = self._product_api.insert_product(input_product_item.get_product())
@@ -124,9 +122,7 @@ class ProcessingAPI:
         return output_product_index_odd, output_product_index_even
 
     def load_model_from_file(self, file_path: Path, algorithm: str | None = None) -> None:
-        if algorithm is not None:
-            self._algorithm_chooser.set_current_plugin(algorithm)
-
+        self.set_algorithm_if_provided(algorithm)
         reconstructor = self._algorithm_chooser.get_current_plugin().strategy
 
         if isinstance(reconstructor, TrainableReconstructor):
@@ -145,9 +141,7 @@ class ProcessingAPI:
         algorithm: str | None = None,
         index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
     ) -> None:
-        if algorithm is not None:
-            self._algorithm_chooser.set_current_plugin(algorithm)
-
+        self.set_algorithm_if_provided(algorithm)
         trainer = self._algorithm_chooser.get_current_plugin().strategy
 
         if isinstance(trainer, TrainableReconstructor):
@@ -170,9 +164,7 @@ class ProcessingAPI:
         algorithm: str | None = None,
         block: bool = False,
     ) -> None:
-        if algorithm is not None:
-            self._algorithm_chooser.set_current_plugin(algorithm)
-
+        self.set_algorithm_if_provided(algorithm)
         algorithm_plugin = self._algorithm_chooser.get_current_plugin()
         trainer = algorithm_plugin.strategy
 
@@ -198,10 +190,15 @@ class ProcessingAPI:
             logger.warning('Algorithm is not trainable!')
 
     def available_reconstructors(self, *, trainable: bool) -> Iterator[str]:
-        # FIXME trainable
-        for plugin in self._algorithm_chooser:
-            yield plugin.display_name
+        if trainable:
+            for plugin in self._algorithm_chooser:
+                if isinstance(plugin.strategy, TrainableReconstructor):
+                    yield plugin.display_name
+        else:
+            for plugin in self._algorithm_chooser:
+                if not isinstance(plugin.strategy, TrainableReconstructor):
+                    yield plugin.display_name
 
-    def set_reconstructor(self, name: str) -> str:  # FIXME remove
-        self._algorithm_chooser.set_current_plugin(name)
-        return self._algorithm_chooser.get_current_plugin().simple_name
+    def set_algorithm_if_provided(self, algorithm: str | None) -> None:
+        if algorithm is not None:
+            self._algorithm_chooser.set_current_plugin(algorithm)

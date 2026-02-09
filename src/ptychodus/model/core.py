@@ -114,6 +114,7 @@ class ModelCore:
             self.rng,
             self.settings_registry,
             self.diffraction_core.pattern_sizer,
+            self.diffraction_core.diffraction_api,
             self.diffraction_core.dataset,
             self.plugin_registry.probe_position_file_readers,
             self.plugin_registry.probe_position_file_writers,
@@ -151,7 +152,7 @@ class ModelCore:
         self.processing_core = ProcessingCore(
             self._task_manager,
             self.settings_registry,
-            self.diffraction_core.dataset,
+            self.diffraction_core.diffraction_api,
             self.product_core.product_api,
             [
                 self.ptychi_reconstructor_library,

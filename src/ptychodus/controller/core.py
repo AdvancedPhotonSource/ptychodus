@@ -72,7 +72,7 @@ class ControllerCore:
             self._file_dialog_factory,
         )
         self._product_controller = ProductController.create_instance(
-            model.diffraction_core.dataset,
+            model.diffraction_core.diffraction_api,
             model.product_core.product_repository,
             model.product_core.product_api,
             view.product_view,

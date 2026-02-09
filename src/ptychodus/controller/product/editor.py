@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import QWidget
 
 from ptychodus.api.observer import Observable, Observer
 
-from ...model.diffraction import AssembledDiffractionDataset
+from ...model.diffraction import DiffractionAPI
 from ...model.product import ProductRepositoryItem
 from ...view.product import ProductEditorDialog
 from ..helpers import create_brush_for_editable_cell
@@ -154,20 +154,20 @@ class ProductPropertyTableModel(QAbstractTableModel):
 class ProductEditorViewController(Observer):
     def __init__(
         self,
-        dataset: AssembledDiffractionDataset,
+        diffraction_api: DiffractionAPI,
         product: ProductRepositoryItem,
         table_model: ProductPropertyTableModel,
         dialog: ProductEditorDialog,
     ) -> None:
         super().__init__()
-        self._dataset = dataset
+        self._diffraction_api = diffraction_api
         self._product = product
         self._table_model = table_model
         self._dialog = dialog
 
     @classmethod
     def edit_product(
-        cls, dataset: AssembledDiffractionDataset, product: ProductRepositoryItem, parent: QWidget
+        cls, diffraction_api: DiffractionAPI, product: ProductRepositoryItem, parent: QWidget
     ) -> None:
         dialog = ProductEditorDialog(parent)
         dialog.setWindowTitle(f'Edit Product: {product.get_name()}')
@@ -188,7 +188,7 @@ class ProductEditorViewController(Observer):
         dialog.table_view.resizeColumnsToContents()
         dialog.table_view.resizeRowsToContents()
 
-        view_controller = cls(dataset, product, table_model, dialog)
+        view_controller = cls(diffraction_api, product, table_model, dialog)
         product.add_observer(view_controller)
         dialog.text_edit.textChanged.connect(view_controller._sync_view_to_model)
 
@@ -214,7 +214,7 @@ class ProductEditorViewController(Observer):
 
     def _estimate_probe_photon_count(self) -> None:
         metadata = self._product.get_metadata_item()
-        assembled_data = self._dataset.get_assembled_data()
+        assembled_data = self._diffraction_api.get_assembled_data()
         metadata.probe_photon_count.set_value(assembled_data.get_pattern_counts().max())
 
         self._table_model.beginResetModel()

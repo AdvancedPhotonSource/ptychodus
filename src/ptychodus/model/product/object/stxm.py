@@ -7,7 +7,7 @@ import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
 
-from ...diffraction import AssembledDiffractionDataset
+from ...diffraction import DiffractionAPI
 from .builder import ObjectBuilder
 from .settings import ObjectSettings
 
@@ -18,14 +18,14 @@ class STXMObjectBuilder(ObjectBuilder):
     def __init__(
         self,
         settings: ObjectSettings,
-        dataset: AssembledDiffractionDataset,
+        diffraction_api: DiffractionAPI,
     ) -> None:
         super().__init__(settings, 'stxm')
         self._settings = settings
-        self._dataset = dataset
+        self._diffraction_api = diffraction_api
 
     def copy(self) -> STXMObjectBuilder:
-        builder = STXMObjectBuilder(self._settings, self._dataset)
+        builder = STXMObjectBuilder(self._settings, self._diffraction_api)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
@@ -41,7 +41,7 @@ class STXMObjectBuilder(ObjectBuilder):
         coordinates_px: list[float] = list()
         values: list[float] = list()
 
-        assembled_data = self._dataset.get_assembled_data()
+        assembled_data = self._diffraction_api.get_assembled_data()
         assembled_indexes = assembled_data.get_indexes().tolist()
         assembled_pattern_counts = assembled_data.get_pattern_counts().tolist()
         pattern_counts_lut = dict(zip(assembled_indexes, assembled_pattern_counts))

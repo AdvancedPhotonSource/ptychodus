@@ -9,7 +9,7 @@ from ptychodus.api.reconstructor import (
 )
 from ptychodus.api.settings import SettingsRegistry
 
-from ..diffraction import AssembledDiffractionDataset
+from ..diffraction import DiffractionAPI
 from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .api import ProcessingAPI
@@ -24,7 +24,7 @@ class ProcessingCore:
         self,
         task_manager: TaskManager,
         settings_registry: SettingsRegistry,
-        diffraction_dataset: AssembledDiffractionDataset,
+        diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
         library_seq: Sequence[ReconstructorLibrary],
     ) -> None:
@@ -51,7 +51,7 @@ class ProcessingCore:
 
         self.processing_api = ProcessingAPI(
             task_manager,
-            diffraction_dataset,
+            diffraction_api,
             product_api,
             self.settings,
             self._context,
