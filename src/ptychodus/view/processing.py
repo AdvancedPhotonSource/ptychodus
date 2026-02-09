@@ -1,3 +1,4 @@
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QComboBox,
     QDialog,
@@ -5,11 +6,14 @@ from PyQt5.QtWidgets import (
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
+    QMenu,
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
+    QRadioButton,
     QScrollArea,
     QStackedWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -19,37 +23,55 @@ from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToo
 from matplotlib.figure import Figure
 
 
-class ReconstructorParametersView(QGroupBox):
+class ProcessingParametersView(QGroupBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Parameters', parent)
         self.algorithm_combo_box = QComboBox()
         self.product_combo_box = QComboBox()
-        self.compute_combo_box = QComboBox()
-
+        self.compute_local_radio_button = QRadioButton('Local')
+        self.compute_remote_radio_button = QRadioButton('Remote')
         self.reconstruct_button = QPushButton()
+        self.reconstruct_tools_menu = QMenu()
+        self.reconstruct_tools_button = QToolButton()
         self.train_button = QPushButton('Train')
+        self.train_tools_menu = QMenu()
+        self.train_tools_button = QToolButton()
+
+        self.reconstruct_tools_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.reconstruct_tools_button.setMenu(self.reconstruct_tools_menu)
+        self.reconstruct_tools_button.setArrowType(Qt.ArrowType.DownArrow)
+
+        self.train_tools_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.train_tools_button.setMenu(self.train_tools_menu)
+        self.train_tools_button.setArrowType(Qt.ArrowType.DownArrow)
+
+        compute_layout = QHBoxLayout()
+        compute_layout.addWidget(self.compute_local_radio_button)
+        compute_layout.addWidget(self.compute_remote_radio_button)
 
         action_layout = QHBoxLayout()
         action_layout.setContentsMargins(0, 0, 0, 0)
         action_layout.addWidget(self.reconstruct_button)
+        action_layout.addWidget(self.reconstruct_tools_button)
         action_layout.addWidget(self.train_button)
+        action_layout.addWidget(self.train_tools_button)
 
         layout = QFormLayout()
         layout.addRow('Algorithm:', self.algorithm_combo_box)
         layout.addRow('Product:', self.product_combo_box)
-        layout.addRow('Compute:', self.compute_combo_box)
+        layout.addRow('Compute:', compute_layout)
         layout.addRow('Action:', action_layout)
         self.setLayout(layout)
 
 
-class ReconstructorProgressDialog(QDialog):
+class ProcessingProgressDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.text_edit = QPlainTextEdit()
         self.progress_bar = QProgressBar()
         self.button_box = QDialogButtonBox()
 
-        self.setWindowTitle('Reconstruction Progress')
+        self.setWindowTitle('Processing Progress')
         self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
         self.button_box.accepted.connect(self.accept)
         self.button_box.addButton(QDialogButtonBox.StandardButton.Cancel)
@@ -62,11 +84,10 @@ class ReconstructorProgressDialog(QDialog):
         self.setLayout(layout)
 
 
-class ReconstructorView(QWidget):
+class ProcessingView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.parameters_view = ReconstructorParametersView()
-
+        self.parameters_view = ProcessingParametersView()
         self.stacked_widget = QStackedWidget()
 
         stacked_widget_layout = self.stacked_widget.layout()
@@ -83,10 +104,10 @@ class ReconstructorView(QWidget):
         layout.addWidget(self.scroll_area)
         self.setLayout(layout)
 
-        self.progress_dialog = ReconstructorProgressDialog()
+        self.progress_dialog = ProcessingProgressDialog()
 
 
-class ReconstructorPlotView(QWidget):
+class ProcessingStatusView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.figure = Figure()

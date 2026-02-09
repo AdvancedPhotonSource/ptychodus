@@ -195,8 +195,8 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         )
         return ConcreteWorkflowDiffractionAPI(self._diffraction_api)
 
-    def available_reconstructors(self, *, trainable: bool) -> Iterator[str]:
-        return self._processing_api.available_reconstructors(trainable=trainable)
+    def available_reconstructors(self) -> Iterator[str]:
+        return self._processing_api.available_reconstructors()
 
     def load_assembled_diffraction_data(self, file_path: Path) -> WorkflowDiffractionAPI:
         self._diffraction_api.import_assembled_patterns(file_path)

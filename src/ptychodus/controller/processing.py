@@ -18,11 +18,15 @@ from ..model.product.metadata import MetadataRepositoryItem
 from ..model.product.object import ObjectRepositoryItem
 from ..model.product.probe import ProbeRepositoryItem
 from ..model.product.probe_positions import ProbePositionsRepositoryItem
-from ..model.processing import ProcessingPresenter, ProcessingProgressMonitor
-from ..view.reconstructor import (
-    ReconstructorPlotView,
-    ReconstructorProgressDialog,
-    ReconstructorView,
+from ..model.processing import (
+    ProcessingAPI,
+    ProcessingAlgorithmParameter,
+    ProcessingProgressMonitor,
+)
+from ..view.processing import (
+    ProcessingStatusView,
+    ProcessingProgressDialog,
+    ProcessingView,
 )
 from ..view.widgets import ExceptionDialog
 from .data import FileDialogFactory
@@ -44,7 +48,7 @@ class ReconstructorViewControllerFactory(ABC):
 
 class ReconstructorProgressController(Observer):
     def __init__(
-        self, monitor: ProcessingProgressMonitor, dialog: ReconstructorProgressDialog
+        self, monitor: ProcessingProgressMonitor, dialog: ProcessingProgressDialog
     ) -> None:
         super().__init__()
         self._monitor = monitor
@@ -88,20 +92,21 @@ class ReconstructorProgressController(Observer):
             self._sync_model_to_view()
 
 
-class ReconstructorController(ProductRepositoryObserver, Observer):
+class ProcessingController(ProductRepositoryObserver):
     def __init__(
         self,
-        progress_monitor: ProcessingProgressMonitor,
-        presenter: ProcessingPresenter,
+        algorithm: ProcessingAlgorithmParameter,
+        processing_api: ProcessingAPI,
         product_repository: ProductRepository,
-        view: ReconstructorView,
-        plot_view: ReconstructorPlotView,
+        view: ProcessingView,
+        plot_view: ProcessingStatusView,
         product_table_model: QAbstractItemModel,
         file_dialog_factory: FileDialogFactory,
         view_controller_factories: Iterable[ReconstructorViewControllerFactory],
     ) -> None:
         super().__init__()
-        self._presenter = presenter
+        self._algorithm = algorithm
+        self._processing_api = processing_api
         self._product_repository = product_repository
         self._view = view
         self._plot_view = plot_view
@@ -109,11 +114,24 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         self._view_controller_factories: dict[str, ReconstructorViewControllerFactory] = {
             vcf.backend_name: vcf for vcf in view_controller_factories
         }
+        # FIXME option for launching Globus in reconstructor view:
+        #       workflow_api.get_product(product_index).reconstruct_remote()
+        # FIXME export training data
+        # FIXME load model from file
+        # FIXME reconstruct, reconstruct split
+        # FIXME monitor progress
+        # FIXME cancel processing; status messages to comments at end
+        # FIXME show compute iff globus supported
+        # FIXME update "processing" icon
+        # FIXME update reconstruct text based on if TrainableReconstructor
 
-        for name in presenter.reconstructors():
+        # FIXME BEGIN
+        for name in processing_api.available_reconstructors():
             self._add_reconstructor(name)
 
-        view.parameters_view.algorithm_combo_box.textActivated.connect(presenter.set_reconstructor)
+        view.parameters_view.algorithm_combo_box.textActivated.connect(
+            processing_api.set_reconstructor_if_provided
+        )
         view.parameters_view.algorithm_combo_box.currentIndexChanged.connect(
             view.stacked_widget.setCurrentIndex
         )
@@ -122,10 +140,9 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         view.parameters_view.product_combo_box.setModel(product_table_model)
 
         self._progress_controller = ReconstructorProgressController(
-            progress_monitor, view.progress_dialog
+            processing_api.get_progress_monitor(), view.progress_dialog
         )
 
-        # FIXME BEGIN
         open_model_action = view.parameters_view.reconstructor_menu.addAction('Open Model...')
         connect_triggered_signal(open_model_action, self._open_model)
         save_model_action = view.parameters_view.reconstructor_menu.addAction('Save Model...')
@@ -148,7 +165,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         connect_triggered_signal(train_action, self._train)
         # FIXME END
 
-        presenter.add_observer(self)
+        # FIXME sync algorithm box to settings
         product_repository.add_observer(self)
         self._sync_model_to_view()
 
@@ -267,11 +284,7 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
         ax.plot(epoch, losses, '.-', label='Loss', linewidth=1.5)
         self._plot_view.figure_canvas.draw()
 
-    def _sync_model_to_view(self) -> None:
-        self._view.parameters_view.algorithm_combo_box.setCurrentText(
-            self._presenter.get_reconstructor()
-        )
-
+    def _sync_model_to_view(self) -> None:  # FIXME
         is_trainable = self._presenter.is_trainable
         self._model_action_group.setVisible(is_trainable)
         self._view.parameters_view.trainer_button.setVisible(is_trainable)
@@ -303,7 +316,3 @@ class ReconstructorController(ProductRepositoryObserver, Observer):
 
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
         pass
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._sync_model_to_view()

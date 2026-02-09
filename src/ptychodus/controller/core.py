@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Final
 
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QAction
@@ -18,12 +19,14 @@ from .product import ProductController
 from .ptychi import PtyChiViewControllerFactory
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopinn import PtychoPINNViewControllerFactory
-from .reconstructor import ReconstructorController
+from .processing import ProcessingController
 from .probe_positions import ProbePositionsController
 from .settings import SettingsController
 
 
 class ControllerCore:
+    ONE_HOUR_S: Final[int] = 3600
+
     def __init__(
         self, model: ModelCore, view: ViewCore, *, is_developer_mode_enabled: bool = False
     ) -> None:
@@ -125,12 +128,12 @@ class ControllerCore:
             view.object_view,
             self._file_dialog_factory,
         )
-        self._reconstructor_controller = ReconstructorController(
-            model.processing_core.processing_api.get_progress_monitor(),
-            model.processing_core.presenter,
+        self._processing_controller = ProcessingController(
+            model.processing_core.algorithm_parameter,
+            model.processing_core.processing_api,
             model.product_core.product_repository,
-            view.reconstructor_view,
-            view.reconstructor_plot_view,
+            view.processing_view,
+            view.processing_status_view,
             self._product_controller.table_model,
             self._file_dialog_factory,
             [
@@ -144,7 +147,7 @@ class ControllerCore:
             model.globus_core.authorizer,
             model.globus_core.status_repository,
             view.globus_view,
-            view.globus_status_table_view,
+            view.globus_status_view,
             self._file_dialog_factory,
         )
         self._automation_controller = AutomationController(
@@ -195,5 +198,6 @@ class ControllerCore:
         self._globus_controller.run_tasks(self._one_second_counter)
         self._one_second_counter += 1
 
-        if self._one_second_counter > 3600:
-            self._one_second_counter -= 3600
+        # counter value is not intended to be precise; protect from overflow
+        if self._one_second_counter > ControllerCore.ONE_HOUR_S:
+            self._one_second_counter -= ControllerCore.ONE_HOUR_S

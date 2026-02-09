@@ -1,29 +1,91 @@
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 import logging
 import threading
 import time
 
-from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.reconstructor import (
+    NullReconstructor,
     PositionIndexFilter,
     ReconstructInput,
     Reconstructor,
+    ReconstructorLibrary,
     TrainableReconstructor,
 )
+
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.parametric import Parameter, StringParameter
 
 from ..diffraction import DiffractionAPI
 from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .context import (
-    ReconstructBackgroundTask,
     ProcessingContext,
     ProcessingProgressMonitor,
+    ReconstructBackgroundTask,
     TrainBackgroundTask,
 )
-from .settings import ProcessingSettings
 
 logger = logging.getLogger(__name__)
+
+
+class ProcessingAlgorithmParameter(Parameter[str], Observer):
+    def __init__(
+        self, parameter: StringParameter, libraries: Sequence[ReconstructorLibrary]
+    ) -> None:
+        self._parameter = parameter
+        self._libraries = libraries
+        self._reconstructor_map: Mapping[str, Reconstructor] = {
+            f'{library.name.casefold()}_{reconstructor.name.casefold()}': reconstructor
+            for library in libraries
+            for reconstructor in library
+        }
+        self._current_value = 'none_none'
+        self._current_reconstructor: Reconstructor = NullReconstructor('None')
+
+        parameter.add_observer(self)
+        self.set_value(parameter.get_value())
+
+    def get_value(self) -> str:
+        return self._current_value
+
+    def set_value(self, value: str, *, notify: bool = True) -> None:
+        if value != self._current_value:
+            try:
+                reconstructor = self._reconstructor_map[value]
+            except KeyError:
+                logger.debug(
+                    f'Invalid plugin name "{value}". '
+                    f'Registered plugins: {self._reconstructor_map.keys()}.'
+                )
+                self._parameter.set_value(self._current_value)
+            else:
+                self._current_value = value
+                self._current_reconstructor = reconstructor
+                self._parameter.set_value(self._current_value)
+
+                if notify:
+                    self.notify_observers()
+
+    def get_value_as_string(self) -> str:
+        return self.get_value()
+
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(value)
+
+    def available_reconstructors(self) -> Iterator[str]:
+        for key in self._reconstructor_map.keys():
+            yield key
+
+    def get_current_reconstructor(self) -> Reconstructor:
+        return self._current_reconstructor
+
+    def copy(self) -> Parameter[str]:
+        return ProcessingAlgorithmParameter(self._parameter, self._libraries)
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self.set_value(self._parameter.get_value())
 
 
 class ProcessingAPI:
@@ -32,17 +94,14 @@ class ProcessingAPI:
         task_manager: TaskManager,
         diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
-        settings: ProcessingSettings,
+        algorithm: ProcessingAlgorithmParameter,
         context: ProcessingContext,
-        algorithm_chooser: PluginChooser[Reconstructor],
     ) -> None:
         self._task_manager = task_manager
         self._diffraction_api = diffraction_api
         self._product_api = product_api
+        self._algorithm_parameter = algorithm
         self._context = context
-        self._algorithm_chooser = algorithm_chooser
-
-        algorithm_chooser.synchronize_with_parameter(settings.algorithm)
 
     def get_progress_monitor(self) -> ProcessingProgressMonitor:
         return self._context.get_progress_monitor()
@@ -74,12 +133,13 @@ class ProcessingAPI:
         output_product_file: Path | None = None,
         block: bool = False,
     ) -> int:
-        self.set_algorithm_if_provided(algorithm)
-        algorithm_plugin = self._algorithm_chooser.get_current_plugin()
+        self.set_reconstructor_if_provided(algorithm)
         input_product_item = self._product_api.get_item(input_product_index)
         output_product_index = self._product_api.insert_product(input_product_item.get_product())
         output_product_item = self._product_api.get_item(output_product_index)
-        output_product_name = f'{input_product_item.get_name()}_{algorithm_plugin.simple_name}'
+        output_product_name = (
+            f'{input_product_item.get_name()}_{self._algorithm_parameter.get_value()}'
+        )
 
         if output_product_suffix:
             output_product_name += f'_{output_product_suffix}'
@@ -91,7 +151,7 @@ class ProcessingAPI:
         finished_event = threading.Event()
         background_task = ReconstructBackgroundTask(
             self._context,
-            algorithm_plugin.strategy,
+            self._algorithm_parameter.get_current_reconstructor(),
             reconstruct_input,
             output_product_item,
             finished_event,
@@ -122,8 +182,8 @@ class ProcessingAPI:
         return output_product_index_odd, output_product_index_even
 
     def load_model_from_file(self, file_path: Path, algorithm: str | None = None) -> None:
-        self.set_algorithm_if_provided(algorithm)
-        reconstructor = self._algorithm_chooser.get_current_plugin().strategy
+        self.set_reconstructor_if_provided(algorithm)
+        reconstructor = self._algorithm_parameter.get_current_reconstructor()
 
         if isinstance(reconstructor, TrainableReconstructor):
             logger.info('Opening model...')
@@ -141,8 +201,8 @@ class ProcessingAPI:
         algorithm: str | None = None,
         index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
     ) -> None:
-        self.set_algorithm_if_provided(algorithm)
-        trainer = self._algorithm_chooser.get_current_plugin().strategy
+        self.set_reconstructor_if_provided(algorithm)
+        trainer = self._algorithm_parameter.get_current_reconstructor()
 
         if isinstance(trainer, TrainableReconstructor):
             reconstruct_input = self.get_reconstruct_input(product_index, index_filter=index_filter)
@@ -164,9 +224,8 @@ class ProcessingAPI:
         algorithm: str | None = None,
         block: bool = False,
     ) -> None:
-        self.set_algorithm_if_provided(algorithm)
-        algorithm_plugin = self._algorithm_chooser.get_current_plugin()
-        trainer = algorithm_plugin.strategy
+        self.set_reconstructor_if_provided(algorithm)
+        trainer = self._algorithm_parameter.get_current_reconstructor()
 
         if isinstance(trainer, TrainableReconstructor):
             reconstruct_input = self.get_reconstruct_input(product_index)
@@ -189,16 +248,9 @@ class ProcessingAPI:
         else:
             logger.warning('Algorithm is not trainable!')
 
-    def available_reconstructors(self, *, trainable: bool) -> Iterator[str]:
-        if trainable:
-            for plugin in self._algorithm_chooser:
-                if isinstance(plugin.strategy, TrainableReconstructor):
-                    yield plugin.display_name
-        else:
-            for plugin in self._algorithm_chooser:
-                if not isinstance(plugin.strategy, TrainableReconstructor):
-                    yield plugin.display_name
+    def available_reconstructors(self) -> Iterator[str]:
+        return self._algorithm_parameter.available_reconstructors()
 
-    def set_algorithm_if_provided(self, algorithm: str | None) -> None:
+    def set_reconstructor_if_provided(self, algorithm: str | None) -> None:
         if algorithm is not None:
-            self._algorithm_chooser.set_current_plugin(algorithm)
+            self._algorithm_parameter.set_value(algorithm)

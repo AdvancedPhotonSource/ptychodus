@@ -90,9 +90,6 @@ class GlobusController(SequenceObserver[GlobusStatus]):
 
         status_repository.add_observer(self)
 
-        # FIXME option for launching Globus in reconstructor view:
-        #       workflow_api.get_product(product_index).reconstruct_remote()
-
         view_builder = ParameterViewBuilder(file_dialog_factory)
 
         input_data_group = 'Input Data'

@@ -7,7 +7,7 @@ from ptychodus.api.parametric import IntegerParameter
 from ..model.ptychopinn.core import PtychoPINNReconstructorLibrary
 from .data import FileDialogFactory
 from .parametric import ParameterViewBuilder, ParameterViewController
-from .reconstructor import ReconstructorViewControllerFactory
+from .processing import ReconstructorViewControllerFactory
 
 
 class PowerTwoSpinBox(QSpinBox):

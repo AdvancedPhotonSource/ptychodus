@@ -31,7 +31,8 @@ class DMReconstructor(Reconstructor):
         self._settings = settings
         self._epoch = 0
 
-    def get_name(self) -> str:
+    @property
+    def name(self) -> str:
         return 'DM'
 
     def _create_reconstructor_options(self) -> DMReconstructorOptions:

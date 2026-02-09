@@ -38,8 +38,9 @@ class ReconstructOutput:
 
 
 class Reconstructor(ABC):
+    @property
     @abstractmethod
-    def get_name(self) -> str:
+    def name(self) -> str:
         pass
 
     @abstractmethod
@@ -84,7 +85,8 @@ class NullReconstructor(TrainableReconstructor):
     def __init__(self, name: str) -> None:
         self._name = name
 
-    def get_name(self) -> str:
+    @property
+    def name(self) -> str:
         return self._name
 
     def get_progress_goal(self) -> int:

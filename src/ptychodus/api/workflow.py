@@ -153,7 +153,7 @@ class WorkflowAPI(ABC):
         pass
 
     @abstractmethod
-    def available_reconstructors(self, *, trainable: bool) -> Iterator[str]:
+    def available_reconstructors(self) -> Iterator[str]:
         pass
 
     @abstractmethod

@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QWidget
 
 from ..model.ptychonn import PtychoNNReconstructorLibrary
 from .parametric import ParameterViewBuilder
-from .reconstructor import ReconstructorViewControllerFactory
+from .processing import ReconstructorViewControllerFactory
 
 
 class PtychoNNViewControllerFactory(ReconstructorViewControllerFactory):

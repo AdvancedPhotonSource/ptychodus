@@ -8,7 +8,7 @@ from ...model.ptychi import (
     PtyChiReconstructorLibrary,
 )
 
-from ..reconstructor import ReconstructorViewControllerFactory
+from ..processing import ReconstructorViewControllerFactory
 from .object import PtyChiObjectViewController
 from .opr import PtyChiOPRViewController
 from .probe_positions import PtyChiProbePositionsViewController

@@ -60,7 +60,8 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         ptychonn_version = version('ptychonn')
         logger.info(f'\tPtychoNN {ptychonn_version}')
 
-    def get_name(self) -> str:
+    @property
+    def name(self) -> str:
         return self._model_provider.get_model_name()
 
     def get_progress_goal(self) -> int:
