@@ -60,9 +60,11 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
         return self._current_value
 
     def set_value(self, value: str, *, notify: bool = True) -> None:
-        if value != self._current_value:
+        sanitized_value = value.strip().casefold()
+
+        if sanitized_value != self._current_value:
             try:
-                reconstructor = self._reconstructor_map[value]
+                reconstructor = self._reconstructor_map[sanitized_value]
             except KeyError:
                 logger.debug(
                     f'Invalid plugin name "{value}". '
@@ -70,7 +72,8 @@ class ProcessingAlgorithmParameter(Parameter[str], Observer):
                 )
                 self._parameter.set_value(self._current_value)
             else:
-                self._current_value = value
+                logger.debug(f'{self._current_value} -> {sanitized_value}')
+                self._current_value = sanitized_value
                 self._current_reconstructor = reconstructor
                 self._parameter.set_value(self._current_value)
 

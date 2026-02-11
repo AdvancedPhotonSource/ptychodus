@@ -8,7 +8,7 @@ class ProcessingSettings(Observable, Observer):
         self._group = registry.create_group('Processing')
         self._group.add_observer(self)
 
-        self.algorithm = self._group.create_string_parameter('Algorithm', 'pty-chi/LSQML')
+        self.algorithm = self._group.create_string_parameter('Algorithm', 'pty-chi_LSQML')
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:

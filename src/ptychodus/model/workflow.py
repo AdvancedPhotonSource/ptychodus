@@ -134,14 +134,13 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         algorithm: str | None = None,
         block: bool = False,
     ) -> None:
-        # FIXME how to handle mlflow?
+        # TODO mlflow
         self._processing_api.train(
             self._product_index, input_path, output_path, algorithm=algorithm, block=block
         )
 
     def train_reconstructor_remote(self, *, algorithm: str | None = None) -> None:
-        # FIXME how to handle mlflow?
-        # FIXME input/output dirs?
+        # TODO mlflow
         self._globus_executor.train(self._product_index, algorithm=algorithm)
 
     def export_training_data(self, file_path: Path, *, algorithm: str | None = None) -> None:

@@ -128,6 +128,9 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
         yield ReconstructOutput(product)
 
+    def is_model_loaded(self):
+        return True  # FIXME
+
     def get_model_file_filter(self) -> str:
         return self.MODEL_FILE_FILTER
 

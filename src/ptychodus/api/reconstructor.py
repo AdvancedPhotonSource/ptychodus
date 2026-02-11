@@ -61,6 +61,10 @@ class TrainOutput:
 
 class TrainableReconstructor(Reconstructor):
     @abstractmethod
+    def is_model_loaded(self) -> bool:
+        pass
+
+    @abstractmethod
     def get_model_file_filter(self) -> str:
         pass
 
@@ -94,6 +98,9 @@ class NullReconstructor(TrainableReconstructor):
 
     def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
         yield from ()
+
+    def is_model_loaded(self) -> bool:
+        return False
 
     def get_model_file_filter(self) -> str:
         return str()
