@@ -108,9 +108,9 @@ class GlobusExecutor:
     def train(self, input_product_index: int, *, algorithm: str | None = None) -> None:
         self._processing_api.set_reconstructor_if_provided(algorithm)
         input_directory = self.populate_input_directory(input_product_index)
-        self._run_flow('train', input_directory.name)  # TODO  MLflow
+        self._run_flow('train', input_directory.name)  # FIXME MLflow
 
     def infer(self, input_product_index: int, *, algorithm: str | None = None) -> None:
         self._processing_api.set_reconstructor_if_provided(algorithm)
         input_directory = self.populate_input_directory(input_product_index)
-        self._run_flow('infer', input_directory.name)  # TODO  MLflow
+        self._run_flow('infer', input_directory.name)  # FIXME MLflow

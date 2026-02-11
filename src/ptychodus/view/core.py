@@ -21,7 +21,7 @@ from .agent import AgentView, AgentChatView
 from .diffraction import PatternsView
 from .image import ImageView
 from .product import ProductView
-from .processing import ProcessingView, ProcessingStatusView
+from .processing import ProcessingStatusView
 from .repository import RepositoryTableView, RepositoryTreeView
 from .probe_positions import ProbePositionsPlotView
 from .settings import SettingsView
@@ -79,7 +79,7 @@ class ViewCore(QMainWindow):
         self.processing_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/processing'), 'Processing'
         )
-        self.processing_view = ProcessingView()
+        self.processing_view = QWidget()
         self.processing_status_view = ProcessingStatusView()
 
         self.globus_action = self.navigation_tool_bar.addAction(

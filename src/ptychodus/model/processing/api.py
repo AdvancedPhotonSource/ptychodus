@@ -30,13 +30,23 @@ logger = logging.getLogger(__name__)
 
 
 class ProcessingAlgorithmParameter(Parameter[str], Observer):
+    @staticmethod
+    def generate_key(library: str, reconstructor: str) -> str:
+        return f'{library.casefold()}_{reconstructor.casefold()}'
+
+    @staticmethod
+    def split_key(key: str) -> tuple[str, str]:
+        library, reconstructor = key.split('_', maxsplit=1)
+        return library, reconstructor
+
     def __init__(
         self, parameter: StringParameter, libraries: Sequence[ReconstructorLibrary]
     ) -> None:
+        super().__init__()
         self._parameter = parameter
         self._libraries = libraries
         self._reconstructor_map: Mapping[str, Reconstructor] = {
-            f'{library.name.casefold()}_{reconstructor.name.casefold()}': reconstructor
+            self.generate_key(library.name, reconstructor.name): reconstructor
             for library in libraries
             for reconstructor in library
         }
@@ -167,16 +177,20 @@ class ProcessingAPI:
 
         return output_product_index
 
-    def reconstruct_split(self, input_product_index: int) -> tuple[int, int]:
+    def reconstruct_split(
+        self, input_product_index: int, *, algorithm: str | None = None
+    ) -> tuple[int, int]:
         output_product_index_odd = self.reconstruct(
             input_product_index,
-            output_product_suffix='odd',
+            algorithm=algorithm,
             index_filter=PositionIndexFilter.ODD,
+            output_product_suffix='odd',
         )
         output_product_index_even = self.reconstruct(
             input_product_index,
-            output_product_suffix='even',
+            algorithm=algorithm,
             index_filter=PositionIndexFilter.EVEN,
+            output_product_suffix='even',
         )
 
         return output_product_index_odd, output_product_index_even
@@ -248,8 +262,34 @@ class ProcessingAPI:
         else:
             logger.warning('Algorithm is not trainable!')
 
+    def get_training_data_file_filter(self, *, algorithm: str | None = None) -> str:
+        self.set_reconstructor_if_provided(algorithm)
+        trainer = self._algorithm_parameter.get_current_reconstructor()
+
+        if isinstance(trainer, TrainableReconstructor):
+            return trainer.get_training_data_file_filter()
+        else:
+            logger.warning('Algorithm is not trainable!')
+
+        return ''
+
+    def get_model_file_filter(self, *, algorithm: str | None = None) -> str:
+        self.set_reconstructor_if_provided(algorithm)
+        trainer = self._algorithm_parameter.get_current_reconstructor()
+
+        if isinstance(trainer, TrainableReconstructor):
+            return trainer.get_model_file_filter()
+        else:
+            logger.warning('Algorithm is not trainable!')
+
+        return ''
+
     def available_reconstructors(self) -> Iterator[str]:
         return self._algorithm_parameter.available_reconstructors()
+
+    def available_reconstructors_parts(self) -> Iterator[tuple[str, str]]:
+        for key in self._algorithm_parameter.available_reconstructors():
+            yield self._algorithm_parameter.split_key(key)
 
     def set_reconstructor_if_provided(self, algorithm: str | None) -> None:
         if algorithm is not None:

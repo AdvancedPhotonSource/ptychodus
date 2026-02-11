@@ -80,7 +80,7 @@ class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):
         self._file_dialog_factory = file_dialog_factory
 
     @property
-    def backend_name(self) -> str:
+    def name(self) -> str:
         return 'PtychoPINN'
 
     def create_view_controller(self, reconstructor_name: str) -> QWidget:

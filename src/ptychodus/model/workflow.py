@@ -38,7 +38,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         probe_api: ProbeAPI,
         object_api: ObjectAPI,
         processing_api: ProcessingAPI,
-        executor: GlobusExecutor,
+        globus_executor: GlobusExecutor,
         product_index: int,
     ) -> None:
         self._product_api = product_api
@@ -46,7 +46,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         self._probe_api = probe_api
         self._object_api = object_api
         self._processing_api = processing_api
-        self._executor = executor
+        self._globus_executor = globus_executor
         self._product_index = product_index
 
     def get_product_index(self) -> int:
@@ -119,12 +119,12 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
             self._probe_api,
             self._object_api,
             self._processing_api,
-            self._executor,
+            self._globus_executor,
             output_product_index,
         )
 
     def reconstruct_remote(self, *, algorithm: str | None = None) -> None:
-        self._executor.reconstruct(self._product_index, algorithm=algorithm)
+        self._globus_executor.reconstruct(self._product_index, algorithm=algorithm)
 
     def train_reconstructor_local(
         self,
@@ -141,7 +141,8 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
 
     def train_reconstructor_remote(self, *, algorithm: str | None = None) -> None:
         # FIXME how to handle mlflow?
-        self._executor.train(self._product_index, algorithm=algorithm)
+        # FIXME input/output dirs?
+        self._globus_executor.train(self._product_index, algorithm=algorithm)
 
     def export_training_data(self, file_path: Path, *, algorithm: str | None = None) -> None:
         self._processing_api.export_training_data(

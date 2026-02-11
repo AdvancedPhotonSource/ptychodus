@@ -132,9 +132,9 @@ class ControllerCore:
             model.processing_core.algorithm_parameter,
             model.processing_core.processing_api,
             model.product_core.product_repository,
+            model.globus_core,
             view.processing_view,
             view.processing_status_view,
-            self._product_controller.table_model,
             self._file_dialog_factory,
             [
                 self._ptychi_view_controller_factory,
