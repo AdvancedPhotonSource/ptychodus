@@ -42,41 +42,10 @@ def _validate_npz_keys(file_path: Path, required_keys: set[str], label: str) -> 
         keys = set(npz_file.files)
 
     missing = sorted(required_keys - keys)
+
     if missing:
         missing_keys = ', '.join(missing)
         raise RuntimeError(f'{label} missing keys: {missing_keys}')
-
-
-def _configure_reconstructor(model: ModelCore, reconstructor_name: str) -> None:
-    available = sorted(model.reconstructor_core.presenter.reconstructors())
-    if reconstructor_name not in available:
-        options = ', '.join(available)
-        raise RuntimeError(
-            f'Reconstructor "{reconstructor_name}" not available. Options: {options}'
-        )
-
-    model.workflow_api.set_reconstructor(reconstructor_name)
-
-    active = model.reconstructor_core.presenter.get_reconstructor()
-    if active != reconstructor_name:
-        raise RuntimeError(f'Failed to set reconstructor "{reconstructor_name}". Active: {active}')
-
-
-def _configure_metadata(model: ModelCore, product_index: int, args: argparse.Namespace) -> None:
-    product_item = model.product_core.product_api.get_item(product_index)
-    metadata = product_item.get_metadata_item()
-
-    metadata.detector_distance_m.set_value(args.detector_distance_m)
-    metadata.probe_energy_eV.set_value(args.probe_energy_ev)
-    metadata.exposure_time_s.set_value(args.exposure_time_s)
-
-    if metadata.probe_photon_count.get_value() <= 0:
-        photon_count = model.diffraction_core.dataset.get_maximum_pattern_counts()
-        metadata.probe_photon_count.set_value(photon_count)
-
-    product_item.get_object_item().rebuild()
-    probe_item = product_item.get_probe_item()
-    probe_item.set_builder(probe_item.get_builder().copy())
 
 
 def _parse_args() -> argparse.Namespace:
@@ -194,58 +163,65 @@ def main() -> int:
 
     try:
         with ModelCore(args.settings, log_level=args.log_level) as model:
-            _configure_reconstructor(model, args.reconstructor)
-
-            model.workflow_api.open_patterns(
+            workflow_diffraction_api = model.workflow_api.load_diffraction_data(
                 dataset_path,
                 file_type='SLAC_NPZ',
                 process_patterns=True,
                 block=True,
             )
-
-            product_api = model.workflow_api.open_product(
-                dataset_path,
-                file_type='SLAC_NPZ',
+            max_pattern_counts = (
+                workflow_diffraction_api.get_assembled_data().get_pattern_counts().max()
             )
-            _configure_metadata(model, product_api.get_product_index(), args)
+            input_product_api = model.workflow_api.create_product(
+                name='Run1084_recon3_postPC_shrunk_3',
+                detector_distance_m=args.detector_distance_m,
+                probe_energy_eV=args.probe_energy_ev,
+                probe_photon_count=max_pattern_counts,
+                exposure_time_s=args.exposure_time_s,
+            )
+            input_product_api.load_probe_positions(dataset_path, file_type='SLAC_NPZ')
+            input_product_api.load_probe(dataset_path, file_type='SLAC_NPZ')
+            input_product_api.load_object(dataset_path, file_type='SLAC_NPZ')
 
+            # TODO: find better way to change settings via Python API
             model_settings = model.ptychopinn_reconstructor_library.model_settings
             model_settings.gridsize.set_value(args.gridsize)
 
             train_data_path = train_dir / 'train_data.npz'
-            product_api.export_training_data(train_data_path)
+            input_product_api.export_training_data(train_data_path, algorithm=args.reconstructor)
             test_data_path = train_dir / 'test_data.npz'
             shutil.copyfile(train_data_path, test_data_path)
 
             _validate_npz_keys(train_data_path, REQUIRED_TRAIN_KEYS, 'train_data.npz')
             _validate_npz_keys(test_data_path, REQUIRED_TRAIN_KEYS, 'test_data.npz')
 
+            # TODO: find better way to change settings via Python API
             training_settings = model.ptychopinn_reconstructor_library.training_settings
             training_settings.nepochs.set_value(args.nepochs)
             training_settings.batch_size.set_value(args.batch_size)
-            training_settings.data_dir.set_value(train_dir)
-            training_settings.output_dir.set_value(model_out_dir)
 
+            # TODO: find better way to change settings via Python API
             inference_settings = model.ptychopinn_reconstructor_library.inference_settings
             inference_settings.n_samples.set_value(args.test_samples)
 
-            model.workflow_api.train_reconstructor(train_dir, model_out_dir)
+            input_product_api.train_reconstructor_local(
+                train_dir, model_out_dir, algorithm=args.reconstructor
+            )
 
             model_file = model_out_dir / 'wts.h5.zip'
+
             if not model_file.is_file():
                 logger.error(f'Model file not found: {model_file}')
                 return 1
 
-            output_product_api = product_api.reconstruct_local(block=True)
-            model.run_tasks()
+            output_product_api = input_product_api.reconstruct_local(
+                algorithm=args.reconstructor, block=True
+            )
 
             recon_product_path = output_dir / 'recon_product.h5'
             output_product_api.save_product(recon_product_path, file_type='HDF5')
-
-            output_item = model.product_core.product_api.get_item(
-                output_product_api.get_product_index()
-            )
-            object_array = output_item.get_object_item().get_object().get_layer(0)
+            output_product = output_product_api.get_product()
+            object_array = output_product.object_.get_layer(0)
 
             if object_array.size == 0:
                 logger.error('Reconstruction produced an empty object array.')

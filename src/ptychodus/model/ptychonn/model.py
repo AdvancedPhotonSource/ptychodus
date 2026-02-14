@@ -48,7 +48,7 @@ class PtychoNNModelProvider:
 
         return self._model
 
-    def open_model(self, file_path: Path) -> None:
+    def load_model_from_file(self, file_path: Path) -> None:
         logger.debug(f'Reading model from "{file_path}"')
         self._model = ptychonn.LitReconSmallModel.load_from_checkpoint(file_path)
         self._trainer = None

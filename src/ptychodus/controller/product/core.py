@@ -22,7 +22,7 @@ from ...model.product import (
     ProductRepositoryItem,
     ProductRepositoryObserver,
 )
-from ...model.diffraction import AssembledDiffractionDataset
+from ...model.diffraction import DiffractionAPI
 from ...model.product.metadata import MetadataRepositoryItem
 from ...model.product.object import ObjectRepositoryItem
 from ...model.product.probe import ProbeRepositoryItem
@@ -159,7 +159,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 class ProductController(ProductRepositoryObserver):
     def __init__(
         self,
-        dataset: AssembledDiffractionDataset,
+        diffraction_api: DiffractionAPI,
         repository: ProductRepository,
         api: ProductAPI,
         view: ProductView,
@@ -169,7 +169,7 @@ class ProductController(ProductRepositoryObserver):
         table_proxy_model: QSortFilterProxyModel,
     ) -> None:
         super().__init__()
-        self._dataset = dataset
+        self._diffraction_api = diffraction_api
         self._repository = repository
         self._api = api
         self._view = view
@@ -181,7 +181,7 @@ class ProductController(ProductRepositoryObserver):
     @classmethod
     def create_instance(
         cls,
-        dataset: AssembledDiffractionDataset,
+        diffraction_api: DiffractionAPI,
         repository: ProductRepository,
         api: ProductAPI,
         view: ProductView,
@@ -200,7 +200,7 @@ class ProductController(ProductRepositoryObserver):
         table_proxy_model.setSourceModel(table_model)
 
         controller = cls(
-            dataset,
+            diffraction_api,
             repository,
             api,
             view,
@@ -312,7 +312,7 @@ class ProductController(ProductRepositoryObserver):
 
         if current.isValid():
             product = self._repository[current.row()]
-            ProductEditorViewController.edit_product(self._dataset, product, self._view)
+            ProductEditorViewController.edit_product(self._diffraction_api, product, self._view)
         else:
             logger.error('No current item!')
 

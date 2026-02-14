@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any
 import logging
@@ -7,16 +7,27 @@ import logging
 from ptychodus.api.diffraction import CropCenter
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.product import Product
-from ptychodus.api.reconstructor import ReconstructInput, TrainOutput
+from ptychodus.api.reconstructor import AssembledDiffractionData, ReconstructInput
 from ptychodus.api.settings import PathPrefixChange, SettingsRegistry
-from ptychodus.api.workflow import WorkflowAPI, WorkflowProductAPI
+from ptychodus.api.workflow import WorkflowAPI, WorkflowDiffractionAPI, WorkflowProductAPI
 
 from .diffraction import DiffractionAPI
 from .globus import GlobusExecutor
 from .product import ObjectAPI, ProbeAPI, ProductAPI, ProbePositionsAPI
-from .reconstructor import ReconstructorAPI
+from .processing import ProcessingAPI
 
 logger = logging.getLogger(__name__)
+
+
+class ConcreteWorkflowDiffractionAPI(WorkflowDiffractionAPI):
+    def __init__(self, diffraction_api: DiffractionAPI) -> None:
+        self._diffraction_api = diffraction_api
+
+    def get_assembled_data(self) -> AssembledDiffractionData:
+        return self._diffraction_api.get_assembled_data()
+
+    def save_assembled_data(self, file_path: Path) -> None:
+        self._diffraction_api.export_assembled_patterns(file_path)
 
 
 class ConcreteWorkflowProductAPI(WorkflowProductAPI):
@@ -26,25 +37,29 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         probe_positions_api: ProbePositionsAPI,
         probe_api: ProbeAPI,
         object_api: ObjectAPI,
-        reconstructor_api: ReconstructorAPI,
-        executor: GlobusExecutor,
+        processing_api: ProcessingAPI,
+        globus_executor: GlobusExecutor,
         product_index: int,
     ) -> None:
         self._product_api = product_api
         self._probe_positions_api = probe_positions_api
         self._probe_api = probe_api
         self._object_api = object_api
-        self._reconstructor_api = reconstructor_api
-        self._executor = executor
+        self._processing_api = processing_api
+        self._globus_executor = globus_executor
         self._product_index = product_index
 
     def get_product_index(self) -> int:
         return self._product_index
 
+    def get_product(self) -> Product:
+        item = self._product_api.get_item(self._product_index)
+        return item.get_product()
+
     def rename_product(self, new_name: str) -> None:
         self._product_api.rename_product(self._product_index, new_name)
 
-    def open_probe_positions(self, file_path: Path, *, file_type: str | None = None) -> None:
+    def load_probe_positions(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._probe_positions_api.open_probe_positions(
             self._product_index, file_path, file_type=file_type
         )
@@ -59,7 +74,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
                 self._product_index, generator_name, generator_parameters
             )
 
-    def open_probe(self, file_path: Path, *, file_type: str | None = None) -> None:
+    def load_probe(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._probe_api.open_probe(self._product_index, file_path, file_type=file_type)
 
     def generate_probe(
@@ -70,7 +85,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         else:
             self._probe_api.build_probe(self._product_index, generator_name, generator_parameters)
 
-    def open_object(self, file_path: Path, *, file_type: str | None = None) -> None:
+    def load_object(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._object_api.open_object(self._product_index, file_path, file_type=file_type)
 
     def generate_object(
@@ -82,13 +97,20 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
             self._object_api.build_object(self._product_index, generator_name, generator_parameters)
 
     def get_reconstruct_input(self) -> ReconstructInput:
-        return self._reconstructor_api.get_reconstruct_input(self._product_index)
+        return self._processing_api.get_reconstruct_input(self._product_index)
 
     def reconstruct_local(
-        self, *, output_product_file: Path | None = None, block: bool = False
+        self,
+        *,
+        algorithm: str | None = None,
+        output_product_file: Path | None = None,
+        block: bool = False,
     ) -> WorkflowProductAPI:
-        output_product_index = self._reconstructor_api.reconstruct(
-            self._product_index, output_product_file=output_product_file, block=block
+        output_product_index = self._processing_api.reconstruct(
+            self._product_index,
+            algorithm=algorithm,
+            output_product_file=output_product_file,
+            block=block,
         )
 
         return ConcreteWorkflowProductAPI(
@@ -96,20 +118,38 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
             self._probe_positions_api,
             self._probe_api,
             self._object_api,
-            self._reconstructor_api,
-            self._executor,
+            self._processing_api,
+            self._globus_executor,
             output_product_index,
         )
 
-    def reconstruct_remote(self) -> None:
-        logger.debug(f'Execute Workflow: index={self._product_index}')
-        self._executor.reconstruct(self._product_index)
+    def reconstruct_remote(self, *, algorithm: str | None = None) -> None:
+        self._globus_executor.reconstruct(self._product_index, algorithm=algorithm)
+
+    def train_reconstructor_local(
+        self,
+        input_path: Path,
+        output_path: Path,
+        *,
+        algorithm: str | None = None,
+        block: bool = False,
+    ) -> None:
+        # TODO mlflow
+        self._processing_api.train(
+            self._product_index, input_path, output_path, algorithm=algorithm, block=block
+        )
+
+    def train_reconstructor_remote(self, *, algorithm: str | None = None) -> None:
+        # TODO mlflow
+        self._globus_executor.train(self._product_index, algorithm=algorithm)
+
+    def export_training_data(self, file_path: Path, *, algorithm: str | None = None) -> None:
+        self._processing_api.export_training_data(
+            file_path, self._product_index, algorithm=algorithm
+        )
 
     def save_product(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._product_api.save_product(self._product_index, file_path, file_type=file_type)
-
-    def export_training_data(self, file_path: Path) -> None:
-        self._reconstructor_api.export_training_data(file_path, self._product_index)
 
 
 class ConcreteWorkflowAPI(WorkflowAPI):
@@ -118,22 +158,22 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         settings_registry: SettingsRegistry,
         diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
-        scan_api: ProbePositionsAPI,
+        probe_positions_api: ProbePositionsAPI,
         probe_api: ProbeAPI,
         object_api: ObjectAPI,
-        reconstructor_api: ReconstructorAPI,
+        processing_api: ProcessingAPI,
         executor: GlobusExecutor,
     ) -> None:
         self._settings_registry = settings_registry
         self._diffraction_api = diffraction_api
         self._product_api = product_api
-        self._scan_api = scan_api
+        self._probe_positions_api = probe_positions_api
         self._probe_api = probe_api
         self._object_api = object_api
-        self._reconstructor_api = reconstructor_api
+        self._processing_api = processing_api
         self._executor = executor
 
-    def open_patterns(
+    def load_diffraction_data(
         self,
         file_path: Path,
         *,
@@ -143,7 +183,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         detector_extent: ImageExtent | None = None,
         process_patterns: bool = True,
         block: bool = False,
-    ) -> None:
+    ) -> WorkflowDiffractionAPI:
         self._diffraction_api.open_patterns(
             file_path,
             file_type=file_type,
@@ -153,12 +193,14 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             process_patterns=process_patterns,
             block=block,
         )
+        return ConcreteWorkflowDiffractionAPI(self._diffraction_api)
 
-    def import_assembled_patterns(self, file_path: Path) -> None:
+    def available_reconstructors(self) -> Iterator[str]:
+        return self._processing_api.available_reconstructors()
+
+    def load_assembled_diffraction_data(self, file_path: Path) -> WorkflowDiffractionAPI:
         self._diffraction_api.import_assembled_patterns(file_path)
-
-    def export_assembled_patterns(self, file_path: Path) -> None:
-        self._diffraction_api.export_assembled_patterns(file_path)
+        return ConcreteWorkflowDiffractionAPI(self._diffraction_api)
 
     def get_product(self, product_index: int) -> WorkflowProductAPI:
         if product_index < 0:
@@ -166,10 +208,10 @@ class ConcreteWorkflowAPI(WorkflowAPI):
 
         return ConcreteWorkflowProductAPI(
             self._product_api,
-            self._scan_api,
+            self._probe_positions_api,
             self._probe_api,
             self._object_api,
-            self._reconstructor_api,
+            self._processing_api,
             self._executor,
             product_index,
         )
@@ -178,7 +220,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         product_index = self._product_api.insert_product(product)
         return self.get_product(product_index)
 
-    def open_product(self, file_path: Path, *, file_type: str | None = None) -> WorkflowProductAPI:
+    def load_product(self, file_path: Path, *, file_type: str | None = None) -> WorkflowProductAPI:
         product_index = self._product_api.open_product(file_path, file_type=file_type)
 
         if product_index < 0:
@@ -214,12 +256,3 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         self, file_path: Path, change_path_prefix: PathPrefixChange | None = None
     ) -> None:
         self._settings_registry.save_settings(file_path, change_path_prefix)
-
-    def set_reconstructor(self, reconstructor_name: str) -> None:
-        reconstructor = self._reconstructor_api.set_reconstructor(reconstructor_name)
-        logger.debug(f'{reconstructor=}')
-
-    def train_reconstructor(self, input_path: Path, output_path: Path) -> TrainOutput:
-        output = self._reconstructor_api.train(input_path)
-        self._reconstructor_api.save_model(output_path)
-        return output

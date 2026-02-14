@@ -19,7 +19,7 @@ class PtychodusAutoloadProductFileBasedWorkflow(FileBasedWorkflow):
         return 'product-out.h5'
 
     def execute(self, api: WorkflowAPI, file_path: Path) -> None:
-        api.open_product(file_path)
+        api.load_product(file_path)
 
 
 class APS2IDFileBasedWorkflow(FileBasedWorkflow):
@@ -35,9 +35,9 @@ class APS2IDFileBasedWorkflow(FileBasedWorkflow):
         scan_id = int(re.findall(r'\d+', scan_name)[-1])
 
         diffraction_file_path = file_path.parents[1] / 'raw_data' / f'scan{scan_id}_master.h5'
-        api.open_patterns(diffraction_file_path)
+        api.load_diffraction_data(diffraction_file_path)
         product_api = api.create_product(f'scan{scan_id}')
-        product_api.open_probe_positions(file_path)
+        product_api.load_probe_positions(file_path)
         product_api.generate_probe()
         product_api.generate_object()
         product_api.reconstruct_remote()
@@ -63,9 +63,9 @@ class APS26IDFileBasedWorkflow(FileBasedWorkflow):
             if digits != 0:
                 break
 
-        api.open_patterns(diffraction_file_path)
+        api.load_diffraction_data(diffraction_file_path)
         product_api = api.create_product(f'scan_{scan_id}')
-        product_api.open_probe_positions(file_path)
+        product_api.load_probe_positions(file_path)
         product_api.generate_probe()
         product_api.generate_object()
         product_api.reconstruct_remote()
@@ -144,9 +144,9 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
             logger.warning(f'Failed to locate metadata for {scan_num}!')
         else:
             product_name = f'scan{scan_num:05d}_' + metadata.label
-            api.open_patterns(file_path)
+            api.load_diffraction_data(file_path)
             input_product_api = api.create_product(product_name, comments=str(metadata))
-            input_product_api.open_probe_positions(scan_file)
+            input_product_api.load_probe_positions(scan_file)
             input_product_api.generate_probe()
             input_product_api.generate_object()
             # TODO would prefer to write instructions and submit to queue

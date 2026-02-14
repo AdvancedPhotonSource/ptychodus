@@ -18,7 +18,6 @@ from ptychodus.api.diffraction import (
     DiffractionIndexes,
     DiffractionMetadata,
     DiffractionPattern,
-    DiffractionPatternCounts,
     DiffractionPatterns,
     SimpleDiffractionDataset,
 )
@@ -65,7 +64,7 @@ class AssembledDiffractionArray(DiffractionArray):
         self._array_index = array_index
         self._label = label
         self._data = data
-        self._pattern_counts = data.get_assembled_pattern_counts()
+        self._pattern_counts = data.get_pattern_counts()
         self._average_pattern = data.get_average_pattern()
 
     @classmethod
@@ -81,10 +80,10 @@ class AssembledDiffractionArray(DiffractionArray):
         return self._label
 
     def get_indexes(self) -> DiffractionIndexes:
-        return self._data.get_assembled_indexes()
+        return self._data.get_indexes()
 
     def get_patterns(self) -> DiffractionPatterns:
-        return self._data.get_assembled_patterns()
+        return self._data.get_patterns()
 
     def get_pattern(self, index: int) -> DiffractionPattern:
         return self._data.get_pattern(index)
@@ -133,26 +132,17 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         except ValueError:
             pass
 
-    def get_layout(self) -> SimpleTreeNode:
-        return self._dataset.get_layout()
-
     def get_metadata(self) -> DiffractionMetadata:
         return self._dataset.get_metadata()
+
+    def get_layout(self) -> SimpleTreeNode:
+        return self._dataset.get_layout()
 
     def get_bad_pixels(self) -> BadPixels | None:
         return self._dataset.get_bad_pixels()
 
-    def get_assembled_indexes(self) -> DiffractionIndexes:
-        return self._data.get_assembled_indexes()
-
-    def get_assembled_patterns(self) -> DiffractionPatterns:
-        return self._data.get_assembled_patterns()
-
-    def get_assembled_pattern_counts(self) -> DiffractionPatternCounts:
-        return self._data.get_assembled_pattern_counts()
-
-    def get_maximum_pattern_counts(self) -> int:
-        return self._data.get_assembled_pattern_counts().max()
+    def get_assembled_data(self) -> AssembledDiffractionData:
+        return self._data
 
     @overload
     def __getitem__(self, index: int) -> AssembledDiffractionArray: ...

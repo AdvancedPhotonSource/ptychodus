@@ -6,7 +6,7 @@ from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import DiffractionAPI
 from ..product import ProductAPI
-from ..reconstructor import ReconstructorAPI
+from ..processing import ProcessingAPI
 from .client import GlobusClient, GlobusJob
 from .settings import GlobusSettings
 
@@ -20,7 +20,7 @@ class GlobusExecutor:
         settings_registry: SettingsRegistry,
         diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
-        reconstructor_api: ReconstructorAPI,
+        processing_api: ProcessingAPI,
         client: GlobusClient,
     ) -> None:
         super().__init__()
@@ -28,7 +28,7 @@ class GlobusExecutor:
         self._settings_registry = settings_registry
         self._diffraction_api = diffraction_api
         self._product_api = product_api
-        self._reconstructor_api = reconstructor_api
+        self._processing_api = processing_api
         self._client = client
 
     def populate_input_directory(self, input_product_index: int) -> Path:
@@ -100,16 +100,18 @@ class GlobusExecutor:
         job = GlobusJob(flow_input, flow_label, flow_tags)
         self._client.run_flow(job)
 
-    def reconstruct(self, input_product_index: int) -> None:
+    def reconstruct(self, input_product_index: int, *, algorithm: str | None = None) -> None:
+        self._processing_api.set_reconstructor_if_provided(algorithm)
         input_directory = self.populate_input_directory(input_product_index)
         self._run_flow('reconstruct', input_directory.name)
 
-    def train(self, input_product_index: int) -> None:
-        # TODO  MLflow
+    def train(self, input_product_index: int, *, algorithm: str | None = None) -> None:
+        # TODO customize input_directory and output_directory
+        self._processing_api.set_reconstructor_if_provided(algorithm)
         input_directory = self.populate_input_directory(input_product_index)
-        self._run_flow('train', input_directory.name)
+        self._run_flow('train', input_directory.name)  # TODO mlflow
 
-    def infer(self, input_product_index: int) -> None:
-        # TODO  MLflow
+    def infer(self, input_product_index: int, *, algorithm: str | None = None) -> None:
+        self._processing_api.set_reconstructor_if_provided(algorithm)
         input_directory = self.populate_input_directory(input_product_index)
-        self._run_flow('infer', input_directory.name)
+        self._run_flow('infer', input_directory.name)  # TODO mlflow

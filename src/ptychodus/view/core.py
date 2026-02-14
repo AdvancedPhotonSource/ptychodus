@@ -21,7 +21,7 @@ from .agent import AgentView, AgentChatView
 from .diffraction import PatternsView
 from .image import ImageView
 from .product import ProductView
-from .reconstructor import ReconstructorView, ReconstructorPlotView
+from .processing import ProcessingStatusView
 from .repository import RepositoryTableView, RepositoryTreeView
 from .probe_positions import ProbePositionsPlotView
 from .settings import SettingsView
@@ -76,18 +76,18 @@ class ViewCore(QMainWindow):
         self.object_view = RepositoryTreeView()
         self.object_image_view = ImageView()
 
-        self.reconstructor_action = self.navigation_tool_bar.addAction(
-            QIcon(':/icons/reconstructor'), 'Reconstructor'
+        self.processing_action = self.navigation_tool_bar.addAction(
+            QIcon(':/icons/processing'), 'Processing'
         )
-        self.reconstructor_view = ReconstructorView()
-        self.reconstructor_plot_view = ReconstructorPlotView()
+        self.processing_view = QWidget()
+        self.processing_status_view = ProcessingStatusView()
 
         self.globus_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/globus'),
             'Globus',
         )
         self.globus_view = QWidget()
-        self.globus_status_table_view = QTableView()
+        self.globus_status_view = QTableView()
 
         self.automation_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/automate'), 'Automation'
@@ -123,7 +123,7 @@ class ViewCore(QMainWindow):
         self.left_panel.addWidget(self.probe_positions_view)
         self.left_panel.addWidget(self.probe_view)
         self.left_panel.addWidget(self.object_view)
-        self.left_panel.addWidget(self.reconstructor_view)
+        self.left_panel.addWidget(self.processing_view)
         self.left_panel.addWidget(self.globus_view)
         self.left_panel.addWidget(self.automation_view)
         self.left_panel.addWidget(self.agent_view)
@@ -137,8 +137,8 @@ class ViewCore(QMainWindow):
         self.right_panel.addWidget(self.probe_positions_plot_view)
         self.right_panel.addWidget(self.probe_image_view)
         self.right_panel.addWidget(self.object_image_view)
-        self.right_panel.addWidget(self.reconstructor_plot_view)
-        self.right_panel.addWidget(self.globus_status_table_view)
+        self.right_panel.addWidget(self.processing_status_view)
+        self.right_panel.addWidget(self.globus_status_view)
         self.right_panel.addWidget(self.automation_widget)
         self.right_panel.addWidget(self.agent_chat_view)
         self.right_panel.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)

@@ -4,7 +4,7 @@ from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import DiffractionAPI
 from ..product import ProductAPI
-from ..reconstructor import ReconstructorAPI
+from ..processing import ProcessingAPI
 from ..task_manager import TaskManager
 from .authorizer import GlobusAuthorizer
 from .client import FakeGlobusClient, GlobusClient
@@ -22,7 +22,7 @@ class GlobusCore:
         settings_registry: SettingsRegistry,
         diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
-        reconstructor_api: ReconstructorAPI,
+        processing_api: ProcessingAPI,
     ) -> None:
         self.settings = GlobusSettings(settings_registry)
         self.authorizer = GlobusAuthorizer()
@@ -43,7 +43,7 @@ class GlobusCore:
             settings_registry,
             diffraction_api,
             product_api,
-            reconstructor_api,
+            processing_api,
             self._client,
         )
 

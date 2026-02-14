@@ -1,14 +1,24 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any
 
 from ptychodus.api.diffraction import CropCenter
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.product import Product
-from ptychodus.api.reconstructor import ReconstructInput, TrainOutput
+from ptychodus.api.reconstructor import AssembledDiffractionData, ReconstructInput
 from ptychodus.api.settings import PathPrefixChange
+
+
+class WorkflowDiffractionAPI(ABC):
+    @abstractmethod
+    def get_assembled_data(self) -> AssembledDiffractionData:
+        pass
+
+    @abstractmethod
+    def save_assembled_data(self, file_path: Path) -> None:
+        pass
 
 
 class WorkflowProductAPI(ABC):
@@ -17,11 +27,15 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
+    def get_product(self) -> Product:
+        pass
+
+    @abstractmethod
     def rename_product(self, new_name: str) -> None:
         pass
 
     @abstractmethod
-    def open_probe_positions(self, file_path: Path, *, file_type: str | None = None) -> None:
+    def load_probe_positions(self, file_path: Path, *, file_type: str | None = None) -> None:
         pass
 
     @abstractmethod
@@ -31,7 +45,7 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def open_probe(self, file_path: Path, *, file_type: str | None = None) -> None:
+    def load_probe(self, file_path: Path, *, file_type: str | None = None) -> None:
         pass
 
     @abstractmethod
@@ -41,7 +55,7 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def open_object(self, file_path: Path, *, file_type: str | None = None) -> None:
+    def load_object(self, file_path: Path, *, file_type: str | None = None) -> None:
         pass
 
     @abstractmethod
@@ -56,26 +70,45 @@ class WorkflowProductAPI(ABC):
 
     @abstractmethod
     def reconstruct_local(
-        self, *, output_product_file: Path | None = None, block: bool = False
+        self,
+        *,
+        algorithm: str | None = None,
+        output_product_file: Path | None = None,
+        block: bool = False,
     ) -> WorkflowProductAPI:
         pass
 
     @abstractmethod
-    def reconstruct_remote(self) -> None:
+    def reconstruct_remote(self, *, algorithm: str | None = None) -> None:
+        pass
+
+    @abstractmethod
+    def train_reconstructor_local(
+        self,
+        input_path: Path,
+        output_path: Path,
+        *,
+        algorithm: str | None = None,
+        block: bool = False,
+    ) -> None:
+        pass
+
+    @abstractmethod
+    def train_reconstructor_remote(self, *, algorithm: str | None = None) -> None:
+        pass
+
+    @abstractmethod
+    def export_training_data(self, file_path: Path, *, algorithm: str | None = None) -> None:
         pass
 
     @abstractmethod
     def save_product(self, file_path: Path, *, file_type: str | None = None) -> None:
         pass
 
-    @abstractmethod
-    def export_training_data(self, file_path: Path) -> None:
-        pass
-
 
 class WorkflowAPI(ABC):
     @abstractmethod
-    def open_patterns(
+    def load_diffraction_data(
         self,
         file_path: Path,
         *,
@@ -85,23 +118,11 @@ class WorkflowAPI(ABC):
         detector_extent: ImageExtent | None = None,
         process_patterns: bool = True,
         block: bool = False,
-    ) -> None:
-        """opens diffraction patterns from file"""
+    ) -> WorkflowDiffractionAPI:
         pass
 
     @abstractmethod
-    def import_assembled_patterns(self, file_path: Path) -> None:
-        """import assembled patterns"""
-        pass
-
-    @abstractmethod
-    def export_assembled_patterns(self, file_path: Path) -> None:
-        """export assembled patterns"""
-        pass
-
-    @abstractmethod
-    def get_product(self, product_index: int) -> WorkflowProductAPI:
-        """returns a product by index"""
+    def load_assembled_diffraction_data(self, file_path: Path) -> WorkflowDiffractionAPI:
         pass
 
     @abstractmethod
@@ -109,8 +130,7 @@ class WorkflowAPI(ABC):
         pass
 
     @abstractmethod
-    def open_product(self, file_path: Path, *, file_type: str | None = None) -> WorkflowProductAPI:
-        """opens product from file"""
+    def load_product(self, file_path: Path, *, file_type: str | None = None) -> WorkflowProductAPI:
         pass
 
     @abstractmethod
@@ -126,21 +146,20 @@ class WorkflowAPI(ABC):
         mass_attenuation_m2_kg: float | None = None,
         tomography_angle_deg: float | None = None,
     ) -> WorkflowProductAPI:
-        """creates a new product"""
+        pass
+
+    @abstractmethod
+    def get_product(self, product_index: int) -> WorkflowProductAPI:
+        pass
+
+    @abstractmethod
+    def available_reconstructors(self) -> Iterator[str]:
         pass
 
     @abstractmethod
     def save_settings(
         self, file_path: Path, change_path_prefix: PathPrefixChange | None = None
     ) -> None:
-        pass
-
-    @abstractmethod
-    def set_reconstructor(self, reconstructor_name: str) -> None:
-        pass
-
-    @abstractmethod
-    def train_reconstructor(self, input_path: Path, output_path: Path) -> TrainOutput:
         pass
 
 

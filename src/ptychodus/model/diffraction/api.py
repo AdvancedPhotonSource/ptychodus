@@ -13,6 +13,7 @@ from ptychodus.api.diffraction import (
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.reconstructor import AssembledDiffractionData
 from ptychodus.api.tree import SimpleTreeNode
 
 from .bad_pixels import BadPixelsProvider
@@ -152,6 +153,9 @@ class DiffractionAPI:
         logger.debug(f'Writing "{file_path}" as "{file_type}"')
         writer = self._file_writer_chooser.get_current_plugin().strategy
         writer.write(file_path, self._dataset)
+
+    def get_assembled_data(self) -> AssembledDiffractionData:
+        return self._dataset.get_assembled_data()
 
     def import_assembled_patterns(self, file_path: Path) -> None:
         self._dataset.import_assembled_patterns(file_path)

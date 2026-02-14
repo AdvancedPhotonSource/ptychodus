@@ -36,7 +36,6 @@ class PtychoPINNTrainingSettings(Observable, Observer):
         self._group.add_observer(self)
 
         self.nphotons = self._group.create_real_parameter('NumPhotons', 1e6)  # TODO remove
-        self.data_dir = self._group.create_path_parameter('DataDir', Path('/path/to/training_data'))
         self.batch_size = self._group.create_integer_parameter(
             'BatchSize', 16, minimum=1, maximum=1 << 30
         )  # must be positive powers of two
@@ -57,9 +56,6 @@ class PtychoPINNTrainingSettings(Observable, Observer):
         self.probe_trainable = self._group.create_boolean_parameter('ProbeTrainable', False)
         self.intensity_scale_trainable = self._group.create_boolean_parameter(
             'IntensityScaleTrainable', True
-        )
-        self.output_dir = self._group.create_path_parameter(
-            'OutputDir', Path('/path/to/output_data')
         )
 
     def _update(self, observable: Observable) -> None:

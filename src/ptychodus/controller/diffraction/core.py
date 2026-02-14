@@ -1,8 +1,7 @@
-from typing import Any
 import logging
 
 
-from PyQt5.QtCore import QAbstractListModel, QModelIndex, QObject, Qt
+from PyQt5.QtCore import QModelIndex
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QDialog,
@@ -39,6 +38,7 @@ from ..parametric import (
     ParameterViewController,
     SpinBoxParameterViewController,
 )
+from ..product.list_model import ProductRepositoryListModel
 from .dataset import DatasetTreeModel
 from .dataset_layout import DatasetLayoutViewController
 from .wizard import OpenDatasetWizardController
@@ -143,28 +143,6 @@ class DetectorController:
         layout.addRow('Bit Depth:', self._bit_depth_view_controller.get_widget())
         layout.addRow('Bad Pixels:', self._bad_pixels_view_controller.get_widget())
         view.setLayout(layout)
-
-
-class ProductRepositoryListModel(QAbstractListModel):
-    def __init__(
-        self,
-        repository: ProductRepository,
-        parent: QObject | None = None,
-    ) -> None:
-        super().__init__(parent)
-        self._repository = repository
-
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
-        if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
-            try:
-                item = self._repository[index.row()]
-            except IndexError as err:
-                logger.exception(err)
-            else:
-                return item.get_name()
-
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
-        return len(self._repository)
 
 
 class DiffractionController(DiffractionDatasetObserver):

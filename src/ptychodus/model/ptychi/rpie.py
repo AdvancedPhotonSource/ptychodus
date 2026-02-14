@@ -31,7 +31,8 @@ class RPIEReconstructor(Reconstructor):
         self._settings = settings
         self._epoch = 0
 
-    def get_name(self) -> str:
+    @property
+    def name(self) -> str:
         return 'rPIE'
 
     def _create_reconstructor_options(self) -> RPIEReconstructorOptions:

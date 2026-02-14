@@ -30,6 +30,7 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import (
     BooleanParameter,
     IntegerParameter,
+    Parameter,
     PathParameter,
     RealParameter,
     StringParameter,
@@ -139,7 +140,7 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
 
 class ComboBoxParameterViewController(ParameterViewController, Observer):
     def __init__(
-        self, parameter: StringParameter, items: Iterable[str], *, tool_tip: str = ''
+        self, parameter: Parameter[str], items: Iterable[str], *, tool_tip: str = ''
     ) -> None:
         super().__init__()
         self._parameter = parameter
@@ -155,7 +156,7 @@ class ComboBoxParameterViewController(ParameterViewController, Observer):
         self._widget.textActivated.connect(parameter.set_value)
         parameter.add_observer(self)
 
-    def get_widget(self) -> QWidget:
+    def get_widget(self) -> QComboBox:
         return self._widget
 
     def __sync_model_to_view(self) -> None:
