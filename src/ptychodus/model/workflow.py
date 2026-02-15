@@ -5,7 +5,7 @@ from typing import Any
 import logging
 
 from ptychodus.api.diffraction import CropCenter
-from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.geometry import AffineTransform, ImageExtent
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import AssembledDiffractionData, ReconstructInput
 from ptychodus.api.settings import PathPrefixChange, SettingsRegistry
@@ -73,6 +73,11 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
             self._probe_positions_api.build_probe_positions(
                 self._product_index, generator_name, generator_parameters
             )
+
+    def set_probe_positions_transform(self, transform: AffineTransform) -> None:
+        item = self._product_api.get_item(self._product_index)
+        probe_positions_transform = item.get_probe_positions_item().get_transform()
+        probe_positions_transform.set_transform(transform)
 
     def load_probe(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._probe_api.open_probe(self._product_index, file_path, file_type=file_type)

@@ -107,7 +107,6 @@ class ControllerCore:
             model.fluorescence_core.visualization_engine,
             view.probe_view,
             self._file_dialog_factory,
-            is_developer_mode_enabled=is_developer_mode_enabled,
         )
         self._object_image_controller = ImageController(
             model.object_visualization_engine,

@@ -94,6 +94,19 @@ class ProbePositionTransform(ParameterGroup):
             a12=self.affine12.get_value(),
         )
 
+    def set_transform(self, transform: AffineTransform) -> None:
+        self.block_notifications(True)
+
+        self.affine00.set_value(transform.a00)
+        self.affine01.set_value(transform.a01)
+        self.affine02.set_value(transform.a02)
+
+        self.affine10.set_value(transform.a10)
+        self.affine11.set_value(transform.a11)
+        self.affine12.set_value(transform.a12)
+
+        self.block_notifications(False)
+
     def set_identity(self) -> None:
         self.apply_presets(0)
 

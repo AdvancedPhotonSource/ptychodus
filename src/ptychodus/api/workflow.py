@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from ptychodus.api.diffraction import CropCenter
-from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.geometry import AffineTransform, ImageExtent
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import AssembledDiffractionData, ReconstructInput
 from ptychodus.api.settings import PathPrefixChange
@@ -42,6 +42,10 @@ class WorkflowProductAPI(ABC):
     def generate_probe_positions(
         self, generator_name: str | None = None, generator_parameters: Mapping[str, Any] = {}
     ) -> None:
+        pass
+
+    @abstractmethod
+    def set_probe_positions_transform(self, transform: AffineTransform) -> None:
         pass
 
     @abstractmethod

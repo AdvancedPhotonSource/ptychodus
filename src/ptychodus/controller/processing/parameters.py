@@ -154,7 +154,7 @@ class ComputeParameterViewController(ParameterViewController):
         if tool_tip:
             self._widget.setToolTip(tool_tip)
 
-        self._button_group.addButton(self._local_button, 0)
+        self._button_group.addButton(self._local_button)
         self._button_group.addButton(self._remote_button)
         self._button_group.setExclusive(True)
         self._local_button.setChecked(True)
@@ -167,7 +167,7 @@ class ComputeParameterViewController(ParameterViewController):
         self._widget.setLayout(layout)
 
     def is_computing_local(self) -> bool:
-        return self._button_group.checkedId() == 0
+        return self._button_group.checkedButton() is self._local_button
 
     def get_widget(self) -> QWidget:
         return self._widget

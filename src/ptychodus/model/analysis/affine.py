@@ -117,6 +117,7 @@ class AffineTransformEstimator(Observable):
         best_error = numpy.inf
         best_model = AffineTransform(1.0, 0.0, 0.0, 0.0, 1.0, 0.0)
 
+        # FIXME verify & match conventions
         # RANSAC estimation of affine transform
         for it in range(num_shuffles):
             self._rng.shuffle(indexes)

@@ -1,6 +1,5 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
-    QCheckBox,
     QComboBox,
     QDialog,
     QFormLayout,
@@ -87,14 +86,12 @@ class ProbePropagationDialog(QDialog):
 class IlluminationParametersView(QGroupBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Parameters', parent)
-        self.quantitative_probe_check_box = QCheckBox('Quantitative Probe')
         self.photon_flux_line_edit = DecimalLineEdit.create_instance()
         self.exposure_time_line_edit = DecimalLineEdit.create_instance()
         self.mass_attenuation_label = QLabel('Mass Attenuation [m\u00b2/kg]:')
         self.mass_attenuation_line_edit = DecimalLineEdit.create_instance()
 
         layout = QFormLayout()
-        layout.addRow(self.quantitative_probe_check_box)
         layout.addRow('Photon Flux [ph/s]:', self.photon_flux_line_edit)
         layout.addRow('Exposure Time [s]:', self.exposure_time_line_edit)
         layout.addRow(self.mass_attenuation_label)
@@ -128,15 +125,15 @@ class IlluminationDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.visualization_widget = VisualizationWidget('Visualization')
-        self.exposure_parameters_view = IlluminationParametersView()
-        self.exposure_quantity_view = IlluminationQuantityView()
+        self.parameters_view = IlluminationParametersView()
+        self.quantity_view = IlluminationQuantityView()
         self.visualization_parameters_view = VisualizationParametersView()
         self.save_button = QPushButton('Save')
         self.status_bar = QStatusBar()
 
         parameter_layout = QVBoxLayout()
-        parameter_layout.addWidget(self.exposure_parameters_view)
-        parameter_layout.addWidget(self.exposure_quantity_view)
+        parameter_layout.addWidget(self.parameters_view)
+        parameter_layout.addWidget(self.quantity_view)
         parameter_layout.addWidget(self.visualization_parameters_view)
         parameter_layout.addWidget(self.save_button)
         parameter_layout.addStretch()

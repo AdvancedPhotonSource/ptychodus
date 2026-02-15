@@ -127,6 +127,7 @@ class DeadLeavesObjectBuilder(ObjectBuilder):
             if num_covered_pixels == is_covered.size:
                 break
 
+        # FIXME real/imag
         array = amplitude * numpy.exp(TWO_PI_J * phase_turns)
 
         return self._create_object(
