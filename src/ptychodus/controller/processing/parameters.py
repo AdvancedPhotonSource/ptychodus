@@ -40,6 +40,8 @@ class ProcessingStatusController(Observer):
         self._view = view
         self._view.text_edit.setReadOnly(True)
 
+        view.stop_button.clicked.connect(monitor.stop_processing)
+
         self._sync_model_to_view()
         monitor.add_observer(self)
 
@@ -67,8 +69,9 @@ class ProcessingStatusController(Observer):
         self._view.figure_canvas.draw()
 
     def _sync_model_to_view(self) -> None:
-        # FIXME cancel processing; status messages to comments at end
-        for text in self._monitor.messages():
+        log_handler = self._monitor.get_log_handler()
+
+        for text in log_handler.messages():
             self._view.text_edit.appendPlainText(text)
 
         progress_goal = self._monitor.get_progress_goal()
@@ -78,8 +81,10 @@ class ProcessingStatusController(Observer):
             progress_bar.show()
             progress_bar.setRange(0, progress_goal)
             progress_bar.setValue(self._monitor.get_progress())
+            self._view.stop_button.show()
         else:
             progress_bar.hide()
+            self._view.stop_button.hide()
 
     def _update(self, observable: Observable) -> None:
         if observable is self._monitor:

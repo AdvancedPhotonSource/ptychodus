@@ -167,8 +167,8 @@ class ProcessingAPI:
             self._algorithm_parameter.get_current_reconstructor(),
             reconstruct_input,
             output_product_item,
-            finished_event,
             output_product_file,
+            finished_event,
         )
         self._task_manager.put_background_task(background_task)
 
@@ -251,9 +251,9 @@ class ProcessingAPI:
                 self._context,
                 trainer,
                 reconstruct_input,
-                finished_event,
                 input_path,
                 output_path,
+                finished_event,
             )
             self._task_manager.put_background_task(background_task)
 

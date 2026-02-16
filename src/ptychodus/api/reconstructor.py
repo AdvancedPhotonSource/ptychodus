@@ -56,6 +56,7 @@ class Reconstructor(ABC):
 class TrainOutput:
     training_loss: Sequence[LossValue] = field(default_factory=list)
     validation_loss: Sequence[LossValue] = field(default_factory=list)
+    progress: int = 0
     result: int = 0
 
 

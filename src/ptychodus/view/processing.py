@@ -47,6 +47,7 @@ class ProcessingStatusView(QSplitter):
 
         self.text_edit = QPlainTextEdit()
         self.progress_bar = QProgressBar()
+        self.stop_button = QPushButton('Stop')
 
         upper_layout = QVBoxLayout()
         upper_layout.addWidget(self.navigation_toolbar)
@@ -56,9 +57,13 @@ class ProcessingStatusView(QSplitter):
         upper_widget.setLayout(upper_layout)
         self.addWidget(upper_widget)
 
+        progress_layout = QHBoxLayout()
+        progress_layout.addWidget(self.progress_bar)
+        progress_layout.addWidget(self.stop_button)
+
         lower_layout = QVBoxLayout()
         lower_layout.addWidget(self.text_edit)
-        lower_layout.addWidget(self.progress_bar)
+        lower_layout.addLayout(progress_layout)
 
         lower_widget = QWidget()
         lower_widget.setLayout(lower_layout)

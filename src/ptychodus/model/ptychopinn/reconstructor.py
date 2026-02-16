@@ -274,4 +274,4 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         save_outputs(recon_amp, recon_phase, train_results, str(output_path))
         self.load_model_from_file(model_path)
 
-        yield TrainOutput()  # TODO yield losses
+        yield TrainOutput()  # TODO yield losses & progress
