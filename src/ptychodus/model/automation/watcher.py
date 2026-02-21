@@ -71,7 +71,7 @@ class DataDirectoryWatcher(Observable, Observer):
         if self.is_alive:
             logger.error('Automation watchdog thread already started!')
         else:
-            logger.info('Starting automation watchdog thread...')
+            logger.debug('Starting automation watchdog thread...')
             self._observer = (
                 PollingObserver()
                 if self._settings.use_watchdog_polling_observer.get_value()
@@ -83,12 +83,12 @@ class DataDirectoryWatcher(Observable, Observer):
 
     def stop(self) -> None:
         if self.is_alive:
-            logger.info('Stopping automation watchdog thread...')
+            logger.debug('Stopping automation watchdog thread...')
             self._observer.stop()
             self._observer.join()
             logger.debug('Automation watchdog thread stopped.')
         else:
-            logger.info('Automation watchdog already stopped.')
+            logger.debug('Automation watchdog already stopped.')
 
     def _update(self, observable: Observable) -> None:
         if observable is self._settings:

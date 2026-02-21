@@ -1,6 +1,4 @@
-from __future__ import annotations
 from collections.abc import Iterator, Sequence
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, Final
 import logging
@@ -60,8 +58,6 @@ def create_raw_data(parameters: ReconstructInput) -> RawData:
 
 class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     MODEL_FILE_NAME: Final[str] = 'wts.h5.zip'
-    MODEL_FILE_FILTER: Final[str] = 'Zipped Archive (*.zip)'
-    TRAINING_DATA_FILE_FILTER: Final[str] = 'NumPy Zipped Archive (*.npz)'
 
     def __init__(
         self,
@@ -80,16 +76,6 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         self.__model: Any = None
         self._config: dict[str, Any] = dict()
         self._is_developer_mode_enabled = is_developer_mode_enabled
-
-        try:
-            ptychopinn_version = version('ptychopinn')
-        except PackageNotFoundError:
-            try:
-                ptychopinn_version = version('ptycho')
-            except PackageNotFoundError:
-                ptychopinn_version = 'unknown'
-
-        logger.info(f'\tPtychoPINN {ptychopinn_version}')
 
     def _create_model_config(self, model_size: int) -> ModelConfig:
         return ModelConfig(
@@ -189,10 +175,10 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         yield ReconstructOutput(product)
 
     def is_model_loaded(self):
-        return True  # FIXME
+        return True  # TODO
 
     def get_model_file_filter(self) -> str:
-        return self.MODEL_FILE_FILTER
+        return 'Zipped Archive (*.zip)'
 
     def load_model_from_file(self, file_path: Path) -> None:
         if file_path.name != self.MODEL_FILE_NAME:
@@ -206,7 +192,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         # TODO sync ptycho.params.cfg with settings after load
 
     def get_training_data_file_filter(self) -> str:
-        return self.TRAINING_DATA_FILE_FILTER
+        return 'NumPy Zipped Archive (*.npz)'
 
     def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
         object_geometry = parameters.product.object_.get_geometry()

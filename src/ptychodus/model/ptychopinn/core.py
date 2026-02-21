@@ -1,14 +1,15 @@
-from __future__ import annotations
 from collections.abc import Iterator
+from importlib.metadata import PackageNotFoundError, version
 import logging
 
-from ...api.reconstructor import (
+from ptychodus.api.reconstructor import (
     NullReconstructor,
     Reconstructor,
     ReconstructorLibrary,
     TrainableReconstructor,
 )
-from ...api.settings import SettingsRegistry
+from ptychodus.api.settings import SettingsRegistry
+
 from .enums import PtychoPINNEnumerators
 from .settings import (
     PtychoPINNInferenceSettings,
@@ -36,9 +37,16 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
             logger.info('PtychoPINN not found.')
 
             if is_developer_mode_enabled:
-                self._reconstructors.append(NullReconstructor('PINN'))
-                self._reconstructors.append(NullReconstructor('Supervised'))
+                for reconstructor in ('PINN', 'Supervised'):
+                    self._reconstructors.append(NullReconstructor(reconstructor))
         else:
+            try:
+                ptychopinn_version = version('ptychopinn')
+            except PackageNotFoundError:
+                ptychopinn_version = version('ptycho')
+
+            logger.info(f'\tPtychoPINN {ptychopinn_version}')
+
             self._reconstructors.append(
                 PtychoPINNTrainableReconstructor(
                     'PINN',

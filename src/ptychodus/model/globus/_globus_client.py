@@ -131,30 +131,30 @@ class RealGlobusClient(GlobusClient, Observer):
 
     def start(self) -> None:
         if self._worker is None:
-            logger.info('Starting Globus thread...')
+            logger.debug('Starting Globus thread...')
             self._stop_event.clear()
             self._worker = threading.Thread(target=self._run_tasks)
             self._worker.start()
-            logger.info('Globus thread started.')
+            logger.debug('Globus thread started.')
         else:
             logger.warning('Worker already started!')
 
     def stop(self) -> None:
         if self._stop_event.is_set():
-            logger.info('Globus thread already stopped.')
+            logger.debug('Globus thread already stopped.')
         else:
-            logger.info('Finishing tasks...')
+            logger.debug('Finishing tasks...')
             self._job_queue.join()
-            logger.info('Tasks finished.')
+            logger.debug('Tasks finished.')
 
             if self._worker is None:
                 logger.warning('Worker is None!')
             else:
-                logger.info('Stopping Globus thread...')
+                logger.debug('Stopping Globus thread...')
                 self._stop_event.set()
                 self._worker.join()
                 self._worker = None
-                logger.info('Globus thread stopped.')
+                logger.debug('Globus thread stopped.')
 
     def run_flow(self, job: GlobusJob) -> None:
         self._job_queue.put(job)

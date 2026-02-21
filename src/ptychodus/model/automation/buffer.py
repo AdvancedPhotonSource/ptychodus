@@ -141,25 +141,25 @@ class PendingFileBuffer(Observable, Observer):
 
     def start(self) -> None:
         if self._worker is None:
-            logger.info('Starting automation buffer...')
+            logger.debug('Starting automation buffer...')
             self._stop_event.clear()
             self._worker = threading.Thread(target=self._process_finalized_files)
             self._worker.start()
-            logger.info('Automation buffer started.')
+            logger.debug('Automation buffer started.')
         else:
-            logger.info('Automation buffer already started!')
+            logger.debug('Automation buffer already started!')
 
     def stop(self) -> None:
         if self._stop_event.is_set():
-            logger.info('Automation buffer already stopped.')
+            logger.debug('Automation buffer already stopped.')
         elif self._worker is None:
             logger.warning('Worker is None!')
         else:
-            logger.info('Stopping automation buffer...')
+            logger.debug('Stopping automation buffer...')
             self._stop_event.set()
             self._worker.join()
             self._worker = None
-            logger.info('Automation buffer stopped.')
+            logger.debug('Automation buffer stopped.')
 
     def _update(self, observable: Observable) -> None:
         if observable is self._settings.watchdog_delay_s:

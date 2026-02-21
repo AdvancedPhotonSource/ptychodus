@@ -113,7 +113,7 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
                 return
 
         registered_plugins = ', '.join(f'"{pi.simple_name}"' for pi in self._registered_plugins)
-        logger.debug(f'Invalid plugin name "{name}". Registered plugins: {registered_plugins}.')
+        logger.warning(f'Invalid plugin name "{name}". Registered plugins: {registered_plugins}.')
 
     def synchronize_with_parameter(self, parameter: StringParameter) -> None:
         self._parameter = parameter
@@ -186,15 +186,15 @@ class PluginRegistry:
             try:
                 module = importlib.import_module(module_info.name)
             except ModuleNotFoundError as exc:
-                logger.info(f'Skipping {module_info.name}')
                 logger.warning(exc)
+                logger.warning(f'Skipping {module_info.name}')
             else:
                 try:
                     module.register_plugins(registry)
                 except AttributeError as exc:
-                    logger.info(f'Failed to register {module_info.name}')
                     logger.warning(exc)
+                    logger.warning(f'Failed to register {module_info.name}')
                 else:
-                    logger.info(f'Registered {module_info.name}')
+                    logger.debug(f'Registered {module_info.name}')
 
         return registry
