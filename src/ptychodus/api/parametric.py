@@ -1,3 +1,5 @@
+"""Observable typed parameters and hierarchical parameter groups for settings management."""
+
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping, MutableSequence, Sequence
@@ -19,6 +21,8 @@ T = TypeVar('T')
 
 
 class Parameter(ABC, Generic[T], Observable):
+    """Abstract typed parameter that notifies observers when its value changes."""
+
     def __init__(self, parent: Parameter[T] | None = None) -> None:
         super().__init__()
         self._parent = parent
@@ -57,6 +61,8 @@ class Parameter(ABC, Generic[T], Observable):
 
 
 class ParameterBase(Parameter[T]):
+    """Concrete Parameter base that stores a value and notifies on change."""
+
     def __init__(self, value: T, parent: Parameter[T] | None) -> None:
         super().__init__(parent)
         self._value = value
@@ -76,6 +82,8 @@ class ParameterBase(Parameter[T]):
 
 
 class StringParameter(ParameterBase[str]):
+    """Parameter holding a str value."""
+
     def __init__(self, value: str, parent: StringParameter | None) -> None:
         super().__init__(value, parent)
 
@@ -90,6 +98,8 @@ class StringParameter(ParameterBase[str]):
 
 
 class PathParameter(ParameterBase[Path]):
+    """Parameter holding a Path value, with optional prefix-remapping on save."""
+
     def __init__(self, value: Path, parent: PathParameter | None) -> None:
         super().__init__(value, parent)
 
@@ -116,6 +126,8 @@ class PathParameter(ParameterBase[Path]):
 
 
 class UUIDParameter(ParameterBase[UUID]):
+    """Parameter holding a UUID value."""
+
     def __init__(self, value: UUID, parent: UUIDParameter | None) -> None:
         super().__init__(value, parent)
 
@@ -130,6 +142,8 @@ class UUIDParameter(ParameterBase[UUID]):
 
 
 class BooleanParameter(ParameterBase[bool]):
+    """Parameter holding a bool value, parseable from common truth strings."""
+
     TRUE_VALUES: Final = ('1', 'true', 't', 'yes', 'y')
 
     def __init__(self, value: bool, parent: BooleanParameter | None) -> None:
@@ -143,6 +157,8 @@ class BooleanParameter(ParameterBase[bool]):
 
 
 class IntegerParameter(ParameterBase[int]):
+    """Parameter holding an int value with optional inclusive minimum and maximum bounds."""
+
     def __init__(
         self,
         value: int,
@@ -182,6 +198,8 @@ class IntegerParameter(ParameterBase[int]):
 
 
 class RealParameter(ParameterBase[float]):
+    """Parameter holding a float value with optional inclusive minimum and maximum bounds."""
+
     def __init__(
         self,
         value: float,
@@ -224,6 +242,8 @@ class RealParameter(ParameterBase[float]):
 
 
 class IntegerSequenceParameter(ParameterBase[MutableSequence[int]]):
+    """Parameter holding a mutable sequence of int values, serialized as a comma-separated string."""
+
     def __init__(self, value: Sequence[int], parent: IntegerSequenceParameter | None) -> None:
         super().__init__(list(value), parent)
 
@@ -273,6 +293,8 @@ class IntegerSequenceParameter(ParameterBase[MutableSequence[int]]):
 
 
 class RealSequenceParameter(ParameterBase[MutableSequence[float]]):
+    """Parameter holding a mutable sequence of float values, serialized as a comma-separated string."""
+
     def __init__(self, value: Sequence[float], parent: RealSequenceParameter | None) -> None:
         super().__init__(list(value), parent)
 
@@ -327,6 +349,8 @@ class RealSequenceParameter(ParameterBase[MutableSequence[float]]):
 
 
 class ComplexSequenceParameter(ParameterBase[MutableSequence[complex]]):
+    """Parameter holding a mutable sequence of complex values, serialized as a comma-separated string."""
+
     def __init__(self, value: Sequence[complex], parent: ComplexSequenceParameter | None) -> None:
         super().__init__(list(value), parent)
 
@@ -381,6 +405,8 @@ class ComplexSequenceParameter(ParameterBase[MutableSequence[complex]]):
 
 
 class ParameterGroup(Observable, Observer):
+    """Hierarchical container of named Parameters and nested ParameterGroups."""
+
     def __init__(self) -> None:
         super().__init__()
         self._parameters: dict[str, Parameter[Any]] = dict()

@@ -341,7 +341,7 @@ class PtyChiObjectOptionsHelper:
 
     def get_pixel_aspect_ratio(self, object_: Object) -> float:
         pixel_geometry = object_.get_pixel_geometry()
-        return pixel_geometry.aspect_ratio
+        return pixel_geometry.get_aspect_ratio()
 
     def get_position_origin_coords(self, object_: Object) -> RealArrayType:
         # TODO return numpy.zeros(2)

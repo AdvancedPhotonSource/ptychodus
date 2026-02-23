@@ -1,3 +1,5 @@
+"""Diffraction data structures and file I/O plugin interfaces."""
+
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -20,11 +22,15 @@ DiffractionIndexes: TypeAlias = numpy.ndarray[tuple[int], numpy.dtype[numpy.inte
 
 @dataclass(frozen=True)
 class CropCenter:
+    """Pixel coordinates of the center used when cropping diffraction patterns."""
+
     position_x_px: int
     position_y_px: int
 
 
-class DiffractionArray:
+class DiffractionArray(ABC):
+    """A block of diffraction patterns with associated scan indexes."""
+
     @abstractmethod
     def get_label(self) -> str:
         pass
@@ -42,6 +48,8 @@ class DiffractionArray:
 
 
 class SimpleDiffractionArray(DiffractionArray):
+    """Concrete DiffractionArray backed by in-memory numpy arrays."""
+
     def __init__(
         self,
         label: str,
@@ -65,6 +73,8 @@ class SimpleDiffractionArray(DiffractionArray):
 
 @dataclass(frozen=True)
 class DiffractionMetadata:
+    """Metadata describing a diffraction dataset (geometry, energy, file path, etc.)."""
+
     num_patterns_per_array: Sequence[int]
     pattern_dtype: DiffractionPatternDType
     detector_distance_m: float | None = None
@@ -83,7 +93,9 @@ class DiffractionMetadata:
         return cls([], numpy.dtype(numpy.ubyte), file_path=file_path)
 
 
-class DiffractionDataset(Sequence[DiffractionArray]):
+class DiffractionDataset(Sequence[DiffractionArray], ABC):
+    """A sequence of DiffractionArrays with shared metadata and bad-pixel mask."""
+
     @abstractmethod
     def get_metadata(self) -> DiffractionMetadata:
         pass
@@ -98,6 +110,8 @@ class DiffractionDataset(Sequence[DiffractionArray]):
 
 
 class SimpleDiffractionDataset(DiffractionDataset):
+    """Concrete DiffractionDataset backed by a list of DiffractionArray objects."""
+
     def __init__(
         self,
         metadata: DiffractionMetadata,
@@ -141,27 +155,27 @@ class SimpleDiffractionDataset(DiffractionDataset):
 
 
 class DiffractionFileReader(ABC):
-    """interface for plugins that read diffraction files"""
+    """Plugin interface for reading diffraction files."""
 
     @abstractmethod
     def read(self, file_path: Path) -> DiffractionDataset:
-        """reads a diffraction dataset from file"""
+        """Read a diffraction dataset from file."""
         pass
 
 
 class DiffractionFileWriter(ABC):
-    """interface for plugins that write diffraction files"""
+    """Plugin interface for writing diffraction files."""
 
     @abstractmethod
     def write(self, file_path: Path, dataset: DiffractionDataset) -> None:
-        """writes a diffraction dataset to file"""
+        """Write a diffraction dataset to file."""
         pass
 
 
 class BadPixelsFileReader(ABC):
-    """interface for plugins that read bad pixel files"""
+    """Plugin interface for reading bad-pixel mask files."""
 
     @abstractmethod
     def read(self, file_path: Path) -> BadPixels:
-        """reads a bad pixels array from file"""
+        """Read a bad-pixel mask from file."""
         pass

@@ -35,7 +35,7 @@ class IlluminationMap:
 
     @property
     def photon_fluence_1_m2(self) -> RealArrayType:
-        return self.photon_number / self.pixel_geometry.area_m2
+        return self.photon_number / self.pixel_geometry.get_area_m2()
 
     @property
     def photon_fluence_rate_Hz_m2(self) -> RealArrayType:  # noqa: N802

@@ -152,7 +152,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             height_px=parameters.product.probes.height_px,
         )
         patches = numpy.zeros(
-            (len(parameters.product.probe_positions), num_channels, *probe_extent.shape),
+            (len(parameters.product.probe_positions), num_channels, *probe_extent.get_shape()),
             dtype=numpy.float32,
         )
 

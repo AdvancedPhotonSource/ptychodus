@@ -189,4 +189,4 @@ class RPIEReconstructor(Reconstructor):
                 self._epoch += step_epochs
                 step_epochs = min(step_epochs, num_epochs - self._epoch)
 
-                yield ReconstructOutput(product=product, progress=self._epoch, result=0)
+                yield ReconstructOutput(product=product, progress=self._epoch)

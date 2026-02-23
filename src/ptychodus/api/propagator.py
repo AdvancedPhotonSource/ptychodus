@@ -1,3 +1,5 @@
+"""Wavefield propagation models and associated parameter containers."""
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -14,36 +16,36 @@ def intensity(wavefield: ComplexArrayType) -> RealArrayType:
 @dataclass(frozen=True)
 class PropagatorParameters:
     wavelength_m: float
-    """illumination wavelength in meters"""
+    """Illumination wavelength in meters."""
     width_px: int
-    """number of pixels in the x-direction"""
+    """Number of pixels in the x-direction."""
     height_px: int
-    """number of pixels in the y-direction"""
+    """Number of pixels in the y-direction."""
     pixel_width_m: float
-    """source plane pixel width in meters"""
+    """Source-plane pixel width in meters."""
     pixel_height_m: float
-    """source plane pixel height in meters"""
+    """Source-plane pixel height in meters."""
     propagation_distance_m: float
-    """propagation distance in meters"""
+    """Propagation distance in meters."""
 
     @property
     def dx(self) -> float:
-        """pixel width in wavelengths"""
+        """Pixel width in wavelengths."""
         return self.pixel_width_m / self.wavelength_m
 
     @property
     def pixel_aspect_ratio(self) -> float:
-        """pixel aspect ratio (width / height)"""
+        """Pixel aspect ratio (width / height)."""
         return self.pixel_width_m / self.pixel_height_m
 
     @property
     def z(self) -> float:
-        """propagation distance in wavelengths"""
+        """Propagation distance in wavelengths."""
         return self.propagation_distance_m / self.wavelength_m
 
     @property
     def fresnel_number(self) -> float:
-        """fresnel number"""
+        """Fresnel number."""
         return numpy.square(self.dx) / numpy.absolute(self.z)
 
     def get_spatial_coordinates(self) -> tuple[RealArrayType, RealArrayType]:
@@ -60,12 +62,16 @@ class PropagatorParameters:
 
 
 class Propagator(ABC):
+    """Abstract interface for free-space wavefield propagators."""
+
     @abstractmethod
     def propagate(self, wavefield: ComplexArrayType) -> ComplexArrayType:
         pass
 
 
 class AngularSpectrumPropagator(Propagator):
+    """Exact propagator using the angular-spectrum transfer function; valid for all Fresnel numbers."""
+
     def __init__(self, parameters: PropagatorParameters) -> None:
         ar = parameters.pixel_aspect_ratio
 
@@ -82,6 +88,8 @@ class AngularSpectrumPropagator(Propagator):
 
 
 class FresnelTransferFunctionPropagator(Propagator):
+    """Fresnel propagator using a paraxial transfer function in the frequency domain."""
+
     def __init__(self, parameters: PropagatorParameters) -> None:
         ar = parameters.pixel_aspect_ratio
 
@@ -97,6 +105,8 @@ class FresnelTransferFunctionPropagator(Propagator):
 
 
 class FresnelTransformPropagator(Propagator):
+    """Fresnel propagator using the direct Fresnel transform; changes pixel size between planes."""
+
     def __init__(self, parameters: PropagatorParameters) -> None:
         ipi = 1j * numpy.pi
 
@@ -123,6 +133,8 @@ class FresnelTransformPropagator(Propagator):
 
 
 class FraunhoferPropagator(Propagator):
+    """Far-field (Fraunhofer) propagator; valid when the Fresnel number is much less than one."""
+
     def __init__(self, parameters: PropagatorParameters) -> None:
         ipi = 1j * numpy.pi
 

@@ -46,7 +46,7 @@ class ProcessingStatusController(Observer):
         monitor.add_observer(self)
 
     def plot_losses(self, product_index: int) -> None:
-        # FIXME plot and progress can mismatch
+        # TODO fix so that plot and progress cannot mismatch
         if product_index < 0:
             self._view.axes.clear()
             return

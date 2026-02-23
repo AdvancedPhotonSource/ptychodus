@@ -1,3 +1,5 @@
+"""Probe (illumination function) data structures and file I/O plugin interfaces."""
+
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -14,6 +16,8 @@ from .propagator import intensity
 
 @dataclass(frozen=True)
 class FresnelZonePlate:
+    """Physical parameters of a Fresnel zone plate optic."""
+
     zone_plate_diameter_m: float
     outermost_zone_width_m: float
     central_beamstop_diameter_m: float
@@ -24,6 +28,8 @@ class FresnelZonePlate:
 
 @dataclass(frozen=True)
 class ProbeGeometry:
+    """Pixel dimensions and physical size of the probe array."""
+
     width_px: int
     height_px: int
     pixel_width_m: float
@@ -45,6 +51,8 @@ class ProbeGeometry:
 
 
 class ProbeGeometryProvider(ABC):
+    """Abstract source of detector and probe geometry."""
+
     @property
     @abstractmethod
     def detector_distance_m(self) -> float:
@@ -80,6 +88,8 @@ class ProbeGeometryProvider(ABC):
 
 
 class Probe:
+    """Probe (illumination function) stored as a (modes, height, width) complex array."""
+
     def __init__(
         self,
         array: ComplexArrayType,
@@ -144,6 +154,11 @@ class Probe:
 
 
 class ProbeSequence(Sequence[Probe]):
+    """Position-dependent probe ensemble stored as a (coherent, incoherent, height, width) array.
+
+    Supports optional OPR (orthogonal probe relaxation) weights for per-position probe variation.
+    """
+
     def __init__(
         self,
         array: ComplexArrayType | None,
@@ -281,14 +296,18 @@ class ProbeSequence(Sequence[Probe]):
 
 
 class ProbeFileReader(ABC):
+    """Plugin interface for reading probe sequences."""
+
     @abstractmethod
     def read(self, file_path: Path) -> ProbeSequence:
-        """reads a probe from file"""
+        """Read a probe sequence from file."""
         pass
 
 
 class ProbeFileWriter(ABC):
+    """Plugin interface for writing probe sequences."""
+
     @abstractmethod
     def write(self, file_path: Path, probes: ProbeSequence) -> None:
-        """writes a probe to file"""
+        """Write a probe sequence to file."""
         pass

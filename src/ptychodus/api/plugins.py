@@ -1,3 +1,5 @@
+"""Plugin registry and chooser for managing ptychodus extensions."""
+
 from __future__ import annotations
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
@@ -39,6 +41,8 @@ logger = logging.getLogger(__name__)
 
 
 class ProductProbePositionFileReader(ProbePositionFileReader):
+    """Adapter that extracts the probe positions from a ProductFileReader."""
+
     def __init__(self, reader: ProductFileReader) -> None:
         super().__init__()
         self._reader = reader
@@ -49,6 +53,8 @@ class ProductProbePositionFileReader(ProbePositionFileReader):
 
 
 class ProductProbeFileReader(ProbeFileReader):
+    """Adapter that extracts the probe sequence from a ProductFileReader."""
+
     def __init__(self, reader: ProductFileReader) -> None:
         super().__init__()
         self._reader = reader
@@ -59,6 +65,8 @@ class ProductProbeFileReader(ProbeFileReader):
 
 
 class ProductObjectFileReader(ObjectFileReader):
+    """Adapter that extracts the object from a ProductFileReader."""
+
     def __init__(self, reader: ProductFileReader) -> None:
         super().__init__()
         self._reader = reader
@@ -70,12 +78,16 @@ class ProductObjectFileReader(ObjectFileReader):
 
 @dataclass(frozen=True)
 class Plugin(Generic[T]):
+    """A registered plugin: its strategy object and both simple and display names."""
+
     strategy: T
     simple_name: str
     display_name: str
 
 
 class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
+    """Observable list of typed plugins with a tracked current selection."""
+
     def __init__(self) -> None:
         super().__init__()
         self._registered_plugins: list[Plugin[T]] = list()
@@ -133,6 +145,8 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
 
 
 class PluginRegistry:
+    """Central collection of PluginChooser instances for every plugin category."""
+
     def __init__(self) -> None:
         self.bad_pixels_file_readers = PluginChooser[BadPixelsFileReader]()
         self.diffraction_file_readers = PluginChooser[DiffractionFileReader]()

@@ -66,7 +66,7 @@ class ProbePositionsAPI:
         return iter(self._builder_factory)
 
     def build_probe_positions(
-        self, index: int, builder_name: str, builder_parameters: Mapping[str, Any] = {}
+        self, index: int, builder_name: str, builder_parameters: Mapping[str, Any] | None = None
     ) -> None:
         try:
             item = self._repository[index]
@@ -80,15 +80,16 @@ class ProbePositionsAPI:
             logger.warning(f'Failed to create builder {builder_name}!')
             return
 
-        for parameter_name, parameter_value in builder_parameters.items():
-            try:
-                parameter = builder.parameters()[parameter_name]
-            except KeyError:
-                logger.warning(
-                    f'Scan builder "{builder.get_name()}" does not have parameter "{parameter_name}"!'
-                )
-            else:
-                parameter.set_value(parameter_value)
+        if builder_parameters is not None:
+            for parameter_name, parameter_value in builder_parameters.items():
+                try:
+                    parameter = builder.parameters()[parameter_name]
+                except KeyError:
+                    logger.warning(
+                        f'Scan builder "{builder.get_name()}" does not have parameter "{parameter_name}"!'
+                    )
+                else:
+                    parameter.set_value(parameter_value)
 
         item.set_builder(builder)
 
@@ -175,7 +176,7 @@ class ProbeAPI:
         return iter(self._builder_factory)
 
     def build_probe(
-        self, index: int, builder_name: str, builder_parameters: Mapping[str, Any] = {}
+        self, index: int, builder_name: str, builder_parameters: Mapping[str, Any] | None = None
     ) -> None:
         try:
             item = self._repository[index]
@@ -189,16 +190,17 @@ class ProbeAPI:
             logger.warning(f'Failed to create builder {builder_name}!')
             return
 
-        for parameter_name, parameter_value in builder_parameters.items():
-            try:
-                parameter = builder.parameters()[parameter_name]
-            except KeyError:
-                logger.warning(
-                    f'Probe builder "{builder.get_name()}" does not have'
-                    f' parameter "{parameter_name}"!'
-                )
-            else:
-                parameter.set_value(parameter_value)
+        if builder_parameters is not None:
+            for parameter_name, parameter_value in builder_parameters.items():
+                try:
+                    parameter = builder.parameters()[parameter_name]
+                except KeyError:
+                    logger.warning(
+                        f'Probe builder "{builder.get_name()}" does not have'
+                        f' parameter "{parameter_name}"!'
+                    )
+                else:
+                    parameter.set_value(parameter_value)
 
         item.set_builder(builder)
 
@@ -283,7 +285,7 @@ class ObjectAPI:
         return iter(self._builder_factory)
 
     def build_object(
-        self, index: int, builder_name: str, builder_parameters: Mapping[str, Any] = {}
+        self, index: int, builder_name: str, builder_parameters: Mapping[str, Any] | None = None
     ) -> None:
         try:
             item = self._repository[index]
@@ -297,16 +299,17 @@ class ObjectAPI:
             logger.warning(f'Failed to create builder {builder_name}!')
             return
 
-        for parameter_name, parameter_value in builder_parameters.items():
-            try:
-                parameter = builder.parameters()[parameter_name]
-            except KeyError:
-                logger.warning(
-                    f'Object builder "{builder.get_name()}" does not have'
-                    f' parameter "{parameter_name}"!'
-                )
-            else:
-                parameter.set_value(parameter_value)
+        if builder_parameters is not None:
+            for parameter_name, parameter_value in builder_parameters.items():
+                try:
+                    parameter = builder.parameters()[parameter_name]
+                except KeyError:
+                    logger.warning(
+                        f'Object builder "{builder.get_name()}" does not have'
+                        f' parameter "{parameter_name}"!'
+                    )
+                else:
+                    parameter.set_value(parameter_value)
 
         item.set_builder(builder)
 

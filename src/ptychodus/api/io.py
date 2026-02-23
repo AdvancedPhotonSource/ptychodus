@@ -1,3 +1,5 @@
+"""I/O utilities for assembled diffraction data and data products."""
+
 from __future__ import annotations
 from enum import StrEnum
 from pathlib import Path

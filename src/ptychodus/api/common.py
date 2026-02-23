@@ -1,3 +1,5 @@
+"""Common type aliases, physical constants, and utility functions used throughout the API."""
+
 from typing import Any, Final, TypeAlias, overload
 
 import numpy
@@ -39,4 +41,5 @@ def lerp(
     upper: InexactArrayType | complex,
     frac: RealArrayType | float,
 ) -> InexactArrayType | complex:
+    """Linearly interpolate between *lower* and *upper* by fraction *frac* in [0, 1]."""
     return (1.0 - frac) * lower + frac * upper

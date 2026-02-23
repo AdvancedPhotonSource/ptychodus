@@ -65,7 +65,9 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         )
 
     def generate_probe_positions(
-        self, generator_name: str | None = None, generator_parameters: Mapping[str, Any] = {}
+        self,
+        generator_name: str | None = None,
+        generator_parameters: Mapping[str, Any] | None = None,
     ) -> None:
         if generator_name is None:
             self._probe_positions_api.build_probe_positions_from_settings(self._product_index)
@@ -83,7 +85,9 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         self._probe_api.open_probe(self._product_index, file_path, file_type=file_type)
 
     def generate_probe(
-        self, generator_name: str | None = None, generator_parameters: Mapping[str, Any] = {}
+        self,
+        generator_name: str | None = None,
+        generator_parameters: Mapping[str, Any] | None = None,
     ) -> None:
         if generator_name is None:
             self._probe_api.build_probe_from_settings(self._product_index)
@@ -94,7 +98,9 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         self._object_api.open_object(self._product_index, file_path, file_type=file_type)
 
     def generate_object(
-        self, generator_name: str | None = None, generator_parameters: Mapping[str, Any] = {}
+        self,
+        generator_name: str | None = None,
+        generator_parameters: Mapping[str, Any] | None = None,
     ) -> None:
         if generator_name is None:
             self._object_api.build_object_from_settings(self._product_index)

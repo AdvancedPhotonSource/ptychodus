@@ -1,3 +1,5 @@
+"""Product data structure bundling the probe positions, probe sequence, object and metadata."""
+
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -12,6 +14,8 @@ from .probe_positions import ProbePositionSequence
 
 @dataclass(frozen=True)
 class ProductMetadata:
+    """Metadata for the sample and experiment geometry."""
+
     name: str
     comments: str
     detector_distance_m: float
@@ -49,12 +53,16 @@ class ProductMetadata:
 
 @dataclass(frozen=True)
 class LossValue:
+    """Loss recorded at a given epoch."""
+
     epoch: int
     value: float
 
 
 @dataclass(frozen=True)
 class Product:
+    """A Data Product bundles metadata, positions, probes, object, and loss history."""
+
     metadata: ProductMetadata
     probe_positions: ProbePositionSequence
     probes: ProbeSequence
@@ -71,14 +79,18 @@ class Product:
 
 
 class ProductFileReader(ABC):
+    """Plugin interface for reading data products."""
+
     @abstractmethod
     def read(self, file_path: Path) -> Product:
-        """reads a product from file"""
+        """Read a data product from file."""
         pass
 
 
 class ProductFileWriter(ABC):
+    """Plugin interface for writing data products."""
+
     @abstractmethod
     def write(self, file_path: Path, product: Product) -> None:
-        """writes a product to file"""
+        """Write a data product to file."""
         pass

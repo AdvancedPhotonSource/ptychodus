@@ -1,3 +1,5 @@
+"""Reconstructor interfaces, I/O data containers, and assembled diffraction data management."""
+
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Sequence
@@ -25,6 +27,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ReconstructInput:
+    """All data required to start a reconstruction: patterns, bad-pixel mask, and initial product."""
+
     diffraction_patterns: DiffractionPatterns
     bad_pixels: BadPixels
     product: Product
@@ -32,12 +36,16 @@ class ReconstructInput:
 
 @dataclass(frozen=True)
 class ReconstructOutput:
+    """Reconstruction result yielded at each iteration: updated product, progress, and status code."""
+
     product: Product
     progress: int = 0
-    result: int = 0
+    status: int = 0
 
 
 class Reconstructor(ABC):
+    """Abstract interface for iterative ptychography reconstruction algorithms."""
+
     @property
     @abstractmethod
     def name(self) -> str:
@@ -54,13 +62,17 @@ class Reconstructor(ABC):
 
 @dataclass(frozen=True)
 class TrainOutput:
+    """Training result yielded at each step: loss curves, progress, and status code."""
+
     training_loss: Sequence[LossValue] = field(default_factory=list)
     validation_loss: Sequence[LossValue] = field(default_factory=list)
     progress: int = 0
-    result: int = 0
+    status: int = 0
 
 
 class TrainableReconstructor(Reconstructor):
+    """Reconstructor that also supports ML model loading and training."""
+
     @abstractmethod
     def is_model_loaded(self) -> bool:
         pass
@@ -87,6 +99,8 @@ class TrainableReconstructor(Reconstructor):
 
 
 class NullReconstructor(TrainableReconstructor):
+    """No-op TrainableReconstructor used as a placeholder when no algorithm is available."""
+
     def __init__(self, name: str) -> None:
         self._name = name
 
@@ -119,8 +133,11 @@ class NullReconstructor(TrainableReconstructor):
         yield from ()
 
 
-class ReconstructorLibrary(Iterable[Reconstructor]):
+class ReconstructorLibrary(Iterable[Reconstructor], ABC):
+    """Iterable collection of Reconstructor instances provided by a plugin library."""
+
     def __init__(self, logger_name: str) -> None:
+        super().__init__()
         self._logger = logging.getLogger(logger_name)
 
     @property
@@ -151,14 +168,14 @@ class ReconstructorLibrary(Iterable[Reconstructor]):
 
 
 class PositionIndexFilter(Enum):
-    """filters scan points by index"""
+    """Filter scan points by scan index."""
 
     ALL = auto()
     ODD = auto()
     EVEN = auto()
 
     def __call__(self, index: int) -> bool:
-        """include scan point if true, exclude otherwise"""
+        """Return True to include the scan point, False to exclude it."""
         if self is PositionIndexFilter.ODD:
             return index & 1 != 0
         elif self is PositionIndexFilter.EVEN:
@@ -168,6 +185,8 @@ class PositionIndexFilter(Enum):
 
 
 class AssembledDiffractionData:
+    """In-memory store for a complete set of indexed diffraction patterns and their bad-pixel mask."""
+
     def __init__(
         self, indexes: DiffractionIndexes, patterns: DiffractionPatterns, bad_pixels: BadPixels
     ) -> None:
