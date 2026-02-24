@@ -3,11 +3,10 @@ from dataclasses import dataclass
 import logging
 
 import numpy
-import numpy.typing
 import scipy.special
 
+from ptychodus.api.common import RealArrayType
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
-from ptychodus.api.typing import RealArrayType
 
 from .builder import ProbeSequenceBuilder
 from .settings import ProbeSettings

@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from skimage.restoration import unwrap_phase
 import numpy
 
-from ptychodus.api.typing import NumberArrayType, RealArrayType
+from ptychodus.api.common import NumberArrayType, RealArrayType
 
 
 class DataArrayComponent(ABC):

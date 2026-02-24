@@ -1,0 +1,37 @@
+from collections.abc import Sequence
+
+from ptychodus.api.reconstructor import ReconstructorLibrary
+from ptychodus.api.settings import SettingsRegistry
+
+from ..diffraction import DiffractionAPI
+from ..product import ProductAPI
+from ..task_manager import TaskManager
+from .api import ProcessingAPI, ProcessingAlgorithmParameter
+from .context import ProcessingContext
+from .settings import ProcessingSettings
+
+
+class ProcessingCore:
+    def __init__(
+        self,
+        task_manager: TaskManager,
+        settings_registry: SettingsRegistry,
+        diffraction_api: DiffractionAPI,
+        product_api: ProductAPI,
+        algorithm_libraries: Sequence[ReconstructorLibrary],
+    ) -> None:
+        self._settings = ProcessingSettings(settings_registry)
+        self.algorithm_parameter = ProcessingAlgorithmParameter(
+            self._settings.algorithm, algorithm_libraries
+        )
+        self._context = ProcessingContext(task_manager)
+        self.processing_api = ProcessingAPI(
+            task_manager,
+            diffraction_api,
+            product_api,
+            self.algorithm_parameter,
+            self._context,
+        )
+
+        for library in algorithm_libraries:
+            library.get_logger().addHandler(self._context.get_log_handler())

@@ -6,6 +6,7 @@ import time
 from scipy.sparse.linalg import lsmr, LinearOperator
 import numpy
 
+from ptychodus.api.common import RealArrayType
 from ptychodus.api.fluorescence import (
     ElementMap,
     FluorescenceDataset,
@@ -14,7 +15,6 @@ from ptychodus.api.fluorescence import (
 from ptychodus.api.object import ObjectPosition
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.product import Product
-from ptychodus.api.typing import RealArrayType
 
 from .settings import FluorescenceSettings
 

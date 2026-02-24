@@ -1,25 +1,25 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
     <qresource prefix="icons">
-        <file alias="automate">Font-Awesome-6.7.2/svgs/solid/robot.svg</file>
-        <file alias="autoscale">Font-Awesome-6.7.2/svgs/solid/arrows-left-right-to-line.svg</file>
-        <file alias="fourier">Font-Awesome-6.7.2/svgs/solid/f.svg</file>
+        <file alias="automate">Font-Awesome-7.1.0/svgs/solid/robot.svg</file>
+        <file alias="autoscale">Font-Awesome-7.1.0/svgs/solid/arrows-left-right-to-line.svg</file>
+        <file alias="fourier">Font-Awesome-7.1.0/svgs/solid/f.svg</file>
         <file alias="globus">globus.svg</file>
-        <file alias="home">Font-Awesome-6.7.2/svgs/solid/house-chimney.svg</file>
-        <file alias="line-cut">Font-Awesome-6.7.2/svgs/solid/chart-line.svg</file>
-        <file alias="move">Font-Awesome-6.7.2/svgs/solid/arrows-up-down-left-right.svg</file>
-        <file alias="object">Font-Awesome-6.7.2/svgs/solid/layer-group.svg</file>
-        <file alias="patterns">Font-Awesome-6.7.2/svgs/solid/table-cells.svg</file>
-        <file alias="positions">Font-Awesome-6.7.2/svgs/solid/route.svg</file>
-        <file alias="probe">Font-Awesome-6.7.2/svgs/solid/circle-radiation.svg</file>
-        <file alias="products">Font-Awesome-6.7.2/svgs/solid/list.svg</file>
+        <file alias="home">Font-Awesome-7.1.0/svgs/solid/house-chimney.svg</file>
+        <file alias="line-cut">Font-Awesome-7.1.0/svgs/solid/chart-line.svg</file>
+        <file alias="move">Font-Awesome-7.1.0/svgs/solid/arrows-up-down-left-right.svg</file>
+        <file alias="object">Font-Awesome-7.1.0/svgs/solid/layer-group.svg</file>
+        <file alias="patterns">Font-Awesome-7.1.0/svgs/solid/table-cells.svg</file>
+        <file alias="positions">Font-Awesome-7.1.0/svgs/solid/route.svg</file>
+        <file alias="probe">Font-Awesome-7.1.0/svgs/solid/circle-radiation.svg</file>
+        <file alias="processing">Font-Awesome-7.1.0/svgs/solid/microchip.svg</file>
+        <file alias="products">Font-Awesome-7.1.0/svgs/solid/list.svg</file>
         <file alias="ptychodus">ptychodus.svg</file>
-        <file alias="reconstructor">Font-Awesome-6.7.2/svgs/solid/screwdriver-wrench.svg</file>
-        <file alias="rectangle">Font-Awesome-6.7.2/svgs/solid/vector-square.svg</file>
-        <file alias="ruler">Font-Awesome-6.7.2/svgs/solid/ruler.svg</file>
-        <file alias="save">Font-Awesome-6.7.2/svgs/regular/floppy-disk.svg</file>
-        <file alias="send">Font-Awesome-6.7.2/svgs/solid/paper-plane.svg</file>
-        <file alias="settings">Font-Awesome-6.7.2/svgs/solid/gear.svg</file>
-        <file alias="sparkles">Font-Awesome-6.7.2/svgs/solid/wand-magic-sparkles.svg</file>
+        <file alias="rectangle">Font-Awesome-7.1.0/svgs/solid/object-group.svg</file>
+        <file alias="ruler">Font-Awesome-7.1.0/svgs/solid/ruler.svg</file>
+        <file alias="save">Font-Awesome-7.1.0/svgs/regular/floppy-disk.svg</file>
+        <file alias="send">Font-Awesome-7.1.0/svgs/solid/paper-plane.svg</file>
+        <file alias="settings">Font-Awesome-7.1.0/svgs/solid/gear.svg</file>
+        <file alias="sparkles">Font-Awesome-7.1.0/svgs/solid/wand-magic-sparkles.svg</file>
     </qresource>
 </RCC>

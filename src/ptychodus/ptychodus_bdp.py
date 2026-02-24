@@ -161,7 +161,7 @@ def main() -> int:
         logger.warning('Defocus distance is not implemented yet!')  # TODO
 
     with ModelCore(Path(args.settings.name), log_level=args.log_level) as model:
-        model.workflow_api.open_patterns(
+        workflow_diffraction_api = model.workflow_api.load_diffraction_data(
             Path(args.diffraction_input.name),
             crop_center=crop_center,
             crop_extent=crop_extent,
@@ -176,17 +176,17 @@ def main() -> int:
             exposure_time_s=args.exposure_time_s,
             tomography_angle_deg=args.tomography_angle_deg,
         )
-        workflow_product_api.open_probe_positions(Path(args.probe_position_input.name))
+        workflow_product_api.load_probe_positions(Path(args.probe_position_input.name))
         workflow_product_api.generate_probe()
         workflow_product_api.generate_object()
 
         staging_dir = args.output_directory
         staging_dir.mkdir(parents=True, exist_ok=True)
-        model.workflow_api.save_settings(staging_dir / StandardFileLayout.SETTINGS)
-        model.workflow_api.export_assembled_patterns(staging_dir / StandardFileLayout.DIFFRACTION)
+        workflow_diffraction_api.save_assembled_data(staging_dir / StandardFileLayout.DIFFRACTION)
         workflow_product_api.save_product(
             staging_dir / StandardFileLayout.PRODUCT_IN, file_type='HDF5'
         )
+        model.workflow_api.save_settings(staging_dir / StandardFileLayout.SETTINGS)
 
     return 0
 

@@ -2,9 +2,10 @@ import logging
 
 from ptychodus.api.settings import SettingsRegistry
 
+from ..diffraction import AssembledDiffractionDataset
 from ..product import ObjectRepository, ProductRepository
-from ..reconstructor import DiffractionPatternPositionMatcher
 from ..visualization import VisualizationEngine
+from .diffraction import DiffractionSimulator
 from .fourier import FourierAnalyzer
 from .frc import FourierRingCorrelator
 from .illumination import IlluminationMapper
@@ -19,10 +20,11 @@ class AnalysisCore:
     def __init__(
         self,
         settings_registry: SettingsRegistry,
-        data_matcher: DiffractionPatternPositionMatcher,
+        dataset: AssembledDiffractionDataset,
         product_repository: ProductRepository,
         object_repository: ObjectRepository,
     ) -> None:
+        self.diffraction_simulator = DiffractionSimulator(dataset, product_repository)
         self._probe_propagation_settings = ProbePropagationSettings(settings_registry)
         self.probe_propagator = ProbePropagator(
             self._probe_propagation_settings, product_repository

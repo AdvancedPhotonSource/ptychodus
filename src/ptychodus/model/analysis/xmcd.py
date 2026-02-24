@@ -7,21 +7,30 @@ import logging
 
 import numpy
 
+from ptychodus.api.common import ComplexArrayType, RealArrayType
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import ObjectCenter
 from ptychodus.api.observer import Observable
-from ptychodus.api.typing import ComplexArrayType
 
 from ..product import ProductRepository
+
+__all__ = [
+    'XMCDAnalyzer',
+    'XMCDResult',
+]
 
 logger = logging.getLogger(__name__)
 
 
+def robust_log_amplitude(array: ComplexArrayType, epsilon: float = 1e-10) -> RealArrayType:
+    return numpy.log(numpy.maximum(numpy.absolute(array), epsilon))
+
+
 @dataclass(frozen=True)
 class XMCDResult:
-    polar_difference: ComplexArrayType
-    polar_sum: ComplexArrayType
-    polar_ratio: ComplexArrayType
+    polar_difference: RealArrayType
+    polar_sum: RealArrayType
+    polar_ratio: RealArrayType
     pixel_geometry: PixelGeometry
     center: ObjectCenter
 
@@ -84,19 +93,16 @@ class XMCDAnalyzer(Observable):
             raise ValueError('Object pixel height mismatch!')
 
         # TODO align lcirc_array/rcirc_array
-        lcirc_amp = numpy.absolute(lcirc_object.get_layers_flattened())
-        rcirc_amp = numpy.absolute(rcirc_object.get_layers_flattened())
+        lcirc_log_amp = robust_log_amplitude(lcirc_object.get_layers_flattened())
+        rcirc_log_amp = robust_log_amplitude(rcirc_object.get_layers_flattened())
 
-        ratio = numpy.divide(lcirc_amp, rcirc_amp)
-        product = numpy.multiply(lcirc_amp, rcirc_amp)
-
-        polar_difference = numpy.log(ratio, out=numpy.zeros_like(ratio), where=(ratio > 0.0))
-        polar_sum = numpy.log(product, out=numpy.zeros_like(product), where=(product > 0.0))
+        polar_difference = lcirc_log_amp - rcirc_log_amp
+        polar_sum = lcirc_log_amp + rcirc_log_amp
         polar_ratio = numpy.divide(
             polar_difference,
             polar_sum,
             out=numpy.zeros_like(polar_sum),
-            where=(polar_sum > 0.0),
+            where=(numpy.absolute(polar_sum) > 1e-10),
         )
 
         self._result = XMCDResult(

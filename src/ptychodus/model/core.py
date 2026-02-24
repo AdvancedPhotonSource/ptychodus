@@ -34,7 +34,7 @@ from .product import PositionsStreamingContext, ProductCore
 from .ptychi import PtyChiReconstructorLibrary
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopinn import PtychoPINNReconstructorLibrary
-from .reconstructor import ReconstructorCore
+from .processing import ProcessingCore
 from .task_manager import TaskManager
 from .visualization import VisualizationEngine
 from .workflow import ConcreteWorkflowAPI
@@ -114,6 +114,7 @@ class ModelCore:
             self.rng,
             self.settings_registry,
             self.diffraction_core.pattern_sizer,
+            self.diffraction_core.diffraction_api,
             self.diffraction_core.dataset,
             self.plugin_registry.probe_position_file_readers,
             self.plugin_registry.probe_position_file_writers,
@@ -142,16 +143,16 @@ class ModelCore:
             self.diffraction_core.pattern_sizer,
             self.is_developer_mode_enabled,
         )
-        self.ptychonn_reconstructor_library = PtychoNNReconstructorLibrary.create_instance(
+        self.ptychonn_reconstructor_library = PtychoNNReconstructorLibrary(
             self.settings_registry, self.is_developer_mode_enabled
         )
         self.ptychopinn_reconstructor_library = PtychoPINNReconstructorLibrary(
             self.settings_registry, self.is_developer_mode_enabled
         )
-        self.reconstructor_core = ReconstructorCore(
+        self.processing_core = ProcessingCore(
             self._task_manager,
             self.settings_registry,
-            self.diffraction_core.dataset,
+            self.diffraction_core.diffraction_api,
             self.product_core.product_api,
             [
                 self.ptychi_reconstructor_library,
@@ -169,14 +170,16 @@ class ModelCore:
         )
         self.analysis_core = AnalysisCore(
             self.settings_registry,
-            self.reconstructor_core.data_matcher,
+            self.diffraction_core.dataset,
             self.product_core.product_repository,
             self.product_core.object_repository,
         )
         self.globus_core = GlobusCore(
+            self._task_manager,
             self.settings_registry,
             self.diffraction_core.diffraction_api,
             self.product_core.product_api,
+            self.processing_core.processing_api,
         )
         self.workflow_api: WorkflowAPI = ConcreteWorkflowAPI(
             self.settings_registry,
@@ -185,10 +188,11 @@ class ModelCore:
             self.product_core.probe_positions_api,
             self.product_core.probe_api,
             self.product_core.object_api,
-            self.reconstructor_core.reconstructor_api,
+            self.processing_core.processing_api,
             self.globus_core.executor,
         )
         self.automation_core = AutomationCore(
+            self._task_manager,
             self.settings_registry,
             self.workflow_api,
             self.plugin_registry.file_based_workflows,
@@ -233,11 +237,22 @@ class ModelCore:
 
     def run_tasks(self) -> None:
         self._task_manager.run_foreground_tasks()
-        self.reconstructor_core.notify_observers_if_progress_changed()
 
     def _batch_mode_train(self, input_directory: Path, output_directory: Path) -> int:
-        output = self.workflow_api.train_reconstructor(input_directory, output_directory)
-        return output.result
+        product_in_path = input_directory / StandardFileLayout.PRODUCT_IN
+
+        if product_in_path.is_file():
+            product_out_path = output_directory / StandardFileLayout.PRODUCT_OUT
+
+            if product_out_path.is_file():
+                logger.warning('Output product file will be overwritten!')
+
+            input_product_api = self.workflow_api.load_product(product_in_path)
+            input_product_api.train_reconstructor_local(input_directory, output_directory)
+            return 0
+        else:
+            logger.error('Input product is not a file!')
+            return -1
 
     def _batch_mode_reconstruct(self, input_directory: Path, output_directory: Path) -> int:
         settings_path = input_directory / StandardFileLayout.SETTINGS
@@ -250,7 +265,7 @@ class ModelCore:
         diffraction_path = input_directory / StandardFileLayout.DIFFRACTION
 
         if diffraction_path.is_file():
-            self.workflow_api.import_assembled_patterns(diffraction_path)
+            self.workflow_api.load_assembled_diffraction_data(diffraction_path)
         else:
             logger.error('Diffraction data is not a file!')
             return -1
@@ -263,9 +278,10 @@ class ModelCore:
             if product_out_path.is_file():
                 logger.warning('Output product file will be overwritten!')
 
-            input_product_api = self.workflow_api.open_product(product_in_path)
-            output_product_api = input_product_api.reconstruct_local(block=True)
-            output_product_api.save_product(product_out_path)
+            input_product_api = self.workflow_api.load_product(product_in_path)
+            output_product_api = input_product_api.reconstruct_local(
+                output_product_file=product_out_path, block=True
+            )
         else:
             logger.error('Input product is not a file!')
             return -1
@@ -297,11 +313,12 @@ class ModelCore:
 
         output_directory.mkdir(parents=True, exist_ok=True)
 
-        # TODO add enum for actions
         match action.lower():
+            case 'reconstruct':
+                return self._batch_mode_reconstruct(input_directory, output_directory)
             case 'train':
                 return self._batch_mode_train(input_directory, output_directory)
-            case 'reconstruct':
+            case 'infer':
                 return self._batch_mode_reconstruct(input_directory, output_directory)
 
         logger.error(f'Unknown batch mode action "{action}"!')

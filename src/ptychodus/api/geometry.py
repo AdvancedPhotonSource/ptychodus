@@ -1,3 +1,5 @@
+"""2D geometric primitives: points, lines, boxes, intervals, and pixel/image geometry."""
+
 from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
@@ -8,6 +10,8 @@ T = TypeVar('T', int, float, Decimal)
 
 @dataclass(frozen=True)
 class AffineTransform:
+    """2D affine transformation expressed as a 2x3 matrix; callable as transform(x, y) -> (x', y')."""
+
     a00: float
     a01: float
     a02: float
@@ -16,23 +20,23 @@ class AffineTransform:
     a11: float
     a12: float
 
-    def __call__(self, y: float, x: float) -> tuple[float, float]:
-        yp = self.a00 * y + self.a01 * x + self.a02
-        xp = self.a10 * y + self.a11 * x + self.a12
+    def __call__(self, x: float, y: float) -> tuple[float, float]:
+        yp = self.a00 * x + self.a01 * y + self.a02
+        xp = self.a10 * x + self.a11 * y + self.a12
         return yp, xp
 
 
 @dataclass(frozen=True)
 class PixelGeometry:
+    """Physical dimensions of a single detector or probe pixel in meters."""
+
     width_m: float
     height_m: float
 
-    @property
-    def area_m2(self) -> float:
+    def get_area_m2(self) -> float:
         return self.width_m * self.height_m
 
-    @property
-    def aspect_ratio(self) -> float:
+    def get_aspect_ratio(self) -> float:
         return self.width_m / self.height_m
 
     def copy(self) -> PixelGeometry:
@@ -44,34 +48,38 @@ class PixelGeometry:
 
 @dataclass(frozen=True)
 class ImageExtent:
+    """Integer pixel dimensions (width × height) of an image or detector."""
+
     width_px: int
     height_px: int
 
-    @property
-    def size(self) -> int:
-        """returns the number of pixels in the image"""
+    def get_size(self) -> int:
+        """Return the number of pixels in the image."""
         return self.width_px * self.height_px
 
-    @property
-    def shape(self) -> tuple[int, int]:
-        """returns the image shape (height_px, width_px) tuple"""
+    def get_shape(self) -> tuple[int, int]:
+        """Return the image shape as a (height_px, width_px) tuple."""
         return self.height_px, self.width_px
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, ImageExtent):
-            return self.shape == other.shape
+            return self.get_shape() == other.get_shape()
 
         return False
 
 
 @dataclass(frozen=True)
 class Point2D:
+    """Floating-point 2D point."""
+
     x: float
     y: float
 
 
 @dataclass(frozen=True)
 class Line2D:
+    """2D line segment between two points with linear interpolation."""
+
     begin: Point2D
     end: Point2D
 
@@ -84,6 +92,8 @@ class Line2D:
 
 @dataclass(frozen=True)
 class Box2D:
+    """Axis-aligned 2D bounding box defined by its top-left corner, width, and height."""
+
     x: float
     y: float
     width: float
@@ -115,6 +125,8 @@ class Box2D:
 
 
 class Interval(Generic[T]):
+    """Closed interval [lower, upper] with clamp, hull, and membership operations."""
+
     def __init__(self, lower: T, upper: T) -> None:
         self.lower: T = lower
         self.upper: T = upper
@@ -126,7 +138,6 @@ class Interval(Generic[T]):
         else:
             return Interval[T](a, b)
 
-    @property
     def is_empty(self) -> bool:
         return self.upper < self.lower
 
@@ -139,12 +150,10 @@ class Interval(Generic[T]):
         else:
             return Interval[T](min(self.lower, value), max(self.upper, value))
 
-    @property
-    def length(self) -> T:
+    def get_length(self) -> T:
         return self.upper - self.lower
 
-    @property
-    def midrange(self) -> T:
+    def get_midrange(self) -> T:
         total = self.lower + self.upper
         return total // 2 if isinstance(total, int) else total / 2
 

@@ -1,22 +1,21 @@
+"""Product data structure bundling the probe positions, probe sequence, object and metadata."""
+
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Final
 from dataclasses import dataclass
 from pathlib import Path
 from sys import getsizeof
 
+from .common import ELECTRON_VOLT_J, PLANCK_CONSTANT_J_PER_HZ, LIGHT_SPEED_M_PER_S
 from .object import Object
 from .probe import ProbeSequence
 from .probe_positions import ProbePositionSequence
 
-# Source: https://physics.nist.gov/cuu/Constants/index.html
-ELECTRON_VOLT_J: Final[float] = 1.602176634e-19
-LIGHT_SPEED_M_PER_S: Final[float] = 299792458
-PLANCK_CONSTANT_J_PER_HZ: Final[float] = 6.62607015e-34
-
 
 @dataclass(frozen=True)
 class ProductMetadata:
+    """Metadata for the sample and experiment geometry."""
+
     name: str
     comments: str
     detector_distance_m: float
@@ -54,12 +53,16 @@ class ProductMetadata:
 
 @dataclass(frozen=True)
 class LossValue:
+    """Loss recorded at a given epoch."""
+
     epoch: int
     value: float
 
 
 @dataclass(frozen=True)
 class Product:
+    """A Data Product bundles metadata, positions, probes, object, and loss history."""
+
     metadata: ProductMetadata
     probe_positions: ProbePositionSequence
     probes: ProbeSequence
@@ -76,14 +79,18 @@ class Product:
 
 
 class ProductFileReader(ABC):
+    """Plugin interface for reading data products."""
+
     @abstractmethod
     def read(self, file_path: Path) -> Product:
-        """reads a product from file"""
+        """Read a data product from file."""
         pass
 
 
 class ProductFileWriter(ABC):
+    """Plugin interface for writing data products."""
+
     @abstractmethod
     def write(self, file_path: Path, product: Product) -> None:
-        """writes a product to file"""
+        """Write a data product to file."""
         pass

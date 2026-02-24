@@ -73,14 +73,18 @@ class ProbePositionTransform(ParameterGroup):
 
         if self.swap_xy(index):
             self.affine00.set_value(0)
-            self.affine01.set_value(-1 if self.negate_x(index) else +1)
-            self.affine10.set_value(-1 if self.negate_y(index) else +1)
+            self.affine01.set_value(-1 if self.negate_y(index) else +1)
+            self.affine02.set_value(0)
+            self.affine10.set_value(-1 if self.negate_x(index) else +1)
             self.affine11.set_value(0)
+            self.affine12.set_value(0)
         else:
-            self.affine00.set_value(-1 if self.negate_y(index) else +1)
+            self.affine00.set_value(-1 if self.negate_x(index) else +1)
             self.affine01.set_value(0)
+            self.affine02.set_value(0)
             self.affine10.set_value(0)
-            self.affine11.set_value(-1 if self.negate_x(index) else +1)
+            self.affine11.set_value(-1 if self.negate_y(index) else +1)
+            self.affine12.set_value(0)
 
         self.block_notifications(False)
 
@@ -94,12 +98,25 @@ class ProbePositionTransform(ParameterGroup):
             a12=self.affine12.get_value(),
         )
 
+    def set_transform(self, transform: AffineTransform) -> None:
+        self.block_notifications(True)
+
+        self.affine00.set_value(transform.a00)
+        self.affine01.set_value(transform.a01)
+        self.affine02.set_value(transform.a02)
+
+        self.affine10.set_value(transform.a10)
+        self.affine11.set_value(transform.a11)
+        self.affine12.set_value(transform.a12)
+
+        self.block_notifications(False)
+
     def set_identity(self) -> None:
         self.apply_presets(0)
 
     def __call__(self, point: ProbePosition) -> ProbePosition:
         transform = self.get_transform()
-        pos_y, pos_x = transform(point.coordinate_y_m, point.coordinate_x_m)
+        pos_x, pos_y = transform(point.coordinate_x_m, point.coordinate_y_m)
         rad = self.jitter_radius_m.get_value()
 
         if rad > 0.0:

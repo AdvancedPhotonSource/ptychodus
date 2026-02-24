@@ -4,6 +4,7 @@ from typing import Final
 try:
     __version__ = version('ptychodus')
 except PackageNotFoundError:
+    # package is not installed
     __version__ = 'unknown'
 
 try:

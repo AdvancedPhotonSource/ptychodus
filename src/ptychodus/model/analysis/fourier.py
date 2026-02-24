@@ -3,10 +3,10 @@ import logging
 
 from scipy.fft import fft2, fftshift, ifftshift
 
+from ptychodus.api.common import ComplexArrayType
 from ptychodus.api.geometry import Box2D, PixelGeometry
 from ptychodus.api.object import Object
 from ptychodus.api.observer import Observable
-from ptychodus.api.typing import ComplexArrayType
 
 from ..product import ProductRepository
 from .interpolators import NearestNeighborArrayInterpolator

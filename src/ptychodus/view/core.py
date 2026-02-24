@@ -18,12 +18,10 @@ from PyQt5.QtWidgets import (
 
 from . import resources  # noqa
 from .agent import AgentView, AgentChatView
-from .automation import AutomationView
 from .diffraction import PatternsView
-from .globus import GlobusParametersView
 from .image import ImageView
 from .product import ProductView
-from .reconstructor import ReconstructorView, ReconstructorPlotView
+from .processing import ProcessingStatusView
 from .repository import RepositoryTableView, RepositoryTreeView
 from .probe_positions import ProbePositionsPlotView
 from .settings import SettingsView
@@ -68,7 +66,7 @@ class ViewCore(QMainWindow):
             QIcon(':/icons/positions'), 'Positions'
         )
         self.probe_positions_view = RepositoryTableView()
-        self.probe_positions_plot_view = ProbePositionsPlotView.create_instance()
+        self.probe_positions_plot_view = ProbePositionsPlotView()
 
         self.probe_action = self.navigation_tool_bar.addAction(QIcon(':/icons/probe'), 'Probe')
         self.probe_view = RepositoryTreeView()
@@ -78,23 +76,23 @@ class ViewCore(QMainWindow):
         self.object_view = RepositoryTreeView()
         self.object_image_view = ImageView()
 
-        self.reconstructor_action = self.navigation_tool_bar.addAction(
-            QIcon(':/icons/reconstructor'), 'Reconstructor'
+        self.processing_action = self.navigation_tool_bar.addAction(
+            QIcon(':/icons/processing'), 'Processing'
         )
-        self.reconstructor_view = ReconstructorView()
-        self.reconstructor_plot_view = ReconstructorPlotView()
+        self.processing_view = QWidget()
+        self.processing_status_view = ProcessingStatusView()
 
         self.globus_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/globus'),
             'Globus',
         )
-        self.globus_parameters_view = GlobusParametersView.create_instance()
-        self.globus_table_view = QTableView()
+        self.globus_view = QWidget()
+        self.globus_status_view = QTableView()
 
         self.automation_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/automate'), 'Automation'
         )
-        self.automation_view = AutomationView.create_instance()
+        self.automation_view = QWidget()
         self.automation_widget = QWidget()
 
         self.agent_action = self.navigation_tool_bar.addAction(
@@ -125,8 +123,8 @@ class ViewCore(QMainWindow):
         self.left_panel.addWidget(self.probe_positions_view)
         self.left_panel.addWidget(self.probe_view)
         self.left_panel.addWidget(self.object_view)
-        self.left_panel.addWidget(self.reconstructor_view)
-        self.left_panel.addWidget(self.globus_parameters_view)
+        self.left_panel.addWidget(self.processing_view)
+        self.left_panel.addWidget(self.globus_view)
         self.left_panel.addWidget(self.automation_view)
         self.left_panel.addWidget(self.agent_view)
         self.left_panel.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
@@ -139,8 +137,8 @@ class ViewCore(QMainWindow):
         self.right_panel.addWidget(self.probe_positions_plot_view)
         self.right_panel.addWidget(self.probe_image_view)
         self.right_panel.addWidget(self.object_image_view)
-        self.right_panel.addWidget(self.reconstructor_plot_view)
-        self.right_panel.addWidget(self.globus_table_view)
+        self.right_panel.addWidget(self.processing_status_view)
+        self.right_panel.addWidget(self.globus_status_view)
         self.right_panel.addWidget(self.automation_widget)
         self.right_panel.addWidget(self.agent_chat_view)
         self.right_panel.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)

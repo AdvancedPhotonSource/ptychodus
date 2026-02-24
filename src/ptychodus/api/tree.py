@@ -1,8 +1,12 @@
+"""Simple tree data structure used for representing dataset layouts."""
+
 from __future__ import annotations
 from collections.abc import Sequence
 
 
 class SimpleTreeNode:
+    """Node in a string-labelled tree, used to expose dataset hierarchy."""
+
     def __init__(self, parent_item: SimpleTreeNode | None, item_data: Sequence[str]) -> None:
         self.parent_item = parent_item
         self.item_data = item_data

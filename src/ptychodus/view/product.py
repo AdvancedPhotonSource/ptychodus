@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from PyQt5.QtWidgets import (
-    QAbstractButton,
     QDialog,
     QDialogButtonBox,
     QGroupBox,
@@ -56,7 +55,7 @@ class ProductEditorDialog(QDialog):
         self.button_box = QDialogButtonBox()
 
         self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
-        self.button_box.clicked.connect(self._handle_button_box_clicked)
+        self.button_box.accepted.connect(self.accept)
 
         top_layout = QHBoxLayout()
         top_layout.addWidget(self.properties_view)
@@ -75,12 +74,6 @@ class ProductEditorDialog(QDialog):
     @property
     def text_edit(self) -> QPlainTextEdit:
         return self.comments_view.text_edit
-
-    def _handle_button_box_clicked(self, button: QAbstractButton) -> None:
-        if self.button_box.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
-            self.accept()
-        else:
-            self.reject()
 
 
 class ProductButtonBox(QWidget):

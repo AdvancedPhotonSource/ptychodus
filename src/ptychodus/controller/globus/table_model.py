@@ -3,11 +3,11 @@ from typing import Any
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QUrl
 from PyQt5.QtGui import QColor, QFont
 
-from ...model.globus import GlobusStatusPresenter
+from ...model.globus import GlobusStatusRepository
 
 
-class GlobusTableModel(QAbstractTableModel):
-    def __init__(self, presenter: GlobusStatusPresenter, parent: QObject | None = None) -> None:
+class GlobusStatusTableModel(QAbstractTableModel):
+    def __init__(self, presenter: GlobusStatusRepository, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._presenter = presenter
         self._section_headers = [
@@ -27,10 +27,11 @@ class GlobusTableModel(QAbstractTableModel):
         role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
         if role == Qt.ItemDataRole.DisplayRole:
-            if orientation == Qt.Orientation.Horizontal:
-                return self._section_headers[section]
-            elif orientation == Qt.Orientation.Vertical:
-                return section
+            match orientation:
+                case Qt.Orientation.Horizontal:
+                    return self._section_headers[section]
+                case Qt.Orientation.Vertical:
+                    return section
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid():
@@ -52,17 +53,18 @@ class GlobusTableModel(QAbstractTableModel):
                     case 5:
                         return flow_run.run_id
             elif index.column() == 5:
-                if role == Qt.ItemDataRole.ToolTipRole:
-                    return flow_run.run_url
-                elif role == Qt.ItemDataRole.FontRole:
-                    font = QFont()
-                    font.setUnderline(True)
-                    return font
-                elif role == Qt.ItemDataRole.ForegroundRole:
-                    color = QColor(Qt.GlobalColor.blue)
-                    return color
-                elif role == Qt.ItemDataRole.UserRole:
-                    return QUrl(flow_run.run_url)
+                match role:
+                    case Qt.ItemDataRole.ToolTipRole:
+                        return flow_run.run_url
+                    case Qt.ItemDataRole.FontRole:
+                        font = QFont()
+                        font.setUnderline(True)
+                        return font
+                    case Qt.ItemDataRole.ForegroundRole:
+                        color = QColor(Qt.GlobalColor.blue)
+                        return color
+                    case Qt.ItemDataRole.UserRole:
+                        return QUrl(flow_run.run_url)
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._presenter)

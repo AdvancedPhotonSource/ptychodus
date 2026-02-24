@@ -1,78 +1,61 @@
-import logging
-
-from PyQt5.QtCore import Qt, QModelIndex, QSortFilterProxyModel, QTimer
-from PyQt5.QtWidgets import QAbstractItemView, QTableView
-from PyQt5.QtGui import QDesktopServices
+from PyQt5.QtWidgets import (
+    QFormLayout,
+    QGroupBox,
+    QPushButton,
+    QWidget,
+)
 
 from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.parametric import BooleanParameter, IntegerParameter
 
-from ...model.globus import GlobusStatusPresenter
-from ...view.globus import GlobusStatusView
-from .table_model import GlobusTableModel
-
-logger = logging.getLogger(__name__)
+from ...controller.parametric import SpinBoxParameterViewController
+from ...model.globus import GlobusStatusRepository
+from ..parametric import CheckBoxParameterViewController, ParameterViewController
 
 
-class GlobusStatusController(Observer):
+class GlobusStatusViewController(ParameterViewController, Observer):
     def __init__(
         self,
-        presenter: GlobusStatusPresenter,
-        view: GlobusStatusView,
-        table_view: QTableView,
+        status_auto_refresh: BooleanParameter,
+        status_refresh_interval_s: IntegerParameter,
+        status_repository: GlobusStatusRepository,
     ) -> None:
         super().__init__()
-        self._presenter = presenter
-        self._view = view
-        self._table_view = table_view
-        self._table_model = GlobusTableModel(presenter)
-        self._proxy_model = QSortFilterProxyModel()
-        self._proxy_model.setSourceModel(self._table_model)
-        self._timer = QTimer()
-        self._timer.timeout.connect(presenter.refresh_status)
+        self._status_auto_refresh = status_auto_refresh
+        self._status_refresh_interval_s = status_refresh_interval_s
+        self._status_repository = status_repository
 
-        table_view.setModel(self._proxy_model)
-        table_view.setSortingEnabled(True)
-        table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        table_view.clicked.connect(self._handle_table_view_clicked)
-
-        view.auto_refresh_check_box.toggled.connect(self._auto_refresh_status)
-        view.auto_refresh_spin_box.valueChanged.connect(presenter.set_refresh_interval_s)
-        view.refresh_button.clicked.connect(presenter.refresh_status)
-
-        self._sync_model_to_view()
-        presenter.add_observer(self)
-
-    def _handle_table_view_clicked(self, index: QModelIndex) -> None:
-        if index.column() == 5:
-            url = index.data(Qt.ItemDataRole.UserRole)
-            logger.info(f'Opening URL: "{url.toString()}"')
-            QDesktopServices.openUrl(url)
-
-    def _auto_refresh_status(self) -> None:
-        if self._view.auto_refresh_check_box.isChecked():
-            self._timer.start(1000 * self._presenter.get_refresh_interval_s())
-            self._view.auto_refresh_spin_box.setEnabled(False)
-            self._view.refresh_button.setEnabled(False)
-        else:
-            self._timer.stop()
-            self._view.auto_refresh_spin_box.setEnabled(True)
-            self._view.refresh_button.setEnabled(True)
-
-    def refresh_table_view(self) -> None:
-        # TODO only reset if changed
-        self._table_model.beginResetModel()
-        self._table_model.endResetModel()
-
-    def _sync_model_to_view(self) -> None:
-        refresh_interval_limits_s = self._presenter.get_refresh_interval_limits_s()
-
-        self._view.auto_refresh_spin_box.blockSignals(True)
-        self._view.auto_refresh_spin_box.setRange(
-            refresh_interval_limits_s.lower, refresh_interval_limits_s.upper
+        self._auto_refresh_view_controller = CheckBoxParameterViewController(
+            status_auto_refresh, 'Auto Refresh [sec]:'
         )
-        self._view.auto_refresh_spin_box.setValue(self._presenter.get_refresh_interval_s())
-        self._view.auto_refresh_spin_box.blockSignals(False)
+        self._status_refresh_interval_view_controller = SpinBoxParameterViewController(
+            status_refresh_interval_s
+        )
+        self._refresh_button = QPushButton('Refresh')
+        self._refresh_button.clicked.connect(status_repository.refresh_status)
+
+        layout = QFormLayout()
+        layout.addRow(
+            self._auto_refresh_view_controller.get_widget(),
+            self._status_refresh_interval_view_controller.get_widget(),
+        )
+        layout.addRow(self._refresh_button)
+
+        self._widget = QGroupBox('Status')
+        self._widget.setLayout(layout)
+
+        status_auto_refresh.add_observer(self)
+        self._update_enabled_widgets()
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+    def _update_enabled_widgets(self) -> None:
+        status_refresh_interval_widget = self._status_refresh_interval_view_controller.get_widget()
+        enable = not self._status_auto_refresh.get_value()
+        status_refresh_interval_widget.setEnabled(enable)
+        self._refresh_button.setEnabled(enable)
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._presenter:
-            self._sync_model_to_view()
+        if observable is self._status_auto_refresh:
+            self._update_enabled_widgets()

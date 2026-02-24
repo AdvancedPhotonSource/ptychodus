@@ -6,10 +6,10 @@ import logging
 
 import numpy
 
+from ptychodus.api.common import ComplexArrayType
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter, ObjectFileReader, ObjectGeometryProvider
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.typing import ComplexArrayType
 
 from ...phase_unwrapper import PhaseUnwrapper
 from .settings import ObjectSettings

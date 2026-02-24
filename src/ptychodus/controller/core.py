@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Final
 
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QAction
@@ -18,15 +19,18 @@ from .product import ProductController
 from .ptychi import PtyChiViewControllerFactory
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopinn import PtychoPINNViewControllerFactory
-from .reconstructor import ReconstructorController
+from .processing import ProcessingController
 from .probe_positions import ProbePositionsController
 from .settings import SettingsController
 
 
 class ControllerCore:
+    ONE_HOUR_S: Final[int] = 3600
+
     def __init__(
         self, model: ModelCore, view: ViewCore, *, is_developer_mode_enabled: bool = False
     ) -> None:
+        self.model = model
         self.view = view
         self._status_bar = view.statusBar()
 
@@ -64,12 +68,14 @@ class ControllerCore:
             model.diffraction_core.diffraction_api,
             model.diffraction_core.dataset,
             model.metadata_presenter,
+            model.product_core.product_repository,
+            model.analysis_core.diffraction_simulator,
             view.patterns_view,
             self._patterns_image_controller,
             self._file_dialog_factory,
         )
         self._product_controller = ProductController.create_instance(
-            model.diffraction_core.dataset,
+            model.diffraction_core.diffraction_api,
             model.product_core.product_repository,
             model.product_core.product_api,
             view.product_view,
@@ -101,7 +107,6 @@ class ControllerCore:
             model.fluorescence_core.visualization_engine,
             view.probe_view,
             self._file_dialog_factory,
-            is_developer_mode_enabled=is_developer_mode_enabled,
         )
         self._object_image_controller = ImageController(
             model.object_visualization_engine,
@@ -122,13 +127,13 @@ class ControllerCore:
             view.object_view,
             self._file_dialog_factory,
         )
-        self._reconstructor_controller = ReconstructorController(
-            model.reconstructor_core.reconstructor_api.get_progress_monitor(),
-            model.reconstructor_core.presenter,
+        self._processing_controller = ProcessingController(
+            model.processing_core.algorithm_parameter,
+            model.processing_core.processing_api,
             model.product_core.product_repository,
-            view.reconstructor_view,
-            view.reconstructor_plot_view,
-            self._product_controller.table_model,
+            model.globus_core,
+            view.processing_view,
+            view.processing_status_view,
             self._file_dialog_factory,
             [
                 self._ptychi_view_controller_factory,
@@ -137,18 +142,17 @@ class ControllerCore:
             ],
         )
         self._globus_controller = GlobusController(
-            model.globus_core.parameters_presenter,
-            model.globus_core.authorization_presenter,
-            model.globus_core.status_presenter,
-            model.globus_core.execution_presenter,
-            view.globus_parameters_view,
-            view.globus_table_view,
-            self._product_controller.table_model,
+            model.globus_core.settings,
+            model.globus_core.authorizer,
+            model.globus_core.status_repository,
+            view.globus_view,
+            view.globus_status_view,
+            self._file_dialog_factory,
         )
-        self._automation_controller = AutomationController.create_instance(
-            model.automation_core,
+        self._automation_controller = AutomationController(
+            model.automation_core.settings,
+            model.automation_core.repository,
             model.automation_core.presenter,
-            model.automation_core.processing_presenter,
             view.automation_view,
             self._file_dialog_factory,
         )
@@ -159,9 +163,10 @@ class ControllerCore:
             model.agent_core.chat_history, model.agent_core.presenter, view.agent_chat_view
         )
 
-        self._run_foreground_tasks_timer = QTimer()
-        self._run_foreground_tasks_timer.timeout.connect(model.run_tasks)
-        self._run_foreground_tasks_timer.start(1000)  # TODO make configurable
+        self._one_second_counter = 0
+        self._run_tasks_timer = QTimer()
+        self._run_tasks_timer.timeout.connect(self._run_tasks)
+        self._run_tasks_timer.start(1000)
 
         view.globus_action.setVisible(model.globus_core.is_supported)
 
@@ -185,3 +190,13 @@ class ControllerCore:
         index = action.data()
         self.view.left_panel.setCurrentIndex(index)
         self.view.right_panel.setCurrentIndex(index)
+
+    def _run_tasks(self) -> None:
+        self.model.run_tasks()
+        self._memory_controller.run_tasks(self._one_second_counter)
+        self._globus_controller.run_tasks(self._one_second_counter)
+        self._one_second_counter += 1
+
+        # counter value is not intended to be precise; protect from overflow
+        if self._one_second_counter > ControllerCore.ONE_HOUR_S:
+            self._one_second_counter -= ControllerCore.ONE_HOUR_S

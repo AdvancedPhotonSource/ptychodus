@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
-    QAbstractButton,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -49,20 +48,15 @@ class RepositoryItemCopierDialog(QDialog):
         self.button_box = QDialogButtonBox()
 
         self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
+        self.button_box.accepted.connect(self.accept)
         self.button_box.addButton(QDialogButtonBox.StandardButton.Cancel)
-        self.button_box.clicked.connect(self._handle_button_box_clicked)
+        self.button_box.rejected.connect(self.reject)
 
         layout = QFormLayout()
         layout.addRow('From:', self.source_combo_box)
         layout.addRow('To:', self.destination_combo_box)
         layout.addRow(self.button_box)
         self.setLayout(layout)
-
-    def _handle_button_box_clicked(self, button: QAbstractButton) -> None:
-        if self.button_box.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
-            self.accept()
-        else:
-            self.reject()
 
 
 class RepositoryTableView(QWidget):

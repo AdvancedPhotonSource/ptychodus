@@ -2,7 +2,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import numpy
+from scipy.ndimage import gaussian_filter
 
+from ptychodus.api.common import TWO_PI_J
 from ptychodus.api.object import Object, ObjectGeometryProvider
 
 from .builder import ObjectBuilder
@@ -19,8 +21,10 @@ class RandomObjectBuilder(ObjectBuilder):
         self._add_parameter('amplitude_mean', self.amplitude_mean)
         self.amplitude_deviation = settings.amplitude_deviation.copy()
         self._add_parameter('amplitude_deviation', self.amplitude_deviation)
-        self.phase_deviation = settings.phase_deviation.copy()
-        self._add_parameter('phase_deviation', self.phase_deviation)
+        self.phase_deviation_turns = settings.phase_deviation_turns.copy()
+        self._add_parameter('phase_deviation_turns', self.phase_deviation_turns)
+        self.blur_deviation_px = settings.blur_deviation_px.copy()
+        self._add_parameter('blur_deviation_px', self.blur_deviation_px)
 
     def copy(self) -> RandomObjectBuilder:
         builder = RandomObjectBuilder(self._rng, self._settings)
@@ -45,10 +49,18 @@ class RandomObjectBuilder(ObjectBuilder):
         )
         phase = self._rng.normal(
             0.0,
-            self.phase_deviation.get_value(),
+            self.phase_deviation_turns.get_value(),
             object_shape,
         )
-        array = numpy.clip(amplitude, 0.0, 1.0) * numpy.exp(1j * phase)
+
+        blur_sigma = self.blur_deviation_px.get_value()
+
+        if blur_sigma > 0.0:
+            # TODO account for pixel aspect ratio in blur calculation
+            amplitude = gaussian_filter(amplitude, sigma=blur_sigma)
+            phase = gaussian_filter(phase, sigma=blur_sigma)
+
+        array = amplitude * numpy.exp(TWO_PI_J * phase)
 
         return self._create_object(
             array=array.astype('complex'),

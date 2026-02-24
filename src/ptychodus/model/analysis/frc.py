@@ -6,7 +6,7 @@ import logging
 import numpy
 import scipy.fft
 
-from ptychodus.api.typing import ComplexArrayType, IntegerArrayType
+from ptychodus.api.common import ComplexArrayType, IntegerArrayType
 from ptychodus.api.visualization import Plot2D, PlotAxis, PlotSeries
 
 from ..product import ObjectRepository
@@ -101,4 +101,6 @@ class FourierRingCorrelator:
         # TODO replace NaNs with interpolated values
 
         rnyquist = numpy.min(array1.shape) // 2 + 1
-        return FourierRingCorrelation(spatial_frequency_per_m[:rnyquist], correlation[:rnyquist])
+        return FourierRingCorrelation(
+            spatial_frequency_per_m[:rnyquist].tolist(), correlation[:rnyquist].tolist()
+        )

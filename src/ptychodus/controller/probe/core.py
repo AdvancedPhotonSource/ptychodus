@@ -43,8 +43,6 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         fluorescence_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
         file_dialog_factory: FileDialogFactory,
-        *,
-        is_developer_mode_enabled: bool,
     ) -> None:
         super().__init__()
         self._repository = repository
@@ -62,7 +60,6 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             illumination_mapper,
             illumination_visualization_engine,
             file_dialog_factory,
-            is_developer_mode_enabled=is_developer_mode_enabled,
         )
         self._fluorescence_view_controller = FluorescenceViewController(
             fluorescence_enhancer, fluorescence_visualization_engine, file_dialog_factory

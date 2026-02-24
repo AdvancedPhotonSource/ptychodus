@@ -38,7 +38,8 @@ class ProductValidator(Observable, Observer):  # TODO display
     def _validate_scan(self) -> None:
         scan = self._scan.get_probe_positions()
         scan_indexes = set(point.index for point in scan)
-        pattern_indexes = set(self._dataset.get_assembled_indexes())
+        assembled_data = self._dataset.get_assembled_data()
+        pattern_indexes = set(assembled_data.get_indexes())
         are_positions_valid_now = not scan_indexes.isdisjoint(pattern_indexes)
 
         if self._are_positions_valid != are_positions_valid_now:

@@ -52,10 +52,8 @@ class XMCDViewController(Observer):
         self._ratio_visualization_widget_controller = VisualizationWidgetController(
             engine, self._dialog.ratio_widget, self._dialog.status_bar, file_dialog_factory
         )
-        self._visualization_parameters_controller = (
-            VisualizationParametersController.create_instance(
-                engine, self._dialog.parameters_view.visualization_parameters_view
-            )
+        self._visualization_parameters_controller = VisualizationParametersController(
+            engine, self._dialog.parameters_view.visualization_parameters_view
         )
 
         analyzer.add_observer(self)

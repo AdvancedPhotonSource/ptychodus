@@ -11,17 +11,16 @@ class AutomationSettings(Observable, Observer):
         self._group = registry.create_group('Automation')
         self._group.add_observer(self)
 
-        self.strategy = self._group.create_string_parameter('Strategy', 'Autoload_Product')
+        self.workflow = self._group.create_string_parameter('Workflow', 'Autoload_Product')
         self.data_directory = self._group.create_path_parameter(
             'DataDirectory', Path('/path/to/data')
-        )
-        self.processing_interval_s = self._group.create_integer_parameter(
-            'ProcessingIntervalInSeconds', 0
         )
         self.use_watchdog_polling_observer = self._group.create_boolean_parameter(
             'UseWatchdogPollingObserver', False
         )
-        self.watchdog_delay_s = self._group.create_integer_parameter('WatchdogDelayInSeconds', 15)
+        self.watchdog_delay_s = self._group.create_integer_parameter(
+            'WatchdogDelayInSeconds', 15, minimum=0, maximum=3600
+        )
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:

@@ -2,7 +2,12 @@ from PyQt5.QtWidgets import QDialog, QMessageBox, QSpinBox, QWidget
 
 from ptychodus.api.observer import Observable, Observer
 
-from ...model.product.object import ObjectRepositoryItem, RandomObjectBuilder, STXMObjectBuilder
+from ...model.product.object import (
+    DeadLeavesObjectBuilder,
+    ObjectRepositoryItem,
+    RandomObjectBuilder,
+    STXMObjectBuilder,
+)
 from ..parametric import ParameterViewBuilder, ParameterViewController
 
 
@@ -44,7 +49,56 @@ class ObjectEditorViewControllerFactory:
         additional_layers_group = 'Additional Layers'
         title = f'{item_name} [{builder_name}]'
 
-        if isinstance(object_builder, RandomObjectBuilder):
+        if isinstance(object_builder, DeadLeavesObjectBuilder):
+            dialog_builder = ParameterViewBuilder()
+            dialog_builder.add_spin_box(
+                object_builder.extra_padding_x, 'Extra Padding X:', group=first_layer_group
+            )
+            dialog_builder.add_spin_box(
+                object_builder.extra_padding_y, 'Extra Padding Y:', group=first_layer_group
+            )
+            dialog_builder.add_decimal_line_edit(
+                object_builder.leaf_radius_lower_px,
+                'Leaf Radius Lower [px]:',
+                group=first_layer_group,
+            )
+            dialog_builder.add_decimal_line_edit(
+                object_builder.leaf_radius_upper_px,
+                'Leaf Radius Upper [px]:',
+                group=first_layer_group,
+            )
+            dialog_builder.add_decimal_line_edit(
+                object_builder.leaf_radius_power_law_exponent,
+                'Leaf Radius Power Law Exponent:',
+                group=first_layer_group,
+            )
+            dialog_builder.add_decimal_line_edit(
+                object_builder.leaf_amplitude_lower,
+                'Leaf Amplitude Lower:',
+                group=first_layer_group,
+            )
+            dialog_builder.add_decimal_line_edit(
+                object_builder.leaf_amplitude_upper,
+                'Leaf Amplitude Upper:',
+                group=first_layer_group,
+            )
+            dialog_builder.add_decimal_line_edit(
+                object_builder.leaf_phase_lower_turns,
+                'Leaf Phase Lower [turns]:',
+                group=first_layer_group,
+            )
+            dialog_builder.add_decimal_line_edit(
+                object_builder.leaf_phase_upper_turns,
+                'Leaf Phase Upper [turns]:',
+                group=first_layer_group,
+            )
+            dialog_builder.add_view_controller(
+                MultisliceViewController(item),
+                'Number of Layers:',
+                group=additional_layers_group,
+            )
+            return dialog_builder.build_dialog(title, parent)
+        elif isinstance(object_builder, RandomObjectBuilder):
             dialog_builder = ParameterViewBuilder()
             dialog_builder.add_spin_box(
                 object_builder.extra_padding_x, 'Extra Padding X:', group=first_layer_group
@@ -61,7 +115,12 @@ class ObjectEditorViewControllerFactory:
                 group=first_layer_group,
             )
             dialog_builder.add_decimal_slider(
-                object_builder.phase_deviation, 'Phase Deviation:', group=first_layer_group
+                object_builder.phase_deviation_turns,
+                'Phase Deviation [turns]:',
+                group=first_layer_group,
+            )
+            dialog_builder.add_decimal_line_edit(
+                object_builder.blur_deviation_px, 'Blur Deviation [px]:', group=first_layer_group
             )
             dialog_builder.add_view_controller(
                 MultisliceViewController(item),

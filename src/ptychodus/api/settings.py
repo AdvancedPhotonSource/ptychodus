@@ -1,3 +1,5 @@
+"""Settings registry for reading and writing settings files."""
+
 from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
@@ -16,11 +18,15 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class PathPrefixChange:
+    """Instruction to replace a path prefix when saving settings (for portability)."""
+
     find_path_prefix: Path
     replacement_path_prefix: Path
 
 
 class SettingsRegistry(Observable):
+    """Central registry of ParameterGroups that can be saved to and loaded from settings files."""
+
     def __init__(self) -> None:
         super().__init__()
         self._parameter_group = ParameterGroup()

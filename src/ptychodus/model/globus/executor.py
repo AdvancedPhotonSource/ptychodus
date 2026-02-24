@@ -1,107 +1,117 @@
-from collections.abc import Mapping
-from dataclasses import dataclass
-from typing import Any
+from pathlib import Path
 import logging
-import queue
 
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import DiffractionAPI
 from ..product import ProductAPI
-from .locator import DataLocator
+from ..processing import ProcessingAPI
+from .client import GlobusClient, GlobusJob
 from .settings import GlobusSettings
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class GlobusJob:
-    flow_label: str
-    flow_input: Mapping[str, Any]
 
 
 class GlobusExecutor:
     def __init__(
         self,
         settings: GlobusSettings,
-        input_data_locator: DataLocator,
-        compute_data_locator: DataLocator,
-        output_data_locator: DataLocator,
         settings_registry: SettingsRegistry,
         diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
+        processing_api: ProcessingAPI,
+        client: GlobusClient,
     ) -> None:
         super().__init__()
         self._settings = settings
-        self._input_data_locator = input_data_locator
-        self._compute_data_locator = compute_data_locator
-        self._output_data_locator = output_data_locator
-        self._product_api = product_api
         self._settings_registry = settings_registry
         self._diffraction_api = diffraction_api
-        self.job_queue: queue.Queue[GlobusJob] = queue.Queue()
+        self._product_api = product_api
+        self._processing_api = processing_api
+        self._client = client
 
-    def run_flow(self, input_product_index: int) -> None:
-        transfer_sync_level = 3  # Copy files if checksums of the source and destination mismatch
-        ptychodus_action = 'reconstruct'  # TODO or 'train'
-
+    def populate_input_directory(self, input_product_index: int) -> Path:
         try:
-            flow_label = self._product_api.get_item(input_product_index).get_name()
+            product_item = self._product_api.get_item(input_product_index)
         except IndexError:
-            logger.warning(f'Failed access product for flow ({input_product_index=})!')
-            return
+            logger.exception(f'Failed access product for flow ({input_product_index=})!')
+            raise
 
-        input_data_posix_path = self._input_data_locator.get_posix_path() / flow_label
-        compute_data_posix_path = self._compute_data_locator.get_posix_path() / flow_label
-
-        input_data_globus_path = f'{self._input_data_locator.get_globus_path()}/{flow_label}'
-        compute_data_globus_path = f'{self._compute_data_locator.get_globus_path()}/{flow_label}'
-        output_data_globus_path = f'{self._output_data_locator.get_globus_path()}/{flow_label}'
+        input_directory = self._settings.input_data_posix_path.get_value() / product_item.get_name()
 
         try:
-            input_data_posix_path.mkdir(mode=0o755, parents=True, exist_ok=True)
+            input_directory.mkdir(mode=0o755, parents=True, exist_ok=True)
         except FileExistsError:
-            logger.warning('Input data POSIX path must be a directory!')
-            return
+            logger.exception('Input data POSIX path must be a directory!')
+            raise
 
-        self._settings_registry.save_settings(input_data_posix_path / StandardFileLayout.SETTINGS)
+        self._settings_registry.save_settings(input_directory / StandardFileLayout.SETTINGS)
         self._diffraction_api.export_assembled_patterns(
-            input_data_posix_path / StandardFileLayout.DIFFRACTION
+            input_directory / StandardFileLayout.DIFFRACTION
         )
         self._product_api.save_product(
             input_product_index,
-            input_data_posix_path / StandardFileLayout.PRODUCT_IN,
+            input_directory / StandardFileLayout.PRODUCT_IN,
             file_type='HDF5',
         )
 
+        return input_directory
+
+    def _run_flow(self, ptychodus_action: str, flow_label: str) -> None:
+        input_data_globus_path = f'{self._settings.input_data_globus_path.get_value()}/{flow_label}'
+
+        compute_data_posix_path = self._settings.compute_data_posix_path.get_value() / flow_label
+        compute_data_globus_path = (
+            f'{self._settings.compute_data_globus_path.get_value()}/{flow_label}'
+        )
+        output_data_globus_path = (
+            f'{self._settings.output_data_globus_path.get_value()}/{flow_label}'
+        )
+
         flow_input = {
-            'input_data_transfer_source_endpoint': str(self._input_data_locator.get_endpoint_id()),
+            'input_data_transfer_source_endpoint': str(
+                self._settings.input_data_endpoint_id.get_value()
+            ),
             'input_data_transfer_source_path': input_data_globus_path,
             'input_data_transfer_destination_endpoint': str(
-                self._compute_data_locator.get_endpoint_id()
+                self._settings.compute_data_endpoint_id.get_value()
             ),
             'input_data_transfer_destination_path': compute_data_globus_path,
             'input_data_transfer_recursive': True,
-            'input_data_transfer_sync_level': transfer_sync_level,
+            'input_data_transfer_sync_level': self._settings.transfer_sync_level.get_value(),
             'compute_endpoint': str(self._settings.compute_endpoint_id.get_value()),
             'ptychodus_action': ptychodus_action,
-            'ptychodus_settings_file': str(compute_data_posix_path / StandardFileLayout.SETTINGS),
-            'ptychodus_diffraction_file': str(
-                compute_data_posix_path / StandardFileLayout.DIFFRACTION
-            ),
-            'ptychodus_input_file': str(compute_data_posix_path / StandardFileLayout.PRODUCT_IN),
-            'ptychodus_output_file': str(compute_data_posix_path / StandardFileLayout.PRODUCT_OUT),
+            'ptychodus_input_directory': str(compute_data_posix_path),
+            'ptychodus_output_directory': str(compute_data_posix_path),
             'output_data_transfer_source_endpoint': str(
-                self._compute_data_locator.get_endpoint_id()
+                self._settings.compute_data_endpoint_id.get_value()
             ),
             'output_data_transfer_source_path': f'{compute_data_globus_path}/{StandardFileLayout.PRODUCT_OUT}',
             'output_data_transfer_destination_endpoint': str(
-                self._output_data_locator.get_endpoint_id()
+                self._settings.output_data_endpoint_id.get_value()
             ),
             'output_data_transfer_destination_path': f'{output_data_globus_path}/{StandardFileLayout.PRODUCT_OUT}',
             'output_data_transfer_recursive': False,
+            'output_data_transfer_sync_level': self._settings.transfer_sync_level.get_value(),
         }
 
-        input_ = GlobusJob(flow_label, flow_input)
-        self.job_queue.put(input_)
+        flow_tags = ['aps', 'ptychography']
+        job = GlobusJob(flow_input, flow_label, flow_tags)
+        self._client.run_flow(job)
+
+    def reconstruct(self, input_product_index: int, *, algorithm: str | None = None) -> None:
+        self._processing_api.set_reconstructor_if_provided(algorithm)
+        input_directory = self.populate_input_directory(input_product_index)
+        self._run_flow('reconstruct', input_directory.name)
+
+    def train(self, input_product_index: int, *, algorithm: str | None = None) -> None:
+        # TODO customize input_directory and output_directory
+        self._processing_api.set_reconstructor_if_provided(algorithm)
+        input_directory = self.populate_input_directory(input_product_index)
+        self._run_flow('train', input_directory.name)  # TODO mlflow
+
+    def infer(self, input_product_index: int, *, algorithm: str | None = None) -> None:
+        self._processing_api.set_reconstructor_if_provided(algorithm)
+        input_directory = self.populate_input_directory(input_product_index)
+        self._run_flow('infer', input_directory.name)  # TODO mlflow

@@ -8,7 +8,7 @@ from ptychodus.api.product import ProductFileReader, ProductFileWriter
 from ptychodus.api.probe_positions import ProbePositionFileReader, ProbePositionFileWriter
 from ptychodus.api.settings import SettingsRegistry
 
-from ..diffraction import AssembledDiffractionDataset, PatternSizer
+from ..diffraction import AssembledDiffractionDataset, DiffractionAPI, PatternSizer
 from .api import ObjectAPI, ProbeAPI, ProductAPI, ProbePositionsAPI
 from .item_factory import ProductRepositoryItemFactory
 from .object import ObjectBuilderFactory, ObjectRepositoryItemFactory, ObjectSettings
@@ -31,7 +31,8 @@ class ProductCore(Observer):
         rng: numpy.random.Generator,
         settings_registry: SettingsRegistry,
         pattern_sizer: PatternSizer,
-        dataset: AssembledDiffractionDataset,
+        diffraction_api: DiffractionAPI,
+        diffraction_dataset: AssembledDiffractionDataset,
         scan_file_reader_chooser: PluginChooser[ProbePositionFileReader],
         scan_file_writer_chooser: PluginChooser[ProbePositionFileWriter],
         fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
@@ -57,7 +58,7 @@ class ProductCore(Observer):
         self._probe_settings = ProbeSettings(settings_registry)
         self._probe_builder_factory = ProbeBuilderFactory(
             self._probe_settings,
-            dataset,
+            diffraction_api,
             fresnel_zone_plate_chooser,
             probe_file_reader_chooser,
             probe_file_writer_chooser,
@@ -70,7 +71,7 @@ class ProductCore(Observer):
         self._object_builder_factory = ObjectBuilderFactory(
             rng,
             self._object_settings,
-            dataset,
+            diffraction_api,
             object_file_reader_chooser,
             object_file_writer_chooser,
         )
@@ -82,7 +83,7 @@ class ProductCore(Observer):
         self._item_factory = ProductRepositoryItemFactory(
             self.settings,
             pattern_sizer,
-            dataset,
+            diffraction_dataset,
             self._scan_repository_item_factory,
             self._probe_repository_item_factory,
             self._object_repository_item_factory,

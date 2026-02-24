@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from PyQt5.QtWidgets import QAction, QActionGroup, QStatusBar
 
+from ptychodus.api.common import NumberArrayType
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.typing import NumberArrayType
 
 from ...model.visualization import VisualizationEngine
 from ...view.visualization import ImageItem, ImageMouseTool, VisualizationWidget

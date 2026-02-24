@@ -7,6 +7,7 @@ import logging
 import numpy
 import ptychonn
 
+from ptychodus.api.common import ComplexArrayType
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.object import Object
 from ptychodus.api.product import Product
@@ -17,7 +18,6 @@ from ptychodus.api.reconstructor import (
     TrainOutput,
     TrainableReconstructor,
 )
-from ptychodus.api.typing import ComplexArrayType
 
 from ..analysis import BarycentricArrayInterpolator, BarycentricArrayStitcher
 from .model import PtychoNNModelProvider
@@ -60,7 +60,8 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         ptychonn_version = version('ptychonn')
         logger.info(f'\tPtychoNN {ptychonn_version}')
 
-    def get_name(self) -> str:
+    @property
+    def name(self) -> str:
         return self._model_provider.get_model_name()
 
     def get_progress_goal(self) -> int:
@@ -127,11 +128,14 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
         yield ReconstructOutput(product)
 
+    def is_model_loaded(self):
+        return True  # TODO
+
     def get_model_file_filter(self) -> str:
         return self.MODEL_FILE_FILTER
 
-    def open_model(self, file_path: Path) -> None:
-        self._model_provider.open_model(file_path)
+    def load_model_from_file(self, file_path: Path) -> None:
+        self._model_provider.load_model_from_file(file_path)
 
     def save_model(self, file_path: Path) -> None:
         self._model_provider.save_model(file_path)
@@ -148,7 +152,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
             height_px=parameters.product.probes.height_px,
         )
         patches = numpy.zeros(
-            (len(parameters.product.probe_positions), num_channels, *probe_extent.shape),
+            (len(parameters.product.probe_positions), num_channels, *probe_extent.get_shape()),
             dtype=numpy.float32,
         )
 
@@ -172,13 +176,9 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
         }
         numpy.savez_compressed(file_path, allow_pickle=False, **contents)
 
-    def get_training_data_path(self) -> Path:
-        return self._training_settings.training_data_path.get_value()
-
-    def train(self, data_path: Path) -> TrainOutput:
-        logger.debug(f'Reading "{data_path}" as "NPZ"')
-        training_data = numpy.load(data_path)
-        self._training_settings.training_data_path.set_value(data_path)
+    def train(self, input_path: Path, output_path: Path) -> Iterator[TrainOutput]:
+        logger.debug(f'Reading "{input_path}" as "NPZ"')
+        training_data = numpy.load(input_path)
 
         model = self._model_provider.get_model()
         logger.debug('Training...')
@@ -211,8 +211,7 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
                 training_loss.append(tloss)
                 training_loss.append(vloss)
 
-        return TrainOutput(
+        yield TrainOutput(
             training_loss=training_loss,
             validation_loss=validation_loss,
-            result=0,
         )

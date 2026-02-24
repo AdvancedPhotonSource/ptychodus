@@ -6,9 +6,9 @@ import numpy
 from PyQt5.QtCore import Qt, QLineF, QRectF
 from PyQt5.QtWidgets import QGraphicsScene, QStatusBar
 
+from ptychodus.api.common import NumberArrayType
 from ptychodus.api.geometry import Box2D, Line2D, PixelGeometry, Point2D
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.typing import NumberArrayType
 
 from ...model.visualization import VisualizationEngine
 from ...view.visualization import (

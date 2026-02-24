@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QStringListModel
-from PyQt5.QtWidgets import QTableView
+from PyQt5.QtWidgets import QDialogButtonBox, QTableView
 
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
@@ -79,8 +79,10 @@ class SettingsController(Observer):
 
         self._table_view.setModel(self._table_model)
 
-        view.button_box.open_button.clicked.connect(self._open_settings)
-        view.button_box.save_button.clicked.connect(self._save_settings)
+        open_button = view.button_box.button(QDialogButtonBox.StandardButton.Open)
+        open_button.clicked.connect(self._open_settings)
+        save_button = view.button_box.button(QDialogButtonBox.StandardButton.Save)
+        save_button.clicked.connect(self._save_settings)
 
         self._sync_model_to_view()
 

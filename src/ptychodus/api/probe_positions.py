@@ -1,3 +1,5 @@
+"""Probe position (scan point) data structures and file I/O plugin interfaces."""
+
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -10,6 +12,8 @@ import numpy
 
 @dataclass(frozen=True)
 class ProbePosition:
+    """Probe position with its scan index and (x, y) physical coordinates in meters."""
+
     index: int
     coordinate_x_m: float
     coordinate_y_m: float
@@ -17,6 +21,8 @@ class ProbePosition:
 
 @dataclass(frozen=True)
 class ScanBoundingBox:
+    """Axis-aligned bounding box enclosing a set of probe positions."""
+
     minimum_x_m: float
     maximum_x_m: float
     minimum_y_m: float
@@ -48,6 +54,8 @@ class ScanBoundingBox:
 
 
 class ProbePositionSequence(Sequence[ProbePosition]):
+    """Memory-efficient sequence of ProbePosition objects backed by numpy arrays."""
+
     def __init__(self, point_seq: Sequence[ProbePosition] | None = None) -> None:
         indexes: list[int] = []
         coordinates_m: list[float] = []
@@ -95,24 +103,24 @@ class ProbePositionSequence(Sequence[ProbePosition]):
 
 
 class ProbePositionParseError(Exception):
-    """raised when the scan file cannot be parsed"""
+    """Raised when a probe position file cannot be parsed."""
 
     pass
 
 
 class ProbePositionFileReader(ABC):
-    """interface for plugins that read position files"""
+    """Plugin interface for reading probe position files."""
 
     @abstractmethod
     def read(self, file_path: Path) -> ProbePositionSequence:
-        """reads positions from file"""
+        """Read probe positions from file."""
         pass
 
 
 class ProbePositionFileWriter(ABC):
-    """interface for plugins that write position files"""
+    """Plugin interface for writing probe position files."""
 
     @abstractmethod
     def write(self, file_path: Path, positions: ProbePositionSequence) -> None:
-        """writes positions to file"""
+        """Write probe positions to file."""
         pass

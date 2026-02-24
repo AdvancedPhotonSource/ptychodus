@@ -1,3 +1,5 @@
+"""Object (transmission function) data structures and file I/O plugin interfaces."""
+
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -6,13 +8,15 @@ from pathlib import Path
 
 import numpy
 
+from .common import ComplexArrayType
 from .geometry import PixelGeometry
 from .probe_positions import ProbePosition
-from .typing import ComplexArrayType
 
 
 @dataclass(frozen=True)
 class ObjectCenter:
+    """Physical center coordinates of the object array in meters."""
+
     coordinate_x_m: float
     coordinate_y_m: float
 
@@ -25,6 +29,8 @@ class ObjectCenter:
 
 @dataclass(frozen=True)
 class ObjectPosition:
+    """Position expressed in object pixel coordinates."""
+
     index: int
     coordinate_x_px: float
     coordinate_y_px: float
@@ -32,6 +38,8 @@ class ObjectPosition:
 
 @dataclass(frozen=True)
 class ObjectGeometry:
+    """Spatial geometry of the object: size, pixel scale, and center."""
+
     width_px: int
     height_px: int
     pixel_width_m: float
@@ -98,6 +106,8 @@ class ObjectGeometry:
 
 
 class ObjectGeometryProvider(ABC):
+    """Interface for classes that provide object geometry."""
+
     @abstractmethod
     def get_probe_positions(self) -> Sequence[ProbePosition]:
         pass
@@ -108,6 +118,8 @@ class ObjectGeometryProvider(ABC):
 
 
 class Object:
+    """Complex transmission function stored as a (layers, height, width) array with spatial metadata."""
+
     def __init__(
         self,
         array: ComplexArrayType | None,
@@ -212,14 +224,18 @@ class Object:
 
 
 class ObjectFileReader(ABC):
+    """Plugin interface for reading objects."""
+
     @abstractmethod
     def read(self, file_path: Path) -> Object:
-        """reads an object from file"""
+        """Read an object from file."""
         pass
 
 
 class ObjectFileWriter(ABC):
+    """Plugin interface for writing objects."""
+
     @abstractmethod
     def write(self, file_path: Path, object_: Object) -> None:
-        """writes an object to file"""
+        """Write an object to file."""
         pass

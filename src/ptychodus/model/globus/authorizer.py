@@ -1,43 +1,58 @@
 import logging
-import threading
+
+from ptychodus.api.observer import Observable
 
 logger = logging.getLogger(__name__)
 
 
-class GlobusAuthorizer:
+class GlobusAuthorizer(Observable):
     def __init__(self) -> None:
         super().__init__()
-        self._authorize_lock = threading.Lock()
-        self._authorize_code = str()
-        self._authorize_url = 'https://aps.anl.gov'
-        self.is_authorized_event = threading.Event()
-        self.is_authorized_event.set()
-        self.shutdown_event = threading.Event()
+        self._authorize_url = ''
+        self._authorize_code = ''
 
     @property
-    def is_authorized(self) -> bool:
-        return self.is_authorized_event.is_set()
+    def _has_authorize_url(self) -> bool:
+        auth_url_empty = not self._authorize_url
+        return not auth_url_empty
+
+    @property
+    def has_authorize_code(self) -> bool:
+        auth_code_empty = not self._authorize_code
+        return not auth_code_empty
+
+    @property
+    def needs_authorize_code(self) -> bool:
+        return self._has_authorize_url and not self.has_authorize_code
+
+    def _authorize(self, url: str) -> None:
+        logger.info(f'Authorize at {url}')
+        self._authorize_url = url
+        self._authorize_code = ''
+        self.notify_observers()
 
     def get_authorize_url(self) -> str:
-        with self._authorize_lock:
-            return self._authorize_url
+        return self._authorize_url
 
     def set_code_from_authorize_url(self, code: str) -> None:
-        with self._authorize_lock:
-            self._authorize_code = code
-            self.is_authorized_event.set()
+        logger.info('Received authorization code.')
+        self._authorize_code = code
+        self.notify_observers()
 
-    def get_code_from_authorize_url(self) -> str:
-        with self._authorize_lock:
-            return self._authorize_code
+    def get_authorize_code(self) -> str:
+        return self._authorize_code
 
-    def authenticate(self, authorize_url: str) -> None:
-        logger.info(f'Authenticate at {authorize_url}')
+    def cancel_authorization(self) -> None:
+        logger.info('Canceled authorization')
+        self._authorize_url = ''
+        self._authorize_code = ''
+        self.notify_observers()
 
-        with self._authorize_lock:
-            self._authorize_url = authorize_url
-            self.is_authorized_event.clear()
 
-        while not self.shutdown_event.is_set():
-            if self.is_authorized_event.wait(timeout=1.0):
-                break
+class AuthorizeWithGlobus:
+    def __init__(self, authorizer: GlobusAuthorizer, authorize_url: str) -> None:
+        self._authorizer = authorizer
+        self._authorize_url = authorize_url
+
+    def __call__(self) -> None:
+        self._authorizer._authorize(self._authorize_url)

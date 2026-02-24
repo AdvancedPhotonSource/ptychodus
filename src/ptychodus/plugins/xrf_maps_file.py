@@ -4,14 +4,14 @@ from typing import Final
 import h5py
 import numpy
 
-from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.typing import RealArrayType
+from ptychodus.api.common import RealArrayType
 from ptychodus.api.fluorescence import (
     ElementMap,
     FluorescenceDataset,
     FluorescenceFileReader,
     FluorescenceFileWriter,
 )
+from ptychodus.api.plugins import PluginRegistry
 
 
 class XRFMapsFileIO(FluorescenceFileReader, FluorescenceFileWriter):

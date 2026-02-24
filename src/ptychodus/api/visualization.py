@@ -1,3 +1,5 @@
+"""Visualization data containers for plots, line cuts, and colorized image products."""
+
 from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
@@ -6,12 +8,14 @@ from typing import Final
 from scipy.stats import gaussian_kde
 import numpy
 
+from .common import NumberArrayType, RealArrayType
 from .geometry import Box2D, Interval, Line2D, PixelGeometry
-from .typing import NumberArrayType, RealArrayType
 
 
 @dataclass(frozen=True)
 class PlotSeries:
+    """A named sequence of float values representing one data series in a plot."""
+
     label: str
     values: Sequence[float]
 
@@ -21,6 +25,8 @@ class PlotSeries:
 
 @dataclass(frozen=True)
 class PlotAxis:
+    """A labeled axis containing one or more PlotSeries."""
+
     label: str
     series: Sequence[PlotSeries]
 
@@ -34,6 +40,8 @@ class PlotAxis:
 
 @dataclass(frozen=True)
 class Plot2D:
+    """A 2D plot with labeled X and Y axes, each containing one or more data series."""
+
     axis_x: PlotAxis
     axis_y: PlotAxis
 
@@ -47,18 +55,24 @@ class Plot2D:
 
 @dataclass(frozen=True)
 class LineCut:
+    """1D profile sampled along a line: distances in meters and corresponding pixel values."""
+
     distance_m: Sequence[float]
     value: Sequence[float | complex]
 
 
 @dataclass(frozen=True)
 class KernelDensityEstimate:
+    """KDE of pixel values within a region, including the value range and fitted kde object."""
+
     value_lower: float
     value_upper: float
     kde: gaussian_kde
 
 
 class VisualizationProduct:
+    """Colorized image with associated scalar values and pixel geometry for display and analysis."""
+
     EPS: Final[float] = 1.0e-6
 
     def __init__(

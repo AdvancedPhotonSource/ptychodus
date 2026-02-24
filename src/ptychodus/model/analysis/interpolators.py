@@ -1,10 +1,10 @@
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 import logging
 
-from numpy.typing import NDArray
+import numpy.typing
 import numpy
 
-from ptychodus.api.typing import RealArrayType
+from ptychodus.api.common import RealArrayType
 
 __all__ = [
     'BarycentricArrayInterpolator',
@@ -12,7 +12,7 @@ __all__ = [
     'NearestNeighborArrayInterpolator',
 ]
 
-InexactDType = TypeVar('InexactDType', bound=numpy.inexact)
+InexactDType = TypeVar('InexactDType', bound=numpy.inexact[Any])
 
 logger = logging.getLogger(__name__)
 
@@ -24,13 +24,13 @@ def calculate_support_frac(x: float, n: int) -> tuple[slice, float]:
 
 
 class NearestNeighborArrayInterpolator(Generic[InexactDType]):
-    def __init__(self, array: NDArray[InexactDType]) -> None:
+    def __init__(self, array: numpy.typing.NDArray[InexactDType]) -> None:
         super().__init__()
         self._array = array
 
     def get_patch(
         self, center_x: float, center_y: float, width: int, height: int
-    ) -> NDArray[InexactDType]:
+    ) -> numpy.typing.NDArray[InexactDType]:
         y_lower = int(center_y - height / 2)
         y_support = slice(y_lower, y_lower + height)
         logger.debug(f'{y_support=}')
@@ -43,13 +43,13 @@ class NearestNeighborArrayInterpolator(Generic[InexactDType]):
 
 
 class BarycentricArrayInterpolator(Generic[InexactDType]):
-    def __init__(self, array: NDArray[InexactDType]) -> None:
+    def __init__(self, array: numpy.typing.NDArray[InexactDType]) -> None:
         super().__init__()
         self._array = array
 
     def get_patch(
         self, center_x: float, center_y: float, width: int, height: int
-    ) -> NDArray[InexactDType]:
+    ) -> numpy.typing.NDArray[InexactDType]:
         x_support, x_frac = calculate_support_frac(center_x, width)
         y_support, y_frac = calculate_support_frac(center_y, height)
 
@@ -72,7 +72,9 @@ class BarycentricArrayInterpolator(Generic[InexactDType]):
 
 
 class BarycentricArrayStitcher(Generic[InexactDType]):
-    def __init__(self, upper: NDArray[InexactDType], lower: RealArrayType | None = None) -> None:
+    def __init__(
+        self, upper: numpy.typing.NDArray[InexactDType], lower: RealArrayType | None = None
+    ) -> None:
         super().__init__()
         self._upper = upper
         self._lower = lower
@@ -84,7 +86,7 @@ class BarycentricArrayStitcher(Generic[InexactDType]):
         self,
         center_x: float,
         center_y: float,
-        value: NDArray[InexactDType],
+        value: numpy.typing.NDArray[InexactDType],
         weight: RealArrayType | None = None,
     ) -> None:
         if numpy.iscomplexobj(self._upper) != numpy.iscomplexobj(value):
@@ -126,7 +128,7 @@ class BarycentricArrayStitcher(Generic[InexactDType]):
             lsupport[..., 1:, :-1] += weight10 * weight
             lsupport[..., 1:, 1:] += weight11 * weight
 
-    def stitch(self) -> NDArray[InexactDType]:
+    def stitch(self) -> numpy.typing.NDArray[InexactDType]:
         if self._lower is None:
             return self._upper
 

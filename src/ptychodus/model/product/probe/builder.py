@@ -5,8 +5,8 @@ from pathlib import Path
 import logging
 
 import numpy
-import numpy.typing
 
+from ptychodus.api.common import RealArrayType
 from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.probe import (
     ProbeSequence,
@@ -15,7 +15,6 @@ from ptychodus.api.probe import (
     ProbeGeometryProvider,
     ComplexArrayType,
 )
-from ptychodus.api.typing import RealArrayType
 
 from .settings import ProbeSettings
 

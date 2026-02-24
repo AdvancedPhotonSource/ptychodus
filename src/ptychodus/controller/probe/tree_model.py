@@ -6,8 +6,8 @@ import numpy
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 from PyQt5.QtGui import QBrush
 
+from ptychodus.api.common import BYTES_PER_MEGABYTE
 from ptychodus.api.probe import Probe
-from ptychodus.api.units import BYTES_PER_MEGABYTE
 
 from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem

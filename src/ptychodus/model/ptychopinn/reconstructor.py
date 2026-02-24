@@ -1,6 +1,4 @@
-from __future__ import annotations
 from collections.abc import Iterator, Sequence
-from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Final
 import logging
@@ -60,8 +58,6 @@ def create_raw_data(parameters: ReconstructInput) -> RawData:
 
 class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     MODEL_FILE_NAME: Final[str] = 'wts.h5.zip'
-    MODEL_FILE_FILTER: Final[str] = 'Zipped Archive (*.zip)'
-    TRAINING_DATA_FILE_FILTER: Final[str] = 'NumPy Zipped Archive (*.npz)'
 
     def __init__(
         self,
@@ -81,9 +77,6 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         self._config: dict[str, Any] = dict()
         self._is_developer_mode_enabled = is_developer_mode_enabled
 
-        ptychopinn_version = version('ptychopinn')
-        logger.info(f'\tPtychoPINN {ptychopinn_version}')
-
     def _create_model_config(self, model_size: int) -> ModelConfig:
         return ModelConfig(
             N=model_size,
@@ -99,7 +92,8 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             gaussian_smoothing_sigma=self._model_settings.gaussian_smoothing_sigma.get_value(),
         )
 
-    def get_name(self) -> str:
+    @property
+    def name(self) -> str:
         return self._name
 
     def get_progress_goal(self) -> int:
@@ -113,9 +107,10 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         return self.__model
 
     def _reconstruct_image(self, test_data: ptycho.loader.PtychoDataContainer) -> Any:
-        import ptycho.model
-
-        intensity_scale = ptycho.model.params()['intensity_scale']
+        try:
+            intensity_scale = ptycho.params.get('intensity_scale')
+        except KeyError as exc:
+            raise RuntimeError('Missing intensity_scale in ptycho.params.cfg') from exc
         return self._model.predict([test_data.X * intensity_scale, test_data.local_offsets])
 
     def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
@@ -179,10 +174,13 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
 
         yield ReconstructOutput(product)
 
-    def get_model_file_filter(self) -> str:
-        return self.MODEL_FILE_FILTER
+    def is_model_loaded(self):
+        return True  # TODO
 
-    def open_model(self, file_path: Path) -> None:
+    def get_model_file_filter(self) -> str:
+        return 'Zipped Archive (*.zip)'
+
+    def load_model_from_file(self, file_path: Path) -> None:
         if file_path.name != self.MODEL_FILE_NAME:
             logger.warning(f"PtychoPINN expects the file name '{self.MODEL_FILE_NAME}'.")
 
@@ -193,11 +191,8 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         self.__model, self._config = load_inference_bundle(file_path.parent)
         # TODO sync ptycho.params.cfg with settings after load
 
-    def save_model(self, file_path: Path) -> None:
-        ptycho.model_manager.save(file_path)
-
     def get_training_data_file_filter(self) -> str:
-        return self.TRAINING_DATA_FILE_FILTER
+        return 'NumPy Zipped Archive (*.npz)'
 
     def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
         object_geometry = parameters.product.object_.get_geometry()
@@ -225,14 +220,9 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
             scan_index=numpy.zeros(len(parameters.product.probe_positions), dtype=int),
         )
 
-    def get_training_data_path(self) -> Path:
-        return self._training_settings.data_dir.get_value()
-
-    def train(self, data_path: Path) -> TrainOutput:
-        self._training_settings.data_dir.set_value(data_path)
-
-        test_raw_data = RawData.from_file(data_path / 'test_data.npz')  # TODO RawData | None
-        train_raw_data = RawData.from_file(data_path / 'train_data.npz')
+    def train(self, input_path: Path, output_path: Path) -> Iterator[TrainOutput]:
+        test_raw_data = RawData.from_file(input_path / 'test_data.npz')  # TODO RawData | None
+        train_raw_data = RawData.from_file(input_path / 'train_data.npz')
 
         model_size = train_raw_data.diff3d.shape[-1]
 
@@ -265,11 +255,9 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         recon_amp, recon_phase, train_results = run_cdi_example(
             train_raw_data, test_raw_data, training_config
         )
-        output_dir = self._training_settings.output_dir.get_value()
-        self.save_model(output_dir)
-        save_outputs(recon_amp, recon_phase, train_results, str(output_dir))
-        self.open_model(output_dir)
+        model_path = output_path / self.MODEL_FILE_NAME
+        ptycho.model_manager.save(output_path)
+        save_outputs(recon_amp, recon_phase, train_results, str(output_path))
+        self.load_model_from_file(model_path)
 
-        training_loss: Sequence[LossValue] = []
-        validation_loss: Sequence[LossValue] = []
-        return TrainOutput(training_loss, validation_loss, 0)  # TODO
+        yield TrainOutput()  # TODO yield losses & progress

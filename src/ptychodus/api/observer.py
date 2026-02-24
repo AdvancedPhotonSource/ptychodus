@@ -1,3 +1,5 @@
+"""Observer pattern for propagating changes across ptychodus components."""
+
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -14,12 +16,16 @@ T = TypeVar('T')
 
 
 class Observer(ABC):
+    """Abstract observer that receives change notifications from an Observable."""
+
     @abstractmethod
     def _update(self, observable: Observable) -> None:
         pass
 
 
 class Observable:
+    """Subject that maintains a list of observers and dispatches change notifications."""
+
     def __init__(self) -> None:
         self._observer_list: list[Observer] = list()
         self._block_notifications = False
@@ -52,6 +58,8 @@ class Observable:
 
 
 class SequenceObserver(Generic[T], ABC):
+    """Observer for fine-grained notifications about insertions, changes, and removals in a sequence."""
+
     @abstractmethod
     def handle_item_inserted(self, index: int, item: T) -> None:
         pass
@@ -66,6 +74,8 @@ class SequenceObserver(Generic[T], ABC):
 
 
 class ObservableSequence(Sequence[T]):
+    """Sequence that maintains a list of observers and dispatches change notifications."""
+
     def __init__(self) -> None:
         self._observer_list: list[SequenceObserver[T]] = list()
 

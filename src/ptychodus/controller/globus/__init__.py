@@ -1,4 +1,4 @@
-from .controller import GlobusController
+from .core import GlobusController
 
 __all__ = [
     'GlobusController',

@@ -3,9 +3,9 @@ from dataclasses import dataclass
 
 import numpy
 
+from ptychodus.api.common import RealArrayType
 from ptychodus.api.geometry import AffineTransform
 from ptychodus.api.observer import Observable
-from ptychodus.api.typing import RealArrayType
 
 from ..product import ProbePositionsRepository
 from .settings import AffineTransformEstimatorSettings
@@ -72,15 +72,15 @@ class AffineTransformEstimator(Observable):
             positions = self._repository[product_index].get_probe_positions()
 
             for point in positions:
-                coordinate_list.append(point.coordinate_y_m)
                 coordinate_list.append(point.coordinate_x_m)
+                coordinate_list.append(point.coordinate_y_m)
 
         coordinates = numpy.reshape(coordinate_list, (-1, 2))
 
         # robust centroid estimation
         centroid_x = estimate_mean_hodges_lehman(coordinates[:, -1])
         centroid_y = estimate_mean_hodges_lehman(coordinates[:, -2])
-        coordinates -= numpy.array((centroid_y, centroid_x))
+        coordinates -= numpy.array((centroid_x, centroid_y))
 
         # rescale for RMS distance = 1
         distance = numpy.hypot(coordinates[:, -1], coordinates[:, -2])

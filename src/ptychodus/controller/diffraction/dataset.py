@@ -3,8 +3,8 @@ from typing import Any, overload
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
-from ptychodus.api.diffraction import DiffractionPatterns
-from ptychodus.api.units import BYTES_PER_MEGABYTE
+from ptychodus.api.common import BYTES_PER_MEGABYTE
+from ptychodus.api.diffraction import DiffractionPattern
 
 from ptychodus.model.diffraction import AssembledDiffractionArray
 
@@ -40,7 +40,7 @@ class DatasetTreeNode:
     def get_label(self) -> str:
         return self._array.get_label() if self._frame_index < 0 else f'Frame {self._frame_index}'
 
-    def get_data(self) -> DiffractionPatterns:
+    def get_data(self) -> DiffractionPattern:
         return (
             self._array.get_average_pattern()
             if self._frame_index < 0

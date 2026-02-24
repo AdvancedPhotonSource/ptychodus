@@ -35,7 +35,8 @@ class AutodiffReconstructor(Reconstructor):
         self._settings = settings
         self._epoch = 0
 
-    def get_name(self) -> str:
+    @property
+    def name(self) -> str:
         return 'Autodiff'
 
     def _create_reconstructor_options(self) -> AutodiffPtychographyReconstructorOptions:
@@ -218,4 +219,4 @@ class AutodiffReconstructor(Reconstructor):
                 self._epoch += step_epochs
                 step_epochs = min(step_epochs, num_epochs - self._epoch)
 
-                yield ReconstructOutput(product=product, progress=self._epoch, result=0)
+                yield ReconstructOutput(product=product, progress=self._epoch)
