@@ -10,7 +10,7 @@ import fair_research_login
 
 
 from ..task_manager import TaskManager
-from ._gladier_client import PtychodusClient
+from ._gladier_client import create_client as create_ptychodus_client
 from .authorizer import GlobusAuthorizer
 from .client import GlobusClient, GlobusJob, GlobusStatus
 from .settings import GlobusSettings
@@ -66,7 +66,7 @@ class GlobusClientThread(threading.Thread):
         self._status_q = status_q
         self._refresh_status_event = refresh_status_event
         self._stop_event = stop_event
-        self._gladier_client = PtychodusClient.create_client(
+        self._gladier_client = create_ptychodus_client(
             [CustomCodeHandler(auth_url_q, auth_code_q, stop_event)]
         )
 
