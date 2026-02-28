@@ -48,7 +48,7 @@ class FileDialogFactory(Observable):
         if selected_name_filter is not None:
             dialog.selectNameFilter(selected_name_filter)
 
-        if dialog.exec() == QDialog.DialogCode.Accepted:  # TODO exec -> open
+        if dialog.exec() == QDialog.DialogCode.Accepted:  # FIXME exec -> open
             file_name_list = dialog.selectedFiles()
             file_name = file_name_list[0]
 
@@ -81,7 +81,7 @@ class FileDialogFactory(Observable):
         if selected_name_filter is not None:
             dialog.selectNameFilter(selected_name_filter)
 
-        if dialog.exec() == QDialog.DialogCode.Accepted:  # TODO exec -> open
+        if dialog.exec() == QDialog.DialogCode.Accepted:  # FIXME exec -> open
             file_name_list = dialog.selectedFiles()
             file_name = file_name_list[0]
 

@@ -1,6 +1,43 @@
 Globus Compute Workflow
 =======================
 
+#####
+
+export TERM=xterm
+wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+bash Miniforge3-$(uname)-$(uname -m).sh
+eval "$($HOME/miniforge3/bin/conda shell.bash hook)"
+time conda create -y -n ptychodus tike ptychonn gladier gladier-tools globus-compute-endpoint --file ptychodus/requirements-dev.txt
+time conda create -y -c conda-forge -n ptychodus tike ptychonn gladier gladier-tools --file ptychodus/requirements-dev.txt
+conda activate ptychodus
+pip install -e ptychodus --no-deps
+ptychodus -h
+
+globus-compute-endpoint configure
+mv ~/polaris.yaml ~/.globus_compute/default/config.yaml
+cat ~/.globus_compute/default/config.yaml
+globus-compute-endpoint start
+
+#####
+
+qstat | grep shenke
+
+#####
+
+https://globus-compute.readthedocs.io/en/stable/endpoints/endpoint_examples.html#polaris-alcf
+
+mkdir ptychodus-compute-endpoint
+cd ptychodus-compute-endpoint/
+uv venv --python 3.13
+source .venv/bin/activate
+uv pip install ptychodus[globus,ptychi] globus-compute-endpoint
+OPENBLAS_NUM_THREADS=1 ptychodus --version
+cat ~/.globus_compute/default/config.yaml
+source ~/ptychodus-compute-endpoint/.venv/bin/activate
+globus-compute-endpoint start
+
+#####
+
 Perform steps 1-3 on the local and remote computers.
 
 #. Install `miniforge <https://github.com/conda-forge/miniforge>`_.

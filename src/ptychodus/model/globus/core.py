@@ -1,4 +1,6 @@
+from importlib.metadata import version
 import logging
+import queue
 
 from ptychodus.api.settings import SettingsRegistry
 
@@ -7,7 +9,7 @@ from ..product import ProductAPI
 from ..processing import ProcessingAPI
 from ..task_manager import TaskManager
 from .authorizer import GlobusAuthorizer
-from .client import FakeGlobusClient, GlobusClient
+from .client import FakeGlobusClient, GlobusClient, GlobusStatus
 from .executor import GlobusExecutor
 from .settings import GlobusSettings
 from .status import GlobusStatusRepository
@@ -24,9 +26,10 @@ class GlobusCore:
         product_api: ProductAPI,
         processing_api: ProcessingAPI,
     ) -> None:
+        status_q: queue.Queue[GlobusStatus] = queue.Queue()
+
         self.settings = GlobusSettings(settings_registry)
         self.authorizer = GlobusAuthorizer()
-        self.status_repository = GlobusStatusRepository()
 
         try:
             from ._globus_client import RealGlobusClient
@@ -34,10 +37,12 @@ class GlobusCore:
             logger.info('Globus not found.')
             self._client: GlobusClient = FakeGlobusClient()
         else:
-            self._client = RealGlobusClient(
-                task_manager, self.settings, self.authorizer, self.status_repository
-            )
+            logger.info('Globus SDK ' + version('globus-sdk'))
+            logger.info('Fair Research Login ' + version('fair-research-login'))
+            logger.info('Gladier ' + version('gladier'))
+            self._client = RealGlobusClient(task_manager, self.settings, self.authorizer, status_q)
 
+        self.status_repository = GlobusStatusRepository(self.settings, self._client, status_q)
         self.executor = GlobusExecutor(
             self.settings,
             settings_registry,
@@ -56,3 +61,7 @@ class GlobusCore:
 
     def stop(self) -> None:
         self._client.stop()
+
+    def run_foreground_tasks(self) -> None:
+        self.authorizer.run_foreground_tasks()
+        self.status_repository.run_foreground_tasks()

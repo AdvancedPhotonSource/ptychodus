@@ -566,7 +566,7 @@ class ParameterDialog(QDialog):
         button_box.clicked.connect(self._handle_button_box_clicked)
 
     def _handle_button_box_clicked(self, button: QAbstractButton) -> None:
-        # TODO remove observers from viewControllers
+        # FIXME remove observers from viewControllers
 
         if self._button_box.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
             self.accept()
