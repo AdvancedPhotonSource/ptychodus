@@ -5,6 +5,11 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Generic, TypeVar
 
+import numpy
+import scipy.special
+
+from .common import RealArrayType
+
 T = TypeVar('T', int, float, Decimal)
 
 
@@ -165,3 +170,62 @@ class Interval(Generic[T]):
 
     def __repr__(self) -> str:
         return f'{type(self).__name__}({self.lower}, {self.upper})'
+
+
+@dataclass(frozen=True)
+class ZernikeMonomial:
+    coefficient: complex
+    radial_degree: int  # n
+    angular_frequency: int  # m
+
+    @property
+    def spatial_frequencey(self) -> int:
+        return self.radial_degree + abs(self.angular_frequency)
+
+    def _radial_polynomial(self, distance: RealArrayType) -> RealArrayType:
+        n_minus_m = self.radial_degree - abs(self.angular_frequency)
+        half_n_minus_m = n_minus_m // 2
+        sgn = 1
+
+        values = numpy.zeros_like(distance)
+
+        for k in range(half_n_minus_m + 1):
+            n_minus_k = self.radial_degree - k
+            n_minus_2k = self.radial_degree - 2 * k
+
+            coef = sgn
+            coef *= scipy.special.binom(n_minus_k, k)
+            coef *= scipy.special.binom(n_minus_2k, half_n_minus_m - k)
+            coef = int(coef)  # NOTE!
+
+            values += numpy.multiply(coef, numpy.power(distance, n_minus_2k))
+
+            sgn = -sgn
+
+        return values
+
+    def _angular_function(self, angle: RealArrayType) -> RealArrayType:
+        return (
+            numpy.sin(-self.angular_frequency * angle)
+            if self.angular_frequency < 0
+            else numpy.cos(self.angular_frequency * angle)
+        )
+
+    def __call__(
+        self, distance: RealArrayType, angle: RealArrayType, undefined_value: complex = 0j
+    ) -> RealArrayType:
+        rvalue = self._radial_polynomial(distance)
+        avalue = self._angular_function(angle)
+        nvalue_sq = self.radial_degree + 1
+
+        if self.angular_frequency != 0:
+            nvalue_sq *= 2
+
+        return numpy.where(
+            numpy.logical_and(0 < distance, distance <= 1),
+            self.coefficient * numpy.sqrt(nvalue_sq) * rvalue * avalue,
+            undefined_value,
+        )
+
+    def __str__(self) -> str:
+        return f'{self.coefficient}$Z_{{{self.radial_degree}}}^{{{self.angular_frequency:+d}}}$'

@@ -3,12 +3,8 @@ from pathlib import Path
 import logging
 
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.probe import (
-    FresnelZonePlate,
-    ProbeSequence,
-    ProbeFileReader,
-    ProbeFileWriter,
-)
+from ptychodus.api.probe import ProbeFileReader, ProbeFileWriter, ProbeSequence
+from ptychodus.api.probe_gen import FresnelZonePlate
 
 from ...diffraction import DiffractionAPI
 from .average_pattern import AveragePatternProbeBuilder

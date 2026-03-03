@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-import numpy
 
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
-from ptychodus.api.propagator import AngularSpectrumPropagator, PropagatorParameters
+from ptychodus.api.probe_gen import (
+    defocus_probe,
+    generate_rectangular_probe,
+    rescale_probe_intensity,
+)
 
 from .builder import ProbeSequenceBuilder
 from .settings import ProbeSettings
@@ -33,30 +36,20 @@ class RectangularProbeBuilder(ProbeSequenceBuilder):
         return builder
 
     def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
-        geometry = geometry_provider.get_probe_geometry()
-        coords = self.get_transverse_coordinates(geometry)
-
-        aX_m = numpy.fabs(coords.position_x_m)  # noqa: N806
-        rx_m = self.width_m.get_value() / 2.0
-        aY_m = numpy.fabs(coords.position_y_m)  # noqa: N806
-        ry_m = self.height_m.get_value() / 2.0
-
-        is_inside = numpy.logical_and(aX_m < rx_m, aY_m < ry_m)
-        rect = numpy.where(is_inside, 1 + 0j, 0j)
-
-        propagator_parameters = PropagatorParameters(
-            wavelength_m=geometry_provider.probe_wavelength_m,
-            width_px=rect.shape[-1],
-            height_px=rect.shape[-2],
-            pixel_width_m=geometry.pixel_width_m,
-            pixel_height_m=geometry.pixel_height_m,
-            propagation_distance_m=self.defocus_distance_m.get_value(),
+        probe = rescale_probe_intensity(
+            defocus_probe(
+                generate_rectangular_probe(
+                    geometry_provider.get_probe_geometry(),
+                    width_m=self.width_m.get_value(),
+                    height_m=self.height_m.get_value(),
+                ),
+                probe_wavelength_m=geometry_provider.probe_wavelength_m,
+                defocus_distance_m=self.defocus_distance_m.get_value(),
+            ),
+            geometry_provider.probe_photon_count,
         )
-        propagator = AngularSpectrumPropagator(propagator_parameters)
-        array = propagator.propagate(rect)
-
         return ProbeSequence(
-            array=self.normalize(array),
+            array=probe.get_array(),
             opr_weights=None,
-            pixel_geometry=geometry.get_pixel_geometry(),
+            pixel_geometry=probe.get_pixel_geometry(),
         )

@@ -19,6 +19,7 @@ from .diffraction import (
     DiffractionPatternDType,
     DiffractionPatterns,
 )
+from .geometry import PixelGeometry
 from .probe_positions import ProbePositionSequence, ProbePosition
 from .product import LossValue, Product
 
@@ -188,10 +189,15 @@ class AssembledDiffractionData:
     """In-memory store for a complete set of indexed diffraction patterns and their bad-pixel mask."""
 
     def __init__(
-        self, indexes: DiffractionIndexes, patterns: DiffractionPatterns, bad_pixels: BadPixels
+        self,
+        indexes: DiffractionIndexes,
+        patterns: DiffractionPatterns,
+        pixel_geometry: PixelGeometry,
+        bad_pixels: BadPixels,
     ) -> None:
         self._indexes = indexes
         self._patterns = patterns
+        self._pixel_geometry = pixel_geometry
         self._bad_pixels = bad_pixels
 
         if indexes.ndim != 1:
@@ -220,6 +226,7 @@ class AssembledDiffractionData:
         return cls(
             indexes=numpy.zeros(1, dtype=int),
             patterns=numpy.zeros((1, 1, 1), dtype=int),
+            pixel_geometry=PixelGeometry(0, 0),
             bad_pixels=numpy.zeros((1, 1), dtype=bool),
         )
 
@@ -231,6 +238,9 @@ class AssembledDiffractionData:
 
     def get_pattern(self, index: int) -> DiffractionPattern:
         return self._patterns[index]
+
+    def get_pixel_geometry(self) -> PixelGeometry:
+        return self._pixel_geometry
 
     def get_bad_pixels(self) -> BadPixels:
         return self._bad_pixels
@@ -249,6 +259,7 @@ class AssembledDiffractionData:
         return AssembledDiffractionData(
             indexes=indexes_view,
             patterns=patterns_view,
+            pixel_geometry=self._pixel_geometry,
             bad_pixels=data._bad_pixels,
         )
 

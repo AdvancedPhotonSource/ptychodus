@@ -265,6 +265,7 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         self._data = AssembledDiffractionData(
             indexes=indexes,
             patterns=patterns,
+            pixel_geometry=pixel_geometry,  # FIXME
             bad_pixels=bad_pixels,
         )
 

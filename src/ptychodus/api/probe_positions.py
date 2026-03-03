@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from itertools import pairwise
 from pathlib import Path
 from typing import overload
 
@@ -20,13 +21,12 @@ class ProbePosition:
 
 
 @dataclass(frozen=True)
-class ScanBoundingBox:
-    """Axis-aligned bounding box enclosing a set of probe positions."""
-
-    minimum_x_m: float
-    maximum_x_m: float
-    minimum_y_m: float
-    maximum_y_m: float
+class ScanGeometry:
+    minimum_x_m: float = +numpy.inf
+    maximum_x_m: float = -numpy.inf
+    minimum_y_m: float = +numpy.inf
+    maximum_y_m: float = -numpy.inf
+    length_m: float = 0.0
 
     @property
     def width_m(self) -> float:
@@ -44,13 +44,45 @@ class ScanBoundingBox:
     def center_y_m(self) -> float:
         return self.minimum_y_m + self.height_m / 2.0
 
-    def hull(self, bbox: ScanBoundingBox) -> ScanBoundingBox:
-        return ScanBoundingBox(
-            minimum_x_m=min(self.minimum_x_m, bbox.minimum_x_m),
-            maximum_x_m=max(self.maximum_x_m, bbox.maximum_x_m),
-            minimum_y_m=min(self.minimum_y_m, bbox.minimum_y_m),
-            maximum_y_m=max(self.maximum_y_m, bbox.maximum_y_m),
-        )
+
+def calculate_scan_geometry(positions: Iterable[ProbePosition]) -> ScanGeometry | None:
+    minimum_x_m = +numpy.inf
+    maximum_x_m = -numpy.inf
+    minimum_y_m = +numpy.inf
+    maximum_y_m = -numpy.inf
+    length_m = 0.0
+
+    for point in positions:
+        if point.coordinate_x_m < minimum_x_m:
+            minimum_x_m = point.coordinate_x_m
+
+        if maximum_x_m < point.coordinate_x_m:
+            maximum_x_m = point.coordinate_x_m
+
+        if point.coordinate_y_m < minimum_y_m:
+            minimum_y_m = point.coordinate_y_m
+
+        if maximum_y_m < point.coordinate_y_m:
+            maximum_y_m = point.coordinate_y_m
+
+    is_empty_x = maximum_x_m < minimum_x_m
+    is_empty_y = maximum_y_m < minimum_y_m
+
+    if is_empty_x or is_empty_y:
+        return None
+
+    for point_l, point_r in pairwise(positions):
+        dx = point_r.coordinate_x_m - point_l.coordinate_x_m
+        dy = point_r.coordinate_y_m - point_l.coordinate_y_m
+        length_m += numpy.hypot(dx, dy)
+
+    return ScanGeometry(
+        minimum_x_m=minimum_x_m,
+        maximum_x_m=maximum_x_m,
+        minimum_y_m=minimum_y_m,
+        maximum_y_m=maximum_y_m,
+        length_m=length_m,
+    )
 
 
 class ProbePositionSequence(Sequence[ProbePosition]):

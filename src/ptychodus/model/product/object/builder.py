@@ -4,14 +4,11 @@ from collections.abc import Sequence
 from pathlib import Path
 import logging
 
-import numpy
 
-from ptychodus.api.common import ComplexArrayType
-from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.object import Object, ObjectCenter, ObjectFileReader, ObjectGeometryProvider
+from ptychodus.api.object import Object, ObjectFileReader, ObjectGeometryProvider
+from ptychodus.api.object_gen import generate_layers, pad_object
 from ptychodus.api.parametric import ParameterGroup
 
-from ...phase_unwrapper import PhaseUnwrapper
 from .settings import ObjectSettings
 
 logger = logging.getLogger(__name__)
@@ -50,49 +47,13 @@ class ObjectBuilder(ParameterGroup):
 
     def _create_object(
         self,
-        array: ComplexArrayType,
-        pixel_geometry: PixelGeometry,
-        center: ObjectCenter,
+        object_: Object,
         layer_spacing_m: Sequence[float],
     ) -> Object:
-        """Create an object from an existing object with a potentially
-        different number of slices.
-
-        If the new object is supposed to be a multislice object with a
-        different number of slices than the existing object, the object is
-        created as
-        `abs(o) ** (1 / nSlices) * exp(i * unwrapPhase(o) / nSlices)`.
-        Otherwise, the object is copied as is.
-        """
-        num_slices = 1 + len(layer_spacing_m)
-
-        if array.ndim < 2:
-            raise ValueError('Array must have at least 2 dimensions')
-        elif array.ndim == 2:
-            array = numpy.expand_dims(array, axis=0)
-        elif array.ndim > 3:
-            raise ValueError('Array must have at most 3 dimensions')
-
-        if num_slices < array.shape[0]:
-            array = array[:num_slices]
-        elif num_slices > array.shape[0]:
-            amplitude = numpy.absolute(array[:1]) ** (1.0 / num_slices)
-            amplitude = amplitude.repeat(num_slices, axis=0)
-            phase = PhaseUnwrapper().unwrap(array[0])[numpy.newaxis, ...] / num_slices
-            phase = phase.repeat(num_slices, axis=0)
-            array = numpy.clip(amplitude, 0.0, 1.0) * numpy.exp(1j * phase)
-
-        pad_width = [
-            (0, 0),
-            (self.extra_padding_y.get_value(), self.extra_padding_y.get_value()),
-            (self.extra_padding_x.get_value(), self.extra_padding_x.get_value()),
-        ]
-
-        return Object(
-            array=numpy.pad(array, pad_width),
-            layer_spacing_m=layer_spacing_m,
-            pixel_geometry=pixel_geometry,
-            center=center,
+        return pad_object(
+            generate_layers(object_, layer_spacing_m),
+            self.extra_padding_x.get_value(),
+            self.extra_padding_y.get_value(),
         )
 
 

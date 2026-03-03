@@ -15,15 +15,17 @@ from .propagator import intensity
 
 
 @dataclass(frozen=True)
-class FresnelZonePlate:
-    """Physical parameters of a Fresnel zone plate optic."""
+class ProbeTransverseCoordinates:
+    position_x_m: RealArrayType
+    position_y_m: RealArrayType
 
-    zone_plate_diameter_m: float
-    outermost_zone_width_m: float
-    central_beamstop_diameter_m: float
+    @property
+    def position_r_m(self) -> RealArrayType:
+        return numpy.hypot(self.position_x_m, self.position_y_m)
 
-    def get_focal_length_m(self, central_wavelength_m: float) -> float:
-        return self.zone_plate_diameter_m * self.outermost_zone_width_m / central_wavelength_m
+    @property
+    def angle_rad(self) -> RealArrayType:
+        return numpy.arctan2(self.position_y_m, self.position_x_m)
 
 
 @dataclass(frozen=True)
@@ -47,6 +49,19 @@ class ProbeGeometry:
         return PixelGeometry(
             width_m=self.pixel_width_m,
             height_m=self.pixel_height_m,
+        )
+
+    def get_transverse_coordinates(self) -> ProbeTransverseCoordinates:
+        Y, X = numpy.mgrid[: self.height_px, : self.width_px]  # noqa: N806
+        position_x_px = X - (self.width_px - 1) / 2
+        position_y_px = Y - (self.height_px - 1) / 2
+
+        position_x_m = position_x_px * self.pixel_width_m
+        position_y_m = position_y_px * self.pixel_height_m
+
+        return ProbeTransverseCoordinates(
+            position_x_m=position_x_m,
+            position_y_m=position_y_m,
         )
 
 

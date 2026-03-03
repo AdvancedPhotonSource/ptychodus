@@ -43,21 +43,20 @@ class ZernikeTableModel(QAbstractTableModel):
             return None
 
         try:
-            poly = self._builder.get_polynomial(index.row())
-            coef = self._builder.get_coefficient(index.row())
+            monomial = self._builder.get_monomial(index.row())
         except IndexError as err:
             logger.exception(err)
             return None
 
         if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
             if index.column() == 0:
-                return poly.radial_degree
+                return monomial.radial_degree
             elif index.column() == 1:
-                return poly.angular_frequency
+                return monomial.angular_frequency
             elif index.column() == 2:
-                return f'{numpy.absolute(coef):.6g}'
+                return f'{numpy.absolute(monomial.coefficient):.6g}'
             elif index.column() == 3:
-                return f'{numpy.angle(coef):.6g}'
+                return f'{numpy.angle(monomial.coefficient):.6g}'
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
         if not index.isValid():
@@ -71,7 +70,7 @@ class ZernikeTableModel(QAbstractTableModel):
                     return False
 
                 try:
-                    coef = self._builder.get_coefficient(index.row())
+                    coef = self._builder.get_monomial(index.row()).coefficient
                 except IndexError:
                     return False
 
@@ -89,7 +88,7 @@ class ZernikeTableModel(QAbstractTableModel):
                     return False
 
                 try:
-                    coef = self._builder.get_coefficient(index.row())
+                    coef = self._builder.get_monomial(index.row()).coefficient
                 except IndexError:
                     return False
 

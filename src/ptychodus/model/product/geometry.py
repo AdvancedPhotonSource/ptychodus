@@ -148,7 +148,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         center_x_m = 0.0
         center_y_m = 0.0
 
-        scan_bbox = self._scan_item.get_bounding_box()
+        scan_bbox = self._scan_item.get_geometry()
 
         if scan_bbox is not None:
             width_m += scan_bbox.width_m

@@ -1,14 +1,17 @@
 from __future__ import annotations
-from itertools import pairwise
 import logging
 
 import numpy
 
 from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.probe_positions import ProbePositionSequence, ScanBoundingBox, ProbePosition
+from ptychodus.api.probe_positions import (
+    ProbePositionSequence,
+    ScanGeometry,
+    calculate_scan_geometry,
+)
+from ptychodus.api.probe_positions_gen import transform_probe_positions
 
-from .bounding_box import ScanBoundingBoxBuilder
 from .builder import FromMemoryProbePositionsBuilder, ProbePositionsBuilder
 from .settings import ProbePositionsSettings
 from .transform import ProbePositionTransform
@@ -29,8 +32,7 @@ class ProbePositionsRepositoryItem(ParameterGroup):
         self._transform = transform
         self._untransformed_scan = ProbePositionSequence()
         self._transformed_scan = ProbePositionSequence()
-        self._bbox_builder = ScanBoundingBoxBuilder()
-        self._length_m = 0.0
+        self._geometry: ScanGeometry | None = None
 
         self._add_group('builder', builder, observe=True)
         self._add_group('transform', transform, observe=True)
@@ -93,41 +95,43 @@ class ProbePositionsRepositoryItem(ParameterGroup):
         self._add_group(group, self._builder, observe=True)
         self._rebuild()
 
-    def get_bounding_box(self) -> ScanBoundingBox | None:
-        bbox = self._bbox_builder.get_bounding_box()
-
+    def get_geometry(self) -> ScanGeometry | None:
         if self.expand_bbox.get_value():
-            expanded_bbox = ScanBoundingBox(
-                minimum_x_m=self.expand_bbox_xmin_m.get_value(),
-                maximum_x_m=self.expand_bbox_xmax_m.get_value(),
-                minimum_y_m=self.expand_bbox_ymin_m.get_value(),
-                maximum_y_m=self.expand_bbox_ymax_m.get_value(),
+            minimum_x_m = self.expand_bbox_xmin_m.get_value()
+            maximum_x_m = self.expand_bbox_xmax_m.get_value()
+            minimum_y_m = self.expand_bbox_ymin_m.get_value()
+            maximum_y_m = self.expand_bbox_ymax_m.get_value()
+            lenth_m = 0.0
+
+            if self._geometry is not None:
+                minimum_x_m = min(minimum_x_m, self._geometry.minimum_x_m)
+                maximum_x_m = max(maximum_x_m, self._geometry.maximum_x_m)
+                minimum_y_m = min(minimum_y_m, self._geometry.minimum_y_m)
+                maximum_y_m = max(maximum_y_m, self._geometry.maximum_y_m)
+                lenth_m = self._geometry.length_m
+
+            return ScanGeometry(
+                minimum_x_m=minimum_x_m,
+                maximum_x_m=maximum_x_m,
+                minimum_y_m=minimum_y_m,
+                maximum_y_m=maximum_y_m,
+                length_m=lenth_m,
             )
-            bbox = expanded_bbox if bbox is None else bbox.hull(expanded_bbox)
 
-        return bbox
+        return self._geometry
 
-    def get_length_m(self) -> float:
-        return self._length_m
+    def _transform_scan(self) -> None:  # FIXME
+        transform = self._transform.get_transform()
+        jitter_radius_m = self._transform.jitter_radius_m.get_value()
+        rng = numpy.random.default_rng() if jitter_radius_m > 0.0 else None
 
-    def _transform_scan(self) -> None:
-        transformed_points: list[ProbePosition] = list()
-        bbox_builder = ScanBoundingBoxBuilder()
-        length_m = 0.0
+        transformed_positions = list(
+            transform_probe_positions(self._untransformed_scan, transform, rng, jitter_radius_m)
+        )
+        geometry = calculate_scan_geometry(transformed_positions)
 
-        for untransformed_point in self._untransformed_scan:
-            transformed_point = self._transform(untransformed_point)
-            transformed_points.append(transformed_point)
-            bbox_builder.hull(transformed_point)
-
-        for point_l, point_r in pairwise(transformed_points):
-            dx = point_r.coordinate_x_m - point_l.coordinate_x_m
-            dy = point_r.coordinate_y_m - point_l.coordinate_y_m
-            length_m += numpy.hypot(dx, dy)
-
-        self._transformed_scan = ProbePositionSequence(transformed_points)
-        self._bbox_builder = bbox_builder
-        self._length_m = length_m
+        self._transformed_scan = ProbePositionSequence(transformed_positions)
+        self._geometry = geometry
         self.notify_observers()
 
     def _rebuild(self) -> None:

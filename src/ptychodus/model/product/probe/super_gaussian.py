@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import numpy
 
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
+from ptychodus.api.probe_gen import rescale_probe_intensity, generate_super_gaussian_probe
 
 from .builder import ProbeSequenceBuilder
 from .settings import ProbeSettings
@@ -31,16 +31,17 @@ class SuperGaussianProbeBuilder(ProbeSequenceBuilder):
         return builder
 
     def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
-        geometry = geometry_provider.get_probe_geometry()
-        coords = self.get_transverse_coordinates(geometry)
-
-        Z = (  # noqa: N806
-            coords.position_r_m - self.annular_radius_m.get_value()
-        ) / self.fwhm_m.get_value()
-        ZP = numpy.power(2 * Z, 2 * self.order_parameter.get_value())  # noqa: N806
-
+        probe = rescale_probe_intensity(
+            generate_super_gaussian_probe(
+                geometry_provider.get_probe_geometry(),
+                annular_radius_m=self.annular_radius_m.get_value(),
+                fwhm_m=self.fwhm_m.get_value(),
+                order_parameter=self.order_parameter.get_value(),
+            ),
+            geometry_provider.probe_photon_count,
+        )
         return ProbeSequence(
-            array=self.normalize(numpy.exp(-numpy.log(2) * ZP) + 0j),
+            array=probe.get_array(),
             opr_weights=None,
-            pixel_geometry=geometry.get_pixel_geometry(),
+            pixel_geometry=probe.get_pixel_geometry(),
         )

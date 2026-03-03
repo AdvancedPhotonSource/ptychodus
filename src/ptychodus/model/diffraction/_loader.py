@@ -69,6 +69,7 @@ class LoadArray:
             data = AssembledDiffractionData(
                 indexes=processed_array.get_indexes(),
                 patterns=processed_array.get_patterns(),
+                pixel_geometry=pixel_geometry,  # FIXME
                 bad_pixels=self._bad_pixels,
             )
             self._assembler._assemble_array(

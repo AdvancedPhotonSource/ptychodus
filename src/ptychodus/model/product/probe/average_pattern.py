@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import numpy
-
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
-from ptychodus.api.propagator import FresnelTransformPropagator, PropagatorParameters
+from ptychodus.api.probe_gen import generate_average_pattern_probe, rescale_probe_intensity
 
 from ...diffraction import DiffractionAPI
 from .builder import ProbeSequenceBuilder
@@ -24,24 +22,17 @@ class AveragePatternProbeBuilder(ProbeSequenceBuilder):
         return AveragePatternProbeBuilder(self._settings, self._diffraction_api)
 
     def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
-        geometry = geometry_provider.get_probe_geometry()
-        assembled_data = self._diffraction_api.get_assembled_data()
-        detector_intensity = numpy.mean(assembled_data.get_patterns(), axis=0)
-
-        pixel_geometry = geometry_provider.get_detector_pixel_geometry()
-        propagator_parameters = PropagatorParameters(
-            wavelength_m=geometry_provider.probe_wavelength_m,
-            width_px=detector_intensity.shape[-1],
-            height_px=detector_intensity.shape[-2],
-            pixel_width_m=pixel_geometry.width_m,
-            pixel_height_m=pixel_geometry.height_m,
-            propagation_distance_m=-geometry_provider.detector_distance_m,
+        probe = rescale_probe_intensity(
+            generate_average_pattern_probe(
+                geometry_provider.get_probe_geometry(),
+                self._diffraction_api.get_assembled_data(),
+                probe_wavelength_m=geometry_provider.probe_wavelength_m,
+                detector_distance_m=geometry_provider.detector_distance_m,
+            ),
+            geometry_provider.probe_photon_count,
         )
-        propagator = FresnelTransformPropagator(propagator_parameters)
-        array = propagator.propagate(numpy.sqrt(detector_intensity).astype(complex))
-
         return ProbeSequence(
-            array=self.normalize(array),
+            array=probe.get_array(),
             opr_weights=None,
-            pixel_geometry=geometry.get_pixel_geometry(),
+            pixel_geometry=probe.get_pixel_geometry(),
         )

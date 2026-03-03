@@ -3,9 +3,10 @@ import numpy
 from ptychodus.api.object import ObjectFileReader, ObjectFileWriter
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter
-from ptychodus.api.product import ProductFileReader, ProductFileWriter
+from ptychodus.api.probe import ProbeFileReader, ProbeFileWriter
+from ptychodus.api.probe_gen import FresnelZonePlate
 from ptychodus.api.probe_positions import ProbePositionFileReader, ProbePositionFileWriter
+from ptychodus.api.product import ProductFileReader, ProductFileWriter
 from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import AssembledDiffractionDataset, DiffractionAPI, PatternSizer

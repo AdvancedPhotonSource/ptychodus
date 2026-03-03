@@ -83,12 +83,12 @@ class ObjectEditorViewControllerFactory:
                 group=first_layer_group,
             )
             dialog_builder.add_decimal_line_edit(
-                object_builder.leaf_phase_lower_turns,
+                object_builder.leaf_phase_lower_tr,
                 'Leaf Phase Lower [turns]:',
                 group=first_layer_group,
             )
             dialog_builder.add_decimal_line_edit(
-                object_builder.leaf_phase_upper_turns,
+                object_builder.leaf_phase_upper_tr,
                 'Leaf Phase Upper [turns]:',
                 group=first_layer_group,
             )
@@ -115,7 +115,7 @@ class ObjectEditorViewControllerFactory:
                 group=first_layer_group,
             )
             dialog_builder.add_decimal_slider(
-                object_builder.phase_deviation_turns,
+                object_builder.phase_deviation_tr,
                 'Phase Deviation [turns]:',
                 group=first_layer_group,
             )

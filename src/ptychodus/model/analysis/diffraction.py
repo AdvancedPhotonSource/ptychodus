@@ -2,10 +2,7 @@ import numpy
 
 from ptychodus.api.diffraction import BadPixels, DiffractionIndexes, DiffractionPatterns
 from ptychodus.api.io import AssembledDiffractionData
-from ptychodus.api.propagator import (
-    FraunhoferPropagator,
-    PropagatorParameters,
-)
+from ptychodus.api.propagator import FraunhoferPropagator, PropagatorParameters
 
 from ..diffraction import AssembledDiffractionDataset
 from ..product import ProductRepository
@@ -70,6 +67,7 @@ class DiffractionSimulator:
         data = AssembledDiffractionData(
             indexes=indexes,
             patterns=patterns,
+            pixel_geometry=pixel_geometry,  # FIXME
             bad_pixels=bad_pixels,
         )
         self._dataset.set_assembled_patterns(data)

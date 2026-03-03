@@ -1,19 +1,19 @@
 from __future__ import annotations
 from abc import abstractmethod
-from dataclasses import dataclass
+from collections.abc import Sequence
+from enum import auto, IntEnum
 from pathlib import Path
 import logging
 
 import numpy
 
-from ptychodus.api.common import RealArrayType
 from ptychodus.api.parametric import ParameterGroup
+from ptychodus.api.probe_gen import generate_coherent_modes, generate_incoherent_modes
 from ptychodus.api.probe import (
+    Probe,
     ProbeSequence,
     ProbeFileReader,
-    ProbeGeometry,
     ProbeGeometryProvider,
-    ComplexArrayType,
 )
 
 from .settings import ProbeSettings
@@ -21,14 +21,21 @@ from .settings import ProbeSettings
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class ProbeTransverseCoordinates:
-    position_x_m: RealArrayType
-    position_y_m: RealArrayType
+class ProbeModeDecayType(IntEnum):
+    NONE = auto()
+    POLYNOMIAL = auto()
+    EXPONENTIAL = auto()
 
-    @property
-    def position_r_m(self) -> RealArrayType:
-        return numpy.hypot(self.position_x_m, self.position_y_m)
+    def get_weights(self, num_modes: int, decay_ratio: float) -> Sequence[float]:
+        match self.value:
+            case ProbeModeDecayType.EXPONENTIAL:
+                b = 1.0 / decay_ratio
+                return [b**-n for n in range(num_modes)]
+            case ProbeModeDecayType.POLYNOMIAL:
+                b = numpy.log(decay_ratio) / numpy.log(2.0)
+                return [(n + 1) ** b for n in range(num_modes)]
+            case _:
+                return [1.0] + [0.0] * (num_modes - 1)
 
 
 class ProbeSequenceBuilder(ParameterGroup):
@@ -38,21 +45,20 @@ class ProbeSequenceBuilder(ParameterGroup):
         self._name.set_value(name)
         self._add_parameter('name', self._name)
 
-    def get_transverse_coordinates(self, geometry: ProbeGeometry) -> ProbeTransverseCoordinates:
-        Y, X = numpy.mgrid[: geometry.height_px, : geometry.width_px]  # noqa: N806
-        position_x_px = X - (geometry.width_px - 1) / 2
-        position_y_px = Y - (geometry.height_px - 1) / 2
+        self.num_incoherent_modes = settings.num_incoherent_modes.copy()
+        self._add_parameter('num_incoherent_modes', self.num_incoherent_modes)
 
-        position_x_m = position_x_px * geometry.pixel_width_m
-        position_y_m = position_y_px * geometry.pixel_height_m
+        self.orthogonalize_incoherent_modes = settings.orthogonalize_incoherent_modes.copy()
+        self._add_parameter('orthogonalize_incoherent_modes', self.orthogonalize_incoherent_modes)
 
-        return ProbeTransverseCoordinates(
-            position_x_m=position_x_m,
-            position_y_m=position_y_m,
-        )
+        self.incoherent_mode_decay_type = settings.incoherent_mode_decay_type.copy()
+        self._add_parameter('incoherent_mode_decay_type', self.incoherent_mode_decay_type)
 
-    def normalize(self, array: ComplexArrayType) -> ComplexArrayType:
-        return array / numpy.sqrt(numpy.sum(numpy.square(numpy.abs(array))))
+        self.incoherent_mode_decay_ratio = settings.incoherent_mode_decay_ratio.copy()
+        self._add_parameter('incoherent_mode_decay_ratio', self.incoherent_mode_decay_ratio)
+
+        self.num_coherent_modes = settings.num_coherent_modes.copy()
+        self._add_parameter('num_coherent_modes', self.num_coherent_modes)
 
     def get_name(self) -> str:
         return self._name.get_value()
@@ -63,11 +69,40 @@ class ProbeSequenceBuilder(ParameterGroup):
 
     @abstractmethod
     def copy(self) -> ProbeSequenceBuilder:
+        # FIXME verify that parameters are copied correctly in subclasses
         pass
 
     @abstractmethod
     def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
         pass
+
+    def _get_imode_weights(self) -> Sequence[float]:
+        imode_decay_ratio = self.incoherent_mode_decay_ratio.get_value()
+        imode_decay_type_text = self.incoherent_mode_decay_type.get_value()
+        imode_decay_type = ProbeModeDecayType.NONE
+
+        if imode_decay_ratio > 0.0:
+            try:
+                imode_decay_type = ProbeModeDecayType[imode_decay_type_text.upper()]
+            except KeyError:
+                logger.debug(f'Unknown probe mode decay type "{imode_decay_type_text}"')
+
+        num_imodes = self.num_incoherent_modes.get_value()
+        return imode_decay_type.get_weights(num_imodes, imode_decay_ratio)
+
+    def _build_probe_modes(self, rng: numpy.random.Generator, probe: Probe) -> ProbeSequence:
+        probe = generate_incoherent_modes(
+            rng,
+            probe,
+            self._get_imode_weights(),
+            orthogonalize=self.orthogonalize_incoherent_modes.get_value(),
+        )
+        return generate_coherent_modes(
+            rng,
+            probe,
+            num_cmodes=self.num_coherent_modes.get_value(),
+            num_diffraction_patterns=num_diffraction_patterns,
+        )
 
 
 class FromMemoryProbeBuilder(ProbeSequenceBuilder):
