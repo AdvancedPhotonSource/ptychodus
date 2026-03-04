@@ -1,15 +1,20 @@
 from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
+import logging
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject, QStringListModel
-from PyQt5.QtWidgets import QDialogButtonBox, QTableView
+from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QTableView
 
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
-from ..view.settings import SettingsView
+from ..model.product import ProductRepository
+from ..view.settings import SettingsView, SyncProductToSettingsDialog
 from .data import FileDialogFactory
+from .product.list_model import ProductRepositoryListModel
+
+logger = logging.getLogger(__name__)
 
 
 class SettingsTableModel(QAbstractTableModel):
@@ -54,41 +59,48 @@ class SettingsController(Observer):
     def __init__(
         self,
         settings_registry: SettingsRegistry,
-        view: SettingsView,
-        table_view: QTableView,
+        product_repository: ProductRepository,
+        settings_view: SettingsView,
+        settings_table_view: QTableView,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._settings_registry = settings_registry
-        self._view = view
-        self._table_view = table_view
+        self._product_repository = product_repository
+        self._settings_view = settings_view
+        self._settings_table_view = settings_table_view
         self._file_dialog_factory = file_dialog_factory
 
-        self._list_model = QStringListModel()
-        self._table_model = SettingsTableModel()
+        self._settings_list_model = QStringListModel()
+        self._settings_table_model = SettingsTableModel()
+        self._product_list_model = ProductRepositoryListModel(product_repository)
+        self._sync_dialog = SyncProductToSettingsDialog(settings_view)
 
         settings_registry.add_observer(self)
 
-        view.list_view.setModel(self._list_model)
-        selection_model = view.list_view.selectionModel()
+        settings_view.list_view.setModel(self._settings_list_model)
+        settings_selection_model = settings_view.list_view.selectionModel()
 
-        if selection_model is None:
+        if settings_selection_model is None:
             raise ValueError('selection_model is None!')
         else:
-            selection_model.currentChanged.connect(self._update_view)
+            settings_selection_model.currentChanged.connect(self._update_view)
 
-        self._table_view.setModel(self._table_model)
+        self._settings_table_view.setModel(self._settings_table_model)
 
-        open_button = view.button_box.button(QDialogButtonBox.StandardButton.Open)
+        open_button = settings_view.button_box.button(QDialogButtonBox.StandardButton.Open)
         open_button.clicked.connect(self._open_settings)
-        save_button = view.button_box.button(QDialogButtonBox.StandardButton.Save)
-        save_button.clicked.connect(self._save_settings)
+        save_button = settings_view.button_box.button(QDialogButtonBox.StandardButton.Save)
+        save_button.clicked.connect(self._sync_dialog.open)
+
+        self._sync_dialog.product_combo_box.setModel(self._product_list_model)
+        self._sync_dialog.finished.connect(self._save_settings)
 
         self._sync_model_to_view()
 
     def _open_settings(self) -> None:
         file_path, _ = self._file_dialog_factory.get_open_file_path(
-            self._view,
+            self._settings_view,
             'Open Settings',
             name_filters=self._settings_registry.get_open_file_filters(),
             selected_name_filter=self._settings_registry.get_open_file_filter(),
@@ -97,9 +109,18 @@ class SettingsController(Observer):
         if file_path:
             self._settings_registry.open_settings(file_path)
 
-    def _save_settings(self) -> None:
+    def _save_settings(self, result: int) -> None:
+        if result == QDialog.DialogCode.Accepted:
+            item_index = self._sync_dialog.product_combo_box.currentIndex()
+
+            if item_index < 0:
+                logger.warning('No current item!')
+            else:
+                item = self._product_repository[item_index]
+                item.sync_to_settings()
+
         file_path, _ = self._file_dialog_factory.get_save_file_path(
-            self._view,
+            self._settings_view,
             'Save Settings',
             name_filters=self._settings_registry.get_save_file_filters(),
             selected_name_filter=self._settings_registry.get_save_file_filter(),
@@ -112,7 +133,7 @@ class SettingsController(Observer):
         if not current.isValid():
             return
 
-        group_name = self._list_model.data(current, Qt.ItemDataRole.DisplayRole)
+        group_name = self._settings_list_model.data(current, Qt.ItemDataRole.DisplayRole)
         group = self._settings_registry[group_name]
         names: list[str] = list()
         values: list[str] = list()
@@ -121,12 +142,12 @@ class SettingsController(Observer):
             names.append(parameter_name)
             values.append(parameter.get_value_as_string())
 
-        self._table_model.set_names_and_values(names, values)
+        self._settings_table_model.set_names_and_values(names, values)
 
     def _sync_model_to_view(self) -> None:
-        self._list_model.setStringList(sorted(iter(self._settings_registry)))
+        self._settings_list_model.setStringList(sorted(iter(self._settings_registry)))
 
-        current = self._view.list_view.currentIndex()
+        current = self._settings_view.list_view.currentIndex()
         self._update_view(current, QModelIndex())
 
     def _update(self, observable: Observable) -> None:

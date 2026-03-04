@@ -50,6 +50,7 @@ class ControllerCore:
         )
         self._settings_controller = SettingsController(
             model.settings_registry,
+            model.product_core.product_repository,
             view.settings_view,
             view.settings_table_view,
             self._file_dialog_factory,

@@ -31,15 +31,17 @@ class PtyChiViewController(QWidget):
         lsqml_settings: PtyChiLSQMLSettings | None = None
         pie_settings: PtyChiPIESettings | None = None
 
-        match reconstructor_name:
-            case 'Autodiff':
+        match reconstructor_name.lower():
+            case 'autodiff':
                 autodiff_settings = model.autodiff_settings
-            case 'DM':
+            case 'dm':
                 dm_settings = model.dm_settings
-            case 'LSQML':
+            case 'lsqml':
                 lsqml_settings = model.lsqml_settings
-            case 'PIE' | 'ePIE' | 'rPIE':
+            case 'pie' | 'epie' | 'rpie':
                 pie_settings = model.pie_settings
+            case _:
+                raise ValueError(f'Unknown reconstructor name: {reconstructor_name}')
 
         self._reconstructor_view_controller = PtyChiReconstructorViewController(
             model.settings,

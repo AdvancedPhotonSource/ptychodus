@@ -157,7 +157,7 @@ class AutomationController:
         buttons_view_controller = AutomationButtonsViewController(repository, presenter)
         view_builder.add_view_controller_to_bottom(buttons_view_controller)
 
-        contents = view_builder.build_widget()
+        contents = view_builder.build_widget(add_stretch=False)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)

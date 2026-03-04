@@ -274,6 +274,9 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
             indexes, patterns, self._get_pixel_geometry(), bad_pixels
         )
 
+        for observer in self._observer_list:
+            observer.handle_dataset_reloaded()
+
         # load all arrays in background
         finished_event = self._array_loader.get_finished_event()
         self._task_manager.put_background_task(self._array_loader)

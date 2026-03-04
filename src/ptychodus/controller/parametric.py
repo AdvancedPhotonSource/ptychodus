@@ -811,8 +811,8 @@ class ParameterViewBuilder:
 
         return view_controllers
 
-    def build_widget(self) -> QWidget:
-        layout = self._build_layout(add_stretch=True)
+    def build_widget(self, add_stretch: bool = True) -> QWidget:
+        layout = self._build_layout(add_stretch=add_stretch)
 
         widget = ParameterWidget(self._flush_view_controllers())
         widget.setLayout(layout)

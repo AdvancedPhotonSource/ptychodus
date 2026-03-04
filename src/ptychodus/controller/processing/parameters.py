@@ -62,10 +62,11 @@ class ProcessingStatusController(Observer):
 
         ax = self._view.axes
         ax.clear()
+        ax.set_title(item.get_name())
         ax.set_xlabel('Epoch')
         ax.set_ylabel('Loss')
+        ax.semilogy(epoch, losses, '.-', label='Loss', linewidth=2.0)
         ax.grid(True)
-        ax.plot(epoch, losses, '.-', label='Loss', linewidth=1.5)
         self._view.figure_canvas.draw()
 
     def _sync_model_to_view(self) -> None:
