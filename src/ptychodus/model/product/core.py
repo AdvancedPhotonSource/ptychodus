@@ -58,6 +58,7 @@ class ProductCore(Observer):
 
         self._probe_settings = ProbeSettings(settings_registry)
         self._probe_builder_factory = ProbeBuilderFactory(
+            rng,
             self._probe_settings,
             diffraction_api,
             fresnel_zone_plate_chooser,

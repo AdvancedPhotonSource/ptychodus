@@ -19,7 +19,7 @@ from ptychodus.api.parametric import PathParameter, StringParameter
 from ...model.analysis import DiffractionSimulator
 from ...model.diffraction import (
     AssembledDiffractionDataset,
-    BadPixelsProvider,
+    Detector,
     DetectorSettings,
     DiffractionAPI,
     DiffractionDatasetObserver,
@@ -51,14 +51,14 @@ class BadPixelsViewController(ParameterViewController, Observer):
         self,
         bad_pixels_file_path: PathParameter,
         bad_pixels_file_type: StringParameter,
-        bad_pixels_provider: BadPixelsProvider,
+        detector: Detector,
         diffraction_api: DiffractionAPI,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._bad_pixels_file_path = bad_pixels_file_path
         self._bad_pixels_file_type = bad_pixels_file_type
-        self._bad_pixels_provider = bad_pixels_provider
+        self._detector = detector
         self._diffraction_api = diffraction_api
         self._file_dialog_factory = file_dialog_factory
 
@@ -78,7 +78,7 @@ class BadPixelsViewController(ParameterViewController, Observer):
         self._widget.setLayout(layout)
 
         self._sync_model_to_view()
-        bad_pixels_provider.add_observer(self)
+        detector.add_observer(self)
 
     def _open_bad_pixels(self) -> None:
         file_reader_chooser = self._diffraction_api.get_bad_pixels_file_reader_chooser()
@@ -101,11 +101,11 @@ class BadPixelsViewController(ParameterViewController, Observer):
         return self._widget
 
     def _sync_model_to_view(self) -> None:
-        num_bad_pixels = self._bad_pixels_provider.get_num_bad_pixels()
+        num_bad_pixels = self._detector.get_num_bad_pixels()
         self._line_edit.setText(str(num_bad_pixels))
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._bad_pixels_provider:
+        if observable is self._detector:
             self._sync_model_to_view()
 
 
@@ -113,7 +113,7 @@ class DetectorController:
     def __init__(
         self,
         settings: DetectorSettings,
-        bad_pixels_provider: BadPixelsProvider,
+        detector: Detector,
         diffraction_api: DiffractionAPI,
         view: DetectorView,
         file_dialog_factory: FileDialogFactory,
@@ -130,7 +130,7 @@ class DetectorController:
         self._bad_pixels_view_controller = BadPixelsViewController(
             settings.bad_pixels_file_path,
             settings.bad_pixels_file_type,
-            bad_pixels_provider,
+            detector,
             diffraction_api,
             file_dialog_factory,
         )
@@ -151,7 +151,7 @@ class DiffractionController(DiffractionDatasetObserver):
         detector_settings: DetectorSettings,
         diffraction_settings: DiffractionSettings,
         pattern_sizer: PatternSizer,
-        bad_pixels_provider: BadPixelsProvider,
+        detector: Detector,
         diffraction_api: DiffractionAPI,
         dataset: AssembledDiffractionDataset,
         metadata_presenter: MetadataPresenter,
@@ -172,7 +172,7 @@ class DiffractionController(DiffractionDatasetObserver):
         self._file_dialog_factory = file_dialog_factory
         self._detector_controller = DetectorController(
             detector_settings,
-            bad_pixels_provider,
+            detector,
             diffraction_api,
             view.detector_view,
             file_dialog_factory,

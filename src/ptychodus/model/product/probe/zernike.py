@@ -1,6 +1,7 @@
 from __future__ import annotations
 import logging
 
+import numpy
 
 from ptychodus.api.geometry import ZernikeMonomial
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
@@ -13,8 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 class ZernikeProbeBuilder(ProbeSequenceBuilder):
-    def __init__(self, settings: ProbeSettings) -> None:
+    def __init__(self, rng: numpy.random.Generator, settings: ProbeSettings) -> None:
         super().__init__(settings, 'zernike')
+        self._rng = rng
         self._settings = settings
         self._polynomial: list[ZernikeMonomial] = list()
         self._order = 0
@@ -25,7 +27,7 @@ class ZernikeProbeBuilder(ProbeSequenceBuilder):
         self.set_order(1)
 
     def copy(self) -> ZernikeProbeBuilder:
-        builder = ZernikeProbeBuilder(self._settings)
+        builder = ZernikeProbeBuilder(self._rng, self._settings)
         builder.diameter_m.set_value(self.diameter_m.get_value())
         builder._polynomial = self._polynomial.copy()
         builder._order = self._order
@@ -73,6 +75,4 @@ class ZernikeProbeBuilder(ProbeSequenceBuilder):
             ),
             geometry_provider.probe_photon_count,
         )
-        return ProbeSequence(
-            array=probe.get_array(), opr_weights=None, pixel_geometry=probe.get_pixel_geometry()
-        )
+        return self._build_probe_modes(self._rng, probe, geometry_provider.num_scan_points)

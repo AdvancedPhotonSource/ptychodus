@@ -4,6 +4,7 @@ from ptychodus.api.observer import Observable, Observer
 
 from ...model.product.object import (
     DeadLeavesObjectBuilder,
+    GaussianRandomFieldObjectBuilder,
     ObjectRepositoryItem,
     RandomObjectBuilder,
     STXMObjectBuilder,
@@ -90,6 +91,25 @@ class ObjectEditorViewControllerFactory:
             dialog_builder.add_decimal_line_edit(
                 object_builder.leaf_phase_upper_tr,
                 'Leaf Phase Upper [turns]:',
+                group=first_layer_group,
+            )
+            dialog_builder.add_view_controller(
+                MultisliceViewController(item),
+                'Number of Layers:',
+                group=additional_layers_group,
+            )
+            return dialog_builder.build_dialog(title, parent)
+        elif isinstance(object_builder, GaussianRandomFieldObjectBuilder):
+            dialog_builder = ParameterViewBuilder()
+            dialog_builder.add_spin_box(
+                object_builder.extra_padding_x, 'Extra Padding X:', group=first_layer_group
+            )
+            dialog_builder.add_spin_box(
+                object_builder.extra_padding_y, 'Extra Padding Y:', group=first_layer_group
+            )
+            dialog_builder.add_decimal_line_edit(
+                object_builder.correlation_length_px,
+                'Correlation Length [px]:',
                 group=first_layer_group,
             )
             dialog_builder.add_view_controller(

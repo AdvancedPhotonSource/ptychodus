@@ -16,8 +16,8 @@ from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.reconstructor import AssembledDiffractionData
 from ptychodus.api.tree import SimpleTreeNode
 
-from .bad_pixels import BadPixelsProvider
 from .dataset import AssembledDiffractionDataset
+from .detector import Detector
 from .settings import DetectorSettings, DiffractionSettings
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ class DiffractionAPI:
         self,
         diffraction_settings: DiffractionSettings,
         detector_settings: DetectorSettings,
-        bad_pixels_provider: BadPixelsProvider,
+        detector: Detector,
         dataset: AssembledDiffractionDataset,
         bad_pixels_file_reader_chooser: PluginChooser[BadPixelsFileReader],
         file_reader_chooser: PluginChooser[DiffractionFileReader],
@@ -55,7 +55,7 @@ class DiffractionAPI:
         super().__init__()
         self._diffraction_settings = diffraction_settings
         self._detector_settings = detector_settings
-        self._bad_pixels_provider = bad_pixels_provider
+        self._detector = detector
         self._dataset = dataset
         self._bad_pixels_file_reader_chooser = bad_pixels_file_reader_chooser
         self._file_reader_chooser = file_reader_chooser
@@ -80,13 +80,13 @@ class DiffractionAPI:
             except Exception as exc:
                 raise RuntimeError(f'Failed to read "{file_path}"') from exc
             else:
-                self._bad_pixels_provider.set_bad_pixels(bad_pixels)
+                self._detector.set_bad_pixels(bad_pixels)
                 self._detector_settings.bad_pixels_file_path.set_value(file_path)
         else:
             logger.warning(f'Refusing to read invalid file path {file_path}')
 
     def clear_bad_pixels(self) -> None:
-        self._bad_pixels_provider.clear_bad_pixels()
+        self._detector.set_bad_pixels(None)
         self._detector_settings.bad_pixels_file_path.set_value(Path('/path/to/bad_pixels.npy'))
 
     def get_file_reader_chooser(self) -> PluginChooser[DiffractionFileReader]:

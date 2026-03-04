@@ -110,13 +110,18 @@ class Probe:
         array: ComplexArrayType,
         pixel_geometry: PixelGeometry,
     ) -> None:
-        self._array = array
+        if numpy.iscomplexobj(array):
+            match array.ndim:
+                case 2:
+                    self._array = array[numpy.newaxis, :, :]
+                case 3:
+                    self._array = array
+                case _:
+                    raise ValueError('Probe must be a 2- or 3-dimensional ndarray.')
+
         self._pixel_geometry = pixel_geometry
 
-        if array.ndim != 3:
-            raise ValueError('Probe must be a 3-dimensional ndarray.')
-
-        power = numpy.sum(intensity(array), axis=(-2, -1))
+        power = numpy.sum(intensity(self._array), axis=(-2, -1))
         powersum = numpy.sum(power)
 
         if powersum > 0.0:

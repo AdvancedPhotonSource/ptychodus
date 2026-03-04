@@ -108,7 +108,6 @@ def generate_gaussian_random_field_object(
     power_spectrum[0, 0] = 0  # zero mean
 
     # shape noise with power spectrum and back-transform
-    # FIXME fftshift?
     field = ifft2(noise * numpy.sqrt(power_spectrum))
 
     return Object(

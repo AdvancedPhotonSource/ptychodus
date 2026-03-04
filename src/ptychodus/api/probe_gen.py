@@ -23,10 +23,20 @@ logger = logging.getLogger(__name__)
 def rescale_probe_intensity(probe: Probe, new_intensity: float) -> Probe:
     array = probe.get_array()
     old_intensity = numpy.sum(intensity(array))
-    return Probe(
-        array=array * numpy.sqrt(new_intensity / old_intensity),
-        pixel_geometry=probe.get_pixel_geometry(),
-    )
+
+    if new_intensity <= 0:
+        logger.warning('Refusing to rescale probe to zero intensity!')
+    elif numpy.isnan(old_intensity):
+        logger.warning('Cannot rescale probe with NaN values!')
+    elif old_intensity <= 0:
+        logger.warning('Cannot rescale probe with zero intensity!')
+    else:
+        return Probe(
+            array=array * numpy.sqrt(new_intensity / old_intensity),
+            pixel_geometry=probe.get_pixel_geometry(),
+        )
+
+    return probe
 
 
 def defocus_probe(
@@ -215,6 +225,11 @@ def generate_incoherent_modes(
 ) -> Probe:
     num_imodes = len(imode_weights)
     array_in = probe.get_array()
+
+    if numpy.isnan(array_in).any():
+        logger.warning('Probe without incoherent modes contains NaN values!')
+        return probe
+
     array_out_shape = num_imodes, *array_in.shape[-2:]
     array_out = numpy.zeros(array_out_shape, dtype=array_in.dtype)
 
@@ -230,20 +245,25 @@ def generate_incoherent_modes(
 
         array_out[imode, :, :] = values
 
-    if orthogonalize:
+    if orthogonalize and array_in.shape[-3] > 1:
         imodes_as_rows = array_out.reshape(num_imodes, -1)
         imodes_as_ortho_rows = scipy.linalg.orth(imodes_as_rows.T).T
         array_out = imodes_as_ortho_rows.reshape(array_out_shape)
+
+    if numpy.isnan(array_out).any():
+        logger.warning('Probe with incoherent modes contains NaN values!')
+        return probe
 
     normalized_imode_weights = numpy.asarray(imode_weights) / numpy.sum(imode_weights)
     imode_intensity = numpy.sum(intensity(array_in)) * normalized_imode_weights
 
     for imode, intensity_out in enumerate(imode_intensity):
         intensity_in = numpy.sum(intensity(array_out[imode, :, :]))
-        array_out[imode, :, :] *= numpy.sqrt(intensity_out / intensity_in)
 
-    logger.info('Intensity in: %s', numpy.sum(intensity(array_in)))  # FIXME
-    logger.info('Intensity out: %s', numpy.sum(intensity(array_out)))  # FIXME
+        if intensity_in <= 0:
+            logger.warning('Cannot rescale imode with zero intensity!')
+        else:
+            array_out[imode, :, :] *= numpy.sqrt(intensity_out / intensity_in)
 
     return Probe(
         array=array_out,
@@ -268,8 +288,9 @@ def generate_coherent_modes(
 
     array_in = probe.get_array()
     array_out = numpy.zeros((num_cmodes, *array_in.shape), array_in.dtype)
+    array_out[0, :, :, :] = array_in[:, :, :]
 
-    for cmode in range(num_cmodes):
+    for cmode in range(1, num_cmodes):
         real = rng.normal(size=array_out.shape[-2:])
         imag = rng.normal(size=array_out.shape[-2:])
         values = real + 1j * imag

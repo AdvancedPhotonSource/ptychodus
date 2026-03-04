@@ -10,7 +10,7 @@ import tempfile
 import numpy
 
 from ptychodus.api.common import BYTES_PER_MEGABYTE
-from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     BadPixels,
     DiffractionArray,
@@ -26,7 +26,7 @@ from ptychodus.api.tree import SimpleTreeNode
 
 from ..task_manager import BackgroundTask, TaskManager
 from ._loader import ArrayAssembler, LoadAllArrays, LoadArray
-from .bad_pixels import BadPixelsProvider
+from .detector import Detector
 from .settings import DiffractionSettings
 from .sizer import PatternSizer
 
@@ -106,13 +106,13 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         self,
         settings: DiffractionSettings,
         sizer: PatternSizer,
-        bad_pixels_provider: BadPixelsProvider,
+        detector: Detector,
         task_manager: TaskManager,
     ) -> None:
         super().__init__()
         self._settings = settings
         self._sizer = sizer
-        self._bad_pixels_provider = bad_pixels_provider
+        self._detector = detector
         self._task_manager = task_manager
         self._observer_list: list[DiffractionDatasetObserver] = []
 
@@ -137,6 +137,9 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
 
     def get_layout(self) -> SimpleTreeNode:
         return self._dataset.get_layout()
+
+    def _get_pixel_geometry(self) -> PixelGeometry:
+        return self._detector.get_pixel_geometry()
 
     def get_bad_pixels(self) -> BadPixels | None:
         return self._dataset.get_bad_pixels()
@@ -172,7 +175,12 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
 
         processor = self._sizer.get_processor()
         return LoadArray(
-            array_index, array, bad_pixels, processor if process_patterns else None, self
+            array_index,
+            array,
+            self._get_pixel_geometry(),
+            bad_pixels,
+            processor if process_patterns else None,
+            self,
         )
 
     def append_array(self, array: DiffractionArray, *, process_patterns: bool = True) -> None:
@@ -229,9 +237,9 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         metadata = self._dataset.get_metadata()
 
         if metadata.detector_extent is not None:
-            self._bad_pixels_provider.set_detector_extent(metadata.detector_extent)
+            self._detector.set_extent(metadata.detector_extent)
 
-        bad_pixels = self._bad_pixels_provider.get_bad_pixels()
+        bad_pixels = self._detector.get_bad_pixels()
 
         if process_patterns:
             processor = self._sizer.get_processor()
@@ -263,10 +271,7 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
             logger.debug(f'{patterns.nbytes / BYTES_PER_MEGABYTE:.2f}MB allocated for patterns')
 
         self._data = AssembledDiffractionData(
-            indexes=indexes,
-            patterns=patterns,
-            pixel_geometry=pixel_geometry,  # FIXME
-            bad_pixels=bad_pixels,
+            indexes, patterns, self._get_pixel_geometry(), bad_pixels
         )
 
         # load all arrays in background
@@ -280,7 +285,6 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
                     break
 
     def _generate_dataset_for_assembled_data(self, file_path: Path | None = None) -> None:
-        # TODO deconflict detector size with bad_pixels_provider
         num_patterns, detector_height, detector_width = self._data.get_patterns_shape()
         metadata = DiffractionMetadata(
             num_patterns_per_array=[num_patterns],

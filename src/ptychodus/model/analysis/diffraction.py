@@ -1,6 +1,7 @@
 import numpy
 
 from ptychodus.api.diffraction import BadPixels, DiffractionIndexes, DiffractionPatterns
+from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import AssembledDiffractionData
 from ptychodus.api.propagator import FraunhoferPropagator, PropagatorParameters
 
@@ -39,6 +40,13 @@ class DiffractionSimulator:
             (num_positions, probe_geometry.height_px, probe_geometry.width_px),
             dtype=float,
         )
+        lambda_z_m2 = (
+            propagator_parameters.wavelength_m * propagator_parameters.propagation_distance_m
+        )
+        pixel_geometry = PixelGeometry(
+            width_m=lambda_z_m2 / probe_geometry.width_m,
+            height_m=lambda_z_m2 / probe_geometry.height_m,
+        )
         bad_pixels: BadPixels = numpy.full(
             (probe_geometry.height_px, probe_geometry.width_px), False
         )
@@ -64,10 +72,5 @@ class DiffractionSimulator:
 
             indexes[index] = object_position.index
 
-        data = AssembledDiffractionData(
-            indexes=indexes,
-            patterns=patterns,
-            pixel_geometry=pixel_geometry,  # FIXME
-            bad_pixels=bad_pixels,
-        )
+        data = AssembledDiffractionData(indexes, patterns, pixel_geometry, bad_pixels)
         self._dataset.set_assembled_patterns(data)

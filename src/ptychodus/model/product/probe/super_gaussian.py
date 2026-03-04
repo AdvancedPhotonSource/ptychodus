@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy
 
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
 from ptychodus.api.probe_gen import rescale_probe_intensity, generate_super_gaussian_probe
@@ -9,8 +10,9 @@ from .settings import ProbeSettings
 
 
 class SuperGaussianProbeBuilder(ProbeSequenceBuilder):
-    def __init__(self, settings: ProbeSettings) -> None:
+    def __init__(self, rng: numpy.random.Generator, settings: ProbeSettings) -> None:
         super().__init__(settings, 'super_gaussian')
+        self._rng = rng
         self._settings = settings
 
         self.annular_radius_m = settings.super_gaussian_annular_radius_m.copy()
@@ -23,7 +25,7 @@ class SuperGaussianProbeBuilder(ProbeSequenceBuilder):
         self._add_parameter('order_parameter', self.order_parameter)
 
     def copy(self) -> SuperGaussianProbeBuilder:
-        builder = SuperGaussianProbeBuilder(self._settings)
+        builder = SuperGaussianProbeBuilder(self._rng, self._settings)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
@@ -40,8 +42,4 @@ class SuperGaussianProbeBuilder(ProbeSequenceBuilder):
             ),
             geometry_provider.probe_photon_count,
         )
-        return ProbeSequence(
-            array=probe.get_array(),
-            opr_weights=None,
-            pixel_geometry=probe.get_pixel_geometry(),
-        )
+        return self._build_probe_modes(self._rng, probe, geometry_provider.num_scan_points)

@@ -120,7 +120,7 @@ class ProbePositionsRepositoryItem(ParameterGroup):
 
         return self._geometry
 
-    def _transform_scan(self) -> None:  # FIXME
+    def _transform_scan(self) -> None:
         transform = self._transform.get_transform()
         jitter_radius_m = self._transform.jitter_radius_m.get_value()
         rng = numpy.random.default_rng() if jitter_radius_m > 0.0 else None
@@ -128,10 +128,9 @@ class ProbePositionsRepositoryItem(ParameterGroup):
         transformed_positions = list(
             transform_probe_positions(self._untransformed_scan, transform, rng, jitter_radius_m)
         )
-        geometry = calculate_scan_geometry(transformed_positions)
 
         self._transformed_scan = ProbePositionSequence(transformed_positions)
-        self._geometry = geometry
+        self._geometry = calculate_scan_geometry(transformed_positions)
         self.notify_observers()
 
     def _rebuild(self) -> None:

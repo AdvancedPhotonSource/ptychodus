@@ -1,6 +1,7 @@
 from __future__ import annotations
 from collections.abc import Iterator
 
+import numpy
 
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
@@ -17,10 +18,12 @@ from .settings import ProbeSettings
 class FresnelZonePlateProbeBuilder(ProbeSequenceBuilder):
     def __init__(
         self,
+        rng: numpy.random.Generator,
         settings: ProbeSettings,
         fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
     ) -> None:
         super().__init__(settings, 'fresnel_zone_plate')
+        self._rng = rng
         self._settings = settings
         self._fresnel_zone_plate_chooser = fresnel_zone_plate_chooser
 
@@ -38,7 +41,9 @@ class FresnelZonePlateProbeBuilder(ProbeSequenceBuilder):
         self._add_parameter('defocus_distance_m', self.defocus_distance_m)
 
     def copy(self) -> FresnelZonePlateProbeBuilder:
-        builder = FresnelZonePlateProbeBuilder(self._settings, self._fresnel_zone_plate_chooser)
+        builder = FresnelZonePlateProbeBuilder(
+            self._rng, self._settings, self._fresnel_zone_plate_chooser
+        )
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
@@ -71,8 +76,4 @@ class FresnelZonePlateProbeBuilder(ProbeSequenceBuilder):
             ),
             geometry_provider.probe_photon_count,
         )
-        return ProbeSequence(
-            array=probe.get_array(),
-            opr_weights=None,
-            pixel_geometry=probe.get_pixel_geometry(),
-        )
+        return self._build_probe_modes(self._rng, probe, geometry_provider.num_scan_points)

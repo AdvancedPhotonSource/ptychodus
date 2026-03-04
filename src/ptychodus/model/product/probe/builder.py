@@ -90,19 +90,24 @@ class ProbeSequenceBuilder(ParameterGroup):
         num_imodes = self.num_incoherent_modes.get_value()
         return imode_decay_type.get_weights(num_imodes, imode_decay_ratio)
 
-    def _build_probe_modes(self, rng: numpy.random.Generator, probe: Probe) -> ProbeSequence:
-        probe = generate_incoherent_modes(
+    def _build_probe_modes(
+        self, rng: numpy.random.Generator, probe: Probe, num_diffraction_patterns: int
+    ) -> ProbeSequence:
+        probe_with_imodes = generate_incoherent_modes(
             rng,
             probe,
             self._get_imode_weights(),
             orthogonalize=self.orthogonalize_incoherent_modes.get_value(),
         )
-        return generate_coherent_modes(
+        probe_seq = generate_coherent_modes(
             rng,
-            probe,
+            probe_with_imodes,
             num_cmodes=self.num_coherent_modes.get_value(),
             num_diffraction_patterns=num_diffraction_patterns,
         )
+        array = probe_seq.get_array()
+        logger.debug(f'Multimodal probe {array.shape=}')
+        return probe_seq
 
 
 class FromMemoryProbeBuilder(ProbeSequenceBuilder):

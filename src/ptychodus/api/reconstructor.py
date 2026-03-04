@@ -219,7 +219,10 @@ class AssembledDiffractionData:
             raise ValueError('Number of indexes does not match number of patterns!')
 
         if patterns.shape[1:] != bad_pixels.shape:
-            raise ValueError('Patterns shape does not match bad pixels shape!')
+            raise ValueError(
+                'Patterns shape does not match bad pixels shape!'
+                f'(actual={patterns.shape[1:]} expected={bad_pixels.shape})'
+            )
 
     @classmethod
     def create_null(cls) -> AssembledDiffractionData:
@@ -284,6 +287,7 @@ class AssembledDiffractionData:
         product: Product,
         index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
     ) -> ReconstructInput:
+        # FIXME also filter OPR weights
         pattern_indexes = [int(index) for index in self.get_indexes()]
         logger.debug(f'{pattern_indexes=}')
         position_indexes = [

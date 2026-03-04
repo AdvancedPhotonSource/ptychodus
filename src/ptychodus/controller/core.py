@@ -64,7 +64,7 @@ class ControllerCore:
             model.diffraction_core.detector_settings,
             model.diffraction_core.diffraction_settings,
             model.diffraction_core.pattern_sizer,
-            model.diffraction_core.bad_pixels_provider,
+            model.diffraction_core.detector,
             model.diffraction_core.diffraction_api,
             model.diffraction_core.dataset,
             model.metadata_presenter,
