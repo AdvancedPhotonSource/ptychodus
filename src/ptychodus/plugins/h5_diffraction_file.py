@@ -78,7 +78,9 @@ class H5DiffractionPatternArray(DiffractionArray):
 
                 if missing_filter_names:
                     error_msg = ' '.join(missing_filter_names)
-                    raise RuntimeError(f'{item_ref} missing filters needed to read dataset: {error_msg}!')
+                    raise RuntimeError(
+                        f'{item_ref} missing filters needed to read dataset: {error_msg}!'
+                    )
 
                 return item[:]
             else:

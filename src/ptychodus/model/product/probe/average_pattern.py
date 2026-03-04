@@ -23,7 +23,12 @@ class AveragePatternProbeBuilder(ProbeSequenceBuilder):
         self._diffraction_api = diffraction_api
 
     def copy(self) -> AveragePatternProbeBuilder:
-        return AveragePatternProbeBuilder(self._rng, self._settings, self._diffraction_api)
+        builder = AveragePatternProbeBuilder(self._rng, self._settings, self._diffraction_api)
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].set_value(value.get_value())
+
+        return builder
 
     def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
         probe = rescale_probe_intensity(

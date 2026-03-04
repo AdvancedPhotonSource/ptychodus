@@ -28,7 +28,10 @@ class ZernikeProbeBuilder(ProbeSequenceBuilder):
 
     def copy(self) -> ZernikeProbeBuilder:
         builder = ZernikeProbeBuilder(self._rng, self._settings)
-        builder.diameter_m.set_value(self.diameter_m.get_value())
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].set_value(value.get_value())
+
         builder._polynomial = self._polynomial.copy()
         builder._order = self._order
         return builder

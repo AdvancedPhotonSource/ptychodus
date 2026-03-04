@@ -69,7 +69,6 @@ class ProbeSequenceBuilder(ParameterGroup):
 
     @abstractmethod
     def copy(self) -> ProbeSequenceBuilder:
-        # FIXME verify that parameters are copied correctly in subclasses
         pass
 
     @abstractmethod

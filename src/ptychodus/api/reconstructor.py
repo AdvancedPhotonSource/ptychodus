@@ -287,7 +287,7 @@ class AssembledDiffractionData:
         product: Product,
         index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
     ) -> ReconstructInput:
-        # FIXME also filter OPR weights
+        # TODO also filter OPR weights
         pattern_indexes = [int(index) for index in self.get_indexes()]
         logger.debug(f'{pattern_indexes=}')
         position_indexes = [
