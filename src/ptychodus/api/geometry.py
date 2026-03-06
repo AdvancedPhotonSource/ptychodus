@@ -26,9 +26,9 @@ class AffineTransform:
     a12: float
 
     def __call__(self, x: float, y: float) -> tuple[float, float]:
-        yp = self.a00 * x + self.a01 * y + self.a02
         xp = self.a10 * x + self.a11 * y + self.a12
-        return yp, xp
+        yp = self.a00 * x + self.a01 * y + self.a02
+        return xp, yp
 
 
 @dataclass(frozen=True)

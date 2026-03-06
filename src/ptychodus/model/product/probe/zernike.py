@@ -5,7 +5,7 @@ import numpy
 
 from ptychodus.api.geometry import ZernikeMonomial
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
-from ptychodus.api.probe_gen import generate_zernike_probe_positions, rescale_probe_intensity
+from ptychodus.api.probe_gen import generate_zernike_probe, rescale_probe_intensity
 
 from .builder import ProbeSequenceBuilder
 from .settings import ProbeSettings
@@ -71,7 +71,7 @@ class ZernikeProbeBuilder(ProbeSequenceBuilder):
 
     def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
         probe = rescale_probe_intensity(
-            generate_zernike_probe_positions(
+            generate_zernike_probe(
                 geometry_provider.get_probe_geometry(),
                 self._polynomial,
                 radius_m=self.diameter_m.get_value() / 2.0,

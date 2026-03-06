@@ -193,7 +193,7 @@ def generate_fresnel_zone_plate_probe(
     )
 
 
-def generate_zernike_probe_positions(
+def generate_zernike_probe(
     geometry: ProbeGeometry, polynomial: Iterable[ZernikeMonomial], *, radius_m: float
 ) -> Probe:
     coords = geometry.get_transverse_coordinates()
@@ -216,7 +216,7 @@ def _random_phase_shift_axis(rng: numpy.random.Generator, size: int) -> ComplexA
     return numpy.exp(1j * numpy.pi * a * b)
 
 
-def generate_incoherent_modes(
+def generate_incoherent_probe_modes(
     rng: numpy.random.Generator,
     probe: Probe,
     imode_weights: Sequence[float],
@@ -271,7 +271,7 @@ def generate_incoherent_modes(
     )
 
 
-def generate_coherent_modes(
+def generate_coherent_probe_modes(
     rng: numpy.random.Generator,
     probe: Probe,
     *,

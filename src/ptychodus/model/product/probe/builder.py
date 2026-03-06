@@ -2,13 +2,12 @@ from __future__ import annotations
 from abc import abstractmethod
 from collections.abc import Sequence
 from enum import auto, IntEnum
-from pathlib import Path
 import logging
 
 import numpy
 
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.probe_gen import generate_coherent_modes, generate_incoherent_modes
+from ptychodus.api.probe_gen import generate_coherent_probe_modes, generate_incoherent_probe_modes
 from ptychodus.api.probe import (
     Probe,
     ProbeSequence,
@@ -92,13 +91,13 @@ class ProbeSequenceBuilder(ParameterGroup):
     def _build_probe_modes(
         self, rng: numpy.random.Generator, probe: Probe, num_diffraction_patterns: int
     ) -> ProbeSequence:
-        probe_with_imodes = generate_incoherent_modes(
+        probe_with_imodes = generate_incoherent_probe_modes(
             rng,
             probe,
             self._get_imode_weights(),
             orthogonalize=self.orthogonalize_incoherent_modes.get_value(),
         )
-        probe_seq = generate_coherent_modes(
+        probe_seq = generate_coherent_probe_modes(
             rng,
             probe_with_imodes,
             num_cmodes=self.num_coherent_modes.get_value(),
@@ -116,7 +115,12 @@ class FromMemoryProbeBuilder(ProbeSequenceBuilder):
         self._probe = probe.copy()
 
     def copy(self) -> FromMemoryProbeBuilder:
-        return FromMemoryProbeBuilder(self._settings, self._probe)
+        builder = FromMemoryProbeBuilder(self._settings, self._probe)
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].set_value(value.get_value())
+
+        return builder
 
     def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
         probe_geometry = geometry_provider.get_probe_geometry()
@@ -140,26 +144,24 @@ class FromMemoryProbeBuilder(ProbeSequenceBuilder):
 
 
 class FromFileProbeBuilder(ProbeSequenceBuilder):
-    def __init__(
-        self, settings: ProbeSettings, file_path: Path, file_type: str, file_reader: ProbeFileReader
-    ) -> None:
+    def __init__(self, settings: ProbeSettings, file_reader: ProbeFileReader) -> None:
         super().__init__(settings, 'from_file')
         self._settings = settings
-        self.file_path = settings.file_path.copy()
-        self.file_path.set_value(file_path)
-        self._add_parameter('file_path', self.file_path)
-        self.file_type = settings.file_type.copy()
-        self.file_type.set_value(file_type)
-        self._add_parameter('file_type', self.file_type)
         self._file_reader = file_reader
 
+        self.file_path = settings.file_path.copy()
+        self._add_parameter('file_path', self.file_path)
+
+        self.file_type = settings.file_type.copy()
+        self._add_parameter('file_type', self.file_type)
+
     def copy(self) -> FromFileProbeBuilder:
-        return FromFileProbeBuilder(
-            self._settings,
-            self.file_path.get_value(),
-            self.file_type.get_value(),
-            self._file_reader,
-        )
+        builder = FromFileProbeBuilder(self._settings, self._file_reader)
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].set_value(value.get_value())
+
+        return builder
 
     def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
         file_path = self.file_path.get_value()

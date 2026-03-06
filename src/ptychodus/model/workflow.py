@@ -78,8 +78,8 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
 
     def set_probe_positions_transform(self, transform: AffineTransform) -> None:
         item = self._product_api.get_item(self._product_index)
-        probe_positions_transform = item.get_probe_positions_item().get_transform()
-        probe_positions_transform.set_transform(transform)
+        builder = item.get_probe_positions_item().get_builder()
+        builder.set_transform(transform)
 
     def load_probe(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._probe_api.open_probe(self._product_index, file_path, file_type=file_type)

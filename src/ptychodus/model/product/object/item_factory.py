@@ -26,13 +26,10 @@ class ObjectRepositoryItemFactory:
     def create(
         self, geometry_provider: ObjectGeometryProvider, object_: Object | None = None
     ) -> ObjectRepositoryItem:
-        # TODO layers_builder = MultilayerObjectBuilder()
-
         if object_ is None:
             builder = self._builder_factory.create_default()
         else:
             builder = FromMemoryObjectBuilder(self._settings, object_)
-            # TODO layers_builder.set_identity()
 
         return ObjectRepositoryItem(geometry_provider, self._settings, builder)
 

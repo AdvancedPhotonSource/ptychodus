@@ -5,16 +5,11 @@ import numpy
 
 from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.probe_positions import (
-    ProbePositionSequence,
-    ScanGeometry,
-    calculate_scan_geometry,
-)
-from ptychodus.api.probe_positions_gen import transform_probe_positions
+from ptychodus.api.probe_positions import ProbePositionSequence, ScanGeometry
+from ptychodus.api.probe_positions_gen import calculate_scan_geometry
 
 from .builder import FromMemoryProbePositionsBuilder, ProbePositionsBuilder
 from .settings import ProbePositionsSettings
-from .transform import ProbePositionTransform
 
 logger = logging.getLogger(__name__)
 
@@ -22,20 +17,18 @@ logger = logging.getLogger(__name__)
 class ProbePositionsRepositoryItem(ParameterGroup):
     def __init__(
         self,
+        rng: numpy.random.Generator,
         settings: ProbePositionsSettings,
         builder: ProbePositionsBuilder,
-        transform: ProbePositionTransform,
     ) -> None:
         super().__init__()
+        self._rng = rng
         self._settings = settings
         self._builder = builder
-        self._transform = transform
-        self._untransformed_scan = ProbePositionSequence()
-        self._transformed_scan = ProbePositionSequence()
+        self._probe_positions = ProbePositionSequence()
         self._geometry: ScanGeometry | None = None
 
         self._add_group('builder', builder, observe=True)
-        self._add_group('transform', transform, observe=True)
 
         self.expand_bbox = settings.expand_bbox.copy()
         self._add_parameter('expand_bbox', self.expand_bbox)
@@ -55,22 +48,11 @@ class ProbePositionsRepositoryItem(ParameterGroup):
         self._rebuild()
 
     def assign_item(self, item: ProbePositionsRepositoryItem) -> None:
-        group = 'transform'
-
-        self._remove_group(group)
-        self._transform.remove_observer(self)
-
-        transform = item.get_transform()
-
-        self._transform = transform.copy()
-        self._transform.add_observer(self)
-        self._add_group(group, self._transform, observe=True)
-
         self.set_builder(item.get_builder().copy())
         self._rebuild()
 
     def assign(self, scan: ProbePositionSequence) -> None:
-        builder = FromMemoryProbePositionsBuilder(self._settings, scan)
+        builder = FromMemoryProbePositionsBuilder(self._rng, self._settings, scan)
         self.set_builder(builder)
 
     def sync_to_settings(self) -> None:
@@ -78,10 +60,9 @@ class ProbePositionsRepositoryItem(ParameterGroup):
             parameter.sync_value_to_parent()
 
         self._builder.sync_to_settings()
-        self._transform.sync_to_settings()
 
     def get_probe_positions(self) -> ProbePositionSequence:
-        return self._transformed_scan
+        return self._probe_positions
 
     def get_builder(self) -> ProbePositionsBuilder:
         return self._builder
@@ -120,36 +101,19 @@ class ProbePositionsRepositoryItem(ParameterGroup):
 
         return self._geometry
 
-    def _transform_scan(self) -> None:
-        transform = self._transform.get_transform()
-        jitter_radius_m = self._transform.jitter_radius_m.get_value()
-        rng = numpy.random.default_rng() if jitter_radius_m > 0.0 else None
-
-        transformed_positions = list(
-            transform_probe_positions(self._untransformed_scan, transform, rng, jitter_radius_m)
-        )
-
-        self._transformed_scan = ProbePositionSequence(transformed_positions)
-        self._geometry = calculate_scan_geometry(transformed_positions)
-        self.notify_observers()
-
     def _rebuild(self) -> None:
         try:
-            scan = self._builder.build()
+            probe_positions = self._builder.build()
         except Exception:
             logger.exception('Failed to rebuild scan!')
             return
 
-        self._untransformed_scan = scan
-        self._transform_scan()
-
-    def get_transform(self) -> ProbePositionTransform:
-        return self._transform
+        self._probe_positions = ProbePositionSequence(probe_positions)
+        self._geometry = calculate_scan_geometry(probe_positions)
+        self.notify_observers()
 
     def _update(self, observable: Observable) -> None:
         if observable is self._builder:
             self._rebuild()
-        elif observable is self._transform:
-            self._transform_scan()
         else:
             super()._update(observable)

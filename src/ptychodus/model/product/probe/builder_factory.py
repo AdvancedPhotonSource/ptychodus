@@ -90,9 +90,12 @@ class ProbeBuilderFactory(Iterable[str]):
 
     def create_probe_from_file(self, file_path: Path, file_filter: str) -> ProbeSequenceBuilder:
         self._file_reader_chooser.set_current_plugin(file_filter)
-        file_type = self._file_reader_chooser.get_current_plugin().simple_name
         file_reader = self._file_reader_chooser.get_current_plugin().strategy
-        return FromFileProbeBuilder(self._settings, file_path, file_type, file_reader)
+
+        builder = FromFileProbeBuilder(self._settings, file_reader)
+        builder.file_path.set_value(file_path)
+        builder.file_type.set_value(self._file_reader_chooser.get_current_plugin().simple_name)
+        return builder
 
     def get_save_file_filters(self) -> Iterator[str]:
         for plugin in self._file_writer_chooser:

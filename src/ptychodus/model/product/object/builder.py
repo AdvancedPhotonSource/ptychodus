@@ -1,7 +1,6 @@
 from __future__ import annotations
 from abc import abstractmethod
 from collections.abc import Sequence
-from pathlib import Path
 import logging
 
 
@@ -64,7 +63,12 @@ class FromMemoryObjectBuilder(ObjectBuilder):
         self._object = object_.copy()
 
     def copy(self) -> FromMemoryObjectBuilder:
-        return FromMemoryObjectBuilder(self._settings, self._object)
+        builder = FromMemoryObjectBuilder(self._settings, self._object)
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].set_value(value.get_value())
+
+        return builder
 
     def build(
         self,
@@ -95,27 +99,25 @@ class FromFileObjectBuilder(ObjectBuilder):
     def __init__(
         self,
         settings: ObjectSettings,
-        file_path: Path,
-        file_type: str,
         file_reader: ObjectFileReader,
     ) -> None:
         super().__init__(settings, 'from_file')
         self._settings = settings
-        self.file_path = settings.file_path.copy()
-        self.file_path.set_value(file_path)
-        self._add_parameter('file_path', self.file_path)
-        self.file_type = settings.file_type.copy()
-        self.file_type.set_value(file_type)
-        self._add_parameter('file_type', self.file_type)
         self._file_reader = file_reader
 
+        self.file_path = settings.file_path.copy()
+        self._add_parameter('file_path', self.file_path)
+
+        self.file_type = settings.file_type.copy()
+        self._add_parameter('file_type', self.file_type)
+
     def copy(self) -> FromFileObjectBuilder:
-        return FromFileObjectBuilder(
-            self._settings,
-            self.file_path.get_value(),
-            self.file_type.get_value(),
-            self._file_reader,
-        )
+        builder = FromFileObjectBuilder(self._settings, self._file_reader)
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].set_value(value.get_value())
+
+        return builder
 
     def build(
         self,

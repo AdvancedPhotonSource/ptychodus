@@ -1,9 +1,10 @@
 from collections.abc import Iterable, Iterator
+from itertools import pairwise
 
 import numpy
 
 from .geometry import AffineTransform
-from .probe_positions import ProbePosition
+from .probe_positions import ProbePosition, ScanGeometry
 
 
 def generate_cartesian_probe_positions(
@@ -123,3 +124,43 @@ def transform_probe_positions(
             coordinate_x_m=x_m,
             coordinate_y_m=y_m,
         )
+
+
+def calculate_scan_geometry(positions: Iterable[ProbePosition]) -> ScanGeometry | None:
+    minimum_x_m = +numpy.inf
+    maximum_x_m = -numpy.inf
+    minimum_y_m = +numpy.inf
+    maximum_y_m = -numpy.inf
+    length_m = 0.0
+
+    for point in positions:
+        if point.coordinate_x_m < minimum_x_m:
+            minimum_x_m = point.coordinate_x_m
+
+        if maximum_x_m < point.coordinate_x_m:
+            maximum_x_m = point.coordinate_x_m
+
+        if point.coordinate_y_m < minimum_y_m:
+            minimum_y_m = point.coordinate_y_m
+
+        if maximum_y_m < point.coordinate_y_m:
+            maximum_y_m = point.coordinate_y_m
+
+    is_empty_x = maximum_x_m < minimum_x_m
+    is_empty_y = maximum_y_m < minimum_y_m
+
+    if is_empty_x or is_empty_y:
+        return None
+
+    for point_l, point_r in pairwise(positions):
+        dx = point_r.coordinate_x_m - point_l.coordinate_x_m
+        dy = point_r.coordinate_y_m - point_l.coordinate_y_m
+        length_m += numpy.hypot(dx, dy)
+
+    return ScanGeometry(
+        minimum_x_m=minimum_x_m,
+        maximum_x_m=maximum_x_m,
+        minimum_y_m=minimum_y_m,
+        maximum_y_m=maximum_y_m,
+        length_m=length_m,
+    )

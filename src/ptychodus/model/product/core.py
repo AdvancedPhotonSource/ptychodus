@@ -50,7 +50,7 @@ class ProductCore(Observer):
 
         self._scan_settings = ProbePositionsSettings(settings_registry)
         self._scan_builder_factory = ProbePositionsBuilderFactory(
-            self._scan_settings, scan_file_reader_chooser, scan_file_writer_chooser
+            rng, self._scan_settings, scan_file_reader_chooser, scan_file_writer_chooser
         )
         self._scan_repository_item_factory = ProbePositionsRepositoryItemFactory(
             rng, self._scan_settings, self._scan_builder_factory

@@ -1,5 +1,7 @@
 from collections.abc import Sequence
 
+import numpy
+
 # TODO from pvaccess import Channel, PvObjectQueue
 
 from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
@@ -10,9 +12,12 @@ from .settings import ProbePositionsSettings
 
 class StreamingScanBuilder(ProbePositionsBuilder):
     def __init__(
-        self, settings: ProbePositionsSettings, point_seq: Sequence[ProbePosition]
+        self,
+        rng: numpy.random.Generator,
+        settings: ProbePositionsSettings,
+        point_seq: Sequence[ProbePosition],
     ) -> None:
-        super().__init__(settings, 'Streaming')
+        super().__init__(rng, settings, 'Streaming')
         self._point_list = list(point_seq)
 
     def append(self, point: ProbePosition) -> None:
