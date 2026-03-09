@@ -246,7 +246,6 @@ class AssembledDiffractionData:
         return self._pixel_geometry
 
     def get_bad_pixels(self) -> BadPixels:
-        # FIXME verify assembled diffraction pattern pixel geometry is set correctly
         return self._bad_pixels
 
     def assemble(self, data: AssembledDiffractionData, offset: int) -> AssembledDiffractionData:

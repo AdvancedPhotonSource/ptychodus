@@ -1,4 +1,5 @@
 from collections.abc import Iterable, Sequence
+from typing import Final
 import logging
 
 from scipy.fft import fftfreq, ifft2
@@ -7,7 +8,7 @@ from scipy.ndimage import gaussian_filter
 import numpy
 
 from ._phase_unwrapper import PhaseUnwrapper
-from .common import RealArrayType, lerp
+from .common import IntegerArrayType, RealArrayType, lerp
 from .object import Object, ObjectGeometry
 from .probe_positions import ProbePosition
 from .reconstructor import AssembledDiffractionData
@@ -112,6 +113,209 @@ def generate_gaussian_random_field_object(
 
     return Object(
         array=field,
+        pixel_geometry=geometry.get_pixel_geometry(),
+        center=geometry.get_center(),
+    )
+
+
+def _map_simplex_to_cartesian(
+    xx: RealArrayType, yy: RealArrayType, grid_scale_px: float
+) -> tuple[RealArrayType, RealArrayType]:
+    SQRT3: Final[float] = numpy.sqrt(3)  # noqa: N806
+    SQRT6: Final[float] = numpy.sqrt(6)  # noqa: N806
+
+    c = 1 / (grid_scale_px * SQRT6)
+    zs = xx + yy
+    zd = xx - yy
+
+    ii = c * (+zs + SQRT3 * zd)
+    jj = c * (-zs + SQRT3 * zd)
+
+    return ii, jj
+
+
+def _map_cartesian_to_simplex(
+    ii: RealArrayType, jj: RealArrayType, grid_scale_px: float
+) -> tuple[RealArrayType, RealArrayType]:
+    SQRT3: Final[float] = numpy.sqrt(3)  # noqa: N806
+    SQRT8: Final[float] = numpy.sqrt(8)  # noqa: N806
+
+    c = grid_scale_px / SQRT8
+    ks = ii + jj
+    kd = ii - jj
+
+    xx = c * (ks + SQRT3 * kd)
+    yy = c * (ks - SQRT3 * kd)
+
+    return xx, yy
+
+
+def _calculate_vertex_noise_contribution(
+    xx: RealArrayType,
+    yy: RealArrayType,
+    vertex_i: IntegerArrayType,
+    vertex_j: IntegerArrayType,
+    vertex_grad_x: RealArrayType,
+    vertex_grad_y: RealArrayType,
+    grid_scale_px: float,
+    vertex_support_px2: float,
+) -> RealArrayType:
+    vertex_x, vertex_y = _map_cartesian_to_simplex(
+        vertex_i.astype(float), vertex_j.astype(float), grid_scale_px
+    )
+    displacement_x = xx - vertex_x
+    displacement_y = yy - vertex_y
+    distancesq_px2 = numpy.square(displacement_x) + numpy.square(displacement_y)
+    kernel = numpy.maximum(0.0, vertex_support_px2 - distancesq_px2) ** 4
+    grad_dir_x = vertex_grad_x[vertex_j, vertex_i] * displacement_x
+    grad_dir_y = vertex_grad_y[vertex_j, vertex_i] * displacement_y
+    return kernel * (grad_dir_x + grad_dir_y)
+
+
+def _generate_simplex_noise(
+    rng: numpy.random.Generator,
+    width_px: int,
+    height_px: int,
+    grid_scale_px: float,
+    vertex_support_px2: float,
+) -> RealArrayType:
+    # generate coordinate grid
+    yy, xx = numpy.mgrid[:height_px, :width_px]
+
+    # generate random direction vectors
+    geometry_coefficient = (1 + numpy.sqrt(3)) / (grid_scale_px * numpy.sqrt(6))
+    logger.debug(f'{geometry_coefficient=}')  # FIXME
+    axis_multiplier = numpy.ceil(geometry_coefficient).astype(int)
+    grad_shape_x = axis_multiplier * width_px
+    grad_shape_y = axis_multiplier * height_px
+    grad_shape = grad_shape_y, grad_shape_x
+    angle_rad = 2 * numpy.pi * rng.uniform(size=grad_shape)
+    vertex_grad_x = numpy.cos(angle_rad)
+    vertex_grad_y = numpy.sin(angle_rad)
+
+    # locate containing cell
+    ii, jj = _map_simplex_to_cartesian(xx, yy, grid_scale_px)
+    cell_origin_i = numpy.floor(ii).astype(int)
+    cell_origin_j = numpy.floor(jj).astype(int)
+    cell_origin_x, cell_origin_y = _map_cartesian_to_simplex(
+        cell_origin_i.astype(float), cell_origin_j.astype(float), grid_scale_px
+    )
+
+    # vertex indexes
+    is_lower_triangle = xx - cell_origin_x > yy - cell_origin_y
+    vertex0_i = cell_origin_i
+    vertex0_j = cell_origin_j
+    vertex1_i = cell_origin_i + numpy.where(is_lower_triangle, 1, 0)
+    vertex1_j = cell_origin_j + numpy.where(is_lower_triangle, 0, 1)
+    vertex2_i = cell_origin_i + 1
+    vertex2_j = cell_origin_j + 1
+
+    # vertex noise contributions
+    noise0 = _calculate_vertex_noise_contribution(
+        xx,
+        yy,
+        vertex0_i,
+        vertex0_j,
+        vertex_grad_x,
+        vertex_grad_y,
+        grid_scale_px,
+        vertex_support_px2,
+    )
+    noise1 = _calculate_vertex_noise_contribution(
+        xx,
+        yy,
+        vertex1_i,
+        vertex1_j,
+        vertex_grad_x,
+        vertex_grad_y,
+        grid_scale_px,
+        vertex_support_px2,
+    )
+    noise2 = _calculate_vertex_noise_contribution(
+        xx,
+        yy,
+        vertex2_i,
+        vertex2_j,
+        vertex_grad_x,
+        vertex_grad_y,
+        grid_scale_px,
+        vertex_support_px2,
+    )
+
+    # FIXME scaling?
+    # accumulate vertex contributions to noise
+    noise = 70.0 * (noise0 + noise1 + noise2)
+
+    return noise
+
+
+def generate_simplex_noise_object(
+    rng: numpy.random.Generator,
+    geometry: ObjectGeometry,
+    *,
+    grid_scale_m: float,
+    vertex_support_px2: float = 0.5,
+) -> Object:
+    pixel_geometry = geometry.get_pixel_geometry()
+
+    if not pixel_geometry.is_square:
+        raise ValueError('Non-square pixels are unsupported!')
+
+    if grid_scale_m <= 0.0:
+        raise ValueError('Grid scale must be strictly positive!')
+
+    if vertex_support_px2 <= 0.0:
+        raise ValueError('Vertex support must be strictly positive!')
+
+    grid_scale_px = grid_scale_m / pixel_geometry.width_m
+
+    re = _generate_simplex_noise(
+        rng=rng,
+        width_px=geometry.width_px,
+        height_px=geometry.height_px,
+        grid_scale_px=grid_scale_px,
+        vertex_support_px2=vertex_support_px2,
+    )
+    im = _generate_simplex_noise(
+        rng=rng,
+        width_px=geometry.width_px,
+        height_px=geometry.height_px,
+        grid_scale_px=grid_scale_px,
+        vertex_support_px2=vertex_support_px2,
+    )
+    array = re + 1j * im
+
+    return Object(
+        array=array,
+        pixel_geometry=geometry.get_pixel_geometry(),
+        center=geometry.get_center(),
+    )
+
+
+def generate_fractal_noise_object(
+    rng: numpy.random.Generator,
+    geometry: ObjectGeometry,
+    *,
+    grid_scale_m: float,
+    vertex_support_px2: float = 0.5,
+    num_octaves: int = 1,
+    gain: float = 0.5,
+    lacunarity: float = 2.0,
+) -> Object:
+    object_shape = (1, geometry.height_px, geometry.width_px)
+    array = numpy.zeros(object_shape, dtype=complex)
+    amplitude = 0.5
+
+    for octave in range(num_octaves):
+        noise = generate_simplex_noise_object(
+            rng, geometry, grid_scale_m=grid_scale_m, vertex_support_px2=vertex_support_px2
+        )
+        array += amplitude * noise.get_array()
+        amplitude *= gain
+        grid_scale_m /= lacunarity
+
+    return Object(
+        array=array,
         pixel_geometry=geometry.get_pixel_geometry(),
         center=geometry.get_center(),
     )

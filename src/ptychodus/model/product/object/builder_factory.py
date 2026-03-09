@@ -10,6 +10,7 @@ from ptychodus.api.plugins import PluginChooser
 from ...diffraction import DiffractionAPI
 from .builder import FromFileObjectBuilder, ObjectBuilder
 from .dead_leaves import DeadLeavesObjectBuilder
+from .fractal_noise import FractalNoiseObjectBuilder
 from .grf import GaussianRandomFieldObjectBuilder
 from .random import RandomObjectBuilder
 from .settings import ObjectSettings
@@ -33,6 +34,7 @@ class ObjectBuilderFactory(Iterable[str]):
         self._builders: Mapping[str, Callable[[], ObjectBuilder]] = {
             'random': lambda: RandomObjectBuilder(rng, settings),
             'dead_leaves': lambda: DeadLeavesObjectBuilder(rng, settings),
+            'fractal_noise': lambda: FractalNoiseObjectBuilder(rng, settings),
             'grf': lambda: GaussianRandomFieldObjectBuilder(rng, settings),
             'stxm': lambda: STXMObjectBuilder(settings, diffraction_api),
         }

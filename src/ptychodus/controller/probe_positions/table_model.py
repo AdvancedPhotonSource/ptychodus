@@ -64,7 +64,6 @@ class ProbePositionsTableModel(QAbstractTableModel):
             elif index.column() == 1:
                 return None
             elif index.column() == 2:
-                # FIXME combo box broken for cartesian probe builders
                 return item.get_builder().get_name()
             elif index.column() == 3:
                 return len(probe_positions)
