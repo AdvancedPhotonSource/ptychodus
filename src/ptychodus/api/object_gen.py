@@ -162,11 +162,9 @@ def _calculate_vertex_noise_contribution(
     vertex_x, vertex_y = _map_cartesian_to_simplex(
         vertex_i.astype(float), vertex_j.astype(float), grid_scale_px
     )
-    displacement_x = xx - vertex_x
-    displacement_y = yy - vertex_y
-    distancesq_normalized = (
-        numpy.square(displacement_x) + numpy.square(displacement_y)
-    ) / grid_scale_px**2
+    displacement_x = (xx - vertex_x) / grid_scale_px
+    displacement_y = (yy - vertex_y) / grid_scale_px
+    distancesq_normalized = numpy.square(displacement_x) + numpy.square(displacement_y)
     kernel = numpy.maximum(0.0, 0.5 - distancesq_normalized) ** 4
     grad_dir_x = vertex_grad_x[vertex_j, vertex_i] * displacement_x
     grad_dir_y = vertex_grad_y[vertex_j, vertex_i] * displacement_y
@@ -201,7 +199,7 @@ def _generate_simplex_noise(
     )
 
     # vertex indexes
-    is_lower_triangle = xx - cell_origin_x > yy - cell_origin_y
+    is_lower_triangle = (ii - cell_origin_i) > (jj - cell_origin_j)
     vertex0_i = cell_origin_i
     vertex0_j = cell_origin_j
     vertex1_i = cell_origin_i + numpy.where(is_lower_triangle, 1, 0)
