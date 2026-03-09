@@ -3,7 +3,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-import ptychodus.model.phase_unwrapper as pu
+import ptychodus.api._phase_unwrapper as pu
 
 
 def test_phase_unwrap() -> None:

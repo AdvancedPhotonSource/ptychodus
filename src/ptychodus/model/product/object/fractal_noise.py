@@ -16,11 +16,8 @@ class FractalNoiseObjectBuilder(ObjectBuilder):
         self._rng = rng
         self._settings = settings
 
-        self.grid_scale_m = settings.simplex_grid_scale_m.copy()
-        self._add_parameter('grid_scale_m', self.grid_scale_m)
-
-        self.vertex_support_px2 = settings.simplex_vertex_support_px2.copy()
-        self._add_parameter('vertex_support_px2', self.vertex_support_px2)
+        self.grid_scale_px = settings.simplex_grid_scale_px.copy()
+        self._add_parameter('grid_scale_px', self.grid_scale_px)
 
         self.num_octaves = settings.fractal_num_octaves.copy()
         self._add_parameter('num_octaves', self.num_octaves)
@@ -44,12 +41,10 @@ class FractalNoiseObjectBuilder(ObjectBuilder):
         geometry_provider: ObjectGeometryProvider,
         layer_spacing_m: Sequence[float],
     ) -> Object:
-        # FIXME add to view controller
         object_ = generate_fractal_noise_object(
             self._rng,
             geometry_provider.get_object_geometry(),
-            grid_scale_m=self.grid_scale_m.get_value(),
-            vertex_support_px2=self.vertex_support_px2.get_value(),
+            grid_scale_px=self.grid_scale_px.get_value(),
             num_octaves=self.num_octaves.get_value(),
             gain=self.gain.get_value(),
             lacunarity=self.lacunarity.get_value(),

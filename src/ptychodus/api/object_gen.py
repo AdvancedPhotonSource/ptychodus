@@ -109,7 +109,7 @@ def generate_gaussian_random_field_object(
     power_spectrum[0, 0] = 0  # zero mean
 
     # shape noise with power spectrum and back-transform
-    field = ifft2(noise * numpy.sqrt(power_spectrum))
+    field = numpy.asarray(ifft2(noise * numpy.sqrt(power_spectrum)))
 
     return Object(
         array=field,
@@ -145,7 +145,7 @@ def _map_cartesian_to_simplex(
     kd = ii - jj
 
     xx = c * (ks + SQRT3 * kd)
-    yy = c * (ks - SQRT3 * kd)
+    yy = c * (-ks + SQRT3 * kd)
 
     return xx, yy
 
@@ -158,15 +158,16 @@ def _calculate_vertex_noise_contribution(
     vertex_grad_x: RealArrayType,
     vertex_grad_y: RealArrayType,
     grid_scale_px: float,
-    vertex_support_px2: float,
 ) -> RealArrayType:
     vertex_x, vertex_y = _map_cartesian_to_simplex(
         vertex_i.astype(float), vertex_j.astype(float), grid_scale_px
     )
     displacement_x = xx - vertex_x
     displacement_y = yy - vertex_y
-    distancesq_px2 = numpy.square(displacement_x) + numpy.square(displacement_y)
-    kernel = numpy.maximum(0.0, vertex_support_px2 - distancesq_px2) ** 4
+    distancesq_normalized = (
+        numpy.square(displacement_x) + numpy.square(displacement_y)
+    ) / grid_scale_px**2
+    kernel = numpy.maximum(0.0, 0.5 - distancesq_normalized) ** 4
     grad_dir_x = vertex_grad_x[vertex_j, vertex_i] * displacement_x
     grad_dir_y = vertex_grad_y[vertex_j, vertex_i] * displacement_y
     return kernel * (grad_dir_x + grad_dir_y)
@@ -177,18 +178,16 @@ def _generate_simplex_noise(
     width_px: int,
     height_px: int,
     grid_scale_px: float,
-    vertex_support_px2: float,
 ) -> RealArrayType:
     # generate coordinate grid
     yy, xx = numpy.mgrid[:height_px, :width_px]
 
     # generate random direction vectors
     geometry_coefficient = (1 + numpy.sqrt(3)) / (grid_scale_px * numpy.sqrt(6))
-    logger.debug(f'{geometry_coefficient=}')  # FIXME
-    axis_multiplier = numpy.ceil(geometry_coefficient).astype(int)
-    grad_shape_x = axis_multiplier * width_px
-    grad_shape_y = axis_multiplier * height_px
+    grad_shape_x = numpy.ceil(geometry_coefficient * width_px).astype(int) + 1
+    grad_shape_y = numpy.ceil(geometry_coefficient * height_px).astype(int) + 1
     grad_shape = grad_shape_y, grad_shape_x
+    logger.debug(f'{geometry_coefficient=} {grad_shape=}')
     angle_rad = 2 * numpy.pi * rng.uniform(size=grad_shape)
     vertex_grad_x = numpy.cos(angle_rad)
     vertex_grad_y = numpy.sin(angle_rad)
@@ -212,39 +211,17 @@ def _generate_simplex_noise(
 
     # vertex noise contributions
     noise0 = _calculate_vertex_noise_contribution(
-        xx,
-        yy,
-        vertex0_i,
-        vertex0_j,
-        vertex_grad_x,
-        vertex_grad_y,
-        grid_scale_px,
-        vertex_support_px2,
+        xx, yy, vertex0_i, vertex0_j, vertex_grad_x, vertex_grad_y, grid_scale_px
     )
     noise1 = _calculate_vertex_noise_contribution(
-        xx,
-        yy,
-        vertex1_i,
-        vertex1_j,
-        vertex_grad_x,
-        vertex_grad_y,
-        grid_scale_px,
-        vertex_support_px2,
+        xx, yy, vertex1_i, vertex1_j, vertex_grad_x, vertex_grad_y, grid_scale_px
     )
     noise2 = _calculate_vertex_noise_contribution(
-        xx,
-        yy,
-        vertex2_i,
-        vertex2_j,
-        vertex_grad_x,
-        vertex_grad_y,
-        grid_scale_px,
-        vertex_support_px2,
+        xx, yy, vertex2_i, vertex2_j, vertex_grad_x, vertex_grad_y, grid_scale_px
     )
 
-    # FIXME scaling?
     # accumulate vertex contributions to noise
-    noise = 70.0 * (noise0 + noise1 + noise2)
+    noise = noise0 + noise1 + noise2
 
     return noise
 
@@ -253,35 +230,28 @@ def generate_simplex_noise_object(
     rng: numpy.random.Generator,
     geometry: ObjectGeometry,
     *,
-    grid_scale_m: float,
-    vertex_support_px2: float = 0.5,
+    grid_scale_px: float = 30.0,
 ) -> Object:
+    logger.warning('EXPERIMENTAL: This simplex noise implementation is still being verified.')
     pixel_geometry = geometry.get_pixel_geometry()
 
     if not pixel_geometry.is_square:
         raise ValueError('Non-square pixels are unsupported!')
 
-    if grid_scale_m <= 0.0:
+    if grid_scale_px <= 0.0:
         raise ValueError('Grid scale must be strictly positive!')
-
-    if vertex_support_px2 <= 0.0:
-        raise ValueError('Vertex support must be strictly positive!')
-
-    grid_scale_px = grid_scale_m / pixel_geometry.width_m
 
     re = _generate_simplex_noise(
         rng=rng,
         width_px=geometry.width_px,
         height_px=geometry.height_px,
         grid_scale_px=grid_scale_px,
-        vertex_support_px2=vertex_support_px2,
     )
     im = _generate_simplex_noise(
         rng=rng,
         width_px=geometry.width_px,
         height_px=geometry.height_px,
         grid_scale_px=grid_scale_px,
-        vertex_support_px2=vertex_support_px2,
     )
     array = re + 1j * im
 
@@ -296,8 +266,7 @@ def generate_fractal_noise_object(
     rng: numpy.random.Generator,
     geometry: ObjectGeometry,
     *,
-    grid_scale_m: float,
-    vertex_support_px2: float = 0.5,
+    grid_scale_px: float,
     num_octaves: int = 1,
     gain: float = 0.5,
     lacunarity: float = 2.0,
@@ -307,12 +276,10 @@ def generate_fractal_noise_object(
     amplitude = 0.5
 
     for octave in range(num_octaves):
-        noise = generate_simplex_noise_object(
-            rng, geometry, grid_scale_m=grid_scale_m, vertex_support_px2=vertex_support_px2
-        )
+        noise = generate_simplex_noise_object(rng, geometry, grid_scale_px=grid_scale_px)
         array += amplitude * noise.get_array()
         amplitude *= gain
-        grid_scale_m /= lacunarity
+        grid_scale_px /= lacunarity
 
     return Object(
         array=array,
@@ -434,7 +401,7 @@ def generate_layers(object_: Object, layer_spacing_m: Sequence[float]) -> Object
         array = amplitude * numpy.exp(1j * phase)
 
     return Object(
-        array=array,
+        array=array.astype('complex'),
         pixel_geometry=object_.get_pixel_geometry(),
         center=object_.get_center(),
         layer_spacing_m=layer_spacing_m,

@@ -61,16 +61,16 @@ class ObjectSettings(Observable, Observer):
             'CorrelationLengthInPixels', 30.0
         )
 
-        self.simplex_grid_scale_m = self._group.create_real_parameter(
-            'SimplexGridScaleInMeters',
-            100e-9,
+        self.simplex_grid_scale_px = self._group.create_real_parameter(
+            'SimplexGridScaleInPixels', 30.0
         )
-        self.simplex_vertex_support_px2 = self._group.create_real_parameter(
-            'SimplexVertexSupportInSquarePixels', 0.5
+        self.fractal_num_octaves = self._group.create_integer_parameter(
+            'FractalNumOctaves', 1, minimum=1, maximum=8
         )
-        self.fractal_num_octaves = self._group.create_integer_parameter('FractalNumOctaves', 1)
-        self.fractal_gain = self._group.create_real_parameter('FractalGain', 0.5)
-        self.fractal_lacunarity = self._group.create_real_parameter('FractalLacunarity', 2.0)
+        self.fractal_gain = self._group.create_real_parameter('FractalGain', 0.5, minimum=0.0)
+        self.fractal_lacunarity = self._group.create_real_parameter(
+            'FractalLacunarity', 2.0, minimum=0.0
+        )
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:

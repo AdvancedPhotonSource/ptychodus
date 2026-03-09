@@ -1,6 +1,7 @@
 from .builder import ObjectBuilder
 from .builder_factory import ObjectBuilderFactory
 from .dead_leaves import DeadLeavesObjectBuilder
+from .fractal_noise import FractalNoiseObjectBuilder
 from .grf import GaussianRandomFieldObjectBuilder
 from .item import ObjectRepositoryItem
 from .item_factory import ObjectRepositoryItemFactory
@@ -10,6 +11,7 @@ from .stxm import STXMObjectBuilder
 
 __all__ = [
     'DeadLeavesObjectBuilder',
+    'FractalNoiseObjectBuilder',
     'GaussianRandomFieldObjectBuilder',
     'ObjectBuilder',
     'ObjectBuilderFactory',
