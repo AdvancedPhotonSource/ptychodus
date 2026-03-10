@@ -60,15 +60,13 @@ class APS26IDFileBasedWorkflow(FileBasedWorkflow):
         for diffraction_file_path in diffraction_dir_path.glob(f'scan_{scan_id}_*.h5'):
             digits = int(re.findall(r'\d+', diffraction_file_path.stem)[-1])
 
-            if digits != 0:
-                break
-
-        api.load_diffraction_data(diffraction_file_path)
-        product_api = api.create_product(f'scan_{scan_id}')
-        product_api.load_probe_positions(file_path)
-        product_api.generate_probe()
-        product_api.generate_object()
-        product_api.reconstruct_remote()
+            if digits == 0:
+                api.load_diffraction_data(diffraction_file_path)
+                product_api = api.create_product(f'scan_{scan_id}')
+                product_api.load_probe_positions(file_path)
+                product_api.generate_probe()
+                product_api.generate_object()
+                product_api.reconstruct_remote()
 
 
 @dataclass(frozen=True)
@@ -101,7 +99,7 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
         return '*.h5'
 
     def execute(self, api: WorkflowAPI, file_path: Path) -> None:
-        if file_path.parent.name != 'eiger_4':
+        if file_path.parents[1].name != 'eiger_4' or '_master_' in file_path.name:
             return
 
         experiment_dir = file_path.parents[3]

@@ -70,25 +70,25 @@ class GlobusExecutor:
         )
 
         flow_input = {
-            'input_data_transfer_source_endpoint': str(
+            'input_data_transfer_source_endpoint_id': str(
                 self._settings.input_data_endpoint_id.get_value()
             ),
             'input_data_transfer_source_path': input_data_globus_path,
-            'input_data_transfer_destination_endpoint': str(
+            'input_data_transfer_destination_endpoint_id': str(
                 self._settings.compute_data_endpoint_id.get_value()
             ),
             'input_data_transfer_destination_path': compute_data_globus_path,
             'input_data_transfer_recursive': True,
             'input_data_transfer_sync_level': self._settings.transfer_sync_level.get_value(),
-            'compute_endpoint': str(self._settings.compute_endpoint_id.get_value()),
+            'compute_endpoint_id': str(self._settings.compute_endpoint_id.get_value()),
             'ptychodus_action': ptychodus_action,
             'ptychodus_input_directory': str(compute_data_posix_path),
             'ptychodus_output_directory': str(compute_data_posix_path),
-            'output_data_transfer_source_endpoint': str(
+            'output_data_transfer_source_endpoint_id': str(
                 self._settings.compute_data_endpoint_id.get_value()
             ),
             'output_data_transfer_source_path': f'{compute_data_globus_path}/{StandardFileLayout.PRODUCT_OUT}',
-            'output_data_transfer_destination_endpoint': str(
+            'output_data_transfer_destination_endpoint_id': str(
                 self._settings.output_data_endpoint_id.get_value()
             ),
             'output_data_transfer_destination_path': f'{output_data_globus_path}/{StandardFileLayout.PRODUCT_OUT}',

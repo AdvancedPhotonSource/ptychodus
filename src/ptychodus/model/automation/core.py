@@ -27,6 +27,8 @@ class AutomationPresenter(Observable, Observer):
         self._dataset_buffer = dataset_buffer
         self._workflow_chooser = workflow_chooser
 
+        workflow_chooser.synchronize_with_parameter(self._settings.workflow)
+
         watcher.add_observer(self)
 
     @property
