@@ -221,7 +221,9 @@ def _generate_simplex_noise(
     # accumulate vertex contributions to noise
     noise = noise0 + noise1 + noise2
 
-    return noise
+    noise_max = noise.max()
+    noise_min = noise.min()
+    return 2 * (noise - noise_min) / (noise_max - noise_min) - 1
 
 
 def generate_simplex_noise_object(
@@ -230,7 +232,6 @@ def generate_simplex_noise_object(
     *,
     grid_scale_px: float = 30.0,
 ) -> Object:
-    logger.warning('EXPERIMENTAL: This simplex noise implementation is still being verified.')
     pixel_geometry = geometry.get_pixel_geometry()
 
     if not pixel_geometry.is_square:

@@ -1,7 +1,8 @@
-import numpy
 from scipy import ndimage
+from scipy.fft import fft, fft2, fftfreq, ifft, ifft2
 from scipy.signal.windows import gaussian as gaussian_window
 from typing import Literal
+import numpy
 
 from .common import ComplexArrayType, InexactArrayType, RealArrayType
 
@@ -244,12 +245,12 @@ def fourier_gradient(image: ComplexArrayType) -> tuple[ComplexArrayType, Complex
     result is the exact gradient of the band-limited interpolant of the
     input.
     """
-    u = numpy.fft.fftfreq(image.shape[0])
-    v = numpy.fft.fftfreq(image.shape[1])
+    u = fftfreq(image.shape[0])
+    v = fftfreq(image.shape[1])
     u, v = numpy.meshgrid(u, v, indexing='ij')
 
-    grad_y = numpy.fft.ifft(numpy.fft.fft(image, axis=-2) * (2j * numpy.pi * u), axis=-2)
-    grad_x = numpy.fft.ifft(numpy.fft.fft(image, axis=-1) * (2j * numpy.pi * v), axis=-1)
+    grad_y = ifft(fft(image, axis=-2) * (2j * numpy.pi * u), axis=-2)
+    grad_x = ifft(fft(image, axis=-1) * (2j * numpy.pi * v), axis=-1)
 
     return grad_y, grad_x
 
@@ -352,12 +353,13 @@ def integrate_image_2d_fourier(
         The integrated image. Returns the real part if inputs are real.
     """
     shape = grad_y.shape
-    f = numpy.fft.fft2(grad_x + 1j * grad_y)
-    y, x = numpy.fft.fftfreq(shape[0]), numpy.fft.fftfreq(shape[1])
+    f = fft2(grad_x + 1j * grad_y)
+    y = fftfreq(shape[0])
+    x = fftfreq(shape[1])
 
     r = 1.0 / (2j * numpy.pi * (x + 1j * y[:, None]) + 1e-15)
     r[0, 0] = 0
-    integrated_image = numpy.fft.ifft2(f * r)
+    integrated_image = ifft2(f * r)
     if not numpy.iscomplexobj(grad_x):
         return integrated_image.real
     return integrated_image
@@ -395,15 +397,15 @@ def integrate_image_2d_deconvolution(
     ComplexArrayType
         The integrated image.
     """
-    u, v = numpy.fft.fftfreq(grad_x.shape[0]), numpy.fft.fftfreq(grad_x.shape[1])
+    u, v = fftfreq(grad_x.shape[0]), fftfreq(grad_x.shape[1])
     u, v = numpy.meshgrid(u, v, indexing='ij')
     if tf_y is None or tf_x is None:
         tf_y = 2j * numpy.pi * u
         tf_x = 2j * numpy.pi * v
-    f_grad_y = numpy.fft.fft2(grad_y)
-    f_grad_x = numpy.fft.fft2(grad_x)
+    f_grad_y = fft2(grad_y)
+    f_grad_x = fft2(grad_x)
     img = (f_grad_y * tf_y + f_grad_x * tf_x) / (numpy.abs(tf_y) ** 2 + numpy.abs(tf_x) ** 2 + 1e-5)
-    img = -numpy.fft.ifft2(img)
+    img = -ifft2(img)
     img = img + bc_center - img[img.shape[0] // 2, img.shape[1] // 2]
     return img
 
@@ -464,9 +466,9 @@ def fourier_shift(
     if strictly_preserve_zeros:
         zero_mask = (images == 0).astype(float)
         zero_mask_shifted = fourier_shift(zero_mask, shifts, strictly_preserve_zeros=False)
-    ft_images = numpy.fft.fft2(images)
+    ft_images = fft2(images)
     freq_y, freq_x = numpy.meshgrid(
-        numpy.fft.fftfreq(images.shape[-2]), numpy.fft.fftfreq(images.shape[-1]), indexing='ij'
+        fftfreq(images.shape[-2]), fftfreq(images.shape[-1]), indexing='ij'
     )
     freq_x = freq_x.repeat(images.shape[0], axis=0)
     freq_y = freq_y.repeat(images.shape[0], axis=0)
@@ -477,7 +479,7 @@ def fourier_shift(
         * (freq_x * shifts[:, 1].reshape([-1, 1, 1]) + freq_y * shifts[:, 0].reshape([-1, 1, 1]))
     )
     ft_images = ft_images * mult
-    shifted_images: InexactArrayType = numpy.asarray(numpy.fft.ifft2(ft_images))
+    shifted_images: InexactArrayType = numpy.asarray(ifft2(ft_images))
     if not numpy.iscomplexobj(images):
         shifted_images = shifted_images.real
     if zero_mask_shifted is not None:
