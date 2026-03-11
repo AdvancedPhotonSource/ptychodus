@@ -3,15 +3,16 @@ from __future__ import annotations
 import numpy
 
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
-from ptychodus.api.propagator import AngularSpectrumPropagator, PropagatorParameters
+from ptychodus.api.probe_gen import defocus_probe, generate_disk_probe, rescale_probe_intensity
 
 from .builder import ProbeSequenceBuilder
 from .settings import ProbeSettings
 
 
 class DiskProbeBuilder(ProbeSequenceBuilder):
-    def __init__(self, settings: ProbeSettings) -> None:
+    def __init__(self, rng: numpy.random.Generator, settings: ProbeSettings) -> None:
         super().__init__(settings, 'disk')
+        self._rng = rng
         self._settings = settings
 
         self.diameter_m = settings.disk_diameter_m.copy()
@@ -22,7 +23,7 @@ class DiskProbeBuilder(ProbeSequenceBuilder):
         self._add_parameter('defocus_distance_m', self.defocus_distance_m)
 
     def copy(self) -> DiskProbeBuilder:
-        builder = DiskProbeBuilder(self._settings)
+        builder = DiskProbeBuilder(self._rng, self._settings)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
@@ -30,26 +31,15 @@ class DiskProbeBuilder(ProbeSequenceBuilder):
         return builder
 
     def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
-        geometry = geometry_provider.get_probe_geometry()
-        coords = self.get_transverse_coordinates(geometry)
-
-        R_m = coords.position_r_m  # noqa: N806
-        r_m = self.diameter_m.get_value() / 2.0
-        disk = numpy.where(R_m < r_m, 1 + 0j, 0j)
-
-        propagator_parameters = PropagatorParameters(
-            wavelength_m=geometry_provider.probe_wavelength_m,
-            width_px=disk.shape[-1],
-            height_px=disk.shape[-2],
-            pixel_width_m=geometry.pixel_width_m,
-            pixel_height_m=geometry.pixel_height_m,
-            propagation_distance_m=self.defocus_distance_m.get_value(),
+        probe = rescale_probe_intensity(
+            defocus_probe(
+                generate_disk_probe(
+                    geometry_provider.get_probe_geometry(),
+                    radius_m=self.diameter_m.get_value() / 2.0,
+                ),
+                probe_wavelength_m=geometry_provider.probe_wavelength_m,
+                defocus_distance_m=self.defocus_distance_m.get_value(),
+            ),
+            geometry_provider.probe_photon_count,
         )
-        propagator = AngularSpectrumPropagator(propagator_parameters)
-        array = propagator.propagate(disk)
-
-        return ProbeSequence(
-            array=self.normalize(array),
-            opr_weights=None,
-            pixel_geometry=geometry.get_pixel_geometry(),
-        )
+        return self._build_probe_modes(self._rng, probe, geometry_provider.num_scan_points)

@@ -1,17 +1,13 @@
 from __future__ import annotations
 from abc import abstractmethod
 from collections.abc import Sequence
-from pathlib import Path
 import logging
 
-import numpy
 
-from ptychodus.api.common import ComplexArrayType
-from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.object import Object, ObjectCenter, ObjectFileReader, ObjectGeometryProvider
+from ptychodus.api.object import Object, ObjectFileReader, ObjectGeometryProvider
+from ptychodus.api.object_gen import generate_layers, pad_object
 from ptychodus.api.parametric import ParameterGroup
 
-from ...phase_unwrapper import PhaseUnwrapper
 from .settings import ObjectSettings
 
 logger = logging.getLogger(__name__)
@@ -50,49 +46,13 @@ class ObjectBuilder(ParameterGroup):
 
     def _create_object(
         self,
-        array: ComplexArrayType,
-        pixel_geometry: PixelGeometry,
-        center: ObjectCenter,
+        object_: Object,
         layer_spacing_m: Sequence[float],
     ) -> Object:
-        """Create an object from an existing object with a potentially
-        different number of slices.
-
-        If the new object is supposed to be a multislice object with a
-        different number of slices than the existing object, the object is
-        created as
-        `abs(o) ** (1 / nSlices) * exp(i * unwrapPhase(o) / nSlices)`.
-        Otherwise, the object is copied as is.
-        """
-        num_slices = 1 + len(layer_spacing_m)
-
-        if array.ndim < 2:
-            raise ValueError('Array must have at least 2 dimensions')
-        elif array.ndim == 2:
-            array = numpy.expand_dims(array, axis=0)
-        elif array.ndim > 3:
-            raise ValueError('Array must have at most 3 dimensions')
-
-        if num_slices < array.shape[0]:
-            array = array[:num_slices]
-        elif num_slices > array.shape[0]:
-            amplitude = numpy.absolute(array[:1]) ** (1.0 / num_slices)
-            amplitude = amplitude.repeat(num_slices, axis=0)
-            phase = PhaseUnwrapper().unwrap(array[0])[numpy.newaxis, ...] / num_slices
-            phase = phase.repeat(num_slices, axis=0)
-            array = numpy.clip(amplitude, 0.0, 1.0) * numpy.exp(1j * phase)
-
-        pad_width = [
-            (0, 0),
-            (self.extra_padding_y.get_value(), self.extra_padding_y.get_value()),
-            (self.extra_padding_x.get_value(), self.extra_padding_x.get_value()),
-        ]
-
-        return Object(
-            array=numpy.pad(array, pad_width),
-            layer_spacing_m=layer_spacing_m,
-            pixel_geometry=pixel_geometry,
-            center=center,
+        return pad_object(
+            generate_layers(object_, layer_spacing_m),
+            self.extra_padding_x.get_value(),
+            self.extra_padding_y.get_value(),
         )
 
 
@@ -103,7 +63,12 @@ class FromMemoryObjectBuilder(ObjectBuilder):
         self._object = object_.copy()
 
     def copy(self) -> FromMemoryObjectBuilder:
-        return FromMemoryObjectBuilder(self._settings, self._object)
+        builder = FromMemoryObjectBuilder(self._settings, self._object)
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].set_value(value.get_value())
+
+        return builder
 
     def build(
         self,
@@ -134,27 +99,25 @@ class FromFileObjectBuilder(ObjectBuilder):
     def __init__(
         self,
         settings: ObjectSettings,
-        file_path: Path,
-        file_type: str,
         file_reader: ObjectFileReader,
     ) -> None:
         super().__init__(settings, 'from_file')
         self._settings = settings
-        self.file_path = settings.file_path.copy()
-        self.file_path.set_value(file_path)
-        self._add_parameter('file_path', self.file_path)
-        self.file_type = settings.file_type.copy()
-        self.file_type.set_value(file_type)
-        self._add_parameter('file_type', self.file_type)
         self._file_reader = file_reader
 
+        self.file_path = settings.file_path.copy()
+        self._add_parameter('file_path', self.file_path)
+
+        self.file_type = settings.file_type.copy()
+        self._add_parameter('file_type', self.file_type)
+
     def copy(self) -> FromFileObjectBuilder:
-        return FromFileObjectBuilder(
-            self._settings,
-            self.file_path.get_value(),
-            self.file_type.get_value(),
-            self._file_reader,
-        )
+        builder = FromFileObjectBuilder(self._settings, self._file_reader)
+
+        for key, value in self.parameters().items():
+            builder.parameters()[key].set_value(value.get_value())
+
+        return builder
 
     def build(
         self,

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
+from ptychodus.api.probe_positions import ProbePositionSequence
+from ptychodus.api.probe_positions_gen import generate_spiral_probe_positions
 
 from .builder import ProbePositionsBuilder
 from .settings import ProbePositionsSettings
@@ -11,8 +12,9 @@ from .settings import ProbePositionsSettings
 class SpiralProbePositionsBuilder(ProbePositionsBuilder):
     """https://doi.org/10.1364/OE.22.012634"""
 
-    def __init__(self, settings: ProbePositionsSettings) -> None:
-        super().__init__(settings, 'spiral')
+    def __init__(self, rng: numpy.random.Generator, settings: ProbePositionsSettings) -> None:
+        super().__init__(rng, settings, 'spiral')
+        self._rng = rng
         self._settings = settings
 
         self.num_points = settings.num_points_x.copy()
@@ -29,7 +31,7 @@ class SpiralProbePositionsBuilder(ProbePositionsBuilder):
         self._add_parameter('radius_scalar_m', self.radius_scalar_m)
 
     def copy(self) -> SpiralProbePositionsBuilder:
-        builder = SpiralProbePositionsBuilder(self._settings)
+        builder = SpiralProbePositionsBuilder(self._rng, self._settings)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
@@ -37,18 +39,7 @@ class SpiralProbePositionsBuilder(ProbePositionsBuilder):
         return builder
 
     def build(self) -> ProbePositionSequence:
-        point_list: list[ProbePosition] = list()
-
-        for index in range(self.num_points.get_value()):
-            radius_m = self.radius_scalar_m.get_value() * numpy.sqrt(index)
-            divergence_angle_rad = (3.0 - numpy.sqrt(5)) * numpy.pi
-            theta_rad = divergence_angle_rad * index
-
-            point = ProbePosition(
-                index=index,
-                coordinate_x_m=radius_m * numpy.cos(theta_rad),
-                coordinate_y_m=radius_m * numpy.sin(theta_rad),
-            )
-            point_list.append(point)
-
-        return ProbePositionSequence(point_list)
+        positions = generate_spiral_probe_positions(
+            self.num_points.get_value(), self.radius_scalar_m.get_value()
+        )
+        return self._create_position_sequence(positions)

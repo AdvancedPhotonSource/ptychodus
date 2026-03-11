@@ -1,32 +1,30 @@
 from bisect import bisect
 from collections.abc import Sequence
-from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import overload
-import threading
+import queue
 
 from ptychodus.api.observer import ObservableSequence
 
-
-@dataclass(frozen=True)
-class GlobusStatus:
-    label: str
-    start_time: datetime
-    completion_time: datetime | None
-    status: str
-    action: str
-    run_id: str
-
-    @property
-    def run_url(self) -> str:
-        return f'https://app.globus.org/runs/{self.run_id}/logs'
+from .settings import GlobusSettings
+from .client import GlobusClient, GlobusStatus
 
 
 class GlobusStatusRepository(ObservableSequence[GlobusStatus]):
-    def __init__(self) -> None:
+    def __init__(
+        self, settings: GlobusSettings, client: GlobusClient, status_q: queue.Queue[GlobusStatus]
+    ) -> None:
         super().__init__()
+        self._settings = settings
+        self._client = client
+        self._status_q = status_q
         self._status_list: list[GlobusStatus] = list()
-        self._refresh_status_event = threading.Event()
+        self._run_id_to_index_map: dict[str, int] = dict()
+        self._status_date_time = datetime.min
+
+    def refresh_status(self) -> None:
+        self._status_date_time = datetime.now(timezone.utc)
+        self._client.refresh_status()
 
     @overload
     def __getitem__(self, index: int) -> GlobusStatus: ...
@@ -40,54 +38,39 @@ class GlobusStatusRepository(ObservableSequence[GlobusStatus]):
     def __len__(self) -> int:
         return len(self._status_list)
 
-    def needs_status_refresh(self) -> bool:
-        return self._refresh_status_event.is_set()
+    def _update_run_id_to_index_map(self) -> None:
+        self._run_id_to_index_map = {
+            status.run_id: index for index, status in enumerate(self._status_list)
+        }
 
-    def refresh_status(self) -> None:
-        self._refresh_status_event.set()
+    def run_foreground_tasks(self) -> None:
+        if self._settings.status_auto_refresh.get_value():
+            status_time_delta = datetime.now(timezone.utc) - self._status_date_time
+            status_age_s = status_time_delta.total_seconds()
 
-    def _status_refreshed(self) -> None:
-        self._refresh_status_event.clear()
+            if status_age_s >= self._settings.status_refresh_interval_s.get_value():
+                self.refresh_status()
 
-    def _insert_sorted(self, status: GlobusStatus) -> None:
-        index = bisect(self._status_list, status.start_time, key=lambda x: x.start_time)
-        self._status_list.insert(index, status)
-        self.notify_observers_item_inserted(index, status)
-
-    def _pop(self, index: int) -> GlobusStatus:
-        status = self._status_list.pop(index)
-        self.notify_observers_item_removed(index, status)
-        return status
-
-    def _update_if_changed(self, index: int, status: GlobusStatus) -> None:
-        old_status = self._status_list[index]
-
-        if old_status != status:
-            self._status_list[index] = status
-            self.notify_observers_item_changed(index, status)
-
-
-class UpdateGlobusStatusRepository:
-    def __init__(
-        self, status_repository: GlobusStatusRepository, status_sequence: Sequence[GlobusStatus]
-    ) -> None:
-        self._status_repository = status_repository
-        self._new_status_list = sorted(status_sequence, key=lambda x: x.start_time)
-
-    def __call__(self) -> None:
-        run_id_to_new_status_map = {status.run_id: status for status in self._new_status_list}
-
-        for index in reversed(range(len(self._status_repository))):
-            old_status = self._status_repository[index]
-
+        while True:
             try:
-                new_status = run_id_to_new_status_map.pop(old_status.run_id)
-            except KeyError:
-                self._status_repository._pop(index)
+                new_status = self._status_q.get(block=False)
+            except queue.Empty:
+                break
             else:
-                self._status_repository._update_if_changed(index, new_status)
+                try:
+                    index = self._run_id_to_index_map[new_status.run_id]
+                except KeyError:
+                    index = bisect(
+                        self._status_list, new_status.start_time, key=lambda x: x.start_time
+                    )
+                    self._status_list.insert(index, new_status)
+                    self._update_run_id_to_index_map()
+                    self.notify_observers_item_inserted(index, new_status)
+                else:
+                    old_status = self._status_list[index]
 
-        for new_status in run_id_to_new_status_map.values():
-            self._status_repository._insert_sorted(new_status)
+                    if old_status != new_status:
+                        self._status_list[index] = new_status
+                        self.notify_observers_item_changed(index, new_status)
 
-        self._status_repository._status_refreshed()
+                self._status_q.task_done()

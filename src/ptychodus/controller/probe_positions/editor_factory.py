@@ -16,7 +16,7 @@ from ...model.product.probe_positions import (
     FromFileProbePositionsBuilder,
     FromMemoryProbePositionsBuilder,
     LissajousProbePositionsBuilder,
-    ProbePositionTransform,
+    ProbePositionsBuilder,
     ProbePositionsRepositoryItem,
     SpiralProbePositionsBuilder,
 )
@@ -35,61 +35,62 @@ __all__ = [
 
 
 class ProbePositionsTransformViewController(ParameterViewController):
-    def __init__(self, transform: ProbePositionTransform) -> None:
+    def __init__(self, builder: ProbePositionsBuilder) -> None:
         super().__init__()
         self._widget = GroupBoxWithPresets('Transformation')
 
-        for index, presets_label in enumerate(transform.labels_for_presets()):
+        for index, presets_label in enumerate(builder.labels_for_preset_transforms()):
             action = self._widget.presets_menu.addAction(presets_label)
-            action.triggered.connect(lambda _, index=index: transform.apply_presets(index))
-
-        self._label_ye = QLabel('y\u2032 =')
-        self._label_ye.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self._affine00_view_controller = DecimalLineEditParameterViewController(
-            transform.affine00, is_signed=True
-        )
-        self._label_yp0 = QLabel('y +')
-        self._affine01_view_controller = DecimalLineEditParameterViewController(
-            transform.affine01, is_signed=True
-        )
-        self._label_xp0 = QLabel('x +')
-        self._affine02_view_controller = LengthWidgetParameterViewController(
-            transform.affine02, is_signed=True
-        )
+            action.triggered.connect(lambda _, index=index: builder.assign_preset_transform(index))
 
         self._label_xe = QLabel('x\u2032 =')
         self._label_xe.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self._affine10_view_controller = DecimalLineEditParameterViewController(
-            transform.affine10, is_signed=True
+        self._affine00_view_controller = DecimalLineEditParameterViewController(
+            builder.affine00, is_signed=True
         )
-        self._label_yp1 = QLabel('y +')
-        self._affine11_view_controller = DecimalLineEditParameterViewController(
-            transform.affine11, is_signed=True
+        self._label_xp0 = QLabel('x +')
+        self._affine01_view_controller = DecimalLineEditParameterViewController(
+            builder.affine01, is_signed=True
+        )
+        self._label_yp0 = QLabel('y +')
+        self._affine02_view_controller = LengthWidgetParameterViewController(
+            builder.affine02, is_signed=True
+        )
+
+        self._label_ye = QLabel('y\u2032 =')
+        self._label_ye.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self._affine10_view_controller = DecimalLineEditParameterViewController(
+            builder.affine10, is_signed=True
         )
         self._label_xp1 = QLabel('x +')
+        self._affine11_view_controller = DecimalLineEditParameterViewController(
+            builder.affine11, is_signed=True
+        )
+        self._label_yp1 = QLabel('y +')
         self._affine12_view_controller = LengthWidgetParameterViewController(
-            transform.affine12, is_signed=True
+            builder.affine12, is_signed=True
         )
 
         self._jitter_radius_label = QLabel('Jitter Radius:')
         self._jitter_radius_view_controller = LengthWidgetParameterViewController(
-            transform.jitter_radius_m, is_signed=False
+            builder.jitter_radius_m, is_signed=False
         )
 
         layout = QGridLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self._label_ye, 0, 0)
+
+        layout.addWidget(self._label_xe, 0, 0)
         layout.addWidget(self._affine00_view_controller.get_widget(), 0, 1)
-        layout.addWidget(self._label_yp0, 0, 2)
+        layout.addWidget(self._label_xp0, 0, 2)
         layout.addWidget(self._affine01_view_controller.get_widget(), 0, 3)
-        layout.addWidget(self._label_xp0, 0, 4)
+        layout.addWidget(self._label_yp0, 0, 4)
         layout.addWidget(self._affine02_view_controller.get_widget(), 0, 5)
 
-        layout.addWidget(self._label_xe, 1, 0)
+        layout.addWidget(self._label_ye, 1, 0)
         layout.addWidget(self._affine10_view_controller.get_widget(), 1, 1)
-        layout.addWidget(self._label_yp1, 1, 2)
+        layout.addWidget(self._label_xp1, 1, 2)
         layout.addWidget(self._affine11_view_controller.get_widget(), 1, 3)
-        layout.addWidget(self._label_xp1, 1, 4)
+        layout.addWidget(self._label_yp1, 1, 4)
         layout.addWidget(self._affine12_view_controller.get_widget(), 1, 5)
 
         layout.addWidget(self._jitter_radius_label, 2, 0)
@@ -128,13 +129,9 @@ class ProbePositionsEditorViewControllerFactory:
     def _append_common_controls(
         self, dialog_builder: ParameterViewBuilder, item: ProbePositionsRepositoryItem
     ) -> None:
-        transform = item.get_transform()
-
-        if transform is not None:
-            dialog_builder.add_view_controller_to_bottom(
-                ProbePositionsTransformViewController(transform)
-            )
-
+        dialog_builder.add_view_controller_to_bottom(
+            ProbePositionsTransformViewController(item.get_builder())
+        )
         dialog_builder.add_view_controller_to_bottom(ScanBoundingBoxViewController(item))
 
     def create_editor_dialog(

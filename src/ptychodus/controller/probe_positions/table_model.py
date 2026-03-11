@@ -55,6 +55,8 @@ class ProbePositionsTableModel(QAbstractTableModel):
 
         item = self._repository[index.row()]
         probe_positions = item.get_probe_positions()
+        geometry = item.get_geometry()
+        length_m = 0.0 if geometry is None else geometry.length_m
 
         if role == Qt.ItemDataRole.DisplayRole:
             if index.column() == 0:
@@ -66,7 +68,7 @@ class ProbePositionsTableModel(QAbstractTableModel):
             elif index.column() == 3:
                 return len(probe_positions)
             elif index.column() == 4:
-                return f'{item.get_length_m():.6f}'
+                return f'{length_m:.6f}'
             elif index.column() == 5:
                 return f'{probe_positions.nbytes / BYTES_PER_MEGABYTE:.2f}'
         elif role == Qt.ItemDataRole.CheckStateRole:

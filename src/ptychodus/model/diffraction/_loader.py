@@ -10,6 +10,7 @@ from ptychodus.api.diffraction import (
     DiffractionArray,
     SimpleDiffractionArray,
 )
+from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import AssembledDiffractionData
 
 from ..task_manager import BackgroundTask, ForegroundTask, ForegroundTaskManager
@@ -40,6 +41,7 @@ class LoadArray:
         self,
         array_index: int,
         array: DiffractionArray,
+        pixel_geometry: PixelGeometry,
         bad_pixels: BadPixels,
         processor: DiffractionPatternProcessor | None,
         assembler: ArrayAssembler,
@@ -47,6 +49,7 @@ class LoadArray:
         super().__init__()
         self._array_index = array_index
         self._array = array
+        self._pixel_geometry = pixel_geometry
         self._bad_pixels = bad_pixels
         self._processor = processor
         self._assembler = assembler
@@ -69,6 +72,7 @@ class LoadArray:
             data = AssembledDiffractionData(
                 indexes=processed_array.get_indexes(),
                 patterns=processed_array.get_patterns(),
+                pixel_geometry=self._pixel_geometry,
                 bad_pixels=self._bad_pixels,
             )
             self._assembler._assemble_array(

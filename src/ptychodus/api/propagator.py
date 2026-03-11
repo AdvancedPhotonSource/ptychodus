@@ -10,7 +10,7 @@ from .common import ComplexArrayType, RealArrayType
 
 
 def intensity(wavefield: ComplexArrayType) -> RealArrayType:
-    return numpy.real(numpy.multiply(wavefield, numpy.conjugate(wavefield)))
+    return numpy.square(numpy.absolute(wavefield))
 
 
 @dataclass(frozen=True)

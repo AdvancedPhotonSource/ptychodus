@@ -36,6 +36,8 @@ class StandardFileLayout(StrEnum):
 
 class DiffractionFileKeys(StrEnum):
     PATTERNS = 'patterns'
+    DETECTOR_PIXEL_HEIGHT = 'detector_pixel_height_m'
+    DETECTOR_PIXEL_WIDTH = 'detector_pixel_width_m'
     INDEXES = 'indexes'
     BAD_PIXELS = 'bad_pixels'
 
@@ -55,6 +57,11 @@ def load_diffraction_data(file: Path, *, mmap_file: Path | None = None) -> Assem
         if not isinstance(h5_patterns, h5py.Dataset):
             raise ValueError('Patterns are not a dataset!')
 
+        detector_pixel_geometry = PixelGeometry(
+            width_m=float(h5_patterns.attrs[DiffractionFileKeys.DETECTOR_PIXEL_WIDTH]),
+            height_m=float(h5_patterns.attrs[DiffractionFileKeys.DETECTOR_PIXEL_HEIGHT]),
+        )
+
         h5_bad_pixels = h5_file[DiffractionFileKeys.BAD_PIXELS]
 
         if not isinstance(h5_bad_pixels, h5py.Dataset):
@@ -63,6 +70,7 @@ def load_diffraction_data(file: Path, *, mmap_file: Path | None = None) -> Assem
         return AssembledDiffractionData(
             h5_indexes[()],
             h5_patterns[()],
+            detector_pixel_geometry,
             h5_bad_pixels[()],
         )
 
@@ -74,8 +82,15 @@ def save_diffraction_data(
         h5_file.create_dataset(
             DiffractionFileKeys.INDEXES, data=data._indexes, compression=compression
         )
-        h5_file.create_dataset(
+        h5_patterns = h5_file.create_dataset(
             DiffractionFileKeys.PATTERNS, data=data._patterns, compression=compression
+        )
+        detector_pixel_geometry = data.get_pixel_geometry()
+        h5_patterns.attrs[DiffractionFileKeys.DETECTOR_PIXEL_WIDTH] = (
+            detector_pixel_geometry.width_m
+        )
+        h5_patterns.attrs[DiffractionFileKeys.DETECTOR_PIXEL_HEIGHT] = (
+            detector_pixel_geometry.height_m
         )
         h5_file.create_dataset(
             DiffractionFileKeys.BAD_PIXELS, data=data._bad_pixels, compression=compression

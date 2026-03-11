@@ -18,9 +18,9 @@ from ...model.product.probe import (
     AveragePatternProbeBuilder,
     DiskProbeBuilder,
     FresnelZonePlateProbeBuilder,
-    MultimodalProbeBuilder,
     ProbeModeDecayType,
     ProbeRepositoryItem,
+    ProbeSequenceBuilder,
     RectangularProbeBuilder,
     SuperGaussianProbeBuilder,
     ZernikeProbeBuilder,
@@ -180,37 +180,34 @@ class DecayTypeParameterViewController(ParameterViewController, Observer):
 class ProbeEditorViewControllerFactory:
     def _append_additional_modes(
         self,
+        probe_builder: ProbeSequenceBuilder,
         dialog_builder: ParameterViewBuilder,
-        additional_modes_builder: MultimodalProbeBuilder | None,
     ) -> None:
-        if additional_modes_builder is None:
-            return
-
         incoherent_modes_group = 'Incoherent (Mixed State) Modes'
         dialog_builder.add_spin_box(
-            additional_modes_builder.num_incoherent_modes,
+            probe_builder.num_incoherent_modes,
             'Number of Modes:',
             group=incoherent_modes_group,
         )
         dialog_builder.add_check_box(
-            additional_modes_builder.orthogonalize_incoherent_modes,
+            probe_builder.orthogonalize_incoherent_modes,
             'Orthogonalize Modes:',
             group=incoherent_modes_group,
         )
         dialog_builder.add_view_controller(
-            DecayTypeParameterViewController(additional_modes_builder.incoherent_mode_decay_type),
+            DecayTypeParameterViewController(probe_builder.incoherent_mode_decay_type),
             'Decay Type:',
             group=incoherent_modes_group,
         )
         dialog_builder.add_decimal_slider(
-            additional_modes_builder.incoherent_mode_decay_ratio,
+            probe_builder.incoherent_mode_decay_ratio,
             'Decay Ratio:',
             group=incoherent_modes_group,
         )
 
         coherent_modes_group = 'Coherent (OPR) Modes'
         dialog_builder.add_spin_box(
-            additional_modes_builder.num_coherent_modes,
+            probe_builder.num_coherent_modes,
             'Number of Modes:',
             group=coherent_modes_group,
         )
@@ -220,13 +217,12 @@ class ProbeEditorViewControllerFactory:
     ) -> QDialog:
         probe_builder = item.get_builder()
         builder_name = probe_builder.get_name()
-        additional_modes_builder = item.get_additional_modes_builder()
         primary_mode_group = 'Primary Mode'
         title = f'{item_name} [{builder_name}]'
 
         if isinstance(probe_builder, AveragePatternProbeBuilder):
             dialog_builder = ParameterViewBuilder()
-            self._append_additional_modes(dialog_builder, additional_modes_builder)
+            self._append_additional_modes(probe_builder, dialog_builder)
             return dialog_builder.build_dialog(title, parent)
         elif isinstance(probe_builder, DiskProbeBuilder):
             dialog_builder = ParameterViewBuilder()
@@ -240,14 +236,14 @@ class ProbeEditorViewControllerFactory:
                 'Defocus Distance:',
                 group=primary_mode_group,
             )
-            self._append_additional_modes(dialog_builder, additional_modes_builder)
+            self._append_additional_modes(probe_builder, dialog_builder)
             return dialog_builder.build_dialog(title, parent)
         elif isinstance(probe_builder, FresnelZonePlateProbeBuilder):
             dialog_builder = ParameterViewBuilder()
             dialog_builder.add_view_controller_to_top(
                 FresnelZonePlateViewController(primary_mode_group, probe_builder)
             )
-            self._append_additional_modes(dialog_builder, additional_modes_builder)
+            self._append_additional_modes(probe_builder, dialog_builder)
             return dialog_builder.build_dialog(title, parent)
         elif isinstance(probe_builder, RectangularProbeBuilder):
             dialog_builder = ParameterViewBuilder()
@@ -266,7 +262,7 @@ class ProbeEditorViewControllerFactory:
                 'Defocus Distance:',
                 group=primary_mode_group,
             )
-            self._append_additional_modes(dialog_builder, additional_modes_builder)
+            self._append_additional_modes(probe_builder, dialog_builder)
             return dialog_builder.build_dialog(title, parent)
         elif isinstance(probe_builder, SuperGaussianProbeBuilder):
             dialog_builder = ParameterViewBuilder()
@@ -285,14 +281,14 @@ class ProbeEditorViewControllerFactory:
                 'Order Parameter:',
                 group=primary_mode_group,
             )
-            self._append_additional_modes(dialog_builder, additional_modes_builder)
+            self._append_additional_modes(probe_builder, dialog_builder)
             return dialog_builder.build_dialog(title, parent)
         elif isinstance(probe_builder, ZernikeProbeBuilder):
             dialog_builder = ParameterViewBuilder()
             dialog_builder.add_view_controller_to_top(
                 ZernikeViewController(primary_mode_group, probe_builder)
             )
-            self._append_additional_modes(dialog_builder, additional_modes_builder)
+            self._append_additional_modes(probe_builder, dialog_builder)
             return dialog_builder.build_dialog(title, parent)
 
         return QMessageBox(

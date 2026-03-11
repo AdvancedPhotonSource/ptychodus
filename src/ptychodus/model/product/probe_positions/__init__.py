@@ -1,4 +1,8 @@
-from .builder import FromFileProbePositionsBuilder, FromMemoryProbePositionsBuilder
+from .builder import (
+    FromFileProbePositionsBuilder,
+    FromMemoryProbePositionsBuilder,
+    ProbePositionsBuilder,
+)
 from .builder_factory import ProbePositionsBuilderFactory
 from .cartesian import CartesianProbePositionsBuilder
 from .concentric import ConcentricProbePositionsBuilder
@@ -7,7 +11,6 @@ from .item_factory import ProbePositionsRepositoryItemFactory
 from .lissajous import LissajousProbePositionsBuilder
 from .settings import ProbePositionsSettings
 from .spiral import SpiralProbePositionsBuilder
-from .transform import ProbePositionTransform
 
 __all__ = [
     'CartesianProbePositionsBuilder',
@@ -15,10 +18,10 @@ __all__ = [
     'FromFileProbePositionsBuilder',
     'FromMemoryProbePositionsBuilder',
     'LissajousProbePositionsBuilder',
-    'ProbePositionsSettings',
+    'ProbePositionsBuilder',
     'ProbePositionsBuilderFactory',
     'ProbePositionsRepositoryItem',
     'ProbePositionsRepositoryItemFactory',
-    'ProbePositionTransform',
+    'ProbePositionsSettings',
     'SpiralProbePositionsBuilder',
 ]
