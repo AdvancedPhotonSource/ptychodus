@@ -360,9 +360,8 @@ def integrate_image_2d_fourier(
     r = 1.0 / (2j * numpy.pi * (x + 1j * y[:, None]) + 1e-15)
     r[0, 0] = 0
     integrated_image = ifft2(f * r)
-    if not numpy.iscomplexobj(grad_x):
-        return integrated_image.real
-    return integrated_image
+
+    return integrated_image if numpy.iscomplexobj(grad_x) else integrated_image.real
 
 
 def integrate_image_2d_deconvolution(
