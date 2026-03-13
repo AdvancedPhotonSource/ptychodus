@@ -54,6 +54,14 @@ Object
    :undoc-members:
    :show-inheritance:
 
+Object Generators
+-----------------
+
+.. automodule:: ptychodus.api.object_gen
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Observer
 --------
 
@@ -86,10 +94,26 @@ Probe
    :undoc-members:
    :show-inheritance:
 
+Probe Generators
+----------------
+
+.. automodule:: ptychodus.api.probe_gen
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Probe Positions
 ---------------
 
 .. automodule:: ptychodus.api.probe_positions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Probe Position Generators
+-------------------------
+
+.. automodule:: ptychodus.api.probe_positions_gen
    :members:
    :undoc-members:
    :show-inheritance:

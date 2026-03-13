@@ -1,11 +1,13 @@
 import os
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import pytest
 
 import ptychodus.api._phase_unwrapper as pu
 
 
+@pytest.mark.skip(reason="this test relies on data that has been excluded from the git repo.")
 def test_phase_unwrap() -> None:
     phase_unwrapper = pu.PhaseUnwrapper(
         image_grad_method='fourier_differentiation',
