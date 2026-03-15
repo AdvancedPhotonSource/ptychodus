@@ -10,7 +10,6 @@ import logging
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIntValidator, QValidator
 from PyQt5.QtWidgets import (
-    QAbstractButton,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -563,15 +562,7 @@ class ParameterDialog(QDialog):
         self._button_box = button_box
 
         button_box.addButton(QDialogButtonBox.StandardButton.Ok)
-        button_box.clicked.connect(self._handle_button_box_clicked)
-
-    def _handle_button_box_clicked(self, button: QAbstractButton) -> None:
-        # TODO remove observers from viewControllers
-
-        if self._button_box.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole:
-            self.accept()
-        else:
-            self.reject()
+        button_box.accepted.connect(self.accept)
 
 
 class ParameterViewBuilder:
@@ -820,8 +811,8 @@ class ParameterViewBuilder:
 
         return view_controllers
 
-    def build_widget(self) -> QWidget:
-        layout = self._build_layout(add_stretch=True)
+    def build_widget(self, add_stretch: bool = True) -> QWidget:
+        layout = self._build_layout(add_stretch=add_stretch)
 
         widget = ParameterWidget(self._flush_view_controllers())
         widget.setLayout(layout)

@@ -3,7 +3,8 @@ from enum import IntEnum
 
 import numpy
 
-from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
+from ptychodus.api.probe_positions import ProbePositionSequence
+from ptychodus.api.probe_positions_gen import generate_cartesian_probe_positions
 
 from .builder import ProbePositionsBuilder
 from .settings import ProbePositionsSettings
@@ -24,7 +25,7 @@ class CartesianProbePositionsVariant(IntEnum):
         return self.value & 1 != 0
 
     @property
-    def is_triangular(self) -> bool:
+    def is_staggered(self) -> bool:
         return self.value & 2 != 0
 
     @property
@@ -34,9 +35,13 @@ class CartesianProbePositionsVariant(IntEnum):
 
 class CartesianProbePositionsBuilder(ProbePositionsBuilder):
     def __init__(
-        self, variant: CartesianProbePositionsVariant, settings: ProbePositionsSettings
+        self,
+        variant: CartesianProbePositionsVariant,
+        rng: numpy.random.Generator,
+        settings: ProbePositionsSettings,
     ) -> None:
-        super().__init__(settings, variant.name.lower())
+        super().__init__(rng, settings, variant.name.lower())
+        self._rng = rng
         self._variant = variant
         self._settings = settings
 
@@ -53,7 +58,7 @@ class CartesianProbePositionsBuilder(ProbePositionsBuilder):
         self._add_parameter('step_size_y_m', self.step_size_y_m)
 
     def copy(self) -> CartesianProbePositionsBuilder:
-        builder = CartesianProbePositionsBuilder(self._variant, self._settings)
+        builder = CartesianProbePositionsBuilder(self._variant, self._rng, self._settings)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
@@ -65,44 +70,22 @@ class CartesianProbePositionsBuilder(ProbePositionsBuilder):
         return self._variant.is_equilateral
 
     def build(self) -> ProbePositionSequence:
-        nx = self.num_points_x.get_value()
-        ny = self.num_points_y.get_value()
-        dx = self.step_size_x_m.get_value()
+        step_size_x_m = self.step_size_x_m.get_value()
 
         if self._variant.is_equilateral:
-            dy = dx
+            step_size_y_m = step_size_x_m
 
-            if self._variant.is_triangular:
-                dy *= numpy.sqrt(0.75)
+            if self._variant.is_staggered:
+                step_size_y_m *= numpy.sqrt(0.75)
         else:
-            dy = self.step_size_y_m.get_value()
+            step_size_y_m = self.step_size_y_m.get_value()
 
-        point_list: list[ProbePosition] = list()
-
-        for index in range(nx * ny):
-            y, x = divmod(index, nx)
-
-            if self._variant.is_snaked:
-                if y & 1:
-                    x = nx - 1 - x
-
-            cx = (nx - 1) / 2
-            cy = (ny - 1) / 2
-
-            xf = (x - cx) * dx
-            yf = (y - cy) * dy
-
-            if self._variant.is_triangular:
-                if y & 1:
-                    xf += dx / 4
-                else:
-                    xf -= dx / 4
-
-            point = ProbePosition(
-                index=index,
-                coordinate_x_m=xf,
-                coordinate_y_m=yf,
-            )
-            point_list.append(point)
-
-        return ProbePositionSequence(point_list)
+        positions = generate_cartesian_probe_positions(
+            self.num_points_x.get_value(),
+            self.num_points_y.get_value(),
+            step_size_x_m,
+            step_size_y_m,
+            snake=self._variant.is_snaked,
+            stagger=self._variant.is_staggered,
+        )
+        return self._create_position_sequence(positions)

@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 
@@ -9,6 +10,20 @@ class GlobusJob:
     flow_input: Mapping[str, Any]
     label: str
     tags: Sequence[str]
+
+
+@dataclass(frozen=True)
+class GlobusStatus:
+    label: str
+    start_time: datetime
+    completion_time: datetime | None
+    status: str
+    action: str
+    run_id: str
+
+    @property
+    def run_url(self) -> str:
+        return f'https://app.globus.org/runs/{self.run_id}/logs'
 
 
 class GlobusClient(ABC):
@@ -29,6 +44,10 @@ class GlobusClient(ABC):
     def run_flow(self, job: GlobusJob) -> None:
         pass
 
+    @abstractmethod
+    def refresh_status(self) -> None:
+        pass
+
 
 class FakeGlobusClient(GlobusClient):
     @property
@@ -43,3 +62,15 @@ class FakeGlobusClient(GlobusClient):
 
     def run_flow(self, job: GlobusJob) -> None:
         pass
+
+    def refresh_status(self) -> None:
+        pass
+
+
+class RunGlobusFlow:
+    def __init__(self, client: GlobusClient, job: GlobusJob) -> None:
+        self._client = client
+        self._job = job
+
+    def __call__(self) -> None:
+        self._client.run_flow(self._job)

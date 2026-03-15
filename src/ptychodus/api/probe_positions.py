@@ -20,13 +20,12 @@ class ProbePosition:
 
 
 @dataclass(frozen=True)
-class ScanBoundingBox:
-    """Axis-aligned bounding box enclosing a set of probe positions."""
-
-    minimum_x_m: float
-    maximum_x_m: float
-    minimum_y_m: float
-    maximum_y_m: float
+class ScanGeometry:
+    minimum_x_m: float = +numpy.inf
+    maximum_x_m: float = -numpy.inf
+    minimum_y_m: float = +numpy.inf
+    maximum_y_m: float = -numpy.inf
+    length_m: float = 0.0
 
     @property
     def width_m(self) -> float:
@@ -43,14 +42,6 @@ class ScanBoundingBox:
     @property
     def center_y_m(self) -> float:
         return self.minimum_y_m + self.height_m / 2.0
-
-    def hull(self, bbox: ScanBoundingBox) -> ScanBoundingBox:
-        return ScanBoundingBox(
-            minimum_x_m=min(self.minimum_x_m, bbox.minimum_x_m),
-            maximum_x_m=max(self.maximum_x_m, bbox.maximum_x_m),
-            minimum_y_m=min(self.minimum_y_m, bbox.minimum_y_m),
-            maximum_y_m=max(self.maximum_y_m, bbox.maximum_y_m),
-        )
 
 
 class ProbePositionSequence(Sequence[ProbePosition]):

@@ -72,9 +72,8 @@ class AutomationDatasetListViewController(
         self._model.endInsertRows()
 
     def handle_item_changed(self, index: int, item: AutomationDataset) -> None:
-        top_left = self._model.index(index, 0)
-        bottom_right = self._model.index(index, self._model.columnCount())
-        self._model.dataChanged.emit(top_left, bottom_right)
+        model_index = self._model.index(index, 0)
+        self._model.dataChanged.emit(model_index, model_index)
 
     def handle_item_removed(self, index: int, item: AutomationDataset) -> None:
         self._model.beginRemoveRows(QModelIndex(), index, index)
@@ -157,7 +156,7 @@ class AutomationController:
         buttons_view_controller = AutomationButtonsViewController(repository, presenter)
         view_builder.add_view_controller_to_bottom(buttons_view_controller)
 
-        contents = view_builder.build_widget()
+        contents = view_builder.build_widget(add_stretch=False)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)

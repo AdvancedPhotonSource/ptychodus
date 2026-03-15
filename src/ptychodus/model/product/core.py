@@ -3,9 +3,10 @@ import numpy
 from ptychodus.api.object import ObjectFileReader, ObjectFileWriter
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter
-from ptychodus.api.product import ProductFileReader, ProductFileWriter
+from ptychodus.api.probe import ProbeFileReader, ProbeFileWriter
+from ptychodus.api.probe_gen import FresnelZonePlate
 from ptychodus.api.probe_positions import ProbePositionFileReader, ProbePositionFileWriter
+from ptychodus.api.product import ProductFileReader, ProductFileWriter
 from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import AssembledDiffractionDataset, DiffractionAPI, PatternSizer
@@ -49,7 +50,7 @@ class ProductCore(Observer):
 
         self._scan_settings = ProbePositionsSettings(settings_registry)
         self._scan_builder_factory = ProbePositionsBuilderFactory(
-            self._scan_settings, scan_file_reader_chooser, scan_file_writer_chooser
+            rng, self._scan_settings, scan_file_reader_chooser, scan_file_writer_chooser
         )
         self._scan_repository_item_factory = ProbePositionsRepositoryItemFactory(
             rng, self._scan_settings, self._scan_builder_factory
@@ -57,6 +58,7 @@ class ProductCore(Observer):
 
         self._probe_settings = ProbeSettings(settings_registry)
         self._probe_builder_factory = ProbeBuilderFactory(
+            rng,
             self._probe_settings,
             diffraction_api,
             fresnel_zone_plate_chooser,

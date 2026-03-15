@@ -21,13 +21,14 @@ from .fluorescence import (
 from .object import ObjectFileReader, ObjectFileWriter, Object
 from .observer import Observable, Observer
 from .parametric import StringParameter
-from .probe import FresnelZonePlate, ProbeFileReader, ProbeFileWriter, ProbeSequence
-from .product import ProductFileReader, ProductFileWriter
+from .probe import ProbeFileReader, ProbeFileWriter, ProbeSequence
+from .probe_gen import FresnelZonePlate
 from .probe_positions import (
     ProbePositionFileReader,
     ProbePositionFileWriter,
     ProbePositionSequence,
 )
+from .product import ProductFileReader, ProductFileWriter
 from .workflow import FileBasedWorkflow
 
 __all__ = [

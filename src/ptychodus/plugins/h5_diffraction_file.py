@@ -47,38 +47,40 @@ class H5DiffractionPatternArray(DiffractionArray):
                 )
 
             if isinstance(item, h5py.Dataset):
-                logger.debug(f'Reading "{item.name}"...')
-                logger.debug(f'\tcompression = {item.compression}')
-                logger.debug(f'\tcompression_opts = {item.compression_opts}')
+                item_ref = f'{self._file_path}:{item.name}'
+                logger.debug(
+                    f'Reading "{item_ref}" '
+                    f'(compression={item.compression} options={item.compression_opts})'
+                    '...',
+                )
+                available_filter_names: list[str] = []
+                missing_filter_names: list[str] = []
 
                 dataset_id = item.id
                 dataset_creation_properties = dataset_id.get_create_plist()
                 nfilters = dataset_creation_properties.get_nfilters()
-                missing_filter_names: list[str] = []
 
-                if nfilters > 0:
-                    logger.debug('\tfilters = [')
+                for filter_idx in range(nfilters):
+                    filter_ = dataset_creation_properties.get_filter(filter_idx)
+                    filter_code = filter_[0]
+                    flags = filter_[1]
+                    aux_data = filter_[2]
+                    name = filter_[3].decode()
+                    available_filter_names.append(
+                        f'({filter_idx}) {filter_code=}, {flags=}, {aux_data=}, {name=}'
+                    )
 
-                    for filter_idx in range(nfilters):
-                        filter_ = dataset_creation_properties.get_filter(filter_idx)
-                        filter_code = filter_[0]
-                        flags = filter_[1]
-                        aux_data = filter_[2]
-                        name = filter_[3].decode()
-                        logger.debug(
-                            f'\t\t({filter_idx}) {filter_code=}, {flags=}, {aux_data=}, {name=}'
-                        )
+                    if not h5py.h5z.filter_avail(filter_code):
+                        missing_filter_names.append(name)
 
-                        if not h5py.h5z.filter_avail(filter_code):
-                            missing_filter_names.append(name)
-
-                    logger.debug('\t]')
-                else:
-                    logger.debug('\tfilters = []')
+                debug_msg = '; '.join(available_filter_names)
+                logger.debug(f'{item_ref} filters: [{debug_msg}]')
 
                 if missing_filter_names:
-                    names = ' '.join(missing_filter_names)
-                    raise RuntimeError(f'Missing filters needed to read dataset: {names}!')
+                    error_msg = ' '.join(missing_filter_names)
+                    raise RuntimeError(
+                        f'{item_ref} missing filters needed to read dataset: {error_msg}!'
+                    )
 
                 return item[:]
             else:

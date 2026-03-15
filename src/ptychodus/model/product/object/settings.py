@@ -26,7 +26,7 @@ class ObjectSettings(Observable, Observer):
         self.amplitude_deviation = self._group.create_real_parameter(
             'AmplitudeDeviation', 0.0, minimum=0.0, maximum=1.0
         )
-        self.phase_deviation_turns = self._group.create_real_parameter(
+        self.phase_deviation_tr = self._group.create_real_parameter(
             'PhaseDeviationInTurns', 0.0, minimum=0.0, maximum=1.0
         )
         self.blur_deviation_px = self._group.create_real_parameter(
@@ -48,13 +48,28 @@ class ObjectSettings(Observable, Observer):
         self.leaf_amplitude_upper = self._group.create_real_parameter(
             'LeafAmplitudeUpper', 1.0, minimum=0.0, maximum=1.0
         )
-        self.leaf_phase_lower_turns = self._group.create_real_parameter(
+        self.leaf_phase_lower_tr = self._group.create_real_parameter(
             'LeafPhaseLowerInTurns',
             -0.5,
         )
-        self.leaf_phase_upper_turns = self._group.create_real_parameter(
+        self.leaf_phase_upper_tr = self._group.create_real_parameter(
             'LeafPhaseUpperInTurns',
             0.5,
+        )
+
+        self.correlation_length_px = self._group.create_real_parameter(
+            'CorrelationLengthInPixels', 30.0
+        )
+
+        self.simplex_grid_scale_px = self._group.create_real_parameter(
+            'SimplexGridScaleInPixels', 30.0
+        )
+        self.fractal_num_octaves = self._group.create_integer_parameter(
+            'FractalNumOctaves', 1, minimum=1, maximum=8
+        )
+        self.fractal_gain = self._group.create_real_parameter('FractalGain', 0.5, minimum=0.0)
+        self.fractal_lacunarity = self._group.create_real_parameter(
+            'FractalLacunarity', 2.0, minimum=0.0
         )
 
     def _update(self, observable: Observable) -> None:

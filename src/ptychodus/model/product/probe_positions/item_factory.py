@@ -8,7 +8,6 @@ from .builder import FromMemoryProbePositionsBuilder
 from .builder_factory import ProbePositionsBuilderFactory
 from .item import ProbePositionsRepositoryItem
 from .settings import ProbePositionsSettings
-from .transform import ProbePositionTransform
 
 logger = logging.getLogger(__name__)
 
@@ -24,16 +23,15 @@ class ProbePositionsRepositoryItemFactory:
         self._settings = settings
         self._builder_factory = builder_factory
 
-    def create(self, scan: ProbePositionSequence | None = None) -> ProbePositionsRepositoryItem:
-        transform = ProbePositionTransform(self._rng, self._settings)
-
-        if scan is None:
+    def create(
+        self, position_seq: ProbePositionSequence | None = None
+    ) -> ProbePositionsRepositoryItem:
+        if position_seq is None:
             builder = self._builder_factory.create_default()
         else:
-            builder = FromMemoryProbePositionsBuilder(self._settings, scan)
-            transform.set_identity()
+            builder = FromMemoryProbePositionsBuilder(self._rng, self._settings, position_seq)
 
-        return ProbePositionsRepositoryItem(self._settings, builder, transform)
+        return ProbePositionsRepositoryItem(self._rng, self._settings, builder)
 
     def create_from_settings(self) -> ProbePositionsRepositoryItem:
         try:
@@ -42,5 +40,4 @@ class ProbePositionsRepositoryItemFactory:
             logger.exception(''.join(exc.args))
             builder = self._builder_factory.create_default()
 
-        transform = ProbePositionTransform(self._rng, self._settings)
-        return ProbePositionsRepositoryItem(self._settings, builder, transform)
+        return ProbePositionsRepositoryItem(self._rng, self._settings, builder)

@@ -11,8 +11,8 @@ from ptychodus.api.settings import SettingsRegistry
 
 from ..task_manager import TaskManager
 from .api import DiffractionAPI
-from .bad_pixels import BadPixelsProvider
 from .dataset import AssembledDiffractionDataset
+from .detector import Detector
 from .settings import DetectorSettings, DiffractionSettings
 from .sizer import PatternSizer
 
@@ -33,14 +33,14 @@ class DiffractionCore(Observer):
         self.detector_settings = DetectorSettings(settings_registry)
         self.diffraction_settings = DiffractionSettings(settings_registry)
         self.pattern_sizer = PatternSizer(self.detector_settings, self.diffraction_settings)
-        self.bad_pixels_provider = BadPixelsProvider(self.detector_settings)
+        self.detector = Detector(self.detector_settings)
         self.dataset = AssembledDiffractionDataset(
-            self.diffraction_settings, self.pattern_sizer, self.bad_pixels_provider, task_manager
+            self.diffraction_settings, self.pattern_sizer, self.detector, task_manager
         )
         self.diffraction_api = DiffractionAPI(
             self.diffraction_settings,
             self.detector_settings,
-            self.bad_pixels_provider,
+            self.detector,
             self.dataset,
             bad_pixels_file_reader_chooser,
             file_reader_chooser,

@@ -50,6 +50,7 @@ class ControllerCore:
         )
         self._settings_controller = SettingsController(
             model.settings_registry,
+            model.product_core.product_repository,
             view.settings_view,
             view.settings_table_view,
             self._file_dialog_factory,
@@ -64,7 +65,7 @@ class ControllerCore:
             model.diffraction_core.detector_settings,
             model.diffraction_core.diffraction_settings,
             model.diffraction_core.pattern_sizer,
-            model.diffraction_core.bad_pixels_provider,
+            model.diffraction_core.detector,
             model.diffraction_core.diffraction_api,
             model.diffraction_core.dataset,
             model.metadata_presenter,

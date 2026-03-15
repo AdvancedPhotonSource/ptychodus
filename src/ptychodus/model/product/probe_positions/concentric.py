@@ -2,17 +2,16 @@ from __future__ import annotations
 
 import numpy
 
-from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
+from ptychodus.api.probe_positions import ProbePositionSequence
+from ptychodus.api.probe_positions_gen import generate_concentric_probe_positions
 
 from .builder import ProbePositionsBuilder
 from .settings import ProbePositionsSettings
 
 
 class ConcentricProbePositionsBuilder(ProbePositionsBuilder):
-    """https://doi.org/10.1088/1367-2630/12/3/035017"""
-
-    def __init__(self, settings: ProbePositionsSettings) -> None:
-        super().__init__(settings, 'concentric')
+    def __init__(self, rng: numpy.random.Generator, settings: ProbePositionsSettings) -> None:
+        super().__init__(rng, settings, 'concentric')
         self._settings = settings
 
         self.radial_step_size_m = settings.radial_step_size_m.copy()
@@ -25,38 +24,17 @@ class ConcentricProbePositionsBuilder(ProbePositionsBuilder):
         self._add_parameter('num_points_1st_shell', self.num_points_1st_shell)
 
     def copy(self) -> ConcentricProbePositionsBuilder:
-        builder = ConcentricProbePositionsBuilder(self._settings)
+        builder = ConcentricProbePositionsBuilder(self._rng, self._settings)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
-    @property
-    def _num_points(self) -> int:
-        num_shells = self.num_shells.get_value()
-        triangle = (num_shells * (num_shells + 1)) // 2
-        return triangle * self.num_points_1st_shell.get_value()
-
     def build(self) -> ProbePositionSequence:
-        point_list: list[ProbePosition] = list()
-
-        for index in range(self._num_points):
-            triangle = index // self.num_points_1st_shell.get_value()
-            shell_index = int((1 + numpy.sqrt(1 + 8 * triangle)) / 2) - 1  # see OEIS A002024
-            shell_triangle = (shell_index * (shell_index + 1)) // 2
-            first_index_in_shell = self.num_points_1st_shell.get_value() * shell_triangle
-            point_index_in_shell = index - first_index_in_shell
-
-            radius_m = self.radial_step_size_m.get_value() * (shell_index + 1)
-            num_points_in_shell = self.num_points_1st_shell.get_value() * (shell_index + 1)
-            theta_rad = 2 * numpy.pi * point_index_in_shell / num_points_in_shell
-
-            point = ProbePosition(
-                index=index,
-                coordinate_x_m=radius_m * numpy.cos(theta_rad),
-                coordinate_y_m=radius_m * numpy.sin(theta_rad),
-            )
-            point_list.append(point)
-
-        return ProbePositionSequence(point_list)
+        positions = generate_concentric_probe_positions(
+            self.radial_step_size_m.get_value(),
+            self.num_shells.get_value(),
+            self.num_points_1st_shell.get_value(),
+        )
+        return self._create_position_sequence(positions)
