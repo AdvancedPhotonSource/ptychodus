@@ -15,12 +15,13 @@ from .image import ImageController
 from .memory import MemoryController
 from .object import ObjectController
 from .probe import ProbeController
+from .probe_positions import ProbePositionsController
+from .processing import ProcessingController
 from .product import ProductController
 from .ptychi import PtyChiViewControllerFactory
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopinn import PtychoPINNViewControllerFactory
-from .processing import ProcessingController
-from .probe_positions import ProbePositionsController
+from .ptychopinn_torch import PtychoPINNTorchViewControllerFactory
 from .settings import SettingsController
 
 
@@ -47,6 +48,9 @@ class ControllerCore:
         )
         self._ptychopinn_view_controller_factory = PtychoPINNViewControllerFactory(
             model.ptychopinn_reconstructor_library, self._file_dialog_factory
+        )
+        self._ptychopinn_torch_view_controller_factory = PtychoPINNTorchViewControllerFactory(
+            model.ptychopinn_torch_reconstructor_library, self._file_dialog_factory
         )
         self._settings_controller = SettingsController(
             model.settings_registry,
@@ -138,6 +142,7 @@ class ControllerCore:
             self._file_dialog_factory,
             [
                 self._ptychi_view_controller_factory,
+                self._ptychopinn_torch_view_controller_factory,
                 self._ptychopinn_view_controller_factory,
                 self._ptychonn_view_controller_factory,
             ],

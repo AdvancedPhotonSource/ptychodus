@@ -11,6 +11,7 @@ from ...api.reconstructor import (
 )
 from ...api.settings import SettingsRegistry
 from .settings import (
+    PtychoPINNTorchDataSettings,
     PtychoPINNTorchInferenceSettings,
     PtychoPINNTorchModelSettings,
     PtychoPINNTorchTrainingSettings,
@@ -24,6 +25,7 @@ class PtychoPINNTorchReconstructorLibrary(ReconstructorLibrary):
         self, settings_registry: SettingsRegistry, is_developer_mode_enabled: bool
     ) -> None:
         super().__init__('ptychopinn-torch')
+        self.data_settings = PtychoPINNTorchDataSettings(settings_registry)
         self.model_settings = PtychoPINNTorchModelSettings(settings_registry)
         self.training_settings = PtychoPINNTorchTrainingSettings(settings_registry)
         self.inference_settings = PtychoPINNTorchInferenceSettings(settings_registry)
@@ -38,7 +40,7 @@ class PtychoPINNTorchReconstructorLibrary(ReconstructorLibrary):
                 for reconstructor in ('PINN', 'Supervised'):
                     self._reconstructors.append(NullReconstructor(reconstructor))
         else:
-            ptychopinn_torch_version = version('ptychopinn_torch')
+            ptychopinn_torch_version = version('ptychopinn')
             logger.info(f'PtychoPINN-Torch {ptychopinn_torch_version}')
 
             self._reconstructors.append(

@@ -2,32 +2,35 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
 
-# FIXME REMOVE
 class PtychoPINNTorchDataSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
         super().__init__()
         self._group = registry.create_group('PtychoPINNTorchData')
         self._group.add_observer(self)
 
-        self.nphotons = self._group.create_real_parameter('nphotons', 1e5)
+        self.nphotons = self._group.create_real_parameter('nphotons', 1e5, minimum=0)
         # General sizing parameters
         # Size of the diffraction patterns/object patch
-        self.N = self._group.create_integer_parameter('N', 64)
+        self.N = self._group.create_integer_parameter('N', 64, minimum=0)
         # Number of channels
-        self.C = self._group.create_integer_parameter('C', 4)
+        self.C = self._group.create_integer_parameter('C', 4, minimum=0)
         # Number of nearest neighbors for lookup
-        self.K = self._group.create_integer_parameter('K', 6)
+        self.K = self._group.create_integer_parameter('K', 6, minimum=0)
         # Grid parameters specifically for overlap constraint
         # Number of nearest neighbors for quadrant lookup
-        self.K_quadrant = self._group.create_integer_parameter('K_quadrant', 30)
+        self.K_quadrant = self._group.create_integer_parameter('K_quadrant', 30, minimum=0)
         # Subsampling factor for coordinates (if applicable)
-        self.n_subsample = self._group.create_integer_parameter('n_subsample', 7)
+        self.n_subsample = self._group.create_integer_parameter('n_subsample', 7, minimum=0)
         # Grid size for scanning positions
-        self.grid_size_x = self._group.create_integer_parameter('grid_size_x', 2)
-        self.grid_size_y = self._group.create_integer_parameter('grid_size_y', 2)
+        self.grid_size_x = self._group.create_integer_parameter('grid_size_x', 2, minimum=0)
+        self.grid_size_y = self._group.create_integer_parameter('grid_size_y', 2, minimum=0)
         self.neighbor_function = self._group.create_string_parameter('neighbor_function', 'Nearest')
-        self.min_neighbor_distance = self._group.create_real_parameter('min_neighbor_distance', 0.0)
-        self.max_neighbor_distance = self._group.create_real_parameter('max_neighbor_distance', 3.0)
+        self.min_neighbor_distance = self._group.create_real_parameter(
+            'min_neighbor_distance', 0.0, minimum=0.0
+        )
+        self.max_neighbor_distance = self._group.create_real_parameter(
+            'max_neighbor_distance', 3.0, minimum=0.0
+        )
         # Scan pattern, used for 4_quadrant neighbor function
         self.scan_pattern = self._group.create_string_parameter('scan_pattern', 'Isotropic')
 
