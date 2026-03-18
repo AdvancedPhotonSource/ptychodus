@@ -60,6 +60,7 @@ module = [
     "parsl.*",
     "ptychi.*",
     "ptycho.*",
+    "ptycho_torch.*",
     "ptychonn.*",
     "pvaccess",
     "pvapy.*",

@@ -300,84 +300,144 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
         builder.add_line_edit(
             training_settings.strategy, 'Distributed Training Strategy:', group=training_group
         )  # FIXME make enum
-        # FIXME BEGIN
-        # # Framework
-        # # Training framework. Most of work don in PT was done in lightning
-        # framework = string_parameter('framework', 'Lightning')
-        # orchestrator = string_parameter('orchestrator', 'Mlflow')
-        #
-        # # Add other training-specific parameters here as needed
-        # learning_rate = real_parameter('learning_rate', 1e-3)
-        # # Default epochs number, will be overridden if multi-stage training is active at all
-        # epochs = integer_parameter('epochs', 50)
-        # batch_size = integer_parameter('batch_size', 16)
-        # # Default 0 fine-tune means no fine-tuning
-        # epochs_fine_tune = integer_parameter('epochs_fine_tune', 0)
-        # # Scales base LR for fine-tuning
-        # fine_tune_gamma = real_parameter('fine_tune_gamma', 0.1)
-        # scheduler = string_parameter('scheduler', 'Default')
-        # # Number of warmup epochs for WarmupCosine scheduler
-        # lr_warmup_epochs = integer_parameter('lr_warmup_epochs', 0)
-        # # Minimum LR ratio for WarmupCosine scheduler (eta_min = base_lr * ratio)
-        # lr_min_ratio = real_parameter('lr_min_ratio', 0.1)
-        # plateau_factor = real_parameter('plateau_factor', 0.5)
-        # plateau_patience = integer_parameter('plateau_patience', 2)
-        # plateau_min_lr = real_parameter('plateau_min_lr', 1e-4)
-        # plateau_threshold = real_parameter('plateau_threshold', 0.0)
-        # # Dataloader workers
-        # num_workers = integer_parameter('num_workers', 4)
-        # # Batch size accumulation, manually implemented for DDP
-        # accum_steps = integer_parameter('accum_steps', 1)
-        # gradient_clip_val = real_parameter('gradient_clip_val', 0.0)
-        # # Gradient clipping algorithm: 'norm', 'value', or 'agc'
-        # gradient_clip_algorithm = string_parameter(
-        #     'gradient_clip_algorithm', 'norm'
-        # )
-        # # Optimizer algorithm: 'adam', 'adamw', or 'sgd'
-        # optimizer = string_parameter('optimizer', 'adam')
-        # # SGD momentum (ignored for Adam/AdamW)
-        # momentum = real_parameter('momentum', 0.9)
-        # # Weight decay (L2 penalty)
-        # weight_decay = real_parameter('weight_decay', 0.0)
-        # # Adam/AdamW beta1
-        # adam_beta1 = real_parameter('adam_beta1', 0.9)
-        # # Adam/AdamW beta2
-        # adam_beta2 = real_parameter('adam_beta2', 0.999)
-        # log_grad_norm = boolean_parameter('log_grad_norm', False)
-        # grad_norm_log_freq = integer_parameter('grad_norm_log_freq', 1)
-        # # batch_size = integer_parameter('batch_size', 32)
-        #
-        # # Meta learning: Schedulers etc.
-        # # Will be set to total epochs if not specified
-        # stage_1_epochs = integer_parameter('stage_1_epochs', 0)
-        # # Weighted transition (0 = disabled)
-        # stage_2_epochs = integer_parameter('stage_2_epochs', 0)
-        # # Physics only (0 = disabled)
-        # stage_3_epochs = integer_parameter('stage_3_epochs', 0)
-        # # 'linear', 'cosine', 'exponential'
-        # physics_weight_schedule = string_parameter(
-        #     'physics_weight_schedule', 'cosine'
-        # )
-        #
-        # # Multi-stage learning rate parameters
-        # # LR reduction for stage 3 (physics)
-        # stage_3_lr_factor = real_parameter('stage_3_lr_factor', 0.1)
-        #
-        # # Backend-specific loss selection
-        # torch_loss_mode = string_parameter('torch_loss_mode', 'poisson')
-        #
-        # # MLFlow config
-        # experiment_name = string_parameter(
-        #     'experiment_name', 'Synthetic_Runs'
-        # )
-        # notes = string_parameter('notes', '')
-        # model_name = string_parameter('model_name', 'PtychoPINNv2')
-        #
-        # # Lightning specific configs
-        # output_dir = string_parameter('output_dir', 'lightning_outputs')
-        #
-        # # Number of grouped samples
-        # n_groups = integer_parameter('n_groups', 0)
-        # FIXME END
+        builder.add_line_edit(
+            training_settings.framework, 'Training Framework:', group=training_group
+        )  # FIXME make enum
+        builder.add_line_edit(
+            training_settings.orchestrator, 'Training Orchestrator:', group=training_group
+        )  # FIXME make enum
+        builder.add_decimal_line_edit(
+            training_settings.learning_rate, 'Learning Rate:', group=training_group
+        )
+        builder.add_integer_line_edit(
+            training_settings.epochs, 'Default Epochs:', group=training_group
+        )
+        builder.add_integer_line_edit(
+            training_settings.batch_size, 'Batch Size:', group=training_group
+        )
+        builder.add_integer_line_edit(
+            training_settings.epochs_fine_tune, 'Fine Tune Epochs:', group=training_group
+        )
+        builder.add_decimal_line_edit(
+            training_settings.fine_tune_gamma,
+            'Fine Tune Gamma:',
+            tool_tip='Scales base learning rate for fine-tuning.',
+            group=training_group,
+        )
+        builder.add_line_edit(
+            training_settings.scheduler, 'Scheduler:', group=training_group
+        )  # FIXME make enum
+
+        builder.add_integer_line_edit(
+            training_settings.lr_warmup_epochs,
+            'Warmup Epochs:',
+            tool_tip='Number of warmup epochs for WarmupCosine scheduler',
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.lr_min_ratio,
+            'Learning Rate Min Ratio:',
+            tool_tip='Minimum learning rate ratio for WarmupCoside scheduler',
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.plateau_factor, 'Plateau Factor:', group=training_group
+        )
+        builder.add_integer_line_edit(
+            training_settings.plateau_patience, 'Plateau Patience:', group=training_group
+        )
+        builder.add_decimal_line_edit(
+            training_settings.plateau_min_lr, 'Plateau Min Learning Rate:', group=training_group
+        )
+        builder.add_decimal_line_edit(
+            training_settings.plateau_threshold, 'Plateau Threshold:', group=training_group
+        )
+
+        builder.add_integer_line_edit(
+            training_settings.num_workers, 'Num Dataloader Workers:', group=training_group
+        )
+        builder.add_integer_line_edit(
+            training_settings.accum_steps, 'Batch Size Accumulation Steps:', group=training_group
+        )
+        builder.add_decimal_line_edit(
+            training_settings.gradient_clip_val, 'Gradient Clip Value:', group=training_group
+        )
+        builder.add_line_edit(
+            training_settings.gradient_clip_algorithm,
+            'Gradient Clip Algorithm:',
+            group=training_group,
+        )  # FIXME make enum
+
+        builder.add_line_edit(training_settings.optimizer, 'Optimizer:', group=training_group)
+        builder.add_decimal_line_edit(training_settings.momentum, 'Momentum:', group=training_group)
+        builder.add_decimal_line_edit(
+            training_settings.weight_decay,
+            'Weight Decay:',
+            tool_tip='L2 Penalty',
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.adam_beta1, 'Adam/AdamW beta1:', group=training_group
+        )
+        builder.add_decimal_line_edit(
+            training_settings.adam_beta2, 'Adam/AdamW beta2:', group=training_group
+        )
+        builder.add_check_box(
+            training_settings.log_grad_norm, 'Log Grad Norm', group=training_group
+        )
+        builder.add_integer_line_edit(
+            training_settings.grad_norm_log_freq, 'Grad Norm Log Freq:', group=training_group
+        )
+        builder.add_integer_line_edit(
+            training_settings.batch_size, 'Batch Size:', group=training_group
+        )
+
+        builder.add_integer_line_edit(
+            training_settings.stage_1_epochs,
+            'Stage 1 Epochs:',
+            tool_tip='Will be set to total epochs if not specified.',
+            group=training_group,
+        )
+        builder.add_integer_line_edit(
+            training_settings.stage_2_epochs,
+            'Stage 2 Epochs:',
+            tool_tip='Weighted transition (0 = disabled)',
+            group=training_group,
+        )
+        builder.add_integer_line_edit(
+            training_settings.stage_3_epochs,
+            'Stage 3 Epochs:',
+            tool_tip='Physics only (0 = disabled)',
+            group=training_group,
+        )
+        builder.add_line_edit(
+            training_settings.physics_weight_schedule,
+            'Physics Weight Schedule:',
+            group=training_group,
+        )  # FIXME make enum
+        builder.add_decimal_line_edit(
+            training_settings.stage_3_lr_factor,
+            'Stage 3 Learning Rate Reduction:',
+            group=training_group,
+        )
+
+        builder.add_line_edit(
+            training_settings.torch_loss_mode, 'Torch Loss Mode:', group=training_group
+        )  # FIXME make enum
+
+        builder.add_line_edit(
+            training_settings.experiment_name, 'MLflow Experiment Name:', group=training_group
+        )
+        builder.add_line_edit(training_settings.notes, 'MLflow Notes:', group=training_group)
+        builder.add_line_edit(
+            training_settings.model_name, 'MLflow Model Name:', group=training_group
+        )
+
+        builder.add_line_edit(
+            training_settings.output_dir, 'Lightning Output Directory:', group=training_group
+        )
+        builder.add_integer_line_edit(
+            training_settings.n_groups, 'Number of Grouped Samples:', group=training_group
+        )
 
         return builder.build_widget()
