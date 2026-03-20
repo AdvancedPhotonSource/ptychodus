@@ -174,6 +174,7 @@ class ModelCore:
             self.plugin_registry.fluorescence_file_writers,
         )
         self.analysis_core = AnalysisCore(
+            self.rng,
             self.settings_registry,
             self.diffraction_core.dataset,
             self.product_core.product_repository,
