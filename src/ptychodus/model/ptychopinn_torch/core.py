@@ -46,6 +46,7 @@ class PtychoPINNTorchReconstructorLibrary(ReconstructorLibrary):
             self._reconstructors.append(
                 PtychoPINNTorchTrainableReconstructor(
                     'Unsupervised',
+                    self.data_settings,
                     self.model_settings,
                     self.inference_settings,
                     self.training_settings,
@@ -55,6 +56,7 @@ class PtychoPINNTorchReconstructorLibrary(ReconstructorLibrary):
             self._reconstructors.append(
                 PtychoPINNTorchTrainableReconstructor(
                     'Supervised',
+                    self.data_settings,
                     self.model_settings,
                     self.inference_settings,
                     self.training_settings,

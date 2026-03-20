@@ -32,6 +32,7 @@ from ptychodus.api.reconstructor import (
 )
 
 from .settings import (
+    PtychoPINNTorchDataSettings,
     PtychoPINNTorchInferenceSettings,
     PtychoPINNTorchModelSettings,
     PtychoPINNTorchTrainingSettings,
@@ -48,6 +49,7 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
     def __init__(
         self,
         name: str,
+        data_settings: PtychoPINNTorchDataSettings,
         model_settings: PtychoPINNTorchModelSettings,
         inference_settings: PtychoPINNTorchInferenceSettings,
         training_settings: PtychoPINNTorchTrainingSettings,
@@ -56,6 +58,7 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
     ) -> None:
         super().__init__()
         self._name = name
+        self._data_settings = data_settings
         self._model_settings = model_settings
         self._inference_settings = inference_settings
         self._training_settings = training_settings
@@ -64,11 +67,132 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
         self._model: PtychoModel | None = None
 
     def _create_config_manager(self) -> ConfigManager:
-        data_config = DataConfig()  # FIXME from settings
-        model_config = ModelConfig()  # FIXME from settings
-        training_config = TrainingConfig()  # FIXME from settings
-        inference_config = InferenceConfig()  # FIXME from settings
-        datagen_config = DatagenConfig()  # FIXME from settings
+        grid_size = (
+            self._data_settings.grid_size_x.get_value(),
+            self._data_settings.grid_size_y.get_value(),
+        )  # FIXME verify order
+        x_bounds = (
+            self._data_settings.x_lower_bound.get_value(),
+            self._data_settings.x_upper_bound.get_value(),
+        )
+        y_bounds = (
+            self._data_settings.y_lower_bound.get_value(),
+            self._data_settings.y_upper_bound.get_value(),
+        )
+        data_config = DataConfig(
+            nphotons=self._data_settings.nphotons.get_value(),
+            N=self._data_settings.N.get_value(),
+            C=self._data_settings.C.get_value(),
+            K=self._data_settings.K.get_value(),
+            K_quadrant=self._data_settings.K_quadrant.get_value(),
+            n_subsample=self._data_settings.n_subsample.get_value(),
+            subsample_seed=None,
+            grid_size=grid_size,
+            neighbor_function=self._data_settings.neighbor_function.get_value(),
+            min_neighbor_distance=self._data_settings.min_neighbor_distance.get_value(),
+            max_neighbor_distance=self._data_settings.max_neighbor_distance.get_value(),
+            scan_pattern=self._data_settings.scan_pattern.get_value(),
+            normalize=self._data_settings.normalize.get_value(),
+            probe_scale=self._data_settings.probe_scale.get_value(),
+            probe_normalize=self._data_settings.probe_normalize.get_value(),
+            probe_ramp_removal=self._data_settings.probe_ramp_removal.get_value(),
+            data_scaling=self._data_settings.data_scaling.get_value(),
+            phase_subtraction=self._data_settings.phase_subtraction.get_value(),
+            x_bounds=x_bounds,
+            y_bounds=y_bounds,
+        )
+        model_config = ModelConfig(
+            mode=self._model_settings.mode.get_value(),
+            intensity_scale_trainable=self._model_settings.intensity_scale_trainable.get_value(),
+            intensity_scale=self._model_settings.intensity_scale.get_value(),
+            max_position_jitter=self._model_settings.max_position_jitter.get_value(),
+            num_datasets=self._model_settings.num_datasets.get_value(),
+            C_model=self._model_settings.C_model.get_value(),
+            n_filters_scale=self._model_settings.n_filters_scale.get_value(),
+            amp_activation=self._model_settings.amp_activation.get_value(),
+            batch_norm=self._model_settings.batch_norm.get_value(),
+            probe_mask=None,  # FIXME
+            edge_pad=self._model_settings.edge_pad.get_value(),
+            decoder_last_c_outer_fraction=self._model_settings.decoder_last_c_outer_fraction.get_value(),
+            decoder_last_amp_channels=self._model_settings.decoder_last_amp_channels.get_value(),
+            use_shared_decoder=self._model_settings.use_shared_decoder.get_value(),
+            eca_encoder=self._model_settings.eca_encoder.get_value(),
+            cbam_encoder=self._model_settings.cbam_encoder.get_value(),
+            cbam_bottleneck=self._model_settings.cbam_bottleneck.get_value(),
+            cbam_decoder=self._model_settings.cbam_decoder.get_value(),
+            eca_decoder=self._model_settings.eca_decoder.get_value(),
+            spatial_decoder=self._model_settings.spatial_decoder.get_value(),
+            decoder_spatial_kernel=self._model_settings.decoder_spatial_kernel.get_value(),
+            object_big=self._model_settings.object_big.get_value(),
+            probe_big=self._model_settings.probe_big.get_value(),
+            offset=self._model_settings.offset.get_value(),
+            C_forward=self._model_settings.C_forward.get_value(),
+            pad_object=self._model_settings.pad_object.get_value(),
+            gaussian_smoothing_sigma=self._model_settings.gaussian_smoothing_sigma.get_value(),
+            loss_function=self._model_settings.loss_function.get_value(),
+            amp_loss=self._model_settings.amp_loss.get_value(),
+            phase_loss=self._model_settings.phase_loss.get_value(),
+            amp_loss_coeff=self._model_settings.amp_loss_coeff.get_value(),
+            phase_loss_coeff=self._model_settings.phase_loss_coeff.get_value(),
+            probe_reference_coeff=self._model_settings.probe_reference_coeff.get_value(),
+        )
+        training_config = TrainingConfig(
+            training_directories=[''],  # FIXME
+            nll=self._training_settings.nll.get_value(),
+            device=self._training_settings.device.get_value(),
+            strategy=self._training_settings.strategy.get_value(),
+            n_devices=self._training_settings.n_devices.get_value(),
+            framework=self._training_settings.framework.get_value(),
+            orchestrator=self._training_settings.orchestrator.get_value(),
+            learning_rate=self._training_settings.learning_rate.get_value(),
+            epochs=self._training_settings.epochs.get_value(),
+            batch_size=self._training_settings.batch_size.get_value(),
+            epochs_fine_tune=self._training_settings.epochs_fine_tune.get_value(),
+            fine_tune_gamma=self._training_settings.fine_tune_gamma.get_value(),
+            scheduler=self._training_settings.scheduler.get_value(),
+            num_workers=self._training_settings.num_workers.get_value(),
+            accum_steps=self._training_settings.accum_steps.get_value(),
+            gradient_clip_val=self._training_settings.gradient_clip_val.get_value(),
+            warmup_epochs=self._training_settings.lr_warmup_epochs.get_value(),
+            min_lr_ratio=self._training_settings.min_lr_ratio.get_value(),
+            stage_1_epochs=self._training_settings.stage_1_epochs.get_value(),
+            stage_2_epochs=self._training_settings.stage_2_epochs.get_value(),
+            stage_3_epochs=self._training_settings.stage_3_epochs.get_value(),
+            physics_weight_schedule=self._training_settings.physics_weight_schedule.get_value(),
+            stage_3_lr_factor=self._training_settings.stage_3_lr_factor.get_value(),
+            torch_loss_mode=self._training_settings.torch_loss_mode.get_value(),
+            experiment_name=self._training_settings.experiment_name.get_value(),
+            notes=self._training_settings.notes.get_value(),
+            model_name=self._training_settings.model_name.get_value(),
+            enable_staged_finetuning=self._training_settings.enable_staged_finetuning.get_value(),
+            finetune_stage1_epochs=self._training_settings.finetune_stage1_epochs.get_value(),
+            finetune_stage2_epochs=self._training_settings.finetune_stage2_epochs.get_value(),
+            finetune_stage3_epochs=self._training_settings.finetune_stage3_epochs.get_value(),
+            finetune_stage1_lr_decoder=self._training_settings.finetune_stage1_lr_decoder.get_value(),
+            finetune_stage2_lr_encoder_top=self._training_settings.finetune_stage2_lr_encoder_top.get_value(),
+            finetune_stage2_lr_decoder=self._training_settings.finetune_stage2_lr_decoder.get_value(),
+            finetune_stage2_lr_phase_head=self._training_settings.finetune_stage2_lr_phase_head.get_value(),
+            finetune_stage3_lr_encoder_bottom=self._training_settings.finetune_stage3_lr_encoder_bottom.get_value(),
+            finetune_stage3_lr_encoder_top=self._training_settings.finetune_stage3_lr_encoder_top.get_value(),
+            finetune_stage3_lr_decoder=self._training_settings.finetune_stage3_lr_decoder.get_value(),
+            finetune_stage3_lr_phase_head=self._training_settings.finetune_stage3_lr_phase_head.get_value(),
+            finetune_skip_stage3=self._training_settings.finetune_skip_stage3.get_value(),
+            finetune_early_stop_patience=self._training_settings.finetune_early_stop_patience.get_value(),
+            finetune_val_split=self._training_settings.finetune_val_split.get_value(),
+            output_dir=self._training_settings.output_dir.get_value(),
+            train_data_file='',  # FIXME
+            test_data_file='',  # FIXME
+            n_groups=self._training_settings.n_groups.get_value(),
+        )
+        inference_config = InferenceConfig(
+            middle_trim=self._inference_settings.middle_trim.get_value(),
+            batch_size=self._inference_settings.batch_size.get_value(),
+            experiment_number=self._inference_settings.experiment_number.get_value(),
+            pad_eval=self._inference_settings.pad_eval.get_value(),
+            window=self._inference_settings.window.get_value(),
+            patch_weighting=self._inference_settings.patch_weighting.get_value(),
+        )
+        datagen_config = DatagenConfig()
 
         return ConfigManager(
             data_config=data_config,

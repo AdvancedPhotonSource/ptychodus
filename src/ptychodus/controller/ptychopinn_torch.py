@@ -335,8 +335,8 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
             group=training_group,
         )
         builder.add_decimal_line_edit(
-            training_settings.lr_min_ratio,
-            'Learning Rate Min Ratio:',
+            training_settings.min_lr_ratio,
+            'Min Learning Rate Ratio:',
             tool_tip='Minimum learning rate ratio for WarmupCoside scheduler',
             group=training_group,
         )

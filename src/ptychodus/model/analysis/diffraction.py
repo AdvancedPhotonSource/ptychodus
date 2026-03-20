@@ -2,12 +2,12 @@ import numpy
 
 from ptychodus.api.diffraction import BadPixels, DiffractionIndexes, DiffractionPatterns
 from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.interpolate import BarycentricArrayInterpolator
 from ptychodus.api.io import AssembledDiffractionData
 from ptychodus.api.propagator import FraunhoferPropagator, PropagatorParameters
 
 from ..diffraction import AssembledDiffractionDataset
 from ..product import ProductRepository
-from .interpolators import BarycentricArrayInterpolator
 
 
 class DiffractionSimulator:
@@ -17,6 +17,7 @@ class DiffractionSimulator:
         self._repository = repository
 
     def simulate(self, product_index: int) -> None:
+        # FIXME call api method here
         product = self._repository[product_index].get_product()
         # TODO also support multislice
         interpolator = BarycentricArrayInterpolator(product.object_.get_layer(0))
@@ -71,6 +72,8 @@ class DiffractionSimulator:
                 patterns[index, :, :] += numpy.square(numpy.abs(wavefield))
 
             indexes[index] = object_position.index
+
+        # FIXME to api diffraction_gen; add poisson noise
 
         data = AssembledDiffractionData(indexes, patterns, pixel_geometry, bad_pixels)
         self._dataset.set_assembled_patterns(data)

@@ -39,6 +39,7 @@ class PtychoPINNTorchDataSettings(Observable, Observer):
         self.normalize = self._group.create_string_parameter('normalize', 'Batch')
         self.probe_scale = self._group.create_real_parameter('probe_scale', 4.0)
         self.probe_normalize = self._group.create_boolean_parameter('probe_normalize', True)
+        self.probe_ramp_removal = self._group.create_boolean_parameter('probe_ramp_removal', False)
         self.data_scaling = self._group.create_string_parameter('data_scaling', 'Parseval')
         # Only useful for supervised training dataset
         self.phase_subtraction = self._group.create_boolean_parameter('phase_subtraction', True)
@@ -108,6 +109,7 @@ class PtychoPINNTorchModelSettings(Observable, Observer):
         self.decoder_last_amp_channels = self._group.create_integer_parameter(
             'decoder_last_amp_channels', 1
         )
+        self.use_shared_decoder = self._group.create_boolean_parameter('use_shared_decoder', False)
 
         # Attention
         self.eca_encoder = self._group.create_boolean_parameter('eca_encoder', False)
@@ -151,6 +153,10 @@ class PtychoPINNTorchModelSettings(Observable, Observer):
         self.phase_loss = self._group.create_string_parameter('phase_loss', 'None')
         self.amp_loss_coeff = self._group.create_real_parameter('amp_loss_coeff', 1.0)
         self.phase_loss_coeff = self._group.create_real_parameter('phase_loss_coeff', 1.0)
+        # Probe reference loss coefficient (0.0 = disabled)
+        self.probe_reference_coeff = self._group.create_real_parameter(
+            'probe_reference_coeff', 0.0, minimum=0.0
+        )
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:
@@ -191,7 +197,7 @@ class PtychoPINNTorchTrainingSettings(Observable, Observer):
         # Number of warmup epochs for WarmupCosine scheduler
         self.lr_warmup_epochs = self._group.create_integer_parameter('lr_warmup_epochs', 0)
         # Minimum LR ratio for WarmupCosine scheduler (eta_min = base_lr * ratio)
-        self.lr_min_ratio = self._group.create_real_parameter('lr_min_ratio', 0.1)
+        self.min_lr_ratio = self._group.create_real_parameter('min_lr_ratio', 0.1)
         self.plateau_factor = self._group.create_real_parameter('plateau_factor', 0.5)
         self.plateau_patience = self._group.create_integer_parameter('plateau_patience', 2)
         self.plateau_min_lr = self._group.create_real_parameter('plateau_min_lr', 1e-4)
@@ -245,6 +251,67 @@ class PtychoPINNTorchTrainingSettings(Observable, Observer):
         self.notes = self._group.create_string_parameter('notes', '')
         self.model_name = self._group.create_string_parameter('model_name', 'PtychoPINNv2')
 
+        # Beta configs... fine tuning on experiments
+        # Fine-tuning configuration
+        self.enable_staged_finetuning = self._group.create_boolean_parameter(
+            'enable_staged_finetuning', False
+        )  # Master switch for synthetic→experimental transfer
+
+        # Stage durations (epochs)
+        self.finetune_stage1_epochs = self._group.create_integer_parameter(
+            'finetune_stage1_epochs', 7
+        )  # Decoder-only
+        self.finetune_stage2_epochs = self._group.create_integer_parameter(
+            'finetune_stage2_epochs', 7
+        )  # Partial encoder + decoder
+        self.finetune_stage3_epochs = self._group.create_integer_parameter(
+            'finetune_stage3_epochs', 5
+        )  # Full network (optional)
+
+        # Learning rate multipliers (relative to base_lr)
+        # Stage 1: Decoder-only
+        self.finetune_stage1_lr_decoder = self._group.create_real_parameter(
+            'finetune_stage1_lr_decoder', 0.1
+        )
+
+        # Stage 2: Partial encoder + decoder with discriminative LR
+        self.finetune_stage2_lr_encoder_top = self._group.create_real_parameter(
+            'finetune_stage2_lr_encoder_top', 0.01
+        )
+        self.finetune_stage2_lr_decoder = self._group.create_real_parameter(
+            'finetune_stage2_lr_decoder', 0.05
+        )
+        self.finetune_stage2_lr_phase_head = self._group.create_real_parameter(
+            'finetune_stage2_lr_phase_head', 0.1
+        )
+
+        # Stage 3: Full network with very conservative LR
+        self.finetune_stage3_lr_encoder_bottom = self._group.create_real_parameter(
+            'finetune_stage3_lr_encoder_bottom', 0.005
+        )
+        self.finetune_stage3_lr_encoder_top = self._group.create_real_parameter(
+            'finetune_stage3_lr_encoder_top', 0.01
+        )
+        self.finetune_stage3_lr_decoder = self._group.create_real_parameter(
+            'finetune_stage3_lr_decoder', 0.02
+        )
+        self.finetune_stage3_lr_phase_head = self._group.create_real_parameter(
+            'finetune_stage3_lr_phase_head', 0.05
+        )
+
+        # Stage control
+        self.finetune_skip_stage3 = self._group.create_boolean_parameter(
+            'finetune_skip_stage3', True
+        )  # Most cases won't need Stage 3
+        self.finetune_early_stop_patience = self._group.create_integer_parameter(
+            'finetune_early_stop_patience', 3
+        )  # Per-stage early stopping
+
+        # Validation split for fine-tuning (small experimental dataset)
+        self.finetune_val_split = self._group.create_real_parameter(
+            'finetune_val_split', 0.05
+        )  # 5% validation split
+
         # Lightning specific configs
         self.output_dir = self._group.create_string_parameter('output_dir', 'lightning_outputs')
 
@@ -271,6 +338,7 @@ class PtychoPINNTorchInferenceSettings(Observable, Observer):
         self.pad_eval = self._group.create_boolean_parameter('pad_eval', True)
         # Window padding around reconstruction due to edge errors
         self.window = self._group.create_integer_parameter('window', 20)
+        self.patch_weighting = self._group.create_string_parameter('patch_weighting', 'probe')
         # Emit patch stats during training/inference
         self.log_patch_stats = self._group.create_boolean_parameter('log_patch_stats', False)
         # Max number of batches to log

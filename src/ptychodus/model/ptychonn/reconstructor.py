@@ -9,6 +9,7 @@ import ptychonn
 
 from ptychodus.api.common import ComplexArrayType
 from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.interpolate import BarycentricArrayInterpolator, BarycentricArrayStitcher
 from ptychodus.api.object import Object
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import (
@@ -19,7 +20,6 @@ from ptychodus.api.reconstructor import (
     TrainableReconstructor,
 )
 
-from ..analysis import BarycentricArrayInterpolator, BarycentricArrayStitcher
 from .model import PtychoNNModelProvider
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 
