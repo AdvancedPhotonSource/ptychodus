@@ -66,8 +66,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
                 for reconstructor in ('DM', 'PIE', 'ePIE', 'rPIE', 'LSQML', 'Autodiff'):
                     self.reconstructor_list.append(NullReconstructor(reconstructor))
         else:
-            ptychi_version = version('ptychi')
-            logger.info(f'Pty-Chi {ptychi_version}')
+            logger.info('Pty-Chi ' + version('ptychi'))
 
             options_helper = PtyChiOptionsHelper(
                 self.settings,

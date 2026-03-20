@@ -5,8 +5,8 @@ import queue
 from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import DiffractionAPI
-from ..product import ProductAPI
 from ..processing import ProcessingAPI
+from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .authorizer import GlobusAuthorizer
 from .client import FakeGlobusClient, GlobusClient, GlobusStatus
@@ -32,14 +32,12 @@ class GlobusCore:
         self.authorizer = GlobusAuthorizer()
 
         try:
-            from ._globus_client import RealGlobusClient
+            from .globus import RealGlobusClient
         except ModuleNotFoundError:
             logger.info('Globus not found.')
             self._client: GlobusClient = FakeGlobusClient()
         else:
             logger.info('Globus SDK ' + version('globus-sdk'))
-            logger.info('Fair Research Login ' + version('fair-research-login'))
-            logger.info('Gladier ' + version('gladier'))
             self._client = RealGlobusClient(task_manager, self.settings, self.authorizer, status_q)
 
         self.status_repository = GlobusStatusRepository(self.settings, self._client, status_q)

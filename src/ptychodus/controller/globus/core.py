@@ -67,13 +67,13 @@ class GlobusController(SequenceObserver[GlobusStatus]):
         self._settings = settings
         self._view = view
         self._auth_controller = GlobusAuthorizationController(authorizer, view)
-        self._compute_data_posix_path_controller = PathLineEditParameterViewController(
-            settings.compute_data_posix_path,
-            tool_tip='POSIX path on the compute endpoint where data will be stored.',
+        self._compute_collection_posix_path_controller = PathLineEditParameterViewController(
+            settings.compute_collection_posix_path,
+            tool_tip='POSIX path on the compute collection where data will be stored.',
         )
-        self._output_data_posix_path_controller = PathLineEditParameterViewController(
-            settings.output_data_posix_path,
-            tool_tip='POSIX path on the output data endpoint where data will be stored.',
+        self._output_collection_posix_path_controller = PathLineEditParameterViewController(
+            settings.output_collection_posix_path,
+            tool_tip='POSIX path on the output collection where data will be stored.',
         )
         self._status_controller = GlobusStatusViewController(
             settings.status_auto_refresh, settings.status_refresh_interval_s, status_repository
@@ -94,13 +94,13 @@ class GlobusController(SequenceObserver[GlobusStatus]):
 
         input_data_group = 'Input Data'
         view_builder.add_uuid_line_edit(
-            settings.input_data_endpoint_id, 'Endpoint ID:', group=input_data_group
+            settings.input_collection_id, 'Collection ID:', group=input_data_group
         )
         view_builder.add_line_edit(
-            settings.input_data_globus_path, 'Globus Path:', group=input_data_group
+            settings.input_collection_globus_path, 'Globus Path:', group=input_data_group
         )
         view_builder.add_directory_chooser(
-            settings.input_data_posix_path, 'POSIX Path:', group=input_data_group
+            settings.input_collection_posix_path, 'POSIX Path:', group=input_data_group
         )
 
         compute_group = 'Compute'
@@ -108,24 +108,24 @@ class GlobusController(SequenceObserver[GlobusStatus]):
             settings.compute_endpoint_id, 'Compute Endpoint ID:', group=compute_group
         )
         view_builder.add_uuid_line_edit(
-            settings.compute_data_endpoint_id, 'Data Endpoint ID:', group=compute_group
+            settings.compute_collection_id, 'Collection ID:', group=compute_group
         )
         view_builder.add_line_edit(
-            settings.compute_data_globus_path, 'Data Globus Path:', group=compute_group
+            settings.compute_collection_globus_path, 'Collection Globus Path:', group=compute_group
         )
         view_builder.add_view_controller(
-            self._compute_data_posix_path_controller, 'Data POSIX Path:', group=compute_group
+            self._compute_collection_posix_path_controller, 'Collection POSIX Path:', group=compute_group
         )
 
         output_data_group = 'Output Data'
         view_builder.add_uuid_line_edit(
-            settings.output_data_endpoint_id, 'Endpoint ID:', group=output_data_group
+            settings.output_collection_id, 'Collection ID:', group=output_data_group
         )
         view_builder.add_line_edit(
-            settings.output_data_globus_path, 'Globus Path:', group=output_data_group
+            settings.output_collection_globus_path, 'Globus Path:', group=output_data_group
         )
         view_builder.add_view_controller(
-            self._output_data_posix_path_controller, 'POSIX Path:', group=output_data_group
+            self._output_collection_posix_path_controller, 'POSIX Path:', group=output_data_group
         )
 
         view_builder.add_view_controller_to_bottom(self._status_controller)

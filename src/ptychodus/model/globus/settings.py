@@ -26,27 +26,31 @@ class GlobusSettings(Observable, Observer):
             'TransferSyncLevel', 3, minimum=0, maximum=3
         )
 
-        self.input_data_endpoint_id = self._group.create_uuid_parameter(
-            'InputDataEndpointID', UUID(int=0)
+        self.input_collection_id = self._group.create_uuid_parameter(
+            'InputCollectionID', UUID(int=0)
         )
-        self.input_data_globus_path = self._group.create_string_parameter(
-            'InputDataGlobusPath', '/~/path/to/input/data'
+        self.input_collection_globus_path = self._group.create_string_parameter(
+            'InputCollectionGlobusPath', '/~/path/to/input/data'
         )
-        self.input_data_posix_path = self._group.create_path_parameter(
-            'InputDataPosixPath', Path('/path/to/input/data')
+        self.input_collection_posix_path = self._group.create_path_parameter(
+            'InputCollectionPosixPath', Path('/path/to/input/data')
         )
 
         self.compute_endpoint_id = self._group.create_uuid_parameter(
             'ComputeEndpointID', UUID(int=0)
         )
-        self.compute_data_endpoint_id = self._group.create_uuid_parameter(
-            'ComputeDataEndpointID', UUID(int=0)
+        self.compute_function_id = self._group.create_uuid_parameter(
+            'ComputeFunctionID', UUID(int=0)
         )
-        self.compute_data_globus_path = self._group.create_string_parameter(
-            'ComputeDataGlobusPath', '/~/path/to/compute/data'
+        self.compute_flow_id = self._group.create_uuid_parameter('ComputeFlowID', UUID(int=0))
+        self.compute_collection_id = self._group.create_uuid_parameter(
+            'ComputeCollectionID', UUID(int=0)
         )
-        self.compute_data_posix_path = self._group.create_path_parameter(
-            'ComputeDataPosixPath', Path('/path/to/compute/data')
+        self.compute_collection_globus_path = self._group.create_string_parameter(
+            'ComputeCollectionGlobusPath', '/~/path/to/compute/data'
+        )
+        self.compute_collection_posix_path = self._group.create_path_parameter(
+            'ComputeCollectionPosixPath', Path('/path/to/compute/data')
         )
 
         self.status_auto_refresh = self._group.create_boolean_parameter('StatusAutoRefresh', False)
@@ -54,14 +58,14 @@ class GlobusSettings(Observable, Observer):
             'StatusRefreshIntervalInSeconds', 30, minimum=10, maximum=86400
         )
 
-        self.output_data_endpoint_id = self._group.create_uuid_parameter(
-            'OutputDataEndpointID', UUID(int=0)
+        self.output_collection_id = self._group.create_uuid_parameter(
+            'OutputCollectionID', UUID(int=0)
         )
-        self.output_data_globus_path = self._group.create_string_parameter(
-            'OutputDataGlobusPath', '/~/path/to/output/data'
+        self.output_collection_globus_path = self._group.create_string_parameter(
+            'OutputCollectionGlobusPath', '/~/path/to/output/data'
         )
-        self.output_data_posix_path = self._group.create_path_parameter(
-            'OutputDataPosixPath', Path('/path/to/output/data')
+        self.output_collection_posix_path = self._group.create_path_parameter(
+            'OutputCollectionPosixPath', Path('/path/to/output/data')
         )
 
     def _update(self, observable: Observable) -> None:

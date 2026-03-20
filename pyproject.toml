@@ -31,7 +31,7 @@ ptychodus-bdp = "ptychodus.ptychodus_bdp:main"
 ptychodus-ptychopinn-tf-test = "ptychodus.scripts.ptychopinn_tf_test:main"
 
 [project.optional-dependencies]
-globus = ["gladier", "gladier-tools>=0.5.4"]
+globus = ["globus-sdk"]
 gui = ["PyQt5"]
 #ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
 ptychi = ["ptychi==1.*,>=1.2.0"]
@@ -46,14 +46,9 @@ where = ["src"]
 
 [[tool.mypy.overrides]]
 module = [
-    "fair_research_login",
-    "funcx_endpoint.*",
-    "gladier.*",
-    "globus_sdk.*",
     "h5py",
     "hdf5plugin",
     "lightning",
-    "parsl.*",
     "ptychi.*",
     "ptycho.*",
     "ptychonn.*",
