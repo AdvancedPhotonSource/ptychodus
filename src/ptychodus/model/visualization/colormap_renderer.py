@@ -5,6 +5,7 @@ from matplotlib.colors import Normalize
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.visualization import (
+    ComplexComponent,
     NumberArrayType,
     RealArrayType,
     VisualizationProduct,
@@ -12,7 +13,6 @@ from ptychodus.api.visualization import (
 
 from .color_axis import ColorAxis
 from .colormap import ColormapParameter
-from .components import DataArrayComponent
 from .renderer import Renderer
 from .transformation import ScalarTransformationParameter
 
@@ -20,7 +20,7 @@ from .transformation import ScalarTransformationParameter
 class ColormapRenderer(Renderer):
     def __init__(
         self,
-        component: DataArrayComponent,
+        component: ComplexComponent,
         transformation: ScalarTransformationParameter,
         color_axis: ColorAxis,
         colormap: ColormapParameter,
@@ -54,8 +54,9 @@ class ColormapRenderer(Renderer):
         return scalar_mappable.to_rgba(values_transformed)
 
     def colorize(self, array: NumberArrayType) -> RealArrayType:
-        values = self._component.calculate(array)
-        values_transformed = self._transformation.transform(values)
+        values = self._component.extract_component(array)
+        transform = self._transformation.get_strategy()
+        values_transformed = transform.transform(values)
         return self._colorize(values_transformed)
 
     def render(
@@ -65,8 +66,9 @@ class ColormapRenderer(Renderer):
         *,
         autoscale_color_axis: bool,
     ) -> VisualizationProduct:
-        values = self._component.calculate(array)
-        values_transformed = self._transformation.transform(values)
+        values = self._component.extract_component(array)
+        transform = self._transformation.get_strategy()
+        values_transformed = transform.transform(values)
 
         if autoscale_color_axis:
             self._color_axis.set_to_data_range(values_transformed)
@@ -74,7 +76,7 @@ class ColormapRenderer(Renderer):
         rgba = self._colorize(values_transformed)
 
         return VisualizationProduct(
-            value_label=self._transformation.decorate_text(self._component.name),
+            value_label=transform.decorate_text(self._component.name),
             values=array,
             rgba=rgba,
             pixel_geometry=pixel_geometry,

@@ -1,11 +1,13 @@
-"""Visualization data containers for plots, line cuts, and colorized image products."""
-
 from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+from enum import Enum, auto
+from typing import Any
 from typing import Final
 
 from scipy.stats import gaussian_kde
+from skimage.restoration import unwrap_phase
+import matplotlib.colors
 import numpy
 
 from .common import NumberArrayType, RealArrayType
@@ -220,3 +222,151 @@ class VisualizationProduct:
             values = numpy.absolute(values)
 
         return KernelDensityEstimate(values.min(), values.max(), gaussian_kde(values))
+
+
+def hsva_to_rgba(
+    hue: RealArrayType, saturation: RealArrayType, value: RealArrayType, alpha: RealArrayType
+) -> RealArrayType:
+    hsv = numpy.stack((hue, saturation, value), axis=-1)
+    rgb = matplotlib.colors.hsv_to_rgb(hsv)
+
+    if alpha.ndim == 1:
+        return numpy.column_stack((rgb, alpha))
+
+    return numpy.dstack((rgb, alpha))
+
+
+def _v(m1: RealArrayType, m2: RealArrayType, hue: RealArrayType) -> RealArrayType:
+    """Adapted from colorsys._v in the Python standard library."""
+    if m1.shape != hue.shape or m2.shape != hue.shape:
+        raise ValueError('Shape mismatch: m1, m2, and hue must have the same shape.')
+
+    hue = hue % 1.0
+
+    return numpy.select(
+        [hue < 1.0 / 6.0, hue < 0.5, hue < 2.0 / 3.0],
+        [m1 + (m2 - m1) * hue * 6.0, m2, m1 + (m2 - m1) * (2.0 / 3.0 - hue) * 6.0],
+        default=m1,
+    )
+
+
+def hlsa_to_rgba(
+    hue: RealArrayType, lightness: RealArrayType, saturation: RealArrayType, alpha: RealArrayType
+) -> RealArrayType:
+    """Adapted from colorsys.hls_to_rgb in the Python standard library."""
+    one_third: Final[float] = 1.0 / 3.0
+
+    m2 = numpy.where(
+        lightness <= 0.5,
+        lightness * (1.0 + saturation),
+        lightness + saturation - (lightness * saturation),
+    )
+    m1 = 2.0 * lightness - m2
+
+    red = numpy.where(saturation > 0.0, _v(m1, m2, hue + one_third), lightness)
+    green = numpy.where(saturation > 0.0, _v(m1, m2, hue), lightness)
+    blue = numpy.where(saturation > 0.0, _v(m1, m2, hue - one_third), lightness)
+
+    return numpy.stack((red, green, blue, alpha), axis=-1)
+
+
+class ComplexComponent(Enum):
+    REAL = auto()
+    IMAGINARY = auto()
+    AMPLITUDE = auto()
+    PHASE_RAD = auto()
+    UNWRAPPED_PHASE_RAD = auto()
+
+    @property
+    def is_cyclic(self) -> bool:
+        return self is ComplexComponent.PHASE_RAD
+
+    def extract_component(
+        self,
+        array: NumberArrayType,
+        dtype: numpy.dtype[numpy.floating[Any]] = numpy.dtype(numpy.single),
+    ) -> RealArrayType:
+        match self:
+            case ComplexComponent.REAL:
+                return numpy.real(array).astype(dtype)
+            case ComplexComponent.IMAGINARY:
+                return numpy.imag(array).astype(dtype)
+            case ComplexComponent.AMPLITUDE:
+                return numpy.absolute(array).astype(dtype)
+            case ComplexComponent.PHASE_RAD:
+                return numpy.angle(array).astype(dtype)
+            case ComplexComponent.UNWRAPPED_PHASE_RAD:
+                phase_rad = numpy.angle(array).astype(dtype)
+                return unwrap_phase(phase_rad)
+
+
+class ScalarTransformation(Enum):
+    IDENTITY = auto()
+    SQRT = auto()
+    LOG2 = auto()
+    LOG = auto()
+    LOG10 = auto()
+
+    def decorate_text(self, text: str) -> str:
+        match self:
+            case ScalarTransformation.SQRT:
+                return f'$\\sqrt{{\\mathrm{{{text}}}}}$'
+            case ScalarTransformation.LOG2:
+                return f'$\\log_2{{\\left(\\mathrm{{{text}}}\\right)}}$'
+            case ScalarTransformation.LOG:
+                return f'$\\ln{{\\left(\\mathrm{{{text}}}\\right)}}$'
+            case ScalarTransformation.LOG10:
+                return f'$\\log_{{10}}{{\\left(\\mathrm{{{text}}}\\right)}}$'
+
+        return text
+
+    def transform(self, array: RealArrayType) -> RealArrayType:
+        nil = numpy.zeros_like(array)
+
+        match self:
+            case ScalarTransformation.SQRT:
+                return numpy.sqrt(array, out=nil, where=(array > 0))
+            case ScalarTransformation.LOG2:
+                return numpy.log2(array, out=nil, where=(array > 0))
+            case ScalarTransformation.LOG:
+                return numpy.log(array, out=nil, where=(array > 0))
+            case ScalarTransformation.LOG10:
+                return numpy.log10(array, out=nil, where=(array > 0))
+
+        return array
+
+
+class CylindricalColorModel(Enum):
+    HSV_SATURATION = auto()
+    HSV_VALUE = auto()
+    HSV_ALPHA = auto()
+    HLS_LIGHTNESS = auto()
+    HLS_SATURATION = auto()
+    HLS_ALPHA = auto()
+
+    @property
+    def simple_name(self) -> str:
+        hxx, variant = self.name.split('_')
+        return f'{hxx}-{variant[0]}'
+
+    @property
+    def display_name(self) -> str:
+        hxx, variant = self.name.split('_')
+        return f'{hxx} {variant.title()}'
+
+    def render_rgba(self, hue: RealArrayType, x: RealArrayType) -> RealArrayType:
+        ones = numpy.ones_like(hue)
+
+        match self:
+            case CylindricalColorModel.HSV_SATURATION:
+                return hsva_to_rgba(hue, x, ones, ones)
+            case CylindricalColorModel.HSV_VALUE:
+                return hsva_to_rgba(hue, ones, x, ones)
+            case CylindricalColorModel.HSV_ALPHA:
+                return hsva_to_rgba(hue, ones, ones, x)
+            case CylindricalColorModel.HLS_LIGHTNESS:
+                return hlsa_to_rgba(hue, x, ones, ones)
+            case CylindricalColorModel.HLS_SATURATION:
+                return hlsa_to_rgba(hue, ones / 2.0, x, ones)
+            case CylindricalColorModel.HLS_ALPHA:
+                return hlsa_to_rgba(hue, ones / 2.0, ones, x)
