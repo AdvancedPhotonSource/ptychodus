@@ -114,7 +114,9 @@ class GlobusController(SequenceObserver[GlobusStatus]):
             settings.compute_collection_globus_path, 'Collection Globus Path:', group=compute_group
         )
         view_builder.add_view_controller(
-            self._compute_collection_posix_path_controller, 'Collection POSIX Path:', group=compute_group
+            self._compute_collection_posix_path_controller,
+            'Collection POSIX Path:',
+            group=compute_group,
         )
 
         output_data_group = 'Output Data'

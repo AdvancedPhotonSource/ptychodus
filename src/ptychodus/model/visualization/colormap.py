@@ -7,24 +7,21 @@ import matplotlib
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import Parameter
 from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.visualization import cyclic_cmap_names, linear_cmap_names
 
 
 class ColormapParameter(Parameter[str], Observer):
-    # See https://matplotlib.org/stable/gallery/color/colormap_reference.html
-    CYCLIC_COLORMAPS: Final[tuple[str, ...]] = ('hsv', 'twilight', 'twilight_shifted')
-
     def __init__(self, *, is_cyclic: bool) -> None:
         super().__init__()
         self._is_cyclic = is_cyclic
         self._chooser = PluginChooser[Colormap]()
+        cmap_name_it = cyclic_cmap_names() if is_cyclic else linear_cmap_names()
 
-        for name, cmap in matplotlib.colormaps.items():
-            is_cyclic_colormap = name in ColormapParameter.CYCLIC_COLORMAPS
+        for name in cmap_name_it:
+            cmap = matplotlib.cm.get_cmap(f'cet_{name}')
+            self._chooser.register_plugin(cmap, display_name=name)
 
-            if is_cyclic == is_cyclic_colormap:
-                self._chooser.register_plugin(cmap, display_name=name)
-
-        self.set_value('hsv' if is_cyclic else 'gray')
+        self.set_value('colorwheel' if is_cyclic else 'gray')
         self._chooser.add_observer(self)
 
     def choices(self) -> Iterator[str]:

@@ -7,6 +7,7 @@ from typing import Final
 
 from scipy.stats import gaussian_kde
 from skimage.restoration import unwrap_phase
+import colorcet
 import matplotlib.colors
 import numpy
 
@@ -370,3 +371,23 @@ class CylindricalColorModel(Enum):
                 return hlsa_to_rgba(hue, ones / 2.0, x, ones)
             case CylindricalColorModel.HLS_ALPHA:
                 return hlsa_to_rgba(hue, ones / 2.0, ones, x)
+
+
+def linear_cmap_names() -> Iterator[str]:
+    for original_name in colorcet.all_original_names(group='linear', not_group='diverging'):
+        try:
+            cmap_aliases = colorcet.aliases[original_name]
+        except KeyError:
+            yield original_name
+        else:
+            yield cmap_aliases[0]
+
+
+def cyclic_cmap_names() -> Iterator[str]:
+    for original_name in colorcet.all_original_names(group='cyclic'):
+        try:
+            cmap_aliases = colorcet.aliases[original_name]
+        except KeyError:
+            yield original_name
+        else:
+            yield cmap_aliases[0]

@@ -51,11 +51,12 @@ def configure_logger(*, log_level: int) -> None:
     )
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
-    logger.info(f'Ptychodus {version("ptychodus")}')
-    logger.info(f'NumPy {version("numpy")}')
-    logger.info(f'Matplotlib {version("matplotlib")}')
-    logger.info(f'HDF5Plugin {version("hdf5plugin")}')
-    logger.info(f'H5Py {version("h5py")}')
+    logger.info('Ptychodus ' + version('ptychodus'))
+    logger.info('NumPy ' + version('numpy'))
+    logger.info('Matplotlib ' + version('matplotlib'))
+    logger.info('Colorcet ' + version('colorcet'))
+    logger.info('HDF5Plugin ' + version('hdf5plugin'))
+    logger.info('H5Py ' + version('h5py'))
     logger.info(f'HDF5 {h5py.version.hdf5_version}')
 
 

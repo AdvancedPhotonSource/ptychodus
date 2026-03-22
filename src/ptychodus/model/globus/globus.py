@@ -2,7 +2,6 @@ from __future__ import annotations
 from datetime import datetime
 from pprint import pformat
 from typing import Final
-from uuid import UUID
 import json
 import logging
 import os
@@ -52,10 +51,10 @@ def uses_data_access(transfer_client: globus_sdk.TransferClient, collection_id: 
 #             transfer_client.add_app_data_access_scope(SRC_COLLECTION)
 #         if uses_data_access(transfer_client, DST_COLLECTION):
 #             transfer_client.add_app_data_access_scope(DST_COLLECTION)
-# 
+#
 #         transfer_request = globus_sdk.TransferData(SRC_COLLECTION, DST_COLLECTION)
 #         transfer_request.add_item(SRC_PATH, DST_PATH)
-# 
+#
 #         task = transfer_client.submit_transfer(transfer_request)
 #         print(f'Submitted transfer. Task ID: {task["task_id"]}.')
 # FIXME END
@@ -208,6 +207,17 @@ class GlobusClientThread(threading.Thread):
             request_refresh_tokens=login_flow_manager.request_refresh_tokens,
         )
         self._globus_app = create_globus_app(config)
+
+        # FIXME BEGIN
+        # flow_id = ...
+        # COLLECTION_ID = ...
+        # app = UserApp("myapp", client_id=NATIVE_APP_CLIENT_ID)
+        # client = SpecificFlowClient(FLOW_ID, app=app).add_app_transfer_data_access_scope(
+        #    COLLECTION_ID
+        # )
+
+        # client.run_flow({"collection": COLLECTION_ID})
+        # FIXME END
 
     def _get_current_action(self, run_id: str) -> str:
         status = self._gladier_client.get_status(run_id)

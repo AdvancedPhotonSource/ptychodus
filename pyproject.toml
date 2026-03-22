@@ -47,6 +47,8 @@ where = ["src"]
 
 [[tool.mypy.overrides]]
 module = [
+    "colorcet",
+    "globus_sdk.*",
     "h5py",
     "hdf5plugin",
     "lightning",

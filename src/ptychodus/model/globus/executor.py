@@ -78,10 +78,11 @@ class GlobusExecutor:
             f'{self._settings.output_collection_globus_path.get_value()}/{flow_label}'
         )
 
+        # FIXME kwargs to schema
         flow_input = {
-            'input_data_transfer': {
+            'transfer_input_data': {
                 'source': {
-                    'id': str(self._settings.input_data_collection_id.get_value()),
+                    'id': str(self._settings.input_collection_id.get_value()),
                     'path': input_data_globus_path,
                 },
                 'destination': {
@@ -100,7 +101,7 @@ class GlobusExecutor:
                     'output_directory': str(compute_data_posix_path),
                 },
             },
-            'output_data_transfer': {
+            'transfer_output_data': {
                 'source': {
                     'id': str(self._settings.compute_collection_id.get_value()),
                     'path': compute_data_globus_path,
