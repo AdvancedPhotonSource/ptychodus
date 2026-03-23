@@ -1,5 +1,7 @@
 import logging
 
+import numpy
+
 from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import AssembledDiffractionDataset
@@ -19,12 +21,13 @@ logger = logging.getLogger(__name__)
 class AnalysisCore:
     def __init__(
         self,
+        rng: numpy.random.Generator,
         settings_registry: SettingsRegistry,
         dataset: AssembledDiffractionDataset,
         product_repository: ProductRepository,
         object_repository: ObjectRepository,
     ) -> None:
-        self.diffraction_simulator = DiffractionSimulator(dataset, product_repository)
+        self.diffraction_simulator = DiffractionSimulator(rng, dataset, product_repository)
         self._probe_propagation_settings = ProbePropagationSettings(settings_registry)
         self.probe_propagator = ProbePropagator(
             self._probe_propagation_settings, product_repository

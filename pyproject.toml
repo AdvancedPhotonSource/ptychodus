@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=80", "setuptools_scm[simple]>=8"]
+requires = ["setuptools>=80", "setuptools-scm[simple]>=9.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -36,6 +36,10 @@ globus = ["globus-sdk"]
 gui = ["PyQt5"]
 #ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
 ptychi = ["ptychi==1.*,>=1.2.0"]
+ptychopinn = ["ptychopinn[torch]"]
+
+[tool.uv.sources]
+ptychopinn = { path = "../PtychoPINN", editable = true }
 
 [tool.setuptools.package-data]
 "ptychodus" = ["py.typed"]
@@ -54,6 +58,7 @@ module = [
     "lightning",
     "ptychi.*",
     "ptycho.*",
+    "ptycho_torch.*",
     "ptychonn.*",
     "pvaccess",
     "pvapy.*",

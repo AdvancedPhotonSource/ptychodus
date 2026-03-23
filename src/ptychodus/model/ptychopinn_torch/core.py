@@ -1,55 +1,52 @@
+from __future__ import annotations
 from collections.abc import Iterator
-from importlib.metadata import PackageNotFoundError, version
+from importlib.metadata import version
 import logging
 
-from ptychodus.api.reconstructor import (
+from ...api.reconstructor import (
     NullReconstructor,
     Reconstructor,
     ReconstructorLibrary,
     TrainableReconstructor,
 )
-from ptychodus.api.settings import SettingsRegistry
-
-from .enums import PtychoPINNEnumerators
+from ...api.settings import SettingsRegistry
 from .settings import (
-    PtychoPINNInferenceSettings,
-    PtychoPINNModelSettings,
-    PtychoPINNTrainingSettings,
+    PtychoPINNTorchDataSettings,
+    PtychoPINNTorchInferenceSettings,
+    PtychoPINNTorchModelSettings,
+    PtychoPINNTorchTrainingSettings,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
+class PtychoPINNTorchReconstructorLibrary(ReconstructorLibrary):
     def __init__(
         self, settings_registry: SettingsRegistry, is_developer_mode_enabled: bool
     ) -> None:
-        super().__init__('ptychopinn')
-        self.model_settings = PtychoPINNModelSettings(settings_registry)
-        self.training_settings = PtychoPINNTrainingSettings(settings_registry)
-        self.inference_settings = PtychoPINNInferenceSettings(settings_registry)
-        self.enumerators = PtychoPINNEnumerators()
+        super().__init__('ptychopinn-torch')
+        self.data_settings = PtychoPINNTorchDataSettings(settings_registry)
+        self.model_settings = PtychoPINNTorchModelSettings(settings_registry)
+        self.training_settings = PtychoPINNTorchTrainingSettings(settings_registry)
+        self.inference_settings = PtychoPINNTorchInferenceSettings(settings_registry)
         self._reconstructors: list[TrainableReconstructor] = list()
 
         try:
-            from .reconstructor import PtychoPINNTrainableReconstructor
+            from .reconstructor import PtychoPINNTorchTrainableReconstructor
         except ModuleNotFoundError:
-            logger.info('PtychoPINN not found.')
+            logger.info('PtychoPINN-Torch not found.')
 
             if is_developer_mode_enabled:
                 for reconstructor in ('PINN', 'Supervised'):
                     self._reconstructors.append(NullReconstructor(reconstructor))
         else:
-            try:
-                ptychopinn_version = version('ptychopinn')
-            except PackageNotFoundError:
-                ptychopinn_version = version('ptycho')
-
-            logger.info(f'PtychoPINN {ptychopinn_version}')
+            ptychopinn_torch_version = version('ptychopinn')
+            logger.info(f'PtychoPINN-Torch {ptychopinn_torch_version}')
 
             self._reconstructors.append(
-                PtychoPINNTrainableReconstructor(
-                    'PINN',
+                PtychoPINNTorchTrainableReconstructor(
+                    'Unsupervised',
+                    self.data_settings,
                     self.model_settings,
                     self.inference_settings,
                     self.training_settings,
@@ -57,8 +54,9 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
                 )
             )
             self._reconstructors.append(
-                PtychoPINNTrainableReconstructor(
+                PtychoPINNTorchTrainableReconstructor(
                     'Supervised',
+                    self.data_settings,
                     self.model_settings,
                     self.inference_settings,
                     self.training_settings,
@@ -68,7 +66,7 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
 
     @property
     def name(self) -> str:
-        return 'PtychoPINN'
+        return 'PtychoPINN-Torch'
 
     def __iter__(self) -> Iterator[Reconstructor]:
         return iter(self._reconstructors)

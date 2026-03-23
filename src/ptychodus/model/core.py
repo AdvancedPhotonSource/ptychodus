@@ -30,11 +30,12 @@ from .fluorescence import FluorescenceCore
 from .globus import GlobusCore
 from .memory import MemoryPresenter
 from .metadata import MetadataPresenter
+from .processing import ProcessingCore
 from .product import PositionsStreamingContext, ProductCore
 from .ptychi import PtyChiReconstructorLibrary
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopinn import PtychoPINNReconstructorLibrary
-from .processing import ProcessingCore
+from .ptychopinn_torch import PtychoPINNTorchReconstructorLibrary
 from .task_manager import TaskManager
 from .visualization import VisualizationEngine
 from .workflow import ConcreteWorkflowAPI
@@ -150,6 +151,9 @@ class ModelCore:
         self.ptychopinn_reconstructor_library = PtychoPINNReconstructorLibrary(
             self.settings_registry, self.is_developer_mode_enabled
         )
+        self.ptychopinn_torch_reconstructor_library = PtychoPINNTorchReconstructorLibrary(
+            self.settings_registry, self.is_developer_mode_enabled
+        )
         self.processing_core = ProcessingCore(
             self._task_manager,
             self.settings_registry,
@@ -159,6 +163,7 @@ class ModelCore:
                 self.ptychi_reconstructor_library,
                 self.ptychonn_reconstructor_library,
                 self.ptychopinn_reconstructor_library,
+                self.ptychopinn_torch_reconstructor_library,
             ],
         )
         self.fluorescence_core = FluorescenceCore(
@@ -170,6 +175,7 @@ class ModelCore:
             self.plugin_registry.fluorescence_file_writers,
         )
         self.analysis_core = AnalysisCore(
+            self.rng,
             self.settings_registry,
             self.diffraction_core.dataset,
             self.product_core.product_repository,
