@@ -4,15 +4,19 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any
 from typing import Final
+import logging
 
+from matplotlib.colors import Colormap, hsv_to_rgb
 from scipy.stats import gaussian_kde
 from skimage.restoration import unwrap_phase
 import colorcet
-import matplotlib.colors
+import matplotlib
 import numpy
 
-from .common import NumberArrayType, RealArrayType
+from .common import ComplexArrayType, NumberArrayType, RealArrayType
 from .geometry import Box2D, Interval, Line2D, PixelGeometry
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -84,6 +88,7 @@ class VisualizationProduct:
         values: NumberArrayType,
         rgba: RealArrayType,
         pixel_geometry: PixelGeometry,
+        color_value_range: Interval[float],
     ) -> None:
         if values.ndim != 2:
             raise ValueError(f'Values must be a 2-dimensional ndarray (actual={values.ndim}).')
@@ -102,6 +107,8 @@ class VisualizationProduct:
         self._rgba = rgba
         self._pixel_width_m = pixel_geometry.width_m
         self._pixel_height_m = pixel_geometry.height_m
+        self._color_value_min = color_value_range.lower
+        self._color_value_max = color_value_range.upper
 
     def get_value_label(self) -> str:
         return self._value_label
@@ -117,6 +124,9 @@ class VisualizationProduct:
             width_m=self._pixel_width_m,
             height_m=self._pixel_height_m,
         )
+
+    def get_color_value_range(self) -> Interval[float]:
+        return Interval[float](self._color_value_min, self._color_value_max)
 
     @staticmethod
     def _intersect_bounding_box(begin: float, end: float, n: int) -> Interval[float]:
@@ -225,52 +235,6 @@ class VisualizationProduct:
         return KernelDensityEstimate(values.min(), values.max(), gaussian_kde(values))
 
 
-def hsva_to_rgba(
-    hue: RealArrayType, saturation: RealArrayType, value: RealArrayType, alpha: RealArrayType
-) -> RealArrayType:
-    hsv = numpy.stack((hue, saturation, value), axis=-1)
-    rgb = matplotlib.colors.hsv_to_rgb(hsv)
-
-    if alpha.ndim == 1:
-        return numpy.column_stack((rgb, alpha))
-
-    return numpy.dstack((rgb, alpha))
-
-
-def _v(m1: RealArrayType, m2: RealArrayType, hue: RealArrayType) -> RealArrayType:
-    """Adapted from colorsys._v in the Python standard library."""
-    if m1.shape != hue.shape or m2.shape != hue.shape:
-        raise ValueError('Shape mismatch: m1, m2, and hue must have the same shape.')
-
-    hue = hue % 1.0
-
-    return numpy.select(
-        [hue < 1.0 / 6.0, hue < 0.5, hue < 2.0 / 3.0],
-        [m1 + (m2 - m1) * hue * 6.0, m2, m1 + (m2 - m1) * (2.0 / 3.0 - hue) * 6.0],
-        default=m1,
-    )
-
-
-def hlsa_to_rgba(
-    hue: RealArrayType, lightness: RealArrayType, saturation: RealArrayType, alpha: RealArrayType
-) -> RealArrayType:
-    """Adapted from colorsys.hls_to_rgb in the Python standard library."""
-    one_third: Final[float] = 1.0 / 3.0
-
-    m2 = numpy.where(
-        lightness <= 0.5,
-        lightness * (1.0 + saturation),
-        lightness + saturation - (lightness * saturation),
-    )
-    m1 = 2.0 * lightness - m2
-
-    red = numpy.where(saturation > 0.0, _v(m1, m2, hue + one_third), lightness)
-    green = numpy.where(saturation > 0.0, _v(m1, m2, hue), lightness)
-    blue = numpy.where(saturation > 0.0, _v(m1, m2, hue - one_third), lightness)
-
-    return numpy.stack((red, green, blue, alpha), axis=-1)
-
-
 class ComplexComponent(Enum):
     REAL = auto()
     IMAGINARY = auto()
@@ -337,6 +301,165 @@ class ScalarTransformation(Enum):
         return array
 
 
+def linear_colormap_names() -> Iterator[str]:
+    for original_name in colorcet.all_original_names(group='linear', not_group='diverging'):
+        try:
+            cmap_aliases = colorcet.aliases[original_name]
+        except KeyError:
+            yield original_name
+        else:
+            yield cmap_aliases[0]
+
+
+def cyclic_colormap_names() -> Iterator[str]:
+    for group in ('cyclic', 'circle'):
+        for original_name in colorcet.all_original_names(group=group):
+            try:
+                cmap_aliases = colorcet.aliases[original_name]
+            except KeyError:
+                yield original_name
+            else:
+                yield cmap_aliases[0]
+
+
+def get_colormap_by_name(name: str) -> Colormap:
+    return matplotlib.cm.get_cmap(f'cet_{name}')
+
+
+def _normalize(
+    values: RealArrayType,
+    *,
+    value_min: float | None = None,
+    value_max: float | None = None,
+    clip: bool = False,
+) -> tuple[RealArrayType, Interval[float]]:
+    mask = numpy.isfinite(values)
+
+    if not mask.all():
+        num_nonfinite = numpy.count_nonzero(numpy.logical_not(mask))
+        logger.warning(f'Encountered {num_nonfinite} non-finite value(s) during normalization!')
+
+    if value_min is None:
+        value_min = numpy.min(values[mask]).item()
+    elif clip:
+        values = numpy.maximum(value_min, values)
+
+    if value_max is None:
+        value_max = numpy.max(values[mask]).item()
+    elif clip:
+        values = numpy.minimum(value_max, values)
+
+    value_range = Interval[float](value_min, value_max)
+
+    if value_max < value_min:
+        raise ValueError('value_max < value_min')
+    elif value_max > value_min:
+        return (values - value_min) / (value_max - value_min), value_range
+    else:
+        return numpy.zeros_like(values), value_range
+
+
+def visualize_real_values(
+    value_label: str,
+    values: RealArrayType,
+    pixel_geometry: PixelGeometry,
+    colormap: Colormap | str = 'gray',
+    *,
+    transform: ScalarTransformation = ScalarTransformation.IDENTITY,
+    value_min: float | None = None,
+    value_max: float | None = None,
+    clip: bool = False,
+) -> VisualizationProduct:
+    values_transformed = transform.transform(values)
+    values_normalized, color_value_range = _normalize(
+        values_transformed, value_min=value_min, value_max=value_max, clip=clip
+    )
+    cmap = colormap if isinstance(colormap, Colormap) else get_colormap_by_name(colormap)
+    return VisualizationProduct(
+        value_label=transform.decorate_text(value_label),
+        values=values,
+        rgba=cmap(values_normalized),
+        pixel_geometry=pixel_geometry,
+        color_value_range=color_value_range,
+    )
+
+
+def visualize_complex_component(
+    values: ComplexArrayType,
+    pixel_geometry: PixelGeometry,
+    component: ComplexComponent,
+    colormap: Colormap | str = 'gray',
+    *,
+    transform: ScalarTransformation = ScalarTransformation.IDENTITY,
+    value_min: float | None = None,
+    value_max: float | None = None,
+    clip: bool = False,
+) -> VisualizationProduct:
+    product = visualize_real_values(
+        value_label=component.name.title(),
+        values=component.extract_component(values),
+        pixel_geometry=pixel_geometry,
+        colormap=colormap,
+        transform=transform,
+        value_min=value_min,
+        value_max=value_max,
+        clip=clip,
+    )
+    return VisualizationProduct(
+        value_label=product.get_value_label(),
+        values=values,
+        rgba=product.get_image_rgba(),
+        pixel_geometry=product.get_pixel_geometry(),
+        color_value_range=product.get_color_value_range(),
+    )
+
+
+def hsva_to_rgba(
+    hue: RealArrayType, saturation: RealArrayType, value: RealArrayType, alpha: RealArrayType
+) -> RealArrayType:
+    hsv = numpy.stack((hue, saturation, value), axis=-1)
+    rgb = hsv_to_rgb(hsv)
+
+    if alpha.ndim == 1:
+        return numpy.column_stack((rgb, alpha))
+
+    return numpy.dstack((rgb, alpha))
+
+
+def _v(m1: RealArrayType, m2: RealArrayType, hue: RealArrayType) -> RealArrayType:
+    """Adapted from colorsys._v in the Python standard library."""
+    if m1.shape != hue.shape or m2.shape != hue.shape:
+        raise ValueError('Shape mismatch: m1, m2, and hue must have the same shape.')
+
+    hue = hue % 1.0
+
+    return numpy.select(
+        [hue < 1.0 / 6.0, hue < 0.5, hue < 2.0 / 3.0],
+        [m1 + (m2 - m1) * hue * 6.0, m2, m1 + (m2 - m1) * (2.0 / 3.0 - hue) * 6.0],
+        default=m1,
+    )
+
+
+def hlsa_to_rgba(
+    hue: RealArrayType, lightness: RealArrayType, saturation: RealArrayType, alpha: RealArrayType
+) -> RealArrayType:
+    """Adapted from colorsys.hls_to_rgb in the Python standard library."""
+    one_third: Final[float] = 1.0 / 3.0
+
+    m2 = numpy.where(
+        lightness <= 0.5,
+        lightness * (1.0 + saturation),
+        lightness + saturation - (lightness * saturation),
+    )
+    m1 = 2.0 * lightness - m2
+
+    red = numpy.where(saturation > 0.0, _v(m1, m2, hue + one_third), lightness)
+    green = numpy.where(saturation > 0.0, _v(m1, m2, hue), lightness)
+    blue = numpy.where(saturation > 0.0, _v(m1, m2, hue - one_third), lightness)
+
+    return numpy.stack((red, green, blue, alpha), axis=-1)
+
+
 class CylindricalColorModel(Enum):
     HSV_SATURATION = auto()
     HSV_VALUE = auto()
@@ -373,21 +496,28 @@ class CylindricalColorModel(Enum):
                 return hlsa_to_rgba(hue, ones / 2.0, ones, x)
 
 
-def linear_cmap_names() -> Iterator[str]:
-    for original_name in colorcet.all_original_names(group='linear', not_group='diverging'):
-        try:
-            cmap_aliases = colorcet.aliases[original_name]
-        except KeyError:
-            yield original_name
-        else:
-            yield cmap_aliases[0]
-
-
-def cyclic_cmap_names() -> Iterator[str]:
-    for original_name in colorcet.all_original_names(group='cyclic'):
-        try:
-            cmap_aliases = colorcet.aliases[original_name]
-        except KeyError:
-            yield original_name
-        else:
-            yield cmap_aliases[0]
+def visualize_complex_values(
+    values: ComplexArrayType,
+    pixel_geometry: PixelGeometry,
+    model: CylindricalColorModel,
+    *,
+    amplitude_transform: ScalarTransformation,
+    value_min: float | None = None,
+    value_max: float | None = None,
+    clip: bool = False,
+) -> VisualizationProduct:
+    amplitude_component = ComplexComponent.AMPLITUDE
+    amplitude = amplitude_component.extract_component(values)
+    amplitude_transformed = amplitude_transform.transform(amplitude)
+    amplitude_normalized, color_value_range = _normalize(
+        amplitude_transformed, value_min=value_min, value_max=value_max, clip=clip
+    )
+    phase_rad = ComplexComponent.PHASE_RAD.extract_component(values)
+    hue = (phase_rad + numpy.pi) / (2 * numpy.pi)
+    return VisualizationProduct(
+        value_label=amplitude_transform.decorate_text(amplitude_component.name.title()),
+        values=values,
+        rgba=model.render_rgba(hue, amplitude_normalized),
+        pixel_geometry=pixel_geometry,
+        color_value_range=color_value_range,
+    )

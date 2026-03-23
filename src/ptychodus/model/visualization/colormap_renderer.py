@@ -9,6 +9,7 @@ from ptychodus.api.visualization import (
     NumberArrayType,
     RealArrayType,
     VisualizationProduct,
+    visualize_complex_component,
 )
 
 from .color_axis import ColorAxis
@@ -47,9 +48,12 @@ class ColormapRenderer(Renderer):
         return self._component.is_cyclic
 
     def _colorize(self, values_transformed: RealArrayType) -> RealArrayType:
-        vrange = self._color_axis.get_range()
-        norm = Normalize(vmin=vrange.lower, vmax=vrange.upper, clip=False)
-        cmap = self._colormap.get_plugin()
+        norm = Normalize(
+            vmin=self._color_axis.lower.get_value(),
+            vmax=self._color_axis.upper.get_value(),
+            clip=False,
+        )
+        cmap = self._colormap.get_strategy()
         scalar_mappable = ScalarMappable(norm, cmap)
         return scalar_mappable.to_rgba(values_transformed)
 
@@ -66,18 +70,26 @@ class ColormapRenderer(Renderer):
         *,
         autoscale_color_axis: bool,
     ) -> VisualizationProduct:
-        values = self._component.extract_component(array)
-        transform = self._transformation.get_strategy()
-        values_transformed = transform.transform(values)
+        value_min: float | None = None
+        value_max: float | None = None
+
+        if not autoscale_color_axis:
+            value_min = self._color_axis.lower.get_value()
+            value_max = self._color_axis.upper.get_value()
+
+        product = visualize_complex_component(
+            values=array,
+            pixel_geometry=pixel_geometry,
+            component=self._component,
+            colormap=self._colormap.get_strategy(),
+            transform=self._transformation.get_strategy(),
+            value_min=value_min,
+            value_max=value_max,
+            clip=False,
+        )
 
         if autoscale_color_axis:
-            self._color_axis.set_to_data_range(values_transformed)
+            color_value_range = product.get_color_value_range()
+            self._color_axis.set_to_data_range(color_value_range.lower, color_value_range.upper)
 
-        rgba = self._colorize(values_transformed)
-
-        return VisualizationProduct(
-            value_label=transform.decorate_text(self._component.name),
-            values=array,
-            rgba=rgba,
-            pixel_geometry=pixel_geometry,
-        )
+        return product
