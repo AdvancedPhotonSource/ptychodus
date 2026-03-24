@@ -21,6 +21,8 @@ class ProbePosition:
 
 @dataclass(frozen=True)
 class ScanGeometry:
+    """Bounding box and total path length of a set of probe positions."""
+
     minimum_x_m: float = +numpy.inf
     maximum_x_m: float = -numpy.inf
     minimum_y_m: float = +numpy.inf

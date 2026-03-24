@@ -10,6 +10,7 @@ from .common import ComplexArrayType, RealArrayType
 
 
 def intensity(wavefield: ComplexArrayType) -> RealArrayType:
+    """Return the element-wise intensity (|wavefield|²) of a complex array."""
     return numpy.square(numpy.absolute(wavefield))
 
 

@@ -1,3 +1,5 @@
+"""Probe position (scan pattern) generators: cartesian, concentric, Lissajous, and spiral grids."""
+
 from collections.abc import Iterable, Iterator
 from itertools import pairwise
 
@@ -16,6 +18,7 @@ def generate_cartesian_probe_positions(
     snake: bool = False,
     stagger: bool = False,
 ) -> Iterator[ProbePosition]:
+    """Yield probe positions on a regular rectangular grid, optionally in snake or staggered order."""
     for index in range(num_points_x * num_points_y):
         y, x = divmod(index, num_points_x)
 
@@ -75,6 +78,7 @@ def generate_lissajous_probe_positions(
     angular_step_y_tr: float,
     angular_shift_tr: float,
 ) -> Iterator[ProbePosition]:
+    """Yield probe positions following a Lissajous figure parameterized by angular steps and amplitudes."""
     for index in range(num_points):
         two_pi = 2 * numpy.pi
         theta_x = two_pi * angular_step_x_tr * index + angular_shift_tr
@@ -109,6 +113,7 @@ def transform_probe_positions(
     rng: numpy.random.Generator | None = None,
     jitter_radius_m: float = 0.0,
 ) -> Iterator[ProbePosition]:
+    """Apply an affine transform (and optional random jitter) to every position in *positions*."""
     for position in positions:
         x_m, y_m = transform(position.coordinate_x_m, position.coordinate_y_m)
 
@@ -127,6 +132,7 @@ def transform_probe_positions(
 
 
 def calculate_scan_geometry(positions: Iterable[ProbePosition]) -> ScanGeometry | None:
+    """Compute the bounding box and total path length of a set of probe positions; returns None if empty."""
     minimum_x_m = +numpy.inf
     maximum_x_m = -numpy.inf
     minimum_y_m = +numpy.inf

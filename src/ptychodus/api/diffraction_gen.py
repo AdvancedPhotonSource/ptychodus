@@ -1,3 +1,5 @@
+"""Forward model for simulating diffraction patterns from a ptychography data product."""
+
 import numpy
 
 from scipy.fft import fft2, fftfreq, ifft2
@@ -12,6 +14,10 @@ from .propagator import AngularSpectrumPropagator, FraunhoferPropagator, Propaga
 def generate_diffraction_data(
     product: Product, rng: numpy.random.Generator | None = None
 ) -> AssembledDiffractionData:
+    """Simulate diffraction patterns for all scan positions in *product* using a multislice forward model.
+
+    If *rng* is provided, Poisson noise is added to the intensity patterns.
+    """
     object_ = product.object_
     probe_geometry = product.probes.get_geometry()
 

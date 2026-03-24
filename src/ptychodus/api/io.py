@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 class StandardFileLayout(StrEnum):
+    """Conventional file names used in the ptychodus standard HDF5 workflow directory."""
+
     DIFFRACTION = 'diffraction.h5'
     FLUORESCENCE_IN = 'fluorescence-in.h5'
     FLUORESCENCE_OUT = 'fluorescence-out.h5'
@@ -35,6 +37,8 @@ class StandardFileLayout(StrEnum):
 
 
 class DiffractionFileKeys(StrEnum):
+    """HDF5 dataset and attribute names for the assembled diffraction data file."""
+
     PATTERNS = 'patterns'
     DETECTOR_PIXEL_HEIGHT = 'detector_pixel_height_m'
     DETECTOR_PIXEL_WIDTH = 'detector_pixel_width_m'
@@ -43,6 +47,7 @@ class DiffractionFileKeys(StrEnum):
 
 
 def load_diffraction_data(file: Path, *, mmap_file: Path | None = None) -> AssembledDiffractionData:
+    """Load assembled diffraction data from an HDF5 file written by :func:`save_diffraction_data`."""
     if mmap_file is not None:
         raise NotImplementedError('Load to memory map not implemented yet!')
 
@@ -78,6 +83,7 @@ def load_diffraction_data(file: Path, *, mmap_file: Path | None = None) -> Assem
 def save_diffraction_data(
     file: Path, data: AssembledDiffractionData, *, compression: str = 'lzf'
 ) -> None:
+    """Write assembled diffraction data to an HDF5 file."""
     with h5py.File(file, 'w') as h5_file:
         h5_file.create_dataset(
             DiffractionFileKeys.INDEXES, data=data._indexes, compression=compression
@@ -98,6 +104,8 @@ def save_diffraction_data(
 
 
 class ProductFileKeys(StrEnum):
+    """HDF5 dataset and attribute names for the product file."""
+
     NAME = 'name'
     COMMENTS = 'comments'
     DETECTOR_OBJECT_DISTANCE = 'detector_object_distance_m'
@@ -124,6 +132,7 @@ class ProductFileKeys(StrEnum):
 
 
 def load_product(file: Path) -> Product:
+    """Load a data product from an HDF5 file written by :func:`save_product`."""
     point_list: list[ProbePosition] = []
 
     with h5py.File(file, 'r') as h5_file:
@@ -257,6 +266,7 @@ def load_product(file: Path) -> Product:
 
 
 def save_product(file: Path, product: Product) -> None:
+    """Write a data product to an HDF5 file."""
     scan_indexes: list[int] = []
     scan_x_m: list[float] = []
     scan_y_m: list[float] = []

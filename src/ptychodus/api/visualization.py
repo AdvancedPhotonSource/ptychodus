@@ -1,3 +1,5 @@
+"""Visualization utilities: colormaps, plot data structures, and image rendering for ptychography results."""
+
 from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
@@ -236,6 +238,8 @@ class VisualizationProduct:
 
 
 class ComplexComponent(Enum):
+    """Component of a complex-valued array to use for visualization."""
+
     REAL = auto()
     IMAGINARY = auto()
     AMPLITUDE = auto()
@@ -266,6 +270,8 @@ class ComplexComponent(Enum):
 
 
 class ScalarTransformation(Enum):
+    """Monotonic scalar transformations applied to real-valued arrays before colormap mapping."""
+
     IDENTITY = auto()
     SQRT = auto()
     LOG2 = auto()
@@ -302,6 +308,7 @@ class ScalarTransformation(Enum):
 
 
 def linear_colormap_names() -> Iterator[str]:
+    """Yield the preferred alias for every linear (non-diverging) colorcet colormap."""
     for original_name in colorcet.all_original_names(group='linear', not_group='diverging'):
         try:
             cmap_aliases = colorcet.aliases[original_name]
@@ -312,6 +319,7 @@ def linear_colormap_names() -> Iterator[str]:
 
 
 def cyclic_colormap_names() -> Iterator[str]:
+    """Yield the preferred alias for every cyclic colorcet colormap."""
     for group in ('cyclic', 'circle'):
         for original_name in colorcet.all_original_names(group=group):
             try:
@@ -323,7 +331,8 @@ def cyclic_colormap_names() -> Iterator[str]:
 
 
 def get_colormap_by_name(name: str) -> Colormap:
-    return matplotlib.cm.get_cmap(f'cet_{name}')
+    """Return the colorcet Colormap for the given short name (prefixed with 'cet_')."""
+    return matplotlib.colormaps[f'cet_{name}']
 
 
 def _normalize(
@@ -370,6 +379,7 @@ def visualize_real_values(
     value_max: float | None = None,
     clip: bool = False,
 ) -> VisualizationProduct:
+    """Render a real-valued 2D array as a colorized VisualizationProduct."""
     values_transformed = transform.transform(values)
     values_normalized, color_value_range = _normalize(
         values_transformed, value_min=value_min, value_max=value_max, clip=clip
@@ -395,6 +405,7 @@ def visualize_complex_component(
     value_max: float | None = None,
     clip: bool = False,
 ) -> VisualizationProduct:
+    """Render a single scalar component of a complex array as a colorized VisualizationProduct."""
     product = visualize_real_values(
         value_label=component.name.title(),
         values=component.extract_component(values),
@@ -417,6 +428,7 @@ def visualize_complex_component(
 def hsva_to_rgba(
     hue: RealArrayType, saturation: RealArrayType, value: RealArrayType, alpha: RealArrayType
 ) -> RealArrayType:
+    """Convert per-pixel HSV + alpha arrays to an RGBA array."""
     hsv = numpy.stack((hue, saturation, value), axis=-1)
     rgb = hsv_to_rgb(hsv)
 
@@ -461,6 +473,8 @@ def hlsa_to_rgba(
 
 
 class CylindricalColorModel(Enum):
+    """Cylindrical color model variant used to encode complex amplitude as hue and a second channel."""
+
     HSV_SATURATION = auto()
     HSV_VALUE = auto()
     HSV_ALPHA = auto()
@@ -506,6 +520,7 @@ def visualize_complex_values(
     value_max: float | None = None,
     clip: bool = False,
 ) -> VisualizationProduct:
+    """Render a complex array using a cylindrical color model (hue = phase)."""
     amplitude_component = ComplexComponent.AMPLITUDE
     amplitude = amplitude_component.extract_component(values)
     amplitude_transformed = amplitude_transform.transform(amplitude)

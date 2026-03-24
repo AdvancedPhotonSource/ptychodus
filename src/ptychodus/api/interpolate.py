@@ -1,3 +1,5 @@
+"""Sub-pixel array interpolation and stitching utilities."""
+
 from typing import Any, Generic, TypeVar
 import logging
 
@@ -18,12 +20,15 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_support_frac(x: float, n: int) -> tuple[slice, float]:
+    """Return the integer support slice and sub-pixel fractional offset for a width-n window centered at x."""
     lower = x - n / 2
     whole = int(lower)
     return slice(whole, whole + n + 1), lower - whole
 
 
 class NearestNeighborArrayInterpolator(Generic[InexactDType]):
+    """Extract patches from an array using integer (nearest-neighbor) pixel centering."""
+
     def __init__(self, array: numpy.typing.NDArray[InexactDType]) -> None:
         super().__init__()
         self._array = array
@@ -43,6 +48,8 @@ class NearestNeighborArrayInterpolator(Generic[InexactDType]):
 
 
 class BarycentricArrayInterpolator(Generic[InexactDType]):
+    """Extract patches from an array using bilinear (barycentric) sub-pixel interpolation."""
+
     def __init__(self, array: numpy.typing.NDArray[InexactDType]) -> None:
         super().__init__()
         self._array = array
@@ -72,6 +79,8 @@ class BarycentricArrayInterpolator(Generic[InexactDType]):
 
 
 class BarycentricArrayStitcher(Generic[InexactDType]):
+    """Accumulate weighted patches into a canvas using bilinear sub-pixel spreading, then normalize."""
+
     def __init__(
         self, upper: numpy.typing.NDArray[InexactDType], lower: RealArrayType | None = None
     ) -> None:
@@ -129,6 +138,7 @@ class BarycentricArrayStitcher(Generic[InexactDType]):
             lsupport[..., 1:, 1:] += weight11 * weight
 
     def stitch(self) -> numpy.typing.NDArray[InexactDType]:
+        """Return the accumulated canvas divided by the weight array; pixels with zero weight remain zero."""
         if self._lower is None:
             return self._upper
 

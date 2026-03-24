@@ -22,6 +22,14 @@ Diffraction
    :undoc-members:
    :show-inheritance:
 
+Diffraction Generators
+----------------------
+
+.. automodule:: ptychodus.api.diffraction_gen
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Fluorescence
 ------------
 
@@ -42,6 +50,14 @@ Input/Output (I/O)
 ------------------
 
 .. automodule:: ptychodus.api.io
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Interpolation
+-------------
+
+.. automodule:: ptychodus.api.interpolate
    :members:
    :undoc-members:
    :show-inheritance:
