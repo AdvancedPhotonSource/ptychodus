@@ -1,8 +1,11 @@
 from __future__ import annotations
+from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from pprint import pformat
-from typing import Final
+from typing import Any, Final
+import hashlib
 import json
 import logging
 import os
@@ -19,6 +22,8 @@ from globus_sdk.login_flows import LoginFlowManager
 from globus_sdk.tokenstorage import SimpleJSONFileAdapter
 import globus_sdk
 
+from ptychodus.api.common import get_ptychodus_dir
+
 from ..task_manager import TaskManager
 from .authorizer import GlobusAuthorizer
 from .client import GlobusClient, GlobusJob, GlobusStatus
@@ -32,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 PTYCHODUS_APP_NAME: Final[str] = 'Ptychodus'
 PTYCHODUS_CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
+PTYCHODUS_FLOW_TITLE: Final[str] = 'Ptychodus Flow'
 
 
 def process_with_ptychodus(**data: str) -> None:
@@ -168,10 +174,11 @@ def create_globus_app(
     authorize_url_q: queue.Queue[str],
     auth_code_q: queue.Queue[str],
     stop_event: threading.Event,
-    token_storage_path: Path,
     request_refresh_tokens: bool = True,
 ) -> globus_sdk.GlobusApp:
-    token_storage = SimpleJSONFileAdapter(token_storage_path)
+    token_storage_path = get_ptychodus_dir() / 'globus_tokens.json'
+    token_storage = SimpleJSONFileAdapter(ensure_owner_only_read_write(token_storage_path))
+
     hostname = platform.node()
     prefill = f'{PTYCHODUS_APP_NAME} on {hostname}' if hostname else PTYCHODUS_APP_NAME
 
@@ -221,6 +228,68 @@ def create_globus_app(
         )
 
 
+def get_flow_checksum(
+    flow_definition: Mapping[str, Any], flow_input_schema: Mapping[str, Any]
+) -> str:
+    """
+    Get the SHA256 checksum of the current flow definition.
+
+    :return: sha256 hex string of flow definition
+    """
+    definition_json = json.dumps(flow_definition, sort_keys=True)
+    input_schema_json = json.dumps(flow_input_schema, sort_keys=True)
+    data = (definition_json + input_schema_json).encode()
+    return hashlib.sha256(data).hexdigest()
+
+
+@dataclass(frozen=True)
+class RegisteredGlobusFlow:
+    flow_id: uuid.UUID
+    checksum: str
+
+    @classmethod
+    def read_from_file(cls, file_path: Path) -> RegisteredGlobusFlow:
+        data = json.loads(file_path.read_text())
+        return cls(flow_id=uuid.UUID(data['flow_id']), checksum=data['checksum'])
+
+    def write_to_file(self, file_path: Path) -> None:
+        data = {'flow_id': str(self.flow_id), 'checksum': self.checksum}
+        file_path.write_text(json.dumps(data))
+
+
+def sync_flow(flows_client: globus_sdk.FlowsClient) -> RegisteredGlobusFlow:
+    file_path = get_ptychodus_dir() / 'globus_flows.json'
+
+    try:
+        registered_flow = RegisteredGlobusFlow.read_from_file(file_path)
+    except FileNotFoundError:
+        # FIXME register flow (first run)
+        new_flow = flows_client.create_flow(
+            title=PTYCHODUS_FLOW_TITLE,
+            definition=dict(PTYCHODUS_FLOW_DEFINITION),
+            input_schema=dict(PTYCHODUS_FLOW_INPUT_SCHEMA),
+        )
+        logger.info(f'Flow created with ID: {new_flow["id"]}')
+    else:
+        current_checksum = get_flow_checksum(
+            flow_definition=dict(PTYCHODUS_FLOW_DEFINITION),
+            flow_input_schema=dict(PTYCHODUS_FLOW_INPUT_SCHEMA),
+        )
+
+        if current_checksum != registered_flow.checksum:
+            # FIXME flow is obsolete
+            new_flow = flows_client.update_flow(
+                registered_flow.flow_id,
+                title=PTYCHODUS_FLOW_TITLE,
+                definition=dict(PTYCHODUS_FLOW_DEFINITION),
+                input_schema=dict(PTYCHODUS_FLOW_INPUT_SCHEMA),
+            )
+        else:
+            pass  # FIXME flow is good
+
+    return registered_flow
+
+
 class GlobusClientThread(threading.Thread):
     def __init__(
         self,
@@ -230,7 +299,6 @@ class GlobusClientThread(threading.Thread):
         status_q: queue.Queue[GlobusStatus],
         refresh_status_event: threading.Event,
         stop_event: threading.Event,
-        token_storage_path: Path,
     ) -> None:
         super().__init__()
         self._job_q = job_q
@@ -242,17 +310,8 @@ class GlobusClientThread(threading.Thread):
             authorize_url_q,
             auth_code_q,
             stop_event,
-            ensure_owner_only_read_write(token_storage_path),
         )
         self._flows_client = globus_sdk.FlowsClient(app=self._globus_app)
-
-    def _create_flow(self) -> None:
-        new_flow = self._flows_client.create_flow(
-            title='Ptychodus Flow',
-            definition=dict(PTYCHODUS_FLOW_DEFINITION),
-            input_schema=dict(PTYCHODUS_FLOW_INPUT_SCHEMA),
-        )
-        logger.info(f'Flow created with ID: {new_flow["id"]}')
 
     def _list_flows(self) -> None:
         for flow in self._flows_client.list_flows(filter_roles='flow_owner'):
@@ -380,8 +439,6 @@ class RealGlobusClient(GlobusClient):
 
     def start(self) -> None:  # FIXME start as needed
         if self._worker is None:
-            token_storage_path = self._settings.token_storage_path.get_value()
-
             logger.debug('Starting Globus thread...')
             self._stop_event.clear()
             self._worker = GlobusClientThread(
@@ -391,7 +448,6 @@ class RealGlobusClient(GlobusClient):
                 status_q=self._status_q,
                 refresh_status_event=self._refresh_status_event,
                 stop_event=self._stop_event,
-                token_storage_path=token_storage_path,
             )
             self._worker.start()
             logger.debug('Globus thread started.')

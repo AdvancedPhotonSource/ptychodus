@@ -65,9 +65,6 @@ def defocus_probe(
     )
 
 
-# FIXME remove phase ramp/offset
-
-
 def generate_disk_probe(
     geometry: ProbeGeometry,
     *,
