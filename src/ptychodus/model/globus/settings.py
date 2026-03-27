@@ -68,6 +68,10 @@ class GlobusSettings(Observable, Observer):
             'OutputCollectionPosixPath', Path('/path/to/output/data')
         )
 
+        self.token_storage_path = self._group.create_path_parameter(
+            'TokenStoragePath', Path.home() / '.ptychodus' / 'globus_tokens.json'
+        )
+
     def _update(self, observable: Observable) -> None:
         if observable is self._group:
             self.notify_observers()

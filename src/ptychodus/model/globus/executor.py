@@ -13,9 +13,6 @@ from .settings import GlobusSettings
 logger = logging.getLogger(__name__)
 
 
-# FIXME urn:globus:auth:scope:transfer.api.globus.org:all
-
-
 class GlobusExecutor:
     def __init__(
         self,
