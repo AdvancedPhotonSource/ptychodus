@@ -249,8 +249,8 @@ class GlobusClientThread(threading.Thread):
     def _create_flow(self) -> None:
         new_flow = self._flows_client.create_flow(
             title='Ptychodus Flow',
-            definition=PTYCHODUS_FLOW_DEFINITION,
-            input_schema=PTYCHODUS_FLOW_INPUT_SCHEMA,
+            definition=dict(PTYCHODUS_FLOW_DEFINITION),
+            input_schema=dict(PTYCHODUS_FLOW_INPUT_SCHEMA),
         )
         logger.info(f'Flow created with ID: {new_flow["id"]}')
 

@@ -75,7 +75,6 @@ class GlobusExecutor:
             f'{self._settings.output_collection_globus_path.get_value()}/{flow_label}'
         )
 
-        # FIXME kwargs to schema
         flow_input = {
             'transfer_input_data': {
                 'source': {

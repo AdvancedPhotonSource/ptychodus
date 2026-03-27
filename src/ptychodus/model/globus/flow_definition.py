@@ -12,13 +12,14 @@ PTYCHODUS_FLOW_DEFINITION: Mapping[str, Any] = {
             'Parameters': {
                 'DATA': [
                     {
-                        'source_path.$': '$.input_data_transfer.source.path',
-                        'destination_path.$': '$.input_data_transfer.destination.path',
-                        'recursive.$': '$.input_data_transfer.recursive',
+                        'source_path.$': '$.transfer_input_data.source.path',
+                        'destination_path.$': '$.transfer_input_data.destination.path',
+                        'recursive.$': '$.transfer_input_data.recursive',
                     }
                 ],
-                'source_endpoint.$': '$.input_data_transfer.source.id',
-                'destination_endpoint.$': '$.input_data_transfer.destination.id',
+                'source_endpoint.$': '$.transfer_input_data.source.id',
+                'destination_endpoint.$': '$.transfer_input_data.destination.id',
+                'sync_level.$': '$.transfer_input_data.sync_level',
             },
             'ResultPath': '$.TransferPtychodusInputData',
             'WaitTime': 600,
@@ -49,13 +50,14 @@ PTYCHODUS_FLOW_DEFINITION: Mapping[str, Any] = {
             'Parameters': {
                 'DATA': [
                     {
-                        'source_path.$': '$.output_data_transfer.source.path',
-                        'destination_path.$': '$.output_data_transfer.destination.path',
-                        'recursive.$': '$.output_data_transfer.recursive',
+                        'source_path.$': '$.transfer_output_data.source.path',
+                        'destination_path.$': '$.transfer_output_data.destination.path',
+                        'recursive.$': '$.transfer_output_data.recursive',
                     }
                 ],
-                'source_endpoint.$': '$.output_data_transfer.source.id',
-                'destination_endpoint.$': '$.output_data_transfer.destination.id',
+                'source_endpoint.$': '$.transfer_output_data.source.id',
+                'destination_endpoint.$': '$.transfer_output_data.destination.id',
+                'sync_level.$': '$.transfer_output_data.sync_level',
             },
             'ResultPath': '$.TransferPtychodusOutputData',
             'WaitTime': 600,

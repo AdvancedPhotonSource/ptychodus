@@ -65,8 +65,26 @@ PTYCHODUS_FLOW_INPUT_SCHEMA: Mapping[str, Any] = {
                     'type': 'object',
                     'title': 'Function Inputs',
                     'description': 'Inputs to pass to the function.',
-                    'properties': {},
-                    'additionalProperties': True,
+                    'required': ['action', 'input_directory', 'output_directory'],
+                    'properties': {
+                        'action': {
+                            'type': 'string',
+                            'title': 'Ptychodus Action',
+                            'description': 'The ptychodus action to perform.',
+                            'enum': ['reconstruct', 'train', 'infer'],
+                        },
+                        'input_directory': {
+                            'type': 'string',
+                            'title': 'Input Directory',
+                            'description': 'POSIX path to the input data directory on the compute resource.',
+                        },
+                        'output_directory': {
+                            'type': 'string',
+                            'title': 'Output Directory',
+                            'description': 'POSIX path to the output data directory on the compute resource.',
+                        },
+                    },
+                    'additionalProperties': False,
                 },
             },
             'additionalProperties': False,
@@ -78,7 +96,7 @@ PTYCHODUS_FLOW_INPUT_SCHEMA: Mapping[str, Any] = {
                 'source': {
                     'type': 'object',
                     'title': 'Select source collection and path',
-                    'description': 'The raw data collection and path (e.g., on the instrument).',
+                    'description': 'The collection and path on the Globus Compute endpoint where output data resides.',
                     'format': 'globus-collection',
                     'required': ['id', 'path'],
                     'properties': {
@@ -90,7 +108,7 @@ PTYCHODUS_FLOW_INPUT_SCHEMA: Mapping[str, Any] = {
                 'destination': {
                     'type': 'object',
                     'title': 'Select destination collection and path',
-                    'description': 'The collection and path on the Globus Compute endpoint.',
+                    'description': 'The collection and path where processed output data will be stored (e.g., archive or analysis system).',
                     'format': 'globus-collection',
                     'required': ['id', 'path'],
                     'properties': {
