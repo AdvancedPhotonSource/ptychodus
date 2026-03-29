@@ -1,11 +1,11 @@
 from __future__ import annotations
-from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Final
+from typing import Final
 import hashlib
+import inspect
 import json
 import logging
 import os
@@ -20,11 +20,13 @@ from globus_sdk.gare import GlobusAuthorizationParameters
 from globus_sdk.globus_app import GlobusAppConfig
 from globus_sdk.login_flows import LoginFlowManager
 from globus_sdk.tokenstorage import SimpleJSONFileAdapter
+import globus_compute_sdk
 import globus_sdk
 
 from ptychodus.api.common import get_ptychodus_dir
 
 from ..task_manager import TaskManager
+from .actions import process_with_ptychodus
 from .authorizer import GlobusAuthorizer
 from .client import GlobusClient, GlobusJob, GlobusStatus
 from .flow_definition import PTYCHODUS_FLOW_DEFINITION
@@ -38,18 +40,6 @@ logger = logging.getLogger(__name__)
 PTYCHODUS_APP_NAME: Final[str] = 'Ptychodus'
 PTYCHODUS_CLIENT_ID: Final[str] = '5c0fb474-ae53-44c2-8c32-dd0db9965c57'
 PTYCHODUS_FLOW_TITLE: Final[str] = 'Ptychodus Flow'
-
-
-def process_with_ptychodus(**data: str) -> None:
-    from pathlib import Path
-    from ptychodus.model import ModelCore
-
-    action = data['action']
-    input_directory = Path(data['input_directory'])
-    output_directory = Path(data['output_directory'])
-
-    with ModelCore() as model:
-        model.batch_mode_execute(action, input_directory, output_directory)
 
 
 def ensure_owner_only_read_write(file_path: Path) -> Path:
@@ -228,66 +218,104 @@ def create_globus_app(
         )
 
 
-def get_flow_checksum(
-    flow_definition: Mapping[str, Any], flow_input_schema: Mapping[str, Any]
-) -> str:
+def get_process_with_ptychodus_action_checksum() -> str:
+    """
+    Get the SHA256 checksum of the current compute function.
+
+    :return: sha256 hex string of compute function
+    """
+    source = inspect.getsource(process_with_ptychodus)
+    return hashlib.sha256(source.encode()).hexdigest()
+
+
+def get_ptychodus_flow_checksum() -> str:
     """
     Get the SHA256 checksum of the current flow definition.
 
     :return: sha256 hex string of flow definition
     """
-    definition_json = json.dumps(flow_definition, sort_keys=True)
-    input_schema_json = json.dumps(flow_input_schema, sort_keys=True)
+    definition_json = json.dumps(PTYCHODUS_FLOW_DEFINITION, sort_keys=True)
+    input_schema_json = json.dumps(PTYCHODUS_FLOW_INPUT_SCHEMA, sort_keys=True)
     data = (definition_json + input_schema_json).encode()
     return hashlib.sha256(data).hexdigest()
 
 
 @dataclass(frozen=True)
-class RegisteredGlobusFlow:
+class RegisteredPtychodusFlow:
+    process_action_id: uuid.UUID
+    process_action_checksum: str
     flow_id: uuid.UUID
-    checksum: str
+    flow_checksum: str
 
     @classmethod
-    def read_from_file(cls, file_path: Path) -> RegisteredGlobusFlow:
+    def read_from_file(cls, file_path: Path) -> RegisteredPtychodusFlow:
         data = json.loads(file_path.read_text())
-        return cls(flow_id=uuid.UUID(data['flow_id']), checksum=data['checksum'])
+        return cls(
+            process_action_id=uuid.UUID(data['process_action_id']),
+            process_action_checksum=data['process_action_checksum'],
+            flow_id=uuid.UUID(data['flow_id']),
+            flow_checksum=data['flow_checksum'],
+        )
 
     def write_to_file(self, file_path: Path) -> None:
-        data = {'flow_id': str(self.flow_id), 'checksum': self.checksum}
+        data = {
+            'process_action_id': str(self.process_action_id),
+            'process_action_checksum': self.process_action_checksum,
+            'flow_id': str(self.flow_id),
+            'flow_checksum': self.flow_checksum,
+        }
         file_path.write_text(json.dumps(data))
 
 
-def sync_flow(flows_client: globus_sdk.FlowsClient) -> RegisteredGlobusFlow:
+def sync_flow(
+    compute_client: globus_compute_sdk.Client, flows_client: globus_sdk.FlowsClient
+) -> RegisteredPtychodusFlow:
     file_path = get_ptychodus_dir() / 'globus_flows.json'
+    expected_action_checksum = get_process_with_ptychodus_action_checksum()
+    expected_flow_checksum = get_ptychodus_flow_checksum()
 
     try:
-        registered_flow = RegisteredGlobusFlow.read_from_file(file_path)
+        registered_flow = RegisteredPtychodusFlow.read_from_file(file_path)
     except FileNotFoundError:
-        # FIXME register flow (first run)
+        # First run: register compute function and create flow
+        new_action = compute_client.register_function(process_with_ptychodus)
+        process_action_id = uuid.UUID(new_action)
+        logger.info(f'Process action registered with ID: {process_action_id}')
+
         new_flow = flows_client.create_flow(
             title=PTYCHODUS_FLOW_TITLE,
             definition=dict(PTYCHODUS_FLOW_DEFINITION),
             input_schema=dict(PTYCHODUS_FLOW_INPUT_SCHEMA),
         )
-        logger.info(f'Flow created with ID: {new_flow["id"]}')
+        flow_id = uuid.UUID(new_flow['id'])
+        logger.info(f'Flow created with ID: {flow_id}')
     else:
-        current_checksum = get_flow_checksum(
-            flow_definition=dict(PTYCHODUS_FLOW_DEFINITION),
-            flow_input_schema=dict(PTYCHODUS_FLOW_INPUT_SCHEMA),
-        )
+        if registered_flow.process_action_checksum == expected_action_checksum:
+            process_action_id = registered_flow.process_action_id
+        else:
+            new_action = compute_client.register_function(process_with_ptychodus)
+            process_action_id = uuid.UUID(new_action)
+            logger.info(f'Process action re-registered with ID: {process_action_id}')
 
-        if current_checksum != registered_flow.checksum:
-            # FIXME flow is obsolete
-            new_flow = flows_client.update_flow(
+        if registered_flow.flow_checksum != expected_flow_checksum:
+            flows_client.update_flow(
                 registered_flow.flow_id,
                 title=PTYCHODUS_FLOW_TITLE,
                 definition=dict(PTYCHODUS_FLOW_DEFINITION),
                 input_schema=dict(PTYCHODUS_FLOW_INPUT_SCHEMA),
             )
-        else:
-            pass  # FIXME flow is good
+            logger.info(f'Flow updated with ID: {registered_flow.flow_id}')
 
-    return registered_flow
+        flow_id = registered_flow.flow_id
+
+    result = RegisteredPtychodusFlow(
+        process_action_id=process_action_id,
+        process_action_checksum=expected_action_checksum,
+        flow_id=flow_id,
+        flow_checksum=expected_flow_checksum,
+    )
+    result.write_to_file(file_path)
+    return result
 
 
 class GlobusClientThread(threading.Thread):
