@@ -90,7 +90,7 @@ class GlobusExecutor:
             },
             'compute': {
                 'endpoint_id': str(self._settings.compute_endpoint_id.get_value()),
-                'function_id': str(self._settings.compute_function_id.get_value()),
+                # NOTE: 'function_id': compute_function_id, # added in globus.py
                 'function_kwargs': {
                     'action': ptychodus_action,
                     'input_directory': str(compute_data_posix_path),

@@ -7,7 +7,6 @@ from ptychodus.api.settings import SettingsRegistry
 from ..diffraction import DiffractionAPI
 from ..processing import ProcessingAPI
 from ..product import ProductAPI
-from ..task_manager import TaskManager
 from .authorizer import GlobusAuthorizer
 from .client import FakeGlobusClient, GlobusClient, GlobusStatus
 from .executor import GlobusExecutor
@@ -20,7 +19,6 @@ logger = logging.getLogger(__name__)
 class GlobusCore:
     def __init__(
         self,
-        task_manager: TaskManager,
         settings_registry: SettingsRegistry,
         diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
@@ -38,7 +36,7 @@ class GlobusCore:
             self._client: GlobusClient = FakeGlobusClient()
         else:
             logger.info('Globus SDK ' + version('globus-sdk'))
-            self._client = RealGlobusClient(task_manager, self.settings, self.authorizer, status_q)
+            self._client = RealGlobusClient(self.settings, self.authorizer, status_q)
 
         self.status_repository = GlobusStatusRepository(self.settings, self._client, status_q)
         self.executor = GlobusExecutor(

@@ -40,5 +40,4 @@ class GlobusAuthorizer(Observable):
         else:
             logger.info(f'Authorize at {url}')
             self._auth_url = url
-            self._authorize_code = ''
             self.notify_observers()

@@ -15,7 +15,6 @@ import stat
 import threading
 import uuid
 
-from globus_sdk.flows import SpecificFlowClient
 from globus_sdk.gare import GlobusAuthorizationParameters
 from globus_sdk.globus_app import GlobusAppConfig
 from globus_sdk.login_flows import LoginFlowManager
@@ -25,7 +24,6 @@ import globus_sdk
 
 from ptychodus.api.common import get_ptychodus_dir
 
-from ..task_manager import TaskManager
 from .actions import process_with_ptychodus
 from .authorizer import GlobusAuthorizer
 from .client import GlobusClient, GlobusJob, GlobusStatus
@@ -154,7 +152,7 @@ class PtychodusLoginFlowManager(LoginFlowManager):
             else:
                 break
 
-        if auth_code is None:
+        if not auth_code:
             raise RuntimeError('Missing auth code!')
 
         return self.login_client.oauth2_exchange_code_for_tokens(auth_code)
@@ -339,14 +337,9 @@ class GlobusClientThread(threading.Thread):
             auth_code_q,
             stop_event,
         )
+        self._transfer_client = globus_sdk.TransferClient(app=self._globus_app)
+        self._compute_client = globus_compute_sdk.Client(app=self._globus_app)
         self._flows_client = globus_sdk.FlowsClient(app=self._globus_app)
-
-    def _list_flows(self) -> None:
-        for flow in self._flows_client.list_flows(filter_roles='flow_owner'):
-            logger.info(f'title={flow["title"]} id={flow["id"]}')
-
-    def _delete_flow(self, flow_id: uuid.UUID):
-        self._flows_client.delete_flow(flow_id)
 
     def _get_current_action(self, run_id: str) -> str:
         status = self._flows_client.get_run(run_id).data
@@ -368,13 +361,11 @@ class GlobusClientThread(threading.Thread):
                 elif det.get('code') == 'FlowStarting':
                     pass
 
-        return action
+        return action or ''
 
     def _refresh_status(self) -> None:
-        logger.debug('Refreshing status.')
-
-        flow_id = uuid.UUID(int=0)  # FIXME
-
+        flow_id = self._registered_flow.flow_id
+        logger.debug(f'Refreshing status for flow: {flow_id}')
         response = self._flows_client.list_runs(filter_flow_id=flow_id)
         run_dict_list = response['runs']
 
@@ -412,9 +403,36 @@ class GlobusClientThread(threading.Thread):
             )
             self._status_q.put(status)
 
+    def _run_flow(self, job: GlobusJob) -> None:
+        for collection_id in (
+            job.flow_input['transfer_input_data']['source']['id'],
+            job.flow_input['transfer_input_data']['destination']['id'],
+            job.flow_input['transfer_output_data']['source']['id'],
+            job.flow_input['transfer_output_data']['destination']['id'],
+        ):
+            if uses_data_access(self._transfer_client, collection_id=collection_id):
+                self._specific_flow_client.add_app_transfer_data_access_scope(collection_id)
+
+        body = {
+            **job.flow_input,
+            'compute': {
+                **job.flow_input['compute'],
+                'function_id': str(self._registered_flow.process_action_id),
+            },
+        }
+
+        response = self._specific_flow_client.run_flow(
+            body,
+            label=job.label,
+            tags=list(job.tags),
+        )
+        logger.info(f'Run Flow Response: {json.dumps(response, indent=4)}')
+
     def run(self) -> None:
-        flow_id = uuid.UUID(int=0)  # FIXME
-        specific_flow_client = SpecificFlowClient(flow_id, app=self._globus_app)
+        self._registered_flow = sync_flow(self._compute_client, self._flows_client)
+        self._specific_flow_client = globus_sdk.SpecificFlowClient(
+            flow_id=self._registered_flow.flow_id, app=self._globus_app
+        )
 
         while not self._stop_event.is_set():
             if self._refresh_status_event.is_set():
@@ -427,15 +445,9 @@ class GlobusClientThread(threading.Thread):
                 pass
             else:
                 try:
-                    response = specific_flow_client.run_flow(
-                        flow_input=job.flow_input,
-                        label=job.label,
-                        tags=job.tags,
-                    )
+                    self._run_flow(job)
                 except Exception:
                     logger.exception('Error running flow!')
-                else:
-                    logger.info(f'Run Flow Response: {json.dumps(response, indent=4)}')
                 finally:
                     self._job_q.task_done()
 
@@ -445,13 +457,11 @@ class GlobusClientThread(threading.Thread):
 class RealGlobusClient(GlobusClient):
     def __init__(
         self,
-        task_manager: TaskManager,
         settings: GlobusSettings,
         authorizer: GlobusAuthorizer,
         status_q: queue.Queue[GlobusStatus],
     ) -> None:
         super().__init__()
-        self._task_manager = task_manager
         self._settings = settings
         self._authorizer = authorizer
         self._status_q = status_q

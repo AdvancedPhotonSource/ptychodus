@@ -65,12 +65,3 @@ class FakeGlobusClient(GlobusClient):
 
     def refresh_status(self) -> None:
         pass
-
-
-class RunGlobusFlow:
-    def __init__(self, client: GlobusClient, job: GlobusJob) -> None:
-        self._client = client
-        self._job = job
-
-    def __call__(self) -> None:
-        self._client.run_flow(self._job)

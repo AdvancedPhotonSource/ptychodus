@@ -182,7 +182,6 @@ class ModelCore:
             self.product_core.object_repository,
         )
         self.globus_core = GlobusCore(
-            self._task_manager,
             self.settings_registry,
             self.diffraction_core.diffraction_api,
             self.product_core.product_api,

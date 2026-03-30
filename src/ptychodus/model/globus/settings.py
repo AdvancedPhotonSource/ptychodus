@@ -39,10 +39,6 @@ class GlobusSettings(Observable, Observer):
         self.compute_endpoint_id = self._group.create_uuid_parameter(
             'ComputeEndpointID', UUID(int=0)
         )
-        self.compute_function_id = self._group.create_uuid_parameter(
-            'ComputeFunctionID', UUID(int=0)
-        )
-        self.compute_flow_id = self._group.create_uuid_parameter('ComputeFlowID', UUID(int=0))
         self.compute_collection_id = self._group.create_uuid_parameter(
             'ComputeCollectionID', UUID(int=0)
         )
