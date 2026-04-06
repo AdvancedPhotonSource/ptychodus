@@ -1,56 +1,24 @@
-from pathlib import Path
 import logging
 
 from PyQt5.QtCore import QModelIndex, QSortFilterProxyModel, Qt
 from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import (
     QAbstractItemView,
-    QLineEdit,
     QTableView,
     QVBoxLayout,
     QWidget,
 )
 
-from ptychodus.api.observer import Observable, Observer, SequenceObserver
-from ptychodus.api.parametric import PathParameter
+from ptychodus.api.observer import SequenceObserver
 
 from ...model.globus import GlobusAuthorizer, GlobusSettings, GlobusStatus, GlobusStatusRepository
 from ..data import FileDialogFactory
-from ..parametric import ParameterViewBuilder, ParameterViewController
+from ..parametric import ParameterViewBuilder, PathLineEditParameterViewController
 from .authorization import GlobusAuthorizationController
 from .status import GlobusStatusViewController
 from .table_model import GlobusStatusTableModel
 
 logger = logging.getLogger(__name__)
-
-
-class PathLineEditParameterViewController(ParameterViewController, Observer):
-    # FIXME: to ptychodus.controller.parametric
-
-    def __init__(self, parameter: PathParameter, *, tool_tip: str = '') -> None:
-        super().__init__()
-        self._parameter = parameter
-        self._widget = QLineEdit()
-
-        if tool_tip:
-            self._widget.setToolTip(tool_tip)
-
-        self.__sync_model_to_view()
-        self._widget.editingFinished.connect(self.__sync_view_to_model)
-        parameter.add_observer(self)
-
-    def get_widget(self) -> QWidget:
-        return self._widget
-
-    def __sync_view_to_model(self) -> None:
-        self._parameter.set_value(Path(self._widget.text()))
-
-    def __sync_model_to_view(self) -> None:
-        self._widget.setText(str(self._parameter.get_value()))
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._parameter:
-            self.__sync_model_to_view()
 
 
 class GlobusController(SequenceObserver[GlobusStatus]):

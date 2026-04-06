@@ -1,16 +1,13 @@
-from pathlib import Path
-
 from PyQt5.QtWidgets import (
     QFormLayout,
     QGroupBox,
-    QLineEdit,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import BooleanParameter, IntegerParameter, PathParameter
+from ptychodus.api.parametric import BooleanParameter, IntegerParameter
 
 from ..model.genesis import GenesisSettings
 from .data import FileDialogFactory
@@ -18,37 +15,9 @@ from .parametric import (
     CheckBoxParameterViewController,
     ParameterViewBuilder,
     ParameterViewController,
+    PathLineEditParameterViewController,
     SpinBoxParameterViewController,
 )
-
-
-class PathLineEditParameterViewController(ParameterViewController, Observer):
-    # FIXME: to ptychodus.controller.parametric
-
-    def __init__(self, parameter: PathParameter, *, tool_tip: str = '') -> None:
-        super().__init__()
-        self._parameter = parameter
-        self._widget = QLineEdit()
-
-        if tool_tip:
-            self._widget.setToolTip(tool_tip)
-
-        self.__sync_model_to_view()
-        self._widget.editingFinished.connect(self.__sync_view_to_model)
-        parameter.add_observer(self)
-
-    def get_widget(self) -> QWidget:
-        return self._widget
-
-    def __sync_view_to_model(self) -> None:
-        self._parameter.set_value(Path(self._widget.text()))
-
-    def __sync_model_to_view(self) -> None:
-        self._widget.setText(str(self._parameter.get_value()))
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._parameter:
-            self.__sync_model_to_view()
 
 
 class GenesisStatusViewController(ParameterViewController, Observer):
@@ -107,6 +76,14 @@ class GenesisController:
             settings.status_auto_refresh,
             settings.status_refresh_interval_s,
         )
+        self._local_collection_posix_path_controller = PathLineEditParameterViewController(
+            settings.local_collection_posix_path,
+            tool_tip='POSIX path on the local system where data is stored.',
+        )
+        self._remote_collection_posix_path_controller = PathLineEditParameterViewController(
+            settings.remote_collection_posix_path,
+            tool_tip='POSIX path on the remote system where data is stored.',
+        )
 
         view_builder = ParameterViewBuilder(file_dialog_factory)
         view_builder.add_line_edit(settings.api_base_url, 'API Base URL:')
@@ -121,10 +98,9 @@ class GenesisController:
             tool_tip='Globus path on the local system where data is stored.',
             group=local_group,
         )
-        view_builder.add_directory_chooser(
-            settings.local_collection_posix_path,
+        view_builder.add_view_controller(
+            self._local_collection_posix_path_controller,
             'Collection POSIX Path:',
-            tool_tip='POSIX path on the local system where data is stored.',
             group=local_group,
         )
 
@@ -138,10 +114,9 @@ class GenesisController:
             tool_tip='Globus path on the remote system where data is stored.',
             group=remote_group,
         )
-        view_builder.add_directory_chooser(
-            settings.remote_collection_posix_path,
+        view_builder.add_view_controller(
+            self._remote_collection_posix_path_controller,
             'Collection POSIX Path:',
-            tool_tip='POSIX path on the remote system where data is stored.',
             group=remote_group,
         )
 
