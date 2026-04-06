@@ -256,7 +256,7 @@ def generate_incoherent_probe_modes(
 
         array_out[imode, :, :] = values
 
-    if orthogonalize and array_in.shape[-3] > 1:
+    if orthogonalize and num_imodes > 1:
         imodes_as_rows = array_out.reshape(num_imodes, -1)
         imodes_as_ortho_rows = scipy.linalg.orth(imodes_as_rows.T).T
         array_out = imodes_as_ortho_rows.reshape(array_out_shape)
