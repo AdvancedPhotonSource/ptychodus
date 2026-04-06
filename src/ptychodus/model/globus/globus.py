@@ -18,7 +18,7 @@ import uuid
 from globus_sdk.gare import GlobusAuthorizationParameters
 from globus_sdk.globus_app import GlobusAppConfig
 from globus_sdk.login_flows import LoginFlowManager
-from globus_sdk.tokenstorage import SimpleJSONFileAdapter
+from globus_sdk.token_storage import JSONTokenStorage
 import globus_compute_sdk
 import globus_sdk
 
@@ -164,8 +164,8 @@ def create_globus_app(
     stop_event: threading.Event,
     request_refresh_tokens: bool = True,
 ) -> globus_sdk.GlobusApp:
-    token_storage_path = get_ptychodus_dir() / 'globus_tokens.json'
-    token_storage = SimpleJSONFileAdapter(ensure_owner_only_read_write(token_storage_path))
+    token_storage_path = ensure_owner_only_read_write(get_ptychodus_dir() / 'globus_tokens.json')
+    token_storage = JSONTokenStorage(token_storage_path)
 
     hostname = platform.node()
     prefill = f'{PTYCHODUS_APP_NAME} on {hostname}' if hostname else PTYCHODUS_APP_NAME
@@ -191,7 +191,6 @@ def create_globus_app(
             login_flow_manager=login_flow_manager,
             token_storage=token_storage,
             request_refresh_tokens=request_refresh_tokens,
-            native_prefill_named_grant=prefill,
         )
         return globus_sdk.UserApp(
             PTYCHODUS_APP_NAME,
@@ -209,7 +208,6 @@ def create_globus_app(
         config = GlobusAppConfig(
             token_storage=token_storage,
             request_refresh_tokens=request_refresh_tokens,
-            native_prefill_named_grant=prefill,
         )
         return globus_sdk.ClientApp(
             PTYCHODUS_APP_NAME, client_id=client_id, client_secret=client_secret, config=config

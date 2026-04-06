@@ -16,6 +16,7 @@ dependencies = [
     "matplotlib",
     "numpy",
     "psutil",
+    "pydantic",
     "pyyaml",
     "requests",
     "scikit-image",
@@ -32,7 +33,7 @@ ptychodus-bdp = "ptychodus.ptychodus_bdp:main"
 ptychodus-ptychopinn-tf-test = "ptychodus.scripts.ptychopinn_tf_test:main"
 
 [project.optional-dependencies]
-globus = ["globus-compute-sdk", "globus-sdk"]
+globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
 gui = ["PyQt5"]
 #ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
 ptychi = ["ptychi==1.*,>=1.2.0"]

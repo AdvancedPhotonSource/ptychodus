@@ -10,6 +10,7 @@ from .agent import AgentChatController, AgentController
 from .automation import AutomationController
 from .data import FileDialogFactory
 from .diffraction import DiffractionController
+from .genesis import GenesisController
 from .globus import GlobusController
 from .image import ImageController
 from .memory import MemoryController
@@ -154,6 +155,9 @@ class ControllerCore:
             view.globus_view,
             view.globus_status_view,
             self._file_dialog_factory,
+        )
+        self._genesis_controller = GenesisController(
+            model.genesis_core.settings, view.genesis_view, self._file_dialog_factory
         )
         self._automation_controller = AutomationController(
             model.automation_core.settings,

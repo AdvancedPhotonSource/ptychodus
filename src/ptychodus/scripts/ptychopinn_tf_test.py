@@ -133,7 +133,6 @@ def main() -> int:
     logging.basicConfig(
         format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
         stream=sys.stdout,
-        encoding='utf-8',
         level=args.log_level,
     )
 

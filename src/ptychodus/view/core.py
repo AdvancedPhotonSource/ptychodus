@@ -6,6 +6,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
     QActionGroup,
     QApplication,
+    QGraphicsView,
     QLCDNumber,
     QMainWindow,
     QSizePolicy,
@@ -89,6 +90,12 @@ class ViewCore(QMainWindow):
         self.globus_view = QWidget()
         self.globus_status_view = QTableView()
 
+        self.genesis_action = self.navigation_tool_bar.addAction(
+            QIcon(':/icons/genesis'), 'Genesis'
+        )
+        self.genesis_view = QWidget()
+        self.genesis_workflow_view = QGraphicsView()
+
         self.automation_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/automate'), 'Automation'
         )
@@ -125,6 +132,7 @@ class ViewCore(QMainWindow):
         self.left_panel.addWidget(self.object_view)
         self.left_panel.addWidget(self.processing_view)
         self.left_panel.addWidget(self.globus_view)
+        self.left_panel.addWidget(self.genesis_view)
         self.left_panel.addWidget(self.automation_view)
         self.left_panel.addWidget(self.agent_view)
         self.left_panel.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
@@ -139,6 +147,7 @@ class ViewCore(QMainWindow):
         self.right_panel.addWidget(self.object_image_view)
         self.right_panel.addWidget(self.processing_status_view)
         self.right_panel.addWidget(self.globus_status_view)
+        self.right_panel.addWidget(self.genesis_workflow_view)
         self.right_panel.addWidget(self.automation_widget)
         self.right_panel.addWidget(self.agent_chat_view)
         self.right_panel.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)

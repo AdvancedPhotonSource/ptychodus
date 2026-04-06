@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class PathLineEditParameterViewController(ParameterViewController, Observer):
-    # TODO: to ptychodus.controller.parametric
+    # FIXME: to ptychodus.controller.parametric
 
     def __init__(self, parameter: PathParameter, *, tool_tip: str = '') -> None:
         super().__init__()

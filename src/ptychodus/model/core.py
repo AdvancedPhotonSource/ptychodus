@@ -27,6 +27,7 @@ from .analysis import AnalysisCore
 from .automation import AutomationCore
 from .diffraction import DiffractionCore, PatternsStreamingContext
 from .fluorescence import FluorescenceCore
+from .genesis import GenesisCore
 from .globus import GlobusCore
 from .memory import MemoryPresenter
 from .metadata import MetadataPresenter
@@ -47,7 +48,6 @@ def configure_logger(*, log_level: int) -> None:
     logging.basicConfig(
         format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
         stream=sys.stdout,
-        encoding='utf-8',
         level=log_level,
     )
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
@@ -186,6 +186,9 @@ class ModelCore:
             self.diffraction_core.diffraction_api,
             self.product_core.product_api,
             self.processing_core.processing_api,
+        )
+        self.genesis_core = GenesisCore(
+            self.settings_registry,
         )
         self.workflow_api: WorkflowAPI = ConcreteWorkflowAPI(
             self.settings_registry,
