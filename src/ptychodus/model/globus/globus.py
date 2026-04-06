@@ -48,8 +48,6 @@ def ensure_owner_only_read_write(file_path: Path) -> Path:
 
         if stat.S_IMODE(file_stat.st_mode) != OWNER_ONLY_RW_MODE:
             raise RuntimeError(f'Token storage path "{file_path} must have 0o600 permissions!"')
-    else:
-        file_path.touch(mode=OWNER_ONLY_RW_MODE)
 
     return file_path
 
@@ -194,7 +192,6 @@ def create_globus_app(
         )
         return globus_sdk.UserApp(
             PTYCHODUS_APP_NAME,
-            client_id=PTYCHODUS_CLIENT_ID,
             client_secret=None,
             scope_requirements=None,
             config=config,
@@ -325,19 +322,12 @@ class GlobusClientThread(threading.Thread):
         stop_event: threading.Event,
     ) -> None:
         super().__init__()
+        self._authorize_url_q = authorize_url_q
+        self._auth_code_q = auth_code_q
         self._job_q = job_q
         self._status_q = status_q
         self._refresh_status_event = refresh_status_event
         self._stop_event = stop_event
-
-        self._globus_app = create_globus_app(
-            authorize_url_q,
-            auth_code_q,
-            stop_event,
-        )
-        self._transfer_client = globus_sdk.TransferClient(app=self._globus_app)
-        self._compute_client = globus_compute_sdk.Client(app=self._globus_app)
-        self._flows_client = globus_sdk.FlowsClient(app=self._globus_app)
 
     def _get_current_action(self, run_id: str) -> str:
         status = self._flows_client.get_run(run_id).data
@@ -427,29 +417,58 @@ class GlobusClientThread(threading.Thread):
         logger.info(f'Run Flow Response: {json.dumps(response, indent=4)}')
 
     def run(self) -> None:
-        self._registered_flow = sync_flow(self._compute_client, self._flows_client)
-        self._specific_flow_client = globus_sdk.SpecificFlowClient(
-            flow_id=self._registered_flow.flow_id, app=self._globus_app
-        )
+        globus_app = None
 
-        while not self._stop_event.is_set():
-            if self._refresh_status_event.is_set():
-                self._refresh_status_event.clear()
-                self._refresh_status()
+        try:
+            globus_app = create_globus_app(
+                self._authorize_url_q,
+                self._auth_code_q,
+                self._stop_event,
+            )
+            self._transfer_client = globus_sdk.TransferClient(app=globus_app)
+            self._compute_client = globus_compute_sdk.Client(app=globus_app)
+            self._flows_client = globus_sdk.FlowsClient(app=globus_app)
+            self._registered_flow = sync_flow(self._compute_client, self._flows_client)
+            self._specific_flow_client = globus_sdk.SpecificFlowClient(
+                flow_id=self._registered_flow.flow_id, app=globus_app
+            )
+        except Exception:
+            logger.exception('Globus worker initialization failed; draining job queue.')
 
-            try:
-                job = self._job_q.get(block=True, timeout=1)
-            except queue.Empty:
-                pass
-            else:
+            while True:
                 try:
-                    self._run_flow(job)
-                except Exception:
-                    logger.exception('Error running flow!')
-                finally:
+                    self._job_q.get_nowait()
                     self._job_q.task_done()
+                except queue.Empty:
+                    break
 
-        self._globus_app.close()
+            if globus_app is not None:
+                globus_app.close()
+
+            return
+
+        try:
+            while not self._stop_event.is_set():
+                if self._refresh_status_event.is_set():
+                    self._refresh_status_event.clear()
+
+                    try:
+                        self._refresh_status()
+                    except Exception:
+                        logger.exception('Error refreshing status.')
+                try:
+                    job = self._job_q.get(block=True, timeout=1)
+                except queue.Empty:
+                    pass
+                else:
+                    try:
+                        self._run_flow(job)
+                    except Exception:
+                        logger.exception('Error running flow!')
+                    finally:
+                        self._job_q.task_done()
+        finally:
+            globus_app.close()
 
 
 class RealGlobusClient(GlobusClient):
@@ -473,8 +492,8 @@ class RealGlobusClient(GlobusClient):
     def is_supported(self) -> bool:
         return True
 
-    def start(self) -> None:  # FIXME start as needed
-        if self._worker is None:
+    def _ensure_started(self) -> None:
+        if self._worker is None or not self._worker.is_alive():
             logger.debug('Starting Globus thread...')
             self._stop_event.clear()
             self._worker = GlobusClientThread(
@@ -487,8 +506,9 @@ class RealGlobusClient(GlobusClient):
             )
             self._worker.start()
             logger.debug('Globus thread started.')
-        else:
-            logger.warning('Worker already started!')
+
+    def start(self) -> None:
+        pass
 
     def stop(self) -> None:
         if self._stop_event.is_set():
@@ -498,9 +518,7 @@ class RealGlobusClient(GlobusClient):
             self._job_q.join()
             logger.debug('Tasks finished.')
 
-            if self._worker is None:
-                logger.warning('Worker is None!')
-            else:
+            if self._worker is not None:
                 logger.debug('Stopping Globus thread...')
                 self._stop_event.set()
                 self._worker.join()
@@ -508,7 +526,9 @@ class RealGlobusClient(GlobusClient):
                 logger.debug('Globus thread stopped.')
 
     def run_flow(self, job: GlobusJob) -> None:
+        self._ensure_started()
         self._job_q.put(job)
 
     def refresh_status(self) -> None:
+        self._ensure_started()
         self._refresh_status_event.set()
