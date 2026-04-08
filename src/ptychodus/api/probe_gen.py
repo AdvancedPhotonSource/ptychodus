@@ -1,3 +1,5 @@
+"""Probe generation functions: geometric apertures, zone plates, Zernike modes, and OPR ensembles."""
+
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 import logging
@@ -21,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 def rescale_probe_intensity(probe: Probe, new_intensity: float) -> Probe:
+    """Return a copy of *probe* rescaled so its total intensity equals *new_intensity*."""
     array = probe.get_array()
     old_intensity = numpy.sum(intensity(array))
 
@@ -45,6 +48,7 @@ def defocus_probe(
     probe_wavelength_m: float,
     defocus_distance_m: float,
 ) -> Probe:
+    """Propagate a probe by *defocus_distance_m* using the angular-spectrum method."""
     pixel_geometry = probe.get_pixel_geometry()
     propagator_parameters = PropagatorParameters(
         wavelength_m=probe_wavelength_m,
@@ -66,6 +70,7 @@ def generate_disk_probe(
     *,
     radius_m: float,
 ) -> Probe:
+    """Generate a binary circular aperture probe with the given radius."""
     coords = geometry.get_transverse_coordinates()
     return Probe(
         array=numpy.where(coords.position_r_m < radius_m, 1, 0) + 0j,
@@ -79,6 +84,7 @@ def generate_rectangular_probe(
     width_m: float,
     height_m: float,
 ) -> Probe:
+    """Generate a binary rectangular aperture probe with the given physical dimensions."""
     coords = geometry.get_transverse_coordinates()
     is_inside = numpy.logical_and(
         numpy.fabs(coords.position_x_m) < 0.5 * width_m,
@@ -97,6 +103,7 @@ def generate_super_gaussian_probe(
     fwhm_m: float,
     order_parameter: float,
 ) -> Probe:
+    """Generate a super-Gaussian (possibly annular) probe with tunable ring radius and order."""
     coords = geometry.get_transverse_coordinates()
     z = (coords.position_r_m - annular_radius_m) / fwhm_m
     zp = numpy.power(2 * z, 2 * order_parameter)
@@ -113,6 +120,7 @@ def generate_average_pattern_probe(
     probe_wavelength_m: float,
     detector_distance_m: float,
 ) -> Probe:
+    """Back-propagate the square root of the mean diffraction pattern to estimate the probe."""
     detector_intensity = numpy.mean(assembled_data.get_patterns(), axis=0)
     detector_pixel_geometry = assembled_data.get_pixel_geometry()
     propagator_parameters = PropagatorParameters(
@@ -151,6 +159,7 @@ def generate_fresnel_zone_plate_probe(
     probe_wavelength_m: float,
     defocus_distance_m: float,
 ) -> Probe:
+    """Simulate the probe formed by a Fresnel zone plate propagated to a given defocus distance."""
     focal_length_m = zone_plate.get_focal_length_m(probe_wavelength_m)
     propagation_distance_m = focal_length_m + defocus_distance_m
 
@@ -196,6 +205,7 @@ def generate_fresnel_zone_plate_probe(
 def generate_zernike_probe(
     geometry: ProbeGeometry, polynomial: Iterable[ZernikeMonomial], *, radius_m: float
 ) -> Probe:
+    """Generate a probe as a superposition of Zernike polynomial modes within a circle of *radius_m*."""
     coords = geometry.get_transverse_coordinates()
     distance = coords.position_r_m / radius_m
     angle_rad = coords.angle_rad
@@ -223,6 +233,7 @@ def generate_incoherent_probe_modes(
     *,
     orthogonalize: bool = True,
 ) -> Probe:
+    """Expand a probe to multiple incoherent modes with random phase shifts and relative weights."""
     num_imodes = len(imode_weights)
     array_in = probe.get_array()
 
@@ -245,7 +256,7 @@ def generate_incoherent_probe_modes(
 
         array_out[imode, :, :] = values
 
-    if orthogonalize and array_in.shape[-3] > 1:
+    if orthogonalize and num_imodes > 1:
         imodes_as_rows = array_out.reshape(num_imodes, -1)
         imodes_as_ortho_rows = scipy.linalg.orth(imodes_as_rows.T).T
         array_out = imodes_as_ortho_rows.reshape(array_out_shape)
@@ -280,6 +291,7 @@ def generate_coherent_probe_modes(
     small_value: float = 1.0e-6,
     normalize_cmodes: bool = True,
 ) -> ProbeSequence:
+    """Build an OPR ProbeSequence with *num_cmodes* coherent modes and random per-scan weights."""
     opr_weights: RealArrayType | None = None
 
     if num_cmodes > 1:

@@ -1,3 +1,5 @@
+"""Object (transmission function) generation functions: STXM, random fields, simplex/fractal noise, and dead-leaves models."""
+
 from collections.abc import Iterable, Sequence
 from typing import Final
 import logging
@@ -21,6 +23,7 @@ def generate_stxm_object(
     assembled_data: AssembledDiffractionData,
     probe_positions: Iterable[ProbePosition],
 ) -> Object:
+    """Generate an STXM-like object by interpolating per-position diffraction counts onto the object grid."""
     coordinates_px: list[float] = list()
     values: list[float] = list()
 
@@ -63,6 +66,7 @@ def generate_random_object(
     phase_deviation_tr: float,
     blur_deviation_px: float,
 ) -> Object:
+    """Generate a random complex object from Gaussian amplitude and phase distributions, with optional Gaussian blur."""
     object_shape = (1, geometry.height_px, geometry.width_px)
 
     amplitude = rng.normal(
@@ -232,6 +236,7 @@ def generate_simplex_noise_object(
     *,
     grid_scale_px: float = 30.0,
 ) -> Object:
+    """Generate a complex object from independent simplex-noise realizations for real and imaginary parts."""
     pixel_geometry = geometry.get_pixel_geometry()
 
     if not pixel_geometry.is_square:
@@ -270,6 +275,7 @@ def generate_fractal_noise_object(
     gain: float = 0.5,
     lacunarity: float = 2.0,
 ) -> Object:
+    """Generate a complex fractal-noise object by summing multiple octaves of simplex noise."""
     object_shape = (1, geometry.height_px, geometry.width_px)
     array = numpy.zeros(object_shape, dtype=complex)
     amplitude = 0.5
@@ -299,6 +305,7 @@ def generate_dead_leaves_object(
     leaf_phase_lower_tr: float,
     leaf_phase_upper_tr: float,
 ) -> Object:
+    """Generate a complex object by layering randomly-sized and positioned disks (dead-leaves model)."""
     # TODO consider using Poisson disk sampling or CVT for sample positions
     # TODO include pixel aspect ratio in sample position calculation
     _sample_positions = [
@@ -408,6 +415,7 @@ def generate_layers(object_: Object, layer_spacing_m: Sequence[float]) -> Object
 
 
 def pad_object(object_: Object, pad_x: int, pad_y: int) -> Object:
+    """Return a zero-padded copy of *object_* with *pad_x* / *pad_y* pixels added on each side."""
     pad_width = [(0, 0), (pad_y, pad_y), (pad_x, pad_x)]
 
     return Object(

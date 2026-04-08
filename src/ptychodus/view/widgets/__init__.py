@@ -5,6 +5,7 @@ from .decimal_line_edit import DecimalLineEdit
 from .decimal_slider import DecimalSlider
 from .exception_dialog import ExceptionDialog
 from .length_widget import LengthWidget
+from .power_two_spin_box import PowerTwoSpinBox
 from .progress_bar_item_delegate import ProgressBarItemDelegate
 from .uuid_line_edit import UUIDLineEdit
 
@@ -17,6 +18,7 @@ __all__ = [
     'ExceptionDialog',
     'GroupBoxWithPresets',
     'LengthWidget',
+    'PowerTwoSpinBox',
     'ProgressBarItemDelegate',
     'UUIDLineEdit',
 ]

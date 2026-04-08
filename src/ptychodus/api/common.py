@@ -1,5 +1,6 @@
 """Common type aliases, physical constants, and utility functions used throughout the API."""
 
+from pathlib import Path
 from typing import Any, Final, TypeAlias, overload
 
 import numpy
@@ -22,6 +23,10 @@ TWO_PI_J: Final[complex] = 2.0j * numpy.pi
 ELECTRON_VOLT_J: Final[float] = 1.602176634e-19
 LIGHT_SPEED_M_PER_S: Final[float] = 299792458
 PLANCK_CONSTANT_J_PER_HZ: Final[float] = 6.62607015e-34
+
+
+def get_ptychodus_dir() -> Path:
+    return Path.home() / '.ptychodus'
 
 
 @overload

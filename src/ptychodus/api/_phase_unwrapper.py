@@ -1,3 +1,5 @@
+"""Phase unwrapping via gradient-domain integration for complex 2D wavefields."""
+
 from scipy import ndimage
 from scipy.fft import fft, fft2, fftfreq, ifft, ifft2
 from scipy.signal.windows import gaussian as gaussian_window
@@ -8,6 +10,8 @@ from .common import ComplexArrayType, InexactArrayType, RealArrayType
 
 
 class PhaseUnwrapper:
+    """Gradient-domain phase unwrapper for complex 2D images."""
+
     def __init__(
         self,
         fourier_shift_step: float = 0.5,

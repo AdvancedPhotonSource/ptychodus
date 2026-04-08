@@ -9,11 +9,11 @@ import numpy
 
 from ptychodus.api.common import RealArrayType
 from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.interpolate import BarycentricArrayStitcher
 from ptychodus.api.object import ObjectCenter
 from ptychodus.api.observer import Observable
 
 from ..product import ProductRepository
-from .interpolators import BarycentricArrayStitcher
 
 
 __all__ = [

@@ -16,6 +16,8 @@ from .propagator import intensity
 
 @dataclass(frozen=True)
 class ProbeTransverseCoordinates:
+    """2D Cartesian coordinate arrays for the transverse plane of the probe, in meters."""
+
     position_x_m: RealArrayType
     position_y_m: RealArrayType
 

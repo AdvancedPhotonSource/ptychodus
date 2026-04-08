@@ -5,11 +5,11 @@ from scipy.fft import fft2, fftshift, ifftshift
 
 from ptychodus.api.common import ComplexArrayType
 from ptychodus.api.geometry import Box2D, PixelGeometry
+from ptychodus.api.interpolate import NearestNeighborArrayInterpolator
 from ptychodus.api.object import Object
 from ptychodus.api.observer import Observable
 
 from ..product import ProductRepository
-from .interpolators import NearestNeighborArrayInterpolator
 
 
 logger = logging.getLogger(__name__)

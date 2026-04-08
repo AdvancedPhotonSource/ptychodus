@@ -178,6 +178,8 @@ class Interval(Generic[T]):
 
 @dataclass(frozen=True)
 class ZernikeMonomial:
+    """A single Zernike polynomial term with a complex coefficient, radial degree n, and angular frequency m."""
+
     coefficient: complex
     radial_degree: int  # n
     angular_frequency: int  # m

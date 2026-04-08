@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from ptychodus.api.common import get_ptychodus_dir
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
@@ -42,7 +43,7 @@ class DiffractionSettings(Observable, Observer):
         self.file_path = self._group.create_path_parameter('FilePath', Path('/path/to/data.npy'))
         self.memmap_enabled = self._group.create_boolean_parameter('MemmapEnabled', False)
         self.scratch_directory = self._group.create_path_parameter(
-            'ScratchDirectory', Path.home() / '.ptychodus'
+            'ScratchDirectory', get_ptychodus_dir()
         )
 
         self.crop_enabled = self._group.create_boolean_parameter('CropEnabled', True)

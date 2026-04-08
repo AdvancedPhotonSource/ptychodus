@@ -27,14 +27,16 @@ from .analysis import AnalysisCore
 from .automation import AutomationCore
 from .diffraction import DiffractionCore, PatternsStreamingContext
 from .fluorescence import FluorescenceCore
+from .genesis import GenesisCore
 from .globus import GlobusCore
 from .memory import MemoryPresenter
 from .metadata import MetadataPresenter
+from .processing import ProcessingCore
 from .product import PositionsStreamingContext, ProductCore
 from .ptychi import PtyChiReconstructorLibrary
 from .ptychonn import PtychoNNReconstructorLibrary
 from .ptychopinn import PtychoPINNReconstructorLibrary
-from .processing import ProcessingCore
+from .ptychopinn_torch import PtychoPINNTorchReconstructorLibrary
 from .task_manager import TaskManager
 from .visualization import VisualizationEngine
 from .workflow import ConcreteWorkflowAPI
@@ -46,16 +48,16 @@ def configure_logger(*, log_level: int) -> None:
     logging.basicConfig(
         format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
         stream=sys.stdout,
-        encoding='utf-8',
         level=log_level,
     )
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
-    logger.info(f'Ptychodus {version("ptychodus")}')
-    logger.info(f'NumPy {version("numpy")}')
-    logger.info(f'Matplotlib {version("matplotlib")}')
-    logger.info(f'HDF5Plugin {version("hdf5plugin")}')
-    logger.info(f'H5Py {version("h5py")}')
+    logger.info('Ptychodus ' + version('ptychodus'))
+    logger.info('NumPy ' + version('numpy'))
+    logger.info('Matplotlib ' + version('matplotlib'))
+    logger.info('Colorcet ' + version('colorcet'))
+    logger.info('HDF5Plugin ' + version('hdf5plugin'))
+    logger.info('H5Py ' + version('h5py'))
     logger.info(f'HDF5 {h5py.version.hdf5_version}')
 
 
@@ -149,6 +151,9 @@ class ModelCore:
         self.ptychopinn_reconstructor_library = PtychoPINNReconstructorLibrary(
             self.settings_registry, self.is_developer_mode_enabled
         )
+        self.ptychopinn_torch_reconstructor_library = PtychoPINNTorchReconstructorLibrary(
+            self.settings_registry, self.is_developer_mode_enabled
+        )
         self.processing_core = ProcessingCore(
             self._task_manager,
             self.settings_registry,
@@ -158,6 +163,7 @@ class ModelCore:
                 self.ptychi_reconstructor_library,
                 self.ptychonn_reconstructor_library,
                 self.ptychopinn_reconstructor_library,
+                # TODO self.ptychopinn_torch_reconstructor_library,
             ],
         )
         self.fluorescence_core = FluorescenceCore(
@@ -169,17 +175,20 @@ class ModelCore:
             self.plugin_registry.fluorescence_file_writers,
         )
         self.analysis_core = AnalysisCore(
+            self.rng,
             self.settings_registry,
             self.diffraction_core.dataset,
             self.product_core.product_repository,
             self.product_core.object_repository,
         )
         self.globus_core = GlobusCore(
-            self._task_manager,
             self.settings_registry,
             self.diffraction_core.diffraction_api,
             self.product_core.product_api,
             self.processing_core.processing_api,
+        )
+        self.genesis_core = GenesisCore(
+            self.settings_registry,
         )
         self.workflow_api: WorkflowAPI = ConcreteWorkflowAPI(
             self.settings_registry,

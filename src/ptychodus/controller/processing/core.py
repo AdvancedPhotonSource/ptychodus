@@ -78,9 +78,6 @@ class ProcessingController(Observer):
         self._algorithm_view_controller = ComboBoxParameterViewController(
             algorithm_parameter, algorithm_parameter.available_reconstructors()
         )
-        self._algorithm_view_controller.get_widget().currentIndexChanged.connect(
-            self._stacked_widget.setCurrentIndex
-        )
         self._status_controller = ProcessingStatusController(
             product_repository, processing_api.get_progress_monitor(), status_view
         )
@@ -226,6 +223,9 @@ class ProcessingController(Observer):
             ExceptionDialog.show_exception('Export Training Data', exc)
 
     def _sync_model_to_view(self) -> None:
+        self._stacked_widget.setCurrentIndex(
+            self._algorithm_view_controller.get_widget().currentIndex()
+        )
         reconstructor = self._algorithm_parameter.get_current_reconstructor()
         is_trainable = False
 

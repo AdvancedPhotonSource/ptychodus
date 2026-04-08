@@ -4,6 +4,7 @@
         <file alias="automate">Font-Awesome-7.1.0/svgs/solid/robot.svg</file>
         <file alias="autoscale">Font-Awesome-7.1.0/svgs/solid/arrows-left-right-to-line.svg</file>
         <file alias="fourier">Font-Awesome-7.1.0/svgs/solid/f.svg</file>
+        <file alias="genesis">genesis.svg</file>
         <file alias="globus">globus.svg</file>
         <file alias="home">Font-Awesome-7.1.0/svgs/solid/house-chimney.svg</file>
         <file alias="line-cut">Font-Awesome-7.1.0/svgs/solid/chart-line.svg</file>

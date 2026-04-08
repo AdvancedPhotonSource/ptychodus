@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=80", "setuptools_scm[simple]>=8"]
+requires = ["setuptools>=80", "setuptools-scm[simple]>=9.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,11 +10,13 @@ requires-python = ">=3.11"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 dependencies = [
+    "colorcet",
     "h5py>=3",
     "hdf5plugin",
     "matplotlib",
     "numpy",
     "psutil",
+    "pydantic",
     "pyyaml",
     "requests",
     "scikit-image",
@@ -31,10 +33,15 @@ ptychodus-bdp = "ptychodus.ptychodus_bdp:main"
 ptychodus-ptychopinn-tf-test = "ptychodus.scripts.ptychopinn_tf_test:main"
 
 [project.optional-dependencies]
-globus = ["gladier", "gladier-tools>=0.5.4"]
+globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
 gui = ["PyQt5"]
 #ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
 ptychi = ["ptychi==1.*,>=1.2.0"]
+ptychopinn = ["ptychopinn[torch]"]
+
+[tool.uv.sources]
+#ptychopinn = { path = "../PtychoPINN", editable = true }
+ptychopinn = { git = "https://github.com/hoidn/PtychoPINN", branch = "torchapi-devel" }
 
 [tool.setuptools.package-data]
 "ptychodus" = ["py.typed"]
@@ -46,16 +53,14 @@ where = ["src"]
 
 [[tool.mypy.overrides]]
 module = [
-    "fair_research_login",
-    "funcx_endpoint.*",
-    "gladier.*",
+    "colorcet",
     "globus_sdk.*",
     "h5py",
     "hdf5plugin",
     "lightning",
-    "parsl.*",
     "ptychi.*",
     "ptycho.*",
+    "ptycho_torch.*",
     "ptychonn.*",
     "pvaccess",
     "pvapy.*",

@@ -2,27 +2,16 @@ from __future__ import annotations
 from collections.abc import Iterator
 import logging
 
+from ptychodus.api.common import NumberArrayType, RealArrayType
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.visualization import (
-    NumberArrayType,
-    RealArrayType,
-    VisualizationProduct,
-)
+from ptychodus.api.visualization import ComplexComponent, VisualizationProduct
 
 from .color_axis import ColorAxis
 from .color_model_renderer import CylindricalColorModelRenderer
 from .colormap import ColormapParameter
 from .colormap_renderer import ColormapRenderer
-from .components import (
-    AmplitudeArrayComponent,
-    ImaginaryArrayComponent,
-    PhaseInRadiansArrayComponent,
-    RealArrayComponent,
-    UnwrappedPhaseInRadiansArrayComponent,
-)
-
 from .renderer import Renderer
 from .transformation import ScalarTransformationParameter
 
@@ -39,7 +28,7 @@ class VisualizationEngine(Observable, Observer):
 
         self._renderer_chooser.register_plugin(
             ColormapRenderer(
-                RealArrayComponent(),
+                ComplexComponent.REAL,
                 self._transformation,
                 self._color_axis,
                 acyclic_colormap,
@@ -48,13 +37,11 @@ class VisualizationEngine(Observable, Observer):
         )
 
         if is_complex:
-            amplitude_component = AmplitudeArrayComponent()
-            phase_component = PhaseInRadiansArrayComponent()
             cyclic_colormap = ColormapParameter(is_cyclic=True)
 
             self._renderer_chooser.register_plugin(
                 ColormapRenderer(
-                    ImaginaryArrayComponent(),
+                    ComplexComponent.IMAGINARY,
                     self._transformation,
                     self._color_axis,
                     acyclic_colormap,
@@ -63,7 +50,7 @@ class VisualizationEngine(Observable, Observer):
             )
             self._renderer_chooser.register_plugin(
                 ColormapRenderer(
-                    amplitude_component,
+                    ComplexComponent.AMPLITUDE,
                     self._transformation,
                     self._color_axis,
                     acyclic_colormap,
@@ -72,7 +59,7 @@ class VisualizationEngine(Observable, Observer):
             )
             self._renderer_chooser.register_plugin(
                 ColormapRenderer(
-                    phase_component,
+                    ComplexComponent.PHASE_RAD,
                     self._transformation,
                     self._color_axis,
                     cyclic_colormap,
@@ -81,7 +68,7 @@ class VisualizationEngine(Observable, Observer):
             )
             self._renderer_chooser.register_plugin(
                 ColormapRenderer(
-                    UnwrappedPhaseInRadiansArrayComponent(),
+                    ComplexComponent.UNWRAPPED_PHASE_RAD,
                     self._transformation,
                     self._color_axis,
                     acyclic_colormap,
@@ -90,8 +77,6 @@ class VisualizationEngine(Observable, Observer):
             )
             self._renderer_chooser.register_plugin(
                 CylindricalColorModelRenderer(
-                    amplitude_component,
-                    phase_component,
                     self._transformation,
                     self._color_axis,
                 ),

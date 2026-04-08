@@ -38,7 +38,9 @@ class GlobusExecutor:
             logger.exception(f'Failed access product for flow ({input_product_index=})!')
             raise
 
-        input_directory = self._settings.input_data_posix_path.get_value() / product_item.get_name()
+        input_directory = (
+            self._settings.input_collection_posix_path.get_value() / product_item.get_name()
+        )
 
         try:
             input_directory.mkdir(mode=0o755, parents=True, exist_ok=True)
@@ -59,41 +61,54 @@ class GlobusExecutor:
         return input_directory
 
     def _run_flow(self, ptychodus_action: str, flow_label: str) -> None:
-        input_data_globus_path = f'{self._settings.input_data_globus_path.get_value()}/{flow_label}'
+        compute_data_posix_path = (
+            self._settings.compute_collection_posix_path.get_value() / flow_label
+        )
 
-        compute_data_posix_path = self._settings.compute_data_posix_path.get_value() / flow_label
+        input_data_globus_path = (
+            f'{self._settings.input_collection_globus_path.get_value()}/{flow_label}'
+        )
         compute_data_globus_path = (
-            f'{self._settings.compute_data_globus_path.get_value()}/{flow_label}'
+            f'{self._settings.compute_collection_globus_path.get_value()}/{flow_label}'
         )
         output_data_globus_path = (
-            f'{self._settings.output_data_globus_path.get_value()}/{flow_label}'
+            f'{self._settings.output_collection_globus_path.get_value()}/{flow_label}'
         )
 
         flow_input = {
-            'input_data_transfer_source_endpoint_id': str(
-                self._settings.input_data_endpoint_id.get_value()
-            ),
-            'input_data_transfer_source_path': input_data_globus_path,
-            'input_data_transfer_destination_endpoint_id': str(
-                self._settings.compute_data_endpoint_id.get_value()
-            ),
-            'input_data_transfer_destination_path': compute_data_globus_path,
-            'input_data_transfer_recursive': True,
-            'input_data_transfer_sync_level': self._settings.transfer_sync_level.get_value(),
-            'compute_endpoint_id': str(self._settings.compute_endpoint_id.get_value()),
-            'ptychodus_action': ptychodus_action,
-            'ptychodus_input_directory': str(compute_data_posix_path),
-            'ptychodus_output_directory': str(compute_data_posix_path),
-            'output_data_transfer_source_endpoint_id': str(
-                self._settings.compute_data_endpoint_id.get_value()
-            ),
-            'output_data_transfer_source_path': f'{compute_data_globus_path}/{StandardFileLayout.PRODUCT_OUT}',
-            'output_data_transfer_destination_endpoint_id': str(
-                self._settings.output_data_endpoint_id.get_value()
-            ),
-            'output_data_transfer_destination_path': f'{output_data_globus_path}/{StandardFileLayout.PRODUCT_OUT}',
-            'output_data_transfer_recursive': False,
-            'output_data_transfer_sync_level': self._settings.transfer_sync_level.get_value(),
+            'transfer_input_data': {
+                'source': {
+                    'id': str(self._settings.input_collection_id.get_value()),
+                    'path': input_data_globus_path,
+                },
+                'destination': {
+                    'id': str(self._settings.compute_collection_id.get_value()),
+                    'path': compute_data_globus_path,
+                },
+                'sync_level': self._settings.transfer_sync_level.get_value(),
+                'recursive': True,
+            },
+            'compute': {
+                'endpoint_id': str(self._settings.compute_endpoint_id.get_value()),
+                # NOTE: 'function_id': compute_function_id, # added in globus.py
+                'function_kwargs': {
+                    'action': ptychodus_action,
+                    'input_directory': str(compute_data_posix_path),
+                    'output_directory': str(compute_data_posix_path),
+                },
+            },
+            'transfer_output_data': {
+                'source': {
+                    'id': str(self._settings.compute_collection_id.get_value()),
+                    'path': compute_data_globus_path,
+                },
+                'destination': {
+                    'id': str(self._settings.output_collection_id.get_value()),
+                    'path': output_data_globus_path,
+                },
+                'sync_level': self._settings.transfer_sync_level.get_value(),
+                'recursive': True,
+            },
         }
 
         flow_tags = ['aps', 'ptychography']

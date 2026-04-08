@@ -45,7 +45,7 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
             except PackageNotFoundError:
                 ptychopinn_version = version('ptycho')
 
-            logger.info(f'\tPtychoPINN {ptychopinn_version}')
+            logger.info(f'PtychoPINN {ptychopinn_version}')
 
             self._reconstructors.append(
                 PtychoPINNTrainableReconstructor(

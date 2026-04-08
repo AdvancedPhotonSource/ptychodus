@@ -10,17 +10,19 @@ from .agent import AgentChatController, AgentController
 from .automation import AutomationController
 from .data import FileDialogFactory
 from .diffraction import DiffractionController
+from .genesis import GenesisController
 from .globus import GlobusController
 from .image import ImageController
 from .memory import MemoryController
 from .object import ObjectController
 from .probe import ProbeController
+from .probe_positions import ProbePositionsController
+from .processing import ProcessingController
 from .product import ProductController
 from .ptychi import PtyChiViewControllerFactory
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopinn import PtychoPINNViewControllerFactory
-from .processing import ProcessingController
-from .probe_positions import ProbePositionsController
+from .ptychopinn_torch import PtychoPINNTorchViewControllerFactory
 from .settings import SettingsController
 
 
@@ -47,6 +49,9 @@ class ControllerCore:
         )
         self._ptychopinn_view_controller_factory = PtychoPINNViewControllerFactory(
             model.ptychopinn_reconstructor_library, self._file_dialog_factory
+        )
+        self._ptychopinn_torch_view_controller_factory = PtychoPINNTorchViewControllerFactory(
+            model.ptychopinn_torch_reconstructor_library, self._file_dialog_factory
         )
         self._settings_controller = SettingsController(
             model.settings_registry,
@@ -138,6 +143,7 @@ class ControllerCore:
             self._file_dialog_factory,
             [
                 self._ptychi_view_controller_factory,
+                self._ptychopinn_torch_view_controller_factory,
                 self._ptychopinn_view_controller_factory,
                 self._ptychonn_view_controller_factory,
             ],
@@ -149,6 +155,9 @@ class ControllerCore:
             view.globus_view,
             view.globus_status_view,
             self._file_dialog_factory,
+        )
+        self._genesis_controller = GenesisController(
+            model.genesis_core.settings, view.genesis_view, self._file_dialog_factory
         )
         self._automation_controller = AutomationController(
             model.automation_core.settings,
@@ -177,6 +186,7 @@ class ControllerCore:
             lambda action: self._swap_central_widgets(action)
         )
 
+        view.genesis_action.setVisible(is_developer_mode_enabled)
         view.agent_action.setVisible(is_developer_mode_enabled)
         view.probe_positions_view.button_box.analyze_button.setEnabled(is_developer_mode_enabled)
 

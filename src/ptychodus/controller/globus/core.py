@@ -1,56 +1,24 @@
-from pathlib import Path
 import logging
 
 from PyQt5.QtCore import QModelIndex, QSortFilterProxyModel, Qt
 from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import (
     QAbstractItemView,
-    QLineEdit,
     QTableView,
     QVBoxLayout,
     QWidget,
 )
 
-from ptychodus.api.observer import Observable, Observer, SequenceObserver
-from ptychodus.api.parametric import PathParameter
+from ptychodus.api.observer import SequenceObserver
 
 from ...model.globus import GlobusAuthorizer, GlobusSettings, GlobusStatus, GlobusStatusRepository
 from ..data import FileDialogFactory
-from ..parametric import ParameterViewBuilder, ParameterViewController
+from ..parametric import ParameterViewBuilder, PathLineEditParameterViewController
 from .authorization import GlobusAuthorizationController
 from .status import GlobusStatusViewController
 from .table_model import GlobusStatusTableModel
 
 logger = logging.getLogger(__name__)
-
-
-class PathLineEditParameterViewController(ParameterViewController, Observer):
-    # TODO: to ptychodus.controller.parametric
-
-    def __init__(self, parameter: PathParameter, *, tool_tip: str = '') -> None:
-        super().__init__()
-        self._parameter = parameter
-        self._widget = QLineEdit()
-
-        if tool_tip:
-            self._widget.setToolTip(tool_tip)
-
-        self.__sync_model_to_view()
-        self._widget.editingFinished.connect(self.__sync_view_to_model)
-        parameter.add_observer(self)
-
-    def get_widget(self) -> QWidget:
-        return self._widget
-
-    def __sync_view_to_model(self) -> None:
-        self._parameter.set_value(Path(self._widget.text()))
-
-    def __sync_model_to_view(self) -> None:
-        self._widget.setText(str(self._parameter.get_value()))
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._parameter:
-            self.__sync_model_to_view()
 
 
 class GlobusController(SequenceObserver[GlobusStatus]):
@@ -67,13 +35,13 @@ class GlobusController(SequenceObserver[GlobusStatus]):
         self._settings = settings
         self._view = view
         self._auth_controller = GlobusAuthorizationController(authorizer, view)
-        self._compute_data_posix_path_controller = PathLineEditParameterViewController(
-            settings.compute_data_posix_path,
-            tool_tip='POSIX path on the compute endpoint where data will be stored.',
+        self._compute_collection_posix_path_controller = PathLineEditParameterViewController(
+            settings.compute_collection_posix_path,
+            tool_tip='POSIX path on the compute collection where data will be stored.',
         )
-        self._output_data_posix_path_controller = PathLineEditParameterViewController(
-            settings.output_data_posix_path,
-            tool_tip='POSIX path on the output data endpoint where data will be stored.',
+        self._output_collection_posix_path_controller = PathLineEditParameterViewController(
+            settings.output_collection_posix_path,
+            tool_tip='POSIX path on the output collection where data will be stored.',
         )
         self._status_controller = GlobusStatusViewController(
             settings.status_auto_refresh, settings.status_refresh_interval_s, status_repository
@@ -94,13 +62,13 @@ class GlobusController(SequenceObserver[GlobusStatus]):
 
         input_data_group = 'Input Data'
         view_builder.add_uuid_line_edit(
-            settings.input_data_endpoint_id, 'Endpoint ID:', group=input_data_group
+            settings.input_collection_id, 'Collection ID:', group=input_data_group
         )
         view_builder.add_line_edit(
-            settings.input_data_globus_path, 'Globus Path:', group=input_data_group
+            settings.input_collection_globus_path, 'Globus Path:', group=input_data_group
         )
         view_builder.add_directory_chooser(
-            settings.input_data_posix_path, 'POSIX Path:', group=input_data_group
+            settings.input_collection_posix_path, 'POSIX Path:', group=input_data_group
         )
 
         compute_group = 'Compute'
@@ -108,24 +76,26 @@ class GlobusController(SequenceObserver[GlobusStatus]):
             settings.compute_endpoint_id, 'Compute Endpoint ID:', group=compute_group
         )
         view_builder.add_uuid_line_edit(
-            settings.compute_data_endpoint_id, 'Data Endpoint ID:', group=compute_group
+            settings.compute_collection_id, 'Collection ID:', group=compute_group
         )
         view_builder.add_line_edit(
-            settings.compute_data_globus_path, 'Data Globus Path:', group=compute_group
+            settings.compute_collection_globus_path, 'Collection Globus Path:', group=compute_group
         )
         view_builder.add_view_controller(
-            self._compute_data_posix_path_controller, 'Data POSIX Path:', group=compute_group
+            self._compute_collection_posix_path_controller,
+            'Collection POSIX Path:',
+            group=compute_group,
         )
 
         output_data_group = 'Output Data'
         view_builder.add_uuid_line_edit(
-            settings.output_data_endpoint_id, 'Endpoint ID:', group=output_data_group
+            settings.output_collection_id, 'Collection ID:', group=output_data_group
         )
         view_builder.add_line_edit(
-            settings.output_data_globus_path, 'Globus Path:', group=output_data_group
+            settings.output_collection_globus_path, 'Globus Path:', group=output_data_group
         )
         view_builder.add_view_controller(
-            self._output_data_posix_path_controller, 'POSIX Path:', group=output_data_group
+            self._output_collection_posix_path_controller, 'POSIX Path:', group=output_data_group
         )
 
         view_builder.add_view_controller_to_bottom(self._status_controller)

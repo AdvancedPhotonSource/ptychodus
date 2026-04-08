@@ -6,14 +6,15 @@ import numpy
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.visualization import (
+    ComplexComponent,
     NumberArrayType,
     RealArrayType,
     VisualizationProduct,
+    visualize_complex_values,
 )
 
 from .color_axis import ColorAxis
 from .color_model import CylindricalColorModelParameter
-from .components import AmplitudeArrayComponent, PhaseInRadiansArrayComponent
 from .renderer import Renderer
 from .transformation import ScalarTransformationParameter
 
@@ -21,14 +22,12 @@ from .transformation import ScalarTransformationParameter
 class CylindricalColorModelRenderer(Renderer):
     def __init__(
         self,
-        amplitude_component: AmplitudeArrayComponent,
-        phase_component: PhaseInRadiansArrayComponent,
         transformation: ScalarTransformationParameter,
         color_axis: ColorAxis,
     ) -> None:
         super().__init__('Complex')
-        self._amplitude_component = amplitude_component
-        self._phase_component = phase_component
+        self._amplitude_component = ComplexComponent.AMPLITUDE
+        self._phase_component = ComplexComponent.PHASE_RAD
         self._transformation = transformation
         self._add_parameter('transformation', transformation)
         self._color_axis = color_axis
@@ -49,34 +48,45 @@ class CylindricalColorModelRenderer(Renderer):
         return True
 
     def _colorize(self, amplitude: RealArrayType, phase_rad: RealArrayType) -> RealArrayType:
-        vrange = self._color_axis.get_range()
-        norm = Normalize(vmin=vrange.lower, vmax=vrange.upper, clip=False)
+        norm = Normalize(
+            vmin=self._color_axis.lower.get_value(),
+            vmax=self._color_axis.upper.get_value(),
+            clip=False,
+        )
 
-        model = self._color_model.get_plugin()
+        model = self._color_model.get_strategy()
         h = (phase_rad + numpy.pi) / (2 * numpy.pi)
-        return model(h, norm(amplitude))
+        return model.render_rgba(h, norm(amplitude))
 
     def colorize(self, array: NumberArrayType) -> RealArrayType:
-        amplitude = self._amplitude_component.calculate(array)
-        amplitude_transformed = self._transformation.transform(amplitude)
-        phase_rad = self._phase_component.calculate(array)
+        amplitude = self._amplitude_component.extract_component(array)
+        transform = self._transformation.get_strategy()
+        amplitude_transformed = transform.transform(amplitude)
+        phase_rad = self._phase_component.extract_component(array)
         return self._colorize(amplitude_transformed, phase_rad)
 
     def render(
         self, array: NumberArrayType, pixel_geometry: PixelGeometry, *, autoscale_color_axis: bool
     ) -> VisualizationProduct:
-        amplitude = self._amplitude_component.calculate(array)
-        amplitude_transformed = self._transformation.transform(amplitude)
-        phase_rad = self._phase_component.calculate(array)
+        value_min: float | None = None
+        value_max: float | None = None
+
+        if not autoscale_color_axis:
+            value_min = self._color_axis.lower.get_value()
+            value_max = self._color_axis.upper.get_value()
+
+        product = visualize_complex_values(
+            values=array,
+            pixel_geometry=pixel_geometry,
+            model=self._color_model.get_strategy(),
+            amplitude_transform=self._transformation.get_strategy(),
+            value_min=value_min,
+            value_max=value_max,
+            clip=False,
+        )
 
         if autoscale_color_axis:
-            self._color_axis.set_to_data_range(amplitude_transformed)
+            color_value_range = product.get_color_value_range()
+            self._color_axis.set_to_data_range(color_value_range.lower, color_value_range.upper)
 
-        rgba = self._colorize(amplitude_transformed, phase_rad)
-
-        return VisualizationProduct(
-            value_label=self._transformation.decorate_text(self._amplitude_component.name),
-            values=array,
-            rgba=rgba,
-            pixel_geometry=pixel_geometry,
-        )
+        return product

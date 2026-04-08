@@ -22,6 +22,14 @@ Diffraction
    :undoc-members:
    :show-inheritance:
 
+Diffraction Generators
+----------------------
+
+.. automodule:: ptychodus.api.diffraction_gen
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Fluorescence
 ------------
 
@@ -46,10 +54,26 @@ Input/Output (I/O)
    :undoc-members:
    :show-inheritance:
 
+Interpolation
+-------------
+
+.. automodule:: ptychodus.api.interpolate
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Object
 ------
 
 .. automodule:: ptychodus.api.object
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Object Generators
+-----------------
+
+.. automodule:: ptychodus.api.object_gen
    :members:
    :undoc-members:
    :show-inheritance:
@@ -86,10 +110,26 @@ Probe
    :undoc-members:
    :show-inheritance:
 
+Probe Generators
+----------------
+
+.. automodule:: ptychodus.api.probe_gen
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Probe Positions
 ---------------
 
 .. automodule:: ptychodus.api.probe_positions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Probe Position Generators
+-------------------------
+
+.. automodule:: ptychodus.api.probe_positions_gen
    :members:
    :undoc-members:
    :show-inheritance:
