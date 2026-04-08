@@ -186,6 +186,7 @@ class ControllerCore:
             lambda action: self._swap_central_widgets(action)
         )
 
+        view.genesis_action.setVisible(is_developer_mode_enabled)
         view.agent_action.setVisible(is_developer_mode_enabled)
         view.probe_positions_view.button_box.analyze_button.setEnabled(is_developer_mode_enabled)
 

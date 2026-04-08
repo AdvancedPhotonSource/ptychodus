@@ -163,7 +163,7 @@ class ModelCore:
                 self.ptychi_reconstructor_library,
                 self.ptychonn_reconstructor_library,
                 self.ptychopinn_reconstructor_library,
-                self.ptychopinn_torch_reconstructor_library,
+                # TODO self.ptychopinn_torch_reconstructor_library,
             ],
         )
         self.fluorescence_core = FluorescenceCore(
