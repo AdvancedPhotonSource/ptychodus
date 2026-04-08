@@ -16,7 +16,7 @@ To install ptychodus from PyPI with the most common optional dependencies:
 
     $ python -m pip install ptychodus[globus,gui,ptychi]
 
-Instructions for installing in containers and from conda-forge are provided in
+Instructions for installing in containers, uv, and from conda-forge are provided in
 the ``docs`` directory.
 
 
@@ -28,28 +28,14 @@ Developer Installation
 .. code-block:: shell
 
    $ git clone https://github.com/AdvancedPhotonSource/ptychodus.git
-   $ conda create -n ptychodus --file ptychodus/requirements-dev.txt
-   $ conda activate ptychodus
-   $ pip install -e ./ptychodus
-
-- To install `pty-chi <https://github.com/AdvancedPhotonSource/pty-chi>`_
-
-.. code-block:: shell
-
-   $ pip install ptychi
-
-- To install `PtychoNN <https://github.com/mcherukara/PtychoNN>`_
-
-.. code-block:: shell
-
-   $ conda install -n ptychodus ptychonn
+   $ cd ptychodus
+   $ uv sync --extra globus --extra gui --extra ptychi
 
 - Launch `ptychodus`:
 
 .. code-block:: shell
 
-   $ conda activate ptychodus
-   $ ptychodus
+   $ uv run ptychodus
 
 
 Reporting Bugs
