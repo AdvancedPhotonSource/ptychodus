@@ -150,7 +150,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         # Perform reconstruction
         obj_tensor_full = self._reconstruct_image(test_data_container)
 
-        # Process the reconstructed image (TODO: ptychodus stitches)
+        # Process the reconstructed image
         object_out_array = ptycho.tf_helper.reassemble_position(
             obj_tensor_full, test_data_container.global_offsets, M=20
         )

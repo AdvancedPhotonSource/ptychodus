@@ -36,7 +36,13 @@ from ptychodus.api.parametric import (
     UUIDParameter,
 )
 
-from ..view.widgets import AngleWidget, DecimalLineEdit, DecimalSlider, LengthWidget
+from ..view.widgets import (
+    AngleWidget,
+    DecimalLineEdit,
+    DecimalSlider,
+    LengthWidget,
+    PowerTwoSpinBox,
+)
 from .data import FileDialogFactory
 
 logger = logging.getLogger(__name__)
@@ -131,6 +137,42 @@ class SpinBoxParameterViewController(ParameterViewController, Observer):
 
             self._widget.setValue(self._parameter.get_value())
             self._widget.blockSignals(False)
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._parameter:
+            self.__sync_model_to_view()
+
+
+class PowerTwoSpinBoxParameterViewController(ParameterViewController, Observer):
+    def __init__(self, parameter: IntegerParameter, *, tool_tip: str = '') -> None:
+        super().__init__()
+        self._parameter = parameter
+        self._widget = PowerTwoSpinBox()
+
+        if tool_tip:
+            self._widget.setToolTip(tool_tip)
+
+        self.__sync_model_to_view()
+        self._widget.valueChanged.connect(parameter.set_value)
+        parameter.add_observer(self)
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+    def __sync_model_to_view(self) -> None:
+        minimum = self._parameter.get_minimum()
+        maximum = self._parameter.get_maximum()
+
+        if minimum is None:
+            raise ValueError('Minimum not provided!')
+
+        if maximum is None:
+            raise ValueError('Maximum not provided!')
+
+        self._widget.blockSignals(True)
+        self._widget.setRange(minimum, maximum)
+        self._widget.setValue(self._parameter.get_value())
+        self._widget.blockSignals(False)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:

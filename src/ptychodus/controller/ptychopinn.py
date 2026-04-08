@@ -1,74 +1,9 @@
-from PyQt5.QtGui import QValidator
-from PyQt5.QtWidgets import QSpinBox, QWidget
-
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import IntegerParameter
+from PyQt5.QtWidgets import QWidget
 
 from ..model.ptychopinn.core import PtychoPINNReconstructorLibrary
 from .data import FileDialogFactory
-from .parametric import ParameterViewBuilder, ParameterViewController
+from .parametric import ParameterViewBuilder, PowerTwoSpinBoxParameterViewController
 from .processing import ReconstructorViewControllerFactory
-
-
-class PowerTwoSpinBox(QSpinBox):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-
-    def stepBy(self, steps: int) -> None:  # noqa: N802
-        if steps < 0:
-            self.setValue(self.value() // (1 << -steps))
-        elif steps > 0:
-            self.setValue(self.value() * (1 << steps))
-
-    def validate(self, input: str, pos: int) -> tuple[QValidator.State, str, int]:
-        try:
-            value = int(input)
-        except ValueError:
-            pass
-        else:
-            if value > 0:
-                is_pow2 = (value & (value - 1)) == 0
-
-                if is_pow2:
-                    return QValidator.State.Acceptable, input, pos
-
-        return QValidator.State.Intermediate, input, pos
-
-
-class PowerTwoSpinBoxParameterViewController(ParameterViewController, Observer):
-    def __init__(self, parameter: IntegerParameter, *, tool_tip: str = '') -> None:
-        super().__init__()
-        self._parameter = parameter
-        self._widget = PowerTwoSpinBox()
-
-        if tool_tip:
-            self._widget.setToolTip(tool_tip)
-
-        self._sync_model_to_view()
-        self._widget.valueChanged.connect(parameter.set_value)
-        parameter.add_observer(self)
-
-    def get_widget(self) -> QWidget:
-        return self._widget
-
-    def _sync_model_to_view(self) -> None:
-        minimum = self._parameter.get_minimum()
-        maximum = self._parameter.get_maximum()
-
-        if minimum is None:
-            raise ValueError('Minimum not provided!')
-
-        if maximum is None:
-            raise ValueError('Maximum not provided!')
-
-        self._widget.blockSignals(True)
-        self._widget.setRange(minimum, maximum)
-        self._widget.setValue(self._parameter.get_value())
-        self._widget.blockSignals(False)
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._parameter:
-            self._sync_model_to_view()
 
 
 class PtychoPINNViewControllerFactory(ReconstructorViewControllerFactory):

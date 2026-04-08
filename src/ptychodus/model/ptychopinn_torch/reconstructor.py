@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
     def __init__(
         self,
-        name: str,
+        model_training_mode: str,
         data_settings: PtychoPINNTorchDataSettings,
         model_settings: PtychoPINNTorchModelSettings,
         inference_settings: PtychoPINNTorchInferenceSettings,
@@ -57,7 +57,7 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
         is_developer_mode_enabled: bool,
     ) -> None:
         super().__init__()
-        self._name = name
+        self._model_training_mode = model_training_mode
         self._data_settings = data_settings
         self._model_settings = model_settings
         self._inference_settings = inference_settings
@@ -66,11 +66,11 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
 
         self._model: PtychoModel | None = None
 
-    def _create_config_manager(self) -> ConfigManager:
+    def _create_config_manager(self, model_size: int) -> ConfigManager:
         grid_size = (
-            self._data_settings.grid_size_x.get_value(),
             self._data_settings.grid_size_y.get_value(),
-        )  # FIXME verify order
+            self._data_settings.grid_size_x.get_value(),
+        )
         x_bounds = (
             self._data_settings.x_lower_bound.get_value(),
             self._data_settings.x_upper_bound.get_value(),
@@ -80,88 +80,88 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             self._data_settings.y_upper_bound.get_value(),
         )
         data_config = DataConfig(
-            nphotons=self._data_settings.nphotons.get_value(),
-            N=self._data_settings.N.get_value(),
-            C=self._data_settings.C.get_value(),
-            K=self._data_settings.K.get_value(),
-            K_quadrant=self._data_settings.K_quadrant.get_value(),
-            n_subsample=self._data_settings.n_subsample.get_value(),
-            subsample_seed=None,
-            grid_size=grid_size,
-            neighbor_function=self._data_settings.neighbor_function.get_value(),
-            min_neighbor_distance=self._data_settings.min_neighbor_distance.get_value(),
-            max_neighbor_distance=self._data_settings.max_neighbor_distance.get_value(),
+            N=model_size,
+            C=self._data_settings.num_channels.get_value(),
+            normalize=self._data_settings.data_normalization_mode.get_value(),
+            neighbor_function=self._data_settings.neighbor_lookup_method.get_value(),
             scan_pattern=self._data_settings.scan_pattern.get_value(),
-            normalize=self._data_settings.normalize.get_value(),
-            probe_scale=self._data_settings.probe_scale.get_value(),
-            probe_normalize=self._data_settings.probe_normalize.get_value(),
-            probe_ramp_removal=self._data_settings.probe_ramp_removal.get_value(),
-            data_scaling=self._data_settings.data_scaling.get_value(),
-            phase_subtraction=self._data_settings.phase_subtraction.get_value(),
+            probe_normalize=self._data_settings.normalize_probe.get_value(),
             x_bounds=x_bounds,
             y_bounds=y_bounds,
+            min_neighbor_distance=self._data_settings.min_neighbor_distance.get_value(),
+            max_neighbor_distance=self._data_settings.max_neighbor_distance.get_value(),
+            K_quadrant=self._data_settings.num_nearest_neighbors_for_quadrant_lookup.get_value(),
+            nphotons=self._data_settings.num_photons.get_value(),
+            n_subsample=self._data_settings.coordinate_subsampling_factor.get_value(),
+            probe_scale=self._data_settings.probe_scale.get_value(),
+            K=self._data_settings.num_nearest_neighbors_for_lookup.get_value(),
+            grid_size=grid_size,
+            subsample_seed=None,
+            probe_ramp_removal=self._data_settings.probe_ramp_removal.get_value(),
+            data_scaling=self._data_settings.data_scaling_method.get_value(),
+            phase_subtraction=self._data_settings.subtract_mean_phase.get_value(),
         )
+
+        amp_loss = self._model_settings.auxiliary_amplitude_loss.get_value()
+        phase_loss = self._model_settings.auxiliary_phase_loss.get_value()
+
         model_config = ModelConfig(
-            mode=self._model_settings.mode.get_value(),
+            mode=self._model_training_mode,
+            object_big=self._model_settings.object_big.get_value(),
+            probe_big=self._model_settings.probe_big.get_value(),
+            amp_activation=self._model_settings.amplitude_activation_function.get_value(),
+            cbam_encoder=self._model_settings.cbam_encoder.get_value(),
+            decoder_last_amp_channels=self._data_settings.num_channels.get_value(),
+            use_shared_decoder=self._model_settings.use_shared_decoder.get_value(),
             intensity_scale_trainable=self._model_settings.intensity_scale_trainable.get_value(),
             intensity_scale=self._model_settings.intensity_scale.get_value(),
             max_position_jitter=self._model_settings.max_position_jitter.get_value(),
             num_datasets=self._model_settings.num_datasets.get_value(),
-            C_model=self._model_settings.C_model.get_value(),
-            n_filters_scale=self._model_settings.n_filters_scale.get_value(),
-            amp_activation=self._model_settings.amp_activation.get_value(),
-            batch_norm=self._model_settings.batch_norm.get_value(),
-            probe_mask=None,  # FIXME
+            C_model=self._data_settings.num_channels.get_value(),
+            C_forward=self._data_settings.num_channels.get_value(),
+            amp_loss=None if amp_loss.casefold() == 'none' else amp_loss,
+            phase_loss=None if phase_loss.casefold() == 'none' else phase_loss,
+            amp_loss_coeff=self._model_settings.auxiliary_amplitude_loss_coeff.get_value(),
+            phase_loss_coeff=self._model_settings.auxiliary_phase_loss_coeff.get_value(),
+            n_filters_scale=self._model_settings.num_filters_scale.get_value(),
+            probe_mask=None,
+            eca_decoder=self._model_settings.eca_decoder.get_value(),
+            batch_norm=self._model_settings.use_batch_normalization.get_value(),
             edge_pad=self._model_settings.edge_pad.get_value(),
             decoder_last_c_outer_fraction=self._model_settings.decoder_last_c_outer_fraction.get_value(),
-            decoder_last_amp_channels=self._model_settings.decoder_last_amp_channels.get_value(),
-            use_shared_decoder=self._model_settings.use_shared_decoder.get_value(),
-            eca_encoder=self._model_settings.eca_encoder.get_value(),
-            cbam_encoder=self._model_settings.cbam_encoder.get_value(),
             cbam_bottleneck=self._model_settings.cbam_bottleneck.get_value(),
             cbam_decoder=self._model_settings.cbam_decoder.get_value(),
-            eca_decoder=self._model_settings.eca_decoder.get_value(),
             spatial_decoder=self._model_settings.spatial_decoder.get_value(),
             decoder_spatial_kernel=self._model_settings.decoder_spatial_kernel.get_value(),
-            object_big=self._model_settings.object_big.get_value(),
-            probe_big=self._model_settings.probe_big.get_value(),
+            eca_encoder=self._model_settings.eca_encoder.get_value(),
             offset=self._model_settings.offset.get_value(),
-            C_forward=self._model_settings.C_forward.get_value(),
             pad_object=self._model_settings.pad_object.get_value(),
-            gaussian_smoothing_sigma=self._model_settings.gaussian_smoothing_sigma.get_value(),
-            loss_function=self._model_settings.loss_function.get_value(),
-            amp_loss=self._model_settings.amp_loss.get_value(),
-            phase_loss=self._model_settings.phase_loss.get_value(),
-            amp_loss_coeff=self._model_settings.amp_loss_coeff.get_value(),
-            phase_loss_coeff=self._model_settings.phase_loss_coeff.get_value(),
-            probe_reference_coeff=self._model_settings.probe_reference_coeff.get_value(),
+            gaussian_smoothing_sigma=self._model_settings.probe_gaussian_smoothing_sigma.get_value(),
+            probe_reference_coeff=self._model_settings.probe_reference_loss_coeff.get_value(),
         )
+        gradient_clip_val = self._training_settings.gradient_clip_val.get_value()
         training_config = TrainingConfig(
-            training_directories=[''],  # FIXME
-            nll=self._training_settings.nll.get_value(),
-            device=self._training_settings.device.get_value(),
-            strategy=self._training_settings.strategy.get_value(),
-            n_devices=self._training_settings.n_devices.get_value(),
-            framework=self._training_settings.framework.get_value(),
-            orchestrator=self._training_settings.orchestrator.get_value(),
-            learning_rate=self._training_settings.learning_rate.get_value(),
             epochs=self._training_settings.epochs.get_value(),
             batch_size=self._training_settings.batch_size.get_value(),
-            epochs_fine_tune=self._training_settings.epochs_fine_tune.get_value(),
-            fine_tune_gamma=self._training_settings.fine_tune_gamma.get_value(),
-            scheduler=self._training_settings.scheduler.get_value(),
-            num_workers=self._training_settings.num_workers.get_value(),
-            accum_steps=self._training_settings.accum_steps.get_value(),
-            gradient_clip_val=self._training_settings.gradient_clip_val.get_value(),
-            warmup_epochs=self._training_settings.lr_warmup_epochs.get_value(),
-            min_lr_ratio=self._training_settings.min_lr_ratio.get_value(),
-            stage_1_epochs=self._training_settings.stage_1_epochs.get_value(),
-            stage_2_epochs=self._training_settings.stage_2_epochs.get_value(),
-            stage_3_epochs=self._training_settings.stage_3_epochs.get_value(),
-            physics_weight_schedule=self._training_settings.physics_weight_schedule.get_value(),
-            stage_3_lr_factor=self._training_settings.stage_3_lr_factor.get_value(),
-            torch_loss_mode=self._training_settings.torch_loss_mode.get_value(),
+            learning_rate=self._training_settings.learning_rate.get_value(),
+            n_devices=self._training_settings.num_devices.get_value(),
+            num_workers=self._training_settings.num_dataloader_workers.get_value(),
+            accum_steps=self._training_settings.gradient_accumulation_steps.get_value(),
+            epochs_fine_tune=self._training_settings.epochs_finetune.get_value(),
+            fine_tune_gamma=self._training_settings.finetune_gamma.get_value(),
+            gradient_clip_val=gradient_clip_val if gradient_clip_val > 0.0 else None,
             experiment_name=self._training_settings.experiment_name.get_value(),
+            training_directories=[''],  # FIXME
+            nll=self._training_settings.use_negative_log_likelihood_loss.get_value(),
+            device=self._training_settings.device.get_value(),
+            strategy='ddp_notebook',
+            framework='Lightning',
+            orchestrator='Lightning',
+            scheduler=self._training_settings.learning_rate_scheduler.get_value(),
+            warmup_epochs=self._training_settings.learning_rate_warmup_epochs.get_value(),
+            min_lr_ratio=self._training_settings.minimum_learning_rate_ratio.get_value(),
+            physics_weight_schedule=self._training_settings.physics_weight_schedule.get_value(),
+            torch_loss_mode=self._training_settings.torch_loss_mode.get_value(),
             notes=self._training_settings.notes.get_value(),
             model_name=self._training_settings.model_name.get_value(),
             enable_staged_finetuning=self._training_settings.enable_staged_finetuning.get_value(),
@@ -178,19 +178,19 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             finetune_stage3_lr_phase_head=self._training_settings.finetune_stage3_lr_phase_head.get_value(),
             finetune_skip_stage3=self._training_settings.finetune_skip_stage3.get_value(),
             finetune_early_stop_patience=self._training_settings.finetune_early_stop_patience.get_value(),
-            finetune_val_split=self._training_settings.finetune_val_split.get_value(),
-            output_dir=self._training_settings.output_dir.get_value(),
+            finetune_val_split=self._training_settings.finetune_validation_split.get_value(),
+            output_dir='',  # FIXME
             train_data_file='',  # FIXME
             test_data_file='',  # FIXME
-            n_groups=self._training_settings.n_groups.get_value(),
+            n_groups=self._training_settings.num_grouped_samples.get_value(),
         )
         inference_config = InferenceConfig(
-            middle_trim=self._inference_settings.middle_trim.get_value(),
             batch_size=self._inference_settings.batch_size.get_value(),
+            middle_trim=self._inference_settings.middle_trim.get_value(),
             experiment_number=self._inference_settings.experiment_number.get_value(),
+            patch_weighting=self._inference_settings.patch_weighting_method.get_value(),
             pad_eval=self._inference_settings.pad_eval.get_value(),
             window=self._inference_settings.window.get_value(),
-            patch_weighting=self._inference_settings.patch_weighting.get_value(),
         )
         datagen_config = DatagenConfig()
 
@@ -204,7 +204,7 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
 
     @property
     def name(self) -> str:
-        return self._name
+        return self._model_training_mode
 
     def get_progress_goal(self) -> int:
         return 0
@@ -213,7 +213,14 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
         if self._model is None:
             raise RuntimeError('Model must be loaded before reconstruction.')
 
-        config_manager = self._create_config_manager()  # FIXME reuse config manager
+        model_size = parameters.diffraction_patterns.shape[-1]
+
+        if parameters.diffraction_patterns.shape[-2] != model_size:
+            raise ValueError('Model requires square diffraction patterns!')
+
+        # FIXME See ptycho_torch/api/example_train_predict_in_memory.py
+
+        config_manager = self._create_config_manager(model_size)
         ptycho_data_dir = Path()  # FIXME
         tensordict_dataloader = PtychoDataLoader(
             data_dir=ptycho_data_dir, config_manager=config_manager, data_format='tensordict'
@@ -247,9 +254,10 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
         return 'PyTorch Lightning Checkpoint Files (*.ckpt)'
 
     def load_model_from_file(self, file_path: Path) -> None:
+        model_size = 0  # FIXME
         json_base_path = Path()  # FIXME
         self._model = PtychoModel._load(
-            config_manager=self._create_config_manager(),
+            config_manager=self._create_config_manager(model_size),
             strategy='lightning',
             run_path=json_base_path,  # FIXME
             model_class=PtychoPINN_Lightning,
@@ -286,7 +294,8 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
         )
 
     def train(self, input_path: Path, output_path: Path) -> Iterator[TrainOutput]:
-        config_manager = self._create_config_manager()  # FIXME reuse config manager?
+        model_size = 0  # FIXME
+        config_manager = self._create_config_manager(model_size)
         timestamp = datetime.now()  # FIXME
 
         lightning_dataloader = PtychoDataLoader(

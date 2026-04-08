@@ -10,6 +10,7 @@ from ...api.reconstructor import (
     TrainableReconstructor,
 )
 from ...api.settings import SettingsRegistry
+from .enums import PtychoPINNTorchEnumerators
 from .settings import (
     PtychoPINNTorchDataSettings,
     PtychoPINNTorchInferenceSettings,
@@ -29,6 +30,7 @@ class PtychoPINNTorchReconstructorLibrary(ReconstructorLibrary):
         self.model_settings = PtychoPINNTorchModelSettings(settings_registry)
         self.training_settings = PtychoPINNTorchTrainingSettings(settings_registry)
         self.inference_settings = PtychoPINNTorchInferenceSettings(settings_registry)
+        self.enumerators = PtychoPINNTorchEnumerators()
         self._reconstructors: list[TrainableReconstructor] = list()
 
         try:

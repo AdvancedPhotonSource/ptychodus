@@ -20,60 +20,31 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
 
     def create_view_controller(self, reconstructor_name: str) -> QWidget:
         builder = ParameterViewBuilder(self._file_dialog_factory)
+        enumerators = self._model.enumerators
 
+        # Data
         data_group = 'Data'
         data_settings = self._model.data_settings
-        builder.add_decimal_line_edit(
-            data_settings.nphotons, 'Number of Photons:', group=data_group
+        builder.add_integer_line_edit(data_settings.num_channels, 'Channels:', group=data_group)
+        builder.add_combo_box(
+            data_settings.data_normalization_mode,
+            enumerators.get_data_normalization_modes(),
+            'Normalize:',
+            group=data_group,
         )
-        builder.add_integer_line_edit(
-            data_settings.N, 'Diffraction Pattern Size:', group=data_group
+        builder.add_combo_box(
+            data_settings.neighbor_lookup_method,
+            enumerators.get_neighbor_lookup_methods(),
+            'Neighbor Function:',
+            group=data_group,
         )
-        builder.add_integer_line_edit(data_settings.C, 'Channels:', group=data_group)
-        builder.add_integer_line_edit(
-            data_settings.K, 'Nearest Neighbors for Lookup:', group=data_group
-        )
-        builder.add_integer_line_edit(
-            data_settings.K_quadrant, 'Nearest Neighbors for Quadrant Lookup:', group=data_group
-        )
-        builder.add_integer_line_edit(
-            data_settings.n_subsample, 'Coordinate Subsampling Factor:', group=data_group
-        )
-        builder.add_integer_line_edit(
-            data_settings.grid_size_x, 'Scan Grid Size X:', group=data_group
-        )
-        builder.add_integer_line_edit(
-            data_settings.grid_size_y, 'Scan Grid Size Y:', group=data_group
-        )
-        builder.add_line_edit(
-            data_settings.neighbor_function, 'Neighbor Function:', group=data_group
-        )  # FIXME make enum
-        builder.add_decimal_line_edit(
-            data_settings.min_neighbor_distance, 'Min Neighbor Distance [px]:', group=data_group
-        )
-        builder.add_decimal_line_edit(
-            data_settings.max_neighbor_distance, 'Max Neighbor Distance [px]:', group=data_group
-        )
-        builder.add_line_edit(
+        builder.add_combo_box(
             data_settings.scan_pattern,
+            enumerators.get_scan_patterns(),
             'Scan Pattern:',
-            tool_tip='Used for four quadrant neighbor function.',
-            group=data_group,
-        )  # FIXME make enum
-        builder.add_line_edit(
-            data_settings.normalize, 'Normalize:', group=data_group
-        )  # FIXME make enum
-        builder.add_decimal_line_edit(data_settings.probe_scale, 'Probe Scale:', group=data_group)
-        builder.add_check_box(data_settings.probe_normalize, 'Normalize Probe', group=data_group)
-        builder.add_line_edit(
-            data_settings.data_scaling, 'Data Scaling:', group=data_group
-        )  # FIXME make enum
-        builder.add_check_box(
-            data_settings.phase_subtraction,
-            'Subtract Phase',
-            tool_tip='Only useful for supervised training dataset.',
             group=data_group,
         )
+        builder.add_check_box(data_settings.normalize_probe, 'Normalize Probe', group=data_group)
         builder.add_decimal_line_edit(
             data_settings.x_lower_bound, 'X Lower Bound:', group=data_group
         )
@@ -86,33 +57,81 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
         builder.add_decimal_line_edit(
             data_settings.y_upper_bound, 'Y Upper Bound:', group=data_group
         )
+        builder.add_decimal_line_edit(
+            data_settings.min_neighbor_distance, 'Min Neighbor Distance [px]:', group=data_group
+        )
+        builder.add_decimal_line_edit(
+            data_settings.max_neighbor_distance, 'Max Neighbor Distance [px]:', group=data_group
+        )
+        builder.add_integer_line_edit(
+            data_settings.num_nearest_neighbors_for_quadrant_lookup,
+            'Nearest Neighbors for Quadrant Lookup:',
+            group=data_group,
+        )
 
+        # Data Advanced
+        builder.add_decimal_line_edit(data_settings.num_photons, 'Photons:', group=data_group)
+        builder.add_integer_line_edit(
+            data_settings.coordinate_subsampling_factor,
+            'Coordinate Subsampling Factor:',
+            group=data_group,
+        )
+        builder.add_decimal_line_edit(data_settings.probe_scale, 'Probe Scale:', group=data_group)
+        builder.add_integer_line_edit(
+            data_settings.num_nearest_neighbors_for_lookup,
+            'Nearest Neighbors for Lookup:',
+            group=data_group,
+        )
+        builder.add_integer_line_edit(data_settings.grid_size_x, 'Grid Size X:', group=data_group)
+        builder.add_integer_line_edit(data_settings.grid_size_y, 'Grid Size Y:', group=data_group)
+        builder.add_check_box(
+            data_settings.probe_ramp_removal,
+            'Probe Ramp Removal',
+            group=data_group,
+        )
+        builder.add_combo_box(
+            data_settings.data_scaling_method,
+            enumerators.get_data_scaling_methods(),
+            'Data Scaling:',
+            group=data_group,
+        )
+        builder.add_check_box(
+            data_settings.subtract_mean_phase,
+            'Subtract Phase',
+            tool_tip='Only useful for supervised training dataset.',
+            group=data_group,
+        )
+
+        # Model
         model_group = 'Model'
         model_settings = self._model.model_settings
-        builder.add_line_edit(
-            model_settings.mode, 'Training Mode:', group=model_group
-        )  # FIXME make enum
-        builder.add_line_edit(
-            model_settings.architecture, 'Architecture:', group=model_group
-        )  # FIXME make enum
-        builder.add_integer_line_edit(model_settings.fno_modes, 'FNO Modes:', group=model_group)
-        builder.add_integer_line_edit(model_settings.fno_width, 'FNO Width:', group=model_group)
-        builder.add_integer_line_edit(model_settings.fno_blocks, 'FNO Blocks:', group=model_group)
-        builder.add_integer_line_edit(
-            model_settings.fno_cnn_blocks, 'FNO CNN Blocks:', group=model_group
+        builder.add_check_box(model_settings.object_big, 'Object Big', group=model_group)
+        builder.add_check_box(model_settings.probe_big, 'Probe Big', group=model_group)
+        builder.add_combo_box(
+            model_settings.loss_function,
+            enumerators.get_loss_functions(),
+            'Loss Function:',
+            group=model_group,
         )
-        builder.add_line_edit(
-            model_settings.fno_input_transform, 'FNO Input Transform:', group=model_group
-        )  # FIXME make enum
-        builder.add_integer_line_edit(
-            model_settings.max_hidden_channels, 'Max Hidden Channels:', group=model_group
+        builder.add_combo_box(
+            model_settings.amplitude_activation_function,
+            enumerators.get_amplitude_activation_functions(),
+            'Amplitude Activation:',
+            group=model_group,
         )
-        builder.add_integer_line_edit(
-            model_settings.resnet_width, 'ResNet Width:', group=model_group
+        builder.add_check_box(
+            model_settings.cbam_encoder,
+            'CBAM Encoder',
+            tool_tip='Whether Convolutional Block Attention Module (CBAM) is turned on for encoder.',
+            group=model_group,
         )
-        builder.add_line_edit(
-            model_settings.generator_output_mode, 'Generator Output Mode:', group=model_group
-        )  # FIXME make enum
+        builder.add_check_box(
+            model_settings.use_shared_decoder,
+            'Shared Decoder',
+            group=model_group,
+        )
+
+        # Model Advanced
         builder.add_check_box(
             model_settings.intensity_scale_trainable, 'Intensity Scale Trainable', group=model_group
         )
@@ -122,31 +141,50 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
         builder.add_integer_line_edit(
             model_settings.max_position_jitter,
             'Max Position Jitter:',
-            tool_tip='Deprecated in Torch path (padded size ignores this)',
             group=model_group,
         )
         builder.add_integer_line_edit(
             model_settings.num_datasets,
-            'Num Datasets:',
-            tool_tip='Number of unique datasets being trained.',
+            'Datasets:',
             group=model_group,
         )
-        builder.add_integer_line_edit(model_settings.C_model, 'C Model:', group=model_group)
+        builder.add_combo_box(
+            model_settings.auxiliary_amplitude_loss,
+            enumerators.get_auxiliary_loss_functions(),
+            'Auxiliary Amplitude Loss Function:',
+            group=model_group,
+        )
+        builder.add_decimal_line_edit(
+            model_settings.auxiliary_amplitude_loss_coeff,
+            'Auxiliary Amplitude Loss Coefficient:',
+            group=model_group,
+        )
+        builder.add_combo_box(
+            model_settings.auxiliary_phase_loss,
+            enumerators.get_auxiliary_loss_functions(),
+            'Auxiliary Phase Loss Function:',
+            group=model_group,
+        )
+        builder.add_decimal_line_edit(
+            model_settings.auxiliary_phase_loss_coeff,
+            'Auxiliary Phase Loss Coefficient:',
+            group=model_group,
+        )
         builder.add_integer_line_edit(
-            model_settings.n_filters_scale,
+            model_settings.num_filters_scale,
             'Num Filters Scale:',
             tool_tip='Shrinking factor for channels in network layers.',
             group=model_group,
         )
-        builder.add_line_edit(
-            model_settings.amp_activation,
-            'Amplitude Activation:',
-            tool_tip='Activation function for amplitude part',
-            group=model_group,
-        )  # FIXNE make enum
         builder.add_check_box(
-            model_settings.batch_norm,
-            'Batch Normalization',
+            model_settings.eca_decoder,
+            'ECA Decoder',
+            tool_tip='Whether Efficient Channel Attention (ECA) is turned on for decoder.',
+            group=model_group,
+        )
+        builder.add_check_box(
+            model_settings.use_batch_normalization,
+            'Use Batch Normalization',
             tool_tip='Whether to use batch normalization',
             group=model_group,
         )
@@ -156,27 +194,10 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
             tool_tip='For padding the decoder_last reconstruction.',
             group=model_group,
         )
-        builder.add_decimal_line_edit(
+        builder.add_decimal_slider(
             model_settings.decoder_last_c_outer_fraction,
             'Decoder Last C Outer Fraction:',
             tool_tip='Amount of channels going to higher frequency components in decoder_last',
-            group=model_group,
-        )
-        builder.add_integer_line_edit(
-            model_settings.decoder_last_amp_channels,
-            'Decoder Last Amp Channels:',
-            group=model_group,
-        )
-        builder.add_check_box(
-            model_settings.eca_encoder,
-            'ECA Encoder',
-            tool_tip='Whether Efficient Channel Attention (ECA) is turned on for encoder.',
-            group=model_group,
-        )
-        builder.add_check_box(
-            model_settings.cbam_encoder,
-            'CBAM Encoder',
-            tool_tip='Whether Convolutional Block Attention Module (CBAM) is turned on for encoder.',
             group=model_group,
         )
         builder.add_check_box(model_settings.cbam_bottleneck, 'CBAM Bottleneck', group=model_group)
@@ -187,32 +208,29 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
             group=model_group,
         )
         builder.add_check_box(
-            model_settings.eca_decoder,
-            'ECA Decoder',
-            tool_tip='Whether Efficient Channel Attention (ECA) is turned on for decoder.',
-            group=model_group,
-        )
-        builder.add_check_box(
             model_settings.spatial_decoder,
-            'Spatial Attention Decoder',
+            'Decoder Spatial Attention',
             tool_tip='Whether Spatial Attention is turned on for decoder.',
             group=model_group,
         )
         builder.add_integer_line_edit(
             model_settings.decoder_spatial_kernel,
-            'Spatial Atttention Kernel:',
+            'Decoder Spatial Atttention Kernel:',
             tool_tip='Spatial attention kernel for decoder.',
             group=model_group,
         )
-        builder.add_check_box(model_settings.object_big, 'Object Big', group=model_group)
-        builder.add_check_box(model_settings.probe_big, 'Probe Big', group=model_group)
+        builder.add_check_box(
+            model_settings.eca_encoder,
+            'ECA Encoder',
+            tool_tip='Whether Efficient Channel Attention (ECA) is turned on for encoder.',
+            group=model_group,
+        )
         builder.add_integer_line_edit(
             model_settings.offset,
             'Offset:',
             tool_tip='Offset parameter for nearest neighbor patches.',
             group=model_group,
         )
-        builder.add_integer_line_edit(model_settings.C_forward, 'Num Channels:', group=model_group)
         builder.add_check_box(
             model_settings.pad_object,
             'Pad Object',
@@ -220,32 +238,21 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
             group=model_group,
         )
         builder.add_decimal_line_edit(
-            model_settings.gaussian_smoothing_sigma,
-            'Gaussian Smoothing Sigma:',
+            model_settings.probe_gaussian_smoothing_sigma,
+            'Probe Gaussian Smoothing Sigma:',
             tool_tip='Gaussian smoothing sigma for probe.',
             group=model_group,
         )
-        builder.add_line_edit(
-            model_settings.loss_function, 'Loss Function:', group=model_group
-        )  # FIXME make enum
-        builder.add_line_edit(
-            model_settings.amp_loss, 'Amplitude Loss Function:', group=model_group
-        )  # FIXME make enum
         builder.add_decimal_line_edit(
-            model_settings.amp_loss_coeff, 'Amplitude Loss Coefficient:', group=model_group
-        )
-        builder.add_line_edit(
-            model_settings.phase_loss, 'Phase Loss Function:', group=model_group
-        )  # FIXME make enum
-        builder.add_decimal_line_edit(
-            model_settings.phase_loss_coeff, 'Phase Loss Coefficient:', group=model_group
+            model_settings.probe_reference_loss_coeff,
+            'Probe Reference Loss Coefficient:',
+            group=model_group,
         )
 
+        # Inference
         inference_group = 'Inference'
         inference_settings = self._model.inference_settings
-        builder.add_integer_line_edit(
-            inference_settings.middle_trim, 'Middle Trim:', group=inference_group
-        )
+
         builder.add_integer_line_edit(
             inference_settings.batch_size,
             'Batch Size:',
@@ -253,8 +260,19 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
             group=inference_group,
         )
         builder.add_integer_line_edit(
+            inference_settings.middle_trim, 'Middle Trim:', group=inference_group
+        )
+        builder.add_integer_line_edit(
             inference_settings.experiment_number, 'Experiment Number:', group=inference_group
         )
+        builder.add_combo_box(
+            inference_settings.patch_weighting_method,
+            enumerators.get_patch_weighting_methods(),
+            'Patch Weighting Method:',
+            group=inference_group,
+        )
+
+        # Inference Advanced
         builder.add_check_box(
             inference_settings.pad_eval,
             'Pad Evaluation Edges',
@@ -267,177 +285,177 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
             tool_tip='Window padding around reconstruction due to edge errors.',
             group=inference_group,
         )
-        builder.add_check_box(
-            inference_settings.log_patch_stats,
-            'Log Patch Statistics',
-            tool_tip='Emit patch statistics during training & inference.',
-            group=inference_group,
-        )
-        builder.add_integer_line_edit(
-            inference_settings.patch_stats_limit,
-            'Patch Statistics Limit:',
-            tool_tip='Maximum number of batches to log.',
-            group=inference_group,
-        )
 
+        # Training
         training_group = 'Training'
         training_settings = self._model.training_settings
-        builder.add_check_box(
-            training_settings.nll, 'Use Negative Log Likelihood Loss', group=training_group
-        )
-        builder.add_line_edit(
-            training_settings.device,
-            'Device:',
-            tool_tip='Device to train on ("cuda", "cpu", etc.)',
-            group=training_group,
-        )  # FIXME improve
-        builder.add_integer_line_edit(
-            training_settings.n_devices,
-            'Num. Devices:',
-            tool_tip='Number of devices to train on',
-            group=training_group,
-        )  # FIXME improve
-        builder.add_line_edit(
-            training_settings.strategy, 'Distributed Training Strategy:', group=training_group
-        )  # FIXME make enum
-        builder.add_line_edit(
-            training_settings.framework, 'Training Framework:', group=training_group
-        )  # FIXME make enum
-        builder.add_line_edit(
-            training_settings.orchestrator, 'Training Orchestrator:', group=training_group
-        )  # FIXME make enum
-        builder.add_decimal_line_edit(
-            training_settings.learning_rate, 'Learning Rate:', group=training_group
-        )
         builder.add_integer_line_edit(
             training_settings.epochs, 'Default Epochs:', group=training_group
         )
         builder.add_integer_line_edit(
             training_settings.batch_size, 'Batch Size:', group=training_group
         )
-        builder.add_integer_line_edit(
-            training_settings.epochs_fine_tune, 'Fine Tune Epochs:', group=training_group
-        )
         builder.add_decimal_line_edit(
-            training_settings.fine_tune_gamma,
+            training_settings.learning_rate, 'Learning Rate:', group=training_group
+        )
+        builder.add_integer_line_edit(
+            training_settings.num_devices,
+            'Devices:',
+            tool_tip='devices to train on',
+            group=training_group,
+        )  # TODO improve
+        builder.add_integer_line_edit(
+            training_settings.num_dataloader_workers,
+            'Dataloader Workers:',
+            group=training_group,
+        )
+        builder.add_integer_line_edit(
+            training_settings.gradient_accumulation_steps,
+            'Gradient Accumulation Steps:',
+            group=training_group,
+        )
+        builder.add_integer_line_edit(
+            training_settings.epochs_finetune, 'Fine Tune Epochs:', group=training_group
+        )
+        builder.add_decimal_slider(
+            training_settings.finetune_gamma,
             'Fine Tune Gamma:',
             tool_tip='Scales base learning rate for fine-tuning.',
             group=training_group,
-        )
-        builder.add_line_edit(
-            training_settings.scheduler, 'Scheduler:', group=training_group
-        )  # FIXME make enum
-
-        builder.add_integer_line_edit(
-            training_settings.lr_warmup_epochs,
-            'Warmup Epochs:',
-            tool_tip='Number of warmup epochs for WarmupCosine scheduler',
-            group=training_group,
-        )
-        builder.add_decimal_line_edit(
-            training_settings.min_lr_ratio,
-            'Min Learning Rate Ratio:',
-            tool_tip='Minimum learning rate ratio for WarmupCoside scheduler',
-            group=training_group,
-        )
-        builder.add_decimal_line_edit(
-            training_settings.plateau_factor, 'Plateau Factor:', group=training_group
-        )
-        builder.add_integer_line_edit(
-            training_settings.plateau_patience, 'Plateau Patience:', group=training_group
-        )
-        builder.add_decimal_line_edit(
-            training_settings.plateau_min_lr, 'Plateau Min Learning Rate:', group=training_group
-        )
-        builder.add_decimal_line_edit(
-            training_settings.plateau_threshold, 'Plateau Threshold:', group=training_group
-        )
-
-        builder.add_integer_line_edit(
-            training_settings.num_workers, 'Num Dataloader Workers:', group=training_group
-        )
-        builder.add_integer_line_edit(
-            training_settings.accum_steps, 'Batch Size Accumulation Steps:', group=training_group
         )
         builder.add_decimal_line_edit(
             training_settings.gradient_clip_val, 'Gradient Clip Value:', group=training_group
         )
         builder.add_line_edit(
-            training_settings.gradient_clip_algorithm,
-            'Gradient Clip Algorithm:',
-            group=training_group,
-        )  # FIXME make enum
+            training_settings.experiment_name, 'MLflow Experiment Name:', group=training_group
+        )
 
-        builder.add_line_edit(training_settings.optimizer, 'Optimizer:', group=training_group)
-        builder.add_decimal_line_edit(training_settings.momentum, 'Momentum:', group=training_group)
-        builder.add_decimal_line_edit(
-            training_settings.weight_decay,
-            'Weight Decay:',
-            tool_tip='L2 Penalty',
-            group=training_group,
-        )
-        builder.add_decimal_line_edit(
-            training_settings.adam_beta1, 'Adam/AdamW beta1:', group=training_group
-        )
-        builder.add_decimal_line_edit(
-            training_settings.adam_beta2, 'Adam/AdamW beta2:', group=training_group
-        )
+        # Training Advanced
         builder.add_check_box(
-            training_settings.log_grad_norm, 'Log Grad Norm', group=training_group
-        )
-        builder.add_integer_line_edit(
-            training_settings.grad_norm_log_freq, 'Grad Norm Log Freq:', group=training_group
-        )
-        builder.add_integer_line_edit(
-            training_settings.batch_size, 'Batch Size:', group=training_group
-        )
-
-        builder.add_integer_line_edit(
-            training_settings.stage_1_epochs,
-            'Stage 1 Epochs:',
-            tool_tip='Will be set to total epochs if not specified.',
-            group=training_group,
-        )
-        builder.add_integer_line_edit(
-            training_settings.stage_2_epochs,
-            'Stage 2 Epochs:',
-            tool_tip='Weighted transition (0 = disabled)',
-            group=training_group,
-        )
-        builder.add_integer_line_edit(
-            training_settings.stage_3_epochs,
-            'Stage 3 Epochs:',
-            tool_tip='Physics only (0 = disabled)',
+            training_settings.use_negative_log_likelihood_loss,
+            'Use Negative Log Likelihood Loss',
             group=training_group,
         )
         builder.add_line_edit(
+            training_settings.device,
+            'Device:',
+            tool_tip='Device to train on ("cuda", "cpu", etc.)',
+            group=training_group,
+        )  # TODO improve
+        builder.add_combo_box(
+            training_settings.learning_rate_scheduler,
+            enumerators.get_learning_rate_schedulers(),
+            'Learning Rate Scheduler:',
+            group=training_group,
+        )
+        builder.add_integer_line_edit(
+            training_settings.learning_rate_warmup_epochs,
+            'Warmup Epochs:',
+            tool_tip='warmup epochs for WarmupCosine scheduler',
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.minimum_learning_rate_ratio,
+            'Min Learning Rate Ratio:',
+            tool_tip='Minimum learning rate ratio for WarmupCoside scheduler',
+            group=training_group,
+        )
+        builder.add_combo_box(
             training_settings.physics_weight_schedule,
+            enumerators.get_physics_weight_schedules(),
             'Physics Weight Schedule:',
             group=training_group,
-        )  # FIXME make enum
-        builder.add_decimal_line_edit(
-            training_settings.stage_3_lr_factor,
-            'Stage 3 Learning Rate Reduction:',
-            group=training_group,
         )
-
-        builder.add_line_edit(
-            training_settings.torch_loss_mode, 'Torch Loss Mode:', group=training_group
-        )  # FIXME make enum
-
-        builder.add_line_edit(
-            training_settings.experiment_name, 'MLflow Experiment Name:', group=training_group
+        builder.add_combo_box(
+            training_settings.torch_loss_mode,
+            enumerators.get_torch_loss_modes(),
+            'Torch Loss Mode:',
+            group=training_group,
         )
         builder.add_line_edit(training_settings.notes, 'MLflow Notes:', group=training_group)
         builder.add_line_edit(
             training_settings.model_name, 'MLflow Model Name:', group=training_group
         )
 
-        builder.add_line_edit(
-            training_settings.output_dir, 'Lightning Output Directory:', group=training_group
+        builder.add_check_box(
+            training_settings.enable_staged_finetuning,
+            'Enable Staged Fine Tuning',
+            group=training_group,
         )
         builder.add_integer_line_edit(
-            training_settings.n_groups, 'Number of Grouped Samples:', group=training_group
+            training_settings.finetune_stage1_epochs,
+            'Fine Tune Stage 1 Epochs:',
+            group=training_group,
+        )
+        builder.add_integer_line_edit(
+            training_settings.finetune_stage2_epochs,
+            'Fine Tune Stage 2 Epochs:',
+            group=training_group,
+        )
+        builder.add_integer_line_edit(
+            training_settings.finetune_stage3_epochs,
+            'Fine Tune Stage 3 Epochs:',
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.finetune_stage1_lr_decoder,
+            'Fine Tune Stage 1 LR Decoder:',
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.finetune_stage2_lr_encoder_top,
+            'Fine Tune Stage 2 LR Encoder Top:',
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.finetune_stage2_lr_decoder,
+            'Fine Tune Stage 2 LR Decoder:',
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.finetune_stage2_lr_phase_head,
+            'Fine Tune Stage 2 LR Phase Head:',
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.finetune_stage3_lr_encoder_bottom,
+            'Fine Tune Stage 3 LR Encoder Bottom:',
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.finetune_stage3_lr_encoder_top,
+            'Fine Tune Stage 3 LR Encoder Top:',
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.finetune_stage3_lr_decoder,
+            'Fine Tune Stage 3 LR Decoder:',
+            group=training_group,
+        )
+        builder.add_decimal_line_edit(
+            training_settings.finetune_stage3_lr_phase_head,
+            'Fine Tune Stage 3 LR Phase Head:',
+            group=training_group,
+        )
+        builder.add_check_box(
+            training_settings.finetune_skip_stage3,
+            'Skip Fine Tune Stage 3',
+            group=training_group,
+        )
+        builder.add_integer_line_edit(
+            training_settings.finetune_early_stop_patience,
+            'Fine Tune Early Stop Patience:',
+            group=training_group,
+        )
+        builder.add_decimal_slider(
+            training_settings.finetune_validation_split,
+            'Fine Tune Validation Split:',
+            group=training_group,
+        )
+        builder.add_integer_line_edit(
+            training_settings.num_grouped_samples,
+            'Grouped Samples:',
+            group=training_group,
         )
 
         return builder.build_widget()
