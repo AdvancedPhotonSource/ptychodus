@@ -4,6 +4,8 @@ from datetime import datetime
 from pydantic import BaseModel
 import requests
 
+from .token_storage import create_headers
+
 
 class GlobusTransferInputs(BaseModel):
     source_url: str | None = None
@@ -35,9 +37,9 @@ class GlobusTransferResult(BaseModel):
 class GenesisGlobusTransferClient:
     # See https://amsc-data-api.nersc.gov/docs#/Globus
 
-    def __init__(self, api_base_url: str, token: str) -> None:
+    def __init__(self, api_base_url: str, access_token: str) -> None:
         self._base_url = f'{api_base_url}/transfer'
-        self._headers = {'Authorization': f'Bearer {token}'}
+        self._headers = create_headers(access_token)
 
     def check_auth_token(self) -> str:
         response = requests.get(f'{self._base_url}/auth/globus', headers=self._headers)

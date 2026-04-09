@@ -12,6 +12,9 @@ class GenesisSettings(Observable, Observer):
         self._group = registry.create_group('Genesis')
         self._group.add_observer(self)
 
+        self.transfer_api_base_url = self._group.create_string_parameter(
+            'TransferAPIBaseURL', 'https://amsc-data-api.nersc.gov'
+        )
         self.api_base_url = self._group.create_string_parameter(
             'APIBaseURL', 'https://api.iri.nersc.gov/api/v1/'
         )

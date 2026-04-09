@@ -7,6 +7,8 @@ import logging
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 import requests
 
+from .token_storage import create_headers
+
 logger = logging.getLogger(__name__)
 
 
@@ -86,9 +88,9 @@ class JobResponse(BaseModel):
 class GenesisComputeClient:
     # See https://api.iri.nersc.gov/#/compute
 
-    def __init__(self, api_base_url: str, token: str) -> None:
-        self._base_url = f'{api_base_url}/api/v1/compute'
-        self._headers = {'Authorization': f'Bearer {token}'}
+    def __init__(self, api_base_url: str, access_token: str) -> None:
+        self._base_url = f'{api_base_url}/compute'
+        self._headers = create_headers(access_token)
 
     def submit_job(self, resource_id: str, spec: JobSpecification) -> JobResponse:
         response = requests.post(
