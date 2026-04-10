@@ -189,6 +189,9 @@ class ModelCore:
         )
         self.genesis_core = GenesisCore(
             self.settings_registry,
+            self.diffraction_core.diffraction_api,
+            self.product_core.product_api,
+            self.processing_core.processing_api,
         )
         self.workflow_api: WorkflowAPI = ConcreteWorkflowAPI(
             self.settings_registry,
@@ -199,6 +202,7 @@ class ModelCore:
             self.product_core.object_api,
             self.processing_core.processing_api,
             self.globus_core.executor,
+            self.genesis_core.executor,
         )
         self.automation_core = AutomationCore(
             self._task_manager,

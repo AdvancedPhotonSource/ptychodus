@@ -30,6 +30,12 @@ uv
 
        $ ptychodus
 
+#. To upgrade ptychodus, use uv tool upgrade:
+
+   .. code-block:: shell
+
+       $ uv tool upgrade ptychodus[globus,gui,ptychi]
+
 
 Conda-Forge
 -----------

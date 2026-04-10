@@ -138,6 +138,7 @@ class ControllerCore:
             model.processing_core.processing_api,
             model.product_core.product_repository,
             model.globus_core,
+            model.genesis_core,
             view.processing_view,
             view.processing_status_view,
             self._file_dialog_factory,

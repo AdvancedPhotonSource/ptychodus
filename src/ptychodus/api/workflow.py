@@ -4,6 +4,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping
 from pathlib import Path
+from enum import Enum, auto
 from typing import Any
 
 from ptychodus.api.diffraction import CropCenter
@@ -11,6 +12,11 @@ from ptychodus.api.geometry import AffineTransform, ImageExtent
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import AssembledDiffractionData, ReconstructInput
 from ptychodus.api.settings import PathPrefixChange
+
+
+class RemoteComputeProvider(Enum):
+    GLOBUS = auto()
+    GENESIS = auto()
 
 
 class WorkflowDiffractionAPI(ABC):
@@ -112,7 +118,12 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def reconstruct_remote(self, *, algorithm: str | None = None) -> None:
+    def reconstruct_remote(
+        self,
+        *,
+        algorithm: str | None = None,
+        provider: RemoteComputeProvider = RemoteComputeProvider.GLOBUS,
+    ) -> None:
         """Submit reconstruction to a remote compute resource."""
         pass
 
@@ -132,7 +143,12 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def train_reconstructor_remote(self, *, algorithm: str | None = None) -> None:
+    def train_reconstructor_remote(
+        self,
+        *,
+        algorithm: str | None = None,
+        provider: RemoteComputeProvider = RemoteComputeProvider.GLOBUS,
+    ) -> None:
         """Submit reconstructor training to a remote compute resource."""
         pass
 

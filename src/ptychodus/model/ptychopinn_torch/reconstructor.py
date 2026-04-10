@@ -91,7 +91,7 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             min_neighbor_distance=self._data_settings.min_neighbor_distance.get_value(),
             max_neighbor_distance=self._data_settings.max_neighbor_distance.get_value(),
             K_quadrant=self._data_settings.num_nearest_neighbors_for_quadrant_lookup.get_value(),
-            nphotons=self._data_settings.num_photons.get_value(),
+            nphotons=self._data_settings.num_photons.get_value(),  # TODO get from product
             n_subsample=self._data_settings.coordinate_subsampling_factor.get_value(),
             probe_scale=self._data_settings.probe_scale.get_value(),
             K=self._data_settings.num_nearest_neighbors_for_lookup.get_value(),

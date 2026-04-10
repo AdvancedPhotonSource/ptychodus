@@ -8,8 +8,6 @@ class PtychoPINNTorchDataSettings(Observable, Observer):
         self._group = registry.create_group('PtychoPINNTorchData')
         self._group.add_observer(self)
 
-        # FIXME see ptychopinn settings and reconstructor for handling of diffraction_pattern_size_px, batch_size, nphotons, etc.
-
         self.num_channels = self._group.create_integer_parameter('num_channels', 4, minimum=1)
         self.data_normalization_mode = self._group.create_string_parameter(
             'data_normalization_mode', 'Batch'
@@ -46,7 +44,9 @@ class PtychoPINNTorchDataSettings(Observable, Observer):
         )
 
         # Advanced
-        self.num_photons = self._group.create_real_parameter('num_photons', 1e5, minimum=0.0)
+        self.num_photons = self._group.create_real_parameter(
+            'num_photons', 1e5, minimum=0.0
+        )  # TODO remove
         self.coordinate_subsampling_factor = self._group.create_integer_parameter(
             'coordinate_subsampling_factor', 7, minimum=1
         )

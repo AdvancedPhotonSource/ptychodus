@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 """
 This script allows a user to login via Globus Auth to the data movement API
 It is equivalent to any third party Globus App that requests the DEFAULT_SCOPE below and calls

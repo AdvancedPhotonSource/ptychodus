@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.reconstructor import TrainableReconstructor
 
+from ...model.genesis import GenesisCore
 from ...model.globus import GlobusCore
 from ...model.processing import ProcessingAPI, ProcessingAlgorithmParameter
 from ...model.product import ProductRepository
@@ -50,6 +51,7 @@ class ProcessingController(Observer):
         processing_api: ProcessingAPI,
         product_repository: ProductRepository,
         globus: GlobusCore,
+        genesis: GenesisCore,
         view: QWidget,
         status_view: ProcessingStatusView,
         file_dialog_factory: FileDialogFactory,
@@ -60,6 +62,7 @@ class ProcessingController(Observer):
         self._processing_api = processing_api
         self._product_repository = product_repository
         self._globus = globus
+        self._genesis = genesis
         self._view = view
         self._status_view = status_view
         self._file_dialog_factory = file_dialog_factory
@@ -140,7 +143,21 @@ class ProcessingController(Observer):
         if input_product_index < 0:
             return
 
-        if self._compute_view_controller.is_computing_local():
+        if self._compute_view_controller.is_globus_button_checked():
+            # FIXME call reconstruct/infer as needed
+            try:
+                self._globus.executor.reconstruct(input_product_index)
+            except Exception as exc:
+                logger.exception(exc)
+                ExceptionDialog.show_exception('Reconstruct Remote (Globus)', exc)
+        elif self._compute_view_controller.is_genesis_button_checked():
+            # FIXME call reconstruct/infer as needed
+            try:
+                self._genesis.executor.reconstruct(input_product_index)
+            except Exception as exc:
+                logger.exception(exc)
+                ExceptionDialog.show_exception('Reconstruct Remote (Genesis)', exc)
+        else:  # local
             try:
                 output_product_index = self._processing_api.reconstruct(input_product_index)
             except Exception as exc:
@@ -148,12 +165,6 @@ class ProcessingController(Observer):
                 ExceptionDialog.show_exception('Reconstruct Local', exc)
             else:
                 self._product_view_controller.get_widget().setCurrentIndex(output_product_index)
-        else:
-            try:
-                self._globus.executor.reconstruct(input_product_index)
-            except Exception as exc:
-                logger.exception(exc)
-                ExceptionDialog.show_exception('Reconstruct Remote', exc)
 
     def _train(self) -> None:
         product_index = self._product_view_controller.get_widget().currentIndex()
@@ -168,18 +179,24 @@ class ProcessingController(Observer):
         if not data_path:
             return
 
-        if self._compute_view_controller.is_computing_local():
+        if self._compute_view_controller.is_globus_button_checked():
+            try:
+                self._globus.executor.train(product_index)
+            except Exception as exc:
+                logger.exception(exc)
+                ExceptionDialog.show_exception('Train Remote (Globus)', exc)
+        elif self._compute_view_controller.is_genesis_button_checked():
+            try:
+                self._genesis.executor.train(product_index)
+            except Exception as exc:
+                logger.exception(exc)
+                ExceptionDialog.show_exception('Train Remote (Genesis)', exc)
+        else:  # local
             try:
                 self._processing_api.train(product_index, data_path, data_path)
             except Exception as exc:
                 logger.exception(exc)
                 ExceptionDialog.show_exception('Train Local', exc)
-        else:
-            try:
-                self._globus.executor.train(product_index)
-            except Exception as exc:
-                logger.exception(exc)
-                ExceptionDialog.show_exception('Train Remote', exc)
 
     def _reconstruct_split(self) -> None:
         pass  # TODO
