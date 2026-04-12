@@ -40,8 +40,8 @@ ptychi = ["ptychi==1.*,>=1.2.0"]
 ptychopinn = ["ptychopinn[torch]"]
 
 [tool.uv.sources]
-#ptychopinn = { path = "../PtychoPINN", editable = true }
-ptychopinn = { git = "https://github.com/hoidn/PtychoPINN", branch = "torchapi-devel" }
+ptychopinn = { path = "../PtychoPINN", editable = true }
+#ptychopinn = { git = "https://github.com/hoidn/PtychoPINN", branch = "torchapi-devel" }
 
 [tool.setuptools.package-data]
 "ptychodus" = ["py.typed"]

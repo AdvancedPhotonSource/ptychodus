@@ -64,9 +64,9 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
         self._training_settings = training_settings
         self._is_developer_mode_enabled = is_developer_mode_enabled
 
-        self._model: PtychoModel | None = None
+        self._inference_engine: InferenceEngine | None = None
 
-    def _create_config_manager(self, model_size: int) -> ConfigManager:
+    def _create_config_manager(self) -> ConfigManager:
         grid_size = (
             self._data_settings.grid_size_y.get_value(),
             self._data_settings.grid_size_x.get_value(),
@@ -80,7 +80,7 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             self._data_settings.y_upper_bound.get_value(),
         )
         data_config = DataConfig(
-            N=model_size,
+            N=self._data_settings.model_size.get_value(),
             C=self._data_settings.num_channels.get_value(),
             normalize=self._data_settings.data_normalization_mode.get_value(),
             neighbor_function=self._data_settings.neighbor_lookup_method.get_value(),
@@ -210,23 +210,30 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
         return 0
 
     def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
-        if self._model is None:
+        if self._inference_engine is None:
             raise RuntimeError('Model must be loaded before reconstruction.')
 
-        model_size = parameters.diffraction_patterns.shape[-1]
+        object_geometry = parameters.product.object_.get_geometry()
+        positions_px: list[float] = list()
 
-        if parameters.diffraction_patterns.shape[-2] != model_size:
-            raise ValueError('Model requires square diffraction patterns!')
+        for position in parameters.product.probe_positions:
+            object_point = object_geometry.map_coordinates_probe_to_object(position)
+            positions_px.append(object_point.coordinate_y_px)
+            positions_px.append(object_point.coordinate_x_px)
 
-        # FIXME See ptycho_torch/api/example_train_predict_in_memory.py
-
-        config_manager = self._create_config_manager(model_size)
-        ptycho_data_dir = Path()  # FIXME
-        tensordict_dataloader = PtychoDataLoader(
-            data_dir=ptycho_data_dir, config_manager=config_manager, data_format='tensordict'
+        config_manager = ConfigManager(
+            data_config=self._inference_engine.data_config,
+            model_config=self._inference_engine.model_config,
+            training_config=self._inference_engine.training_config,
+            inference_config=self._inference_engine.inference_config,
         )
-        ptycho_inference = InferenceEngine(config_manager=config_manager, ptycho_model=self._model)
-        object_out_array = ptycho_inference.predict_and_stitch(tensordict_dataloader)
+        data_loader = PtychoDataLoader.from_np(
+            diff_patterns=parameters.diffraction_patterns,
+            probe=parameters.product.probes.get_probe_no_opr().get_incoherent_mode(0),
+            positions=numpy.reshape(positions_px, (-1, 2)),
+            config_manager=config_manager,
+        )
+        object_out_array = self._inference_engine.predict_and_stitch(data_loader)
 
         object_in = parameters.product.object_
         object_out = Object(
@@ -235,8 +242,9 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             pixel_geometry=object_in.get_pixel_geometry(),
             center=object_in.get_center(),
         )
-        losses: Sequence[LossValue] = list()
 
+        # TODO: Fourier error
+        losses: Sequence[LossValue] = []
         product = Product(
             metadata=parameters.product.metadata,
             probe_positions=parameters.product.probe_positions,
@@ -248,19 +256,29 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
         yield ReconstructOutput(product)
 
     def is_model_loaded(self):
-        return self._model is not None
+        return self._inference_engine is not None
 
     def get_model_file_filter(self) -> str:
         return 'PyTorch Lightning Checkpoint Files (*.ckpt)'
 
     def load_model_from_file(self, file_path: Path) -> None:
-        model_size = 0  # FIXME
-        json_base_path = Path()  # FIXME
-        self._model = PtychoModel._load(
-            config_manager=self._create_config_manager(model_size),
-            strategy='lightning',
-            run_path=json_base_path,  # FIXME
-            model_class=PtychoPINN_Lightning,
+        config_manager = self._create_config_manager()
+        ptycho_model = PtychoModel(
+            model_config=config_manager.model_config,
+            data_config=config_manager.data_config,
+            training_config=config_manager.training_config,
+            inference_config=config_manager.inference_config,
+        )
+        ptycho_model.model = PtychoPINN_Lightning.load_from_checkpoint(
+            file_path,
+            model_config=config_manager.model_config,
+            data_config=config_manager.data_config,
+            training_config=config_manager.training_config,
+            inference_config=config_manager.inference_config,
+        )
+        # FIXME sync config to settings here
+        self._inference_engine = InferenceEngine(
+            config_manager=config_manager, ptycho_model=ptycho_model
         )
 
     def get_training_data_file_filter(self) -> str:
@@ -288,39 +306,34 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             ycoords_start=ycoords,
             diff3d=parameters.diffraction_patterns,
             probeGuess=parameters.product.probes.get_probe_no_opr().get_incoherent_mode(0),
-            # assume that all patches are from the same object
             objectGuess=parameters.product.object_.get_layer(0),
+            # assume that all patches are from the same object
             scan_index=numpy.zeros(len(parameters.product.probe_positions), dtype=int),
         )
 
     def train(self, input_path: Path, output_path: Path) -> Iterator[TrainOutput]:
-        model_size = 0  # FIXME
-        config_manager = self._create_config_manager(model_size)
-        timestamp = datetime.now()  # FIXME
+        config_manager = self._create_config_manager()
 
-        lightning_dataloader = PtychoDataLoader(
+        data_loader = PtychoDataLoader(
             data_dir=input_path,
             config_manager=config_manager,
             data_format=DataloaderFormats('lightning_only_module'),
             output_dir=output_path,
-            timestamp=timestamp,  # FIXME
+            timestamp=datetime.now(),  # FIXME
         )
 
-        new_ptycho_model = PtychoModel._new_model(
-            model=PtychoPINN_Lightning, config_manager=config_manager
-        )
-        lightning_trainer = Trainer._from_lightning(
-            model=new_ptycho_model,
-            dataloader=lightning_dataloader,
+        model = PtychoModel._new_model(model=PtychoPINN_Lightning, config_manager=config_manager)
+        trainer = Trainer._from_lightning(
+            model=model,
+            dataloader=data_loader,
             orchestration='lightning',
             config_manager=config_manager,
         )
-        output_dir = lightning_trainer.train(orchestration='lightning', experiment_name='test_run')
+        trainer.train(orchestration='lightning', experiment_name='test_run')
 
-        new_destination = output_path / 'new_ptycho_model'  # FIXME file suffix
-        new_ptycho_model.save(
-            path=new_destination, source_run_path=output_dir, strategy='lightning'
-        )
-        self._model = new_ptycho_model
+        self._inference_engine = InferenceEngine(config_manager=config_manager, ptycho_model=model)
+        # vvv FIXME vvv: Checkpoint saved at: {output_path}/checkpoints/best-checkpoint.ckpt
+        new_destination = output_path / 'ptycho_model'
+        model.save(path=new_destination, source_run_path=output_path, strategy='lightning')
 
         yield TrainOutput()  # TODO yield losses & progress

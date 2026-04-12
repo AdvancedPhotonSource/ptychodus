@@ -8,6 +8,7 @@ class PtychoPINNTorchDataSettings(Observable, Observer):
         self._group = registry.create_group('PtychoPINNTorchData')
         self._group.add_observer(self)
 
+        self.model_size = self._group.create_integer_parameter('model_size', 128, minimum=1)
         self.num_channels = self._group.create_integer_parameter('num_channels', 4, minimum=1)
         self.data_normalization_mode = self._group.create_string_parameter(
             'data_normalization_mode', 'Batch'

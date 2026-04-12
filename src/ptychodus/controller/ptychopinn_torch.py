@@ -25,6 +25,7 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
         # Data
         data_group = 'Data'
         data_settings = self._model.data_settings
+        builder.add_integer_line_edit(data_settings.model_size, 'Model Size:', group=data_group)
         builder.add_integer_line_edit(data_settings.num_channels, 'Channels:', group=data_group)
         builder.add_combo_box(
             data_settings.data_normalization_mode,

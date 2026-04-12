@@ -9,9 +9,9 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import BooleanParameter, IntegerParameter
 
-from ..model.genesis import GenesisSettings
-from .data import FileDialogFactory
-from .parametric import (
+from ...model.genesis import GenesisSettings
+from ..data import FileDialogFactory
+from ..parametric import (
     CheckBoxParameterViewController,
     ParameterViewBuilder,
     ParameterViewController,
