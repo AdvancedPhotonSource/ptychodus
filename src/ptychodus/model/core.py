@@ -188,6 +188,7 @@ class ModelCore:
             self.processing_core.processing_api,
         )
         self.genesis_core = GenesisCore(
+            self._task_manager,
             self.settings_registry,
             self.diffraction_core.diffraction_api,
             self.product_core.product_api,

@@ -7,7 +7,12 @@ import logging
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 import requests
 
-from .token_storage import create_headers
+from .token_storage import (
+    GenesisAccessTokens,
+    create_headers,
+    get_compute_access_tokens_file,
+    write_access_tokens,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -174,3 +179,26 @@ class GenesisComputeClient:
         )
         response.raise_for_status()
         return response.status_code == 204
+
+
+if __name__ == '__main__':
+    tokens_file = get_compute_access_tokens_file()
+    access_tokens: list[GenesisAccessTokens] = []
+
+    while True:
+        name = input('Enter a name for the access token (or blank to finish): ').strip()
+
+        if not name:
+            break
+
+        api_base_url = input('Enter the API base URL: ').strip()
+        access_token = input('Enter the access token: ').strip()
+        access_tokens.append(
+            GenesisAccessTokens(
+                name=name,
+                api_base_url=api_base_url,
+                access_token=access_token,
+            )
+        )
+
+    write_access_tokens(tokens_file, access_tokens)
