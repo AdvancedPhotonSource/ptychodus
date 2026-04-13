@@ -31,6 +31,10 @@ convert-to-ptychodus = "ptychodus.convert_to_ptychodus:main"
 ptychodus = "ptychodus.__main__:main"
 ptychodus-bdp = "ptychodus.ptychodus_bdp:main"
 ptychodus-ptychopinn-tf-test = "ptychodus.scripts.ptychopinn_tf_test:main"
+ptychodus-set-compute-tokens = "ptychodus.model.genesis.compute:set_compute_tokens_cli"
+ptychodus-check-compute-tokens = "ptychodus.model.genesis.compute:check_compute_tokens_cli"
+ptychodus-set-transfer-tokens = "ptychodus.model.genesis.transfer:set_transfer_tokens_cli"
+ptychodus-check-transfer-tokens = "ptychodus.model.genesis.transfer:check_transfer_tokens_cli"
 
 [project.optional-dependencies]
 globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]

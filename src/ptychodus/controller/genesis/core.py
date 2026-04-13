@@ -86,7 +86,7 @@ class GenesisController:
         )
 
         view_builder = ParameterViewBuilder(file_dialog_factory)
-        view_builder.add_line_edit(settings.api_base_url, 'API Base URL:')
+        # FIXME view_builder.add_line_edit(settings.api_base_url, 'API Base URL:')
 
         local_group = 'Local'
         view_builder.add_uuid_line_edit(

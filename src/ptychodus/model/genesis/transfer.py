@@ -1,15 +1,21 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
+from typing import Any
+import json
+import logging
 
 from pydantic import BaseModel
 import requests
 
-from .token_storage import (
+from .tokens import (
     GenesisAccessTokens,
     create_headers,
-    get_transfer_access_tokens_file,
-    write_access_tokens,
+    get_transfer_tokens_file,
+    read_tokens,
+    write_tokens,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class GlobusTransferInputs(BaseModel):
@@ -46,10 +52,10 @@ class GenesisGlobusTransferClient:
         self._base_url = f'{api_base_url}/transfer'
         self._headers = create_headers(access_token)
 
-    def check_auth_token(self) -> str:
+    def check_auth_token(self) -> Mapping[str, Any]:
         response = requests.get(f'{self._base_url}/auth/globus', headers=self._headers)
         response.raise_for_status()
-        return response.text
+        return response.json()
 
     def start_transfer(self, inputs: GlobusTransferInputs) -> Sequence[GlobusTransferDetails]:
         response = requests.post(
@@ -77,8 +83,10 @@ class GenesisGlobusTransferClient:
         return GlobusTransferResult.model_validate(response.json())
 
 
-if __name__ == '__main__':
-    tokens_file = get_transfer_access_tokens_file()
+def set_transfer_tokens_cli() -> None:
+    logging.basicConfig(level=logging.INFO)
+
+    tokens_file = get_transfer_tokens_file()
     access_tokens: list[GenesisAccessTokens] = []
 
     while True:
@@ -89,6 +97,11 @@ if __name__ == '__main__':
 
         api_base_url = input('Enter the API base URL: ').strip()
         access_token = input('Enter the access token: ').strip()
+
+        client = GenesisGlobusTransferClient(api_base_url, access_token)
+        data = client.check_auth_token()
+        logger.info(f'Check auth token response: {data}')
+
         access_tokens.append(
             GenesisAccessTokens(
                 name=name,
@@ -97,4 +110,21 @@ if __name__ == '__main__':
             )
         )
 
-    write_access_tokens(tokens_file, access_tokens)
+    write_tokens(tokens_file, access_tokens)
+
+
+def check_transfer_tokens_cli() -> None:
+    logging.basicConfig(level=logging.INFO)
+
+    tokens_file = get_transfer_tokens_file()
+    access_tokens = read_tokens(tokens_file)
+
+    for token in access_tokens:
+        client = GenesisGlobusTransferClient(token.api_base_url, token.access_token)
+
+        try:
+            data = client.check_auth_token()
+        except requests.HTTPError as exc:
+            logger.error(f'Token "{token.name}" error: {exc}')
+        else:
+            logger.info(f'Token "{token.name}" response:' + json.dumps(data, indent=4))

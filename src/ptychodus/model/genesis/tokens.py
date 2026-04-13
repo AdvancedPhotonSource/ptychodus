@@ -22,15 +22,15 @@ class GenesisAccessTokens(BaseModel):
     access_token: str
 
 
-def get_compute_access_tokens_file() -> Path:
-    return get_ptychodus_dir() / 'genesis_compute_access_tokens.json'
+def get_compute_tokens_file() -> Path:
+    return get_ptychodus_dir() / 'genesis_compute_tokens.json'
 
 
-def get_transfer_access_tokens_file() -> Path:
-    return get_ptychodus_dir() / 'genesis_transfer_access_tokens.json'
+def get_transfer_tokens_file() -> Path:
+    return get_ptychodus_dir() / 'genesis_transfer_tokens.json'
 
 
-def read_access_tokens(file_path: Path) -> Sequence[GenesisAccessTokens]:
+def read_tokens(file_path: Path) -> Sequence[GenesisAccessTokens]:
     mode = file_path.stat().st_mode
 
     if mode & 0o177:
@@ -45,7 +45,7 @@ def read_access_tokens(file_path: Path) -> Sequence[GenesisAccessTokens]:
     return [GenesisAccessTokens.model_validate(token) for token in data]
 
 
-def write_access_tokens(file_path: Path, access_tokens: Sequence[GenesisAccessTokens]) -> None:
+def write_tokens(file_path: Path, access_tokens: Sequence[GenesisAccessTokens]) -> None:
     data = [token.model_dump(mode='json') for token in access_tokens]
     fd = os.open(file_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 

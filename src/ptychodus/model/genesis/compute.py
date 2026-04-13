@@ -7,11 +7,12 @@ import logging
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 import requests
 
-from .token_storage import (
+from .tokens import (
     GenesisAccessTokens,
     create_headers,
-    get_compute_access_tokens_file,
-    write_access_tokens,
+    get_compute_tokens_file,
+    read_tokens,
+    write_tokens,
 )
 
 logger = logging.getLogger(__name__)
@@ -181,8 +182,8 @@ class GenesisComputeClient:
         return response.status_code == 204
 
 
-if __name__ == '__main__':
-    tokens_file = get_compute_access_tokens_file()
+def set_compute_tokens_cli() -> None:
+    tokens_file = get_compute_tokens_file()
     access_tokens: list[GenesisAccessTokens] = []
 
     while True:
@@ -201,4 +202,21 @@ if __name__ == '__main__':
             )
         )
 
-    write_access_tokens(tokens_file, access_tokens)
+    write_tokens(tokens_file, access_tokens)
+
+
+def check_compute_tokens_cli() -> None:
+    logging.basicConfig(level=logging.INFO)
+
+    tokens_file = get_compute_tokens_file()
+    access_tokens = read_tokens(tokens_file)
+
+    for token in access_tokens:
+        client = GenesisComputeClient(token.api_base_url, token.access_token)
+
+        try:
+            print(client)  # FIXME
+        except requests.HTTPError as exc:
+            logger.error(f'Token "{token.name}" error: {exc}')
+        else:
+            pass  # FIXME
