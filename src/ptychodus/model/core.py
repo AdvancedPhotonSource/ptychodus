@@ -333,8 +333,6 @@ class ModelCore:
                 return self._batch_mode_reconstruct(input_directory, output_directory)
             case 'train':
                 return self._batch_mode_train(input_directory, output_directory)
-            case 'infer':
-                return self._batch_mode_reconstruct(input_directory, output_directory)
 
         logger.error(f'Unknown batch mode action "{action}"!')
         return -1

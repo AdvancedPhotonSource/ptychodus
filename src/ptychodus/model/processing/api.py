@@ -297,3 +297,7 @@ class ProcessingAPI:
     def set_reconstructor_if_provided(self, algorithm: str | None) -> None:
         if algorithm is not None:
             self._algorithm_parameter.set_value(algorithm)
+
+    def is_reconstructor_trainable(self) -> bool:
+        reconstructor = self._algorithm_parameter.get_current_reconstructor()
+        return isinstance(reconstructor, TrainableReconstructor)

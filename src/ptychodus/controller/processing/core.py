@@ -144,14 +144,12 @@ class ProcessingController(Observer):
             return
 
         if self._compute_view_controller.is_globus_button_checked():
-            # FIXME call reconstruct/infer as needed
             try:
                 self._globus.executor.reconstruct(input_product_index)
             except Exception as exc:
                 logger.exception(exc)
                 ExceptionDialog.show_exception('Reconstruct Remote (Globus)', exc)
         elif self._compute_view_controller.is_genesis_button_checked():
-            # FIXME call reconstruct/infer as needed
             try:
                 self._genesis.executor.reconstruct(input_product_index)
             except Exception as exc:

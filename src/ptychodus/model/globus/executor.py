@@ -118,15 +118,14 @@ class GlobusExecutor:
     def reconstruct(self, input_product_index: int, *, algorithm: str | None = None) -> None:
         self._processing_api.set_reconstructor_if_provided(algorithm)
         input_directory = self.populate_input_directory(input_product_index)
+
+        if self._processing_api.is_reconstructor_trainable():
+            pass  # TODO get model from mlflow
+
         self._run_flow('reconstruct', input_directory.name)
 
     def train(self, input_product_index: int, *, algorithm: str | None = None) -> None:
-        # TODO customize input_directory and output_directory
         self._processing_api.set_reconstructor_if_provided(algorithm)
         input_directory = self.populate_input_directory(input_product_index)
-        self._run_flow('train', input_directory.name)  # TODO mlflow
-
-    def infer(self, input_product_index: int, *, algorithm: str | None = None) -> None:
-        self._processing_api.set_reconstructor_if_provided(algorithm)
-        input_directory = self.populate_input_directory(input_product_index)
-        self._run_flow('infer', input_directory.name)  # TODO mlflow
+        self._run_flow('train', input_directory.name)
+        # TODO customize input/output directories; put model to mlflow
