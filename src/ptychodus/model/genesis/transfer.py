@@ -49,7 +49,7 @@ class GenesisGlobusTransferClient:
     # See https://amsc-data-api.nersc.gov/docs#/Globus
 
     def __init__(self, api_base_url: str, access_token: str) -> None:
-        self._base_url = f'{api_base_url}/transfer'
+        self._base_url = api_base_url.rstrip('/') + '/transfer'
         self._headers = create_headers(access_token)
 
     def check_auth_token(self) -> Mapping[str, Any]:

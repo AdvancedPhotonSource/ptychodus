@@ -95,7 +95,7 @@ class GenesisComputeClient:
     # See https://api.iri.nersc.gov/#/compute
 
     def __init__(self, api_base_url: str, access_token: str) -> None:
-        self._base_url = f'{api_base_url}/compute'
+        self._base_url = api_base_url.rstrip('/') + '/compute'
         self._headers = create_headers(access_token)
 
     def submit_job(self, resource_id: str, spec: JobSpecification) -> JobResponse:
