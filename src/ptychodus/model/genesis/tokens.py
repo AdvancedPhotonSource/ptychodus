@@ -22,10 +22,6 @@ class GenesisAccessTokens(BaseModel):
     access_token: str
 
 
-def get_iri_tokens_file() -> Path:
-    return get_ptychodus_dir() / 'iri_tokens.json'
-
-
 def get_transfer_tokens_file() -> Path:
     return get_ptychodus_dir() / 'genesis_transfer_tokens.json'
 

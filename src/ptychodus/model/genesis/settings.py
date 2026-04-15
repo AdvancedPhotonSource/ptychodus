@@ -12,10 +12,10 @@ class GenesisSettings(Observable, Observer):
         self._group = registry.create_group('Genesis')
         self._group.add_observer(self)
 
+        self.iri_provider = self._group.create_string_parameter('IRIProvider', 'NERSC')
         self.globus_transfer_provider = self._group.create_string_parameter(
             'GlobusTransferProvider', 'AmSC'
         )
-        self.compute_provider = self._group.create_string_parameter('ComputeProvider', 'NERSC')
 
         self.local_collection_id = self._group.create_uuid_parameter(
             'LocalCollectionID', UUID(int=0)

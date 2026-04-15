@@ -1,6 +1,5 @@
 import json
 import logging
-import sys
 
 from ptychodus.model.genesis.compute import (
     GenesisComputeClient,
@@ -50,7 +49,7 @@ def main() -> None:
         attributes=JobAttributes(
             duration=300,
             queue_name='debug',
-            #account='APS_IRI',
+            # account='APS_IRI',
             account='APSDataProcessing',
             custom_attributes={'filesystems': 'eagle'},
         ),

@@ -1,13 +1,11 @@
 from collections.abc import Sequence
 from datetime import datetime
-from enum import StrEnum, auto
-import json
 import logging
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 import requests
 
-from .tokens import create_headers, get_iri_tokens_file, read_tokens
+from ..tokens import create_headers
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +41,7 @@ class Site(BaseModel):
     resource_uris: list[str]
 
 
-class GenesisFacilityClient:
+class IRIFacilityClient:
     # See https://api.iri.nersc.gov/#/facility
 
     def __init__(self, api_base_url: str, access_token: str) -> None:
@@ -96,30 +94,3 @@ class GenesisFacilityClient:
         )
         response.raise_for_status()
         return Site.model_validate(response.json())
-
-
-def check_facility_tokens_cli() -> None:
-    logging.basicConfig(level=logging.INFO)
-
-    tokens_file = get_iri_tokens_file()
-    access_tokens = read_tokens(tokens_file)
-
-    for token in access_tokens:
-        client = GenesisFacilityClient(token.api_base_url, token.access_token)
-
-        try:
-            facility = client.get_facility()
-            sites = client.get_sites()
-        except requests.HTTPError as exc:
-            logger.error(f'Token "{token.name}" error: {exc}')
-        else:
-            logger.info(
-                f'Token "{token.name}" facility: '
-                + json.dumps(facility.model_dump(mode='json'), indent=4)
-            )
-            sites_data = [site.model_dump(mode='json') for site in sites]
-            logger.info(f'Token "{token.name}" sites: ' + json.dumps(sites_data, indent=4))
-
-
-if __name__ == 'main':
-    check_facility_tokens_cli()

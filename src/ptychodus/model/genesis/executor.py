@@ -9,7 +9,7 @@ from ..diffraction import DiffractionAPI
 from ..processing import ProcessingAPI
 from ..product import ProductAPI
 from ..task_manager import BackgroundTaskManager, ForegroundTask
-from .compute import GenesisComputeClient
+from .iri import IRIClient
 from .settings import GenesisSettings
 from .transfer import GenesisGlobusTransferClient
 
@@ -20,13 +20,13 @@ class WorkflowTask:
     def __init__(
         self,
         transfer_client: GenesisGlobusTransferClient,
-        compute_client: GenesisComputeClient,
+        iri_client: IRIClient,
         ptychodus_action: str,
         flow_label: str,
     ) -> None:
         super().__init__()
         self._transfer_client = transfer_client
-        self._compute_client = compute_client
+        self._iri_client = iri_client
         self._ptychodus_action = ptychodus_action
         self._flow_label = flow_label
 
@@ -49,7 +49,7 @@ class GenesisExecutor:
         product_api: ProductAPI,
         processing_api: ProcessingAPI,
         settings: GenesisSettings,
-        compute_client_chooser: PluginChooser[GenesisComputeClient],
+        iri_client_chooser: PluginChooser[IRIClient],
         transfer_client_chooser: PluginChooser[GenesisGlobusTransferClient],
     ) -> None:
         super().__init__()
@@ -59,7 +59,7 @@ class GenesisExecutor:
         self._diffraction_api = diffraction_api
         self._product_api = product_api
         self._processing_api = processing_api
-        self._compute_client_chooser = compute_client_chooser
+        self._iri_client_chooser = iri_client_chooser
         self._transfer_client_chooser = transfer_client_chooser
 
     def populate_input_directory(self, input_product_index: int) -> Path:
@@ -94,7 +94,7 @@ class GenesisExecutor:
     def _run_flow(self, ptychodus_action: str, flow_label: str) -> None:
         workflow_task = WorkflowTask(
             self._transfer_client_chooser.get_current_plugin().strategy,
-            self._compute_client_chooser.get_current_plugin().strategy,
+            self._iri_client_chooser.get_current_plugin().strategy,
             ptychodus_action,
             flow_label,
         )

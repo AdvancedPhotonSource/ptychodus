@@ -7,13 +7,7 @@ import logging
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 import requests
 
-from .tokens import (
-    GenesisAccessTokens,
-    create_headers,
-    get_iri_tokens_file,
-    read_tokens,
-    write_tokens,
-)
+from ..tokens import create_headers
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +85,7 @@ class JobResponse(BaseModel):
     job_specification: JobSpecification | None = Field(None, alias='job_spec')
 
 
-class GenesisComputeClient:
+class IRIComputeClient:
     # See https://api.iri.nersc.gov/#/compute
 
     def __init__(self, api_base_url: str, access_token: str) -> None:
@@ -180,43 +174,3 @@ class GenesisComputeClient:
         )
         response.raise_for_status()
         return response.status_code == 204
-
-
-def set_compute_tokens_cli() -> None:
-    tokens_file = get_iri_tokens_file()
-    access_tokens: list[GenesisAccessTokens] = []
-
-    while True:
-        name = input('Enter a name for the access token (or blank to finish): ').strip()
-
-        if not name:
-            break
-
-        api_base_url = input('Enter the API base URL: ').strip()
-        access_token = input('Enter the access token: ').strip()
-        access_tokens.append(
-            GenesisAccessTokens(
-                name=name,
-                api_base_url=api_base_url,
-                access_token=access_token,
-            )
-        )
-
-    write_tokens(tokens_file, access_tokens)
-
-
-def check_compute_tokens_cli() -> None:
-    logging.basicConfig(level=logging.INFO)
-
-    tokens_file = get_iri_tokens_file()
-    access_tokens = read_tokens(tokens_file)
-
-    for token in access_tokens:
-        client = GenesisComputeClient(token.api_base_url, token.access_token)
-
-        try:
-            print(client)  # FIXME
-        except requests.HTTPError as exc:
-            logger.error(f'Token "{token.name}" error: {exc}')
-        else:
-            pass  # FIXME

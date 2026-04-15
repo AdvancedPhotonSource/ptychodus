@@ -3,20 +3,16 @@ import logging
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 
-from .compute import GenesisComputeClient
+from .executor import GenesisExecutor
+from .iri import IRIClient, get_iri_tokens_file
 from .settings import GenesisSettings
 from .transfer import GenesisGlobusTransferClient
-from .executor import GenesisExecutor
 
 from ..diffraction import DiffractionAPI
 from ..processing import ProcessingAPI
 from ..product import ProductAPI
 from ..task_manager import TaskManager
-from .tokens import (
-    get_iri_tokens_file,
-    get_transfer_tokens_file,
-    read_tokens,
-)
+from .tokens import get_transfer_tokens_file, read_tokens
 
 __all__ = [
     'GenesisCore',
@@ -25,17 +21,15 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-def create_compute_client_chooser() -> PluginChooser[GenesisComputeClient]:
-    plugin_chooser = PluginChooser[GenesisComputeClient]()
+def create_iri_client_chooser() -> PluginChooser[IRIClient]:
+    plugin_chooser = PluginChooser[IRIClient]()
     tokens_file = get_iri_tokens_file()
-    logger.info(f'Loading compute access tokens from {tokens_file}...')
+    logger.info(f'Loading IRI access tokens from {tokens_file}...')
 
     if tokens_file.is_file():
         for tokens in read_tokens(tokens_file):
             plugin_chooser.register_plugin(
-                GenesisComputeClient(
-                    api_base_url=tokens.api_base_url, access_token=tokens.access_token
-                ),
+                IRIClient(api_base_url=tokens.api_base_url, access_token=tokens.access_token),
                 display_name=tokens.name,
             )
     else:
@@ -73,8 +67,8 @@ class GenesisCore:
         processing_api: ProcessingAPI,
     ) -> None:
         self.settings = GenesisSettings(settings_registry)
-        self.compute_client_chooser = create_compute_client_chooser()
-        self.compute_client_chooser.synchronize_with_parameter(self.settings.compute_provider)
+        self.iri_client_chooser = create_iri_client_chooser()
+        self.iri_client_chooser.synchronize_with_parameter(self.settings.iri_provider)
         self.transfer_client_chooser = create_transfer_client_chooser()
         self.transfer_client_chooser.synchronize_with_parameter(
             self.settings.globus_transfer_provider
@@ -86,10 +80,10 @@ class GenesisCore:
             product_api,
             processing_api,
             self.settings,
-            self.compute_client_chooser,
+            self.iri_client_chooser,
             self.transfer_client_chooser,
         )
 
     @property
     def is_supported(self) -> bool:
-        return bool(self.compute_client_chooser) and bool(self.transfer_client_chooser)
+        return bool(self.iri_client_chooser) and bool(self.transfer_client_chooser)

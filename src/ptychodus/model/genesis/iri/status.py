@@ -1,17 +1,12 @@
 from collections.abc import Sequence
 from datetime import datetime
 from enum import StrEnum, auto
-import json
 import logging
 
 from pydantic import BaseModel
 import requests
 
-from .tokens import (
-    create_headers,
-    get_iri_tokens_file,
-    read_tokens,
-)
+from ..tokens import create_headers
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +47,7 @@ class Resource(BaseModel):
     capability_uris: list[str]
 
 
-class GenesisStatusClient:
+class IRIStatusClient:
     # See https://api.iri.nersc.gov/#/status
 
     def __init__(self, api_base_url: str, access_token: str) -> None:
@@ -101,21 +96,3 @@ class GenesisStatusClient:
         )
         response.raise_for_status()
         return Resource.model_validate(response.json())
-
-
-def check_status_tokens_cli() -> None:
-    logging.basicConfig(level=logging.INFO)
-
-    tokens_file = get_iri_tokens_file()
-    access_tokens = read_tokens(tokens_file)
-
-    for token in access_tokens:
-        client = GenesisStatusClient(token.api_base_url, token.access_token)
-
-        try:
-            resources = client.get_resources()
-        except requests.HTTPError as exc:
-            logger.error(f'Token "{token.name}" error: {exc}')
-        else:
-            resources_data = [resource.model_dump(mode='json') for resource in resources]
-            logger.info(f'Token "{token.name}" resources: ' + json.dumps(resources_data, indent=4))
