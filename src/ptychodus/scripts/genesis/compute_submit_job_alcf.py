@@ -1,0 +1,76 @@
+import json
+import logging
+import sys
+
+from ptychodus.model.genesis.compute import (
+    GenesisComputeClient,
+    JobAttributes,
+    JobSpecification,
+    ResourceSpecification,
+)
+from ptychodus.model.genesis.presets import get_genesis_facilities
+from ptychodus.model.genesis.tokens import GenesisAccessTokens, get_iri_tokens_file, read_tokens
+
+
+def get_access_token(api_base_url: str) -> GenesisAccessTokens:
+    tokens_file = get_iri_tokens_file()
+    tokens = read_tokens(tokens_file)
+
+    for token in tokens:
+        if token.api_base_url == api_base_url:
+            return token
+
+    raise RuntimeError(f'No access token found for {api_base_url!r} in {tokens_file}.')
+
+
+def main() -> None:
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    facilities = get_genesis_facilities()
+    facility_name = 'ALCF'
+    resource_name = 'Polaris'
+    facility = facilities[facility_name]
+    resource_id = str(facility.compute_resource_ids[resource_name])
+
+    token = get_access_token(facility.compute_api_base_url)
+    client = GenesisComputeClient(
+        api_base_url=token.api_base_url,
+        access_token=token.access_token,
+    )
+
+    commands = 'echo BEGIN; source $HOME/.local/bin/env; which python; which ptychodus; ptychodus --version; echo END'
+    job_spec = JobSpecification(
+        executable='/bin/bash',
+        arguments=['-c', commands],
+        name='TEST',
+        stdout_path='/home/shenke/qsub',
+        stderr_path='/home/shenke/qsub',
+        resources=ResourceSpecification(memory=2222, node_count=1),
+        attributes=JobAttributes(
+            duration=300,
+            queue_name='debug',
+            #account='APS_IRI',
+            account='APSDataProcessing',
+            custom_attributes={'filesystems': 'eagle'},
+        ),
+    )
+
+    logger.info(
+        'Submitting job to %s / %s (resource %s)', facility_name, resource_name, resource_id
+    )
+    response = client.submit_job_with_retry(resource_id, job_spec)
+
+    print(f'Job ID: {response.job_id}')
+
+    if response.status is not None:
+        print(f'State:  {response.status.state}')
+
+        if response.status.message:
+            print(f'Message: {response.status.message}')
+
+    print(json.dumps(response.model_dump(mode='json', by_alias=True), indent=2))
+
+
+if __name__ == '__main__':
+    main()

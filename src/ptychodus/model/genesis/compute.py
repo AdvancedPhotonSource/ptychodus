@@ -10,7 +10,7 @@ import requests
 from .tokens import (
     GenesisAccessTokens,
     create_headers,
-    get_compute_tokens_file,
+    get_iri_tokens_file,
     read_tokens,
     write_tokens,
 )
@@ -183,7 +183,7 @@ class GenesisComputeClient:
 
 
 def set_compute_tokens_cli() -> None:
-    tokens_file = get_compute_tokens_file()
+    tokens_file = get_iri_tokens_file()
     access_tokens: list[GenesisAccessTokens] = []
 
     while True:
@@ -208,7 +208,7 @@ def set_compute_tokens_cli() -> None:
 def check_compute_tokens_cli() -> None:
     logging.basicConfig(level=logging.INFO)
 
-    tokens_file = get_compute_tokens_file()
+    tokens_file = get_iri_tokens_file()
     access_tokens = read_tokens(tokens_file)
 
     for token in access_tokens:

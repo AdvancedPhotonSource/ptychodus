@@ -1,4 +1,4 @@
-09 April 2025
+14 April 2025
 
 AmSC Data Transfer API
 ======================
@@ -18,28 +18,12 @@ python generate_token.py login \
 AmSC IRI Compute API
 ====================
 
-It is possible that this procedures will eventually be standardized here:
-https://github.com/doe-iri/iri-facility-api-examples
-
 ALCF
 ----
 
 Get ALCF IRI API (https://api.alcf.anl.gov) access tokens using instructions and scripts here:
 
-https://github.com/argonne-lcf/alcf-facility-api/tree/alcf-deployment/alcf/python_example_scripts
-
-From the python_example_scripts directory, follow the instructions in README.md
-for Keycloak Access Token for Compute Operations:
-
-1. Prepare your `.env` file:
-```bash
-echo 'BASE_URL="https://api.alcf.anl.gov/api/v1"' > .env
-```
-2. Execute the auth script and enter your username and MobilePass+ credentials:
-```bash
-sh keycloak_access_token.sh
-```
-3. Copy the `access_token` field from the response and add it to your `.env` file as `ACCESS_TOKEN=...`.
+https://github.com/argonne-lcf/alcf-facility-api-token
 
 NERSC
 -----
@@ -53,6 +37,9 @@ Run the script and follow instructions to input the auth code:
 python get_globus_token.py
 ```
 Token JSON is saved to `~/.globus/auth_tokens.json`.
+
+It is possible that this procedures will eventually be standardized here:
+https://github.com/doe-iri/iri-facility-api-examples
 
 
 Ptychodus Installation on ALCF/NERSC

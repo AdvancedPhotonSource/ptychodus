@@ -13,7 +13,7 @@ from ..processing import ProcessingAPI
 from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .tokens import (
-    get_compute_tokens_file,
+    get_iri_tokens_file,
     get_transfer_tokens_file,
     read_tokens,
 )
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 def create_compute_client_chooser() -> PluginChooser[GenesisComputeClient]:
     plugin_chooser = PluginChooser[GenesisComputeClient]()
-    tokens_file = get_compute_tokens_file()
+    tokens_file = get_iri_tokens_file()
     logger.info(f'Loading compute access tokens from {tokens_file}...')
 
     if tokens_file.is_file():
