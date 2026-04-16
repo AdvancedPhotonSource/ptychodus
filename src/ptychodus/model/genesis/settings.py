@@ -37,6 +37,8 @@ class GenesisSettings(Observable, Observer):
             'RemoteCollectionPosixPath', Path('/path/to/remote/data')
         )
 
+        self.compute_resource_id = self._group.create_string_parameter('ComputeResourceID', '')
+
         self.status_auto_refresh = self._group.create_boolean_parameter('StatusAutoRefresh', False)
         self.status_refresh_interval_s = self._group.create_integer_parameter(
             'StatusRefreshIntervalInSeconds', 30, minimum=10, maximum=86400

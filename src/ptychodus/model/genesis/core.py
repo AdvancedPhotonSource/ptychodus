@@ -6,7 +6,7 @@ from ptychodus.api.settings import SettingsRegistry
 from .executor import GenesisExecutor
 from .iri import IRIClient, get_iri_tokens_file
 from .settings import GenesisSettings
-from .transfer import GenesisGlobusTransferClient
+from .transfer import AmSCGlobusTransferClient
 
 from ..diffraction import DiffractionAPI
 from ..processing import ProcessingAPI
@@ -38,15 +38,15 @@ def create_iri_client_chooser() -> PluginChooser[IRIClient]:
     return plugin_chooser
 
 
-def create_transfer_client_chooser() -> PluginChooser[GenesisGlobusTransferClient]:
-    plugin_chooser = PluginChooser[GenesisGlobusTransferClient]()
+def create_transfer_client_chooser() -> PluginChooser[AmSCGlobusTransferClient]:
+    plugin_chooser = PluginChooser[AmSCGlobusTransferClient]()
     tokens_file = get_transfer_tokens_file()
     logger.info(f'Loading transfer access tokens from {tokens_file}...')
 
     if tokens_file.is_file():
         for tokens in read_tokens(tokens_file):
             plugin_chooser.register_plugin(
-                GenesisGlobusTransferClient(
+                AmSCGlobusTransferClient(
                     api_base_url=tokens.api_base_url, access_token=tokens.access_token
                 ),
                 display_name=tokens.name,

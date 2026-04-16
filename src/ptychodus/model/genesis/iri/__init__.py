@@ -1,3 +1,18 @@
-from .iri import IRIClient, get_iri_tokens_file
+from .compute import IRIComputeClient, JobResponse, JobSpecification, JobState
+from .iri import (
+    IRIClient,
+    check_iri_tokens_cli,
+    get_iri_tokens_file,
+    set_iri_tokens_cli,
+)
 
-__all__ = ['IRIClient', 'get_iri_tokens_file']
+__all__ = [
+    'IRIClient',
+    'IRIComputeClient',
+    'JobResponse',
+    'JobSpecification',
+    'JobState',
+    'check_iri_tokens_cli',
+    'get_iri_tokens_file',
+    'set_iri_tokens_cli',
+]

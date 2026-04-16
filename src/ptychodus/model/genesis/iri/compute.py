@@ -1,7 +1,6 @@
 from collections.abc import Mapping, Sequence
 from enum import StrEnum, auto
 from typing import Any
-import time
 import logging
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
@@ -100,28 +99,6 @@ class IRIComputeClient:
         )
         response.raise_for_status()
         return JobResponse.model_validate(response.json())
-
-    def submit_job_with_retry(
-        self,
-        resource_id: str,
-        spec: JobSpecification,
-        max_retries: int = 10,
-        retry_delay: float = 1.0,
-    ) -> JobResponse:
-        for attempt in range(1, max_retries + 1):
-            try:
-                return self.submit_job(resource_id, spec)
-            except requests.HTTPError as exc:
-                if exc.response.status_code == 404:
-                    if attempt == max_retries:
-                        logger.warning('Exceeded max retries.')
-                        raise
-
-                    time.sleep(retry_delay)
-                else:
-                    raise
-
-        raise RuntimeError('submit_job_with_retry exited loop without returning')
 
     def update_job(self, resource_id: str, job_id: str, spec: JobSpecification) -> JobResponse:
         response = requests.put(

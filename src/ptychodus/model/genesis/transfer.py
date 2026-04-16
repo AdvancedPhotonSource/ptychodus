@@ -45,7 +45,7 @@ class GlobusTransferResult(BaseModel):
     effective_bytes_per_second: int | None = None
 
 
-class GenesisGlobusTransferClient:
+class AmSCGlobusTransferClient:
     # See https://amsc-data-api.nersc.gov/docs#/Globus
 
     def __init__(self, api_base_url: str, access_token: str) -> None:
@@ -98,7 +98,7 @@ def set_transfer_tokens_cli() -> None:
         api_base_url = input('Enter the API base URL: ').strip()
         access_token = input('Enter the access token: ').strip()
 
-        client = GenesisGlobusTransferClient(api_base_url, access_token)
+        client = AmSCGlobusTransferClient(api_base_url, access_token)
         data = client.check_auth_token()
         logger.info(f'Check auth token response: {data}')
 
@@ -120,7 +120,7 @@ def check_transfer_tokens_cli() -> None:
     access_tokens = read_tokens(tokens_file)
 
     for token in access_tokens:
-        client = GenesisGlobusTransferClient(token.api_base_url, token.access_token)
+        client = AmSCGlobusTransferClient(token.api_base_url, token.access_token)
 
         try:
             data = client.check_auth_token()

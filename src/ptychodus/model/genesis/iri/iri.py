@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 import json
 import logging
 
@@ -56,6 +57,7 @@ def check_iri_tokens_cli() -> None:
 
     for token in access_tokens:
         client = IRIClient(token.api_base_url, token.access_token)
+        data: dict[str, Any] = {}
 
         try:
             facility = client.facility.get_facility()
@@ -64,13 +66,10 @@ def check_iri_tokens_cli() -> None:
         except requests.HTTPError as exc:
             logger.error(f'"{token.name}" token error: {exc}')
         else:
-            logger.info(
-                f'"{token.name}" Facility: '
-                + json.dumps(facility.model_dump(mode='json'), indent=4)
-            )
+            data[token.name] = {
+                'facility': facility.model_dump(mode='json'),
+                'sites': [site.model_dump(mode='json') for site in sites],
+                'resources': [resource.model_dump(mode='json') for resource in resources],
+            }
 
-            sites_data = [site.model_dump(mode='json') for site in sites]
-            logger.info(f'"{token.name}" Sites: ' + json.dumps(sites_data, indent=4))
-
-            resources_data = [resource.model_dump(mode='json') for resource in resources]
-            logger.info(f'"{token.name}" Resources: ' + json.dumps(resources_data, indent=4))
+        print(json.dumps(data, indent=4))
