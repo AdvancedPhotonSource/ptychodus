@@ -1,10 +1,5 @@
 from .compute import IRIComputeClient, JobResponse, JobSpecification, JobState
-from .iri import (
-    IRIClient,
-    check_iri_tokens_cli,
-    get_iri_tokens_file,
-    set_iri_tokens_cli,
-)
+from .client import IRIClient, get_iri_tokens_file
 
 __all__ = [
     'IRIClient',
@@ -12,7 +7,5 @@ __all__ = [
     'JobResponse',
     'JobSpecification',
     'JobState',
-    'check_iri_tokens_cli',
     'get_iri_tokens_file',
-    'set_iri_tokens_cli',
 ]

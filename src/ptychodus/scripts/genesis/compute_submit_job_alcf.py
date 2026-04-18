@@ -7,7 +7,7 @@ from ptychodus.model.genesis.compute import (
     JobSpecification,
     ResourceSpecification,
 )
-from ptychodus.model.genesis.presets import get_genesis_facilities
+from ptychodus.model.genesis.facility_adapters import get_genesis_facility_adapters
 from ptychodus.model.genesis.tokens import GenesisAccessTokens, get_iri_tokens_file, read_tokens
 
 
@@ -26,13 +26,13 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
-    facilities = get_genesis_facilities()
+    facilities = get_genesis_facility_adapters()
     facility_name = 'ALCF'
     resource_name = 'Polaris'
     facility = facilities[facility_name]
     resource_id = str(facility.compute_resource_ids[resource_name])
 
-    token = get_access_token(facility.compute_api_base_url)
+    token = get_access_token(facility.iri_api_base_url)
     client = GenesisComputeClient(
         api_base_url=token.api_base_url,
         access_token=token.access_token,

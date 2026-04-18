@@ -1,6 +1,5 @@
 from __future__ import annotations
 from collections.abc import Iterator, Sequence
-from datetime import datetime
 from pathlib import Path
 import logging
 
@@ -151,7 +150,6 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             fine_tune_gamma=self._training_settings.finetune_gamma.get_value(),
             gradient_clip_val=gradient_clip_val if gradient_clip_val > 0.0 else None,
             experiment_name=self._training_settings.experiment_name.get_value(),
-            training_directories=[''],  # FIXME
             nll=self._training_settings.use_negative_log_likelihood_loss.get_value(),
             device=self._training_settings.device.get_value(),
             strategy='ddp_notebook',
@@ -179,9 +177,6 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             finetune_skip_stage3=self._training_settings.finetune_skip_stage3.get_value(),
             finetune_early_stop_patience=self._training_settings.finetune_early_stop_patience.get_value(),
             finetune_val_split=self._training_settings.finetune_validation_split.get_value(),
-            output_dir='',  # FIXME
-            train_data_file='',  # FIXME
-            test_data_file='',  # FIXME
             n_groups=self._training_settings.num_grouped_samples.get_value(),
         )
         inference_config = InferenceConfig(
@@ -319,7 +314,6 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             config_manager=config_manager,
             data_format=DataloaderFormats('lightning_only_module'),
             output_dir=output_path,
-            timestamp=datetime.now(),  # FIXME
         )
 
         model = PtychoModel._new_model(model=PtychoPINN_Lightning, config_manager=config_manager)

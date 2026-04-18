@@ -6,8 +6,6 @@ import stat
 
 from pydantic import BaseModel
 
-from ptychodus.api.common import get_ptychodus_dir
-
 
 def create_headers(access_token: str) -> Mapping[str, str]:
     return {
@@ -17,13 +15,8 @@ def create_headers(access_token: str) -> Mapping[str, str]:
 
 
 class GenesisAccessTokens(BaseModel):
-    name: str
-    api_base_url: str
+    facility: str
     access_token: str
-
-
-def get_transfer_tokens_file() -> Path:
-    return get_ptychodus_dir() / 'genesis_transfer_tokens.json'
 
 
 def read_tokens(file_path: Path) -> Sequence[GenesisAccessTokens]:

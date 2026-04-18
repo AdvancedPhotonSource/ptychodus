@@ -158,7 +158,10 @@ class ControllerCore:
             self._file_dialog_factory,
         )
         self._genesis_controller = GenesisController(
-            model.genesis_core.settings, view.genesis_view, self._file_dialog_factory
+            model.genesis_core.settings,
+            model.genesis_core.presenter,
+            view.genesis_view,
+            self._file_dialog_factory,
         )
         self._automation_controller = AutomationController(
             model.automation_core.settings,

@@ -12,7 +12,8 @@ class GenesisSettings(Observable, Observer):
         self._group = registry.create_group('Genesis')
         self._group.add_observer(self)
 
-        self.iri_provider = self._group.create_string_parameter('IRIProvider', 'NERSC')
+        self.facility = self._group.create_string_parameter('Facility', 'NERSC')
+        self.compute_resource_id = self._group.create_string_parameter('ComputeResourceID', '')
         self.globus_transfer_provider = self._group.create_string_parameter(
             'GlobusTransferProvider', 'AmSC'
         )
@@ -36,8 +37,6 @@ class GenesisSettings(Observable, Observer):
         self.remote_collection_posix_path = self._group.create_path_parameter(
             'RemoteCollectionPosixPath', Path('/path/to/remote/data')
         )
-
-        self.compute_resource_id = self._group.create_string_parameter('ComputeResourceID', '')
 
         self.status_auto_refresh = self._group.create_boolean_parameter('StatusAutoRefresh', False)
         self.status_refresh_interval_s = self._group.create_integer_parameter(

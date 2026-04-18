@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import BooleanParameter, IntegerParameter
 
-from ...model.genesis import GenesisSettings
+from ...model.genesis import GenesisPresenter, GenesisSettings
 from ..data import FileDialogFactory
 from ..parametric import (
     CheckBoxParameterViewController,
@@ -67,10 +67,15 @@ class GenesisStatusViewController(ParameterViewController, Observer):
 
 class GenesisController:
     def __init__(
-        self, settings: GenesisSettings, view: QWidget, file_dialog_factory: FileDialogFactory
+        self,
+        settings: GenesisSettings,
+        presenter: GenesisPresenter,
+        view: QWidget,
+        file_dialog_factory: FileDialogFactory,
     ) -> None:
         self._settings = settings
         self._view = view
+        self._presenter = presenter
 
         self._status_controller = GenesisStatusViewController(
             settings.status_auto_refresh,
@@ -86,7 +91,23 @@ class GenesisController:
         )
 
         view_builder = ParameterViewBuilder(file_dialog_factory)
-        # FIXME view_builder.add_line_edit(settings.api_base_url, 'API Base URL:')
+        # TODO Compute Resource: ALCF Polaris, NERSC Perlmutter, OLCF Odo
+
+        genesis_group = 'Genesis'
+        view_builder.add_combo_box(
+            settings.facility, presenter.supported_facilities(), 'Facility:', group=genesis_group
+        )
+        # FIXME show API base URL for the selected facility
+        view_builder.add_line_edit(
+            settings.compute_resource_id, 'Compute Resource ID:', group=genesis_group
+        )
+        view_builder.add_combo_box(
+            settings.globus_transfer_provider,
+            presenter.supported_transfer_clients(),
+            'Globus Transfer Provider:',
+            group=genesis_group,
+        )
+        # FIXME add button to call presenter.apply_facility_defaults() to fill in the default values for the selected facility
 
         local_group = 'Local'
         view_builder.add_uuid_line_edit(

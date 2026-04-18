@@ -1,9 +1,9 @@
 from collections.abc import Callable
 from pathlib import Path
+from uuid import UUID
 import logging
 import queue
 import threading
-
 
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.plugins import PluginChooser
@@ -13,13 +13,21 @@ from ..diffraction import DiffractionAPI
 from ..processing import ProcessingAPI
 from ..product import ProductAPI
 from ..task_manager import BackgroundTaskManager, ForegroundTask
-from .iri import IRIClient, IRIComputeClient, JobSpecification
-
+from .facility_adapters import IRIFacilityAdapter
+from .iri import IRIComputeClient, JobSpecification
 from .settings import GenesisSettings
-from .transfer import AmSCGlobusTransferClient, GlobusTransferInputs
 from .tasks import compute_task, transfer_task
+from .transfer import AmSCGlobusTransferClient, GlobusTransferInputs
 
 logger = logging.getLogger(__name__)
+
+
+def combine_path_parts(base_path: str, subpath: str) -> str:
+    return f'{base_path.rstrip("/")}/{subpath.lstrip("/")}'
+
+
+def create_globus_url(collection_id: UUID, globus_path: str) -> str:
+    return f'globus://{collection_id}/{globus_path.lstrip("/")}'
 
 
 class WorkflowTask:
@@ -130,7 +138,7 @@ class GenesisExecutor:
         product_api: ProductAPI,
         processing_api: ProcessingAPI,
         settings: GenesisSettings,
-        iri_client_chooser: PluginChooser[IRIClient],
+        iri_facility_adapter: PluginChooser[IRIFacilityAdapter],
         transfer_client_chooser: PluginChooser[AmSCGlobusTransferClient],
     ) -> None:
         super().__init__()
@@ -140,7 +148,7 @@ class GenesisExecutor:
         self._diffraction_api = diffraction_api
         self._product_api = product_api
         self._processing_api = processing_api
-        self._iri_client_chooser = iri_client_chooser
+        self._iri_facility_adapter = iri_facility_adapter
         self._transfer_client_chooser = transfer_client_chooser
 
     def populate_input_directory(self, input_product_index: int) -> Path:
@@ -178,26 +186,38 @@ class GenesisExecutor:
         flow_label: str,
     ) -> None:
         transfer_client = self._transfer_client_chooser.get_current_plugin().strategy
-        compute_client = self._iri_client_chooser.get_current_plugin().strategy.compute
+        facility_adapter = self._iri_facility_adapter.get_current_plugin().strategy
+        iri_client = facility_adapter.get_iri_client()
+        compute_resource_id = self._settings.compute_resource_id.get_value()
 
-        local_uuid = str(self._settings.local_collection_id.get_value())
-        local_base = self._settings.local_collection_globus_path.get_value().rstrip('/')
-        remote_uuid = str(self._settings.remote_collection_id.get_value())
-        remote_base = self._settings.remote_collection_globus_path.get_value().rstrip('/')
+        local_collection_id = self._settings.local_collection_id.get_value()
+        local_collection_globus_path = self._settings.local_collection_globus_path.get_value()
+        local_collection_url = create_globus_url(local_collection_id, local_collection_globus_path)
 
-        local_to_remote_inputs = GlobusTransferInputs(
-            label=flow_label,
-            source_uuid=local_uuid,
-            source_path=f'{local_base}/{flow_label}',
-            destination_uuid=remote_uuid,
-            destination_path=f'{remote_base}/{flow_label}',
+        remote_collection_id = self._settings.remote_collection_id.get_value()
+        remote_collection_globus_path = self._settings.remote_collection_globus_path.get_value()
+        remote_collection_url = create_globus_url(
+            remote_collection_id, remote_collection_globus_path
         )
-        remote_to_local_inputs = GlobusTransferInputs(
-            label=flow_label,
-            source_uuid=remote_uuid,
-            source_path=f'{remote_base}/{flow_label}',
-            destination_uuid=local_uuid,
-            destination_path=f'{local_base}/{flow_label}',
+
+        outbound_transfer_inputs = GlobusTransferInputs(
+            source_url=local_collection_url,
+            destination_url=remote_collection_url,
+            label=f'{flow_label}_outbound',
+            source_uuid=str(local_collection_id),
+            source_path=f'{local_collection_globus_path.rstrip("/")}/{flow_label}',
+            destination_uuid=str(remote_collection_id),
+            destination_path=f'{remote_collection_globus_path.rstrip("/")}/{flow_label}',
+        )
+        job_specification = JobSpecification()  # FIXME
+        inbound_transfer_inputs = GlobusTransferInputs(
+            source_url=remote_collection_url,
+            destination_url=local_collection_url,
+            label=f'{flow_label}_inbound',
+            source_uuid=str(remote_collection_id),
+            source_path=f'{remote_collection_globus_path.rstrip("/")}/{flow_label}',
+            destination_uuid=str(local_collection_id),
+            destination_path=f'{local_collection_globus_path.rstrip("/")}/{flow_label}',
         )
 
         stop_event = threading.Event()
@@ -205,11 +225,11 @@ class GenesisExecutor:
 
         workflow_task = WorkflowTask(
             transfer_client=transfer_client,
-            compute_client=compute_client,
-            local_to_remote_transfer_inputs=local_to_remote_inputs,
+            compute_client=iri_client.compute,
+            local_to_remote_transfer_inputs=outbound_transfer_inputs,
             compute_resource_id=compute_resource_id,
             job_specification=job_specification,
-            remote_to_local_transfer_inputs=remote_to_local_inputs,
+            remote_to_local_transfer_inputs=inbound_transfer_inputs,
             stop_event=stop_event,
             status_interval_s=status_interval_s,
         )

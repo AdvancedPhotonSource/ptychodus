@@ -9,7 +9,7 @@ import time
 import requests
 
 from .iri import IRIComputeClient, JobSpecification, JobState
-from .transfer import AmSCGlobusTransferClient, GlobusTransferInputs
+from .transfer import AmSCGlobusTransferClient, GlobusTransferInputs, TransferStatus
 
 logger = logging.getLogger(__name__)
 
@@ -31,38 +31,35 @@ def transfer_task(
 ) -> Iterator[GenesisStatus]:
     start_time = datetime.now()
 
-    for details in client.start_transfer(inputs):
-        if details.transfer_uuid is None:
-            continue
+    transfer = client.start_transfer(inputs)
+    transfer_uuid = transfer.transfer_uuid
+    label = transfer.label or transfer_uuid
 
-        while not stop_event.is_set():
-            result = client.get_transfer(details.transfer_uuid)
-            status = result.status or 'UNKNOWN'
-            logger.info(f'Transfer {details.name!r} [{details.transfer_uuid}]: {status}')
+    while not stop_event.is_set():
+        result = client.get_transfer(transfer_uuid)
+        status = result.status or TransferStatus.UNKNOWN
+        logger.info(f'Transfer {label!r} [{transfer_uuid}]: {status}')
 
-            if status == 'SUCCEEDED':
-                yield GenesisStatus(
-                    label=details.name,
-                    start_time=start_time,
-                    completion_time=result.completion_time or datetime.now(),
-                    status=status,
-                    action='Transfer',
-                )
-                break
-            elif status in {'FAILED', 'CANCELED'}:
-                raise RuntimeError(
-                    f'Transfer {details.name!r} [{details.transfer_uuid}] '
-                    f'ended with status {status!r}: {result.reason}'
-                )
-            else:
-                yield GenesisStatus(
-                    label=details.name,
-                    start_time=start_time,
-                    completion_time=None,
-                    status=status,
-                    action='Transfer',
-                )
-                stop_event.wait(status_interval_s)
+        if status == TransferStatus.SUCCEEDED:
+            yield GenesisStatus(
+                label=label,
+                start_time=start_time,
+                completion_time=result.completion_time or datetime.now(),
+                status=status,
+                action='Transfer',
+            )
+            break
+        elif status in {TransferStatus.FAILED, TransferStatus.CANCELED}:
+            raise RuntimeError(f'Transfer {label!r} [{transfer_uuid}] ended with status {status!r}')
+        else:
+            yield GenesisStatus(
+                label=label,
+                start_time=start_time,
+                completion_time=None,
+                status=status,
+                action='Transfer',
+            )
+            stop_event.wait(status_interval_s)
 
 
 def compute_task(

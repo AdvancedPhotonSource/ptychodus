@@ -27,14 +27,12 @@ dependencies = [
 dynamic = ["version"]
 
 [project.scripts]
-convert-to-ptychodus = "ptychodus.convert_to_ptychodus:main"
+convert-to-ptychodus = "ptychodus.scripts.convert_to_ptychodus:main"
 ptychodus = "ptychodus.__main__:main"
-ptychodus-bdp = "ptychodus.ptychodus_bdp:main"
+ptychodus-bdp = "ptychodus.scripts.ptychodus_bdp:main"
 ptychodus-ptychopinn-tf-test = "ptychodus.scripts.ptychopinn_tf_test:main"
-ptychodus-set-iri-tokens = "ptychodus.model.genesis.iri:set_iri_tokens_cli"
-ptychodus-check-iri-tokens = "ptychodus.model.genesis.iri:check_iri_tokens_cli"
-ptychodus-set-transfer-tokens = "ptychodus.model.genesis.transfer:set_transfer_tokens_cli"
-ptychodus-check-transfer-tokens = "ptychodus.model.genesis.transfer:check_transfer_tokens_cli"
+ptychodus-store-iri-tokens = "ptychodus.scripts.genesis.store_iri_tokens:main"
+ptychodus-store-transfer-tokens = "ptychodus.scripts.genesis.store_transfer_tokens:main"
 
 [project.optional-dependencies]
 globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
