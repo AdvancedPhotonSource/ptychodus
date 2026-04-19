@@ -23,7 +23,7 @@ def main() -> None:
         logger.info(f'Checking IRI access token for facility "{name}"...')
 
         client = adapter.get_iri_client()
-        resource_id = adapter.get_default_compute_resource_id()
+        resource_id = '94351904-6dba-4c16-b5cd-fbd280d8615b'  # Perlmutter
         # FIXME commands = 'source $HOME/.local/bin/env; which python; which ptychodus; ptychodus --version; nvidia-smi'
         commands = 'echo BEGIN; nvidia-smi; echo END'
         job_spec = JobSpecification(

@@ -2,6 +2,7 @@ from pathlib import Path
 
 from ptychodus.api.common import get_ptychodus_dir
 
+from .account import IRIAccountClient
 from .compute import IRIComputeClient
 from .facility import IRIFacilityClient
 from .status import IRIStatusClient
@@ -12,6 +13,7 @@ class IRIClient:
 
     def __init__(self, api_base_url: str, access_token: str) -> None:
         self._api_base_url = api_base_url
+        self.account = IRIAccountClient(api_base_url, access_token)
         self.facility = IRIFacilityClient(api_base_url, access_token)
         self.status = IRIStatusClient(api_base_url, access_token)
         self.compute = IRIComputeClient(api_base_url, access_token)

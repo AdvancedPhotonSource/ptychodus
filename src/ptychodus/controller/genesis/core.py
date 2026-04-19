@@ -14,11 +14,59 @@ from ...model.genesis import GenesisPresenter, GenesisSettings
 from ..data import FileDialogFactory
 from ..parametric import (
     CheckBoxParameterViewController,
+    LineEditParameterViewController,
     ParameterViewBuilder,
     ParameterViewController,
     PathLineEditParameterViewController,
     SpinBoxParameterViewController,
 )
+
+
+class ProjectComboBoxViewController(ParameterViewController, Observer):
+    def __init__(
+        self,
+        project_id: StringParameter,
+        facility: StringParameter,
+        presenter: GenesisPresenter,
+    ) -> None:
+        super().__init__()
+        self._project_id = project_id
+        self._facility = facility
+        self._presenter = presenter
+        self._widget = QComboBox()
+
+        self._repopulate()
+        self._sync_model_to_view()
+
+        self._widget.textActivated.connect(self._handle_text_activated)
+        project_id.add_observer(self)
+        facility.add_observer(self)
+
+    def get_widget(self) -> QComboBox:
+        return self._widget
+
+    def _repopulate(self) -> None:
+        self._widget.blockSignals(True)
+        self._widget.clear()
+
+        for name in self._presenter.supported_projects():
+            self._widget.addItem(name)
+
+        self._widget.blockSignals(False)
+
+    def _handle_text_activated(self, project_name: str) -> None:
+        self._project_id.set_value(self._presenter.map_project_name_to_id(project_name))
+
+    def _sync_model_to_view(self) -> None:
+        name = self._presenter.map_project_id_to_name(self._project_id.get_value())
+        self._widget.setCurrentText(name)
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._facility:
+            self._repopulate()
+            self._sync_model_to_view()
+        elif observable is self._project_id:
+            self._sync_model_to_view()
 
 
 class ComputeResourceComboBoxViewController(ParameterViewController, Observer):
@@ -147,6 +195,17 @@ class GenesisController:
             settings.facility,
             presenter,
         )
+        if False:  # FIXME
+            self._project_controller = ProjectComboBoxViewController(
+                settings.project_id,
+                settings.facility,
+                presenter,
+            )
+        else:
+            self._project_controller = LineEditParameterViewController(
+                settings.project_id,
+                tool_tip='Project ID to use when running on the remote system.',
+            )
 
         view_builder = ParameterViewBuilder(file_dialog_factory)
 
@@ -160,6 +219,11 @@ class GenesisController:
         view_builder.add_view_controller(
             self._compute_resource_controller,
             'IRI Compute Resource:',
+            group=genesis_group,
+        )
+        view_builder.add_view_controller(
+            self._project_controller,
+            'Project:',
             group=genesis_group,
         )
         view_builder.add_combo_box(

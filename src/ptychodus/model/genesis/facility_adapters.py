@@ -7,7 +7,9 @@ from typing import Final
 from uuid import UUID
 import logging
 
-from .iri import IRIClient, JobSpecification, ResourceType
+from ptychodus.api.io import StandardFileLayout
+
+from .iri import IRIClient, JobAttributes, JobSpecification, ResourceSpecification, ResourceType
 
 logger = logging.getLogger(__name__)
 
@@ -20,17 +22,15 @@ class GlobusCollection:
 
 
 class IRIFacilityAdapter(ABC):
-    def __init__(self, iri_client: IRIClient, default_compute_resource_id: str) -> None:
+    def __init__(self, iri_client: IRIClient) -> None:
         self._iri_client = iri_client
         self._compute_resource_name_to_id_cache: dict[str, str] = {}
         self._compute_resource_id_to_name_cache: dict[str, str] = {}
-        self._default_compute_resource_id = default_compute_resource_id
+        self._project_name_to_id_cache: dict[str, str] = {}
+        self._project_id_to_name_cache: dict[str, str] = {}
 
     def get_iri_client(self) -> IRIClient:
         return self._iri_client
-
-    def get_default_compute_resource_id(self) -> str:
-        return self._default_compute_resource_id
 
     def refresh_compute_resources(self) -> None:
         self._compute_resource_name_to_id_cache.clear()
@@ -80,6 +80,43 @@ class IRIFacilityAdapter(ABC):
 
         return self._compute_resource_id_to_name_cache.get(resource_id, '')
 
+    def refresh_projects(self) -> None:
+        self._project_name_to_id_cache.clear()
+        self._project_id_to_name_cache.clear()
+
+        try:
+            projects = self._iri_client.account.get_projects()
+        except Exception:
+            logger.warning('Failed to fetch projects', exc_info=True)
+        else:
+            for project in projects:
+                self._project_name_to_id_cache[project.name] = project.id
+                self._project_id_to_name_cache[project.id] = project.name
+
+        api_base_url = self._iri_client.get_api_base_url()
+        logger.info(
+            f'Fetched projects from {api_base_url}:\n'
+            + json.dumps(self._project_name_to_id_cache, indent=2)
+        )
+
+    def project_names(self) -> Sequence[str]:
+        if not self._project_name_to_id_cache:
+            self.refresh_projects()
+
+        return sorted(self._project_name_to_id_cache.keys())
+
+    def map_project_name_to_id(self, project_name: str) -> str:
+        if not self._project_name_to_id_cache:
+            self.refresh_projects()
+
+        return self._project_name_to_id_cache[project_name]
+
+    def map_project_id_to_name(self, project_id: str) -> str:
+        if not self._project_id_to_name_cache:
+            self.refresh_projects()
+
+        return self._project_id_to_name_cache.get(project_id, '')
+
     @abstractmethod
     def globus_collections(self) -> Mapping[str, GlobusCollection]:
         pass
@@ -98,9 +135,8 @@ class ALCFFacilityAdapter(IRIFacilityAdapter):
     NAME: Final[str] = 'ALCF'
 
     def __init__(self, access_token: str) -> None:
-        # FIXME 'Polaris': '55c1c993-1124-47f9-b823-514ba3849a9a',
         iri_client = IRIClient('https://api.alcf.anl.gov/api/v1/', access_token)
-        super().__init__(iri_client, '55c1c993-1124-47f9-b823-514ba3849a9a')
+        super().__init__(iri_client)
 
     def globus_collections(self) -> Mapping[str, GlobusCollection]:
         return {
@@ -124,11 +160,30 @@ class ALCFFacilityAdapter(IRIFacilityAdapter):
     def create_job_specification(
         self, action: str, input_directory: Path, output_directory: Path
     ) -> JobSpecification:
-        # FIXME implement
+        settings_file = input_directory / StandardFileLayout.SETTINGS
+        command_list = [
+            'source $HOME/.local/bin/env',
+            f'ptychodus -b {action} -i {input_directory} -o {output_directory} -s {settings_file}',
+        ]
+        commands = '; '.join(command_list)
+        logger.debug(f'Generated job specification command: {commands}')
+        outputs_directory = output_directory / 'outputs'
+
         return JobSpecification(
-            executable='/bin/hostname',
-            resources=None,
-            attributes=None,
+            executable='/bin/bash',
+            arguments=['-c', commands],
+            name=f'ptychodus-{action}',
+            stdout_path=str(outputs_directory),
+            stderr_path=str(outputs_directory),
+            resources=ResourceSpecification(
+                node_count=1,
+            ),
+            attributes=JobAttributes(  # FIXME from settings
+                duration=300,
+                queue_name='debug',
+                account='APSDataProcessing',
+                custom_attributes={'filesystems': 'eagle'},
+            ),
         )
 
 
@@ -136,9 +191,8 @@ class NERSCFacilityAdapter(IRIFacilityAdapter):
     NAME: Final[str] = 'NERSC'
 
     def __init__(self, access_token: str) -> None:
-        # FIXME 'Perlmutter': '94351904-6dba-4c16-b5cd-fbd280d8615b',
         iri_client = IRIClient('https://api.iri.nersc.gov/api/v1/', access_token)
-        super().__init__(iri_client, '94351904-6dba-4c16-b5cd-fbd280d8615b')
+        super().__init__(iri_client)
 
     def globus_collections(self) -> Mapping[str, GlobusCollection]:
         return {

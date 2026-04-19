@@ -13,6 +13,7 @@ class GenesisSettings(Observable, Observer):
         self._group.add_observer(self)
 
         self.facility = self._group.create_string_parameter('Facility', 'NERSC')
+        self.project_id = self._group.create_string_parameter('ProjectID', '')
         self.compute_resource_id = self._group.create_string_parameter('ComputeResourceID', '')
         self.globus_transfer_provider = self._group.create_string_parameter(
             'GlobusTransferProvider', 'AmSC'

@@ -23,7 +23,7 @@ def main() -> None:
         logger.info(f'Checking IRI access token for facility "{name}"...')
 
         client = adapter.get_iri_client()
-        resource_id = adapter.get_default_compute_resource_id()
+        resource_id = '55c1c993-1124-47f9-b823-514ba3849a9a'  # Polaris
         commands = 'echo BEGIN; source $HOME/.local/bin/env; which python; which ptychodus; ptychodus --version; nvidia-smi; echo END'
         job_spec = JobSpecification(
             executable='/bin/bash',
