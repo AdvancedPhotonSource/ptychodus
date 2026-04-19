@@ -24,10 +24,10 @@ class IRIFacilityAdapter(ABC):
         pass
 
     @abstractmethod
-    def compute_resource_ids(self) -> Mapping[str, UUID]:
+    def compute_resource_ids(self) -> Mapping[str, str]:
         pass
 
-    def get_default_compute_resource_id(self) -> UUID:
+    def get_default_compute_resource_id(self) -> str:
         return next(iter(self.compute_resource_ids().values()))
 
     @abstractmethod
@@ -53,9 +53,9 @@ class ALCFFacilityAdapter(IRIFacilityAdapter):
     def get_iri_client(self) -> IRIClient:
         return self._iri_client
 
-    def compute_resource_ids(self) -> Mapping[str, UUID]:
+    def compute_resource_ids(self) -> Mapping[str, str]:
         return {
-            'Polaris': UUID('55c1c993-1124-47f9-b823-514ba3849a9a'),
+            'Polaris': '55c1c993-1124-47f9-b823-514ba3849a9a',
         }
 
     def globus_collections(self) -> Mapping[str, GlobusCollection]:
@@ -97,9 +97,9 @@ class NERSCFacilityAdapter(IRIFacilityAdapter):
     def get_iri_client(self) -> IRIClient:
         return self._iri_client
 
-    def compute_resource_ids(self) -> Mapping[str, UUID]:
+    def compute_resource_ids(self) -> Mapping[str, str]:
         return {
-            'Perlmutter': UUID('94351904-6dba-4c16-b5cd-fbd280d8615b'),
+            'Perlmutter': '94351904-6dba-4c16-b5cd-fbd280d8615b',
         }
 
     def globus_collections(self) -> Mapping[str, GlobusCollection]:
