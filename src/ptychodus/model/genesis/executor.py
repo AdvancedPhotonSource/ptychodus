@@ -1,8 +1,6 @@
-from collections.abc import Callable
 from pathlib import Path
 from uuid import UUID
 import logging
-import queue
 import threading
 
 from ptychodus.api.io import StandardFileLayout
@@ -22,7 +20,7 @@ from .transfer import AmSCGlobusTransferClient, GlobusTransferInputs
 logger = logging.getLogger(__name__)
 
 
-def combine_path_parts(base_path: str, subpath: str) -> str:
+def combine_path_segments(base_path: str, subpath: str) -> str:
     return f'{base_path.rstrip("/")}/{subpath.lstrip("/")}'
 
 
@@ -35,21 +33,23 @@ class WorkflowTask:
         self,
         transfer_client: AmSCGlobusTransferClient,
         compute_client: IRIComputeClient,
-        local_to_remote_transfer_inputs: GlobusTransferInputs,
+        outbound_transfer_inputs: GlobusTransferInputs,
         compute_resource_id: str,
         job_specification: JobSpecification,
-        remote_to_local_transfer_inputs: GlobusTransferInputs,
+        inbound_transfer_inputs: GlobusTransferInputs,
         stop_event: threading.Event,
         status_interval_s: float,
+        load_product: bool,
     ) -> None:
         self._transfer_client = transfer_client
         self._compute_client = compute_client
-        self._local_to_remote_transfer_inputs = local_to_remote_transfer_inputs
+        self._local_to_remote_transfer_inputs = outbound_transfer_inputs
         self._compute_resource_id = compute_resource_id
         self._job_specification = job_specification
-        self._remote_to_local_transfer_inputs = remote_to_local_transfer_inputs
+        self._remote_to_local_transfer_inputs = inbound_transfer_inputs
         self._stop_event = stop_event
         self._status_interval_s = status_interval_s
+        self._load_product = load_product
 
     def __call__(self) -> ForegroundTask | None:
         # Step 1: Transfer input data from local to remote
@@ -101,32 +101,15 @@ class WorkflowTask:
             logger.exception('Remote-to-local transfer failed!')
             return None
 
+        result: ForegroundTask | None = None
+
+        # Step 4: Load data product (reconstruct only)
+        if self._load_product:
+            logger.info('Workflow step 4: loading reconstructed product...')
+            # FIXME return ForegroundTask that loads the product
+
         logger.info('Workflow completed successfully.')
-        return None
-
-
-class TaskRunner:  # FIXME finish
-    def __init__(self) -> None:
-        self._task_queue: queue.Queue[Callable] = queue.Queue()
-        self._dependent_tasks: dict[int, list[Callable]] = dict()
-        self._num_submissions = 0
-
-    def submit(self, task: Callable, depends_on: int | None = None) -> int:
-        # FIXME ensure thread-safe?
-        """returns int useful for dependencies"""
-        task_number = self._num_submissions
-
-        if depends_on is None:
-            self._task_queue.put(task)
-        else:
-            try:
-                self._dependent_tasks[depends_on].append(task)
-            except KeyError:
-                self._dependent_tasks[depends_on] = [task]
-
-        self._num_submissions += 1
-
-        return task_number
+        return result
 
 
 class GenesisExecutor:
@@ -138,7 +121,7 @@ class GenesisExecutor:
         product_api: ProductAPI,
         processing_api: ProcessingAPI,
         settings: GenesisSettings,
-        iri_facility_adapter: PluginChooser[IRIFacilityAdapter],
+        facility_chooser: PluginChooser[IRIFacilityAdapter],
         transfer_client_chooser: PluginChooser[AmSCGlobusTransferClient],
     ) -> None:
         super().__init__()
@@ -148,7 +131,7 @@ class GenesisExecutor:
         self._diffraction_api = diffraction_api
         self._product_api = product_api
         self._processing_api = processing_api
-        self._iri_facility_adapter = iri_facility_adapter
+        self._facility_chooser = facility_chooser
         self._transfer_client_chooser = transfer_client_chooser
 
     def populate_input_directory(self, input_product_index: int) -> Path:
@@ -180,44 +163,49 @@ class GenesisExecutor:
 
         return input_directory
 
-    def _run_flow(
-        self,
-        ptychodus_action: str,
-        flow_label: str,
-    ) -> None:
+    def _run_flow(self, ptychodus_action: str, flow_label: str, *, load_product: bool) -> None:
         transfer_client = self._transfer_client_chooser.get_current_plugin().strategy
-        facility_adapter = self._iri_facility_adapter.get_current_plugin().strategy
+        facility_adapter = self._facility_chooser.get_current_plugin().strategy
         iri_client = facility_adapter.get_iri_client()
         compute_resource_id = self._settings.compute_resource_id.get_value()
 
-        local_collection_id = self._settings.local_collection_id.get_value()
-        local_collection_globus_path = self._settings.local_collection_globus_path.get_value()
-        local_collection_url = create_globus_url(local_collection_id, local_collection_globus_path)
+        input_path_segment = f'{flow_label}/input'
+        output_path_segment = f'{flow_label}/output'
 
-        remote_collection_id = self._settings.remote_collection_id.get_value()
-        remote_collection_globus_path = self._settings.remote_collection_globus_path.get_value()
-        remote_collection_url = create_globus_url(
-            remote_collection_id, remote_collection_globus_path
-        )
+        lc_id = self._settings.local_collection_id.get_value()
+        lc_globus_path = self._settings.local_collection_globus_path.get_value()
+
+        rc_id = self._settings.remote_collection_id.get_value()
+        rc_globus_path = self._settings.remote_collection_globus_path.get_value()
+        rc_posix_path = str(self._settings.remote_collection_posix_path.get_value())
+
+        outbound_source_path = combine_path_segments(lc_globus_path, input_path_segment)
+        outbound_destination_path = combine_path_segments(rc_globus_path, input_path_segment)
+        inbound_source_path = combine_path_segments(rc_globus_path, output_path_segment)
+        inbound_destination_path = combine_path_segments(lc_globus_path, output_path_segment)
 
         outbound_transfer_inputs = GlobusTransferInputs(
-            source_url=local_collection_url,
-            destination_url=remote_collection_url,
-            label=f'{flow_label}_outbound',
-            source_uuid=str(local_collection_id),
-            source_path=f'{local_collection_globus_path.rstrip("/")}/{flow_label}',
-            destination_uuid=str(remote_collection_id),
-            destination_path=f'{remote_collection_globus_path.rstrip("/")}/{flow_label}',
+            source_url=create_globus_url(lc_id, outbound_source_path),
+            destination_url=create_globus_url(rc_id, outbound_destination_path),
+            label=f'ptychodus_{flow_label}_outbound',
+            source_uuid=str(lc_id),
+            source_path=outbound_source_path,
+            destination_uuid=str(rc_id),
+            destination_path=outbound_destination_path,
         )
-        job_specification = JobSpecification()  # FIXME
+        job_specification = facility_adapter.create_job_specification(
+            action=ptychodus_action,
+            input_directory=Path(combine_path_segments(rc_posix_path, input_path_segment)),
+            output_directory=Path(combine_path_segments(rc_posix_path, output_path_segment)),
+        )
         inbound_transfer_inputs = GlobusTransferInputs(
-            source_url=remote_collection_url,
-            destination_url=local_collection_url,
-            label=f'{flow_label}_inbound',
-            source_uuid=str(remote_collection_id),
-            source_path=f'{remote_collection_globus_path.rstrip("/")}/{flow_label}',
-            destination_uuid=str(local_collection_id),
-            destination_path=f'{local_collection_globus_path.rstrip("/")}/{flow_label}',
+            source_url=create_globus_url(rc_id, inbound_source_path),
+            destination_url=create_globus_url(lc_id, inbound_destination_path),
+            label=f'ptychodus_{flow_label}_inbound',
+            source_uuid=str(rc_id),
+            source_path=inbound_source_path,
+            destination_uuid=str(lc_id),
+            destination_path=inbound_destination_path,
         )
 
         stop_event = threading.Event()
@@ -226,12 +214,13 @@ class GenesisExecutor:
         workflow_task = WorkflowTask(
             transfer_client=transfer_client,
             compute_client=iri_client.compute,
-            local_to_remote_transfer_inputs=outbound_transfer_inputs,
+            outbound_transfer_inputs=outbound_transfer_inputs,
             compute_resource_id=compute_resource_id,
             job_specification=job_specification,
-            remote_to_local_transfer_inputs=inbound_transfer_inputs,
+            inbound_transfer_inputs=inbound_transfer_inputs,
             stop_event=stop_event,
             status_interval_s=status_interval_s,
+            load_product=load_product,
         )
         self._task_manager.put_background_task(workflow_task)
 
@@ -242,10 +231,10 @@ class GenesisExecutor:
         if self._processing_api.is_reconstructor_trainable():
             pass  # TODO get model from mlflow
 
-        self._run_flow('reconstruct', input_directory.name)
+        self._run_flow('reconstruct', input_directory.name, load_product=True)
 
     def train(self, input_product_index: int, *, algorithm: str | None = None) -> None:
         self._processing_api.set_reconstructor_if_provided(algorithm)
         input_directory = self.populate_input_directory(input_product_index)
-        self._run_flow('train', input_directory.name)
+        self._run_flow('train', input_directory.name, load_product=False)
         # TODO customize input/output directories; put model to mlflow
