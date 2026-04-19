@@ -1,3 +1,4 @@
+from .client import IRIClient, get_iri_tokens_file
 from .compute import (
     IRIComputeClient,
     JobAttributes,
@@ -6,7 +7,7 @@ from .compute import (
     JobState,
     ResourceSpecification,
 )
-from .client import IRIClient, get_iri_tokens_file
+from .status import ResourceType
 
 __all__ = [
     'IRIClient',
@@ -16,5 +17,6 @@ __all__ = [
     'JobSpecification',
     'JobState',
     'ResourceSpecification',
+    'ResourceType',
     'get_iri_tokens_file',
 ]

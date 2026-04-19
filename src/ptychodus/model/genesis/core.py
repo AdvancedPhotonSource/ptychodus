@@ -80,6 +80,22 @@ class GenesisPresenter:
     def supported_transfer_clients(self) -> Sequence[str]:
         return [plugin.display_name for plugin in self._transfer_client_chooser]
 
+    def refresh_compute_resources(self) -> None:
+        facility_adapter = self._facility_chooser.get_current_plugin().strategy
+        facility_adapter.refresh_compute_resources()
+
+    def supported_compute_resources(self) -> Sequence[str]:
+        facility_adapter = self._facility_chooser.get_current_plugin().strategy
+        return facility_adapter.compute_resource_names()
+
+    def map_compute_resource_name_to_id(self, name: str) -> str:
+        facility_adapter = self._facility_chooser.get_current_plugin().strategy
+        return facility_adapter.map_compute_resource_name_to_id(name)
+
+    def map_compute_resource_id_to_name(self, resource_id: str) -> str:
+        facility_adapter = self._facility_chooser.get_current_plugin().strategy
+        return facility_adapter.map_compute_resource_id_to_name(resource_id)
+
     def apply_facility_defaults(self, label: str) -> None:
         self._facility_chooser.set_current_plugin(label)  # FIXME check this
         adapter = self._facility_chooser.get_current_plugin().strategy

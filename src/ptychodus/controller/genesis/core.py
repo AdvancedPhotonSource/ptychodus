@@ -1,4 +1,5 @@
 from PyQt5.QtWidgets import (
+    QComboBox,
     QFormLayout,
     QGroupBox,
     QPushButton,
@@ -7,7 +8,7 @@ from PyQt5.QtWidgets import (
 )
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import BooleanParameter, IntegerParameter
+from ptychodus.api.parametric import BooleanParameter, IntegerParameter, StringParameter
 
 from ...model.genesis import GenesisPresenter, GenesisSettings
 from ..data import FileDialogFactory
@@ -18,6 +19,57 @@ from ..parametric import (
     PathLineEditParameterViewController,
     SpinBoxParameterViewController,
 )
+
+
+class ComputeResourceComboBoxViewController(ParameterViewController, Observer):
+    def __init__(
+        self,
+        compute_resource_id: StringParameter,
+        facility: StringParameter,
+        presenter: GenesisPresenter,
+    ) -> None:
+        super().__init__()
+        self._compute_resource_id = compute_resource_id
+        self._facility = facility
+        self._presenter = presenter
+        self._widget = QComboBox()
+
+        self._repopulate()
+        self._sync_model_to_view()
+
+        self._widget.textActivated.connect(self._handle_text_activated)
+        compute_resource_id.add_observer(self)
+        facility.add_observer(self)
+
+    def get_widget(self) -> QComboBox:
+        return self._widget
+
+    def _repopulate(self) -> None:
+        self._widget.blockSignals(True)
+        self._widget.clear()
+
+        for name in self._presenter.supported_compute_resources():
+            self._widget.addItem(name)
+
+        self._widget.blockSignals(False)
+
+    def _handle_text_activated(self, resource_name: str) -> None:
+        self._compute_resource_id.set_value(
+            self._presenter.map_compute_resource_name_to_id(resource_name)
+        )
+
+    def _sync_model_to_view(self) -> None:
+        name = self._presenter.map_compute_resource_id_to_name(
+            self._compute_resource_id.get_value()
+        )
+        self._widget.setCurrentText(name)
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._facility:
+            self._repopulate()
+            self._sync_model_to_view()
+        elif observable is self._compute_resource_id:
+            self._sync_model_to_view()
 
 
 class GenesisStatusViewController(ParameterViewController, Observer):
@@ -90,16 +142,25 @@ class GenesisController:
             tool_tip='POSIX path on the remote system where data is stored.',
         )
 
-        view_builder = ParameterViewBuilder(file_dialog_factory)
-        # TODO Compute Resource: ALCF Polaris, NERSC Perlmutter, OLCF Odo
-
-        genesis_group = 'Genesis'
-        view_builder.add_combo_box(
-            settings.facility, presenter.supported_facilities(), 'Facility:', group=genesis_group
+        self._compute_resource_controller = ComputeResourceComboBoxViewController(
+            settings.compute_resource_id,
+            settings.facility,
+            presenter,
         )
-        # FIXME show API base URL for the selected facility
-        view_builder.add_line_edit(
-            settings.compute_resource_id, 'Compute Resource ID:', group=genesis_group
+
+        view_builder = ParameterViewBuilder(file_dialog_factory)
+
+        genesis_group = 'American Science Cloud'
+        view_builder.add_combo_box(
+            settings.facility,
+            presenter.supported_facilities(),
+            'IRI Facility:',
+            group=genesis_group,
+        )
+        view_builder.add_view_controller(
+            self._compute_resource_controller,
+            'IRI Compute Resource:',
+            group=genesis_group,
         )
         view_builder.add_combo_box(
             settings.globus_transfer_provider,
