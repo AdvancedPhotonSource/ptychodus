@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 from uuid import UUID
 import logging
@@ -43,6 +44,9 @@ class WorkflowTask:
         status_q: queue.Queue[GenesisStatus],
         status_interval_s: float,
         load_product: bool,
+        label: str,
+        product_api: ProductAPI,
+        output_product_path: Path,
     ) -> None:
         self._transfer_client = transfer_client
         self._compute_client = compute_client
@@ -54,8 +58,31 @@ class WorkflowTask:
         self._status_q = status_q
         self._status_interval_s = status_interval_s
         self._load_product = load_product
+        self._label = label
+        self._product_api = product_api
+        self._output_product_path = output_product_path
+        self._start_time = datetime.now()
+        self._status_q.put(
+            GenesisStatus(
+                label=self._label,
+                start_time=self._start_time,
+                completion_time=None,
+                status='Waiting',
+                action='Workflow',
+            )
+        )
 
     def __call__(self) -> ForegroundTask | None:
+        self._status_q.put(
+            GenesisStatus(
+                label=self._label,
+                start_time=self._start_time,
+                completion_time=None,
+                status='Running',
+                action='Workflow',
+            )
+        )
+
         # Step 1: Transfer input data from local to remote
         logger.info('Workflow step 1: transferring input data from local to remote...')
         try:
@@ -110,7 +137,21 @@ class WorkflowTask:
         # Step 4: Load data product (reconstruct only)
         if self._load_product:
             logger.info('Workflow step 4: loading reconstructed product...')
-            # FIXME return ForegroundTask that loads the product
+
+            def load_result() -> None:  # FIXME clean up
+                self._product_api.open_product(self._output_product_path, file_type='HDF5')
+
+            result = load_result
+
+        self._status_q.put(
+            GenesisStatus(
+                label=self._label,
+                start_time=self._start_time,
+                completion_time=datetime.now(),
+                status='Completed',
+                action='Workflow',
+            )
+        )
 
         logger.info('Workflow completed successfully.')
         return result
@@ -167,6 +208,9 @@ class GenesisExecutor:
             file_type='HDF5',
         )
 
+        if self._processing_api.is_reconstructor_trainable():
+            pass  # FIXME save model
+
         return input_directory
 
     def _run_flow(self, ptychodus_action: str, flow_label: str, *, load_product: bool) -> None:
@@ -216,6 +260,12 @@ class GenesisExecutor:
 
         stop_event = threading.Event()
         status_interval_s = float(self._settings.status_refresh_interval_s.get_value())
+        output_product_path = (
+            self._settings.local_collection_posix_path.get_value()
+            / flow_label
+            / 'output'
+            / StandardFileLayout.PRODUCT_OUT
+        )
 
         workflow_task = WorkflowTask(
             transfer_client=transfer_client,
@@ -228,16 +278,19 @@ class GenesisExecutor:
             status_q=self._status_q,
             status_interval_s=status_interval_s,
             load_product=load_product,
+            label=flow_label,
+            product_api=self._product_api,
+            output_product_path=output_product_path,
         )
         self._task_manager.put_background_task(workflow_task)
 
     def reconstruct(self, input_product_index: int, *, algorithm: str | None = None) -> None:
         self._processing_api.set_reconstructor_if_provided(algorithm)
-        input_directory = self.populate_input_directory(input_product_index)
 
         if self._processing_api.is_reconstructor_trainable():
             pass  # TODO get model from mlflow
 
+        input_directory = self.populate_input_directory(input_product_index)
         self._run_flow('reconstruct', input_directory.name, load_product=True)
 
     def train(self, input_product_index: int, *, algorithm: str | None = None) -> None:
