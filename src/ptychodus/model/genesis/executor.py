@@ -1,6 +1,7 @@
 from pathlib import Path
 from uuid import UUID
 import logging
+import queue
 import threading
 
 from ptychodus.api.io import StandardFileLayout
@@ -16,6 +17,7 @@ from .iri import IRIComputeClient, JobSpecification
 from .settings import GenesisSettings
 from .tasks import compute_task, transfer_task
 from .transfer import AmSCGlobusTransferClient, GlobusTransferInputs
+from .status import GenesisStatus
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,7 @@ class WorkflowTask:
         job_specification: JobSpecification,
         inbound_transfer_inputs: GlobusTransferInputs,
         stop_event: threading.Event,
+        status_q: queue.Queue[GenesisStatus],
         status_interval_s: float,
         load_product: bool,
     ) -> None:
@@ -48,6 +51,7 @@ class WorkflowTask:
         self._job_specification = job_specification
         self._remote_to_local_transfer_inputs = inbound_transfer_inputs
         self._stop_event = stop_event
+        self._status_q = status_q
         self._status_interval_s = status_interval_s
         self._load_product = load_product
 
@@ -61,7 +65,7 @@ class WorkflowTask:
                 self._stop_event,
                 self._status_interval_s,
             ):
-                logger.info(f'{status.action} [{status.label}]: {status.status}')
+                self._status_q.put(status)
         except Exception:
             logger.exception('Local-to-remote transfer failed!')
             return None
@@ -79,7 +83,7 @@ class WorkflowTask:
                 self._stop_event,
                 self._status_interval_s,
             ):
-                logger.info(f'{status.action} [{status.label}]: {status.status}')
+                self._status_q.put(status)
         except Exception:
             logger.exception('Compute job failed!')
             return None
@@ -96,7 +100,7 @@ class WorkflowTask:
                 self._stop_event,
                 self._status_interval_s,
             ):
-                logger.info(f'{status.action} [{status.label}]: {status.status}')
+                self._status_q.put(status)
         except Exception:
             logger.exception('Remote-to-local transfer failed!')
             return None
@@ -123,6 +127,7 @@ class GenesisExecutor:
         settings: GenesisSettings,
         facility_chooser: PluginChooser[IRIFacilityAdapter],
         transfer_client_chooser: PluginChooser[AmSCGlobusTransferClient],
+        status_q: queue.Queue[GenesisStatus],
     ) -> None:
         super().__init__()
         self._task_manager = task_manager
@@ -133,6 +138,7 @@ class GenesisExecutor:
         self._processing_api = processing_api
         self._facility_chooser = facility_chooser
         self._transfer_client_chooser = transfer_client_chooser
+        self._status_q = status_q
 
     def populate_input_directory(self, input_product_index: int) -> Path:
         try:
@@ -219,6 +225,7 @@ class GenesisExecutor:
             job_specification=job_specification,
             inbound_transfer_inputs=inbound_transfer_inputs,
             stop_event=stop_event,
+            status_q=self._status_q,
             status_interval_s=status_interval_s,
             load_product=load_product,
         )

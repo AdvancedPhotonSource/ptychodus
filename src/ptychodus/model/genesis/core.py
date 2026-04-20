@@ -1,5 +1,6 @@
 from collections.abc import Mapping, Sequence
 import logging
+import queue
 
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
@@ -12,6 +13,7 @@ from .executor import GenesisExecutor
 from .facility_adapters import IRIFacilityAdapter, ALCFFacilityAdapter, NERSCFacilityAdapter
 from .iri import get_iri_tokens_file
 from .settings import GenesisSettings
+from .status import GenesisStatusRepository, GenesisStatus
 from .tokens import read_tokens
 from .transfer import AmSCGlobusTransferClient, get_amsc_transfer_api_url, get_transfer_tokens_file
 
@@ -146,6 +148,8 @@ class GenesisCore:
             self.settings.globus_transfer_provider
         )
 
+        status_q: queue.Queue[GenesisStatus] = queue.Queue()
+        self.status_repository = GenesisStatusRepository(status_q)
         self.executor = GenesisExecutor(
             task_manager,
             settings_registry,
@@ -155,6 +159,7 @@ class GenesisCore:
             self.settings,
             self._facility_chooser,
             self._transfer_client_chooser,
+            status_q,
         )
         self.presenter = GenesisPresenter(
             self.settings, self._facility_chooser, self._transfer_client_chooser
@@ -163,3 +168,6 @@ class GenesisCore:
     @property
     def is_supported(self) -> bool:
         return bool(self._facility_chooser) and bool(self._transfer_client_chooser)
+
+    def run_foreground_tasks(self) -> None:
+        self.status_repository.run_foreground_tasks()

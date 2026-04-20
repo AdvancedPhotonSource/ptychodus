@@ -252,6 +252,7 @@ class ModelCore:
     def run_tasks(self) -> None:
         self._task_manager.run_foreground_tasks()
         self.globus_core.run_foreground_tasks()
+        self.genesis_core.run_foreground_tasks()
 
     def _batch_mode_train(self, input_directory: Path, output_directory: Path) -> int:
         product_in_path = input_directory / StandardFileLayout.PRODUCT_IN

@@ -39,9 +39,8 @@ class GenesisSettings(Observable, Observer):
             'RemoteCollectionPosixPath', Path('/path/to/remote/data')
         )
 
-        self.status_auto_refresh = self._group.create_boolean_parameter('StatusAutoRefresh', False)
         self.status_refresh_interval_s = self._group.create_integer_parameter(
-            'StatusRefreshIntervalInSeconds', 30, minimum=10, maximum=86400
+            'StatusRefreshIntervalInSeconds', 15, minimum=10, maximum=86400
         )
 
     def _update(self, observable: Observable) -> None:

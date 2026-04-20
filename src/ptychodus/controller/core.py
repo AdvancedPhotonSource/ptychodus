@@ -160,7 +160,9 @@ class ControllerCore:
         self._genesis_controller = GenesisController(
             model.genesis_core.settings,
             model.genesis_core.presenter,
+            model.genesis_core.status_repository,
             view.genesis_view,
+            view.genesis_status_view,
             self._file_dialog_factory,
         )
         self._automation_controller = AutomationController(

@@ -1,25 +1,29 @@
+from PyQt5.QtCore import QModelIndex, QSortFilterProxyModel
 from PyQt5.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
-    QFormLayout,
-    QGroupBox,
-    QPushButton,
+    QTableView,
     QVBoxLayout,
     QWidget,
 )
 
-from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import BooleanParameter, IntegerParameter, StringParameter
+from ptychodus.api.observer import Observable, Observer, SequenceObserver
+from ptychodus.api.parametric import StringParameter
 
-from ...model.genesis import GenesisPresenter, GenesisSettings
+from ...model.genesis import (
+    GenesisPresenter,
+    GenesisSettings,
+    GenesisStatus,
+    GenesisStatusRepository,
+)
 from ..data import FileDialogFactory
 from ..parametric import (
-    CheckBoxParameterViewController,
     LineEditParameterViewController,
     ParameterViewBuilder,
     ParameterViewController,
     PathLineEditParameterViewController,
-    SpinBoxParameterViewController,
 )
+from .table_model import GenesisStatusTableModel
 
 
 class ProjectComboBoxViewController(ParameterViewController, Observer):
@@ -120,67 +124,31 @@ class ComputeResourceComboBoxViewController(ParameterViewController, Observer):
             self._sync_model_to_view()
 
 
-class GenesisStatusViewController(ParameterViewController, Observer):
-    def __init__(
-        self,
-        status_auto_refresh: BooleanParameter,
-        status_refresh_interval_s: IntegerParameter,
-    ) -> None:
-        super().__init__()
-        self._status_auto_refresh = status_auto_refresh
-        self._status_refresh_interval_s = status_refresh_interval_s
-
-        self._auto_refresh_view_controller = CheckBoxParameterViewController(
-            status_auto_refresh, 'Auto Refresh [sec]:'
-        )
-        self._status_refresh_interval_view_controller = SpinBoxParameterViewController(
-            status_refresh_interval_s
-        )
-        self._refresh_button = QPushButton('Refresh')
-
-        layout = QFormLayout()
-        layout.addRow(
-            self._auto_refresh_view_controller.get_widget(),
-            self._status_refresh_interval_view_controller.get_widget(),
-        )
-        layout.addRow(self._refresh_button)
-
-        self._widget = QGroupBox('Status')
-        self._widget.setLayout(layout)
-
-        status_auto_refresh.add_observer(self)
-        self._update_enabled_widgets()
-
-    def get_widget(self) -> QWidget:
-        return self._widget
-
-    def _update_enabled_widgets(self) -> None:
-        status_refresh_interval_widget = self._status_refresh_interval_view_controller.get_widget()
-        enable = not self._status_auto_refresh.get_value()
-        status_refresh_interval_widget.setEnabled(enable)
-        self._refresh_button.setEnabled(enable)
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._status_auto_refresh:
-            self._update_enabled_widgets()
-
-
-class GenesisController:
+class GenesisController(SequenceObserver[GenesisStatus]):
     def __init__(
         self,
         settings: GenesisSettings,
         presenter: GenesisPresenter,
+        status_repository: GenesisStatusRepository,
         view: QWidget,
+        status_view: QTableView,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
+        super().__init__()
         self._settings = settings
-        self._view = view
         self._presenter = presenter
+        self._view = view
 
-        self._status_controller = GenesisStatusViewController(
-            settings.status_auto_refresh,
-            settings.status_refresh_interval_s,
-        )
+        self._status_table_model = GenesisStatusTableModel(status_repository)
+        self._status_proxy_model = QSortFilterProxyModel()
+        self._status_proxy_model.setSourceModel(self._status_table_model)
+
+        status_view.setModel(self._status_proxy_model)
+        status_view.setSortingEnabled(True)
+        status_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+
+        status_repository.add_observer(self)
+
         self._local_collection_posix_path_controller = PathLineEditParameterViewController(
             settings.local_collection_posix_path,
             tool_tip='POSIX path on the local system where data is stored.',
@@ -196,7 +164,7 @@ class GenesisController:
             presenter,
         )
         if False:  # FIXME
-            self._project_controller = ProjectComboBoxViewController(
+            self._project_controller: ParameterViewController = ProjectComboBoxViewController(
                 settings.project_id,
                 settings.facility,
                 presenter,
@@ -230,6 +198,11 @@ class GenesisController:
             settings.globus_transfer_provider,
             presenter.supported_transfer_clients(),
             'Globus Transfer Provider:',
+            group=genesis_group,
+        )
+        view_builder.add_spin_box(
+            settings.status_refresh_interval_s,
+            'Status Refresh Interval [s]:',
             group=genesis_group,
         )
         # FIXME add button to call presenter.apply_facility_defaults() to fill in the default values for the selected facility
@@ -266,10 +239,22 @@ class GenesisController:
             group=remote_group,
         )
 
-        view_builder.add_view_controller_to_bottom(self._status_controller)
         contents = view_builder.build_widget()
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(contents)
         view.setLayout(layout)
+
+    def handle_item_inserted(self, index: int, item: GenesisStatus) -> None:
+        self._status_table_model.beginInsertRows(QModelIndex(), index, index)
+        self._status_table_model.endInsertRows()
+
+    def handle_item_changed(self, index: int, item: GenesisStatus) -> None:
+        top_left = self._status_table_model.index(index, 0)
+        bottom_right = self._status_table_model.index(index, self._status_table_model.columnCount())
+        self._status_table_model.dataChanged.emit(top_left, bottom_right)
+
+    def handle_item_removed(self, index: int, item: GenesisStatus) -> None:
+        self._status_table_model.beginRemoveRows(QModelIndex(), index, index)
+        self._status_table_model.endRemoveRows()

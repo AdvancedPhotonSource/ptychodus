@@ -1,6 +1,5 @@
 from __future__ import annotations
 from collections.abc import Iterator
-from dataclasses import dataclass
 from datetime import datetime
 import logging
 import threading
@@ -10,17 +9,9 @@ import requests
 
 from .iri import IRIComputeClient, JobSpecification, JobState
 from .transfer import AmSCGlobusTransferClient, GlobusTransferInputs, TransferStatus
+from .status import GenesisStatus
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class GenesisStatus:
-    label: str
-    start_time: datetime
-    completion_time: datetime | None
-    status: str
-    action: str
 
 
 def transfer_task(
