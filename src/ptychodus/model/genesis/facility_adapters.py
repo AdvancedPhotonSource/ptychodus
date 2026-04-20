@@ -133,6 +133,7 @@ class IRIFacilityAdapter(ABC):
 def create_ptychodus_command(action: str, input_directory: Path, output_directory: Path) -> str:
     command_list = [
         'source $HOME/.local/bin/env',
+        'ptychodus -v',
         f'ptychodus -b {action} -i {input_directory} -o {output_directory}',
     ]
     return '; '.join(command.strip().replace('"', '\\"') for command in command_list)

@@ -13,7 +13,7 @@ from ptychodus.model.genesis.transfer import get_transfer_tokens_file
 logger = logging.getLogger(__name__)
 
 
-def set_tokens() -> None:
+def store_tokens() -> None:
     tokens_file = get_transfer_tokens_file()
     access_token = GenesisAccessTokens(
         facility='AmSC',
@@ -42,8 +42,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description='Store and check transfer access tokens.')
     subparsers = parser.add_subparsers(dest='command', required=True)
 
-    set_parser = subparsers.add_parser('set', help='Set transfer access tokens')
-    set_parser.set_defaults(func=set_tokens)
+    set_parser = subparsers.add_parser('store', help='Store transfer access tokens')
+    set_parser.set_defaults(func=store_tokens)
 
     check_parser = subparsers.add_parser('check', help='Check transfer access tokens')
     check_parser.set_defaults(func=check_tokens)

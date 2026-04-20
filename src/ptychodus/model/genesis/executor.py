@@ -1,7 +1,7 @@
+from dataclasses import dataclass
 from pathlib import Path
 from uuid import UUID
 import logging
-import os
 import queue
 import threading
 
@@ -22,12 +22,36 @@ from .workflow import PtychodusWorkflow
 logger = logging.getLogger(__name__)
 
 
-def combine_path_segments(base_path: str, subpath: str) -> str:
-    return f'{base_path.rstrip("/")}/{subpath.lstrip("/")}'
+def create_globus_url(collection_id: UUID, *path_segments: str) -> str:
+    path = '/'.join(segment.strip('/') for segment in path_segments)
+    return f'globus://{collection_id}/{path}'
 
 
-def create_globus_url(collection_id: UUID, globus_path: str) -> str:
-    return f'globus://{collection_id}/{globus_path.lstrip("/")}'
+@dataclass(frozen=True)
+class WorkflowDirectoryStructure:
+    base_directory: Path
+
+    @property
+    def label(self) -> str:
+        return self.base_directory.name
+
+    @property
+    def input_directory(self) -> Path:
+        return self.base_directory / 'input'
+
+    @property
+    def input_path_segments(self) -> tuple[str, str]:
+        parts = self.input_directory.parts
+        return (parts[-2], parts[-1])
+
+    @property
+    def output_directory(self) -> Path:
+        return self.base_directory / 'output'
+
+    @property
+    def output_path_segments(self) -> tuple[str, str]:
+        parts = self.output_directory.parts
+        return (parts[-2], parts[-1])
 
 
 class GenesisExecutor:
@@ -56,91 +80,91 @@ class GenesisExecutor:
         self._status_q = status_q
         self._stop_event = stop_event
 
-    def populate_input_directory(self, input_product_index: int) -> Path:
+    def populate_input_directory(self, input_product_index: int) -> WorkflowDirectoryStructure:
         try:
             product_item = self._product_api.get_item(input_product_index)
         except IndexError:
             logger.exception(f'Failed access product for flow ({input_product_index=})!')
             raise
 
-        input_directory = (
+        local_dir_struct = WorkflowDirectoryStructure(
             self._settings.local_collection_posix_path.get_value() / product_item.get_name()
         )
 
         try:
-            input_directory.mkdir(mode=0o755, parents=True, exist_ok=True)
+            local_dir_struct.input_directory.mkdir(mode=0o755, parents=True, exist_ok=True)
         except FileExistsError:
             logger.exception('Input data POSIX path must be a directory!')
             raise
 
-        self._settings_registry.save_settings(input_directory / StandardFileLayout.SETTINGS)
+        self._settings_registry.save_settings(
+            local_dir_struct.input_directory / StandardFileLayout.SETTINGS
+        )
         self._diffraction_api.export_assembled_patterns(
-            input_directory / StandardFileLayout.DIFFRACTION
+            local_dir_struct.input_directory / StandardFileLayout.DIFFRACTION
         )
         self._product_api.save_product(
             input_product_index,
-            input_directory / StandardFileLayout.PRODUCT_IN,
+            local_dir_struct.input_directory / StandardFileLayout.PRODUCT_IN,
             file_type='HDF5',
         )
 
         if self._processing_api.is_reconstructor_trainable():
             pass  # FIXME save model
 
-        return input_directory
+        return local_dir_struct
 
-    def _run_flow(self, ptychodus_action: str, flow_label: str, *, load_product: bool) -> None:
+    def _run_flow(
+        self, ptychodus_action: str, local_dir_struct: WorkflowDirectoryStructure
+    ) -> None:
+        flow_label = f'ptychodus_{ptychodus_action}_{local_dir_struct.label}'
         transfer_client = self._transfer_client_chooser.get_current_plugin().strategy
         facility_adapter = self._facility_chooser.get_current_plugin().strategy
         iri_client = facility_adapter.get_iri_client()
         compute_resource_id = self._settings.compute_resource_id.get_value()
 
-        input_path_segment = f'{flow_label}/input'
-        output_path_segment = f'{flow_label}/output'
-
         lc_id = self._settings.local_collection_id.get_value()
         lc_globus_path = self._settings.local_collection_globus_path.get_value()
-        lc_posix_path = self._settings.local_collection_posix_path.get_value()
 
         rc_id = self._settings.remote_collection_id.get_value()
         rc_globus_path = self._settings.remote_collection_globus_path.get_value()
-        rc_posix_path = str(self._settings.remote_collection_posix_path.get_value())
-
-        outbound_source_path = combine_path_segments(lc_globus_path, input_path_segment)
-        outbound_destination_path = combine_path_segments(rc_globus_path, input_path_segment)
-        inbound_source_path = combine_path_segments(rc_globus_path, output_path_segment)
-        inbound_destination_path = combine_path_segments(lc_globus_path, output_path_segment)
 
         outbound_transfer_inputs = GlobusTransferInputs(
-            source_url=create_globus_url(lc_id, outbound_source_path),
-            destination_url=create_globus_url(rc_id, outbound_destination_path),
-            label=f'ptychodus_{flow_label}_outbound',
-            source_uuid=str(lc_id),
-            source_path=outbound_source_path,
-            destination_uuid=str(rc_id),
-            destination_path=outbound_destination_path,
+            source_url=create_globus_url(
+                lc_id, lc_globus_path, *local_dir_struct.input_path_segments
+            ),
+            destination_url=create_globus_url(
+                rc_id, rc_globus_path, *local_dir_struct.input_path_segments
+            ),
+            label=f'{flow_label}_outbound',
         )
         logger.debug(f'Created outbound transfer inputs: {outbound_transfer_inputs}')
+
+        remote_dir_struct = WorkflowDirectoryStructure(
+            self._settings.remote_collection_posix_path.get_value() / local_dir_struct.label
+        )
         job_specification = facility_adapter.create_job_specification(
             action=ptychodus_action,
-            input_directory=Path(combine_path_segments(rc_posix_path, input_path_segment)),
-            output_directory=Path(combine_path_segments(rc_posix_path, output_path_segment)),
+            input_directory=remote_dir_struct.input_directory,
+            output_directory=remote_dir_struct.output_directory,
         )
         logger.debug(f'Created job specification: {job_specification}')
+
         inbound_transfer_inputs = GlobusTransferInputs(
-            source_url=create_globus_url(rc_id, inbound_source_path),
-            destination_url=create_globus_url(lc_id, inbound_destination_path),
-            label=f'ptychodus_{flow_label}_inbound',
-            source_uuid=str(rc_id),
-            source_path=inbound_source_path,
-            destination_uuid=str(lc_id),
-            destination_path=inbound_destination_path,
+            source_url=create_globus_url(
+                rc_id, rc_globus_path, *local_dir_struct.output_path_segments
+            ),
+            destination_url=create_globus_url(
+                lc_id, lc_globus_path, *local_dir_struct.output_path_segments
+            ),
+            label=f'{flow_label}_inbound',
         )
         logger.debug(f'Created inbound transfer inputs: {inbound_transfer_inputs}')
 
         status_interval_s = self._settings.status_refresh_interval_s.get_value()
         load_product_path = (
-            Path(os.path.join(lc_posix_path, output_path_segment)) / StandardFileLayout.PRODUCT_OUT
-            if load_product
+            local_dir_struct.output_directory / StandardFileLayout.PRODUCT_OUT
+            if ptychodus_action == 'reconstruct'
             else None
         )
 
@@ -166,11 +190,11 @@ class GenesisExecutor:
         if self._processing_api.is_reconstructor_trainable():
             pass  # TODO get model from mlflow
 
-        input_directory = self.populate_input_directory(input_product_index)
-        self._run_flow('reconstruct', input_directory.name, load_product=True)
+        dir_structure = self.populate_input_directory(input_product_index)
+        self._run_flow('reconstruct', dir_structure)
 
     def train(self, input_product_index: int, *, algorithm: str | None = None) -> None:
         self._processing_api.set_reconstructor_if_provided(algorithm)
-        input_directory = self.populate_input_directory(input_product_index)
-        self._run_flow('train', input_directory.name, load_product=False)
+        dir_structure = self.populate_input_directory(input_product_index)
+        self._run_flow('train', dir_structure)
         # TODO customize input/output directories; put model to mlflow
