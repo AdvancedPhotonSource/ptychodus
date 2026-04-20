@@ -1,12 +1,14 @@
 import json
 import logging
 
+from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.genesis.core import create_facility_adapters
 from ptychodus.model.genesis.iri import (
     JobAttributes,
     JobSpecification,
     ResourceSpecification,
 )
-from ptychodus.model.genesis.core import create_facility_adapters
+from ptychodus.model.genesis.settings import GenesisSettings
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +16,9 @@ logger = logging.getLogger(__name__)
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
-    adapters = create_facility_adapters()
+    settings_registry = SettingsRegistry()
+    settings = GenesisSettings(settings_registry)
+    adapters = create_facility_adapters(settings)
 
     for name, adapter in adapters.items():
         if name != 'NERSC':
@@ -24,15 +28,13 @@ def main() -> None:
 
         client = adapter.get_iri_client()
         resource_id = '94351904-6dba-4c16-b5cd-fbd280d8615b'  # Perlmutter
-        # FIXME commands = 'source $HOME/.local/bin/env; which python; which ptychodus; ptychodus --version; nvidia-smi'
-        commands = 'echo BEGIN; nvidia-smi; echo END'
+        commands = 'echo BEGIN; source $HOME/.local/bin/env; which python; which ptychodus; ptychodus --version; nvidia-smi; echo END'
         job_spec = JobSpecification(
             executable='/bin/bash',
             arguments=['-c', commands],
-            directory='/global/homes/s/shenke',
             name='Ptychodus',
-            stdout_path='/global/homes/s/shenke/outputs',
-            stderr_path='/global/homes/s/shenke/outputs',
+            stdout_path='/global/homes/s/shenke/stdout%j.log',
+            stderr_path='/global/homes/s/shenke/stderr%j.log',
             resources=ResourceSpecification(
                 node_count=1,
                 process_count=1,
@@ -41,15 +43,14 @@ def main() -> None:
                 gpu_cores_per_process=4,
             ),
             attributes=JobAttributes(
-                duration=1800,
+                duration=300,
                 queue_name='debug',
-                # FIXME account='m5074',
                 account='m5074_g',
             ),
-            # FIXME launcher='single',
-            # FIXME launcher='srun',
+            pre_launch='echo PRE_LAUNCH',
+            post_launch='echo POST_LAUNCH',
+            launcher='srun',
         )
-        print(job_spec.model_dump_json(by_alias=True, indent=2))
         response = client.compute.submit_job(resource_id, job_spec)
 
         print(f'Job ID: {response.job_id}')

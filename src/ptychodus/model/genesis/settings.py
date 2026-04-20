@@ -18,6 +18,7 @@ class GenesisSettings(Observable, Observer):
         )
         self.account = self._group.create_string_parameter('Account', 'APSDataProcessing')
         self.queue_name = self._group.create_string_parameter('Queue', 'debug')
+        self.duration_s = self._group.create_integer_parameter('DurationInSeconds', 300, minimum=1)
         self.globus_transfer_provider = self._group.create_string_parameter(
             'GlobusTransferProvider', 'AmSC'
         )

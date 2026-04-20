@@ -1,12 +1,14 @@
 import json
 import logging
 
+from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.genesis.core import create_facility_adapters
 from ptychodus.model.genesis.iri import (
     JobAttributes,
     JobSpecification,
     ResourceSpecification,
 )
-from ptychodus.model.genesis.core import create_facility_adapters
+from ptychodus.model.genesis.settings import GenesisSettings
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +16,9 @@ logger = logging.getLogger(__name__)
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
-    adapters = create_facility_adapters()
+    settings_registry = SettingsRegistry()
+    settings = GenesisSettings(settings_registry)
+    adapters = create_facility_adapters(settings)
 
     for name, adapter in adapters.items():
         if name != 'ALCF':

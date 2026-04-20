@@ -7,8 +7,6 @@ from typing import Final
 from uuid import UUID
 import logging
 
-from ptychodus.api.io import StandardFileLayout
-
 from .iri import IRIClient, JobAttributes, JobSpecification, ResourceSpecification, ResourceType
 from .settings import GenesisSettings
 
@@ -132,6 +130,14 @@ class IRIFacilityAdapter(ABC):
         pass
 
 
+def create_ptychodus_command(action: str, input_directory: Path, output_directory: Path) -> str:
+    command_list = [
+        'source $HOME/.local/bin/env',
+        f'ptychodus -b {action} -i {input_directory} -o {output_directory}',
+    ]
+    return '; '.join(command.strip().replace('"', '\\"') for command in command_list)
+
+
 class ALCFFacilityAdapter(IRIFacilityAdapter):
     NAME: Final[str] = 'ALCF'
 
@@ -162,25 +168,18 @@ class ALCFFacilityAdapter(IRIFacilityAdapter):
     def create_job_specification(
         self, action: str, input_directory: Path, output_directory: Path
     ) -> JobSpecification:
-        settings_file = input_directory / StandardFileLayout.SETTINGS
-        command_list = [
-            'source $HOME/.local/bin/env',
-            f'ptychodus -b {action} -i {input_directory} -o {output_directory} -s {settings_file}',
-        ]
-        commands = '; '.join(command.strip().replace('"', '\\"') for command in command_list)
-        outputs_directory = output_directory / 'outputs'
-
+        commands = create_ptychodus_command(action, input_directory, output_directory)
         return JobSpecification(
             executable='/bin/bash',
             arguments=['-c', commands],
             name=f'ptychodus-{action}',
-            stdout_path=str(outputs_directory),
-            stderr_path=str(outputs_directory),
+            stdout_path=str(output_directory),
+            stderr_path=str(output_directory),
             resources=ResourceSpecification(
                 node_count=1,
             ),
             attributes=JobAttributes(
-                duration=300,
+                duration=self._settings.duration_s.get_value(),
                 queue_name=self._settings.queue_name.get_value(),
                 account=self._settings.account.get_value(),
                 custom_attributes={'filesystems': 'eagle'},
@@ -208,9 +207,26 @@ class NERSCFacilityAdapter(IRIFacilityAdapter):
     def create_job_specification(
         self, action: str, input_directory: Path, output_directory: Path
     ) -> JobSpecification:
-        # FIXME implement
+        commands = create_ptychodus_command(action, input_directory, output_directory)
         return JobSpecification(
-            executable='/bin/hostname',
-            resources=None,
-            attributes=None,
+            executable='/bin/bash',
+            arguments=['-c', commands],
+            name=f'ptychodus-{action}',
+            stdout_path=str(output_directory / 'stdout%j.log'),
+            stderr_path=str(output_directory / 'stderr%j.log'),
+            resources=ResourceSpecification(
+                node_count=1,
+                process_count=1,
+                processes_per_node=1,
+                cpu_cores_per_process=1,
+                gpu_cores_per_process=4,
+            ),
+            attributes=JobAttributes(
+                duration=self._settings.duration_s.get_value(),
+                queue_name=self._settings.queue_name.get_value(),
+                account=self._settings.account.get_value(),
+            ),
+            pre_launch='echo PRE_LAUNCH',
+            post_launch='echo POST_LAUNCH',
+            launcher='srun',
         )

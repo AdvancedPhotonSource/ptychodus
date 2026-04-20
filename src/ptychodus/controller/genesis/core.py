@@ -172,12 +172,7 @@ class GenesisController(SequenceObserver[GenesisStatus]):
         else:
             self._account_view_controller = LineEditParameterViewController(
                 settings.account,
-                tool_tip='Account to use when running on the remote system.',
             )
-        self._queue_view_controller = LineEditParameterViewController(
-            settings.queue_name,
-            tool_tip='Queue to use when running on the remote system.',
-        )
 
         view_builder = ParameterViewBuilder(file_dialog_factory)
 
@@ -186,21 +181,6 @@ class GenesisController(SequenceObserver[GenesisStatus]):
             settings.facility,
             presenter.supported_facilities(),
             'IRI Facility:',
-            group=genesis_group,
-        )
-        view_builder.add_view_controller(
-            self._compute_resource_view_controller,
-            'IRI Compute Resource:',
-            group=genesis_group,
-        )
-        view_builder.add_view_controller(
-            self._account_view_controller,
-            'Account:',
-            group=genesis_group,
-        )
-        view_builder.add_view_controller(
-            self._queue_view_controller,
-            'Queue:',
             group=genesis_group,
         )
         view_builder.add_combo_box(
@@ -214,37 +194,54 @@ class GenesisController(SequenceObserver[GenesisStatus]):
             'Status Refresh Interval [s]:',
             group=genesis_group,
         )
-        # FIXME add button to call presenter.apply_facility_defaults() to fill in the default values for the selected facility
 
-        local_group = 'Local'
-        view_builder.add_uuid_line_edit(
-            settings.local_collection_id, 'Collection UUID:', group=local_group
+        compute_group = 'Compute'
+        view_builder.add_view_controller(
+            self._compute_resource_view_controller,
+            'IRI Resource:',
+            group=compute_group,
+        )
+        view_builder.add_view_controller(
+            self._account_view_controller,
+            'Account:',
+            group=compute_group,
         )
         view_builder.add_line_edit(
+            settings.queue_name,
+            'Queue:',
+            group=compute_group,
+        )
+        view_builder.add_integer_line_edit(
+            settings.duration_s,
+            'Duration [s]:',
+            group=compute_group,
+        )
+
+        local_group = 'Local Collection'
+        view_builder.add_uuid_line_edit(settings.local_collection_id, 'UUID:', group=local_group)
+        view_builder.add_line_edit(
             settings.local_collection_globus_path,
-            'Collection Globus Path:',
+            'Globus Path:',
             tool_tip='Globus path on the local system where data is stored.',
             group=local_group,
         )
         view_builder.add_view_controller(
             self._local_collection_posix_path_view_controller,
-            'Collection POSIX Path:',
+            'POSIX Path:',
             group=local_group,
         )
 
-        remote_group = 'Remote'
-        view_builder.add_uuid_line_edit(
-            settings.remote_collection_id, 'Collection UUID:', group=remote_group
-        )
+        remote_group = 'Remote Collection'
+        view_builder.add_uuid_line_edit(settings.remote_collection_id, 'UUID:', group=remote_group)
         view_builder.add_line_edit(
             settings.remote_collection_globus_path,
-            'Collection Globus Path:',
+            'Globus Path:',
             tool_tip='Globus path on the remote system where data is stored.',
             group=remote_group,
         )
         view_builder.add_view_controller(
             self._remote_collection_posix_path_view_controller,
-            'Collection POSIX Path:',
+            'POSIX Path:',
             group=remote_group,
         )
 
