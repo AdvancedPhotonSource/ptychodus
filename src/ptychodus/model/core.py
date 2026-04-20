@@ -218,6 +218,7 @@ class ModelCore:
 
     def __enter__(self) -> ModelCore:
         self._task_manager.start()
+        self.genesis_core.start()
         self.globus_core.start()
         self.automation_core.start()
         return self
@@ -241,6 +242,7 @@ class ModelCore:
     ) -> None:
         self.automation_core.stop()
         self.globus_core.stop()
+        self.genesis_core.stop()
         self._task_manager.stop(await_finish=False)
 
     def create_streaming_context(self, metadata: DiffractionMetadata) -> PtychodusStreamingContext:
@@ -254,30 +256,7 @@ class ModelCore:
         self.globus_core.run_foreground_tasks()
         self.genesis_core.run_foreground_tasks()
 
-    def _batch_mode_train(self, input_directory: Path, output_directory: Path) -> int:
-        product_in_path = input_directory / StandardFileLayout.PRODUCT_IN
-
-        if product_in_path.is_file():
-            product_out_path = output_directory / StandardFileLayout.PRODUCT_OUT
-
-            if product_out_path.is_file():
-                logger.warning('Output product file will be overwritten!')
-
-            input_product_api = self.workflow_api.load_product(product_in_path)
-            input_product_api.train_reconstructor_local(input_directory, output_directory)
-            return 0
-        else:
-            logger.error('Input product is not a file!')
-            return -1
-
     def _batch_mode_reconstruct(self, input_directory: Path, output_directory: Path) -> int:
-        settings_path = input_directory / StandardFileLayout.SETTINGS
-
-        if settings_path.is_file():
-            self.settings_registry.open_settings(settings_path)
-        else:
-            logger.warning('Settings file not found! Proceeding with defaults.')
-
         diffraction_path = input_directory / StandardFileLayout.DIFFRACTION
 
         if diffraction_path.is_file():
@@ -323,11 +302,29 @@ class ModelCore:
 
         return 0
 
+    def _batch_mode_train(self, input_directory: Path, output_directory: Path) -> int:
+        product_in_path = input_directory / StandardFileLayout.PRODUCT_IN
+
+        if product_in_path.is_file():
+            input_product_api = self.workflow_api.load_product(product_in_path)
+            input_product_api.train_reconstructor_local(input_directory, output_directory)
+            return 0
+        else:
+            logger.error('Input product is not a file!')
+            return -1
+
     def batch_mode_execute(self, action: str, input_directory: Path, output_directory: Path) -> int:
         if not input_directory.is_dir():
             raise ValueError('Input path is not a directory!')
 
         output_directory.mkdir(parents=True, exist_ok=True)
+
+        settings_path = input_directory / StandardFileLayout.SETTINGS
+
+        if settings_path.is_file():
+            self.settings_registry.open_settings(settings_path)
+        else:
+            logger.warning('Settings file not found! Proceeding with defaults.')
 
         match action.lower():
             case 'reconstruct':

@@ -12,9 +12,12 @@ class GenesisSettings(Observable, Observer):
         self._group = registry.create_group('Genesis')
         self._group.add_observer(self)
 
-        self.facility = self._group.create_string_parameter('Facility', 'NERSC')
-        self.project_id = self._group.create_string_parameter('ProjectID', '')
-        self.compute_resource_id = self._group.create_string_parameter('ComputeResourceID', '')
+        self.facility = self._group.create_string_parameter('Facility', 'ALCF')
+        self.compute_resource_id = self._group.create_string_parameter(
+            'ComputeResourceID', '55c1c993-1124-47f9-b823-514ba3849a9a'
+        )
+        self.account = self._group.create_string_parameter('Account', 'APSDataProcessing')
+        self.queue_name = self._group.create_string_parameter('Queue', 'debug')
         self.globus_transfer_provider = self._group.create_string_parameter(
             'GlobusTransferProvider', 'AmSC'
         )

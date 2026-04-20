@@ -1,6 +1,7 @@
 from collections.abc import Mapping, Sequence
 import logging
 import queue
+import threading
 
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
@@ -27,7 +28,7 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-def create_facility_adapters() -> Mapping[str, IRIFacilityAdapter]:
+def create_facility_adapters(settings: GenesisSettings) -> Mapping[str, IRIFacilityAdapter]:
     adapters: dict[str, IRIFacilityAdapter] = {}
 
     tokens_file = get_iri_tokens_file()
@@ -37,9 +38,9 @@ def create_facility_adapters() -> Mapping[str, IRIFacilityAdapter]:
     for token in access_tokens:
         facility = token.facility.casefold()
         if facility == ALCFFacilityAdapter.NAME.casefold():
-            adapters[ALCFFacilityAdapter.NAME] = ALCFFacilityAdapter(token.access_token)
+            adapters[ALCFFacilityAdapter.NAME] = ALCFFacilityAdapter(settings, token.access_token)
         elif facility == NERSCFacilityAdapter.NAME.casefold():
-            adapters[NERSCFacilityAdapter.NAME] = NERSCFacilityAdapter(token.access_token)
+            adapters[NERSCFacilityAdapter.NAME] = NERSCFacilityAdapter(settings, token.access_token)
         else:
             logger.warning(f'Unsupported facility: {token.facility}')
 
@@ -132,12 +133,13 @@ class GenesisCore:
         product_api: ProductAPI,
         processing_api: ProcessingAPI,
     ) -> None:
+        self._stop_event = threading.Event()
         self.settings = GenesisSettings(settings_registry)
 
         self._facility_chooser = PluginChooser[IRIFacilityAdapter]()
         self._transfer_client_chooser = PluginChooser[AmSCGlobusTransferClient]()
 
-        for name, adapter in create_facility_adapters().items():
+        for name, adapter in create_facility_adapters(self.settings).items():
             self._facility_chooser.register_plugin(adapter, display_name=name)
 
         for name, provider in create_globus_transfer_providers().items():
@@ -160,6 +162,7 @@ class GenesisCore:
             self._facility_chooser,
             self._transfer_client_chooser,
             status_q,
+            self._stop_event,
         )
         self.presenter = GenesisPresenter(
             self.settings, self._facility_chooser, self._transfer_client_chooser
@@ -168,6 +171,12 @@ class GenesisCore:
     @property
     def is_supported(self) -> bool:
         return bool(self._facility_chooser) and bool(self._transfer_client_chooser)
+
+    def start(self) -> None:
+        pass
+
+    def stop(self) -> None:
+        self._stop_event.set()
 
     def run_foreground_tasks(self) -> None:
         self.status_repository.run_foreground_tasks()

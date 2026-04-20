@@ -10,6 +10,7 @@ import logging
 from ptychodus.api.io import StandardFileLayout
 
 from .iri import IRIClient, JobAttributes, JobSpecification, ResourceSpecification, ResourceType
+from .settings import GenesisSettings
 
 logger = logging.getLogger(__name__)
 
@@ -134,9 +135,10 @@ class IRIFacilityAdapter(ABC):
 class ALCFFacilityAdapter(IRIFacilityAdapter):
     NAME: Final[str] = 'ALCF'
 
-    def __init__(self, access_token: str) -> None:
+    def __init__(self, settings: GenesisSettings, access_token: str) -> None:
         iri_client = IRIClient('https://api.alcf.anl.gov/api/v1/', access_token)
         super().__init__(iri_client)
+        self._settings = settings
 
     def globus_collections(self) -> Mapping[str, GlobusCollection]:
         return {
@@ -165,8 +167,7 @@ class ALCFFacilityAdapter(IRIFacilityAdapter):
             'source $HOME/.local/bin/env',
             f'ptychodus -b {action} -i {input_directory} -o {output_directory} -s {settings_file}',
         ]
-        commands = '; '.join(command_list)
-        logger.debug(f'Generated job specification command: {commands}')
+        commands = '; '.join(command.strip().replace('"', '\\"') for command in command_list)
         outputs_directory = output_directory / 'outputs'
 
         return JobSpecification(
@@ -178,10 +179,10 @@ class ALCFFacilityAdapter(IRIFacilityAdapter):
             resources=ResourceSpecification(
                 node_count=1,
             ),
-            attributes=JobAttributes(  # FIXME from settings
+            attributes=JobAttributes(
                 duration=300,
-                queue_name='debug',
-                account='APSDataProcessing',
+                queue_name=self._settings.queue_name.get_value(),
+                account=self._settings.account.get_value(),
                 custom_attributes={'filesystems': 'eagle'},
             ),
         )
@@ -190,9 +191,10 @@ class ALCFFacilityAdapter(IRIFacilityAdapter):
 class NERSCFacilityAdapter(IRIFacilityAdapter):
     NAME: Final[str] = 'NERSC'
 
-    def __init__(self, access_token: str) -> None:
+    def __init__(self, settings: GenesisSettings, access_token: str) -> None:
         iri_client = IRIClient('https://api.iri.nersc.gov/api/v1/', access_token)
         super().__init__(iri_client)
+        self._settings = settings
 
     def globus_collections(self) -> Mapping[str, GlobusCollection]:
         return {

@@ -26,15 +26,15 @@ from ..parametric import (
 from .table_model import GenesisStatusTableModel
 
 
-class ProjectComboBoxViewController(ParameterViewController, Observer):
+class AccountComboBoxViewController(ParameterViewController, Observer):
     def __init__(
         self,
-        project_id: StringParameter,
+        account: StringParameter,
         facility: StringParameter,
         presenter: GenesisPresenter,
     ) -> None:
         super().__init__()
-        self._project_id = project_id
+        self._account = account
         self._facility = facility
         self._presenter = presenter
         self._widget = QComboBox()
@@ -43,7 +43,7 @@ class ProjectComboBoxViewController(ParameterViewController, Observer):
         self._sync_model_to_view()
 
         self._widget.textActivated.connect(self._handle_text_activated)
-        project_id.add_observer(self)
+        account.add_observer(self)
         facility.add_observer(self)
 
     def get_widget(self) -> QComboBox:
@@ -58,18 +58,18 @@ class ProjectComboBoxViewController(ParameterViewController, Observer):
 
         self._widget.blockSignals(False)
 
-    def _handle_text_activated(self, project_name: str) -> None:
-        self._project_id.set_value(self._presenter.map_project_name_to_id(project_name))
+    def _handle_text_activated(self, account_name: str) -> None:
+        self._account.set_value(self._presenter.map_project_name_to_id(account_name))
 
     def _sync_model_to_view(self) -> None:
-        name = self._presenter.map_project_id_to_name(self._project_id.get_value())
+        name = self._presenter.map_project_id_to_name(self._account.get_value())
         self._widget.setCurrentText(name)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._facility:
             self._repopulate()
             self._sync_model_to_view()
-        elif observable is self._project_id:
+        elif observable is self._account:
             self._sync_model_to_view()
 
 
@@ -149,31 +149,35 @@ class GenesisController(SequenceObserver[GenesisStatus]):
 
         status_repository.add_observer(self)
 
-        self._local_collection_posix_path_controller = PathLineEditParameterViewController(
+        self._local_collection_posix_path_view_controller = PathLineEditParameterViewController(
             settings.local_collection_posix_path,
             tool_tip='POSIX path on the local system where data is stored.',
         )
-        self._remote_collection_posix_path_controller = PathLineEditParameterViewController(
+        self._remote_collection_posix_path_view_controller = PathLineEditParameterViewController(
             settings.remote_collection_posix_path,
             tool_tip='POSIX path on the remote system where data is stored.',
         )
 
-        self._compute_resource_controller = ComputeResourceComboBoxViewController(
+        self._compute_resource_view_controller = ComputeResourceComboBoxViewController(
             settings.compute_resource_id,
             settings.facility,
             presenter,
         )
         if False:  # FIXME
-            self._project_controller: ParameterViewController = ProjectComboBoxViewController(
-                settings.project_id,
+            self._account_view_controller: ParameterViewController = AccountComboBoxViewController(
+                settings.account,
                 settings.facility,
                 presenter,
             )
         else:
-            self._project_controller = LineEditParameterViewController(
-                settings.project_id,
-                tool_tip='Project ID to use when running on the remote system.',
+            self._account_view_controller = LineEditParameterViewController(
+                settings.account,
+                tool_tip='Account to use when running on the remote system.',
             )
+        self._queue_view_controller = LineEditParameterViewController(
+            settings.queue_name,
+            tool_tip='Queue to use when running on the remote system.',
+        )
 
         view_builder = ParameterViewBuilder(file_dialog_factory)
 
@@ -185,13 +189,18 @@ class GenesisController(SequenceObserver[GenesisStatus]):
             group=genesis_group,
         )
         view_builder.add_view_controller(
-            self._compute_resource_controller,
+            self._compute_resource_view_controller,
             'IRI Compute Resource:',
             group=genesis_group,
         )
         view_builder.add_view_controller(
-            self._project_controller,
-            'Project:',
+            self._account_view_controller,
+            'Account:',
+            group=genesis_group,
+        )
+        view_builder.add_view_controller(
+            self._queue_view_controller,
+            'Queue:',
             group=genesis_group,
         )
         view_builder.add_combo_box(
@@ -218,7 +227,7 @@ class GenesisController(SequenceObserver[GenesisStatus]):
             group=local_group,
         )
         view_builder.add_view_controller(
-            self._local_collection_posix_path_controller,
+            self._local_collection_posix_path_view_controller,
             'Collection POSIX Path:',
             group=local_group,
         )
@@ -234,7 +243,7 @@ class GenesisController(SequenceObserver[GenesisStatus]):
             group=remote_group,
         )
         view_builder.add_view_controller(
-            self._remote_collection_posix_path_controller,
+            self._remote_collection_posix_path_view_controller,
             'Collection POSIX Path:',
             group=remote_group,
         )

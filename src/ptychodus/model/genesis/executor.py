@@ -1,7 +1,7 @@
-from datetime import datetime
 from pathlib import Path
 from uuid import UUID
 import logging
+import os
 import queue
 import threading
 
@@ -12,13 +12,12 @@ from ptychodus.api.settings import SettingsRegistry
 from ..diffraction import DiffractionAPI
 from ..processing import ProcessingAPI
 from ..product import ProductAPI
-from ..task_manager import BackgroundTaskManager, ForegroundTask
+from ..task_manager import BackgroundTaskManager
 from .facility_adapters import IRIFacilityAdapter
-from .iri import IRIComputeClient, JobSpecification
 from .settings import GenesisSettings
-from .tasks import compute_task, transfer_task
 from .transfer import AmSCGlobusTransferClient, GlobusTransferInputs
 from .status import GenesisStatus
+from .workflow import PtychodusWorkflow
 
 logger = logging.getLogger(__name__)
 
@@ -29,132 +28,6 @@ def combine_path_segments(base_path: str, subpath: str) -> str:
 
 def create_globus_url(collection_id: UUID, globus_path: str) -> str:
     return f'globus://{collection_id}/{globus_path.lstrip("/")}'
-
-
-class WorkflowTask:
-    def __init__(
-        self,
-        transfer_client: AmSCGlobusTransferClient,
-        compute_client: IRIComputeClient,
-        outbound_transfer_inputs: GlobusTransferInputs,
-        compute_resource_id: str,
-        job_specification: JobSpecification,
-        inbound_transfer_inputs: GlobusTransferInputs,
-        stop_event: threading.Event,
-        status_q: queue.Queue[GenesisStatus],
-        status_interval_s: float,
-        load_product: bool,
-        label: str,
-        product_api: ProductAPI,
-        output_product_path: Path,
-    ) -> None:
-        self._transfer_client = transfer_client
-        self._compute_client = compute_client
-        self._local_to_remote_transfer_inputs = outbound_transfer_inputs
-        self._compute_resource_id = compute_resource_id
-        self._job_specification = job_specification
-        self._remote_to_local_transfer_inputs = inbound_transfer_inputs
-        self._stop_event = stop_event
-        self._status_q = status_q
-        self._status_interval_s = status_interval_s
-        self._load_product = load_product
-        self._label = label
-        self._product_api = product_api
-        self._output_product_path = output_product_path
-        self._start_time = datetime.now()
-        self._status_q.put(
-            GenesisStatus(
-                label=self._label,
-                start_time=self._start_time,
-                completion_time=None,
-                status='Waiting',
-                action='Workflow',
-            )
-        )
-
-    def __call__(self) -> ForegroundTask | None:
-        self._status_q.put(
-            GenesisStatus(
-                label=self._label,
-                start_time=self._start_time,
-                completion_time=None,
-                status='Running',
-                action='Workflow',
-            )
-        )
-
-        # Step 1: Transfer input data from local to remote
-        logger.info('Workflow step 1: transferring input data from local to remote...')
-        try:
-            for status in transfer_task(
-                self._transfer_client,
-                self._local_to_remote_transfer_inputs,
-                self._stop_event,
-                self._status_interval_s,
-            ):
-                self._status_q.put(status)
-        except Exception:
-            logger.exception('Local-to-remote transfer failed!')
-            return None
-
-        if self._stop_event.is_set():
-            return None
-
-        # Step 2: Submit compute job and wait for completion
-        logger.info('Workflow step 2: submitting compute job...')
-        try:
-            for status in compute_task(
-                self._compute_client,
-                self._compute_resource_id,
-                self._job_specification,
-                self._stop_event,
-                self._status_interval_s,
-            ):
-                self._status_q.put(status)
-        except Exception:
-            logger.exception('Compute job failed!')
-            return None
-
-        if self._stop_event.is_set():
-            return None
-
-        # Step 3: Transfer output data from remote to local
-        logger.info('Workflow step 3: transferring output data from remote to local...')
-        try:
-            for status in transfer_task(
-                self._transfer_client,
-                self._remote_to_local_transfer_inputs,
-                self._stop_event,
-                self._status_interval_s,
-            ):
-                self._status_q.put(status)
-        except Exception:
-            logger.exception('Remote-to-local transfer failed!')
-            return None
-
-        result: ForegroundTask | None = None
-
-        # Step 4: Load data product (reconstruct only)
-        if self._load_product:
-            logger.info('Workflow step 4: loading reconstructed product...')
-
-            def load_result() -> None:  # FIXME clean up
-                self._product_api.open_product(self._output_product_path, file_type='HDF5')
-
-            result = load_result
-
-        self._status_q.put(
-            GenesisStatus(
-                label=self._label,
-                start_time=self._start_time,
-                completion_time=datetime.now(),
-                status='Completed',
-                action='Workflow',
-            )
-        )
-
-        logger.info('Workflow completed successfully.')
-        return result
 
 
 class GenesisExecutor:
@@ -169,6 +42,7 @@ class GenesisExecutor:
         facility_chooser: PluginChooser[IRIFacilityAdapter],
         transfer_client_chooser: PluginChooser[AmSCGlobusTransferClient],
         status_q: queue.Queue[GenesisStatus],
+        stop_event: threading.Event,
     ) -> None:
         super().__init__()
         self._task_manager = task_manager
@@ -180,6 +54,7 @@ class GenesisExecutor:
         self._facility_chooser = facility_chooser
         self._transfer_client_chooser = transfer_client_chooser
         self._status_q = status_q
+        self._stop_event = stop_event
 
     def populate_input_directory(self, input_product_index: int) -> Path:
         try:
@@ -224,6 +99,7 @@ class GenesisExecutor:
 
         lc_id = self._settings.local_collection_id.get_value()
         lc_globus_path = self._settings.local_collection_globus_path.get_value()
+        lc_posix_path = self._settings.local_collection_posix_path.get_value()
 
         rc_id = self._settings.remote_collection_id.get_value()
         rc_globus_path = self._settings.remote_collection_globus_path.get_value()
@@ -243,11 +119,13 @@ class GenesisExecutor:
             destination_uuid=str(rc_id),
             destination_path=outbound_destination_path,
         )
+        logger.debug(f'Created outbound transfer inputs: {outbound_transfer_inputs}')
         job_specification = facility_adapter.create_job_specification(
             action=ptychodus_action,
             input_directory=Path(combine_path_segments(rc_posix_path, input_path_segment)),
             output_directory=Path(combine_path_segments(rc_posix_path, output_path_segment)),
         )
+        logger.debug(f'Created job specification: {job_specification}')
         inbound_transfer_inputs = GlobusTransferInputs(
             source_url=create_globus_url(rc_id, inbound_source_path),
             destination_url=create_globus_url(lc_id, inbound_destination_path),
@@ -257,30 +135,28 @@ class GenesisExecutor:
             destination_uuid=str(lc_id),
             destination_path=inbound_destination_path,
         )
+        logger.debug(f'Created inbound transfer inputs: {inbound_transfer_inputs}')
 
-        stop_event = threading.Event()
-        status_interval_s = float(self._settings.status_refresh_interval_s.get_value())
-        output_product_path = (
-            self._settings.local_collection_posix_path.get_value()
-            / flow_label
-            / 'output'
-            / StandardFileLayout.PRODUCT_OUT
+        status_interval_s = self._settings.status_refresh_interval_s.get_value()
+        load_product_path = (
+            Path(os.path.join(lc_posix_path, output_path_segment)) / StandardFileLayout.PRODUCT_OUT
+            if load_product
+            else None
         )
 
-        workflow_task = WorkflowTask(
+        workflow_task = PtychodusWorkflow(
+            product_api=self._product_api,
             transfer_client=transfer_client,
             compute_client=iri_client.compute,
             outbound_transfer_inputs=outbound_transfer_inputs,
             compute_resource_id=compute_resource_id,
             job_specification=job_specification,
             inbound_transfer_inputs=inbound_transfer_inputs,
-            stop_event=stop_event,
+            stop_event=self._stop_event,
             status_q=self._status_q,
             status_interval_s=status_interval_s,
-            load_product=load_product,
             label=flow_label,
-            product_api=self._product_api,
-            output_product_path=output_product_path,
+            load_product_path=load_product_path,
         )
         self._task_manager.put_background_task(workflow_task)
 
