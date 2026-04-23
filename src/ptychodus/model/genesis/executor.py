@@ -136,7 +136,7 @@ class GenesisExecutor:
             destination_url=create_globus_url(
                 rc_id, rc_globus_path, *local_dir_struct.input_path_segments
             ),
-            label=f'{flow_label}_outbound',
+            label=flow_label,
         )
         logger.debug(f'Created outbound transfer inputs: {outbound_transfer_inputs}')
 
@@ -157,7 +157,7 @@ class GenesisExecutor:
             destination_url=create_globus_url(
                 lc_id, lc_globus_path, *local_dir_struct.output_path_segments
             ),
-            label=f'{flow_label}_inbound',
+            label=flow_label,
         )
         logger.debug(f'Created inbound transfer inputs: {inbound_transfer_inputs}')
 

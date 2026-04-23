@@ -60,9 +60,7 @@ def get_alcf_token() -> str:
         config=globus_sdk.GlobusAppConfig(request_refresh_tokens=True),
     )
     app.login(auth_params=ALCF_GA_PARAMS)
-    auth = app.get_authorizer(ALCF_SCOPE_CLIENT_ID)
-    auth.ensure_valid_token()
-    return auth.access_token
+    return app.token_storage.get_token_data(ALCF_SCOPE_CLIENT_ID).access_token
 
 
 def main() -> None:

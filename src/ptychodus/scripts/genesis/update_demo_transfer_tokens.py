@@ -35,7 +35,7 @@ def main() -> None:
     app.add_scope_requirements({RESOURCE_SERVER: scope})
     app.login()
 
-    access_token = app.get_authorizer(RESOURCE_SERVER).access_token
+    access_token = app.token_storage.get_token_data(RESOURCE_SERVER).access_token
     tokens_file = get_transfer_tokens_file()
     write_tokens(tokens_file, [GenesisAccessTokens(facility='AmSC', access_token=access_token)])
     print(f'Token written to {tokens_file}')

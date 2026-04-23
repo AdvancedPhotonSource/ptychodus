@@ -4,7 +4,7 @@ import platform
 import sys
 
 
-def main() -> None:
+def main() -> int:
     for key, value in platform.uname()._asdict().items():
         print(f'{key.title()}: {value}')
 
@@ -16,6 +16,8 @@ def main() -> None:
         print(f'PyTorch Version: {torch.__version__}')
         print(f'CUDA Available: {torch.cuda.is_available()}')
         print(f'CUDA Version: {torch.version.cuda}')
+
+    return 0
 
 
 if __name__ == '__main__':

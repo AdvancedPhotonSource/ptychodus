@@ -130,13 +130,12 @@ class IRIFacilityAdapter(ABC):
         pass
 
 
-def create_ptychodus_command(action: str, input_directory: Path, output_directory: Path) -> str:
-    command_list = [
-        'source $HOME/.local/bin/env',
-        'ptychodus -v',
-        f'ptychodus -b {action} -i {input_directory} -o {output_directory}',
-    ]
-    return '; '.join(command.strip().replace('"', '\\"') for command in command_list)
+def run_ptychodus_command(action: str, input_directory: Path, output_directory: Path) -> str:
+    return f'ptychodus -b {action} -i {input_directory} -o {output_directory}'
+
+
+def join_commands(command_seq: Sequence[str]) -> str:
+    return '; '.join(command.strip().replace('"', '\\"') for command in command_seq)
 
 
 class ALCFFacilityAdapter(IRIFacilityAdapter):
@@ -169,10 +168,16 @@ class ALCFFacilityAdapter(IRIFacilityAdapter):
     def create_job_specification(
         self, action: str, input_directory: Path, output_directory: Path
     ) -> JobSpecification:
-        commands = create_ptychodus_command(action, input_directory, output_directory)
+        commands = [
+            'module use /soft/modulefiles',
+            'module load conda',
+            'conda activate ptychodus',
+            'ptychodus -v',
+            run_ptychodus_command(action, input_directory, output_directory),
+        ]
         return JobSpecification(
             executable='/bin/bash',
-            arguments=['-c', commands],
+            arguments=['-c', join_commands(commands)],
             name=f'ptychodus-{action}',
             stdout_path=str(output_directory),
             stderr_path=str(output_directory),
@@ -208,10 +213,14 @@ class NERSCFacilityAdapter(IRIFacilityAdapter):
     def create_job_specification(
         self, action: str, input_directory: Path, output_directory: Path
     ) -> JobSpecification:
-        commands = create_ptychodus_command(action, input_directory, output_directory)
+        commands = [
+            'source $HOME/.local/bin/env',
+            'ptychodus -v',
+            run_ptychodus_command(action, input_directory, output_directory)
+        ]
         return JobSpecification(
             executable='/bin/bash',
-            arguments=['-c', commands],
+            arguments=['-c', join_commands(commands)],
             name=f'ptychodus-{action}',
             stdout_path=str(output_directory / 'stdout%j.log'),
             stderr_path=str(output_directory / 'stderr%j.log'),
