@@ -33,6 +33,7 @@ ptychodus-bdp = "ptychodus.scripts.ptychodus_bdp:main"
 ptychodus-ptychopinn-tf-test = "ptychodus.scripts.ptychopinn_tf_test:main"
 ptychodus-iri-tokens = "ptychodus.scripts.genesis.ptychodus_iri_tokens:main"
 ptychodus-transfer-tokens = "ptychodus.scripts.genesis.ptychodus_transfer_tokens:main"
+ptychodus-system-check = "ptychodus.scripts.ptychodus_system_check:main"
 
 [project.optional-dependencies]
 globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
@@ -42,8 +43,14 @@ ptychi = ["ptychi==1.*,>=1.2.0"]
 ptychopinn = ["ptychopinn[torch]"]
 
 [tool.uv.sources]
+ptychi = { path = "../pty-chi", editable = true }
 ptychopinn = { path = "../PtychoPINN", editable = true }
 #ptychopinn = { git = "https://github.com/hoidn/PtychoPINN", branch = "torchapi-devel" }
+
+[[tool.uv.index]]
+name = "pytorch-cu132"
+url = "https://download.pytorch.org/whl/nightly/cu132"
+explicit = true
 
 [tool.setuptools.package-data]
 "ptychodus" = ["py.typed"]
