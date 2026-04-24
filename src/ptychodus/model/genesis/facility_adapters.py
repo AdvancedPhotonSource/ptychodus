@@ -168,16 +168,18 @@ class ALCFFacilityAdapter(IRIFacilityAdapter):
     def create_job_specification(
         self, action: str, input_directory: Path, output_directory: Path
     ) -> JobSpecification:
+        # installation:
+        #    'module use /soft/modulefiles',
+        #    'module load conda',
+        #    'conda create -n ptychodus python==3.11',
+        #    'conda activate ptychodus',
+        #    'pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128'
+        #    'pip install -e ptychodus[ptychi,ptychopinn]',
         commands = [
-            f'mkdir -p {output_directory}',
             'source /etc/bash.bashrc',
             'module use /soft/modulefiles',
             'module load conda',
-            #'conda create -n ptychodus python==3.11 pytorch torchvision'
             'conda activate ptychodus',
-            #'pip install ptychodus[ptychi]',
-            'which ptychodus',
-            'ptychodus -v',
             run_ptychodus_command(action, input_directory, output_directory),
         ]
         return JobSpecification(
@@ -218,14 +220,14 @@ class NERSCFacilityAdapter(IRIFacilityAdapter):
     def create_job_specification(
         self, action: str, input_directory: Path, output_directory: Path
     ) -> JobSpecification:
-        commands = [
-            'source $HOME/.local/bin/env',
-            'ptychodus -v',
-            run_ptychodus_command(action, input_directory, output_directory),
-        ]
+        # installation:
+        #    'module load conda',
+        #    'conda create -n ptychodus python==3.11',
+        #    'conda activate ptychodus',
+        #    'pip install -e ptychodus[ptychi,ptychopinn]',
         return JobSpecification(
-            executable='/bin/bash',
-            arguments=['-c', join_commands(commands)],
+            executable='ptychodus',
+            arguments=['-b', action, '-i', str(input_directory), '-o', str(output_directory)],
             name=f'ptychodus-{action}',
             stdout_path=str(output_directory / 'stdout%j.log'),
             stderr_path=str(output_directory / 'stderr%j.log'),
@@ -241,7 +243,7 @@ class NERSCFacilityAdapter(IRIFacilityAdapter):
                 queue_name=self._settings.queue_name.get_value(),
                 account=self._settings.account.get_value(),
             ),
-            pre_launch='echo PRE_LAUNCH',
+            pre_launch='module load conda; conda activate ptychodus',
             post_launch='echo POST_LAUNCH',
             launcher='srun',
         )

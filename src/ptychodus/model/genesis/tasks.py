@@ -84,7 +84,14 @@ def compute_task(
     job_id = job_response.job_id
 
     while not stop_event.is_set():
-        response = client.get_job_status(resource_id, job_id)
+        try:
+            response = client.get_job_status(resource_id, job_id)
+        except requests.HTTPError as exc:
+            if exc.response.status_code == 400:
+                logger.warning('Invalid request parameters.')
+                break
+            else:
+                raise
 
         if response.status is None:
             logger.info(f'Job [{job_id}]: status unknown, waiting...')

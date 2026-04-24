@@ -203,7 +203,7 @@ class ReconstructBackgroundTask:
                 of = self.output_product_file
 
                 if of is not None:
-                    of = of.parent / f'{of.stem}.{result.progress:06d}.{of.suffix}'
+                    of = of.parent / f'{of.stem}.{result.progress:06d}{of.suffix}'
                     save_product(of, result.product)
 
                 if context.is_stopping:

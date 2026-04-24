@@ -134,8 +134,28 @@ class PtychodusWorkflow:
         if self._load_product_path is not None:
             logger.info('Workflow step 4: loading reconstructed product...')
 
+            parent = self._load_product_path.parent
+            stem = self._load_product_path.stem
+            suffix = self._load_product_path.suffix
+
+            best_path = max(
+                (
+                    path
+                    for path in parent.glob(f'{stem}.*{suffix}')
+                    if path.stem[len(stem) + 1 :].isdigit()
+                ),
+                key=lambda p: int(p.stem[len(stem) + 1 :]),
+                default=None,
+            )
+
+            if best_path is None:
+                logger.warning('No epoch-stamped product files found; falling back to base path.')
+                best_path = self._load_product_path
+
+            logger.info(f'Loading product from {best_path}...')
+
             try:
-                product = load_product(self._load_product_path)
+                product = load_product(best_path)
             except Exception:
                 logger.exception('Failed to load reconstructed product!')
             else:
