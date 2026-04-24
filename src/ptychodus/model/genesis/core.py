@@ -33,7 +33,12 @@ def create_facility_adapters(settings: GenesisSettings) -> Mapping[str, IRIFacil
 
     tokens_file = get_iri_tokens_file()
     logger.info(f'Loading IRI access tokens from {tokens_file}...')
-    access_tokens = read_tokens(tokens_file)
+
+    try:
+        access_tokens = read_tokens(tokens_file)
+    except FileNotFoundError:
+        logger.info(f'IRI tokens file not found: {tokens_file}')
+        return adapters
 
     for token in access_tokens:
         facility = token.facility.casefold()
@@ -52,7 +57,12 @@ def create_globus_transfer_providers() -> Mapping[str, AmSCGlobusTransferClient]
 
     tokens_file = get_transfer_tokens_file()
     logger.info(f'Loading transfer access tokens from {tokens_file}...')
-    access_tokens = read_tokens(tokens_file)
+
+    try:
+        access_tokens = read_tokens(tokens_file)
+    except FileNotFoundError:
+        logger.info(f'Transfer tokens file not found: {tokens_file}')
+        return providers
 
     for token in access_tokens:
         facility = token.facility.casefold()

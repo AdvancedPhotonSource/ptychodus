@@ -169,9 +169,14 @@ class ALCFFacilityAdapter(IRIFacilityAdapter):
         self, action: str, input_directory: Path, output_directory: Path
     ) -> JobSpecification:
         commands = [
+            f'mkdir -p {output_directory}',
+            'source /etc/bash.bashrc',
             'module use /soft/modulefiles',
             'module load conda',
+            #'conda create -n ptychodus python==3.11 pytorch torchvision'
             'conda activate ptychodus',
+            #'pip install ptychodus[ptychi]',
+            'which ptychodus',
             'ptychodus -v',
             run_ptychodus_command(action, input_directory, output_directory),
         ]
@@ -179,8 +184,8 @@ class ALCFFacilityAdapter(IRIFacilityAdapter):
             executable='/bin/bash',
             arguments=['-c', join_commands(commands)],
             name=f'ptychodus-{action}',
-            stdout_path=str(output_directory),
-            stderr_path=str(output_directory),
+            stdout_path=str(output_directory / 'stdout.log'),
+            stderr_path=str(output_directory / 'stderr.log'),
             resources=ResourceSpecification(
                 node_count=1,
             ),
@@ -188,7 +193,7 @@ class ALCFFacilityAdapter(IRIFacilityAdapter):
                 duration=self._settings.duration_s.get_value(),
                 queue_name=self._settings.queue_name.get_value(),
                 account=self._settings.account.get_value(),
-                custom_attributes={'filesystems': 'eagle'},
+                custom_attributes={'filesystems': 'home:eagle'},
             ),
         )
 
@@ -216,7 +221,7 @@ class NERSCFacilityAdapter(IRIFacilityAdapter):
         commands = [
             'source $HOME/.local/bin/env',
             'ptychodus -v',
-            run_ptychodus_command(action, input_directory, output_directory)
+            run_ptychodus_command(action, input_directory, output_directory),
         ]
         return JobSpecification(
             executable='/bin/bash',

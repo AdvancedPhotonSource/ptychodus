@@ -185,6 +185,7 @@ class ControllerCore:
         self._run_tasks_timer.start(1000)
 
         view.globus_action.setVisible(model.globus_core.is_supported)
+        view.genesis_action.setVisible(model.genesis_core.is_supported)
 
         self._swap_central_widgets(view.patterns_action)
         view.patterns_action.setChecked(True)
