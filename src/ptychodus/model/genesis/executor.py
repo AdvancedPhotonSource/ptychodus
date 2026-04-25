@@ -136,7 +136,7 @@ class GenesisExecutor:
             destination_url=create_globus_url(
                 rc_id, rc_globus_path, *local_dir_struct.input_path_segments
             ),
-            label=flow_label,
+            label='Transfer Outbound',
         )
         logger.debug(f'Created outbound transfer inputs: {outbound_transfer_inputs}')
 
@@ -157,7 +157,7 @@ class GenesisExecutor:
             destination_url=create_globus_url(
                 lc_id, lc_globus_path, *local_dir_struct.output_path_segments
             ),
-            label=flow_label,
+            label='Transfer Inbound',
         )
         logger.debug(f'Created inbound transfer inputs: {inbound_transfer_inputs}')
 
@@ -179,7 +179,7 @@ class GenesisExecutor:
             stop_event=self._stop_event,
             status_q=self._status_q,
             status_interval_s=status_interval_s,
-            label=flow_label,
+            flow_label=flow_label,
             load_product_path=load_product_path,
         )
         self._task_manager.put_background_task(workflow_task)

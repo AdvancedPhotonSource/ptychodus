@@ -13,10 +13,10 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class GenesisStatus:
     label: str
+    action: str
+    status: str
     start_time: datetime
     completion_time: datetime | None
-    status: str
-    action: str
 
 
 class GenesisStatusRepository(ObservableSequence[GenesisStatus]):
@@ -44,7 +44,7 @@ class GenesisStatusRepository(ObservableSequence[GenesisStatus]):
             except queue.Empty:
                 break
             else:
-                logger.info(f'{new_status.action} [{new_status.label}]: {new_status.status}')
+                logger.info(f'{new_status.label} [{new_status.action}]: {new_status.status}')
                 self._status_q.task_done()
 
                 try:
@@ -53,9 +53,10 @@ class GenesisStatusRepository(ObservableSequence[GenesisStatus]):
                     self._status_list.append(new_status)
                     self.notify_observers_item_inserted(0, new_status)
                 else:
-                    if old_status == new_status:
-                        continue
-                    elif old_status.start_time == new_status.start_time:
+                    if (
+                        old_status.label == new_status.label
+                        and old_status.action == new_status.action
+                    ):
                         self._status_list[-1] = new_status
                         self.notify_observers_item_changed(len(self._status_list) - 1, new_status)
                     else:

@@ -6,7 +6,6 @@ import queue
 import threading
 
 from ptychodus.api.io import load_product
-from ptychodus.api.product import Product
 
 from ..product import ProductAPI
 from ..task_manager import ForegroundTask
@@ -19,12 +18,12 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class InsertProductTask:
+class LoadProductTask:
     product_api: ProductAPI
-    product: Product
+    file_path: Path
 
     def __call__(self) -> None:
-        self.product_api.insert_product(self.product)
+        self.product_api.open_product(self.file_path, file_type='HDF5')
 
 
 class PtychodusWorkflow:
@@ -40,7 +39,7 @@ class PtychodusWorkflow:
         stop_event: threading.Event,
         status_q: queue.Queue[GenesisStatus],
         status_interval_s: float,
-        label: str,
+        flow_label: str,
         load_product_path: Path | None = None,
     ) -> None:
         self._product_api = product_api
@@ -54,28 +53,28 @@ class PtychodusWorkflow:
         self._status_q = status_q
         self._status_interval_s = status_interval_s
         self._load_product = load_product
-        self._label = label
+        self._flow_label = flow_label
         self._load_product_path = load_product_path
 
         self._start_time = datetime.now()
         self._status_q.put(
             GenesisStatus(
-                label=self._label,
+                label=self._flow_label,
+                action='Starting',
+                status='Waiting',
                 start_time=self._start_time,
                 completion_time=None,
-                status='Waiting',
-                action='Workflow',
             )
         )
 
     def __call__(self) -> ForegroundTask | None:
         self._status_q.put(
             GenesisStatus(
-                label=self._label,
+                label=self._flow_label,
+                action='Starting',
+                status='Succeeded',
                 start_time=self._start_time,
-                completion_time=None,
-                status='Running',
-                action='Workflow',
+                completion_time=datetime.now(),
             )
         )
 
@@ -87,6 +86,7 @@ class PtychodusWorkflow:
                 self._local_to_remote_transfer_inputs,
                 self._stop_event,
                 self._status_interval_s,
+                self._flow_label,
             ):
                 self._status_q.put(status)
         except Exception:
@@ -105,6 +105,7 @@ class PtychodusWorkflow:
                 self._job_specification,
                 self._stop_event,
                 self._status_interval_s,
+                self._flow_label,
             ):
                 self._status_q.put(status)
         except Exception:
@@ -122,6 +123,7 @@ class PtychodusWorkflow:
                 self._remote_to_local_transfer_inputs,
                 self._stop_event,
                 self._status_interval_s,
+                self._flow_label,
             ):
                 self._status_q.put(status)
         except Exception:
@@ -129,6 +131,7 @@ class PtychodusWorkflow:
             return None
 
         result: ForegroundTask | None = None
+        finishing_start_time = datetime.now()
 
         # Step 4: Load data product (optional)
         if self._load_product_path is not None:
@@ -152,22 +155,15 @@ class PtychodusWorkflow:
                 logger.warning('No epoch-stamped product files found; falling back to base path.')
                 best_path = self._load_product_path
 
-            logger.info(f'Loading product from {best_path}...')
-
-            try:
-                product = load_product(best_path)
-            except Exception:
-                logger.exception('Failed to load reconstructed product!')
-            else:
-                result = InsertProductTask(self._product_api, product)
+            result = LoadProductTask(self._product_api, best_path)
 
         self._status_q.put(
             GenesisStatus(
-                label=self._label,
-                start_time=self._start_time,
+                label=self._flow_label,
+                action='Finishing',
+                status='Succeeded',
+                start_time=finishing_start_time,
                 completion_time=datetime.now(),
-                status='Completed',
-                action='Workflow',
             )
         )
 

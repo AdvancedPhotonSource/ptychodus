@@ -13,44 +13,62 @@ from .status import GenesisStatus
 
 logger = logging.getLogger(__name__)
 
+__all__ = ['compute_task', 'transfer_task']
+
 
 def transfer_task(
     client: AmSCGlobusTransferClient,
     inputs: GlobusTransferInputs,
     stop_event: threading.Event,
     status_interval_s: float,
+    flow_label: str,
 ) -> Iterator[GenesisStatus]:
     start_time = datetime.now()
 
+    yield GenesisStatus(
+        label=flow_label,
+        action=inputs.label,
+        status='Starting',
+        start_time=start_time,
+        completion_time=None,
+    )
+
     transfer = client.start_transfer(inputs)
     transfer_uuid = transfer.transfer_uuid
-    label = transfer.label or transfer_uuid
+    transfer_label = transfer.label or transfer_uuid
+
+    # FIXME transfer metrics to GenesisStatus.details
 
     while not stop_event.is_set():
         result = client.get_transfer(transfer_uuid)
         status = result.status or TransferStatus.UNKNOWN
-        logger.info(f'Transfer {label!r} [{transfer_uuid}]: {status}')
+        logger.info(f'Transfer {transfer_label!r} [{transfer_uuid}]: {status}')
 
-        if status == TransferStatus.SUCCEEDED:
-            yield GenesisStatus(
-                label=label,
-                start_time=start_time,
-                completion_time=result.completion_time or datetime.now(),
-                status=status,
-                action='Transfer',
-            )
-            break
-        elif status in {TransferStatus.FAILED, TransferStatus.CANCELED}:
-            raise RuntimeError(f'Transfer {label!r} [{transfer_uuid}] ended with status {status!r}')
-        else:
-            yield GenesisStatus(
-                label=label,
-                start_time=start_time,
-                completion_time=None,
-                status=status,
-                action='Transfer',
-            )
-            stop_event.wait(status_interval_s)
+        match status:
+            case TransferStatus.SUCCEEDED | TransferStatus.FAILED | TransferStatus.CANCELED:
+                yield GenesisStatus(
+                    label=flow_label,
+                    action=transfer_label,
+                    status=str(status).title(),
+                    start_time=start_time,
+                    completion_time=result.completion_time or datetime.now(),
+                )
+
+                if status == TransferStatus.SUCCEEDED:
+                    break
+                else:
+                    raise RuntimeError(
+                        f'Transfer {transfer_label!r} [{transfer_uuid}] ended with status {status!r}'
+                    )
+            case _:
+                yield GenesisStatus(
+                    label=flow_label,
+                    action=transfer_label,
+                    status=str(status).title(),
+                    start_time=start_time,
+                    completion_time=None,
+                )
+                stop_event.wait(status_interval_s)
 
 
 def compute_task(
@@ -59,17 +77,33 @@ def compute_task(
     spec: JobSpecification,
     stop_event: threading.Event,
     status_interval_s: float,
+    flow_label: str,
     max_retries: int = 10,
     retry_delay: float = 1.0,
 ) -> Iterator[GenesisStatus]:
     start_time = datetime.now()
 
     for attempt in range(1, max_retries + 1):
+        yield GenesisStatus(
+            label=flow_label,
+            action='Submit Job',
+            status=f'Attempt {attempt}',
+            start_time=start_time,
+            completion_time=None,
+        )
+
         try:
             job_response = client.submit_job(resource_id, spec)
         except requests.HTTPError as exc:
             if exc.response.status_code == 404:
                 if attempt == max_retries:
+                    yield GenesisStatus(
+                        label=flow_label,
+                        action='Submit Job',
+                        status='Failed',
+                        start_time=start_time,
+                        completion_time=None,
+                    )
                     logger.warning('Exceeded max retries.')
                     raise
 
@@ -77,11 +111,20 @@ def compute_task(
             else:
                 raise
         else:
+            yield GenesisStatus(
+                label=flow_label,
+                action='Submit Job',
+                status='Succeeded',
+                start_time=start_time,
+                completion_time=None,
+            )
             break
     else:
         raise RuntimeError('submit_job_with_retry exited loop without returning')
 
+    start_time = datetime.now()
     job_id = job_response.job_id
+    action = f'Job {job_id}'
 
     while not stop_event.is_set():
         try:
@@ -94,31 +137,34 @@ def compute_task(
                 raise
 
         if response.status is None:
-            logger.info(f'Job [{job_id}]: status unknown, waiting...')
+            logger.info(f'{action}: status unknown, waiting...')
             stop_event.wait(status_interval_s)
             continue
 
         state = response.status.state
         message = response.status.message or ''
-        logger.info(f'Job [{job_id}]: {state} {message}'.rstrip())
+        logger.info(f'{action}: {state} {message}'.rstrip())
 
-        if state == JobState.COMPLETED:
-            yield GenesisStatus(
-                label=job_id,
-                start_time=start_time,
-                completion_time=datetime.now(),
-                status=state,
-                action='Compute',
-            )
-            break
-        elif state in {JobState.FAILED, JobState.CANCELED}:
-            raise RuntimeError(f'Job [{job_id}] ended with state {state!r}: {message}')
-        else:
-            yield GenesisStatus(
-                label=job_id,
-                start_time=start_time,
-                completion_time=None,
-                status=state,
-                action='Compute',
-            )
-            stop_event.wait(status_interval_s)
+        match state:
+            case JobState.COMPLETED | JobState.FAILED | JobState.CANCELED:
+                yield GenesisStatus(
+                    label=flow_label,
+                    action=action,
+                    status=str(state).title(),
+                    start_time=start_time,
+                    completion_time=datetime.now(),
+                )
+
+                if state == JobState.COMPLETED:
+                    break
+                else:
+                    raise RuntimeError(f'{action} ended with state {state!r}: {message}')
+            case _:
+                yield GenesisStatus(
+                    label=flow_label,
+                    action=action,
+                    status=str(state).title(),
+                    start_time=start_time,
+                    completion_time=None,
+                )
+                stop_event.wait(status_interval_s)

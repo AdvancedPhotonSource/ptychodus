@@ -11,10 +11,10 @@ class GenesisStatusTableModel(QAbstractTableModel):
         self._presenter = presenter
         self._section_headers = [
             'Label',
+            'Action',
+            'Status',
             'Start Time',
             'Completion Time',
-            'Status',
-            'Action',
         ]
         self._dt_format = '%Y-%m-%d %H:%M:%S'
 
@@ -39,14 +39,14 @@ class GenesisStatusTableModel(QAbstractTableModel):
                 case 0:
                     return status.label
                 case 1:
-                    return status.start_time.strftime(self._dt_format)
+                    return status.action
                 case 2:
+                    return status.status
+                case 3:
+                    return status.start_time.strftime(self._dt_format)
+                case 4:
                     if status.completion_time is not None:
                         return status.completion_time.strftime(self._dt_format)
-                case 3:
-                    return status.status
-                case 4:
-                    return status.action
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._presenter)
