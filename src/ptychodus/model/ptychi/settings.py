@@ -14,7 +14,7 @@ class PtyChiSettings(Observable, Observer):
         self.batch_size = self._group.create_integer_parameter('BatchSize', 100, minimum=1)
         self.batching_mode = self._group.create_string_parameter('BatchingMode', 'random')
         self.compact_mode_update_clustering = self._group.create_integer_parameter(
-            'CompactModeUpdateClustering', 1, minimum=0
+            'CompactModeUpdateClustering', 0, minimum=0
         )
         self.use_devices = self._group.create_boolean_parameter('UseDevices', True)
         self.use_double_precision = self._group.create_boolean_parameter(
@@ -30,6 +30,20 @@ class PtyChiSettings(Observable, Observer):
         # ForwardModelOptions
         self.use_low_memory_mode = self._group.create_boolean_parameter('UseLowMemoryMode', False)
         self.pad_for_shift = self._group.create_integer_parameter('PadForShift', 0, minimum=0)
+        self.enable_diffraction_pattern_blur = self._group.create_boolean_parameter(
+            'EnableDiffractionPatternBlur', False
+        )
+        self.diffraction_pattern_blur_sigma = self._group.create_real_parameter(
+            'DiffractionPatternBlurSigma', 1.0, minimum=0.0
+        )
+
+        # ReconstructorOptions
+        self.enable_exclude_measured_pixels_below = self._group.create_boolean_parameter(
+            'EnableExcludeMeasuredPixelsBelow', False
+        )
+        self.exclude_measured_pixels_below = self._group.create_real_parameter(
+            'ExcludeMeasuredPixelsBelow', 0.0
+        )
 
         # PtychographyDataOptions
         self.use_far_field_propagation = self._group.create_boolean_parameter(
@@ -169,6 +183,9 @@ class PtyChiObjectSettings(Observable, Observer):
         self.remove_grid_artifacts_direction = self._group.create_string_parameter(
             'RemoveGridArtifactsDirection', 'XY'
         )
+        self.remove_grid_artifacts_component = self._group.create_string_parameter(
+            'RemoveGridArtifactsComponent', 'PHASE'
+        )
 
         self.regularize_multislice = self._group.create_boolean_parameter(
             'RegularizeMultislice', False
@@ -220,6 +237,37 @@ class PtyChiObjectSettings(Observable, Observer):
             'BuildPreconditionerWithAllModes', False
         )
 
+        self.constrain_hard_limits = self._group.create_boolean_parameter(
+            'ConstrainHardLimits', False
+        )
+        self.constrain_hard_limits_start = self._group.create_integer_parameter(
+            'ConstrainHardLimitsStart', 0, minimum=0
+        )
+        self.constrain_hard_limits_stop = self._group.create_integer_parameter(
+            'ConstrainHardLimitsStop', -1
+        )
+        self.constrain_hard_limits_stride = self._group.create_integer_parameter(
+            'ConstrainHardLimitsStride', 1, minimum=1
+        )
+        self.constrain_hard_limits_enable_abs = self._group.create_boolean_parameter(
+            'ConstrainHardLimitsEnableAbs', False
+        )
+        self.constrain_hard_limits_abs_min = self._group.create_real_parameter(
+            'ConstrainHardLimitsAbsMin', 0.0, minimum=0.0
+        )
+        self.constrain_hard_limits_abs_max = self._group.create_real_parameter(
+            'ConstrainHardLimitsAbsMax', 1.0, minimum=0.0
+        )
+        self.constrain_hard_limits_enable_phase = self._group.create_boolean_parameter(
+            'ConstrainHardLimitsEnablePhase', False
+        )
+        self.constrain_hard_limits_phase_min_deg = self._group.create_real_parameter(
+            'ConstrainHardLimitsPhasMinDeg', -180.0
+        )
+        self.constrain_hard_limits_phase_max_deg = self._group.create_real_parameter(
+            'ConstrainHardLimitsPhaseMaxDeg', 180.0
+        )
+
     def _update(self, observable: Observable) -> None:
         if observable is self._group:
             self.notify_observers()
@@ -256,6 +304,9 @@ class PtyChiProbeSettings(Observable, Observer):
         self.constrain_probe_power_stride = self._group.create_integer_parameter(
             'ConstrainProbePowerStride', 1, minimum=1
         )
+        self.constrain_probe_power_scale_object = self._group.create_boolean_parameter(
+            'ConstrainProbePowerScaleObject', True
+        )
 
         self.orthogonalize_incoherent_modes = self._group.create_boolean_parameter(
             'OrthogonalizeIncoherentModes', True
@@ -271,6 +322,11 @@ class PtyChiProbeSettings(Observable, Observer):
         )
         self.orthogonalize_incoherent_modes_method = self._group.create_string_parameter(
             'OrthogonalizeIncoherentModesMethod', 'SVD'
+        )
+        self.orthogonalize_incoherent_modes_sort_by_occupancy = (
+            self._group.create_boolean_parameter(
+                'OrthogonalizeIncoherentModesSortByOccupancy', False
+            )
         )
 
         self.orthogonalize_opr_modes = self._group.create_boolean_parameter(
@@ -299,6 +355,9 @@ class PtyChiProbeSettings(Observable, Observer):
         self.constrain_support_threshold = self._group.create_real_parameter(
             'ConstrainSupportThreshold', 0.005, minimum=0.0
         )
+        self.constrain_support_method = self._group.create_string_parameter(
+            'ConstrainSupportMethod', 'NONE'
+        )
 
         self.constrain_center = self._group.create_boolean_parameter('ConstrainCenter', False)
         self.constrain_center_start = self._group.create_integer_parameter(
@@ -310,6 +369,9 @@ class PtyChiProbeSettings(Observable, Observer):
         )
         self.use_intensity_for_mass_centroid = self._group.create_boolean_parameter(
             'UseIntensityForMassCentroid', False
+        )
+        self.constrain_center_modes_individually = self._group.create_boolean_parameter(
+            'ConstrainCenterModesIndividually', False
         )
 
         self.relax_eigenmode_update = self._group.create_real_parameter(
@@ -366,7 +428,7 @@ class PtyChiProbePositionSettings(Observable, Observer):
             'ClipUpdateMagnitudeByMAD', True
         )
         self.limit_update_magnitude = self._group.create_boolean_parameter(
-            'LimitUpdateMagnitude', False
+            'LimitUpdateMagnitude', True
         )
         self.update_magnitude_limit = self._group.create_real_parameter(
             'UpdateMagnitudeLimit', 0.1, minimum=0.0
@@ -398,6 +460,17 @@ class PtyChiProbePositionSettings(Observable, Observer):
         )
         self.constrain_affine_transform_max_expected_error_px = self._group.create_real_parameter(
             'ConstrainAffineTransformMaxExpectedErrorInPixels', 1.0, minimum=0.0
+        )
+        self.override_affine_transform_update_flexibility = self._group.create_boolean_parameter(
+            'OverrideAffineTransformUpdateFlexibility', False
+        )
+        self.constrain_affine_transform_override_update_flexibility = (
+            self._group.create_real_parameter(
+                'ConstrainAffineTransformOverrideUpdateFlexibility',
+                0.5,
+                minimum=0.0,
+                maximum=1.0,
+            )
         )
 
     def _update(self, observable: Observable) -> None:
@@ -506,10 +579,11 @@ class PtyChiLSQMLSettings(Observable, Observer):
         self.gaussian_noise_deviation = self._group.create_real_parameter(
             'GaussianNoiseDeviation', 0.5
         )
-        self.solve_object_probe_step_size_jointly_for_first_slice_in_multislice = (
-            self._group.create_boolean_parameter(
-                'SolveObjectProbeStepSizeJointlyForFirstSliceInMultislice', False
-            )
+        self.single_slice_solve_object_probe_step_size_jointly = (
+            self._group.create_boolean_parameter('SingleSliceSolveObjectProbeStepSizeJointly', True)
+        )
+        self.multislice_solve_object_probe_step_size_jointly = self._group.create_boolean_parameter(
+            'MultisliceSolveObjectProbeStepSizeJointly', False
         )
         self.solve_step_sizes_only_using_first_probe_mode = self._group.create_boolean_parameter(
             'SolveStepSizesOnlyUsingFirstProbeMode', True
@@ -517,9 +591,9 @@ class PtyChiLSQMLSettings(Observable, Observer):
         self.momentum_acceleration_gain = self._group.create_real_parameter(
             'MomentumAccelerationGain', 0.0, minimum=0.0
         )
-        self.use_momentum_acceleration_gradient_mixing_factor = (
+        self.auto_momentum_acceleration_gradient_mixing_factor = (
             self._group.create_boolean_parameter(
-                'UseMomentumAccelerationGradientMixingFactor', False
+                'AutoMomentumAccelerationGradientMixingFactor', False
             )
         )
         self.momentum_acceleration_gradient_mixing_factor = self._group.create_real_parameter(
@@ -540,6 +614,40 @@ class PtyChiLSQMLSettings(Observable, Observer):
         )
         self.probe_optimal_step_size_scaler = self._group.create_real_parameter(
             'ProbeOptimalStepSizeScaler', 0.9, minimum=0.0
+        )
+
+        self.probe_position_momentum_acceleration_gain = self._group.create_real_parameter(
+            'ProbePositionMomentumAccelerationGain', 0.0, minimum=0.0
+        )
+        self.probe_position_auto_momentum_gradient_mixing_factor = (
+            self._group.create_boolean_parameter(
+                'ProbePositionAutoMomentumGradientMixingFactor', False
+            )
+        )
+        self.probe_position_momentum_acceleration_gradient_mixing_factor = (
+            self._group.create_real_parameter(
+                'ProbePositionMomentumAccelerationGradientMixingFactor', 1.0
+            )
+        )
+        self.probe_position_momentum_acceleration_memory = self._group.create_integer_parameter(
+            'ProbePositionMomentumAccelerationMemory', 3, minimum=1
+        )
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._group:
+            self.notify_observers()
+
+
+class PtyChiBHSettings(Observable, Observer):
+    def __init__(self, registry: SettingsRegistry) -> None:
+        super().__init__()
+        self._group = registry.create_group('PtyChiBH')
+        self._group.add_observer(self)
+
+        self.method = self._group.create_string_parameter('Method', 'GD')
+        self.probe_rho = self._group.create_real_parameter('ProbeRho', 1.0, minimum=0.0)
+        self.probe_position_rho = self._group.create_real_parameter(
+            'ProbePositionRho', 0.1, minimum=0.0
         )
 
     def _update(self, observable: Observable) -> None:

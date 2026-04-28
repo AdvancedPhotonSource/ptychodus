@@ -3,12 +3,12 @@ import logging
 
 
 from ptychi.api import (
-    DMOPRModeWeightsOptions,
-    DMObjectOptions,
-    DMOptions,
-    DMProbeOptions,
-    DMProbePositionOptions,
-    DMReconstructorOptions,
+    BHOPRModeWeightsOptions,
+    BHObjectOptions,
+    BHOptions,
+    BHProbeOptions,
+    BHProbePositionOptions,
+    BHReconstructorOptions,
 )
 from ptychi.api.task import PtychographyTask
 
@@ -19,13 +19,13 @@ from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Rec
 from ptychodus.api.probe_positions import ProbePositionSequence
 
 from .helper import PtyChiOptionsHelper
-from .settings import PtyChiDMSettings
+from .settings import PtyChiBHSettings
 
 logger = logging.getLogger(__name__)
 
 
-class DMReconstructor(Reconstructor):
-    def __init__(self, options_helper: PtyChiOptionsHelper, settings: PtyChiDMSettings) -> None:
+class BHReconstructor(Reconstructor):
+    def __init__(self, options_helper: PtyChiOptionsHelper, settings: PtyChiBHSettings) -> None:
         super().__init__()
         self._options_helper = options_helper
         self._settings = settings
@@ -33,11 +33,11 @@ class DMReconstructor(Reconstructor):
 
     @property
     def name(self) -> str:
-        return 'DM'
+        return 'BH'
 
-    def _create_reconstructor_options(self) -> DMReconstructorOptions:
+    def _create_reconstructor_options(self) -> BHReconstructorOptions:
         helper = self._options_helper.reconstructor_helper
-        return DMReconstructorOptions(
+        return BHReconstructorOptions(
             num_epochs=helper.num_epochs,
             batch_size=helper.batch_size,
             batching_mode=helper.batching_mode,
@@ -51,13 +51,12 @@ class DMReconstructor(Reconstructor):
             displayed_loss_function=helper.displayed_loss_function,
             exclude_measured_pixels_below=helper.exclude_measured_pixels_below,
             forward_model_options=helper.forward_model_options,
-            exit_wave_update_relaxation=self._settings.exit_wave_update_relaxation.get_value(),
-            chunk_length=self._settings.chunk_length.get_value(),
+            method=self._settings.method.get_value(),
         )
 
-    def _create_object_options(self, object_: Object) -> DMObjectOptions:
+    def _create_object_options(self, object_: Object) -> BHObjectOptions:
         helper = self._options_helper.object_helper
-        return DMObjectOptions(
+        return BHObjectOptions(
             optimizable=helper.optimizable,
             optimization_plan=helper.optimization_plan,
             optimizer=helper.optimizer,
@@ -72,6 +71,7 @@ class DMReconstructor(Reconstructor):
             l2_norm_constraint=helper.l2_norm_constraint,
             smoothness_constraint=helper.smoothness_constraint,
             total_variation=helper.total_variation,
+            hard_limits_magnitude_phase=helper.hard_limits_magnitude_phase,
             remove_grid_artifacts=helper.remove_grid_artifacts,
             multislice_regularization=helper.multislice_regularization,
             patch_interpolation_method=helper.patch_interpolation_method,
@@ -79,16 +79,13 @@ class DMReconstructor(Reconstructor):
             build_preconditioner_with_all_modes=helper.build_preconditioner_with_all_modes,
             determine_position_origin_coords_by=helper.determine_position_origin_coords_by,
             position_origin_coords=helper.get_position_origin_coords(object_),
-            hard_limits_magnitude_phase=helper.hard_limits_magnitude_phase,
-            amplitude_clamp_limit=self._settings.object_amplitude_clamp_limit.get_value(),
-            inertia=self._settings.object_inertia.get_value(),
         )
 
     def _create_probe_options(
         self, probes: ProbeSequence, metadata: ProductMetadata
-    ) -> DMProbeOptions:
+    ) -> BHProbeOptions:
         helper = self._options_helper.probe_helper
-        return DMProbeOptions(
+        return BHProbeOptions(
             optimizable=helper.optimizable,
             optimization_plan=helper.optimization_plan,
             optimizer=helper.optimizer,
@@ -101,15 +98,15 @@ class DMReconstructor(Reconstructor):
             support_constraint=helper.support_constraint,
             center_constraint=helper.center_constraint,
             eigenmode_update_relaxation=helper.eigenmode_update_relaxation,
-            inertia=self._settings.probe_inertia.get_value(),
+            rho=self._settings.probe_rho.get_value(),
         )
 
     def _create_probe_position_options(
         self, scan: ProbePositionSequence, object_geometry: ObjectGeometry
-    ) -> DMProbePositionOptions:
+    ) -> BHProbePositionOptions:
         helper = self._options_helper.probe_position_helper
         position_x_px, position_y_px = helper.get_positions_px(scan, object_geometry)
-        return DMProbePositionOptions(
+        return BHProbePositionOptions(
             optimizable=helper.optimizable,
             optimization_plan=helper.optimization_plan,
             optimizer=helper.optimizer,
@@ -120,11 +117,12 @@ class DMReconstructor(Reconstructor):
             constrain_position_mean=helper.constrain_position_mean,
             correction_options=helper.correction_options,
             affine_transform_constraint=helper.affine_transform_constraint,
+            rho=self._settings.probe_position_rho.get_value(),
         )
 
-    def _create_opr_mode_weight_options(self, probes: ProbeSequence) -> DMOPRModeWeightsOptions:
+    def _create_opr_mode_weight_options(self, probes: ProbeSequence) -> BHOPRModeWeightsOptions:
         helper = self._options_helper.opr_helper
-        return DMOPRModeWeightsOptions(
+        return BHOPRModeWeightsOptions(
             optimizable=helper.optimizable,
             optimization_plan=helper.optimization_plan,
             optimizer=helper.optimizer,
@@ -137,9 +135,9 @@ class DMReconstructor(Reconstructor):
             update_relaxation=helper.update_relaxation,
         )
 
-    def _create_task_options(self, parameters: ReconstructInput) -> DMOptions:
+    def _create_task_options(self, parameters: ReconstructInput) -> BHOptions:
         product = parameters.product
-        return DMOptions(
+        return BHOptions(
             data_options=self._options_helper.create_data_options(parameters),
             reconstructor_options=self._create_reconstructor_options(),
             object_options=self._create_object_options(product.object_),

@@ -14,6 +14,7 @@ from .device import PtyChiDeviceRepository
 from .enums import PtyChiEnumerators
 from .settings import (
     PtyChiAutodiffSettings,
+    PtyChiBHSettings,
     PtyChiDMSettings,
     PtyChiLSQMLSettings,
     PtyChiOPRSettings,
@@ -36,6 +37,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
     ) -> None:
         super().__init__('ptychi')
         self.autodiff_settings = PtyChiAutodiffSettings(settings_registry)
+        self.bh_settings = PtyChiBHSettings(settings_registry)
         self.dm_settings = PtyChiDMSettings(settings_registry)
         self.lsqml_settings = PtyChiLSQMLSettings(settings_registry)
         self.object_settings = PtyChiObjectSettings(settings_registry)
@@ -53,6 +55,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
 
         try:
             from .autodiff import AutodiffReconstructor
+            from .bh import BHReconstructor
             from .dm import DMReconstructor
             from .epie import EPIEReconstructor
             from .helper import PtyChiOptionsHelper
@@ -63,7 +66,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
             logger.info('pty-chi not found.')
 
             if is_developer_mode_enabled:
-                for reconstructor in ('DM', 'PIE', 'ePIE', 'rPIE', 'LSQML', 'Autodiff'):
+                for reconstructor in ('DM', 'PIE', 'ePIE', 'rPIE', 'LSQML', 'Autodiff', 'BH'):
                     self.reconstructor_list.append(NullReconstructor(reconstructor))
         else:
             logger.info('Pty-Chi ' + version('ptychi'))
@@ -84,6 +87,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
             self.reconstructor_list.append(
                 AutodiffReconstructor(options_helper, self.autodiff_settings)
             )
+            self.reconstructor_list.append(BHReconstructor(options_helper, self.bh_settings))
 
     @property
     def name(self) -> str:

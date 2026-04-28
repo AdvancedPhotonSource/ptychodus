@@ -14,6 +14,7 @@ from ptychodus.api.parametric import BooleanParameter, RealParameter
 
 from ...model.ptychi import (
     PtyChiAutodiffSettings,
+    PtyChiBHSettings,
     PtyChiDMSettings,
     PtyChiDeviceRepository,
     PtyChiEnumerators,
@@ -128,6 +129,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
         self,
         settings: PtyChiSettings,
         autodiff_settings: PtyChiAutodiffSettings | None,
+        bh_settings: PtyChiBHSettings | None,
         dm_settings: PtyChiDMSettings | None,
         lsqml_settings: PtyChiLSQMLSettings | None,
         enumerators: PtyChiEnumerators,
@@ -192,6 +194,44 @@ class PtyChiReconstructorViewController(ParameterViewController):
             'Save Data on Device',
             tool_tip='When checked, diffraction data will be saved on the device',
         )
+        self._diffraction_pattern_blur_view_controller = CheckableGroupBoxParameterViewController(
+            settings.enable_diffraction_pattern_blur,
+            'Blur Diffraction Patterns',
+            tool_tip='When enabled, diffraction patterns will be blurred with a Gaussian kernel',
+        )
+        self._diffraction_pattern_blur_sigma_view_controller = (
+            DecimalLineEditParameterViewController(
+                settings.diffraction_pattern_blur_sigma,
+                tool_tip='Standard deviation of the Gaussian blur kernel in pixels',
+            )
+        )
+        self._exclude_measured_pixels_below_view_controller = (
+            CheckableGroupBoxParameterViewController(
+                settings.enable_exclude_measured_pixels_below,
+                'Exclude Measured Pixels Below',
+                tool_tip='When enabled, measured pixels below the threshold will be excluded',
+            )
+        )
+        self._exclude_measured_pixels_below_value_view_controller = (
+            DecimalLineEditParameterViewController(
+                settings.exclude_measured_pixels_below,
+                tool_tip='Intensity threshold below which measured pixels are excluded',
+            )
+        )
+        _diffraction_blur_layout = QVBoxLayout()
+        _diffraction_blur_layout.addWidget(
+            self._diffraction_pattern_blur_sigma_view_controller.get_widget()
+        )
+        self._diffraction_pattern_blur_view_controller.get_widget().setLayout(
+            _diffraction_blur_layout
+        )
+        _exclude_pixels_layout = QVBoxLayout()
+        _exclude_pixels_layout.addWidget(
+            self._exclude_measured_pixels_below_value_view_controller.get_widget()
+        )
+        self._exclude_measured_pixels_below_view_controller.get_widget().setLayout(
+            _exclude_pixels_layout
+        )
         self._widget = QGroupBox('Reconstructor')
 
         layout = QFormLayout()
@@ -217,6 +257,8 @@ class PtyChiReconstructorViewController(ParameterViewController):
         layout.addRow(self._use_far_field_propagation_view_controller.get_widget())
         layout.addRow(self._fft_shift_diffraction_patterns_view_controller.get_widget())
         layout.addRow(self._save_data_on_device_view_controller.get_widget())
+        layout.addRow(self._diffraction_pattern_blur_view_controller.get_widget())
+        layout.addRow(self._exclude_measured_pixels_below_view_controller.get_widget())
 
         if autodiff_settings is not None:
             self._loss_function_view_controller = ComboBoxParameterViewController(
@@ -268,13 +310,22 @@ class PtyChiReconstructorViewController(ParameterViewController):
                 self._gaussian_noise_deviation_view_controller.get_widget(),
             )
 
-            self._solve_object_probe_step_size_jointly_for_first_slice_in_multislice_view_controller = CheckBoxParameterViewController(
-                lsqml_settings.solve_object_probe_step_size_jointly_for_first_slice_in_multislice,
-                'Solve Object Probe Step Size Jointly For First Slice In Multislice',
-                tool_tip='When checked, the object and probe step length calculation will be solved simultaneously',
+            self._single_slice_solve_object_probe_step_size_jointly_view_controller = CheckBoxParameterViewController(
+                lsqml_settings.single_slice_solve_object_probe_step_size_jointly,
+                'Solve Object/Probe Step Size Jointly (Single Slice)',
+                tool_tip='When checked, object and probe step lengths are solved simultaneously in single-slice mode',
             )
             layout.addRow(
-                self._solve_object_probe_step_size_jointly_for_first_slice_in_multislice_view_controller.get_widget()
+                self._single_slice_solve_object_probe_step_size_jointly_view_controller.get_widget()
+            )
+
+            self._multislice_solve_object_probe_step_size_jointly_view_controller = CheckBoxParameterViewController(
+                lsqml_settings.multislice_solve_object_probe_step_size_jointly,
+                'Solve Object/Probe Step Size Jointly (Multislice)',
+                tool_tip='When checked, object and probe step lengths are solved simultaneously in multislice mode',
+            )
+            layout.addRow(
+                self._multislice_solve_object_probe_step_size_jointly_view_controller.get_widget()
             )
 
             self._solve_step_sizes_only_using_first_probe_mode_view_controller = CheckBoxParameterViewController(
@@ -298,7 +349,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
             )
 
             self._momentum_acceleration_gradient_mixing_factor_view_controller = PtyChiMomentumAccelerationGradientMixingFactorViewController(
-                lsqml_settings.use_momentum_acceleration_gradient_mixing_factor,
+                lsqml_settings.auto_momentum_acceleration_gradient_mixing_factor,
                 lsqml_settings.momentum_acceleration_gradient_mixing_factor,
                 tool_tip='Controls how the current gradient is mixed with the accumulated velocity in LSQML momentum acceleration',
             )
@@ -322,6 +373,57 @@ class PtyChiReconstructorViewController(ParameterViewController):
             layout.addRow(
                 'Preconditioning Damping Factor:',
                 self._preconditioning_damping_factor_view_controller.get_widget(),
+            )
+
+            self._probe_position_momentum_acceleration_gain_view_controller = (
+                DecimalLineEditParameterViewController(
+                    lsqml_settings.probe_position_momentum_acceleration_gain,
+                    tool_tip='Gain of probe position momentum acceleration',
+                )
+            )
+            layout.addRow(
+                'Position Momentum Gain:',
+                self._probe_position_momentum_acceleration_gain_view_controller.get_widget(),
+            )
+
+            self._probe_position_momentum_gradient_mixing_factor_view_controller = PtyChiMomentumAccelerationGradientMixingFactorViewController(
+                lsqml_settings.probe_position_auto_momentum_gradient_mixing_factor,
+                lsqml_settings.probe_position_momentum_acceleration_gradient_mixing_factor,
+                tool_tip='Controls how the current gradient is mixed with the accumulated velocity in probe position momentum acceleration',
+            )
+            layout.addRow(
+                self._probe_position_momentum_gradient_mixing_factor_view_controller.get_widget()
+            )
+
+            self._probe_position_momentum_acceleration_memory_view_controller = SpinBoxParameterViewController(
+                lsqml_settings.probe_position_momentum_acceleration_memory,
+                tool_tip='Number of past gradients to use in probe position momentum acceleration',
+            )
+            layout.addRow(
+                'Position Momentum Memory:',
+                self._probe_position_momentum_acceleration_memory_view_controller.get_widget(),
+            )
+
+        if bh_settings is not None:
+            self._bh_method_view_controller = ComboBoxParameterViewController(
+                bh_settings.method,
+                iter(['GD', 'CG']),
+                tool_tip='BH reconstruction algorithm: GD (Gradient Descent) or CG (Conjugate Gradients)',
+            )
+            layout.addRow('BH Method:', self._bh_method_view_controller.get_widget())
+
+            self._bh_probe_rho_view_controller = DecimalLineEditParameterViewController(
+                bh_settings.probe_rho,
+                tool_tip='Rho parameter for the probe update in BH',
+            )
+            layout.addRow('BH Probe Rho:', self._bh_probe_rho_view_controller.get_widget())
+
+            self._bh_probe_position_rho_view_controller = DecimalLineEditParameterViewController(
+                bh_settings.probe_position_rho,
+                tool_tip='Rho parameter for probe position update in BH',
+            )
+            layout.addRow(
+                'BH Position Rho:', self._bh_probe_position_rho_view_controller.get_widget()
             )
 
         self._widget.setLayout(layout)

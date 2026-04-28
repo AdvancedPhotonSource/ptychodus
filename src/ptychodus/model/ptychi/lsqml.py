@@ -53,7 +53,7 @@ class LSQMLReconstructor(Reconstructor):
 
         momentum_acceleration_gradient_mixing_factor: float | None = None
 
-        if self._settings.use_momentum_acceleration_gradient_mixing_factor.get_value():
+        if not self._settings.auto_momentum_acceleration_gradient_mixing_factor.get_value():
             momentum_acceleration_gradient_mixing_factor = (
                 self._settings.momentum_acceleration_gradient_mixing_factor.get_value()
             )
@@ -72,10 +72,12 @@ class LSQMLReconstructor(Reconstructor):
             allow_nondeterministic_algorithms=helper.allow_nondeterministic_algorithms,
             random_seed=helper.random_seed,
             displayed_loss_function=helper.displayed_loss_function,
+            exclude_measured_pixels_below=helper.exclude_measured_pixels_below,
             forward_model_options=helper.forward_model_options,
             noise_model=noise_model,
             gaussian_noise_std=self._settings.gaussian_noise_deviation.get_value(),
-            solve_obj_prb_step_size_jointly_for_first_slice_in_multislice=self._settings.solve_object_probe_step_size_jointly_for_first_slice_in_multislice.get_value(),
+            single_slice_solve_obj_prb_step_size_jointly=self._settings.single_slice_solve_object_probe_step_size_jointly.get_value(),
+            multislice_solve_obj_prb_step_size_jointly=self._settings.multislice_solve_object_probe_step_size_jointly.get_value(),
             solve_step_sizes_only_using_first_probe_mode=self._settings.solve_step_sizes_only_using_first_probe_mode.get_value(),
             momentum_acceleration_gain=self._settings.momentum_acceleration_gain.get_value(),
             momentum_acceleration_gradient_mixing_factor=momentum_acceleration_gradient_mixing_factor,
@@ -107,6 +109,7 @@ class LSQMLReconstructor(Reconstructor):
             build_preconditioner_with_all_modes=helper.build_preconditioner_with_all_modes,
             determine_position_origin_coords_by=helper.determine_position_origin_coords_by,
             position_origin_coords=helper.get_position_origin_coords(object_),
+            hard_limits_magnitude_phase=helper.hard_limits_magnitude_phase,
             optimal_step_size_scaler=self._settings.object_optimal_step_size_scaler.get_value(),
             multimodal_update=self._settings.object_multimodal_update.get_value(),
         )
@@ -136,6 +139,11 @@ class LSQMLReconstructor(Reconstructor):
     ) -> LSQMLProbePositionOptions:
         helper = self._options_helper.probe_position_helper
         position_x_px, position_y_px = helper.get_positions_px(scan, object_geometry)
+
+        probe_pos_mixing_factor: float | None = None
+        if not self._settings.probe_position_auto_momentum_gradient_mixing_factor.get_value():
+            probe_pos_mixing_factor = self._settings.probe_position_momentum_acceleration_gradient_mixing_factor.get_value()
+
         return LSQMLProbePositionOptions(
             optimizable=helper.optimizable,
             optimization_plan=helper.optimization_plan,
@@ -147,6 +155,9 @@ class LSQMLReconstructor(Reconstructor):
             constrain_position_mean=helper.constrain_position_mean,
             correction_options=helper.correction_options,
             affine_transform_constraint=helper.affine_transform_constraint,
+            momentum_acceleration_gain=self._settings.probe_position_momentum_acceleration_gain.get_value(),
+            momentum_acceleration_gradient_mixing_factor=probe_pos_mixing_factor,
+            momentum_acceleration_memory=self._settings.probe_position_momentum_acceleration_memory.get_value(),
         )
 
     def _create_opr_mode_weight_options(self, probes: ProbeSequence) -> LSQMLOPRModeWeightsOptions:

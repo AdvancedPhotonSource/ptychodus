@@ -4,6 +4,8 @@ import logging
 import torch
 import numpy
 
+import math
+
 from ptychi.api import (
     AffineDegreesOfFreedom,
     BatchingModes,
@@ -13,17 +15,20 @@ from ptychi.api import (
     ImageGradientMethods,
     ImageIntegrationMethods,
     LossFunctions,
+    MagPhaseComponents,
     OPRWeightSmoothingMethods,
     ObjectPosOriginCoordsMethods,
     Optimizers,
     OrthogonalizationMethods,
     PatchInterpolationMethods,
     PositionCorrectionTypes,
+    ProbeSupportMethods,
     PtychographyDataOptions,
 )
 from ptychi.api.options.base import (
     ForwardModelOptions,
     OPRModeWeightsSmoothingOptions,
+    ObjectHardLimitsMagnitudePhase,
     ObjectL1NormConstraintOptions,
     ObjectL2NormConstraintOptions,
     ObjectMultisliceRegularizationOptions,
@@ -138,10 +143,22 @@ class PtyChiReconstructorOptionsHelper:
         return LossFunctions.MSE_SQRT  # TODO
 
     @property
+    def exclude_measured_pixels_below(self) -> float | None:
+        if self._settings.enable_exclude_measured_pixels_below.get_value():
+            return self._settings.exclude_measured_pixels_below.get_value()
+        return None
+
+    @property
     def forward_model_options(self) -> ForwardModelOptions:
+        blur_sigma = (
+            self._settings.diffraction_pattern_blur_sigma.get_value()
+            if self._settings.enable_diffraction_pattern_blur.get_value()
+            else None
+        )
         return ForwardModelOptions(
             low_memory_mode=self._settings.use_low_memory_mode.get_value(),
             pad_for_shift=self._settings.pad_for_shift.get_value(),
+            diffraction_pattern_blur_sigma=blur_sigma,
         )
 
 
@@ -245,6 +262,14 @@ class PtyChiObjectOptionsHelper:
             logger.warning(f'Failed to parse direction "{direction_str}"!')
             direction = Directions.XY
 
+        component_str = self._settings.remove_grid_artifacts_component.get_value()
+
+        try:
+            component = MagPhaseComponents[component_str.upper()]
+        except KeyError:
+            logger.warning(f'Failed to parse grid artifacts component "{component_str}"!')
+            component = MagPhaseComponents.PHASE
+
         return RemoveGridArtifactsOptions(
             enabled=self._settings.remove_grid_artifacts.get_value(),
             optimization_plan=create_optimization_plan(
@@ -256,6 +281,38 @@ class PtyChiObjectOptionsHelper:
             period_y_m=self._settings.remove_grid_artifacts_period_y_m.get_value(),
             window_size=self._settings.remove_grid_artifacts_window_size_px.get_value(),
             direction=direction,
+            component=component,
+        )
+
+    @property
+    def hard_limits_magnitude_phase(self) -> ObjectHardLimitsMagnitudePhase:
+        abs_lim = None
+        if self._settings.constrain_hard_limits_enable_abs.get_value():
+            abs_lim = numpy.array(
+                [
+                    self._settings.constrain_hard_limits_abs_min.get_value(),
+                    self._settings.constrain_hard_limits_abs_max.get_value(),
+                ]
+            )
+
+        phase_lim = None
+        if self._settings.constrain_hard_limits_enable_phase.get_value():
+            phase_lim = numpy.array(
+                [
+                    math.radians(self._settings.constrain_hard_limits_phase_min_deg.get_value()),
+                    math.radians(self._settings.constrain_hard_limits_phase_max_deg.get_value()),
+                ]
+            )
+
+        return ObjectHardLimitsMagnitudePhase(
+            enabled=self._settings.constrain_hard_limits.get_value(),
+            optimization_plan=create_optimization_plan(
+                self._settings.constrain_hard_limits_start.get_value(),
+                self._settings.constrain_hard_limits_stop.get_value(),
+                self._settings.constrain_hard_limits_stride.get_value(),
+            ),
+            abs_lim=abs_lim,
+            phase_lim=phase_lim,
         )
 
     @property
@@ -394,6 +451,7 @@ class PtyChiProbeOptionsHelper:
                 self._settings.orthogonalize_incoherent_modes_stride.get_value(),
             ),
             method=method,
+            sort_by_occupancy=self._settings.orthogonalize_incoherent_modes_sort_by_occupancy.get_value(),
         )
 
     @property
@@ -409,6 +467,14 @@ class PtyChiProbeOptionsHelper:
 
     @property
     def support_constraint(self) -> ProbeSupportConstraintOptions:
+        method_str = self._settings.constrain_support_method.get_value()
+
+        try:
+            fixed_probe_support = ProbeSupportMethods[method_str.upper()]
+        except KeyError:
+            logger.warning(f'Failed to parse probe support method "{method_str}"!')
+            fixed_probe_support = ProbeSupportMethods.NONE
+
         return ProbeSupportConstraintOptions(
             enabled=self._settings.constrain_support.get_value(),
             optimization_plan=create_optimization_plan(
@@ -417,6 +483,7 @@ class PtyChiProbeOptionsHelper:
                 self._settings.constrain_support_stride.get_value(),
             ),
             threshold=self._settings.constrain_support_threshold.get_value(),
+            fixed_probe_support=fixed_probe_support,
         )
 
     @property
@@ -428,7 +495,8 @@ class PtyChiProbeOptionsHelper:
                 self._settings.constrain_center_stop.get_value(),
                 self._settings.constrain_center_stride.get_value(),
             ),
-            use_intensity_for_com=self._settings.use_intensity_for_mass_centroid.get_value(),
+            use_total_intensity_for_com=self._settings.use_intensity_for_mass_centroid.get_value(),
+            center_modes_individually=self._settings.constrain_center_modes_individually.get_value(),
         )
 
     @property
@@ -447,6 +515,7 @@ class PtyChiProbeOptionsHelper:
                 self._settings.constrain_probe_power_stride.get_value(),
             ),
             probe_power=metadata.probe_photon_count,
+            scale_object=self._settings.constrain_probe_power_scale_object.get_value(),
         )
 
 
@@ -546,6 +615,12 @@ class PtyChiProbePositionOptionsHelper:
         if self._affine_dof.is_bit_set(PtyChiAffineDegreesOfFreedom.ASYMMETRY):
             degrees_of_freedom.append(AffineDegreesOfFreedom.ASYMMETRY)
 
+        override_update_flexibility = (
+            self._settings.constrain_affine_transform_override_update_flexibility.get_value()
+            if self._settings.override_affine_transform_update_flexibility.get_value()
+            else None
+        )
+
         return PositionAffineTransformConstraintOptions(
             enabled=self._settings.constrain_affine_transform.get_value(),
             optimization_plan=create_optimization_plan(
@@ -557,6 +632,7 @@ class PtyChiProbePositionOptionsHelper:
             position_weight_update_interval=self._settings.constrain_affine_transform_position_weight_update_interval.get_value(),
             apply_constraint=self._settings.constrain_affine_transform_apply_constraint.get_value(),
             max_expected_error=self._settings.constrain_affine_transform_max_expected_error_px.get_value(),
+            override_update_flexibility=override_update_flexibility,
         )
 
     def get_positions_px(

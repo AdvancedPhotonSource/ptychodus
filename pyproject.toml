@@ -39,7 +39,7 @@ ptychodus-system-check = "ptychodus.scripts.ptychodus_system_check:main"
 globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
 gui = ["PyQt5"]
 #ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
-ptychi = ["ptychi==1.3.*"]
+ptychi = ["ptychi==1.4.*"]
 ptychopinn = ["ptychopinn[torch]"]
 
 [tool.uv.sources]
