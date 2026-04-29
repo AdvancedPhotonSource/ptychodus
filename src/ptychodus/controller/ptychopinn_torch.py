@@ -361,18 +361,6 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
             tool_tip='Minimum learning rate ratio for WarmupCoside scheduler',
             group=training_group,
         )
-        builder.add_combo_box(
-            training_settings.physics_weight_schedule,
-            enumerators.get_physics_weight_schedules(),
-            'Physics Weight Schedule:',
-            group=training_group,
-        )
-        builder.add_combo_box(
-            training_settings.torch_loss_mode,
-            enumerators.get_torch_loss_modes(),
-            'Torch Loss Mode:',
-            group=training_group,
-        )
         builder.add_line_edit(training_settings.notes, 'MLflow Notes:', group=training_group)
         builder.add_line_edit(
             training_settings.model_name, 'MLflow Model Name:', group=training_group
@@ -453,10 +441,4 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
             'Fine Tune Validation Split:',
             group=training_group,
         )
-        builder.add_integer_line_edit(
-            training_settings.num_grouped_samples,
-            'Grouped Samples:',
-            group=training_group,
-        )
-
         return builder.build_widget()

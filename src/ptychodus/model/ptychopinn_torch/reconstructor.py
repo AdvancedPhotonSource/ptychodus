@@ -7,15 +7,17 @@ import numpy
 
 from ptycho_torch.api.base_api import (
     ConfigManager,
-    DataConfig,
-    DatagenConfig,
     DataloaderFormats,
-    InferenceConfig,
     InferenceEngine,
-    ModelConfig,
     PtychoDataLoader,
     PtychoModel,
     Trainer,
+)
+from ptycho_torch.config_params import (
+    DataConfig,
+    DatagenConfig,
+    InferenceConfig,
+    ModelConfig,
     TrainingConfig,
 )
 from ptycho_torch.model import PtychoPINN_Lightning
@@ -108,6 +110,7 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             mode=self._model_training_mode,
             object_big=self._model_settings.object_big.get_value(),
             probe_big=self._model_settings.probe_big.get_value(),
+            loss_function=self._model_settings.loss_function.get_value(),
             amp_activation=self._model_settings.amplitude_activation_function.get_value(),
             cbam_encoder=self._model_settings.cbam_encoder.get_value(),
             decoder_last_amp_channels=self._data_settings.num_channels.get_value(),
@@ -158,8 +161,6 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             scheduler=self._training_settings.learning_rate_scheduler.get_value(),
             warmup_epochs=self._training_settings.learning_rate_warmup_epochs.get_value(),
             min_lr_ratio=self._training_settings.minimum_learning_rate_ratio.get_value(),
-            physics_weight_schedule=self._training_settings.physics_weight_schedule.get_value(),
-            torch_loss_mode=self._training_settings.torch_loss_mode.get_value(),
             notes=self._training_settings.notes.get_value(),
             model_name=self._training_settings.model_name.get_value(),
             enable_staged_finetuning=self._training_settings.enable_staged_finetuning.get_value(),
@@ -177,7 +178,6 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             finetune_skip_stage3=self._training_settings.finetune_skip_stage3.get_value(),
             finetune_early_stop_patience=self._training_settings.finetune_early_stop_patience.get_value(),
             finetune_val_split=self._training_settings.finetune_validation_split.get_value(),
-            n_groups=self._training_settings.num_grouped_samples.get_value(),
         )
         inference_config = InferenceConfig(
             batch_size=self._inference_settings.batch_size.get_value(),
@@ -221,10 +221,11 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             model_config=self._inference_engine.model_config,
             training_config=self._inference_engine.training_config,
             inference_config=self._inference_engine.inference_config,
+            datagen_config=DatagenConfig(),
         )
         data_loader = PtychoDataLoader.from_np(
             diff_patterns=parameters.diffraction_patterns,
-            probe=parameters.product.probes.get_probe_no_opr().get_incoherent_mode(0),
+            probe=parameters.product.probes.get_probe_no_opr(),
             positions=numpy.reshape(positions_px, (-1, 2)),
             config_manager=config_manager,
         )
