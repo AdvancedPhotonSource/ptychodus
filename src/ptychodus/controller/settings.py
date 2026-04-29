@@ -87,6 +87,8 @@ class SettingsController(Observer):
             settings_selection_model.currentChanged.connect(self._update_view)
 
         self._settings_table_view.setModel(self._settings_table_model)
+        header = self._settings_table_view.horizontalHeader()
+        header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
 
         open_button = settings_view.button_box.button(QDialogButtonBox.StandardButton.Open)
         open_button.clicked.connect(self._open_settings)

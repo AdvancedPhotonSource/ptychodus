@@ -185,7 +185,8 @@ class ProductEditorViewController(Observer):
         if vertical_header is not None:
             vertical_header.hide()
 
-        dialog.table_view.resizeColumnsToContents()
+        header = dialog.table_view.horizontalHeader()
+        header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
         dialog.table_view.resizeRowsToContents()
 
         view_controller = cls(diffraction_api, product, table_model, dialog)

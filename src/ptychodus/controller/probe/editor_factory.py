@@ -97,6 +97,8 @@ class ZernikeViewController(ParameterViewController, Observer):
         )
 
         self._coefficients_table_view.setModel(self._coefficients_table_model)
+        header = self._coefficients_table_view.horizontalHeader()
+        header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
 
         layout = QFormLayout()
         layout.addRow('Diameter:', self._diameter_view_controller.get_widget())

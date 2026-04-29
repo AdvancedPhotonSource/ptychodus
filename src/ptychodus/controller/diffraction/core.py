@@ -188,6 +188,8 @@ class DiffractionController(DiffractionDatasetObserver):
 
         view.tree_view.setModel(self._tree_model)
         view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        header = view.tree_view.header()
+        header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
         counts_item_delegate = ProgressBarItemDelegate(view.tree_view)
         view.tree_view.setItemDelegateForColumn(1, counts_item_delegate)
         selection_model = view.tree_view.selectionModel()

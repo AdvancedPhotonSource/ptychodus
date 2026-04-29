@@ -221,6 +221,8 @@ class ProductController(ProductRepositoryObserver):
             vertical_header.hide()
 
         view.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        header = view.table_view.horizontalHeader()
+        header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
         connect_current_changed_signal(view.table_view, controller._update_enabled_buttons)
         controller._update_enabled_buttons(QModelIndex(), QModelIndex())
 

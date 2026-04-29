@@ -54,6 +54,8 @@ class GlobusController(SequenceObserver[GlobusStatus]):
         status_table_view.setModel(self._status_proxy_model)
         status_table_view.setSortingEnabled(True)
         status_table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        header = status_table_view.horizontalHeader()
+        header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
         status_table_view.clicked.connect(self._handle_table_view_clicked)
 
         status_repository.add_observer(self)

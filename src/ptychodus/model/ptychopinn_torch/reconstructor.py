@@ -301,7 +301,7 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             xcoords_start=xcoords,
             ycoords_start=ycoords,
             diff3d=parameters.diffraction_patterns,
-            probeGuess=parameters.product.probes.get_probe_no_opr().get_incoherent_mode(0),
+            probeGuess=parameters.product.probes.get_probe_no_opr().get_array(),
             objectGuess=parameters.product.object_.get_layer(0),
             # assume that all patches are from the same object
             scan_index=numpy.zeros(len(parameters.product.probe_positions), dtype=int),

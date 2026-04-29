@@ -1,4 +1,4 @@
-from PyQt5.QtCore import QModelIndex, QSortFilterProxyModel, Qt
+from PyQt5.QtCore import QModelIndex, QSortFilterProxyModel
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -146,7 +146,8 @@ class GenesisController(SequenceObserver[GenesisStatus]):
         status_view.setModel(self._status_proxy_model)
         status_view.setSortingEnabled(True)
         status_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        status_view.sortByColumn(3, Qt.SortOrder.DescendingOrder)
+        header = status_view.horizontalHeader()
+        header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
 
         status_repository.add_observer(self)
 

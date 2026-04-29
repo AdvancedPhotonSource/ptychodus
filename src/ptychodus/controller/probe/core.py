@@ -74,6 +74,8 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         view.tree_view.setModel(self._tree_model)
         view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        header = view.tree_view.header()
+        header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
         power_item_delegate = ProgressBarItemDelegate(view.tree_view)
         view.tree_view.setItemDelegateForColumn(1, power_item_delegate)
         view.tree_view.setItemDelegateForColumn(2, builder_item_delegate)

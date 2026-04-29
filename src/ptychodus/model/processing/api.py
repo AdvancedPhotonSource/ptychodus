@@ -154,7 +154,7 @@ class ProcessingAPI:
             f'{input_product_item.get_name()}_{self._algorithm_parameter.get_value()}'
         )
 
-        if output_product_suffix:
+        if output_product_suffix and not output_product_name.endswith(f'_{output_product_suffix}'):
             output_product_name += f'_{output_product_suffix}'
 
         output_product_item.set_name(output_product_name)
