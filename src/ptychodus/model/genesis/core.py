@@ -11,7 +11,12 @@ from ..processing import ProcessingAPI
 from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .executor import GenesisExecutor
-from .facility_adapters import IRIFacilityAdapter, ALCFFacilityAdapter, NERSCFacilityAdapter
+from .facility_adapters import (
+    ALCFFacilityAdapter,
+    IRIFacilityAdapter,
+    NERSCFacilityAdapter,
+    OLCFFacilityAdapter,
+)
 from .iri import get_iri_tokens_file
 from .settings import GenesisSettings
 from .status import GenesisStatusRepository, GenesisStatus
@@ -42,10 +47,13 @@ def create_facility_adapters(settings: GenesisSettings) -> Mapping[str, IRIFacil
 
     for token in access_tokens:
         facility = token.facility.casefold()
-        if facility == ALCFFacilityAdapter.NAME.casefold():
-            adapters[ALCFFacilityAdapter.NAME] = ALCFFacilityAdapter(settings, token.access_token)
-        elif facility == NERSCFacilityAdapter.NAME.casefold():
+
+        if facility == NERSCFacilityAdapter.NAME.casefold():
             adapters[NERSCFacilityAdapter.NAME] = NERSCFacilityAdapter(settings, token.access_token)
+        elif facility == ALCFFacilityAdapter.NAME.casefold():
+            adapters[ALCFFacilityAdapter.NAME] = ALCFFacilityAdapter(settings, token.access_token)
+        elif facility == OLCFFacilityAdapter.NAME.casefold():
+            adapters[OLCFFacilityAdapter.NAME] = OLCFFacilityAdapter(settings, token.access_token)
         else:
             logger.warning(f'Unsupported facility: {token.facility}')
 

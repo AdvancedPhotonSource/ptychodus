@@ -8,9 +8,9 @@ curl -H "Authorization: Bearer $S3M_TOKEN" https://s3m.olcf.ornl.gov/olcf/v1/tok
 
 echo "Job Submission"
 curl -i -s -H "Authorization: Bearer $S3M_TOKEN" \
--H "Content-Type: application/json" \
--X POST \
--d '{
+    -H "Content-Type: application/json" \
+    -X POST \
+    -d '{
 "executable": "/bin/bash",
 "arguments": ["-lc", "echo hello\nhostname"],
 "name": "s3m-echo-test",
@@ -24,7 +24,7 @@ curl -i -s -H "Authorization: Bearer $S3M_TOKEN" \
 "cpu_cores_per_process": 1
 },
 "attributes": {
-"account": “csc682",
+"account": "csc682",
 "queue_name": "batch",
 "duration": 300
 }

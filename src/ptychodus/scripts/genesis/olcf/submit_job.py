@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import json
 import logging
 
@@ -21,35 +23,30 @@ def main() -> None:
     adapters = create_facility_adapters(settings)
 
     for name, adapter in adapters.items():
-        if name != 'NERSC':
+        if name != 'OLCF':
             continue
 
         logger.info(f'Checking IRI access token for facility "{name}"...')
 
         client = adapter.get_iri_client()
-        resource_id = '94351904-6dba-4c16-b5cd-fbd280d8615b'  # Perlmutter
-        commands = 'echo BEGIN; source $HOME/.local/bin/env; which python; which ptychodus; ptychodus --version; nvidia-smi; echo END'
+        resource_id = 'odo'
+        commands = 'echo BEGIN; module load miniforge3; conda activate ptychodus; which python; which ptychodus; ptychodus --version; echo END'
         job_spec = JobSpecification(
             executable='/bin/bash',
             arguments=['-c', commands],
             name='Ptychodus',
-            stdout_path='/global/homes/s/shenke/stdout%j.log',
-            stderr_path='/global/homes/s/shenke/stderr%j.log',
+            directory='/gpfs/wolf2/olcf/csc682/proj-shared',
+            environment={'DUMMY': '1'},
             resources=ResourceSpecification(
                 node_count=1,
                 process_count=1,
-                processes_per_node=1,
                 cpu_cores_per_process=1,
-                gpu_cores_per_process=4,
             ),
             attributes=JobAttributes(
                 duration=300,
-                queue_name='debug',
-                account='m5074_g',
+                queue_name='batch',
+                account='csc682',
             ),
-            pre_launch='echo PRE_LAUNCH',
-            post_launch='echo POST_LAUNCH',
-            launcher='srun',
         )
         response = client.compute.submit_job(resource_id, job_spec)
 

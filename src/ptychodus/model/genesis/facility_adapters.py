@@ -247,3 +247,52 @@ class NERSCFacilityAdapter(IRIFacilityAdapter):
             post_launch='echo POST_LAUNCH',
             launcher='srun',
         )
+
+
+class OLCFFacilityAdapter(IRIFacilityAdapter):
+    NAME: Final[str] = 'OLCF'
+
+    def __init__(self, settings: GenesisSettings, access_token: str) -> None:
+        iri_client = IRIClient('https://amsc-open.s3m.olcf.ornl.gov/api/v1', access_token)
+        super().__init__(iri_client)
+        self._settings = settings
+
+    def globus_collections(self) -> Mapping[str, GlobusCollection]:
+        return {
+            'NCCS Open DTN': GlobusCollection(
+                id=UUID('7399956e-a57b-4560-b3d7-a035ff42cad4'),
+                globus_path='/gpfs/wolf2/olcf/csc682/proj-shared',
+                posix_path=Path('/gpfs/wolf2/olcf/csc682/proj-shared'),
+            )
+        }
+
+    def create_job_specification(
+        self, action: str, input_directory: Path, output_directory: Path
+    ) -> JobSpecification:  # FIXME
+        # installation:
+        #    'module load miniforge3',
+        #    'conda create -n ptychodus python==3.11',
+        #    'conda activate ptychodus',
+        #    'pip install -e ptychodus[ptychi,ptychopinn]',
+        return JobSpecification(
+            executable='ptychodus',
+            arguments=['-b', action, '-i', str(input_directory), '-o', str(output_directory)],
+            name=f'ptychodus-{action}',
+            stdout_path=str(output_directory / 'stdout%j.log'),
+            stderr_path=str(output_directory / 'stderr%j.log'),
+            resources=ResourceSpecification(
+                node_count=1,
+                process_count=1,
+                processes_per_node=1,
+                cpu_cores_per_process=1,
+                gpu_cores_per_process=4,
+            ),
+            attributes=JobAttributes(
+                duration=self._settings.duration_s.get_value(),
+                queue_name=self._settings.queue_name.get_value(),
+                account=self._settings.account.get_value(),
+            ),
+            pre_launch='module load conda; conda activate ptychodus',
+            post_launch='echo POST_LAUNCH',
+            launcher='srun',
+        )
