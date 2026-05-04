@@ -40,6 +40,7 @@ def main() -> None:
             resources=ResourceSpecification(
                 node_count=1,
                 process_count=1,
+                processes_per_node=1,
                 cpu_cores_per_process=1,
             ),
             attributes=JobAttributes(
@@ -47,6 +48,9 @@ def main() -> None:
                 queue_name='batch',
                 account='csc682',
             ),
+            pre_launch='echo PRE_LAUNCH',
+            post_launch='echo POST_LAUNCH',
+            launcher='srun',
         )
         response = client.compute.submit_job(resource_id, job_spec)
 

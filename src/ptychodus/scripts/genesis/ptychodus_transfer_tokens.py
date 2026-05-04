@@ -38,18 +38,34 @@ def check_tokens() -> None:
             logger.info(f'"{name}" token response:' + json.dumps(data, indent=4))
 
 
+def print_spec(provider: str) -> None:
+    providers = create_globus_transfer_providers()
+
+    try:
+        client = providers[provider]
+    except KeyError:
+        known = ', '.join(sorted(providers))
+        raise SystemExit(f'Unknown provider "{provider}". Known providers: {known}')
+
+    client.print_openapi_specification()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description='Store and check transfer access tokens.')
     subparsers = parser.add_subparsers(dest='command', required=True)
 
     set_parser = subparsers.add_parser('store', help='Store transfer access tokens')
-    set_parser.set_defaults(func=store_tokens)
+    set_parser.set_defaults(func=lambda _: store_tokens())
 
     check_parser = subparsers.add_parser('check', help='Check transfer access tokens')
-    check_parser.set_defaults(func=check_tokens)
+    check_parser.set_defaults(func=lambda _: check_tokens())
+
+    spec_parser = subparsers.add_parser('spec', help='Print OpenAPI spec for a provider')
+    spec_parser.add_argument('provider', help='Provider name')
+    spec_parser.set_defaults(func=lambda args: print_spec(args.provider))
 
     args = parser.parse_args()
-    args.func()
+    args.func(args)
 
 
 if __name__ == '__main__':

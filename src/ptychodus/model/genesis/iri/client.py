@@ -1,4 +1,7 @@
 from pathlib import Path
+import json
+
+import requests
 
 from ptychodus.api.common import get_ptychodus_dir
 
@@ -20,6 +23,11 @@ class IRIClient:
 
     def get_api_base_url(self) -> str:
         return self._api_base_url
+
+    def print_openapi_specification(self) -> None:
+        response = requests.get(f'{self._api_base_url}/openapi.json')
+        response.raise_for_status()
+        print(json.dumps(response.json(), indent=2))
 
 
 def get_iri_tokens_file() -> Path:

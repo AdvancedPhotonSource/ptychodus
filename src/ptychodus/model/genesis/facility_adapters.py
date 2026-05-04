@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-import json
 from pathlib import Path
 from typing import Final
 from uuid import UUID
+import json
 import logging
 
 from .iri import IRIClient, JobAttributes, JobSpecification, ResourceSpecification, ResourceType
@@ -142,7 +142,7 @@ class ALCFFacilityAdapter(IRIFacilityAdapter):
     NAME: Final[str] = 'ALCF'
 
     def __init__(self, settings: GenesisSettings, access_token: str) -> None:
-        iri_client = IRIClient('https://api.alcf.anl.gov/api/v1/', access_token)
+        iri_client = IRIClient('https://api.alcf.anl.gov', access_token)
         super().__init__(iri_client)
         self._settings = settings
 
@@ -204,7 +204,7 @@ class NERSCFacilityAdapter(IRIFacilityAdapter):
     NAME: Final[str] = 'NERSC'
 
     def __init__(self, settings: GenesisSettings, access_token: str) -> None:
-        iri_client = IRIClient('https://api.iri.nersc.gov/api/v1/', access_token)
+        iri_client = IRIClient('https://api.iri.nersc.gov', access_token)
         super().__init__(iri_client)
         self._settings = settings
 
@@ -253,7 +253,7 @@ class OLCFFacilityAdapter(IRIFacilityAdapter):
     NAME: Final[str] = 'OLCF'
 
     def __init__(self, settings: GenesisSettings, access_token: str) -> None:
-        iri_client = IRIClient('https://amsc-open.s3m.olcf.ornl.gov/api/v1', access_token)
+        iri_client = IRIClient('https://amsc-open.s3m.olcf.ornl.gov', access_token)
         super().__init__(iri_client)
         self._settings = settings
 

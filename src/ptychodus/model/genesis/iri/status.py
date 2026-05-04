@@ -51,7 +51,7 @@ class IRIStatusClient:
     # See https://api.iri.nersc.gov/#/status
 
     def __init__(self, api_base_url: str, access_token: str) -> None:
-        self._base_url = api_base_url.rstrip('/') + '/status'
+        self._base_url = api_base_url.rstrip('/') + '/api/v1/status'
         self._headers = create_headers(access_token)
 
     def get_resources(

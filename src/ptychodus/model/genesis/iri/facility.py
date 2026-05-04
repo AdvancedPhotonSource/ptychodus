@@ -45,15 +45,17 @@ class IRIFacilityClient:
     # See https://api.iri.nersc.gov/#/facility
 
     def __init__(self, api_base_url: str, access_token: str) -> None:
-        self._base_url = api_base_url.rstrip('/')
+        self._base_url = api_base_url.rstrip('/') + '/api/v1/facility'
         self._headers = create_headers(access_token)
 
     def get_facility(self, modified_since: datetime | None = None) -> Facility:
         params: dict = {}
+
         if modified_since is not None:
             params['modified_since'] = modified_since.isoformat()
+
         response = requests.get(
-            f'{self._base_url}/facility',
+            self._base_url,
             params=params,
             headers=self._headers,
         )
@@ -69,14 +71,18 @@ class IRIFacilityClient:
         short_name: str | None = None,
     ) -> Sequence[Site]:
         params: dict = {'offset': offset, 'limit': limit}
+
         if modified_since is not None:
             params['modified_since'] = modified_since.isoformat()
+
         if name is not None:
             params['name'] = name
+
         if short_name is not None:
             params['short_name'] = short_name
+
         response = requests.get(
-            f'{self._base_url}/facility/sites',
+            f'{self._base_url}/sites',
             params=params,
             headers=self._headers,
         )
@@ -85,10 +91,12 @@ class IRIFacilityClient:
 
     def get_site(self, site_id: str, modified_since: datetime | None = None) -> Site:
         params: dict = {}
+
         if modified_since is not None:
             params['modified_since'] = modified_since.isoformat()
+
         response = requests.get(
-            f'{self._base_url}/facility/sites/{site_id}',
+            f'{self._base_url}/sites/{site_id}',
             params=params,
             headers=self._headers,
         )
