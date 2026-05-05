@@ -20,7 +20,7 @@ from .facility_adapters import (
 from .iri import get_iri_tokens_file
 from .settings import GenesisSettings
 from .status import GenesisStatusRepository, GenesisStatus
-from .tokens import read_tokens
+from .tokens import load_tokens
 from .transfer import AmSCGlobusTransferClient, get_amsc_transfer_api_url, get_transfer_tokens_file
 
 __all__ = [
@@ -40,7 +40,7 @@ def create_facility_adapters(settings: GenesisSettings) -> Mapping[str, IRIFacil
     logger.info(f'Loading IRI access tokens from {tokens_file}...')
 
     try:
-        access_tokens = read_tokens(tokens_file)
+        access_tokens = load_tokens(tokens_file)
     except FileNotFoundError:
         logger.info(f'IRI tokens file not found: {tokens_file}')
         return adapters
@@ -67,7 +67,7 @@ def create_globus_transfer_providers() -> Mapping[str, AmSCGlobusTransferClient]
     logger.info(f'Loading transfer access tokens from {tokens_file}...')
 
     try:
-        access_tokens = read_tokens(tokens_file)
+        access_tokens = load_tokens(tokens_file)
     except FileNotFoundError:
         logger.info(f'Transfer tokens file not found: {tokens_file}')
         return providers

@@ -11,7 +11,7 @@ from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.genesis.core import create_facility_adapters
 from ptychodus.model.genesis.iri import get_iri_tokens_file
 from ptychodus.model.genesis.settings import GenesisSettings
-from ptychodus.model.genesis.tokens import GenesisAccessTokens, write_tokens
+from ptychodus.model.genesis.tokens import GenesisAccessTokens, save_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def store_tokens() -> None:
             )
         )
 
-    write_tokens(tokens_file, access_tokens)
+    save_tokens(tokens_file, access_tokens)
 
 
 def check_tokens() -> None:

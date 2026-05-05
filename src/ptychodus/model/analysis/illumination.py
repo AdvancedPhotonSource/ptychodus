@@ -6,10 +6,10 @@ from typing import Any
 import logging
 
 import numpy
+from scipy.fft import fft2, fftfreq, ifft2
 
 from ptychodus.api.common import RealArrayType
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.interpolate import BarycentricArrayStitcher
 from ptychodus.api.object import ObjectCenter
 from ptychodus.api.observer import Observable
 
@@ -83,18 +83,33 @@ class IlluminationMapper(Observable):
     def map(self) -> None:
         product = self._repository[self._product_index].get_product()
         object_geometry = product.object_.get_geometry()
+        probe_geometry = product.probes.get_geometry()
 
-        stitcher = BarycentricArrayStitcher[numpy.floating[Any]](
-            numpy.zeros((object_geometry.height_px, object_geometry.width_px))
-        )
+        canvas = numpy.zeros((object_geometry.height_px, object_geometry.width_px))
+
+        freq_y = fftfreq(probe_geometry.height_px)
+        freq_x = fftfreq(probe_geometry.width_px)
+        fy, fx = numpy.meshgrid(freq_y, freq_x, indexing='ij')
 
         for scan_point, probe in zip(product.probe_positions, product.probes):
             object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-            stitcher.add_patch(
-                object_point.coordinate_x_px,
-                object_point.coordinate_y_px,
-                probe.get_intensity(),
-            )
+            cx = object_point.coordinate_x_px
+            cy = object_point.coordinate_y_px
+
+            x_lower = int(cx - probe_geometry.width_px / 2)
+            y_lower = int(cy - probe_geometry.height_px / 2)
+
+            dx = cx - (x_lower + probe_geometry.width_px / 2)
+            dy = cy - (y_lower + probe_geometry.height_px / 2)
+
+            shift_phase = numpy.exp(-2j * numpy.pi * (fy * dy + fx * dx))
+            shifted_modes = ifft2(fft2(probe.get_array()) * shift_phase)
+
+            patch = numpy.sum(numpy.abs(shifted_modes) ** 2, axis=0)
+            canvas[
+                y_lower : y_lower + probe_geometry.height_px,
+                x_lower : x_lower + probe_geometry.width_px,
+            ] += patch
 
         exposure_time_s = product.metadata.exposure_time_s
         photon_flux_Hz = float('nan')  # noqa: N806
@@ -105,7 +120,7 @@ class IlluminationMapper(Observable):
             pass
 
         self._illumination_map = IlluminationMap(
-            photon_number=stitcher.stitch(),
+            photon_number=canvas,
             photon_flux_Hz=photon_flux_Hz,
             photon_energy_J=product.metadata.probe_energy_J,
             exposure_time_s=exposure_time_s,

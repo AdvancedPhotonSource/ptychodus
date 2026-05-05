@@ -167,6 +167,11 @@ class WorkflowAPI(ABC):
     """Top-level API for loading data, managing products, and running reconstructions."""
 
     @abstractmethod
+    def load_bad_pixels(self, file_path: Path, *, file_type: str | None = None) -> None:
+        """Load a bad-pixel mask from file, uses format from settings when file_type is None."""
+        pass
+
+    @abstractmethod
     def load_diffraction_data(
         self,
         file_path: Path,

@@ -217,6 +217,9 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         self._globus_executor = globus_executor
         self._genesis_executor = genesis_executor
 
+    def load_bad_pixels(self, file_path: Path, *, file_type: str | None = None) -> None:
+        self._diffraction_api.open_bad_pixels(file_path, file_type=file_type)
+
     def load_diffraction_data(
         self,
         file_path: Path,

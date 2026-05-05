@@ -43,7 +43,7 @@ class IRIFacilityAdapter(ABC):
             for resource in resources:
                 name_segments: list[str] = []
 
-                if resource.group is not None and resource.group != 'computes':
+                if resource.group is not None and resource.group not in ('computes', 'olcf'):
                     name_segments.append(resource.group.title())
 
                 if resource.name is None:
@@ -292,7 +292,7 @@ class OLCFFacilityAdapter(IRIFacilityAdapter):
                 queue_name=self._settings.queue_name.get_value(),
                 account=self._settings.account.get_value(),
             ),
-            pre_launch='module load conda; conda activate ptychodus',
+            pre_launch='source /etc/bash.bashrc; module load miniforge3; conda activate ptychodus',
             post_launch='echo POST_LAUNCH',
             launcher='srun',
         )

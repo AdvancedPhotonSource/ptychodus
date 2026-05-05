@@ -7,7 +7,7 @@ import logging
 import requests
 
 from ptychodus.model.genesis.core import create_globus_transfer_providers
-from ptychodus.model.genesis.tokens import GenesisAccessTokens, write_tokens
+from ptychodus.model.genesis.tokens import GenesisAccessTokens, save_tokens
 from ptychodus.model.genesis.transfer import get_transfer_tokens_file
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ def store_tokens() -> None:
         facility='AmSC',
         access_token=input('Enter the access token: ').strip(),
     )
-    write_tokens(tokens_file, [access_token])
+    save_tokens(tokens_file, [access_token])
 
 
 def check_tokens() -> None:

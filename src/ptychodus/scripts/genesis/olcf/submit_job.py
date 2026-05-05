@@ -29,14 +29,13 @@ def main() -> None:
         logger.info(f'Checking IRI access token for facility "{name}"...')
 
         client = adapter.get_iri_client()
-        resource_id = 'odo'
-        commands = 'echo BEGIN; module load miniforge3; conda activate ptychodus; which python; which ptychodus; ptychodus --version; echo END'
+        resource_id = '70e0dde0-88e4-52e3-89f3-4849760f2e87'
         job_spec = JobSpecification(
-            executable='/bin/bash',
-            arguments=['-c', commands],
-            name='Ptychodus',
+            executable='ptychodus',
+            arguments=['-v'],
+            name='test',
             directory='/gpfs/wolf2/olcf/csc682/proj-shared',
-            environment={'DUMMY': '1'},
+            #environment={'DUMMY': '1'},
             resources=ResourceSpecification(
                 node_count=1,
                 process_count=1,
@@ -48,7 +47,7 @@ def main() -> None:
                 queue_name='batch',
                 account='csc682',
             ),
-            pre_launch='echo PRE_LAUNCH',
+            pre_launch='source /etc/bash.bashrc; module load miniforge3; conda activate ptychodus',
             post_launch='echo POST_LAUNCH',
             launcher='srun',
         )
