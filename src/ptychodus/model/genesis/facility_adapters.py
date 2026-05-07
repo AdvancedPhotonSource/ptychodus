@@ -271,9 +271,11 @@ class OLCFFacilityAdapter(IRIFacilityAdapter):
     ) -> JobSpecification:  # FIXME
         # installation:
         #    'module load miniforge3',
-        #    'conda create -n ptychodus python==3.11',
-        #    'conda activate ptychodus',
+        #    'conda create --prefix /ccsopen/proj/csc682/ptychodus-env python==3.11',
+        #    'conda activate /ccsopen/proj/csc682/ptychodus-env',
         #    'pip install -e ptychodus[ptychi,ptychopinn]',
+        account = self._settings.account.get_value()
+        conda_env = f'/ccsopen/proj/{account}/ptychodus-env'
         return JobSpecification(
             executable='ptychodus',
             arguments=['-b', action, '-i', str(input_directory), '-o', str(output_directory)],
@@ -290,9 +292,9 @@ class OLCFFacilityAdapter(IRIFacilityAdapter):
             attributes=JobAttributes(
                 duration=self._settings.duration_s.get_value(),
                 queue_name=self._settings.queue_name.get_value(),
-                account=self._settings.account.get_value(),
+                account=account,
             ),
-            pre_launch='source /etc/bash.bashrc; module load miniforge3; conda activate ptychodus',
+            pre_launch=f'source /etc/bash.bashrc; module load miniforge3; conda activate {conda_env}',
             post_launch='echo POST_LAUNCH',
             launcher='srun',
         )

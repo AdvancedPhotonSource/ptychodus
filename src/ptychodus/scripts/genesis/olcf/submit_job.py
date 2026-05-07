@@ -33,9 +33,8 @@ def main() -> None:
         job_spec = JobSpecification(
             executable='ptychodus',
             arguments=['-v'],
-            name='test',
+            name='ptychodus',
             directory='/gpfs/wolf2/olcf/csc682/proj-shared',
-            #environment={'DUMMY': '1'},
             resources=ResourceSpecification(
                 node_count=1,
                 process_count=1,
@@ -47,7 +46,7 @@ def main() -> None:
                 queue_name='batch',
                 account='csc682',
             ),
-            pre_launch='source /etc/bash.bashrc; module load miniforge3; conda activate ptychodus',
+            pre_launch='source /etc/bash.bashrc; module load miniforge3; conda activate /ccsopen/proj/csc682/ptychodus-env',
             post_launch='echo POST_LAUNCH',
             launcher='srun',
         )

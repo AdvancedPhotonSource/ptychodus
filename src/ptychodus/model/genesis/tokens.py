@@ -36,6 +36,7 @@ def load_tokens(file_path: Path) -> Sequence[GenesisAccessTokens]:
 
 def save_tokens(file_path: Path, access_tokens: Sequence[GenesisAccessTokens]) -> None:
     data = [token.model_dump(mode='json') for token in access_tokens]
+    file_path.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(file_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 
     with open(fd, 'w') as f:

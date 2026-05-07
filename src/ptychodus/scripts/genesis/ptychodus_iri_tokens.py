@@ -45,6 +45,28 @@ def check_tokens() -> None:
     settings_registry = SettingsRegistry()
     settings = GenesisSettings(settings_registry)
     adapters = create_facility_adapters(settings)
+    data = list()
+
+    for name, adapter in adapters.items():
+        logger.info(f'Checking IRI access token for facility "{name}"...')
+        client = adapter.get_iri_client()
+
+        try:
+            projects = client.account.get_projects()
+        except requests.HTTPError as exc:
+            logger.error(f'"{name}" token error: {exc}')
+        else:
+            data = [project.model_dump(mode='json') for project in projects]
+
+    print(json.dumps(data, indent=4))
+
+
+def list_resources() -> None:
+    logging.basicConfig(level=logging.INFO)
+
+    settings_registry = SettingsRegistry()
+    settings = GenesisSettings(settings_registry)
+    adapters = create_facility_adapters(settings)
     data: dict[str, Any] = {}
 
     for name, adapter in adapters.items():
@@ -91,6 +113,9 @@ def main() -> None:
 
     check_parser = subparsers.add_parser('check', help='Check transfer access tokens')
     check_parser.set_defaults(func=lambda _: check_tokens())
+
+    resources_parser = subparsers.add_parser('resources', help='List facility resources')
+    resources_parser.set_defaults(func=lambda _: list_resources())
 
     spec_parser = subparsers.add_parser('spec', help='Print OpenAPI spec for a facility')
     spec_parser.add_argument('facility', help='Facility name')
