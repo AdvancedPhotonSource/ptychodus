@@ -19,8 +19,6 @@ class PtychoPINNTorchEnumerators:
         self._learning_rate_schedulers: Sequence[str] = [
             'Default',
             'Exponential',
-            'MultiStage',
-            'Adaptive',
             'Cosine',
         ]
 

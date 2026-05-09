@@ -258,7 +258,7 @@ class OLCFFacilityAdapter(IRIFacilityAdapter):
 
     def create_job_specification(
         self, action: str, input_directory: Path, output_directory: Path
-    ) -> JobSpecification:  # FIXME
+    ) -> JobSpecification:
         # installation:
         #    'module load miniforge3',
         #    'conda create --prefix /ccsopen/proj/csc682/ptychodus-env python==3.11',

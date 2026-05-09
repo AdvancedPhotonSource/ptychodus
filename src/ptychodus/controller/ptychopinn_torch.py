@@ -1,17 +1,71 @@
-from PyQt5.QtWidgets import QWidget
+import logging
 
+from PyQt5.QtWidgets import QHBoxLayout, QPushButton, QWidget
+
+from ..api.diffraction import estimate_probe_photon_count
+from ..api.parametric import RealParameter
+from ..model.diffraction import DiffractionAPI
 from ..model.ptychopinn_torch.core import PtychoPINNTorchReconstructorLibrary
 from .data import FileDialogFactory
-from .parametric import ParameterViewBuilder
+from .parametric import (
+    DecimalLineEditParameterViewController,
+    ParameterViewBuilder,
+    ParameterViewController,
+)
 from .processing import ReconstructorViewControllerFactory
+
+logger = logging.getLogger(__name__)
+
+
+class _EstimateNumPhotonsViewController(ParameterViewController):
+    """`num_photons` line-edit with a button that estimates from loaded diffraction data."""
+
+    def __init__(
+        self,
+        parameter: RealParameter,
+        diffraction_api: DiffractionAPI,
+        *,
+        tool_tip: str = '',
+    ) -> None:
+        super().__init__()
+        self._parameter = parameter
+        self._diffraction_api = diffraction_api
+        self._line_edit = DecimalLineEditParameterViewController(parameter, tool_tip=tool_tip)
+        self._button = QPushButton('Estimate')
+        self._button.setToolTip('Estimate from currently loaded diffraction data.')
+        self._button.clicked.connect(self._estimate)
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._line_edit.get_widget())
+        layout.addWidget(self._button)
+
+        self._widget = QWidget()
+        self._widget.setLayout(layout)
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+    def _estimate(self) -> None:
+        assembled_data = self._diffraction_api.get_assembled_data()
+        patterns = assembled_data.get_patterns()
+        if patterns.size == 0:
+            logger.warning('Cannot estimate photon count: no diffraction data loaded.')
+            return
+        photon_count = estimate_probe_photon_count(patterns, assembled_data.get_bad_pixels())
+        self._parameter.set_value(float(photon_count))
 
 
 class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
     def __init__(
-        self, model: PtychoPINNTorchReconstructorLibrary, file_dialog_factory: FileDialogFactory
+        self,
+        model: PtychoPINNTorchReconstructorLibrary,
+        diffraction_api: DiffractionAPI,
+        file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._model = model
+        self._diffraction_api = diffraction_api
         self._file_dialog_factory = file_dialog_factory
 
     @property
@@ -71,7 +125,11 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
         )
 
         # Data Advanced
-        builder.add_decimal_line_edit(data_settings.num_photons, 'Photons:', group=data_group)
+        builder.add_view_controller(
+            _EstimateNumPhotonsViewController(data_settings.num_photons, self._diffraction_api),
+            'Photons:',
+            group=data_group,
+        )
         builder.add_integer_line_edit(
             data_settings.coordinate_subsampling_factor,
             'Coordinate Subsampling Factor:',
@@ -232,21 +290,20 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
             tool_tip='Offset parameter for nearest neighbor patches.',
             group=model_group,
         )
-        builder.add_check_box(
-            model_settings.pad_object,
-            'Pad Object',
-            tool_tip='Pad object during forward model.',
-            group=model_group,
-        )
-        builder.add_decimal_line_edit(
-            model_settings.probe_gaussian_smoothing_sigma,
-            'Probe Gaussian Smoothing Sigma:',
-            tool_tip='Gaussian smoothing sigma for probe.',
-            group=model_group,
-        )
         builder.add_decimal_line_edit(
             model_settings.probe_reference_loss_coeff,
             'Probe Reference Loss Coefficient:',
+            group=model_group,
+        )
+        builder.add_check_box(
+            model_settings.amplitude_variance_loss,
+            'Amplitude Variance Loss',
+            tool_tip='Penalize spatial variance of complex modulus to encourage uniform amplitude.',
+            group=model_group,
+        )
+        builder.add_decimal_line_edit(
+            model_settings.amplitude_variance_coeff,
+            'Amplitude Variance Coefficient:',
             group=model_group,
         )
 
@@ -300,12 +357,6 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
             training_settings.learning_rate, 'Learning Rate:', group=training_group
         )
         builder.add_integer_line_edit(
-            training_settings.num_devices,
-            'Devices:',
-            tool_tip='devices to train on',
-            group=training_group,
-        )  # TODO improve
-        builder.add_integer_line_edit(
             training_settings.num_dataloader_workers,
             'Dataloader Workers:',
             group=training_group,
@@ -343,6 +394,12 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
             tool_tip='Device to train on ("cuda", "cpu", etc.)',
             group=training_group,
         )  # TODO improve
+        builder.add_integer_line_edit(
+            training_settings.num_devices,
+            'Number of Devices:',
+            tool_tip='Number of GPUs to train on. >1 enables DDP via the spawn launcher.',
+            group=training_group,
+        )
         builder.add_combo_box(
             training_settings.learning_rate_scheduler,
             enumerators.get_learning_rate_schedulers(),

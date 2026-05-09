@@ -20,6 +20,38 @@ DiffractionPatterns: TypeAlias = numpy.ndarray[tuple[int, int, int], Diffraction
 DiffractionIndexes: TypeAlias = numpy.ndarray[tuple[int], numpy.dtype[numpy.integer[Any]]]
 
 
+def estimate_probe_photon_count(
+    patterns: DiffractionPatterns, bad_pixels: BadPixels | None = None
+) -> int:
+    """Estimate the per-snapshot probe photon count from diffraction patterns.
+
+    Heuristic: total counts of the brightest pattern over good pixels. The
+    brightest pattern bounds the photons reaching the detector when the probe
+    is least obstructed by the sample.
+    """
+    if bad_pixels is None:
+        per_pattern = numpy.sum(patterns, axis=(-2, -1))
+    else:
+        per_pattern = numpy.sum(patterns[:, numpy.logical_not(bad_pixels)], axis=-1)
+    return int(per_pattern.max())
+
+
+def zero_bad_pixels(
+    patterns: DiffractionPatterns, bad_pixels: BadPixels | None
+) -> DiffractionPatterns:
+    """Return a copy of `patterns` with bad pixels zeroed.
+
+    Zero is a neutral choice (no photons measured) but does mildly bias any
+    consumer toward predicting low intensity at those locations. Returns the
+    input unchanged when `bad_pixels` is None or all-False to avoid a copy.
+    """
+    if bad_pixels is None or not numpy.any(bad_pixels):
+        return patterns
+    cleaned = patterns.copy()
+    cleaned[:, bad_pixels] = 0
+    return cleaned
+
+
 @dataclass(frozen=True)
 class CropCenter:
     """Pixel coordinates of the center used when cropping diffraction patterns."""

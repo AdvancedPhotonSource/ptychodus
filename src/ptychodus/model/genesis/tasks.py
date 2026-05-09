@@ -39,8 +39,6 @@ def transfer_task(
     transfer_uuid = transfer.transfer_uuid
     transfer_label = transfer.label or transfer_uuid
 
-    # FIXME transfer metrics to GenesisStatus.details
-
     while not stop_event.is_set():
         result = client.get_transfer(transfer_uuid)
         status = result.status or TransferStatus.UNKNOWN

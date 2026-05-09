@@ -51,7 +51,9 @@ class ControllerCore:
             model.ptychopinn_reconstructor_library, self._file_dialog_factory
         )
         self._ptychopinn_torch_view_controller_factory = PtychoPINNTorchViewControllerFactory(
-            model.ptychopinn_torch_reconstructor_library, self._file_dialog_factory
+            model.ptychopinn_torch_reconstructor_library,
+            model.diffraction_core.diffraction_api,
+            self._file_dialog_factory,
         )
         self._settings_controller = SettingsController(
             model.settings_registry,

@@ -12,6 +12,7 @@ import ptycho.loader
 import ptycho.model_manager
 import ptycho.params
 
+from ptychodus.api.io import save_ptychopinn_training_data
 from ptychodus.api.object import Object
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import (
@@ -195,30 +196,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         return 'NumPy Zipped Archive (*.npz)'
 
     def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
-        object_geometry = parameters.product.object_.get_geometry()
-        position_x_px: list[float] = list()
-        position_y_px: list[float] = list()
-
-        for scan_point in parameters.product.probe_positions:
-            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-            position_x_px.append(object_point.coordinate_x_px)
-            position_y_px.append(object_point.coordinate_y_px)
-
-        xcoords = numpy.array(position_x_px)
-        ycoords = numpy.array(position_y_px)
-
-        numpy.savez(
-            file_path,
-            xcoords=xcoords,
-            ycoords=ycoords,
-            xcoords_start=xcoords,
-            ycoords_start=ycoords,
-            diff3d=parameters.diffraction_patterns,
-            probeGuess=parameters.product.probes.get_probe_no_opr().get_incoherent_mode(0),
-            # assume that all patches are from the same object
-            objectGuess=parameters.product.object_.get_layer(0),
-            scan_index=numpy.zeros(len(parameters.product.probe_positions), dtype=int),
-        )
+        save_ptychopinn_training_data(file_path, parameters, multimodal_probe=False)
 
     def train(self, input_path: Path, output_path: Path) -> Iterator[TrainOutput]:
         test_raw_data = RawData.from_file(input_path / 'test_data.npz')  # TODO RawData | None

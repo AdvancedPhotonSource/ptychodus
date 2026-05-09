@@ -126,12 +126,14 @@ class PtychoPINNTorchModelSettings(Observable, Observer):
         )
         self.eca_encoder = self._group.create_boolean_parameter('eca_encoder', False)
         self.offset = self._group.create_integer_parameter('offset', 6, minimum=0)
-        self.pad_object = self._group.create_boolean_parameter('pad_object', True)
-        self.probe_gaussian_smoothing_sigma = self._group.create_real_parameter(
-            'probe_gaussian_smoothing_sigma', 0.0
-        )
         self.probe_reference_loss_coeff = self._group.create_real_parameter(
             'probe_reference_loss_coeff', 0.0, minimum=0.0
+        )
+        self.amplitude_variance_loss = self._group.create_boolean_parameter(
+            'amplitude_variance_loss', False
+        )
+        self.amplitude_variance_coeff = self._group.create_real_parameter(
+            'amplitude_variance_coeff', 0.01, minimum=0.0
         )
 
     def _update(self, observable: Observable) -> None:
@@ -148,7 +150,6 @@ class PtychoPINNTorchTrainingSettings(Observable, Observer):
         self.epochs = self._group.create_integer_parameter('epochs', 50, minimum=1)
         self.batch_size = self._group.create_integer_parameter('batch_size', 16, minimum=1)
         self.learning_rate = self._group.create_real_parameter('learning_rate', 1e-3, minimum=0.0)
-        self.num_devices = self._group.create_integer_parameter('num_devices', 1, minimum=0)
         self.num_dataloader_workers = self._group.create_integer_parameter(
             'num_dataloader_workers', 4, minimum=0
         )
@@ -170,6 +171,7 @@ class PtychoPINNTorchTrainingSettings(Observable, Observer):
             'use_negative_log_likelihood_loss', True
         )
         self.device = self._group.create_string_parameter('device', 'cuda')
+        self.num_devices = self._group.create_integer_parameter('num_devices', 1, minimum=1)
         self.learning_rate_scheduler = self._group.create_string_parameter(
             'learning_rate_scheduler', 'Default'
         )

@@ -10,6 +10,7 @@ from PyQt5.QtCore import (
 from PyQt5.QtGui import QBrush
 from PyQt5.QtWidgets import QWidget
 
+from ptychodus.api.diffraction import estimate_probe_photon_count
 from ptychodus.api.observer import Observable, Observer
 
 from ...model.diffraction import DiffractionAPI
@@ -216,7 +217,10 @@ class ProductEditorViewController(Observer):
     def _estimate_probe_photon_count(self) -> None:
         metadata = self._product.get_metadata_item()
         assembled_data = self._diffraction_api.get_assembled_data()
-        metadata.probe_photon_count.set_value(assembled_data.get_pattern_counts().max())
+        photon_count = estimate_probe_photon_count(
+            assembled_data.get_patterns(), assembled_data.get_bad_pixels()
+        )
+        metadata.probe_photon_count.set_value(photon_count)
 
         self._table_model.beginResetModel()
         self._table_model.endResetModel()

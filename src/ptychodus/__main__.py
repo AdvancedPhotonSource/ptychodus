@@ -96,4 +96,5 @@ def main() -> int:
         return app.exec()
 
 
-sys.exit(main())
+if __name__ == '__main__':
+    sys.exit(main())
