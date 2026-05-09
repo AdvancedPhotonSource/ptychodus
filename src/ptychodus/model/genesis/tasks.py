@@ -21,11 +21,13 @@ def transfer_task(
     inputs: GlobusTransferInputs,
     stop_event: threading.Event,
     status_interval_s: float,
+    facility: str,
     flow_label: str,
 ) -> Iterator[GenesisStatus]:
     start_time = datetime.now()
 
     yield GenesisStatus(
+        facility=facility,
         label=flow_label,
         action=inputs.label,
         status='Starting',
@@ -47,6 +49,7 @@ def transfer_task(
         match status:
             case TransferStatus.SUCCEEDED | TransferStatus.FAILED | TransferStatus.CANCELED:
                 yield GenesisStatus(
+                    facility=facility,
                     label=flow_label,
                     action=transfer_label,
                     status=str(status).title(),
@@ -62,6 +65,7 @@ def transfer_task(
                     )
             case _:
                 yield GenesisStatus(
+                    facility=facility,
                     label=flow_label,
                     action=transfer_label,
                     status=str(status).title(),
@@ -77,6 +81,7 @@ def compute_task(
     spec: JobSpecification,
     stop_event: threading.Event,
     status_interval_s: float,
+    facility: str,
     flow_label: str,
     max_retries: int = 10,
     retry_delay: float = 1.0,
@@ -85,6 +90,7 @@ def compute_task(
 
     for attempt in range(1, max_retries + 1):
         yield GenesisStatus(
+            facility=facility,
             label=flow_label,
             action='Submit Job',
             status=f'Attempt {attempt}',
@@ -98,6 +104,7 @@ def compute_task(
             if exc.response.status_code == 404:
                 if attempt == max_retries:
                     yield GenesisStatus(
+                        facility=facility,
                         label=flow_label,
                         action='Submit Job',
                         status='Failed',
@@ -112,6 +119,7 @@ def compute_task(
                 raise
         else:
             yield GenesisStatus(
+                facility=facility,
                 label=flow_label,
                 action='Submit Job',
                 status='Succeeded',
@@ -148,6 +156,7 @@ def compute_task(
         match state:
             case JobState.COMPLETED | JobState.FAILED | JobState.CANCELED:
                 yield GenesisStatus(
+                    facility=facility,
                     label=flow_label,
                     action=action,
                     status=str(state).title(),
@@ -161,6 +170,7 @@ def compute_task(
                     raise RuntimeError(f'{action} ended with state {state!r}: {message}')
             case _:
                 yield GenesisStatus(
+                    facility=facility,
                     label=flow_label,
                     action=action,
                     status=str(state).title(),

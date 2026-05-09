@@ -119,7 +119,9 @@ class GenesisExecutor:
     ) -> None:
         flow_label = f'ptychodus_{ptychodus_action}_{local_dir_struct.label}'
         transfer_client = self._transfer_client_chooser.get_current_plugin().strategy
-        facility_adapter = self._facility_chooser.get_current_plugin().strategy
+        facility_plugin = self._facility_chooser.get_current_plugin()
+        facility_adapter = facility_plugin.strategy
+        facility_name = facility_plugin.display_name
         iri_client = facility_adapter.get_iri_client()
         compute_resource_id = self._settings.compute_resource_id.get_value()
 
@@ -179,6 +181,7 @@ class GenesisExecutor:
             stop_event=self._stop_event,
             status_q=self._status_q,
             status_interval_s=status_interval_s,
+            facility=facility_name,
             flow_label=flow_label,
             load_product_path=load_product_path,
         )

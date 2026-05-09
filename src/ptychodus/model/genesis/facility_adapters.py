@@ -148,20 +148,10 @@ class ALCFFacilityAdapter(IRIFacilityAdapter):
 
     def globus_collections(self) -> Mapping[str, GlobusCollection]:
         return {
-            'dtn_home': GlobusCollection(
-                id=UUID('9032dd3a-e841-4687-a163-2720da731b5b'),
-                globus_path='/~/',
-                posix_path=Path('/home'),
-            ),
             'dtn_eagle': GlobusCollection(
                 id=UUID('05d2c76a-e867-4f67-aa57-76edeb0beda0'),
                 globus_path='/~/',
                 posix_path=Path('/eagle'),
-            ),
-            'dtn_grand': GlobusCollection(
-                id=UUID('3caddd4a-bb35-4c3d-9101-d9a0ad7f3a30'),
-                globus_path='/~/',
-                posix_path=Path('/grand'),
             ),
         }
 

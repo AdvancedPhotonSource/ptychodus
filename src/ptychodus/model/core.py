@@ -307,7 +307,7 @@ class ModelCore:
 
         if product_in_path.is_file():
             input_product_api = self.workflow_api.load_product(product_in_path)
-            input_product_api.train_reconstructor_local(input_directory, output_directory)
+            input_product_api.train_reconstructor_local(input_directory, output_directory, block=True)
             return 0
         else:
             logger.error('Input product is not a file!')

@@ -41,12 +41,12 @@ globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
 gui = ["PyQt5"]
 #ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
 ptychi = ["ptychi==1.4.*"]
-ptychopinn = ["ptychopinn[torch]"]
+ptychopinn = ["ptychopinn"]
 
 [tool.uv.sources]
 #ptychi = { path = "../pty-chi", editable = true }
-#ptychopinn = { path = "../PtychoPINN", editable = true }
-ptychopinn = { git = "https://github.com/hoidn/PtychoPINN", branch = "main" }
+ptychopinn = { path = "../PtychoPINN", editable = true }
+#ptychopinn = { git = "https://github.com/hoidn/PtychoPINN", branch = "main" }
 
 #[[tool.uv.index]]
 #name = "pytorch-cu132"

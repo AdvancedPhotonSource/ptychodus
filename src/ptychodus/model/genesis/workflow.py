@@ -39,6 +39,7 @@ class PtychodusWorkflow:
         stop_event: threading.Event,
         status_q: queue.Queue[GenesisStatus],
         status_interval_s: float,
+        facility: str,
         flow_label: str,
         load_product_path: Path | None = None,
     ) -> None:
@@ -53,12 +54,14 @@ class PtychodusWorkflow:
         self._status_q = status_q
         self._status_interval_s = status_interval_s
         self._load_product = load_product
+        self._facility = facility
         self._flow_label = flow_label
         self._load_product_path = load_product_path
 
         self._start_time = datetime.now()
         self._status_q.put(
             GenesisStatus(
+                facility=self._facility,
                 label=self._flow_label,
                 action='Starting',
                 status='Waiting',
@@ -70,6 +73,7 @@ class PtychodusWorkflow:
     def __call__(self) -> ForegroundTask | None:
         self._status_q.put(
             GenesisStatus(
+                facility=self._facility,
                 label=self._flow_label,
                 action='Starting',
                 status='Succeeded',
@@ -86,6 +90,7 @@ class PtychodusWorkflow:
                 self._local_to_remote_transfer_inputs,
                 self._stop_event,
                 self._status_interval_s,
+                self._facility,
                 self._flow_label,
             ):
                 self._status_q.put(status)
@@ -105,6 +110,7 @@ class PtychodusWorkflow:
                 self._job_specification,
                 self._stop_event,
                 self._status_interval_s,
+                self._facility,
                 self._flow_label,
             ):
                 self._status_q.put(status)
@@ -123,6 +129,7 @@ class PtychodusWorkflow:
                 self._remote_to_local_transfer_inputs,
                 self._stop_event,
                 self._status_interval_s,
+                self._facility,
                 self._flow_label,
             ):
                 self._status_q.put(status)
@@ -159,6 +166,7 @@ class PtychodusWorkflow:
 
         self._status_q.put(
             GenesisStatus(
+                facility=self._facility,
                 label=self._flow_label,
                 action='Finishing',
                 status='Succeeded',

@@ -310,6 +310,8 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
     def train(self, input_path: Path, output_path: Path) -> Iterator[TrainOutput]:
         config_manager = self._create_config_manager()
 
+        print('data_loader')
+
         data_loader = PtychoDataLoader(
             data_dir=input_path,
             config_manager=config_manager,
@@ -317,13 +319,17 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             output_dir=output_path,
         )
 
+        print('model')
+
         model = PtychoModel._new_model(model=PtychoPINN_Lightning, config_manager=config_manager)
+        print('trainer')
         trainer = Trainer._from_lightning(
             model=model,
             dataloader=data_loader,
             orchestration='lightning',
             config_manager=config_manager,
         )
+        print('train')
         trainer.train(orchestration='lightning', experiment_name='test_run')
 
         self._inference_engine = InferenceEngine(config_manager=config_manager, ptycho_model=model)

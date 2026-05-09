@@ -10,6 +10,7 @@ class GenesisStatusTableModel(QAbstractTableModel):
         super().__init__(parent)
         self._presenter = presenter
         self._section_headers = [
+            'Facility',
             'Label',
             'Action',
             'Status',
@@ -37,14 +38,16 @@ class GenesisStatusTableModel(QAbstractTableModel):
 
             match index.column():
                 case 0:
-                    return status.label
+                    return status.facility
                 case 1:
-                    return status.action
+                    return status.label
                 case 2:
-                    return status.status
+                    return status.action
                 case 3:
-                    return status.start_time.strftime(self._dt_format)
+                    return status.status
                 case 4:
+                    return status.start_time.strftime(self._dt_format)
+                case 5:
                     if status.completion_time is not None:
                         return status.completion_time.strftime(self._dt_format)
 

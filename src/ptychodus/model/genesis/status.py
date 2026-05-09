@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class GenesisStatus:
+    facility: str
     label: str
     action: str
     status: str
@@ -54,7 +55,8 @@ class GenesisStatusRepository(ObservableSequence[GenesisStatus]):
                     self.notify_observers_item_inserted(0, new_status)
                 else:
                     if (
-                        old_status.label == new_status.label
+                        old_status.facility == new_status.facility
+                        and old_status.label == new_status.label
                         and old_status.action == new_status.action
                     ):
                         self._status_list[-1] = new_status
