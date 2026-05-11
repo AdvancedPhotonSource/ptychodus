@@ -176,6 +176,7 @@ class ALCFFacilityAdapter(IRIFacilityAdapter):
             executable='/bin/bash',
             arguments=['-c', join_commands(commands)],
             name=f'ptychodus-{action}',
+            directory=str(output_directory),
             stdout_path=str(output_directory / 'stdout.log'),
             stderr_path=str(output_directory / 'stderr.log'),
             resources=ResourceSpecification(
@@ -219,6 +220,7 @@ class NERSCFacilityAdapter(IRIFacilityAdapter):
             executable='ptychodus',
             arguments=['-b', action, '-i', str(input_directory), '-o', str(output_directory)],
             name=f'ptychodus-{action}',
+            directory=str(output_directory),
             stdout_path=str(output_directory / 'stdout%j.log'),
             stderr_path=str(output_directory / 'stderr%j.log'),
             resources=ResourceSpecification(
@@ -270,6 +272,7 @@ class OLCFFacilityAdapter(IRIFacilityAdapter):
             executable='ptychodus',
             arguments=['-b', action, '-i', str(input_directory), '-o', str(output_directory)],
             name=f'ptychodus-{action}',
+            directory=str(output_directory),
             stdout_path=str(output_directory / 'stdout%j.log'),
             stderr_path=str(output_directory / 'stderr%j.log'),
             resources=ResourceSpecification(
