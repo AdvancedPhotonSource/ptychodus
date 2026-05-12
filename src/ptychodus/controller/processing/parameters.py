@@ -151,7 +151,13 @@ class ProductParameterViewController(ParameterViewController, ProductRepositoryO
 
 
 class ComputeParameterViewController(ParameterViewController):
-    def __init__(self, *, tool_tip: str = '') -> None:
+    def __init__(
+        self,
+        *,
+        globus_supported: bool = True,
+        genesis_supported: bool = True,
+        tool_tip: str = '',
+    ) -> None:
         self._local_button = QRadioButton('Local')
         self._globus_button = QRadioButton('Remote (Globus)')
         self._genesis_button = QRadioButton('Remote (Genesis)')
@@ -166,6 +172,8 @@ class ComputeParameterViewController(ParameterViewController):
         self._button_group.addButton(self._genesis_button)
         self._button_group.setExclusive(True)
         self._local_button.setChecked(True)
+        self._globus_button.setVisible(globus_supported)
+        self._genesis_button.setVisible(genesis_supported)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)

@@ -387,7 +387,7 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
         diff_patterns = zero_bad_pixels(parameters.diffraction_patterns, parameters.bad_pixels)
         data_loader = PtychoDataLoader.from_np(
             diff_patterns=diff_patterns,
-            probe=parameters.product.probes.get_probe_no_opr(),
+            probe=parameters.product.probes.get_probe_no_opr().get_array(),
             positions=numpy.reshape(positions_px, (-1, 2)),
             config_manager=self._inference_config_manager,
         )

@@ -87,14 +87,17 @@ class ProcessingController(Observer):
         self._product_view_controller = ProductParameterViewController(
             product_repository, self._status_controller
         )
-        self._compute_view_controller = ComputeParameterViewController()
+        self._compute_view_controller = ComputeParameterViewController(
+            globus_supported=globus.is_supported,
+            genesis_supported=genesis.is_supported,
+        )
         self._actions_view = ProcessingActionsView()
 
         layout = QFormLayout()
         layout.addRow('Algorithm:', self._algorithm_view_controller.get_widget())
         layout.addRow('Product:', self._product_view_controller.get_widget())
 
-        if globus.is_supported:
+        if globus.is_supported or genesis.is_supported:
             layout.addRow('Compute:', self._compute_view_controller.get_widget())
 
         layout.addRow('Action:', self._actions_view)
@@ -170,13 +173,6 @@ class ProcessingController(Observer):
         if product_index < 0:
             return
 
-        data_path = self._file_dialog_factory.get_existing_directory_path(
-            self._view, 'Choose Training Data Directory'
-        )
-
-        if not data_path:
-            return
-
         if self._compute_view_controller.is_globus_button_checked():
             try:
                 self._globus.executor.train(product_index)
@@ -190,18 +186,27 @@ class ProcessingController(Observer):
                 logger.exception(exc)
                 ExceptionDialog.show_exception('Train Remote (Genesis)', exc)
         else:  # local
+            data_path = self._file_dialog_factory.get_existing_directory_path(
+                self._view, 'Choose Training Data Directory'
+            )
+
+            if not data_path:
+                return
+
             try:
                 self._processing_api.train(product_index, data_path, data_path)
             except Exception as exc:
                 logger.exception(exc)
                 ExceptionDialog.show_exception('Train Local', exc)
+            else:
+                self._sync_model_to_view()
 
     def _reconstruct_split(self) -> None:
         pass  # TODO
 
     def _load_model(self) -> None:
         name_filter = self._processing_api.get_model_file_filter()
-        file_path, name_filter = self._file_dialog_factory.get_open_file_path(
+        file_path, _ = self._file_dialog_factory.get_open_file_path(
             self._view, 'Load Model', name_filters=[name_filter], selected_name_filter=name_filter
         )
 
@@ -213,6 +218,8 @@ class ProcessingController(Observer):
         except Exception as exc:
             logger.exception(exc)
             ExceptionDialog.show_exception('Load Model', exc)
+        else:
+            self._sync_model_to_view()
 
     def _export_training_data(self) -> None:
         input_product_index = self._product_view_controller.get_widget().currentIndex()
