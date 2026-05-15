@@ -19,6 +19,7 @@ integrated into a data pipeline.
    :caption: Contents:
 
    getting_started
+   initial_guesses
    readers
    api
    globus
