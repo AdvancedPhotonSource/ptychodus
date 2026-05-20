@@ -26,11 +26,11 @@ class GridDataUpscaling(UpscalingStrategy):
 
         points = numpy.reshape(scan_coords_px, (-1, 2))
         values = emap.counts_per_second.flat
-        YY, XX = numpy.mgrid[: object_geometry.height_px, : object_geometry.width_px]  # noqa: N806
-        query_points = numpy.transpose((YY.flat, XX.flat))
+        shape = (object_geometry.height_px, object_geometry.width_px)
+        query_points = numpy.indices(shape).reshape(2, -1).T
 
         cps = griddata(points, values, query_points, method=self._method, fill_value=0.0).reshape(
-            XX.shape
+            shape
         )
 
         return ElementMap(emap.name, cps.astype(emap.counts_per_second.dtype))
@@ -67,9 +67,9 @@ class RadialBasisFunctionUpscaling(UpscalingStrategy):
             epsilon=self._epsilon,
             degree=self._degree,
         )
-        YY, XX = numpy.mgrid[: object_geometry.height_px, : object_geometry.width_px]  # noqa: N806
-        cps = interpolator(numpy.transpose((YY.flat, XX.flat)))
-        return ElementMap(emap.name, cps.astype(emap.counts_per_second.dtype).reshape(XX.shape))
+        shape = (object_geometry.height_px, object_geometry.width_px)
+        cps = interpolator(numpy.indices(shape).reshape(2, -1).T)
+        return ElementMap(emap.name, cps.astype(emap.counts_per_second.dtype).reshape(shape))
 
 
 def register_plugins(registry: PluginRegistry) -> None:

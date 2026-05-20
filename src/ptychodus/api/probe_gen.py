@@ -163,8 +163,6 @@ def generate_fresnel_zone_plate_probe(
     focal_length_m = zone_plate.get_focal_length_m(probe_wavelength_m)
     propagation_distance_m = focal_length_m + defocus_distance_m
 
-    fzp_half_width = (geometry.width_px + 1) // 2
-    fzp_half_height = (geometry.height_px + 1) // 2
     fzp_plane_pixel_size_numerator = probe_wavelength_m * propagation_distance_m
     fzp_pixel_geometry = PixelGeometry(
         width_m=fzp_plane_pixel_size_numerator / geometry.width_m,
@@ -172,10 +170,14 @@ def generate_fresnel_zone_plate_probe(
     )
 
     # coordinate on FZP plane
-    lx_fzp = -fzp_pixel_geometry.width_m * numpy.arange(-fzp_half_width, fzp_half_width)
-    ly_fzp = -fzp_pixel_geometry.height_m * numpy.arange(-fzp_half_height, fzp_half_height)
+    lx_fzp = -fzp_pixel_geometry.width_m * (
+        numpy.arange(geometry.width_px) - geometry.width_px // 2
+    )
+    ly_fzp = -fzp_pixel_geometry.height_m * (
+        numpy.arange(geometry.height_px) - geometry.height_px // 2
+    )
 
-    XX_FZP, YY_FZP = numpy.meshgrid(lx_fzp, ly_fzp)  # noqa: N806
+    YY_FZP, XX_FZP = numpy.meshgrid(ly_fzp, lx_fzp, indexing='ij')  # noqa: N806
     RR_FZP = numpy.hypot(XX_FZP, YY_FZP)  # noqa: N806
 
     # transmission function of FZP

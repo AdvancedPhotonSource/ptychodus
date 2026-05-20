@@ -8,7 +8,7 @@ from typing import Generic, TypeVar
 import numpy
 import scipy.special
 
-from .common import RealArrayType
+from .common import ComplexArrayType, RealArrayType
 
 T = TypeVar('T', int, float, Decimal)
 
@@ -61,10 +61,6 @@ class ImageExtent:
 
     width_px: int
     height_px: int
-
-    def get_size(self) -> int:
-        """Return the number of pixels in the image."""
-        return self.width_px * self.height_px
 
     def get_shape(self) -> tuple[int, int]:
         """Return the image shape as a (height_px, width_px) tuple."""
@@ -134,7 +130,7 @@ class Box2D:
 
 
 class Interval(Generic[T]):
-    """Closed interval [lower, upper] with clamp, hull, and membership operations."""
+    """Closed interval [lower, upper] with clamp and membership operations."""
 
     def __init__(self, lower: T, upper: T) -> None:
         self.lower: T = lower
@@ -147,30 +143,11 @@ class Interval(Generic[T]):
         else:
             return Interval[T](a, b)
 
-    def is_empty(self) -> bool:
-        return self.upper < self.lower
-
     def clamp(self, value: T) -> T:
         return max(self.lower, min(value, self.upper))
 
-    def hull(self, value: Interval[T] | T) -> Interval[T]:
-        if isinstance(value, Interval):
-            return Interval[T](min(self.lower, value.lower), max(self.upper, value.upper))
-        else:
-            return Interval[T](min(self.lower, value), max(self.upper, value))
-
-    def get_length(self) -> T:
-        return self.upper - self.lower
-
-    def get_midrange(self) -> T:
-        total = self.lower + self.upper
-        return total // 2 if isinstance(total, int) else total / 2
-
-    def copy(self) -> Interval[T]:
-        return Interval[T](self.lower, self.upper)
-
     def __contains__(self, item: T) -> bool:
-        return self.lower <= item and item < self.upper
+        return self.lower <= item <= self.upper
 
     def __repr__(self) -> str:
         return f'{type(self).__name__}({self.lower}, {self.upper})'
@@ -183,10 +160,6 @@ class ZernikeMonomial:
     coefficient: complex
     radial_degree: int  # n
     angular_frequency: int  # m
-
-    @property
-    def spatial_frequencey(self) -> int:
-        return self.radial_degree + abs(self.angular_frequency)
 
     def _radial_polynomial(self, distance: RealArrayType) -> RealArrayType:
         n_minus_m = self.radial_degree - abs(self.angular_frequency)
@@ -235,3 +208,23 @@ class ZernikeMonomial:
 
     def __str__(self) -> str:
         return f'{self.coefficient}$Z_{{{self.radial_degree}}}^{{{self.angular_frequency:+d}}}$'
+
+
+def fourier_gradient(
+    image: ComplexArrayType, pixel_geometry: PixelGeometry | None = None
+) -> tuple[ComplexArrayType, ComplexArrayType]:
+    """Calculate the Fourier-differentiation gradient of an image.
+
+    If ``pixel_geometry`` is provided, the returned gradient is in units of
+    ``image_units / m``; otherwise it is in ``image_units / pixel``.
+    """
+    dy = pixel_geometry.height_m if pixel_geometry is not None else 1.0
+    dx = pixel_geometry.width_m if pixel_geometry is not None else 1.0
+
+    u = numpy.fft.fftfreq(image.shape[-2], d=dy).reshape(-1, 1)
+    v = numpy.fft.fftfreq(image.shape[-1], d=dx)
+
+    grad_y = numpy.fft.ifft(numpy.fft.fft(image, axis=-2) * (2j * numpy.pi * u), axis=-2)
+    grad_x = numpy.fft.ifft(numpy.fft.fft(image, axis=-1) * (2j * numpy.pi * v), axis=-1)
+
+    return grad_y, grad_x

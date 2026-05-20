@@ -132,7 +132,12 @@ def transform_probe_positions(
 
 
 def calculate_scan_geometry(positions: Iterable[ProbePosition]) -> ScanGeometry | None:
-    """Compute the bounding box and total path length of a set of probe positions; returns None if empty."""
+    """Compute the bounding box and total path length of a set of probe positions; returns None if empty.
+
+    ``positions`` is iterated twice (once for the bounding box, once for the
+    path length), so it must be a re-iterable sequence. Passing a one-shot
+    generator will silently report ``length_m=0``.
+    """
     minimum_x_m = +numpy.inf
     maximum_x_m = -numpy.inf
     minimum_y_m = +numpy.inf

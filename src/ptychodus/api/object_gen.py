@@ -105,7 +105,7 @@ def generate_gaussian_random_field_object(
     # frequency grid
     kx = fftfreq(geometry.width_px)
     ky = fftfreq(geometry.height_px)
-    KX, KY = numpy.meshgrid(kx, ky)  # noqa: N806
+    KY, KX = numpy.meshgrid(ky, kx, indexing='ij')  # noqa: N806
     K2 = numpy.square(KX) + numpy.square(KY)  # noqa: N806
 
     # power spectrum: Gaussian envelope to control correlation length
@@ -388,11 +388,11 @@ def generate_layers(object_: Object, layer_spacing_m: Sequence[float]) -> Object
     """Create an object from an existing object with a potentially
     different number of slices.
 
-    If the new object is supposed to be a multislice object with a
-    different number of slices than the existing object, the object is
-    created as
-    `abs(o) ** (1 / nSlices) * exp(i * unwrapPhase(o) / nSlices)`.
-    Otherwise, the object is copied as is.
+    The new slice count is ``1 + len(layer_spacing_m)``. If it is greater
+    than the existing slice count, the first layer is split as
+    ``abs(o) ** (1 / nSlices) * exp(i * unwrapPhase(o) / nSlices)`` and
+    repeated. If it is less, the existing layers are truncated to the new
+    count. If equal, the array is reused as is.
     """
     num_slices = 1 + len(layer_spacing_m)
     array = object_.get_array()

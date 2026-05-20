@@ -161,10 +161,9 @@ class ALCFFacilityAdapter(IRIFacilityAdapter):
         # installation:
         #    'module use /soft/modulefiles',
         #    'module load conda',
-        #    'conda create -n ptychodus python==3.11',
+        #    'conda create -n ptychodus python==3.11 pytorch torchvision',
         #    'conda activate ptychodus',
-        #    'pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128'
-        #    'pip install -e ptychodus[ptychi,ptychopinn]',
+        #    'pip install -e ./ptychodus[ptychi] -e ./PtychoPINN',
         commands = [
             'source /etc/bash.bashrc',
             'module use /soft/modulefiles',
@@ -213,9 +212,9 @@ class NERSCFacilityAdapter(IRIFacilityAdapter):
     ) -> JobSpecification:
         # installation:
         #    'module load conda',
-        #    'conda create -n ptychodus python==3.11',
+        #    'conda create -n ptychodus python==3.11 pytorch torchvision',
         #    'conda activate ptychodus',
-        #    'pip install -e ptychodus[ptychi,ptychopinn]',
+        #    'pip install -e ./ptychodus[ptychi] -e ./PtychoPINN',
         return JobSpecification(
             executable='ptychodus',
             arguments=['-b', action, '-i', str(input_directory), '-o', str(output_directory)],

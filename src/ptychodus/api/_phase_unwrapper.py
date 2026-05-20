@@ -1,12 +1,13 @@
 """Phase unwrapping via gradient-domain integration for complex 2D wavefields."""
 
 from scipy import ndimage
-from scipy.fft import fft, fft2, fftfreq, ifft, ifft2
+from scipy.fft import fft2, fftfreq, ifft2
 from scipy.signal.windows import gaussian as gaussian_window
 from typing import Literal
 import numpy
 
 from .common import ComplexArrayType, InexactArrayType, RealArrayType
+from .geometry import fourier_gradient
 
 
 class PhaseUnwrapper:
@@ -22,7 +23,7 @@ class PhaseUnwrapper:
         weight_map: ComplexArrayType | None = None,
         eps: float = 1e-9,
     ) -> None:
-        """Get the unwrapped phase of a complex 2D image.
+        """Configure a phase unwrapper for 2D complex images.
 
         Parameters
         ----------
@@ -31,16 +32,21 @@ class PhaseUnwrapper:
             if the Fourier shift method is used.
         image_grad_method : str
             The method used to calculate the phase gradient.
-                - "fourier_shift": Use Fourier shift to perform shift.
-                - "nearest": Use nearest neighbor to perform shift.
-                - "fourier_differentiation": Use Fourier differentiation.
+                - "fourier_shift": Estimate the gradient from finite differences
+                  between the image and a Fourier-shifted copy.
+                - "nearest": Estimate the gradient from finite differences
+                  between the image and an integer-pixel-shifted copy.
+                - "fourier_differentiation": Multiply by ``i*k`` in Fourier
+                  space and inverse-transform.
         image_integration_method : str
             The method used to integrate the image back from gradients.
                 - "fourier": Use Fourier integration as implemented in PtychoShelves.
                 - "deconvolution": Deconvolve ramp filter.
                 - "discrete": Use cumulative sum.
         weight_map : ComplexArrayType | None
-            A weight map multiplied to the input image.
+            An optional weight applied to the input image. The current
+            implementation coerces this to a single float in [0, 1] via
+            ``float(numpy.clip(...))``, so only scalar / 0-d inputs work.
         eps : float
             A small number to avoid division by zero.
         """
@@ -163,100 +169,6 @@ def vignette(img: ComplexArrayType, margin: int = 20, sigma: float = 1.0) -> Com
         slicer = tuple([slice(None)] * i_dim + [slice(-margin, None)])
         img[slicer] = img[slicer] * numpy.flip(mask, axis=i_dim)
     return img
-
-
-def nearest_neighbor_gradient(
-    image: ComplexArrayType,
-    direction: Literal['forward', 'backward'],
-    dim: int | tuple[int, ...] = (0, 1),
-) -> tuple[ComplexArrayType | None, ComplexArrayType | None]:
-    """
-    Calculate the nearest neighbor gradient of a 2D image.
-
-    Parameters
-    ----------
-    image : ComplexArrayType
-        a (... H, W) tensor of images.
-    direction : str
-        'forward' or 'backward'.
-    dim : int | tuple[int, ...], optional
-        Dimensions to calculate gradient. Default is (0, 1).
-
-    Returns
-    -------
-    tuple[ComplexArrayType | None, ComplexArrayType | None]
-        A tuple of 2 images with the gradient in y and x directions.
-        Elements are None if the corresponding dimension is not in `dim`.
-    """
-    dims: tuple[int, ...] = (dim,) if isinstance(dim, int) else dim
-    grad_x: ComplexArrayType | None = None
-    grad_y: ComplexArrayType | None = None
-    if direction == 'forward':
-        if 1 in dims:
-            grad_x = numpy.concatenate([image[:, 1:], image[:, -1:]], axis=1) - image
-        if 0 in dims:
-            grad_y = numpy.concatenate([image[1:, :], image[-1:, :]], axis=0) - image
-    elif direction == 'backward':
-        if 1 in dims:
-            grad_x = image - numpy.concatenate([image[:, :1], image[:, :-1]], axis=1)
-        if 0 in dims:
-            grad_y = image - numpy.concatenate([image[:1, :], image[:-1, :]], axis=0)
-    return grad_y, grad_x
-
-
-def gaussian_gradient(
-    image: RealArrayType, sigma: float = 1.0, kernel_size: int = 5
-) -> tuple[RealArrayType, RealArrayType]:
-    """
-    Calculate the gradient of a 2D image with a Gaussian-derivative kernel.
-
-    Parameters
-    ----------
-    image : RealArrayType
-        A (... H, W) tensor of images.
-    sigma : float
-        Sigma of the Gaussian derivative kernel.
-    kernel_size : int
-        Size of the Gaussian derivative kernel.
-
-    Returns
-    -------
-    tuple of RealArrayType
-        A tuple of 2 images with the gradient in y and x directions.
-    """
-    r = numpy.arange(kernel_size) - (kernel_size - 1) / 2.0
-    kernel = -r / (numpy.sqrt(2 * numpy.pi) * sigma**3) * numpy.exp(-(r**2) / (2 * sigma**2))
-    grad_y = ndimage.convolve(image, kernel.reshape(-1, 1), mode='nearest')
-    grad_x = ndimage.convolve(image, kernel.reshape(1, -1), mode='nearest')
-
-    # Gate the gradients
-    grads = [grad_y, grad_x]
-    for i, g in enumerate(grads):
-        m = numpy.logical_and(numpy.abs(grad_y) < 1e-6, numpy.abs(grad_y) != 0)
-        if numpy.count_nonzero(m) > 0:
-            print('Gradient magnitudes between 0 and 1e-6 are set to 0.')
-            g = g * numpy.logical_not(m)
-            grads[i] = g
-    grad_y, grad_x = grads
-    return grad_y, grad_x
-
-
-def fourier_gradient(image: ComplexArrayType) -> tuple[ComplexArrayType, ComplexArrayType]:
-    """Calculate the Fourier-differentiation gradient of an image.
-
-    Multiplies the FFT of the image along each axis by the corresponding
-    imaginary ramp filter (2πiu or 2πiv), then inverse-transforms. The
-    result is the exact gradient of the band-limited interpolant of the
-    input.
-    """
-    u = fftfreq(image.shape[0])
-    v = fftfreq(image.shape[1])
-    u, v = numpy.meshgrid(u, v, indexing='ij')
-
-    grad_y = ifft(fft(image, axis=-2) * (2j * numpy.pi * u), axis=-2)
-    grad_x = ifft(fft(image, axis=-1) * (2j * numpy.pi * v), axis=-1)
-
-    return grad_y, grad_x
 
 
 def get_phase_gradient(

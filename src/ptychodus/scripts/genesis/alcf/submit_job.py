@@ -30,13 +30,13 @@ def main() -> None:
 
         client = adapter.get_iri_client()
         resource_id = '55c1c993-1124-47f9-b823-514ba3849a9a'  # Polaris
-        commands = 'echo BEGIN; source $HOME/.local/bin/env; which python; which ptychodus; ptychodus --version; nvidia-smi; echo END'
+        commands = 'source /etc/bash.bashrc; module use /soft/modulefiles; module load conda; conda activate ptychodus; ptychodus-system-check'
         job_spec = JobSpecification(
             executable='/bin/bash',
             arguments=['-c', commands],
-            name='Ptychodus',
-            stdout_path='/home/shenke/outputs',
-            stderr_path='/home/shenke/outputs',
+            name='ptychodus-system-check',
+            stdout_path='/home/shenke',
+            stderr_path='/home/shenke',
             resources=ResourceSpecification(
                 node_count=1,
                 # process_count=1,
