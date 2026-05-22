@@ -40,7 +40,7 @@ def _make_params(
 
 def _gaussian_wavefield(params: PropagatorParameters, sigma_px: float = 5.0) -> numpy.ndarray:
     """Smooth, bandlimited Gaussian wavefield centered on the array."""
-    YY, XX = params.get_spatial_coordinates()
+    YY, XX = params.get_spatial_coordinates()  # noqa: N806
     return numpy.exp(-(numpy.square(XX) + numpy.square(YY)) / (2.0 * sigma_px**2)).astype(complex)
 
 
@@ -115,20 +115,20 @@ class TestPropagatorParameters:
 
     def test_get_spatial_coordinates_shape(self) -> None:
         params = _make_params(0.1, width_px=16, height_px=24)
-        YY, XX = params.get_spatial_coordinates()
+        YY, XX = params.get_spatial_coordinates()  # noqa: N806
         assert YY.shape == (24, 16)
         assert XX.shape == (24, 16)
 
     def test_get_spatial_coordinates_zero_at_center(self) -> None:
         # For even N=8, center index is N//2 = 4
         params = _make_params(0.1, width_px=8, height_px=8)
-        YY, XX = params.get_spatial_coordinates()
+        YY, XX = params.get_spatial_coordinates()  # noqa: N806
         assert XX[4, 4] == 0
         assert YY[4, 4] == 0
 
     def test_get_spatial_coordinates_range(self) -> None:
         params = _make_params(0.1, width_px=8, height_px=8)
-        YY, XX = params.get_spatial_coordinates()
+        YY, XX = params.get_spatial_coordinates()  # noqa: N806
         assert int(XX.min()) == -4
         assert int(XX.max()) == 3
         assert int(YY.min()) == -4
@@ -136,26 +136,26 @@ class TestPropagatorParameters:
 
     def test_get_frequency_coordinates_shape(self) -> None:
         params = _make_params(0.1, width_px=16, height_px=24)
-        FY, FX = params.get_frequency_coordinates()
+        FY, FX = params.get_frequency_coordinates()  # noqa: N806
         assert FY.shape == (24, 16)
         assert FX.shape == (24, 16)
 
     def test_get_frequency_coordinates_dc_at_center(self) -> None:
         # For N=32, fftshift places DC at index 16
         params = _make_params(0.1, width_px=32, height_px=32)
-        FY, FX = params.get_frequency_coordinates()
+        FY, FX = params.get_frequency_coordinates()  # noqa: N806
         assert FX[16, 16] == pytest.approx(0.0)
         assert FY[16, 16] == pytest.approx(0.0)
 
     def test_get_frequency_coordinates_min_is_minus_half(self) -> None:
         params = _make_params(0.1, width_px=32, height_px=32)
-        FY, FX = params.get_frequency_coordinates()
+        FY, FX = params.get_frequency_coordinates()  # noqa: N806
         assert FX.min() == pytest.approx(-0.5)
         assert FY.min() == pytest.approx(-0.5)
 
     def test_get_frequency_coordinates_max_less_than_half(self) -> None:
         params = _make_params(0.1, width_px=32, height_px=32)
-        FY, FX = params.get_frequency_coordinates()
+        FY, FX = params.get_frequency_coordinates()  # noqa: N806
         assert FX.max() < 0.5
         assert FY.max() < 0.5
 
@@ -226,9 +226,9 @@ class TestAngularSpectrumPropagator:
             pixel_height_m=300e-9,
         )
         prop = AngularSpectrumPropagator(params)
-        FY, FX = params.get_frequency_coordinates()
+        FY, FX = params.get_frequency_coordinates()  # noqa: N806
         ar = params.pixel_aspect_ratio
-        F2 = numpy.square(FX) + numpy.square(ar * FY)
+        F2 = numpy.square(FX) + numpy.square(ar * FY)  # noqa: N806
         evanescent = F2 / numpy.square(params.dx) >= 1
         assert evanescent.any(), 'Test precondition: no evanescent modes found; adjust parameters'
         numpy.testing.assert_array_equal(prop._transfer_function[evanescent], 0.0)
@@ -237,9 +237,9 @@ class TestAngularSpectrumPropagator:
         """TF has |TF|=1 for all propagating spatial frequencies."""
         params = _make_params(0.01)
         prop = AngularSpectrumPropagator(params)
-        FY, FX = params.get_frequency_coordinates()
+        FY, FX = params.get_frequency_coordinates()  # noqa: N806
         ar = params.pixel_aspect_ratio
-        F2 = numpy.square(FX) + numpy.square(ar * FY)
+        F2 = numpy.square(FX) + numpy.square(ar * FY)  # noqa: N806
         propagating = F2 / numpy.square(params.dx) < 1
         tf_mag = numpy.abs(prop._transfer_function[propagating])
         numpy.testing.assert_allclose(tf_mag, 1.0, atol=1e-12)

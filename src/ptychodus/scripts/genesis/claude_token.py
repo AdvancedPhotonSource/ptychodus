@@ -17,7 +17,7 @@ from pathlib import Path
 
 import globus_sdk
 from globus_sdk import Scope
-from globus_sdk.login_flows import LocalServerLoginFlowManager  # needed to access globus_sdk.gare
+from globus_sdk.login_flows import LocalServerLoginFlowManager  # noqa: F401  # side-effect: loads globus_sdk.gare
 from globus_sdk.exc import GlobusAPIError
 from globus_sdk.scopes import TransferScopes, GCSCollectionScopes
 

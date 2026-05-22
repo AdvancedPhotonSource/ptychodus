@@ -254,8 +254,10 @@ def interactive_login(
         refresh_tokens=True,
     )
     print('Open this URL, login, and consent:')
-    prompt = 'login' if prompt_login else globus_sdk.MISSING
-    print(client.oauth2_get_authorize_url(prompt=prompt))
+    if prompt_login:
+        print(client.oauth2_get_authorize_url(prompt='login'))
+    else:
+        print(client.oauth2_get_authorize_url())
     code = input('\nEnter authorization code: ').strip()
     if not code:
         raise RuntimeError(

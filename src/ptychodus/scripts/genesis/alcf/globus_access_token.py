@@ -1,7 +1,7 @@
 # mypy: ignore-errors
 
 import globus_sdk
-from globus_sdk.login_flows import LocalServerLoginFlowManager  # Needed to access globus_sdk.gare
+from globus_sdk.login_flows import LocalServerLoginFlowManager  # noqa: F401  # side-effect: loads globus_sdk.gare
 import os.path
 import time
 
