@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import (
     QListView,
     QPushButton,
     QRadioButton,
+    QScrollArea,
     QSlider,
     QSpinBox,
     QStackedWidget,
@@ -22,6 +23,38 @@ from .visualization import VisualizationParametersView, VisualizationWidget
 from .widgets import DecimalLineEdit, LengthWidget
 
 
+class ProbeMetricsView(QGroupBox):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__('XY Probe Metrics', parent)
+        self.major_axis_tilt_label = QLabel('N/A')
+        self.minor_axis_tilt_label = QLabel('N/A')
+        self.fwhm_major_axis_label = QLabel('N/A')
+        self.fwhm_minor_axis_label = QLabel('N/A')
+        self.rms_major_axis_label = QLabel('N/A')
+        self.rms_minor_axis_label = QLabel('N/A')
+        self.encircled_energy_diameter_label = QLabel('N/A')
+
+        layout = QGridLayout()
+        layout.addWidget(QLabel('Major Axis'), 0, 1, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(QLabel('Minor Axis'), 0, 2, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(QLabel('Tilt [deg]:'), 1, 0)
+        layout.addWidget(self.major_axis_tilt_label, 1, 1, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.minor_axis_tilt_label, 1, 2, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(QLabel('FWHM [nm]:'), 2, 0)
+        layout.addWidget(self.fwhm_major_axis_label, 2, 1, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.fwhm_minor_axis_label, 2, 2, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(QLabel('RMS [nm]:'), 3, 0)
+        layout.addWidget(self.rms_major_axis_label, 3, 1, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.rms_minor_axis_label, 3, 2, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(QLabel('Encircled Energy Diameter [nm]:'), 4, 0)
+        layout.addWidget(
+            self.encircled_energy_diameter_label, 4, 1, 1, 2, Qt.AlignmentFlag.AlignCenter
+        )
+        layout.setColumnStretch(1, 1)
+        layout.setColumnStretch(2, 1)
+        self.setLayout(layout)
+
+
 class ProbePropagationParametersView(QGroupBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Parameters', parent)
@@ -29,6 +62,7 @@ class ProbePropagationParametersView(QGroupBox):
         self.end_coordinate_widget = LengthWidget(is_signed=True)
         self.num_steps_spin_box = QSpinBox()
         self.visualization_parameters_view = VisualizationParametersView()
+        self.metrics_view = ProbeMetricsView()
 
         propagation_layout = QFormLayout()
         propagation_layout.addRow('Begin Coordinate:', self.begin_coordinate_widget)
@@ -38,10 +72,22 @@ class ProbePropagationParametersView(QGroupBox):
         propagation_group_box = QGroupBox('Propagation')
         propagation_group_box.setLayout(propagation_layout)
 
+        scroll_widget = QWidget()
+        scroll_widget_layout = QVBoxLayout()
+        scroll_widget_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_widget_layout.addWidget(self.metrics_view)
+        scroll_widget_layout.addWidget(propagation_group_box)
+        scroll_widget_layout.addWidget(self.visualization_parameters_view)
+        scroll_widget_layout.addStretch()
+        scroll_widget.setLayout(scroll_widget_layout)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidget(scroll_widget)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+
         layout = QVBoxLayout()
-        layout.addWidget(propagation_group_box)
-        layout.addWidget(self.visualization_parameters_view)
-        layout.addStretch()
+        layout.addWidget(scroll_area)
         self.setLayout(layout)
 
 

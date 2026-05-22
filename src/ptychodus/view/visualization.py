@@ -81,6 +81,15 @@ class ImageItem(QGraphicsPixmapItem):
         self._fourier_item.setZValue(100)
         self._fourier_origin = QPointF()
 
+        z_pen = QPen(Qt.GlobalColor.red)
+        z_pen.setWidth(2)
+        z_pen.setCosmetic(True)
+
+        self._z_indicator_item = QGraphicsLineItem(self)
+        self._z_indicator_item.setPen(z_pen)
+        self._z_indicator_item.hide()
+        self._z_indicator_item.setZValue(100)
+
         self.setTransformationMode(Qt.TransformationMode.FastTransformation)
         self.setAcceptedMouseButtons(Qt.MouseButton.LeftButton)
         self.setAcceptHoverEvents(True)
@@ -119,6 +128,19 @@ class ImageItem(QGraphicsPixmapItem):
     def set_mouse_tool(self, mouse_tool: ImageMouseTool) -> None:
         self._fourier_item.setVisible(mouse_tool == ImageMouseTool.FOURIER_TOOL)
         self._mouse_tool = mouse_tool
+
+    def set_vertical_indicator(self, x: float) -> None:
+        height = self.pixmap().height()
+
+        if height <= 0:
+            self._z_indicator_item.hide()
+            return
+
+        self._z_indicator_item.setLine(QLineF(x, 0.0, x, float(height)))
+        self._z_indicator_item.show()
+
+    def clear_vertical_indicator(self) -> None:
+        self._z_indicator_item.hide()
 
     def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent | None) -> None:  # noqa: N802
         if event is None:

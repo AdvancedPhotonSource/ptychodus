@@ -60,6 +60,12 @@ class VisualizationWidgetController:
     def clear_array(self) -> None:
         self._controller.clear_array()
 
+    def set_vertical_indicator(self, x: float) -> None:
+        self._controller.get_item().set_vertical_indicator(x)
+
+    def clear_vertical_indicator(self) -> None:
+        self._controller.get_item().clear_vertical_indicator()
+
     def _set_mouse_tool(self, mouse_tool_action: QAction) -> None:
         tool_id = mouse_tool_action.data()
         mouse_tool = ImageMouseTool(tool_id)

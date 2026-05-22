@@ -210,9 +210,21 @@ def test_hermite_str() -> None:
         # H_0(x) * H_0(y) = 1 * 1 = 1
         (0, 0, numpy.array([-1.0, 0.0, 2.5]), numpy.array([0.3, -1.7, 4.0]), numpy.ones(3)),
         # H_1(x) * H_0(y) = 2x * 1 = 2x
-        (1, 0, numpy.array([0.5, -1.0, 3.0]), numpy.array([0.7, 0.0, -2.0]), 2.0 * numpy.array([0.5, -1.0, 3.0])),
+        (
+            1,
+            0,
+            numpy.array([0.5, -1.0, 3.0]),
+            numpy.array([0.7, 0.0, -2.0]),
+            2.0 * numpy.array([0.5, -1.0, 3.0]),
+        ),
         # H_0(x) * H_1(y) = 1 * 2y = 2y
-        (0, 1, numpy.array([0.7, 0.0, -2.0]), numpy.array([0.5, -1.0, 3.0]), 2.0 * numpy.array([0.5, -1.0, 3.0])),
+        (
+            0,
+            1,
+            numpy.array([0.7, 0.0, -2.0]),
+            numpy.array([0.5, -1.0, 3.0]),
+            2.0 * numpy.array([0.5, -1.0, 3.0]),
+        ),
         # H_2(x) * H_0(y) = (4x^2 - 2) * 1
         (
             2,

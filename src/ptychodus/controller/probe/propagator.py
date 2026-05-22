@@ -1,7 +1,10 @@
 from decimal import Decimal
 import logging
 
+import numpy
+
 from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.probe import ProbeSizeMetrics
 
 from ...model.analysis import ProbePropagator
 from ...model.visualization import VisualizationEngine
@@ -12,6 +15,7 @@ from ..visualization import (
     VisualizationParametersController,
     VisualizationWidgetController,
 )
+from .metrics import compute_xy_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +53,41 @@ class ProbePropagationViewController(Observer):
         propagator.add_observer(self)
         self._sync_model_to_view()
 
+    def _update_metrics_view(self, metrics: ProbeSizeMetrics | None) -> None:
+        view = self._dialog.parameters_view.metrics_view
+
+        if metrics is None:
+            for label in (
+                view.major_axis_tilt_label,
+                view.minor_axis_tilt_label,
+                view.fwhm_major_axis_label,
+                view.fwhm_minor_axis_label,
+                view.rms_major_axis_label,
+                view.rms_minor_axis_label,
+                view.encircled_energy_diameter_label,
+            ):
+                label.setText('N/A')
+            return
+
+        view.major_axis_tilt_label.setText(f'{numpy.rad2deg(metrics.major_axis_tilt_rad):.4g}')
+        view.minor_axis_tilt_label.setText(f'{numpy.rad2deg(metrics.minor_axis_tilt_rad):.4g}')
+        view.fwhm_major_axis_label.setText(f'{metrics.fwhm_major_axis_length_m * 1e9:.4g}')
+        view.fwhm_minor_axis_label.setText(f'{metrics.fwhm_minor_axis_length_m * 1e9:.4g}')
+        view.rms_major_axis_label.setText(f'{metrics.rms_major_axis_length_m * 1e9:.4g}')
+        view.rms_minor_axis_label.setText(f'{metrics.rms_minor_axis_length_m * 1e9:.4g}')
+        view.encircled_energy_diameter_label.setText(
+            f'{metrics.encircled_energy_diameter_m * 1e9:.4g}'
+        )
+
+    def _update_z_indicators(self, step: int) -> None:
+        if self._propagator.get_num_steps() > 0:
+            indicator_x = float(step) + 0.5
+            self._zx_visualization_widget_controller.set_vertical_indicator(indicator_x)
+            self._zy_visualization_widget_controller.set_vertical_indicator(indicator_x)
+        else:
+            self._zx_visualization_widget_controller.clear_vertical_indicator()
+            self._zy_visualization_widget_controller.clear_vertical_indicator()
+
     def _update_current_coordinate(self, step: int) -> None:
         lerp_value = 0.0
 
@@ -64,6 +103,8 @@ class ProbePropagationViewController(Observer):
         else:
             logger.error('Bad slider range!')
 
+        metrics: ProbeSizeMetrics | None = None
+
         try:
             xy_projection = self._propagator.get_xy_projection(step)
         except (IndexError, ValueError):
@@ -78,6 +119,10 @@ class ProbePropagationViewController(Observer):
                 logger.warning('Missing propagator pixel geometry!')
             else:
                 self._xy_visualization_widget_controller.set_array(xy_projection, pixel_geometry)
+                metrics = compute_xy_metrics(xy_projection, pixel_geometry)
+
+        self._update_metrics_view(metrics)
+        self._update_z_indicators(step)
 
         # TODO auto-units
         lerp_value *= 1e6
@@ -162,9 +207,13 @@ class ProbePropagationViewController(Observer):
         except ValueError:
             self._zx_visualization_widget_controller.clear_array()
             self._zy_visualization_widget_controller.clear_array()
+            self._zx_visualization_widget_controller.clear_vertical_indicator()
+            self._zy_visualization_widget_controller.clear_vertical_indicator()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.show_exception('Update Views', err)
+        else:
+            self._update_z_indicators(self._dialog.coordinate_slider.value())
 
     def _update(self, observable: Observable) -> None:
         if observable is self._propagator:
