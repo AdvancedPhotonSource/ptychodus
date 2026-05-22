@@ -1,9 +1,11 @@
 from __future__ import annotations
 from collections.abc import Iterator
+from typing import cast
 
 from matplotlib.colors import Normalize
 import numpy
 
+from ptychodus.api.common import ComplexArrayType
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.visualization import (
     ComplexComponent,
@@ -59,10 +61,11 @@ class CylindricalColorModelRenderer(Renderer):
         return model.render_rgba(h, norm(amplitude))
 
     def colorize(self, array: NumberArrayType) -> RealArrayType:
-        amplitude = self._amplitude_component.extract_component(array)
+        complex_array = cast(ComplexArrayType, array)
+        amplitude = self._amplitude_component.extract_component(complex_array)
         transform = self._transformation.get_strategy()
         amplitude_transformed = transform.transform(amplitude)
-        phase_rad = self._phase_component.extract_component(array)
+        phase_rad = self._phase_component.extract_component(complex_array)
         return self._colorize(amplitude_transformed, phase_rad)
 
     def render(
@@ -76,7 +79,7 @@ class CylindricalColorModelRenderer(Renderer):
             value_max = self._color_axis.upper.get_value()
 
         product = visualize_complex_values(
-            values=array,
+            values=cast(ComplexArrayType, array),
             pixel_geometry=pixel_geometry,
             model=self._color_model.get_strategy(),
             amplitude_transform=self._transformation.get_strategy(),

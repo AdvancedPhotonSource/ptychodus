@@ -107,9 +107,10 @@ def estimate_probe_size(
        are computed on the cleaned image (in physical metres). Its eigenvectors
        define the major/minor axes; the tilt of each is reported in radians,
        folded into ``[-pi/2, pi/2)`` since the axis direction is sign-ambiguous.
-    3. **RMS widths.** The square roots of the covariance eigenvalues — i.e.
-       the one-sigma standard deviations of the intensity distribution along
-       each principal axis.
+    3. **RMS widths.** Twice the square root of each covariance eigenvalue —
+       i.e. the full ``2 sigma`` width of the intensity distribution along
+       each principal axis. The factor of two makes these comparable to the
+       FWHM and encircled-energy *diameters* rather than radii.
     4. **FWHM widths.** The cleaned intensity is projected onto each principal
        axis (weighted 1D histogram) and the full width at half maximum is read
        off by linearly interpolating the outermost half-max crossings, which
@@ -207,8 +208,8 @@ def estimate_probe_size(
     covariance = numpy.array([[mxx, mxy], [mxy, myy]])
 
     eigenvalues, eigenvectors = numpy.linalg.eigh(covariance)
-    rms_minor_m = float(numpy.sqrt(max(float(eigenvalues[0]), 0.0)))
-    rms_major_m = float(numpy.sqrt(max(float(eigenvalues[1]), 0.0)))
+    rms_minor_m = 2.0 * float(numpy.sqrt(max(float(eigenvalues[0]), 0.0)))
+    rms_major_m = 2.0 * float(numpy.sqrt(max(float(eigenvalues[1]), 0.0)))
     minor_axis = eigenvectors[:, 0]
     major_axis = eigenvectors[:, 1]
 

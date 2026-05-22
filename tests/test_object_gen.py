@@ -44,6 +44,7 @@ import numpy
 import numpy.testing
 import pytest
 
+from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import ObjectGeometry
 from ptychodus.api.object_gen import (
     _calculate_vertex_noise_contribution,
@@ -51,7 +52,11 @@ from ptychodus.api.object_gen import (
     _map_cartesian_to_simplex,
     _map_simplex_to_cartesian,
     generate_gaussian_random_field_object,
+    generate_paganin_object,
+    generate_stxm_object,
 )
+from ptychodus.api.probe_positions import ProbePosition
+from ptychodus.api.reconstructor import AssembledDiffractionData
 
 
 # ---------------------------------------------------------------------------
@@ -113,6 +118,48 @@ def _make_geometry(
         center_x_m=center_x_m,
         center_y_m=center_y_m,
     )
+
+
+def _make_assembled_data(
+    pattern_counts: list[int],
+    *,
+    height_px: int = 4,
+    width_px: int = 4,
+    pixel_width_m: float = 75e-6,
+    pixel_height_m: float = 75e-6,
+) -> AssembledDiffractionData:
+    """Build AssembledDiffractionData so each pattern's total count equals the given value."""
+    num_patterns = len(pattern_counts)
+    indexes = numpy.arange(num_patterns, dtype=int)
+    patterns = numpy.zeros((num_patterns, height_px, width_px), dtype=numpy.int32)
+    for i, count in enumerate(pattern_counts):
+        patterns[i, 0, 0] = int(count)
+    bad_pixels = numpy.zeros((height_px, width_px), dtype=bool)
+    pixel_geometry = PixelGeometry(width_m=pixel_width_m, height_m=pixel_height_m)
+    return AssembledDiffractionData(indexes, patterns, pixel_geometry, bad_pixels)
+
+
+def _make_probe_positions_grid(
+    geometry: ObjectGeometry,
+    grid_shape: tuple[int, int],
+    *,
+    margin_frac: float = 0.2,
+) -> list[ProbePosition]:
+    """Regular ny x nx scan grid centered on the geometry, leaving ``margin_frac`` on each side."""
+    ny, nx = grid_shape
+    half_w = (geometry.width_m / 2.0) * (1.0 - margin_frac)
+    half_h = (geometry.height_m / 2.0) * (1.0 - margin_frac)
+    xs = numpy.linspace(geometry.center_x_m - half_w, geometry.center_x_m + half_w, nx)
+    ys = numpy.linspace(geometry.center_y_m - half_h, geometry.center_y_m + half_h, ny)
+    positions: list[ProbePosition] = []
+    index = 0
+    for y in ys:
+        for x in xs:
+            positions.append(
+                ProbePosition(index=index, coordinate_x_m=float(x), coordinate_y_m=float(y))
+            )
+            index += 1
+    return positions
 
 
 # ===========================================================================
@@ -645,3 +692,238 @@ class TestSimplexVisualOutput:
                 f'1/e crossing should increase from scale={s1} ({c1:.1f} px) '
                 f'to scale={s2} ({c2:.1f} px).'
             )
+
+
+# ===========================================================================
+# generate_stxm_object
+# ===========================================================================
+
+
+class TestStxmObject:
+    def test_shape_and_dtype(self) -> None:
+        geometry = _make_geometry(32, 32)
+        positions = _make_probe_positions_grid(geometry, (4, 4))
+        data = _make_assembled_data([100] * len(positions))
+        obj = generate_stxm_object(geometry, data, positions)
+        assert obj.get_array().shape == (1, 32, 32)
+        assert numpy.issubdtype(obj.get_array().dtype, numpy.complexfloating)
+
+    def test_preserves_geometry_metadata(self) -> None:
+        geometry = _make_geometry(
+            width_px=24,
+            height_px=32,
+            pixel_width_m=2.5e-9,
+            pixel_height_m=3.5e-9,
+            center_x_m=1.0e-6,
+            center_y_m=-2.0e-6,
+        )
+        positions = _make_probe_positions_grid(geometry, (3, 3))
+        data = _make_assembled_data([50] * len(positions))
+        obj = generate_stxm_object(geometry, data, positions)
+        assert obj.get_pixel_geometry().width_m == pytest.approx(2.5e-9)
+        assert obj.get_pixel_geometry().height_m == pytest.approx(3.5e-9)
+        assert obj.get_center().coordinate_x_m == pytest.approx(1.0e-6)
+        assert obj.get_center().coordinate_y_m == pytest.approx(-2.0e-6)
+
+    def test_constant_counts_yield_constant_intensity_interior(self) -> None:
+        geometry = _make_geometry(64, 64)
+        positions = _make_probe_positions_grid(geometry, (5, 5))
+        data = _make_assembled_data([200] * len(positions))
+        obj = generate_stxm_object(geometry, data, positions)
+        intensity = numpy.square(numpy.abs(obj.get_array()[0]))
+        interior = intensity[20:44, 20:44]
+        numpy.testing.assert_allclose(interior, 200.0, rtol=1e-6)
+
+    def test_monotonic_ramp_yields_monotonic_intensity(self) -> None:
+        geometry = _make_geometry(64, 64)
+        positions = _make_probe_positions_grid(geometry, (5, 5))
+        counts = [
+            int(1000 + 5000 * (p.coordinate_x_m - geometry.minimum_x_m) / geometry.width_m)
+            for p in positions
+        ]
+        data = _make_assembled_data(counts)
+        obj = generate_stxm_object(geometry, data, positions)
+        intensity = numpy.square(numpy.abs(obj.get_array()[0]))
+        row = intensity[32, 20:44]
+        assert numpy.all(numpy.diff(row) >= -1e-6)
+        assert row[-1] > row[0]
+
+    def test_skips_missing_indexes(self) -> None:
+        geometry = _make_geometry(32, 32)
+        positions = _make_probe_positions_grid(geometry, (4, 4))
+        # Provide patterns for only the first 9 of 16 positions; the rest are
+        # silently skipped because their LUT key is missing.
+        partial_data = _make_assembled_data([100] * 9)
+        obj = generate_stxm_object(geometry, partial_data, positions)
+        assert obj.get_array().shape == (1, 32, 32)
+
+
+# ===========================================================================
+# generate_paganin_object
+# ===========================================================================
+
+
+def _paganin_common_inputs(
+    seed: int = 7,
+) -> tuple[ObjectGeometry, AssembledDiffractionData, list[ProbePosition]]:
+    geometry = _make_geometry(64, 64, pixel_width_m=1e-9, pixel_height_m=1e-9)
+    positions = _make_probe_positions_grid(geometry, (5, 5))
+    rng = _rng(seed)
+    counts = (1000 + rng.integers(0, 500, size=len(positions))).tolist()
+    data = _make_assembled_data(counts)
+    return geometry, data, positions
+
+
+class TestPaganinObject:
+    def test_shape_and_dtype(self) -> None:
+        geometry, data, positions = _paganin_common_inputs()
+        obj = generate_paganin_object(
+            geometry,
+            data,
+            positions,
+            probe_wavelength_m=1.0e-10,
+            propagation_distance_m=1.0,
+            delta_over_beta=100.0,
+        )
+        assert obj.get_array().shape == (1, 64, 64)
+        assert numpy.issubdtype(obj.get_array().dtype, numpy.complexfloating)
+
+    def test_preserves_geometry_metadata(self) -> None:
+        geometry = _make_geometry(
+            width_px=32,
+            height_px=40,
+            pixel_width_m=2.0e-9,
+            pixel_height_m=4.0e-9,
+            center_x_m=5.0e-6,
+            center_y_m=-3.0e-6,
+        )
+        positions = _make_probe_positions_grid(geometry, (5, 5))
+        data = _make_assembled_data([500] * len(positions))
+        obj = generate_paganin_object(
+            geometry,
+            data,
+            positions,
+            probe_wavelength_m=1.0e-10,
+            propagation_distance_m=1.0,
+            delta_over_beta=100.0,
+        )
+        assert obj.get_pixel_geometry().width_m == pytest.approx(2.0e-9)
+        assert obj.get_pixel_geometry().height_m == pytest.approx(4.0e-9)
+        assert obj.get_center().coordinate_x_m == pytest.approx(5.0e-6)
+        assert obj.get_center().coordinate_y_m == pytest.approx(-3.0e-6)
+
+    def test_rejects_nonpositive_propagation_distance(self) -> None:
+        geometry, data, positions = _paganin_common_inputs()
+        with pytest.raises(ValueError, match='Propagation distance'):
+            generate_paganin_object(
+                geometry,
+                data,
+                positions,
+                probe_wavelength_m=1.0e-10,
+                propagation_distance_m=0.0,
+                delta_over_beta=100.0,
+            )
+
+    def test_rejects_nonpositive_delta_over_beta(self) -> None:
+        geometry, data, positions = _paganin_common_inputs()
+        with pytest.raises(ValueError, match='delta/beta'):
+            generate_paganin_object(
+                geometry,
+                data,
+                positions,
+                probe_wavelength_m=1.0e-10,
+                propagation_distance_m=1.0,
+                delta_over_beta=-1.0,
+            )
+
+    def test_rejects_zero_intensity(self) -> None:
+        geometry = _make_geometry(32, 32)
+        positions = _make_probe_positions_grid(geometry, (4, 4))
+        data = _make_assembled_data([0] * len(positions))
+        with pytest.raises(ValueError, match='Mean STXM intensity'):
+            generate_paganin_object(
+                geometry,
+                data,
+                positions,
+                probe_wavelength_m=1.0e-10,
+                propagation_distance_m=1.0,
+                delta_over_beta=100.0,
+            )
+
+    def test_low_pass_behavior(self) -> None:
+        """Paganin filter should suppress high frequencies relative to raw STXM."""
+        geometry, data, positions = _paganin_common_inputs()
+        stxm_obj = generate_stxm_object(geometry, data, positions)
+        paganin_obj = generate_paganin_object(
+            geometry,
+            data,
+            positions,
+            probe_wavelength_m=1.0e-10,
+            propagation_distance_m=10.0,
+            delta_over_beta=500.0,
+        )
+        stxm_intensity = numpy.square(numpy.abs(stxm_obj.get_array()[0]))
+        paganin_intensity = numpy.square(numpy.abs(paganin_obj.get_array()[0]))
+        # remove DC so the comparison is over fluctuations only
+        stxm_intensity = stxm_intensity - stxm_intensity.mean()
+        paganin_intensity = paganin_intensity - paganin_intensity.mean()
+        stxm_power = numpy.abs(numpy.fft.fft2(stxm_intensity)) ** 2
+        paganin_power = numpy.abs(numpy.fft.fft2(paganin_intensity)) ** 2
+        h, w = stxm_intensity.shape
+        ky = numpy.fft.fftfreq(h)
+        kx = numpy.fft.fftfreq(w)
+        KY, KX = numpy.meshgrid(ky, kx, indexing='ij')  # noqa: N806
+        K = numpy.hypot(KX, KY)  # noqa: N806
+        high_freq = K > 0.3
+        assert paganin_power[high_freq].sum() < 0.5 * stxm_power[high_freq].sum()
+
+    def test_phase_amplitude_ratio_matches_delta_over_beta(self) -> None:
+        """Closed-form relation: phase = (delta/beta) * log(amplitude) at interior pixels."""
+        geometry, data, positions = _paganin_common_inputs()
+        delta_over_beta = 1.0  # keep phase within (-pi, pi] so numpy.angle does not wrap
+        # Near-identity filter so the input STXM variation survives into the output and
+        # log(amplitude) has meaningful magnitude.
+        obj = generate_paganin_object(
+            geometry,
+            data,
+            positions,
+            probe_wavelength_m=1.0e-10,
+            propagation_distance_m=1.0e-14,
+            delta_over_beta=delta_over_beta,
+        )
+        stxm_intensity = numpy.square(
+            numpy.abs(generate_stxm_object(geometry, data, positions).get_array()[0])
+        )
+        interior = stxm_intensity > 0  # exclude boundary pixels filled by griddata
+        array = obj.get_array()[0]
+        amplitude = numpy.abs(array)
+        phase = numpy.angle(array)
+        log_amp = numpy.log(amplitude)
+        mask = interior & (numpy.abs(log_amp) > 1e-3)
+        assert mask.sum() > 100
+        ratio = phase[mask] / log_amp[mask]
+        numpy.testing.assert_allclose(ratio, delta_over_beta, rtol=1e-4, atol=1e-6)
+
+    def test_near_zero_distance_reduces_to_stxm_power(self) -> None:
+        """With a near-zero propagation distance the filter is identity, and on interior
+        pixels the result equals (I/<I>) ** ((1 + i*delta/beta)/2)."""
+        geometry, data, positions = _paganin_common_inputs()
+        delta_over_beta = 50.0
+        obj = generate_paganin_object(
+            geometry,
+            data,
+            positions,
+            probe_wavelength_m=1.0e-10,
+            propagation_distance_m=1.0e-30,
+            delta_over_beta=delta_over_beta,
+        )
+        stxm_intensity = numpy.square(
+            numpy.abs(generate_stxm_object(geometry, data, positions).get_array()[0])
+        )
+        interior = stxm_intensity > 0  # boundary pixels are clipped to small_value
+        normalized = stxm_intensity / stxm_intensity.mean()
+        exponent = 0.5 * (1.0 + 1j * delta_over_beta)
+        expected = numpy.power(normalized.astype(complex), exponent)
+        numpy.testing.assert_allclose(
+            obj.get_array()[0][interior], expected[interior], rtol=1e-6, atol=1e-12
+        )

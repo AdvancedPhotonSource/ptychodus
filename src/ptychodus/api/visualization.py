@@ -395,7 +395,7 @@ def visualize_real_values(
 
 
 def visualize_complex_component(
-    values: ComplexArrayType,
+    values: NumberArrayType,
     pixel_geometry: PixelGeometry,
     component: ComplexComponent,
     colormap: Colormap | str = 'gray',
@@ -405,7 +405,7 @@ def visualize_complex_component(
     value_max: float | None = None,
     clip: bool = False,
 ) -> VisualizationProduct:
-    """Render a single scalar component of a complex array as a colorized VisualizationProduct."""
+    """Render a single scalar component of a numeric array as a colorized VisualizationProduct."""
     product = visualize_real_values(
         value_label=component.name.title(),
         values=component.extract_component(values),

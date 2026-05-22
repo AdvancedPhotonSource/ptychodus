@@ -4,7 +4,7 @@ from collections.abc import Iterable, Sequence
 from typing import Final
 import logging
 
-from scipy.fft import fftfreq, ifft2
+from scipy.fft import fft2, fftfreq, ifft2
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 import numpy
@@ -52,6 +52,63 @@ def generate_stxm_object(
     return Object(
         array=numpy.sqrt(intensity[numpy.newaxis, :, :]).astype('complex'),
         pixel_geometry=geometry.get_pixel_geometry(),
+        center=geometry.get_center(),
+    )
+
+
+def generate_paganin_object(
+    geometry: ObjectGeometry,
+    assembled_data: AssembledDiffractionData,
+    probe_positions: Iterable[ProbePosition],
+    *,
+    probe_wavelength_m: float,
+    propagation_distance_m: float,
+    delta_over_beta: float,
+    small_value: float = 1.0e-12,
+) -> Object:
+    """Generate a complex object via Paganin single-material phase retrieval on an STXM-like intensity image.
+
+    See D. Paganin et al., J. Microsc. 206, 33 (2002). The intensity image
+    I(x,y) is built from per-position diffraction-pattern counts, normalized
+    by its mean to approximate I/I_0, then low-pass filtered to recover the
+    projected thickness T(x,y) of a homogeneous, weakly-absorbing sample with
+    refractive-index decrement delta and extinction coefficient beta. The
+    transmission function follows as ``filtered ** ((1 + i * delta/beta) / 2)``.
+    """
+    if propagation_distance_m <= 0.0:
+        raise ValueError('Propagation distance must be strictly positive!')
+
+    if delta_over_beta <= 0.0:
+        raise ValueError('delta/beta ratio must be strictly positive!')
+
+    stxm = generate_stxm_object(geometry, assembled_data, probe_positions)
+    intensity = numpy.square(numpy.abs(stxm.get_array()[0]))
+
+    mean_intensity = float(numpy.mean(intensity))
+
+    if mean_intensity <= 0.0:
+        raise ValueError('Mean STXM intensity must be positive!')
+
+    intensity_normalized = intensity / mean_intensity
+
+    pixel_geometry = geometry.get_pixel_geometry()
+    kx = 2 * numpy.pi * fftfreq(geometry.width_px, d=pixel_geometry.width_m)
+    ky = 2 * numpy.pi * fftfreq(geometry.height_px, d=pixel_geometry.height_m)
+    KY, KX = numpy.meshgrid(ky, kx, indexing='ij')  # noqa: N806
+    K2 = numpy.square(KX) + numpy.square(KY)  # noqa: N806
+
+    filter_denominator = (
+        1.0 + delta_over_beta * propagation_distance_m * probe_wavelength_m * K2 / (4 * numpy.pi)
+    )
+    filtered = numpy.real(numpy.asarray(ifft2(fft2(intensity_normalized) / filter_denominator)))
+    filtered = numpy.clip(filtered, small_value, None)
+
+    exponent = 0.5 * (1.0 + 1j * delta_over_beta)
+    array = numpy.power(filtered.astype(complex), exponent)[numpy.newaxis, :, :]
+
+    return Object(
+        array=array.astype('complex'),
+        pixel_geometry=pixel_geometry,
         center=geometry.get_center(),
     )
 

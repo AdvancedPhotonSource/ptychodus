@@ -13,6 +13,7 @@ from .average_pattern import AveragePatternProbeBuilder
 from .builder import FromFileProbeBuilder, ProbeSequenceBuilder
 from .disk import DiskProbeBuilder
 from .fzp import FresnelZonePlateProbeBuilder
+from .hermite import HermiteProbeBuilder
 from .rect import RectangularProbeBuilder
 from .settings import ProbeSettings
 from .super_gaussian import SuperGaussianProbeBuilder
@@ -42,6 +43,7 @@ class ProbeBuilderFactory(Iterable[str]):
             'disk': lambda: DiskProbeBuilder(rng, settings),
             'average_pattern': self._create_average_pattern_builder,
             'fresnel_zone_plate': self._create_fresnel_zone_plate_builder,
+            'hermite': lambda: HermiteProbeBuilder(rng, settings),
             'rectangular': lambda: RectangularProbeBuilder(rng, settings),
             'super_gaussian': lambda: SuperGaussianProbeBuilder(rng, settings),
             'zernike': lambda: ZernikeProbeBuilder(rng, settings),

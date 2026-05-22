@@ -12,6 +12,7 @@ from .builder import FromFileObjectBuilder, ObjectBuilder
 from .dead_leaves import DeadLeavesObjectBuilder
 from .fractal_noise import FractalNoiseObjectBuilder
 from .grf import GaussianRandomFieldObjectBuilder
+from .paganin import PaganinObjectBuilder
 from .random import RandomObjectBuilder
 from .settings import ObjectSettings
 from .stxm import STXMObjectBuilder
@@ -37,6 +38,7 @@ class ObjectBuilderFactory(Iterable[str]):
             'fractal_noise': lambda: FractalNoiseObjectBuilder(rng, settings),
             'grf': lambda: GaussianRandomFieldObjectBuilder(rng, settings),
             'stxm': lambda: STXMObjectBuilder(settings, diffraction_api),
+            'paganin': lambda: PaganinObjectBuilder(settings, diffraction_api),
         }
 
     def __iter__(self) -> Iterator[str]:

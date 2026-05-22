@@ -154,7 +154,7 @@ class Interval(Generic[T]):
 
 
 @dataclass(frozen=True)
-class ZernikeMonomial:
+class ZernikeMode:
     """A single Zernike polynomial term with a complex coefficient, radial degree n, and angular frequency m."""
 
     coefficient: complex
@@ -192,7 +192,7 @@ class ZernikeMonomial:
 
     def __call__(
         self, distance: RealArrayType, angle: RealArrayType, undefined_value: complex = 0j
-    ) -> RealArrayType:
+    ) -> ComplexArrayType:
         rvalue = self._radial_polynomial(distance)
         avalue = self._angular_function(angle)
         nvalue_sq = self.radial_degree + 1
@@ -208,6 +208,26 @@ class ZernikeMonomial:
 
     def __str__(self) -> str:
         return f'{self.coefficient}$Z_{{{self.radial_degree}}}^{{{self.angular_frequency:+d}}}$'
+
+
+@dataclass(frozen=True)
+class HermiteMode:
+    """A single 2D Hermite polynomial term H_m(x) * H_n(y) with a complex coefficient and non-negative orders m (x) and n (y)."""
+
+    coefficient: complex
+    order_x: int  # m
+    order_y: int  # n
+
+    def _hermite(self, order: int, value: RealArrayType) -> RealArrayType:
+        return scipy.special.eval_hermite(order, value)
+
+    def __call__(self, x: RealArrayType, y: RealArrayType) -> ComplexArrayType:
+        hx = self._hermite(self.order_x, x)
+        hy = self._hermite(self.order_y, y)
+        return self.coefficient * hx * hy
+
+    def __str__(self) -> str:
+        return f'{self.coefficient}$H_{{{self.order_x},{self.order_y}}}(x,y)$'
 
 
 def fourier_gradient(

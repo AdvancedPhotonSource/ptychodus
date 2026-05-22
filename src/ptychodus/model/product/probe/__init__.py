@@ -3,6 +3,7 @@ from .builder import ProbeModeDecayType, ProbeSequenceBuilder
 from .builder_factory import ProbeBuilderFactory
 from .disk import DiskProbeBuilder
 from .fzp import FresnelZonePlateProbeBuilder
+from .hermite import HermiteProbeBuilder
 from .item import ProbeRepositoryItem
 from .item_factory import ProbeRepositoryItemFactory
 from .rect import RectangularProbeBuilder
@@ -14,6 +15,7 @@ __all__ = [
     'AveragePatternProbeBuilder',
     'DiskProbeBuilder',
     'FresnelZonePlateProbeBuilder',
+    'HermiteProbeBuilder',
     'ProbeBuilderFactory',
     'ProbeModeDecayType',
     'ProbeRepositoryItem',

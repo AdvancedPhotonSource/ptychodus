@@ -3,7 +3,12 @@ import logging
 
 from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
+from ptychodus.api.probe import (
+    ProbeGeometryProvider,
+    ProbeSequence,
+    ProbeSizeMetrics,
+    estimate_probe_size,
+)
 
 from .builder import FromMemoryProbeBuilder, ProbeSequenceBuilder
 from .settings import ProbeSettings
@@ -43,6 +48,24 @@ class ProbeRepositoryItem(ParameterGroup):
 
     def get_probes(self) -> ProbeSequence:
         return self._probe_seq
+
+    def get_size_metrics(self) -> ProbeSizeMetrics | None:
+        probe_seq = self._probe_seq
+
+        if probe_seq.width_px == 0 or probe_seq.height_px == 0:
+            return None
+
+        try:
+            pixel_geometry = probe_seq.get_pixel_geometry()
+            probe = probe_seq.get_probe_no_opr()
+        except ValueError:
+            return None
+
+        try:
+            return estimate_probe_size(probe.get_intensity(), pixel_geometry)
+        except Exception:
+            logger.exception('Failed to estimate probe size!')
+            return None
 
     def get_builder(self) -> ProbeSequenceBuilder:
         return self._builder

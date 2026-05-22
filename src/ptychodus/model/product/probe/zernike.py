@@ -3,7 +3,7 @@ import logging
 
 import numpy
 
-from ptychodus.api.geometry import ZernikeMonomial
+from ptychodus.api.geometry import ZernikeMode
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
 from ptychodus.api.probe_gen import generate_zernike_probe, rescale_probe_intensity
 
@@ -18,7 +18,7 @@ class ZernikeProbeBuilder(ProbeSequenceBuilder):
         super().__init__(settings, 'zernike')
         self._rng = rng
         self._settings = settings
-        self._polynomial: list[ZernikeMonomial] = list()
+        self._polynomial: list[ZernikeMode] = list()
         self._order = 0
 
         self.diameter_m = settings.disk_diameter_m.copy()
@@ -48,8 +48,8 @@ class ZernikeProbeBuilder(ProbeSequenceBuilder):
 
         for radial_degree in range(order):
             for angular_frequency in range(-radial_degree, 1 + radial_degree, 2):
-                monomial = ZernikeMonomial(1 + 0j, radial_degree, angular_frequency)
-                self._polynomial.append(monomial)
+                mode = ZernikeMode(1 + 0j, radial_degree, angular_frequency)
+                self._polynomial.append(mode)
 
         self._order = order
         self.notify_observers()
@@ -58,12 +58,10 @@ class ZernikeProbeBuilder(ProbeSequenceBuilder):
         return self._order
 
     def set_coefficient(self, idx: int, value: complex) -> None:
-        monomial = self._polynomial[idx]
-        self._polynomial[idx] = ZernikeMonomial(
-            value, monomial.radial_degree, monomial.angular_frequency
-        )
+        mode = self._polynomial[idx]
+        self._polynomial[idx] = ZernikeMode(value, mode.radial_degree, mode.angular_frequency)
 
-    def get_monomial(self, idx: int) -> ZernikeMonomial:
+    def get_mode(self, idx: int) -> ZernikeMode:
         return self._polynomial[idx]
 
     def __len__(self) -> int:

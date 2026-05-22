@@ -2,11 +2,10 @@
 
 import numpy
 import numpy.testing
-import pytest
 
-from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.probe import Probe
-from ptychodus.api.probe_gen import generate_incoherent_probe_modes
+from ptychodus.api.geometry import HermiteMode, PixelGeometry
+from ptychodus.api.probe import Probe, ProbeGeometry
+from ptychodus.api.probe_gen import generate_hermite_probe, generate_incoherent_probe_modes
 
 
 PIXEL_GEOMETRY = PixelGeometry(width_m=1e-8, height_m=1e-8)
@@ -82,3 +81,84 @@ class TestGenerateIncoherentProbeModes:
         ratios = intensities / intensities[0]
         expected = numpy.array(weights) / weights[0]
         numpy.testing.assert_allclose(ratios, expected, rtol=1e-6)
+
+
+def _probe_geometry(height_px: int = 16, width_px: int = 16) -> ProbeGeometry:
+    return ProbeGeometry(
+        width_px=width_px,
+        height_px=height_px,
+        pixel_width_m=PIXEL_GEOMETRY.width_m,
+        pixel_height_m=PIXEL_GEOMETRY.height_m,
+    )
+
+
+class TestGenerateHermiteProbe:
+    def test_returns_probe_with_input_pixel_geometry(self) -> None:
+        geometry = _probe_geometry()
+        result = generate_hermite_probe(
+            geometry, [HermiteMode(1.0, 0, 0)], width_m=1e-7, height_m=1e-7
+        )
+        assert result.get_pixel_geometry() == geometry.get_pixel_geometry()
+
+    def test_returns_probe_with_geometry_shape(self) -> None:
+        geometry = _probe_geometry(height_px=12, width_px=20)
+        result = generate_hermite_probe(
+            geometry, [HermiteMode(1.0, 1, 2)], width_m=1e-7, height_m=1e-7
+        )
+        array = result.get_array()
+        # Probe packs incoherent modes in a leading dim: (num_modes, height, width).
+        assert array.shape[-2:] == (geometry.height_px, geometry.width_px)
+        assert numpy.iscomplexobj(array)
+
+    def test_empty_modes_returns_zero_probe(self) -> None:
+        geometry = _probe_geometry()
+        result = generate_hermite_probe(geometry, [], width_m=1e-7, height_m=1e-7)
+        array = result.get_array()
+        assert array.shape[-2:] == (geometry.height_px, geometry.width_px)
+        numpy.testing.assert_array_equal(array, numpy.zeros_like(array))
+
+    def test_piston_mode_is_constant(self) -> None:
+        """A single HermiteMode(c, 0, 0) yields an array of constant value c."""
+        geometry = _probe_geometry()
+        coefficient = 1.7 - 0.3j
+        for scale_m in (1e-8, 1.0, 1e3):
+            result = generate_hermite_probe(
+                geometry, [HermiteMode(coefficient, 0, 0)], width_m=scale_m, height_m=scale_m
+            )
+            numpy.testing.assert_allclose(result.get_array(), coefficient)
+
+    def test_linearity_over_modes(self) -> None:
+        """Sum of probes from individual modes equals the probe from the combined list."""
+        geometry = _probe_geometry()
+        scale_m = 2e-7
+        modes = [HermiteMode(2.0 + 1j, 1, 0), HermiteMode(-0.5j, 0, 2), HermiteMode(0.7, 2, 1)]
+
+        combined = generate_hermite_probe(
+            geometry, modes, width_m=scale_m, height_m=scale_m
+        ).get_array()
+        separate = sum(
+            generate_hermite_probe(geometry, [m], width_m=scale_m, height_m=scale_m).get_array()
+            for m in modes
+        )
+        numpy.testing.assert_allclose(combined, separate, atol=1e-12)
+
+    def test_width_inversely_scales_x_argument(self) -> None:
+        """For H_1(x) = 2x/width_m, doubling width_m halves the returned array."""
+        geometry = _probe_geometry()
+        mode = HermiteMode(1.0, 1, 0)
+        scale_m = 1e-7
+        small = generate_hermite_probe(
+            geometry, [mode], width_m=scale_m, height_m=scale_m
+        ).get_array()
+        large = generate_hermite_probe(
+            geometry, [mode], width_m=2.0 * scale_m, height_m=scale_m
+        ).get_array()
+        numpy.testing.assert_allclose(large, 0.5 * small, atol=1e-12)
+
+    def test_independent_axis_scaling(self) -> None:
+        """Doubling height_m halves the y-argument; x-argument is unaffected."""
+        geometry = _probe_geometry()
+        mode_y = HermiteMode(1.0, 0, 1)  # H_1(y) = 2y
+        small = generate_hermite_probe(geometry, [mode_y], width_m=1e-7, height_m=1e-7).get_array()
+        large = generate_hermite_probe(geometry, [mode_y], width_m=1e-7, height_m=2e-7).get_array()
+        numpy.testing.assert_allclose(large, 0.5 * small, atol=1e-12)

@@ -72,6 +72,16 @@ class ObjectSettings(Observable, Observer):
             'FractalLacunarity', 2.0, minimum=0.0
         )
 
+        self.paganin_probe_wavelength_m = self._group.create_real_parameter(
+            'PaganinProbeWavelengthInMeters', 1.0e-10, minimum=1e-12
+        )
+        self.paganin_propagation_distance_m = self._group.create_real_parameter(
+            'PaganinPropagationDistanceInMeters', 1.0, minimum=1e-6
+        )
+        self.paganin_delta_over_beta = self._group.create_real_parameter(
+            'PaganinDeltaOverBeta', 100.0, minimum=1e-3
+        )
+
     def _update(self, observable: Observable) -> None:
         if observable is self._group:
             self.notify_observers()

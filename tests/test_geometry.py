@@ -2,40 +2,43 @@ import numpy
 import numpy.testing
 import pytest
 
+import scipy.special
+
 from ptychodus.api.geometry import (
     AffineTransform,
     Box2D,
+    HermiteMode,
     ImageExtent,
     Interval,
     Line2D,
     PixelGeometry,
     Point2D,
-    ZernikeMonomial,
+    ZernikeMode,
     fourier_gradient,
 )
 
 
 def test_str() -> None:
-    assert str(ZernikeMonomial(1.0, 0, 0)) == '1.0$Z_{0}^{+0}$'
-    assert str(ZernikeMonomial(2.5, 3, -1)) == '2.5$Z_{3}^{-1}$'
-    assert str(ZernikeMonomial(0.5, 2, 2)) == '0.5$Z_{2}^{+2}$'
+    assert str(ZernikeMode(1.0, 0, 0)) == '1.0$Z_{0}^{+0}$'
+    assert str(ZernikeMode(2.5, 3, -1)) == '2.5$Z_{3}^{-1}$'
+    assert str(ZernikeMode(0.5, 2, 2)) == '0.5$Z_{2}^{+2}$'
 
 
 def test_domain_masking() -> None:
     """Points with distance <= 0 or distance > 1 return undefined_value."""
-    monomial = ZernikeMonomial(1.0, 0, 0)
+    mode = ZernikeMode(1.0, 0, 0)
     angle = numpy.zeros(4)
     distance = numpy.array([0.0, -0.5, 1.1, 2.0])
-    result = monomial(distance, angle, undefined_value=numpy.nan)
+    result = mode(distance, angle, undefined_value=numpy.nan)
     assert numpy.all(numpy.isnan(result))
 
 
 def test_boundary_included() -> None:
     """distance == 1 is within the domain."""
-    monomial = ZernikeMonomial(1.0, 0, 0)
+    mode = ZernikeMode(1.0, 0, 0)
     distance = numpy.array([1.0])
     angle = numpy.array([0.0])
-    result = monomial(distance, angle, undefined_value=numpy.nan)
+    result = mode(distance, angle, undefined_value=numpy.nan)
     assert numpy.isfinite(result[0])
 
 
@@ -97,19 +100,19 @@ def test_known_values(
     angle: numpy.ndarray,
     expected: numpy.ndarray,
 ) -> None:
-    monomial = ZernikeMonomial(1.0, radial_degree, angular_frequency)
-    numpy.testing.assert_allclose(monomial(distance, angle), expected, atol=1e-12)
+    mode = ZernikeMode(1.0, radial_degree, angular_frequency)
+    numpy.testing.assert_allclose(mode(distance, angle), expected, atol=1e-12)
 
 
 def test_coefficient_scaling() -> None:
     """Output scales linearly with coefficient."""
-    monomial_unit = ZernikeMonomial(1.0, 2, 0)
-    monomial_scaled = ZernikeMonomial(3.7, 2, 0)
+    mode_unit = ZernikeMode(1.0, 2, 0)
+    mode_scaled = ZernikeMode(3.7, 2, 0)
     distance = numpy.array([0.3, 0.6, 0.9])
     angle = numpy.zeros(3)
     numpy.testing.assert_allclose(
-        monomial_scaled(distance, angle),
-        3.7 * monomial_unit(distance, angle),
+        mode_scaled(distance, angle),
+        3.7 * mode_unit(distance, angle),
     )
 
 
@@ -119,14 +122,14 @@ def test_coefficient_scaling() -> None:
 )
 def test_normalization(radial_degree: int, angular_frequency: int) -> None:
     """Integral of Z^2 over the unit disk equals pi (OSA/ANSI normalization)."""
-    monomial = ZernikeMonomial(1.0, radial_degree, angular_frequency)
+    mode = ZernikeMode(1.0, radial_degree, angular_frequency)
     num_pixels = 512
     Y, X = numpy.mgrid[:num_pixels, :num_pixels]  # noqa: N806
     X = (X - (num_pixels - 1) / 2) / (num_pixels / 2)  # noqa: N806
     Y = (Y - (num_pixels - 1) / 2) / (num_pixels / 2)  # noqa: N806
     distance = numpy.hypot(Y, X)
     angle = numpy.arctan2(Y, X)
-    Z = monomial(distance, angle, undefined_value=0.0)  # noqa: N806
+    Z = mode(distance, angle, undefined_value=0.0)  # noqa: N806
     pixel_area = (2.0 / num_pixels) ** 2
     integral = numpy.sum(Z**2) * pixel_area
     numpy.testing.assert_allclose(integral, numpy.pi, rtol=0.01)
@@ -153,7 +156,7 @@ def test_pyramid() -> None:
     import matplotlib.colors
     import matplotlib.pyplot as plt
 
-    from ptychodus.api.geometry import ZernikeMonomial
+    from ptychodus.api.geometry import ZernikeMode
 
     my_dpi = 300
     num_pixels = 256
@@ -174,8 +177,8 @@ def test_pyramid() -> None:
 
     for radial_degree in range(max_radial_degree):
         for angular_frequency in range(-radial_degree, radial_degree + 1, 2):
-            monomial = ZernikeMonomial(1.0, radial_degree, angular_frequency)
-            Z = monomial(distance, angle, undefined_value=numpy.nan)  # noqa: N806
+            mode = ZernikeMode(1.0, radial_degree, angular_frequency)
+            Z = mode(distance, angle, undefined_value=numpy.nan)  # noqa: N806
 
             row = radial_degree
             col = max_radial_degree + angular_frequency
@@ -183,11 +186,111 @@ def test_pyramid() -> None:
             ax = fig.add_subplot(gs[row : row + 1, col : col + 2])
             ax.pcolormesh(X, Y, Z, norm=matplotlib.colors.CenteredNorm(), cmap='seismic')
             ax.set_aspect('equal')
-            ax.set_title(str(monomial))
+            ax.set_title(str(mode))
             ax.axis('off')
 
     plt.savefig('zernike_pyramid.png', bbox_inches='tight', dpi=my_dpi)
     plt.close(fig)
+
+
+# ---------------------------------------------------------------------------
+# HermiteMode
+# ---------------------------------------------------------------------------
+
+
+def test_hermite_str() -> None:
+    assert str(HermiteMode(1.0, 0, 0)) == '1.0$H_{0,0}(x,y)$'
+    assert str(HermiteMode(2.5, 3, 1)) == '2.5$H_{3,1}(x,y)$'
+    assert str(HermiteMode(0.5, 2, 4)) == '0.5$H_{2,4}(x,y)$'
+
+
+@pytest.mark.parametrize(
+    'order_x,order_y,x,y,expected',
+    [
+        # H_0(x) * H_0(y) = 1 * 1 = 1
+        (0, 0, numpy.array([-1.0, 0.0, 2.5]), numpy.array([0.3, -1.7, 4.0]), numpy.ones(3)),
+        # H_1(x) * H_0(y) = 2x * 1 = 2x
+        (1, 0, numpy.array([0.5, -1.0, 3.0]), numpy.array([0.7, 0.0, -2.0]), 2.0 * numpy.array([0.5, -1.0, 3.0])),
+        # H_0(x) * H_1(y) = 1 * 2y = 2y
+        (0, 1, numpy.array([0.7, 0.0, -2.0]), numpy.array([0.5, -1.0, 3.0]), 2.0 * numpy.array([0.5, -1.0, 3.0])),
+        # H_2(x) * H_0(y) = (4x^2 - 2) * 1
+        (
+            2,
+            0,
+            numpy.array([0.5, 1.0, -1.5]),
+            numpy.zeros(3),
+            4.0 * numpy.array([0.5, 1.0, -1.5]) ** 2 - 2.0,
+        ),
+        # H_1(x) * H_1(y) = 2x * 2y = 4xy
+        (
+            1,
+            1,
+            numpy.array([0.5, -1.0, 2.0]),
+            numpy.array([1.5, 0.5, -0.25]),
+            4.0 * numpy.array([0.5, -1.0, 2.0]) * numpy.array([1.5, 0.5, -0.25]),
+        ),
+        # H_3(x) * H_2(y) = (8x^3 - 12x) * (4y^2 - 2)
+        (
+            3,
+            2,
+            numpy.array([0.4, -0.8, 1.2]),
+            numpy.array([0.6, 1.1, -0.3]),
+            (8.0 * numpy.array([0.4, -0.8, 1.2]) ** 3 - 12.0 * numpy.array([0.4, -0.8, 1.2]))
+            * (4.0 * numpy.array([0.6, 1.1, -0.3]) ** 2 - 2.0),
+        ),
+    ],
+)
+def test_hermite_known_values(
+    order_x: int,
+    order_y: int,
+    x: numpy.ndarray,
+    y: numpy.ndarray,
+    expected: numpy.ndarray,
+) -> None:
+    mode = HermiteMode(1.0, order_x, order_y)
+    numpy.testing.assert_allclose(mode(x, y), expected, atol=1e-12)
+
+
+def test_hermite_coefficient_scaling() -> None:
+    """Output scales linearly with the (complex) coefficient."""
+    mode_unit = HermiteMode(1.0, 2, 1)
+    mode_scaled = HermiteMode(3.7 - 1.2j, 2, 1)
+    x = numpy.array([-1.0, 0.0, 0.5, 1.5])
+    y = numpy.array([0.2, -0.8, 1.1, -0.3])
+    numpy.testing.assert_allclose(
+        mode_scaled(x, y),
+        (3.7 - 1.2j) * mode_unit(x, y),
+    )
+
+
+@pytest.mark.parametrize('order_x,order_y', [(0, 0), (1, 0), (0, 1), (2, 3), (4, 2), (3, 3)])
+def test_hermite_separability(order_x: int, order_y: int) -> None:
+    """HermiteMode is the tensor product H_m(x) * H_n(y)."""
+    mode = HermiteMode(1.0, order_x, order_y)
+    x_1d = numpy.linspace(-2.0, 2.0, 11)
+    y_1d = numpy.linspace(-1.5, 2.5, 9)
+    Y, X = numpy.meshgrid(y_1d, x_1d, indexing='ij')  # noqa: N806
+    expected = scipy.special.eval_hermite(order_x, X) * scipy.special.eval_hermite(order_y, Y)
+    numpy.testing.assert_allclose(mode(X, Y), expected, atol=1e-12)
+
+
+@pytest.mark.parametrize('n', [0, 1, 2, 3, 4, 5])
+def test_hermite_three_term_recurrence(n: int) -> None:
+    """H_{n+1}(x) = 2x H_n(x) - 2n H_{n-1}(x); verified through HermiteMode along x."""
+    x = numpy.linspace(-2.0, 2.0, 25)
+    y = numpy.zeros_like(x)  # H_0(y) = 1, so the y factor drops out
+
+    mode_n_plus_1 = HermiteMode(1.0, n + 1, 0)
+    mode_n = HermiteMode(1.0, n, 0)
+
+    expected_lhs = mode_n_plus_1(x, y)
+    if n == 0:
+        expected_rhs = 2.0 * x * mode_n(x, y)
+    else:
+        mode_n_minus_1 = HermiteMode(1.0, n - 1, 0)
+        expected_rhs = 2.0 * x * mode_n(x, y) - 2.0 * n * mode_n_minus_1(x, y)
+
+    numpy.testing.assert_allclose(expected_lhs, expected_rhs, atol=1e-10)
 
 
 # ---------------------------------------------------------------------------

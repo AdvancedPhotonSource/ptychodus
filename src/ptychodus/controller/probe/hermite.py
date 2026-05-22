@@ -5,18 +5,18 @@ import numpy
 
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject
 
-from ...model.product.probe import ZernikeProbeBuilder
+from ...model.product.probe import HermiteProbeBuilder
 
 logger = logging.getLogger(__name__)
 
 
-class ZernikeTableModel(QAbstractTableModel):
-    def __init__(self, builder: ZernikeProbeBuilder, parent: QObject | None = None) -> None:
+class HermiteTableModel(QAbstractTableModel):
+    def __init__(self, builder: HermiteProbeBuilder, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._builder = builder
         self._header = [
-            'Radial Degree',
-            'Angular Frequency',
+            'Order X',
+            'Order Y',
             'Amplitude',
             'Phase [tr]',
         ]
@@ -50,9 +50,9 @@ class ZernikeTableModel(QAbstractTableModel):
 
         if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
             if index.column() == 0:
-                return mode.radial_degree
+                return mode.order_x
             elif index.column() == 1:
-                return mode.angular_frequency
+                return mode.order_y
             elif index.column() == 2:
                 return f'{numpy.absolute(mode.coefficient):.6g}'
             elif index.column() == 3:
