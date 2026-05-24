@@ -132,7 +132,7 @@ def _diffraction_intensities(product: Product) -> list[numpy.ndarray]:
 
 class TestReconstructionAmbiguitiesConstruction:
     def test_identity_factory_round_trips_the_four_fields(self) -> None:
-        ambiguities = ReconstructionAmbiguities.identity()
+        ambiguities = ReconstructionAmbiguities.create_identity()
         assert ambiguities.object_scale_factor == 1.0
         assert ambiguities.phase_offset_rad == 0.0
         assert ambiguities.phase_ramp_x_rad_per_m == 0.0
@@ -168,7 +168,7 @@ class TestReconstructionAmbiguitiesConstruction:
 class TestStandardizeProductIdentity:
     def test_identity_passes_object_through_unchanged(self) -> None:
         product = _make_product()
-        result = ReconstructionAmbiguities.identity().standardize_product(product)
+        result = ReconstructionAmbiguities.create_identity().standardize_product(product)
         numpy.testing.assert_array_equal(
             result.object_.get_array(),
             product.object_.get_array(),
@@ -176,7 +176,7 @@ class TestStandardizeProductIdentity:
 
     def test_identity_passes_probes_through_unchanged(self) -> None:
         product = _make_product()
-        result = ReconstructionAmbiguities.identity().standardize_product(product)
+        result = ReconstructionAmbiguities.create_identity().standardize_product(product)
         numpy.testing.assert_array_equal(
             result.probes.get_array(),
             product.probes.get_array(),
@@ -184,7 +184,7 @@ class TestStandardizeProductIdentity:
 
     def test_identity_passes_positions_metadata_and_losses_through(self) -> None:
         product = _make_product()
-        result = ReconstructionAmbiguities.identity().standardize_product(product)
+        result = ReconstructionAmbiguities.create_identity().standardize_product(product)
         assert result.metadata is product.metadata
         assert result.probe_positions is product.probe_positions
         assert result.losses is product.losses
@@ -351,3 +351,393 @@ class TestStandardizeProductOPRPassthrough:
 
         numpy.testing.assert_array_equal(result_weights, weights)
         assert result_weights is not weights  # copied, not aliased
+
+
+def _make_real_positive_object(seed: int = 7) -> Object:
+    """Object whose layer 0 has zero phase everywhere — exact-recovery test fixture."""
+    rng = numpy.random.default_rng(seed)
+    amp = rng.uniform(0.5, 1.5, (OBJ_HEIGHT_PX, OBJ_WIDTH_PX))
+    array = amp.astype(numpy.complex128)[numpy.newaxis, ...]
+    return Object(
+        array=array,
+        pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=PIXEL_M),
+        center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        layer_spacing_m=[],
+    )
+
+
+def _replace_object(product: Product, new_object: Object) -> Product:
+    return Product(
+        metadata=product.metadata,
+        probe_positions=product.probe_positions,
+        probes=product.probes,
+        object_=new_object,
+        losses=product.losses,
+    )
+
+
+class TestEstimateSingleProduct:
+    """Single-product estimator: recover (phi, k_x, k_y); scale fixed at 1.0."""
+
+    def test_scale_factor_is_always_one(self) -> None:
+        product = _make_product()
+        estimate = ReconstructionAmbiguities.estimate(product)
+        assert estimate.object_scale_factor == 1.0
+
+    def test_real_positive_object_recovers_phi_and_ramp_exactly(self) -> None:
+        # A real-positive object has zero clean phase, so the only signal driving
+        # the estimator is the applied ambiguity. Recovery is exact up to fp noise.
+        clean = _replace_object(_make_product(), _make_real_positive_object())
+        applied = ReconstructionAmbiguities(
+            object_scale_factor=1.0,
+            phase_offset_rad=0.4,
+            phase_ramp_x_rad_per_m=2.0e7,
+            phase_ramp_y_rad_per_m=-1.0e7,
+        )
+        perturbed_obj = TestStandardizeProductRoundTrip._apply_ambiguity_to_object(
+            clean.object_, applied
+        )
+        perturbed = _replace_object(clean, perturbed_obj)
+
+        estimate = ReconstructionAmbiguities.estimate(perturbed)
+
+        assert estimate.object_scale_factor == 1.0
+        numpy.testing.assert_allclose(
+            estimate.phase_offset_rad, applied.phase_offset_rad, atol=1.0e-12
+        )
+        numpy.testing.assert_allclose(
+            estimate.phase_ramp_x_rad_per_m, applied.phase_ramp_x_rad_per_m, atol=1.0e-3
+        )
+        numpy.testing.assert_allclose(
+            estimate.phase_ramp_y_rad_per_m, applied.phase_ramp_y_rad_per_m, atol=1.0e-3
+        )
+
+    def test_estimate_then_standardize_is_idempotent(self) -> None:
+        # On a random object the absolute estimate has 1/sqrt(N) noise, but
+        # estimating then standardizing then re-estimating should land at identity.
+        product = _make_product()
+        estimate = ReconstructionAmbiguities.estimate(product)
+        standardized = estimate.standardize_product(product)
+        re_estimate = ReconstructionAmbiguities.estimate(standardized)
+
+        assert re_estimate.object_scale_factor == 1.0
+        assert abs(re_estimate.phase_offset_rad) < 1.0e-10
+        # On a random complex array the differential-phase circular mean is
+        # essentially zero after one canonicalization; allow tight tolerance
+        # in per-pixel units, divided by pixel size to convert to rad/m.
+        assert abs(re_estimate.phase_ramp_x_rad_per_m * PIXEL_M) < 1.0e-10
+        assert abs(re_estimate.phase_ramp_y_rad_per_m * PIXEL_M) < 1.0e-10
+
+    def test_standardize_with_estimate_removes_added_ramp(self) -> None:
+        # End-to-end: apply ramp, estimate, standardize — the result equals the
+        # standardized clean product (both go through the same canonicalization,
+        # so any "baseline" of the clean object cancels).
+        clean = _make_product()
+        applied = ReconstructionAmbiguities(
+            object_scale_factor=1.0,
+            phase_offset_rad=0.3,
+            phase_ramp_x_rad_per_m=1.0e7,
+            phase_ramp_y_rad_per_m=-5.0e6,
+        )
+        perturbed_obj = TestStandardizeProductRoundTrip._apply_ambiguity_to_object(
+            clean.object_, applied
+        )
+        perturbed = _replace_object(clean, perturbed_obj)
+
+        clean_canonical = ReconstructionAmbiguities.estimate(clean).standardize_product(clean)
+        perturbed_canonical = ReconstructionAmbiguities.estimate(perturbed).standardize_product(
+            perturbed
+        )
+        numpy.testing.assert_allclose(
+            perturbed_canonical.object_.get_array()[0],
+            clean_canonical.object_.get_array()[0],
+            rtol=1.0e-10,
+            atol=1.0e-12,
+        )
+
+    def test_multilayer_object_uses_only_layer_zero(self) -> None:
+        product = _make_product(num_layers=3)
+        single_layer_obj = Object(
+            array=product.object_.get_array()[0:1].copy(),
+            pixel_geometry=product.object_.get_pixel_geometry().copy(),
+            center=product.object_.get_center().copy(),
+            layer_spacing_m=[],
+        )
+        single_layer_product = _replace_object(product, single_layer_obj)
+
+        multi_estimate = ReconstructionAmbiguities.estimate(product)
+        single_estimate = ReconstructionAmbiguities.estimate(single_layer_product)
+        assert multi_estimate == single_estimate
+
+    def test_all_ones_weights_match_no_weights(self) -> None:
+        product = _make_product()
+        layer_shape = product.object_.get_array()[0].shape
+        ones = numpy.ones(layer_shape, dtype=numpy.float64)
+
+        unweighted = ReconstructionAmbiguities.estimate(product)
+        weighted = ReconstructionAmbiguities.estimate(product, weights=ones)
+
+        assert unweighted == weighted
+
+    def test_region_mask_recovers_known_ambiguity(self) -> None:
+        # On a real-positive object the unweighted estimate is exact; a 0/1
+        # mask covering most of the array is also exact (the masked region
+        # still carries the ramp signal uniformly).
+        product = _replace_object(_make_product(), _make_real_positive_object())
+        applied = ReconstructionAmbiguities(
+            object_scale_factor=1.0,
+            phase_offset_rad=0.2,
+            phase_ramp_x_rad_per_m=5.0e6,
+            phase_ramp_y_rad_per_m=-2.0e6,
+        )
+        perturbed_obj = TestStandardizeProductRoundTrip._apply_ambiguity_to_object(
+            product.object_, applied
+        )
+        perturbed = _replace_object(product, perturbed_obj)
+
+        layer_shape = perturbed.object_.get_array()[0].shape
+        mask = numpy.ones(layer_shape, dtype=numpy.float64)
+        mask[: layer_shape[0] // 4, :] = 0.0
+        mask[:, : layer_shape[1] // 4] = 0.0
+
+        estimate = ReconstructionAmbiguities.estimate(perturbed, weights=mask)
+        numpy.testing.assert_allclose(
+            estimate.phase_offset_rad, applied.phase_offset_rad, atol=1.0e-10
+        )
+        numpy.testing.assert_allclose(
+            estimate.phase_ramp_x_rad_per_m, applied.phase_ramp_x_rad_per_m, atol=1.0e-3
+        )
+        numpy.testing.assert_allclose(
+            estimate.phase_ramp_y_rad_per_m, applied.phase_ramp_y_rad_per_m, atol=1.0e-3
+        )
+
+    def test_complex64_input_is_handled(self) -> None:
+        product = _make_product()
+        complex64_array = product.object_.get_array().astype(numpy.complex64)
+        new_obj = Object(
+            array=complex64_array,
+            pixel_geometry=product.object_.get_pixel_geometry().copy(),
+            center=product.object_.get_center().copy(),
+            layer_spacing_m=list(product.object_.layer_spacing_m),
+        )
+        product_c64 = _replace_object(product, new_obj)
+
+        estimate = ReconstructionAmbiguities.estimate(product_c64)
+        assert numpy.isfinite(estimate.phase_offset_rad)
+        assert numpy.isfinite(estimate.phase_ramp_x_rad_per_m)
+        assert numpy.isfinite(estimate.phase_ramp_y_rad_per_m)
+
+
+class TestEstimateRelative:
+    """Relative estimator: recover all four ambiguities aligning target to reference."""
+
+    @staticmethod
+    def _perturbed_product(clean: Product, applied: ReconstructionAmbiguities) -> Product:
+        perturbed_obj = TestStandardizeProductRoundTrip._apply_ambiguity_to_object(
+            clean.object_, applied
+        )
+        return _replace_object(clean, perturbed_obj)
+
+    def test_identical_products_give_identity(self) -> None:
+        product = _make_product()
+        estimate = ReconstructionAmbiguities.estimate(product, reference=product)
+        numpy.testing.assert_allclose(estimate.object_scale_factor, 1.0, rtol=1.0e-12)
+        assert abs(estimate.phase_offset_rad) < 1.0e-10
+        # Tolerance is per-pixel: rad/m * pixel_m. The accumulated complex sum
+        # has fp roundoff on the order of 1e-15 / pixel = 1e-15 / 1e-9 m = 1e-6
+        # rad/m for the worst case; cap with a generous bound.
+        assert abs(estimate.phase_ramp_x_rad_per_m * PIXEL_M) < 1.0e-12
+        assert abs(estimate.phase_ramp_y_rad_per_m * PIXEL_M) < 1.0e-12
+
+    def test_recovers_all_four_parameters_on_random_object(self) -> None:
+        # For the relative estimator, S = target * conj(ref) cancels the
+        # clean object's phase content, so recovery is precise on any
+        # non-degenerate object.
+        clean = _make_product()
+        applied = ReconstructionAmbiguities(
+            object_scale_factor=2.5,
+            phase_offset_rad=0.3,
+            phase_ramp_x_rad_per_m=2.0e7,
+            phase_ramp_y_rad_per_m=-1.0e7,
+        )
+        target = self._perturbed_product(clean, applied)
+
+        estimate = ReconstructionAmbiguities.estimate(target, reference=clean)
+
+        numpy.testing.assert_allclose(
+            estimate.object_scale_factor, applied.object_scale_factor, rtol=1.0e-10
+        )
+        numpy.testing.assert_allclose(
+            estimate.phase_offset_rad, applied.phase_offset_rad, atol=1.0e-10
+        )
+        numpy.testing.assert_allclose(
+            estimate.phase_ramp_x_rad_per_m, applied.phase_ramp_x_rad_per_m, atol=1.0e-3
+        )
+        numpy.testing.assert_allclose(
+            estimate.phase_ramp_y_rad_per_m, applied.phase_ramp_y_rad_per_m, atol=1.0e-3
+        )
+
+    def test_standardize_target_with_estimate_recovers_reference(self) -> None:
+        clean = _make_product()
+        applied = ReconstructionAmbiguities(
+            object_scale_factor=2.5,
+            phase_offset_rad=0.3,
+            phase_ramp_x_rad_per_m=2.0e7,
+            phase_ramp_y_rad_per_m=-1.0e7,
+        )
+        target = self._perturbed_product(clean, applied)
+
+        estimate = ReconstructionAmbiguities.estimate(target, reference=clean)
+        recovered = estimate.standardize_product(target)
+
+        numpy.testing.assert_allclose(
+            recovered.object_.get_array()[0],
+            clean.object_.get_array()[0],
+            rtol=1.0e-9,
+            atol=1.0e-11,
+        )
+
+    def test_negative_scale_is_folded_into_phase(self) -> None:
+        # Applying a negative real scale to a clean object is indistinguishable
+        # from positive scale + pi phase offset. The estimator must return the
+        # positive-scale form.
+        clean = _make_product()
+        applied = ReconstructionAmbiguities(
+            object_scale_factor=-1.5,
+            phase_offset_rad=0.0,
+            phase_ramp_x_rad_per_m=0.0,
+            phase_ramp_y_rad_per_m=0.0,
+        )
+        target = self._perturbed_product(clean, applied)
+
+        estimate = ReconstructionAmbiguities.estimate(target, reference=clean)
+
+        assert estimate.object_scale_factor > 0.0
+        numpy.testing.assert_allclose(estimate.object_scale_factor, 1.5, rtol=1.0e-10)
+        # phi should be equivalent to pi modulo 2*pi. Reduce to [-pi, pi] via
+        # phi mod 2pi - pi, then compare to 0.
+        wrapped = estimate.phase_offset_rad % (2.0 * numpy.pi) - numpy.pi
+        assert abs(wrapped) < 1.0e-10
+
+    def test_all_ones_weights_match_no_weights(self) -> None:
+        clean = _make_product()
+        applied = ReconstructionAmbiguities(
+            object_scale_factor=2.0,
+            phase_offset_rad=0.4,
+            phase_ramp_x_rad_per_m=1.0e7,
+            phase_ramp_y_rad_per_m=-2.0e7,
+        )
+        target = self._perturbed_product(clean, applied)
+        ones = numpy.ones(clean.object_.get_array()[0].shape, dtype=numpy.float64)
+
+        without = ReconstructionAmbiguities.estimate(target, reference=clean)
+        with_ones = ReconstructionAmbiguities.estimate(target, reference=clean, weights=ones)
+
+        assert without == with_ones
+
+    def test_layer_zero_only_on_multilayer_objects(self) -> None:
+        clean = _make_product(num_layers=3)
+        applied = ReconstructionAmbiguities(
+            object_scale_factor=1.5,
+            phase_offset_rad=0.2,
+            phase_ramp_x_rad_per_m=5.0e6,
+            phase_ramp_y_rad_per_m=-3.0e6,
+        )
+        target = self._perturbed_product(clean, applied)
+
+        def first_layer_product(p: Product) -> Product:
+            new_obj = Object(
+                array=p.object_.get_array()[0:1].copy(),
+                pixel_geometry=p.object_.get_pixel_geometry().copy(),
+                center=p.object_.get_center().copy(),
+                layer_spacing_m=[],
+            )
+            return _replace_object(p, new_obj)
+
+        multi_estimate = ReconstructionAmbiguities.estimate(target, reference=clean)
+        single_estimate = ReconstructionAmbiguities.estimate(
+            first_layer_product(target), reference=first_layer_product(clean)
+        )
+        assert multi_estimate == single_estimate
+
+    def test_shape_mismatch_raises(self) -> None:
+        product_a = _make_product()
+        rng = numpy.random.default_rng(99)
+        small_array = (
+            rng.standard_normal((1, 16, 20)) + 1j * rng.standard_normal((1, 16, 20))
+        ).astype(numpy.complex128)
+        small_obj = Object(
+            array=small_array,
+            pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=PIXEL_M),
+            center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+            layer_spacing_m=[],
+        )
+        product_b = _replace_object(product_a, small_obj)
+
+        with pytest.raises(ValueError, match='shape'):
+            ReconstructionAmbiguities.estimate(product_b, reference=product_a)
+
+    def test_pixel_geometry_mismatch_raises(self) -> None:
+        product_a = _make_product()
+        rng = numpy.random.default_rng(123)
+        array = (
+            rng.standard_normal((1, OBJ_HEIGHT_PX, OBJ_WIDTH_PX))
+            + 1j * rng.standard_normal((1, OBJ_HEIGHT_PX, OBJ_WIDTH_PX))
+        ).astype(numpy.complex128)
+        different_pixel_obj = Object(
+            array=array,
+            pixel_geometry=PixelGeometry(width_m=2.0 * PIXEL_M, height_m=PIXEL_M),
+            center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+            layer_spacing_m=[],
+        )
+        product_b = _replace_object(product_a, different_pixel_obj)
+
+        with pytest.raises(ValueError, match='pixel geometry'):
+            ReconstructionAmbiguities.estimate(product_b, reference=product_a)
+
+    def test_zero_reference_raises(self) -> None:
+        clean = _make_product()
+        zero_obj = Object(
+            array=numpy.zeros((1, OBJ_HEIGHT_PX, OBJ_WIDTH_PX), dtype=numpy.complex128),
+            pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=PIXEL_M),
+            center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+            layer_spacing_m=[],
+        )
+        zero_product = _replace_object(clean, zero_obj)
+        with pytest.raises(ValueError, match='zero'):
+            ReconstructionAmbiguities.estimate(clean, reference=zero_product)
+
+
+class TestEstimateValidation:
+    """Validation of the optional weights argument shared by both estimators."""
+
+    def test_weights_shape_mismatch_raises(self) -> None:
+        product = _make_product()
+        bad_weights = numpy.ones((1, 1), dtype=numpy.float64)
+        with pytest.raises(ValueError, match='shape'):
+            ReconstructionAmbiguities.estimate(product, weights=bad_weights)
+
+    def test_negative_weights_raises(self) -> None:
+        product = _make_product()
+        bad_weights = -numpy.ones(product.object_.get_array()[0].shape, dtype=numpy.float64)
+        with pytest.raises(ValueError, match='non-negative'):
+            ReconstructionAmbiguities.estimate(product, weights=bad_weights)
+
+    def test_non_finite_weights_raises(self) -> None:
+        product = _make_product()
+        bad_weights = numpy.ones(product.object_.get_array()[0].shape, dtype=numpy.float64)
+        bad_weights[0, 0] = numpy.nan
+        with pytest.raises(ValueError, match='finite'):
+            ReconstructionAmbiguities.estimate(product, weights=bad_weights)
+
+    def test_all_zero_weights_raises_for_single_product(self) -> None:
+        product = _make_product()
+        zeros = numpy.zeros(product.object_.get_array()[0].shape, dtype=numpy.float64)
+        with pytest.raises(ValueError, match='zero'):
+            ReconstructionAmbiguities.estimate(product, weights=zeros)
+
+    def test_all_zero_weights_raises_for_relative(self) -> None:
+        product = _make_product()
+        zeros = numpy.zeros(product.object_.get_array()[0].shape, dtype=numpy.float64)
+        with pytest.raises(ValueError, match='zero'):
+            ReconstructionAmbiguities.estimate(product, reference=product, weights=zeros)
