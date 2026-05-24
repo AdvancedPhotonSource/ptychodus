@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy
 
-from .common import ComplexArrayType
+from .common import ComplexArrayType, RealArrayType
 from .geometry import PixelGeometry
 from .probe_positions import ProbePosition
 
@@ -34,6 +34,14 @@ class ObjectPosition:
     index: int
     coordinate_x_px: float
     coordinate_y_px: float
+
+
+@dataclass(frozen=True)
+class ObjectTransverseCoordinates:
+    """2D Cartesian coordinate arrays for the transverse plane of the object, in meters."""
+
+    position_x_m: RealArrayType
+    position_y_m: RealArrayType
 
 
 @dataclass(frozen=True)
@@ -73,6 +81,19 @@ class ObjectGeometry:
         return ObjectCenter(
             coordinate_x_m=self.center_x_m,
             coordinate_y_m=self.center_y_m,
+        )
+
+    def get_transverse_coordinates(self) -> ObjectTransverseCoordinates:
+        Y, X = numpy.mgrid[: self.height_px, : self.width_px]  # noqa: N806
+        position_x_px = X - (self.width_px - 1) / 2
+        position_y_px = Y - (self.height_px - 1) / 2
+
+        position_x_m = position_x_px * self.pixel_width_m
+        position_y_m = position_y_px * self.pixel_height_m
+
+        return ObjectTransverseCoordinates(
+            position_x_m=position_x_m,
+            position_y_m=position_y_m,
         )
 
     def map_coordinates_object_to_probe(self, position: ObjectPosition) -> ProbePosition:

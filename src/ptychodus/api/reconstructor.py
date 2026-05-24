@@ -3,14 +3,14 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from enum import auto, Enum
 from pathlib import Path
 import logging
 
 import numpy
 
-from .common import BYTES_PER_MEGABYTE
+from .common import BYTES_PER_MEGABYTE, RealArrayType
 from .diffraction import (
     BadPixels,
     DiffractionIndexes,
@@ -20,6 +20,8 @@ from .diffraction import (
     DiffractionPatterns,
 )
 from .geometry import PixelGeometry
+from .object import Object
+from .probe import ProbeSequence
 from .probe_positions import ProbePositionSequence, ProbePosition
 from .product import LossValue, Product
 
@@ -119,13 +121,13 @@ class NullReconstructor(TrainableReconstructor):
         return False
 
     def get_model_file_filter(self) -> str:
-        return str()
+        return ''
 
     def load_model_from_file(self, file_path: Path) -> None:
         pass
 
     def get_training_data_file_filter(self) -> str:
-        return str()
+        return ''
 
     def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
         pass
@@ -220,17 +222,17 @@ class AssembledDiffractionData:
 
         if patterns.shape[1:] != bad_pixels.shape:
             raise ValueError(
-                'Patterns shape does not match bad pixels shape!'
+                'Patterns shape does not match bad pixels shape! '
                 f'(actual={patterns.shape[1:]} expected={bad_pixels.shape})'
             )
 
     @classmethod
     def create_null(cls) -> AssembledDiffractionData:
         return cls(
-            indexes=numpy.zeros(1, dtype=int),
-            patterns=numpy.zeros((1, 1, 1), dtype=int),
+            indexes=numpy.zeros(1, dtype=numpy.intp),
+            patterns=numpy.zeros((1, 1, 1), dtype=numpy.intp),
             pixel_geometry=PixelGeometry(0, 0),
-            bad_pixels=numpy.zeros((1, 1), dtype=bool),
+            bad_pixels=numpy.zeros((1, 1), dtype=numpy.bool_),
         )
 
     def get_patterns_shape(self) -> tuple[int, int, int]:
@@ -329,3 +331,121 @@ class AssembledDiffractionData:
         dtype = str(self._patterns.dtype)
         size_MB = self._patterns.nbytes / BYTES_PER_MEGABYTE  # noqa: N806
         return f'{number} x {height}H x {width}W {dtype} [{size_MB:.2f}MB]'
+
+
+@dataclass(frozen=True)
+class ReconstructionAmbiguities:
+    """The four scalar ambiguities that ptychography cannot constrain from intensities alone.
+
+    A reconstructed object is determined only up to a global complex scale and a 2D
+    linear phase ramp. Concretely, the convention used here is
+
+    ``object = standardized_object * scale * exp(i * (phi + k_x * x + k_y * y))``
+
+    where ``(x, y)`` are measured in meters from the geometric center of the
+    object **array** (``(width_px - 1) / 2`` in each axis, not
+    ``Object.get_center()``). The corresponding complementary transform on the
+    probe leaves the diffraction-pattern intensities at every scan position
+    unchanged. See :meth:`standardize_product` for what is and is not exactly
+    preserved.
+
+    Attributes:
+        object_scale_factor: ``scale`` above. Must be non-zero and finite.
+        phase_offset_rad: ``phi`` above, in radians.
+        phase_ramp_x_rad_per_m: ``k_x`` above, in rad/m.
+        phase_ramp_y_rad_per_m: ``k_y`` above, in rad/m.
+    """
+
+    object_scale_factor: float
+    phase_offset_rad: float
+    phase_ramp_x_rad_per_m: float
+    phase_ramp_y_rad_per_m: float
+
+    def __post_init__(self) -> None:
+        for f in fields(self):
+            value = getattr(self, f.name)
+            if not numpy.isfinite(value):
+                raise ValueError(f'{f.name} must be finite, got {value!r}')
+
+        if self.object_scale_factor == 0.0:
+            raise ValueError('object_scale_factor must be non-zero')
+
+    @classmethod
+    def identity(cls) -> ReconstructionAmbiguities:
+        """Return the no-op instance: unit scale, zero phase, zero ramp."""
+        return cls(
+            object_scale_factor=1.0,
+            phase_offset_rad=0.0,
+            phase_ramp_x_rad_per_m=0.0,
+            phase_ramp_y_rad_per_m=0.0,
+        )
+
+    def _phase_ramp_grid(
+        self, position_x_m: RealArrayType, position_y_m: RealArrayType
+    ) -> RealArrayType:
+        return (
+            self.phase_ramp_x_rad_per_m * position_x_m + self.phase_ramp_y_rad_per_m * position_y_m
+        )
+
+    def standardize_product(self, product: Product) -> Product:
+        """Remove these ambiguities from ``product`` and return the standardized result.
+
+        The inverse correction is applied to layer 0 of the object (other layers
+        pass through unchanged) and the complementary correction is applied to
+        every coherent and incoherent mode of the probe in the probe's own local
+        frame. Probe positions, OPR weights, losses, and metadata pass through.
+
+        What is preserved:
+
+        - **Diffraction-pattern intensities** at every scan position, exactly
+          (up to floating-point precision).
+        - **Exit waves** (``probe * object``) exactly, when the phase ramp is
+          zero (``phase_ramp_x_rad_per_m == phase_ramp_y_rad_per_m == 0``).
+
+        When the phase ramp is non-zero, the standardized exit wave at scan
+        position ``r_pos`` differs from the original by a per-position scalar
+        factor ``exp(-i * k * (r_pos - r_obj_array_center))``. This is itself
+        one of the unmeasurable ambiguities of ptychography (diffraction
+        intensities are insensitive to a global phase per pattern), so all
+        observable quantities still agree exactly.
+        """
+        obj = product.object_
+        obj_array = obj.get_array()
+        obj_geometry = obj.get_geometry()
+        obj_coords = obj_geometry.get_transverse_coordinates()
+
+        obj_ramp = self._phase_ramp_grid(obj_coords.position_x_m, obj_coords.position_y_m)
+        obj_correction = (
+            numpy.exp(-1j * (self.phase_offset_rad + obj_ramp)) / self.object_scale_factor
+        )
+        standardized_array = obj_array.copy()
+        standardized_array[0] = (obj_array[0] * obj_correction).astype(obj_array.dtype)
+        standardized_object = Object(
+            array=standardized_array,
+            pixel_geometry=obj.get_pixel_geometry().copy(),
+            center=obj.get_center().copy(),
+            layer_spacing_m=list(obj.layer_spacing_m),
+        )
+
+        probes = product.probes
+        probe_array = probes.get_array()
+        probe_coords = probes.get_geometry().get_transverse_coordinates()
+
+        probe_ramp = self._phase_ramp_grid(probe_coords.position_x_m, probe_coords.position_y_m)
+        probe_correction = self.object_scale_factor * numpy.exp(
+            1j * (self.phase_offset_rad + probe_ramp)
+        )
+        opr_weights = probes.get_opr_weights_or_none()
+        standardized_probes = ProbeSequence(
+            array=(probe_array * probe_correction).astype(probe_array.dtype),
+            opr_weights=None if opr_weights is None else opr_weights.copy(),
+            pixel_geometry=probes.get_pixel_geometry().copy(),
+        )
+
+        return Product(
+            metadata=product.metadata,
+            probe_positions=product.probe_positions,
+            probes=standardized_probes,
+            object_=standardized_object,
+            losses=product.losses,
+        )

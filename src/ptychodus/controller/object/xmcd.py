@@ -32,11 +32,11 @@ class XMCDViewController(Observer):
         self._dialog.setWindowTitle('X-ray Magnetic Circular Dichroism (XMCD)')
         self._dialog.parameters_view.lcirc_combo_box.setModel(tree_model)
         self._dialog.parameters_view.lcirc_combo_box.currentIndexChanged.connect(
-            analyzer.set_lcirc_product
+            analyzer.set_lcp_product
         )
         self._dialog.parameters_view.rcirc_combo_box.setModel(tree_model)
         self._dialog.parameters_view.rcirc_combo_box.currentIndexChanged.connect(
-            analyzer.set_rcirc_product
+            analyzer.set_rcp_product
         )
         self._dialog.parameters_view.save_button.clicked.connect(self._save_data)
 
@@ -59,8 +59,8 @@ class XMCDViewController(Observer):
         analyzer.add_observer(self)
 
     def analyze(self, lcirc_product_index: int, rcirc_product_index: int) -> None:
-        self._analyzer.set_lcirc_product(lcirc_product_index)
-        self._analyzer.set_rcirc_product(rcirc_product_index)
+        self._analyzer.set_lcp_product(lcirc_product_index)
+        self._analyzer.set_rcp_product(rcirc_product_index)
         self._analyzer.analyze()
         self._dialog.open()
 
@@ -81,10 +81,10 @@ class XMCDViewController(Observer):
                 ExceptionDialog.show_exception(title, err)
 
     def _sync_model_to_view(self) -> None:
-        lcirc_product_index = self._analyzer.get_lcirc_product()
+        lcirc_product_index = self._analyzer.get_lcp_product()
         self._dialog.parameters_view.lcirc_combo_box.setCurrentIndex(lcirc_product_index)
 
-        rcirc_product_index = self._analyzer.get_rcirc_product()
+        rcirc_product_index = self._analyzer.get_rcp_product()
         self._dialog.parameters_view.rcirc_combo_box.setCurrentIndex(rcirc_product_index)
 
         try:

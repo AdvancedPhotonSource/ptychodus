@@ -486,6 +486,9 @@ class ProbeSequence(Sequence[Probe]):
 
         return self._opr_weights
 
+    def get_opr_weights_or_none(self) -> RealArrayType | None:
+        return self._opr_weights
+
     def get_pixel_geometry(self) -> PixelGeometry:
         if self._pixel_geometry is None:
             raise ValueError('Missing probe pixel geometry!')
