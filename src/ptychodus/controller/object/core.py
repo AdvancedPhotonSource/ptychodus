@@ -35,7 +35,8 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
         fourier_real_space_visualization_engine: VisualizationEngine,
         fourier_reciprocal_space_visualization_engine: VisualizationEngine,
         xmcd_analyzer: XMCDAnalyzer,
-        xmcd_visualization_engine: VisualizationEngine,
+        xmcd_structural_visualization_engine: VisualizationEngine,
+        xmcd_magnetic_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
@@ -58,7 +59,11 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
             file_dialog_factory,
         )
         self._xmcd_view_controller = XMCDViewController(
-            xmcd_analyzer, xmcd_visualization_engine, file_dialog_factory, self._tree_model
+            xmcd_analyzer,
+            xmcd_structural_visualization_engine,
+            xmcd_magnetic_visualization_engine,
+            file_dialog_factory,
+            self._tree_model,
         )
 
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)

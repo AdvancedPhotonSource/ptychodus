@@ -131,7 +131,8 @@ class ControllerCore:
             model.analysis_core.fourier_real_space_visualization_engine,
             model.analysis_core.fourier_reciprocal_space_visualization_engine,
             model.analysis_core.xmcd_analyzer,
-            model.analysis_core.xmcd_visualization_engine,
+            model.analysis_core.xmcd_structural_visualization_engine,
+            model.analysis_core.xmcd_magnetic_visualization_engine,
             view.object_view,
             self._file_dialog_factory,
         )

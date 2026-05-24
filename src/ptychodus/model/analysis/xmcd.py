@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 import logging
@@ -10,6 +10,7 @@ from skimage.registration import phase_cross_correlation
 
 from ptychodus.api.object import Object
 from ptychodus.api.observer import Observable
+from ptychodus.api.reconstructor import ReconstructionAmbiguities
 
 from ..product import ProductRepository
 
@@ -17,8 +18,7 @@ __all__ = [
     'XMCDAnalyzer',
     'XMCDResult',
     'align_objects',
-    'estimate_structural_and_magnetic_objects',
-    'remove_phase_offset',
+    'estimate_xmcd',
 ]
 
 logger = logging.getLogger(__name__)
@@ -78,44 +78,7 @@ def align_objects(
     )
 
 
-def remove_phase_offset(
-    reference_object: Object,
-    moving_object: Object,
-    reference_region: tuple[slice, slice],
-) -> Object:
-    """Match the global phase of ``moving_object`` to ``reference_object``.
-
-    Computes the mean phase of each reconstruction within ``reference_region`` —
-    expected to be a known non-magnetic patch of the FOV — and applies a global
-    phase shift to ``moving_object`` so the two means agree. Using the phase of
-    the complex mean (rather than averaging unwrapped phases) avoids 2π wrapping
-    bias and is robust to per-pixel amplitude variation.
-    """
-    reference_array = reference_object.get_layers_flattened()
-    moving_array = moving_object.get_layers_flattened()
-
-    if reference_array.shape != moving_array.shape:
-        raise ValueError(
-            f'Object array shape mismatch: reference {reference_array.shape}'
-            f' vs moving {moving_array.shape}!'
-        )
-
-    reference_mean = numpy.mean(reference_array[reference_region])
-    moving_mean = numpy.mean(moving_array[reference_region])
-    phase_offset = numpy.angle(reference_mean) - numpy.angle(moving_mean)
-    logger.info(f'XMCD reference-region phase offset = {phase_offset:.6f} rad')
-
-    shifted_array = (moving_array * numpy.exp(1j * phase_offset)).astype(moving_array.dtype)
-
-    return Object(
-        array=shifted_array,
-        pixel_geometry=moving_object.get_pixel_geometry(),
-        center=moving_object.get_center(),
-        layer_spacing_m=list(moving_object.layer_spacing_m),
-    )
-
-
-def estimate_structural_and_magnetic_objects(
+def estimate_xmcd(
     rcp_object: Object, lcp_object_aligned: Object, *, epsilon: float = 1.0e-12
 ) -> XMCDResult:
     if rcp_object.num_layers > 1 or lcp_object_aligned.num_layers > 1:
@@ -182,44 +145,34 @@ class XMCDAnalyzer(Observable):
     def set_lcp_product(self, lcirc_product_index: int) -> None:
         if self._lcp_product_index != lcirc_product_index:
             self._lcp_product_index = lcirc_product_index
-            self._lcirc_product_data = None
             self.notify_observers()
 
     def get_lcp_product(self) -> int:
         return self._lcp_product_index
 
-    def get_lcp_product_name(self) -> str:
-        lcp_product = self._repository[self._lcp_product_index]
-        return lcp_product.get_name()
-
     def set_rcp_product(self, rcirc_product_index: int) -> None:
         if self._rcp_product_index != rcirc_product_index:
             self._rcp_product_index = rcirc_product_index
-            self._rcirc_product_data = None
             self.notify_observers()
 
     def get_rcp_product(self) -> int:
         return self._rcp_product_index
 
-    def get_rcp_product_name(self) -> str:
-        rcp_product = self._repository[self._rcp_product_index]
-        return rcp_product.get_name()
-
     def analyze(self) -> None:
-        lcp_product = self._repository[self._lcp_product_index]
-        rcp_product = self._repository[self._rcp_product_index]
+        lcp_product = self._repository[self._lcp_product_index].get_product()
+        rcp_product = self._repository[self._rcp_product_index].get_product()
 
-        rcp_object = rcp_product.get_object_item().get_object()
-        lcp_object = lcp_product.get_object_item().get_object()
+        aligned_lcp_object = align_objects(rcp_product.object_, lcp_product.object_)
+        aligned_lcp_product = replace(lcp_product, object_=aligned_lcp_object)
 
-        lcp_object_aligned = align_objects(rcp_object, lcp_object)
+        ambiguities = ReconstructionAmbiguities.estimate(
+            aligned_lcp_product, reference=rcp_product
+        )
+        standardized_lcp_product = ambiguities.standardize_product(aligned_lcp_product)
 
-        # FIXME also remove phase offset
-        # FIXME ensure that phase offset estimate comes from amplitude-weighted circular mean
-
-        self._result = estimate_structural_and_magnetic_objects(
-            rcp_object=rcp_object,
-            lcp_object_aligned=lcp_object_aligned,
+        self._result = estimate_xmcd(
+            rcp_object=rcp_product.object_,
+            lcp_object_aligned=standardized_lcp_product.object_,
         )
         self.notify_observers()
 

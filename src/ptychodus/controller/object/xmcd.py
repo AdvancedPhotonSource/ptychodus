@@ -7,10 +7,7 @@ from ...model.visualization import VisualizationEngine
 from ...view.object import XMCDDialog
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
-from ..visualization import (
-    VisualizationParametersController,
-    VisualizationWidgetController,
-)
+from ..image import ImageController
 from .tree_model import ObjectTreeModel
 
 logger = logging.getLogger(__name__)
@@ -20,13 +17,13 @@ class XMCDViewController(Observer):
     def __init__(
         self,
         analyzer: XMCDAnalyzer,
-        engine: VisualizationEngine,
+        structural_visualization_engine: VisualizationEngine,
+        magnetic_visualization_engine: VisualizationEngine,
         file_dialog_factory: FileDialogFactory,
         tree_model: ObjectTreeModel,
     ) -> None:
         super().__init__()
         self._analyzer = analyzer
-        self._engine = engine
         self._file_dialog_factory = file_dialog_factory
         self._dialog = XMCDDialog()
         self._dialog.setWindowTitle('X-ray Magnetic Circular Dichroism (XMCD)')
@@ -40,20 +37,17 @@ class XMCDViewController(Observer):
         )
         self._dialog.parameters_view.save_button.clicked.connect(self._save_data)
 
-        self._difference_visualization_widget_controller = VisualizationWidgetController(
-            engine,
-            self._dialog.difference_widget,
+        self._structural_image_controller = ImageController(
+            structural_visualization_engine,
+            self._dialog.structural_view,
             self._dialog.status_bar,
             file_dialog_factory,
         )
-        self._sum_visualization_widget_controller = VisualizationWidgetController(
-            engine, self._dialog.sum_widget, self._dialog.status_bar, file_dialog_factory
-        )
-        self._ratio_visualization_widget_controller = VisualizationWidgetController(
-            engine, self._dialog.ratio_widget, self._dialog.status_bar, file_dialog_factory
-        )
-        self._visualization_parameters_controller = VisualizationParametersController(
-            engine, self._dialog.parameters_view.visualization_parameters_view
+        self._magnetic_image_controller = ImageController(
+            magnetic_visualization_engine,
+            self._dialog.magnetic_view,
+            self._dialog.status_bar,
+            file_dialog_factory,
         )
 
         analyzer.add_observer(self)
@@ -88,21 +82,21 @@ class XMCDViewController(Observer):
         self._dialog.parameters_view.rcirc_combo_box.setCurrentIndex(rcirc_product_index)
 
         try:
-            data = self._analyzer.get_result()
+            result = self._analyzer.get_result()
         except ValueError:
-            self._difference_visualization_widget_controller.clear_array()
-            self._sum_visualization_widget_controller.clear_array()
-            self._ratio_visualization_widget_controller.clear_array()
+            self._structural_image_controller.clear_array()
+            self._magnetic_image_controller.clear_array()
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.show_exception('Update Views', err)
         else:
-            self._difference_visualization_widget_controller.set_array(
-                data.polar_difference, data.pixel_geometry
+            structural_object = result.structural_object
+            self._structural_image_controller.set_array(
+                structural_object.get_layer(0), structural_object.get_pixel_geometry()
             )
-            self._sum_visualization_widget_controller.set_array(data.polar_sum, data.pixel_geometry)
-            self._ratio_visualization_widget_controller.set_array(
-                data.polar_ratio, data.pixel_geometry
+            magnetic_object = result.magnetic_object
+            self._magnetic_image_controller.set_array(
+                magnetic_object.get_layer(0), magnetic_object.get_pixel_geometry()
             )
 
     def _update(self, observable: Observable) -> None:

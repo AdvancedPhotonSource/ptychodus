@@ -44,4 +44,5 @@ class AnalysisCore:
         self.fourier_reciprocal_space_visualization_engine = VisualizationEngine(is_complex=True)
 
         self.xmcd_analyzer = XMCDAnalyzer(product_repository)
-        self.xmcd_visualization_engine = VisualizationEngine(is_complex=False)
+        self.xmcd_structural_visualization_engine = VisualizationEngine(is_complex=True)
+        self.xmcd_magnetic_visualization_engine = VisualizationEngine(is_complex=True)
