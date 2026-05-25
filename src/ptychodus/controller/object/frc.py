@@ -34,25 +34,17 @@ class FourierRingCorrelationViewController:
             return
 
         frc = self._correlator.correlate(current_index1, current_index2)
-        plot2d = frc.get_plot()
-        axis_x = plot2d.axis_x
-        axis_y = plot2d.axis_y
 
         ax = self._dialog.axes
         ax.clear()
-        ax.set_xlabel(axis_x.label)
-        ax.set_ylabel(axis_y.label)
+        ax.set_xlabel('Spatial Frequency [1/nm]')
+        ax.set_ylabel('Fourier Ring Correlation')
         ax.grid(True)
-
-        if len(axis_x.series) == 1:
-            sx = axis_x.series[0]
-
-            for sy in axis_y.series:
-                ax.plot(sx.values, sy.values, '.-', label=sy.label, linewidth=1.5)
-        else:
-            logger.warning('Failed to broadcast plot series!')
-
-        if len(axis_x.series) > 1:
-            ax.legend(loc='upper right')
+        ax.plot(
+            1.0e-9 * frc.spatial_frequency_per_m,
+            frc.correlation,
+            '.-',
+            linewidth=1.5,
+        )
 
         self._dialog.figure_canvas.draw()

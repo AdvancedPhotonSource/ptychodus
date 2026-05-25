@@ -30,6 +30,7 @@ class XMCDResult:
     magnetic_object: Object
 
 
+# FIXME move align_objects to ptychodus.api (only depends on Object + FFT, parallels FRC extraction)
 def align_objects(
     reference_object: Object, moving_object: Object, *, upsample_factor: int = 100
 ) -> Object:
@@ -163,11 +164,9 @@ class XMCDAnalyzer(Observable):
         rcp_product = self._repository[self._rcp_product_index].get_product()
 
         aligned_lcp_object = align_objects(rcp_product.object_, lcp_product.object_)
-        aligned_lcp_product = replace(lcp_product, object_=aligned_lcp_object)
+        aligned_lcp_product = replace(lcp_product, object_=aligned_lcp_object)  # FIXME
 
-        ambiguities = ReconstructionAmbiguities.estimate(
-            aligned_lcp_product, reference=rcp_product
-        )
+        ambiguities = ReconstructionAmbiguities.estimate(aligned_lcp_product, reference=rcp_product)
         standardized_lcp_product = ambiguities.standardize_product(aligned_lcp_product)
 
         self._result = estimate_xmcd(
@@ -188,7 +187,7 @@ class XMCDAnalyzer(Observable):
     def get_save_file_filter(self) -> str:
         return 'NumPy Zipped Archive (*.npz)'
 
-    def save_data(self, file_path: Path) -> None:
+    def save_data(self, file_path: Path) -> None:  # FIXME rethink
         if self._result is None:
             raise ValueError('No analyzed data!')
 

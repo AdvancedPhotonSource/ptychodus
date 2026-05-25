@@ -1,4 +1,4 @@
-"""Visualization utilities: colormaps, plot data structures, and image rendering for ptychography results."""
+"""Visualization utilities: colormaps and image rendering for ptychography results."""
 
 from __future__ import annotations
 from collections.abc import Iterator, Sequence
@@ -19,47 +19,6 @@ from .common import ComplexArrayType, NumberArrayType, RealArrayType
 from .geometry import Box2D, Interval, Line2D, PixelGeometry
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class PlotSeries:
-    """A named sequence of float values representing one data series in a plot."""
-
-    label: str
-    values: Sequence[float]
-
-    def copy(self) -> PlotSeries:
-        return PlotSeries(str(self.label), list(self.values))
-
-
-@dataclass(frozen=True)
-class PlotAxis:
-    """A labeled axis containing one or more PlotSeries."""
-
-    label: str
-    series: Sequence[PlotSeries]
-
-    @classmethod
-    def create_null(cls) -> PlotAxis:
-        return cls('', [])
-
-    def copy(self) -> PlotAxis:
-        return PlotAxis(str(self.label), [series.copy() for series in self.series])
-
-
-@dataclass(frozen=True)
-class Plot2D:
-    """A 2D plot with labeled X and Y axes, each containing one or more data series."""
-
-    axis_x: PlotAxis
-    axis_y: PlotAxis
-
-    @classmethod
-    def create_null(cls) -> Plot2D:
-        return cls(PlotAxis.create_null(), PlotAxis.create_null())
-
-    def copy(self) -> Plot2D:
-        return Plot2D(self.axis_x.copy(), self.axis_y.copy())
 
 
 @dataclass(frozen=True)

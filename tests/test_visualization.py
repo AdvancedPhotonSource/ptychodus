@@ -12,9 +12,6 @@ from ptychodus.api.visualization import (
     CylindricalColorModel,
     KernelDensityEstimate,
     LineCut,
-    Plot2D,
-    PlotAxis,
-    PlotSeries,
     ScalarTransformation,
     VisualizationProduct,
     cyclic_colormap_names,
@@ -50,61 +47,6 @@ def _make_product(
     geo = pixel_geo if pixel_geo is not None else _pixel_geo()
     color_range = Interval[float](0.0, 1.0)
     return VisualizationProduct(value_label, values, rgba, geo, color_range)
-
-
-# ---------------------------------------------------------------------------
-# PlotSeries
-# ---------------------------------------------------------------------------
-
-
-class TestPlotSeries:
-    def test_copy_is_equal(self):
-        ps = PlotSeries('x', [1.0, 2.0, 3.0])
-        cp = ps.copy()
-        assert cp.label == ps.label
-        assert list(cp.values) == list(ps.values)
-
-    def test_copy_is_independent(self):
-        original = [1.0, 2.0]
-        ps = PlotSeries('x', original)
-        cp = ps.copy()
-        original.append(3.0)
-        assert len(list(cp.values)) == 2
-
-
-# ---------------------------------------------------------------------------
-# PlotAxis
-# ---------------------------------------------------------------------------
-
-
-class TestPlotAxis:
-    def test_create_null(self):
-        ax = PlotAxis.create_null()
-        assert ax.label == ''
-        assert list(ax.series) == []
-
-    def test_copy(self):
-        ax = PlotAxis('Y', [PlotSeries('a', [1.0])])
-        cp = ax.copy()
-        assert cp.label == 'Y'
-        assert len(list(cp.series)) == 1
-
-
-# ---------------------------------------------------------------------------
-# Plot2D
-# ---------------------------------------------------------------------------
-
-
-class TestPlot2D:
-    def test_create_null(self):
-        p = Plot2D.create_null()
-        assert p.axis_x.label == ''
-        assert p.axis_y.label == ''
-
-    def test_copy(self):
-        p = Plot2D.create_null()
-        cp = p.copy()
-        assert cp.axis_x.label == p.axis_x.label
 
 
 # ---------------------------------------------------------------------------
