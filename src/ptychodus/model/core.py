@@ -180,6 +180,7 @@ class ModelCore:
             self.diffraction_core.dataset,
             self.product_core.product_repository,
             self.product_core.object_repository,
+            self.product_core.probe_positions_repository,
         )
         self.globus_core = GlobusCore(
             self.settings_registry,

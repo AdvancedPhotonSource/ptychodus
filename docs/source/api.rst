@@ -6,6 +6,14 @@ API Reference
    :caption: Contents
 
 
+Affine
+------
+
+.. automodule:: ptychodus.api.affine
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Common
 ------
 

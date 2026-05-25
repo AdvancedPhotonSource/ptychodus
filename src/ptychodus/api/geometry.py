@@ -30,6 +30,15 @@ class AffineTransform:
         yp = self.a10 * x + self.a11 * y + self.a12
         return xp, yp
 
+    def apply_transform(self, points: RealArrayType) -> RealArrayType:
+        """Vectorized form of ``__call__``: apply this transform to an (N, 2) array of (x, y)
+        points and return an (N, 2) array of (x', y')."""
+        x = points[:, 0]
+        y = points[:, 1]
+        xp = self.a00 * x + self.a01 * y + self.a02
+        yp = self.a10 * x + self.a11 * y + self.a12
+        return numpy.column_stack((xp, yp))
+
 
 @dataclass(frozen=True)
 class PixelGeometry:
