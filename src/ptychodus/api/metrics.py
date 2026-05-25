@@ -29,6 +29,16 @@ class FourierRingCorrelation:
         low-frequency rings tolerate higher correlation before being deemed
         significant.
         """
+        return self._resolution_at_threshold_curve(self.get_bit_threshold_curve(bits))
+
+    def get_bit_threshold_curve(self, bits: float = 0.5) -> RealArrayType:
+        """Per-ring van Heel/Schatz b-bit FRC significance threshold.
+
+        Returns the per-ring threshold curve used by
+        :meth:`get_resolution_m_at_bit_threshold`. Bins with zero pixels yield
+        NaN. Useful for overlaying the threshold on an FRC plot without
+        re-deriving the formula.
+        """
         sigma = 0.5 * (2.0**bits - 1.0)
         sqrt_sigma = float(numpy.sqrt(sigma))
         n_per_ring = numpy.asarray(self.pixels_per_ring, dtype=float)
@@ -39,7 +49,78 @@ class FourierRingCorrelation:
                 sigma + 1.0 + 2.0 * sqrt_sigma * inv_sqrt_n
             )
 
-        return self._resolution_at_threshold_curve(threshold_curve)
+        return threshold_curve
+
+    def get_spectral_signal_to_noise_ratio(self) -> RealArrayType:
+        """Spectral SNR per ring under the full-image van Heel/Schatz convention.
+
+        ``SSNR(f) = 2 * FRC(f) / (1 - FRC(f))``. Negative FRC values (anti-
+        correlation from noise, not physical signal) are clipped to 0 so SSNR=0.
+        FRC values of exactly 1 yield +inf. NaN inputs propagate as NaN.
+        """
+        frc = numpy.asarray(self.correlation, dtype=float)
+        nan_mask = numpy.isnan(frc)
+        safe_frc = numpy.clip(frc, 0.0, None)
+        denominator = 1.0 - safe_frc
+
+        with numpy.errstate(divide='ignore', invalid='ignore'):
+            ssnr = numpy.where(denominator > 0.0, 2.0 * safe_frc / denominator, numpy.inf)
+
+        return numpy.where(nan_mask, numpy.nan, ssnr)
+
+    def get_area_under_curve(
+        self,
+        *,
+        normalize: bool = True,
+        max_frequency_per_m: float | None = None,
+    ) -> float:
+        """Trapezoidal area under the FRC curve over spatial frequency.
+
+        NaN correlation bins are excluded. With ``normalize=True`` the integral
+        is divided by the span of the integration domain, giving a dimensionless
+        number in [0, 1] (1 = ideal FRC, 0 = uncorrelated). With
+        ``normalize=False`` the result has units of m^-1. ``max_frequency_per_m``
+        optionally clips the upper end of the integration domain.
+        """
+        freq = numpy.asarray(self.spatial_frequency_per_m, dtype=float)
+        corr = numpy.asarray(self.correlation, dtype=float)
+
+        mask = numpy.isfinite(corr) & numpy.isfinite(freq)
+        if max_frequency_per_m is not None:
+            mask &= freq <= max_frequency_per_m
+
+        if int(mask.sum()) < 2:
+            return float('nan')
+
+        f = freq[mask]
+        y = corr[mask]
+        span = float(f[-1] - f[0])
+
+        if span <= 0.0:
+            return float('nan')
+
+        auc = float(numpy.trapezoid(y, f))
+        return auc / span if normalize else auc
+
+    def get_average_signal_to_noise_ratio(self) -> float:
+        """Mean SSNR across bins, excluding non-finite values (NaN and +inf)."""
+        ssnr = self.get_spectral_signal_to_noise_ratio()
+        finite = numpy.isfinite(ssnr)
+        if not bool(finite.any()):
+            return float('nan')
+        return float(numpy.mean(ssnr[finite]))
+
+    def get_resolution_m_at_signal_to_noise_threshold(self, snr: float) -> float:
+        """Resolution where the FRC-derived SSNR drops below ``snr``.
+
+        Inverts ``SSNR = 2 * FRC / (1 - FRC)`` to get the equivalent FRC
+        threshold ``F = snr / (snr + 2)`` and defers to
+        :meth:`get_resolution_m`. Raises ``ValueError`` for negative ``snr``.
+        """
+        if snr < 0.0:
+            raise ValueError('SNR threshold must be non-negative')
+        frc_threshold = snr / (snr + 2.0)
+        return self.get_resolution_m(frc_threshold)
 
     def _resolution_at_threshold_curve(self, threshold_curve: RealArrayType) -> float:
         freq = numpy.asarray(self.spatial_frequency_per_m)

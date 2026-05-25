@@ -1,11 +1,12 @@
 from __future__ import annotations
+from dataclasses import replace
 import logging
 
-import numpy
-
 from ptychodus.api.metrics import FourierRingCorrelation, compute_fourier_ring_correlation
+from ptychodus.api.object import align_objects
+from ptychodus.api.reconstructor import ReconstructionAmbiguities
 
-from ..product import ObjectRepository
+from ..product import ProductRepository
 
 __all__ = ['FourierRingCorrelation', 'FourierRingCorrelator']
 
@@ -13,29 +14,30 @@ logger = logging.getLogger(__name__)
 
 
 class FourierRingCorrelator:
-    def __init__(self, repository: ObjectRepository) -> None:
+    def __init__(self, repository: ProductRepository) -> None:
         self._repository = repository
 
     def correlate(self, product_index_1: int, product_index_2: int) -> FourierRingCorrelation:
-        object1 = self._repository[product_index_1].get_object()
-        object2 = self._repository[product_index_2].get_object()
+        product1 = self._repository[product_index_1].get_product()
+        product2 = self._repository[product_index_2].get_product()
 
-        # FIXME support multilayer objects
-        array1 = object1.get_layer(0)
-        array2 = object2.get_layer(0)
+        aligned_object2 = align_objects(product1.object_, product2.object_)
+        aligned_product2 = replace(product2, object_=aligned_object2)
 
-        if numpy.ndim(array1) != 2 or numpy.ndim(array2) != 2:
-            raise ValueError('Arrays must be 2D!')
+        ambiguities = ReconstructionAmbiguities.estimate(aligned_product2, reference=product1)
+        standardized_product2 = ambiguities.standardize_product(aligned_product2)
 
-        if numpy.shape(array1) != numpy.shape(array2):
-            raise ValueError('Arrays must have same shape!')
+        object1 = product1.object_
+        object2 = standardized_product2.object_
 
-        # FIXME verify compatible pixel geometry
-        # FIXME subpixel image registration: skimage.registration.phase_cross_correlation
-        # FIXME remove phase offset and ramp
-        # FIXME apply soft-edged mask
-        # FIXME stats: SSNR, area under FRC curve, average SNR, etc.
-        pixel_geometry = object2.get_pixel_geometry()
+        if object1.num_layers > 1 or object2.num_layers > 1:
+            logger.warning('FRC flattens multi-layer objects; per-layer FRC is not implemented.')
+
+        array1 = object1.get_layers_flattened()
+        array2 = object2.get_layers_flattened()
+
+        # TODO apply soft-edged mask
+        pixel_geometry = object1.get_pixel_geometry()
 
         return compute_fourier_ring_correlation(
             array1,

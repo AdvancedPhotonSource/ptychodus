@@ -5,12 +5,16 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+import logging
 
 import numpy
+from skimage.registration import phase_cross_correlation
 
 from .common import ComplexArrayType, RealArrayType
 from .geometry import PixelGeometry
 from .probe_positions import ProbePosition
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -242,6 +246,87 @@ class Object:
 
     def __repr__(self) -> str:
         return f'{self._array.dtype}{self._array.shape}'
+
+
+def align_objects(
+    reference_object: Object, moving_object: Object, *, upsample_factor: int = 100
+) -> Object:
+    """Sub-pixel align ``moving_object`` to ``reference_object``.
+
+    Estimates the sub-pixel translation between the two reconstructions with
+    ``skimage.registration.phase_cross_correlation`` (run on layer-flattened
+    amplitudes), then applies the shift to every layer of the complex
+    ``moving_object`` array via a Fourier phase ramp so the complex phase is
+    preserved across the interpolation.
+
+    The returned object's ``center`` is offset from the moving object's center
+    by ``-shift_yx * pixel_size`` (in meters). This preserves the
+    world-coordinate mapping of every probe position that was previously valid
+    against ``moving_object``: a probe at world coordinate ``W`` that addressed
+    a particular piece of content in ``moving_object`` will, after alignment,
+    address that same content at its new array index in the returned object.
+    The returned center therefore differs from ``reference_object.get_center()``
+    by the alignment shift.
+
+    Args:
+        reference_object: The reconstruction whose array indices the result is
+            aligned to.
+        moving_object: The reconstruction to be re-registered. Must share
+            ``reference_object``'s pixel geometry and flattened array shape.
+        upsample_factor: Sub-pixel precision passed to
+            ``phase_cross_correlation``. Higher values find finer shifts at
+            roughly linear cost.
+    """
+    reference_pixel_geometry = reference_object.get_pixel_geometry()
+    moving_pixel_geometry = moving_object.get_pixel_geometry()
+    if reference_pixel_geometry != moving_pixel_geometry:
+        raise ValueError(
+            f'Object pixel geometry mismatch: reference {reference_pixel_geometry} '
+            f'vs moving {moving_pixel_geometry}!'
+        )
+
+    reference_flat = reference_object.get_layers_flattened()
+    moving_flat = moving_object.get_layers_flattened()
+    if reference_flat.shape != moving_flat.shape:
+        raise ValueError(
+            f'Object array shape mismatch: reference {reference_flat.shape} '
+            f'vs moving {moving_flat.shape}!'
+        )
+
+    shift_yx, _, _ = phase_cross_correlation(
+        numpy.absolute(reference_flat),
+        numpy.absolute(moving_flat),
+        upsample_factor=upsample_factor,
+    )
+    logger.info(f'align_objects sub-pixel shift (y, x) = {tuple(shift_yx)} px')
+
+    moving_array = moving_object.get_array()
+    height_px, width_px = moving_array.shape[-2:]
+    ky = numpy.fft.fftfreq(height_px)
+    kx = numpy.fft.fftfreq(width_px)
+    ky_grid, kx_grid = numpy.meshgrid(ky, kx, indexing='ij')
+    # exp(-2πi * shift * k_normalized) shifts the inverse-transformed signal by +shift in real space
+    phase_ramp = numpy.exp(-2j * numpy.pi * (shift_yx[0] * ky_grid + shift_yx[1] * kx_grid))
+
+    moving_fft = numpy.fft.fft2(moving_array, axes=(-2, -1))
+    aligned_array = numpy.fft.ifft2(moving_fft * phase_ramp[numpy.newaxis], axes=(-2, -1)).astype(
+        moving_array.dtype
+    )
+
+    moving_center = moving_object.get_center()
+    new_center = ObjectCenter(
+        coordinate_x_m=moving_center.coordinate_x_m
+        - float(shift_yx[1]) * moving_pixel_geometry.width_m,
+        coordinate_y_m=moving_center.coordinate_y_m
+        - float(shift_yx[0]) * moving_pixel_geometry.height_m,
+    )
+
+    return Object(
+        array=aligned_array,
+        pixel_geometry=moving_pixel_geometry.copy(),
+        center=new_center,
+        layer_spacing_m=list(moving_object.layer_spacing_m),
+    )
 
 
 class ObjectFileReader(ABC):

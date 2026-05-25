@@ -241,3 +241,190 @@ class TestBitThresholdResolution:
         max_resolvable_m = shape[0] * pixel_size_m
         assert numpy.isfinite(resolution)
         assert nyquist_resolution_m < resolution < max_resolvable_m
+
+
+class TestBitThresholdCurve:
+    def test_half_bit_curve_asymptote_at_large_n(self):
+        # With huge pixels_per_ring the per-bin threshold tends to
+        # HALF_BIT_ASYMPTOTE (~0.172) — same constant guarded by the existing
+        # resolution tests above. The 1/sqrt(N) correction at N=1e6 is ~1e-3.
+        frc = _make_frc([1.0, 0.5, 0.0], pixels_per_ring=[1, 1_000_000, 1_000_000])
+        curve = frc.get_bit_threshold_curve(0.5)
+        numpy.testing.assert_allclose(
+            curve[1:], TestBitThresholdResolution.HALF_BIT_ASYMPTOTE, atol=2e-3
+        )
+
+    def test_one_bit_curve_asymptote_at_large_n(self):
+        frc = _make_frc([1.0, 0.5, 0.2], pixels_per_ring=[1, 1_000_000, 1_000_000])
+        curve = frc.get_bit_threshold_curve(1.0)
+        numpy.testing.assert_allclose(
+            curve[1:], TestBitThresholdResolution.ONE_BIT_ASYMPTOTE, atol=2e-3
+        )
+
+    def test_zero_pixels_per_ring_gives_nan(self):
+        frc = _make_frc([1.0, 1.0, 0.0], pixels_per_ring=[0, 0, 4])
+        curve = frc.get_bit_threshold_curve(0.5)
+        assert numpy.isnan(curve[0])
+        assert numpy.isnan(curve[1])
+        assert numpy.isfinite(curve[2])
+
+    def test_output_shape_matches_correlation(self):
+        frc = _make_frc([1.0, 0.5, 0.2, 0.0])
+        assert frc.get_bit_threshold_curve().shape == frc.correlation.shape
+
+
+class TestSpectralSignalToNoiseRatio:
+    def test_half_correlation_gives_snr_of_two(self):
+        # SSNR = 2 * 0.5 / (1 - 0.5) = 2
+        frc = _make_frc([0.5, 0.5, 0.5])
+        numpy.testing.assert_allclose(frc.get_spectral_signal_to_noise_ratio(), 2.0)
+
+    def test_unit_correlation_gives_positive_infinity(self):
+        # FRC == 1 makes the denominator vanish → +inf.
+        frc = _make_frc([1.0, 0.5, 0.0])
+        ssnr = frc.get_spectral_signal_to_noise_ratio()
+        assert numpy.isposinf(ssnr[0])
+        assert ssnr[1] == pytest.approx(2.0)
+        assert ssnr[2] == pytest.approx(0.0)
+
+    def test_zero_correlation_gives_zero_snr(self):
+        frc = _make_frc([0.0, 0.0])
+        numpy.testing.assert_allclose(frc.get_spectral_signal_to_noise_ratio(), 0.0)
+
+    def test_negative_correlation_is_clipped_to_zero(self):
+        # Anti-correlation from noise is not a physical signal.
+        frc = _make_frc([-0.3, -0.1, 0.5])
+        ssnr = frc.get_spectral_signal_to_noise_ratio()
+        assert ssnr[0] == pytest.approx(0.0)
+        assert ssnr[1] == pytest.approx(0.0)
+        assert ssnr[2] == pytest.approx(2.0)
+
+    def test_nan_propagates(self):
+        frc = _make_frc([1.0, float('nan'), 0.5])
+        ssnr = frc.get_spectral_signal_to_noise_ratio()
+        assert numpy.isposinf(ssnr[0])
+        assert numpy.isnan(ssnr[1])
+        assert ssnr[2] == pytest.approx(2.0)
+
+    def test_output_shape_matches_correlation(self):
+        frc = _make_frc([1.0, 0.5, 0.2, 0.0])
+        assert frc.get_spectral_signal_to_noise_ratio().shape == frc.correlation.shape
+
+
+class TestAreaUnderCurve:
+    def test_constant_unit_frc_normalized_auc_is_one(self):
+        # FRC ≡ 1 over freq = [0, 1, 2, 3] → AUC = 3, normalized = 1.
+        frc = _make_frc([1.0, 1.0, 1.0, 1.0])
+        assert frc.get_area_under_curve() == pytest.approx(1.0)
+        assert frc.get_area_under_curve(normalize=False) == pytest.approx(3.0)
+
+    def test_zero_frc_gives_zero_auc(self):
+        frc = _make_frc([0.0, 0.0, 0.0])
+        assert frc.get_area_under_curve() == pytest.approx(0.0)
+        assert frc.get_area_under_curve(normalize=False) == pytest.approx(0.0)
+
+    def test_triangular_ramp_normalized_auc_is_one_half(self):
+        # FRC = 1 - f/(N-1) on freq = [0, 1, 2, 3] → AUC = 1.5, normalized = 0.5.
+        frc = _make_frc([1.0, 2.0 / 3.0, 1.0 / 3.0, 0.0])
+        assert frc.get_area_under_curve() == pytest.approx(0.5)
+        assert frc.get_area_under_curve(normalize=False) == pytest.approx(1.5)
+
+    def test_max_frequency_clips_integration_domain(self):
+        # Whole curve: freq = [0..4], FRC ≡ 1 → AUC = 4. Clipping to 2.0 → AUC = 2.
+        frc = _make_frc([1.0, 1.0, 1.0, 1.0, 1.0])
+        assert frc.get_area_under_curve(normalize=False, max_frequency_per_m=2.0) == pytest.approx(
+            2.0
+        )
+        assert frc.get_area_under_curve(max_frequency_per_m=2.0) == pytest.approx(1.0)
+
+    def test_nan_bins_excluded(self):
+        # Drop the bin at freq=1 → integrate over freq = [0, 2, 3].
+        # Trapezoid on a constant FRC = 1 still gives span = 3, normalized = 1.
+        frc = _make_frc([1.0, float('nan'), 1.0, 1.0])
+        assert frc.get_area_under_curve(normalize=False) == pytest.approx(3.0)
+        assert frc.get_area_under_curve() == pytest.approx(1.0)
+
+    def test_fewer_than_two_finite_points_returns_nan(self):
+        frc = _make_frc([1.0, float('nan'), float('nan')])
+        assert numpy.isnan(frc.get_area_under_curve())
+        assert numpy.isnan(frc.get_area_under_curve(normalize=False))
+
+    def test_zero_span_returns_nan(self):
+        # Clipping to a max below the second frequency leaves a single point.
+        frc = _make_frc([1.0, 1.0, 1.0])
+        assert numpy.isnan(frc.get_area_under_curve(max_frequency_per_m=0.5))
+
+
+class TestAverageSignalToNoiseRatio:
+    def test_constant_half_correlation_averages_to_two(self):
+        frc = _make_frc([0.5, 0.5, 0.5])
+        assert frc.get_average_signal_to_noise_ratio() == pytest.approx(2.0)
+
+    def test_infinite_ssnr_bins_excluded(self):
+        # FRC == 1 at bin 0 → +inf SSNR there; should be dropped from the mean.
+        # Remaining bin has FRC = 0.5 → SSNR = 2.
+        frc = _make_frc([1.0, 0.5])
+        assert frc.get_average_signal_to_noise_ratio() == pytest.approx(2.0)
+
+    def test_all_nan_returns_nan(self):
+        frc = _make_frc([float('nan'), float('nan')])
+        assert numpy.isnan(frc.get_average_signal_to_noise_ratio())
+
+    def test_all_infinite_returns_nan(self):
+        # Every FRC == 1 → every SSNR is +inf → no finite bins.
+        frc = _make_frc([1.0, 1.0])
+        assert numpy.isnan(frc.get_average_signal_to_noise_ratio())
+
+
+class TestResolutionAtSignalToNoiseThreshold:
+    def test_snr_two_matches_frc_threshold_one_half(self):
+        # SSNR = 2 inverts to FRC = 2 / (2 + 2) = 0.5.
+        frc = _make_frc([1.0, 0.8, 0.2])
+        snr_resolution = frc.get_resolution_m_at_signal_to_noise_threshold(2.0)
+        frc_resolution = frc.get_resolution_m(0.5)
+        assert snr_resolution == pytest.approx(frc_resolution)
+
+    def test_snr_zero_matches_frc_threshold_zero(self):
+        frc = _make_frc([1.0, 0.5, -0.1])
+        snr_resolution = frc.get_resolution_m_at_signal_to_noise_threshold(0.0)
+        frc_resolution = frc.get_resolution_m(0.0)
+        # Both reach the same below-threshold bin.
+        assert (numpy.isnan(snr_resolution) and numpy.isnan(frc_resolution)) or (
+            snr_resolution == pytest.approx(frc_resolution)
+        )
+
+    def test_negative_snr_raises(self):
+        frc = _make_frc([1.0, 0.5, 0.0])
+        with pytest.raises(ValueError, match='non-negative'):
+            frc.get_resolution_m_at_signal_to_noise_threshold(-1.0)
+
+    def test_round_trip_two_noisy_copies(self):
+        # On a realistic noisy spectrum, the SNR=2 resolution should land
+        # between Nyquist and the full image span — the same window as the
+        # half-bit resolution in the existing round-trip test.
+        rng = numpy.random.default_rng(7)
+        shape = (64, 64)
+        pixel_size_m = 1e-6
+        ky = numpy.fft.fftfreq(shape[0])
+        kx = numpy.fft.fftfreq(shape[1])
+        radius = numpy.hypot(ky[:, None], kx[None, :])
+
+        spectrum = rng.standard_normal(shape) + 1j * rng.standard_normal(shape)
+        spectrum *= numpy.exp(-((radius / 0.15) ** 2) / 2.0)
+        image = numpy.fft.ifft2(spectrum)
+
+        noise_scale = 0.05 * numpy.abs(image).max()
+        noisy_a = image + noise_scale * (
+            rng.standard_normal(shape) + 1j * rng.standard_normal(shape)
+        )
+        noisy_b = image + noise_scale * (
+            rng.standard_normal(shape) + 1j * rng.standard_normal(shape)
+        )
+
+        frc = compute_fourier_ring_correlation(noisy_a, noisy_b, pixel_size_m, pixel_size_m)
+        resolution = frc.get_resolution_m_at_signal_to_noise_threshold(2.0)
+
+        nyquist_resolution_m = 2.0 * pixel_size_m
+        max_resolvable_m = shape[0] * pixel_size_m
+        assert numpy.isfinite(resolution)
+        assert nyquist_resolution_m < resolution < max_resolvable_m

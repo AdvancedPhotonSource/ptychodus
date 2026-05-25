@@ -5,7 +5,7 @@ import numpy
 from ptychodus.api.settings import SettingsRegistry
 
 from ..diffraction import AssembledDiffractionDataset
-from ..product import ObjectRepository, ProbePositionsRepository, ProductRepository
+from ..product import ProbePositionsRepository, ProductRepository
 from ..visualization import VisualizationEngine
 from .affine import AffineTransformEstimator
 from .diffraction import DiffractionSimulator
@@ -26,7 +26,6 @@ class AnalysisCore:
         settings_registry: SettingsRegistry,
         dataset: AssembledDiffractionDataset,
         product_repository: ProductRepository,
-        object_repository: ObjectRepository,
         probe_positions_repository: ProbePositionsRepository,
     ) -> None:
         self._affine_transform_estimator_settings = AffineTransformEstimatorSettings(
@@ -46,7 +45,7 @@ class AnalysisCore:
         self.exposure_analyzer = IlluminationMapper(product_repository)
         self.exposure_visualization_engine = VisualizationEngine(is_complex=False)
 
-        self.fourier_ring_correlator = FourierRingCorrelator(object_repository)
+        self.fourier_ring_correlator = FourierRingCorrelator(product_repository)
 
         self.fourier_analyzer = FourierAnalyzer(product_repository)
         self.fourier_real_space_visualization_engine = VisualizationEngine(is_complex=True)
