@@ -8,10 +8,10 @@ Ptychodus is a ptychography data-analysis application that ingests instrument da
 
 ## Common Commands
 
-Project uses `uv` (preferred) and a developer install with extras. The repo also ships `install.sh` which adds a CUDA PyTorch nightly index — only use it when the torch/PtychoPINN stack is needed.
+Project uses `uv` (preferred) and a developer install with extras.
 
 ```sh
-# Dev install (preferred)
+# Dev install (preferred). Other available extras: docs, ptychopinn
 uv sync --extra globus --extra gui --extra ptychi
 
 # Launch GUI
@@ -23,7 +23,7 @@ uv run ptychodus -b train      -i <input_dir> -o <output_dir>
 # Batch mode reads <input_dir>/settings.ini, <input_dir>/diffraction.h5, <input_dir>/product-in.h5
 # (see StandardFileLayout in src/ptychodus/api/io.py)
 
-# Beamline data-prep CLI (see TODO file for a full real-world invocation)
+# Beamline data-prep CLI
 uv run ptychodus-bdp --product-name <name> --diffraction-input <h5> \
                      --probe-position-input <csv> --output-directory <dir> \
                      --settings <ini>
@@ -33,6 +33,7 @@ uv run convert-to-ptychodus
 uv run ptychodus-system-check
 uv run ptychodus-iri-tokens          # Genesis/IRI auth
 uv run ptychodus-transfer-tokens     # AmSC data-transfer auth
+uv run ptychodus-ptychopinn-tf-test  # PtychoPINN TensorFlow smoke check
 ```
 
 Tests, lint, types:
@@ -46,7 +47,7 @@ uv run ruff format .                           # format (single quotes, line-len
 uv run mypy src/ptychodus                      # type check (py 3.11)
 ```
 
-CI (.github/workflows/python-package.yml) only verifies that `pip install .` succeeds and `ptychodus --version` runs on Python 3.10–3.12 — it does **not** run pytest, ruff, or mypy. Run them locally before pushing.
+CI (`.github/workflows/python-package.yml`) runs four jobs on push/PR to `main`: a `pip install` + `ptychodus --version` smoke test (Py 3.11/3.12/3.13), `pytest tests/`, `ruff check` + `ruff format --check`, and `mypy src/ptychodus`. Run the local equivalents before pushing — CI will block the PR otherwise.
 
 Container & docs:
 
@@ -61,7 +62,7 @@ make -C docs html        # Sphinx docs into docs/build/
 ### Three-layer separation: api / model / view+controller
 
 - **`src/ptychodus/api/`** — pure-Python domain layer with **no** GUI or model dependencies. Defines core data structures (`Product`, `ProbeSequence`, `Object`, `ProbePositionSequence`, `DiffractionDataset`, `AssembledDiffractionData`), abstract interfaces (`DiffractionFileReader/Writer`, `ProductFileReader/Writer`, `Reconstructor`, `TrainableReconstructor`, `WorkflowAPI`), and infrastructure (`Observable`/`Observer`, `Parameter`/`ParameterGroup`, `SettingsRegistry`, `PluginRegistry`/`PluginChooser`). All other layers depend on this; this layer depends on nothing else in ptychodus.
-- **`src/ptychodus/model/`** — application logic. Each subpackage (`diffraction/`, `product/`, `processing/`, `analysis/`, `fluorescence/`, `globus/`, `genesis/`, `automation/`, `agent/`, `visualization/`, `ptychi/`, `ptychonn/`, `ptychopinn/`, `ptychopinn_torch/`) exposes a `*Core` class that owns its settings, repositories, and APIs. `model/core.py::ModelCore` is the composition root: it constructs every `*Core` in dependency order and wires them together. Used both by the GUI and by `__main__.py` batch mode.
+- **`src/ptychodus/model/`** — application logic. Each subpackage (`diffraction/`, `product/`, `processing/`, `reconstructor/`, `analysis/`, `fluorescence/`, `globus/`, `genesis/`, `automation/`, `agent/`, `visualization/`, `ptychi/`, `ptychonn/`, `ptychopinn/`, `ptychopinn_torch/`) exposes a `*Core` class that owns its settings, repositories, and APIs. `model/core.py::ModelCore` is the composition root: it constructs every `*Core` in dependency order and wires them together. Used both by the GUI and by `__main__.py` batch mode.
 - **`src/ptychodus/view/`** (PyQt5 widgets, no logic) and **`src/ptychodus/controller/`** (mediates between widgets and model). Mirror the model package layout. `view/core.py::ViewCore` and `controller/core.py::ControllerCore` are the composition roots; the navigation toolbar order in `ViewCore` is the source of truth for the left/right stacked-panel indexes.
 
 The GUI is optional: `__main__.py` falls back to headless mode if PyQt5 is missing. `ptychodus_stream_processor.py` (the `PtychodusAdImageProcessor`) is the third entry mode and is only imported when `pvapy` is available.
@@ -74,7 +75,7 @@ To add a new file format: create a module under `src/ptychodus/plugins/`, implem
 
 ### Settings & observers
 
-Settings flow through `api/parametric.py::Parameter[T]` and `ParameterGroup`. Each `*Core` calls `settings_registry.create_group(name)` and creates typed parameters on it. `SettingsRegistry` serializes the full tree as INI (see `*.ini` files at the repo root for examples — `defaults_v1.1.1.ini` is the canonical template). Components react to settings changes through the `Observer`/`Observable` pattern in `api/observer.py`; `PluginChooser.synchronize_with_parameter` is the typical bridge for "settings string → currently selected plugin." When adding cross-component reactivity, hook observers rather than poll.
+Settings flow through `api/parametric.py::Parameter[T]` and `ParameterGroup`. Each `*Core` calls `settings_registry.create_group(name)` and creates typed parameters on it. `SettingsRegistry` serializes the full tree as INI. Components react to settings changes through the `Observer`/`Observable` pattern in `api/observer.py`; `PluginChooser.synchronize_with_parameter` is the typical bridge for "settings string → currently selected plugin." When adding cross-component reactivity, hook observers rather than poll.
 
 ### Reconstructor libraries
 
@@ -89,7 +90,7 @@ Each reconstructor backend (`model/ptychi/`, `model/ptychonn/`, `model/ptychopin
 Two providers, both gated by optional dependencies and constructed by `ModelCore` even when disabled:
 
 - `model/globus/` — Globus Compute submission, used by the original APS workflow.
-- `model/genesis/` — IRI/AmSC HPC submission with facility adapters in `model/genesis/facility_adapters.py` and per-facility scripts under `src/ptychodus/scripts/genesis/{alcf,nersc,olcf}/`. The corresponding `amsc-{alcf,nersc,olcf}.ini` files at the repo root are real configs, not examples.
+- `model/genesis/` — IRI/AmSC HPC submission with facility adapters in `model/genesis/facility_adapters.py` and per-facility scripts under `src/ptychodus/scripts/genesis/{alcf,nersc,olcf}/`.
 
 `WorkflowAPI` (see `api/workflow.py` and `model/workflow.py::ConcreteWorkflowAPI`) is the unified façade that GUI, batch mode, and remote workflows all drive.
 
@@ -97,11 +98,9 @@ Two providers, both gated by optional dependencies and constructed by `ModelCore
 
 - Ruff is configured for **single-quoted** strings, 100-char lines, py311 target. The selected lint rules (F, N, NPY) flag pyflakes errors, PEP-8 naming, and NumPy-specific issues. NumPy/Qt-style names (e.g., `probe_energy_eV`, `set_value_from_string`) are accepted via `# noqa: N802/N806/N815` — preserve the unit suffixes on physical quantities; reviewers expect them.
 - Type hints are mandatory; `pyproject.toml` lists modules whose missing stubs are intentionally ignored. Keep new code typed and avoid widening that ignore list.
-- The `.ini` files at the repo root are real working configurations for specific beamlines/facilities (APS sectors, NSLS-II, LCLS, MAX IV NanoMAX, SLS cSAXS, etc.) — do not treat them as scratch files.
 - `model/core.py::ModelCore.is_developer_mode_enabled` is `True` whenever the effective log level ≤ DEBUG (`--log-level 10`). Some controllers gate features (Agent panel, probe-position analysis) behind it.
 
 ## Repository Notes
 
 - The git CI workflow targets `main`; local development branches such as `amsc` are active — confirm the intended target before opening PRs.
-- `TODO` (plain text, repo root) tracks the maintainer's work-in-progress notes and contains useful real `ptychodus-bdp` invocations and Globus-Compute endpoint setup snippets.
-- `dist/`, `bool_pixels.npy`, `nanomax3002_product.h5`, `nanomax3003_product.h5`, and the various `.ini` files in the working tree are **untracked** local artifacts — do not stage them in commits unless explicitly asked.
+- Sample `.h5`/`.npy` data and the `dist/` build output in the working tree are typically **untracked** local artifacts — do not stage them in commits unless explicitly asked.
