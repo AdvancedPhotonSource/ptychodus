@@ -92,9 +92,7 @@ class VSPILinearOperator(LinearOperator):
         object_array = x.reshape((object_geometry.height_px, object_geometry.width_px))
         AX = numpy.zeros(len(self._product.probe_positions))  # noqa: N806
 
-        for index, (scan_point, probe) in enumerate(
-            zip(self._product.probe_positions, self._product.probes)
-        ):
+        for index, (scan_point, probe) in enumerate(self._product.iter_position_probes()):
             object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
             probe_intensity = probe.get_intensity()
             psf = probe_intensity / probe_intensity.sum()
@@ -107,9 +105,7 @@ class VSPILinearOperator(LinearOperator):
         object_geometry = self._product.object_.get_geometry()
         object_array = numpy.zeros((object_geometry.height_px, object_geometry.width_px))
 
-        for index, (scan_point, probe) in enumerate(
-            zip(self._product.probe_positions, self._product.probes)
-        ):
+        for index, (scan_point, probe) in enumerate(self._product.iter_position_probes()):
             object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
             probe_intensity = probe.get_intensity()
             psf = probe_intensity / probe_intensity.sum()

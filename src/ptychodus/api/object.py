@@ -11,7 +11,7 @@ import numpy
 from skimage.registration import phase_cross_correlation
 
 from .common import ComplexArrayType, RealArrayType
-from .geometry import PixelGeometry
+from .geometry import PixelGeometry, fourier_shift_2d
 from .probe_positions import ProbePosition
 
 logger = logging.getLogger(__name__)
@@ -301,17 +301,7 @@ def align_objects(
     logger.info(f'align_objects sub-pixel shift (y, x) = {tuple(shift_yx)} px')
 
     moving_array = moving_object.get_array()
-    height_px, width_px = moving_array.shape[-2:]
-    ky = numpy.fft.fftfreq(height_px)
-    kx = numpy.fft.fftfreq(width_px)
-    ky_grid, kx_grid = numpy.meshgrid(ky, kx, indexing='ij')
-    # exp(-2πi * shift * k_normalized) shifts the inverse-transformed signal by +shift in real space
-    phase_ramp = numpy.exp(-2j * numpy.pi * (shift_yx[0] * ky_grid + shift_yx[1] * kx_grid))
-
-    moving_fft = numpy.fft.fft2(moving_array, axes=(-2, -1))
-    aligned_array = numpy.fft.ifft2(moving_fft * phase_ramp[numpy.newaxis], axes=(-2, -1)).astype(
-        moving_array.dtype
-    )
+    aligned_array = fourier_shift_2d(moving_array, dx=float(shift_yx[1]), dy=float(shift_yx[0]))
 
     moving_center = moving_object.get_center()
     new_center = ObjectCenter(

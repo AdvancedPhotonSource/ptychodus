@@ -302,3 +302,30 @@ class TestMultislice:
         result_nonzero = generate_diffraction_data(_make_product([pos], probe, object_nonzero))
 
         assert not numpy.allclose(result_zero.get_pattern(0), result_nonzero.get_pattern(0))
+
+
+# ---------------------------------------------------------------------------
+# Multi-position iteration (regression: zip(positions, probes) silently
+# truncated to a single position when OPR weights were absent)
+# ---------------------------------------------------------------------------
+
+
+class TestMultiPositionWithoutOpr:
+    def test_all_positions_populated_without_opr_weights(self) -> None:
+        """With multiple scan positions and no OPR weights, every output pattern
+        must be populated — not just the first."""
+        rng = numpy.random.default_rng(40)
+        probe = _random_probe(rng)
+        positions = [
+            ProbePosition(index=0, coordinate_x_m=-8 * _PIXEL_SIZE_M, coordinate_y_m=0.0),
+            ProbePosition(index=1, coordinate_x_m=0.0, coordinate_y_m=0.0),
+            ProbePosition(index=2, coordinate_x_m=+8 * _PIXEL_SIZE_M, coordinate_y_m=0.0),
+        ]
+        # _make_probe_seq constructs a ProbeSequence with opr_weights=None.
+        product = _make_product(positions, probe, _flat_object())
+
+        result = generate_diffraction_data(product)
+        assert result.get_patterns_shape() == (3, _PROBE_PX, _PROBE_PX)
+        # The bug symptom was patterns[1:] all zero. Assert every position has signal.
+        for i in range(3):
+            assert numpy.sum(result.get_pattern(i)) > 0.0

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Generic, TypeVar
 
+from scipy.fft import fft, fft2, fftfreq, ifft, ifft2
 import numpy
 import scipy.special
 
@@ -250,10 +251,23 @@ def fourier_gradient(
     dy = pixel_geometry.height_m if pixel_geometry is not None else 1.0
     dx = pixel_geometry.width_m if pixel_geometry is not None else 1.0
 
-    u = numpy.fft.fftfreq(image.shape[-2], d=dy).reshape(-1, 1)
-    v = numpy.fft.fftfreq(image.shape[-1], d=dx)
+    u = fftfreq(image.shape[-2], d=dy).reshape(-1, 1)
+    v = fftfreq(image.shape[-1], d=dx)
 
-    grad_y = numpy.fft.ifft(numpy.fft.fft(image, axis=-2) * (2j * numpy.pi * u), axis=-2)
-    grad_x = numpy.fft.ifft(numpy.fft.fft(image, axis=-1) * (2j * numpy.pi * v), axis=-1)
+    grad_y = ifft(fft(image, axis=-2) * (2j * numpy.pi * u), axis=-2)
+    grad_x = ifft(fft(image, axis=-1) * (2j * numpy.pi * v), axis=-1)
 
     return grad_y, grad_x
+
+
+def fourier_shift_2d(array: ComplexArrayType, dx: float, dy: float) -> ComplexArrayType:
+    """Translate the last two axes of ``array`` by ``(dx, dy)`` pixels via
+    a Fourier phase ramp. Subpixel shifts are exact for bandlimited signals; positive
+    shifts move features toward larger x/y indices. Leading axes are treated as a
+    batch dimension. The output preserves the input's dtype."""
+    height_px, width_px = array.shape[-2:]
+    fy = fftfreq(height_px).reshape(-1, 1)
+    fx = fftfreq(width_px)
+    phase = numpy.exp(-2j * numpy.pi * (fy * dy + fx * dx))
+    shifted = ifft2(fft2(array, axes=(-2, -1)) * phase, axes=(-2, -1))
+    return shifted.astype(array.dtype)

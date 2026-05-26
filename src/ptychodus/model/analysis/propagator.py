@@ -1,21 +1,13 @@
 from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
 import logging
-
-import numpy
 
 from ptychodus.api.common import RealArrayType
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.observer import Observable
 from ptychodus.api.probe import ProbeSequence
-from ptychodus.api.propagator import (
-    AngularSpectrumPropagator,
-    PropagatorParameters,
-    ComplexArrayType,
-    intensity,
-)
+from ptychodus.api.propagator import PropagatedProbe, propagate_probe
 
 from ..product import ProductRepository
 from .settings import ProbePropagationSettings
@@ -30,14 +22,12 @@ class ProbePropagator(Observable):
         self._repository = repository
 
         self._product_index = -1
-        self._propagated_wavefield: ComplexArrayType | None = None
-        self._propagated_intensity: RealArrayType | None = None
+        self._result: PropagatedProbe | None = None
 
     def set_product(self, product_index: int) -> None:
         if self._product_index != product_index:
             self._product_index = product_index
-            self._propagated_wavefield = None
-            self._propagated_intensity = None
+            self._result = None
             self.notify_observers()
 
     def get_product_name(self) -> str:
@@ -52,36 +42,30 @@ class ProbePropagator(Observable):
         num_steps: int,
     ) -> None:
         item = self._repository[self._product_index]
-        probe = item.get_probe_item().get_probes().get_probe_no_opr()  # TODO OPR
+        probes = item.get_probe_item().get_probes()
         wavelength_m = item.get_geometry().probe_wavelength_m
-        propagated_wavefield = numpy.zeros(
-            (num_steps, probe.num_incoherent_modes, probe.height_px, probe.width_px),
-            dtype=probe.dtype,
-        )
-        propagated_intensity = numpy.zeros((num_steps, probe.height_px, probe.width_px))
-        distance_m = numpy.linspace(begin_coordinate_m, end_coordinate_m, num_steps)
-        pixel_geometry = probe.get_pixel_geometry()
 
-        for idx, z_m in enumerate(distance_m):
-            propagator_parameters = PropagatorParameters(
-                wavelength_m=wavelength_m,
-                width_px=probe.width_px,
-                height_px=probe.height_px,
-                pixel_width_m=pixel_geometry.width_m,
-                pixel_height_m=pixel_geometry.height_m,
-                propagation_distance_m=float(z_m),
+        # OPR caveat: propagate only the first coherent mode and discard any
+        # per-position weighting. Matches the long-standing behavior; warn so
+        # users with OPR reconstructions are not silently misled.
+        if probes.get_opr_weights_or_none() is not None:
+            logger.warning(
+                'ProbeSequence has OPR weights; propagation uses only the first coherent mode '
+                'and discards per-position variation.'
             )
-            propagator = AngularSpectrumPropagator(propagator_parameters)
 
-            for mode in range(probe.num_incoherent_modes):
-                wf = propagator.propagate(probe.get_incoherent_mode(mode))
-                propagated_wavefield[idx, mode, :, :] = wf
-                propagated_intensity[idx, :, :] += intensity(wf)
+        probe = probes.get_probe_no_opr()
 
+        self._result = propagate_probe(
+            probe.get_array(),
+            pixel_geometry=probe.get_pixel_geometry(),
+            wavelength_m=wavelength_m,
+            begin_coordinate_m=begin_coordinate_m,
+            end_coordinate_m=end_coordinate_m,
+            num_steps=num_steps,
+        )
         self._settings.begin_coordinate_m.set_value(begin_coordinate_m)
         self._settings.end_coordinate_m.set_value(end_coordinate_m)
-        self._propagated_wavefield = propagated_wavefield
-        self._propagated_intensity = propagated_intensity
         self.notify_observers()
 
     def get_begin_coordinate_m(self) -> float:
@@ -103,34 +87,28 @@ class ProbePropagator(Observable):
             return probe.get_pixel_geometry()
 
     def get_num_steps(self) -> int:
-        if self._propagated_intensity is None:
+        if self._result is None:
             return self._settings.num_steps.get_value()
 
-        return self._propagated_intensity.shape[0]
+        return self._result.num_steps
 
     def get_xy_projection(self, step: int) -> RealArrayType:
-        if self._propagated_intensity is None:
+        if self._result is None:
             raise ValueError('No propagated wavefield!')
 
-        return self._propagated_intensity[step]
+        return self._result.get_xy_projection(step)
 
     def get_zx_projection(self) -> RealArrayType:
-        if self._propagated_intensity is None:
+        if self._result is None:
             raise ValueError('No propagated wavefield!')
 
-        sz = self._propagated_intensity.shape[-2]
-        cut_plane_l = self._propagated_intensity[:, (sz - 1) // 2, :]
-        cut_plane_r = self._propagated_intensity[:, sz // 2, :]
-        return numpy.transpose(numpy.add(cut_plane_l, cut_plane_r) / 2)
+        return self._result.get_zx_projection()
 
     def get_zy_projection(self) -> RealArrayType:
-        if self._propagated_intensity is None:
+        if self._result is None:
             raise ValueError('No propagated wavefield!')
 
-        sz = self._propagated_intensity.shape[-1]
-        cut_plane_l = self._propagated_intensity[:, :, (sz - 1) // 2]
-        cut_plane_r = self._propagated_intensity[:, :, sz // 2]
-        return numpy.transpose(numpy.add(cut_plane_l, cut_plane_r) / 2)
+        return self._result.get_zy_projection()
 
     def get_save_file_filters(self) -> Sequence[str]:
         return [self.get_save_file_filter()]
@@ -139,20 +117,7 @@ class ProbePropagator(Observable):
         return 'NumPy Zipped Archive (*.npz)'
 
     def save_propagated_probe(self, file_path: Path) -> None:
-        if self._propagated_wavefield is None or self._propagated_intensity is None:
+        if self._result is None:
             raise ValueError('No propagated wavefield!')
 
-        contents: dict[str, Any] = {
-            'begin_coordinate_m': self.get_begin_coordinate_m(),
-            'end_coordinate_m': self.get_end_coordinate_m(),
-            'wavefield': self._propagated_wavefield,
-            'intensity': self._propagated_intensity,
-        }
-
-        pixel_geometry = self.get_pixel_geometry()
-
-        if pixel_geometry is not None:
-            contents['pixel_height_m'] = pixel_geometry.height_m
-            contents['pixel_width_m'] = pixel_geometry.width_m
-
-        numpy.savez_compressed(file_path, allow_pickle=False, **contents)
+        self._result.save_npz(file_path)

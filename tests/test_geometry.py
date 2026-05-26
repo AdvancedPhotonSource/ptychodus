@@ -15,6 +15,7 @@ from ptychodus.api.geometry import (
     Point2D,
     ZernikeMode,
     fourier_gradient,
+    fourier_shift_2d,
 )
 
 
@@ -782,3 +783,67 @@ def test_fourier_gradient_odd_shape_anisotropic_spacing() -> None:
 
     numpy.testing.assert_allclose(gy, expected_gy, rtol=1e-10, atol=1e-6)
     numpy.testing.assert_allclose(gx, expected_gx, rtol=1e-10, atol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# fourier_shift_2d
+# ---------------------------------------------------------------------------
+
+
+def _gaussian_2d(height: int, width: int, sigma: float = 4.0) -> numpy.ndarray:
+    y = numpy.arange(height).reshape(-1, 1) - (height - 1) / 2
+    x = numpy.arange(width).reshape(1, -1) - (width - 1) / 2
+    return numpy.exp(-(x**2 + y**2) / (2.0 * sigma**2)).astype(complex)
+
+
+class TestFourierShift2D:
+    def test_zero_shift_is_identity(self) -> None:
+        image = _gaussian_2d(32, 32)
+        shifted = fourier_shift_2d(image, dx=0.0, dy=0.0)
+        numpy.testing.assert_allclose(shifted, image, atol=1e-12)
+
+    def test_integer_shift_matches_numpy_roll(self) -> None:
+        """For a bandlimited signal, an integer-pixel Fourier shift equals numpy.roll."""
+        image = _gaussian_2d(32, 32)
+        shifted = fourier_shift_2d(image, dx=-3.0, dy=2.0)
+        expected = numpy.roll(image, shift=(2, -3), axis=(-2, -1))
+        numpy.testing.assert_allclose(shifted, expected, atol=1e-10)
+
+    def test_subpixel_shift_preserves_power(self) -> None:
+        """Parseval: a unitary FFT-based shift preserves total power."""
+        image = _gaussian_2d(32, 32)
+        shifted = fourier_shift_2d(image, dx=-0.25, dy=0.5)
+        power_in = float(numpy.sum(numpy.abs(image) ** 2))
+        power_out = float(numpy.sum(numpy.abs(shifted) ** 2))
+        assert power_out == pytest.approx(power_in, rel=1e-10)
+
+    def test_round_trip_returns_original(self) -> None:
+        image = _gaussian_2d(32, 32)
+        shifted = fourier_shift_2d(image, dx=-1.3, dy=0.7)
+        restored = fourier_shift_2d(shifted, dx=1.3, dy=-0.7)
+        numpy.testing.assert_allclose(restored, image, atol=1e-10)
+
+    def test_batched_3d_array_applies_uniformly(self) -> None:
+        """A (B, H, W) input is shifted independently per batch plane with the same shift."""
+        rng = numpy.random.default_rng(0)
+        batch = rng.standard_normal((4, 16, 16)) + 1j * rng.standard_normal((4, 16, 16))
+        shifted = fourier_shift_2d(batch, dx=-2.0, dy=1.0)
+        for i in range(batch.shape[0]):
+            numpy.testing.assert_allclose(
+                shifted[i],
+                fourier_shift_2d(batch[i], dx=-2.0, dy=1.0),
+                atol=1e-12,
+            )
+
+    def test_preserves_complex64_dtype(self) -> None:
+        image = _gaussian_2d(16, 16).astype(numpy.complex64)
+        shifted = fourier_shift_2d(image, dx=0.7, dy=0.3)
+        assert shifted.dtype == numpy.complex64
+
+    def test_positive_y_shift_moves_feature_to_larger_row_index(self) -> None:
+        """Sign convention: a +y shift moves a bandlimited feature toward larger row indices."""
+        image = _gaussian_2d(32, 32, sigma=2.0)
+        shifted = fourier_shift_2d(image, dx=0.0, dy=3.0)
+        peak_row_in = int(numpy.argmax(numpy.abs(image).sum(axis=-1)))
+        peak_row_out = int(numpy.argmax(numpy.abs(shifted).sum(axis=-1)))
+        assert peak_row_out - peak_row_in == 3

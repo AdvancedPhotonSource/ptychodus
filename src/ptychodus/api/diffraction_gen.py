@@ -2,10 +2,8 @@
 
 import numpy
 
-from scipy.fft import fft2, fftfreq, ifft2
-
 from .diffraction import BadPixels, DiffractionIndexes, DiffractionPatterns
-from .geometry import PixelGeometry
+from .geometry import PixelGeometry, fourier_shift_2d
 from .io import AssembledDiffractionData
 from .product import Product
 from .propagator import AngularSpectrumPropagator, FraunhoferPropagator, PropagatorParameters
@@ -61,14 +59,9 @@ def generate_diffraction_data(
     )
     bad_pixels: BadPixels = numpy.full((probe_geometry.height_px, probe_geometry.width_px), False)
 
-    # Precompute frequency grids for Fourier shifting the probe
-    freq_y = fftfreq(probe_geometry.height_px)
-    freq_x = fftfreq(probe_geometry.width_px)
-    fy, fx = numpy.meshgrid(freq_y, freq_x, indexing='ij')
-
     object_geometry = object_.get_geometry()
 
-    for index, (probe_position, probe) in enumerate(zip(product.probe_positions, product.probes)):
+    for index, (probe_position, probe) in enumerate(product.iter_position_probes()):
         object_position = object_geometry.map_coordinates_probe_to_object(probe_position)
 
         cx = object_position.coordinate_x_px
@@ -90,9 +83,7 @@ def generate_diffraction_data(
         dx = cx - (x_lower + probe_geometry.width_px / 2)
         dy = cy - (y_lower + probe_geometry.height_px / 2)
 
-        # Shift all incoherent modes at once via a single batched FFT pair
-        shift_phase = numpy.exp(-2j * numpy.pi * (fy * dy + fx * dx))
-        shifted_modes = ifft2(fft2(probe.get_array()) * shift_phase)
+        shifted_modes = fourier_shift_2d(probe.get_array(), dx=dx, dy=dy)
 
         for wavefield in shifted_modes:
             # Multislice: apply each layer then propagate to the next; last layer has no propagation

@@ -1,15 +1,15 @@
 """Product data structure bundling the probe positions, probe sequence, object and metadata."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from sys import getsizeof
 
 from .common import ELECTRON_VOLT_J, PLANCK_CONSTANT_J_PER_HZ, LIGHT_SPEED_M_PER_S
 from .object import Object
-from .probe import ProbeSequence
-from .probe_positions import ProbePositionSequence
+from .probe import Probe, ProbeSequence
+from .probe_positions import ProbePosition, ProbePositionSequence
 
 
 @dataclass(frozen=True)
@@ -76,6 +76,11 @@ class Product:
         sz += self.probes.nbytes
         sz += self.object_.nbytes
         return sz
+
+    def iter_position_probes(self) -> Iterator[tuple[ProbePosition, Probe]]:
+        """Yield ``(scan_position, probe)`` pairs for every scan position."""
+        for index, position in enumerate(self.probe_positions):
+            yield position, self.probes[index]
 
 
 class ProductFileReader(ABC):
