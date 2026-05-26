@@ -4,15 +4,12 @@ import numpy
 
 from ptychodus.api.affine import estimate_affine_transform_ransac
 from ptychodus.api.geometry import AffineTransform
-from ptychodus.api.observer import Observable
 
 from ..product import ProbePositionsRepository
 from .settings import AffineTransformEstimatorSettings
 
-__all__ = ['AffineTransformEstimator']
 
-
-class AffineTransformEstimator(Observable):
+class AffineTransformEstimator:
     def __init__(
         self,
         rng: numpy.random.Generator,
@@ -50,7 +47,7 @@ class AffineTransformEstimator(Observable):
         return estimate_affine_transform_ransac(
             measured_positions,
             corrected_positions,
-            num_iterations=self._settings.num_shuffles.get_value(),
+            num_iterations=self._settings.num_iterations.get_value(),
             inlier_threshold=self._settings.inlier_threshold.get_value(),
             min_inliers=self._settings.min_inliers.get_value(),
             rng=self._rng,

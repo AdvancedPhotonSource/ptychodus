@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import PathParameter, StringParameter
 
-from ...model.analysis import DiffractionSimulator
+from ...model.analysis import DiffractionSimulator, DiffractionSimulatorSettings
 from ...model.diffraction import (
     AssembledDiffractionDataset,
     Detector,
@@ -34,6 +34,7 @@ from ..data import FileDialogFactory
 from ..helpers import connect_triggered_signal
 from ..image import ImageController
 from ..parametric import (
+    CheckBoxParameterViewController,
     LengthWidgetParameterViewController,
     ParameterViewController,
     SpinBoxParameterViewController,
@@ -157,6 +158,7 @@ class DiffractionController(DiffractionDatasetObserver):
         metadata_presenter: MetadataPresenter,
         product_repository: ProductRepository,
         diffraction_simulator: DiffractionSimulator,
+        diffraction_simulator_settings: DiffractionSimulatorSettings,
         view: PatternsView,
         image_controller: ImageController,
         file_dialog_factory: FileDialogFactory,
@@ -213,6 +215,11 @@ class DiffractionController(DiffractionDatasetObserver):
         connect_triggered_signal(simulate_action, self._choose_product_for_simulation)
 
         view.simulate_dialog.product_combo_box.setModel(self._product_list_model)
+        self._poisson_view_controller = CheckBoxParameterViewController(
+            diffraction_simulator_settings.add_poisson_noise,
+            'Add Poisson Noise',
+        )
+        view.simulate_dialog.form_layout.insertRow(1, self._poisson_view_controller.get_widget())
         view.simulate_dialog.finished.connect(self._simulate_diffraction)
 
         dataset.add_observer(self)

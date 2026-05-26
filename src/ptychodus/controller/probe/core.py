@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ptychodus.api.observer import SequenceObserver
 
-from ...model.analysis import IlluminationMapper, ProbePropagator
+from ...model.analysis import IlluminationMapper, ProbePropagatorSettings, ProbePropagator
 from ...model.fluorescence import FluorescenceEnhancer
 from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
@@ -36,6 +36,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         api: ProbeAPI,
         image_controller: ImageController,
         propagator: ProbePropagator,
+        propagator_settings: ProbePropagatorSettings,
         propagator_visualization_engine: VisualizationEngine,
         illumination_mapper: IlluminationMapper,
         illumination_visualization_engine: VisualizationEngine,
@@ -54,7 +55,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self._editor_factory = ProbeEditorViewControllerFactory()
 
         self._propagation_view_controller = ProbePropagationViewController(
-            propagator, propagator_visualization_engine, file_dialog_factory
+            propagator, propagator_settings, propagator_visualization_engine, file_dialog_factory
         )
         self._illumination_view_controller = IlluminationViewController(
             illumination_mapper,

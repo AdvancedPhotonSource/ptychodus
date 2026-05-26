@@ -20,7 +20,7 @@ from PyQt5.QtWidgets import (
 )
 
 from .visualization import VisualizationParametersView, VisualizationWidget
-from .widgets import DecimalLineEdit, LengthWidget
+from .widgets import DecimalLineEdit
 
 
 class ProbeMetricsView(QGroupBox):
@@ -56,18 +56,21 @@ class ProbeMetricsView(QGroupBox):
 
 
 class ProbePropagationParametersView(QGroupBox):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        begin_coordinate_widget: QWidget,
+        end_coordinate_widget: QWidget,
+        num_steps_spin_box: QWidget,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__('Parameters', parent)
-        self.begin_coordinate_widget = LengthWidget(is_signed=True)
-        self.end_coordinate_widget = LengthWidget(is_signed=True)
-        self.num_steps_spin_box = QSpinBox()
         self.visualization_parameters_view = VisualizationParametersView()
         self.metrics_view = ProbeMetricsView()
 
         propagation_layout = QFormLayout()
-        propagation_layout.addRow('Begin Coordinate:', self.begin_coordinate_widget)
-        propagation_layout.addRow('End Coordinate:', self.end_coordinate_widget)
-        propagation_layout.addRow('Number of Steps:', self.num_steps_spin_box)
+        propagation_layout.addRow('Begin Coordinate:', begin_coordinate_widget)
+        propagation_layout.addRow('End Coordinate:', end_coordinate_widget)
+        propagation_layout.addRow('Number of Steps:', num_steps_spin_box)
 
         propagation_group_box = QGroupBox('Propagation')
         propagation_group_box.setLayout(propagation_layout)
@@ -92,11 +95,19 @@ class ProbePropagationParametersView(QGroupBox):
 
 
 class ProbePropagationDialog(QDialog):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        begin_coordinate_widget: QWidget,
+        end_coordinate_widget: QWidget,
+        num_steps_spin_box: QWidget,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self.xy_view = VisualizationWidget('XY Plane')
         self.zx_view = VisualizationWidget('ZX Plane')
-        self.parameters_view = ProbePropagationParametersView()
+        self.parameters_view = ProbePropagationParametersView(
+            begin_coordinate_widget, end_coordinate_widget, num_steps_spin_box
+        )
         self.zy_view = VisualizationWidget('ZY Plane')
         self.propagate_button = QPushButton('Propagate')
         self.save_button = QPushButton('Save')

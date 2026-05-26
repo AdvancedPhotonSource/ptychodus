@@ -123,10 +123,10 @@ class SimulateDiffractionDialog(QDialog):
         self.button_box.addButton(QDialogButtonBox.StandardButton.Cancel)
         self.button_box.rejected.connect(self.reject)
 
-        layout = QFormLayout()
-        layout.addRow('Product:', self.product_combo_box)
-        layout.addRow(self.button_box)
-        self.setLayout(layout)
+        self.form_layout = QFormLayout()
+        self.form_layout.addRow('Product:', self.product_combo_box)
+        self.form_layout.addRow(self.button_box)
+        self.setLayout(self.form_layout)
 
         self.setWindowTitle('Simulate Diffraction Patterns')
 

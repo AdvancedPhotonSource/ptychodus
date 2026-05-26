@@ -3,9 +3,8 @@ import logging
 from PyQt5.QtCore import QRectF
 
 from ptychodus.api.geometry import Box2D
-from ptychodus.api.observer import Observable, Observer
 
-from ...model.analysis import FourierAnalyzer
+from ...model.analysis import FourierAnalysisResult, FourierAnalyzer
 from ...model.visualization import VisualizationEngine
 from ...view.object import FourierAnalysisDialog
 from ...view.widgets import ExceptionDialog
@@ -15,7 +14,7 @@ from ..image import ImageController
 logger = logging.getLogger(__name__)
 
 
-class FourierAnalysisViewController(Observer):
+class FourierAnalysisViewController:
     def __init__(
         self,
         analyzer: FourierAnalyzer,
@@ -25,6 +24,9 @@ class FourierAnalysisViewController(Observer):
     ) -> None:
         super().__init__()
         self._analyzer = analyzer
+        self._product_index = -1
+        self._result: FourierAnalysisResult | None = None
+
         self._dialog = FourierAnalysisDialog()
         self._dialog.setWindowTitle('Fourier Analysis')
 
@@ -44,10 +46,17 @@ class FourierAnalysisViewController(Observer):
         item_signals = self._real_space_image_controller.get_item().get_signals()
         item_signals.fourier_finished.connect(self._analyze_fourier)
 
-        analyzer.add_observer(self)
-
     def analyze(self, item_index: int) -> None:
-        self._analyzer.set_product(item_index)
+        self._product_index = item_index
+
+        try:
+            self._result = self._analyzer.analyze_layer(item_index)
+        except Exception as exc:
+            self._result = None
+            logger.exception(exc)
+            ExceptionDialog.show_exception('Fourier Analysis', exc)
+
+        self._sync_model_to_view()
         self._dialog.open()
 
     def _analyze_fourier(self, rect: QRectF) -> None:
@@ -63,14 +72,17 @@ class FourierAnalysisViewController(Observer):
         )
 
         try:
-            self._analyzer.analyze_roi(box)
+            self._result = self._analyzer.analyze_roi(self._product_index, box)
         except ValueError as exc:
             logger.exception(exc)
             ExceptionDialog.show_exception('Fourier Analysis', exc)
+            return
+
+        self._sync_model_to_view()
 
     def _sync_model_to_view(self) -> None:
         try:
-            object_ = self._analyzer.get_object()
+            object_ = self._analyzer.get_object(self._product_index)
         except Exception as exc:
             logger.exception(exc)
             ExceptionDialog.show_exception('Fourier Analysis', exc)
@@ -79,18 +91,9 @@ class FourierAnalysisViewController(Observer):
                 object_.get_layer(0), object_.get_pixel_geometry()
             )
 
-        try:
-            result = self._analyzer.get_result()
-        except ValueError:
+        if self._result is None:
             self._reciprocal_space_image_controller.clear_array()
-        except Exception as exc:
-            logger.exception(exc)
-            ExceptionDialog.show_exception('Fourier Analysis', exc)
         else:
             self._reciprocal_space_image_controller.set_array(
-                result.transformed_roi, result.pixel_geometry
+                self._result.transformed_roi, self._result.pixel_geometry
             )
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._analyzer:
-            self._sync_model_to_view()

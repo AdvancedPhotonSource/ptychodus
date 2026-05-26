@@ -3,6 +3,7 @@ from a ptychography product by summing subpixel-shifted probe intensities."""
 
 from __future__ import annotations
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy
 
@@ -52,6 +53,23 @@ class IlluminationMap:
     @property
     def intensity_W_m2(self) -> RealArrayType:  # noqa: N802
         return self.energy_fluence_rate_W_m2
+
+    def save_npz(self, file_path: Path) -> None:
+        numpy.savez_compressed(
+            file_path,
+            allow_pickle=False,
+            photon_number=self.photon_number,
+            photon_fluence_1_m2=self.photon_fluence_1_m2,
+            photon_fluence_rate_Hz_m2=self.photon_fluence_rate_Hz_m2,
+            energy_fluence_J_m2=self.energy_fluence_J_m2,
+            energy_fluence_rate_W_m2=self.energy_fluence_rate_W_m2,
+            dose_Gy=self.dose_Gy,
+            dose_rate_Gy_s=self.dose_rate_Gy_s,
+            pixel_height_m=self.pixel_geometry.height_m,
+            pixel_width_m=self.pixel_geometry.width_m,
+            center_x_m=self.center.coordinate_x_m,
+            center_y_m=self.center.coordinate_y_m,
+        )
 
 
 def compute_illumination_map(product: Product) -> IlluminationMap:

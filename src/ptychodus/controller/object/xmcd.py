@@ -1,6 +1,6 @@
 import logging
 
-from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.xmcd import XMCDResult
 
 from ...model.analysis import XMCDAnalyzer
 from ...model.visualization import VisualizationEngine
@@ -12,8 +12,10 @@ from .tree_model import ObjectTreeModel
 
 logger = logging.getLogger(__name__)
 
+_SAVE_FILE_FILTER = 'NumPy Zipped Archive (*.npz)'
 
-class XMCDViewController(Observer):
+
+class XMCDViewController:
     def __init__(
         self,
         analyzer: XMCDAnalyzer,
@@ -25,16 +27,14 @@ class XMCDViewController(Observer):
         super().__init__()
         self._analyzer = analyzer
         self._file_dialog_factory = file_dialog_factory
+        self._result: XMCDResult | None = None
+
         self._dialog = XMCDDialog()
         self._dialog.setWindowTitle('X-ray Magnetic Circular Dichroism (XMCD)')
         self._dialog.parameters_view.lcirc_combo_box.setModel(tree_model)
-        self._dialog.parameters_view.lcirc_combo_box.currentIndexChanged.connect(
-            analyzer.set_lcp_product
-        )
+        self._dialog.parameters_view.lcirc_combo_box.textActivated.connect(self._reanalyze)
         self._dialog.parameters_view.rcirc_combo_box.setModel(tree_model)
-        self._dialog.parameters_view.rcirc_combo_box.currentIndexChanged.connect(
-            analyzer.set_rcp_product
-        )
+        self._dialog.parameters_view.rcirc_combo_box.textActivated.connect(self._reanalyze)
         self._dialog.parameters_view.save_button.clicked.connect(self._save_data)
 
         self._structural_image_controller = ImageController(
@@ -50,55 +50,61 @@ class XMCDViewController(Observer):
             file_dialog_factory,
         )
 
-        analyzer.add_observer(self)
-
     def analyze(self, lcirc_product_index: int, rcirc_product_index: int) -> None:
-        self._analyzer.set_lcp_product(lcirc_product_index)
-        self._analyzer.set_rcp_product(rcirc_product_index)
-        self._analyzer.analyze()
+        self._dialog.parameters_view.lcirc_combo_box.setCurrentIndex(lcirc_product_index)
+        self._dialog.parameters_view.rcirc_combo_box.setCurrentIndex(rcirc_product_index)
+        self._reanalyze()
         self._dialog.open()
 
+    def _reanalyze(self) -> None:
+        lcp_index = self._dialog.parameters_view.lcirc_combo_box.currentIndex()
+        rcp_index = self._dialog.parameters_view.rcirc_combo_box.currentIndex()
+
+        if lcp_index < 0 or rcp_index < 0:
+            self._result = None
+            self._render_result()
+            return
+
+        try:
+            self._result = self._analyzer.analyze(lcp_index, rcp_index)
+        except Exception as err:
+            self._result = None
+            logger.exception(err)
+            ExceptionDialog.show_exception('XMCD Analysis', err)
+
+        self._render_result()
+
+    def _render_result(self) -> None:
+        if self._result is None:
+            self._structural_image_controller.clear_array()
+            self._magnetic_image_controller.clear_array()
+            return
+
+        structural_object = self._result.structural_object
+        self._structural_image_controller.set_array(
+            structural_object.get_layer(0), structural_object.get_pixel_geometry()
+        )
+        magnetic_object = self._result.magnetic_object
+        self._magnetic_image_controller.set_array(
+            magnetic_object.get_layer(0), magnetic_object.get_pixel_geometry()
+        )
+
     def _save_data(self) -> None:
+        if self._result is None:
+            logger.warning('No XMCD result to save!')
+            return
+
         title = 'Save XMCD Data'
         file_path, _ = self._file_dialog_factory.get_save_file_path(
             self._dialog,
             title,
-            name_filters=self._analyzer.get_save_file_filters(),
-            selected_name_filter=self._analyzer.get_save_file_filter(),
+            name_filters=[_SAVE_FILE_FILTER],
+            selected_name_filter=_SAVE_FILE_FILTER,
         )
 
         if file_path:
             try:
-                self._analyzer.save_data(file_path)
+                self._result.save_npz(file_path)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.show_exception(title, err)
-
-    def _sync_model_to_view(self) -> None:
-        lcirc_product_index = self._analyzer.get_lcp_product()
-        self._dialog.parameters_view.lcirc_combo_box.setCurrentIndex(lcirc_product_index)
-
-        rcirc_product_index = self._analyzer.get_rcp_product()
-        self._dialog.parameters_view.rcirc_combo_box.setCurrentIndex(rcirc_product_index)
-
-        try:
-            result = self._analyzer.get_result()
-        except ValueError:
-            self._structural_image_controller.clear_array()
-            self._magnetic_image_controller.clear_array()
-        except Exception as err:
-            logger.exception(err)
-            ExceptionDialog.show_exception('Update Views', err)
-        else:
-            structural_object = result.structural_object
-            self._structural_image_controller.set_array(
-                structural_object.get_layer(0), structural_object.get_pixel_geometry()
-            )
-            magnetic_object = result.magnetic_object
-            self._magnetic_image_controller.set_array(
-                magnetic_object.get_layer(0), magnetic_object.get_pixel_geometry()
-            )
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._analyzer:
-            self._sync_model_to_view()
