@@ -86,6 +86,7 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
             selection_model.currentChanged.connect(self._update_view)
 
         self._update_view(QModelIndex(), QModelIndex())
+        self._ensure_selection()
 
         load_from_file_action = view.button_box.load_menu.addAction('Open File...')
         connect_triggered_signal(load_from_file_action, self._load_current_object_from_file)
@@ -252,8 +253,31 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
                 )
                 self._image_controller.set_array(array, object_.get_pixel_geometry())
 
+    def _ensure_selection(self) -> None:
+        if self._view.tree_view.currentIndex().isValid():
+            return
+
+        if self._tree_model.rowCount(QModelIndex()) > 0:
+            self._view.tree_view.setCurrentIndex(self._tree_model.index(0, 0))
+
+    def _top_level_row(self, index: QModelIndex) -> int:
+        if not index.isValid():
+            return -1
+
+        node = index
+        parent = node.parent()
+
+        while parent.isValid():
+            node = parent
+            parent = node.parent()
+
+        return node.row()
+
     def handle_item_inserted(self, index: int, item: ObjectRepositoryItem) -> None:
         self._tree_model.insert_item(index, item)
+
+        if not self._view.tree_view.currentIndex().isValid():
+            self._view.tree_view.setCurrentIndex(self._tree_model.index(index, 0))
 
     def handle_item_changed(self, index: int, item: ObjectRepositoryItem) -> None:
         self._tree_model.update_item(index, item)
@@ -263,4 +287,12 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
             self._update_view(current_index, current_index)
 
     def handle_item_removed(self, index: int, item: ObjectRepositoryItem) -> None:
+        was_current = self._top_level_row(self._view.tree_view.currentIndex()) == index
         self._tree_model.remove_item(index, item)
+
+        if was_current:
+            row_count = self._tree_model.rowCount(QModelIndex())
+
+            if row_count > 0:
+                target_row = min(index, row_count - 1)
+                self._view.tree_view.setCurrentIndex(self._tree_model.index(target_row, 0))

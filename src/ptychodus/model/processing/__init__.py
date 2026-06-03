@@ -1,10 +1,10 @@
 from .api import ProcessingAPI
-from .context import ProcessingProgressMonitor
 from .core import ProcessingAlgorithmParameter, ProcessingCore
+from .monitor import ProcessingTaskMonitor
 
 __all__ = [
     'ProcessingAPI',
-    'ProcessingCore',
-    'ProcessingProgressMonitor',
     'ProcessingAlgorithmParameter',
+    'ProcessingCore',
+    'ProcessingTaskMonitor',
 ]

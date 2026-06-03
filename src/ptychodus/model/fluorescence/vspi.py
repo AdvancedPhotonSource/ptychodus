@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Iterator
 from typing import Final
 import logging
 import time
@@ -10,7 +11,9 @@ from ptychodus.api.common import RealArrayType
 from ptychodus.api.fluorescence import (
     ElementMap,
     FluorescenceDataset,
-    FluorescenceEnhancingAlgorithm,
+    FluorescenceEnhancer,
+    FluorescenceEnhancerInput,
+    FluorescenceEnhancerOutput,
 )
 from ptychodus.api.object import ObjectPosition
 from ptychodus.api.observer import Observable, Observer
@@ -21,7 +24,7 @@ from .settings import FluorescenceSettings
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    'VSPIFluorescenceEnhancingAlgorithm',
+    'VSPIFluorescenceEnhancer',
 ]
 
 
@@ -117,7 +120,7 @@ class VSPILinearOperator(LinearOperator):
         return HX
 
 
-class VSPIFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Observable, Observer):
+class VSPIFluorescenceEnhancer(FluorescenceEnhancer, Observable, Observer):
     SIMPLE_NAME: Final[str] = 'VSPI'
     DISPLAY_NAME: Final[str] = 'Virtual Single Pixel Imaging'
 
@@ -128,7 +131,20 @@ class VSPIFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Observa
         settings.vspi_damping_factor.add_observer(self)
         settings.vspi_max_iterations.add_observer(self)
 
-    def enhance(self, dataset: FluorescenceDataset, product: Product) -> FluorescenceDataset:
+    @property
+    def name(self) -> str:
+        return self.DISPLAY_NAME
+
+    def get_progress_goal(self) -> int:
+        return 0
+
+    def enhance(
+        self, parameters: FluorescenceEnhancerInput
+    ) -> Iterator[FluorescenceEnhancerOutput]:
+        # Per-channel granularity; per-LSMR-iteration progress is a future enhancement
+        # (would require wrapping LinearOperator._matvec or chunking lsmr with maxiter).
+        dataset = parameters.dataset
+        product = parameters.product
         object_geometry = product.object_.get_geometry()
         e_cps_shape = object_geometry.height_px, object_geometry.width_px
         element_maps: list[ElementMap] = list()
@@ -152,12 +168,14 @@ class VSPIFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Observa
             logger.info(f'Enhanced "{emap.name}" in {toc - tic:.4f} seconds.')
 
             element_maps.append(emap_enhanced)
-
-        return FluorescenceDataset(
-            element_maps=element_maps,
-            counts_per_second_path=dataset.counts_per_second_path,
-            channel_names_path=dataset.channel_names_path,
-        )
+            yield FluorescenceEnhancerOutput(
+                dataset=FluorescenceDataset(
+                    element_maps=list(element_maps),
+                    counts_per_second_path=dataset.counts_per_second_path,
+                    channel_names_path=dataset.channel_names_path,
+                ),
+                progress=len(element_maps),
+            )
 
     def get_damping_factor(self) -> float:
         return self._settings.vspi_damping_factor.get_value()

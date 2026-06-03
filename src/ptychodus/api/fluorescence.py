@@ -1,7 +1,7 @@
 """Fluorescence data structures and enhancement plugin interfaces."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,11 +30,38 @@ class FluorescenceDataset:
     # scan_indexes: IntegerArray
 
 
-class FluorescenceEnhancingAlgorithm(ABC):
-    """Algorithm that uses a ptychography data product to enhance a fluorescence dataset."""
+@dataclass(frozen=True)
+class FluorescenceEnhancerInput:
+    """All data required to start a fluorescence enhancement: dataset and ptychography product."""
+
+    dataset: FluorescenceDataset
+    product: Product
+
+
+@dataclass(frozen=True)
+class FluorescenceEnhancerOutput:
+    """Enhancement result yielded at each step: updated dataset and progress."""
+
+    dataset: FluorescenceDataset
+    progress: int = 0
+
+
+class FluorescenceEnhancer(ABC):
+    """Abstract interface for algorithms that enhance fluorescence datasets using ptychography."""
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        pass
 
     @abstractmethod
-    def enhance(self, dataset: FluorescenceDataset, product: Product) -> FluorescenceDataset:
+    def get_progress_goal(self) -> int:
+        pass
+
+    @abstractmethod
+    def enhance(
+        self, parameters: FluorescenceEnhancerInput
+    ) -> Iterator[FluorescenceEnhancerOutput]:
         pass
 
 

@@ -2,14 +2,27 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy
 import numpy.testing
 import pytest
 
+from ptychodus.api.geometry import PixelGeometry, fourier_shift_2d
 from ptychodus.api.metrics import (
     FourierRingCorrelation,
+    ObjectComparison,
     compute_fourier_ring_correlation,
+    compute_mean_absolute_error,
+    compute_peak_signal_to_noise_ratio,
+    compute_root_mean_square_error,
+    compute_structural_similarity,
 )
+from ptychodus.api.object import Object, ObjectCenter
+from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
+from ptychodus.api.product import Product, ProductMetadata
+from ptychodus.api.reconstructor import ReconstructionAmbiguities
 
 
 def _make_frc(
@@ -428,3 +441,430 @@ class TestResolutionAtSignalToNoiseThreshold:
         max_resolvable_m = shape[0] * pixel_size_m
         assert numpy.isfinite(resolution)
         assert nyquist_resolution_m < resolution < max_resolvable_m
+
+
+class TestComputeRootMeanSquareError:
+    def test_identical_arrays_give_zero(self) -> None:
+        rng = numpy.random.default_rng(0)
+        arr = rng.standard_normal((8, 12)) + 1j * rng.standard_normal((8, 12))
+        assert compute_root_mean_square_error(arr, arr) == pytest.approx(0.0)
+
+    def test_constant_offset_matches_hand_computed(self) -> None:
+        reference = numpy.zeros((4, 4), dtype=numpy.float64)
+        test = numpy.full((4, 4), 3.0)
+        # |3 - 0| everywhere → RMSE = 3.
+        assert compute_root_mean_square_error(reference, test) == pytest.approx(3.0)
+
+    def test_complex_uses_modulus_not_real_part(self) -> None:
+        # Pure imaginary difference: real-part-only metric would give 0;
+        # the modulus distance gives 2 everywhere → RMSE = 2.
+        reference = numpy.zeros((4, 4), dtype=numpy.complex128)
+        test = numpy.full((4, 4), 2j, dtype=numpy.complex128)
+        assert compute_root_mean_square_error(reference, test) == pytest.approx(2.0)
+
+    def test_raises_on_shape_mismatch(self) -> None:
+        a = numpy.zeros((4, 4))
+        b = numpy.zeros((4, 5))
+        with pytest.raises(ValueError, match='shape'):
+            compute_root_mean_square_error(a, b)
+
+
+class TestComputeMeanAbsoluteError:
+    def test_identical_arrays_give_zero(self) -> None:
+        rng = numpy.random.default_rng(0)
+        arr = rng.standard_normal((8, 12)) + 1j * rng.standard_normal((8, 12))
+        assert compute_mean_absolute_error(arr, arr) == pytest.approx(0.0)
+
+    def test_constant_offset_matches_hand_computed(self) -> None:
+        reference = numpy.zeros((4, 4), dtype=numpy.float64)
+        test = numpy.full((4, 4), -2.5)
+        assert compute_mean_absolute_error(reference, test) == pytest.approx(2.5)
+
+    def test_complex_uses_modulus(self) -> None:
+        # 3 + 4j → modulus 5 → MAE 5.
+        reference = numpy.zeros((4, 4), dtype=numpy.complex128)
+        test = numpy.full((4, 4), 3.0 + 4.0j)
+        assert compute_mean_absolute_error(reference, test) == pytest.approx(5.0)
+
+    def test_raises_on_shape_mismatch(self) -> None:
+        a = numpy.zeros((4, 4))
+        b = numpy.zeros((4, 5))
+        with pytest.raises(ValueError, match='shape'):
+            compute_mean_absolute_error(a, b)
+
+
+class TestComputePeakSignalToNoiseRatio:
+    def test_identical_arrays_give_positive_infinity(self) -> None:
+        rng = numpy.random.default_rng(0)
+        arr = rng.standard_normal((16, 16))
+        assert numpy.isposinf(compute_peak_signal_to_noise_ratio(arr, arr))
+
+    def test_known_value_matches_hand_computed(self) -> None:
+        # reference = 0..15 reshaped, test differs by 1.0 everywhere.
+        # MSE = 1.0; data_range inferred = 15 - 0 = 15.
+        # PSNR = 20 * log10(15) ≈ 23.5218 dB.
+        reference = numpy.arange(16, dtype=numpy.float64).reshape(4, 4)
+        test = reference + 1.0
+        psnr = compute_peak_signal_to_noise_ratio(reference, test)
+        assert psnr == pytest.approx(20.0 * numpy.log10(15.0), rel=1e-9)
+
+    def test_explicit_data_range_overrides_inferred(self) -> None:
+        reference = numpy.arange(16, dtype=numpy.float64).reshape(4, 4)
+        test = reference + 1.0
+        # Same MSE = 1, but force data_range = 1 → PSNR = 0 dB.
+        psnr = compute_peak_signal_to_noise_ratio(reference, test, data_range=1.0)
+        assert psnr == pytest.approx(0.0, abs=1e-12)
+
+    def test_raises_on_shape_mismatch(self) -> None:
+        a = numpy.zeros((4, 4))
+        b = numpy.zeros((4, 5))
+        with pytest.raises(ValueError, match='shape'):
+            compute_peak_signal_to_noise_ratio(a, b)
+
+
+class TestComputeStructuralSimilarity:
+    def test_identical_arrays_give_one(self) -> None:
+        rng = numpy.random.default_rng(0)
+        arr = rng.standard_normal((32, 32))
+        assert compute_structural_similarity(arr, arr) == pytest.approx(1.0)
+
+    def test_uncorrelated_random_arrays_score_low(self) -> None:
+        rng = numpy.random.default_rng(1)
+        a = rng.standard_normal((64, 64))
+        b = rng.standard_normal((64, 64))
+        assert compute_structural_similarity(a, b) < 0.3
+
+    def test_explicit_data_range_is_honored(self) -> None:
+        # Same inputs, different data_range → SSIM changes (the regularization
+        # constants C1 and C2 in scikit-image scale with data_range).
+        rng = numpy.random.default_rng(2)
+        a = rng.standard_normal((32, 32))
+        b = a + 0.05 * rng.standard_normal((32, 32))
+        ssim_small = compute_structural_similarity(a, b, data_range=1.0)
+        ssim_large = compute_structural_similarity(a, b, data_range=100.0)
+        assert ssim_small != pytest.approx(ssim_large)
+
+    def test_raises_on_shape_mismatch(self) -> None:
+        a = numpy.zeros((8, 8))
+        b = numpy.zeros((8, 9))
+        with pytest.raises(ValueError, match='shape'):
+            compute_structural_similarity(a, b)
+
+
+_PIXEL_M = 1.0e-9
+_OBJ_HEIGHT_PX = 32
+_OBJ_WIDTH_PX = 40
+_PROBE_HEIGHT_PX = 8
+_PROBE_WIDTH_PX = 8
+
+
+def _metadata() -> ProductMetadata:
+    return ProductMetadata(
+        name='test',
+        comments='',
+        detector_distance_m=1.0,
+        probe_energy_eV=10_000.0,
+        probe_photon_count=1.0,
+        exposure_time_s=1.0,
+        mass_attenuation_m2_kg=0.0,
+        tomography_angle_deg=0.0,
+    )
+
+
+def _make_object(
+    *,
+    num_layers: int = 1,
+    seed: int = 0,
+    dtype: numpy.dtype = numpy.dtype(numpy.complex128),
+    pixel_m: float = _PIXEL_M,
+) -> Object:
+    rng = numpy.random.default_rng(seed)
+    real = rng.standard_normal((num_layers, _OBJ_HEIGHT_PX, _OBJ_WIDTH_PX))
+    imag = rng.standard_normal((num_layers, _OBJ_HEIGHT_PX, _OBJ_WIDTH_PX))
+    array = (real + 1j * imag).astype(dtype)
+    return Object(
+        array=array,
+        pixel_geometry=PixelGeometry(width_m=pixel_m, height_m=pixel_m),
+        center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        layer_spacing_m=[1.0e-6] * (num_layers - 1),
+    )
+
+
+def _make_probes() -> ProbeSequence:
+    rng = numpy.random.default_rng(1)
+    shape = (1, 1, _PROBE_HEIGHT_PX, _PROBE_WIDTH_PX)
+    array = (rng.standard_normal(shape) + 1j * rng.standard_normal(shape)).astype(numpy.complex128)
+    return ProbeSequence(
+        array=array,
+        opr_weights=None,
+        pixel_geometry=PixelGeometry(width_m=_PIXEL_M, height_m=_PIXEL_M),
+    )
+
+
+def _make_positions() -> ProbePositionSequence:
+    points = [
+        ProbePosition(index=i, coordinate_x_m=x, coordinate_y_m=y)
+        for i, (x, y) in enumerate(
+            [(0.0, 0.0), (3 * _PIXEL_M, -2 * _PIXEL_M), (-4 * _PIXEL_M, 1 * _PIXEL_M)]
+        )
+    ]
+    return ProbePositionSequence(points)
+
+
+def _make_product(
+    *,
+    num_layers: int = 1,
+    seed: int = 0,
+    dtype: numpy.dtype = numpy.dtype(numpy.complex128),
+    pixel_m: float = _PIXEL_M,
+) -> Product:
+    return Product(
+        metadata=_metadata(),
+        probe_positions=_make_positions(),
+        probes=_make_probes(),
+        object_=_make_object(num_layers=num_layers, seed=seed, dtype=dtype, pixel_m=pixel_m),
+        losses=[],
+    )
+
+
+def _apply_ambiguity_to_object(obj: Object, ambiguities: ReconstructionAmbiguities) -> Object:
+    coords = obj.get_geometry().get_transverse_coordinates()
+    ramp = (
+        ambiguities.phase_ramp_x_rad_per_m * coords.position_x_m
+        + ambiguities.phase_ramp_y_rad_per_m * coords.position_y_m
+    )
+    factor = ambiguities.object_scale_factor * numpy.exp(1j * (ambiguities.phase_offset_rad + ramp))
+    new_array = obj.get_array().copy()
+    new_array[0] = (new_array[0] * factor).astype(new_array.dtype)
+    return Object(
+        array=new_array,
+        pixel_geometry=obj.get_pixel_geometry().copy(),
+        center=obj.get_center().copy(),
+        layer_spacing_m=list(obj.layer_spacing_m),
+    )
+
+
+class TestObjectComparison:
+    def test_identical_products_yield_identity_ambiguities(self) -> None:
+        product = _make_product()
+        comparison = ObjectComparison.from_products(reference=product, test=product)
+
+        assert comparison.ambiguities.object_scale_factor == pytest.approx(1.0, abs=1e-10)
+        assert comparison.ambiguities.phase_offset_rad == pytest.approx(0.0, abs=1e-10)
+        assert comparison.ambiguities.phase_ramp_x_rad_per_m == pytest.approx(0.0, abs=1e-2)
+        assert comparison.ambiguities.phase_ramp_y_rad_per_m == pytest.approx(0.0, abs=1e-2)
+        numpy.testing.assert_allclose(
+            comparison.test_complex, comparison.reference_complex, rtol=1e-10, atol=1e-12
+        )
+
+    def test_pixel_geometry_passed_through(self) -> None:
+        product = _make_product()
+        comparison = ObjectComparison.from_products(reference=product, test=product)
+        assert comparison.pixel_geometry == PixelGeometry(width_m=_PIXEL_M, height_m=_PIXEL_M)
+
+    def test_constant_phase_offset_recovered(self) -> None:
+        reference = _make_product()
+        applied = ReconstructionAmbiguities(
+            object_scale_factor=1.0,
+            phase_offset_rad=0.4,
+            phase_ramp_x_rad_per_m=0.0,
+            phase_ramp_y_rad_per_m=0.0,
+        )
+        perturbed = replace(
+            reference, object_=_apply_ambiguity_to_object(reference.object_, applied)
+        )
+
+        comparison = ObjectComparison.from_products(reference=reference, test=perturbed)
+
+        assert comparison.ambiguities.phase_offset_rad == pytest.approx(0.4, abs=1e-6)
+        numpy.testing.assert_allclose(
+            comparison.test_complex,
+            reference.object_.get_layers_flattened(),
+            rtol=1e-8,
+            atol=1e-10,
+        )
+
+    def test_scale_factor_recovered(self) -> None:
+        reference = _make_product()
+        applied = ReconstructionAmbiguities(
+            object_scale_factor=2.5,
+            phase_offset_rad=0.0,
+            phase_ramp_x_rad_per_m=0.0,
+            phase_ramp_y_rad_per_m=0.0,
+        )
+        perturbed = replace(
+            reference, object_=_apply_ambiguity_to_object(reference.object_, applied)
+        )
+
+        comparison = ObjectComparison.from_products(reference=reference, test=perturbed)
+
+        assert comparison.ambiguities.object_scale_factor == pytest.approx(2.5, rel=1e-6)
+        numpy.testing.assert_allclose(
+            comparison.test_complex,
+            reference.object_.get_layers_flattened(),
+            rtol=1e-6,
+            atol=1e-10,
+        )
+
+    def test_phase_ramp_recovered(self) -> None:
+        reference = _make_product()
+        applied = ReconstructionAmbiguities(
+            object_scale_factor=1.0,
+            phase_offset_rad=0.0,
+            phase_ramp_x_rad_per_m=1.0e8,
+            phase_ramp_y_rad_per_m=-2.0e8,
+        )
+        perturbed = replace(
+            reference, object_=_apply_ambiguity_to_object(reference.object_, applied)
+        )
+
+        comparison = ObjectComparison.from_products(reference=reference, test=perturbed)
+
+        # The estimator works in the object array's intrinsic coordinate frame,
+        # so recovered ramps should match the applied ramps to high precision.
+        assert comparison.ambiguities.phase_ramp_x_rad_per_m == pytest.approx(1.0e8, rel=1e-6)
+        assert comparison.ambiguities.phase_ramp_y_rad_per_m == pytest.approx(-2.0e8, rel=1e-6)
+        numpy.testing.assert_allclose(
+            comparison.test_complex,
+            reference.object_.get_layers_flattened(),
+            rtol=1e-6,
+            atol=1e-8,
+        )
+
+    def test_sub_pixel_shift_recovered_on_interior(self) -> None:
+        # Make a smooth band-limited reference so the shifted test object
+        # matches the reference content well after re-registration. Pure noise
+        # objects don't admit a clean sub-pixel shift recovery test because
+        # phase_cross_correlation needs a structure to lock onto.
+        rng = numpy.random.default_rng(7)
+        ky = numpy.fft.fftfreq(_OBJ_HEIGHT_PX)
+        kx = numpy.fft.fftfreq(_OBJ_WIDTH_PX)
+        radius = numpy.hypot(ky[:, None], kx[None, :])
+        spectrum = rng.standard_normal((_OBJ_HEIGHT_PX, _OBJ_WIDTH_PX)) + 1j * rng.standard_normal(
+            (_OBJ_HEIGHT_PX, _OBJ_WIDTH_PX)
+        )
+        spectrum *= numpy.exp(-((radius / 0.15) ** 2) / 2.0)
+        smooth = numpy.fft.ifft2(spectrum).astype(numpy.complex128)
+
+        reference_obj = Object(
+            array=smooth,
+            pixel_geometry=PixelGeometry(width_m=_PIXEL_M, height_m=_PIXEL_M),
+            center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        )
+        reference = Product(
+            metadata=_metadata(),
+            probe_positions=_make_positions(),
+            probes=_make_probes(),
+            object_=reference_obj,
+            losses=[],
+        )
+
+        shift_dx, shift_dy = 0.37, -0.62
+        shifted = fourier_shift_2d(reference_obj.get_array(), dx=shift_dx, dy=shift_dy)
+        shifted_obj = Object(
+            array=shifted,
+            pixel_geometry=PixelGeometry(width_m=_PIXEL_M, height_m=_PIXEL_M),
+            center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        )
+        test = replace(reference, object_=shifted_obj)
+
+        comparison = ObjectComparison.from_products(reference=reference, test=test)
+
+        # Crop off a few pixels at every edge — the Fourier shift wraps content
+        # there and re-aligning back doesn't fully undo the wrap. The remaining
+        # residual is dominated by phase_cross_correlation's ~1/upsample_factor
+        # quantization, so demand only that the recovered pair agrees to ~1e-3.
+        margin = 4
+        ref_inner = comparison.reference_complex[margin:-margin, margin:-margin]
+        test_inner = comparison.test_complex[margin:-margin, margin:-margin]
+        numpy.testing.assert_allclose(test_inner, ref_inner, atol=1e-3)
+
+    def test_dtype_promotion_to_complex128(self) -> None:
+        reference = _make_product(dtype=numpy.dtype(numpy.complex64), seed=0)
+        test = _make_product(dtype=numpy.dtype(numpy.complex128), seed=0)
+
+        comparison = ObjectComparison.from_products(reference=reference, test=test)
+
+        assert comparison.reference_complex.dtype == numpy.dtype(numpy.complex128)
+        assert comparison.test_complex.dtype == numpy.dtype(numpy.complex128)
+
+    def test_shape_mismatch_raises(self) -> None:
+        reference = _make_product()
+        small_object = Object(
+            array=numpy.zeros((_OBJ_HEIGHT_PX, _OBJ_WIDTH_PX // 2), dtype=numpy.complex128),
+            pixel_geometry=PixelGeometry(width_m=_PIXEL_M, height_m=_PIXEL_M),
+            center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        )
+        test = replace(reference, object_=small_object)
+
+        with pytest.raises(ValueError, match='shape'):
+            ObjectComparison.from_products(reference=reference, test=test)
+
+    def test_pixel_geometry_mismatch_raises(self) -> None:
+        reference = _make_product()
+        test = _make_product(pixel_m=2.0 * _PIXEL_M)
+
+        with pytest.raises(ValueError, match='pixel geometry'):
+            ObjectComparison.from_products(reference=reference, test=test)
+
+    def test_amplitude_and_phase_properties(self) -> None:
+        product = _make_product()
+        comparison = ObjectComparison.from_products(reference=product, test=product)
+
+        numpy.testing.assert_array_equal(
+            comparison.reference_amplitude, numpy.absolute(comparison.reference_complex)
+        )
+        numpy.testing.assert_array_equal(
+            comparison.test_amplitude, numpy.absolute(comparison.test_complex)
+        )
+        numpy.testing.assert_array_equal(
+            comparison.reference_phase, numpy.angle(comparison.reference_complex)
+        )
+        numpy.testing.assert_array_equal(
+            comparison.test_phase, numpy.angle(comparison.test_complex)
+        )
+
+
+class TestObjectComparisonMetricsIntegration:
+    """End-to-end plumbing check: build a Product pair, prepare an ObjectComparison,
+    and feed it through every metric. Catches breakage in the metric / dataclass
+    contract without re-testing the math each metric covers in isolation."""
+
+    def test_all_metrics_return_finite_scalars_of_expected_sign(self) -> None:
+        reference = _make_product(seed=0)
+        # Different seed → slightly different object so metrics aren't degenerate
+        # (RMSE > 0, SSIM < 1).
+        test = _make_product(seed=42)
+        comparison = ObjectComparison.from_products(reference=reference, test=test)
+
+        rmse = compute_root_mean_square_error(comparison.reference_complex, comparison.test_complex)
+        mae = compute_mean_absolute_error(comparison.reference_complex, comparison.test_complex)
+        assert numpy.isfinite(rmse) and rmse > 0.0
+        assert numpy.isfinite(mae) and mae > 0.0
+
+        psnr_amp = compute_peak_signal_to_noise_ratio(
+            comparison.reference_amplitude, comparison.test_amplitude
+        )
+        ssim_amp = compute_structural_similarity(
+            comparison.reference_amplitude, comparison.test_amplitude
+        )
+        assert numpy.isfinite(psnr_amp)
+        assert -1.0 <= ssim_amp <= 1.0
+
+        psnr_phase = compute_peak_signal_to_noise_ratio(
+            comparison.reference_phase, comparison.test_phase
+        )
+        ssim_phase = compute_structural_similarity(
+            comparison.reference_phase, comparison.test_phase
+        )
+        assert numpy.isfinite(psnr_phase)
+        assert -1.0 <= ssim_phase <= 1.0
+
+        frc = compute_fourier_ring_correlation(
+            comparison.reference_complex,
+            comparison.test_complex,
+            pixel_width_m=comparison.pixel_geometry.width_m,
+            pixel_height_m=comparison.pixel_geometry.height_m,
+        )
+        assert isinstance(frc, FourierRingCorrelation)
+        assert frc.correlation.shape == frc.spatial_frequency_per_m.shape

@@ -1,12 +1,128 @@
 """Resolution metrics for reconstructed images (Fourier ring correlation, etc.)."""
 
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy
 import scipy.fft
+from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 
 from .common import ComplexArrayType, IntegerArrayType, RealArrayType
+from .geometry import PixelGeometry
+from .object import align_objects
+from .product import Product
+from .reconstructor import ReconstructionAmbiguities
+
+
+@dataclass(frozen=True)
+class ObjectComparison:
+    """Two ptychography object reconstructions standardized and aligned for metric comparison.
+
+    Reconstructed objects are uniquely determined only up to a global complex scale,
+    a 2D linear phase ramp, and a sub-pixel translation (any of which leaves the
+    measured diffraction intensities unchanged). A pixelwise quality metric
+    (SSIM, PSNR, RMSE, MAE, FRC, ...) computed on raw reconstructions therefore
+    reflects ambiguity noise rather than real reconstruction error. This dataclass
+    holds the result of removing those degrees of freedom so the same prepared
+    pair can be fed to every metric.
+
+    Construct via :meth:`from_products`, which:
+
+    1. Sub-pixel registers the test object onto the reference (:func:`align_objects`).
+    2. Estimates the four ambiguity scalars and standardizes the test product
+       (:class:`ReconstructionAmbiguities`).
+    3. Flattens multi-layer objects via :meth:`Object.get_layers_flattened`.
+    4. Promotes both arrays to a common complex dtype.
+
+    Attributes:
+        reference_complex: 2D complex array, the reference object's flattened layers,
+            promoted to the common dtype.
+        test_complex: 2D complex array, the standardized + aligned test object's
+            flattened layers. Same shape and dtype as ``reference_complex``.
+        pixel_geometry: Shared pixel geometry of both reconstructions (validated
+            equal by the upstream primitives).
+        ambiguities: The ambiguities removed from the test side, useful as
+            provenance (e.g. for reporting "how much ramp/scale was removed"
+            alongside the metric value).
+    """
+
+    reference_complex: ComplexArrayType
+    test_complex: ComplexArrayType
+    pixel_geometry: PixelGeometry
+    ambiguities: ReconstructionAmbiguities
+
+    @classmethod
+    def from_products(
+        cls,
+        reference: Product,
+        test: Product,
+        *,
+        upsample_factor: int = 100,
+        weights: RealArrayType | None = None,
+    ) -> ObjectComparison:
+        """Align ``test`` onto ``reference``, standardize ambiguities, and bundle the pair.
+
+        Args:
+            reference: The reconstruction treated as ground truth. Defines the
+                array indexing and ambiguity anchor.
+            test: The reconstruction being evaluated against ``reference``.
+            upsample_factor: Sub-pixel precision for
+                :func:`skimage.registration.phase_cross_correlation`, forwarded
+                through :func:`align_objects`.
+            weights: Optional non-negative per-pixel weights for the ambiguity
+                estimate, shape ``(height_px, width_px)`` matching layer 0. Pass
+                a 0/1 mask to restrict the estimate to a region of interest.
+
+        Raises:
+            ValueError: If the two products' objects disagree on pixel geometry,
+                if their flattened or layer-0 shapes differ, or if the weighted
+                reference intensity is zero. These checks come from
+                :func:`align_objects` and
+                :meth:`ReconstructionAmbiguities.estimate`; this method does not
+                duplicate them.
+        """
+        aligned_test_object = align_objects(
+            reference.object_, test.object_, upsample_factor=upsample_factor
+        )
+        aligned_test = replace(test, object_=aligned_test_object)
+
+        ambiguities = ReconstructionAmbiguities.estimate(
+            aligned_test, reference=reference, weights=weights
+        )
+        standardized_test = ambiguities.standardize_product(aligned_test)
+
+        reference_array = reference.object_.get_layers_flattened()
+        test_array = standardized_test.object_.get_layers_flattened()
+
+        common_dtype = numpy.result_type(reference_array.dtype, test_array.dtype)
+
+        return cls(
+            reference_complex=reference_array.astype(common_dtype, copy=False),
+            test_complex=test_array.astype(common_dtype, copy=False),
+            pixel_geometry=reference.object_.get_pixel_geometry().copy(),
+            ambiguities=ambiguities,
+        )
+
+    @property
+    def reference_amplitude(self) -> RealArrayType:
+        """``|reference|`` — real-valued amplitude image for metrics like SSIM/PSNR."""
+        return numpy.absolute(self.reference_complex)
+
+    @property
+    def test_amplitude(self) -> RealArrayType:
+        """``|test|`` — real-valued amplitude image for metrics like SSIM/PSNR."""
+        return numpy.absolute(self.test_complex)
+
+    @property
+    def reference_phase(self) -> RealArrayType:
+        """``arg(reference)`` in radians, wrapped to ``(-pi, pi]``."""
+        return numpy.angle(self.reference_complex)
+
+    @property
+    def test_phase(self) -> RealArrayType:
+        """``arg(test)`` in radians, wrapped to ``(-pi, pi]``. Constant offset and
+        linear ramp have been removed by :class:`ReconstructionAmbiguities`."""
+        return numpy.angle(self.test_complex)
 
 
 @dataclass(frozen=True)
@@ -40,7 +156,7 @@ class FourierRingCorrelation:
         re-deriving the formula.
         """
         sigma = 0.5 * (2.0**bits - 1.0)
-        sqrt_sigma = float(numpy.sqrt(sigma))
+        sqrt_sigma = numpy.sqrt(sigma).item()
         n_per_ring = numpy.asarray(self.pixels_per_ring, dtype=float)
 
         with numpy.errstate(divide='ignore', invalid='ignore'):
@@ -99,7 +215,7 @@ class FourierRingCorrelation:
         if span <= 0.0:
             return float('nan')
 
-        auc = float(numpy.trapezoid(y, f))
+        auc = numpy.trapezoid(y, f).item()
         return auc / span if normalize else auc
 
     def get_average_signal_to_noise_ratio(self) -> float:
@@ -108,7 +224,8 @@ class FourierRingCorrelation:
         finite = numpy.isfinite(ssnr)
         if not bool(finite.any()):
             return float('nan')
-        return float(numpy.mean(ssnr[finite]))
+
+        return numpy.mean(ssnr[finite]).item()
 
     def get_resolution_m_at_signal_to_noise_threshold(self, snr: float) -> float:
         """Resolution where the FRC-derived SSNR drops below ``snr``.
@@ -137,12 +254,12 @@ class FourierRingCorrelation:
         # FRC == 1 against the bit-threshold's N=1 limit of 1), the crossing
         # belongs at freq[first], not at the touchpoint.
         if first > 0 and finite[first - 1] and diff[first - 1] > 0.0:
-            g0 = float(diff[first - 1])
-            g1 = float(diff[first])
+            g0 = diff[first - 1].item()
+            g1 = diff[first].item()
             alpha = g0 / (g0 - g1)
             crossing_freq = float(freq[first - 1]) + alpha * float(freq[first] - freq[first - 1])
         else:
-            crossing_freq = float(freq[first])
+            crossing_freq = freq[first].item()
 
         return float('nan') if crossing_freq <= 0.0 else 1.0 / crossing_freq
 
@@ -172,7 +289,7 @@ def compute_fourier_ring_correlation(
 
     kx_per_m = scipy.fft.fftfreq(width_px, d=pixel_width_m)
     ky_per_m = scipy.fft.fftfreq(height_px, d=pixel_height_m)
-    bin_size_per_m = max(abs(float(kx_per_m[1])), abs(float(ky_per_m[1])))
+    bin_size_per_m = max(abs(kx_per_m[1].item()), abs(ky_per_m[1].item()))
 
     radii_per_m = numpy.hypot(ky_per_m[:, None], kx_per_m[None, :])
     rings = numpy.floor(radii_per_m / bin_size_per_m).astype(numpy.intp, copy=False)
@@ -208,3 +325,88 @@ def compute_fourier_ring_correlation(
         correlation=correlation[:rnyquist],
         pixels_per_ring=pixels_per_ring[:rnyquist],
     )
+
+
+def compute_root_mean_square_error(
+    reference: ComplexArrayType | RealArrayType,
+    test: ComplexArrayType | RealArrayType,
+) -> float:
+    """L2-norm pixelwise distance: ``sqrt(mean(|test - reference|**2))``.
+
+    Accepts real or complex inputs. For complex inputs, ``|test - reference|``
+    is the modulus of the per-pixel complex difference (Euclidean distance in
+    the complex plane), which is the natural error metric for ptychography
+    object reconstructions.
+    """
+    if reference.shape != test.shape:
+        raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
+
+    diff = test - reference
+    return numpy.sqrt(numpy.mean(numpy.square(numpy.absolute(diff)))).item()
+
+
+def compute_mean_absolute_error(
+    reference: ComplexArrayType | RealArrayType,
+    test: ComplexArrayType | RealArrayType,
+) -> float:
+    """L1-norm pixelwise distance: ``mean(|test - reference|)``.
+
+    For complex inputs, ``|test - reference|`` is the modulus of the per-pixel
+    complex difference. Less sensitive to outliers than
+    :func:`compute_root_mean_square_error`.
+    """
+    if reference.shape != test.shape:
+        raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
+
+    return numpy.mean(numpy.absolute(test - reference)).item()
+
+
+def _infer_data_range(reference: RealArrayType) -> float:
+    """Pick a sensible default ``data_range`` for PSNR/SSIM from the reference image.
+
+    Uses ``reference.max() - reference.min()``, matching scikit-image's
+    recommendation for floating-point inputs.
+    """
+    return numpy.ptp(reference).item()
+
+
+def compute_peak_signal_to_noise_ratio(
+    reference: RealArrayType,
+    test: RealArrayType,
+    *,
+    data_range: float | None = None,
+) -> float:
+    """Peak signal-to-noise ratio in dB via :func:`skimage.metrics.peak_signal_noise_ratio`.
+
+    Real-valued inputs only — project complex objects to amplitude
+    (:attr:`ObjectComparison.reference_amplitude`) or phase
+    (:attr:`ObjectComparison.reference_phase`) before calling.
+
+    When ``data_range`` is ``None``, infers ``reference.max() - reference.min()``
+    so floating-point inputs do not trigger scikit-image's data-range warning.
+    Returns ``+inf`` when the two arrays are identical.
+    """
+    if reference.shape != test.shape:
+        raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
+
+    effective_range = _infer_data_range(reference) if data_range is None else data_range
+    return peak_signal_noise_ratio(reference, test, data_range=effective_range).item()
+
+
+def compute_structural_similarity(
+    reference: RealArrayType,
+    test: RealArrayType,
+    *,
+    data_range: float | None = None,
+) -> float:
+    """Structural similarity index via :func:`skimage.metrics.structural_similarity`.
+
+    Real-valued inputs only — see :func:`compute_peak_signal_to_noise_ratio`
+    for the rationale and the ``data_range`` convention. Returns a scalar in
+    ``[-1, 1]``; ``1.0`` for identical inputs.
+    """
+    if reference.shape != test.shape:
+        raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
+
+    effective_range = _infer_data_range(reference) if data_range is None else data_range
+    return structural_similarity(reference, test, data_range=effective_range).item()

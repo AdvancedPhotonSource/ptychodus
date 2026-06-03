@@ -8,23 +8,24 @@ from ptychodus.api.fluorescence import (
     DeconvolutionStrategy,
     ElementMap,
     FluorescenceDataset,
-    FluorescenceEnhancingAlgorithm,
+    FluorescenceEnhancer,
+    FluorescenceEnhancerInput,
+    FluorescenceEnhancerOutput,
     UpscalingStrategy,
 )
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.product import Product
 
 from .settings import FluorescenceSettings
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    'TwoStepFluorescenceEnhancingAlgorithm',
+    'TwoStepFluorescenceEnhancer',
 ]
 
 
-class TwoStepFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Observable, Observer):
+class TwoStepFluorescenceEnhancer(FluorescenceEnhancer, Observable, Observer):
     SIMPLE_NAME: Final[str] = 'TwoStep'
     DISPLAY_NAME: Final[str] = 'Upscale and Deconvolve'
 
@@ -44,9 +45,20 @@ class TwoStepFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Obse
         deconvolution_strategy_chooser.synchronize_with_parameter(settings.deconvolution_strategy)
         deconvolution_strategy_chooser.add_observer(self)
 
-    def enhance(self, dataset: FluorescenceDataset, product: Product) -> FluorescenceDataset:
+    @property
+    def name(self) -> str:
+        return self.DISPLAY_NAME
+
+    def get_progress_goal(self) -> int:
+        return 0
+
+    def enhance(
+        self, parameters: FluorescenceEnhancerInput
+    ) -> Iterator[FluorescenceEnhancerOutput]:
         upscaler = self._upscaling_strategy_chooser.get_current_plugin().strategy
         deconvolver = self._deconvolution_strategy_chooser.get_current_plugin().strategy
+        dataset = parameters.dataset
+        product = parameters.product
         element_maps: list[ElementMap] = list()
 
         for emap in dataset.element_maps:
@@ -58,12 +70,14 @@ class TwoStepFluorescenceEnhancingAlgorithm(FluorescenceEnhancingAlgorithm, Obse
             logger.info(f'Enhanced "{emap.name}" in {toc - tic:.4f} seconds.')
 
             element_maps.append(emap_enhanced)
-
-        return FluorescenceDataset(
-            element_maps=element_maps,
-            counts_per_second_path=dataset.counts_per_second_path,
-            channel_names_path=dataset.channel_names_path,
-        )
+            yield FluorescenceEnhancerOutput(
+                dataset=FluorescenceDataset(
+                    element_maps=list(element_maps),
+                    counts_per_second_path=dataset.counts_per_second_path,
+                    channel_names_path=dataset.channel_names_path,
+                ),
+                progress=len(element_maps),
+            )
 
     def get_upscaling_strategies(self) -> Iterator[str]:
         for plugin in self._upscaling_strategy_chooser:

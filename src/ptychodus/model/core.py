@@ -167,8 +167,9 @@ class ModelCore:
             ],
         )
         self.fluorescence_core = FluorescenceCore(
+            self._task_manager,
             self.settings_registry,
-            self.product_core.product_repository,
+            self.product_core.product_api,
             self.plugin_registry.upscaling_strategies,
             self.plugin_registry.deconvolution_strategies,
             self.plugin_registry.fluorescence_file_readers,
@@ -202,6 +203,7 @@ class ModelCore:
             self.product_core.probe_api,
             self.product_core.object_api,
             self.processing_core.processing_api,
+            self.fluorescence_core.fluorescence_api,
             self.globus_core.executor,
             self.genesis_core.executor,
         )
@@ -291,11 +293,10 @@ class ModelCore:
 
             logger.info('Enhancing fluorescence...')
 
-            # TODO add to workflow API
-            self.fluorescence_core.enhance_fluorescence(
-                output_product_api.get_product_index(),
+            output_product_api.enhance_fluorescence_local(
                 fluorescence_in_path,
                 fluorescence_out_path,
+                block=True,
             )
         else:
             logger.info('No fluorescence data to enhance.')

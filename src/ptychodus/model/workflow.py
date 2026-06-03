@@ -17,6 +17,7 @@ from ptychodus.api.workflow import (
 )
 
 from .diffraction import DiffractionAPI
+from .fluorescence import FluorescenceAPI
 from .genesis import GenesisExecutor
 from .globus import GlobusExecutor
 from .processing import ProcessingAPI
@@ -44,6 +45,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         probe_api: ProbeAPI,
         object_api: ObjectAPI,
         processing_api: ProcessingAPI,
+        fluorescence_api: FluorescenceAPI,
         globus_executor: GlobusExecutor,
         genesis_executor: GenesisExecutor,
         product_index: int,
@@ -53,6 +55,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         self._probe_api = probe_api
         self._object_api = object_api
         self._processing_api = processing_api
+        self._fluorescence_api = fluorescence_api
         self._globus_executor = globus_executor
         self._genesis_executor = genesis_executor
         self._product_index = product_index
@@ -138,6 +141,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
             self._probe_api,
             self._object_api,
             self._processing_api,
+            self._fluorescence_api,
             self._globus_executor,
             self._genesis_executor,
             output_product_index,
@@ -193,6 +197,26 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
     def save_product(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._product_api.save_product(self._product_index, file_path, file_type=file_type)
 
+    def enhance_fluorescence_local(
+        self,
+        input_path: Path,
+        output_path: Path,
+        *,
+        input_file_type: str | None = None,
+        output_file_type: str | None = None,
+        algorithm: str | None = None,
+        block: bool = False,
+    ) -> None:
+        self._fluorescence_api.enhance_local(
+            self._product_index,
+            input_path,
+            output_path,
+            input_file_type=input_file_type,
+            output_file_type=output_file_type,
+            algorithm=algorithm,
+            block=block,
+        )
+
 
 class ConcreteWorkflowAPI(WorkflowAPI):
     def __init__(
@@ -204,6 +228,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         probe_api: ProbeAPI,
         object_api: ObjectAPI,
         processing_api: ProcessingAPI,
+        fluorescence_api: FluorescenceAPI,
         globus_executor: GlobusExecutor,
         genesis_executor: GenesisExecutor,
     ) -> None:
@@ -214,6 +239,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         self._probe_api = probe_api
         self._object_api = object_api
         self._processing_api = processing_api
+        self._fluorescence_api = fluorescence_api
         self._globus_executor = globus_executor
         self._genesis_executor = genesis_executor
 
@@ -259,6 +285,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             self._probe_api,
             self._object_api,
             self._processing_api,
+            self._fluorescence_api,
             self._globus_executor,
             self._genesis_executor,
             product_index,

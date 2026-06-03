@@ -7,7 +7,7 @@ from ..diffraction import DiffractionAPI
 from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .api import ProcessingAPI, ProcessingAlgorithmParameter
-from .context import ProcessingContext
+from .monitor import ProcessingTaskMonitor
 from .settings import ProcessingSettings
 
 
@@ -24,14 +24,14 @@ class ProcessingCore:
         self.algorithm_parameter = ProcessingAlgorithmParameter(
             self._settings.algorithm, algorithm_libraries
         )
-        self._context = ProcessingContext(task_manager)
+        self._task_monitor = ProcessingTaskMonitor(task_manager)
         self.processing_api = ProcessingAPI(
             task_manager,
             diffraction_api,
             product_api,
             self.algorithm_parameter,
-            self._context,
+            self._task_monitor,
         )
 
         for library in algorithm_libraries:
-            library.get_logger().addHandler(self._context.get_log_handler())
+            library.get_logger().addHandler(self._task_monitor.get_log_handler())

@@ -8,6 +8,8 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QListView,
+    QPlainTextEdit,
+    QProgressBar,
     QPushButton,
     QRadioButton,
     QScrollArea,
@@ -254,6 +256,24 @@ class FluorescenceParametersView(QGroupBox):
         self.setLayout(layout)
 
 
+class FluorescenceStatusView(QGroupBox):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__('Status', parent)
+        self.text_edit = QPlainTextEdit()
+        self.text_edit.setReadOnly(True)
+        self.progress_bar = QProgressBar()
+        self.stop_button = QPushButton('Stop')
+
+        progress_layout = QHBoxLayout()
+        progress_layout.addWidget(self.progress_bar)
+        progress_layout.addWidget(self.stop_button)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.text_edit)
+        layout.addLayout(progress_layout)
+        self.setLayout(layout)
+
+
 class FluorescenceDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -262,13 +282,14 @@ class FluorescenceDialog(QDialog):
         self.fluorescence_parameters_view = FluorescenceParametersView()
         self.fluorescence_channel_list_view = QListView()
         self.visualization_parameters_view = VisualizationParametersView()
+        self.fluorescence_status_view = FluorescenceStatusView()
         self.status_bar = QStatusBar()
 
         parameter_layout = QVBoxLayout()
         parameter_layout.addWidget(self.fluorescence_parameters_view)
         parameter_layout.addWidget(self.fluorescence_channel_list_view, 1)
         parameter_layout.addWidget(self.visualization_parameters_view)
-        parameter_layout.addStretch()
+        parameter_layout.addWidget(self.fluorescence_status_view, 1)
 
         contents_layout = QHBoxLayout()
         contents_layout.addWidget(self.measured_widget, 1)

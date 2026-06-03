@@ -1,7 +1,6 @@
 from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 import logging
-import threading
 import time
 
 from ptychodus.api.reconstructor import (
@@ -19,9 +18,8 @@ from ptychodus.api.parametric import Parameter, StringParameter
 from ..diffraction import DiffractionAPI
 from ..product import ProductAPI
 from ..task_manager import TaskManager
-from .context import (
-    ProcessingContext,
-    ProcessingProgressMonitor,
+from .monitor import (
+    ProcessingTaskMonitor,
     ReconstructBackgroundTask,
     TrainBackgroundTask,
 )
@@ -108,16 +106,17 @@ class ProcessingAPI:
         diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
         algorithm: ProcessingAlgorithmParameter,
-        context: ProcessingContext,
+        task_monitor: ProcessingTaskMonitor,
     ) -> None:
         self._task_manager = task_manager
         self._diffraction_api = diffraction_api
         self._product_api = product_api
         self._algorithm_parameter = algorithm
-        self._context = context
+        self._task_monitor = task_monitor
 
-    def get_progress_monitor(self) -> ProcessingProgressMonitor:
-        return self._context.get_progress_monitor()
+    @property
+    def task_monitor(self) -> ProcessingTaskMonitor:
+        return self._task_monitor
 
     def get_reconstruct_input(
         self,
@@ -161,20 +160,21 @@ class ProcessingAPI:
         reconstruct_input = self.get_reconstruct_input(
             output_product_index, index_filter=index_filter
         )
-        finished_event = threading.Event()
         background_task = ReconstructBackgroundTask(
-            self._context,
+            self._task_monitor,
             self._algorithm_parameter.get_current_reconstructor(),
             reconstruct_input,
             output_product_item,
             output_product_file,
-            finished_event,
         )
+        snapshot = self._task_monitor.get_completed_runs()
         self._task_manager.put_background_task(background_task)
 
         if block:
             while not self._task_manager.is_stopping:
-                if finished_event.wait(timeout=TaskManager.WAIT_TIME_S):
+                if self._task_monitor.wait_for_completion_after(
+                    snapshot, timeout=TaskManager.WAIT_TIME_S
+                ):
                     self._task_manager.run_foreground_tasks()
                     break
 
@@ -246,20 +246,21 @@ class ProcessingAPI:
 
         if isinstance(trainer, TrainableReconstructor):
             reconstruct_input = self.get_reconstruct_input(product_index)
-            finished_event = threading.Event()
             background_task = TrainBackgroundTask(
-                self._context,
+                self._task_monitor,
                 trainer,
                 reconstruct_input,
                 input_path,
                 output_path,
-                finished_event,
             )
+            snapshot = self._task_monitor.get_completed_runs()
             self._task_manager.put_background_task(background_task)
 
             if block:
                 while not self._task_manager.is_stopping:
-                    if finished_event.wait(timeout=TaskManager.WAIT_TIME_S):
+                    if self._task_monitor.wait_for_completion_after(
+                        snapshot, timeout=TaskManager.WAIT_TIME_S
+                    ):
                         self._task_manager.run_foreground_tasks()
                         break
         else:

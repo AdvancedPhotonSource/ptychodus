@@ -54,6 +54,14 @@ Geometry
    :undoc-members:
    :show-inheritance:
 
+Illumination
+------------
+
+.. automodule:: ptychodus.api.illumination
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Input/Output (I/O)
 ------------------
 
@@ -66,6 +74,14 @@ Interpolation
 -------------
 
 .. automodule:: ptychodus.api.interpolate
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Metrics
+-------
+
+.. automodule:: ptychodus.api.metrics
    :members:
    :undoc-members:
    :show-inheritance:
@@ -194,6 +210,14 @@ Workflow
 --------
 
 .. automodule:: ptychodus.api.workflow
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+XMCD
+----
+
+.. automodule:: ptychodus.api.xmcd
    :members:
    :undoc-members:
    :show-inheritance:

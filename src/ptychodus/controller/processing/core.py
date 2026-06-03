@@ -82,7 +82,7 @@ class ProcessingController(Observer):
             algorithm_parameter, algorithm_parameter.available_reconstructors()
         )
         self._status_controller = ProcessingStatusController(
-            product_repository, processing_api.get_progress_monitor(), status_view
+            product_repository, processing_api.task_monitor, status_view
         )
         self._product_view_controller = ProductParameterViewController(
             product_repository, self._status_controller

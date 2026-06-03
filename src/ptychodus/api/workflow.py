@@ -162,6 +162,23 @@ class WorkflowProductAPI(ABC):
         """Save the product to file, uses format from settings when file_type is None."""
         pass
 
+    @abstractmethod
+    def enhance_fluorescence_local(
+        self,
+        input_path: Path,
+        output_path: Path,
+        *,
+        input_file_type: str | None = None,
+        output_file_type: str | None = None,
+        algorithm: str | None = None,
+        block: bool = False,
+    ) -> None:
+        """Run fluorescence enhancement locally and write the result to output_path.
+
+        Blocks until completion when block is True, otherwise returns immediately.
+        """
+        pass
+
 
 class WorkflowAPI(ABC):
     """Top-level API for loading data, managing products, and running reconstructions."""

@@ -68,7 +68,7 @@ module = [
     "globus_sdk.*",
     "h5py",
     "hdf5plugin",
-    "lightning",
+    "lightning.*",
     "ptychi.*",
     "ptycho.*",
     "ptycho_torch.*",

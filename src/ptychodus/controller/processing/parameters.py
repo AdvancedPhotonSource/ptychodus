@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.product import LossValue
 
-from ...model.processing import ProcessingProgressMonitor
+from ...model.processing import ProcessingTaskMonitor
 from ...model.product import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver
 from ...model.product.metadata import MetadataRepositoryItem
 from ...model.product.object import ObjectRepositoryItem
@@ -31,7 +31,7 @@ class ProcessingStatusController(Observer):
     def __init__(
         self,
         product_repository: ProductRepository,
-        monitor: ProcessingProgressMonitor,
+        monitor: ProcessingTaskMonitor,
         view: ProcessingStatusView,
     ) -> None:
         super().__init__()

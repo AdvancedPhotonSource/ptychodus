@@ -225,6 +225,7 @@ class ProductController(ProductRepositoryObserver):
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
         connect_current_changed_signal(view.table_view, controller._update_enabled_buttons)
         controller._update_enabled_buttons(QModelIndex(), QModelIndex())
+        controller._ensure_selection()
 
         connect_triggered_signal(open_file_action, controller._open_product_from_file)
         connect_triggered_signal(create_new_action, controller._create_new_product)
@@ -337,11 +338,36 @@ class ProductController(ProductRepositoryObserver):
         info_text = self._repository.get_info_text()
         self._view.info_label.setText(info_text)
 
+    def _ensure_selection(self) -> None:
+        if self._view.table_view.currentIndex().isValid():
+            return
+
+        if self._table_model.rowCount() > 0:
+            source_index = self._table_model.index(0, 0)
+            self._view.table_view.setCurrentIndex(
+                self._table_proxy_model.mapFromSource(source_index)
+            )
+
+    def _current_source_row(self) -> int:
+        proxy_index = self._view.table_view.currentIndex()
+
+        if not proxy_index.isValid():
+            return -1
+
+        return self._table_proxy_model.mapToSource(proxy_index).row()
+
+    def _select_source_row(self, row: int) -> None:
+        source_index = self._table_model.index(row, 0)
+        self._view.table_view.setCurrentIndex(self._table_proxy_model.mapFromSource(source_index))
+
     def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
         parent = QModelIndex()
         self._table_model.beginInsertRows(parent, index, index)
         self._table_model.endInsertRows()
         self._update_info_text()
+
+        if not self._view.table_view.currentIndex().isValid():
+            self._select_source_row(index)
 
     def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
         top_left = self._table_model.index(index, 0)
@@ -364,7 +390,14 @@ class ProductController(ProductRepositoryObserver):
         self._update_info_text()
 
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
+        was_current = self._current_source_row() == index
         parent = QModelIndex()
         self._table_model.beginRemoveRows(parent, index, index)
         self._table_model.endRemoveRows()
         self._update_info_text()
+
+        if was_current:
+            row_count = self._table_model.rowCount()
+
+            if row_count > 0:
+                self._select_source_row(min(index, row_count - 1))
