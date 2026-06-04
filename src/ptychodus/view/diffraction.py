@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (
     QHeaderView,
     QLabel,
     QMenu,
+    QProgressBar,
     QPushButton,
     QTreeView,
     QVBoxLayout,
@@ -131,12 +132,26 @@ class SimulateDiffractionDialog(QDialog):
         self.setWindowTitle('Simulate Diffraction Patterns')
 
 
+class DiffractionStatusView(QWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.progress_bar = QProgressBar()
+        self.stop_button = QPushButton('Stop')
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.progress_bar)
+        layout.addWidget(self.stop_button)
+        self.setLayout(layout)
+
+
 class PatternsView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.detector_view = DetectorView()
         self.tree_view = QTreeView()
         self.info_label = QLabel()
+        self.status_view = DiffractionStatusView()
         self.button_box = PatternsButtonBox()
         self.simulate_dialog = SimulateDiffractionDialog(self)
 
@@ -149,5 +164,6 @@ class PatternsView(QWidget):
         layout.addWidget(self.detector_view)
         layout.addWidget(self.tree_view)
         layout.addWidget(self.info_label)
+        layout.addWidget(self.status_view)
         layout.addWidget(self.button_box)
         self.setLayout(layout)

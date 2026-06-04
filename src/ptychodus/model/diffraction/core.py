@@ -13,6 +13,7 @@ from ..task_manager import TaskManager
 from .api import DiffractionAPI
 from .dataset import AssembledDiffractionDataset
 from .detector import Detector
+from .monitor import DiffractionTaskMonitor
 from .settings import DetectorSettings, DiffractionSettings
 from .sizer import PatternSizer
 
@@ -34,8 +35,13 @@ class DiffractionCore(Observer):
         self.diffraction_settings = DiffractionSettings(settings_registry)
         self.pattern_sizer = PatternSizer(self.detector_settings, self.diffraction_settings)
         self.detector = Detector(self.detector_settings)
+        self.task_monitor = DiffractionTaskMonitor(task_manager)
         self.dataset = AssembledDiffractionDataset(
-            self.diffraction_settings, self.pattern_sizer, self.detector, task_manager
+            self.diffraction_settings,
+            self.pattern_sizer,
+            self.detector,
+            task_manager,
+            self.task_monitor,
         )
         self.diffraction_api = DiffractionAPI(
             self.diffraction_settings,

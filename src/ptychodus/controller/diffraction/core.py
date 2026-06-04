@@ -24,11 +24,12 @@ from ...model.diffraction import (
     DiffractionAPI,
     DiffractionDatasetObserver,
     DiffractionSettings,
+    DiffractionTaskMonitor,
     PatternSizer,
 )
 from ...model.metadata import MetadataPresenter
 from ...model.product import ProductRepository
-from ...view.diffraction import DetectorView, PatternsView
+from ...view.diffraction import DetectorView, DiffractionStatusView, PatternsView
 from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate
 from ..data import FileDialogFactory
 from ..helpers import connect_triggered_signal
@@ -146,6 +147,39 @@ class DetectorController:
         view.setLayout(layout)
 
 
+class DiffractionStatusController(Observer):
+    def __init__(
+        self,
+        monitor: DiffractionTaskMonitor,
+        view: DiffractionStatusView,
+    ) -> None:
+        super().__init__()
+        self._monitor = monitor
+        self._view = view
+
+        view.stop_button.clicked.connect(monitor.stop_processing)
+
+        self._sync_model_to_view()
+        monitor.add_observer(self)
+
+    def _sync_model_to_view(self) -> None:
+        progress_goal = self._monitor.get_progress_goal()
+        progress_bar = self._view.progress_bar
+
+        if self._monitor.is_processing and progress_goal > 0:
+            progress_bar.show()
+            progress_bar.setRange(0, progress_goal)
+            progress_bar.setValue(self._monitor.get_progress())
+            self._view.stop_button.show()
+        else:
+            progress_bar.hide()
+            self._view.stop_button.hide()
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._monitor:
+            self._sync_model_to_view()
+
+
 class DiffractionController(DiffractionDatasetObserver):
     def __init__(
         self,
@@ -155,6 +189,7 @@ class DiffractionController(DiffractionDatasetObserver):
         detector: Detector,
         diffraction_api: DiffractionAPI,
         dataset: AssembledDiffractionDataset,
+        task_monitor: DiffractionTaskMonitor,
         metadata_presenter: MetadataPresenter,
         product_repository: ProductRepository,
         diffraction_simulator: DiffractionSimulator,
@@ -186,6 +221,7 @@ class DiffractionController(DiffractionDatasetObserver):
             metadata_presenter,
             file_dialog_factory,
         )
+        self._status_controller = DiffractionStatusController(task_monitor, view.status_view)
         self._tree_model = DatasetTreeModel()
 
         view.tree_view.setModel(self._tree_model)

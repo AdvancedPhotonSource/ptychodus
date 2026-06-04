@@ -75,6 +75,7 @@ class ControllerCore:
             model.diffraction_core.detector,
             model.diffraction_core.diffraction_api,
             model.diffraction_core.dataset,
+            model.diffraction_core.task_monitor,
             model.metadata_presenter,
             model.product_core.product_repository,
             model.analysis_core.diffraction_simulator,
