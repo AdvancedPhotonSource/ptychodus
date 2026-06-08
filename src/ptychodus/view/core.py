@@ -20,7 +20,7 @@ from . import resources  # noqa
 from .agent import AgentView, AgentChatView
 from .diffraction import PatternsView
 from .image import ImageView
-from .product import ProductView
+from .product import ProductView, ProductVisualizationView
 from .processing import ProcessingStatusView
 from .repository import RepositoryTableView, RepositoryTreeView
 from .probe_positions import ProbePositionsPlotView
@@ -60,7 +60,7 @@ class ViewCore(QMainWindow):
             QIcon(':/icons/products'), 'Products'
         )
         self.product_view = ProductView()
-        self.product_diagram_view = QWidget()
+        self.product_visualization_view = ProductVisualizationView()
 
         self.positions_action = self.navigation_tool_bar.addAction(
             QIcon(':/icons/positions'), 'Positions'
@@ -137,7 +137,7 @@ class ViewCore(QMainWindow):
         # maintain same order as navigationToolBar buttons
         self.right_panel.addWidget(self.settings_table_view)
         self.right_panel.addWidget(self.patterns_image_view)
-        self.right_panel.addWidget(self.product_diagram_view)
+        self.right_panel.addWidget(self.product_visualization_view)
         self.right_panel.addWidget(self.probe_positions_plot_view)
         self.right_panel.addWidget(self.probe_image_view)
         self.right_panel.addWidget(self.object_image_view)

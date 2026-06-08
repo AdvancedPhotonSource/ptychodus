@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import time
 
 from ptychodus.api.illumination import IlluminationMap, compute_illumination_map
 
@@ -23,4 +24,11 @@ class IlluminationMapper:
 
     def map(self, product_index: int) -> IlluminationMap:
         product = self._repository[product_index].get_product()
-        return compute_illumination_map(product)
+
+        logger.info('Computing illumination map...')
+        tic = time.perf_counter()
+        result = compute_illumination_map(product)
+        toc = time.perf_counter()
+        logger.info(f'Computed illumination map in {toc - tic:.4f} seconds.')
+
+        return result

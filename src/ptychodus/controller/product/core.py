@@ -244,15 +244,23 @@ class ProductController(ProductRepositoryObserver):
     def table_model(self) -> QAbstractTableModel:
         return self._table_model
 
-    def _get_current_item_index(self) -> int:
+    def get_current_item_index(self) -> int:
+        """Repository row index of the currently-selected product, or -1 if none is selected."""
         proxy_index = self._view.table_view.currentIndex()
 
         if proxy_index.isValid():
             model_index = self._table_proxy_model.mapToSource(proxy_index)
             return model_index.row()
 
-        logger.warning('No current index!')
         return -1
+
+    def _get_current_item_index(self) -> int:
+        item_index = self.get_current_item_index()
+
+        if item_index < 0:
+            logger.warning('No current index!')
+
+        return item_index
 
     def _open_product_from_file(self) -> None:
         file_path, name_filter = self._file_dialog_factory.get_open_file_path(

@@ -9,10 +9,14 @@ from PyQt5.QtWidgets import (
     QMenu,
     QPlainTextEdit,
     QPushButton,
+    QSizePolicy,
     QTableView,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
+
+from .image import ImageView
 
 
 class ProductEditorPropertiesView(QGroupBox):
@@ -110,3 +114,26 @@ class ProductView(QWidget):
         layout.addWidget(self.info_label)
         layout.addWidget(self.button_box)
         self.setLayout(layout)
+
+
+class ProductVisualizationView(QWidget):
+    """Right-panel tabbed visualization of reconstruction residuals for the active product."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+
+        self.real_space_image_view = ImageView()
+        self.reciprocal_space_image_view = ImageView()
+        self.compute_button = QPushButton('Compute Residuals')
+
+        self.tab_widget = QTabWidget()
+        self.tab_widget.addTab(self.real_space_image_view, 'Real-Space Error Map')
+        self.tab_widget.addTab(self.reciprocal_space_image_view, 'Reciprocal-Space Error Map')
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.tab_widget)
+        layout.addWidget(self.compute_button)
+        self.setLayout(layout)
+
+        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)

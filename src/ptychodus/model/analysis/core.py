@@ -11,6 +11,7 @@ from .fourier import FourierAnalyzer
 from .frc import FourierRingCorrelator
 from .illumination import IlluminationMapper
 from .propagator import ProbePropagator
+from .residuals import ResidualAnalyzer
 from .settings import (
     AffineTransformEstimatorSettings,
     DiffractionSimulatorSettings,
@@ -52,6 +53,10 @@ class AnalysisCore:
         self.probe_propagator_settings = ProbePropagatorSettings(settings_registry)
         self.probe_propagator = ProbePropagator(self.probe_propagator_settings, product_repository)
         self.probe_propagator_visualization_engine = VisualizationEngine(is_complex=False)
+
+        self.residual_analyzer = ResidualAnalyzer(product_repository, dataset)
+        self.residual_real_space_visualization_engine = VisualizationEngine(is_complex=False)
+        self.residual_reciprocal_space_visualization_engine = VisualizationEngine(is_complex=False)
 
         self.xmcd_analyzer = XMCDAnalyzer(product_repository)
         self.xmcd_structural_visualization_engine = VisualizationEngine(is_complex=True)

@@ -1,4 +1,6 @@
 from collections.abc import Sequence
+import logging
+import time
 
 import numpy
 
@@ -7,6 +9,8 @@ from ptychodus.api.geometry import AffineTransform
 
 from ..product import ProbePositionsRepository
 from .settings import AffineTransformEstimatorSettings
+
+logger = logging.getLogger(__name__)
 
 
 class AffineTransformEstimator:
@@ -44,7 +48,9 @@ class AffineTransformEstimator:
             self._repository[idx].get_probe_positions() for idx in corrected_product_indexes
         ]
 
-        return estimate_affine_transform_ransac(
+        logger.info('Computing affine transform...')
+        tic = time.perf_counter()
+        result = estimate_affine_transform_ransac(
             measured_positions,
             corrected_positions,
             num_iterations=self._settings.num_iterations.get_value(),
@@ -52,3 +58,7 @@ class AffineTransformEstimator:
             min_inliers=self._settings.min_inliers.get_value(),
             rng=self._rng,
         )
+        toc = time.perf_counter()
+        logger.info(f'Computed affine transform in {toc - tic:.4f} seconds.')
+
+        return result

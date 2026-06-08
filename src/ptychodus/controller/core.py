@@ -19,6 +19,7 @@ from .probe import ProbeController
 from .probe_positions import ProbePositionsController
 from .processing import ProcessingController
 from .product import ProductController
+from .product.visualization import ProductVisualizationController
 from .ptychi import PtyChiViewControllerFactory
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopinn import PtychoPINNViewControllerFactory
@@ -89,6 +90,15 @@ class ControllerCore:
             model.product_core.product_repository,
             model.product_core.product_api,
             view.product_view,
+            self._file_dialog_factory,
+        )
+        self._product_visualization_controller = ProductVisualizationController(
+            model.analysis_core.residual_analyzer,
+            model.analysis_core.residual_real_space_visualization_engine,
+            model.analysis_core.residual_reciprocal_space_visualization_engine,
+            self._product_controller,
+            view.product_visualization_view,
+            self._status_bar,
             self._file_dialog_factory,
         )
         self._probe_positions_controller = ProbePositionsController(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import time
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.propagator import PropagatedProbe, propagate_probe
@@ -42,7 +43,9 @@ class ProbePropagator:
 
         probe = probes.get_probe_no_opr()
 
-        return propagate_probe(
+        logger.info('Computing probe propagation...')
+        tic = time.perf_counter()
+        result = propagate_probe(
             probe.get_array(),
             pixel_geometry=probe.get_pixel_geometry(),
             wavelength_m=wavelength_m,
@@ -50,3 +53,7 @@ class ProbePropagator:
             end_coordinate_m=self._settings.end_coordinate_m.get_value(),
             num_steps=self._settings.num_steps.get_value(),
         )
+        toc = time.perf_counter()
+        logger.info(f'Computed probe propagation in {toc - tic:.4f} seconds.')
+
+        return result

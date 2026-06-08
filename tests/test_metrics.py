@@ -9,12 +9,17 @@ import numpy.testing
 import pytest
 
 from ptychodus.api.geometry import PixelGeometry, fourier_shift_2d
+from ptychodus.api.diffraction_gen import generate_diffraction_data
+from ptychodus.api.illumination import compute_illumination_map
 from ptychodus.api.metrics import (
     FourierRingCorrelation,
     ObjectComparison,
+    ReconstructionResiduals,
     compute_fourier_ring_correlation,
     compute_mean_absolute_error,
     compute_peak_signal_to_noise_ratio,
+    compute_r_factor,
+    compute_reconstruction_residuals,
     compute_root_mean_square_error,
     compute_structural_similarity,
 )
@@ -493,6 +498,37 @@ class TestComputeMeanAbsoluteError:
             compute_mean_absolute_error(a, b)
 
 
+class TestComputeRFactor:
+    def test_identical_arrays_give_zero(self) -> None:
+        rng = numpy.random.default_rng(0)
+        arr = rng.standard_normal((8, 12)) + 1j * rng.standard_normal((8, 12))
+        assert compute_r_factor(arr, arr) == pytest.approx(0.0)
+
+    def test_known_value_matches_hand_computed(self) -> None:
+        # |ref| = 2 everywhere, |test - ref| = 1 everywhere
+        #   → R = (1 * N) / (2 * N) = 0.5
+        reference = numpy.full((4, 4), 2.0)
+        test = numpy.full((4, 4), 3.0)
+        assert compute_r_factor(reference, test) == pytest.approx(0.5)
+
+    def test_complex_uses_modulus(self) -> None:
+        # ref = 4 + 0j → |ref| = 4; diff = 3j → |diff| = 3 → R = 3/4 = 0.75
+        reference = numpy.full((4, 4), 4.0 + 0.0j)
+        test = numpy.full((4, 4), 4.0 + 3.0j)
+        assert compute_r_factor(reference, test) == pytest.approx(0.75)
+
+    def test_zero_reference_returns_nan(self) -> None:
+        reference = numpy.zeros((4, 4), dtype=numpy.complex128)
+        test = numpy.ones((4, 4), dtype=numpy.complex128)
+        assert numpy.isnan(compute_r_factor(reference, test))
+
+    def test_raises_on_shape_mismatch(self) -> None:
+        a = numpy.zeros((4, 4))
+        b = numpy.zeros((4, 5))
+        with pytest.raises(ValueError, match='shape'):
+            compute_r_factor(a, b)
+
+
 class TestComputePeakSignalToNoiseRatio:
     def test_identical_arrays_give_positive_infinity(self) -> None:
         rng = numpy.random.default_rng(0)
@@ -839,8 +875,10 @@ class TestObjectComparisonMetricsIntegration:
 
         rmse = compute_root_mean_square_error(comparison.reference_complex, comparison.test_complex)
         mae = compute_mean_absolute_error(comparison.reference_complex, comparison.test_complex)
+        r = compute_r_factor(comparison.reference_complex, comparison.test_complex)
         assert numpy.isfinite(rmse) and rmse > 0.0
         assert numpy.isfinite(mae) and mae > 0.0
+        assert numpy.isfinite(r) and r > 0.0
 
         psnr_amp = compute_peak_signal_to_noise_ratio(
             comparison.reference_amplitude, comparison.test_amplitude
@@ -868,3 +906,125 @@ class TestObjectComparisonMetricsIntegration:
         )
         assert isinstance(frc, FourierRingCorrelation)
         assert frc.correlation.shape == frc.spatial_frequency_per_m.shape
+
+
+def _simulate_measured(product: Product) -> numpy.ndarray:
+    return generate_diffraction_data(product).get_patterns()
+
+
+class TestComputeReconstructionResiduals:
+    def test_self_consistent_inputs_yield_zero_residuals(self) -> None:
+        product = _make_product()
+        measured = _simulate_measured(product)
+        bad_pixels = numpy.zeros(measured.shape[1:], dtype=bool)
+
+        result = compute_reconstruction_residuals(product, measured, bad_pixels)
+
+        assert isinstance(result, ReconstructionResiduals)
+        numpy.testing.assert_allclose(result.reciprocal_space_error_map, 0.0, atol=1e-12)
+        numpy.testing.assert_allclose(result.real_space_error_map, 0.0, atol=1e-12)
+
+    def test_constant_offset_gives_expected_chi2_reciprocal(self) -> None:
+        product = _make_product()
+        baseline = _simulate_measured(product)
+        offset = 0.25
+        measured = baseline + offset
+        bad_pixels = numpy.zeros(measured.shape[1:], dtype=bool)
+
+        result = compute_reconstruction_residuals(product, measured, bad_pixels)
+
+        # New convention: reduced χ² = (measured - predicted)² / max(predicted, 1),
+        # averaged over frames. With predicted == baseline and a constant offset,
+        # the per-pixel χ² is offset² / max(baseline, 1) averaged across frames.
+        safe = numpy.maximum(baseline, 1.0)
+        expected_reciprocal = (offset**2 / safe).mean(axis=0)
+        numpy.testing.assert_allclose(
+            result.reciprocal_space_error_map, expected_reciprocal, atol=1e-10
+        )
+
+    def test_un_illuminated_pixels_remain_zero(self) -> None:
+        product = _make_product()
+        measured = _simulate_measured(product) + 0.5
+        bad_pixels = numpy.zeros(measured.shape[1:], dtype=bool)
+
+        result = compute_reconstruction_residuals(product, measured, bad_pixels)
+
+        # Wherever no probe lands, the splat never touches the canvas; the illumination map
+        # has the same zero footprint, so we can use it as the "no-data" mask.
+        illumination = compute_illumination_map(product).photon_number
+        un_illuminated = illumination == 0.0
+        assert un_illuminated.any(), 'test setup expects at least one un-illuminated pixel'
+        numpy.testing.assert_array_equal(result.real_space_error_map[un_illuminated], 0.0)
+
+    def test_bad_pixels_are_masked_in_reciprocal_map(self) -> None:
+        product = _make_product()
+        baseline = _simulate_measured(product)
+        offset = 0.5
+        measured = baseline + offset
+        bad_pixels = numpy.zeros(measured.shape[1:], dtype=bool)
+        bad_pixels[0, 0] = True
+
+        result = compute_reconstruction_residuals(product, measured, bad_pixels)
+
+        assert numpy.isnan(result.reciprocal_space_error_map[0, 0])
+        good = ~bad_pixels
+        safe = numpy.maximum(baseline, 1.0)
+        expected_chi2 = (offset**2 / safe).mean(axis=0)
+        numpy.testing.assert_allclose(
+            result.reciprocal_space_error_map[good], expected_chi2[good], atol=1e-10
+        )
+
+    def test_geometry_passthrough_matches_product(self) -> None:
+        product = _make_product()
+        measured = _simulate_measured(product)
+        bad_pixels = numpy.zeros(measured.shape[1:], dtype=bool)
+
+        result = compute_reconstruction_residuals(product, measured, bad_pixels)
+
+        object_geometry = product.object_.get_geometry()
+        assert result.real_space_error_map.shape == (
+            object_geometry.height_px,
+            object_geometry.width_px,
+        )
+        assert result.reciprocal_space_error_map.shape == measured.shape[1:]
+        assert result.object_pixel_geometry == object_geometry.get_pixel_geometry()
+        assert result.object_center == object_geometry.get_center()
+
+    def test_shape_mismatch_raises(self) -> None:
+        product = _make_product()
+        measured = _simulate_measured(product)
+        bad_pixels = numpy.zeros((measured.shape[1] + 1, measured.shape[2]), dtype=bool)
+
+        with pytest.raises(ValueError, match='shape'):
+            compute_reconstruction_residuals(product, measured, bad_pixels)
+
+    def test_real_space_map_is_invariant_to_scan_density(self) -> None:
+        # Duplicating every scan position doubles both the χ²-weighted splat
+        # and the illumination splat at every covered pixel, so their ratio —
+        # the real-space χ² map — is unchanged. This is the scan-density
+        # invariance the normalization is designed to provide.
+        product = _make_product()
+        baseline = _simulate_measured(product)
+        measured = baseline + 0.5
+        bad_pixels = numpy.zeros(measured.shape[1:], dtype=bool)
+
+        positions = list(product.probe_positions)
+        doubled_positions = ProbePositionSequence(positions + positions)
+        doubled_product = replace(product, probe_positions=doubled_positions)
+        doubled_measured = numpy.concatenate([measured, measured], axis=0)
+
+        baseline_result = compute_reconstruction_residuals(product, measured, bad_pixels)
+        doubled_result = compute_reconstruction_residuals(
+            doubled_product, doubled_measured, bad_pixels
+        )
+
+        numpy.testing.assert_allclose(
+            doubled_result.real_space_error_map,
+            baseline_result.real_space_error_map,
+            atol=1e-10,
+        )
+        numpy.testing.assert_allclose(
+            doubled_result.reciprocal_space_error_map,
+            baseline_result.reciprocal_space_error_map,
+            atol=1e-10,
+        )

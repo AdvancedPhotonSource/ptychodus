@@ -8,8 +8,10 @@ import scipy.fft
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 
 from .common import ComplexArrayType, IntegerArrayType, RealArrayType
-from .geometry import PixelGeometry
-from .object import align_objects
+from .diffraction import BadPixels, DiffractionPatterns
+from .diffraction_gen import generate_diffraction_data
+from .geometry import PixelGeometry, fourier_shift_2d
+from .object import ObjectCenter, align_objects
 from .product import Product
 from .reconstructor import ReconstructionAmbiguities
 
@@ -361,6 +363,32 @@ def compute_mean_absolute_error(
     return numpy.mean(numpy.absolute(test - reference)).item()
 
 
+def compute_r_factor(
+    reference: ComplexArrayType | RealArrayType,
+    test: ComplexArrayType | RealArrayType,
+) -> float:
+    """Relative L1 distance: ``sum(|test - reference|) / sum(|reference|)``.
+
+    Unitless, scale-invariant counterpart to
+    :func:`compute_mean_absolute_error`. Returns 0 for a perfect match and
+    grows without an upper bound as the reconstructions disagree (a fully
+    uncorrelated test typically lands near 1). Accepts real or complex
+    inputs; for complex inputs both the numerator and denominator use the
+    per-pixel modulus, matching the convention of the other metrics in this
+    module. Returns NaN when the reference has zero total amplitude (R-factor
+    is undefined in that case).
+    """
+    if reference.shape != test.shape:
+        raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
+
+    denominator = numpy.sum(numpy.absolute(reference)).item()
+    if denominator == 0.0:
+        return float('nan')
+
+    numerator = numpy.sum(numpy.absolute(test - reference)).item()
+    return numerator / denominator
+
+
 def _infer_data_range(reference: RealArrayType) -> float:
     """Pick a sensible default ``data_range`` for PSNR/SSIM from the reference image.
 
@@ -410,3 +438,136 @@ def compute_structural_similarity(
 
     effective_range = _infer_data_range(reference) if data_range is None else data_range
     return structural_similarity(reference, test, data_range=effective_range).item()
+
+
+@dataclass(frozen=True)
+class ReconstructionResiduals:
+    """Real- and reciprocal-space residual maps comparing measured to forward-simulated patterns.
+
+    Built by :func:`compute_reconstruction_residuals` from a reconstructed product and the
+    measured diffraction patterns it should reproduce. Both maps are dimensionless reduced-χ²
+    quantities under a Poisson noise model: ``(measured - predicted)² / max(predicted, 1)``.
+    A perfectly fitted reconstruction at the shot-noise floor yields values near 1; model errors
+    push values well above 1. The normalization makes both maps invariant to the incident flux
+    and to the number of scan positions, so they are directly comparable across datasets.
+
+    Attributes:
+        real_space_error_map: 2D array on the object grid. Each pixel is the normalized-probe-
+            footprint-weighted average over every frame whose probe touched that pixel of the
+            frame's per-frame χ² (its mean χ² over good detector pixels). Each frame's probe-
+            intensity patch is normalized to sum to 1 before splatting, so frames contribute
+            equally regardless of probe power (relevant for variable-probe reconstructions).
+            The weighted quotient removes scan-density dependence: doubling the number of frames
+            covering a pixel doubles both the weighted χ² splat and the weight, leaving the
+            ratio unchanged. Un-illuminated pixels are zero (no frame contributed).
+        object_pixel_geometry: Pixel geometry of ``real_space_error_map``.
+        object_center: Real-space origin of ``real_space_error_map``.
+        reciprocal_space_error_map: 2D array on the detector grid. Each pixel is the mean over
+            frames of ``(measured - predicted)² / max(predicted, 1)``. NaN at bad pixels.
+        detector_pixel_geometry: Pixel geometry of ``reciprocal_space_error_map`` (derived from
+            the forward propagator).
+    """
+
+    real_space_error_map: RealArrayType
+    object_pixel_geometry: PixelGeometry
+    object_center: ObjectCenter
+    reciprocal_space_error_map: RealArrayType
+    detector_pixel_geometry: PixelGeometry
+
+
+def compute_reconstruction_residuals(
+    product: Product,
+    measured_patterns: DiffractionPatterns,
+    bad_pixels: BadPixels,
+) -> ReconstructionResiduals:
+    """Compute reduced-χ² real- and reciprocal-space residual maps for a reconstructed product.
+
+    Re-runs the multislice forward model on ``product`` (via
+    :func:`generate_diffraction_data`) and compares the simulated intensities to
+    ``measured_patterns``. Both maps use the same per-pixel reduced χ²,
+    ``(measured - predicted)² / max(predicted, 1)``, so a perfectly fitted
+    reconstruction at the Poisson shot-noise floor lands near 1 and model
+    errors push values well above 1.
+
+    The reciprocal-space map is this χ² averaged over all frames per detector
+    pixel; bad pixels become NaN. The real-space map averages each frame's
+    χ² (taken over its good detector pixels) onto the object grid weighted
+    by the frame's **per-frame-normalized** probe intensity (each frame's
+    ``|probe|²`` patch divided by its own total), then divides by the same
+    normalized-intensity splat. The normalization makes every frame contribute
+    the same total weight regardless of its probe power, so the map is
+    invariant to both the incident flux and to the number of scan positions
+    (variable-probe frames included). Un-illuminated pixels remain zero.
+
+    Inputs must already be aligned: ``measured_patterns`` is shape ``(N, H, W)``
+    in product position order (typically the output of
+    :meth:`AssembledDiffractionData.prepare_reconstruct_input`).
+    """
+    if measured_patterns.ndim != 3:
+        raise ValueError(
+            f'measured_patterns must be 3D (N,H,W); got shape {measured_patterns.shape}'
+        )
+
+    if measured_patterns.shape[1:] != bad_pixels.shape:
+        raise ValueError(
+            'measured_patterns frame shape does not match bad_pixels shape '
+            f'(measured frame={measured_patterns.shape[1:]} vs bad_pixels={bad_pixels.shape})'
+        )
+
+    simulated = generate_diffraction_data(product)
+    predicted = simulated.get_patterns()
+
+    if predicted.shape != measured_patterns.shape:
+        raise ValueError(
+            'Simulated patterns shape does not match measured patterns shape '
+            f'(simulated={predicted.shape} vs measured={measured_patterns.shape})'
+        )
+
+    valid = numpy.logical_not(bad_pixels)
+    safe_predicted = numpy.maximum(predicted, 1.0)
+    sq_chi2 = (measured_patterns - predicted) ** 2 / safe_predicted  # (N, H, W)
+    per_pixel_chi2 = sq_chi2.mean(axis=0)
+    reciprocal_map = numpy.where(valid, per_pixel_chi2, numpy.nan)
+
+    npix = max(int(valid.sum()), 1)
+    per_frame_chi2 = numpy.einsum('nhw,hw->n', sq_chi2, valid.astype(sq_chi2.dtype)) / npix  # (N,)
+
+    object_geometry = product.object_.get_geometry()
+    probe_geometry = product.probes.get_geometry()
+    weighted_chi2_splat = numpy.zeros((object_geometry.height_px, object_geometry.width_px))
+    weight_splat = numpy.zeros_like(weighted_chi2_splat)
+
+    for chi2_i, (scan_point, probe) in zip(per_frame_chi2, product.iter_position_probes()):
+        object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
+        cx = object_point.coordinate_x_px
+        cy = object_point.coordinate_y_px
+
+        x_lower = int(cx - probe_geometry.width_px / 2)
+        y_lower = int(cy - probe_geometry.height_px / 2)
+        dx = cx - (x_lower + probe_geometry.width_px / 2)
+        dy = cy - (y_lower + probe_geometry.height_px / 2)
+
+        shifted_modes = fourier_shift_2d(probe.get_array(), dx=dx, dy=dy)
+        intensity = numpy.sum(numpy.abs(shifted_modes) ** 2, axis=0)
+        total = intensity.sum()
+        patch = intensity / total if total > 0.0 else intensity
+
+        ys = slice(y_lower, y_lower + probe_geometry.height_px)
+        xs = slice(x_lower, x_lower + probe_geometry.width_px)
+        weighted_chi2_splat[ys, xs] += float(chi2_i) * patch
+        weight_splat[ys, xs] += patch
+
+    real_space_error_map = numpy.divide(
+        weighted_chi2_splat,
+        weight_splat,
+        out=numpy.zeros_like(weighted_chi2_splat),
+        where=weight_splat > 0.0,
+    )
+
+    return ReconstructionResiduals(
+        real_space_error_map=real_space_error_map,
+        object_pixel_geometry=object_geometry.get_pixel_geometry(),
+        object_center=object_geometry.get_center(),
+        reciprocal_space_error_map=reciprocal_map,
+        detector_pixel_geometry=simulated.get_pixel_geometry(),
+    )
