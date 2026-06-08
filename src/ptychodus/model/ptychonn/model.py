@@ -1,5 +1,6 @@
 from pathlib import Path
 import logging
+import shutil
 
 import lightning
 import ptychonn
@@ -22,6 +23,7 @@ class PtychoNNModelProvider:
         self._enable_amplitude = enable_amplitude
         self._model: ptychonn.LitReconSmallModel | None = None
         self._trainer: lightning.Trainer | None = None
+        self._loaded_from: Path | None = None
 
     def get_model_name(self) -> str:
         return 'AmplitudePhase' if self._enable_amplitude else 'PhaseOnly'
@@ -52,14 +54,21 @@ class PtychoNNModelProvider:
         logger.debug(f'Reading model from "{file_path}"')
         self._model = ptychonn.LitReconSmallModel.load_from_checkpoint(file_path)
         self._trainer = None
+        self._loaded_from = file_path
 
     def set_trainer(self, trainer: lightning.Trainer) -> None:
         self._model = None
         self._trainer = trainer
+        self._loaded_from = None
 
     def save_model(self, file_path: Path) -> None:
-        if self._trainer is None:
-            logger.warning('Need trainer to save model!')
-        else:
+        if self._trainer is not None:
             logger.debug(f'Writing model to "{file_path}"')
             self._trainer.save_checkpoint(file_path)
+        elif self._loaded_from is not None and self._loaded_from.is_file():
+            logger.debug(f'Copying loaded checkpoint "{self._loaded_from}" -> "{file_path}"')
+            shutil.copyfile(self._loaded_from, file_path)
+        else:
+            raise RuntimeError(
+                'Cannot save PtychoNN model: no trainer and no source checkpoint to copy from.'
+            )

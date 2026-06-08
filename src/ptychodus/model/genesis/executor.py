@@ -109,9 +109,6 @@ class GenesisExecutor:
             file_type='HDF5',
         )
 
-        if self._processing_api.is_reconstructor_trainable():
-            pass  # FIXME save model
-
         return local_dir_struct
 
     def _run_flow(
@@ -189,11 +186,13 @@ class GenesisExecutor:
 
     def reconstruct(self, input_product_index: int, *, algorithm: str | None = None) -> None:
         self._processing_api.set_reconstructor_if_provided(algorithm)
+        dir_structure = self.populate_input_directory(input_product_index)
 
         if self._processing_api.is_reconstructor_trainable():
-            pass  # TODO get model from mlflow
+            ext = self._processing_api.get_model_file_extension()
+            model_path = dir_structure.input_directory / f'{StandardFileLayout.MODEL_BASENAME}{ext}'
+            self._processing_api.save_model_to_file(model_path)
 
-        dir_structure = self.populate_input_directory(input_product_index)
         self._run_flow('reconstruct', dir_structure)
 
     def train(self, input_product_index: int, *, algorithm: str | None = None) -> None:

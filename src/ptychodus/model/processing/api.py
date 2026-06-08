@@ -211,6 +211,19 @@ class ProcessingAPI:
         else:
             logger.warning('Algorithm is not trainable!')
 
+    def save_model_to_file(self, file_path: Path, algorithm: str | None = None) -> None:
+        self.set_reconstructor_if_provided(algorithm)
+        reconstructor = self._algorithm_parameter.get_current_reconstructor()
+
+        if isinstance(reconstructor, TrainableReconstructor):
+            logger.info('Saving model...')
+            tic = time.perf_counter()
+            reconstructor.save_model(file_path)
+            toc = time.perf_counter()
+            logger.info(f'Save time {toc - tic:.4f} seconds.')
+        else:
+            logger.warning('Algorithm is not trainable!')
+
     def export_training_data(
         self,
         file_path: Path,
@@ -283,6 +296,17 @@ class ProcessingAPI:
 
         if isinstance(trainer, TrainableReconstructor):
             return trainer.get_model_file_filter()
+        else:
+            logger.warning('Algorithm is not trainable!')
+
+        return ''
+
+    def get_model_file_extension(self, *, algorithm: str | None = None) -> str:
+        self.set_reconstructor_if_provided(algorithm)
+        trainer = self._algorithm_parameter.get_current_reconstructor()
+
+        if isinstance(trainer, TrainableReconstructor):
+            return trainer.get_model_file_extension()
         else:
             logger.warning('Algorithm is not trainable!')
 

@@ -89,6 +89,16 @@ class TrainableReconstructor(Reconstructor):
         pass
 
     @abstractmethod
+    def get_model_file_extension(self) -> str:
+        """Return the file extension (with leading dot) used when saving the model."""
+        pass
+
+    @abstractmethod
+    def save_model(self, file_path: Path) -> None:
+        """Write the currently-loaded model to file_path."""
+        pass
+
+    @abstractmethod
     def get_training_data_file_filter(self) -> str:
         pass
 
@@ -124,6 +134,12 @@ class NullReconstructor(TrainableReconstructor):
         return ''
 
     def load_model_from_file(self, file_path: Path) -> None:
+        pass
+
+    def get_model_file_extension(self) -> str:
+        return ''
+
+    def save_model(self, file_path: Path) -> None:
         pass
 
     def get_training_data_file_filter(self) -> str:

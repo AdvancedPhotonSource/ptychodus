@@ -2,6 +2,9 @@ from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Any, Final
 import logging
+import shutil
+import tempfile
+import zipfile
 
 import numpy
 
@@ -77,6 +80,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         self.__model: Any = None
         self._config: dict[str, Any] = dict()
         self._is_developer_mode_enabled = is_developer_mode_enabled
+        self._model_bundle_dir: Path | None = None
 
     def _create_model_config(self, model_size: int) -> ModelConfig:
         return ModelConfig(
@@ -181,16 +185,38 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
     def get_model_file_filter(self) -> str:
         return 'Zipped Archive (*.zip)'
 
-    def load_model_from_file(self, file_path: Path) -> None:
-        if file_path.name != self.MODEL_FILE_NAME:
-            logger.warning(f"PtychoPINN expects the file name '{self.MODEL_FILE_NAME}'.")
+    def get_model_file_extension(self) -> str:
+        return '.zip'
 
+    def load_model_from_file(self, file_path: Path) -> None:
         # TODO model path to/from settings
         self._inference_settings.model_path.set_value(file_path)
 
+        if file_path.name == self.MODEL_FILE_NAME:
+            # Loose bundle directory containing wts.h5.zip + auxiliary files.
+            bundle_dir = file_path.parent
+        elif file_path.suffix == '.zip':
+            # Zipped bundle (e.g. produced by save_model). Unpack to a tempdir
+            # that lives for the process lifetime; load_inference_bundle may
+            # keep lazy file handles open against this directory.
+            bundle_dir = Path(tempfile.mkdtemp(prefix='ptychopinn-bundle-'))
+            with zipfile.ZipFile(file_path) as archive:
+                archive.extractall(bundle_dir)
+        else:
+            logger.warning(f"PtychoPINN expects the file name '{self.MODEL_FILE_NAME}'.")
+            bundle_dir = file_path.parent
+
         # global config (ptycho.params.cfg) updated during load
-        self.__model, self._config = load_inference_bundle(file_path.parent)
+        self.__model, self._config = load_inference_bundle(bundle_dir)
+        self._model_bundle_dir = bundle_dir
         # TODO sync ptycho.params.cfg with settings after load
+
+    def save_model(self, file_path: Path) -> None:
+        if self._model_bundle_dir is None:
+            raise RuntimeError('Cannot save PtychoPINN model: model is not loaded.')
+        archive_stem = str(file_path.with_suffix(''))
+        logger.debug(f'Archiving bundle "{self._model_bundle_dir}" -> "{file_path}"')
+        shutil.make_archive(archive_stem, 'zip', root_dir=self._model_bundle_dir)
 
     def get_training_data_file_filter(self) -> str:
         return 'NumPy Zipped Archive (*.npz)'
@@ -235,6 +261,7 @@ class PtychoPINNTrainableReconstructor(TrainableReconstructor):
         )
         model_path = output_path / self.MODEL_FILE_NAME
         ptycho.model_manager.save(output_path)
+        self._model_bundle_dir = output_path
         save_outputs(recon_amp, recon_phase, train_results, str(output_path))
         self.load_model_from_file(model_path)
 

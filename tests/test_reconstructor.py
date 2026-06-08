@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy
 import numpy.testing
 import pytest
@@ -13,6 +15,7 @@ from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstructor import (
     AssembledDiffractionData,
+    NullReconstructor,
     PositionIndexFilter,
     ReconstructionAmbiguities,
 )
@@ -1109,3 +1112,19 @@ class TestPrepareReconstructInputMerge:
         product = _product_with_position_indexes([0, 1, 2])
         result = data.prepare_reconstruct_input(product)
         assert result.bad_pixels is data.get_bad_pixels()
+
+
+class TestNullReconstructor:
+    """NullReconstructor must remain instantiable as new abstract methods are added."""
+
+    def test_instantiable(self) -> None:
+        # Will raise TypeError if any abstract method on TrainableReconstructor lacks a stub.
+        NullReconstructor('null')
+
+    def test_get_model_file_extension_returns_empty(self) -> None:
+        assert NullReconstructor('null').get_model_file_extension() == ''
+
+    def test_save_model_is_noop(self, tmp_path: Path) -> None:
+        target = tmp_path / 'model.bin'
+        NullReconstructor('null').save_model(target)
+        assert not target.exists()

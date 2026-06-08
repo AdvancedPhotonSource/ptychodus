@@ -267,6 +267,20 @@ class ModelCore:
             logger.error('Diffraction data is not a file!')
             return -1
 
+        processing_api = self.processing_core.processing_api
+
+        if processing_api.is_reconstructor_trainable():
+            ext = processing_api.get_model_file_extension()
+            model_path = input_directory / f'{StandardFileLayout.MODEL_BASENAME}{ext}'
+
+            if model_path.is_file():
+                processing_api.load_model_from_file(model_path)
+            else:
+                logger.info(
+                    f'No model file found at {model_path}; '
+                    'reconstructor will run without a preloaded model.'
+                )
+
         product_in_path = input_directory / StandardFileLayout.PRODUCT_IN
 
         if product_in_path.is_file():

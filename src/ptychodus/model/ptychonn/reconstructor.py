@@ -43,6 +43,7 @@ class CenterBoxMeanPhaseCenteringStrategy:  # TODO USE
 
 class PtychoNNTrainableReconstructor(TrainableReconstructor):
     MODEL_FILE_FILTER: Final[str] = 'PyTorch Lightning Checkpoint Files (*.ckpt)'
+    MODEL_FILE_EXTENSION: Final[str] = '.ckpt'
     TRAINING_DATA_FILE_FILTER: Final[str] = 'NumPy Zipped Archive (*.npz)'
     PATCHES_KEY: Final[str] = 'real'
     PATTERNS_KEY: Final[str] = 'reciprocal'
@@ -133,6 +134,9 @@ class PtychoNNTrainableReconstructor(TrainableReconstructor):
 
     def get_model_file_filter(self) -> str:
         return self.MODEL_FILE_FILTER
+
+    def get_model_file_extension(self) -> str:
+        return self.MODEL_FILE_EXTENSION
 
     def load_model_from_file(self, file_path: Path) -> None:
         self._model_provider.load_model_from_file(file_path)

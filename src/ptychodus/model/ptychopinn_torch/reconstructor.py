@@ -2,6 +2,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 import logging
+import shutil
 
 import numpy
 
@@ -97,6 +98,7 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
 
         self._inference_engine: InferenceEngine | None = None
         self._inference_config_manager: ConfigManager | None = None
+        self._loaded_from: Path | None = None
 
     def _create_config_from_settings(self) -> ConfigManager:
         grid_size = (
@@ -465,6 +467,21 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
         # Cache the canonical ConfigManager for reuse in reconstruct(); InferenceEngine
         # only stores the four config dataclasses, not the manager itself.
         self._inference_config_manager = config_manager
+        self._loaded_from = file_path
+
+    def get_model_file_extension(self) -> str:
+        return '.ckpt'
+
+    def save_model(self, file_path: Path) -> None:
+        if self._inference_engine is None:
+            raise RuntimeError('Cannot save PtychoPINN_Torch model: model is not loaded.')
+        if self._loaded_from is None or not self._loaded_from.is_file():
+            raise RuntimeError(
+                'Cannot save PtychoPINN_Torch model: no source checkpoint to copy from. '
+                'Train or load a model first.'
+            )
+        logger.debug(f'Copying loaded checkpoint "{self._loaded_from}" -> "{file_path}"')
+        shutil.copyfile(self._loaded_from, file_path)
 
     def get_training_data_file_filter(self) -> str:
         return 'NumPy Zipped Archive (*.npz)'
