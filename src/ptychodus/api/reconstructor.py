@@ -290,36 +290,113 @@ class AssembledDiffractionData:
         index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
     ) -> ReconstructInput:
         # TODO also filter OPR weights
-        pattern_indexes = [int(index) for index in self.get_indexes()]
-        logger.debug(f'{pattern_indexes=}')
-        position_indexes = [
-            int(point.index) for point in product.probe_positions if index_filter(point.index)
-        ]
-        logger.debug(f'{position_indexes=}')
-        common_indexes = sorted(set(pattern_indexes).intersection(position_indexes))
-        logger.debug(f'{common_indexes=}')
+        # Pattern indexes are authoritative. The position sequence is conditioned
+        # to the pattern-index axis in three steps:
+        #   - duplicate position indexes are averaged into a single anchor;
+        #   - pattern indexes inside the position-index range with no matching
+        #     position are linearly interpolated from neighboring anchors;
+        #   - pattern indexes outside the position-index range are dropped
+        #     (no extrapolation).
+        # Positions whose index has no matching pattern naturally do not appear
+        # in the output. The OPR caveat below is unchanged from the prior
+        # implementation; interpolation makes the misalignment worse because
+        # interpolated entries have no natural OPR row at all.
+        valid_mask = self._indexes >= 0
+        pattern_indexes = self._indexes[valid_mask]
+        valid_patterns = self._patterns[valid_mask]
 
-        patterns = numpy.take(
-            self.get_patterns(),
-            common_indexes,
-            axis=0,
+        if pattern_indexes.size == 0:
+            raise ValueError('Cannot prepare reconstruct input from empty diffraction dataset.')
+
+        pattern_keep = numpy.fromiter(
+            (index_filter(int(i)) for i in pattern_indexes),
+            dtype=numpy.bool_,
+            count=pattern_indexes.size,
+        )
+        filtered_pattern_indexes = pattern_indexes[pattern_keep]
+        filtered_pattern_offsets = numpy.flatnonzero(pattern_keep)
+
+        n_positions = len(product.probe_positions)
+        pos_indexes_all = numpy.empty(n_positions, dtype=numpy.intp)
+        pos_x_all = numpy.empty(n_positions, dtype=numpy.float64)
+        pos_y_all = numpy.empty(n_positions, dtype=numpy.float64)
+        for k, position in enumerate(product.probe_positions):
+            pos_indexes_all[k] = position.index
+            pos_x_all[k] = position.coordinate_x_m
+            pos_y_all[k] = position.coordinate_y_m
+
+        pos_keep = numpy.fromiter(
+            (index_filter(int(i)) for i in pos_indexes_all),
+            dtype=numpy.bool_,
+            count=n_positions,
+        )
+        pos_indexes = pos_indexes_all[pos_keep]
+        pos_x = pos_x_all[pos_keep]
+        pos_y = pos_y_all[pos_keep]
+
+        if filtered_pattern_indexes.size == 0 or pos_indexes.size == 0:
+            raise ValueError(
+                'Index filter eliminated all pattern indexes and/or all position indexes.'
+            )
+
+        # Average duplicate position indexes. numpy.unique sorts ascending, so
+        # the resulting (unique_pos_indexes, mean_x, mean_y) triple is the
+        # canonical interpolation anchor set.
+        unique_pos_indexes, inverse = numpy.unique(pos_indexes, return_inverse=True)
+        counts = numpy.bincount(inverse)
+        mean_x = numpy.bincount(inverse, weights=pos_x) / counts
+        mean_y = numpy.bincount(inverse, weights=pos_y) / counts
+
+        lo = int(unique_pos_indexes[0])
+        hi = int(unique_pos_indexes[-1])
+        in_range_mask = (filtered_pattern_indexes >= lo) & (filtered_pattern_indexes <= hi)
+        in_range_pattern_indexes = filtered_pattern_indexes[in_range_mask]
+        in_range_pattern_offsets = filtered_pattern_offsets[in_range_mask]
+
+        if in_range_pattern_indexes.size == 0:
+            pat_lo = int(filtered_pattern_indexes[0])
+            pat_hi = int(filtered_pattern_indexes[-1])
+            raise ValueError(
+                'No probe positions overlap the diffraction pattern indexes; '
+                f'pattern indexes span [{pat_lo}, {pat_hi}] and position indexes '
+                f'span [{lo}, {hi}].'
+            )
+
+        # When unique_pos_indexes.size == 1, lo == hi, so only pattern indexes
+        # equal to that single anchor survive the in_range trim -- and those
+        # match exactly, never requiring interpolation. So the "need >= 2
+        # anchors to interpolate" rule is enforced by the in_range trim itself;
+        # no separate guard is needed.
+        exact_match = numpy.isin(in_range_pattern_indexes, unique_pos_indexes)
+
+        # numpy.interp returns the exact value at coincident xp entries and
+        # linearly interpolates between them. Out-of-range is impossible here
+        # because in_range_mask already trimmed to [lo, hi].
+        x_coords = numpy.interp(in_range_pattern_indexes, unique_pos_indexes, mean_x)
+        y_coords = numpy.interp(in_range_pattern_indexes, unique_pos_indexes, mean_y)
+
+        n_averaged = pos_indexes.size - unique_pos_indexes.size
+        n_interpolated = int((~exact_match).sum())
+        logger.debug(
+            f'prepare_reconstruct_input: matched {in_range_pattern_indexes.size} of '
+            f'{filtered_pattern_indexes.size} pattern indexes; averaged {n_averaged} '
+            f'duplicate positions; interpolated {n_interpolated} positions'
         )
 
-        point_list: list[ProbePosition] = list()
-        point_iterator = iter(product.probe_positions)
-
-        for index in common_indexes:
-            while True:
-                point = next(point_iterator)
-
-                if point.index == index:
-                    point_list.append(point)
-                    break
+        point_list = [
+            ProbePosition(index=int(i), coordinate_x_m=float(x), coordinate_y_m=float(y))
+            for i, x, y in zip(in_range_pattern_indexes, x_coords, y_coords)
+        ]
+        patterns = valid_patterns[in_range_pattern_offsets]
 
         product = Product(
             metadata=product.metadata,
             probe_positions=ProbePositionSequence(point_list),
-            probes=product.probes,  # TODO remap if needed
+            # OPR weight rows are still array-indexed by the original scan
+            # ordering, not by the merged-and-interpolated subset. Correct only
+            # when matched positions are contiguous from zero with no
+            # interpolation; latent misalignment otherwise.
+            probes=product.probes,
             object_=product.object_,
             losses=product.losses,
         )

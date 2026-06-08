@@ -12,7 +12,6 @@ from .metadata import MetadataRepositoryItem, UniqueNameFactory
 from .object import ObjectRepositoryItem
 from .probe import ProbeRepositoryItem
 from .probe_positions import ProbePositionsRepositoryItem
-from .validator import ProductValidator
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +47,6 @@ class ProductRepositoryItem(ParameterGroup):
         geometry: ProductGeometry,
         probe_item: ProbeRepositoryItem,
         object_item: ObjectRepositoryItem,
-        validator: ProductValidator,
         losses: Sequence[LossValue],
     ) -> None:
         super().__init__()
@@ -58,7 +56,6 @@ class ProductRepositoryItem(ParameterGroup):
         self._geometry = geometry
         self._probe_item = probe_item
         self._object_item = object_item
-        self._validator = validator
         self._losses = list(losses)
 
         self._add_group('metadata', self._metadata_item, observe=True)

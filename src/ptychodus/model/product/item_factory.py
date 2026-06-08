@@ -12,7 +12,6 @@ from .probe import ProbeRepositoryItemFactory
 from .repository import ProductRepository
 from .probe_positions import ProbePositionsRepositoryItemFactory
 from .settings import ProductSettings
-from .validator import ProductValidator
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +72,6 @@ class ProductRepositoryItemFactory:
         geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
         probe_item = self._probe_item_factory.create(geometry)
         object_item = self._object_item_factory.create(geometry)
-        validator = ProductValidator(self._dataset, scan_item, geometry, probe_item, object_item)
 
         return ProductRepositoryItem(
             parent=self._repository,
@@ -82,7 +80,6 @@ class ProductRepositoryItemFactory:
             geometry=geometry,
             probe_item=probe_item,
             object_item=object_item,
-            validator=validator,
             losses=list(),
         )
 
@@ -104,7 +101,6 @@ class ProductRepositoryItemFactory:
         geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
         probe_item = self._probe_item_factory.create(geometry, product.probes)
         object_item = self._object_item_factory.create(geometry, product.object_)
-        validator = ProductValidator(self._dataset, scan_item, geometry, probe_item, object_item)
 
         return ProductRepositoryItem(
             parent=self._repository,
@@ -113,7 +109,6 @@ class ProductRepositoryItemFactory:
             geometry=geometry,
             probe_item=probe_item,
             object_item=object_item,
-            validator=validator,
             losses=product.losses,
         )
 
@@ -145,7 +140,6 @@ class ProductRepositoryItemFactory:
             geometry=geometry,
             probe_item=probe_item,
             object_item=object_item,
-            validator=ProductValidator(self._dataset, scan_item, geometry, probe_item, object_item),
             losses=list(),
         )
         logger.debug(f'Created product from settings: {item.get_name()}')

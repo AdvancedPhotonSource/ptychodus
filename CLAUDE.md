@@ -67,6 +67,14 @@ make -C docs html        # Sphinx docs into docs/build/
 
 The GUI is optional: `__main__.py` falls back to headless mode if PyQt5 is missing. `ptychodus_stream_processor.py` (the `PtychodusAdImageProcessor`) is the third entry mode and is only imported when `pvapy` is available.
 
+### Index-based pattern/position association
+
+Diffraction patterns and probe positions are paired by **integer scan index**, never by array order. This is what makes streaming and mismatched-rate ingest robust: patterns and positions can arrive from different files or different PV channels, with dropped or extra samples on either side, and the matcher still pairs them correctly.
+
+- Producers: `DiffractionArray.get_indexes()` on the pattern side (`api/diffraction.py`); `ProbePosition.index` on the position side (`api/probe_positions.py`).
+- Matcher: `AssembledDiffractionData.prepare_reconstruct_input` in `api/reconstructor.py` treats pattern indexes as authoritative — duplicate position indexes are averaged into anchors, pattern indexes inside the anchor range with no exact position are linearly interpolated, and pattern indexes outside the anchor range are dropped (no extrapolation). The `Product` is rebuilt from the resulting per-pattern positions.
+- Round-trip: HDF5 and NPZ product writers persist position indexes via `ProductFileKeys.PROBE_POSITION_INDEXES`.
+
 ### Plugin system
 
 File-format support is dynamic. `api/plugins.py::PluginRegistry.load_plugins()` walks `ptychodus.plugins.*` with `pkgutil.iter_modules` and calls each module's `register_plugins(registry)` function. Module-load failures are logged and skipped — this is how optional-dependency plugins (e.g., LCLS, NSLS-II) silently disable themselves.
