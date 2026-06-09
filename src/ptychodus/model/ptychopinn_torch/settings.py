@@ -45,9 +45,6 @@ class PtychoPINNTorchDataSettings(Observable, Observer):
         )
 
         # Advanced
-        self.num_photons = self._group.create_real_parameter(
-            'num_photons', 1e5, minimum=0.0
-        )  # TODO remove
         self.coordinate_subsampling_factor = self._group.create_integer_parameter(
             'coordinate_subsampling_factor', 7, minimum=1
         )
@@ -163,15 +160,11 @@ class PtychoPINNTorchTrainingSettings(Observable, Observer):
         self.gradient_clip_val = self._group.create_real_parameter(
             'gradient_clip_val', 0.0, minimum=0.0
         )
-        self.experiment_name = self._group.create_string_parameter(
-            'experiment_name', 'Synthetic_Runs'
-        )
 
         self.use_negative_log_likelihood_loss = self._group.create_boolean_parameter(
             'use_negative_log_likelihood_loss', True
         )
         self.device = self._group.create_string_parameter('device', 'cuda')
-        self.num_devices = self._group.create_integer_parameter('num_devices', 1, minimum=1)
         self.learning_rate_scheduler = self._group.create_string_parameter(
             'learning_rate_scheduler', 'Default'
         )

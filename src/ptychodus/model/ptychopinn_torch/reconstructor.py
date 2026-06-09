@@ -125,7 +125,6 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             min_neighbor_distance=self._data_settings.min_neighbor_distance.get_value(),
             max_neighbor_distance=self._data_settings.max_neighbor_distance.get_value(),
             K_quadrant=self._data_settings.num_nearest_neighbors_for_quadrant_lookup.get_value(),
-            nphotons=self._data_settings.num_photons.get_value(),  # TODO get from product
             n_subsample=self._data_settings.coordinate_subsampling_factor.get_value(),
             probe_scale=self._data_settings.probe_scale.get_value(),
             K=self._data_settings.num_nearest_neighbors_for_lookup.get_value(),
@@ -178,13 +177,12 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             epochs=self._training_settings.epochs.get_value(),
             batch_size=self._training_settings.batch_size.get_value(),
             learning_rate=self._training_settings.learning_rate.get_value(),
-            n_devices=self._training_settings.num_devices.get_value(),
+            n_devices=1,  # TODO "auto"
             num_workers=self._training_settings.num_dataloader_workers.get_value(),
             accum_steps=self._training_settings.gradient_accumulation_steps.get_value(),
             epochs_fine_tune=self._training_settings.epochs_finetune.get_value(),
             fine_tune_gamma=self._training_settings.finetune_gamma.get_value(),
             gradient_clip_val=gradient_clip_val if gradient_clip_val > 0.0 else None,
-            experiment_name=self._training_settings.experiment_name.get_value(),
             nll=self._training_settings.use_negative_log_likelihood_loss.get_value(),
             device=self._training_settings.device.get_value(),
             strategy='ddp_spawn',
@@ -263,7 +261,6 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
         d.min_neighbor_distance.set_value(data_config.min_neighbor_distance)
         d.max_neighbor_distance.set_value(data_config.max_neighbor_distance)
         d.num_nearest_neighbors_for_quadrant_lookup.set_value(data_config.K_quadrant)
-        d.num_photons.set_value(data_config.nphotons)
         d.coordinate_subsampling_factor.set_value(data_config.n_subsample)
         d.probe_scale.set_value(data_config.probe_scale)
         d.num_nearest_neighbors_for_lookup.set_value(data_config.K)
@@ -311,16 +308,6 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
         t.epochs.set_value(training_config.epochs)
         t.batch_size.set_value(training_config.batch_size)
         t.learning_rate.set_value(training_config.learning_rate)
-        # n_devices may be 'auto' (str) or an int; the settings field is int-only,
-        # so warn rather than silently leaving the UI out of sync.
-        if isinstance(training_config.n_devices, int):
-            t.num_devices.set_value(training_config.n_devices)
-        else:
-            logger.warning(
-                'Loaded checkpoint n_devices=%r is non-integer; UI num_devices left at %d.',
-                training_config.n_devices,
-                t.num_devices.get_value(),
-            )
         t.num_dataloader_workers.set_value(training_config.num_workers)
         t.gradient_accumulation_steps.set_value(training_config.accum_steps)
         t.epochs_finetune.set_value(training_config.epochs_fine_tune)
@@ -330,7 +317,6 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
             if training_config.gradient_clip_val is not None
             else 0.0
         )
-        t.experiment_name.set_value(training_config.experiment_name)
         t.use_negative_log_likelihood_loss.set_value(training_config.nll)
         t.device.set_value(training_config.device)
         t.learning_rate_scheduler.set_value(training_config.scheduler)
@@ -513,7 +499,7 @@ class PtychoPINNTorchTrainableReconstructor(TrainableReconstructor):
 
         trainer.train(
             orchestration='lightning',
-            experiment_name=self._training_settings.experiment_name.get_value(),
+            experiment_name='',  # unused on the Lightning orchestration path
         )
         # PtychoDataLoader appends a `run_<timestamp>` segment to output_dir,
         # and the checkpoint callback writes there — not at output_path.

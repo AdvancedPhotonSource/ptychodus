@@ -43,6 +43,7 @@ gui = ["PyQt5"]
 #ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
 ptychi = ["ptychi==1.4.*"]
 ptychopinn = ["ptychopinn"]
+ptychozoon = ["ptychozoon"]
 
 [tool.uv.sources]
 #ptychi = { path = "../pty-chi", editable = true }
