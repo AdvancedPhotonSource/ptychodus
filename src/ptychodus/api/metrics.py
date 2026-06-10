@@ -499,14 +499,15 @@ class ReconstructionResiduals:
             normalized to sum to 1 before splatting, so frames contribute equally regardless
             of probe power (relevant for variable-probe reconstructions). Scan-density
             invariant: doubling the number of frames covering a pixel doubles both splats,
-            leaving the ratio unchanged. Un-illuminated pixels are zero (no frame contributed);
-            object regions touched only by frames with zero measured signal also read zero
-            (R-factor is undefined when ``Σ √I_meas = 0``).
+            leaving the ratio unchanged. NaN where no R-factor is defined: un-illuminated
+            pixels (no frame contributed) and object regions touched only by frames with zero
+            measured signal (``Σ √I_meas = 0``).
         object_pixel_geometry: Pixel geometry of ``real_space_error_map``.
         object_center: Real-space origin of ``real_space_error_map``.
         reciprocal_space_error_map: 2D array on the detector grid. Each pixel is
-            ``Σ_n |√I_meas,n − √I_pred,n| / Σ_n √I_meas,n``, summed across frames. NaN at bad
-            pixels; zero at detector pixels with no measured signal across any frame.
+            ``Σ_n |√I_meas,n − √I_pred,n| / Σ_n √I_meas,n``, summed across frames. NaN where
+            no R-factor is defined: bad pixels and detector pixels with no measured signal
+            across any frame.
         detector_pixel_geometry: Pixel geometry of ``reciprocal_space_error_map`` (derived from
             the forward propagator).
     """
@@ -593,7 +594,7 @@ def compute_reconstruction_residuals(
         recip_ratio = numpy.where(
             denominator_per_pixel > 0.0,
             numerator_per_pixel / denominator_per_pixel,
-            0.0,
+            numpy.nan,
         )
     reciprocal_map = numpy.where(valid, recip_ratio, numpy.nan)
 
@@ -628,10 +629,11 @@ def compute_reconstruction_residuals(
         numerator_splat[ys, xs] += float(num_i) * patch
         denominator_splat[ys, xs] += float(den_i) * patch
 
-    real_space_error_map = numpy.divide(
+    real_space_error_map = numpy.full_like(numerator_splat, numpy.nan)
+    numpy.divide(
         numerator_splat,
         denominator_splat,
-        out=numpy.zeros_like(numerator_splat),
+        out=real_space_error_map,
         where=denominator_splat > 0.0,
     )
 

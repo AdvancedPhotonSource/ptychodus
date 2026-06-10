@@ -972,8 +972,15 @@ class TestComputeReconstructionResiduals:
         result = compute_reconstruction_residuals(product, measured, bad_pixels)
 
         assert isinstance(result, ReconstructionResiduals)
-        numpy.testing.assert_allclose(result.reciprocal_space_error_map, 0.0, atol=1e-12)
-        numpy.testing.assert_allclose(result.real_space_error_map, 0.0, atol=1e-12)
+        # Finite pixels are the well-defined R-factor region; NaN marks "no data".
+        recip_finite = numpy.isfinite(result.reciprocal_space_error_map)
+        assert recip_finite.any()
+        numpy.testing.assert_allclose(
+            result.reciprocal_space_error_map[recip_finite], 0.0, atol=1e-12
+        )
+        real_finite = numpy.isfinite(result.real_space_error_map)
+        assert real_finite.any()
+        numpy.testing.assert_allclose(result.real_space_error_map[real_finite], 0.0, atol=1e-12)
 
     def test_constant_offset_gives_expected_r_factor_reciprocal(self) -> None:
         product = _make_product()
@@ -991,12 +998,12 @@ class TestComputeReconstructionResiduals:
         pred_amp = numpy.sqrt(numpy.maximum(baseline, 0.0))
         numerator = numpy.absolute(meas_amp - pred_amp).sum(axis=0)
         denominator = meas_amp.sum(axis=0)
-        expected_reciprocal = numpy.where(denominator > 0.0, numerator / denominator, 0.0)
+        expected_reciprocal = numpy.where(denominator > 0.0, numerator / denominator, numpy.nan)
         numpy.testing.assert_allclose(
-            result.reciprocal_space_error_map, expected_reciprocal, atol=1e-10
+            result.reciprocal_space_error_map, expected_reciprocal, atol=1e-10, equal_nan=True
         )
 
-    def test_un_illuminated_pixels_remain_zero(self) -> None:
+    def test_un_illuminated_pixels_are_nan(self) -> None:
         product = _make_product()
         measured = _simulate_measured(product) + 0.5
         bad_pixels = numpy.zeros(measured.shape[1:], dtype=bool)
@@ -1008,7 +1015,7 @@ class TestComputeReconstructionResiduals:
         illumination = compute_illumination_map(product).photon_number
         un_illuminated = illumination == 0.0
         assert un_illuminated.any(), 'test setup expects at least one un-illuminated pixel'
-        numpy.testing.assert_array_equal(result.real_space_error_map[un_illuminated], 0.0)
+        assert numpy.all(numpy.isnan(result.real_space_error_map[un_illuminated]))
 
     def test_bad_pixels_are_masked_in_reciprocal_map(self) -> None:
         product = _make_product()
@@ -1026,9 +1033,9 @@ class TestComputeReconstructionResiduals:
         pred_amp = numpy.sqrt(numpy.maximum(baseline, 0.0))
         numerator = numpy.absolute(meas_amp - pred_amp).sum(axis=0)
         denominator = meas_amp.sum(axis=0)
-        expected_r = numpy.where(denominator > 0.0, numerator / denominator, 0.0)
+        expected_r = numpy.where(denominator > 0.0, numerator / denominator, numpy.nan)
         numpy.testing.assert_allclose(
-            result.reciprocal_space_error_map[good], expected_r[good], atol=1e-10
+            result.reciprocal_space_error_map[good], expected_r[good], atol=1e-10, equal_nan=True
         )
 
     def test_geometry_passthrough_matches_product(self) -> None:
@@ -1079,9 +1086,11 @@ class TestComputeReconstructionResiduals:
             doubled_result.real_space_error_map,
             baseline_result.real_space_error_map,
             atol=1e-10,
+            equal_nan=True,
         )
         numpy.testing.assert_allclose(
             doubled_result.reciprocal_space_error_map,
             baseline_result.reciprocal_space_error_map,
             atol=1e-10,
+            equal_nan=True,
         )
