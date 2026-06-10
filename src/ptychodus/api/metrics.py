@@ -5,7 +5,11 @@ from dataclasses import dataclass, replace
 
 import numpy
 import scipy.fft
-from skimage.metrics import peak_signal_noise_ratio, structural_similarity
+from skimage.metrics import (
+    normalized_mutual_information,
+    peak_signal_noise_ratio,
+    structural_similarity,
+)
 
 from .common import ComplexArrayType, IntegerArrayType, RealArrayType
 from .diffraction import BadPixels, DiffractionPatterns
@@ -440,30 +444,69 @@ def compute_structural_similarity(
     return structural_similarity(reference, test, data_range=effective_range).item()
 
 
+def compute_normalized_mutual_information(
+    reference: RealArrayType,
+    test: RealArrayType,
+    *,
+    bins: int = 100,
+) -> float:
+    """Normalized mutual information via :func:`skimage.metrics.normalized_mutual_information`.
+
+    Real-valued inputs only — project complex objects to amplitude
+    (:attr:`ObjectComparison.reference_amplitude`) or phase
+    (:attr:`ObjectComparison.reference_phase`) before calling.
+
+    Returns the Studholme NMI ``(H(reference) + H(test)) / H(reference, test)``,
+    which is ~1.0 for statistically independent inputs and 2.0 for identical
+    inputs. Unlike SSIM/PSNR, NMI is insensitive to monotonic intensity
+    remappings, so it scores residual amplitude scale ambiguity less harshly.
+    ``bins`` controls the joint-histogram resolution; the scikit-image default
+    of 100 is preserved.
+    """
+    if reference.shape != test.shape:
+        raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
+
+    return float(normalized_mutual_information(reference, test, bins=bins))
+
+
 @dataclass(frozen=True)
 class ReconstructionResiduals:
     """Real- and reciprocal-space residual maps comparing measured to forward-simulated patterns.
 
     Built by :func:`compute_reconstruction_residuals` from a reconstructed product and the
-    measured diffraction patterns it should reproduce. Both maps are dimensionless reduced-χ²
-    quantities under a Poisson noise model: ``(measured - predicted)² / max(predicted, 1)``.
-    A perfectly fitted reconstruction at the shot-noise floor yields values near 1; model errors
-    push values well above 1. The normalization makes both maps invariant to the incident flux
-    and to the number of scan positions, so they are directly comparable across datasets.
+    measured diffraction patterns it should reproduce. Both maps are dimensionless amplitude
+    R-factors (Crowther/Rosenthal): the fraction of detected amplitude the model fails to
+    explain, with both numerator and denominator scaling with local photon count so the ratio
+    decouples from sample thickness, probe brightness, and incident flux. A perfectly fitted
+    reconstruction yields zero everywhere; an uncorrelated model approaches ~1. The square-root
+    transform inside the metric is Poisson variance-stabilizing, so the shot-noise floor of
+    ``R_F`` is automatically tighter where photons are abundant and looser where they are
+    scarce — the eye-readable behavior.
+
+    **What "amplitude" means here.** The metric compares **diffraction amplitudes** on the
+    detector (``√I_meas``, ``√I_pred``), not **object amplitudes** (``|O|``). The reconstructed
+    object is a complex transmission function whose phase and amplitude jointly determine the
+    predicted diffraction; phase-dominated samples (typical at hard-x-ray energies) still
+    produce richly structured diffraction patterns, and errors in reconstructed phase show up
+    as errors in predicted intensity. These maps therefore quantify detector-domain data-fit
+    quality and are *not* phase-blind.
 
     Attributes:
-        real_space_error_map: 2D array on the object grid. Each pixel is the normalized-probe-
-            footprint-weighted average over every frame whose probe touched that pixel of the
-            frame's per-frame χ² (its mean χ² over good detector pixels). Each frame's probe-
-            intensity patch is normalized to sum to 1 before splatting, so frames contribute
-            equally regardless of probe power (relevant for variable-probe reconstructions).
-            The weighted quotient removes scan-density dependence: doubling the number of frames
-            covering a pixel doubles both the weighted χ² splat and the weight, leaving the
-            ratio unchanged. Un-illuminated pixels are zero (no frame contributed).
+        real_space_error_map: 2D array on the object grid. For each object pixel, the
+            probe-footprint-weighted aggregation of per-frame amplitude residuals over every
+            frame whose probe touched that pixel, divided by the same probe-weighted
+            aggregation of measured amplitudes. Each frame's probe-intensity patch is
+            normalized to sum to 1 before splatting, so frames contribute equally regardless
+            of probe power (relevant for variable-probe reconstructions). Scan-density
+            invariant: doubling the number of frames covering a pixel doubles both splats,
+            leaving the ratio unchanged. Un-illuminated pixels are zero (no frame contributed);
+            object regions touched only by frames with zero measured signal also read zero
+            (R-factor is undefined when ``Σ √I_meas = 0``).
         object_pixel_geometry: Pixel geometry of ``real_space_error_map``.
         object_center: Real-space origin of ``real_space_error_map``.
-        reciprocal_space_error_map: 2D array on the detector grid. Each pixel is the mean over
-            frames of ``(measured - predicted)² / max(predicted, 1)``. NaN at bad pixels.
+        reciprocal_space_error_map: 2D array on the detector grid. Each pixel is
+            ``Σ_n |√I_meas,n − √I_pred,n| / Σ_n √I_meas,n``, summed across frames. NaN at bad
+            pixels; zero at detector pixels with no measured signal across any frame.
         detector_pixel_geometry: Pixel geometry of ``reciprocal_space_error_map`` (derived from
             the forward propagator).
     """
@@ -480,28 +523,41 @@ def compute_reconstruction_residuals(
     measured_patterns: DiffractionPatterns,
     bad_pixels: BadPixels,
 ) -> ReconstructionResiduals:
-    """Compute reduced-χ² real- and reciprocal-space residual maps for a reconstructed product.
+    """Compute amplitude R-factor real- and reciprocal-space residual maps for a reconstructed product.
 
     Re-runs the multislice forward model on ``product`` (via
-    :func:`generate_diffraction_data`) and compares the simulated intensities to
-    ``measured_patterns``. Both maps use the same per-pixel reduced χ²,
-    ``(measured - predicted)² / max(predicted, 1)``, so a perfectly fitted
-    reconstruction at the Poisson shot-noise floor lands near 1 and model
-    errors push values well above 1.
+    :func:`generate_diffraction_data`) and compares the simulated intensities
+    to ``measured_patterns`` through the Crowther/Rosenthal amplitude R-factor:
+    ``Σ |√I_meas − √I_pred| / Σ √I_meas``. The √-transform is the standard
+    Poisson variance stabilizer, and the ratio form scales numerator and
+    denominator together so brightness and thickness cancel — only model
+    misfit moves the value.
 
-    The reciprocal-space map is this χ² averaged over all frames per detector
-    pixel; bad pixels become NaN. The real-space map averages each frame's
-    χ² (taken over its good detector pixels) onto the object grid weighted
-    by the frame's **per-frame-normalized** probe intensity (each frame's
-    ``|probe|²`` patch divided by its own total), then divides by the same
-    normalized-intensity splat. The normalization makes every frame contribute
-    the same total weight regardless of its probe power, so the map is
-    invariant to both the incident flux and to the number of scan positions
-    (variable-probe frames included). Un-illuminated pixels remain zero.
+    The reciprocal-space map sums numerator and denominator over all frames at
+    each detector pixel; bad pixels become NaN. The real-space map aggregates
+    per-frame amplitude residual sums and per-frame measured-amplitude sums
+    onto the object grid, both weighted by the same per-frame-normalized
+    probe-intensity patch (each frame's ``|probe|²`` divided by its own total),
+    then divides. The shared probe-weighting makes the ratio scan-density
+    invariant (variable-probe frames included) and ensures every frame
+    contributes equal total weight regardless of probe power. Un-illuminated
+    pixels and detector pixels with no measured signal across any frame both
+    remain zero.
 
     Inputs must already be aligned: ``measured_patterns`` is shape ``(N, H, W)``
     in product position order (typically the output of
     :meth:`AssembledDiffractionData.prepare_reconstruct_input`).
+
+    **Hard-x-ray caveat.** At hard-x-ray energies the detector dynamic range commonly spans
+    4–6 orders of magnitude and the ``√I`` transform compresses that only to ~2–3 orders, so
+    both the numerator and denominator of ``R_F`` are dominated by the bright low-q region.
+    The high-q tail — where fine phase-contrast features leave their strongest unique
+    signature — is correspondingly underweighted, and a reconstruction with poor high-q fit
+    can read a deceptively small ``R_F``. ``bad_pixels`` is the supported lever for masking
+    this region: it already drops beamstop pixels, and users who care about high-q phase
+    fidelity should extend it to cover the bright direct-beam halo just outside the beamstop.
+    Soft-x-ray data has a much smaller detector dynamic range and is not affected to the
+    same degree.
     """
     if measured_patterns.ndim != 3:
         raise ValueError(
@@ -524,20 +580,35 @@ def compute_reconstruction_residuals(
         )
 
     valid = numpy.logical_not(bad_pixels)
-    safe_predicted = numpy.maximum(predicted, 1.0)
-    sq_chi2 = (measured_patterns - predicted) ** 2 / safe_predicted  # (N, H, W)
-    per_pixel_chi2 = sq_chi2.mean(axis=0)
-    reciprocal_map = numpy.where(valid, per_pixel_chi2, numpy.nan)
+    # Amplitude (sqrt-intensity) form: variance-stabilizes Poisson noise and
+    # gives the R-factor a natural unbounded-positive denominator without any
+    # ad-hoc clip on small predicted values.
+    meas_amp = numpy.sqrt(numpy.maximum(measured_patterns, 0.0))  # (N, H, W)
+    pred_amp = numpy.sqrt(numpy.maximum(predicted, 0.0))  # (N, H, W)
+    abs_amp_diff = numpy.absolute(meas_amp - pred_amp)  # (N, H, W)
 
-    npix = max(int(valid.sum()), 1)
-    per_frame_chi2 = numpy.einsum('nhw,hw->n', sq_chi2, valid.astype(sq_chi2.dtype)) / npix  # (N,)
+    numerator_per_pixel = abs_amp_diff.sum(axis=0)  # (H, W)
+    denominator_per_pixel = meas_amp.sum(axis=0)  # (H, W)
+    with numpy.errstate(divide='ignore', invalid='ignore'):
+        recip_ratio = numpy.where(
+            denominator_per_pixel > 0.0,
+            numerator_per_pixel / denominator_per_pixel,
+            0.0,
+        )
+    reciprocal_map = numpy.where(valid, recip_ratio, numpy.nan)
+
+    valid_f = valid.astype(abs_amp_diff.dtype)
+    per_frame_numerator = numpy.einsum('nhw,hw->n', abs_amp_diff, valid_f)  # (N,)
+    per_frame_denominator = numpy.einsum('nhw,hw->n', meas_amp, valid_f)  # (N,)
 
     object_geometry = product.object_.get_geometry()
     probe_geometry = product.probes.get_geometry()
-    weighted_chi2_splat = numpy.zeros((object_geometry.height_px, object_geometry.width_px))
-    weight_splat = numpy.zeros_like(weighted_chi2_splat)
+    numerator_splat = numpy.zeros((object_geometry.height_px, object_geometry.width_px))
+    denominator_splat = numpy.zeros_like(numerator_splat)
 
-    for chi2_i, (scan_point, probe) in zip(per_frame_chi2, product.iter_position_probes()):
+    for num_i, den_i, (scan_point, probe) in zip(
+        per_frame_numerator, per_frame_denominator, product.iter_position_probes()
+    ):
         object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
         cx = object_point.coordinate_x_px
         cy = object_point.coordinate_y_px
@@ -554,14 +625,14 @@ def compute_reconstruction_residuals(
 
         ys = slice(y_lower, y_lower + probe_geometry.height_px)
         xs = slice(x_lower, x_lower + probe_geometry.width_px)
-        weighted_chi2_splat[ys, xs] += float(chi2_i) * patch
-        weight_splat[ys, xs] += patch
+        numerator_splat[ys, xs] += float(num_i) * patch
+        denominator_splat[ys, xs] += float(den_i) * patch
 
     real_space_error_map = numpy.divide(
-        weighted_chi2_splat,
-        weight_splat,
-        out=numpy.zeros_like(weighted_chi2_splat),
-        where=weight_splat > 0.0,
+        numerator_splat,
+        denominator_splat,
+        out=numpy.zeros_like(numerator_splat),
+        where=denominator_splat > 0.0,
     )
 
     return ReconstructionResiduals(

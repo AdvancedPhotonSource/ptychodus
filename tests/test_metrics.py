@@ -17,6 +17,7 @@ from ptychodus.api.metrics import (
     ReconstructionResiduals,
     compute_fourier_ring_correlation,
     compute_mean_absolute_error,
+    compute_normalized_mutual_information,
     compute_peak_signal_to_noise_ratio,
     compute_r_factor,
     compute_reconstruction_residuals,
@@ -587,6 +588,45 @@ class TestComputeStructuralSimilarity:
             compute_structural_similarity(a, b)
 
 
+class TestComputeNormalizedMutualInformation:
+    def test_identical_arrays_give_two(self) -> None:
+        rng = numpy.random.default_rng(0)
+        arr = rng.standard_normal((32, 32))
+        assert compute_normalized_mutual_information(arr, arr) == pytest.approx(2.0)
+
+    def test_uncorrelated_random_arrays_score_near_one(self) -> None:
+        rng = numpy.random.default_rng(1)
+        a = rng.standard_normal((128, 128))
+        b = rng.standard_normal((128, 128))
+        nmi = compute_normalized_mutual_information(a, b)
+        assert nmi == pytest.approx(1.0, abs=0.05)
+
+    def test_invariant_to_affine_remapping(self) -> None:
+        # NMI's signature property vs SSIM/PSNR: an affine intensity remap of
+        # `test` leaves the joint-histogram structure intact (same per-axis
+        # bin partition) so the score should be essentially unchanged.
+        rng = numpy.random.default_rng(2)
+        reference = rng.standard_normal((64, 64))
+        test = reference + 0.1 * rng.standard_normal((64, 64))
+        nmi_raw = compute_normalized_mutual_information(reference, test)
+        nmi_scaled = compute_normalized_mutual_information(reference, 3.0 * test + 5.0)
+        assert nmi_scaled == pytest.approx(nmi_raw, rel=1e-6)
+
+    def test_explicit_bins_is_honored(self) -> None:
+        rng = numpy.random.default_rng(3)
+        a = rng.standard_normal((32, 32))
+        b = a + 0.05 * rng.standard_normal((32, 32))
+        nmi_few = compute_normalized_mutual_information(a, b, bins=8)
+        nmi_many = compute_normalized_mutual_information(a, b, bins=256)
+        assert nmi_few != pytest.approx(nmi_many)
+
+    def test_raises_on_shape_mismatch(self) -> None:
+        a = numpy.zeros((8, 8))
+        b = numpy.zeros((8, 9))
+        with pytest.raises(ValueError, match='shape'):
+            compute_normalized_mutual_information(a, b)
+
+
 _PIXEL_M = 1.0e-9
 _OBJ_HEIGHT_PX = 32
 _OBJ_WIDTH_PX = 40
@@ -898,6 +938,17 @@ class TestObjectComparisonMetricsIntegration:
         assert numpy.isfinite(psnr_phase)
         assert -1.0 <= ssim_phase <= 1.0
 
+        nmi_amp = compute_normalized_mutual_information(
+            comparison.reference_amplitude, comparison.test_amplitude
+        )
+        nmi_phase = compute_normalized_mutual_information(
+            comparison.reference_phase, comparison.test_phase
+        )
+        # Studholme NMI is bounded in [1, 2] in theory; allow a small slack on
+        # the lower end since histogram noise on small arrays can dip below.
+        assert 0.95 <= nmi_amp <= 2.0
+        assert 0.95 <= nmi_phase <= 2.0
+
         frc = compute_fourier_ring_correlation(
             comparison.reference_complex,
             comparison.test_complex,
@@ -924,7 +975,7 @@ class TestComputeReconstructionResiduals:
         numpy.testing.assert_allclose(result.reciprocal_space_error_map, 0.0, atol=1e-12)
         numpy.testing.assert_allclose(result.real_space_error_map, 0.0, atol=1e-12)
 
-    def test_constant_offset_gives_expected_chi2_reciprocal(self) -> None:
+    def test_constant_offset_gives_expected_r_factor_reciprocal(self) -> None:
         product = _make_product()
         baseline = _simulate_measured(product)
         offset = 0.25
@@ -933,11 +984,14 @@ class TestComputeReconstructionResiduals:
 
         result = compute_reconstruction_residuals(product, measured, bad_pixels)
 
-        # New convention: reduced χ² = (measured - predicted)² / max(predicted, 1),
-        # averaged over frames. With predicted == baseline and a constant offset,
-        # the per-pixel χ² is offset² / max(baseline, 1) averaged across frames.
-        safe = numpy.maximum(baseline, 1.0)
-        expected_reciprocal = (offset**2 / safe).mean(axis=0)
+        # Amplitude R-factor per detector pixel:
+        #   R_F(q) = Σ_n |√I_meas,n − √I_pred,n| / Σ_n √I_meas,n
+        # with predicted == baseline and measured == baseline + offset.
+        meas_amp = numpy.sqrt(numpy.maximum(measured, 0.0))
+        pred_amp = numpy.sqrt(numpy.maximum(baseline, 0.0))
+        numerator = numpy.absolute(meas_amp - pred_amp).sum(axis=0)
+        denominator = meas_amp.sum(axis=0)
+        expected_reciprocal = numpy.where(denominator > 0.0, numerator / denominator, 0.0)
         numpy.testing.assert_allclose(
             result.reciprocal_space_error_map, expected_reciprocal, atol=1e-10
         )
@@ -968,10 +1022,13 @@ class TestComputeReconstructionResiduals:
 
         assert numpy.isnan(result.reciprocal_space_error_map[0, 0])
         good = ~bad_pixels
-        safe = numpy.maximum(baseline, 1.0)
-        expected_chi2 = (offset**2 / safe).mean(axis=0)
+        meas_amp = numpy.sqrt(numpy.maximum(measured, 0.0))
+        pred_amp = numpy.sqrt(numpy.maximum(baseline, 0.0))
+        numerator = numpy.absolute(meas_amp - pred_amp).sum(axis=0)
+        denominator = meas_amp.sum(axis=0)
+        expected_r = numpy.where(denominator > 0.0, numerator / denominator, 0.0)
         numpy.testing.assert_allclose(
-            result.reciprocal_space_error_map[good], expected_chi2[good], atol=1e-10
+            result.reciprocal_space_error_map[good], expected_r[good], atol=1e-10
         )
 
     def test_geometry_passthrough_matches_product(self) -> None:
@@ -999,10 +1056,10 @@ class TestComputeReconstructionResiduals:
             compute_reconstruction_residuals(product, measured, bad_pixels)
 
     def test_real_space_map_is_invariant_to_scan_density(self) -> None:
-        # Duplicating every scan position doubles both the χ²-weighted splat
-        # and the illumination splat at every covered pixel, so their ratio —
-        # the real-space χ² map — is unchanged. This is the scan-density
-        # invariance the normalization is designed to provide.
+        # Duplicating every scan position doubles both the amplitude-residual
+        # splat and the measured-amplitude splat at every covered pixel, so
+        # their ratio — the real-space R_F map — is unchanged. This is the
+        # scan-density invariance the normalization is designed to provide.
         product = _make_product()
         baseline = _simulate_measured(product)
         measured = baseline + 0.5
