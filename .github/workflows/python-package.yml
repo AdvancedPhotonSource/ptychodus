@@ -27,13 +27,13 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
-          enable-cache: true
-      - name: Install Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
+          python-version: ${{ matrix.python-version }}
+          cache: pip
       - name: Install ptychodus (minimal)
-        run: uv pip install --system .
+        run: pip install .
       - name: ptychodus --version
         run: ptychodus --version
 
@@ -46,13 +46,13 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
-          enable-cache: true
-      - name: Install Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
+          python-version: ${{ matrix.python-version }}
+          cache: pip
       - name: Install ptychodus + pytest
-        run: uv pip install --system . pytest
+        run: pip install . pytest
       - name: Run pytest
         run: pytest tests/ -v
 
@@ -61,13 +61,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
         with:
-          enable-cache: true
-      - name: Install Python 3.11
-        run: uv python install 3.11
+          python-version: "3.11"
+          cache: pip
       - name: Install ruff
-        run: uv pip install --system ruff
+        run: pip install ruff
       - name: ruff check
         run: ruff check .
       - name: ruff format --check
@@ -78,12 +78,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
         with:
-          enable-cache: true
-      - name: Install Python 3.11
-        run: uv python install 3.11
+          python-version: "3.11"
+          cache: pip
       - name: Install ptychodus + mypy
-        run: uv pip install --system . mypy types-psutil types-pyyaml types-requests
+        run: pip install . mypy types-psutil types-pyyaml types-requests
       - name: mypy
         run: mypy src/ptychodus
