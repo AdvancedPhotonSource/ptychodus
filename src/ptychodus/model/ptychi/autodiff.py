@@ -76,6 +76,7 @@ class AutodiffReconstructor(Reconstructor):
             allow_nondeterministic_algorithms=helper.allow_nondeterministic_algorithms,
             random_seed=helper.random_seed,
             displayed_loss_function=helper.displayed_loss_function,
+            exclude_measured_pixels_below=helper.exclude_measured_pixels_below,
             forward_model_options=helper.forward_model_options,
             loss_function=loss_function,
             forward_model_class=forward_model_class,
@@ -106,6 +107,7 @@ class AutodiffReconstructor(Reconstructor):
             build_preconditioner_with_all_modes=helper.build_preconditioner_with_all_modes,
             determine_position_origin_coords_by=helper.determine_position_origin_coords_by,
             position_origin_coords=helper.get_position_origin_coords(object_),
+            hard_limits_magnitude_phase=helper.hard_limits_magnitude_phase,
         )
 
     def _create_probe_options(

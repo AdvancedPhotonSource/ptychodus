@@ -11,12 +11,14 @@ class PtyChiEnumerators:
                 ImageGradientMethods,
                 ImageIntegrationMethods,
                 LossFunctions,
+                MagPhaseComponents,
                 NoiseModels,
                 OPRWeightSmoothingMethods,
                 Optimizers,
                 OrthogonalizationMethods,
                 PatchInterpolationMethods,
                 PositionCorrectionTypes,
+                ProbeSupportMethods,
             )
         except ModuleNotFoundError:
             self._batching_modes: Sequence[str] = list()
@@ -25,12 +27,14 @@ class PtyChiEnumerators:
             self._image_gradient_methods: Sequence[str] = list()
             self._image_integration_methods: Sequence[str] = list()
             self._loss_functions: Sequence[str] = list()
+            self._mag_phase_components: Sequence[str] = list()
             self._noise_models: Sequence[str] = list()
             self._opr_weight_smoothing_methods: Sequence[str] = list()
             self._optimizers: Sequence[str] = list()
             self._orthogonalization_methods: Sequence[str] = list()
             self._patch_interpolation_methods: Sequence[str] = list()
             self._position_correction_types: Sequence[str] = list()
+            self._probe_support_methods: Sequence[str] = list()
         else:
             self._batching_modes = [member.name for member in BatchingModes]
             self._directions = [member.name for member in Directions]
@@ -38,6 +42,7 @@ class PtyChiEnumerators:
             self._image_gradient_methods = [member.name for member in ImageGradientMethods]
             self._image_integration_methods = [member.name for member in ImageIntegrationMethods]
             self._loss_functions = [member.name for member in LossFunctions]
+            self._mag_phase_components = [member.name for member in MagPhaseComponents]
             self._noise_models = [member.name for member in NoiseModels]
             self._opr_weight_smoothing_methods = [
                 member.name for member in OPRWeightSmoothingMethods
@@ -48,6 +53,7 @@ class PtyChiEnumerators:
                 member.name for member in PatchInterpolationMethods
             ]
             self._position_correction_types = [member.name for member in PositionCorrectionTypes]
+            self._probe_support_methods = [member.name for member in ProbeSupportMethods]
 
     def batching_modes(self) -> Iterator[str]:
         return iter(self._batching_modes)
@@ -67,6 +73,9 @@ class PtyChiEnumerators:
     def loss_functions(self) -> Iterator[str]:
         return iter(self._loss_functions)
 
+    def mag_phase_components(self) -> Iterator[str]:
+        return iter(self._mag_phase_components)
+
     def noise_models(self) -> Iterator[str]:
         return iter(self._noise_models)
 
@@ -84,3 +93,6 @@ class PtyChiEnumerators:
 
     def position_correction_types(self) -> Iterator[str]:
         return iter(self._position_correction_types)
+
+    def probe_support_methods(self) -> Iterator[str]:
+        return iter(self._probe_support_methods)

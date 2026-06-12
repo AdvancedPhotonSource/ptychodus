@@ -4,6 +4,7 @@ from .device import PtyChiDeviceRepository
 from .enums import PtyChiEnumerators
 from .settings import (
     PtyChiAutodiffSettings,
+    PtyChiBHSettings,
     PtyChiDMSettings,
     PtyChiLSQMLSettings,
     PtyChiOPRSettings,
@@ -17,6 +18,7 @@ from .settings import (
 __all__ = [
     'PtyChiAffineDegreesOfFreedomBitField',
     'PtyChiAutodiffSettings',
+    'PtyChiBHSettings',
     'PtyChiDMSettings',
     'PtyChiDeviceRepository',
     'PtyChiEnumerators',

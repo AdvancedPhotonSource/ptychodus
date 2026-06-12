@@ -49,6 +49,7 @@ class DMReconstructor(Reconstructor):
             allow_nondeterministic_algorithms=helper.allow_nondeterministic_algorithms,
             random_seed=helper.random_seed,
             displayed_loss_function=helper.displayed_loss_function,
+            exclude_measured_pixels_below=helper.exclude_measured_pixels_below,
             forward_model_options=helper.forward_model_options,
             exit_wave_update_relaxation=self._settings.exit_wave_update_relaxation.get_value(),
             chunk_length=self._settings.chunk_length.get_value(),
@@ -78,6 +79,7 @@ class DMReconstructor(Reconstructor):
             build_preconditioner_with_all_modes=helper.build_preconditioner_with_all_modes,
             determine_position_origin_coords_by=helper.determine_position_origin_coords_by,
             position_origin_coords=helper.get_position_origin_coords(object_),
+            hard_limits_magnitude_phase=helper.hard_limits_magnitude_phase,
             amplitude_clamp_limit=self._settings.object_amplitude_clamp_limit.get_value(),
             inertia=self._settings.object_inertia.get_value(),
         )

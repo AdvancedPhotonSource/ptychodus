@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from bisect import bisect
 from collections.abc import Sequence
 from pathlib import Path
-from typing import overload
+from typing import IO, overload
 import logging
 import tempfile
 
@@ -27,16 +27,11 @@ from ptychodus.api.tree import SimpleTreeNode
 from ..task_manager import BackgroundTask, TaskManager
 from ._loader import ArrayAssembler, LoadAllArrays, LoadArray
 from .detector import Detector
+from .monitor import DiffractionTaskMonitor
 from .settings import DiffractionSettings
 from .sizer import PatternSizer
 
 logger = logging.getLogger(__name__)
-
-__all__ = [
-    'AssembledDiffractionArray',
-    'AssembledDiffractionDataset',
-    'DiffractionDatasetObserver',
-]
 
 
 class DiffractionDatasetObserver(ABC):
@@ -108,12 +103,14 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         sizer: PatternSizer,
         detector: Detector,
         task_manager: TaskManager,
+        task_monitor: DiffractionTaskMonitor,
     ) -> None:
         super().__init__()
         self._settings = settings
         self._sizer = sizer
         self._detector = detector
         self._task_manager = task_manager
+        self._task_monitor = task_monitor
         self._observer_list: list[DiffractionDatasetObserver] = []
 
         self._dataset = SimpleDiffractionDataset.create_null()
@@ -121,6 +118,7 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         self._array_list: list[AssembledDiffractionArray] = list()
         self._array_counter = 0
         self._array_loader: LoadAllArrays | None = None
+        self._scratch_tempfile: IO[bytes] | None = None
 
     def add_observer(self, observer: DiffractionDatasetObserver) -> None:
         if observer not in self._observer_list:
@@ -161,10 +159,11 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
     def __len__(self) -> int:
         return len(self._array_list)
 
-    def _create_array_loader(
+    def create_array_loader(
         self, array: DiffractionArray, *, process_patterns: bool
     ) -> BackgroundTask:
-        """Load a new array into the dataset. Assumes that arrays arrive in order."""
+        """Build a loader task for one array. Loaders are assigned a monotonic array_index;
+        arrays may complete out of order and are sorted on insertion via bisect."""
         bad_pixels = self._dataset.get_bad_pixels()
 
         if bad_pixels is None:
@@ -184,7 +183,7 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         )
 
     def append_array(self, array: DiffractionArray, *, process_patterns: bool = True) -> None:
-        task = self._create_array_loader(array, process_patterns=process_patterns)
+        task = self.create_array_loader(array, process_patterns=process_patterns)
         self._task_manager.put_background_task(task)
 
     def _insert_array(self, array: AssembledDiffractionArray) -> None:
@@ -194,7 +193,7 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         for observer in self._observer_list:
             observer.handle_array_inserted(pos)
 
-    def _assemble_array(
+    def assemble_array(
         self,
         array_index: int,
         label: str,
@@ -218,20 +217,24 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         self._array_counter = 0
         self._array_loader = None
 
+        if self._scratch_tempfile is not None:
+            self._scratch_tempfile.close()
+            self._scratch_tempfile = None
+
         for observer in self._observer_list:
             observer.handle_dataset_reloaded()
 
     def reload(self, dataset: DiffractionDataset) -> None:
         self.clear()
         self._dataset = SimpleDiffractionDataset(dataset.get_metadata(), dataset.get_layout(), [])
-        self._array_loader = LoadAllArrays(dataset, self, self._task_manager)
+        self._array_loader = LoadAllArrays(dataset, self, self._task_manager, self._task_monitor)
 
         for observer in self._observer_list:
             observer.handle_dataset_reloaded()
 
     def load_all_arrays(self, *, process_patterns: bool, block: bool) -> None:
         if self._array_loader is None:
-            logger.warning('Arrays have already been loaded!')
+            logger.warning('No dataset queued for loading; call reload() first.')
             return
 
         metadata = self._dataset.get_metadata()
@@ -259,10 +262,12 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         if self._settings.memmap_enabled.get_value():
             scratch_dir = self._settings.scratch_directory.get_value()
             scratch_dir.mkdir(mode=0o755, parents=True, exist_ok=True)
-            npy_tmp_file = tempfile.NamedTemporaryFile(dir=scratch_dir, suffix='.npy')
-            logger.info(f'Scratch data file {npy_tmp_file.name} is {patterns_shape}')
+            # Held on self so the file persists on disk for as long as the memmap is live;
+            # released in clear().
+            self._scratch_tempfile = tempfile.NamedTemporaryFile(dir=scratch_dir, suffix='.npy')
+            logger.info(f'Scratch data file {self._scratch_tempfile.name} is {patterns_shape}')
             patterns: DiffractionPatterns = numpy.memmap(
-                npy_tmp_file, dtype=patterns_dtype, shape=patterns_shape
+                self._scratch_tempfile, dtype=patterns_dtype, shape=patterns_shape
             )
             patterns[:] = 0
         else:

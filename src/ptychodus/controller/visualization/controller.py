@@ -67,19 +67,20 @@ class VisualizationController(Observer):
         *,
         autoscale_color_axis: bool = False,
     ) -> None:
-        if numpy.all(numpy.isfinite(array)):
-            try:
-                product = self._engine.render(
-                    array, pixel_geometry, autoscale_color_axis=autoscale_color_axis
-                )
-            except ValueError as err:
-                logger.exception(err)
-                ExceptionDialog.show_exception('Renderer', err)
-            else:
-                self._item.set_product(product)
-        else:
-            logger.warning('Array contains infinite or NaN values!')
+        if numpy.any(numpy.isinf(array)):
+            logger.warning('Array contains infinite values!')
             self._item.clear_product()
+            return
+
+        try:
+            product = self._engine.render(
+                array, pixel_geometry, autoscale_color_axis=autoscale_color_axis
+            )
+        except ValueError as err:
+            logger.exception(err)
+            ExceptionDialog.show_exception('Renderer', err)
+        else:
+            self._item.set_product(product)
 
     def clear_array(self) -> None:
         self._item.clear_product()

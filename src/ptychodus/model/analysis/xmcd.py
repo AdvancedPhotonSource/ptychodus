@@ -1,143 +1,46 @@
 from __future__ import annotations
-from collections.abc import Sequence
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
+from dataclasses import replace
 import logging
+import time
 
-import numpy
-
-from ptychodus.api.common import ComplexArrayType, RealArrayType
-from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.object import ObjectCenter
-from ptychodus.api.observer import Observable
+from ptychodus.api.object import align_objects
+from ptychodus.api.reconstructor import ReconstructionAmbiguities
+from ptychodus.api.xmcd import XMCDResult, estimate_xmcd
 
 from ..product import ProductRepository
-
-__all__ = [
-    'XMCDAnalyzer',
-    'XMCDResult',
-]
 
 logger = logging.getLogger(__name__)
 
 
-def robust_log_amplitude(array: ComplexArrayType, epsilon: float = 1e-10) -> RealArrayType:
-    return numpy.log(numpy.maximum(numpy.absolute(array), epsilon))
-
-
-@dataclass(frozen=True)
-class XMCDResult:
-    polar_difference: RealArrayType
-    polar_sum: RealArrayType
-    polar_ratio: RealArrayType
-    pixel_geometry: PixelGeometry
-    center: ObjectCenter
-
-
-class XMCDAnalyzer(Observable):
-    # TODO feature request: want ability to align/add reconstructed slices
-    #      of repeat scans for each polarization separately to improve statistics
-
+class XMCDAnalyzer:
     def __init__(self, repository: ProductRepository) -> None:
-        super().__init__()
         self._repository = repository
 
-        self._lcirc_product_index = -1
-        self._rcirc_product_index = -1
-        self._result: XMCDResult | None = None
+    def analyze(self, lcp_product_index: int, rcp_product_index: int) -> XMCDResult:
+        lcp_product = self._repository[lcp_product_index].get_product()
+        rcp_product = self._repository[rcp_product_index].get_product()
 
-    def set_lcirc_product(self, lcirc_product_index: int) -> None:
-        if self._lcirc_product_index != lcirc_product_index:
-            self._lcirc_product_index = lcirc_product_index
-            self._lcirc_product_data = None
-            self.notify_observers()
+        if lcp_product.object_.num_layers > 1 or rcp_product.object_.num_layers > 1:
+            logger.warning('XMCD flattens multi-layer objects; per-layer XMCD is not implemented.')
 
-    def get_lcirc_product(self) -> int:
-        return self._lcirc_product_index
+        logger.info('Computing object alignment...')
+        tic = time.perf_counter()
+        aligned_lcp_object = align_objects(rcp_product.object_, lcp_product.object_)
+        toc = time.perf_counter()
+        logger.info(f'Computed object alignment in {toc - tic:.4f} seconds.')
 
-    def get_lcirc_product_name(self) -> str:
-        lcirc_product = self._repository[self._lcirc_product_index]
-        return lcirc_product.get_name()
+        aligned_lcp_product = replace(lcp_product, object_=aligned_lcp_object)
 
-    def set_rcirc_product(self, rcirc_product_index: int) -> None:
-        if self._rcirc_product_index != rcirc_product_index:
-            self._rcirc_product_index = rcirc_product_index
-            self._rcirc_product_data = None
-            self.notify_observers()
+        ambiguities = ReconstructionAmbiguities.estimate(aligned_lcp_product, reference=rcp_product)
+        standardized_lcp_product = ambiguities.standardize_product(aligned_lcp_product)
 
-    def get_rcirc_product(self) -> int:
-        return self._rcirc_product_index
-
-    def get_rcirc_product_name(self) -> str:
-        rcirc_product = self._repository[self._rcirc_product_index]
-        return rcirc_product.get_name()
-
-    def analyze(self) -> None:
-        lcirc_object = self._repository[self._lcirc_product_index].get_object_item().get_object()
-        rcirc_object = self._repository[self._rcirc_product_index].get_object_item().get_object()
-
-        lcirc_object_geometry = lcirc_object.get_geometry()
-        rcirc_object_geometry = rcirc_object.get_geometry()
-
-        if lcirc_object_geometry.width_px != rcirc_object_geometry.width_px:
-            raise ValueError('Object width mismatch!')
-
-        if lcirc_object_geometry.height_px != rcirc_object_geometry.height_px:
-            raise ValueError('Object height mismatch!')
-
-        if lcirc_object_geometry.pixel_width_m != rcirc_object_geometry.pixel_width_m:
-            raise ValueError('Object pixel width mismatch!')
-
-        if lcirc_object_geometry.pixel_height_m != rcirc_object_geometry.pixel_height_m:
-            raise ValueError('Object pixel height mismatch!')
-
-        # TODO align lcirc_array/rcirc_array
-        lcirc_log_amp = robust_log_amplitude(lcirc_object.get_layers_flattened())
-        rcirc_log_amp = robust_log_amplitude(rcirc_object.get_layers_flattened())
-
-        polar_difference = lcirc_log_amp - rcirc_log_amp
-        polar_sum = lcirc_log_amp + rcirc_log_amp
-        polar_ratio = numpy.divide(
-            polar_difference,
-            polar_sum,
-            out=numpy.zeros_like(polar_sum),
-            where=(numpy.absolute(polar_sum) > 1e-10),
+        logger.info('Computing XMCD...')
+        tic = time.perf_counter()
+        result = estimate_xmcd(
+            rcp_object=rcp_product.object_,
+            lcp_object_aligned=standardized_lcp_product.object_,
         )
+        toc = time.perf_counter()
+        logger.info(f'Computed XMCD in {toc - tic:.4f} seconds.')
 
-        self._result = XMCDResult(
-            polar_difference=polar_difference,
-            polar_sum=polar_sum,
-            polar_ratio=polar_ratio,
-            pixel_geometry=rcirc_object.get_pixel_geometry(),
-            center=rcirc_object.get_center(),
-        )
-        self.notify_observers()
-
-    def get_result(self) -> XMCDResult:
-        if self._result is None:
-            raise ValueError('No analyzed data!')
-
-        return self._result
-
-    def get_save_file_filters(self) -> Sequence[str]:
-        return [self.get_save_file_filter()]
-
-    def get_save_file_filter(self) -> str:
-        return 'NumPy Zipped Archive (*.npz)'
-
-    def save_data(self, file_path: Path) -> None:
-        if self._result is None:
-            raise ValueError('No analyzed data!')
-
-        contents: dict[str, Any] = {
-            'polar_difference': self._result.polar_difference,
-            'polar_sum': self._result.polar_sum,
-            'polar_ratio': self._result.polar_ratio,
-            'pixel_height_m': self._result.pixel_geometry.height_m,
-            'pixel_width_m': self._result.pixel_geometry.width_m,
-            'center_x_m': self._result.center.coordinate_x_m,
-            'center_y_m': self._result.center.coordinate_y_m,
-        }
-
-        numpy.savez_compressed(file_path, allow_pickle=False, **contents)
+        return result

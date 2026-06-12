@@ -71,6 +71,12 @@ def main() -> int:
         required=True,
     )
     parser.add_argument(
+        '--bad-pixels-input',
+        metavar='BAD_PIXELS_INPUT_FILE',
+        help='Path to bad pixel mask file',
+        type=argparse.FileType('r'),
+    )
+    parser.add_argument(
         '--exposure-time-s',
         metavar='TIME',
         help='Exposure time in seconds',
@@ -161,6 +167,8 @@ def main() -> int:
         logger.warning('Defocus distance is not implemented yet!')  # TODO
 
     with ModelCore(Path(args.settings.name), log_level=args.log_level) as model:
+        if args.bad_pixels_input is not None:
+            model.workflow_api.load_bad_pixels(Path(args.bad_pixels_input.name))
         workflow_diffraction_api = model.workflow_api.load_diffraction_data(
             Path(args.diffraction_input.name),
             crop_center=crop_center,

@@ -1,0 +1,21 @@
+FROM python:3.13-slim-trixie
+
+WORKDIR /app
+COPY . /src
+
+# Pre-install CPU-only torch from the PyTorch CPU index so the later
+# pip install of ptychi sees torch as already satisfied and does NOT
+# pull a CUDA-flavored torch wheel from PyPI.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git libqt5gui5 && \
+    rm -rf /var/lib/apt/lists/* && \
+    python3 -m pip install --root-user-action=ignore --no-cache-dir --upgrade pip && \
+    python3 -m pip install --root-user-action=ignore --no-cache-dir \
+        --index-url https://download.pytorch.org/whl/cpu \
+        torch && \
+    python3 -m pip install --root-user-action=ignore --no-cache-dir \
+        /src[globus,gui] \
+        git+https://github.com/AdvancedPhotonSource/pty-chi.git && \
+    rm -rf /src
+
+CMD ["python3", "-m", "ptychodus"]

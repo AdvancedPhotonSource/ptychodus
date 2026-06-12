@@ -1,5 +1,4 @@
 from __future__ import annotations
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from pprint import pformat
@@ -14,6 +13,8 @@ import queue
 import stat
 import threading
 import uuid
+
+from pydantic import BaseModel, ConfigDict
 
 from globus_sdk.gare import GlobusAuthorizationParameters
 from globus_sdk.globus_app import GlobusAppConfig
@@ -233,8 +234,9 @@ def get_ptychodus_flow_checksum() -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-@dataclass(frozen=True)
-class RegisteredPtychodusFlow:
+class RegisteredPtychodusFlow(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     process_action_id: uuid.UUID
     process_action_checksum: str
     flow_id: uuid.UUID
@@ -242,22 +244,10 @@ class RegisteredPtychodusFlow:
 
     @classmethod
     def read_from_file(cls, file_path: Path) -> RegisteredPtychodusFlow:
-        data = json.loads(file_path.read_text())
-        return cls(
-            process_action_id=uuid.UUID(data['process_action_id']),
-            process_action_checksum=data['process_action_checksum'],
-            flow_id=uuid.UUID(data['flow_id']),
-            flow_checksum=data['flow_checksum'],
-        )
+        return cls.model_validate_json(file_path.read_text())
 
     def write_to_file(self, file_path: Path) -> None:
-        data = {
-            'process_action_id': str(self.process_action_id),
-            'process_action_checksum': self.process_action_checksum,
-            'flow_id': str(self.flow_id),
-            'flow_checksum': self.flow_checksum,
-        }
-        file_path.write_text(json.dumps(data))
+        file_path.write_text(self.model_dump_json())
 
 
 def sync_flow(

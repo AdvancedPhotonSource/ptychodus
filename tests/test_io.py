@@ -135,6 +135,9 @@ class TestStandardFileLayout:
         assert StandardFileLayout.FLUORESCENCE_IN == 'fluorescence-in.h5'
         assert StandardFileLayout.FLUORESCENCE_OUT == 'fluorescence-out.h5'
 
+    def test_model_basename(self) -> None:
+        assert StandardFileLayout.MODEL_BASENAME == 'model'
+
     def test_all_values_are_strings(self) -> None:
         for member in StandardFileLayout:
             assert isinstance(member.value, str)

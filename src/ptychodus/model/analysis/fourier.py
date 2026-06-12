@@ -7,7 +7,6 @@ from ptychodus.api.common import ComplexArrayType
 from ptychodus.api.geometry import Box2D, PixelGeometry
 from ptychodus.api.interpolate import NearestNeighborArrayInterpolator
 from ptychodus.api.object import Object
-from ptychodus.api.observer import Observable
 
 from ..product import ProductRepository
 
@@ -21,49 +20,32 @@ class FourierAnalysisResult:
     pixel_geometry: PixelGeometry
 
 
-class FourierAnalyzer(Observable):
+class FourierAnalyzer:
     def __init__(self, repository: ProductRepository) -> None:
-        super().__init__()
         self._repository = repository
-        self._product_index = -1
-        self._result: FourierAnalysisResult | None = None
 
-    def set_product(self, product_index: int) -> None:
-        if self._product_index != product_index:
-            self._product_index = product_index
-            object_ = self.get_object()
-            self._analyze(object_.get_layer(0))
+    def get_object(self, product_index: int) -> Object:
+        return self._repository[product_index].get_object_item().get_object()
 
-    def get_product_name(self) -> str:
-        product = self._repository[self._product_index]
-        return product.get_name()
+    def analyze_layer(self, product_index: int) -> FourierAnalysisResult:
+        object_ = self.get_object(product_index)
+        return self._analyze(object_.get_layer(0), object_.get_pixel_geometry())
 
-    def get_object(self) -> Object:
-        product = self._repository[self._product_index]
-        return product.get_object_item().get_object()
-
-    def _analyze(self, array: ComplexArrayType) -> None:
-        norm = 'forward'  # TODO let user choose norm
-        object_ = self.get_object()
-        self._result = FourierAnalysisResult(
-            transformed_roi=fftshift(fft2(ifftshift(array), norm=norm)),
-            pixel_geometry=object_.get_pixel_geometry(),
-        )
-        self.notify_observers()
-
-    def analyze_roi(self, bounding_box: Box2D) -> None:
+    def analyze_roi(self, product_index: int, bounding_box: Box2D) -> FourierAnalysisResult:
         logger.debug(f'bounding_box: {bounding_box}')
-        object_ = self.get_object()
+        object_ = self.get_object(product_index)
         interpolator = NearestNeighborArrayInterpolator(object_.get_layer(0))
 
         width = int(bounding_box.width + 0.5)
         height = int(bounding_box.height + 0.5)
         roi = interpolator.get_patch(bounding_box.x_center, bounding_box.y_center, width, height)
         logger.debug(f'roi: {roi.dtype}{roi.shape}')
-        self._analyze(roi)
+        return self._analyze(roi, object_.get_pixel_geometry())
 
-    def get_result(self) -> FourierAnalysisResult:
-        if self._result is None:
-            raise ValueError('Fourier analysis has not been performed yet.')
-
-        return self._result
+    @staticmethod
+    def _analyze(array: ComplexArrayType, pixel_geometry: PixelGeometry) -> FourierAnalysisResult:
+        norm = 'forward'  # TODO let user choose norm
+        return FourierAnalysisResult(
+            transformed_roi=fftshift(fft2(ifftshift(array), norm=norm)),
+            pixel_geometry=pixel_geometry,
+        )

@@ -5,12 +5,16 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+import logging
 
 import numpy
+from skimage.registration import phase_cross_correlation
 
-from .common import ComplexArrayType
-from .geometry import PixelGeometry
+from .common import ComplexArrayType, RealArrayType
+from .geometry import PixelGeometry, fourier_shift_2d
 from .probe_positions import ProbePosition
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -34,6 +38,14 @@ class ObjectPosition:
     index: int
     coordinate_x_px: float
     coordinate_y_px: float
+
+
+@dataclass(frozen=True)
+class ObjectTransverseCoordinates:
+    """2D Cartesian coordinate arrays for the transverse plane of the object, in meters."""
+
+    position_x_m: RealArrayType
+    position_y_m: RealArrayType
 
 
 @dataclass(frozen=True)
@@ -73,6 +85,19 @@ class ObjectGeometry:
         return ObjectCenter(
             coordinate_x_m=self.center_x_m,
             coordinate_y_m=self.center_y_m,
+        )
+
+    def get_transverse_coordinates(self) -> ObjectTransverseCoordinates:
+        Y, X = numpy.mgrid[: self.height_px, : self.width_px]  # noqa: N806
+        position_x_px = X - (self.width_px - 1) / 2
+        position_y_px = Y - (self.height_px - 1) / 2
+
+        position_x_m = position_x_px * self.pixel_width_m
+        position_y_m = position_y_px * self.pixel_height_m
+
+        return ObjectTransverseCoordinates(
+            position_x_m=position_x_m,
+            position_y_m=position_y_m,
         )
 
     def map_coordinates_object_to_probe(self, position: ObjectPosition) -> ProbePosition:
@@ -221,6 +246,77 @@ class Object:
 
     def __repr__(self) -> str:
         return f'{self._array.dtype}{self._array.shape}'
+
+
+def align_objects(
+    reference_object: Object, moving_object: Object, *, upsample_factor: int = 100
+) -> Object:
+    """Sub-pixel align ``moving_object`` to ``reference_object``.
+
+    Estimates the sub-pixel translation between the two reconstructions with
+    ``skimage.registration.phase_cross_correlation`` (run on layer-flattened
+    amplitudes), then applies the shift to every layer of the complex
+    ``moving_object`` array via a Fourier phase ramp so the complex phase is
+    preserved across the interpolation.
+
+    The returned object's ``center`` is offset from the moving object's center
+    by ``-shift_yx * pixel_size`` (in meters). This preserves the
+    world-coordinate mapping of every probe position that was previously valid
+    against ``moving_object``: a probe at world coordinate ``W`` that addressed
+    a particular piece of content in ``moving_object`` will, after alignment,
+    address that same content at its new array index in the returned object.
+    The returned center therefore differs from ``reference_object.get_center()``
+    by the alignment shift.
+
+    Args:
+        reference_object: The reconstruction whose array indices the result is
+            aligned to.
+        moving_object: The reconstruction to be re-registered. Must share
+            ``reference_object``'s pixel geometry and flattened array shape.
+        upsample_factor: Sub-pixel precision passed to
+            ``phase_cross_correlation``. Higher values find finer shifts at
+            roughly linear cost.
+    """
+    reference_pixel_geometry = reference_object.get_pixel_geometry()
+    moving_pixel_geometry = moving_object.get_pixel_geometry()
+    if reference_pixel_geometry != moving_pixel_geometry:
+        raise ValueError(
+            f'Object pixel geometry mismatch: reference {reference_pixel_geometry} '
+            f'vs moving {moving_pixel_geometry}!'
+        )
+
+    reference_flat = reference_object.get_layers_flattened()
+    moving_flat = moving_object.get_layers_flattened()
+    if reference_flat.shape != moving_flat.shape:
+        raise ValueError(
+            f'Object array shape mismatch: reference {reference_flat.shape} '
+            f'vs moving {moving_flat.shape}!'
+        )
+
+    shift_yx, _, _ = phase_cross_correlation(
+        numpy.absolute(reference_flat),
+        numpy.absolute(moving_flat),
+        upsample_factor=upsample_factor,
+    )
+    logger.info(f'align_objects sub-pixel shift (y, x) = {tuple(shift_yx)} px')
+
+    moving_array = moving_object.get_array()
+    aligned_array = fourier_shift_2d(moving_array, dx=float(shift_yx[1]), dy=float(shift_yx[0]))
+
+    moving_center = moving_object.get_center()
+    new_center = ObjectCenter(
+        coordinate_x_m=moving_center.coordinate_x_m
+        - float(shift_yx[1]) * moving_pixel_geometry.width_m,
+        coordinate_y_m=moving_center.coordinate_y_m
+        - float(shift_yx[0]) * moving_pixel_geometry.height_m,
+    )
+
+    return Object(
+        array=aligned_array,
+        pixel_geometry=moving_pixel_geometry.copy(),
+        center=new_center,
+        layer_spacing_m=list(moving_object.layer_spacing_m),
+    )
 
 
 class ObjectFileReader(ABC):

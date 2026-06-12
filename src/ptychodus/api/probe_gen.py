@@ -1,4 +1,4 @@
-"""Probe generation functions: geometric apertures, zone plates, Zernike modes, and OPR ensembles."""
+"""Probe generation functions: geometric apertures, zone plates, Zernike modes, Hermite modes, and OPR ensembles."""
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -8,7 +8,7 @@ import numpy
 import scipy.linalg
 
 from .common import ComplexArrayType, RealArrayType
-from .geometry import PixelGeometry, ZernikeMonomial
+from .geometry import HermiteMode, PixelGeometry, ZernikeMode
 from .probe import Probe, ProbeGeometry, ProbeSequence
 from .propagator import (
     AngularSpectrumPropagator,
@@ -119,14 +119,48 @@ def generate_average_pattern_probe(
     *,
     probe_wavelength_m: float,
     detector_distance_m: float,
+    rtol: float = 1.0e-3,
 ) -> Probe:
-    """Back-propagate the square root of the mean diffraction pattern to estimate the probe."""
+    """Back-propagate the square root of the mean diffraction pattern to estimate the probe.
+
+    Raises ValueError if the diffraction-pattern shape or the Fresnel-transform's implied
+    sample-plane pixel size are inconsistent with *geometry*. The single-FFT Fresnel
+    propagator preserves array shape, and its output pitch is ``lambda * |z| / (N * dx_det)``;
+    both must match what *geometry* declares for the returned Probe to be self-consistent.
+    """
     detector_intensity = numpy.mean(assembled_data.get_patterns(), axis=0)
+    height_px, width_px = detector_intensity.shape[-2:]
+
+    if (width_px, height_px) != (geometry.width_px, geometry.height_px):
+        raise ValueError(
+            f'Diffraction pattern shape ({width_px}x{height_px} px) does not match probe '
+            f'geometry ({geometry.width_px}x{geometry.height_px} px); resample patterns first.'
+        )
+
     detector_pixel_geometry = assembled_data.get_pixel_geometry()
+    implied_pixel_width_m = (
+        probe_wavelength_m * abs(detector_distance_m) / (width_px * detector_pixel_geometry.width_m)
+    )
+    implied_pixel_height_m = (
+        probe_wavelength_m
+        * abs(detector_distance_m)
+        / (height_px * detector_pixel_geometry.height_m)
+    )
+
+    if not numpy.isclose(implied_pixel_width_m, geometry.pixel_width_m, rtol=rtol) or not (
+        numpy.isclose(implied_pixel_height_m, geometry.pixel_height_m, rtol=rtol)
+    ):
+        raise ValueError(
+            'Fresnel-transform output pixel size '
+            f'({implied_pixel_width_m:.3e} x {implied_pixel_height_m:.3e} m) does not match '
+            f'probe geometry ({geometry.pixel_width_m:.3e} x {geometry.pixel_height_m:.3e} m) '
+            f'within rtol={rtol}.'
+        )
+
     propagator_parameters = PropagatorParameters(
         wavelength_m=probe_wavelength_m,
-        width_px=detector_intensity.shape[-1],
-        height_px=detector_intensity.shape[-2],
+        width_px=width_px,
+        height_px=height_px,
         pixel_width_m=detector_pixel_geometry.width_m,
         pixel_height_m=detector_pixel_geometry.height_m,
         propagation_distance_m=-detector_distance_m,
@@ -149,6 +183,7 @@ class FresnelZonePlate:
     central_beamstop_diameter_m: float
 
     def get_focal_length_m(self, central_wavelength_m: float) -> float:
+        """Return the zone plate focal length at *central_wavelength_m* (thin-lens formula)."""
         return self.zone_plate_diameter_m * self.outermost_zone_width_m / central_wavelength_m
 
 
@@ -163,8 +198,6 @@ def generate_fresnel_zone_plate_probe(
     focal_length_m = zone_plate.get_focal_length_m(probe_wavelength_m)
     propagation_distance_m = focal_length_m + defocus_distance_m
 
-    fzp_half_width = (geometry.width_px + 1) // 2
-    fzp_half_height = (geometry.height_px + 1) // 2
     fzp_plane_pixel_size_numerator = probe_wavelength_m * propagation_distance_m
     fzp_pixel_geometry = PixelGeometry(
         width_m=fzp_plane_pixel_size_numerator / geometry.width_m,
@@ -172,10 +205,14 @@ def generate_fresnel_zone_plate_probe(
     )
 
     # coordinate on FZP plane
-    lx_fzp = -fzp_pixel_geometry.width_m * numpy.arange(-fzp_half_width, fzp_half_width)
-    ly_fzp = -fzp_pixel_geometry.height_m * numpy.arange(-fzp_half_height, fzp_half_height)
+    lx_fzp = -fzp_pixel_geometry.width_m * (
+        numpy.arange(geometry.width_px) - geometry.width_px // 2
+    )
+    ly_fzp = -fzp_pixel_geometry.height_m * (
+        numpy.arange(geometry.height_px) - geometry.height_px // 2
+    )
 
-    XX_FZP, YY_FZP = numpy.meshgrid(lx_fzp, ly_fzp)  # noqa: N806
+    YY_FZP, XX_FZP = numpy.meshgrid(ly_fzp, lx_fzp, indexing='ij')  # noqa: N806
     RR_FZP = numpy.hypot(XX_FZP, YY_FZP)  # noqa: N806
 
     # transmission function of FZP
@@ -203,7 +240,7 @@ def generate_fresnel_zone_plate_probe(
 
 
 def generate_zernike_probe(
-    geometry: ProbeGeometry, polynomial: Iterable[ZernikeMonomial], *, radius_m: float
+    geometry: ProbeGeometry, polynomial: Iterable[ZernikeMode], *, radius_m: float
 ) -> Probe:
     """Generate a probe as a superposition of Zernike polynomial modes within a circle of *radius_m*."""
     coords = geometry.get_transverse_coordinates()
@@ -211,8 +248,30 @@ def generate_zernike_probe(
     angle_rad = coords.angle_rad
     array = numpy.zeros_like(distance, dtype=complex)
 
-    for monomial in polynomial:
-        array += monomial(distance, angle_rad)
+    for mode in polynomial:
+        array += mode(distance, angle_rad)
+
+    return Probe(
+        array=array,
+        pixel_geometry=geometry.get_pixel_geometry(),
+    )
+
+
+def generate_hermite_probe(
+    geometry: ProbeGeometry,
+    polynomial: Iterable[HermiteMode],
+    *,
+    width_m: float,
+    height_m: float,
+) -> Probe:
+    """Generate a probe as a superposition of 2D Hermite polynomial modes with characteristic widths *width_m* (x) and *height_m* (y)."""
+    coords = geometry.get_transverse_coordinates()
+    x = coords.position_x_m / width_m
+    y = coords.position_y_m / height_m
+    array = numpy.zeros_like(x, dtype=complex)
+
+    for mode in polynomial:
+        array += mode(x, y)
 
     return Probe(
         array=array,

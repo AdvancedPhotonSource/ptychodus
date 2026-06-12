@@ -15,6 +15,7 @@ from ...model.ptychi import (
     PtyChiProbeSettings,
 )
 from ..parametric import (
+    CheckBoxParameterViewController,
     CheckableGroupBoxParameterViewController,
     ComboBoxParameterViewController,
     DecimalLineEditParameterViewController,
@@ -32,6 +33,7 @@ class PtyChiConstrainProbePowerViewController(CheckableGroupBoxParameterViewCont
         start: IntegerParameter,
         stop: IntegerParameter,
         stride: IntegerParameter,
+        scale_object: BooleanParameter,
         num_epochs: IntegerParameter,
     ) -> None:
         super().__init__(
@@ -40,9 +42,15 @@ class PtyChiConstrainProbePowerViewController(CheckableGroupBoxParameterViewCont
         self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
+        self._scale_object_view_controller = CheckBoxParameterViewController(
+            scale_object,
+            'Scale Object',
+            tool_tip='When checked, the object will be scaled to compensate for the probe power constraint',
+        )
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        layout.addRow(self._scale_object_view_controller.get_widget())
         self.get_widget().setLayout(layout)
 
 
@@ -54,6 +62,7 @@ class PtyChiOrthogonalizeIncoherentModesViewController(CheckableGroupBoxParamete
         stop: IntegerParameter,
         stride: IntegerParameter,
         method: StringParameter,
+        sort_by_occupancy: BooleanParameter,
         num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
@@ -70,10 +79,16 @@ class PtyChiOrthogonalizeIncoherentModesViewController(CheckableGroupBoxParamete
             enumerators.orthogonalization_methods(),
             tool_tip='Method to use for incoherent mode orthogonalization',
         )
+        self._sort_by_occupancy_view_controller = CheckBoxParameterViewController(
+            sort_by_occupancy,
+            'Sort By Occupancy',
+            tool_tip='When checked, incoherent modes will be sorted by occupancy after orthogonalization',
+        )
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
         layout.addRow('Method:', self._method_view_controller.get_widget())
+        layout.addRow(self._sort_by_occupancy_view_controller.get_widget())
         self.get_widget().setLayout(layout)
 
 
@@ -108,7 +123,9 @@ class PtyChiConstrainSupportViewController(CheckableGroupBoxParameterViewControl
         stop: IntegerParameter,
         stride: IntegerParameter,
         threshold: RealParameter,
+        method: StringParameter,
         num_epochs: IntegerParameter,
+        enumerators: PtyChiEnumerators,
     ) -> None:
         super().__init__(
             constrain_support,
@@ -121,10 +138,16 @@ class PtyChiConstrainSupportViewController(CheckableGroupBoxParameterViewControl
         self._threshold_view_controller = DecimalLineEditParameterViewController(
             threshold, tool_tip='Threshold for the probe support constraint'
         )
+        self._method_view_controller = ComboBoxParameterViewController(
+            method,
+            enumerators.probe_support_methods(),
+            tool_tip='Method for probe support constraint',
+        )
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
         layout.addRow('Threshold:', self._threshold_view_controller.get_widget())
+        layout.addRow('Method:', self._method_view_controller.get_widget())
         self.get_widget().setLayout(layout)
 
 
@@ -137,6 +160,7 @@ class PtyChiConstrainCenterViewController(CheckableGroupBoxParameterViewControll
         stride: IntegerParameter,
         num_epochs: IntegerParameter,
         use_intensity_for_mass_centroid: BooleanParameter,
+        center_modes_individually: BooleanParameter,
     ) -> None:
         super().__init__(
             constrain_center,
@@ -151,10 +175,16 @@ class PtyChiConstrainCenterViewController(CheckableGroupBoxParameterViewControll
             'Use Intensity for Mass Centroid',
             tool_tip='When enabled, the mass centroid will be calculated using the intensity of the probe',
         )
+        self._center_modes_individually_view_controller = CheckBoxParameterViewController(
+            center_modes_individually,
+            'Center Modes Individually',
+            tool_tip='When checked, each probe mode will be centered independently',
+        )
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
         layout.addRow(self._use_intensity_for_mass_centroid_view_controller.get_widget())
+        layout.addRow(self._center_modes_individually_view_controller.get_widget())
         self.get_widget().setLayout(layout)
 
 
@@ -188,6 +218,7 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
             settings.constrain_probe_power_start,
             settings.constrain_probe_power_stop,
             settings.constrain_probe_power_stride,
+            settings.constrain_probe_power_scale_object,
             num_epochs,
         )
         self._orthogonalize_incoherent_modes_view_controller = (
@@ -197,6 +228,7 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
                 settings.orthogonalize_incoherent_modes_stop,
                 settings.orthogonalize_incoherent_modes_stride,
                 settings.orthogonalize_incoherent_modes_method,
+                settings.orthogonalize_incoherent_modes_sort_by_occupancy,
                 num_epochs,
                 enumerators,
             )
@@ -214,7 +246,9 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
             settings.constrain_support_stop,
             settings.constrain_support_stride,
             settings.constrain_support_threshold,
+            settings.constrain_support_method,
             num_epochs,
+            enumerators,
         )
         self._constrain_center_view_controller = PtyChiConstrainCenterViewController(
             settings.constrain_center,
@@ -223,6 +257,7 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
             settings.constrain_center_stride,
             num_epochs,
             settings.use_intensity_for_mass_centroid,
+            settings.constrain_center_modes_individually,
         )
         self._relax_eigenmode_update_view_controller = DecimalSliderParameterViewController(
             settings.relax_eigenmode_update,

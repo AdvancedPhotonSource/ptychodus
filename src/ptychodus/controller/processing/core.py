@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.reconstructor import TrainableReconstructor
 
+from ...model.genesis import GenesisCore
 from ...model.globus import GlobusCore
 from ...model.processing import ProcessingAPI, ProcessingAlgorithmParameter
 from ...model.product import ProductRepository
@@ -50,6 +51,7 @@ class ProcessingController(Observer):
         processing_api: ProcessingAPI,
         product_repository: ProductRepository,
         globus: GlobusCore,
+        genesis: GenesisCore,
         view: QWidget,
         status_view: ProcessingStatusView,
         file_dialog_factory: FileDialogFactory,
@@ -60,6 +62,7 @@ class ProcessingController(Observer):
         self._processing_api = processing_api
         self._product_repository = product_repository
         self._globus = globus
+        self._genesis = genesis
         self._view = view
         self._status_view = status_view
         self._file_dialog_factory = file_dialog_factory
@@ -79,19 +82,22 @@ class ProcessingController(Observer):
             algorithm_parameter, algorithm_parameter.available_reconstructors()
         )
         self._status_controller = ProcessingStatusController(
-            product_repository, processing_api.get_progress_monitor(), status_view
+            product_repository, processing_api.task_monitor, status_view
         )
         self._product_view_controller = ProductParameterViewController(
             product_repository, self._status_controller
         )
-        self._compute_view_controller = ComputeParameterViewController()
+        self._compute_view_controller = ComputeParameterViewController(
+            globus_supported=globus.is_supported,
+            genesis_supported=genesis.is_supported,
+        )
         self._actions_view = ProcessingActionsView()
 
         layout = QFormLayout()
         layout.addRow('Algorithm:', self._algorithm_view_controller.get_widget())
         layout.addRow('Product:', self._product_view_controller.get_widget())
 
-        if globus.is_supported:
+        if globus.is_supported or genesis.is_supported:
             layout.addRow('Compute:', self._compute_view_controller.get_widget())
 
         layout.addRow('Action:', self._actions_view)
@@ -140,7 +146,19 @@ class ProcessingController(Observer):
         if input_product_index < 0:
             return
 
-        if self._compute_view_controller.is_computing_local():
+        if self._compute_view_controller.is_globus_button_checked():
+            try:
+                self._globus.executor.reconstruct(input_product_index)
+            except Exception as exc:
+                logger.exception(exc)
+                ExceptionDialog.show_exception('Reconstruct Remote (Globus)', exc)
+        elif self._compute_view_controller.is_genesis_button_checked():
+            try:
+                self._genesis.executor.reconstruct(input_product_index)
+            except Exception as exc:
+                logger.exception(exc)
+                ExceptionDialog.show_exception('Reconstruct Remote (Genesis)', exc)
+        else:  # local
             try:
                 output_product_index = self._processing_api.reconstruct(input_product_index)
             except Exception as exc:
@@ -148,12 +166,6 @@ class ProcessingController(Observer):
                 ExceptionDialog.show_exception('Reconstruct Local', exc)
             else:
                 self._product_view_controller.get_widget().setCurrentIndex(output_product_index)
-        else:
-            try:
-                self._globus.executor.reconstruct(input_product_index)
-            except Exception as exc:
-                logger.exception(exc)
-                ExceptionDialog.show_exception('Reconstruct Remote', exc)
 
     def _train(self) -> None:
         product_index = self._product_view_controller.get_widget().currentIndex()
@@ -161,32 +173,40 @@ class ProcessingController(Observer):
         if product_index < 0:
             return
 
-        data_path = self._file_dialog_factory.get_existing_directory_path(
-            self._view, 'Choose Training Data Directory'
-        )
+        if self._compute_view_controller.is_globus_button_checked():
+            try:
+                self._globus.executor.train(product_index)
+            except Exception as exc:
+                logger.exception(exc)
+                ExceptionDialog.show_exception('Train Remote (Globus)', exc)
+        elif self._compute_view_controller.is_genesis_button_checked():
+            try:
+                self._genesis.executor.train(product_index)
+            except Exception as exc:
+                logger.exception(exc)
+                ExceptionDialog.show_exception('Train Remote (Genesis)', exc)
+        else:  # local
+            data_path = self._file_dialog_factory.get_existing_directory_path(
+                self._view, 'Choose Training Data Directory'
+            )
 
-        if not data_path:
-            return
+            if not data_path:
+                return
 
-        if self._compute_view_controller.is_computing_local():
             try:
                 self._processing_api.train(product_index, data_path, data_path)
             except Exception as exc:
                 logger.exception(exc)
                 ExceptionDialog.show_exception('Train Local', exc)
-        else:
-            try:
-                self._globus.executor.train(product_index)
-            except Exception as exc:
-                logger.exception(exc)
-                ExceptionDialog.show_exception('Train Remote', exc)
+            else:
+                self._sync_model_to_view()
 
     def _reconstruct_split(self) -> None:
         pass  # TODO
 
     def _load_model(self) -> None:
         name_filter = self._processing_api.get_model_file_filter()
-        file_path, name_filter = self._file_dialog_factory.get_open_file_path(
+        file_path, _ = self._file_dialog_factory.get_open_file_path(
             self._view, 'Load Model', name_filters=[name_filter], selected_name_filter=name_filter
         )
 
@@ -198,6 +218,8 @@ class ProcessingController(Observer):
         except Exception as exc:
             logger.exception(exc)
             ExceptionDialog.show_exception('Load Model', exc)
+        else:
+            self._sync_model_to_view()
 
     def _export_training_data(self) -> None:
         input_product_index = self._product_view_controller.get_widget().currentIndex()

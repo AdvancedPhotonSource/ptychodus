@@ -5,11 +5,27 @@ import argparse
 import logging
 import sys
 
+from ptychodus.api.observer import Observable, Observer
 from ptychodus.cli import DirectoryType, verify_all_arguments_parsed
 from ptychodus.model import ModelCore
+from ptychodus.model.diffraction import DiffractionTaskMonitor
 import ptychodus
 
 logger = logging.getLogger(__name__)
+
+
+class _DiffractionProgressLogger(Observer):
+    def __init__(self, monitor: DiffractionTaskMonitor) -> None:
+        super().__init__()
+        self._monitor = monitor
+        monitor.add_observer(self)
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._monitor:
+            goal = self._monitor.get_progress_goal()
+
+            if goal > 0:
+                logger.info(f'Loaded {self._monitor.get_progress()}/{goal} arrays')
 
 
 def main() -> int:
@@ -68,6 +84,7 @@ def main() -> int:
                 parser.error('Batch mode requires input and output arguments!')
                 return -1
 
+            _DiffractionProgressLogger(model.diffraction_core.task_monitor)
             return model.batch_mode_execute(
                 parsed_args.batch, parsed_args.input_directory, parsed_args.output_directory
             )
@@ -96,4 +113,5 @@ def main() -> int:
         return app.exec()
 
 
-sys.exit(main())
+if __name__ == '__main__':
+    sys.exit(main())

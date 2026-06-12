@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import PathParameter, StringParameter
 
-from ...model.analysis import DiffractionSimulator
+from ...model.analysis import DiffractionSimulator, DiffractionSimulatorSettings
 from ...model.diffraction import (
     AssembledDiffractionDataset,
     Detector,
@@ -24,16 +24,18 @@ from ...model.diffraction import (
     DiffractionAPI,
     DiffractionDatasetObserver,
     DiffractionSettings,
+    DiffractionTaskMonitor,
     PatternSizer,
 )
 from ...model.metadata import MetadataPresenter
 from ...model.product import ProductRepository
-from ...view.diffraction import DetectorView, PatternsView
+from ...view.diffraction import DetectorView, DiffractionStatusView, PatternsView
 from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate
 from ..data import FileDialogFactory
 from ..helpers import connect_triggered_signal
 from ..image import ImageController
 from ..parametric import (
+    CheckBoxParameterViewController,
     LengthWidgetParameterViewController,
     ParameterViewController,
     SpinBoxParameterViewController,
@@ -126,7 +128,6 @@ class DetectorController:
         self._pixel_height_view_controller = LengthWidgetParameterViewController(
             settings.pixel_height_m
         )
-        self._bit_depth_view_controller = SpinBoxParameterViewController(settings.bit_depth)
         self._bad_pixels_view_controller = BadPixelsViewController(
             settings.bad_pixels_file_path,
             settings.bad_pixels_file_type,
@@ -140,9 +141,41 @@ class DetectorController:
         layout.addRow('Detector Height [px]:', self._height_px_view_controller.get_widget())
         layout.addRow('Pixel Width:', self._pixel_width_view_controller.get_widget())
         layout.addRow('Pixel Height:', self._pixel_height_view_controller.get_widget())
-        layout.addRow('Bit Depth:', self._bit_depth_view_controller.get_widget())
         layout.addRow('Bad Pixels:', self._bad_pixels_view_controller.get_widget())
         view.setLayout(layout)
+
+
+class DiffractionStatusController(Observer):
+    def __init__(
+        self,
+        monitor: DiffractionTaskMonitor,
+        view: DiffractionStatusView,
+    ) -> None:
+        super().__init__()
+        self._monitor = monitor
+        self._view = view
+
+        view.stop_button.clicked.connect(monitor.stop_processing)
+
+        self._sync_model_to_view()
+        monitor.add_observer(self)
+
+    def _sync_model_to_view(self) -> None:
+        progress_goal = self._monitor.get_progress_goal()
+        progress_bar = self._view.progress_bar
+
+        if self._monitor.is_processing and progress_goal > 0:
+            progress_bar.show()
+            progress_bar.setRange(0, progress_goal)
+            progress_bar.setValue(self._monitor.get_progress())
+            self._view.stop_button.show()
+        else:
+            progress_bar.hide()
+            self._view.stop_button.hide()
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._monitor:
+            self._sync_model_to_view()
 
 
 class DiffractionController(DiffractionDatasetObserver):
@@ -154,10 +187,13 @@ class DiffractionController(DiffractionDatasetObserver):
         detector: Detector,
         diffraction_api: DiffractionAPI,
         dataset: AssembledDiffractionDataset,
+        task_monitor: DiffractionTaskMonitor,
         metadata_presenter: MetadataPresenter,
         product_repository: ProductRepository,
         diffraction_simulator: DiffractionSimulator,
+        diffraction_simulator_settings: DiffractionSimulatorSettings,
         view: PatternsView,
+        status_view: DiffractionStatusView,
         image_controller: ImageController,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
@@ -184,10 +220,13 @@ class DiffractionController(DiffractionDatasetObserver):
             metadata_presenter,
             file_dialog_factory,
         )
+        self._status_controller = DiffractionStatusController(task_monitor, status_view)
         self._tree_model = DatasetTreeModel()
 
         view.tree_view.setModel(self._tree_model)
         view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        header = view.tree_view.header()
+        header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
         counts_item_delegate = ProgressBarItemDelegate(view.tree_view)
         view.tree_view.setItemDelegateForColumn(1, counts_item_delegate)
         selection_model = view.tree_view.selectionModel()
@@ -211,6 +250,11 @@ class DiffractionController(DiffractionDatasetObserver):
         connect_triggered_signal(simulate_action, self._choose_product_for_simulation)
 
         view.simulate_dialog.product_combo_box.setModel(self._product_list_model)
+        self._poisson_view_controller = CheckBoxParameterViewController(
+            diffraction_simulator_settings.add_poisson_noise,
+            'Add Poisson Noise',
+        )
+        view.simulate_dialog.form_layout.insertRow(1, self._poisson_view_controller.get_widget())
         view.simulate_dialog.finished.connect(self._simulate_diffraction)
 
         dataset.add_observer(self)

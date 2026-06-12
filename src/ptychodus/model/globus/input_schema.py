@@ -71,7 +71,7 @@ PTYCHODUS_FLOW_INPUT_SCHEMA: Mapping[str, Any] = {
                             'type': 'string',
                             'title': 'Ptychodus Action',
                             'description': 'The ptychodus action to perform.',
-                            'enum': ['reconstruct', 'train', 'infer'],
+                            'enum': ['reconstruct', 'train'],
                         },
                         'input_directory': {
                             'type': 'string',

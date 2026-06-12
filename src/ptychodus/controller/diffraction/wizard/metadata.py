@@ -23,9 +23,6 @@ class OpenDatasetWizardMetadataViewController(Observer):
         if self._page.detector_pixel_size_check_box.isChecked():
             self._presenter.sync_detector_pixel_size()
 
-        if self._page.detector_bit_depth_check_box.isChecked():
-            self._presenter.sync_detector_bit_depth()
-
         if self._page.detector_distance_check_box.isChecked():
             self._presenter.sync_detector_distance()
 
@@ -51,10 +48,6 @@ class OpenDatasetWizardMetadataViewController(Observer):
         can_sync_detector_pixel_size = self._presenter.can_sync_detector_pixel_size()
         self._page.detector_pixel_size_check_box.setVisible(can_sync_detector_pixel_size)
         self._page.detector_pixel_size_check_box.setChecked(can_sync_detector_pixel_size)
-
-        can_sync_detector_bit_depth = self._presenter.can_sync_detector_bit_depth()
-        self._page.detector_bit_depth_check_box.setVisible(can_sync_detector_bit_depth)
-        self._page.detector_bit_depth_check_box.setChecked(can_sync_detector_bit_depth)
 
         can_sync_detector_distance = self._presenter.can_sync_detector_distance()
         self._page.detector_distance_check_box.setVisible(can_sync_detector_distance)

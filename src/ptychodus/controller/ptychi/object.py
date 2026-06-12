@@ -191,6 +191,7 @@ class PtyChiRemoveGridArtifactsViewController(CheckableGroupBoxParameterViewCont
         period_y_m: RealParameter,
         window_size_px: IntegerParameter,
         direction: StringParameter,
+        component: StringParameter,
         num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
@@ -214,6 +215,11 @@ class PtyChiRemoveGridArtifactsViewController(CheckableGroupBoxParameterViewCont
         self._direction_view_controller = ComboBoxParameterViewController(
             direction, enumerators.directions(), tool_tip='Direction of grid artifact removal'
         )
+        self._component_view_controller = ComboBoxParameterViewController(
+            component,
+            enumerators.mag_phase_components(),
+            tool_tip='Component of the object to apply grid artifact removal to',
+        )
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
@@ -221,6 +227,7 @@ class PtyChiRemoveGridArtifactsViewController(CheckableGroupBoxParameterViewCont
         layout.addRow('Period Y:', self._period_y_view_controller.get_widget())
         layout.addRow('Window Size [px]:', self._window_size_view_controller.get_widget())
         layout.addRow('Direction:', self._direction_view_controller.get_widget())
+        layout.addRow('Component:', self._component_view_controller.get_widget())
         self.get_widget().setLayout(layout)
 
 
@@ -295,6 +302,59 @@ class PtyChiRemoveObjectProbeAmbiguityViewController(CheckableGroupBoxParameterV
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        self.get_widget().setLayout(layout)
+
+
+class PtyChiConstrainHardLimitsViewController(CheckableGroupBoxParameterViewController):
+    def __init__(
+        self,
+        constrain_hard_limits: BooleanParameter,
+        start: IntegerParameter,
+        stop: IntegerParameter,
+        stride: IntegerParameter,
+        enable_abs: BooleanParameter,
+        abs_min: RealParameter,
+        abs_max: RealParameter,
+        enable_phase: BooleanParameter,
+        phase_min_deg: RealParameter,
+        phase_max_deg: RealParameter,
+        num_epochs: IntegerParameter,
+    ) -> None:
+        super().__init__(
+            constrain_hard_limits,
+            'Constrain Hard Limits',
+            tool_tip='Whether to apply hard magnitude/phase limits to the object',
+        )
+        self._plan_view_controller = PtyChiOptimizationPlanViewController(
+            start, stop, stride, num_epochs
+        )
+        self._enable_abs_view_controller = CheckBoxParameterViewController(
+            enable_abs, 'Limit Magnitude', tool_tip='Whether to apply magnitude limits'
+        )
+        self._abs_min_view_controller = DecimalLineEditParameterViewController(
+            abs_min, tool_tip='Minimum magnitude value'
+        )
+        self._abs_max_view_controller = DecimalLineEditParameterViewController(
+            abs_max, tool_tip='Maximum magnitude value'
+        )
+        self._enable_phase_view_controller = CheckBoxParameterViewController(
+            enable_phase, 'Limit Phase', tool_tip='Whether to apply phase limits'
+        )
+        self._phase_min_deg_view_controller = DecimalLineEditParameterViewController(
+            phase_min_deg, tool_tip='Minimum phase value in degrees'
+        )
+        self._phase_max_deg_view_controller = DecimalLineEditParameterViewController(
+            phase_max_deg, tool_tip='Maximum phase value in degrees'
+        )
+
+        layout = QFormLayout()
+        layout.addRow('Plan:', self._plan_view_controller.get_widget())
+        layout.addRow(self._enable_abs_view_controller.get_widget())
+        layout.addRow('Magnitude Min:', self._abs_min_view_controller.get_widget())
+        layout.addRow('Magnitude Max:', self._abs_max_view_controller.get_widget())
+        layout.addRow(self._enable_phase_view_controller.get_widget())
+        layout.addRow('Phase Min [deg]:', self._phase_min_deg_view_controller.get_widget())
+        layout.addRow('Phase Max [deg]:', self._phase_max_deg_view_controller.get_widget())
         self.get_widget().setLayout(layout)
 
 
@@ -378,6 +438,7 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
             settings.remove_grid_artifacts_period_y_m,
             settings.remove_grid_artifacts_window_size_px,
             settings.remove_grid_artifacts_direction,
+            settings.remove_grid_artifacts_component,
             num_epochs,
             enumerators,
         )
@@ -412,6 +473,19 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
             'Build Preconditioner with All Modes',
             tool_tip='Whether to build the preconditioner using all modes',
         )
+        self._constrain_hard_limits_view_controller = PtyChiConstrainHardLimitsViewController(
+            settings.constrain_hard_limits,
+            settings.constrain_hard_limits_start,
+            settings.constrain_hard_limits_stop,
+            settings.constrain_hard_limits_stride,
+            settings.constrain_hard_limits_enable_abs,
+            settings.constrain_hard_limits_abs_min,
+            settings.constrain_hard_limits_abs_max,
+            settings.constrain_hard_limits_enable_phase,
+            settings.constrain_hard_limits_phase_min_deg,
+            settings.constrain_hard_limits_phase_max_deg,
+            num_epochs,
+        )
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._optimization_plan_view_controller.get_widget())
@@ -427,6 +501,7 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
         layout.addRow('Patch Interpolator:', self._patch_interpolator_view_controller.get_widget())
         layout.addRow(self._remove_object_probe_ambiguity_view_controller.get_widget())
         layout.addRow(self._build_preconditioner_with_all_modes_view_controller.get_widget())
+        layout.addRow(self._constrain_hard_limits_view_controller.get_widget())
 
         if dm_settings is not None:
             self._amplitude_clamp_limit_view_controller = DecimalLineEditParameterViewController(

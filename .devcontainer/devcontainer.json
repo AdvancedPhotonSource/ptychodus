@@ -1,0 +1,16 @@
+{
+  "name": "ptychodus (CPU)",
+  "build": {
+    "context": "..",
+    "dockerfile": "../Dockerfile.cpu"
+  },
+  "postCreateCommand": "pip install -e .",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff"
+      ]
+    }
+  }
+}

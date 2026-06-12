@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.product import LossValue
 
-from ...model.processing import ProcessingProgressMonitor
+from ...model.processing import ProcessingTaskMonitor
 from ...model.product import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver
 from ...model.product.metadata import MetadataRepositoryItem
 from ...model.product.object import ObjectRepositoryItem
@@ -31,7 +31,7 @@ class ProcessingStatusController(Observer):
     def __init__(
         self,
         product_repository: ProductRepository,
-        monitor: ProcessingProgressMonitor,
+        monitor: ProcessingTaskMonitor,
         view: ProcessingStatusView,
     ) -> None:
         super().__init__()
@@ -151,9 +151,16 @@ class ProductParameterViewController(ParameterViewController, ProductRepositoryO
 
 
 class ComputeParameterViewController(ParameterViewController):
-    def __init__(self, *, tool_tip: str = '') -> None:
+    def __init__(
+        self,
+        *,
+        globus_supported: bool = True,
+        genesis_supported: bool = True,
+        tool_tip: str = '',
+    ) -> None:
         self._local_button = QRadioButton('Local')
-        self._remote_button = QRadioButton('Remote')
+        self._globus_button = QRadioButton('Remote (Globus)')
+        self._genesis_button = QRadioButton('Remote (Genesis)')
         self._button_group = QButtonGroup()
         self._widget = QWidget()
 
@@ -161,19 +168,26 @@ class ComputeParameterViewController(ParameterViewController):
             self._widget.setToolTip(tool_tip)
 
         self._button_group.addButton(self._local_button)
-        self._button_group.addButton(self._remote_button)
+        self._button_group.addButton(self._globus_button)
+        self._button_group.addButton(self._genesis_button)
         self._button_group.setExclusive(True)
         self._local_button.setChecked(True)
+        self._globus_button.setVisible(globus_supported)
+        self._genesis_button.setVisible(genesis_supported)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._local_button)
-        layout.addWidget(self._remote_button)
+        layout.addWidget(self._globus_button)
+        layout.addWidget(self._genesis_button)
         layout.addStretch()
         self._widget.setLayout(layout)
 
-    def is_computing_local(self) -> bool:
-        return self._button_group.checkedButton() is self._local_button
+    def is_globus_button_checked(self) -> bool:
+        return self._button_group.checkedButton() is self._globus_button
+
+    def is_genesis_button_checked(self) -> bool:
+        return self._button_group.checkedButton() is self._genesis_button
 
     def get_widget(self) -> QWidget:
         return self._widget

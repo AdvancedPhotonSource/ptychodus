@@ -1,8 +1,24 @@
-from collections.abc import Sequence
+from collections.abc import Mapping
 from datetime import datetime
+from enum import StrEnum
+from pathlib import Path
+from typing import Any, Final
+import json
 
 from pydantic import BaseModel
 import requests
+
+from ptychodus.api.common import get_ptychodus_dir
+
+from .tokens import create_headers
+
+
+class TransferStatus(StrEnum):
+    ACTIVE = 'ACTIVE'
+    SUCCEEDED = 'SUCCEEDED'
+    FAILED = 'FAILED'
+    CANCELED = 'CANCELED'
+    UNKNOWN = 'UNKNOWN'
 
 
 class GlobusTransferInputs(BaseModel):
@@ -15,47 +31,41 @@ class GlobusTransferInputs(BaseModel):
     destination_path: str | None = None
 
 
-class GlobusTransferDetails(BaseModel):
-    name: str
-    source_url: str  # uri >= 1 characters
-    destination_url: str  # uri >= 1 characters
-    transfer_uuid: str | None
-
-
 class GlobusTransferResult(BaseModel):
+    label: str | None = None
     transfer_uuid: str
-    status: str | None = None
+    status: TransferStatus | None = None
     completion_time: datetime | None = None
-    destination_url: str | None
-    reason: str | None
     bytes_transferred: int | None = None
     effective_bytes_per_second: int | None = None
 
 
-class GenesisGlobusTransferClient:
-    # See https://amsc-data-api.nersc.gov/docs#/Globus
+class AmSCGlobusTransferClient:
+    """See https://amsc-data-api.nersc.gov/docs#/Globus"""
 
-    def __init__(self, api_base_url: str, token: str) -> None:
-        self._base_url = f'{api_base_url}/transfer'
-        self._headers = {'Authorization': f'Bearer {token}'}
+    NAME: Final[str] = 'AmSC'
 
-    def check_auth_token(self) -> str:
-        response = requests.get(f'{self._base_url}/auth/globus', headers=self._headers)
+    def __init__(self, api_base_url: str, access_token: str) -> None:
+        self._api_base_url = api_base_url.rstrip('/')
+        self._headers = create_headers(access_token)
+
+    def check_auth_token(self) -> Mapping[str, Any]:
+        response = requests.get(f'{self._api_base_url}/movement/auth/globus', headers=self._headers)
         response.raise_for_status()
-        return response.text
+        return response.json()
 
-    def start_transfer(self, inputs: GlobusTransferInputs) -> Sequence[GlobusTransferDetails]:
+    def start_transfer(self, inputs: GlobusTransferInputs) -> GlobusTransferResult:
         response = requests.post(
-            f'{self._base_url}/globus',
+            f'{self._api_base_url}/movement/transfer/globus',
             json=inputs.model_dump(mode='json'),
             headers=self._headers,
         )
         response.raise_for_status()
-        return [GlobusTransferDetails.model_validate(item) for item in response.json()]
+        return GlobusTransferResult.model_validate(response.json())
 
     def get_transfer(self, transfer_id: str) -> GlobusTransferResult:
         response = requests.get(
-            f'{self._base_url}/globus/{transfer_id}',
+            f'{self._api_base_url}/movement/transfer/globus/{transfer_id}',
             headers=self._headers,
         )
         response.raise_for_status()
@@ -63,8 +73,21 @@ class GenesisGlobusTransferClient:
 
     def delete_transfer(self, transfer_id: str) -> GlobusTransferResult:
         response = requests.delete(
-            f'{self._base_url}/globus/{transfer_id}',
+            f'{self._api_base_url}/movement/transfer/globus/{transfer_id}',
             headers=self._headers,
         )
         response.raise_for_status()
         return GlobusTransferResult.model_validate(response.json())
+
+    def print_openapi_specification(self) -> None:
+        response = requests.get(f'{self._api_base_url}/openapi.json')
+        response.raise_for_status()
+        print(json.dumps(response.json(), indent=2))
+
+
+def get_amsc_transfer_api_url() -> str:
+    return 'https://amsc-data-api.nersc.gov'
+
+
+def get_transfer_tokens_file() -> Path:
+    return get_ptychodus_dir() / 'genesis_transfer_tokens.json'

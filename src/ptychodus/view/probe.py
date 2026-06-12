@@ -8,8 +8,11 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QListView,
+    QPlainTextEdit,
+    QProgressBar,
     QPushButton,
     QRadioButton,
+    QScrollArea,
     QSlider,
     QSpinBox,
     QStackedWidget,
@@ -19,38 +22,94 @@ from PyQt5.QtWidgets import (
 )
 
 from .visualization import VisualizationParametersView, VisualizationWidget
-from .widgets import DecimalLineEdit, LengthWidget
+from .widgets import DecimalLineEdit
+
+
+class ProbeMetricsView(QGroupBox):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__('XY Probe Metrics', parent)
+        self.major_axis_tilt_label = QLabel('N/A')
+        self.minor_axis_tilt_label = QLabel('N/A')
+        self.fwhm_major_axis_label = QLabel('N/A')
+        self.fwhm_minor_axis_label = QLabel('N/A')
+        self.rms_major_axis_label = QLabel('N/A')
+        self.rms_minor_axis_label = QLabel('N/A')
+        self.encircled_energy_diameter_label = QLabel('N/A')
+
+        layout = QGridLayout()
+        layout.addWidget(QLabel('Major Axis'), 0, 1, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(QLabel('Minor Axis'), 0, 2, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(QLabel('Tilt [deg]:'), 1, 0)
+        layout.addWidget(self.major_axis_tilt_label, 1, 1, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.minor_axis_tilt_label, 1, 2, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(QLabel('FWHM [nm]:'), 2, 0)
+        layout.addWidget(self.fwhm_major_axis_label, 2, 1, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.fwhm_minor_axis_label, 2, 2, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(QLabel('RMS [nm]:'), 3, 0)
+        layout.addWidget(self.rms_major_axis_label, 3, 1, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.rms_minor_axis_label, 3, 2, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(QLabel('Encircled Energy Diameter [nm]:'), 4, 0)
+        layout.addWidget(
+            self.encircled_energy_diameter_label, 4, 1, 1, 2, Qt.AlignmentFlag.AlignCenter
+        )
+        layout.setColumnStretch(1, 1)
+        layout.setColumnStretch(2, 1)
+        self.setLayout(layout)
 
 
 class ProbePropagationParametersView(QGroupBox):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        begin_coordinate_widget: QWidget,
+        end_coordinate_widget: QWidget,
+        num_steps_spin_box: QWidget,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__('Parameters', parent)
-        self.begin_coordinate_widget = LengthWidget(is_signed=True)
-        self.end_coordinate_widget = LengthWidget(is_signed=True)
-        self.num_steps_spin_box = QSpinBox()
         self.visualization_parameters_view = VisualizationParametersView()
+        self.metrics_view = ProbeMetricsView()
 
         propagation_layout = QFormLayout()
-        propagation_layout.addRow('Begin Coordinate:', self.begin_coordinate_widget)
-        propagation_layout.addRow('End Coordinate:', self.end_coordinate_widget)
-        propagation_layout.addRow('Number of Steps:', self.num_steps_spin_box)
+        propagation_layout.addRow('Begin Coordinate:', begin_coordinate_widget)
+        propagation_layout.addRow('End Coordinate:', end_coordinate_widget)
+        propagation_layout.addRow('Number of Steps:', num_steps_spin_box)
 
         propagation_group_box = QGroupBox('Propagation')
         propagation_group_box.setLayout(propagation_layout)
 
+        scroll_widget = QWidget()
+        scroll_widget_layout = QVBoxLayout()
+        scroll_widget_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_widget_layout.addWidget(self.metrics_view)
+        scroll_widget_layout.addWidget(propagation_group_box)
+        scroll_widget_layout.addWidget(self.visualization_parameters_view)
+        scroll_widget_layout.addStretch()
+        scroll_widget.setLayout(scroll_widget_layout)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidget(scroll_widget)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+
         layout = QVBoxLayout()
-        layout.addWidget(propagation_group_box)
-        layout.addWidget(self.visualization_parameters_view)
-        layout.addStretch()
+        layout.addWidget(scroll_area)
         self.setLayout(layout)
 
 
 class ProbePropagationDialog(QDialog):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        begin_coordinate_widget: QWidget,
+        end_coordinate_widget: QWidget,
+        num_steps_spin_box: QWidget,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self.xy_view = VisualizationWidget('XY Plane')
         self.zx_view = VisualizationWidget('ZX Plane')
-        self.parameters_view = ProbePropagationParametersView()
+        self.parameters_view = ProbePropagationParametersView(
+            begin_coordinate_widget, end_coordinate_widget, num_steps_spin_box
+        )
         self.zy_view = VisualizationWidget('ZY Plane')
         self.propagate_button = QPushButton('Propagate')
         self.save_button = QPushButton('Save')
@@ -197,6 +256,24 @@ class FluorescenceParametersView(QGroupBox):
         self.setLayout(layout)
 
 
+class FluorescenceStatusView(QGroupBox):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__('Status', parent)
+        self.text_edit = QPlainTextEdit()
+        self.text_edit.setReadOnly(True)
+        self.progress_bar = QProgressBar()
+        self.stop_button = QPushButton('Stop')
+
+        progress_layout = QHBoxLayout()
+        progress_layout.addWidget(self.progress_bar)
+        progress_layout.addWidget(self.stop_button)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.text_edit)
+        layout.addLayout(progress_layout)
+        self.setLayout(layout)
+
+
 class FluorescenceDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -205,13 +282,14 @@ class FluorescenceDialog(QDialog):
         self.fluorescence_parameters_view = FluorescenceParametersView()
         self.fluorescence_channel_list_view = QListView()
         self.visualization_parameters_view = VisualizationParametersView()
+        self.fluorescence_status_view = FluorescenceStatusView()
         self.status_bar = QStatusBar()
 
         parameter_layout = QVBoxLayout()
         parameter_layout.addWidget(self.fluorescence_parameters_view)
         parameter_layout.addWidget(self.fluorescence_channel_list_view, 1)
         parameter_layout.addWidget(self.visualization_parameters_view)
-        parameter_layout.addStretch()
+        parameter_layout.addWidget(self.fluorescence_status_view, 1)
 
         contents_layout = QHBoxLayout()
         contents_layout.addWidget(self.measured_widget, 1)

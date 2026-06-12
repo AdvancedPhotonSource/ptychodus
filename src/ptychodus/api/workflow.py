@@ -4,6 +4,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping
 from pathlib import Path
+from enum import Enum, auto
 from typing import Any
 
 from ptychodus.api.diffraction import CropCenter
@@ -11,6 +12,11 @@ from ptychodus.api.geometry import AffineTransform, ImageExtent
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import AssembledDiffractionData, ReconstructInput
 from ptychodus.api.settings import PathPrefixChange
+
+
+class RemoteComputeProvider(Enum):
+    GLOBUS = auto()
+    GENESIS = auto()
 
 
 class WorkflowDiffractionAPI(ABC):
@@ -112,7 +118,12 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def reconstruct_remote(self, *, algorithm: str | None = None) -> None:
+    def reconstruct_remote(
+        self,
+        *,
+        algorithm: str | None = None,
+        provider: RemoteComputeProvider = RemoteComputeProvider.GLOBUS,
+    ) -> None:
         """Submit reconstruction to a remote compute resource."""
         pass
 
@@ -132,7 +143,12 @@ class WorkflowProductAPI(ABC):
         pass
 
     @abstractmethod
-    def train_reconstructor_remote(self, *, algorithm: str | None = None) -> None:
+    def train_reconstructor_remote(
+        self,
+        *,
+        algorithm: str | None = None,
+        provider: RemoteComputeProvider = RemoteComputeProvider.GLOBUS,
+    ) -> None:
         """Submit reconstructor training to a remote compute resource."""
         pass
 
@@ -146,9 +162,31 @@ class WorkflowProductAPI(ABC):
         """Save the product to file, uses format from settings when file_type is None."""
         pass
 
+    @abstractmethod
+    def enhance_fluorescence_local(
+        self,
+        input_path: Path,
+        output_path: Path,
+        *,
+        input_file_type: str | None = None,
+        output_file_type: str | None = None,
+        algorithm: str | None = None,
+        block: bool = False,
+    ) -> None:
+        """Run fluorescence enhancement locally and write the result to output_path.
+
+        Blocks until completion when block is True, otherwise returns immediately.
+        """
+        pass
+
 
 class WorkflowAPI(ABC):
     """Top-level API for loading data, managing products, and running reconstructions."""
+
+    @abstractmethod
+    def load_bad_pixels(self, file_path: Path, *, file_type: str | None = None) -> None:
+        """Load a bad-pixel mask from file, uses format from settings when file_type is None."""
+        pass
 
     @abstractmethod
     def load_diffraction_data(

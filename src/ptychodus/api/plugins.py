@@ -1,4 +1,11 @@
-"""Plugin registry and chooser for managing ptychodus extensions."""
+"""Plugin registry and chooser for managing ptychodus extensions.
+
+Plugins are discovered at runtime by :meth:`PluginRegistry.load_plugins`, which
+walks ``ptychodus.plugins.*`` and calls each module's ``register_plugins(registry)``
+function. Modules whose imports fail (typically optional-dependency plugins) are
+logged and skipped so that missing dependencies silently disable plugins rather
+than crashing the application.
+"""
 
 from __future__ import annotations
 from collections.abc import Iterable, Iterator
@@ -96,9 +103,11 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
         self._parameter: StringParameter | None = None
 
     def stringify_plugin_names(self) -> str:
+        """Return a sorted, comma-separated list of registered plugin simple names."""
         return ', '.join(sorted(plugin.simple_name for plugin in self._registered_plugins))
 
     def register_plugin(self, strategy: T, *, display_name: str, simple_name: str = '') -> None:
+        """Register *strategy* under *display_name*; *simple_name* defaults to a stripped form."""
         if not simple_name:
             simple_name = re.sub(r'\W+', '', display_name)
 
@@ -108,9 +117,11 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
         self.notify_observers()
 
     def get_current_plugin(self) -> Plugin[T]:
+        """Return the currently selected plugin."""
         return self._registered_plugins[self._current_index]
 
     def set_current_plugin(self, name: str) -> None:
+        """Select the plugin matching *name* (case-insensitive simple or display name); warn if none match."""
         namecf = name.casefold()
 
         for index, plugin in enumerate(self._registered_plugins):
@@ -129,6 +140,7 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
         logger.warning(f'Invalid plugin name "{name}". Registered plugins: {registered_plugins}.')
 
     def synchronize_with_parameter(self, parameter: StringParameter) -> None:
+        """Bind selection to *parameter*: the chooser tracks the parameter's value and vice versa."""
         self._parameter = parameter
         self.set_current_plugin(parameter.get_value())
         self._parameter.add_observer(self)
@@ -170,6 +182,7 @@ class PluginRegistry:
     def register_product_file_reader_with_adapters(
         self, strategy: ProductFileReader, *, display_name: str, simple_name: str = ''
     ) -> None:
+        """Register *strategy* as a product reader, and as probe-position, probe, and object readers via adapters."""
         self.probe_position_file_readers.register_plugin(
             ProductProbePositionFileReader(strategy),
             display_name=display_name,
@@ -187,6 +200,7 @@ class PluginRegistry:
 
     @classmethod
     def load_plugins(cls) -> PluginRegistry:
+        """Return a registry populated by importing every ``ptychodus.plugins.*`` module and calling its ``register_plugins`` hook."""
         registry = cls()
 
         import ptychodus.plugins

@@ -14,20 +14,21 @@ from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import AssembledDiffractionData
 
 from ..task_manager import BackgroundTask, ForegroundTask, ForegroundTaskManager
+from ..task_monitor import TaskProgressMonitor
 from .processor import DiffractionPatternProcessor
 
-logger = logging.getLogger('.'.join(__name__.split('.')[:-1]))
+logger = logging.getLogger(__name__)
 
 
 class ArrayAssembler(ABC):
     @abstractmethod
-    def _create_array_loader(
+    def create_array_loader(
         self, array: DiffractionArray, *, process_patterns: bool
     ) -> BackgroundTask:
         pass
 
     @abstractmethod
-    def _assemble_array(
+    def assemble_array(
         self,
         array_index: int,
         label: str,
@@ -75,7 +76,7 @@ class LoadArray:
                 pixel_geometry=self._pixel_geometry,
                 bad_pixels=self._bad_pixels,
             )
-            self._assembler._assemble_array(
+            self._assembler.assemble_array(
                 self._array_index,
                 label,
                 data,
@@ -90,11 +91,13 @@ class LoadAllArrays:
         array_seq: Sequence[DiffractionArray],
         assembler: ArrayAssembler,
         foreground_task_manager: ForegroundTaskManager,
+        task_monitor: TaskProgressMonitor,
     ) -> None:
         super().__init__()
         self._array_seq = array_seq
         self._assembler = assembler
         self._foreground_task_manager = foreground_task_manager
+        self._task_monitor = task_monitor
         self._process_patterns = False
         self._finished_event = threading.Event()
 
@@ -105,25 +108,45 @@ class LoadAllArrays:
         return self._finished_event
 
     def __call__(self) -> None:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future_list = [
-                executor.submit(
-                    lambda loader_task: loader_task(),
-                    self._assembler._create_array_loader(
-                        array,
-                        process_patterns=self._process_patterns,
-                    ),
-                )
-                for array in self._array_seq
-            ]
+        try:
+            with self._task_monitor as monitor:
+                total = len(self._array_seq)
+                monitor.update_progress(0, total)
 
-            for future in concurrent.futures.as_completed(future_list):
-                try:
-                    task = future.result()
-                except Exception as ex:
-                    logger.warning(ex)
-                else:
-                    if task is not None:
-                        self._foreground_task_manager.put_foreground_task(task)
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future_list = [
+                        executor.submit(
+                            self._assembler.create_array_loader(
+                                array,
+                                process_patterns=self._process_patterns,
+                            )
+                        )
+                        for array in self._array_seq
+                    ]
 
-        self._finished_event.set()
+                    completed = 0
+                    cancelled = False
+
+                    for future in concurrent.futures.as_completed(future_list):
+                        try:
+                            task = future.result()
+                        except concurrent.futures.CancelledError:
+                            pass
+                        except Exception as ex:
+                            logger.warning(ex)
+                        else:
+                            if task is not None:
+                                self._foreground_task_manager.put_foreground_task(task)
+
+                        completed += 1
+                        monitor.update_progress(completed, total)
+
+                        if not cancelled and monitor.is_stopping:
+                            num_cancelled = sum(1 for f in future_list if f.cancel())
+                            logger.info(
+                                f'Diffraction load stop requested; cancelled '
+                                f'{num_cancelled} pending arrays. In-flight reads will finish.'
+                            )
+                            cancelled = True
+        finally:
+            self._finished_event.set()

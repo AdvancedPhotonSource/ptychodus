@@ -12,8 +12,15 @@ class GenesisSettings(Observable, Observer):
         self._group = registry.create_group('Genesis')
         self._group.add_observer(self)
 
-        self.api_base_url = self._group.create_string_parameter(
-            'APIBaseURL', 'https://api.iri.nersc.gov/api/v1/'
+        self.facility = self._group.create_string_parameter('Facility', 'ALCF')
+        self.compute_resource_id = self._group.create_string_parameter(
+            'ComputeResourceID', '55c1c993-1124-47f9-b823-514ba3849a9a'
+        )
+        self.account = self._group.create_string_parameter('Account', 'APSDataProcessing')
+        self.queue_name = self._group.create_string_parameter('Queue', 'debug')
+        self.duration_s = self._group.create_integer_parameter('DurationInSeconds', 300, minimum=1)
+        self.globus_transfer_provider = self._group.create_string_parameter(
+            'GlobusTransferProvider', 'AmSC'
         )
 
         self.local_collection_id = self._group.create_uuid_parameter(
@@ -36,9 +43,8 @@ class GenesisSettings(Observable, Observer):
             'RemoteCollectionPosixPath', Path('/path/to/remote/data')
         )
 
-        self.status_auto_refresh = self._group.create_boolean_parameter('StatusAutoRefresh', False)
         self.status_refresh_interval_s = self._group.create_integer_parameter(
-            'StatusRefreshIntervalInSeconds', 30, minimum=10, maximum=86400
+            'StatusRefreshIntervalInSeconds', 15, minimum=10, maximum=86400
         )
 
     def _update(self, observable: Observable) -> None:

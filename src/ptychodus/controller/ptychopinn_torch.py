@@ -8,7 +8,9 @@ from .processing import ReconstructorViewControllerFactory
 
 class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
     def __init__(
-        self, model: PtychoPINNTorchReconstructorLibrary, file_dialog_factory: FileDialogFactory
+        self,
+        model: PtychoPINNTorchReconstructorLibrary,
+        file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._model = model
@@ -25,6 +27,7 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
         # Data
         data_group = 'Data'
         data_settings = self._model.data_settings
+        builder.add_integer_line_edit(data_settings.model_size, 'Model Size:', group=data_group)
         builder.add_integer_line_edit(data_settings.num_channels, 'Channels:', group=data_group)
         builder.add_combo_box(
             data_settings.data_normalization_mode,
@@ -70,7 +73,6 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
         )
 
         # Data Advanced
-        builder.add_decimal_line_edit(data_settings.num_photons, 'Photons:', group=data_group)
         builder.add_integer_line_edit(
             data_settings.coordinate_subsampling_factor,
             'Coordinate Subsampling Factor:',
@@ -231,21 +233,20 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
             tool_tip='Offset parameter for nearest neighbor patches.',
             group=model_group,
         )
-        builder.add_check_box(
-            model_settings.pad_object,
-            'Pad Object',
-            tool_tip='Pad object during forward model.',
-            group=model_group,
-        )
-        builder.add_decimal_line_edit(
-            model_settings.probe_gaussian_smoothing_sigma,
-            'Probe Gaussian Smoothing Sigma:',
-            tool_tip='Gaussian smoothing sigma for probe.',
-            group=model_group,
-        )
         builder.add_decimal_line_edit(
             model_settings.probe_reference_loss_coeff,
             'Probe Reference Loss Coefficient:',
+            group=model_group,
+        )
+        builder.add_check_box(
+            model_settings.amplitude_variance_loss,
+            'Amplitude Variance Loss',
+            tool_tip='Penalize spatial variance of complex modulus to encourage uniform amplitude.',
+            group=model_group,
+        )
+        builder.add_decimal_line_edit(
+            model_settings.amplitude_variance_coeff,
+            'Amplitude Variance Coefficient:',
             group=model_group,
         )
 
@@ -299,12 +300,6 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
             training_settings.learning_rate, 'Learning Rate:', group=training_group
         )
         builder.add_integer_line_edit(
-            training_settings.num_devices,
-            'Devices:',
-            tool_tip='devices to train on',
-            group=training_group,
-        )  # TODO improve
-        builder.add_integer_line_edit(
             training_settings.num_dataloader_workers,
             'Dataloader Workers:',
             group=training_group,
@@ -325,9 +320,6 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
         )
         builder.add_decimal_line_edit(
             training_settings.gradient_clip_val, 'Gradient Clip Value:', group=training_group
-        )
-        builder.add_line_edit(
-            training_settings.experiment_name, 'MLflow Experiment Name:', group=training_group
         )
 
         # Training Advanced
@@ -358,18 +350,6 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
             training_settings.minimum_learning_rate_ratio,
             'Min Learning Rate Ratio:',
             tool_tip='Minimum learning rate ratio for WarmupCoside scheduler',
-            group=training_group,
-        )
-        builder.add_combo_box(
-            training_settings.physics_weight_schedule,
-            enumerators.get_physics_weight_schedules(),
-            'Physics Weight Schedule:',
-            group=training_group,
-        )
-        builder.add_combo_box(
-            training_settings.torch_loss_mode,
-            enumerators.get_torch_loss_modes(),
-            'Torch Loss Mode:',
             group=training_group,
         )
         builder.add_line_edit(training_settings.notes, 'MLflow Notes:', group=training_group)
@@ -452,10 +432,4 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
             'Fine Tune Validation Split:',
             group=training_group,
         )
-        builder.add_integer_line_edit(
-            training_settings.num_grouped_samples,
-            'Grouped Samples:',
-            group=training_group,
-        )
-
         return builder.build_widget()

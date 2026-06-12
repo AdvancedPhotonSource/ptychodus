@@ -19,6 +19,7 @@ from .probe import ProbeController
 from .probe_positions import ProbePositionsController
 from .processing import ProcessingController
 from .product import ProductController
+from .product.visualization import ProductVisualizationController
 from .ptychi import PtyChiViewControllerFactory
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopinn import PtychoPINNViewControllerFactory
@@ -51,7 +52,8 @@ class ControllerCore:
             model.ptychopinn_reconstructor_library, self._file_dialog_factory
         )
         self._ptychopinn_torch_view_controller_factory = PtychoPINNTorchViewControllerFactory(
-            model.ptychopinn_torch_reconstructor_library, self._file_dialog_factory
+            model.ptychopinn_torch_reconstructor_library,
+            self._file_dialog_factory,
         )
         self._settings_controller = SettingsController(
             model.settings_registry,
@@ -62,7 +64,7 @@ class ControllerCore:
         )
         self._patterns_image_controller = ImageController(
             model.pattern_visualization_engine,
-            view.patterns_image_view,
+            view.patterns_image_view.image_view,
             self._status_bar,
             self._file_dialog_factory,
         )
@@ -73,10 +75,13 @@ class ControllerCore:
             model.diffraction_core.detector,
             model.diffraction_core.diffraction_api,
             model.diffraction_core.dataset,
+            model.diffraction_core.task_monitor,
             model.metadata_presenter,
             model.product_core.product_repository,
             model.analysis_core.diffraction_simulator,
+            model.analysis_core.diffraction_simulator_settings,
             view.patterns_view,
+            view.patterns_image_view.status_view,
             self._patterns_image_controller,
             self._file_dialog_factory,
         )
@@ -85,6 +90,15 @@ class ControllerCore:
             model.product_core.product_repository,
             model.product_core.product_api,
             view.product_view,
+            self._file_dialog_factory,
+        )
+        self._product_visualization_controller = ProductVisualizationController(
+            model.analysis_core.residual_analyzer,
+            model.analysis_core.residual_real_space_visualization_engine,
+            model.analysis_core.residual_reciprocal_space_visualization_engine,
+            self._product_controller,
+            view.product_visualization_view,
+            self._status_bar,
             self._file_dialog_factory,
         )
         self._probe_positions_controller = ProbePositionsController(
@@ -106,10 +120,15 @@ class ControllerCore:
             model.product_core.probe_api,
             self._probe_image_controller,
             model.analysis_core.probe_propagator,
+            model.analysis_core.probe_propagator_settings,
             model.analysis_core.probe_propagator_visualization_engine,
-            model.analysis_core.exposure_analyzer,
-            model.analysis_core.exposure_visualization_engine,
-            model.fluorescence_core.enhancer,
+            model.analysis_core.illumination_mapper,
+            model.analysis_core.illumination_visualization_engine,
+            model.fluorescence_core.fluorescence_api,
+            model.fluorescence_core.enhancer_chooser,
+            model.fluorescence_core.two_step_enhancer,
+            model.fluorescence_core.vspi_enhancer,
+            model.fluorescence_core.task_monitor,
             model.fluorescence_core.visualization_engine,
             view.probe_view,
             self._file_dialog_factory,
@@ -129,7 +148,8 @@ class ControllerCore:
             model.analysis_core.fourier_real_space_visualization_engine,
             model.analysis_core.fourier_reciprocal_space_visualization_engine,
             model.analysis_core.xmcd_analyzer,
-            model.analysis_core.xmcd_visualization_engine,
+            model.analysis_core.xmcd_structural_visualization_engine,
+            model.analysis_core.xmcd_magnetic_visualization_engine,
             view.object_view,
             self._file_dialog_factory,
         )
@@ -138,6 +158,7 @@ class ControllerCore:
             model.processing_core.processing_api,
             model.product_core.product_repository,
             model.globus_core,
+            model.genesis_core,
             view.processing_view,
             view.processing_status_view,
             self._file_dialog_factory,
@@ -157,7 +178,12 @@ class ControllerCore:
             self._file_dialog_factory,
         )
         self._genesis_controller = GenesisController(
-            model.genesis_core.settings, view.genesis_view, self._file_dialog_factory
+            model.genesis_core.settings,
+            model.genesis_core.presenter,
+            model.genesis_core.status_repository,
+            view.genesis_view,
+            view.genesis_status_view,
+            self._file_dialog_factory,
         )
         self._automation_controller = AutomationController(
             model.automation_core.settings,
@@ -178,15 +204,17 @@ class ControllerCore:
         self._run_tasks_timer.timeout.connect(self._run_tasks)
         self._run_tasks_timer.start(1000)
 
-        view.globus_action.setVisible(model.globus_core.is_supported)
+        self._action_permitted: dict[QAction, bool] = {
+            view.globus_action: model.globus_core.is_supported,
+            view.genesis_action: model.genesis_core.is_supported,
+        }
 
         self._swap_central_widgets(view.patterns_action)
         view.patterns_action.setChecked(True)
-        view.navigation_action_group.triggered.connect(
+        view.navigation.action_group.triggered.connect(
             lambda action: self._swap_central_widgets(action)
         )
 
-        view.genesis_action.setVisible(is_developer_mode_enabled)
         view.agent_action.setVisible(is_developer_mode_enabled)
         view.probe_positions_view.button_box.analyze_button.setEnabled(is_developer_mode_enabled)
 
@@ -198,9 +226,17 @@ class ControllerCore:
         if action is None:
             raise ValueError('QAction is None!')
 
-        index = action.data()
-        self.view.left_panel.setCurrentIndex(index)
-        self.view.right_panel.setCurrentIndex(index)
+        self.view.navigation.set_current_index(action.data())
+        self._update_subview_visibility(action)
+
+    def _update_subview_visibility(self, action: QAction) -> None:
+        for group in self.view.navigation.subview_groups:
+            expanded = action is group.parent_action or action in group.child_actions
+            for child in group.child_actions:
+                allowed = self._action_permitted.get(child, True)
+                child.setVisible(expanded and allowed)
+            group.top_separator.setVisible(expanded)
+            group.bottom_separator.setVisible(expanded)
 
     def _run_tasks(self) -> None:
         self.model.run_tasks()

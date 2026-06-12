@@ -8,10 +8,254 @@ from pathlib import Path
 from typing import overload
 
 import numpy
+import scipy.ndimage
 
-from .common import ComplexArrayType, RealArrayType
+from .common import ComplexArrayType, RealArrayType, estimate_noise_floor
 from .geometry import PixelGeometry
 from .propagator import intensity
+
+
+@dataclass(frozen=True)
+class ProbeSizeMetrics:
+    major_axis_tilt_rad: float
+    minor_axis_tilt_rad: float
+
+    fwhm_major_axis_length_m: float
+    fwhm_minor_axis_length_m: float
+
+    rms_major_axis_length_m: float
+    rms_minor_axis_length_m: float
+
+    encircled_energy_diameter_m: float
+
+
+def _projected_fwhm(
+    coordinate: RealArrayType,
+    intensity: RealArrayType,
+    num_bins: int,
+) -> float:
+    """FWHM of a 2D intensity distribution projected onto an arbitrary axis."""
+    coord_flat = coordinate.ravel()
+    intensity_flat = intensity.ravel()
+    cmin = coord_flat.min().item()
+    cmax = coord_flat.max().item()
+
+    if cmax <= cmin:
+        return 0.0
+
+    hist, edges = numpy.histogram(
+        coord_flat, bins=num_bins, range=(cmin, cmax), weights=intensity_flat
+    )
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    peak = hist.max().item()
+
+    if peak <= 0.0:
+        return 0.0
+
+    half_max = 0.5 * peak
+    above = hist >= half_max
+    # Use the outermost crossings so isolated noise spikes inside the profile
+    # don't fragment the half-max interval.
+    left_idx = numpy.argmax(above).item()
+    right_idx = len(above) - 1 - numpy.argmax(above[::-1]).item()
+
+    if left_idx == 0:
+        left_x = float(centers[0])
+    else:
+        y0 = float(hist[left_idx - 1])
+        y1 = float(hist[left_idx])
+        x0 = float(centers[left_idx - 1])
+        x1 = float(centers[left_idx])
+        left_x = x0 + (half_max - y0) * (x1 - x0) / (y1 - y0) if y1 > y0 else x0
+
+    if right_idx >= len(centers) - 1:
+        right_x = float(centers[-1])
+    else:
+        y0 = float(hist[right_idx])
+        y1 = float(hist[right_idx + 1])
+        x0 = float(centers[right_idx])
+        x1 = float(centers[right_idx + 1])
+        right_x = x0 + (half_max - y0) * (x1 - x0) / (y1 - y0) if y0 > y1 else x1
+
+    return right_x - left_x
+
+
+def estimate_probe_size(
+    probe_intensity: RealArrayType,
+    pixel_geometry: PixelGeometry,
+    *,
+    energy_fraction: float = 0.8,
+    mad_threshold: float = 4.5,
+) -> ProbeSizeMetrics:
+    """Estimate transverse probe-size metrics from a 2D intensity distribution.
+
+    The pipeline is:
+
+    1. **Pre-filter and noise floor.** The input is passed through a 3x3
+       median filter to suppress hot pixels and other isolated outliers
+       (matching :func:`ptychodus.api.diffraction.estimate_crop_center`).
+       Background and noise scale are then estimated via
+       :func:`ptychodus.api.common.estimate_noise_floor`, which uses Otsu's
+       method on the filtered image to identify the background class when
+       the histogram is bimodal and falls back to median / median-absolute-
+       deviation over the outermost ring of pixels when it is not. The
+       filtered image is then shifted down by ``background + mad_threshold
+       * MAD`` and clipped to non-negative values. Larger ``mad_threshold``
+       is more aggressive at suppressing noise tails but increasingly
+       truncates real signal in the wings.
+    2. **Principal axes.** The centroid and intensity-weighted 2x2 covariance
+       are computed on the cleaned image (in physical metres). Its eigenvectors
+       define the major/minor axes; the tilt of each is reported in radians,
+       folded into ``[-pi/2, pi/2)`` since the axis direction is sign-ambiguous.
+    3. **RMS widths.** Twice the square root of each covariance eigenvalue —
+       i.e. the full ``2 sigma`` width of the intensity distribution along
+       each principal axis. The factor of two makes these comparable to the
+       FWHM and encircled-energy *diameters* rather than radii.
+    4. **FWHM widths.** The cleaned intensity is projected onto each principal
+       axis (weighted 1D histogram) and the full width at half maximum is read
+       off by linearly interpolating the outermost half-max crossings, which
+       makes the result insensitive to isolated bins above half-max inside the
+       profile.
+    5. **Encircled-energy diameter.** Pixels are sorted by radial distance from
+       the centroid; the cumulative cleaned power is taken; and the diameter
+       reported is twice the radius at which the cumulative power reaches
+       ``energy_fraction`` of the total (with linear interpolation between
+       adjacent sorted pixels).
+
+    The major and minor axis tilts in :class:`ProbeSizeMetrics` are *shared*
+    between the FWHM and RMS measurements: both are reported along the
+    eigenvectors of the second-moment covariance. This assumes the intensity
+    distribution is approximately elliptically symmetric (the typical case for
+    Gaussian-like probes), so the half-max contour and the variance ellipse
+    line up. For distributions where they don't — bimodal lobes, vortex /
+    donut probes, or strongly non-elliptical apertures — the reported FWHM
+    values are still the projections onto the variance principal axes, which
+    may not coincide with the directions of largest / smallest half-max
+    extent.
+
+    Args:
+        probe_intensity: 2D array of intensity values (any non-negative units).
+        pixel_geometry: Physical pixel size used to convert pixel indices into
+            metres.
+        energy_fraction: Fraction of cleaned total power that defines the
+            encircled-energy diameter; must be in ``(0, 1]``.
+        mad_threshold: Soft-threshold level, in units of border-MAD, applied
+            above the estimated background. ``0.0`` disables thresholding
+            (background is still subtracted).
+
+    Raises:
+        ValueError: If ``probe_intensity`` is not 2D, ``energy_fraction`` is
+            outside ``(0, 1]``, or ``mad_threshold`` is negative.
+
+    Returns:
+        A :class:`ProbeSizeMetrics` populated with the shared axis tilts and
+        the FWHM, RMS, and encircled-energy widths. If thresholding wipes out
+        all signal (cleaned total power is zero), every field is returned as
+        ``0.0``.
+    """
+
+    if probe_intensity.ndim != 2:
+        raise ValueError(f'probe_intensity must be 2-dimensional, got {probe_intensity.ndim}D')
+
+    if not (0.0 < energy_fraction <= 1.0):
+        raise ValueError(f'energy_fraction must be in (0, 1], got {energy_fraction}')
+
+    if mad_threshold < 0.0:
+        raise ValueError(f'mad_threshold must be non-negative, got {mad_threshold}')
+
+    height_px, width_px = probe_intensity.shape
+
+    filtered = scipy.ndimage.median_filter(probe_intensity.astype(numpy.float64), size=3)
+
+    border = numpy.concatenate(
+        [
+            filtered[0, :].ravel(),
+            filtered[-1, :].ravel(),
+            filtered[1:-1, 0].ravel(),
+            filtered[1:-1, -1].ravel(),
+        ]
+    )
+    noise_floor = estimate_noise_floor(filtered, fallback_values=border)
+    threshold = noise_floor.get_significance_threshold(mad_threshold)
+
+    cleaned = numpy.clip(filtered - threshold, 0.0, None)
+    total_power = float(cleaned.sum())
+
+    if total_power <= 0.0:
+        return ProbeSizeMetrics(
+            major_axis_tilt_rad=0.0,
+            minor_axis_tilt_rad=0.0,
+            fwhm_major_axis_length_m=0.0,
+            fwhm_minor_axis_length_m=0.0,
+            rms_major_axis_length_m=0.0,
+            rms_minor_axis_length_m=0.0,
+            encircled_energy_diameter_m=0.0,
+        )
+
+    y_idx, x_idx = numpy.mgrid[:height_px, :width_px]  # noqa: N806
+    x_m = (x_idx - (width_px - 1) / 2.0) * pixel_geometry.width_m
+    y_m = (y_idx - (height_px - 1) / 2.0) * pixel_geometry.height_m
+
+    centroid_x = float((cleaned * x_m).sum() / total_power)
+    centroid_y = float((cleaned * y_m).sum() / total_power)
+
+    dx = x_m - centroid_x
+    dy = y_m - centroid_y
+
+    mxx = float((cleaned * dx * dx).sum() / total_power)
+    myy = float((cleaned * dy * dy).sum() / total_power)
+    mxy = float((cleaned * dx * dy).sum() / total_power)
+    covariance = numpy.array([[mxx, mxy], [mxy, myy]])
+
+    eigenvalues, eigenvectors = numpy.linalg.eigh(covariance)
+    rms_minor_m = 2.0 * float(numpy.sqrt(max(float(eigenvalues[0]), 0.0)))
+    rms_major_m = 2.0 * float(numpy.sqrt(max(float(eigenvalues[1]), 0.0)))
+    minor_axis = eigenvectors[:, 0]
+    major_axis = eigenvectors[:, 1]
+
+    def _axis_tilt(axis: RealArrayType) -> float:
+        # axis direction is sign-ambiguous; fold the angle into [-pi/2, pi/2)
+        angle = float(numpy.arctan2(axis[1], axis[0]))
+        return (angle + numpy.pi / 2.0) % numpy.pi - numpy.pi / 2.0
+
+    major_tilt = _axis_tilt(major_axis)
+    minor_tilt = _axis_tilt(minor_axis)
+
+    num_bins = max(height_px, width_px)
+    projection_major = dx * major_axis[0] + dy * major_axis[1]
+    projection_minor = dx * minor_axis[0] + dy * minor_axis[1]
+    fwhm_major = _projected_fwhm(projection_major, cleaned, num_bins)
+    fwhm_minor = _projected_fwhm(projection_minor, cleaned, num_bins)
+
+    radial = numpy.hypot(dx, dy).ravel()
+    intensity_flat = cleaned.ravel()
+    order = numpy.argsort(radial)
+    sorted_radii = radial[order]
+    sorted_power = intensity_flat[order]
+    cumulative = numpy.cumsum(sorted_power)
+    target = energy_fraction * float(cumulative[-1])
+    idx = numpy.searchsorted(cumulative, target).item()
+
+    if idx <= 0:
+        encircled_radius = float(sorted_radii[0])
+    elif idx >= len(sorted_radii):
+        encircled_radius = float(sorted_radii[-1])
+    else:
+        c0 = float(cumulative[idx - 1])
+        c1 = float(cumulative[idx])
+        r0 = float(sorted_radii[idx - 1])
+        r1 = float(sorted_radii[idx])
+        encircled_radius = r0 + (target - c0) * (r1 - r0) / (c1 - c0) if c1 > c0 else r1
+
+    return ProbeSizeMetrics(
+        major_axis_tilt_rad=major_tilt,
+        minor_axis_tilt_rad=minor_tilt,
+        fwhm_major_axis_length_m=fwhm_major,
+        fwhm_minor_axis_length_m=fwhm_minor,
+        rms_major_axis_length_m=rms_major_m,
+        rms_minor_axis_length_m=rms_minor_m,
+        encircled_energy_diameter_m=2.0 * encircled_radius,
+    )
 
 
 @dataclass(frozen=True)
@@ -23,7 +267,7 @@ class ProbeTransverseCoordinates:
 
     @property
     def position_r_m(self) -> RealArrayType:
-        return numpy.hypot(self.position_x_m, self.position_y_m)
+        return numpy.hypot(self.position_y_m, self.position_x_m)
 
     @property
     def angle_rad(self) -> RealArrayType:
@@ -240,6 +484,9 @@ class ProbeSequence(Sequence[Probe]):
         if self._opr_weights is None:
             raise ValueError('Missing opr_weights!')
 
+        return self._opr_weights
+
+    def get_opr_weights_or_none(self) -> RealArrayType | None:
         return self._opr_weights
 
     def get_pixel_geometry(self) -> PixelGeometry:

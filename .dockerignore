@@ -1,0 +1,13 @@
+.git
+.github
+dist/
+build/
+docs/build/
+memoized_data/
+*.h5
+*.npy
+*.ini
+NOTES
+TODO
+__pycache__/
+*.pyc

@@ -14,6 +14,7 @@ dependencies = [
     "h5py>=3",
     "hdf5plugin",
     "matplotlib",
+    "mlflow-skinny",
     "numpy",
     "psutil",
     "pydantic",
@@ -27,21 +28,32 @@ dependencies = [
 dynamic = ["version"]
 
 [project.scripts]
-convert-to-ptychodus = "ptychodus.convert_to_ptychodus:main"
+convert-to-ptychodus = "ptychodus.scripts.convert_to_ptychodus:main"
 ptychodus = "ptychodus.__main__:main"
-ptychodus-bdp = "ptychodus.ptychodus_bdp:main"
+ptychodus-bdp = "ptychodus.scripts.ptychodus_bdp:main"
 ptychodus-ptychopinn-tf-test = "ptychodus.scripts.ptychopinn_tf_test:main"
+ptychodus-iri-tokens = "ptychodus.scripts.genesis.ptychodus_iri_tokens:main"
+ptychodus-transfer-tokens = "ptychodus.scripts.genesis.ptychodus_transfer_tokens:main"
+ptychodus-system-check = "ptychodus.scripts.ptychodus_system_check:main"
 
 [project.optional-dependencies]
+docs = ["sphinx", "sphinx-copybutton", "sphinx-rtd-theme"]
 globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
 gui = ["PyQt5"]
 #ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
-ptychi = ["ptychi==1.*,>=1.2.0"]
-ptychopinn = ["ptychopinn[torch]"]
+ptychi = ["ptychi==1.4.*"]
+ptychopinn = ["ptychopinn"]
+ptychozoon = ["ptychozoon"]
 
 [tool.uv.sources]
+#ptychi = { path = "../pty-chi", editable = true }
 #ptychopinn = { path = "../PtychoPINN", editable = true }
-ptychopinn = { git = "https://github.com/hoidn/PtychoPINN", branch = "torchapi-devel" }
+ptychopinn = { git = "https://github.com/hoidn/PtychoPINN", branch = "main" }
+
+#[[tool.uv.index]]
+#name = "pytorch-cu132"
+#url = "https://download.pytorch.org/whl/nightly/cu132"
+#explicit = true
 
 [tool.setuptools.package-data]
 "ptychodus" = ["py.typed"]
@@ -54,10 +66,11 @@ where = ["src"]
 [[tool.mypy.overrides]]
 module = [
     "colorcet",
+    "globus_compute_sdk.*",
     "globus_sdk.*",
     "h5py",
     "hdf5plugin",
-    "lightning",
+    "lightning.*",
     "ptychi.*",
     "ptycho.*",
     "ptycho_torch.*",
@@ -66,6 +79,7 @@ module = [
     "pvapy.*",
     "scipy.*",
     "tifffile",
+    "torch",
 ]
 ignore_missing_imports = true
 

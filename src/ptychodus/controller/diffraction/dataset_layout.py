@@ -106,6 +106,8 @@ class DatasetLayoutViewController(DiffractionDatasetObserver):
         dialog = DatasetFileLayoutDialog(parent)
         dialog.setWindowTitle('Dataset File Layout')
         dialog.tree_view.setModel(tree_model)
+        header = dialog.tree_view.header()
+        header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
 
         controller._sync_model_to_view()
         dialog.open()

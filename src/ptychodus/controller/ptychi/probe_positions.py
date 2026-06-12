@@ -215,6 +215,8 @@ class PtyChiConstrainAffineTransformViewController(CheckableGroupBoxParameterVie
         position_weight_update_interval: IntegerParameter,
         apply_constraint: BooleanParameter,
         max_expected_error_px: RealParameter,
+        override_update_flexibility: BooleanParameter,
+        update_flexibility_value: RealParameter,
         num_epochs: IntegerParameter,
     ) -> None:
         super().__init__(
@@ -238,6 +240,15 @@ class PtyChiConstrainAffineTransformViewController(CheckableGroupBoxParameterVie
         self._max_expected_error_px_view_controller = DecimalLineEditParameterViewController(
             max_expected_error_px, tool_tip='Maximum expected error in pixels'
         )
+        self._override_update_flexibility_view_controller = CheckBoxParameterViewController(
+            override_update_flexibility,
+            'Override Update Flexibility:',
+            tool_tip='When checked, the affine transform update flexibility will be overridden',
+        )
+        self._update_flexibility_value_view_controller = DecimalLineEditParameterViewController(
+            update_flexibility_value,
+            tool_tip='Update flexibility value (0 = rigid, 1 = fully flexible)',
+        )
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
@@ -248,6 +259,10 @@ class PtyChiConstrainAffineTransformViewController(CheckableGroupBoxParameterVie
         layout.addRow(self._apply_constraint_view_controller.get_widget())
         layout.addRow(
             'Max Expected Error [px]:', self._max_expected_error_px_view_controller.get_widget()
+        )
+        layout.addRow(
+            self._override_update_flexibility_view_controller.get_widget(),
+            self._update_flexibility_value_view_controller.get_widget(),
         )
         self.get_widget().setLayout(layout)
 
@@ -320,6 +335,8 @@ class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewControlle
                 settings.constrain_affine_transform_position_weight_update_interval,
                 settings.constrain_affine_transform_apply_constraint,
                 settings.constrain_affine_transform_max_expected_error_px,
+                settings.override_affine_transform_update_flexibility,
+                settings.constrain_affine_transform_override_update_flexibility,
                 num_epochs,
             )
         )

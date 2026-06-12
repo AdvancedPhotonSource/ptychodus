@@ -6,8 +6,16 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ptychodus.api.observer import SequenceObserver
 
-from ...model.analysis import IlluminationMapper, ProbePropagator
-from ...model.fluorescence import FluorescenceEnhancer
+from ptychodus.api.fluorescence import FluorescenceEnhancer
+from ptychodus.api.plugins import PluginChooser
+
+from ...model.analysis import IlluminationMapper, ProbePropagatorSettings, ProbePropagator
+from ...model.fluorescence import (
+    FluorescenceAPI,
+    FluorescenceTaskMonitor,
+    TwoStepFluorescenceEnhancer,
+    VSPIFluorescenceEnhancer,
+)
 from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
 from ...model.visualization import VisualizationEngine
@@ -36,10 +44,15 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         api: ProbeAPI,
         image_controller: ImageController,
         propagator: ProbePropagator,
+        propagator_settings: ProbePropagatorSettings,
         propagator_visualization_engine: VisualizationEngine,
         illumination_mapper: IlluminationMapper,
         illumination_visualization_engine: VisualizationEngine,
-        fluorescence_enhancer: FluorescenceEnhancer,
+        fluorescence_api: FluorescenceAPI,
+        fluorescence_enhancer_chooser: PluginChooser[FluorescenceEnhancer],
+        fluorescence_two_step_enhancer: TwoStepFluorescenceEnhancer,
+        fluorescence_vspi_enhancer: VSPIFluorescenceEnhancer,
+        fluorescence_task_monitor: FluorescenceTaskMonitor,
         fluorescence_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
         file_dialog_factory: FileDialogFactory,
@@ -54,7 +67,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self._editor_factory = ProbeEditorViewControllerFactory()
 
         self._propagation_view_controller = ProbePropagationViewController(
-            propagator, propagator_visualization_engine, file_dialog_factory
+            propagator, propagator_settings, propagator_visualization_engine, file_dialog_factory
         )
         self._illumination_view_controller = IlluminationViewController(
             illumination_mapper,
@@ -62,7 +75,13 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             file_dialog_factory,
         )
         self._fluorescence_view_controller = FluorescenceViewController(
-            fluorescence_enhancer, fluorescence_visualization_engine, file_dialog_factory
+            fluorescence_api,
+            fluorescence_enhancer_chooser,
+            fluorescence_two_step_enhancer,
+            fluorescence_vspi_enhancer,
+            fluorescence_task_monitor,
+            fluorescence_visualization_engine,
+            file_dialog_factory,
         )
 
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
@@ -74,6 +93,8 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         view.tree_view.setModel(self._tree_model)
         view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        header = view.tree_view.header()
+        header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
         power_item_delegate = ProgressBarItemDelegate(view.tree_view)
         view.tree_view.setItemDelegateForColumn(1, power_item_delegate)
         view.tree_view.setItemDelegateForColumn(2, builder_item_delegate)
@@ -85,6 +106,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             selection_model.currentChanged.connect(self._update_view)
 
         self._update_view(QModelIndex(), QModelIndex())
+        self._ensure_selection()
 
         load_from_file_action = view.button_box.load_menu.addAction('Open File...')
         connect_triggered_signal(load_from_file_action, self._load_current_probe_from_file)
@@ -251,8 +273,31 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
                 )
                 self._image_controller.set_array(array, probe.get_pixel_geometry())
 
+    def _ensure_selection(self) -> None:
+        if self._view.tree_view.currentIndex().isValid():
+            return
+
+        if self._tree_model.rowCount(QModelIndex()) > 0:
+            self._view.tree_view.setCurrentIndex(self._tree_model.index(0, 0))
+
+    def _top_level_row(self, index: QModelIndex) -> int:
+        if not index.isValid():
+            return -1
+
+        node = index
+        parent = node.parent()
+
+        while parent.isValid():
+            node = parent
+            parent = node.parent()
+
+        return node.row()
+
     def handle_item_inserted(self, index: int, item: ProbeRepositoryItem) -> None:
         self._tree_model.insert_item(index, item)
+
+        if not self._view.tree_view.currentIndex().isValid():
+            self._view.tree_view.setCurrentIndex(self._tree_model.index(index, 0))
 
     def handle_item_changed(self, index: int, item: ProbeRepositoryItem) -> None:
         self._tree_model.update_item(index, item)
@@ -262,4 +307,12 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             self._update_view(current_index, current_index)
 
     def handle_item_removed(self, index: int, item: ProbeRepositoryItem) -> None:
+        was_current = self._top_level_row(self._view.tree_view.currentIndex()) == index
         self._tree_model.remove_item(index, item)
+
+        if was_current:
+            row_count = self._tree_model.rowCount(QModelIndex())
+
+            if row_count > 0:
+                target_row = min(index, row_count - 1)
+                self._view.tree_view.setCurrentIndex(self._tree_model.index(target_row, 0))

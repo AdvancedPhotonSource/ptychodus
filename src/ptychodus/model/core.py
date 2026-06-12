@@ -163,12 +163,13 @@ class ModelCore:
                 self.ptychi_reconstructor_library,
                 self.ptychonn_reconstructor_library,
                 self.ptychopinn_reconstructor_library,
-                # TODO self.ptychopinn_torch_reconstructor_library,
+                self.ptychopinn_torch_reconstructor_library,
             ],
         )
         self.fluorescence_core = FluorescenceCore(
+            self._task_manager,
             self.settings_registry,
-            self.product_core.product_repository,
+            self.product_core.product_api,
             self.plugin_registry.upscaling_strategies,
             self.plugin_registry.deconvolution_strategies,
             self.plugin_registry.fluorescence_file_readers,
@@ -179,7 +180,7 @@ class ModelCore:
             self.settings_registry,
             self.diffraction_core.dataset,
             self.product_core.product_repository,
-            self.product_core.object_repository,
+            self.product_core.probe_positions_repository,
         )
         self.globus_core = GlobusCore(
             self.settings_registry,
@@ -188,7 +189,11 @@ class ModelCore:
             self.processing_core.processing_api,
         )
         self.genesis_core = GenesisCore(
+            self._task_manager,
             self.settings_registry,
+            self.diffraction_core.diffraction_api,
+            self.product_core.product_api,
+            self.processing_core.processing_api,
         )
         self.workflow_api: WorkflowAPI = ConcreteWorkflowAPI(
             self.settings_registry,
@@ -198,7 +203,9 @@ class ModelCore:
             self.product_core.probe_api,
             self.product_core.object_api,
             self.processing_core.processing_api,
+            self.fluorescence_core.fluorescence_api,
             self.globus_core.executor,
+            self.genesis_core.executor,
         )
         self.automation_core = AutomationCore(
             self._task_manager,
@@ -213,6 +220,7 @@ class ModelCore:
 
     def __enter__(self) -> ModelCore:
         self._task_manager.start()
+        self.genesis_core.start()
         self.globus_core.start()
         self.automation_core.start()
         return self
@@ -236,6 +244,7 @@ class ModelCore:
     ) -> None:
         self.automation_core.stop()
         self.globus_core.stop()
+        self.genesis_core.stop()
         self._task_manager.stop(await_finish=False)
 
     def create_streaming_context(self, metadata: DiffractionMetadata) -> PtychodusStreamingContext:
@@ -247,31 +256,9 @@ class ModelCore:
     def run_tasks(self) -> None:
         self._task_manager.run_foreground_tasks()
         self.globus_core.run_foreground_tasks()
-
-    def _batch_mode_train(self, input_directory: Path, output_directory: Path) -> int:
-        product_in_path = input_directory / StandardFileLayout.PRODUCT_IN
-
-        if product_in_path.is_file():
-            product_out_path = output_directory / StandardFileLayout.PRODUCT_OUT
-
-            if product_out_path.is_file():
-                logger.warning('Output product file will be overwritten!')
-
-            input_product_api = self.workflow_api.load_product(product_in_path)
-            input_product_api.train_reconstructor_local(input_directory, output_directory)
-            return 0
-        else:
-            logger.error('Input product is not a file!')
-            return -1
+        self.genesis_core.run_foreground_tasks()
 
     def _batch_mode_reconstruct(self, input_directory: Path, output_directory: Path) -> int:
-        settings_path = input_directory / StandardFileLayout.SETTINGS
-
-        if settings_path.is_file():
-            self.settings_registry.open_settings(settings_path)
-        else:
-            logger.warning('Settings file not found! Proceeding with defaults.')
-
         diffraction_path = input_directory / StandardFileLayout.DIFFRACTION
 
         if diffraction_path.is_file():
@@ -279,6 +266,20 @@ class ModelCore:
         else:
             logger.error('Diffraction data is not a file!')
             return -1
+
+        processing_api = self.processing_core.processing_api
+
+        if processing_api.is_reconstructor_trainable():
+            ext = processing_api.get_model_file_extension()
+            model_path = input_directory / f'{StandardFileLayout.MODEL_BASENAME}{ext}'
+
+            if model_path.is_file():
+                processing_api.load_model_from_file(model_path)
+            else:
+                logger.info(
+                    f'No model file found at {model_path}; '
+                    'reconstructor will run without a preloaded model.'
+                )
 
         product_in_path = input_directory / StandardFileLayout.PRODUCT_IN
 
@@ -306,16 +307,28 @@ class ModelCore:
 
             logger.info('Enhancing fluorescence...')
 
-            # TODO add to workflow API
-            self.fluorescence_core.enhance_fluorescence(
-                output_product_api.get_product_index(),
+            output_product_api.enhance_fluorescence_local(
                 fluorescence_in_path,
                 fluorescence_out_path,
+                block=True,
             )
         else:
             logger.info('No fluorescence data to enhance.')
 
         return 0
+
+    def _batch_mode_train(self, input_directory: Path, output_directory: Path) -> int:
+        product_in_path = input_directory / StandardFileLayout.PRODUCT_IN
+
+        if product_in_path.is_file():
+            input_product_api = self.workflow_api.load_product(product_in_path)
+            input_product_api.train_reconstructor_local(
+                input_directory, output_directory, block=True
+            )
+            return 0
+        else:
+            logger.error('Input product is not a file!')
+            return -1
 
     def batch_mode_execute(self, action: str, input_directory: Path, output_directory: Path) -> int:
         if not input_directory.is_dir():
@@ -323,13 +336,18 @@ class ModelCore:
 
         output_directory.mkdir(parents=True, exist_ok=True)
 
+        settings_path = input_directory / StandardFileLayout.SETTINGS
+
+        if settings_path.is_file():
+            self.settings_registry.open_settings(settings_path)
+        else:
+            logger.warning('Settings file not found! Proceeding with defaults.')
+
         match action.lower():
             case 'reconstruct':
                 return self._batch_mode_reconstruct(input_directory, output_directory)
             case 'train':
                 return self._batch_mode_train(input_directory, output_directory)
-            case 'infer':
-                return self._batch_mode_reconstruct(input_directory, output_directory)
 
         logger.error(f'Unknown batch mode action "{action}"!')
         return -1

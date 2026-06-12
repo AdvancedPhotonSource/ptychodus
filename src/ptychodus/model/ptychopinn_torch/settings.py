@@ -8,8 +8,7 @@ class PtychoPINNTorchDataSettings(Observable, Observer):
         self._group = registry.create_group('PtychoPINNTorchData')
         self._group.add_observer(self)
 
-        # FIXME see ptychopinn settings and reconstructor for handling of diffraction_pattern_size_px, batch_size, nphotons, etc.
-
+        self.model_size = self._group.create_integer_parameter('model_size', 128, minimum=1)
         self.num_channels = self._group.create_integer_parameter('num_channels', 4, minimum=1)
         self.data_normalization_mode = self._group.create_string_parameter(
             'data_normalization_mode', 'Batch'
@@ -46,7 +45,6 @@ class PtychoPINNTorchDataSettings(Observable, Observer):
         )
 
         # Advanced
-        self.num_photons = self._group.create_real_parameter('num_photons', 1e5, minimum=0.0)
         self.coordinate_subsampling_factor = self._group.create_integer_parameter(
             'coordinate_subsampling_factor', 7, minimum=1
         )
@@ -125,12 +123,14 @@ class PtychoPINNTorchModelSettings(Observable, Observer):
         )
         self.eca_encoder = self._group.create_boolean_parameter('eca_encoder', False)
         self.offset = self._group.create_integer_parameter('offset', 6, minimum=0)
-        self.pad_object = self._group.create_boolean_parameter('pad_object', True)
-        self.probe_gaussian_smoothing_sigma = self._group.create_real_parameter(
-            'probe_gaussian_smoothing_sigma', 0.0
-        )
         self.probe_reference_loss_coeff = self._group.create_real_parameter(
             'probe_reference_loss_coeff', 0.0, minimum=0.0
+        )
+        self.amplitude_variance_loss = self._group.create_boolean_parameter(
+            'amplitude_variance_loss', False
+        )
+        self.amplitude_variance_coeff = self._group.create_real_parameter(
+            'amplitude_variance_coeff', 0.01, minimum=0.0
         )
 
     def _update(self, observable: Observable) -> None:
@@ -147,7 +147,6 @@ class PtychoPINNTorchTrainingSettings(Observable, Observer):
         self.epochs = self._group.create_integer_parameter('epochs', 50, minimum=1)
         self.batch_size = self._group.create_integer_parameter('batch_size', 16, minimum=1)
         self.learning_rate = self._group.create_real_parameter('learning_rate', 1e-3, minimum=0.0)
-        self.num_devices = self._group.create_integer_parameter('num_devices', 1, minimum=0)
         self.num_dataloader_workers = self._group.create_integer_parameter(
             'num_dataloader_workers', 4, minimum=0
         )
@@ -160,9 +159,6 @@ class PtychoPINNTorchTrainingSettings(Observable, Observer):
         )
         self.gradient_clip_val = self._group.create_real_parameter(
             'gradient_clip_val', 0.0, minimum=0.0
-        )
-        self.experiment_name = self._group.create_string_parameter(
-            'experiment_name', 'Synthetic_Runs'
         )
 
         self.use_negative_log_likelihood_loss = self._group.create_boolean_parameter(
@@ -178,10 +174,6 @@ class PtychoPINNTorchTrainingSettings(Observable, Observer):
         self.minimum_learning_rate_ratio = self._group.create_real_parameter(
             'minimum_learning_rate_ratio', 0.1, minimum=0.0
         )
-        self.physics_weight_schedule = self._group.create_string_parameter(
-            'physics_weight_schedule', 'cosine'
-        )
-        self.torch_loss_mode = self._group.create_string_parameter('torch_loss_mode', 'poisson')
         self.notes = self._group.create_string_parameter('notes', '')
         self.model_name = self._group.create_string_parameter('model_name', 'PtychoPINNv2')
 
@@ -230,8 +222,6 @@ class PtychoPINNTorchTrainingSettings(Observable, Observer):
         self.finetune_validation_split = self._group.create_real_parameter(
             'finetune_val_split', 0.05, minimum=0.0, maximum=1.0
         )  # 5% validation split
-
-        self.num_grouped_samples = self._group.create_integer_parameter('num_grouped_samples', 0)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:

@@ -6,13 +6,15 @@ from pathlib import Path
 import logging
 
 import h5py
+import numpy
 
+from .diffraction import zero_bad_pixels
 from .geometry import PixelGeometry
 from .object import Object, ObjectCenter
 from .probe import ProbeSequence
 from .probe_positions import ProbePositionSequence, ProbePosition
 from .product import Product, ProductMetadata
-from .reconstructor import AssembledDiffractionData, LossValue
+from .reconstructor import AssembledDiffractionData, LossValue, ReconstructInput
 
 __all__ = [
     'StandardFileLayout',
@@ -20,6 +22,7 @@ __all__ = [
     'load_product',
     'save_diffraction_data',
     'save_product',
+    'save_ptychopinn_training_data',
 ]
 
 logger = logging.getLogger(__name__)
@@ -31,6 +34,10 @@ class StandardFileLayout(StrEnum):
     DIFFRACTION = 'diffraction.h5'
     FLUORESCENCE_IN = 'fluorescence-in.h5'
     FLUORESCENCE_OUT = 'fluorescence-out.h5'
+    # Stem only; the per-backend extension comes from
+    # TrainableReconstructor.get_model_file_extension(). The full path is
+    # f'{input_directory}/{MODEL_BASENAME}{ext}'.
+    MODEL_BASENAME = 'model'
     PRODUCT_IN = 'product-in.h5'
     PRODUCT_OUT = 'product-out.h5'
     SETTINGS = 'settings.ini'
@@ -322,3 +329,46 @@ def save_product(file: Path, product: Product) -> None:
 
         h5_file.create_dataset(ProductFileKeys.LOSS_EPOCHS, data=loss_epochs)
         h5_file.create_dataset(ProductFileKeys.LOSS_VALUES, data=loss_values)
+
+
+def save_ptychopinn_training_data(
+    file_path: Path,
+    parameters: ReconstructInput,
+    *,
+    multimodal_probe: bool,
+) -> None:
+    """Write a ReconstructInput to the NPZ format consumed by PtychoPINN trainers.
+
+    Bad pixels are zeroed in `diff3d` before writing. `multimodal_probe`
+    selects the `probeGuess` shape: True writes the full `(N_modes, H, W)`
+    array (ptycho_torch); False writes only mode 0 as `(H, W)` (legacy
+    ptycho). All scan points are assigned `scan_index=0` (single-object
+    assumption).
+    """
+    object_geometry = parameters.product.object_.get_geometry()
+    position_x_px: list[float] = list()
+    position_y_px: list[float] = list()
+
+    for scan_point in parameters.product.probe_positions:
+        object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
+        position_x_px.append(object_point.coordinate_x_px)
+        position_y_px.append(object_point.coordinate_y_px)
+
+    xcoords = numpy.array(position_x_px)
+    ycoords = numpy.array(position_y_px)
+    diff3d = zero_bad_pixels(parameters.diffraction_patterns, parameters.bad_pixels)
+
+    probe = parameters.product.probes.get_probe_no_opr()
+    probe_array = probe.get_array() if multimodal_probe else probe.get_incoherent_mode(0)
+
+    numpy.savez(
+        file_path,
+        xcoords=xcoords,
+        ycoords=ycoords,
+        xcoords_start=xcoords,
+        ycoords_start=ycoords,
+        diff3d=diff3d,
+        probeGuess=probe_array,
+        objectGuess=parameters.product.object_.get_layer(0),
+        scan_index=numpy.zeros(len(parameters.product.probe_positions), dtype=int),
+    )

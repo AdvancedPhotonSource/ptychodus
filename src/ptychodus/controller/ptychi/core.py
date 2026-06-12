@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QVBoxLayout, QWidget
 
 from ...model.ptychi import (
     PtyChiAutodiffSettings,
+    PtyChiBHSettings,
     PtyChiDMSettings,
     PtyChiLSQMLSettings,
     PtyChiPIESettings,
@@ -27,6 +28,7 @@ class PtyChiViewController(QWidget):
     ) -> None:
         super().__init__(parent)
         autodiff_settings: PtyChiAutodiffSettings | None = None
+        bh_settings: PtyChiBHSettings | None = None
         dm_settings: PtyChiDMSettings | None = None
         lsqml_settings: PtyChiLSQMLSettings | None = None
         pie_settings: PtyChiPIESettings | None = None
@@ -34,6 +36,8 @@ class PtyChiViewController(QWidget):
         match reconstructor_name.lower():
             case 'autodiff':
                 autodiff_settings = model.autodiff_settings
+            case 'bh':
+                bh_settings = model.bh_settings
             case 'dm':
                 dm_settings = model.dm_settings
             case 'lsqml':
@@ -46,6 +50,7 @@ class PtyChiViewController(QWidget):
         self._reconstructor_view_controller = PtyChiReconstructorViewController(
             model.settings,
             autodiff_settings,
+            bh_settings,
             dm_settings,
             lsqml_settings,
             model.enumerators,

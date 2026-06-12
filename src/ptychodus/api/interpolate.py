@@ -20,7 +20,11 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_support_frac(x: float, n: int) -> tuple[slice, float]:
-    """Return the integer support slice and sub-pixel fractional offset for a width-n window centered at x."""
+    """Return the integer support slice and sub-pixel fractional offset for a width-n window centered at x.
+
+    The returned slice spans ``n + 1`` samples so bilinear interpolation
+    across the n-wide window has grid points at both endpoints.
+    """
     lower = x - n / 2
     whole = int(lower)
     return slice(whole, whole + n + 1), lower - whole

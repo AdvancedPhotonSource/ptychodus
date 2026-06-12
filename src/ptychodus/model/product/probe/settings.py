@@ -40,6 +40,9 @@ class ProbeSettings(Observable, Observer):
             'RectangleHeightInMeters', 1e-6, minimum=0.0
         )
 
+        self.hermite_order_x = self._group.create_integer_parameter('HermiteOrderX', 1, minimum=1)
+        self.hermite_order_y = self._group.create_integer_parameter('HermiteOrderY', 1, minimum=1)
+
         self.super_gaussian_annular_radius_m = self._group.create_real_parameter(
             'SuperGaussianAnnularRadiusInMeters', 0, minimum=0.0
         )

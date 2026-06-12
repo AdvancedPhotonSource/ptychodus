@@ -12,12 +12,15 @@ from PyQt5.QtWidgets import (
     QHeaderView,
     QLabel,
     QMenu,
+    QProgressBar,
     QPushButton,
     QTreeView,
     QVBoxLayout,
     QWidget,
     QWizardPage,
 )
+
+from .image import ImageView
 
 
 class DetectorView(QGroupBox):
@@ -67,7 +70,6 @@ class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
         super().__init__(parent)
         self.detector_extent_check_box = QCheckBox('Detector Extent')
         self.detector_pixel_size_check_box = QCheckBox('Detector Pixel Size')
-        self.detector_bit_depth_check_box = QCheckBox('Detector Bit Depth')
         self.detector_distance_check_box = QCheckBox('Detector Distance')
         self.pattern_crop_center_check_box = QCheckBox('Pattern Crop Center')
         self.pattern_crop_extent_check_box = QCheckBox('Pattern Crop Extent')
@@ -80,7 +82,6 @@ class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
         layout = QVBoxLayout()
         layout.addWidget(self.detector_extent_check_box)
         layout.addWidget(self.detector_pixel_size_check_box)
-        layout.addWidget(self.detector_bit_depth_check_box)
         layout.addWidget(self.detector_distance_check_box)
         layout.addWidget(self.pattern_crop_center_check_box)
         layout.addWidget(self.pattern_crop_extent_check_box)
@@ -123,12 +124,25 @@ class SimulateDiffractionDialog(QDialog):
         self.button_box.addButton(QDialogButtonBox.StandardButton.Cancel)
         self.button_box.rejected.connect(self.reject)
 
-        layout = QFormLayout()
-        layout.addRow('Product:', self.product_combo_box)
-        layout.addRow(self.button_box)
-        self.setLayout(layout)
+        self.form_layout = QFormLayout()
+        self.form_layout.addRow('Product:', self.product_combo_box)
+        self.form_layout.addRow(self.button_box)
+        self.setLayout(self.form_layout)
 
         self.setWindowTitle('Simulate Diffraction Patterns')
+
+
+class DiffractionStatusView(QWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.progress_bar = QProgressBar()
+        self.stop_button = QPushButton('Stop')
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.progress_bar)
+        layout.addWidget(self.stop_button)
+        self.setLayout(layout)
 
 
 class PatternsView(QWidget):
@@ -150,4 +164,17 @@ class PatternsView(QWidget):
         layout.addWidget(self.tree_view)
         layout.addWidget(self.info_label)
         layout.addWidget(self.button_box)
+        self.setLayout(layout)
+
+
+class PatternsImageView(QWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.image_view = ImageView()
+        self.status_view = DiffractionStatusView()
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.image_view)
+        layout.addWidget(self.status_view)
         self.setLayout(layout)

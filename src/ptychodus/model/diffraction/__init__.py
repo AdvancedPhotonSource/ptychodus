@@ -6,6 +6,7 @@ from .dataset import (
     DiffractionDatasetObserver,
 )
 from .detector import Detector
+from .monitor import DiffractionTaskMonitor
 from .settings import DetectorSettings, DiffractionSettings
 from .sizer import PatternSizer
 
@@ -18,6 +19,7 @@ __all__ = [
     'DiffractionCore',
     'DiffractionDatasetObserver',
     'DiffractionSettings',
+    'DiffractionTaskMonitor',
     'PatternSizer',
     'PatternsStreamingContext',
 ]

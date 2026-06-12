@@ -1,10 +1,19 @@
-from .core import FluorescenceCore, FluorescenceEnhancer
-from .two_step import TwoStepFluorescenceEnhancingAlgorithm
-from .vspi import VSPIFluorescenceEnhancingAlgorithm
+from .api import FluorescenceAPI
+from .core import FluorescenceCore
+from .monitor import (
+    EnhanceFluorescenceBackgroundTask,
+    FluorescenceDatasetEmitter,
+    FluorescenceTaskMonitor,
+)
+from .two_step import TwoStepFluorescenceEnhancer
+from .vspi import VSPIFluorescenceEnhancer
 
 __all__ = [
+    'EnhanceFluorescenceBackgroundTask',
+    'FluorescenceAPI',
     'FluorescenceCore',
-    'FluorescenceEnhancer',
-    'TwoStepFluorescenceEnhancingAlgorithm',
-    'VSPIFluorescenceEnhancingAlgorithm',
+    'FluorescenceDatasetEmitter',
+    'FluorescenceTaskMonitor',
+    'TwoStepFluorescenceEnhancer',
+    'VSPIFluorescenceEnhancer',
 ]

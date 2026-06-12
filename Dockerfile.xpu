@@ -1,0 +1,19 @@
+ARG BASE_TAG=latest
+FROM intel/intel-optimized-pytorch:${BASE_TAG}
+
+WORKDIR /app
+COPY . /src
+
+# The base image already includes Intel-optimized torch (with IPEX / XPU
+# support for ALCF Aurora); pip sees the torch requirement satisfied and
+# leaves it alone.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git libqt5gui5 && \
+    rm -rf /var/lib/apt/lists/* && \
+    python3 -m pip install --root-user-action=ignore --no-cache-dir --upgrade pip && \
+    python3 -m pip install --root-user-action=ignore --no-cache-dir \
+        /src[globus,gui] \
+        git+https://github.com/AdvancedPhotonSource/pty-chi.git && \
+    rm -rf /src
+
+CMD ["python3", "-m", "ptychodus"]

@@ -9,12 +9,19 @@ from ptychodus.api.geometry import AffineTransform, ImageExtent
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import AssembledDiffractionData, ReconstructInput
 from ptychodus.api.settings import PathPrefixChange, SettingsRegistry
-from ptychodus.api.workflow import WorkflowAPI, WorkflowDiffractionAPI, WorkflowProductAPI
+from ptychodus.api.workflow import (
+    RemoteComputeProvider,
+    WorkflowAPI,
+    WorkflowDiffractionAPI,
+    WorkflowProductAPI,
+)
 
 from .diffraction import DiffractionAPI
+from .fluorescence import FluorescenceAPI
+from .genesis import GenesisExecutor
 from .globus import GlobusExecutor
-from .product import ObjectAPI, ProbeAPI, ProductAPI, ProbePositionsAPI
 from .processing import ProcessingAPI
+from .product import ObjectAPI, ProbeAPI, ProductAPI, ProbePositionsAPI
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +45,9 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         probe_api: ProbeAPI,
         object_api: ObjectAPI,
         processing_api: ProcessingAPI,
+        fluorescence_api: FluorescenceAPI,
         globus_executor: GlobusExecutor,
+        genesis_executor: GenesisExecutor,
         product_index: int,
     ) -> None:
         self._product_api = product_api
@@ -46,7 +55,9 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         self._probe_api = probe_api
         self._object_api = object_api
         self._processing_api = processing_api
+        self._fluorescence_api = fluorescence_api
         self._globus_executor = globus_executor
+        self._genesis_executor = genesis_executor
         self._product_index = product_index
 
     def get_product_index(self) -> int:
@@ -130,12 +141,25 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
             self._probe_api,
             self._object_api,
             self._processing_api,
+            self._fluorescence_api,
             self._globus_executor,
+            self._genesis_executor,
             output_product_index,
         )
 
-    def reconstruct_remote(self, *, algorithm: str | None = None) -> None:
-        self._globus_executor.reconstruct(self._product_index, algorithm=algorithm)
+    def reconstruct_remote(
+        self,
+        *,
+        algorithm: str | None = None,
+        provider: RemoteComputeProvider = RemoteComputeProvider.GLOBUS,
+    ) -> None:
+        match provider:
+            case RemoteComputeProvider.GLOBUS:
+                self._globus_executor.reconstruct(self._product_index, algorithm=algorithm)
+            case RemoteComputeProvider.GENESIS:
+                self._genesis_executor.reconstruct(self._product_index, algorithm=algorithm)
+            case _:
+                raise ValueError(f'Unsupported remote compute provider: {provider}')
 
     def train_reconstructor_local(
         self,
@@ -150,9 +174,20 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
             self._product_index, input_path, output_path, algorithm=algorithm, block=block
         )
 
-    def train_reconstructor_remote(self, *, algorithm: str | None = None) -> None:
+    def train_reconstructor_remote(
+        self,
+        *,
+        algorithm: str | None = None,
+        provider: RemoteComputeProvider = RemoteComputeProvider.GLOBUS,
+    ) -> None:
         # TODO mlflow
-        self._globus_executor.train(self._product_index, algorithm=algorithm)
+        match provider:
+            case RemoteComputeProvider.GLOBUS:
+                self._globus_executor.train(self._product_index, algorithm=algorithm)
+            case RemoteComputeProvider.GENESIS:
+                self._genesis_executor.train(self._product_index, algorithm=algorithm)
+            case _:
+                raise ValueError(f'Unsupported remote compute provider: {provider}')
 
     def export_training_data(self, file_path: Path, *, algorithm: str | None = None) -> None:
         self._processing_api.export_training_data(
@@ -161,6 +196,26 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
 
     def save_product(self, file_path: Path, *, file_type: str | None = None) -> None:
         self._product_api.save_product(self._product_index, file_path, file_type=file_type)
+
+    def enhance_fluorescence_local(
+        self,
+        input_path: Path,
+        output_path: Path,
+        *,
+        input_file_type: str | None = None,
+        output_file_type: str | None = None,
+        algorithm: str | None = None,
+        block: bool = False,
+    ) -> None:
+        self._fluorescence_api.enhance_local(
+            self._product_index,
+            input_path,
+            output_path,
+            input_file_type=input_file_type,
+            output_file_type=output_file_type,
+            algorithm=algorithm,
+            block=block,
+        )
 
 
 class ConcreteWorkflowAPI(WorkflowAPI):
@@ -173,7 +228,9 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         probe_api: ProbeAPI,
         object_api: ObjectAPI,
         processing_api: ProcessingAPI,
-        executor: GlobusExecutor,
+        fluorescence_api: FluorescenceAPI,
+        globus_executor: GlobusExecutor,
+        genesis_executor: GenesisExecutor,
     ) -> None:
         self._settings_registry = settings_registry
         self._diffraction_api = diffraction_api
@@ -182,7 +239,12 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         self._probe_api = probe_api
         self._object_api = object_api
         self._processing_api = processing_api
-        self._executor = executor
+        self._fluorescence_api = fluorescence_api
+        self._globus_executor = globus_executor
+        self._genesis_executor = genesis_executor
+
+    def load_bad_pixels(self, file_path: Path, *, file_type: str | None = None) -> None:
+        self._diffraction_api.open_bad_pixels(file_path, file_type=file_type)
 
     def load_diffraction_data(
         self,
@@ -223,7 +285,9 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             self._probe_api,
             self._object_api,
             self._processing_api,
-            self._executor,
+            self._fluorescence_api,
+            self._globus_executor,
+            self._genesis_executor,
             product_index,
         )
 

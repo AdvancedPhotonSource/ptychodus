@@ -16,16 +16,11 @@ class PtychoPINNTorchEnumerators:
             'Mean_Deviation',
         ]
 
-        self._devices: Sequence[str] = ['cuda', 'cpu']
         self._learning_rate_schedulers: Sequence[str] = [
             'Default',
             'Exponential',
-            'MultiStage',
-            'Adaptive',
             'Cosine',
         ]
-        self._physics_weight_schedules: Sequence[str] = ['linear', 'cosine', 'exponential']
-        self._torch_loss_modes: Sequence[str] = ['poisson', 'mae']
 
         self._patch_weighting_methods: Sequence[str] = ['probe', 'uniform']
 
@@ -50,17 +45,8 @@ class PtychoPINNTorchEnumerators:
     def get_auxiliary_loss_functions(self) -> Iterator[str]:
         return iter(self._auxiliary_loss_functions)
 
-    def get_devices(self) -> Iterator[str]:
-        return iter(self._devices)
-
     def get_learning_rate_schedulers(self) -> Iterator[str]:
         return iter(self._learning_rate_schedulers)
-
-    def get_physics_weight_schedules(self) -> Iterator[str]:
-        return iter(self._physics_weight_schedules)
-
-    def get_torch_loss_modes(self) -> Iterator[str]:
-        return iter(self._torch_loss_modes)
 
     def get_patch_weighting_methods(self) -> Iterator[str]:
         return iter(self._patch_weighting_methods)
