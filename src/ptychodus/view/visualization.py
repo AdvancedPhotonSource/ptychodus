@@ -107,7 +107,7 @@ class ImageItem(QGraphicsPixmapItem):
 
         try:
             image = QImage(
-                image_rgba_i.data,
+                image_rgba_i.data,  # type: ignore[call-overload]
                 image_rgba_i.shape[1],
                 image_rgba_i.shape[0],
                 image_rgba_i.strides[0],

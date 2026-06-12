@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import QWizard
 
 from ....model.metadata import MetadataPresenter
 from ....model.diffraction import DiffractionSettings, PatternSizer, DiffractionAPI
+from ....view.widgets import ExceptionDialog
 
 from ...data import FileDialogFactory
 from .files import OpenDatasetWizardFilesViewController
@@ -60,7 +61,11 @@ class OpenDatasetWizardController:
             self._metadata_view_controller.import_metadata()
 
     def _execute_finish_button_action(self) -> None:
-        self._api.load_all_arrays()
+        try:
+            self._api.load_all_arrays()
+        except Exception as exc:
+            logger.exception(exc)
+            ExceptionDialog.show_exception('Open Dataset', exc)
 
     def open_dataset(self) -> None:
         self._wizard.restart()

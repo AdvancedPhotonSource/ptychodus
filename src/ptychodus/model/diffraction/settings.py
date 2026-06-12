@@ -19,7 +19,6 @@ class DetectorSettings(Observable, Observer):
         self.pixel_height_m = self._group.create_real_parameter(
             'PixelHeightInMeters', 75e-6, minimum=0.0
         )
-        self.bit_depth = self._group.create_integer_parameter('BitDepth', 8, minimum=1)
 
         self.bad_pixels_file_type = self._group.create_string_parameter(
             'BadPixelsFileType', 'NPY_Bad_Pixels'

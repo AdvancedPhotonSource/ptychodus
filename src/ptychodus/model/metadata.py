@@ -52,15 +52,6 @@ class MetadataPresenter(Observable, DiffractionDatasetObserver):
             self._detector_settings.pixel_width_m.set_value(pixel_geometry.width_m)
             self._detector_settings.pixel_height_m.set_value(pixel_geometry.height_m)
 
-    def can_sync_detector_bit_depth(self) -> bool:
-        return self._metadata.detector_bit_depth is not None
-
-    def sync_detector_bit_depth(self) -> None:
-        bit_depth = self._metadata.detector_bit_depth
-
-        if bit_depth:
-            self._detector_settings.bit_depth.set_value(bit_depth)
-
     def can_sync_pattern_crop_center(self) -> bool:
         return self._metadata.crop_center is not None or self._metadata.detector_extent is not None
 

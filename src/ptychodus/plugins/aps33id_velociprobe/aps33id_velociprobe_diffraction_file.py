@@ -100,7 +100,6 @@ class DetectorGroup:
     detector_distance_m: float
     beam_center_x_px: int
     beam_center_y_px: int
-    bit_depth_readout: int
     x_pixel_size_m: float
     y_pixel_size_m: float
 
@@ -113,7 +112,6 @@ class DetectorGroup:
         assert h5_beam_center_x.attrs['units'] == b'pixel'
         h5_beam_center_y = group['beam_center_y']
         assert h5_beam_center_y.attrs['units'] == b'pixel'
-        h5_bit_depth_readout = group['bit_depth_readout']
         h5_x_pixel_size = group['x_pixel_size']
         assert h5_x_pixel_size.attrs['units'] == b'm'
         h5_y_pixel_size = group['y_pixel_size']
@@ -123,7 +121,6 @@ class DetectorGroup:
             float(h5_detector_distance[()]),
             int(h5_beam_center_x[()]),
             int(h5_beam_center_y[()]),
-            int(h5_bit_depth_readout[()]),
             float(h5_x_pixel_size[()]),
             float(h5_y_pixel_size[()]),
         )
@@ -255,7 +252,6 @@ class VelociprobeDiffractionFileReader(DiffractionFileReader):
                 detector_distance_m=detector.detector_distance_m,
                 detector_extent=detector_extent,
                 detector_pixel_geometry=detector_pixel_geometry,
-                detector_bit_depth=detector.bit_depth_readout,
                 crop_center=crop_center,
                 probe_energy_eV=probe_energy_eV,
                 file_path=file_path,

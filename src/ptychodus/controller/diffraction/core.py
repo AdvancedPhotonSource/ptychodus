@@ -128,7 +128,6 @@ class DetectorController:
         self._pixel_height_view_controller = LengthWidgetParameterViewController(
             settings.pixel_height_m
         )
-        self._bit_depth_view_controller = SpinBoxParameterViewController(settings.bit_depth)
         self._bad_pixels_view_controller = BadPixelsViewController(
             settings.bad_pixels_file_path,
             settings.bad_pixels_file_type,
@@ -142,7 +141,6 @@ class DetectorController:
         layout.addRow('Detector Height [px]:', self._height_px_view_controller.get_widget())
         layout.addRow('Pixel Width:', self._pixel_width_view_controller.get_widget())
         layout.addRow('Pixel Height:', self._pixel_height_view_controller.get_widget())
-        layout.addRow('Bit Depth:', self._bit_depth_view_controller.get_widget())
         layout.addRow('Bad Pixels:', self._bad_pixels_view_controller.get_widget())
         view.setLayout(layout)
 
@@ -195,6 +193,7 @@ class DiffractionController(DiffractionDatasetObserver):
         diffraction_simulator: DiffractionSimulator,
         diffraction_simulator_settings: DiffractionSimulatorSettings,
         view: PatternsView,
+        status_view: DiffractionStatusView,
         image_controller: ImageController,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
@@ -221,7 +220,7 @@ class DiffractionController(DiffractionDatasetObserver):
             metadata_presenter,
             file_dialog_factory,
         )
-        self._status_controller = DiffractionStatusController(task_monitor, view.status_view)
+        self._status_controller = DiffractionStatusController(task_monitor, status_view)
         self._tree_model = DatasetTreeModel()
 
         view.tree_view.setModel(self._tree_model)

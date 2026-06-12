@@ -64,7 +64,7 @@ class ControllerCore:
         )
         self._patterns_image_controller = ImageController(
             model.pattern_visualization_engine,
-            view.patterns_image_view,
+            view.patterns_image_view.image_view,
             self._status_bar,
             self._file_dialog_factory,
         )
@@ -81,6 +81,7 @@ class ControllerCore:
             model.analysis_core.diffraction_simulator,
             model.analysis_core.diffraction_simulator_settings,
             view.patterns_view,
+            view.patterns_image_view.status_view,
             self._patterns_image_controller,
             self._file_dialog_factory,
         )
@@ -203,12 +204,14 @@ class ControllerCore:
         self._run_tasks_timer.timeout.connect(self._run_tasks)
         self._run_tasks_timer.start(1000)
 
-        view.globus_action.setVisible(model.globus_core.is_supported)
-        view.genesis_action.setVisible(model.genesis_core.is_supported)
+        self._action_permitted: dict[QAction, bool] = {
+            view.globus_action: model.globus_core.is_supported,
+            view.genesis_action: model.genesis_core.is_supported,
+        }
 
         self._swap_central_widgets(view.patterns_action)
         view.patterns_action.setChecked(True)
-        view.navigation_action_group.triggered.connect(
+        view.navigation.action_group.triggered.connect(
             lambda action: self._swap_central_widgets(action)
         )
 
@@ -223,9 +226,17 @@ class ControllerCore:
         if action is None:
             raise ValueError('QAction is None!')
 
-        index = action.data()
-        self.view.left_panel.setCurrentIndex(index)
-        self.view.right_panel.setCurrentIndex(index)
+        self.view.navigation.set_current_index(action.data())
+        self._update_subview_visibility(action)
+
+    def _update_subview_visibility(self, action: QAction) -> None:
+        for group in self.view.navigation.subview_groups:
+            expanded = action is group.parent_action or action in group.child_actions
+            for child in group.child_actions:
+                allowed = self._action_permitted.get(child, True)
+                child.setVisible(expanded and allowed)
+            group.top_separator.setVisible(expanded)
+            group.bottom_separator.setVisible(expanded)
 
     def _run_tasks(self) -> None:
         self.model.run_tasks()

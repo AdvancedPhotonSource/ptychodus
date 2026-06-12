@@ -20,6 +20,8 @@ from PyQt5.QtWidgets import (
     QWizardPage,
 )
 
+from .image import ImageView
+
 
 class DetectorView(QGroupBox):
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -68,7 +70,6 @@ class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
         super().__init__(parent)
         self.detector_extent_check_box = QCheckBox('Detector Extent')
         self.detector_pixel_size_check_box = QCheckBox('Detector Pixel Size')
-        self.detector_bit_depth_check_box = QCheckBox('Detector Bit Depth')
         self.detector_distance_check_box = QCheckBox('Detector Distance')
         self.pattern_crop_center_check_box = QCheckBox('Pattern Crop Center')
         self.pattern_crop_extent_check_box = QCheckBox('Pattern Crop Extent')
@@ -81,7 +82,6 @@ class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
         layout = QVBoxLayout()
         layout.addWidget(self.detector_extent_check_box)
         layout.addWidget(self.detector_pixel_size_check_box)
-        layout.addWidget(self.detector_bit_depth_check_box)
         layout.addWidget(self.detector_distance_check_box)
         layout.addWidget(self.pattern_crop_center_check_box)
         layout.addWidget(self.pattern_crop_extent_check_box)
@@ -151,7 +151,6 @@ class PatternsView(QWidget):
         self.detector_view = DetectorView()
         self.tree_view = QTreeView()
         self.info_label = QLabel()
-        self.status_view = DiffractionStatusView()
         self.button_box = PatternsButtonBox()
         self.simulate_dialog = SimulateDiffractionDialog(self)
 
@@ -164,6 +163,18 @@ class PatternsView(QWidget):
         layout.addWidget(self.detector_view)
         layout.addWidget(self.tree_view)
         layout.addWidget(self.info_label)
-        layout.addWidget(self.status_view)
         layout.addWidget(self.button_box)
+        self.setLayout(layout)
+
+
+class PatternsImageView(QWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.image_view = ImageView()
+        self.status_view = DiffractionStatusView()
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.image_view)
+        layout.addWidget(self.status_view)
         self.setLayout(layout)

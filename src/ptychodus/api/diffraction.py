@@ -209,7 +209,6 @@ class DiffractionMetadata:
     detector_distance_m: float | None = None
     detector_extent: ImageExtent | None = None
     detector_pixel_geometry: PixelGeometry | None = None
-    detector_bit_depth: int | None = None
     crop_center: CropCenter | None = None
     probe_energy_eV: float | None = None  # noqa: N815
     probe_photon_count: int | None = None
