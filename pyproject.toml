@@ -66,6 +66,7 @@ where = ["src"]
 [[tool.mypy.overrides]]
 module = [
     "colorcet",
+    "globus_compute_sdk.*",
     "globus_sdk.*",
     "h5py",
     "hdf5plugin",
@@ -78,6 +79,7 @@ module = [
     "pvapy.*",
     "scipy.*",
     "tifffile",
+    "torch",
 ]
 ignore_missing_imports = true
 
