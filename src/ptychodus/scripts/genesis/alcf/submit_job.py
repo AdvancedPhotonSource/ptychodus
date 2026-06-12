@@ -22,6 +22,11 @@ def main() -> None:
     settings = GenesisSettings(settings_registry)
     adapters = create_facility_adapters(settings)
 
+    # NOTE: Replace ALCF_USERNAME and ALCF_ALLOCATION below with your own ALCF
+    # username and project allocation before running this example.
+    alcf_username = 'ALCF_USERNAME'
+    alcf_allocation = 'ALCF_ALLOCATION'
+
     for name, adapter in adapters.items():
         if name != 'ALCF':
             continue
@@ -35,8 +40,8 @@ def main() -> None:
             executable='/bin/bash',
             arguments=['-c', commands],
             name='ptychodus-system-check',
-            stdout_path='/home/shenke',
-            stderr_path='/home/shenke',
+            stdout_path=f'/home/{alcf_username}',
+            stderr_path=f'/home/{alcf_username}',
             resources=ResourceSpecification(
                 node_count=1,
                 # process_count=1,
@@ -47,7 +52,7 @@ def main() -> None:
             attributes=JobAttributes(
                 duration=300,
                 queue_name='debug',
-                account='APSDataProcessing',
+                account=alcf_allocation,
                 custom_attributes={'filesystems': 'eagle'},
             ),
         )

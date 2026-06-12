@@ -22,6 +22,11 @@ def main() -> None:
     settings = GenesisSettings(settings_registry)
     adapters = create_facility_adapters(settings)
 
+    # NOTE: Replace NERSC_USERNAME and NERSC_ALLOCATION below with your own NERSC
+    # username and project allocation before running this example.
+    nersc_username = 'NERSC_USERNAME'
+    nersc_allocation = 'NERSC_ALLOCATION'
+
     for name, adapter in adapters.items():
         if name != 'NERSC':
             continue
@@ -35,8 +40,8 @@ def main() -> None:
             executable='/bin/bash',
             arguments=['-c', commands],
             name='Ptychodus',
-            stdout_path='/global/homes/s/shenke/stdout%j.log',
-            stderr_path='/global/homes/s/shenke/stderr%j.log',
+            stdout_path=f'/global/homes/{nersc_username[0]}/{nersc_username}/stdout%j.log',
+            stderr_path=f'/global/homes/{nersc_username[0]}/{nersc_username}/stderr%j.log',
             resources=ResourceSpecification(
                 node_count=1,
                 process_count=1,
@@ -47,7 +52,7 @@ def main() -> None:
             attributes=JobAttributes(
                 duration=300,
                 queue_name='debug',
-                account='m5074_g',
+                account=nersc_allocation,
             ),
             pre_launch='echo PRE_LAUNCH',
             post_launch='echo POST_LAUNCH',

@@ -22,6 +22,10 @@ def main() -> None:
     settings = GenesisSettings(settings_registry)
     adapters = create_facility_adapters(settings)
 
+    # NOTE: Replace OLCF_ALLOCATION below with your own OLCF project allocation
+    # before running this example.
+    olcf_allocation = 'OLCF_ALLOCATION'
+
     for name, adapter in adapters.items():
         if name != 'OLCF':
             continue
@@ -34,7 +38,7 @@ def main() -> None:
             executable='ptychodus',
             arguments=['-v'],
             name='ptychodus',
-            directory='/gpfs/wolf2/olcf/csc682/proj-shared',
+            directory=f'/gpfs/wolf2/olcf/{olcf_allocation}/proj-shared',
             resources=ResourceSpecification(
                 node_count=1,
                 process_count=1,
@@ -44,9 +48,9 @@ def main() -> None:
             attributes=JobAttributes(
                 duration=300,
                 queue_name='batch',
-                account='csc682',
+                account=olcf_allocation,
             ),
-            pre_launch='source /etc/bash.bashrc; module load miniforge3; conda activate /ccsopen/proj/csc682/ptychodus-env',
+            pre_launch=f'source /etc/bash.bashrc; module load miniforge3; conda activate /ccsopen/proj/{olcf_allocation}/ptychodus-env',
             post_launch='echo POST_LAUNCH',
             launcher='srun',
         )
