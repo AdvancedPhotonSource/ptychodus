@@ -84,6 +84,6 @@ jobs:
           python-version: "3.11"
           cache: pip
       - name: Install ptychodus + mypy
-        run: pip install . mypy types-psutil types-pyyaml types-requests
+        run: pip install . mypy pyqt5-stubs types-psutil types-pyyaml types-requests
       - name: mypy
         run: mypy src/ptychodus
