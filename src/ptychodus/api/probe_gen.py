@@ -183,6 +183,7 @@ class FresnelZonePlate:
     central_beamstop_diameter_m: float
 
     def get_focal_length_m(self, central_wavelength_m: float) -> float:
+        """Return the zone plate focal length at *central_wavelength_m* (thin-lens formula)."""
         return self.zone_plate_diameter_m * self.outermost_zone_width_m / central_wavelength_m
 
 

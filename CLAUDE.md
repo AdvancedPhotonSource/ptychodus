@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Ptychodus is a ptychography data-analysis application that ingests instrument data, prepares it for processing, and dispatches it through several reconstruction libraries (PtyChi, PtychoNN, PtychoPINN, PtychoPINN-Torch). It runs interactively as a PyQt5 GUI, headless via batch CLI, and as a streaming processor inside beamline pipelines (pvapy area-detector). Python ≥3.11.
+Ptychodus is a ptychography data-analysis application that ingests instrument data, prepares it for processing, and dispatches it through several reconstruction libraries (PtyChi, PtychoPINN, PtychoPINN-Torch). It runs interactively as a PyQt5 GUI, headless via batch CLI, and as a streaming processor inside beamline pipelines (pvapy area-detector). Python ≥3.11.
 
 ## Common Commands
 
@@ -62,7 +62,7 @@ make -C docs html        # Sphinx docs into docs/build/
 ### Three-layer separation: api / model / view+controller
 
 - **`src/ptychodus/api/`** — pure-Python domain layer with **no** GUI or model dependencies. Defines core data structures (`Product`, `ProbeSequence`, `Object`, `ProbePositionSequence`, `DiffractionDataset`, `AssembledDiffractionData`), abstract interfaces (`DiffractionFileReader/Writer`, `ProductFileReader/Writer`, `Reconstructor`, `TrainableReconstructor`, `WorkflowAPI`), and infrastructure (`Observable`/`Observer`, `Parameter`/`ParameterGroup`, `SettingsRegistry`, `PluginRegistry`/`PluginChooser`). All other layers depend on this; this layer depends on nothing else in ptychodus.
-- **`src/ptychodus/model/`** — application logic. Each subpackage (`diffraction/`, `product/`, `processing/`, `reconstructor/`, `analysis/`, `fluorescence/`, `globus/`, `genesis/`, `automation/`, `agent/`, `visualization/`, `ptychi/`, `ptychonn/`, `ptychopinn/`, `ptychopinn_torch/`) exposes a `*Core` class that owns its settings, repositories, and APIs. `model/core.py::ModelCore` is the composition root: it constructs every `*Core` in dependency order and wires them together. Used both by the GUI and by `__main__.py` batch mode.
+- **`src/ptychodus/model/`** — application logic. Each subpackage (`diffraction/`, `product/`, `processing/`, `reconstructor/`, `analysis/`, `fluorescence/`, `globus/`, `genesis/`, `automation/`, `agent/`, `visualization/`, `ptychi/`, `ptychopinn/`, `ptychopinn_torch/`) exposes a `*Core` class that owns its settings, repositories, and APIs. `model/core.py::ModelCore` is the composition root: it constructs every `*Core` in dependency order and wires them together. Used both by the GUI and by `__main__.py` batch mode.
 - **`src/ptychodus/view/`** (PyQt5 widgets, no logic) and **`src/ptychodus/controller/`** (mediates between widgets and model). Mirror the model package layout. `view/core.py::ViewCore` and `controller/core.py::ControllerCore` are the composition roots; the navigation toolbar order in `ViewCore` is the source of truth for the left/right stacked-panel indexes.
 
 The GUI is optional: `__main__.py` falls back to headless mode if PyQt5 is missing. `ptychodus_stream_processor.py` (the `PtychodusAdImageProcessor`) is the third entry mode and is only imported when `pvapy` is available.
@@ -87,7 +87,7 @@ Settings flow through `api/parametric.py::Parameter[T]` and `ParameterGroup`. Ea
 
 ### Reconstructor libraries
 
-Each reconstructor backend (`model/ptychi/`, `model/ptychonn/`, `model/ptychopinn/`, `model/ptychopinn_torch/`) exposes a `*ReconstructorLibrary` class. They are constructed in `ModelCore` and passed as a list to `ProcessingCore`. Backends that aren't installed should fail cleanly at import inside their own `__init__.py` — keep the surface a stable `*ReconstructorLibrary` regardless. Reconstructors implement `Reconstructor`/`TrainableReconstructor` from `api/reconstructor.py` and yield `ReconstructOutput` per iteration so the GUI can stream progress.
+Each reconstructor backend (`model/ptychi/`, `model/ptychopinn/`, `model/ptychopinn_torch/`) exposes a `*ReconstructorLibrary` class. They are constructed in `ModelCore` and passed as a list to `ProcessingCore`. Backends that aren't installed should fail cleanly at import inside their own `__init__.py` — keep the surface a stable `*ReconstructorLibrary` regardless. Reconstructors implement `Reconstructor`/`TrainableReconstructor` from `api/reconstructor.py` and yield `ReconstructOutput` per iteration so the GUI can stream progress.
 
 ### Standard HDF5 layout
 
