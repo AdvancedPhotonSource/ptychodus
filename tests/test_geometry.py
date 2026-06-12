@@ -306,6 +306,43 @@ def test_hermite_three_term_recurrence(n: int) -> None:
     numpy.testing.assert_allclose(expected_lhs, expected_rhs, atol=1e-10)
 
 
+def test_hermite_grid() -> None:
+    import numpy
+    import matplotlib
+
+    matplotlib.use('Agg')
+    import matplotlib.colors
+    import matplotlib.pyplot as plt
+
+    from ptychodus.api.geometry import HermiteMode
+
+    my_dpi = 300
+    num_pixels = 256
+    max_order = 5
+
+    Y, X = numpy.mgrid[:num_pixels, :num_pixels]  # noqa: N806
+    X = (X - (num_pixels - 1) / 2) / (num_pixels / 2)  # noqa: N806
+    Y = (Y - (num_pixels - 1) / 2) / (num_pixels / 2)  # noqa: N806
+
+    fig = plt.figure(dpi=my_dpi)
+    fig.patch.set_alpha(0.0)
+    gs = fig.add_gridspec(max_order + 1, max_order + 1)
+
+    for m in range(max_order + 1):
+        for n in range(max_order + 1):
+            mode = HermiteMode(1.0, m, n)
+            Z = mode(X, Y).real  # noqa: N806
+
+            ax = fig.add_subplot(gs[m, n])
+            ax.pcolormesh(X, Y, Z, norm=matplotlib.colors.CenteredNorm(), cmap='seismic')
+            ax.set_aspect('equal')
+            ax.set_title(str(mode))
+            ax.axis('off')
+
+    plt.savefig('hermite_grid.png', bbox_inches='tight', dpi=my_dpi)
+    plt.close(fig)
+
+
 # ---------------------------------------------------------------------------
 # fourier_gradient
 # ---------------------------------------------------------------------------
