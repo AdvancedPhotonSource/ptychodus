@@ -52,8 +52,8 @@ CI (`.github/workflows/python-package.yml`) runs four jobs on push/PR to `main`:
 Container & docs:
 
 ```sh
-podman build -t ptychodus:latest .
-docker build -t ptychodus:latest .
+podman build -f Dockerfile.cuda -t ptychodus:cuda13.0 .   # also: Dockerfile.cpu / .rocm / .xpu
+docker build  -f Dockerfile.cuda -t ptychodus:cuda13.0 .
 make -C docs html        # Sphinx docs into docs/build/
 ```
 

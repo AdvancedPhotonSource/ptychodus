@@ -1,0 +1,21 @@
+ARG ROCM_VERSION=7.2.4
+ARG UBUNTU_VERSION=24.04
+ARG PYTHON_VERSION=3.12
+ARG PYTORCH_VERSION=2.10.0
+FROM rocm/pytorch:rocm${ROCM_VERSION}_ubuntu${UBUNTU_VERSION}_py${PYTHON_VERSION}_pytorch_release_${PYTORCH_VERSION}
+
+WORKDIR /app
+COPY . /src
+
+# The base image already includes a ROCm-built torch; pip sees the torch
+# requirement satisfied and leaves it alone.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git libqt5gui5 && \
+    rm -rf /var/lib/apt/lists/* && \
+    python3 -m pip install --root-user-action=ignore --no-cache-dir --upgrade pip && \
+    python3 -m pip install --root-user-action=ignore --no-cache-dir \
+        /src[globus,gui] \
+        git+https://github.com/AdvancedPhotonSource/pty-chi.git && \
+    rm -rf /src
+
+CMD ["python3", "-m", "ptychodus"]
