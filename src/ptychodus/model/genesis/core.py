@@ -102,38 +102,59 @@ class GenesisPresenter:
         return [plugin.display_name for plugin in self._transfer_client_chooser]
 
     def refresh_projects(self) -> None:
+        if not self._facility_chooser:
+            logger.debug('refresh_projects: no facility adapter registered; skipping')
+            return
         facility_adapter = self._facility_chooser.get_current_plugin().strategy
         facility_adapter.refresh_projects()
 
     def supported_projects(self) -> Sequence[str]:
+        if not self._facility_chooser:
+            return []
         facility_adapter = self._facility_chooser.get_current_plugin().strategy
         return facility_adapter.project_names()
 
     def map_project_name_to_id(self, name: str) -> str:
+        if not self._facility_chooser:
+            return name
         facility_adapter = self._facility_chooser.get_current_plugin().strategy
         return facility_adapter.map_project_name_to_id(name)
 
     def map_project_id_to_name(self, project_id: str) -> str:
+        if not self._facility_chooser:
+            return project_id
         facility_adapter = self._facility_chooser.get_current_plugin().strategy
         return facility_adapter.map_project_id_to_name(project_id)
 
     def refresh_compute_resources(self) -> None:
+        if not self._facility_chooser:
+            logger.debug('refresh_compute_resources: no facility adapter registered; skipping')
+            return
         facility_adapter = self._facility_chooser.get_current_plugin().strategy
         facility_adapter.refresh_compute_resources()
 
     def supported_compute_resources(self) -> Sequence[str]:
+        if not self._facility_chooser:
+            return []
         facility_adapter = self._facility_chooser.get_current_plugin().strategy
         return facility_adapter.compute_resource_names()
 
     def map_compute_resource_name_to_id(self, name: str) -> str:
+        if not self._facility_chooser:
+            return name
         facility_adapter = self._facility_chooser.get_current_plugin().strategy
         return facility_adapter.map_compute_resource_name_to_id(name)
 
     def map_compute_resource_id_to_name(self, resource_id: str) -> str:
+        if not self._facility_chooser:
+            return resource_id
         facility_adapter = self._facility_chooser.get_current_plugin().strategy
         return facility_adapter.map_compute_resource_id_to_name(resource_id)
 
     def apply_facility_defaults(self) -> None:
+        if not self._facility_chooser:
+            logger.debug('apply_facility_defaults: no facility adapter registered; skipping')
+            return
         adapter = self._facility_chooser.get_current_plugin().strategy
         globus_collection = adapter.get_default_globus_collection()
 
@@ -163,10 +184,13 @@ class GenesisCore:
         for name, provider in create_globus_transfer_providers().items():
             self._transfer_client_chooser.register_plugin(provider, display_name=name)
 
-        self._facility_chooser.synchronize_with_parameter(self.settings.facility)
-        self._transfer_client_chooser.synchronize_with_parameter(
-            self.settings.globus_transfer_provider
-        )
+        if self._facility_chooser:
+            self._facility_chooser.synchronize_with_parameter(self.settings.facility)
+
+        if self._transfer_client_chooser:
+            self._transfer_client_chooser.synchronize_with_parameter(
+                self.settings.globus_transfer_provider
+            )
 
         status_q: queue.Queue[GenesisStatus] = queue.Queue()
         self.status_repository = GenesisStatusRepository(status_q)

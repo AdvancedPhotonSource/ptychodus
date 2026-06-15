@@ -48,7 +48,7 @@ ptychozoon = ["ptychozoon"]
 [tool.uv.sources]
 #ptychi = { path = "../pty-chi", editable = true }
 #ptychopinn = { path = "../PtychoPINN", editable = true }
-ptychopinn = { git = "https://github.com/hoidn/PtychoPINN", branch = "main" }
+#ptychopinn = { git = "https://github.com/hoidn/PtychoPINN", branch = "main" }
 
 #[[tool.uv.index]]
 #name = "pytorch-cu132"

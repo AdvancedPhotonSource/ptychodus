@@ -92,15 +92,16 @@ class ControllerCore:
             view.product_view,
             self._file_dialog_factory,
         )
-        self._product_visualization_controller = ProductVisualizationController(
-            model.analysis_core.residual_analyzer,
-            model.analysis_core.residual_real_space_visualization_engine,
-            model.analysis_core.residual_reciprocal_space_visualization_engine,
-            self._product_controller,
-            view.product_visualization_view,
-            self._status_bar,
-            self._file_dialog_factory,
-        )
+        if is_developer_mode_enabled:
+            self._product_visualization_controller = ProductVisualizationController(
+                model.analysis_core.residual_analyzer,
+                model.analysis_core.residual_real_space_visualization_engine,
+                model.analysis_core.residual_reciprocal_space_visualization_engine,
+                self._product_controller,
+                view.product_visualization_view,
+                self._status_bar,
+                self._file_dialog_factory,
+            )
         self._probe_positions_controller = ProbePositionsController(
             model.product_core.probe_positions_repository,
             model.product_core.probe_positions_api,
@@ -209,7 +210,7 @@ class ControllerCore:
             view.genesis_action: model.genesis_core.is_supported,
         }
 
-        self._swap_central_widgets(view.patterns_action)
+        self._swap_central_widgets(view.patterns_action, animated=False)
         view.patterns_action.setChecked(True)
         view.navigation.action_group.triggered.connect(
             lambda action: self._swap_central_widgets(action)
@@ -222,19 +223,20 @@ class ControllerCore:
         self.view.setWindowTitle(window_title)
         self.view.show()
 
-    def _swap_central_widgets(self, action: QAction | None) -> None:
+    def _swap_central_widgets(self, action: QAction | None, *, animated: bool = True) -> None:
         if action is None:
             raise ValueError('QAction is None!')
 
         self.view.navigation.set_current_index(action.data())
-        self._update_subview_visibility(action)
+        self._update_subview_visibility(action, animated=animated)
 
-    def _update_subview_visibility(self, action: QAction) -> None:
+    def _update_subview_visibility(self, action: QAction, *, animated: bool = True) -> None:
         for group in self.view.navigation.subview_groups:
             expanded = action is group.parent_action or action in group.child_actions
             for child in group.child_actions:
                 allowed = self._action_permitted.get(child, True)
-                child.setVisible(expanded and allowed)
+                group.container.set_child_button_visible(child, allowed)
+            group.container.set_expanded(expanded, animated=animated)
             group.top_separator.setVisible(expanded)
             group.bottom_separator.setVisible(expanded)
 
