@@ -101,7 +101,7 @@ def main() -> int:
 
         from ptychodus.view import ViewCore
 
-        view = ViewCore()
+        view = ViewCore(is_developer_mode_enabled=model.is_developer_mode_enabled)
 
         from ptychodus.controller import ControllerCore
 

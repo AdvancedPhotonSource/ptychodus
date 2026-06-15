@@ -2,7 +2,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 import logging
 
-from PyQt5.QtCore import PYQT_VERSION_STR, QSize, QT_VERSION_STR, Qt
+from PyQt5.QtCore import (
+    PYQT_VERSION_STR,
+    QEasingCurve,
+    QPropertyAnimation,
+    QSize,
+    QT_VERSION_STR,
+    Qt,
+)
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
     QAction,
@@ -16,6 +23,7 @@ from PyQt5.QtWidgets import (
     QTableView,
     QToolBar,
     QToolButton,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -32,20 +40,81 @@ from .settings import SettingsView
 logger = logging.getLogger(__name__)
 
 
-_SUBVIEW_BUTTON_STYLE = (
-    'QToolButton { padding-left: 12px; background-color: palette(mid); }'
-    'QToolButton:hover { background-color: palette(midlight); }'
-    'QToolButton:checked {'
+_SUBVIEW_GROUP_STYLE = (
+    '_SubviewGroupContainer { background-color: palette(mid); }'
+    '_SubviewGroupContainer QToolButton { background: transparent; border: none; }'
+    '_SubviewGroupContainer QToolButton:hover { background-color: palette(midlight); }'
+    '_SubviewGroupContainer QToolButton:checked {'
     '    background-color: palette(highlight);'
     '    color: palette(highlighted-text);'
     '}'
 )
+
+_EXPAND_COLLAPSE_DURATION_MS = 180
+
+
+class _SubviewGroupContainer(QWidget):
+    def __init__(
+        self,
+        child_actions: tuple[QAction, ...],
+        *,
+        icon_size: QSize,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setStyleSheet(_SUBVIEW_GROUP_STYLE)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        self._buttons: dict[QAction, QToolButton] = {}
+        for action in child_actions:
+            btn = QToolButton(self)
+            btn.setDefaultAction(action)
+            btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+            btn.setIconSize(icon_size)
+            layout.addWidget(btn)
+            self._buttons[action] = btn
+
+        layout.activate()
+        self._cached_natural_height = layout.sizeHint().height()
+
+        self.setMaximumHeight(0)
+        self._expanded = False
+
+        self._animation = QPropertyAnimation(self, b'maximumHeight', self)
+        self._animation.setDuration(_EXPAND_COLLAPSE_DURATION_MS)
+        self._animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
+
+    def child_button(self, action: QAction) -> QToolButton | None:
+        return self._buttons.get(action)
+
+    def set_child_button_visible(self, action: QAction, visible: bool) -> None:
+        btn = self._buttons.get(action)
+        if btn is not None:
+            btn.setVisible(visible)
+
+    def set_expanded(self, expanded: bool, *, animated: bool = True) -> None:
+        running = self._animation.state() == QPropertyAnimation.State.Running
+        if expanded == self._expanded and not running:
+            return
+        self._expanded = expanded
+        self._animation.stop()
+        target = self._cached_natural_height if expanded else 0
+        if not animated:
+            self.setMaximumHeight(target)
+            return
+        self._animation.setStartValue(self.maximumHeight())
+        self._animation.setEndValue(target)
+        self._animation.start()
 
 
 @dataclass(frozen=True)
 class NavigationSubviewGroup:
     parent_action: QAction
     child_actions: tuple[QAction, ...]
+    container: _SubviewGroupContainer
     top_separator: QAction
     bottom_separator: QAction
 
@@ -56,6 +125,7 @@ class NavigationPanel:
         self.action_group = QActionGroup(self.tool_bar)
         self.left_stack = QStackedWidget()
         self.right_stack = QStackedWidget()
+        self.top_level_actions: list[QAction] = []
         self.subview_groups: list[NavigationSubviewGroup] = []
 
     def add_panel(self, icon: QIcon, label: str, *, left: QWidget, right: QWidget) -> QAction:
@@ -67,6 +137,7 @@ class NavigationPanel:
         self.action_group.addAction(action)
         self.left_stack.addWidget(left)
         self.right_stack.addWidget(right)
+        self.top_level_actions.append(action)
         return action
 
     def add_subview_group(
@@ -74,14 +145,23 @@ class NavigationPanel:
         parent_action: QAction,
         child_actions: tuple[QAction, ...],
         *,
-        top_separator_before: QAction,
-        bottom_separator_before: QAction,
+        insert_before: QAction,
+        child_icon_size: QSize,
     ) -> NavigationSubviewGroup:
+        for child in child_actions:
+            self.tool_bar.removeAction(child)
+        top_separator = self.tool_bar.insertSeparator(insert_before)
+        container = _SubviewGroupContainer(child_actions, icon_size=child_icon_size)
+        self.tool_bar.insertWidget(insert_before, container)
+        bottom_separator = self.tool_bar.insertSeparator(insert_before)
+        top_separator.setVisible(False)
+        bottom_separator.setVisible(False)
         group = NavigationSubviewGroup(
             parent_action=parent_action,
             child_actions=child_actions,
-            top_separator=self.tool_bar.insertSeparator(top_separator_before),
-            bottom_separator=self.tool_bar.insertSeparator(bottom_separator_before),
+            container=container,
+            top_separator=top_separator,
+            bottom_separator=bottom_separator,
         )
         self.subview_groups.append(group)
         return group
@@ -90,9 +170,38 @@ class NavigationPanel:
         self.left_stack.setCurrentIndex(index)
         self.right_stack.setCurrentIndex(index)
 
+    def normalize_button_widths(self) -> None:
+        top_level_buttons: list[QToolButton] = []
+        for action in self.top_level_actions:
+            widget = self.tool_bar.widgetForAction(action)
+            if isinstance(widget, QToolButton):
+                top_level_buttons.append(widget)
+
+        child_buttons: list[QToolButton] = []
+        for group in self.subview_groups:
+            for action in group.child_actions:
+                btn = group.container.child_button(action)
+                if btn is not None:
+                    child_buttons.append(btn)
+
+        all_buttons = top_level_buttons + child_buttons
+        if not all_buttons:
+            return
+
+        target_width = max(btn.sizeHint().width() for btn in all_buttons)
+        for btn in all_buttons:
+            btn.setFixedWidth(target_width)
+        for group in self.subview_groups:
+            group.container.setFixedWidth(target_width)
+
 
 class ViewCore(QMainWindow):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        is_developer_mode_enabled: bool = False,
+    ) -> None:
         super().__init__(parent)
 
         logger.info(f'PyQt {PYQT_VERSION_STR}')
@@ -121,12 +230,16 @@ class ViewCore(QMainWindow):
         )
 
         self.product_view = ProductView()
-        self.product_visualization_view = ProductVisualizationView()
+        if is_developer_mode_enabled:
+            self.product_visualization_view = ProductVisualizationView()
+            product_right: QWidget = self.product_visualization_view
+        else:
+            product_right = QWidget()
         self.product_action = self.navigation.add_panel(
             QIcon(':/icons/products'),
             'Products',
             left=self.product_view,
-            right=self.product_visualization_view,
+            right=product_right,
         )
 
         self.probe_positions_view = RepositoryTableView()
@@ -201,19 +314,6 @@ class ViewCore(QMainWindow):
             right=self.agent_chat_view,
         )
 
-        self.navigation.add_subview_group(
-            parent_action=self.product_action,
-            child_actions=(self.positions_action, self.probe_action, self.object_action),
-            top_separator_before=self.positions_action,
-            bottom_separator_before=self.processing_action,
-        )
-        self.navigation.add_subview_group(
-            parent_action=self.processing_action,
-            child_actions=(self.globus_action, self.genesis_action, self.automation_action),
-            top_separator_before=self.globus_action,
-            bottom_separator_before=self.agent_action,
-        )
-
         #####
 
         self.setWindowIcon(QIcon(':/icons/ptychodus'))
@@ -223,12 +323,20 @@ class ViewCore(QMainWindow):
         self.navigation.tool_bar.setIconSize(QSize(32, 32))
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, self.navigation.tool_bar)
 
-        for group in self.navigation.subview_groups:
-            for action in group.child_actions:
-                btn = self.navigation.tool_bar.widgetForAction(action)
-                if isinstance(btn, QToolButton):
-                    btn.setIconSize(QSize(24, 24))
-                    btn.setStyleSheet(_SUBVIEW_BUTTON_STYLE)
+        self.navigation.add_subview_group(
+            parent_action=self.product_action,
+            child_actions=(self.positions_action, self.probe_action, self.object_action),
+            insert_before=self.processing_action,
+            child_icon_size=QSize(24, 24),
+        )
+        self.navigation.add_subview_group(
+            parent_action=self.processing_action,
+            child_actions=(self.globus_action, self.genesis_action, self.automation_action),
+            insert_before=self.agent_action,
+            child_icon_size=QSize(24, 24),
+        )
+
+        self.navigation.normalize_button_widths()
 
         self.navigation.left_stack.setSizePolicy(
             QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum

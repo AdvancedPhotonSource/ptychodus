@@ -118,6 +118,8 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
 
     def get_current_plugin(self) -> Plugin[T]:
         """Return the currently selected plugin."""
+        if not self._registered_plugins:
+            raise LookupError('No plugins registered')
         return self._registered_plugins[self._current_index]
 
     def set_current_plugin(self, name: str) -> None:
