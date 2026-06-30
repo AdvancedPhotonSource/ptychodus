@@ -1,13 +1,17 @@
-from .chat import ChatMessage, ChatHistory, ChatObserver, ChatRole
-from .core import AgentCore, AgentPresenter
-from .settings import ArgoSettings
+from .core import AgentCore
+from .model_catalog import ModelCatalog
+from .models import ChatMessage, ChatRole
+from .repository import ConversationObserver, ConversationRepository
+from .settings import AgentSettings
+from .terminal import ChatTerminal
 
 __all__ = [
     'AgentCore',
-    'AgentPresenter',
-    'ArgoSettings',
-    'ChatHistory',
+    'AgentSettings',
     'ChatMessage',
-    'ChatObserver',
     'ChatRole',
+    'ChatTerminal',
+    'ConversationObserver',
+    'ConversationRepository',
+    'ModelCatalog',
 ]
