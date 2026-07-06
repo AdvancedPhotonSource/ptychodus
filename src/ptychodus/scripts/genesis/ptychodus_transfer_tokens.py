@@ -4,7 +4,7 @@ import argparse
 import json
 import logging
 
-import requests
+import httpx
 
 from ptychodus.model.genesis.core import create_globus_transfer_providers
 from ptychodus.model.genesis.tokens import GenesisAccessTokens, save_tokens
@@ -32,7 +32,7 @@ def check_tokens() -> None:
 
         try:
             data = client.check_auth_token()
-        except requests.HTTPError as exc:
+        except httpx.HTTPStatusError as exc:
             logger.error(f'"{name}" token error: {exc}')
         else:
             logger.info(f'"{name}" token response:' + json.dumps(data, indent=4))

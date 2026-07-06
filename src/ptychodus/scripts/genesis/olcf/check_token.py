@@ -4,7 +4,7 @@ import json
 import logging
 import sys
 
-import requests
+import httpx
 
 from ptychodus.model.genesis.iri.client import get_iri_tokens_file
 from ptychodus.model.genesis.tokens import create_headers, load_tokens
@@ -29,14 +29,18 @@ def main() -> None:
     headers = create_headers(olcf_token)
 
     logger.info('Testing token validity...')
-    token_response = requests.get(
-        'https://s3m.olcf.ornl.gov/olcf/v1/token/ctls/introspect', headers=headers
+    token_response = httpx.get(
+        'https://s3m.olcf.ornl.gov/olcf/v1/token/ctls/introspect',
+        headers=headers,
+        timeout=30.0,
     )
     print(json.dumps(token_response.json(), indent=2))
 
     logger.info('Testing resource availability...')
-    resource_response = requests.get(
-        'https://amsc-open.s3m.olcf.ornl.gov/api/v1/status/resources/odo', headers=headers
+    resource_response = httpx.get(
+        'https://amsc-open.s3m.olcf.ornl.gov/api/v1/status/resources/odo',
+        headers=headers,
+        timeout=30.0,
     )
     print(json.dumps(resource_response.json(), indent=2))
 

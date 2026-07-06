@@ -98,9 +98,13 @@ def _write_product_h5(path: Path) -> None:
 
 
 def _write_fluorescence_h5(path: Path, elements: list[str], h: int = 6, w: int = 10) -> None:
+    """Write the XRF-Maps v10 NNLS layout expected by :func:`load_fluorescence_data`."""
     with h5py.File(path, 'w') as f:
-        f.create_dataset('element_names', data=np.array(elements, dtype='S16'))
-        f.create_dataset('element_maps', data=np.zeros((len(elements), h, w), dtype=np.float32))
+        group = f.require_group('/MAPS/XRF_Analyzed/NNLS')
+        group.create_dataset(
+            'Counts_Per_Sec', data=np.zeros((len(elements), h, w), dtype=np.float32)
+        )
+        group.create_dataset('Channel_Names', data=np.array(elements, dtype='S16'))
 
 
 @pytest.fixture
@@ -238,6 +242,7 @@ async def app_client(
         fluorescence,
         health,
         lineage,
+        visualization,
     )
     from ptychodus_store.routers import product as product_router
 
@@ -262,6 +267,7 @@ async def app_client(
     app.include_router(fluorescence.router, prefix=api_prefix)
     app.include_router(lineage.router, prefix=api_prefix)
     app.include_router(admin.router, prefix=api_prefix)
+    app.include_router(visualization.router, prefix=api_prefix)
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url='http://testserver') as client:

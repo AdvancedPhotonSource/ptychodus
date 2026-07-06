@@ -7,7 +7,7 @@ from typing import Any
 
 import h5py
 
-from ptychodus.api.io import DiffractionFileKeys, ProductFileKeys
+from ptychodus.api.io import DiffractionFileKeys, ProductFileKeys, load_fluorescence_data
 
 
 class IntrospectionError(Exception):
@@ -137,40 +137,26 @@ def introspect_product(path: Path) -> dict[str, Any]:
         raise IntrospectionError(f'{path}: {exc}') from exc
 
 
-FLUORESCENCE_ELEMENT_NAMES_KEY = 'element_names'
-FLUORESCENCE_ELEMENT_MAPS_KEY = 'element_maps'
-
-
 def introspect_fluorescence(path: Path) -> dict[str, Any]:
-    """Read element names and map shape from fluorescence.h5.
-
-    The service convention is a flat layout:
-      * `element_names` — 1D string dataset, length N_elements
-      * `element_maps`  — 3D float dataset, shape (N_elements, H, W)
+    """Read element names and map shape from a fluorescence.h5 file (XRF-Maps layout).
 
     Returns a dict with `element_names: list[str]` and `map_shape: tuple[int, int] | None`.
+    Delegates to :func:`ptychodus.api.io.load_fluorescence_data`, which recognises the
+    v10 NNLS/Fitted and legacy v9 layouts.
     """
     try:
-        with h5py.File(path, 'r') as f:
-            names_ds = f.get(FLUORESCENCE_ELEMENT_NAMES_KEY)
-            maps_ds = f.get(FLUORESCENCE_ELEMENT_MAPS_KEY)
-
-            element_names: list[str] = []
-            if isinstance(names_ds, h5py.Dataset):
-                raw = names_ds[()]
-                for entry in raw:
-                    if isinstance(entry, bytes):
-                        element_names.append(entry.decode('utf-8', errors='replace'))
-                    else:
-                        element_names.append(str(entry))
-
-            map_shape: tuple[int, int] | None = None
-            if isinstance(maps_ds, h5py.Dataset) and len(maps_ds.shape) == 3:
-                map_shape = (int(maps_ds.shape[1]), int(maps_ds.shape[2]))
-
-            return {
-                'element_names': element_names,
-                'map_shape': map_shape,
-            }
-    except (OSError, KeyError) as exc:
+        dataset = load_fluorescence_data(path)
+    except (OSError, KeyError, ValueError) as exc:
         raise IntrospectionError(f'{path}: {exc}') from exc
+
+    element_names = [emap.name for emap in dataset.element_maps]
+    map_shape: tuple[int, int] | None = None
+    if dataset.element_maps:
+        cps = dataset.element_maps[0].counts_per_second
+        if cps.ndim == 2:
+            map_shape = (int(cps.shape[0]), int(cps.shape[1]))
+
+    return {
+        'element_names': element_names,
+        'map_shape': map_shape,
+    }

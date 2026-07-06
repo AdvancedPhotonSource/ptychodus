@@ -21,7 +21,6 @@ dependencies = [
     "pydantic",
     "pydantic-ai>=1.0,<3",
     "pyyaml",
-    "requests",
     "scikit-image",
     "scipy",
     "tifffile",
@@ -53,6 +52,7 @@ store = [
     "uvicorn[standard]>=0.30",
     "sqlalchemy[asyncio]>=2.0",
     "aiosqlite>=0.20",
+    "pillow>=10",
     "pydantic-settings>=2.5",
     "python-multipart",
 ]
@@ -122,7 +122,6 @@ dev = [
     "ruff",
     "types-psutil",
     "types-pyyaml",
-    "types-requests",
 ]
 
 [tool.pytest.ini_options]

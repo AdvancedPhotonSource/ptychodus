@@ -11,7 +11,7 @@ import typer
 import globus_sdk
 from globus_sdk.scopes import TransferScopes
 from globus_sdk.gare import GlobusAuthorizationParameters
-import requests
+import httpx
 import json
 
 
@@ -93,15 +93,22 @@ def test_transfer(source_url: str = None, destination_url: str = None):
             'label': 'Test Transfer on Tutorial Endpoints',
         }
 
-    r = requests.post('https://amsc-data-api.nersc.gov/transfer/globus', json=payload, headers=auth)
+    r = httpx.post(
+        'https://amsc-data-api.nersc.gov/transfer/globus',
+        json=payload,
+        headers=auth,
+        timeout=30.0,
+    )
     print(json.dumps(r.json()))
 
 
 @app.command()
 def check_transfer(transfer_uuid: str):
     auth = {'Authorization': f'Bearer {globus_app.get_authorizer(RESOURCE_SERVER).access_token}'}
-    r = requests.get(
-        f'https://amsc-data-api.nersc.gov/transfer/globus/{transfer_uuid}', headers=auth
+    r = httpx.get(
+        f'https://amsc-data-api.nersc.gov/transfer/globus/{transfer_uuid}',
+        headers=auth,
+        timeout=30.0,
     )
     print(json.dumps(r.json()))
 

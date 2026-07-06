@@ -107,6 +107,7 @@ Two providers, both gated by optional dependencies and constructed by `ModelCore
 - Ruff is configured for **single-quoted** strings, 100-char lines, py311 target. The selected lint rules (F, N, NPY) flag pyflakes errors, PEP-8 naming, and NumPy-specific issues. NumPy/Qt-style names (e.g., `probe_energy_eV`, `set_value_from_string`) are accepted via `# noqa: N802/N806/N815` — preserve the unit suffixes on physical quantities; reviewers expect them.
 - Type hints are mandatory; `pyproject.toml` lists modules whose missing stubs are intentionally ignored. Keep new code typed and avoid widening that ignore list.
 - `model/core.py::ModelCore.is_developer_mode_enabled` is `True` whenever the effective log level ≤ DEBUG (`--log-level 10`). Some controllers gate features (Agent panel, probe-position analysis) behind it.
+- HTTP-client code uses `httpx` throughout (sync `httpx.Client` for repeated calls, module-level `httpx.get/post/...` for one-shots). `requests` is not a direct dependency.
 
 ## Repository Notes
 

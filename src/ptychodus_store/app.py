@@ -13,8 +13,16 @@ from ptychodus_store.config import Settings, get_settings
 from ptychodus_store.db.session import SessionProvider, create_engine, create_schema
 from ptychodus_store.ingest.reconciler import full_rescan
 from ptychodus_store.ingest.watcher import ManifestWatcher
-from ptychodus_store.mcp_server import bind_session_provider, create_mcp_server
-from ptychodus_store.routers import admin, campaign, diffraction, fluorescence, health, lineage
+from ptychodus_store.mcp_server import bind_layout, bind_session_provider, create_mcp_server
+from ptychodus_store.routers import (
+    admin,
+    campaign,
+    diffraction,
+    fluorescence,
+    health,
+    lineage,
+    visualization,
+)
 from ptychodus_store.routers import product as product_router
 from ptychodus_store.storage.layout import StoreLayout
 
@@ -41,6 +49,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await create_schema(engine)
         bind_session_provider(session_provider)
+        bind_layout(layout)
         layout.ensure_kind_dirs()
 
         watcher: ManifestWatcher | None = None
@@ -80,6 +89,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(fluorescence.router, prefix=api_prefix)
     app.include_router(lineage.router, prefix=api_prefix)
     app.include_router(admin.router, prefix=api_prefix)
+    app.include_router(visualization.router, prefix=api_prefix)
 
     # Mount the fastmcp HTTP app at the configured path
     try:

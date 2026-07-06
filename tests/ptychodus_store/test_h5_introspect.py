@@ -72,8 +72,9 @@ def test_introspect_product(tmp_path: Path) -> None:
 def test_introspect_fluorescence(tmp_path: Path) -> None:
     path = tmp_path / 'fluorescence.h5'
     with h5py.File(path, 'w') as f:
-        f.create_dataset('element_names', data=np.array(['Fe', 'Cu'], dtype='S8'))
-        f.create_dataset('element_maps', data=np.zeros((2, 6, 9), dtype=np.float32))
+        group = f.require_group('/MAPS/XRF_Analyzed/NNLS')
+        group.create_dataset('Counts_Per_Sec', data=np.zeros((2, 6, 9), dtype=np.float32))
+        group.create_dataset('Channel_Names', data=np.array(['Fe', 'Cu'], dtype='S8'))
 
     result = introspect_fluorescence(path)
     assert result['element_names'] == ['Fe', 'Cu']

@@ -5,16 +5,38 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from uuid import UUID
 
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
+from fastmcp.utilities.types import Image as MCPImage
 from sqlalchemy import String, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.io import load_diffraction_data, load_fluorescence_data, load_product
+from ptychodus.api.visualization import (
+    ComplexComponent,
+    CylindricalColorModel,
+    ScalarTransformation,
+    cyclic_colormap_names,
+    linear_colormap_names,
+)
 
 from ptychodus_store.db import repositories as repo
 from ptychodus_store.db.base import IngestState
 from ptychodus_store.db.models import Campaign, DerivationEdge, Diffraction, Fluorescence, Product
 from ptychodus_store.db.session import SessionProvider
+from ptychodus_store.rendering import (
+    OptionsRead,
+    RenderParamsError,
+    build_visualization_complex,
+    build_visualization_real,
+    coerce_render_params,
+    product_to_png_bytes,
+)
+from ptychodus_store.rendering.params import InvalidRenderParamError
 from ptychodus_store.routers._convert import (
     campaign_to_read,
     diffraction_to_read,
@@ -31,17 +53,25 @@ from ptychodus_store.routers.schemas import (
     ProductRead,
     StoreStats,
 )
+from ptychodus_store.storage.layout import StoreLayout
 from ptychodus_store.storage.manifest import ResourceKind
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_FLUORESCENCE_PIXEL_GEOMETRY = PixelGeometry(width_m=1e-6, height_m=1e-6)
+
 
 class _Ctx:
     provider: SessionProvider | None = None
+    layout: StoreLayout | None = None
 
 
 def bind_session_provider(provider: SessionProvider) -> None:
     _Ctx.provider = provider
+
+
+def bind_layout(layout: StoreLayout) -> None:
+    _Ctx.layout = layout
 
 
 @asynccontextmanager
@@ -50,6 +80,50 @@ async def _session() -> AsyncIterator[AsyncSession]:
         raise RuntimeError('SessionProvider not bound; call bind_session_provider() first')
     async with _Ctx.provider.session_factory() as session:
         yield session
+
+
+def _require_layout() -> StoreLayout:
+    if _Ctx.layout is None:
+        raise ToolError('StoreLayout not bound; call bind_layout() first')
+    return _Ctx.layout
+
+
+def _resolve_resource_file(kind: str, uuid: UUID, filename: str) -> Path:
+    layout = _require_layout()
+    path = layout.resource_folder(kind, uuid) / filename
+    if not path.is_file():
+        raise ToolError(f'{filename} for {kind} {uuid} not present on disk')
+    return path
+
+
+async def _ensure_row_exists(kind: str, uuid: UUID) -> None:
+    async with _session() as session:
+        row = await repo.get_row(session, kind, uuid)
+        if row is None:
+            raise ToolError(f'{kind} {uuid} not found')
+
+
+def _coerce_render_params_or_error(
+    colormap: str,
+    transform: str,
+    component: str | None,
+    color_model: str | None,
+    value_min: float | None,
+    value_max: float | None,
+    clip: bool,
+):  # -> RenderParams (typing.TYPE_CHECKING avoided to keep import surface small)
+    try:
+        return coerce_render_params(
+            colormap=colormap,
+            transform=transform,
+            component=component,
+            color_model=color_model,
+            value_min=value_min,
+            value_max=value_max,
+            clip=clip,
+        )
+    except InvalidRenderParamError as exc:
+        raise ToolError(str(exc)) from exc
 
 
 def create_mcp_server() -> FastMCP:
@@ -254,5 +328,216 @@ def create_mcp_server() -> FastMCP:
                 fluorescence_count=await _count(Fluorescence),
                 invalid_count=invalid_total,
             )
+
+    @mcp.tool()
+    async def get_visualization_options() -> OptionsRead:
+        """Enumerate valid choices for colormap / transform / component / color_model."""
+        return OptionsRead(
+            colormaps_linear=list(linear_colormap_names()),
+            colormaps_cyclic=list(cyclic_colormap_names()),
+            transforms=[member.name.lower() for member in ScalarTransformation],
+            components=[member.name.lower() for member in ComplexComponent],
+            color_models=[member.name.lower() for member in CylindricalColorModel],
+        )
+
+    @mcp.tool()
+    async def render_diffraction_pattern(
+        uuid: str,
+        index: int,
+        colormap: str = 'gray',
+        transform: str = 'identity',
+        value_min: float | None = None,
+        value_max: float | None = None,
+        clip: bool = False,
+    ) -> MCPImage:
+        """Render a single diffraction pattern from an assembled dataset."""
+        target = UUID(uuid)
+        await _ensure_row_exists(ResourceKind.DIFFRACTION, target)
+        path = _resolve_resource_file(ResourceKind.DIFFRACTION, target, 'diffraction.h5')
+        data = load_diffraction_data(path)
+        num_patterns = data.get_patterns_shape()[0]
+        if not 0 <= index < num_patterns:
+            raise ToolError(f'pattern index {index} out of range [0, {num_patterns})')
+        params = _coerce_render_params_or_error(
+            colormap, transform, None, None, value_min, value_max, clip
+        )
+        try:
+            vp = build_visualization_real(
+                data.get_pattern(index), data.get_pixel_geometry(), params, value_label='Counts'
+            )
+        except RenderParamsError as exc:
+            raise ToolError(str(exc)) from exc
+        return MCPImage(data=product_to_png_bytes(vp), format='png')
+
+    @mcp.tool()
+    async def render_diffraction_aggregate(
+        uuid: str,
+        colormap: str = 'gray',
+        transform: str = 'identity',
+        value_min: float | None = None,
+        value_max: float | None = None,
+        clip: bool = False,
+    ) -> MCPImage:
+        """Render the mean pattern across an assembled diffraction dataset."""
+        target = UUID(uuid)
+        await _ensure_row_exists(ResourceKind.DIFFRACTION, target)
+        path = _resolve_resource_file(ResourceKind.DIFFRACTION, target, 'diffraction.h5')
+        data = load_diffraction_data(path)
+        params = _coerce_render_params_or_error(
+            colormap, transform, None, None, value_min, value_max, clip
+        )
+        try:
+            vp = build_visualization_real(
+                data.get_average_pattern(),
+                data.get_pixel_geometry(),
+                params,
+                value_label='Mean Counts',
+            )
+        except RenderParamsError as exc:
+            raise ToolError(str(exc)) from exc
+        return MCPImage(data=product_to_png_bytes(vp), format='png')
+
+    @mcp.tool()
+    async def render_probe(
+        uuid: str,
+        incoherent: int = 0,
+        colormap: str = 'gray',
+        transform: str = 'identity',
+        component: str | None = None,
+        color_model: str | None = None,
+        value_min: float | None = None,
+        value_max: float | None = None,
+        clip: bool = False,
+    ) -> MCPImage:
+        """Render a single incoherent probe mode. coherent axis is fixed at 0."""
+        target = UUID(uuid)
+        await _ensure_row_exists(ResourceKind.PRODUCT, target)
+        path = _resolve_resource_file(ResourceKind.PRODUCT, target, 'product.h5')
+        product = load_product(path)
+        probe = product.probes.get_probe_no_opr()
+        if not 0 <= incoherent < probe.num_incoherent_modes:
+            raise ToolError(
+                f'incoherent mode {incoherent} out of range [0, {probe.num_incoherent_modes})'
+            )
+        params = _coerce_render_params_or_error(
+            colormap, transform, component, color_model, value_min, value_max, clip
+        )
+        try:
+            vp = build_visualization_complex(
+                probe.get_incoherent_mode(incoherent),
+                product.probes.get_pixel_geometry(),
+                params,
+            )
+        except RenderParamsError as exc:
+            raise ToolError(str(exc)) from exc
+        return MCPImage(data=product_to_png_bytes(vp), format='png')
+
+    @mcp.tool()
+    async def render_probe_modes(
+        uuid: str,
+        colormap: str = 'gray',
+        transform: str = 'identity',
+        component: str | None = None,
+        color_model: str | None = None,
+        value_min: float | None = None,
+        value_max: float | None = None,
+        clip: bool = False,
+    ) -> MCPImage:
+        """Render all incoherent probe modes tiled horizontally into a single image."""
+        target = UUID(uuid)
+        await _ensure_row_exists(ResourceKind.PRODUCT, target)
+        path = _resolve_resource_file(ResourceKind.PRODUCT, target, 'product.h5')
+        product = load_product(path)
+        probe = product.probes.get_probe_no_opr()
+        params = _coerce_render_params_or_error(
+            colormap, transform, component, color_model, value_min, value_max, clip
+        )
+        try:
+            vp = build_visualization_complex(
+                probe.get_incoherent_modes_flattened(),
+                product.probes.get_pixel_geometry(),
+                params,
+            )
+        except RenderParamsError as exc:
+            raise ToolError(str(exc)) from exc
+        return MCPImage(data=product_to_png_bytes(vp), format='png')
+
+    @mcp.tool()
+    async def render_object_layer(
+        uuid: str,
+        layer: int,
+        colormap: str = 'gray',
+        transform: str = 'identity',
+        component: str | None = None,
+        color_model: str | None = None,
+        value_min: float | None = None,
+        value_max: float | None = None,
+        clip: bool = False,
+    ) -> MCPImage:
+        """Render a single object layer as a complex-valued image."""
+        target = UUID(uuid)
+        await _ensure_row_exists(ResourceKind.PRODUCT, target)
+        path = _resolve_resource_file(ResourceKind.PRODUCT, target, 'product.h5')
+        product = load_product(path)
+        if not 0 <= layer < product.object_.num_layers:
+            raise ToolError(f'object layer {layer} out of range [0, {product.object_.num_layers})')
+        params = _coerce_render_params_or_error(
+            colormap, transform, component, color_model, value_min, value_max, clip
+        )
+        try:
+            vp = build_visualization_complex(
+                product.object_.get_layer(layer),
+                product.object_.get_pixel_geometry(),
+                params,
+            )
+        except RenderParamsError as exc:
+            raise ToolError(str(exc)) from exc
+        return MCPImage(data=product_to_png_bytes(vp), format='png')
+
+    @mcp.tool()
+    async def render_fluorescence_element(
+        uuid: str,
+        name: str,
+        product_uuid: str | None = None,
+        colormap: str = 'gray',
+        transform: str = 'identity',
+        value_min: float | None = None,
+        value_max: float | None = None,
+        clip: bool = False,
+    ) -> MCPImage:
+        """Render one element map from a fluorescence dataset."""
+        target = UUID(uuid)
+        await _ensure_row_exists(ResourceKind.FLUORESCENCE, target)
+        path = _resolve_resource_file(ResourceKind.FLUORESCENCE, target, 'fluorescence.h5')
+        dataset = load_fluorescence_data(path)
+        matches = [emap for emap in dataset.element_maps if emap.name == name]
+        if not matches:
+            available = ', '.join(emap.name for emap in dataset.element_maps)
+            raise ToolError(f'element {name!r} not found; available: [{available}]')
+        emap = matches[0]
+
+        if product_uuid is not None:
+            product_target = UUID(product_uuid)
+            await _ensure_row_exists(ResourceKind.PRODUCT, product_target)
+            product_path = _resolve_resource_file(
+                ResourceKind.PRODUCT, product_target, 'product.h5'
+            )
+            pixel_geometry = load_product(product_path).object_.get_pixel_geometry()
+        else:
+            pixel_geometry = _DEFAULT_FLUORESCENCE_PIXEL_GEOMETRY
+
+        params = _coerce_render_params_or_error(
+            colormap, transform, None, None, value_min, value_max, clip
+        )
+        try:
+            vp = build_visualization_real(
+                emap.counts_per_second,
+                pixel_geometry,
+                params,
+                value_label=f'{emap.name} counts/s',
+            )
+        except RenderParamsError as exc:
+            raise ToolError(str(exc)) from exc
+        return MCPImage(data=product_to_png_bytes(vp), format='png')
 
     return mcp

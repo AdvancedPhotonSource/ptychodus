@@ -5,7 +5,7 @@ import argparse
 import json
 import logging
 
-import requests
+import httpx
 
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.genesis.core import create_facility_adapters
@@ -53,7 +53,7 @@ def check_tokens() -> None:
 
         try:
             projects = client.account.get_projects()
-        except requests.HTTPError as exc:
+        except httpx.HTTPStatusError as exc:
             logger.error(f'"{name}" token error: {exc}')
         else:
             data = [project.model_dump(mode='json') for project in projects]
@@ -77,7 +77,7 @@ def list_resources() -> None:
             facility = client.facility.get_facility()
             sites = client.facility.get_sites()
             resources = client.status.get_resources()
-        except requests.HTTPError as exc:
+        except httpx.HTTPStatusError as exc:
             logger.error(f'"{name}" token error: {exc}')
         else:
             data[name] = {
