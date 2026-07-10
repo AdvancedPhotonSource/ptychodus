@@ -13,6 +13,7 @@ from ...model.analysis import IlluminationMapper, ProbePropagatorSettings, Probe
 from ...model.fluorescence import (
     FluorescenceAPI,
     FluorescenceTaskMonitor,
+    PtychozoonFluorescenceEnhancer,
     TwoStepFluorescenceEnhancer,
     VSPIFluorescenceEnhancer,
 )
@@ -52,6 +53,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         fluorescence_enhancer_chooser: PluginChooser[FluorescenceEnhancer],
         fluorescence_two_step_enhancer: TwoStepFluorescenceEnhancer,
         fluorescence_vspi_enhancer: VSPIFluorescenceEnhancer,
+        fluorescence_ptychozoon_enhancer: PtychozoonFluorescenceEnhancer | None,
         fluorescence_task_monitor: FluorescenceTaskMonitor,
         fluorescence_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
@@ -79,6 +81,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             fluorescence_enhancer_chooser,
             fluorescence_two_step_enhancer,
             fluorescence_vspi_enhancer,
+            fluorescence_ptychozoon_enhancer,
             fluorescence_task_monitor,
             fluorescence_visualization_engine,
             file_dialog_factory,

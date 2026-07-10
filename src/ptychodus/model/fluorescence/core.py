@@ -15,9 +15,12 @@ from ..task_manager import TaskManager
 from ..visualization import VisualizationEngine
 from .api import FluorescenceAPI
 from .monitor import FluorescenceTaskMonitor
+from .ptychozoon import PtychozoonFluorescenceEnhancer
 from .settings import FluorescenceSettings
 from .two_step import TwoStepFluorescenceEnhancer
 from .vspi import VSPIFluorescenceEnhancer
+
+logger = logging.getLogger(__name__)
 
 
 class FluorescenceCore:
@@ -48,6 +51,26 @@ class FluorescenceCore:
             simple_name=VSPIFluorescenceEnhancer.SIMPLE_NAME,
             display_name=VSPIFluorescenceEnhancer.DISPLAY_NAME,
         )
+
+        # The GPU VSPI enhancer is optional: register it only when ptychozoon is
+        # installed so it silently disappears otherwise. Register it last so its
+        # combo-box entry and stacked GUI page stay aligned by index. Importing
+        # the top-level package is cheap and does not pull in CuPy (that happens
+        # only inside the spawned subprocess), so probing it here is safe.
+        self.ptychozoon_enhancer: PtychozoonFluorescenceEnhancer | None = None
+
+        try:
+            import ptychozoon  # noqa: F401
+        except ModuleNotFoundError:
+            logger.info('ptychozoon not found.')
+        else:
+            self.ptychozoon_enhancer = PtychozoonFluorescenceEnhancer(self._settings)
+            self.enhancer_chooser.register_plugin(
+                self.ptychozoon_enhancer,
+                simple_name=PtychozoonFluorescenceEnhancer.SIMPLE_NAME,
+                display_name=PtychozoonFluorescenceEnhancer.DISPLAY_NAME,
+            )
+
         self.enhancer_chooser.synchronize_with_parameter(self._settings.algorithm)
 
         file_reader_chooser.synchronize_with_parameter(self._settings.file_type)

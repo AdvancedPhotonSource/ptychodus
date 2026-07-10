@@ -129,6 +129,7 @@ class ControllerCore:
             model.fluorescence_core.enhancer_chooser,
             model.fluorescence_core.two_step_enhancer,
             model.fluorescence_core.vspi_enhancer,
+            model.fluorescence_core.ptychozoon_enhancer,
             model.fluorescence_core.task_monitor,
             model.fluorescence_core.visualization_engine,
             view.probe_view,

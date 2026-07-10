@@ -12,12 +12,14 @@ from ptychodus.api.plugins import PluginChooser
 from ...model.fluorescence import (
     FluorescenceAPI,
     FluorescenceTaskMonitor,
+    PtychozoonFluorescenceEnhancer,
     TwoStepFluorescenceEnhancer,
     VSPIFluorescenceEnhancer,
 )
 from ...model.visualization import VisualizationEngine
 from ...view.probe import (
     FluorescenceDialog,
+    FluorescencePtychozoonParametersView,
     FluorescenceStatusView,
     FluorescenceTwoStepParametersView,
     FluorescenceVSPIParametersView,
@@ -125,6 +127,69 @@ class FluorescenceVSPIViewController(Observer):
             self._sync_model_to_view()
 
 
+class FluorescencePtychozoonViewController(Observer):
+    MAX_INT: Final[int] = 0x7FFFFFFF
+
+    def __init__(self, enhancer: PtychozoonFluorescenceEnhancer) -> None:
+        super().__init__()
+        self._enhancer = enhancer
+        self._view = FluorescencePtychozoonParametersView()
+
+        self._view.damping_factor_line_edit.value_changed.connect(
+            self._sync_damping_factor_to_model
+        )
+        self._view.gradient_smoothness_line_edit.value_changed.connect(
+            self._sync_gradient_smoothness_to_model
+        )
+        self._view.max_iterations_spin_box.setRange(1, self.MAX_INT)
+        self._view.max_iterations_spin_box.valueChanged.connect(enhancer.set_max_iterations)
+        self._view.atol_line_edit.value_changed.connect(self._sync_atol_to_model)
+        self._view.btol_line_edit.value_changed.connect(self._sync_btol_to_model)
+        self._view.checkpoint_interval_spin_box.setRange(1, self.MAX_INT)
+        self._view.checkpoint_interval_spin_box.valueChanged.connect(
+            enhancer.set_checkpoint_interval
+        )
+        self._view.use_gpu_check_box.toggled.connect(enhancer.set_gpu_enabled)
+        self._view.gpu_device_index_spin_box.setRange(0, self.MAX_INT)
+        self._view.gpu_device_index_spin_box.valueChanged.connect(enhancer.set_gpu_device_index)
+
+        enhancer.add_observer(self)
+        self._sync_model_to_view()
+
+    def get_widget(self) -> QWidget:
+        return self._view
+
+    def _sync_damping_factor_to_model(self, value: Decimal) -> None:
+        self._enhancer.set_damping_factor(float(value))
+
+    def _sync_gradient_smoothness_to_model(self, value: Decimal) -> None:
+        self._enhancer.set_gradient_smoothness(float(value))
+
+    def _sync_atol_to_model(self, value: Decimal) -> None:
+        self._enhancer.set_atol(float(value))
+
+    def _sync_btol_to_model(self, value: Decimal) -> None:
+        self._enhancer.set_btol(float(value))
+
+    def _sync_model_to_view(self) -> None:
+        self._view.damping_factor_line_edit.set_value(
+            Decimal(repr(self._enhancer.get_damping_factor()))
+        )
+        self._view.gradient_smoothness_line_edit.set_value(
+            Decimal(repr(self._enhancer.get_gradient_smoothness()))
+        )
+        self._view.max_iterations_spin_box.setValue(self._enhancer.get_max_iterations())
+        self._view.atol_line_edit.set_value(Decimal(repr(self._enhancer.get_atol())))
+        self._view.btol_line_edit.set_value(Decimal(repr(self._enhancer.get_btol())))
+        self._view.checkpoint_interval_spin_box.setValue(self._enhancer.get_checkpoint_interval())
+        self._view.use_gpu_check_box.setChecked(self._enhancer.is_gpu_enabled())
+        self._view.gpu_device_index_spin_box.setValue(self._enhancer.get_gpu_device_index())
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._enhancer:
+            self._sync_model_to_view()
+
+
 class FluorescenceStatusController(Observer):
     def __init__(
         self,
@@ -170,6 +235,7 @@ class FluorescenceViewController(Observer):
         enhancer_chooser: PluginChooser,
         two_step_enhancer: TwoStepFluorescenceEnhancer,
         vspi_enhancer: VSPIFluorescenceEnhancer,
+        ptychozoon_enhancer: PtychozoonFluorescenceEnhancer | None,
         task_monitor: FluorescenceTaskMonitor,
         engine: VisualizationEngine,
         file_dialog_factory: FileDialogFactory,
@@ -213,6 +279,23 @@ class FluorescenceViewController(Observer):
         self._dialog.fluorescence_parameters_view.stacked_widget.addWidget(
             vspi_view_controller.get_widget()
         )
+
+        # Registered last, matching the enhancer_chooser order, so the combo-box
+        # index selects the correct stacked page. Only present when ptychozoon is
+        # installed (enhancer is None otherwise).
+        self._ptychozoon_view_controller: FluorescencePtychozoonViewController | None = None
+
+        if ptychozoon_enhancer is not None:
+            self._ptychozoon_view_controller = FluorescencePtychozoonViewController(
+                ptychozoon_enhancer
+            )
+            self._dialog.fluorescence_parameters_view.algorithm_combo_box.addItem(
+                PtychozoonFluorescenceEnhancer.DISPLAY_NAME,
+                self._dialog.fluorescence_parameters_view.algorithm_combo_box.count(),
+            )
+            self._dialog.fluorescence_parameters_view.stacked_widget.addWidget(
+                self._ptychozoon_view_controller.get_widget()
+            )
 
         self._dialog.fluorescence_parameters_view.algorithm_combo_box.textActivated.connect(
             enhancer_chooser.set_current_plugin
