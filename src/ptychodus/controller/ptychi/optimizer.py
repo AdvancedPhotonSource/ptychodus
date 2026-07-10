@@ -64,13 +64,13 @@ class PtyChiOptimizationPlanViewController(ParameterViewController):
     ) -> None:
         super().__init__()
         self._start_view_controller = SpinBoxParameterViewController(
-            start, tool_tip='Iteration to start optimizing'
+            start, tool_tip='First epoch at which this parameter is optimized.'
         )
         self._stop_view_controller = PtyChiStopSpinBoxParameterViewController(
-            stop, num_epochs, tool_tip='Iteration to stop optimizing'
+            stop, num_epochs, tool_tip='Epoch after which this parameter is no longer optimized.'
         )
         self._stride_view_controller = SpinBoxParameterViewController(
-            stride, tool_tip='Number of iterations between updates'
+            stride, tool_tip='Number of epochs between updates of this parameter.'
         )
         self._widget = QWidget()
 

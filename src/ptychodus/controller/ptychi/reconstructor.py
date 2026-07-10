@@ -113,7 +113,10 @@ class PtyChiMomentumAccelerationGradientMixingFactorViewController(
         super().__init__(
             use_gradient_mixing_factor,
             'Use Gradient Mixing Factor',
-            tool_tip='Controls how the current gradient is mixed with the accumulated velocity in LSQML momentum acceleration',
+            tool_tip=(
+                'When enabled, use an explicit gradient mixing factor for momentum acceleration; '
+                'when disabled, it is chosen automatically from the estimated friction.'
+            ),
         )
         self._gradient_mixing_factor_view_controller = DecimalLineEditParameterViewController(
             gradient_mixing_factor, tool_tip=tool_tip
@@ -146,11 +149,16 @@ class PtyChiReconstructorViewController(ParameterViewController):
             settings.batch_size, tool_tip='Number of data to process in each minibatch'
         )
         self._batching_mode_view_controller = ComboBoxParameterViewController(
-            settings.batching_mode, enumerators.batching_modes(), tool_tip='Batching mode to use'
+            settings.batching_mode,
+            enumerators.batching_modes(),
+            tool_tip=(
+                'Minibatch selection: RANDOM (random points), COMPACT (spatially clustered), '
+                'or UNIFORM (spread across the scan).'
+            ),
         )
         self._compact_mode_update_clustering_view_controller = SpinBoxParameterViewController(
             settings.compact_mode_update_clustering,
-            tool_tip='When greater than zero, the number of epochs between updating clusters in compact batching mode',
+            tool_tip='Number of epochs between cluster updates in COMPACT batching mode (0 disables).',
         )
         self._device_view_controller = PtyChiDeviceViewController(
             settings.use_devices, repository, tool_tip='Default device to use for computation'
@@ -161,12 +169,12 @@ class PtyChiReconstructorViewController(ParameterViewController):
         )
         self._fft_precision_view_controller = PtyChiPrecisionParameterViewController(
             settings.use_double_precision_for_fft,
-            tool_tip='Floating point precision to use for critical FFT operations',
+            tool_tip='Use double precision for critical FFT operations, overriding the compute precision.',
         )
         self.allow_nondeterministic_algorithms_view_controller = CheckBoxParameterViewController(
             settings.allow_nondeterministic_algorithms,
             'Allow Nondeterministic Algorithms',
-            tool_tip='When checked, nondeterministic algorithms will be used. This may lead to different results on different runs',
+            tool_tip='Allow nondeterministic algorithms, which can be faster but cause larger run-to-run variation.',
         )
 
         self._use_low_memory_view_controller = CheckBoxParameterViewController(
@@ -192,7 +200,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
         self._save_data_on_device_view_controller = CheckBoxParameterViewController(
             settings.save_data_on_device,
             'Save Data on Device',
-            tool_tip='When checked, diffraction data will be saved on the device',
+            tool_tip='Keep the diffraction data on the compute device (e.g. GPU).',
         )
         self._diffraction_pattern_blur_view_controller = CheckableGroupBoxParameterViewController(
             settings.enable_diffraction_pattern_blur,
@@ -202,7 +210,10 @@ class PtyChiReconstructorViewController(ParameterViewController):
         self._diffraction_pattern_blur_sigma_view_controller = (
             DecimalLineEditParameterViewController(
                 settings.diffraction_pattern_blur_sigma,
-                tool_tip='Standard deviation of the Gaussian blur kernel in pixels',
+                tool_tip=(
+                    'Sigma (in pixels) of the Gaussian kernel used to blur simulated diffraction '
+                    "patterns; models the detector's point-spread function."
+                ),
             )
         )
         self._exclude_measured_pixels_below_view_controller = (
@@ -212,11 +223,9 @@ class PtyChiReconstructorViewController(ParameterViewController):
                 tool_tip='When enabled, measured pixels below the threshold will be excluded',
             )
         )
-        self._exclude_measured_pixels_below_value_view_controller = (
-            DecimalLineEditParameterViewController(
-                settings.exclude_measured_pixels_below,
-                tool_tip='Intensity threshold below which measured pixels are excluded',
-            )
+        self._exclude_measured_pixels_below_value_view_controller = DecimalLineEditParameterViewController(
+            settings.exclude_measured_pixels_below,
+            tool_tip='Gradients for measured pixels with intensity at or below this threshold are zeroed.',
         )
         _diffraction_blur_layout = QVBoxLayout()
         _diffraction_blur_layout.addWidget(
@@ -289,7 +298,10 @@ class PtyChiReconstructorViewController(ParameterViewController):
 
             self._chunk_length_view_controller = SpinBoxParameterViewController(
                 dm_settings.chunk_length,
-                tool_tip='Number of probe positions used in each chunk of the exit wave update loop',
+                tool_tip=(
+                    'Number of scan points per chunk of the exit-wave update loop; smaller values '
+                    'use less memory but can be slower.'
+                ),
             )
             layout.addRow('Chunk Length:', self._chunk_length_view_controller.get_widget())
 
@@ -301,13 +313,13 @@ class PtyChiReconstructorViewController(ParameterViewController):
             )
             layout.addRow('Noise Model:', self._noise_model_view_controller.get_widget())
 
-            self._gaussian_noise_deviation_view_controller = DecimalLineEditParameterViewController(
-                lsqml_settings.gaussian_noise_deviation,
-                tool_tip='Standard deviation of the Gaussian noise',
+            self._gaussian_noise_std_view_controller = DecimalLineEditParameterViewController(
+                lsqml_settings.gaussian_noise_std,
+                tool_tip='Standard deviation of the Gaussian noise (used only with the Gaussian noise model).',
             )
             layout.addRow(
                 'Gaussian Noise Deviation:',
-                self._gaussian_noise_deviation_view_controller.get_widget(),
+                self._gaussian_noise_std_view_controller.get_widget(),
             )
 
             self._single_slice_solve_object_probe_step_size_jointly_view_controller = CheckBoxParameterViewController(
@@ -340,7 +352,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
             self._momentum_acceleration_gain_view_controller = (
                 DecimalLineEditParameterViewController(
                     lsqml_settings.momentum_acceleration_gain,
-                    tool_tip='Gain of momentum accleration',
+                    tool_tip='Gain of momentum acceleration for object and probe; 0 disables it.',
                 )
             )
             layout.addRow(
@@ -351,7 +363,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
             self._momentum_acceleration_gradient_mixing_factor_view_controller = PtyChiMomentumAccelerationGradientMixingFactorViewController(
                 lsqml_settings.auto_momentum_acceleration_gradient_mixing_factor,
                 lsqml_settings.momentum_acceleration_gradient_mixing_factor,
-                tool_tip='Controls how the current gradient is mixed with the accumulated velocity in LSQML momentum acceleration',
+                tool_tip='Mixing factor of the current gradient into the accumulated velocity; set to 1 to reproduce PtychoShelves.',
             )
             layout.addRow(
                 self._momentum_acceleration_gradient_mixing_factor_view_controller.get_widget()
@@ -378,7 +390,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
             self._probe_position_momentum_acceleration_gain_view_controller = (
                 DecimalLineEditParameterViewController(
                     lsqml_settings.probe_position_momentum_acceleration_gain,
-                    tool_tip='Gain of probe position momentum acceleration',
+                    tool_tip='Gain of probe-position momentum acceleration; 0 disables it.',
                 )
             )
             layout.addRow(
@@ -389,7 +401,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
             self._probe_position_momentum_gradient_mixing_factor_view_controller = PtyChiMomentumAccelerationGradientMixingFactorViewController(
                 lsqml_settings.probe_position_auto_momentum_gradient_mixing_factor,
                 lsqml_settings.probe_position_momentum_acceleration_gradient_mixing_factor,
-                tool_tip='Controls how the current gradient is mixed with the accumulated velocity in probe position momentum acceleration',
+                tool_tip='Mixing factor of the current position update into the accumulated velocity; set to 1 to reproduce foldslice.',
             )
             layout.addRow(
                 self._probe_position_momentum_gradient_mixing_factor_view_controller.get_widget()
@@ -397,7 +409,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
 
             self._probe_position_momentum_acceleration_memory_view_controller = SpinBoxParameterViewController(
                 lsqml_settings.probe_position_momentum_acceleration_memory,
-                tool_tip='Number of past gradients to use in probe position momentum acceleration',
+                tool_tip='Number of previous epochs used to estimate friction in probe-position momentum acceleration.',
             )
             layout.addRow(
                 'Position Momentum Memory:',
@@ -408,19 +420,22 @@ class PtyChiReconstructorViewController(ParameterViewController):
             self._bh_method_view_controller = ComboBoxParameterViewController(
                 bh_settings.method,
                 iter(['GD', 'CG']),
-                tool_tip='BH reconstruction algorithm: GD (Gradient Descent) or CG (Conjugate Gradients)',
+                tool_tip=(
+                    'Reconstruction algorithm: GD (gradient descent, for batched updates) or '
+                    'CG (conjugate gradients, faster with a single batch).'
+                ),
             )
             layout.addRow('BH Method:', self._bh_method_view_controller.get_widget())
 
             self._bh_probe_rho_view_controller = DecimalLineEditParameterViewController(
                 bh_settings.probe_rho,
-                tool_tip='Rho parameter for the probe update in BH',
+                tool_tip='Scaling factor for the probe relative to the object (~1 near-field, 0.1 far-field).',
             )
             layout.addRow('BH Probe Rho:', self._bh_probe_rho_view_controller.get_widget())
 
             self._bh_probe_position_rho_view_controller = DecimalLineEditParameterViewController(
                 bh_settings.probe_position_rho,
-                tool_tip='Rho parameter for probe position update in BH',
+                tool_tip='Scaling factor for probe positions relative to the object (~0.1 near-field, 1 far-field).',
             )
             layout.addRow(
                 'BH Position Rho:', self._bh_probe_position_rho_view_controller.get_widget()

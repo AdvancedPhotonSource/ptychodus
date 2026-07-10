@@ -116,7 +116,9 @@ class PtyChiReconstructorOptionsHelper:
 
     @property
     def compact_mode_update_clustering_stride(self) -> int:
-        return self._settings.compact_mode_update_clustering.get_value()
+        # pty-chi requires the stride to be >= 1 even when clustering is disabled
+        # (the settings value is 0 in that case).
+        return max(1, self._settings.compact_mode_update_clustering.get_value())
 
     @property
     def default_device(self) -> Devices:
@@ -286,23 +288,20 @@ class PtyChiObjectOptionsHelper:
 
     @property
     def hard_limits_magnitude_phase(self) -> ObjectHardLimitsMagnitudePhase:
+        # pty-chi types these limits as a serializable list/tuple, not an ndarray.
         abs_lim = None
         if self._settings.constrain_hard_limits_enable_abs.get_value():
-            abs_lim = numpy.array(
-                [
-                    self._settings.constrain_hard_limits_abs_min.get_value(),
-                    self._settings.constrain_hard_limits_abs_max.get_value(),
-                ]
-            )
+            abs_lim = [
+                self._settings.constrain_hard_limits_abs_min.get_value(),
+                self._settings.constrain_hard_limits_abs_max.get_value(),
+            ]
 
         phase_lim = None
         if self._settings.constrain_hard_limits_enable_phase.get_value():
-            phase_lim = numpy.array(
-                [
-                    math.radians(self._settings.constrain_hard_limits_phase_min_deg.get_value()),
-                    math.radians(self._settings.constrain_hard_limits_phase_max_deg.get_value()),
-                ]
-            )
+            phase_lim = [
+                math.radians(self._settings.constrain_hard_limits_phase_min_deg.get_value()),
+                math.radians(self._settings.constrain_hard_limits_phase_max_deg.get_value()),
+            ]
 
         return ObjectHardLimitsMagnitudePhase(
             enabled=self._settings.constrain_hard_limits.get_value(),
@@ -358,7 +357,7 @@ class PtyChiObjectOptionsHelper:
 
     @property
     def patch_interpolation_method(self) -> PatchInterpolationMethods:
-        method_str = self._settings.patch_interpolator.get_value()
+        method_str = self._settings.patch_interpolation_method.get_value()
 
         try:
             return PatchInterpolationMethods[method_str.upper()]
@@ -388,9 +387,10 @@ class PtyChiObjectOptionsHelper:
     def get_initial_guess(self, object_: Object) -> ComplexArrayType:
         return object_.get_array()
 
-    def get_slice_spacings_m(self, object_: Object) -> RealArrayType | None:
+    def get_slice_spacings_m(self, object_: Object) -> list[float] | None:
+        # pty-chi types slice spacings as a serializable list/tuple, not an ndarray.
         slice_spacings_m = object_.layer_spacing_m
-        return numpy.array(slice_spacings_m) if slice_spacings_m else None
+        return list(slice_spacings_m) if slice_spacings_m else None
 
     def get_pixel_size_m(self, object_: Object) -> float:
         pixel_geometry = object_.get_pixel_geometry()
@@ -400,9 +400,9 @@ class PtyChiObjectOptionsHelper:
         pixel_geometry = object_.get_pixel_geometry()
         return pixel_geometry.get_aspect_ratio()
 
-    def get_position_origin_coords(self, object_: Object) -> RealArrayType:
-        # TODO return numpy.zeros(2)
-        return torch.zeros(2)  # type: ignore
+    def get_position_origin_coords(self, object_: Object) -> list[float]:
+        # pty-chi types this as a serializable list/tuple, not an ndarray/tensor.
+        return [0.0, 0.0]
 
 
 class PtyChiProbeOptionsHelper:
@@ -495,13 +495,13 @@ class PtyChiProbeOptionsHelper:
                 self._settings.constrain_center_stop.get_value(),
                 self._settings.constrain_center_stride.get_value(),
             ),
-            use_total_intensity_for_com=self._settings.use_intensity_for_mass_centroid.get_value(),
+            use_total_intensity_for_com=self._settings.use_total_intensity_for_com.get_value(),
             center_modes_individually=self._settings.constrain_center_modes_individually.get_value(),
         )
 
     @property
     def eigenmode_update_relaxation(self) -> float:
-        return self._settings.relax_eigenmode_update.get_value()
+        return self._settings.eigenmode_update_relaxation.get_value()
 
     def get_initial_guess(self, probe: ProbeSequence) -> ComplexArrayType:
         return probe.get_array()
@@ -552,7 +552,7 @@ class PtyChiProbePositionOptionsHelper:
 
     @property
     def constrain_position_mean(self) -> bool:
-        return self._settings.constrain_centroid.get_value()
+        return self._settings.constrain_position_mean.get_value()
 
     @property
     def correction_options(self) -> PositionCorrectionOptions:
@@ -683,7 +683,7 @@ class PtyChiOPROptionsHelper:
 
     @property
     def optimize_intensity_variation(self) -> bool:
-        return self._settings.optimize_intensities.get_value()
+        return self._settings.optimize_intensity_variation.get_value()
 
     @property
     def smoothing(self) -> OPRModeWeightsSmoothingOptions:
@@ -708,7 +708,7 @@ class PtyChiOPROptionsHelper:
 
     @property
     def update_relaxation(self) -> float:
-        return self._settings.relax_update.get_value()
+        return self._settings.update_relaxation.get_value()
 
     def get_initial_weights(self, probe: ProbeSequence) -> RealArrayType:
         try:
