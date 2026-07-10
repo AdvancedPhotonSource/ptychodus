@@ -75,6 +75,7 @@ module = [
     "ptycho.*",
     "ptycho_torch.*",
     "ptychonn.*",
+    "ptychozoon.*",
     "pvaccess",
     "pvapy.*",
     "scipy.*",
