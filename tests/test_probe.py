@@ -5,7 +5,13 @@ import numpy.testing
 import pytest
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.probe import ProbeSizeMetrics, estimate_probe_size
+from ptychodus.api.probe import (
+    Probe,
+    ProbeSizeMetrics,
+    compute_shannon_entropy,
+    estimate_probe_entropy,
+    estimate_probe_size,
+)
 
 
 PIXEL_M = 1e-9  # 1 nm per pixel — keeps lengths interpretable as "px == nm"
@@ -172,3 +178,54 @@ class TestEstimateProbeSize:
     def test_rejects_negative_mad_threshold(self) -> None:
         with pytest.raises(ValueError, match='mad_threshold'):
             estimate_probe_size(numpy.ones((16, 16)), PIXEL_GEOMETRY, mad_threshold=-1.0)
+
+
+class TestComputeShannonEntropy:
+    def test_uniform_distribution_has_max_normalized_entropy(self) -> None:
+        numpy.testing.assert_allclose(compute_shannon_entropy(numpy.ones((16, 16))), 1.0)
+
+    def test_one_hot_distribution_has_zero_entropy(self) -> None:
+        values = numpy.zeros((16, 16))
+        values[3, 5] = 1.0
+        assert compute_shannon_entropy(values) == 0.0
+
+    def test_empty_mass_returns_zero(self) -> None:
+        assert compute_shannon_entropy(numpy.zeros((8, 8))) == 0.0
+
+    def test_negative_values_are_clipped(self) -> None:
+        # After clipping, one positive element remains -> zero entropy.
+        values = numpy.full((4, 4), -1.0)
+        values[0, 0] = 2.0
+        assert compute_shannon_entropy(values) == 0.0
+
+    def test_concentrated_has_lower_entropy_than_broad(self) -> None:
+        narrow = _gaussian_2d(128, 128, 4.0, 4.0, tilt_rad=0.0)
+        broad = _gaussian_2d(128, 128, 32.0, 32.0, tilt_rad=0.0)
+        assert compute_shannon_entropy(narrow) < compute_shannon_entropy(broad)
+
+    def test_raw_entropy_of_uniform_equals_log2_n(self) -> None:
+        values = numpy.ones((8, 8))
+        numpy.testing.assert_allclose(
+            compute_shannon_entropy(values, normalize=False), numpy.log2(values.size)
+        )
+
+
+class TestEstimateProbeEntropy:
+    def _gaussian_probe(self, sigma_px: float) -> Probe:
+        amplitude = numpy.sqrt(_gaussian_2d(128, 128, sigma_px, sigma_px, tilt_rad=0.0))
+        return Probe(amplitude.astype(numpy.complex128), PIXEL_GEOMETRY)
+
+    def test_metrics_are_normalized_to_unit_interval(self) -> None:
+        metrics = estimate_probe_entropy(self._gaussian_probe(16.0))
+        assert 0.0 <= metrics.real_space_intensity_entropy <= 1.0
+        assert 0.0 <= metrics.spectral_entropy <= 1.0
+
+    def test_fourier_duality_direction(self) -> None:
+        """A tightly focused probe is concentrated in real space (low real-space
+        entropy) but spread in frequency (high spectral entropy); a broad probe
+        is the reverse."""
+        narrow = estimate_probe_entropy(self._gaussian_probe(4.0))
+        broad = estimate_probe_entropy(self._gaussian_probe(32.0))
+
+        assert narrow.real_space_intensity_entropy < broad.real_space_intensity_entropy
+        assert narrow.spectral_entropy > broad.spectral_entropy

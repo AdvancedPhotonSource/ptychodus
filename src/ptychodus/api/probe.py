@@ -9,10 +9,59 @@ from typing import overload
 
 import numpy
 import scipy.ndimage
+from scipy.fft import fft2
 
 from .common import ComplexArrayType, RealArrayType, estimate_noise_floor
 from .geometry import PixelGeometry
 from .propagator import intensity
+
+
+def compute_shannon_entropy(distribution: RealArrayType, *, normalize: bool = True) -> float:
+    """Shannon entropy (in bits) of a non-negative array treated as a distribution.
+
+    Each element of ``distribution`` is normalized to a probability
+    ``p_i = x_i / sum(x)`` and the Shannon entropy ``H = -sum(p_i log2 p_i)`` is
+    computed over the non-zero probabilities. When ``normalize`` is ``True`` the
+    result is divided by ``log2(N)`` (``N`` = number of elements), yielding a
+    size-independent value in ``[0, 1]`` where ``1.0`` is a perfectly uniform
+    distribution and values approaching ``0`` indicate concentration in a single
+    element.
+
+    Args:
+        distribution: Array of non-negative values (e.g. an intensity or power
+            spectrum). Negative values are clipped to zero.
+        normalize: If ``True``, divide by ``log2(N)`` so the result lies in
+            ``[0, 1]``. If ``False``, return the raw entropy in bits.
+
+    Returns:
+        The (optionally normalized) Shannon entropy. Returns ``0.0`` when the
+        distribution has no positive mass.
+    """
+    values = numpy.clip(numpy.asarray(distribution, dtype=numpy.float64).ravel(), 0.0, None)
+    total = float(values.sum())
+
+    if total <= 0.0:
+        return 0.0
+
+    p = values / total
+    nonzero = p[p > 0.0]
+    entropy = float(-numpy.sum(nonzero * numpy.log2(nonzero)))
+
+    if normalize and p.size > 1:
+        entropy /= numpy.log2(p.size)
+
+    return entropy
+
+
+@dataclass(frozen=True)
+class ProbeEntropyMetrics:
+    """Normalized Shannon-entropy metrics for a probe, in bits and in ``[0, 1]``."""
+
+    real_space_intensity_entropy: float
+    """Normalized entropy of the real-space intensity distribution."""
+
+    spectral_entropy: float
+    """Normalized entropy of the power-spectrum (frequency-domain) distribution."""
 
 
 @dataclass(frozen=True)
@@ -417,6 +466,28 @@ class Probe:
 
     def get_intensity(self) -> RealArrayType:
         return numpy.sum(intensity(self._array), axis=-3)
+
+    def get_power_spectrum(self) -> RealArrayType:
+        """Incoherent-sum power spectrum |FFT(psi)|^2 over the mode axis.
+
+        No fftshift is applied: Shannon entropy is permutation-invariant, so the
+        frequency ordering is irrelevant for entropy calculations.
+        """
+        return numpy.sum(intensity(fft2(self._array, axes=(-2, -1))), axis=-3)
+
+
+def estimate_probe_entropy(probe: Probe) -> ProbeEntropyMetrics:
+    """Compute normalized real-space and spectral Shannon entropy for a probe.
+
+    Both quantities use the incoherent sum over modes: the real-space entropy is
+    computed from :meth:`Probe.get_intensity` and the spectral entropy from
+    :meth:`Probe.get_power_spectrum`. Each is a normalized value in ``[0, 1]``
+    (see :func:`compute_shannon_entropy`).
+    """
+    return ProbeEntropyMetrics(
+        real_space_intensity_entropy=compute_shannon_entropy(probe.get_intensity()),
+        spectral_entropy=compute_shannon_entropy(probe.get_power_spectrum()),
+    )
 
 
 class ProbeSequence(Sequence[Probe]):

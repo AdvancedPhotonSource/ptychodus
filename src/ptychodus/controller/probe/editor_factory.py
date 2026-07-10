@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
-    QMessageBox,
+    QLabel,
     QRadioButton,
     QSpinBox,
     QTableView,
@@ -229,6 +229,16 @@ class DecayTypeParameterViewController(ParameterViewController, Observer):
             self._sync_model_to_view()
 
 
+class LabelViewController(ParameterViewController):
+    def __init__(self, text: str) -> None:
+        super().__init__()
+        self._widget = QLabel(text)
+        self._widget.setWordWrap(True)
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+
 class ProbeMetricsViewController(ParameterViewController, Observer):
     def __init__(self, title: str, probe_item: ProbeRepositoryItem) -> None:
         super().__init__()
@@ -258,6 +268,8 @@ class ProbeMetricsViewController(ParameterViewController, Observer):
     def _refresh_metrics(self) -> None:
         metrics = self._probe_item.get_size_metrics()
         self._table_model.set_metrics(metrics)
+        entropy_metrics = self._probe_item.get_entropy_metrics()
+        self._table_model.set_entropy_metrics(entropy_metrics)
         self._table_view.resizeRowsToContents()
 
     def _update(self, observable: Observable) -> None:
@@ -385,12 +397,9 @@ class ProbeEditorViewControllerFactory:
 
         if self._append_primary_mode(probe_builder, dialog_builder):
             self._append_additional_modes(probe_builder, dialog_builder)
-            return dialog_builder.build_dialog(title, parent)
+        else:
+            dialog_builder.add_view_controller_to_bottom(
+                LabelViewController(f'"{builder_name}" has no editable parameters.')
+            )
 
-        return QMessageBox(
-            QMessageBox.Icon.Information,
-            title,
-            f'"{builder_name}" has no editable parameters!',
-            QMessageBox.StandardButton.Ok,
-            parent,
-        )
+        return dialog_builder.build_dialog(title, parent)
