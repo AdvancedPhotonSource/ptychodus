@@ -5,7 +5,12 @@ import numpy.testing
 
 from ptychodus.api.geometry import HermiteMode, PixelGeometry
 from ptychodus.api.probe import Probe, ProbeGeometry
-from ptychodus.api.probe_gen import generate_hermite_probe, generate_incoherent_probe_modes
+from ptychodus.api.probe_gen import (
+    generate_coherent_probe_modes,
+    generate_hermite_probe,
+    generate_incoherent_probe_modes,
+)
+from ptychodus.api.propagator import intensity
 
 
 PIXEL_GEOMETRY = PixelGeometry(width_m=1e-8, height_m=1e-8)
@@ -81,6 +86,57 @@ class TestGenerateIncoherentProbeModes:
         ratios = intensities / intensities[0]
         expected = numpy.array(weights) / weights[0]
         numpy.testing.assert_allclose(ratios, expected, rtol=1e-6)
+
+
+class TestGenerateCoherentProbeModes:
+    def _make_multimode_probe(self, num_imodes: int = 5, seed: int = 3) -> Probe:
+        rng = numpy.random.default_rng(seed)
+        single = _make_single_mode_probe(seed=seed)
+        return generate_incoherent_probe_modes(rng, single, [1.0] * num_imodes, orthogonalize=True)
+
+    def test_eigenmode_incoherent_slots_are_all_nonzero(self) -> None:
+        """Regression test: eigenmodes must fill every incoherent mode.
+
+        Before the fix only incoherent slot 0 of each eigenmode was populated,
+        leaving zero-power slots that trigger a 0/0 -> NaN in pty-chi's
+        Gram-Schmidt orthogonalization (segfault/abort on the CUDA backend).
+        """
+        rng = numpy.random.default_rng(11)
+        num_imodes = 5
+        num_cmodes = 2
+        probe = self._make_multimode_probe(num_imodes=num_imodes)
+
+        result = generate_coherent_probe_modes(
+            rng, probe, num_cmodes=num_cmodes, num_diffraction_patterns=8
+        )
+
+        array = result.get_array()
+        assert array.shape == (num_cmodes, num_imodes, probe.height_px, probe.width_px)
+        assert not numpy.isnan(array).any()
+
+        for cmode in range(1, num_cmodes):
+            for imode in range(num_imodes):
+                power = numpy.sum(intensity(array[cmode, imode]))
+                assert power > 0.0, f'eigenmode ({cmode}, {imode}) has zero power'
+
+    def test_opr_weights_shape_and_main_column(self) -> None:
+        rng = numpy.random.default_rng(12)
+        probe = self._make_multimode_probe(num_imodes=3)
+
+        result = generate_coherent_probe_modes(rng, probe, num_cmodes=2, num_diffraction_patterns=8)
+
+        weights = result.get_opr_weights()
+        assert weights.shape == (8, 2)
+        numpy.testing.assert_array_equal(weights[:, 0], numpy.ones(8))
+
+    def test_single_coherent_mode_has_no_opr_weights(self) -> None:
+        rng = numpy.random.default_rng(13)
+        probe = self._make_multimode_probe(num_imodes=3)
+
+        result = generate_coherent_probe_modes(rng, probe, num_cmodes=1, num_diffraction_patterns=8)
+
+        assert result.get_array().shape[0] == 1
+        assert result.get_opr_weights_or_none() is None
 
 
 def _probe_geometry(height_px: int = 16, width_px: int = 16) -> ProbeGeometry:

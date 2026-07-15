@@ -777,7 +777,7 @@ class PtyChiOptionsHelper:
         )
 
         probe_out = ProbeSequence(
-            array=numpy.array(probe_array[0]),
+            array=numpy.array(probe_array),
             opr_weights=numpy.array(opr_weights),
             pixel_geometry=product.probes.get_pixel_geometry(),
         )

@@ -358,18 +358,19 @@ def generate_coherent_probe_modes(
         opr_weights[:, 0] = 1.0
 
     array_in = probe.get_array()
-    array_out = numpy.zeros((num_cmodes, *array_in.shape), array_in.dtype)
+
+    # Initialize every OPR mode (and its incoherent modes) with normalized Gaussian
+    # random noise, then overwrite the main OPR mode with the input probe.
+    array_out_shape = (num_cmodes, *array_in.shape)
+    array_out = (rng.normal(size=array_out_shape) + 1j * rng.normal(size=array_out_shape)).astype(
+        array_in.dtype
+    )
+
+    if normalize_cmodes:
+        rms = numpy.sqrt(numpy.mean(intensity(array_out), axis=(-2, -1), keepdims=True))
+        array_out /= rms
+
     array_out[0, :, :, :] = array_in[:, :, :]
-
-    for cmode in range(1, num_cmodes):
-        real = rng.normal(size=array_out.shape[-2:])
-        imag = rng.normal(size=array_out.shape[-2:])
-        values = real + 1j * imag
-
-        if normalize_cmodes:
-            values /= numpy.sqrt(numpy.mean(intensity(values)))
-
-        array_out[cmode, 0, :, :] = values
 
     return ProbeSequence(
         array=array_out,
