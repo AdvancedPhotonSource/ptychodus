@@ -1,7 +1,7 @@
-from collections import defaultdict
 from pathlib import Path
 from typing import Final
 import logging
+import re
 
 import h5py
 import numpy
@@ -15,86 +15,109 @@ from ptychodus.api.diffraction import (
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.tree import SimpleTreeNode
 
-from .h5_diffraction_file import H5DiffractionPatternArray
+from .h5_diffraction_file import H5DiffractionFileTreeBuilder, H5DiffractionPatternArray
 
 logger = logging.getLogger(__name__)
 
 
+def _read_ndattribute_scalar(h5_file: h5py.File, path: str) -> float | None:
+    try:
+        value = h5_file[path][()]
+    except KeyError:
+        logger.warning(f'NDAttribute "{path}" not found in "{h5_file.filename}".')
+        return None
+
+    array = numpy.atleast_1d(value)
+    return float(array[0])
+
+
+def _glob_h5_series(file_path: Path) -> tuple[dict[int, Path], str]:
+    file_path_dict: dict[int, Path] = dict()
+
+    digits = re.findall(r'\d+', file_path.stem)
+    longest_digits = max(digits, key=len)
+    file_pattern = file_path.name.replace(longest_digits, f'(\\d{{{len(longest_digits)}}})')
+
+    for fp in file_path.parent.iterdir():
+        z = re.match(file_pattern, fp.name)
+
+        if z:
+            index = int(z.group(1))
+            file_path_dict[index] = fp
+
+    return file_path_dict, file_pattern
+
+
 class APS12IDDiffractionFileReader(DiffractionFileReader):
     DATA_PATH: Final[str] = '/entry/data/data'
+    ENERGY_PATH: Final[str] = '/entry/instrument/NDAttributes/monoE'
+    EXPOSURE_PATH: Final[str] = '/entry/instrument/NDAttributes/ExposureTime'
 
     def read(self, file_path: Path) -> DiffractionDataset:
-        stem_parts = file_path.stem.split('_')
-        stem_prefix = '_'.join(stem_parts[:-2])
-        logger.debug(f'{stem_prefix=}')
-        scan_num = int(stem_parts[-3])
-        logger.debug(f'{scan_num=}')
-
-        lines: set[int] = set()
-        points: set[int] = set()
-        points_per_line: dict[int, set[int]] = defaultdict(set[int])
-        file_dict: dict[tuple[int, int], Path] = dict()
-
-        for p in file_path.parent.glob(f'{stem_prefix}_*{file_path.suffix}'):
-            stem_parts = p.stem.split('_')
-            line = int(stem_parts[-2])
-            point = int(stem_parts[-1])
-
-            lines.add(line)
-            points.add(point)
-            points_per_line[line].add(point)
-            file_dict[line, point] = p
-
-        logger.debug(f'{lines=}')
-        lines_min = min(lines)
-        lines_max = max(lines)
-        lines_num = lines_max - lines_min + 1
-        logger.debug(f'{points=}')
-        points_min = min(points)
-        points_max = max(points)
-        points_num = points_max - points_min + 1
-
-        for line, line_points in points_per_line.items():
-            missing_points = points - line_points
-
-            if missing_points:
-                logger.warning(f'Line {line} is missing points {missing_points}')
-
-        contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Line', 'Point'])
-        array_list: list[DiffractionArray] = list()
+        tree_builder = H5DiffractionFileTreeBuilder()
 
         with h5py.File(file_path, 'r') as h5_file:
+            contents_tree = tree_builder.build(h5_file)
+
             try:
                 h5_data = h5_file[self.DATA_PATH]
             except KeyError:
                 logger.warning(f'File "{file_path}" is not an APS 12-ID data file.')
                 return SimpleDiffractionDataset.create_null(file_path)
-            else:
-                if not isinstance(h5_data, h5py.Dataset):
-                    logger.warning(
-                        f'Data path "{self.DATA_PATH}" in "{file_path}" is not a dataset.'
-                    )
-                    return SimpleDiffractionDataset.create_null(file_path)
 
-                detector_height, detector_width = h5_data.shape
+            if not isinstance(h5_data, h5py.Dataset):
+                logger.warning(f'Data path "{self.DATA_PATH}" in "{file_path}" is not a dataset.')
+                return SimpleDiffractionDataset.create_null(file_path)
 
-                metadata = DiffractionMetadata(
-                    num_patterns_per_array=[1] * lines_num * points_num,
-                    pattern_dtype=h5_data.dtype,
-                    detector_extent=ImageExtent(detector_width, detector_height),
-                    file_path=file_path,
-                )
+            data_shape = h5_data.shape
+            data_dtype = h5_data.dtype
+            probe_energy_eV = _read_ndattribute_scalar(h5_file, self.ENERGY_PATH)  # noqa: N806
+            exposure_time_s = _read_ndattribute_scalar(h5_file, self.EXPOSURE_PATH)
 
-        for (line, point), fp in file_dict.items():
-            index = (point - points_min) + (line - lines_min) * points_num
-            indexes = numpy.array([index])
-            array = H5DiffractionPatternArray(fp.stem, indexes, fp, self.DATA_PATH)
-            contents_tree.create_child([array.get_label(), 'HDF5', str(line), str(point)])
-            array_list.append(array)
+        if len(data_shape) == 3:
+            num_patterns, detector_height, detector_width = data_shape
 
-        return SimpleDiffractionDataset(metadata, contents_tree, array_list)
+            metadata = DiffractionMetadata(
+                num_patterns_per_array=[num_patterns],
+                pattern_dtype=data_dtype,
+                detector_extent=ImageExtent(detector_width, detector_height),
+                probe_energy_eV=probe_energy_eV,
+                exposure_time_s=exposure_time_s,
+                file_path=file_path,
+            )
+            array = H5DiffractionPatternArray(
+                label=file_path.stem,
+                indexes=numpy.arange(num_patterns),
+                file_path=file_path,
+                data_path=self.DATA_PATH,
+            )
+            return SimpleDiffractionDataset(metadata, contents_tree, [array])
+
+        if len(data_shape) == 2:
+            detector_height, detector_width = data_shape
+            file_path_dict, file_pattern = _glob_h5_series(file_path)
+            array_list: list[DiffractionArray] = list()
+
+            for idx, (_, fp) in enumerate(sorted(file_path_dict.items())):
+                indexes = numpy.array([idx])
+                array = H5DiffractionPatternArray(fp.stem, indexes, fp, self.DATA_PATH)
+                array_list.append(array)
+
+            metadata = DiffractionMetadata(
+                num_patterns_per_array=[1] * len(array_list),
+                pattern_dtype=data_dtype,
+                detector_extent=ImageExtent(detector_width, detector_height),
+                probe_energy_eV=probe_energy_eV,
+                exposure_time_s=exposure_time_s,
+                file_path=file_path.parent / file_pattern,
+            )
+            return SimpleDiffractionDataset(metadata, contents_tree, array_list)
+
+        logger.warning(
+            f'Data path "{self.DATA_PATH}" in "{file_path}" has unsupported shape {data_shape}.'
+        )
+        return SimpleDiffractionDataset.create_null(file_path)
 
 
 def register_plugins(registry: PluginRegistry) -> None:

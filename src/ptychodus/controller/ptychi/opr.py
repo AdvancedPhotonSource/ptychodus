@@ -37,7 +37,7 @@ class PtyChiSmoothOPRModeWeightsViewController(CheckableGroupBoxParameterViewCon
         self._smoothing_method_view_controller = ComboBoxParameterViewController(
             smoothing_method,
             enumerators.opr_weight_smoothing_methods(),
-            tool_tip='Method for smoothing OPR mode weights',
+            tool_tip='Method for smoothing OPR mode weights (MEDIAN filter or POLYNOMIAL fit).',
         )
         self._polynomial_smoothing_degree_view_controller = SpinBoxParameterViewController(
             polynomial_smoothing_degree,
@@ -63,7 +63,7 @@ class PtyChiOPRViewController(CheckableGroupBoxParameterViewController):
         super().__init__(
             settings.is_optimizable,
             'Orthogonal Probe Relaxation',
-            tool_tip='Whether OPR modes are optimizable',
+            tool_tip='Master switch for optimizing OPR mode weights.',
         )
         self._optimization_plan_view_controller = PtyChiOptimizationPlanViewController(
             settings.optimization_plan_start,
@@ -75,15 +75,15 @@ class PtyChiOPRViewController(CheckableGroupBoxParameterViewController):
             settings.optimizer, enumerators
         )
         self._step_size_view_controller = DecimalLineEditParameterViewController(
-            settings.step_size, tool_tip='Optimizer step size'
+            settings.step_size, tool_tip='Optimizer step size (learning rate).'
         )
         self._optimize_eigenmode_weights_view_controller = CheckBoxParameterViewController(
             settings.optimize_eigenmode_weights,
             'Optimize Eigenmode Weights',
             tool_tip='Whether to optimize eigenmode weights (i.e., the weights of the second and following OPR modes)',
         )
-        self._optimize_intensities_view_controller = CheckBoxParameterViewController(
-            settings.optimize_intensities,
+        self._optimize_intensity_variation_view_controller = CheckBoxParameterViewController(
+            settings.optimize_intensity_variation,
             'Optimize Intensities',
             tool_tip='Whether to optimize intensity variation (i.e., the weight of the first OPR mode)',
         )
@@ -97,17 +97,17 @@ class PtyChiOPRViewController(CheckableGroupBoxParameterViewController):
             num_epochs,
             enumerators,
         )
-        self._relax_update_view_controller = DecimalSliderParameterViewController(
-            settings.relax_update,
-            tool_tip='Whether to relax the update of the OPR mode weights',
+        self._update_relaxation_view_controller = DecimalSliderParameterViewController(
+            settings.update_relaxation,
+            tool_tip='Separate step size (relaxation) for the OPR mode weight update.',
         )
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._optimization_plan_view_controller.get_widget())
         layout.addRow('Optimizer:', self._optimizer_view_controller.get_widget())
         layout.addRow('Step Size:', self._step_size_view_controller.get_widget())
-        layout.addRow(self._optimize_intensities_view_controller.get_widget())
+        layout.addRow(self._optimize_intensity_variation_view_controller.get_widget())
         layout.addRow(self._optimize_eigenmode_weights_view_controller.get_widget())
         layout.addRow(self._smooth_mode_weights_view_controller.get_widget())
-        layout.addRow('Relax Update:', self._relax_update_view_controller.get_widget())
+        layout.addRow('Relax Update:', self._update_relaxation_view_controller.get_widget())
         self.get_widget().setLayout(layout)

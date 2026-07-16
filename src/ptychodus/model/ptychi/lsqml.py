@@ -75,7 +75,7 @@ class LSQMLReconstructor(Reconstructor):
             exclude_measured_pixels_below=helper.exclude_measured_pixels_below,
             forward_model_options=helper.forward_model_options,
             noise_model=noise_model,
-            gaussian_noise_std=self._settings.gaussian_noise_deviation.get_value(),
+            gaussian_noise_std=self._settings.gaussian_noise_std.get_value(),
             single_slice_solve_obj_prb_step_size_jointly=self._settings.single_slice_solve_object_probe_step_size_jointly.get_value(),
             multislice_solve_obj_prb_step_size_jointly=self._settings.multislice_solve_object_probe_step_size_jointly.get_value(),
             solve_step_sizes_only_using_first_probe_mode=self._settings.solve_step_sizes_only_using_first_probe_mode.get_value(),

@@ -1,6 +1,14 @@
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.settings import SettingsRegistry
 
+# pty-chi's Options are Pydantic dataclasses that enforce their constraints at
+# assignment. Several fields are declared ``gt=0`` (strictly positive), but
+# ptychodus parameter bounds are inclusive and clamping, so an inclusive minimum
+# of 0.0 would let a user select exactly 0 and trigger a pty-chi ValidationError
+# at reconstruction time. This small positive floor is the closest representable
+# inclusive minimum; it never affects the (always > 0) defaults.
+_STRICTLY_POSITIVE_MIN = 1e-12
+
 
 class PtyChiSettings(Observable, Observer):
     def __init__(self, registry: SettingsRegistry) -> None:
@@ -170,10 +178,10 @@ class PtyChiObjectSettings(Observable, Observer):
             'RemoveGridArtifactsStride', 1, minimum=1
         )
         self.remove_grid_artifacts_period_x_m = self._group.create_real_parameter(
-            'RemoveGridArtifactsPeriodXInMeters', 1e-7, minimum=0.0
+            'RemoveGridArtifactsPeriodXInMeters', 1e-7, minimum=_STRICTLY_POSITIVE_MIN
         )
         self.remove_grid_artifacts_period_y_m = self._group.create_real_parameter(
-            'RemoveGridArtifactsPeriodYInMeters', 1e-7, minimum=0.0
+            'RemoveGridArtifactsPeriodYInMeters', 1e-7, minimum=_STRICTLY_POSITIVE_MIN
         )
         self.remove_grid_artifacts_window_size_px = self._group.create_integer_parameter(
             'RemoveGridArtifactsWindowSizeInPixels',
@@ -216,8 +224,8 @@ class PtyChiObjectSettings(Observable, Observer):
             )
         )
 
-        self.patch_interpolator = self._group.create_string_parameter(
-            'PatchInterpolator', 'FOURIER'
+        self.patch_interpolation_method = self._group.create_string_parameter(
+            'PatchInterpolationMethod', 'FOURIER'
         )
 
         self.remove_object_probe_ambiguity = self._group.create_boolean_parameter(
@@ -262,7 +270,7 @@ class PtyChiObjectSettings(Observable, Observer):
             'ConstrainHardLimitsEnablePhase', False
         )
         self.constrain_hard_limits_phase_min_deg = self._group.create_real_parameter(
-            'ConstrainHardLimitsPhasMinDeg', -180.0
+            'ConstrainHardLimitsPhaseMinDeg', -180.0
         )
         self.constrain_hard_limits_phase_max_deg = self._group.create_real_parameter(
             'ConstrainHardLimitsPhaseMaxDeg', 180.0
@@ -367,15 +375,15 @@ class PtyChiProbeSettings(Observable, Observer):
         self.constrain_center_stride = self._group.create_integer_parameter(
             'ConstrainCenterStride', 1, minimum=1
         )
-        self.use_intensity_for_mass_centroid = self._group.create_boolean_parameter(
-            'UseIntensityForMassCentroid', False
+        self.use_total_intensity_for_com = self._group.create_boolean_parameter(
+            'UseTotalIntensityForCOM', False
         )
         self.constrain_center_modes_individually = self._group.create_boolean_parameter(
             'ConstrainCenterModesIndividually', False
         )
 
-        self.relax_eigenmode_update = self._group.create_real_parameter(
-            'RelaxEigenmodeUpdate', 1.0, minimum=0.0, maximum=1.0
+        self.eigenmode_update_relaxation = self._group.create_real_parameter(
+            'EigenmodeUpdateRelaxation', 1.0, minimum=0.0, maximum=1.0
         )
 
     def _update(self, observable: Observable) -> None:
@@ -402,7 +410,9 @@ class PtyChiProbePositionSettings(Observable, Observer):
         self.optimizer = self._group.create_string_parameter('Optimizer', 'SGD')
         self.step_size = self._group.create_real_parameter('StepSize', 0.3, minimum=0.0)
 
-        self.constrain_centroid = self._group.create_boolean_parameter('ConstrainCentroid', False)
+        self.constrain_position_mean = self._group.create_boolean_parameter(
+            'ConstrainPositionMean', False
+        )
 
         # correction_options
         self.correction_type = self._group.create_string_parameter('CorrectionType', 'GRADIENT')
@@ -413,8 +423,10 @@ class PtyChiProbePositionSettings(Observable, Observer):
             'CrossCorrelationScale', 20000, minimum=1
         )
         self.cross_correlation_real_space_width = self._group.create_real_parameter(
-            'CrossCorrelationRealSpaceWidth', 0.01, minimum=0.0
+            'CrossCorrelationRealSpaceWidth', 0.01, minimum=_STRICTLY_POSITIVE_MIN
         )
+        # pty-chi only constrains this to ge=0; the maximum of 1.0 is an
+        # intentional ptychodus sanity cap (a stricter GUI bound is valid input).
         self.cross_correlation_probe_threshold = self._group.create_real_parameter(
             'CrossCorrelationProbeThreshold', 0.1, minimum=0.0, maximum=1.0
         )
@@ -431,7 +443,7 @@ class PtyChiProbePositionSettings(Observable, Observer):
             'LimitUpdateMagnitude', True
         )
         self.update_magnitude_limit = self._group.create_real_parameter(
-            'UpdateMagnitudeLimit', 0.1, minimum=0.0
+            'UpdateMagnitudeLimit', 0.1, minimum=_STRICTLY_POSITIVE_MIN
         )
 
         # affine_transform_constraint
@@ -459,7 +471,9 @@ class PtyChiProbePositionSettings(Observable, Observer):
             'ConstrainAffineTransformApplyConstraint', True
         )
         self.constrain_affine_transform_max_expected_error_px = self._group.create_real_parameter(
-            'ConstrainAffineTransformMaxExpectedErrorInPixels', 1.0, minimum=0.0
+            'ConstrainAffineTransformMaxExpectedErrorInPixels',
+            1.0,
+            minimum=_STRICTLY_POSITIVE_MIN,
         )
         self.override_affine_transform_update_flexibility = self._group.create_boolean_parameter(
             'OverrideAffineTransformUpdateFlexibility', False
@@ -498,10 +512,10 @@ class PtyChiOPRSettings(Observable, Observer):
         self.step_size = self._group.create_real_parameter('StepSize', 1.0, minimum=0.0)
 
         self.optimize_eigenmode_weights = self._group.create_boolean_parameter(
-            'OptimizeEigenmodeWeigts', True
+            'OptimizeEigenmodeWeights', True
         )
-        self.optimize_intensities = self._group.create_boolean_parameter(
-            'OptimizeIntensities', False
+        self.optimize_intensity_variation = self._group.create_boolean_parameter(
+            'OptimizeIntensityVariation', False
         )
 
         self.smooth_mode_weights = self._group.create_boolean_parameter('SmoothModeWeights', False)
@@ -515,12 +529,14 @@ class PtyChiOPRSettings(Observable, Observer):
             'SmoothModeWeightsStride', 1, minimum=1
         )
         self.smoothing_method = self._group.create_string_parameter('SmoothingMethod', '')
+        # pty-chi only constrains this to ge=0; the maximum of 10 is an
+        # intentional ptychodus sanity cap (a stricter GUI bound is valid input).
         self.polynomial_smoothing_degree = self._group.create_integer_parameter(
             'PolynomialSmoothingDegree', 4, minimum=0, maximum=10
         )
 
-        self.relax_update = self._group.create_real_parameter(
-            'RelaxUpdate', 1.0, minimum=0.0, maximum=1.0
+        self.update_relaxation = self._group.create_real_parameter(
+            'UpdateRelaxation', 1.0, minimum=0.0, maximum=1.0
         )
 
     def _update(self, observable: Observable) -> None:
@@ -555,7 +571,7 @@ class PtyChiDMSettings(Observable, Observer):
         )
         self.chunk_length = self._group.create_integer_parameter('ChunkLength', 1, minimum=1)
         self.object_amplitude_clamp_limit = self._group.create_real_parameter(
-            'ObjectAmplitudeClampLimit', 1000, minimum=0.0
+            'ObjectAmplitudeClampLimit', 1000, minimum=_STRICTLY_POSITIVE_MIN
         )
         self.object_inertia = self._group.create_real_parameter(
             'ObjectInertia', 0.0, minimum=0.0, maximum=1.0
@@ -576,8 +592,8 @@ class PtyChiLSQMLSettings(Observable, Observer):
         self._group.add_observer(self)
 
         self.noise_model = self._group.create_string_parameter('NoiseModel', 'GAUSSIAN')
-        self.gaussian_noise_deviation = self._group.create_real_parameter(
-            'GaussianNoiseDeviation', 0.5
+        self.gaussian_noise_std = self._group.create_real_parameter(
+            'GaussianNoiseStd', 0.5, minimum=_STRICTLY_POSITIVE_MIN
         )
         self.single_slice_solve_object_probe_step_size_jointly = (
             self._group.create_boolean_parameter('SingleSliceSolveObjectProbeStepSizeJointly', True)
@@ -597,7 +613,7 @@ class PtyChiLSQMLSettings(Observable, Observer):
             )
         )
         self.momentum_acceleration_gradient_mixing_factor = self._group.create_real_parameter(
-            'MomentumAccelerationGradientMixingFactor', 1.0
+            'MomentumAccelerationGradientMixingFactor', 1.0, minimum=0.0
         )
         self.rescale_probe_intensity_in_first_epoch = self._group.create_boolean_parameter(
             'RescaleProbeIntensityInFirstEpoch', True
@@ -607,13 +623,13 @@ class PtyChiLSQMLSettings(Observable, Observer):
         )
 
         self.object_optimal_step_size_scaler = self._group.create_real_parameter(
-            'ObjectOptimalStepSizeScaler', 0.9, minimum=0.0
+            'ObjectOptimalStepSizeScaler', 0.9, minimum=_STRICTLY_POSITIVE_MIN
         )
         self.object_multimodal_update = self._group.create_boolean_parameter(
             'ObjectMultimodalUpdate', True
         )
         self.probe_optimal_step_size_scaler = self._group.create_real_parameter(
-            'ProbeOptimalStepSizeScaler', 0.9, minimum=0.0
+            'ProbeOptimalStepSizeScaler', 0.9, minimum=_STRICTLY_POSITIVE_MIN
         )
 
         self.probe_position_momentum_acceleration_gain = self._group.create_real_parameter(
@@ -626,7 +642,7 @@ class PtyChiLSQMLSettings(Observable, Observer):
         )
         self.probe_position_momentum_acceleration_gradient_mixing_factor = (
             self._group.create_real_parameter(
-                'ProbePositionMomentumAccelerationGradientMixingFactor', 1.0
+                'ProbePositionMomentumAccelerationGradientMixingFactor', 1.0, minimum=0.0
             )
         )
         self.probe_position_momentum_acceleration_memory = self._group.create_integer_parameter(
@@ -645,9 +661,11 @@ class PtyChiBHSettings(Observable, Observer):
         self._group.add_observer(self)
 
         self.method = self._group.create_string_parameter('Method', 'GD')
-        self.probe_rho = self._group.create_real_parameter('ProbeRho', 1.0, minimum=0.0)
+        self.probe_rho = self._group.create_real_parameter(
+            'ProbeRho', 1.0, minimum=_STRICTLY_POSITIVE_MIN
+        )
         self.probe_position_rho = self._group.create_real_parameter(
-            'ProbePositionRho', 0.1, minimum=0.0
+            'ProbePositionRho', 0.1, minimum=_STRICTLY_POSITIVE_MIN
         )
 
     def _update(self, observable: Observable) -> None:
@@ -661,6 +679,8 @@ class PtyChiPIESettings(Observable, Observer):
         self._group = registry.create_group('PtyChiPIE')
         self._group.add_observer(self)
 
+        # pty-chi only constrains these to ge=0; the maximum of 1.0 is an
+        # intentional ptychodus sanity cap (a stricter GUI bound is valid input).
         self.probe_alpha = self._group.create_real_parameter(
             'ProbeAlpha', 0.1, minimum=0.0, maximum=1.0
         )

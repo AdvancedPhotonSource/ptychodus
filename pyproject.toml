@@ -41,7 +41,7 @@ docs = ["sphinx", "sphinx-copybutton", "sphinx-rtd-theme"]
 globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
 gui = ["PyQt5"]
 #ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
-ptychi = ["ptychi==1.4.*"]
+ptychi = ["ptychi==1.5.*"]
 ptychopinn = ["ptychopinn"]
 ptychozoon = ["ptychozoon"]
 

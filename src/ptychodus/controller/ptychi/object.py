@@ -55,7 +55,7 @@ class PtyChiOptimizeSliceSpacingViewController(CheckableGroupBoxParameterViewCon
             optimizer, enumerators
         )
         self._step_size_view_controller = DecimalLineEditParameterViewController(
-            step_size, tool_tip='Optimizer step size'
+            step_size, tool_tip='Optimizer step size (learning rate).'
         )
 
         layout = QFormLayout()
@@ -85,7 +85,7 @@ class PtyChiConstrainL1NormViewController(CheckableGroupBoxParameterViewControll
         )
         self._weight_view_controller = DecimalLineEditParameterViewController(
             weight,
-            tool_tip='Weight of the L\u2081 norm constraint',
+            tool_tip='Weight of the L\u2081 norm constraint (0 or less disables it).',
         )
 
         layout = QFormLayout()
@@ -114,7 +114,7 @@ class PtyChiConstrainL2NormViewController(CheckableGroupBoxParameterViewControll
         )
         self._weight_view_controller = DecimalLineEditParameterViewController(
             weight,
-            tool_tip='Weight of the L\u2082 norm constraint',
+            tool_tip='Weight of the L\u2082 norm constraint (0 or less disables it).',
         )
 
         layout = QFormLayout()
@@ -142,7 +142,8 @@ class PtyChiConstrainSmoothnessViewController(CheckableGroupBoxParameterViewCont
             start, stop, stride, num_epochs
         )
         self._alpha_view_controller = DecimalSliderParameterViewController(
-            alpha, tool_tip='Relaxation smoothing constant'
+            alpha,
+            tool_tip='Relaxation smoothing constant; must be in (0, 1/8], with maximal smoothing at 1/8.',
         )
 
         layout = QFormLayout()
@@ -171,7 +172,7 @@ class PtyChiConstrainTotalVariationViewController(CheckableGroupBoxParameterView
         )
         self._weight_view_controller = DecimalLineEditParameterViewController(
             weight,
-            tool_tip='Weight of the total variation constraint',
+            tool_tip='Weight of the total variation constraint (0 or less disables it).',
         )
 
         layout = QFormLayout()
@@ -255,7 +256,7 @@ class PtyChiRegularizeMultisliceViewController(CheckableGroupBoxParameterViewCon
         )
         self._weight_view_controller = DecimalLineEditParameterViewController(
             weight,
-            tool_tip='Weight for multislice regularization',
+            tool_tip='Weight of the cross-slice smoothing regularization for multislice objects (0 disables it).',
         )
         self._unwrap_phase_view_controller = CheckBoxParameterViewController(
             unwrap_phase,
@@ -383,7 +384,7 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
             settings.optimizer, enumerators
         )
         self._step_size_view_controller = DecimalLineEditParameterViewController(
-            settings.step_size, tool_tip='Optimizer step size'
+            settings.step_size, tool_tip='Optimizer step size (learning rate).'
         )
         self._optimize_slice_spacing_view_controller = PtyChiOptimizeSliceSpacingViewController(
             settings.optimize_slice_spacing,
@@ -454,8 +455,8 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
             num_epochs,
             enumerators,
         )
-        self._patch_interpolator_view_controller = ComboBoxParameterViewController(
-            settings.patch_interpolator,
+        self._patch_interpolation_method_view_controller = ComboBoxParameterViewController(
+            settings.patch_interpolation_method,
             enumerators.patch_interpolation_methods(),
             tool_tip='Interpolation method used for extracting and updating patches of the object',
         )
@@ -471,7 +472,7 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
         self._build_preconditioner_with_all_modes_view_controller = CheckBoxParameterViewController(
             settings.build_preconditioner_with_all_modes,
             'Build Preconditioner with All Modes',
-            tool_tip='Whether to build the preconditioner using all modes',
+            tool_tip='Build the illumination preconditioner from the summed intensity of all probe modes.',
         )
         self._constrain_hard_limits_view_controller = PtyChiConstrainHardLimitsViewController(
             settings.constrain_hard_limits,
@@ -498,7 +499,9 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
         layout.addRow(self._constrain_total_variation_view_controller.get_widget())
         layout.addRow(self._remove_grid_artifacts_view_controller.get_widget())
         layout.addRow(self._regularize_multislice_view_controller.get_widget())
-        layout.addRow('Patch Interpolator:', self._patch_interpolator_view_controller.get_widget())
+        layout.addRow(
+            'Patch Interpolator:', self._patch_interpolation_method_view_controller.get_widget()
+        )
         layout.addRow(self._remove_object_probe_ambiguity_view_controller.get_widget())
         layout.addRow(self._build_preconditioner_with_all_modes_view_controller.get_widget())
         layout.addRow(self._constrain_hard_limits_view_controller.get_widget())
@@ -506,7 +509,7 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
         if dm_settings is not None:
             self._amplitude_clamp_limit_view_controller = DecimalLineEditParameterViewController(
                 dm_settings.object_amplitude_clamp_limit,
-                tool_tip='Maximum amplitude value for the object',
+                tool_tip='Maximum object amplitude; larger values are clamped to this limit.',
             )
             layout.addRow(
                 'Amplitude Clamp Limit:', self._amplitude_clamp_limit_view_controller.get_widget()
@@ -514,16 +517,14 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
 
             self._inertia_view_controller = DecimalLineEditParameterViewController(
                 dm_settings.object_inertia,
-                tool_tip='Inertia for the object update',
+                tool_tip='Inertia of the object update; should be between 0 and 1.',
             )
             layout.addRow('Inertia:', self._inertia_view_controller.get_widget())
 
         if lsqml_settings is not None:
-            self._object_optimal_step_size_scaler_view_controller = (
-                DecimalLineEditParameterViewController(
-                    lsqml_settings.object_optimal_step_size_scaler,
-                    tool_tip='Optimal step size scaler for the object update',
-                )
+            self._object_optimal_step_size_scaler_view_controller = DecimalLineEditParameterViewController(
+                lsqml_settings.object_optimal_step_size_scaler,
+                tool_tip='Scaler applied to the solved optimal step size for the object update.',
             )
             layout.addRow(
                 'Optimal Step Size Scaler:',
@@ -533,14 +534,14 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
             self._object_multimodal_update_view_controller = CheckBoxParameterViewController(
                 lsqml_settings.object_multimodal_update,
                 'Multimodal Update',
-                tool_tip='When checked, the object update direction is calculated and summed over all probe modes rather than only the first mode',
+                tool_tip='Compute the object update direction summed over all probe modes rather than only the first mode.',
             )
             layout.addRow(self._object_multimodal_update_view_controller.get_widget())
 
         if pie_settings is not None:
             self._alpha_view_controller = DecimalSliderParameterViewController(
                 pie_settings.object_alpha,
-                tool_tip='Relaxation factor for the object update',
+                tool_tip='Update multiplier (feedback parameter) for the object, per Maiden (2017).',
             )
             layout.addRow('Alpha:', self._alpha_view_controller.get_widget())
 
