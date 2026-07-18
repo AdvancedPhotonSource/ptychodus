@@ -119,7 +119,7 @@ class PtyChiSliceForCorrectionViewController(ParameterViewController, Observer):
         self._choose_slice_for_correction_view_controller = CheckBoxParameterViewController(
             choose_slice_for_correction,
             'Slice For Correction:',
-            tool_tip='Whether to specify the slice that is used for position correction',
+            tool_tip='Specify the object slice used for position correction; otherwise the middle slice is used.',
         )
         self._slice_for_correction_view_controller = IntegerLineEditParameterViewController(
             slice_for_correction,
@@ -188,6 +188,9 @@ class PtyChiAffineDegreesOfFreedomViewController(ParameterViewController, Observ
         self._list_model = PtyChiAffineDegreesOfFreedomListModel(parameter)
         self._widget = QListView()
         self._widget.setModel(self._list_model)
+        self._widget.setToolTip(
+            'Degrees of freedom included when fitting the affine transform of the probe positions.'
+        )
 
         parameter.add_observer(self)
         self._sync_model_to_view()
@@ -222,7 +225,7 @@ class PtyChiConstrainAffineTransformViewController(CheckableGroupBoxParameterVie
         super().__init__(
             is_optimizable,
             'Constrain Affine Transform',
-            tool_tip='Constrain the affine transform during position correction',
+            tool_tip='Fit an affine transform from the initial to the current positions and penalize positions that deviate from it.',
         )
         self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
@@ -232,13 +235,16 @@ class PtyChiConstrainAffineTransformViewController(CheckableGroupBoxParameterVie
         )
         self._weight_update_interval_view_controller = SpinBoxParameterViewController(
             position_weight_update_interval,
-            tool_tip='Interval for updating the position weight',
+            tool_tip='Number of epochs between position weight updates.',
         )
         self._apply_constraint_view_controller = CheckBoxParameterViewController(
-            apply_constraint, 'Apply Constraint', tool_tip='Whether to apply the constraint'
+            apply_constraint,
+            'Apply Constraint',
+            tool_tip='Apply the fitted transform to the positions; when off, weights are still computed for logging but positions are unchanged.',
         )
         self._max_expected_error_px_view_controller = DecimalLineEditParameterViewController(
-            max_expected_error_px, tool_tip='Maximum expected error in pixels'
+            max_expected_error_px,
+            tool_tip='Maximum expected position error in pixels; used only to estimate friction in the affine constraint.',
         )
         self._override_update_flexibility_view_controller = CheckBoxParameterViewController(
             override_update_flexibility,
@@ -289,10 +295,10 @@ class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewControlle
             settings.optimizer, enumerators
         )
         self._step_size_view_controller = DecimalLineEditParameterViewController(
-            settings.step_size, tool_tip='Optimizer step size'
+            settings.step_size, tool_tip='Optimizer step size (learning rate).'
         )
-        self._constrain_centroid_view_controller = CheckBoxParameterViewController(
-            settings.constrain_centroid,
+        self._constrain_position_mean_view_controller = CheckBoxParameterViewController(
+            settings.constrain_position_mean,
             'Constrain Centroid',
             tool_tip='Whether to subtract the mean from positions after updating positions',
         )
@@ -304,7 +310,7 @@ class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewControlle
         self._differentiation_method_view_controller = ComboBoxParameterViewController(
             settings.differentiation_method,
             enumerators.image_gradient_methods(),
-            tool_tip='Method for calculating the object gradient',
+            tool_tip='Method for computing the object gradient (GRADIENT correction only); FOURIER_DIFFERENTIATION is usually fastest.',
         )
         self._cross_correlation_view_controller = PtyChiCrossCorrelationViewController(
             settings.correction_type,
@@ -345,7 +351,7 @@ class PtyChiProbePositionsViewController(CheckableGroupBoxParameterViewControlle
         layout.addRow('Plan:', self._optimization_plan_view_controller.get_widget())
         layout.addRow('Optimizer:', self._optimizer_view_controller.get_widget())
         layout.addRow('Step Size:', self._step_size_view_controller.get_widget())
-        layout.addRow(self._constrain_centroid_view_controller.get_widget())
+        layout.addRow(self._constrain_position_mean_view_controller.get_widget())
         layout.addRow('Correction Type:', self._correction_type_view_controller.get_widget())
         layout.addRow(
             'Differentiation Method:', self._differentiation_method_view_controller.get_widget()

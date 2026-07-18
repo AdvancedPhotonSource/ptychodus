@@ -5,6 +5,7 @@ from .monitor import (
     FluorescenceDatasetEmitter,
     FluorescenceTaskMonitor,
 )
+from .ptychozoon import PtychozoonFluorescenceEnhancer
 from .two_step import TwoStepFluorescenceEnhancer
 from .vspi import VSPIFluorescenceEnhancer
 
@@ -14,6 +15,7 @@ __all__ = [
     'FluorescenceCore',
     'FluorescenceDatasetEmitter',
     'FluorescenceTaskMonitor',
+    'PtychozoonFluorescenceEnhancer',
     'TwoStepFluorescenceEnhancer',
     'VSPIFluorescenceEnhancer',
 ]

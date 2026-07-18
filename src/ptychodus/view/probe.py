@@ -1,5 +1,6 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QFormLayout,
@@ -217,6 +218,31 @@ class FluorescenceVSPIParametersView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addRow('Damping Factor:', self.damping_factor_line_edit)
         layout.addRow('Max Iterations:', self.max_iterations_spin_box)
+        self.setLayout(layout)
+
+
+class FluorescencePtychozoonParametersView(QWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.damping_factor_line_edit = DecimalLineEdit.create_instance()
+        self.gradient_smoothness_line_edit = DecimalLineEdit.create_instance()
+        self.max_iterations_spin_box = QSpinBox()
+        self.atol_line_edit = DecimalLineEdit.create_instance()
+        self.btol_line_edit = DecimalLineEdit.create_instance()
+        self.checkpoint_interval_spin_box = QSpinBox()
+        self.use_gpu_check_box = QCheckBox('Use GPU')
+        self.gpu_device_index_spin_box = QSpinBox()
+
+        layout = QFormLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addRow('Damping Factor:', self.damping_factor_line_edit)
+        layout.addRow('Gradient Smoothness:', self.gradient_smoothness_line_edit)
+        layout.addRow('Max Iterations:', self.max_iterations_spin_box)
+        layout.addRow('A Tolerance:', self.atol_line_edit)
+        layout.addRow('B Tolerance:', self.btol_line_edit)
+        layout.addRow('Checkpoint Interval:', self.checkpoint_interval_spin_box)
+        layout.addRow(self.use_gpu_check_box)
+        layout.addRow('CUDA Device Index:', self.gpu_device_index_spin_box)
         self.setLayout(layout)
 
 

@@ -45,7 +45,7 @@ class PtyChiConstrainProbePowerViewController(CheckableGroupBoxParameterViewCont
         self._scale_object_view_controller = CheckBoxParameterViewController(
             scale_object,
             'Scale Object',
-            tool_tip='When checked, the object will be scaled to compensate for the probe power constraint',
+            tool_tip='Scale the object inversely when the probe power is constrained; otherwise only the probe is rescaled.',
         )
 
         layout = QFormLayout()
@@ -82,7 +82,7 @@ class PtyChiOrthogonalizeIncoherentModesViewController(CheckableGroupBoxParamete
         self._sort_by_occupancy_view_controller = CheckBoxParameterViewController(
             sort_by_occupancy,
             'Sort By Occupancy',
-            tool_tip='When checked, incoherent modes will be sorted by occupancy after orthogonalization',
+            tool_tip='Keep modes sorted so the highest-occupancy mode is the first shared mode.',
         )
 
         layout = QFormLayout()
@@ -136,12 +136,13 @@ class PtyChiConstrainSupportViewController(CheckableGroupBoxParameterViewControl
             start, stop, stride, num_epochs
         )
         self._threshold_view_controller = DecimalLineEditParameterViewController(
-            threshold, tool_tip='Threshold for the probe support constraint'
+            threshold,
+            tool_tip='Shrinkwrap threshold: probe pixels below this fraction of the blurred maximum are set to zero.',
         )
         self._method_view_controller = ComboBoxParameterViewController(
             method,
             enumerators.probe_support_methods(),
-            tool_tip='Method for probe support constraint',
+            tool_tip='Optional fixed support mask (ellipse or rectangle) applied before shrinkwrapping.',
         )
 
         layout = QFormLayout()
@@ -159,7 +160,7 @@ class PtyChiConstrainCenterViewController(CheckableGroupBoxParameterViewControll
         stop: IntegerParameter,
         stride: IntegerParameter,
         num_epochs: IntegerParameter,
-        use_intensity_for_mass_centroid: BooleanParameter,
+        use_total_intensity_for_com: BooleanParameter,
         center_modes_individually: BooleanParameter,
     ) -> None:
         super().__init__(
@@ -170,10 +171,10 @@ class PtyChiConstrainCenterViewController(CheckableGroupBoxParameterViewControll
         self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
-        self._use_intensity_for_mass_centroid_view_controller = CheckableGroupBoxParameterViewController(
-            use_intensity_for_mass_centroid,
+        self._use_total_intensity_for_com_view_controller = CheckableGroupBoxParameterViewController(
+            use_total_intensity_for_com,
             'Use Intensity for Mass Centroid',
-            tool_tip='When enabled, the mass centroid will be calculated using the intensity of the probe',
+            tool_tip="Use the total probe intensity for the center-of-mass calculation instead of the dominant shared mode's magnitude.",
         )
         self._center_modes_individually_view_controller = CheckBoxParameterViewController(
             center_modes_individually,
@@ -183,7 +184,7 @@ class PtyChiConstrainCenterViewController(CheckableGroupBoxParameterViewControll
 
         layout = QFormLayout()
         layout.addRow('Plan:', self._plan_view_controller.get_widget())
-        layout.addRow(self._use_intensity_for_mass_centroid_view_controller.get_widget())
+        layout.addRow(self._use_total_intensity_for_com_view_controller.get_widget())
         layout.addRow(self._center_modes_individually_view_controller.get_widget())
         self.get_widget().setLayout(layout)
 
@@ -211,7 +212,7 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
             settings.optimizer, enumerators
         )
         self._step_size_view_controller = DecimalLineEditParameterViewController(
-            settings.step_size, tool_tip='Optimizer step size'
+            settings.step_size, tool_tip='Optimizer step size (learning rate).'
         )
         self._constrain_probe_power_view_controller = PtyChiConstrainProbePowerViewController(
             settings.constrain_probe_power,
@@ -256,12 +257,12 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
             settings.constrain_center_stop,
             settings.constrain_center_stride,
             num_epochs,
-            settings.use_intensity_for_mass_centroid,
+            settings.use_total_intensity_for_com,
             settings.constrain_center_modes_individually,
         )
-        self._relax_eigenmode_update_view_controller = DecimalSliderParameterViewController(
-            settings.relax_eigenmode_update,
-            tool_tip='Relaxation factor for the eigenmode update',
+        self._eigenmode_update_relaxation_view_controller = DecimalSliderParameterViewController(
+            settings.eigenmode_update_relaxation,
+            tool_tip='Separate step size (relaxation) for the eigenmode update.',
         )
 
         layout = QFormLayout()
@@ -274,19 +275,21 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
         layout.addRow(self._constrain_support_view_controller.get_widget())
         layout.addRow(self._constrain_center_view_controller.get_widget())
         layout.addRow(
-            'Relax Eigenmode Update:', self._relax_eigenmode_update_view_controller.get_widget()
+            'Relax Eigenmode Update:',
+            self._eigenmode_update_relaxation_view_controller.get_widget(),
         )
 
         if dm_settings is not None:
             self._inertia_view_controller = DecimalLineEditParameterViewController(
-                dm_settings.probe_inertia, tool_tip='Inertia for the probe update'
+                dm_settings.probe_inertia,
+                tool_tip='Inertia of the probe update; should be between 0 and 1.',
             )
             layout.addRow('Inertia:', self._inertia_view_controller.get_widget())
 
         if lsqml_settings is not None:
             self._optimal_step_size_scaler_view_controller = DecimalLineEditParameterViewController(
                 lsqml_settings.probe_optimal_step_size_scaler,
-                tool_tip='Optimal step size scaler for the probe update',
+                tool_tip='Scaler applied to the solved optimal step size for the probe update.',
             )
             layout.addRow(
                 'Optimal Step Size Scaler:',
@@ -295,7 +298,8 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
 
         if pie_settings is not None:
             self._alpha = DecimalSliderParameterViewController(
-                pie_settings.probe_alpha, tool_tip='Relaxation factor for the probe update'
+                pie_settings.probe_alpha,
+                tool_tip='Update multiplier (feedback parameter) for the probe, per Maiden (2017).',
             )
             layout.addRow('Alpha:', self._alpha.get_widget())
 

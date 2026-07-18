@@ -1,0 +1,63 @@
+# ptychodus GUI + PtychoPINN on Ubuntu 24.04, using the system Python 3.12 in a venv.
+#
+# CUDA is expected to come from the host via the NVIDIA Container Toolkit
+# (`docker run --gpus all ...`); the PyTorch wheels pulled in by ptychi ship
+# their own CUDA runtime libraries and bind to the host driver.
+#
+# Run (Linux host with X11):
+#   xhost +local:docker
+#   docker run --rm -it --gpus all \
+#       -e DISPLAY=$DISPLAY \
+#       -v /tmp/.X11-unix:/tmp/.X11-unix \
+#       ptychodus
+#
+# `docker run ... ptychodus bash` drops into a shell instead of launching the GUI.
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    VIRTUAL_ENV=/opt/venv \
+    PATH=/opt/venv/bin:$PATH \
+    QT_X11_NO_MITSHM=1
+
+# Build toolchain + system Python 3.12 + the Qt/X11 runtime libraries PyQt5
+# needs to render against the host X server.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        git \
+        build-essential \
+        python3 \
+        python3-venv \
+        python3-dev \
+        libgl1 \
+        libegl1 \
+        libglib2.0-0 \
+        libdbus-1-3 \
+        libfontconfig1 \
+        libxkbcommon-x11-0 \
+        libxcb-cursor0 \
+        libxcb-icccm4 \
+        libxcb-image0 \
+        libxcb-keysyms1 \
+        libxcb-randr0 \
+        libxcb-render-util0 \
+        libxcb-shape0 \
+        libxcb-sync1 \
+        libxcb-xfixes0 \
+        libxcb-xinerama0 \
+        libxcb-xkb1 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m venv "${VIRTUAL_ENV}" \
+    && pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# PtychoPINN: clone, strip tensorflow* deps from pyproject.toml (they conflict with
+# the PyTorch stack), install (bypassing its overly strict Python pin), drop the source.
+RUN git clone --depth 1 https://github.com/hoidn/PtychoPINN /tmp/ptychopinn \
+    && sed -i '/^[[:space:]]*"tensorflow/d' /tmp/ptychopinn/pyproject.toml \
+    && pip install --no-cache-dir --ignore-requires-python /tmp/ptychopinn \
+    && rm -rf /tmp/ptychopinn
+
+RUN pip install --no-cache-dir "ptychodus[gui,ptychi]"

@@ -4,9 +4,11 @@ import logging
 from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.probe import (
+    ProbeEntropyMetrics,
     ProbeGeometryProvider,
     ProbeSequence,
     ProbeSizeMetrics,
+    estimate_probe_entropy,
     estimate_probe_size,
 )
 
@@ -65,6 +67,23 @@ class ProbeRepositoryItem(ParameterGroup):
             return estimate_probe_size(probe.get_intensity(), pixel_geometry)
         except Exception:
             logger.exception('Failed to estimate probe size!')
+            return None
+
+    def get_entropy_metrics(self) -> ProbeEntropyMetrics | None:
+        probe_seq = self._probe_seq
+
+        if probe_seq.width_px == 0 or probe_seq.height_px == 0:
+            return None
+
+        try:
+            probe = probe_seq.get_probe_no_opr()
+        except ValueError:
+            return None
+
+        try:
+            return estimate_probe_entropy(probe)
+        except Exception:
+            logger.exception('Failed to estimate probe entropy!')
             return None
 
     def get_builder(self) -> ProbeSequenceBuilder:

@@ -1,10 +1,13 @@
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Final
 import logging
+import re
 
 import h5py
 import numpy
 
-from ptychodus.api.geometry import ImageExtent, PixelGeometry
+from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.diffraction import (
     DiffractionDataset,
     DiffractionFileReader,
@@ -13,83 +16,109 @@ from ptychodus.api.diffraction import (
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
+from ptychodus.api.tree import SimpleTreeNode
 
-from .h5_diffraction_file import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
+from .h5_diffraction_file import H5DiffractionPatternArray
 
 logger = logging.getLogger(__name__)
 
+# eV*angstrom: E(eV) = HC_EV_ANGSTROM / wavelength(angstrom)
+HC_EV_ANGSTROM: Final[float] = 12398.4198
+
 
 class ISNDiffractionFileReader(DiffractionFileReader):
-    def __init__(self) -> None:
-        self._tree_builder = H5DiffractionFileTreeBuilder()
+    """Reader for APS 19-ID In-Situ Nanoprobe diffraction data.
+
+    The new ISN format stores diffraction frames across many sibling
+    per-file HDF5s in a single directory (e.g. ``scan_1307_00001.h5`` ...
+    ``scan_1307_00400.h5``), each holding ``/entry/data/data`` of shape
+    ``(nframes, height, width)``. There is no master file and no configs
+    group; geometry (detector distance, pixel size) is not recorded and is
+    supplied by the user via GUI settings. Frames are indexed by array order.
+    """
+
+    DATA_PATH: Final[str] = '/entry/data/data'
+    WAVELENGTH_PATH: Final[str] = '/entry/instrument/NDAttributes/Wavelength'
+    COUNT_TIME_PATH: Final[str] = '/entry/instrument/NDAttributes/CountTime'
+
+    def _get_file_series(self, file_path: Path) -> tuple[Mapping[int, Path], str]:
+        file_path_dict: dict[int, Path] = dict()
+
+        digits = re.findall(r'\d+', file_path.stem)
+        longest_digits = max(digits, key=len)
+        file_pattern = file_path.name.replace(longest_digits, f'(\\d{{{len(longest_digits)}}})')
+
+        for fp in file_path.parent.iterdir():
+            z = re.match(file_pattern, fp.name)
+
+            if z:
+                index = int(z.group(1))
+                file_path_dict[index] = fp
+
+        return file_path_dict, file_pattern
+
+    def _read_scalar(self, h5_file: h5py.File, data_path: str) -> float | None:
+        """Read a per-frame NDAttribute scalar, returning None if absent or NaN."""
+        try:
+            values = h5_file[data_path][()]
+        except KeyError:
+            return None
+
+        value = float(numpy.ravel(values)[0])
+        return None if numpy.isnan(value) else value
 
     def read(self, file_path: Path) -> DiffractionDataset:
+        file_path_mapping, file_pattern = self._get_file_series(file_path)
+
+        num_patterns_per_array: list[int] = []
         array_list: list[DiffractionArray] = []
+        contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
 
-        with h5py.File(file_path, 'r') as h5_file:
-            ptycho = h5_file['PTYCHO']
-            configs = h5_file['configs']
-            num_patterns_per_array: list[int] = []
+        pattern_dtype = numpy.dtype(numpy.int32)
+        detector_extent: ImageExtent | None = None
+        probe_energy_eV: float | None = None  # noqa: N806
+        exposure_time_s: float | None = None
+        offset = 0
 
-            if isinstance(ptycho, h5py.Group):
-                data_path = '/entry/data/data'
-                offset = 0
+        for idx, fp in sorted(file_path_mapping.items()):
+            with h5py.File(fp, 'r') as h5_file:
+                h5_data = h5_file[self.DATA_PATH]
 
-                for name in sorted(ptycho):
-                    h5_item = ptycho.get(name, getlink=True)
+                if not isinstance(h5_data, h5py.Dataset):
+                    raise ValueError(f'Expected dataset at "{fp}:{self.DATA_PATH}".')
 
-                    if isinstance(h5_item, h5py.ExternalLink):
-                        data_file_path = file_path.parent / h5_item.filename
+                num_patterns, detector_height, detector_width = h5_data.shape
 
-                        with h5py.File(data_file_path) as h5_data_file:
-                            h5_data = h5_data_file[data_path]
+                if detector_extent is None:
+                    pattern_dtype = h5_data.dtype
+                    detector_extent = ImageExtent(detector_width, detector_height)
 
-                            if isinstance(h5_data, h5py.Dataset):
-                                num_patterns, _, _ = h5_data.shape
-                                num_patterns_per_array.append(num_patterns)
-                            else:
-                                raise ValueError(
-                                    f'Expected {data_file_path}:{data_path} to be a dataset.'
-                                )
+                    wavelength_angstrom = self._read_scalar(h5_file, self.WAVELENGTH_PATH)
+                    if wavelength_angstrom:
+                        probe_energy_eV = HC_EV_ANGSTROM / wavelength_angstrom  # noqa: N806
 
-                        array = H5DiffractionPatternArray(
-                            label=name,
-                            indexes=numpy.arange(num_patterns) + offset,
-                            file_path=data_file_path,
-                            data_path=data_path,
-                        )
-                        array_list.append(array)
-                        offset += num_patterns
-                    else:
-                        logger.debug(f'Skipping "{name}": not an external link.')
-            else:
-                raise KeyError('PTYCHO is not a group!')
+                    exposure_time_s = self._read_scalar(h5_file, self.COUNT_TIME_PATH)
 
-            if isinstance(configs, h5py.Group):
-                detector_distance_m = float(
-                    configs['det_dist_mm'][()]
-                )  # file units are m; typo in dataset name
-                detector_width_px = int(configs['det_size_x'][()])
-                detector_height_px = int(configs['det_size_y'][()])
-                pixel_width_m = float(configs['pix_size_x'][()])
-                pixel_height_m = float(configs['pix_size_y'][()])
-                probe_energy_eV = float(configs['photon_energy_eV'][()])  # noqa: N806
+            indexes = numpy.arange(num_patterns) + offset
+            array = H5DiffractionPatternArray(fp.stem, indexes, fp, self.DATA_PATH)
+            contents_tree.create_child([array.get_label(), 'HDF5', str(idx)])
+            array_list.append(array)
+            num_patterns_per_array.append(num_patterns)
+            offset += num_patterns
 
-                metadata = DiffractionMetadata(
-                    num_patterns_per_array=num_patterns_per_array,
-                    pattern_dtype=numpy.dtype(numpy.uint32),
-                    detector_distance_m=detector_distance_m,
-                    detector_extent=ImageExtent(detector_width_px, detector_height_px),
-                    detector_pixel_geometry=PixelGeometry(pixel_width_m, pixel_height_m),
-                    probe_energy_eV=probe_energy_eV,
-                    file_path=file_path,
-                )
-            else:
-                raise KeyError('configs is not a group!')
+        if detector_extent is None:
+            raise ValueError(f'No ISN diffraction files matched "{file_pattern}".')
 
-            contents_tree = self._tree_builder.build(h5_file)
+        metadata = DiffractionMetadata(
+            num_patterns_per_array=num_patterns_per_array,
+            pattern_dtype=pattern_dtype,
+            detector_extent=detector_extent,
+            probe_energy_eV=probe_energy_eV,
+            exposure_time_s=exposure_time_s,
+            file_path=file_path.parent / file_pattern,
+        )
 
-            return SimpleDiffractionDataset(metadata, contents_tree, array_list)
+        return SimpleDiffractionDataset(metadata, contents_tree, array_list)
 
 
 def register_plugins(registry: PluginRegistry) -> None:

@@ -19,9 +19,35 @@ logger = logging.getLogger(__name__)
 
 
 class PolarDiffractionFileReader(DiffractionFileReader):
+    NDARRAY_UNIQUE_ID_PATH = '/entry/instrument/NDAttributes/NDArrayUniqueId'
+
     def __init__(self) -> None:
         self._data_path = '/entry/externals/eiger'
         self._tree_builder = H5DiffractionFileTreeBuilder()
+
+    def _read_pattern_indexes(self, h5_file: h5py.File, num_patterns: int) -> numpy.ndarray:
+        """Return per-pattern indexes.
+
+        Uses the Eiger detector's NDArrayUniqueId when the file exposes
+        it (this reader already opens the external Eiger file where the
+        UID lives). Normalizes to per-scan 0-based, then shifts by +1 to
+        match the flyscan convention that the detector skips pos_stream
+        trigger 0 (see process_flyscan.plot_data).
+        """
+        try:
+            uid = h5_file[self.NDARRAY_UNIQUE_ID_PATH][()]
+        except KeyError:
+            logger.warning(
+                'NDArrayUniqueId not found; falling back to sequential indexes '
+                '(gap-preserving alignment with dropped Eiger frames not possible).'
+            )
+            return numpy.arange(1, num_patterns + 1, dtype=numpy.int64)
+
+        if uid.shape[0] != num_patterns:
+            raise ValueError(
+                f'NDArrayUniqueId length {uid.shape[0]} != pattern count {num_patterns}.'
+            )
+        return (uid - int(uid[0]) + 1).astype(numpy.int64)
 
     def read(self, file_path: Path) -> DiffractionDataset:
         with h5py.File(file_path, 'r') as h5_file:
@@ -53,9 +79,11 @@ class PolarDiffractionFileReader(DiffractionFileReader):
                     file_path=file_path,
                 )
 
+                indexes = self._read_pattern_indexes(h5_file, num_patterns)
+
                 array = H5DiffractionPatternArray(
                     label=file_path.stem,
-                    indexes=numpy.arange(num_patterns),
+                    indexes=indexes,
                     file_path=data_file_path,
                     data_path=data.name,
                 )
