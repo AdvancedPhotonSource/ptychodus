@@ -16,10 +16,9 @@ be happy to add file readers to support more ptychography instruments.
     - 31-ID-E LYNX
     - 33-ID-C PtychoProbe
     - 33-ID-C Velociprobe
-- Advanced Light Source (ALS)
-    - Coherent X-ray Imaging (``*.cxi``)
 - Linac Coherent Light Source (LCLS)
     - Hutch 1.3: X-ray Pump Probe (XPP)
+    - SLAC NumPy Zipped Archive (``*.npz``)
 - MAX IV
     - NanoMAX Diffraction Endstation (``*.h5``)
 - National Synchrotron Light Source II (NSLS-II)
@@ -27,10 +26,11 @@ be happy to add file readers to support more ptychography instruments.
 - Swiss Light Source (SLS)
     - X12SA: Coherent Small-Angle X-ray Scattering (cSAXS)
 - Common File Formats
+    - Coherent X-ray Imaging (``*.cxi``)
     - Comma-Separated Values (``*.csv``)
     - EPICS Multi-Dimensional Archive (``*.mda``)
+    - fold_slice (``*.mat``, ``*.h5``)
     - NumPy Binary Files (``*.npy``, ``*.npz``)
-    - PtychoShelves (``*.mat``, ``*.h5``)
     - Ptychodus Diffraction Patterns (``*.h5``, ``*.npz``)
     - Ptychodus Product (``*.h5``, ``*.npz``)
     - Space-Separated Values (``*.txt``)
