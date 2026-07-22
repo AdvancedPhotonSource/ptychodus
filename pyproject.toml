@@ -48,7 +48,7 @@ ptychopinn = ["ptychopinn"]
 ptychozoon = ["ptychozoon"]
 store = [
     "fastapi>=0.115",
-    "fastmcp>=2",
+    "fastmcp>=3",
     "uvicorn[standard]>=0.30",
     "sqlalchemy[asyncio]>=2.0",
     "aiosqlite>=0.20",
@@ -56,10 +56,11 @@ store = [
     "pydantic-settings>=2.5",
     "python-multipart",
 ]
+xraydb = ["xraydb>=4.5"]
 
 [tool.uv.sources]
 #ptychi = { path = "../pty-chi", editable = true }
-#ptychopinn = { path = "../PtychoPINN", editable = true }
+ptychopinn = { path = "../PtychoPINN", editable = true }
 #ptychopinn = { git = "https://github.com/hoidn/PtychoPINN", branch = "main" }
 
 #[[tool.uv.index]]
@@ -69,6 +70,15 @@ store = [
 
 [tool.setuptools.package-data]
 "ptychodus" = ["py.typed"]
+"ptychodus_store" = [
+    "ui/index.html",
+    "ui/styles.css",
+    "ui/dist/**/*.js",
+    "ui/dist/**/*.js.map",
+    "ui/icons/*.svg",
+    "ui/icons/README.md",
+    "ui/icons/Font-Awesome-LICENSE.txt",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -94,6 +104,7 @@ module = [
     "scipy.*",
     "tifffile",
     "torch",
+    "xraydb.*",
 ]
 ignore_missing_imports = true
 

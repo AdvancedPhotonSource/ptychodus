@@ -28,6 +28,12 @@ uv run ptychodus-bdp --product-name <name> --diffraction-input <h5> \
                      --probe-position-input <csv> --output-directory <dir> \
                      --settings <ini>
 
+# ptychodus-store service (REST + MCP + browser UI). Full details in
+# src/ptychodus_store/README.md.
+uv sync --extra store
+PTYCHODUS_STORE_STORAGE_ROOT=/path/to/artifacts uv run ptychodus-store serve
+uv run ptychodus-store rebuild-index    # full DB reconciliation from disk
+
 # Other entry points (see [project.scripts] in pyproject.toml)
 uv run convert-to-ptychodus
 uv run ptychodus-system-check
@@ -102,14 +108,26 @@ Two providers, both gated by optional dependencies and constructed by `ModelCore
 
 `WorkflowAPI` (see `api/workflow.py` and `model/workflow.py::ConcreteWorkflowAPI`) is the unified façade that GUI, batch mode, and remote workflows all drive.
 
+### ptychodus_store service
+
+`src/ptychodus_store/` is a **separate package** adjacent to `ptychodus`, not a subpackage. It reads-only from `ptychodus.api` (loaders, product schema, visualization types) and never imports `ptychodus.model` or `ptychodus.view`. It exposes:
+
+- a FastAPI REST API under `/api/v1/*` (routers in `src/ptychodus_store/routers/`),
+- an MCP server at `/mcp` (see `src/ptychodus_store/mcp_server.py`) with read-only tools mirroring the REST surface,
+- a minimal TypeScript browser UI at `/ui/` (source in `src/ptychodus_store/ui/src/`, compiled by `tsc` to `ui/dist/`),
+- a SQLite metadata cache reconciled against the on-disk storage root by a watchdog observer.
+
+Composition root is `create_app()` in `src/ptychodus_store/app.py`. Settings load via pydantic-settings from `PTYCHODUS_STORE_*` env vars (see `src/ptychodus_store/config.py`). Full deployment docs: `src/ptychodus_store/README.md`.
+
 ## Conventions
 
 - Ruff is configured for **single-quoted** strings, 100-char lines, py311 target. The selected lint rules (F, N, NPY) flag pyflakes errors, PEP-8 naming, and NumPy-specific issues. NumPy/Qt-style names (e.g., `probe_energy_eV`, `set_value_from_string`) are accepted via `# noqa: N802/N806/N815` — preserve the unit suffixes on physical quantities; reviewers expect them.
 - Type hints are mandatory; `pyproject.toml` lists modules whose missing stubs are intentionally ignored. Keep new code typed and avoid widening that ignore list.
 - `model/core.py::ModelCore.is_developer_mode_enabled` is `True` whenever the effective log level ≤ DEBUG (`--log-level 10`). Some controllers gate features (Agent panel, probe-position analysis) behind it.
 - HTTP-client code uses `httpx` throughout (sync `httpx.Client` for repeated calls, module-level `httpx.get/post/...` for one-shots). `requests` is not a direct dependency.
+- The `ptychodus_store/ui/` frontend is authored in TypeScript, compiled to native ES modules with plain `tsc` (no bundler, no framework, no runtime npm deps). Wheel builds run `tsc` automatically via a `build_py` cmdclass in `setup.py`; interactive dev needs `tsc` on PATH.
 
 ## Repository Notes
 
 - The git CI workflow targets `main`; local development branches such as `amsc` are active — confirm the intended target before opening PRs.
-- Sample `.h5`/`.npy` data and the `dist/` build output in the working tree are typically **untracked** local artifacts — do not stage them in commits unless explicitly asked.
+- Sample `.h5`/`.npy` data and any `dist/` output — including the compiled frontend at `src/ptychodus_store/ui/dist/` and packaging output at repo-root `dist/` — are untracked local artifacts. The frontend `dist/` is regenerated automatically at wheel build time; do not stage it in commits.

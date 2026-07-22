@@ -1,26 +1,26 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
     <qresource prefix="icons">
-        <file alias="automate">Font-Awesome-7.1.0/svgs/solid/robot.svg</file>
-        <file alias="autoscale">Font-Awesome-7.1.0/svgs/solid/arrows-left-right-to-line.svg</file>
-        <file alias="fourier">Font-Awesome-7.1.0/svgs/solid/f.svg</file>
-        <file alias="genesis">genesis.svg</file>
-        <file alias="globus">globus.svg</file>
-        <file alias="home">Font-Awesome-7.1.0/svgs/solid/house-chimney.svg</file>
-        <file alias="line-cut">Font-Awesome-7.1.0/svgs/solid/chart-line.svg</file>
-        <file alias="move">Font-Awesome-7.1.0/svgs/solid/arrows-up-down-left-right.svg</file>
-        <file alias="object">Font-Awesome-7.1.0/svgs/solid/layer-group.svg</file>
-        <file alias="patterns">Font-Awesome-7.1.0/svgs/solid/table-cells.svg</file>
-        <file alias="positions">Font-Awesome-7.1.0/svgs/solid/route.svg</file>
-        <file alias="probe">Font-Awesome-7.1.0/svgs/solid/circle-radiation.svg</file>
-        <file alias="processing">Font-Awesome-7.1.0/svgs/solid/microchip.svg</file>
-        <file alias="products">Font-Awesome-7.1.0/svgs/solid/list.svg</file>
-        <file alias="ptychodus">ptychodus.svg</file>
-        <file alias="rectangle">Font-Awesome-7.1.0/svgs/solid/object-group.svg</file>
-        <file alias="ruler">Font-Awesome-7.1.0/svgs/solid/ruler.svg</file>
-        <file alias="save">Font-Awesome-7.1.0/svgs/regular/floppy-disk.svg</file>
-        <file alias="send">Font-Awesome-7.1.0/svgs/solid/paper-plane.svg</file>
-        <file alias="settings">Font-Awesome-7.1.0/svgs/solid/gear.svg</file>
-        <file alias="sparkles">Font-Awesome-7.1.0/svgs/solid/wand-magic-sparkles.svg</file>
+        <file alias="automate">../../ptychodus_store/ui/icons/robot.svg</file>
+        <file alias="autoscale">../../ptychodus_store/ui/icons/arrows-left-right-to-line.svg</file>
+        <file alias="fourier">../../ptychodus_store/ui/icons/f.svg</file>
+        <file alias="genesis">../../ptychodus_store/ui/icons/genesis.svg</file>
+        <file alias="globus">../../ptychodus_store/ui/icons/globus.svg</file>
+        <file alias="home">../../ptychodus_store/ui/icons/house-chimney.svg</file>
+        <file alias="line-cut">../../ptychodus_store/ui/icons/chart-line.svg</file>
+        <file alias="move">../../ptychodus_store/ui/icons/arrows-up-down-left-right.svg</file>
+        <file alias="object">../../ptychodus_store/ui/icons/layer-group.svg</file>
+        <file alias="patterns">../../ptychodus_store/ui/icons/table-cells.svg</file>
+        <file alias="positions">../../ptychodus_store/ui/icons/route.svg</file>
+        <file alias="probe">../../ptychodus_store/ui/icons/circle-radiation.svg</file>
+        <file alias="processing">../../ptychodus_store/ui/icons/microchip.svg</file>
+        <file alias="products">../../ptychodus_store/ui/icons/list.svg</file>
+        <file alias="ptychodus">../../ptychodus_store/ui/icons/ptychodus.svg</file>
+        <file alias="rectangle">../../ptychodus_store/ui/icons/object-group.svg</file>
+        <file alias="ruler">../../ptychodus_store/ui/icons/ruler.svg</file>
+        <file alias="save">../../ptychodus_store/ui/icons/floppy-disk.svg</file>
+        <file alias="send">../../ptychodus_store/ui/icons/paper-plane.svg</file>
+        <file alias="settings">../../ptychodus_store/ui/icons/gear.svg</file>
+        <file alias="sparkles">../../ptychodus_store/ui/icons/wand-magic-sparkles.svg</file>
     </qresource>
 </RCC>

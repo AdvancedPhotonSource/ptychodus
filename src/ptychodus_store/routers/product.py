@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from base64 import b64encode
+from io import BytesIO
 from uuid import UUID
 
+import numpy
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
+from PIL import Image, ImageDraw
 from sqlalchemy import exists, select
 
 from ptychodus.api.io import load_product
@@ -132,3 +136,62 @@ async def get_object_layer_image(
         )
     values = product.object_.get_layer(layer)
     return render_complex(values, product.object_.get_pixel_geometry(), params)
+
+
+@router.get('/{uuid}/positions/image', response_model=RenderedImage)
+async def get_positions_image(
+    uuid: UUID,
+    session: SessionDep,
+    layout: LayoutDep,
+    canvas_px: int = Query(512, ge=64, le=2048, description='Square output resolution in pixels.'),
+    connect_path: bool = Query(True, description='Draw a polyline through successive scan points.'),
+    margin_frac: float = Query(
+        0.05, ge=0.0, le=0.5, description='Blank margin around the bounding box, as a fraction.'
+    ),
+) -> RenderedImage:
+    product = await _load_product_or_404(uuid, session, layout)
+    positions = product.probe_positions
+    n_points = len(positions)
+    if n_points == 0:
+        raise HTTPException(status_code=404, detail='product has no probe positions')
+
+    xs = numpy.array([positions[i].coordinate_x_m for i in range(n_points)], dtype=float)
+    ys = numpy.array([positions[i].coordinate_y_m for i in range(n_points)], dtype=float)
+
+    x_min, x_max = float(xs.min()), float(xs.max())
+    y_min, y_max = float(ys.min()), float(ys.max())
+    width_m = max(x_max - x_min, 1e-9)
+    height_m = max(y_max - y_min, 1e-9)
+    range_m = max(width_m, height_m) * (1.0 + 2.0 * margin_frac)
+    x_center = 0.5 * (x_min + x_max)
+    y_center = 0.5 * (y_min + y_max)
+
+    scale = canvas_px / range_m
+    px_x = (xs - x_center) * scale + canvas_px / 2.0
+    px_y = canvas_px / 2.0 - (ys - y_center) * scale  # flip y so +y is up
+    pts = [(int(round(px)), int(round(py))) for px, py in zip(px_x, px_y)]
+
+    img = Image.new('RGB', (canvas_px, canvas_px), (0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    if connect_path and n_points > 1:
+        draw.line(pts, fill=(80, 80, 80), width=1)
+    radius = max(1, canvas_px // 200)
+    denom = max(1, n_points - 1)
+    for i, (px, py) in enumerate(pts):
+        t = i / denom
+        color = (int(255 * t), 80, int(255 * (1.0 - t)))
+        draw.ellipse((px - radius, py - radius, px + radius, py + radius), fill=color)
+
+    buf = BytesIO()
+    img.save(buf, format='PNG')
+    pixel_m = range_m / canvas_px
+    return RenderedImage(
+        png_base64=b64encode(buf.getvalue()).decode('ascii'),
+        value_label='Scan Index',
+        color_value_min=0.0,
+        color_value_max=float(max(0, n_points - 1)),
+        pixel_width_m=pixel_m,
+        pixel_height_m=pixel_m,
+        shape_h_px=canvas_px,
+        shape_w_px=canvas_px,
+    )
