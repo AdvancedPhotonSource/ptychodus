@@ -47,6 +47,16 @@ def calc_coherent_percent(probe: Probe) -> int:
     return int(100.0 * coherence) if numpy.isfinite(coherence) else -1
 
 
+def try_get_probe(item: ProbeRepositoryItem) -> Probe | None:
+    # Returns None when the probe sequence is the null sentinel (no dataset
+    # bound yet — see ProbeRepositoryItem._rebuild). Same pattern used by
+    # ProbeRepositoryItem.get_size_metrics / get_entropy_metrics.
+    try:
+        return item.get_probes().get_probe_no_opr()
+    except ValueError:
+        return None
+
+
 class ProbeTreeModel(QAbstractItemModel):
     def __init__(
         self,
@@ -175,47 +185,57 @@ class ProbeTreeModel(QAbstractItemModel):
                     case 0:
                         return f'Mode {index.row() + 1}'
                     case 1:
-                        probe = item.get_probes().get_probe_no_opr()  # TODO OPR
+                        probe = try_get_probe(item)
+                        if probe is None:
+                            return None
                         power_percent = calc_relative_power_percent(probe, index.row())
                         return f'{power_percent}%'
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
-                probe = item.get_probes().get_probe_no_opr()  # TODO OPR
+                probe = try_get_probe(item)
+                if probe is None:
+                    return None
                 return calc_relative_power_percent(probe, index.row())
         else:
             item = self._repository[index.row()]
             probes = item.get_probes()
-            probe = probes.get_probe_no_opr()  # TODO OPR
-            pixel_geometry = probe.get_pixel_geometry()
+            probe = try_get_probe(item)
+            # None when the probe is not yet built (see ProbeRepositoryItem._rebuild
+            # guard): probe-dependent columns return None; name/builder/size still show.
+            pixel_geometry = probe.get_pixel_geometry() if probe is not None else None
 
             if role == Qt.ItemDataRole.DisplayRole:
                 match index.column():
                     case 0:
                         return self._repository.get_name(index.row())
                     case 1:
+                        if probe is None:
+                            return None
                         coherent_percent = calc_coherent_percent(probe)
                         return f'{coherent_percent}%'
                     case 2:
                         return item.get_builder().get_name()
                     case 3:
-                        return str(probe.dtype)
+                        return str(probe.dtype) if probe is not None else None
                     case 4:
-                        return probe.width_px
+                        return probe.width_px if probe is not None else None
                     case 5:
-                        return probe.height_px
+                        return probe.height_px if probe is not None else None
                     case 6:
-                        return f'{pixel_geometry.width_m * 1e9:.4g}'
+                        return f'{pixel_geometry.width_m * 1e9:.4g}' if pixel_geometry else None
                     case 7:
-                        return f'{pixel_geometry.height_m * 1e9:.4g}'
+                        return f'{pixel_geometry.height_m * 1e9:.4g}' if pixel_geometry else None
                     case 8:
                         return f'{probes.nbytes / BYTES_PER_MEGABYTE:.2f}'
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush
             elif role == Qt.ItemDataRole.UserRole and index.column() == 1:
-                probe = item.get_probes().get_probe_no_opr()  # TODO OPR
+                probe = try_get_probe(item)
+                if probe is None:
+                    return None
                 return calc_coherent_percent(probe)
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:

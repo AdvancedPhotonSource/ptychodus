@@ -99,6 +99,10 @@ class ProbeRepositoryItem(ParameterGroup):
         self._rebuild()
 
     def _rebuild(self) -> None:
+        if not self._geometry_provider.get_probe_geometry().get_pixel_geometry().is_valid:
+            # Geometry provider not yet bound to a dataset; a later
+            # notify_observers() from ProductGeometry will re-trigger this.
+            return
         try:
             probe_seq = self._builder.build(self._geometry_provider)
         except Exception:

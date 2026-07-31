@@ -5,9 +5,22 @@ from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 from PyQt5.QtGui import QBrush
 
 from ptychodus.api.common import BYTES_PER_MEGABYTE
+from ptychodus.api.object import Object
 
 from ...model.product import ObjectAPI, ObjectRepository
 from ...model.product.object import ObjectRepositoryItem
+
+
+def try_get_object(item: ObjectRepositoryItem) -> Object | None:
+    # Returns None when the object is the null sentinel (no dataset bound yet
+    # — see ObjectRepositoryItem.__init__). Callers skip work rather than
+    # letting the ValueError from Object.get_pixel_geometry() escape.
+    object_ = item.get_object()
+    try:
+        object_.get_pixel_geometry()
+    except ValueError:
+        return None
+    return object_
 
 
 class ObjectTreeNode:
@@ -164,29 +177,33 @@ class ObjectTreeModel(QAbstractItemModel):
                     return self._editable_item_brush
         else:
             item = self._repository[index.row()]
-            object_ = item.get_object()
-            pixel_geometry = object_.get_pixel_geometry()
+            raw_object = item.get_object()
+            object_ = try_get_object(item)
+            # None when the object is not yet built (see ObjectRepositoryItem
+            # null sentinel): pixel-geometry- and array-dependent columns return
+            # None; name/thickness/builder/size still show.
+            pixel_geometry = object_.get_pixel_geometry() if object_ is not None else None
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 match index.column():
                     case 0:
                         return self._repository.get_name(index.row())
                     case 1:
-                        return object_.get_total_thickness_m()
+                        return raw_object.get_total_thickness_m()
                     case 2:
                         return item.get_builder().get_name()
                     case 3:
-                        return str(object_.dtype)
+                        return str(object_.dtype) if object_ is not None else None
                     case 4:
-                        return object_.width_px
+                        return object_.width_px if object_ is not None else None
                     case 5:
-                        return object_.height_px
+                        return object_.height_px if object_ is not None else None
                     case 6:
-                        return f'{pixel_geometry.width_m * 1e9:.4g}'
+                        return f'{pixel_geometry.width_m * 1e9:.4g}' if pixel_geometry else None
                     case 7:
-                        return f'{pixel_geometry.height_m * 1e9:.4g}'
+                        return f'{pixel_geometry.height_m * 1e9:.4g}' if pixel_geometry else None
                     case 8:
-                        return f'{object_.nbytes / BYTES_PER_MEGABYTE:.2f}'
+                        return f'{raw_object.nbytes / BYTES_PER_MEGABYTE:.2f}'
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush

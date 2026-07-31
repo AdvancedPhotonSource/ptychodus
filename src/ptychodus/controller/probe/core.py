@@ -33,7 +33,7 @@ from .editor_factory import ProbeEditorViewControllerFactory
 from .fluorescence import FluorescenceViewController
 from .illumination import IlluminationViewController
 from .propagator import ProbePropagationViewController
-from .tree_model import ProbeTreeModel
+from .tree_model import ProbeTreeModel, try_get_probe
 
 logger = logging.getLogger(__name__)
 
@@ -268,7 +268,11 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             except IndexError:
                 logger.warning('Unable to access item for visualization!')
             else:
-                probe = item.get_probes().get_probe_no_opr()  # TODO OPR
+                probe = try_get_probe(item)  # TODO OPR
+                if probe is None:
+                    # Null sentinel until the dataset binds; observer chain will re-fire.
+                    self._image_controller.clear_array()
+                    return
                 array = (
                     probe.get_incoherent_mode(current.row())
                     if current.parent().isValid()

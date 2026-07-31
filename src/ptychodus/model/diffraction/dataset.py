@@ -292,10 +292,6 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
             bad_pixels = pipeline.apply_to_mask(bad_pixels)
             self._array_loader.enable_pattern_processing()
 
-        self._dataset = SimpleDiffractionDataset(
-            metadata, self._dataset.get_layout(), [], bad_pixels
-        )
-
         num_patterns_total = sum(metadata.num_patterns_per_array)
         indexes = -numpy.ones(num_patterns_total, dtype=int)
 

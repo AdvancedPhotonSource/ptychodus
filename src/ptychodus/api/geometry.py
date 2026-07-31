@@ -52,6 +52,10 @@ class PixelGeometry:
     def is_square(self) -> bool:
         return self.width_m == self.height_m
 
+    @property
+    def is_valid(self) -> bool:
+        return self.width_m > 0.0 and self.height_m > 0.0
+
     def get_area_m2(self) -> float:
         return self.width_m * self.height_m
 

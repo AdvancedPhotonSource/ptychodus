@@ -113,6 +113,35 @@ def test_load_array_matches_shapes_and_repairs_bad_pixels_before_crop() -> None:
     assert int(data.get_pattern(0)[0, 0]) == 1  # type: ignore[attr-defined]
 
 
+def test_load_all_arrays_preserves_raw_metadata_extent() -> None:
+    """load_all_arrays(process_patterns=True) must not conflate raw detector geometry
+    with the processed bad-pixel mask shape.
+
+    Regression for the fly001.ini failure: the old code rebuilt the internal
+    SimpleDiffractionDataset with raw metadata but the *processed* bad_pixels,
+    tripping SimpleDiffractionDataset's shape-mismatch check. The processed
+    mask belongs on self._data (AssembledDiffractionData), not on the metadata
+    holder.
+    """
+    dataset = _make_dataset(
+        detector_height=40,
+        detector_width=60,
+        crop_center_y=20,
+        crop_center_x=30,
+        crop_height=12,
+        crop_width=16,
+    )
+
+    dataset.load_all_arrays(process_patterns=True, block=True)
+
+    # Metadata still reports the raw detector extent.
+    extent = dataset.get_metadata().detector_extent
+    assert extent.width_px == 60
+    assert extent.height_px == 40
+    # The assembled data holds the processed bad-pixel mask matching the crop output.
+    assert dataset.get_assembled_data().get_bad_pixels().shape == (12, 16)
+
+
 def test_load_array_without_processing_keeps_raw_shapes() -> None:
     """process_patterns=False should skip the processor and keep raw shapes intact."""
     dataset = _make_dataset(

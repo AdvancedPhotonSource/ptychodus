@@ -670,6 +670,25 @@ def test_pixel_geometry_equality() -> None:
     assert PixelGeometry(1e-6, 1e-6) != PixelGeometry(1e-6, 2e-6)
 
 
+def test_pixel_geometry_is_valid_true_for_strictly_positive() -> None:
+    assert PixelGeometry(width_m=1e-6, height_m=1e-6).is_valid
+
+
+def test_pixel_geometry_is_valid_false_when_either_dimension_is_zero() -> None:
+    """Zero on either axis is the 'not ready' sentinel returned by ProductGeometry
+    before a dataset binds — must be rejected."""
+    assert not PixelGeometry(width_m=0.0, height_m=1e-6).is_valid
+    assert not PixelGeometry(width_m=1e-6, height_m=0.0).is_valid
+    assert not PixelGeometry(width_m=0.0, height_m=0.0).is_valid
+
+
+def test_pixel_geometry_is_valid_false_for_negative_dimensions() -> None:
+    """Negative pixel sizes are physically meaningless — the predicate treats
+    them the same as zero."""
+    assert not PixelGeometry(width_m=-1e-6, height_m=1e-6).is_valid
+    assert not PixelGeometry(width_m=1e-6, height_m=-1e-6).is_valid
+
+
 # ---------------------------------------------------------------------------
 # ImageExtent
 # ---------------------------------------------------------------------------

@@ -1,0 +1,163 @@
+"""Regression tests for ProbeRepositoryItem._rebuild.
+
+The critical invariant: when the geometry provider has not yet bound to a
+dataset (its ProbeGeometry has zero-valued pixel dimensions), _rebuild must
+NOT invoke the builder — otherwise builders like FZP that divide by
+`geometry.width_m` crash with ZeroDivisionError. See CLAUDE fly001.ini bug
+report.
+"""
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+import numpy
+
+from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider, ProbeSequence
+from ptychodus.api.settings import SettingsRegistry
+from ptychodus.model.product.probe.builder import ProbeSequenceBuilder
+from ptychodus.model.product.probe.item import ProbeRepositoryItem
+from ptychodus.model.product.probe.settings import ProbeSettings
+
+
+class _RecordingBuilder(ProbeSequenceBuilder):
+    """Minimal builder that records build() invocations without touching numpy math."""
+
+    def __init__(self, settings: ProbeSettings, probe_seq: ProbeSequence) -> None:
+        super().__init__(settings, 'recording')
+        self._settings = settings
+        self._probe_seq = probe_seq
+        self.build_calls: list[ProbeGeometryProvider] = []
+
+    def copy(self) -> _RecordingBuilder:
+        return _RecordingBuilder(self._settings, self._probe_seq)
+
+    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+        self.build_calls.append(geometry_provider)
+        return self._probe_seq
+
+
+def _make_provider(pixel_width_m: float, pixel_height_m: float) -> MagicMock:
+    provider = MagicMock(spec=ProbeGeometryProvider)
+    provider.get_probe_geometry.return_value = ProbeGeometry(
+        width_px=64,
+        height_px=64,
+        pixel_width_m=pixel_width_m,
+        pixel_height_m=pixel_height_m,
+    )
+    return provider
+
+
+def _make_probe_seq(pixel_size_m: float) -> ProbeSequence:
+    array = numpy.zeros((1, 4, 4), dtype=numpy.complex64)
+    return ProbeSequence(
+        array=array,
+        opr_weights=None,
+        pixel_geometry=PixelGeometry(width_m=pixel_size_m, height_m=pixel_size_m),
+    )
+
+
+def test_rebuild_skips_when_geometry_not_ready() -> None:
+    """Pre-dataset startup: pixel dimensions are zero. Builder must NOT be called;
+    the initial null ProbeSequence stays in place; no exception escapes."""
+    registry = SettingsRegistry()
+    settings = ProbeSettings(registry)
+    provider = _make_provider(pixel_width_m=0.0, pixel_height_m=0.0)
+    canned = _make_probe_seq(pixel_size_m=1e-6)
+    builder = _RecordingBuilder(settings, canned)
+
+    item = ProbeRepositoryItem(provider, settings, builder)
+
+    assert builder.build_calls == []
+    # The null sentinel from ProbeRepositoryItem.__init__ has size 0; the canned
+    # replacement would be shape (1, 4, 4). Same-size check would let a silent
+    # overwrite slip past.
+    assert item.get_probes().get_array().size == 0
+
+
+def test_rebuild_fires_when_geometry_becomes_ready() -> None:
+    """Once the provider reports a valid pixel geometry and the item is nudged
+    (e.g. via set_builder from a settings change), the builder runs and its
+    ProbeSequence replaces the null sentinel."""
+    registry = SettingsRegistry()
+    settings = ProbeSettings(registry)
+    provider = _make_provider(pixel_width_m=0.0, pixel_height_m=0.0)
+    canned = _make_probe_seq(pixel_size_m=2e-6)
+    builder = _RecordingBuilder(settings, canned)
+
+    item = ProbeRepositoryItem(provider, settings, builder)
+    assert builder.build_calls == []
+
+    # Provider becomes ready (dataset would bind in production).
+    provider.get_probe_geometry.return_value = ProbeGeometry(
+        width_px=64,
+        height_px=64,
+        pixel_width_m=2e-6,
+        pixel_height_m=2e-6,
+    )
+    # A settings change would normally re-fire _rebuild via the observer chain;
+    # set_builder is the shortest public path that triggers a rebuild.
+    replacement = _RecordingBuilder(settings, canned)
+    item.set_builder(replacement)
+
+    assert len(replacement.build_calls) == 1
+    assert item.get_probes().get_array() is canned.get_array()
+
+
+def test_rebuild_skips_when_only_one_dimension_is_zero() -> None:
+    """The guard uses PixelGeometry.is_valid, which requires BOTH dims positive.
+    An asymmetric zero (e.g. width provided, height missing) still blocks the
+    rebuild — matches PixelGeometry.is_valid semantics."""
+    registry = SettingsRegistry()
+    settings = ProbeSettings(registry)
+    provider = _make_provider(pixel_width_m=1e-6, pixel_height_m=0.0)
+    canned = _make_probe_seq(pixel_size_m=1e-6)
+    builder = _RecordingBuilder(settings, canned)
+
+    item = ProbeRepositoryItem(provider, settings, builder)
+
+    assert builder.build_calls == []
+    assert item.get_probes().get_array().size == 0
+
+
+def test_try_get_probe_returns_none_on_null_sentinel() -> None:
+    """try_get_probe must swallow the 'Missing probe pixel geometry!' ValueError
+    that ProbeSequence.get_probe_no_opr() raises on the null sentinel."""
+    from ptychodus.controller.probe.tree_model import try_get_probe
+
+    registry = SettingsRegistry()
+    settings = ProbeSettings(registry)
+    provider = _make_provider(pixel_width_m=0.0, pixel_height_m=0.0)
+    canned = _make_probe_seq(pixel_size_m=1e-6)
+    builder = _RecordingBuilder(settings, canned)
+
+    item = ProbeRepositoryItem(provider, settings, builder)
+    assert try_get_probe(item) is None
+
+
+def test_try_get_probe_returns_probe_when_ready() -> None:
+    """Once _rebuild has run and left a real ProbeSequence, try_get_probe
+    returns the underlying single-mode Probe."""
+    from ptychodus.controller.probe.tree_model import try_get_probe
+
+    registry = SettingsRegistry()
+    settings = ProbeSettings(registry)
+    provider = _make_provider(pixel_width_m=0.0, pixel_height_m=0.0)
+    canned = _make_probe_seq(pixel_size_m=1e-6)
+    builder = _RecordingBuilder(settings, canned)
+
+    item = ProbeRepositoryItem(provider, settings, builder)
+
+    provider.get_probe_geometry.return_value = ProbeGeometry(
+        width_px=64,
+        height_px=64,
+        pixel_width_m=1e-6,
+        pixel_height_m=1e-6,
+    )
+    replacement = _RecordingBuilder(settings, canned)
+    item.set_builder(replacement)
+
+    probe = try_get_probe(item)
+    assert probe is not None
+    assert probe.get_pixel_geometry() == canned.get_pixel_geometry()

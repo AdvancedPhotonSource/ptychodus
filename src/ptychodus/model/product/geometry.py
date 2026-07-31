@@ -153,9 +153,9 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     def is_probe_geometry_valid(self, geometry: ProbeGeometry) -> bool:
         expected = self.get_probe_geometry()
-        width_is_valid = geometry.pixel_width_m > 0.0 and geometry.width_m == expected.width_m
-        height_is_valid = geometry.pixel_height_m > 0.0 and geometry.height_m == expected.height_m
-        return width_is_valid and height_is_valid
+        if not geometry.get_pixel_geometry().is_valid:
+            return False
+        return geometry.width_m == expected.width_m and geometry.height_m == expected.height_m
 
     def get_probe_positions(self) -> Sequence[ProbePosition]:
         return self._scan_item.get_probe_positions()
@@ -176,8 +176,12 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
             center_y_m = scan_bbox.center_y_m
 
         pixel_geometry = self.get_object_plane_pixel_geometry()
-        width_px = width_m / pixel_geometry.width_m if pixel_geometry.width_m > 0.0 else 0.0
-        height_px = height_m / pixel_geometry.height_m if pixel_geometry.height_m > 0.0 else 0.0
+        if pixel_geometry.is_valid:
+            width_px = width_m / pixel_geometry.width_m
+            height_px = height_m / pixel_geometry.height_m
+        else:
+            width_px = 0.0
+            height_px = 0.0
 
         return ObjectGeometry(
             width_px=int(numpy.ceil(width_px)),
@@ -190,8 +194,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     def is_object_geometry_valid(self, geometry: ObjectGeometry) -> bool:
         expected_geometry = self.get_object_geometry()
-        pixel_size_is_valid = geometry.pixel_width_m > 0.0 and geometry.pixel_height_m > 0.0
-        return pixel_size_is_valid and geometry.contains(expected_geometry)
+        return geometry.get_pixel_geometry().is_valid and geometry.contains(expected_geometry)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._metadata_item:

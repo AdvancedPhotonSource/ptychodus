@@ -18,7 +18,7 @@ from ..image import ImageController
 from .editor_factory import ObjectEditorViewControllerFactory
 from .fourier import FourierAnalysisViewController
 from .frc import FourierRingCorrelationViewController
-from .tree_model import ObjectTreeModel
+from .tree_model import ObjectTreeModel, try_get_object
 from .xmcd import XMCDViewController
 
 logger = logging.getLogger(__name__)
@@ -245,7 +245,11 @@ class ObjectController(SequenceObserver[ObjectRepositoryItem]):
             except IndexError:
                 logger.warning('Unable to access item for visualization!')
             else:
-                object_ = item.get_object()
+                object_ = try_get_object(item)
+                if object_ is None:
+                    # Null sentinel until the dataset binds; observer chain will re-fire.
+                    self._image_controller.clear_array()
+                    return
                 array = (
                     object_.get_layer(current.row())
                     if current.parent().isValid()
