@@ -123,7 +123,10 @@ class DiffractionAPI:
                 except Exception:
                     logger.warning(f'Failed to load bad pixels from "{bad_pixels_file_path}"')
                 else:
-                    dataset.set_bad_pixels(bad_pixels)
+                    try:
+                        dataset.set_bad_pixels(bad_pixels)
+                    except ValueError as exc:
+                        logger.warning(f'Ignoring bad pixels from "{bad_pixels_file_path}": {exc}')
             else:
                 logger.warning(
                     f'Refusing to read invalid bad pixels file path {bad_pixels_file_path}'

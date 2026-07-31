@@ -257,10 +257,16 @@ class SimpleDiffractionDataset(DiffractionDataset):
         self._contents_tree = contents_tree
         self._array_list = array_list
 
+        extent = metadata.detector_extent
+
         if bad_pixels is None:
-            extent = metadata.detector_extent
             shape = (extent.height_px, extent.width_px) if extent is not None else (0, 0)
             bad_pixels = numpy.zeros(shape, dtype=numpy.bool_)
+        elif extent is not None and bad_pixels.shape != extent.get_shape():
+            raise ValueError(
+                f'Bad pixels shape {bad_pixels.shape} does not match '
+                f'detector extent {extent.get_shape()}.'
+            )
 
         self._bad_pixels = bad_pixels
 

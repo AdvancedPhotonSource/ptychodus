@@ -10,6 +10,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import numpy
+import pytest
 
 from ptychodus.api.diffraction import DiffractionMetadata, SimpleDiffractionDataset
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
@@ -130,6 +131,56 @@ def test_reset_bad_pixels_restores_default() -> None:
     a.reset_bad_pixels()
     assert a.get_bad_pixels().shape == (16, 16)
     assert not a.get_bad_pixels().any()
+
+
+def test_set_bad_pixels_rejects_shape_mismatch_after_reload() -> None:
+    repo = _make_repository()
+    a = repo.create_dataset('scan_a')
+    repo.insert_dataset(a)
+    _reload_with_extent(a, ImageExtent(width_px=16, height_px=16))
+
+    wrong_shape = numpy.zeros((8, 8), dtype=numpy.bool_)
+    with pytest.raises(ValueError, match='does not match loaded detector extent'):
+        a.set_bad_pixels(wrong_shape)
+
+    # The original default mask is untouched.
+    assert a.get_bad_pixels().shape == (16, 16)
+
+
+def test_set_bad_pixels_permissive_before_reload() -> None:
+    """Streaming pre-load path: without a reloaded dataset, any 2-D mask is accepted."""
+    repo = _make_repository()
+    a = repo.create_dataset('scan_a')
+    repo.insert_dataset(a)
+
+    mask = numpy.zeros((32, 64), dtype=numpy.bool_)
+    a.set_bad_pixels(mask)
+    assert a.get_bad_pixels().shape == (32, 64)
+
+
+def test_simple_diffraction_dataset_rejects_bad_pixels_shape_mismatch() -> None:
+    metadata = DiffractionMetadata(
+        num_patterns_per_array=[0],
+        pattern_dtype=numpy.dtype(numpy.uint16),
+        detector_extent=ImageExtent(width_px=16, height_px=16),
+    )
+    contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+    wrong_shape = numpy.zeros((8, 8), dtype=numpy.bool_)
+
+    with pytest.raises(ValueError, match='does not match detector extent'):
+        SimpleDiffractionDataset(metadata, contents_tree, [], wrong_shape)
+
+
+def test_simple_diffraction_dataset_default_bad_pixels_matches_extent() -> None:
+    metadata = DiffractionMetadata(
+        num_patterns_per_array=[0],
+        pattern_dtype=numpy.dtype(numpy.uint16),
+        detector_extent=ImageExtent(width_px=16, height_px=8),
+    )
+    contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+    dataset = SimpleDiffractionDataset(metadata, contents_tree, [])
+    assert dataset.get_bad_pixels().shape == (8, 16)
+    assert not dataset.get_bad_pixels().any()
 
 
 def test_create_unique_name_prevents_collision_after_insert() -> None:

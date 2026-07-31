@@ -139,6 +139,15 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
     def set_bad_pixels(self, bad_pixels: BadPixels) -> None:
         if bad_pixels.ndim != 2:
             raise ValueError(f'Bad pixels array must be 2D, got {bad_pixels.ndim}D.')
+
+        extent = self._dataset.get_metadata().detector_extent
+
+        if extent is not None and bad_pixels.shape != extent.get_shape():
+            raise ValueError(
+                f'Bad pixels shape {bad_pixels.shape} does not match '
+                f'loaded detector extent {extent.get_shape()}.'
+            )
+
         self._bad_pixels = bad_pixels
 
     def reset_bad_pixels(self) -> None:
