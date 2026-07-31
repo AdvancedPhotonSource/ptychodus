@@ -206,8 +206,8 @@ class DiffractionMetadata:
 
     num_patterns_per_array: Sequence[int]
     pattern_dtype: DiffractionPatternDType
+    detector_extent: ImageExtent
     detector_distance_m: float | None = None
-    detector_extent: ImageExtent | None = None
     detector_pixel_geometry: PixelGeometry | None = None
     crop_center: CropCenter | None = None
     probe_energy_eV: float | None = None  # noqa: N815
@@ -218,7 +218,12 @@ class DiffractionMetadata:
 
     @classmethod
     def create_null(cls, file_path: Path | None = None) -> DiffractionMetadata:
-        return cls([], numpy.dtype(numpy.ubyte), file_path=file_path)
+        return cls(
+            num_patterns_per_array=[],
+            pattern_dtype=numpy.dtype(numpy.ubyte),
+            detector_extent=ImageExtent(width_px=0, height_px=0),
+            file_path=file_path,
+        )
 
 
 class DiffractionDataset(Sequence[DiffractionArray], ABC):
@@ -260,9 +265,8 @@ class SimpleDiffractionDataset(DiffractionDataset):
         extent = metadata.detector_extent
 
         if bad_pixels is None:
-            shape = (extent.height_px, extent.width_px) if extent is not None else (0, 0)
-            bad_pixels = numpy.zeros(shape, dtype=numpy.bool_)
-        elif extent is not None and bad_pixels.shape != extent.get_shape():
+            bad_pixels = numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool_)
+        elif bad_pixels.shape != extent.get_shape():
             raise ValueError(
                 f'Bad pixels shape {bad_pixels.shape} does not match '
                 f'detector extent {extent.get_shape()}.'

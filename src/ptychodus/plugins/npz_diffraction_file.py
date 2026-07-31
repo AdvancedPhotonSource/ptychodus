@@ -28,14 +28,12 @@ class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
     BAD_PIXELS: Final[str] = 'bad_pixels'
 
     def read(self, file_path: Path) -> DiffractionDataset:
-        dataset = SimpleDiffractionDataset.create_null(file_path)
         contents = numpy.load(file_path)
 
         try:
             patterns = contents[self.PATTERNS]
-        except KeyError:
-            logger.warning(f'Failed to read patterns in "{file_path}".')
-            return dataset
+        except KeyError as exc:
+            raise ValueError(f'Failed to read patterns in "{file_path}".') from exc
 
         num_patterns, detector_height, detector_width = patterns.shape
 

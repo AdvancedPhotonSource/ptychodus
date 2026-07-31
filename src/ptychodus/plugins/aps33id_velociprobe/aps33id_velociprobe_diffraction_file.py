@@ -16,7 +16,6 @@ from ptychodus.api.diffraction import (
     DiffractionFileReader,
     DiffractionMetadata,
     DiffractionArray,
-    SimpleDiffractionDataset,
 )
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -200,8 +199,7 @@ class VelociprobeDiffractionDataset(DiffractionDataset):
 
     def get_bad_pixels(self) -> BadPixels:
         extent = self._metadata.detector_extent
-        shape = (0, 0) if extent is None else (extent.height_px, extent.width_px)
-        return numpy.zeros(shape, dtype=numpy.bool_)
+        return numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool_)
 
     @overload
     def __getitem__(self, index: int) -> DiffractionArray: ...
@@ -223,8 +221,6 @@ class VelociprobeDiffractionFileReader(DiffractionFileReader):
         self.stage_rotation_deg = 0.0  # TODO This is a hack; remove when able!
 
     def read(self, file_path: Path) -> DiffractionDataset:
-        dataset: DiffractionDataset = SimpleDiffractionDataset.create_null(file_path)
-
         with h5py.File(file_path, 'r') as h5_file:
             h5_dataset = h5_file['/entry/data/data_000001']
             num_patterns_per_array = h5_dataset.shape[0]

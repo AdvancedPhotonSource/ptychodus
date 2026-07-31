@@ -129,8 +129,6 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
 
     def _create_default_bad_pixels(self) -> BadPixels:
         extent = self._dataset.get_metadata().detector_extent
-        if extent is None:
-            return numpy.zeros((0, 0), dtype=numpy.bool_)
         return numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool_)
 
     def get_name(self) -> str:
@@ -142,7 +140,7 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
 
         extent = self._dataset.get_metadata().detector_extent
 
-        if extent is not None and bad_pixels.shape != extent.get_shape():
+        if bad_pixels.shape != extent.get_shape():
             raise ValueError(
                 f'Bad pixels shape {bad_pixels.shape} does not match '
                 f'loaded detector extent {extent.get_shape()}.'

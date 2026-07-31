@@ -147,15 +147,15 @@ def test_set_bad_pixels_rejects_shape_mismatch_after_reload() -> None:
     assert a.get_bad_pixels().shape == (16, 16)
 
 
-def test_set_bad_pixels_permissive_before_reload() -> None:
-    """Streaming pre-load path: without a reloaded dataset, any 2-D mask is accepted."""
+def test_set_bad_pixels_rejects_shape_mismatch_before_reload() -> None:
+    """Pre-reload, the metadata extent is (0, 0); any non-empty mask is rejected."""
     repo = _make_repository()
     a = repo.create_dataset('scan_a')
     repo.insert_dataset(a)
 
     mask = numpy.zeros((32, 64), dtype=numpy.bool_)
-    a.set_bad_pixels(mask)
-    assert a.get_bad_pixels().shape == (32, 64)
+    with pytest.raises(ValueError, match='does not match loaded detector extent'):
+        a.set_bad_pixels(mask)
 
 
 def test_simple_diffraction_dataset_rejects_bad_pixels_shape_mismatch() -> None:
