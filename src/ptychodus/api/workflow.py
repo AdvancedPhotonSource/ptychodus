@@ -19,8 +19,13 @@ class RemoteComputeProvider(Enum):
     GENESIS = auto()
 
 
-class WorkflowDiffractionAPI(ABC):
+class DiffractionWorkflowAPI(ABC):
     """Act on an assembled diffraction dataset within a workflow."""
+
+    @abstractmethod
+    def get_dataset_index(self) -> int:
+        """Return the repository index this handle was bound to at load time."""
+        pass
 
     @abstractmethod
     def get_assembled_data(self) -> AssembledDiffractionData:
@@ -33,7 +38,7 @@ class WorkflowDiffractionAPI(ABC):
         pass
 
 
-class WorkflowProductAPI(ABC):
+class ProductWorkflowAPI(ABC):
     """Act on a data product within a workflow."""
 
     @abstractmethod
@@ -110,7 +115,7 @@ class WorkflowProductAPI(ABC):
         algorithm: str | None = None,
         output_product_file: Path | None = None,
         block: bool = False,
-    ) -> WorkflowProductAPI:
+    ) -> ProductWorkflowAPI:
         """Run reconstruction locally; returns a handle to the output product.
 
         Blocks until completion when block is True, otherwise returns immediately.
@@ -184,11 +189,6 @@ class WorkflowAPI(ABC):
     """Top-level API for loading data, managing products, and running reconstructions."""
 
     @abstractmethod
-    def load_bad_pixels(self, file_path: Path, *, file_type: str | None = None) -> None:
-        """Load a bad-pixel mask from file, uses format from settings when file_type is None."""
-        pass
-
-    @abstractmethod
     def load_diffraction_data(
         self,
         file_path: Path,
@@ -197,28 +197,45 @@ class WorkflowAPI(ABC):
         crop_center: CropCenter | None = None,
         crop_extent: ImageExtent | None = None,
         detector_extent: ImageExtent | None = None,
+        bad_pixels_file_path: Path | None = None,
+        bad_pixels_file_type: str | None = None,
         process_patterns: bool = True,
         block: bool = False,
-    ) -> WorkflowDiffractionAPI:
+    ) -> DiffractionWorkflowAPI:
         """Load and assemble a diffraction dataset from file.
 
-        Blocks until complete when block is True, otherwise returns immediately.
+        When bad_pixels_file_path is provided, its mask is applied to the loaded
+        dataset. Blocks until complete when block is True, otherwise returns immediately.
         """
         pass
 
     @abstractmethod
-    def load_assembled_diffraction_data(self, file_path: Path) -> WorkflowDiffractionAPI:
+    def load_assembled_diffraction_data(self, file_path: Path) -> DiffractionWorkflowAPI:
         """Load a pre-assembled diffraction dataset from file."""
         pass
 
     @abstractmethod
-    def register_product(self, product: Product) -> WorkflowProductAPI:
-        """Register an existing Product object and return a handle to it."""
+    def register_product(
+        self, product: Product, *, diffraction: DiffractionWorkflowAPI | None = None
+    ) -> ProductWorkflowAPI:
+        """Register an existing Product object and return a handle to it.
+
+        The product is bound to the given diffraction dataset at creation time.
+        """
         pass
 
     @abstractmethod
-    def load_product(self, file_path: Path, *, file_type: str | None = None) -> WorkflowProductAPI:
-        """Load a product from file and return a handle to it."""
+    def load_product(
+        self,
+        file_path: Path,
+        *,
+        file_type: str | None = None,
+        diffraction: DiffractionWorkflowAPI | None = None,
+    ) -> ProductWorkflowAPI:
+        """Load a product from file and return a handle to it.
+
+        The product is bound to the given diffraction dataset at creation time.
+        """
         pass
 
     @abstractmethod
@@ -233,12 +250,16 @@ class WorkflowAPI(ABC):
         exposure_time_s: float | None = None,
         mass_attenuation_m2_kg: float | None = None,
         tomography_angle_deg: float | None = None,
-    ) -> WorkflowProductAPI:
-        """Create a new product with optional metadata overrides and return a handle to it."""
+        diffraction: DiffractionWorkflowAPI | None = None,
+    ) -> ProductWorkflowAPI:
+        """Create a new product with optional metadata overrides and return a handle to it.
+
+        The product is bound to the given diffraction dataset at creation time.
+        """
         pass
 
     @abstractmethod
-    def get_product(self, product_index: int) -> WorkflowProductAPI:
+    def get_product(self, product_index: int) -> ProductWorkflowAPI:
         """Return a handle to an already-registered product by index."""
         pass
 

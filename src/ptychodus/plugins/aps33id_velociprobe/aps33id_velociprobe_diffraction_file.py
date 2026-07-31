@@ -198,8 +198,10 @@ class VelociprobeDiffractionDataset(DiffractionDataset):
     def get_layout(self) -> SimpleTreeNode:
         return self._contents_tree
 
-    def get_bad_pixels(self) -> BadPixels | None:
-        return None
+    def get_bad_pixels(self) -> BadPixels:
+        extent = self._metadata.detector_extent
+        shape = (0, 0) if extent is None else (extent.height_px, extent.width_px)
+        return numpy.zeros(shape, dtype=numpy.bool_)
 
     @overload
     def __getitem__(self, index: int) -> DiffractionArray: ...

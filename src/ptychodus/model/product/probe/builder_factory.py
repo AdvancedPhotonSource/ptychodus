@@ -8,7 +8,7 @@ from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import ProbeFileReader, ProbeFileWriter, ProbeSequence
 from ptychodus.api.probe_gen import FresnelZonePlate
 
-from ...diffraction import DiffractionAPI
+from ...diffraction import AssembledDiffractionDataset
 from .average_pattern import AveragePatternProbeBuilder
 from .builder import FromFileProbeBuilder, ProbeSequenceBuilder
 from .disk import DiskProbeBuilder
@@ -27,7 +27,6 @@ class ProbeBuilderFactory(Iterable[str]):
         self,
         rng: numpy.random.Generator,
         settings: ProbeSettings,
-        diffraction_api: DiffractionAPI,
         fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
         file_reader_chooser: PluginChooser[ProbeFileReader],
         file_writer_chooser: PluginChooser[ProbeFileWriter],
@@ -35,35 +34,50 @@ class ProbeBuilderFactory(Iterable[str]):
         super().__init__()
         self._rng = rng
         self._settings = settings
-        self._diffraction_api = diffraction_api
         self._fresnel_zone_plate_chooser = fresnel_zone_plate_chooser
         self._file_reader_chooser = file_reader_chooser
         self._file_writer_chooser = file_writer_chooser
-        self._builders: Mapping[str, Callable[[], ProbeSequenceBuilder]] = {
+        self._non_diffraction_builders: Mapping[str, Callable[[], ProbeSequenceBuilder]] = {
             'disk': lambda: DiskProbeBuilder(rng, settings),
-            'average_pattern': self._create_average_pattern_builder,
             'fresnel_zone_plate': self._create_fresnel_zone_plate_builder,
             'hermite': lambda: HermiteProbeBuilder(rng, settings),
             'rectangular': lambda: RectangularProbeBuilder(rng, settings),
             'super_gaussian': lambda: SuperGaussianProbeBuilder(rng, settings),
             'zernike': lambda: ZernikeProbeBuilder(rng, settings),
         }
+        self._diffraction_builders: Mapping[
+            str, Callable[[AssembledDiffractionDataset], ProbeSequenceBuilder]
+        ] = {
+            'average_pattern': lambda dataset: AveragePatternProbeBuilder(rng, settings, dataset),
+        }
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self._builders)
+        yield from self._non_diffraction_builders
+        yield from self._diffraction_builders
 
-    def create(self, name: str) -> ProbeSequenceBuilder:
+    def create(
+        self, name: str, *, dataset: AssembledDiffractionDataset | None = None
+    ) -> ProbeSequenceBuilder:
+        diffraction_factory = self._diffraction_builders.get(name)
+        if diffraction_factory is not None:
+            if dataset is None:
+                raise RuntimeError(
+                    f'Probe builder "{name}" requires an associated diffraction dataset.'
+                )
+            return diffraction_factory(dataset)
+
         try:
-            factory = self._builders[name]
+            factory = self._non_diffraction_builders[name]
         except KeyError as exc:
             raise KeyError(f'Unknown probe builder "{name}"!') from exc
-
         return factory()
 
     def create_default(self) -> ProbeSequenceBuilder:
-        return next(iter(self._builders.values()))()
+        return next(iter(self._non_diffraction_builders.values()))()
 
-    def create_from_settings(self) -> ProbeSequenceBuilder:
+    def create_from_settings(
+        self, *, dataset: AssembledDiffractionDataset | None = None
+    ) -> ProbeSequenceBuilder:
         name = self._settings.builder.get_value()
         name_repaired = name.casefold()
 
@@ -73,10 +87,7 @@ class ProbeBuilderFactory(Iterable[str]):
                 self._settings.file_type.get_value(),
             )
 
-        return self.create(name_repaired)
-
-    def _create_average_pattern_builder(self) -> ProbeSequenceBuilder:
-        return AveragePatternProbeBuilder(self._rng, self._settings, self._diffraction_api)
+        return self.create(name_repaired, dataset=dataset)
 
     def _create_fresnel_zone_plate_builder(self) -> ProbeSequenceBuilder:
         return FresnelZonePlateProbeBuilder(

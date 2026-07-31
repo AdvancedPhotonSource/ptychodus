@@ -9,7 +9,6 @@ from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 
-from ..diffraction import DiffractionAPI
 from ..processing import ProcessingAPI
 from ..product import ProductAPI
 from ..task_manager import BackgroundTaskManager
@@ -59,7 +58,6 @@ class GenesisExecutor:
         self,
         task_manager: BackgroundTaskManager,
         settings_registry: SettingsRegistry,
-        diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
         processing_api: ProcessingAPI,
         settings: GenesisSettings,
@@ -72,7 +70,6 @@ class GenesisExecutor:
         self._task_manager = task_manager
         self._settings = settings
         self._settings_registry = settings_registry
-        self._diffraction_api = diffraction_api
         self._product_api = product_api
         self._processing_api = processing_api
         self._facility_chooser = facility_chooser
@@ -87,6 +84,13 @@ class GenesisExecutor:
             logger.exception(f'Failed access product for flow ({input_product_index=})!')
             raise
 
+        dataset = product_item.get_dataset()
+
+        if dataset is None:
+            raise RuntimeError(
+                f'Product "{product_item.get_name()}" has no associated diffraction dataset.'
+            )
+
         local_dir_struct = WorkflowDirectoryStructure(
             self._settings.local_collection_posix_path.get_value() / product_item.get_name()
         )
@@ -100,7 +104,7 @@ class GenesisExecutor:
         self._settings_registry.save_settings(
             local_dir_struct.input_directory / StandardFileLayout.SETTINGS
         )
-        self._diffraction_api.export_assembled_patterns(
+        dataset.export_assembled_patterns(
             local_dir_struct.input_directory / StandardFileLayout.DIFFRACTION
         )
         self._product_api.save_product(

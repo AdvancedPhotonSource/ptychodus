@@ -6,6 +6,7 @@ import logging
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter
 
+from ..diffraction import AssembledDiffractionDataset
 from .item import ProductRepositoryItem
 from .item_factory import ProductRepositoryItemFactory
 from .object.builder_factory import ObjectBuilderFactory
@@ -176,7 +177,10 @@ class ProbeAPI:
         return iter(self._builder_factory)
 
     def build_probe(
-        self, index: int, builder_name: str, builder_parameters: Mapping[str, Any] | None = None
+        self,
+        index: int,
+        builder_name: str,
+        builder_parameters: Mapping[str, Any] | None = None,
     ) -> None:
         try:
             item = self._repository[index]
@@ -184,10 +188,12 @@ class ProbeAPI:
             logger.warning(f'Failed to access item {index}!')
             return
 
+        dataset = self._repository.get_dataset(index)
+
         try:
-            builder = self._builder_factory.create(builder_name)
-        except KeyError:
-            logger.warning(f'Failed to create builder {builder_name}!')
+            builder = self._builder_factory.create(builder_name, dataset=dataset)
+        except (KeyError, RuntimeError) as exc:
+            logger.warning(f'Failed to create builder {builder_name}: {exc}')
             return
 
         if builder_parameters is not None:
@@ -211,10 +217,12 @@ class ProbeAPI:
             logger.warning(f'Failed to access item {index}!')
             return
 
+        dataset = self._repository.get_dataset(index)
+
         try:
-            builder = self._builder_factory.create_from_settings()
-        except KeyError:
-            logger.warning('Failed to create builder from settings!')
+            builder = self._builder_factory.create_from_settings(dataset=dataset)
+        except (KeyError, RuntimeError) as exc:
+            logger.warning(f'Failed to create builder from settings: {exc}')
             return
 
         item.set_builder(builder)
@@ -285,7 +293,10 @@ class ObjectAPI:
         return iter(self._builder_factory)
 
     def build_object(
-        self, index: int, builder_name: str, builder_parameters: Mapping[str, Any] | None = None
+        self,
+        index: int,
+        builder_name: str,
+        builder_parameters: Mapping[str, Any] | None = None,
     ) -> None:
         try:
             item = self._repository[index]
@@ -293,10 +304,12 @@ class ObjectAPI:
             logger.warning(f'Failed to access item {index}!')
             return
 
+        dataset = self._repository.get_dataset(index)
+
         try:
-            builder = self._builder_factory.create(builder_name)
-        except KeyError:
-            logger.warning(f'Failed to create builder {builder_name}!')
+            builder = self._builder_factory.create(builder_name, dataset=dataset)
+        except (KeyError, RuntimeError) as exc:
+            logger.warning(f'Failed to create builder {builder_name}: {exc}')
             return
 
         if builder_parameters is not None:
@@ -320,10 +333,12 @@ class ObjectAPI:
             logger.warning(f'Failed to access item {index}!')
             return
 
+        dataset = self._repository.get_dataset(index)
+
         try:
-            builder = self._builder_factory.create_from_settings()
-        except KeyError:
-            logger.warning('Failed to create builder from settings!')
+            builder = self._builder_factory.create_from_settings(dataset=dataset)
+        except (KeyError, RuntimeError) as exc:
+            logger.warning(f'Failed to create builder from settings: {exc}')
             return
 
         item.set_builder(builder)
@@ -405,6 +420,7 @@ class ProductAPI:
         exposure_time_s: float | None = None,
         mass_attenuation_m2_kg: float | None = None,
         tomography_angle_deg: float | None = None,
+        dataset: AssembledDiffractionDataset | None = None,
     ) -> int:
         item = self._item_factory.create_from_values(
             name=name,
@@ -415,15 +431,20 @@ class ProductAPI:
             exposure_time_s=exposure_time_s,
             mass_attenuation_m2_kg=mass_attenuation_m2_kg,
             tomography_angle_deg=tomography_angle_deg,
+            dataset=dataset,
         )
         return self._repository.insert_product(item)
 
-    def insert_product(self, product: Product) -> int:
-        item = self._item_factory.create_from_product(product)
+    def insert_product(
+        self, product: Product, *, dataset: AssembledDiffractionDataset | None = None
+    ) -> int:
+        item = self._item_factory.create_from_product(product, dataset=dataset)
         return self._repository.insert_product(item)
 
-    def insert_product_from_settings(self) -> int:
-        item = self._item_factory.create_from_settings()
+    def insert_product_from_settings(
+        self, *, dataset: AssembledDiffractionDataset | None = None
+    ) -> int:
+        item = self._item_factory.create_from_settings(dataset=dataset)
         return self._repository.insert_product(item)
 
     def get_item(self, product_index: int) -> ProductRepositoryItem:
@@ -436,7 +457,13 @@ class ProductAPI:
     def get_open_file_filter(self) -> str:
         return self._file_reader_chooser.get_current_plugin().display_name
 
-    def open_product(self, file_path: Path, *, file_type: str | None = None) -> int:
+    def open_product(
+        self,
+        file_path: Path,
+        *,
+        file_type: str | None = None,
+        dataset: AssembledDiffractionDataset | None = None,
+    ) -> int:
         if file_path.is_file():
             if file_type is not None:
                 self._file_reader_chooser.set_current_plugin(file_type)
@@ -450,7 +477,7 @@ class ProductAPI:
             except Exception as exc:
                 raise RuntimeError(f'Failed to read "{file_path}"') from exc
             else:
-                return self.insert_product(product)
+                return self.insert_product(product, dataset=dataset)
         else:
             logger.warning(f'Refusing to create product with invalid file path "{file_path}"')
 

@@ -2,7 +2,7 @@ import numpy
 
 from ptychodus.api.settings import SettingsRegistry
 
-from ..diffraction import AssembledDiffractionDataset
+from ..diffraction import DiffractionDatasetRepository
 from ..product import ProbePositionsRepository, ProductRepository
 from ..visualization import VisualizationEngine
 from .affine import AffineTransformEstimator
@@ -25,7 +25,7 @@ class AnalysisCore:
         self,
         rng: numpy.random.Generator,
         settings_registry: SettingsRegistry,
-        dataset: AssembledDiffractionDataset,
+        diffraction_repository: DiffractionDatasetRepository,
         product_repository: ProductRepository,
         probe_positions_repository: ProbePositionsRepository,
     ) -> None:
@@ -38,7 +38,7 @@ class AnalysisCore:
 
         self.diffraction_simulator_settings = DiffractionSimulatorSettings(settings_registry)
         self.diffraction_simulator = DiffractionSimulator(
-            rng, self.diffraction_simulator_settings, dataset, product_repository
+            rng, self.diffraction_simulator_settings, diffraction_repository, product_repository
         )
 
         self.fourier_analyzer = FourierAnalyzer(product_repository)
@@ -54,7 +54,7 @@ class AnalysisCore:
         self.probe_propagator = ProbePropagator(self.probe_propagator_settings, product_repository)
         self.probe_propagator_visualization_engine = VisualizationEngine(is_complex=False)
 
-        self.residual_analyzer = ResidualAnalyzer(product_repository, dataset)
+        self.residual_analyzer = ResidualAnalyzer(product_repository)
         self.residual_real_space_visualization_engine = VisualizationEngine(is_complex=False)
         self.residual_reciprocal_space_visualization_engine = VisualizationEngine(is_complex=False)
 

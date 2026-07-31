@@ -177,6 +177,7 @@ def main() -> int:
                 probe_energy_eV=args.probe_energy_ev,
                 probe_photon_count=max_pattern_counts,
                 exposure_time_s=args.exposure_time_s,
+                diffraction=workflow_diffraction_api,
             )
             input_product_api.load_probe_positions(dataset_path, file_type='SLAC_NPZ')
             input_product_api.load_probe(dataset_path, file_type='SLAC_NPZ')
@@ -204,7 +205,9 @@ def main() -> int:
             inference_settings.n_samples.set_value(args.test_samples)
 
             input_product_api.train_reconstructor_local(
-                train_dir, model_out_dir, algorithm=args.reconstructor
+                train_dir,
+                model_out_dir,
+                algorithm=args.reconstructor,
             )
 
             model_file = model_out_dir / 'wts.h5.zip'

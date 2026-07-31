@@ -2,8 +2,14 @@ import logging
 
 from PyQt5.QtWidgets import QWizard
 
+from ....api.diffraction import DiffractionMetadata
 from ....model.metadata import MetadataPresenter
-from ....model.diffraction import DiffractionSettings, PatternSizer, DiffractionAPI
+from ....model.diffraction import (
+    DetectorSettings,
+    DiffractionAPI,
+    DiffractionDatasetRepository,
+    DiffractionSettings,
+)
 from ....view.widgets import ExceptionDialog
 
 from ...data import FileDialogFactory
@@ -18,18 +24,23 @@ class OpenDatasetWizardController:
     def __init__(
         self,
         settings: DiffractionSettings,
-        sizer: PatternSizer,
+        detector_settings: DetectorSettings,
         api: DiffractionAPI,
+        repository: DiffractionDatasetRepository,
         metadata_presenter: MetadataPresenter,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         self._api = api
+        self._repository = repository
+        self._pending_dataset_index = -1
         self._file_view_controller = OpenDatasetWizardFilesViewController(
-            settings, api, file_dialog_factory
+            settings, detector_settings, api, file_dialog_factory
         )
-        self._metadata_view_controller = OpenDatasetWizardMetadataViewController(metadata_presenter)
+        self._metadata_view_controller = OpenDatasetWizardMetadataViewController(
+            metadata_presenter, self._get_pending_metadata
+        )
         self._patterns_view_controller = OpenDatasetWizardPatternsViewController(
-            settings, sizer, file_dialog_factory
+            settings, detector_settings, file_dialog_factory
         )
 
         self._wizard = QWizard()
@@ -52,22 +63,31 @@ class OpenDatasetWizardController:
         else:
             finish_button.clicked.connect(self._execute_finish_button_action)
 
+    def _get_pending_metadata(self) -> DiffractionMetadata:
+        if self._pending_dataset_index < 0:
+            return DiffractionMetadata.create_null()
+        return self._repository[self._pending_dataset_index].get_metadata()
+
     def _execute_next_button_action(self) -> None:
         page = self._wizard.currentPage()
 
         if page is self._metadata_view_controller.get_widget():
-            self._file_view_controller.open_dataset()
+            self._pending_dataset_index = self._file_view_controller.open_dataset()
+            self._metadata_view_controller.refresh()
         elif page is self._patterns_view_controller.get_widget():
             self._metadata_view_controller.import_metadata()
 
     def _execute_finish_button_action(self) -> None:
+        if self._pending_dataset_index < 0:
+            return
         try:
-            self._api.load_all_arrays()
+            self._api.load_all_arrays(dataset_index=self._pending_dataset_index)
         except Exception as exc:
             logger.exception(exc)
             ExceptionDialog.show_exception('Open Dataset', exc)
 
     def open_dataset(self) -> None:
+        self._pending_dataset_index = -1
         self._wizard.restart()
         self._file_view_controller.restart()
         self._wizard.show()

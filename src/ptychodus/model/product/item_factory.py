@@ -21,7 +21,6 @@ class ProductRepositoryItemFactory:
         self,
         settings: ProductSettings,
         pattern_sizer: PatternSizer,
-        dataset: AssembledDiffractionDataset,
         scan_item_factory: ProbePositionsRepositoryItemFactory,
         probe_item_factory: ProbeRepositoryItemFactory,
         object_item_factory: ObjectRepositoryItemFactory,
@@ -31,7 +30,6 @@ class ProductRepositoryItemFactory:
         super().__init__()
         self._settings = settings
         self._pattern_sizer = pattern_sizer
-        self._dataset = dataset
         self._scan_item_factory = scan_item_factory
         self._probe_item_factory = probe_item_factory
         self._object_item_factory = object_item_factory
@@ -49,6 +47,7 @@ class ProductRepositoryItemFactory:
         exposure_time_s: float | None = None,
         mass_attenuation_m2_kg: float | None = None,
         tomography_angle_deg: float | None = None,
+        dataset: AssembledDiffractionDataset | None = None,
     ) -> ProductRepositoryItem:
         metadata_item = MetadataRepositoryItem(
             self._settings,
@@ -63,10 +62,9 @@ class ProductRepositoryItemFactory:
             tomography_angle_deg=tomography_angle_deg,
         )
 
-        if metadata_item.probe_photon_count.get_value() <= 0:
-            assembled_data = self._dataset.get_assembled_data()
-            max_pattern_counts = assembled_data.get_pattern_counts().max()
-            metadata_item.probe_photon_count.set_value(max_pattern_counts)
+        # probe_photon_count auto-estimation from diffraction data now lives in the
+        # controller layer (see ProductEditorViewController._estimate_probe_photon_count).
+        # This factory takes whatever value the caller supplied.
 
         scan_item = self._scan_item_factory.create()
         geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
@@ -81,9 +79,12 @@ class ProductRepositoryItemFactory:
             probe_item=probe_item,
             object_item=object_item,
             losses=list(),
+            dataset=dataset,
         )
 
-    def create_from_product(self, product: Product) -> ProductRepositoryItem:
+    def create_from_product(
+        self, product: Product, *, dataset: AssembledDiffractionDataset | None = None
+    ) -> ProductRepositoryItem:
         metadata_item = MetadataRepositoryItem(
             self._settings,
             self._repository,
@@ -110,9 +111,12 @@ class ProductRepositoryItemFactory:
             probe_item=probe_item,
             object_item=object_item,
             losses=product.losses,
+            dataset=dataset,
         )
 
-    def create_from_settings(self) -> ProductRepositoryItem:
+    def create_from_settings(
+        self, *, dataset: AssembledDiffractionDataset | None = None
+    ) -> ProductRepositoryItem:
         file_path = self._settings.file_path.get_value()
 
         if file_path.is_file():
@@ -125,13 +129,13 @@ class ProductRepositoryItemFactory:
             except Exception as exc:
                 raise RuntimeError(f'Failed to read "{file_path}"') from exc
             else:
-                return self.create_from_product(product)
+                return self.create_from_product(product, dataset=dataset)
 
         metadata_item = MetadataRepositoryItem(self._settings, self._repository)
         scan_item = self._scan_item_factory.create_from_settings()
         geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
-        probe_item = self._probe_item_factory.create_from_settings(geometry)
-        object_item = self._object_item_factory.create_from_settings(geometry)
+        probe_item = self._probe_item_factory.create_from_settings(geometry, dataset=dataset)
+        object_item = self._object_item_factory.create_from_settings(geometry, dataset=dataset)
 
         item = ProductRepositoryItem(
             parent=self._repository,
@@ -141,6 +145,7 @@ class ProductRepositoryItemFactory:
             probe_item=probe_item,
             object_item=object_item,
             losses=list(),
+            dataset=dataset,
         )
         logger.debug(f'Created product from settings: {item.get_name()}')
         return item

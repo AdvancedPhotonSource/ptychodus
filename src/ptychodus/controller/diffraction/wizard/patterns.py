@@ -1,5 +1,3 @@
-from typing import Final
-
 from PyQt5.QtWidgets import (
     QFormLayout,
     QGridLayout,
@@ -11,9 +9,10 @@ from PyQt5.QtWidgets import (
     QWizardPage,
 )
 
+from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable
 
-from ....model.diffraction import DiffractionSettings, PatternSizer
+from ....model.diffraction import DetectorSettings, DiffractionSettings
 from ....view.diffraction import OpenDatasetWizardPage
 
 from ...data import FileDialogFactory
@@ -24,6 +23,31 @@ from ...parametric import (
     PathParameterViewController,
     SpinBoxParameterViewController,
 )
+
+
+def _crop_size_limits(det_size_px: int) -> Interval[int]:
+    return Interval[int](1, det_size_px)
+
+
+def _crop_center_limits(det_size_px: int) -> Interval[int]:
+    return Interval[int](1, det_size_px)
+
+
+def _effective_crop_size(det_size_px: int, requested: int, *, crop_enabled: bool) -> int:
+    """The crop dimension actually used by the pipeline: clamped to detector when cropping is on;
+    otherwise the full detector width/height."""
+    return _crop_size_limits(det_size_px).clamp(requested) if crop_enabled else det_size_px
+
+
+def _bin_size_limits(effective_crop_px: int) -> Interval[int]:
+    return Interval[int](1, effective_crop_px)
+
+
+def _set_spin_box(box: QSpinBox, limits: Interval[int], value: int) -> None:
+    box.blockSignals(True)
+    box.setRange(limits.lower, limits.upper)
+    box.setValue(value)
+    box.blockSignals(False)
 
 
 class PatternMemoryMapViewController(CheckableGroupBoxParameterViewController):
@@ -43,12 +67,12 @@ class PatternMemoryMapViewController(CheckableGroupBoxParameterViewController):
 class PatternCropViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
-        settings: DiffractionSettings,
-        sizer: PatternSizer,
+        diffraction_settings: DiffractionSettings,
+        detector_settings: DetectorSettings,
     ) -> None:
-        super().__init__(settings.crop_enabled, 'Crop')
-        self._settings = settings
-        self._sizer = sizer
+        super().__init__(diffraction_settings.crop_enabled, 'Crop')
+        self._diffraction_settings = diffraction_settings
+        self._detector_settings = detector_settings
 
         self._center_x_spin_box = QSpinBox()
         self._center_y_spin_box = QSpinBox()
@@ -66,48 +90,60 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
         layout.setColumnStretch(2, 1)
         self.get_widget().setLayout(layout)
 
+        self._observed = (
+            diffraction_settings.crop_center_x_px,
+            diffraction_settings.crop_center_y_px,
+            diffraction_settings.crop_width_px,
+            diffraction_settings.crop_height_px,
+            detector_settings.width_px,
+            detector_settings.height_px,
+        )
+
         self._sync_model_to_view()
 
-        self._center_x_spin_box.valueChanged.connect(settings.crop_center_x_px.set_value)
-        self._center_y_spin_box.valueChanged.connect(settings.crop_center_y_px.set_value)
-        self._width_spin_box.valueChanged.connect(settings.crop_width_px.set_value)
-        self._height_spin_box.valueChanged.connect(settings.crop_height_px.set_value)
+        self._center_x_spin_box.valueChanged.connect(
+            diffraction_settings.crop_center_x_px.set_value
+        )
+        self._center_y_spin_box.valueChanged.connect(
+            diffraction_settings.crop_center_y_px.set_value
+        )
+        self._width_spin_box.valueChanged.connect(diffraction_settings.crop_width_px.set_value)
+        self._height_spin_box.valueChanged.connect(diffraction_settings.crop_height_px.set_value)
 
-        sizer.add_observer(self)
+        for parameter in self._observed:
+            parameter.add_observer(self)
 
     def _sync_model_to_view(self) -> None:
-        center_x = self._sizer.axis_x.get_crop_center()
-        center_y = self._sizer.axis_y.get_crop_center()
-        width = self._sizer.axis_x.get_crop_size()
-        height = self._sizer.axis_y.get_crop_size()
+        det_w = self._detector_settings.width_px.get_value()
+        det_h = self._detector_settings.height_px.get_value()
 
-        center_x_limits = self._sizer.axis_x.get_crop_center_limits()
-        center_y_limits = self._sizer.axis_y.get_crop_center_limits()
-        width_limits = self._sizer.axis_x.get_crop_size_limits()
-        height_limits = self._sizer.axis_y.get_crop_size_limits()
-
-        self._center_x_spin_box.blockSignals(True)
-        self._center_x_spin_box.setRange(center_x_limits.lower, center_x_limits.upper)
-        self._center_x_spin_box.setValue(center_x)
-        self._center_x_spin_box.blockSignals(False)
-
-        self._center_y_spin_box.blockSignals(True)
-        self._center_y_spin_box.setRange(center_y_limits.lower, center_y_limits.upper)
-        self._center_y_spin_box.setValue(center_y)
-        self._center_y_spin_box.blockSignals(False)
-
-        self._width_spin_box.blockSignals(True)
-        self._width_spin_box.setRange(width_limits.lower, width_limits.upper)
-        self._width_spin_box.setValue(width)
-        self._width_spin_box.blockSignals(False)
-
-        self._height_spin_box.blockSignals(True)
-        self._height_spin_box.setRange(height_limits.lower, height_limits.upper)
-        self._height_spin_box.setValue(height)
-        self._height_spin_box.blockSignals(False)
+        _set_spin_box(
+            self._center_x_spin_box,
+            _crop_center_limits(det_w),
+            _crop_center_limits(det_w).clamp(
+                self._diffraction_settings.crop_center_x_px.get_value()
+            ),
+        )
+        _set_spin_box(
+            self._center_y_spin_box,
+            _crop_center_limits(det_h),
+            _crop_center_limits(det_h).clamp(
+                self._diffraction_settings.crop_center_y_px.get_value()
+            ),
+        )
+        _set_spin_box(
+            self._width_spin_box,
+            _crop_size_limits(det_w),
+            _crop_size_limits(det_w).clamp(self._diffraction_settings.crop_width_px.get_value()),
+        )
+        _set_spin_box(
+            self._height_spin_box,
+            _crop_size_limits(det_h),
+            _crop_size_limits(det_h).clamp(self._diffraction_settings.crop_height_px.get_value()),
+        )
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._sizer:
+        if observable in self._observed:
             self._sync_model_to_view()
         else:
             super()._update(observable)
@@ -116,12 +152,12 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
 class PatternBinningViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
-        settings: DiffractionSettings,
-        sizer: PatternSizer,
+        diffraction_settings: DiffractionSettings,
+        detector_settings: DetectorSettings,
     ) -> None:
-        super().__init__(settings.binning_enabled, 'Bin Pixels')
-        self._settings = settings
-        self._sizer = sizer
+        super().__init__(diffraction_settings.binning_enabled, 'Bin Pixels')
+        self._diffraction_settings = diffraction_settings
+        self._detector_settings = detector_settings
 
         self._bin_size_x_spin_box = QSpinBox()
         self._bin_size_y_spin_box = QSpinBox()
@@ -134,86 +170,80 @@ class PatternBinningViewController(CheckableGroupBoxParameterViewController):
         layout.setColumnStretch(2, 1)
         self.get_widget().setLayout(layout)
 
+        # Also observe crop_enabled + crop extents because the effective bin-size upper bound
+        # depends on the crop settings.
+        self._observed = (
+            diffraction_settings.bin_size_x,
+            diffraction_settings.bin_size_y,
+            diffraction_settings.crop_enabled,
+            diffraction_settings.crop_width_px,
+            diffraction_settings.crop_height_px,
+            detector_settings.width_px,
+            detector_settings.height_px,
+        )
+
         self._sync_model_to_view()
 
-        self._bin_size_x_spin_box.valueChanged.connect(settings.bin_size_x.set_value)
-        self._bin_size_y_spin_box.valueChanged.connect(settings.bin_size_y.set_value)
+        self._bin_size_x_spin_box.valueChanged.connect(diffraction_settings.bin_size_x.set_value)
+        self._bin_size_y_spin_box.valueChanged.connect(diffraction_settings.bin_size_y.set_value)
 
-        sizer.add_observer(self)
+        for parameter in self._observed:
+            parameter.add_observer(self)
 
     def _sync_model_to_view(self) -> None:
-        bin_size_x = self._sizer.axis_x.get_bin_size()
-        bin_size_y = self._sizer.axis_y.get_bin_size()
+        det_w = self._detector_settings.width_px.get_value()
+        det_h = self._detector_settings.height_px.get_value()
+        crop_enabled = self._diffraction_settings.crop_enabled.get_value()
+        binning_enabled = self._diffraction_settings.binning_enabled.get_value()
 
-        bin_size_x_limits = self._sizer.axis_x.get_bin_size_limits()
-        bin_size_y_limits = self._sizer.axis_y.get_bin_size_limits()
+        effective_w = _effective_crop_size(
+            det_w,
+            self._diffraction_settings.crop_width_px.get_value(),
+            crop_enabled=crop_enabled,
+        )
+        effective_h = _effective_crop_size(
+            det_h,
+            self._diffraction_settings.crop_height_px.get_value(),
+            crop_enabled=crop_enabled,
+        )
 
-        self._bin_size_x_spin_box.blockSignals(True)
-        self._bin_size_x_spin_box.setRange(bin_size_x_limits.lower, bin_size_x_limits.upper)
-        self._bin_size_x_spin_box.setValue(bin_size_x)
-        self._bin_size_x_spin_box.blockSignals(False)
+        bin_x_limits = _bin_size_limits(effective_w)
+        bin_y_limits = _bin_size_limits(effective_h)
 
-        self._bin_size_y_spin_box.blockSignals(True)
-        self._bin_size_y_spin_box.setRange(bin_size_y_limits.lower, bin_size_y_limits.upper)
-        self._bin_size_y_spin_box.setValue(bin_size_y)
-        self._bin_size_y_spin_box.blockSignals(False)
+        bin_x_value = (
+            bin_x_limits.clamp(self._diffraction_settings.bin_size_x.get_value())
+            if binning_enabled
+            else 1
+        )
+        bin_y_value = (
+            bin_y_limits.clamp(self._diffraction_settings.bin_size_y.get_value())
+            if binning_enabled
+            else 1
+        )
+
+        _set_spin_box(self._bin_size_x_spin_box, bin_x_limits, bin_x_value)
+        _set_spin_box(self._bin_size_y_spin_box, bin_y_limits, bin_y_value)
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._sizer:
+        if observable in self._observed:
             self._sync_model_to_view()
         else:
             super()._update(observable)
 
 
 class PatternPaddingViewController(CheckableGroupBoxParameterViewController):
-    MAX_INT: Final[int] = 0x7FFFFFFF
-
-    def __init__(
-        self,
-        settings: DiffractionSettings,
-        sizer: PatternSizer,
-    ) -> None:
-        super().__init__(settings.padding_enabled, 'Pad')
-        self._settings = settings
-        self._sizer = sizer
-
-        self._pad_x_spin_box = QSpinBox()
-        self._pad_y_spin_box = QSpinBox()
+    def __init__(self, diffraction_settings: DiffractionSettings) -> None:
+        super().__init__(diffraction_settings.padding_enabled, 'Pad')
+        self._pad_x_view_controller = SpinBoxParameterViewController(diffraction_settings.pad_x)
+        self._pad_y_view_controller = SpinBoxParameterViewController(diffraction_settings.pad_y)
 
         layout = QGridLayout()
         layout.addWidget(QLabel('Padding:'), 0, 0)
-        layout.addWidget(self._pad_x_spin_box, 0, 1)
-        layout.addWidget(self._pad_y_spin_box, 0, 2)
+        layout.addWidget(self._pad_x_view_controller.get_widget(), 0, 1)
+        layout.addWidget(self._pad_y_view_controller.get_widget(), 0, 2)
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
         self.get_widget().setLayout(layout)
-
-        self._sync_model_to_view()
-
-        self._pad_x_spin_box.valueChanged.connect(settings.pad_x.set_value)
-        self._pad_y_spin_box.valueChanged.connect(settings.pad_y.set_value)
-
-        sizer.add_observer(self)
-
-    def _sync_model_to_view(self) -> None:
-        pad_x = self._sizer.axis_x.get_pad_size()
-        pad_y = self._sizer.axis_y.get_pad_size()
-
-        self._pad_x_spin_box.blockSignals(True)
-        self._pad_x_spin_box.setRange(0, self.MAX_INT)
-        self._pad_x_spin_box.setValue(pad_x)
-        self._pad_x_spin_box.blockSignals(False)
-
-        self._pad_y_spin_box.blockSignals(True)
-        self._pad_y_spin_box.setRange(0, self.MAX_INT)
-        self._pad_y_spin_box.setValue(pad_y)
-        self._pad_y_spin_box.blockSignals(False)
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._sizer:
-            self._sync_model_to_view()
-        else:
-            super()._update(observable)
 
 
 class PatternTransformViewController:
@@ -265,18 +295,22 @@ class PatternTransformViewController:
 class OpenDatasetWizardPatternsViewController(ParameterViewController):
     def __init__(
         self,
-        settings: DiffractionSettings,
-        sizer: PatternSizer,
+        diffraction_settings: DiffractionSettings,
+        detector_settings: DetectorSettings,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         self._memory_map_view_controller = PatternMemoryMapViewController(
-            settings, file_dialog_factory
+            diffraction_settings, file_dialog_factory
         )
-        self._crop_view_controller = PatternCropViewController(settings, sizer)
-        self._binning_view_controller = PatternBinningViewController(settings, sizer)
-        self._padding_view_controller = PatternPaddingViewController(settings, sizer)
+        self._crop_view_controller = PatternCropViewController(
+            diffraction_settings, detector_settings
+        )
+        self._binning_view_controller = PatternBinningViewController(
+            diffraction_settings, detector_settings
+        )
+        self._padding_view_controller = PatternPaddingViewController(diffraction_settings)
         self._transform_view_controller = PatternTransformViewController(
-            settings, file_dialog_factory
+            diffraction_settings, file_dialog_factory
         )
 
         layout = QVBoxLayout()

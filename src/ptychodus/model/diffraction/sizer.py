@@ -1,15 +1,19 @@
+from ptychodus.api.diffraction import CropCenter
+from ptychodus.api.diffraction_prep import (
+    BinningStep,
+    CropStep,
+    DiffractionPrepPipeline,
+    DiffractionPrepStepUnion,
+    FilterValuesStep,
+    HorizontalFlipStep,
+    PaddingStep,
+    TransposeStep,
+    VerticalFlipStep,
+)
 from ptychodus.api.geometry import ImageExtent, Interval, PixelGeometry
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import BooleanParameter, IntegerParameter, RealParameter
-from ptychodus.api.diffraction import CropCenter
+from ptychodus.api.parametric import BooleanParameter, IntegerParameter
 
-from .processor import (
-    DiffractionPatternBinning,
-    DiffractionPatternCrop,
-    DiffractionPatternFilterValues,
-    DiffractionPatternPadding,
-    DiffractionPatternProcessor,
-)
 from .settings import DetectorSettings, DiffractionSettings
 
 
@@ -17,7 +21,6 @@ class PatternAxisSizer(Observable, Observer):
     def __init__(
         self,
         detector_size: IntegerParameter,
-        detector_pixel_size_m: RealParameter,
         crop_enabled: BooleanParameter,
         crop_size: IntegerParameter,
         crop_center: IntegerParameter,
@@ -28,7 +31,6 @@ class PatternAxisSizer(Observable, Observer):
     ) -> None:
         super().__init__()
         self._detector_size = detector_size
-        self._detector_pixel_size_m = detector_pixel_size_m
         self._crop_enabled = crop_enabled
         self._crop_size = crop_size
         self._crop_center = crop_center
@@ -38,7 +40,6 @@ class PatternAxisSizer(Observable, Observer):
         self._pad_size = pad_size
 
         detector_size.add_observer(self)
-        detector_pixel_size_m.add_observer(self)
         crop_enabled.add_observer(self)
         crop_size.add_observer(self)
         crop_center.add_observer(self)
@@ -47,41 +48,26 @@ class PatternAxisSizer(Observable, Observer):
         padding_enabled.add_observer(self)
         pad_size.add_observer(self)
 
-    def get_detector_size(self) -> int:
-        return self._detector_size.get_value()
-
-    def get_crop_size_limits(self) -> Interval[int]:
-        return Interval[int](1, self.get_detector_size())
-
     def get_crop_size(self) -> int:
+        det_size = self._detector_size.get_value()
         if self._crop_enabled.get_value():
-            limits = self.get_crop_size_limits()
-            return limits.clamp(self._crop_size.get_value())
-
-        return self.get_detector_size()
+            return Interval[int](1, det_size).clamp(self._crop_size.get_value())
+        return det_size
 
     def get_safe_crop_center(self) -> int:
-        """Crop center clamped so the configured crop window fits inside the detector."""
-        xmin = (self.get_crop_size() + 1) // 2
-        xmax = self.get_detector_size() - 1 - xmin
-        limits = Interval[int](xmin, xmax)
-        return limits.clamp(self._crop_center.get_value())
+        """Crop center clamped so the configured crop window fits inside the detector.
 
-    def get_crop_center_limits(self) -> Interval[int]:
-        return Interval[int](1, self.get_detector_size())
-
-    def get_crop_center(self) -> int:
-        limits = self.get_crop_center_limits()
-        return limits.clamp(self._crop_center.get_value())
-
-    def get_bin_size_limits(self) -> Interval[int]:
-        return Interval[int](1, self.get_crop_size())
+        CropStep slices ``[center - radius, center + radius)`` with
+        ``radius = crop_size // 2``, so valid centers satisfy
+        ``radius <= center <= det_size - radius``.
+        """
+        radius = self.get_crop_size() // 2
+        det_size = self._detector_size.get_value()
+        return Interval[int](radius, det_size - radius).clamp(self._crop_center.get_value())
 
     def get_bin_size(self) -> int:
         if self._binning_enabled.get_value():
-            limits = self.get_bin_size_limits()
-            return limits.clamp(self._bin_size.get_value())
-
+            return Interval[int](1, self.get_crop_size()).clamp(self._bin_size.get_value())
         return 1
 
     def validate_bin_size(self) -> None:
@@ -94,31 +80,10 @@ class PatternAxisSizer(Observable, Observer):
     def get_pad_size(self) -> int:
         if self._padding_enabled.get_value():
             return self._pad_size.get_value()
-
         return 0
 
-    def get_processed_size(self) -> int:
-        return self.get_crop_size() // self.get_bin_size() + 2 * self.get_pad_size()
-
-    def get_processed_pixel_size_m(self) -> float:
-        return self.get_bin_size() * self._detector_pixel_size_m.get_value()
-
-    def get_processed_size_m(self) -> float:
-        return self.get_processed_size() * self.get_processed_pixel_size_m()
-
     def _update(self, observable: Observable) -> None:
-        if observable in (
-            self._detector_size,
-            self._detector_pixel_size_m,
-            self._crop_enabled,
-            self._crop_size,
-            self._crop_center,
-            self._binning_enabled,
-            self._bin_size,
-            self._padding_enabled,
-            self._pad_size,
-        ):
-            self.notify_observers()
+        self.notify_observers()
 
 
 class PatternSizer(Observable, Observer):
@@ -126,10 +91,10 @@ class PatternSizer(Observable, Observer):
         self, detector_settings: DetectorSettings, diffraction_settings: DiffractionSettings
     ) -> None:
         super().__init__()
+        self._detector_settings = detector_settings
         self._diffraction_settings = diffraction_settings
-        self.axis_x = PatternAxisSizer(
+        self._axis_x = PatternAxisSizer(
             detector_settings.width_px,
-            detector_settings.pixel_width_m,
             diffraction_settings.crop_enabled,
             diffraction_settings.crop_width_px,
             diffraction_settings.crop_center_x_px,
@@ -138,9 +103,8 @@ class PatternSizer(Observable, Observer):
             diffraction_settings.padding_enabled,
             diffraction_settings.pad_x,
         )
-        self.axis_y = PatternAxisSizer(
+        self._axis_y = PatternAxisSizer(
             detector_settings.height_px,
-            detector_settings.pixel_height_m,
             diffraction_settings.crop_enabled,
             diffraction_settings.crop_height_px,
             diffraction_settings.crop_center_y_px,
@@ -150,87 +114,101 @@ class PatternSizer(Observable, Observer):
             diffraction_settings.pad_y,
         )
 
-        self.axis_x.add_observer(self)
-        self.axis_y.add_observer(self)
+        self._axis_x.add_observer(self)
+        self._axis_y.add_observer(self)
+
+        # Whole-image parameters that don't decompose per axis. Register directly so
+        # get_prep_pipeline()/get_processed_*() consumers wake up on these edits.
+        diffraction_settings.hflip.add_observer(self)
+        diffraction_settings.vflip.add_observer(self)
+        diffraction_settings.transpose.add_observer(self)
+        diffraction_settings.value_lower_bound_enabled.add_observer(self)
+        diffraction_settings.value_lower_bound.add_observer(self)
+        diffraction_settings.value_upper_bound_enabled.add_observer(self)
+        diffraction_settings.value_upper_bound.add_observer(self)
 
     def get_detector_extent(self) -> ImageExtent:
         return ImageExtent(
-            width_px=self.axis_x.get_detector_size(),
-            height_px=self.axis_y.get_detector_size(),
+            width_px=self._detector_settings.width_px.get_value(),
+            height_px=self._detector_settings.height_px.get_value(),
         )
 
-    def get_processed_width_m(self) -> float:
-        return self.axis_x.get_processed_size_m()
-
-    def get_processed_height_m(self) -> float:
-        return self.axis_y.get_processed_size_m()
+    def _get_detector_pixel_geometry(self) -> PixelGeometry:
+        return PixelGeometry(
+            width_m=self._detector_settings.pixel_width_m.get_value(),
+            height_m=self._detector_settings.pixel_height_m.get_value(),
+        )
 
     def get_processed_image_extent(self) -> ImageExtent:
-        return ImageExtent(
-            width_px=self.axis_x.get_processed_size(),
-            height_px=self.axis_y.get_processed_size(),
-        )
+        return self.get_prep_pipeline().compute_output_extent(self.get_detector_extent())
 
     def get_processed_pixel_geometry(self) -> PixelGeometry:
-        return PixelGeometry(
-            width_m=self.axis_x.get_processed_pixel_size_m(),
-            height_m=self.axis_y.get_processed_pixel_size_m(),
+        return self.get_prep_pipeline().compute_output_pixel_geometry(
+            self._get_detector_pixel_geometry()
         )
 
-    def get_processor(self) -> DiffractionPatternProcessor:
-        value_lower_bound: int | None = None
-        value_upper_bound: int | None = None
-        crop: DiffractionPatternCrop | None = None
-        binning: DiffractionPatternBinning | None = None
-        padding: DiffractionPatternPadding | None = None
+    def get_prep_pipeline(self) -> DiffractionPrepPipeline:
+        """Snapshot live settings as an ordered preprocessing pipeline.
 
-        if self._diffraction_settings.value_lower_bound_enabled.get_value():
-            value_lower_bound = self._diffraction_settings.value_lower_bound.get_value()
+        Canonical order: filter → crop → binning → padding → hflip → vflip → transpose.
+        """
+        steps: list[DiffractionPrepStepUnion] = []
 
-        if self._diffraction_settings.value_upper_bound_enabled.get_value():
-            value_upper_bound = self._diffraction_settings.value_upper_bound.get_value()
-
-        filter_values = DiffractionPatternFilterValues(
-            lower_bound=value_lower_bound,
-            upper_bound=value_upper_bound,
+        lower_bound = (
+            self._diffraction_settings.value_lower_bound.get_value()
+            if self._diffraction_settings.value_lower_bound_enabled.get_value()
+            else None
         )
+        upper_bound = (
+            self._diffraction_settings.value_upper_bound.get_value()
+            if self._diffraction_settings.value_upper_bound_enabled.get_value()
+            else None
+        )
+        if lower_bound is not None or upper_bound is not None:
+            steps.append(FilterValuesStep(lower_bound=lower_bound, upper_bound=upper_bound))
 
         if self._diffraction_settings.crop_enabled.get_value():
-            crop = DiffractionPatternCrop(
-                center=CropCenter(
-                    self.axis_x.get_safe_crop_center(),
-                    self.axis_y.get_safe_crop_center(),
-                ),
-                extent=ImageExtent(
-                    self.axis_x.get_crop_size(),
-                    self.axis_y.get_crop_size(),
-                ),
+            steps.append(
+                CropStep(
+                    center=CropCenter(
+                        self._axis_x.get_safe_crop_center(),
+                        self._axis_y.get_safe_crop_center(),
+                    ),
+                    extent=ImageExtent(
+                        width_px=self._axis_x.get_crop_size(),
+                        height_px=self._axis_y.get_crop_size(),
+                    ),
+                )
             )
 
         if self._diffraction_settings.binning_enabled.get_value():
-            self.axis_x.validate_bin_size()
-            self.axis_y.validate_bin_size()
-            binning = DiffractionPatternBinning(
-                bin_size_x=self.axis_x.get_bin_size(),
-                bin_size_y=self.axis_y.get_bin_size(),
+            self._axis_x.validate_bin_size()
+            self._axis_y.validate_bin_size()
+            steps.append(
+                BinningStep(
+                    bin_size_x=self._axis_x.get_bin_size(),
+                    bin_size_y=self._axis_y.get_bin_size(),
+                )
             )
 
         if self._diffraction_settings.padding_enabled.get_value():
-            padding = DiffractionPatternPadding(
-                pad_x=self.axis_x.get_pad_size(),
-                pad_y=self.axis_y.get_pad_size(),
+            steps.append(
+                PaddingStep(
+                    pad_x=self._axis_x.get_pad_size(),
+                    pad_y=self._axis_y.get_pad_size(),
+                )
             )
 
-        return DiffractionPatternProcessor(
-            filter_values=filter_values,
-            crop=crop,
-            binning=binning,
-            padding=padding,
-            hflip=self._diffraction_settings.hflip.get_value(),
-            vflip=self._diffraction_settings.vflip.get_value(),
-            transpose=self._diffraction_settings.transpose.get_value(),
-        )
+        if self._diffraction_settings.hflip.get_value():
+            steps.append(HorizontalFlipStep())
+
+        if self._diffraction_settings.vflip.get_value():
+            steps.append(VerticalFlipStep())
+
+        if self._diffraction_settings.transpose.get_value():
+            steps.append(TransposeStep())
+
+        return DiffractionPrepPipeline(steps=tuple(steps))
 
     def _update(self, observable: Observable) -> None:
-        if observable in (self.axis_x, self.axis_y):
-            self.notify_observers()
+        self.notify_observers()

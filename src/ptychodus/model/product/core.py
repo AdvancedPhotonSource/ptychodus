@@ -9,7 +9,12 @@ from ptychodus.api.probe_positions import ProbePositionFileReader, ProbePosition
 from ptychodus.api.product import ProductFileReader, ProductFileWriter
 from ptychodus.api.settings import SettingsRegistry
 
-from ..diffraction import AssembledDiffractionDataset, DiffractionAPI, PatternSizer
+from ..diffraction import (
+    AssembledDiffractionDataset,
+    DiffractionAPI,
+    DiffractionDatasetRepositoryObserver,
+    PatternSizer,
+)
 from .api import ObjectAPI, ProbeAPI, ProductAPI, ProbePositionsAPI
 from .item_factory import ProductRepositoryItemFactory
 from .object import ObjectBuilderFactory, ObjectRepositoryItemFactory, ObjectSettings
@@ -26,6 +31,21 @@ from .scan_repository import ProbePositionsRepository
 from .settings import ProductSettings
 
 
+class _DatasetOrphanObserver(DiffractionDatasetRepositoryObserver):
+    """Clears product references to a diffraction dataset when it leaves the repository."""
+
+    def __init__(self, product_repository: ProductRepository) -> None:
+        self._product_repository = product_repository
+
+    def handle_dataset_inserted(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        pass
+
+    def handle_dataset_removed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        for item in self._product_repository:
+            if item.get_dataset() is dataset:
+                item.set_dataset(None)
+
+
 class ProductCore(Observer):
     def __init__(
         self,
@@ -33,7 +53,6 @@ class ProductCore(Observer):
         settings_registry: SettingsRegistry,
         pattern_sizer: PatternSizer,
         diffraction_api: DiffractionAPI,
-        diffraction_dataset: AssembledDiffractionDataset,
         scan_file_reader_chooser: PluginChooser[ProbePositionFileReader],
         scan_file_writer_chooser: PluginChooser[ProbePositionFileWriter],
         fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
@@ -60,7 +79,6 @@ class ProductCore(Observer):
         self._probe_builder_factory = ProbeBuilderFactory(
             rng,
             self._probe_settings,
-            diffraction_api,
             fresnel_zone_plate_chooser,
             probe_file_reader_chooser,
             probe_file_writer_chooser,
@@ -73,7 +91,6 @@ class ProductCore(Observer):
         self._object_builder_factory = ObjectBuilderFactory(
             rng,
             self._object_settings,
-            diffraction_api,
             object_file_reader_chooser,
             object_file_writer_chooser,
         )
@@ -85,7 +102,6 @@ class ProductCore(Observer):
         self._item_factory = ProductRepositoryItemFactory(
             self.settings,
             pattern_sizer,
-            diffraction_dataset,
             self._scan_repository_item_factory,
             self._probe_repository_item_factory,
             self._object_repository_item_factory,
@@ -99,6 +115,8 @@ class ProductCore(Observer):
             product_file_reader_chooser,
             product_file_writer_chooser,
         )
+        self._dataset_orphan_observer = _DatasetOrphanObserver(self.product_repository)
+        diffraction_api.get_repository().add_observer(self._dataset_orphan_observer)
         self.probe_positions_repository = ProbePositionsRepository(self.product_repository)
         self.probe_positions_api = ProbePositionsAPI(
             self._scan_settings, self.probe_positions_repository, self._scan_builder_factory

@@ -222,7 +222,12 @@ class DiffractionMetadata:
 
 
 class DiffractionDataset(Sequence[DiffractionArray], ABC):
-    """A sequence of DiffractionArrays with shared metadata and bad-pixel mask."""
+    """A sequence of DiffractionArrays with shared metadata and bad-pixel mask.
+
+    Every dataset owns a bad-pixel mask; callers can always rely on
+    ``get_bad_pixels()`` returning a real array, defaulting to all-good pixels
+    when the source data did not include a mask.
+    """
 
     @abstractmethod
     def get_metadata(self) -> DiffractionMetadata:
@@ -233,7 +238,7 @@ class DiffractionDataset(Sequence[DiffractionArray], ABC):
         pass
 
     @abstractmethod
-    def get_bad_pixels(self) -> BadPixels | None:
+    def get_bad_pixels(self) -> BadPixels:
         pass
 
 
@@ -251,6 +256,12 @@ class SimpleDiffractionDataset(DiffractionDataset):
         self._metadata = metadata
         self._contents_tree = contents_tree
         self._array_list = array_list
+
+        if bad_pixels is None:
+            extent = metadata.detector_extent
+            shape = (extent.height_px, extent.width_px) if extent is not None else (0, 0)
+            bad_pixels = numpy.zeros(shape, dtype=numpy.bool_)
+
         self._bad_pixels = bad_pixels
 
     @classmethod
@@ -266,7 +277,7 @@ class SimpleDiffractionDataset(DiffractionDataset):
     def get_layout(self) -> SimpleTreeNode:
         return self._contents_tree
 
-    def get_bad_pixels(self) -> BadPixels | None:
+    def get_bad_pixels(self) -> BadPixels:
         return self._bad_pixels
 
     @overload

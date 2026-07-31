@@ -4,6 +4,7 @@ import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
 
+from ...diffraction import AssembledDiffractionDataset
 from .builder import FromMemoryObjectBuilder
 from .builder_factory import ObjectBuilderFactory
 from .item import ObjectRepositoryItem
@@ -34,10 +35,13 @@ class ObjectRepositoryItemFactory:
         return ObjectRepositoryItem(geometry_provider, self._settings, builder)
 
     def create_from_settings(
-        self, geometry_provider: ObjectGeometryProvider
+        self,
+        geometry_provider: ObjectGeometryProvider,
+        *,
+        dataset: AssembledDiffractionDataset | None = None,
     ) -> ObjectRepositoryItem:
         try:
-            builder = self._builder_factory.create_from_settings()
+            builder = self._builder_factory.create_from_settings(dataset=dataset)
         except Exception as exc:
             logger.error(''.join(exc.args))
             builder = self._builder_factory.create_default()

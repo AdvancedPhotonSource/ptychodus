@@ -166,13 +166,16 @@ def main() -> int:
     if args.defocus_distance_m is not None:
         logger.warning('Defocus distance is not implemented yet!')  # TODO
 
+    bad_pixels_path = (
+        Path(args.bad_pixels_input.name) if args.bad_pixels_input is not None else None
+    )
+
     with ModelCore(Path(args.settings.name), log_level=args.log_level) as model:
-        if args.bad_pixels_input is not None:
-            model.workflow_api.load_bad_pixels(Path(args.bad_pixels_input.name))
         workflow_diffraction_api = model.workflow_api.load_diffraction_data(
             Path(args.diffraction_input.name),
             crop_center=crop_center,
             crop_extent=crop_extent,
+            bad_pixels_file_path=bad_pixels_path,
             block=True,
         )
         workflow_product_api = model.workflow_api.create_product(
@@ -183,6 +186,7 @@ def main() -> int:
             probe_photon_count=args.probe_photon_count,
             exposure_time_s=args.exposure_time_s,
             tomography_angle_deg=args.tomography_angle_deg,
+            diffraction=workflow_diffraction_api,
         )
         workflow_product_api.load_probe_positions(Path(args.probe_position_input.name))
         workflow_product_api.generate_probe()

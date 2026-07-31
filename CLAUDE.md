@@ -125,6 +125,7 @@ Composition root is `create_app()` in `src/ptychodus_store/app.py`. Settings loa
 - Type hints are mandatory; `pyproject.toml` lists modules whose missing stubs are intentionally ignored. Keep new code typed and avoid widening that ignore list.
 - `model/core.py::ModelCore.is_developer_mode_enabled` is `True` whenever the effective log level ≤ DEBUG (`--log-level 10`). Some controllers gate features (Agent panel, probe-position analysis) behind it.
 - HTTP-client code uses `httpx` throughout (sync `httpx.Client` for repeated calls, module-level `httpx.get/post/...` for one-shots). `requests` is not a direct dependency.
+- Prefer affirmative conditionals. For `if/else` pairs, put the positive case first (`if x.is_file(): ... else: ...`), not the negated one (`if not x.is_file(): ... else: ...`) — reading the affirmative branch up front reduces cognitive load. Guard clauses that early-return (`if not x: return`) are still idiomatic; this rule targets branching where both sides do meaningful work.
 - The `ptychodus_store/ui/` frontend is authored in TypeScript, compiled to native ES modules with plain `tsc` (no bundler, no framework, no runtime npm deps). Wheel builds run `tsc` automatically via a `build_py` cmdclass in `setup.py`; interactive dev needs `tsc` on PATH.
 
 ## Repository Notes

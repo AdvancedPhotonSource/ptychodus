@@ -72,9 +72,8 @@ class ControllerCore:
             model.diffraction_core.detector_settings,
             model.diffraction_core.diffraction_settings,
             model.diffraction_core.pattern_sizer,
-            model.diffraction_core.detector,
             model.diffraction_core.diffraction_api,
-            model.diffraction_core.dataset,
+            model.diffraction_core.repository,
             model.diffraction_core.task_monitor,
             model.metadata_presenter,
             model.product_core.product_repository,
@@ -86,9 +85,9 @@ class ControllerCore:
             self._file_dialog_factory,
         )
         self._product_controller = ProductController.create_instance(
-            model.diffraction_core.diffraction_api,
             model.product_core.product_repository,
             model.product_core.product_api,
+            model.diffraction_core.repository,
             view.product_view,
             self._file_dialog_factory,
         )

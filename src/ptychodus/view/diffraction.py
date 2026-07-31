@@ -35,10 +35,12 @@ class PatternsButtonBox(QWidget):
         self.load_menu = QMenu()
         self.save_button = QPushButton('Save')
         self.close_button = QPushButton('Close')
+        self.close_menu = QMenu()
         self.analyze_button = QPushButton('Analyze')
         self.analyze_menu = QMenu()
 
         self.load_button.setMenu(self.load_menu)
+        self.close_button.setMenu(self.close_menu)
         self.analyze_button.setMenu(self.analyze_menu)
 
         layout = QHBoxLayout()

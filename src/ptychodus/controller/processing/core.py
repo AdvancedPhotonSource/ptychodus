@@ -140,10 +140,29 @@ class ProcessingController(Observer):
 
             self._stacked_widget.addWidget(widget)
 
+    def _has_dataset_or_warn(self, product_index: int, action: str) -> bool:
+        try:
+            item = self._product_repository[product_index]
+        except IndexError:
+            logger.warning(f'Cannot {action}: no product at index {product_index}.')
+            return False
+
+        if item.get_dataset() is None:
+            logger.warning(
+                f'Cannot {action}: product "{item.get_name()}" '
+                'has no associated diffraction dataset.'
+            )
+            return False
+
+        return True
+
     def _reconstruct(self) -> None:
         input_product_index = self._product_view_controller.get_widget().currentIndex()
 
         if input_product_index < 0:
+            return
+
+        if not self._has_dataset_or_warn(input_product_index, 'reconstruct'):
             return
 
         if self._compute_view_controller.is_globus_button_checked():
@@ -160,7 +179,9 @@ class ProcessingController(Observer):
                 ExceptionDialog.show_exception('Reconstruct Remote (Genesis)', exc)
         else:  # local
             try:
-                output_product_index = self._processing_api.reconstruct(input_product_index)
+                output_product_index = self._processing_api.reconstruct(
+                    product_index=input_product_index
+                )
             except Exception as exc:
                 logger.exception(exc)
                 ExceptionDialog.show_exception('Reconstruct Local', exc)
@@ -171,6 +192,9 @@ class ProcessingController(Observer):
         product_index = self._product_view_controller.get_widget().currentIndex()
 
         if product_index < 0:
+            return
+
+        if not self._has_dataset_or_warn(product_index, 'train'):
             return
 
         if self._compute_view_controller.is_globus_button_checked():
@@ -194,7 +218,11 @@ class ProcessingController(Observer):
                 return
 
             try:
-                self._processing_api.train(product_index, data_path, data_path)
+                self._processing_api.train(
+                    data_path,
+                    data_path,
+                    product_index=product_index,
+                )
             except Exception as exc:
                 logger.exception(exc)
                 ExceptionDialog.show_exception('Train Local', exc)
@@ -238,8 +266,11 @@ class ProcessingController(Observer):
         if not file_path:
             return
 
+        if not self._has_dataset_or_warn(input_product_index, 'export training data'):
+            return
+
         try:
-            self._processing_api.export_training_data(file_path, input_product_index)
+            self._processing_api.export_training_data(file_path, product_index=input_product_index)
         except Exception as exc:
             logger.exception(exc)
             ExceptionDialog.show_exception('Export Training Data', exc)

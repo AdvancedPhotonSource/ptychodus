@@ -9,13 +9,14 @@ from ptychodus.api.diffraction import (
     BadPixels,
     DiffractionArray,
     SimpleDiffractionArray,
+    zero_bad_pixels,
 )
+from ptychodus.api.diffraction_prep import DiffractionPrepPipeline
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import AssembledDiffractionData
 
 from ..task_manager import BackgroundTask, ForegroundTask, ForegroundTaskManager
 from ..task_monitor import TaskProgressMonitor
-from .processor import DiffractionPatternProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -43,44 +44,50 @@ class LoadArray:
         array_index: int,
         array: DiffractionArray,
         pixel_geometry: PixelGeometry,
-        bad_pixels: BadPixels,
-        processor: DiffractionPatternProcessor | None,
+        *,
+        raw_bad_pixels: BadPixels,
+        processed_bad_pixels: BadPixels,
+        pipeline: DiffractionPrepPipeline | None,
         assembler: ArrayAssembler,
     ) -> None:
         super().__init__()
         self._array_index = array_index
         self._array = array
         self._pixel_geometry = pixel_geometry
-        self._bad_pixels = bad_pixels
-        self._processor = processor
+        self._raw_bad_pixels = raw_bad_pixels
+        self._processed_bad_pixels = processed_bad_pixels
+        self._pipeline = pipeline
         self._assembler = assembler
 
     def __call__(self) -> ForegroundTask | None:
         label = self._array.get_label()
 
         try:
-            loaded_array = SimpleDiffractionArray(
-                label,
-                self._array.get_indexes(),
-                self._array.get_patterns(),
-            )
+            raw_patterns = self._array.get_patterns()
         except FileNotFoundError:
             logger.warning(f'File not found for "{label}"!')
-        else:
-            processed_array = (
-                loaded_array if self._processor is None else self._processor(loaded_array)
-            )
-            data = AssembledDiffractionData(
-                indexes=processed_array.get_indexes(),
-                patterns=processed_array.get_patterns(),
-                pixel_geometry=self._pixel_geometry,
-                bad_pixels=self._bad_pixels,
-            )
-            self._assembler.assemble_array(
-                self._array_index,
-                label,
-                data,
-            )
+            return None
+
+        # Zero bad pixels in raw detector coords before crop/bin/pad/flip/transpose so
+        # saturated pixel values can't leak into neighboring bins downstream.
+        repaired_patterns = zero_bad_pixels(raw_patterns, self._raw_bad_pixels)
+        loaded_array = SimpleDiffractionArray(
+            label,
+            self._array.get_indexes(),
+            repaired_patterns,
+        )
+        processed_array = loaded_array if self._pipeline is None else self._pipeline(loaded_array)
+        data = AssembledDiffractionData(
+            indexes=processed_array.get_indexes(),
+            patterns=processed_array.get_patterns(),
+            pixel_geometry=self._pixel_geometry,
+            bad_pixels=self._processed_bad_pixels,
+        )
+        self._assembler.assemble_array(
+            self._array_index,
+            label,
+            data,
+        )
 
         return None
 

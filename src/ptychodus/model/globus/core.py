@@ -4,7 +4,6 @@ import queue
 
 from ptychodus.api.settings import SettingsRegistry
 
-from ..diffraction import DiffractionAPI
 from ..processing import ProcessingAPI
 from ..product import ProductAPI
 from .authorizer import GlobusAuthorizer
@@ -20,7 +19,6 @@ class GlobusCore:
     def __init__(
         self,
         settings_registry: SettingsRegistry,
-        diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
         processing_api: ProcessingAPI,
     ) -> None:
@@ -42,7 +40,6 @@ class GlobusCore:
         self.executor = GlobusExecutor(
             self.settings,
             settings_registry,
-            diffraction_api,
             product_api,
             processing_api,
             self._client,

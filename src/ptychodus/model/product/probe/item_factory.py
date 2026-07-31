@@ -4,6 +4,7 @@ import numpy.random
 
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
 
+from ...diffraction import AssembledDiffractionDataset
 from .builder import FromMemoryProbeBuilder
 from .builder_factory import ProbeBuilderFactory
 from .item import ProbeRepositoryItem
@@ -33,9 +34,14 @@ class ProbeRepositoryItemFactory:
 
         return ProbeRepositoryItem(geometry_provider, self._settings, builder)
 
-    def create_from_settings(self, geometry_provider: ProbeGeometryProvider) -> ProbeRepositoryItem:
+    def create_from_settings(
+        self,
+        geometry_provider: ProbeGeometryProvider,
+        *,
+        dataset: AssembledDiffractionDataset | None = None,
+    ) -> ProbeRepositoryItem:
         try:
-            builder = self._builder_factory.create_from_settings()
+            builder = self._builder_factory.create_from_settings(dataset=dataset)
         except Exception as exc:
             logger.error(''.join(exc.args))
             builder = self._builder_factory.create_default()

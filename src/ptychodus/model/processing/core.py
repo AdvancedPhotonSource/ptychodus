@@ -3,7 +3,6 @@ from collections.abc import Sequence
 from ptychodus.api.reconstructor import ReconstructorLibrary
 from ptychodus.api.settings import SettingsRegistry
 
-from ..diffraction import DiffractionAPI
 from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .api import ProcessingAPI, ProcessingAlgorithmParameter
@@ -16,7 +15,6 @@ class ProcessingCore:
         self,
         task_manager: TaskManager,
         settings_registry: SettingsRegistry,
-        diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
         algorithm_libraries: Sequence[ReconstructorLibrary],
     ) -> None:
@@ -27,7 +25,6 @@ class ProcessingCore:
         self._task_monitor = ProcessingTaskMonitor(task_manager)
         self.processing_api = ProcessingAPI(
             task_manager,
-            diffraction_api,
             product_api,
             self.algorithm_parameter,
             self._task_monitor,

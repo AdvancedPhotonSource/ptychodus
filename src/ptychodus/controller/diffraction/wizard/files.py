@@ -22,7 +22,7 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import PathParameter
 
-from ....model.diffraction import DiffractionAPI, DiffractionSettings
+from ....model.diffraction import DetectorSettings, DiffractionAPI, DiffractionSettings
 from ....view.diffraction import OpenDatasetWizardPage
 from ....view.widgets import ExceptionDialog
 from ...data import FileDialogFactory
@@ -256,11 +256,13 @@ class OpenDatasetWizardFilesViewController(Observer):
     def __init__(
         self,
         settings: DiffractionSettings,
+        detector_settings: DetectorSettings,
         api: DiffractionAPI,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._settings = settings
+        self._detector_settings = detector_settings
         self._api = api
         self._file_dialog_factory = file_dialog_factory
 
@@ -289,16 +291,22 @@ class OpenDatasetWizardFilesViewController(Observer):
         self._sync_model_to_view()
         settings.file_path.add_observer(self)
 
-    def open_dataset(self) -> None:
+    def open_dataset(self) -> int:
         file_reader_chooser = self._api.get_file_reader_chooser()
         file_type = file_reader_chooser.get_current_plugin().simple_name
         file_path = self._settings.file_path.get_value()
 
         try:
-            self._api.open_patterns(file_path, file_type=file_type)
+            return self._api.open_patterns(
+                file_path,
+                file_type=file_type,
+                bad_pixels_file_path=self._detector_settings.bad_pixels_file_path.get_value(),
+                bad_pixels_file_type=self._detector_settings.bad_pixels_file_type.get_value(),
+            )
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.show_exception('Open Dataset', err)
+            return -1
 
     def get_widget(self) -> QWizardPage:
         return self._page

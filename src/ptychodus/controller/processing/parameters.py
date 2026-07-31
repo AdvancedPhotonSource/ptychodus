@@ -144,6 +144,9 @@ class ProductParameterViewController(ParameterViewController, ProductRepositoryO
         if index == current_index:
             self._status_controller.plot_losses(index)
 
+    def handle_dataset_changed(self, index: int, item: ProductRepositoryItem) -> None:
+        pass
+
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
         parent = QModelIndex()
         self._model.beginRemoveRows(parent, index, index)

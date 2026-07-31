@@ -10,13 +10,13 @@ from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import AssembledDiffractionData, ReconstructInput
 from ptychodus.api.settings import PathPrefixChange, SettingsRegistry
 from ptychodus.api.workflow import (
+    DiffractionWorkflowAPI,
+    ProductWorkflowAPI,
     RemoteComputeProvider,
     WorkflowAPI,
-    WorkflowDiffractionAPI,
-    WorkflowProductAPI,
 )
 
-from .diffraction import DiffractionAPI
+from .diffraction import AssembledDiffractionDataset, DiffractionAPI
 from .fluorescence import FluorescenceAPI
 from .genesis import GenesisExecutor
 from .globus import GlobusExecutor
@@ -26,18 +26,24 @@ from .product import ObjectAPI, ProbeAPI, ProductAPI, ProbePositionsAPI
 logger = logging.getLogger(__name__)
 
 
-class ConcreteWorkflowDiffractionAPI(WorkflowDiffractionAPI):
-    def __init__(self, diffraction_api: DiffractionAPI) -> None:
+class ConcreteDiffractionWorkflowAPI(DiffractionWorkflowAPI):
+    def __init__(self, diffraction_api: DiffractionAPI, dataset_index: int) -> None:
         self._diffraction_api = diffraction_api
+        self._dataset_index = dataset_index
+
+    def get_dataset_index(self) -> int:
+        return self._dataset_index
 
     def get_assembled_data(self) -> AssembledDiffractionData:
-        return self._diffraction_api.get_assembled_data()
+        return self._diffraction_api.get_assembled_data(self._dataset_index)
 
     def save_assembled_data(self, file_path: Path) -> None:
-        self._diffraction_api.export_assembled_patterns(file_path)
+        self._diffraction_api.export_assembled_patterns(
+            file_path, dataset_index=self._dataset_index
+        )
 
 
-class ConcreteWorkflowProductAPI(WorkflowProductAPI):
+class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
     def __init__(
         self,
         product_api: ProductAPI,
@@ -119,7 +125,7 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
             self._object_api.build_object(self._product_index, generator_name, generator_parameters)
 
     def get_reconstruct_input(self) -> ReconstructInput:
-        return self._processing_api.get_reconstruct_input(self._product_index)
+        return self._processing_api.get_reconstruct_input(product_index=self._product_index)
 
     def reconstruct_local(
         self,
@@ -127,15 +133,14 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
         algorithm: str | None = None,
         output_product_file: Path | None = None,
         block: bool = False,
-    ) -> WorkflowProductAPI:
+    ) -> ProductWorkflowAPI:
         output_product_index = self._processing_api.reconstruct(
-            self._product_index,
+            product_index=self._product_index,
             algorithm=algorithm,
             output_product_file=output_product_file,
             block=block,
         )
-
-        return ConcreteWorkflowProductAPI(
+        return ConcreteProductWorkflowAPI(
             self._product_api,
             self._probe_positions_api,
             self._probe_api,
@@ -171,7 +176,11 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
     ) -> None:
         # TODO mlflow
         self._processing_api.train(
-            self._product_index, input_path, output_path, algorithm=algorithm, block=block
+            input_path,
+            output_path,
+            product_index=self._product_index,
+            algorithm=algorithm,
+            block=block,
         )
 
     def train_reconstructor_remote(
@@ -191,7 +200,9 @@ class ConcreteWorkflowProductAPI(WorkflowProductAPI):
 
     def export_training_data(self, file_path: Path, *, algorithm: str | None = None) -> None:
         self._processing_api.export_training_data(
-            file_path, self._product_index, algorithm=algorithm
+            file_path,
+            product_index=self._product_index,
+            algorithm=algorithm,
         )
 
     def save_product(self, file_path: Path, *, file_type: str | None = None) -> None:
@@ -243,8 +254,19 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         self._globus_executor = globus_executor
         self._genesis_executor = genesis_executor
 
-    def load_bad_pixels(self, file_path: Path, *, file_type: str | None = None) -> None:
-        self._diffraction_api.open_bad_pixels(file_path, file_type=file_type)
+    def _fetch_dataset(
+        self, diffraction: DiffractionWorkflowAPI | None
+    ) -> AssembledDiffractionDataset | None:
+        if diffraction is None:
+            return None
+
+        repository = self._diffraction_api.get_repository()
+        dataset_index = diffraction.get_dataset_index()
+
+        if 0 <= dataset_index < len(repository):
+            return repository[dataset_index]
+
+        return None
 
     def load_diffraction_data(
         self,
@@ -254,32 +276,36 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         crop_center: CropCenter | None = None,
         crop_extent: ImageExtent | None = None,
         detector_extent: ImageExtent | None = None,
+        bad_pixels_file_path: Path | None = None,
+        bad_pixels_file_type: str | None = None,
         process_patterns: bool = True,
         block: bool = False,
-    ) -> WorkflowDiffractionAPI:
-        self._diffraction_api.open_patterns(
+    ) -> DiffractionWorkflowAPI:
+        dataset_index = self._diffraction_api.open_patterns(
             file_path,
             file_type=file_type,
             crop_center=crop_center,
             crop_extent=crop_extent,
             detector_extent=detector_extent,
+            bad_pixels_file_path=bad_pixels_file_path,
+            bad_pixels_file_type=bad_pixels_file_type,
             process_patterns=process_patterns,
             block=block,
         )
-        return ConcreteWorkflowDiffractionAPI(self._diffraction_api)
+        return ConcreteDiffractionWorkflowAPI(self._diffraction_api, dataset_index)
 
     def available_reconstructors(self) -> Iterator[str]:
         return self._processing_api.available_reconstructors()
 
-    def load_assembled_diffraction_data(self, file_path: Path) -> WorkflowDiffractionAPI:
-        self._diffraction_api.import_assembled_patterns(file_path)
-        return ConcreteWorkflowDiffractionAPI(self._diffraction_api)
+    def load_assembled_diffraction_data(self, file_path: Path) -> DiffractionWorkflowAPI:
+        dataset_index = self._diffraction_api.import_assembled_patterns(file_path)
+        return ConcreteDiffractionWorkflowAPI(self._diffraction_api, dataset_index)
 
-    def get_product(self, product_index: int) -> WorkflowProductAPI:
+    def get_product(self, product_index: int) -> ProductWorkflowAPI:
         if product_index < 0:
             raise ValueError(f'Bad product index ({product_index=})!')
 
-        return ConcreteWorkflowProductAPI(
+        return ConcreteProductWorkflowAPI(
             self._product_api,
             self._probe_positions_api,
             self._probe_api,
@@ -291,12 +317,24 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             product_index,
         )
 
-    def register_product(self, product: Product) -> WorkflowProductAPI:
-        product_index = self._product_api.insert_product(product)
+    def register_product(
+        self, product: Product, *, diffraction: DiffractionWorkflowAPI | None = None
+    ) -> ProductWorkflowAPI:
+        product_index = self._product_api.insert_product(
+            product, dataset=self._fetch_dataset(diffraction)
+        )
         return self.get_product(product_index)
 
-    def load_product(self, file_path: Path, *, file_type: str | None = None) -> WorkflowProductAPI:
-        product_index = self._product_api.open_product(file_path, file_type=file_type)
+    def load_product(
+        self,
+        file_path: Path,
+        *,
+        file_type: str | None = None,
+        diffraction: DiffractionWorkflowAPI | None = None,
+    ) -> ProductWorkflowAPI:
+        product_index = self._product_api.open_product(
+            file_path, file_type=file_type, dataset=self._fetch_dataset(diffraction)
+        )
 
         if product_index < 0:
             raise RuntimeError(f'Failed to open product "{file_path}"!')
@@ -314,7 +352,8 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         exposure_time_s: float | None = None,
         mass_attenuation_m2_kg: float | None = None,
         tomography_angle_deg: float | None = None,
-    ) -> WorkflowProductAPI:
+        diffraction: DiffractionWorkflowAPI | None = None,
+    ) -> ProductWorkflowAPI:
         product_index = self._product_api.insert_new_product(
             name,
             comments=comments,
@@ -324,6 +363,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             exposure_time_s=exposure_time_s,
             mass_attenuation_m2_kg=mass_attenuation_m2_kg,
             tomography_angle_deg=tomography_angle_deg,
+            dataset=self._fetch_dataset(diffraction),
         )
         return self.get_product(product_index)
 

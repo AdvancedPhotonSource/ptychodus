@@ -6,7 +6,6 @@ import threading
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 
-from ..diffraction import DiffractionAPI
 from ..processing import ProcessingAPI
 from ..product import ProductAPI
 from ..task_manager import TaskManager
@@ -168,7 +167,6 @@ class GenesisCore:
         self,
         task_manager: TaskManager,
         settings_registry: SettingsRegistry,
-        diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
         processing_api: ProcessingAPI,
     ) -> None:
@@ -197,7 +195,6 @@ class GenesisCore:
         self.executor = GenesisExecutor(
             task_manager,
             settings_registry,
-            diffraction_api,
             product_api,
             processing_api,
             self.settings,

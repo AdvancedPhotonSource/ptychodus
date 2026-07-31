@@ -35,8 +35,8 @@ class APS2IDFileBasedWorkflow(FileBasedWorkflow):
         scan_id = int(re.findall(r'\d+', scan_name)[-1])
 
         diffraction_file_path = file_path.parents[1] / 'raw_data' / f'scan{scan_id}_master.h5'
-        api.load_diffraction_data(diffraction_file_path)
-        product_api = api.create_product(f'scan{scan_id}')
+        diffraction_api = api.load_diffraction_data(diffraction_file_path)
+        product_api = api.create_product(f'scan{scan_id}', diffraction=diffraction_api)
         product_api.load_probe_positions(file_path)
         product_api.generate_probe()
         product_api.generate_object()
@@ -61,8 +61,8 @@ class APS26IDFileBasedWorkflow(FileBasedWorkflow):
             digits = int(re.findall(r'\d+', diffraction_file_path.stem)[-1])
 
             if digits == 0:
-                api.load_diffraction_data(diffraction_file_path)
-                product_api = api.create_product(f'scan_{scan_id}')
+                diffraction_api = api.load_diffraction_data(diffraction_file_path)
+                product_api = api.create_product(f'scan_{scan_id}', diffraction=diffraction_api)
                 product_api.load_probe_positions(file_path)
                 product_api.generate_probe()
                 product_api.generate_object()
@@ -142,8 +142,10 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
             logger.warning(f'Failed to locate metadata for {scan_num}!')
         else:
             product_name = f'scan{scan_num:05d}_' + metadata.label
-            api.load_diffraction_data(file_path)
-            input_product_api = api.create_product(product_name, comments=str(metadata))
+            diffraction_api = api.load_diffraction_data(file_path)
+            input_product_api = api.create_product(
+                product_name, comments=str(metadata), diffraction=diffraction_api
+            )
             input_product_api.load_probe_positions(scan_file)
             input_product_api.generate_probe()
             input_product_api.generate_object()

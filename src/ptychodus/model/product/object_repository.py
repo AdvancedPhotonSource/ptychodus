@@ -5,6 +5,7 @@ import logging
 from ptychodus.api.observer import ObservableSequence
 from ptychodus.api.product import LossValue
 
+from ..diffraction import AssembledDiffractionDataset
 from .item import ProductRepositoryItem, ProductRepositoryObserver
 from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItem
@@ -26,6 +27,9 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductReposito
 
     def set_name(self, index: int, name: str) -> None:
         self._repository[index].set_name(name)
+
+    def get_dataset(self, index: int) -> AssembledDiffractionDataset | None:
+        return self._repository[index].get_dataset()
 
     @overload
     def __getitem__(self, index: int) -> ObjectRepositoryItem: ...
@@ -62,6 +66,9 @@ class ObjectRepository(ObservableSequence[ObjectRepositoryItem], ProductReposito
         self.notify_observers_item_changed(index, item)
 
     def handle_losses_changed(self, index: int, losses: Sequence[LossValue]) -> None:
+        pass
+
+    def handle_dataset_changed(self, index: int, item: ProductRepositoryItem) -> None:
         pass
 
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:

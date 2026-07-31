@@ -11,18 +11,18 @@ from PyQt5.QtCore import (
     Qt,
 )
 from PyQt5.QtGui import QBrush
-from PyQt5.QtWidgets import QAbstractItemView, QAction
+from PyQt5.QtWidgets import QAbstractItemView, QAction, QInputDialog
 
 from ptychodus.api.common import BYTES_PER_MEGABYTE
 from ptychodus.api.product import LossValue
 
+from ...model.diffraction import AssembledDiffractionDataset, DiffractionDatasetRepository
 from ...model.product import (
     ProductAPI,
     ProductRepository,
     ProductRepositoryItem,
     ProductRepositoryObserver,
 )
-from ...model.diffraction import DiffractionAPI
 from ...model.product.metadata import MetadataRepositoryItem
 from ...model.product.object import ObjectRepositoryItem
 from ...model.product.probe import ProbeRepositoryItem
@@ -99,9 +99,9 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                     case 3:
                         return f'{metadata_item.probe_photon_count.get_value():.4g}'
                     case 4:
-                        return f'{geometry.object_plane_pixel_width_m * 1e9:.4g}'
+                        return f'{geometry.get_object_plane_pixel_geometry().width_m * 1e9:.4g}'
                     case 5:
-                        return f'{geometry.object_plane_pixel_height_m * 1e9:.4g}'
+                        return f'{geometry.get_object_plane_pixel_geometry().height_m * 1e9:.4g}'
                     case 6:
                         product = item.get_product()
                         return f'{product.nbytes / BYTES_PER_MEGABYTE:.2f}'
@@ -159,9 +159,9 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 class ProductController(ProductRepositoryObserver):
     def __init__(
         self,
-        diffraction_api: DiffractionAPI,
         repository: ProductRepository,
         api: ProductAPI,
+        diffraction_repository: DiffractionDatasetRepository,
         view: ProductView,
         file_dialog_factory: FileDialogFactory,
         duplicate_action: QAction,
@@ -169,9 +169,9 @@ class ProductController(ProductRepositoryObserver):
         table_proxy_model: QSortFilterProxyModel,
     ) -> None:
         super().__init__()
-        self._diffraction_api = diffraction_api
         self._repository = repository
         self._api = api
+        self._diffraction_repository = diffraction_repository
         self._view = view
         self._file_dialog_factory = file_dialog_factory
         self._duplicate_action = duplicate_action
@@ -181,9 +181,9 @@ class ProductController(ProductRepositoryObserver):
     @classmethod
     def create_instance(
         cls,
-        diffraction_api: DiffractionAPI,
         repository: ProductRepository,
         api: ProductAPI,
+        diffraction_repository: DiffractionDatasetRepository,
         view: ProductView,
         file_dialog_factory: FileDialogFactory,
     ) -> ProductController:
@@ -200,9 +200,9 @@ class ProductController(ProductRepositoryObserver):
         table_proxy_model.setSourceModel(table_model)
 
         controller = cls(
-            diffraction_api,
             repository,
             api,
+            diffraction_repository,
             view,
             file_dialog_factory,
             duplicate_action,
@@ -262,6 +262,30 @@ class ProductController(ProductRepositoryObserver):
 
         return item_index
 
+    def _choose_dataset(self, title: str) -> tuple[bool, AssembledDiffractionDataset | None]:
+        """Prompt the user to bind the new product to a diffraction dataset.
+
+        Returns (accepted, dataset). ``dataset`` is None when the user selects "None".
+        """
+        datasets = list(self._diffraction_repository)
+        labels = ['None', *(dataset.get_name() for dataset in datasets)]
+
+        label, accepted = QInputDialog.getItem(
+            self._view,
+            title,
+            'Diffraction Dataset:',
+            labels,
+            0,
+            False,
+        )
+
+        if not accepted:
+            return False, None
+
+        row = labels.index(label) - 1
+        dataset = datasets[row] if 0 <= row < len(datasets) else None
+        return True, dataset
+
     def _open_product_from_file(self) -> None:
         file_path, name_filter = self._file_dialog_factory.get_open_file_path(
             self._view,
@@ -271,14 +295,24 @@ class ProductController(ProductRepositoryObserver):
         )
 
         if file_path:
+            accepted, dataset = self._choose_dataset('Open Product')
+
+            if not accepted:
+                return
+
             try:
-                self._api.open_product(file_path, file_type=name_filter)
+                self._api.open_product(file_path, file_type=name_filter, dataset=dataset)
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.show_exception('File Reader', err)
 
     def _create_new_product(self) -> None:
-        self._api.insert_new_product()
+        accepted, dataset = self._choose_dataset('Create Product')
+
+        if not accepted:
+            return
+
+        self._api.insert_new_product(dataset=dataset)
 
     def _save_current_product_to_file(self) -> None:
         current = self._table_proxy_model.mapToSource(self._view.table_view.currentIndex())
@@ -314,7 +348,7 @@ class ProductController(ProductRepositoryObserver):
 
         if current.isValid():
             like_item = self._repository[current.row()]
-            self._api.insert_product(like_item.get_product())
+            self._api.insert_product(like_item.get_product(), dataset=like_item.get_dataset())
         else:
             logger.error('No current item!')
 
@@ -323,7 +357,9 @@ class ProductController(ProductRepositoryObserver):
 
         if current.isValid():
             product = self._repository[current.row()]
-            ProductEditorViewController.edit_product(self._diffraction_api, product, self._view)
+            ProductEditorViewController.edit_product(
+                self._diffraction_repository, product, self._view
+            )
         else:
             logger.error('No current item!')
 
@@ -396,6 +432,9 @@ class ProductController(ProductRepositoryObserver):
 
     def handle_losses_changed(self, index: int, losses: Sequence[LossValue]) -> None:
         self._update_info_text()
+
+    def handle_dataset_changed(self, index: int, item: ProductRepositoryItem) -> None:
+        pass
 
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
         was_current = self._current_source_row() == index

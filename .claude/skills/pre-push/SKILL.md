@@ -1,0 +1,45 @@
+---
+name: pre-push
+description: Run the ptychodus CI gate locally before pushing — ruff check, ruff format --check, mypy, and pytest, matching what .github/workflows/python-package.yml runs on PR. Use when the user says "check before push", "run CI locally", "pre-push", or after a batch of code changes when they're about to open/update a PR.
+---
+
+# pre-push
+
+Runs the four commands `.github/workflows/python-package.yml` runs on every PR, in the same order, so a green run here means CI will pass.
+
+## Steps
+
+Run these sequentially. Stop at the first failure and report clearly; do not proceed to the next step until the current one is clean.
+
+```sh
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy src/ptychodus
+uv run pytest
+```
+
+## Handling failures
+
+- **`ruff check` failure:** show the violations. If they are auto-fixable (`--fix` would resolve them), ask the user before running `uv run ruff check --fix .`. Never auto-fix `N` (naming) violations — those often involve deliberate `# noqa: N…` on physical-quantity names per CLAUDE.md.
+- **`ruff format --check` failure:** offer to run `uv run ruff format .` and re-run the check. This is almost always safe to apply.
+- **`mypy` failure:** show the errors with file:line. Do not attempt fixes here — hand back to the user; typing changes often need real thought.
+- **`pytest` failure:** show the failing test name(s) and a compact traceback. Ask the user how to proceed before rerunning.
+
+## Scope shortcuts
+
+If the user's diff only touches one subpackage, you can offer to run the module-scoped variant instead:
+
+```sh
+uv run ruff check src/ptychodus/<subpackage>
+uv run ruff format --check src/ptychodus/<subpackage>
+uv run mypy src/ptychodus/<subpackage>
+uv run pytest tests/test_<subpackage>.py  # if a matching test file exists
+```
+
+Use this only when the user asks for a fast local check on WIP; the full four-command sweep above is what CI actually runs.
+
+## Notes
+
+- Ruff rules for this repo: `F, N, NPY`; single-quoted strings; 100-char lines; py311 target (see `pyproject.toml`).
+- `mypy` targets `src/ptychodus` only. `src/ptychodus_store` is not currently in CI's mypy job — check `pyproject.toml`/`.github/workflows/python-package.yml` before assuming coverage.
+- Do not add `--no-verify` or skip hooks to work around a failure; investigate and fix instead.

@@ -84,35 +84,34 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
     def _lambda_z_m2(self) -> float:
         return self.probe_wavelength_m * self.detector_distance_m
 
-    @property
-    def object_plane_pixel_width_m(self) -> float:
-        return self._lambda_z_m2 / self._pattern_sizer.get_processed_width_m()
-
-    @property
-    def object_plane_pixel_height_m(self) -> float:
-        return self._lambda_z_m2 / self._pattern_sizer.get_processed_height_m()
-
     def get_detector_pixel_geometry(self):
         return self._pattern_sizer.get_processed_pixel_geometry()
 
     def get_object_plane_pixel_geometry(self) -> PixelGeometry:
+        extent = self._pattern_sizer.get_processed_image_extent()
+        detector_pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry()
+        lambda_z = self._lambda_z_m2
         return PixelGeometry(
-            width_m=self.object_plane_pixel_width_m,
-            height_m=self.object_plane_pixel_height_m,
+            width_m=lambda_z / (extent.width_px * detector_pixel_geometry.width_m),
+            height_m=lambda_z / (extent.height_px * detector_pixel_geometry.height_m),
         )
 
     @property
     def fresnel_number(self) -> float:
-        width_m = self._pattern_sizer.get_processed_width_m()
-        height_m = self._pattern_sizer.get_processed_height_m()
+        extent = self._pattern_sizer.get_processed_image_extent()
+        pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry()
+        width_m = extent.width_px * pixel_geometry.width_m
+        height_m = extent.height_px * pixel_geometry.height_m
         area_m2 = width_m * height_m
         return area_m2 / self._lambda_z_m2
 
     @property
     def _detector_numerical_aperture_sq(self) -> float:
+        extent = self._pattern_sizer.get_processed_image_extent()
+        pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry()
         two_z_m = 2 * self.detector_distance_m
-        NA_x = self._pattern_sizer.get_processed_width_m() / two_z_m  # noqa: N806
-        NA_y = self._pattern_sizer.get_processed_height_m() / two_z_m  # noqa: N806
+        NA_x = (extent.width_px * pixel_geometry.width_m) / two_z_m  # noqa: N806
+        NA_y = (extent.height_px * pixel_geometry.height_m) / two_z_m  # noqa: N806
         return NA_x * NA_y
 
     @property
@@ -125,11 +124,12 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     def get_probe_geometry(self) -> ProbeGeometry:
         extent = self._pattern_sizer.get_processed_image_extent()
+        pixel_geometry = self.get_object_plane_pixel_geometry()
         return ProbeGeometry(
             width_px=extent.width_px,
             height_px=extent.height_px,
-            pixel_width_m=self.object_plane_pixel_width_m,
-            pixel_height_m=self.object_plane_pixel_height_m,
+            pixel_width_m=pixel_geometry.width_m,
+            pixel_height_m=pixel_geometry.height_m,
         )
 
     def is_probe_geometry_valid(self, geometry: ProbeGeometry) -> bool:
@@ -156,17 +156,15 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
             center_x_m = scan_bbox.center_x_m
             center_y_m = scan_bbox.center_y_m
 
-        pixel_width_m = self.object_plane_pixel_width_m
-        width_px = width_m / pixel_width_m if pixel_width_m > 0.0 else 0.0
-
-        pixel_height_m = self.object_plane_pixel_height_m
-        height_px = height_m / pixel_height_m if pixel_height_m > 0.0 else 0.0
+        pixel_geometry = self.get_object_plane_pixel_geometry()
+        width_px = width_m / pixel_geometry.width_m if pixel_geometry.width_m > 0.0 else 0.0
+        height_px = height_m / pixel_geometry.height_m if pixel_geometry.height_m > 0.0 else 0.0
 
         return ObjectGeometry(
             width_px=int(numpy.ceil(width_px)),
             height_px=int(numpy.ceil(height_px)),
-            pixel_width_m=self.object_plane_pixel_width_m,
-            pixel_height_m=self.object_plane_pixel_height_m,
+            pixel_width_m=pixel_geometry.width_m,
+            pixel_height_m=pixel_geometry.height_m,
             center_x_m=center_x_m,
             center_y_m=center_y_m,
         )

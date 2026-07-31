@@ -7,6 +7,7 @@ from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.product import LossValue, Product
 
+from ..diffraction import AssembledDiffractionDataset
 from .geometry import ProductGeometry
 from .metadata import MetadataRepositoryItem, UniqueNameFactory
 from .object import ObjectRepositoryItem
@@ -37,6 +38,10 @@ class ProductRepositoryItemObserver(UniqueNameFactory):
     def handle_losses_changed(self, item: ProductRepositoryItem) -> None:
         pass
 
+    @abstractmethod
+    def handle_dataset_changed(self, item: ProductRepositoryItem) -> None:
+        pass
+
 
 class ProductRepositoryItem(ParameterGroup):
     def __init__(
@@ -48,6 +53,7 @@ class ProductRepositoryItem(ParameterGroup):
         probe_item: ProbeRepositoryItem,
         object_item: ObjectRepositoryItem,
         losses: Sequence[LossValue],
+        dataset: AssembledDiffractionDataset | None = None,
     ) -> None:
         super().__init__()
         self._parent = parent
@@ -57,6 +63,7 @@ class ProductRepositoryItem(ParameterGroup):
         self._probe_item = probe_item
         self._object_item = object_item
         self._losses = list(losses)
+        self._dataset = dataset
 
         self._add_group('metadata', self._metadata_item, observe=True)
         self._add_group('probe_positions', self._probe_positions_item, observe=True)
@@ -99,6 +106,18 @@ class ProductRepositoryItem(ParameterGroup):
 
     def get_object_item(self) -> ObjectRepositoryItem:
         return self._object_item
+
+    def get_dataset(self) -> AssembledDiffractionDataset | None:
+        """Return the diffraction dataset this product is associated with, if any.
+
+        Model-only reference; not part of the persisted Product.
+        """
+        return self._dataset
+
+    def set_dataset(self, dataset: AssembledDiffractionDataset | None) -> None:
+        if self._dataset is not dataset:
+            self._dataset = dataset
+            self._parent.handle_dataset_changed(self)
 
     def _invalidate_losses(self) -> None:
         self._losses = list()
@@ -158,6 +177,10 @@ class ProductRepositoryObserver(ABC):
 
     @abstractmethod
     def handle_losses_changed(self, index: int, losses: Sequence[LossValue]) -> None:
+        pass
+
+    @abstractmethod
+    def handle_dataset_changed(self, index: int, item: ProductRepositoryItem) -> None:
         pass
 
     @abstractmethod
