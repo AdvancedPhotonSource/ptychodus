@@ -331,8 +331,6 @@ def test_sizer_processed_size_accounts_for_double_sided_padding(
 ) -> None:
     """B4: padding is applied on both sides; processed size adds 2 * pad."""
     diff, det = settings
-    det.width_px.set_value(64)
-    det.height_px.set_value(64)
     diff.crop_enabled.set_value(True)
     diff.crop_width_px.set_value(32)
     diff.crop_height_px.set_value(32)
@@ -344,7 +342,8 @@ def test_sizer_processed_size_accounts_for_double_sided_padding(
     diff.pad_y.set_value(4)
 
     sizer = PatternSizer(det, diff)
-    extent = sizer.get_processed_image_extent()
+    detector_extent = ImageExtent(width_px=64, height_px=64)
+    extent = sizer.get_processed_image_extent(detector_extent)
     assert extent.width_px == 32 + 2 * 4
     assert extent.height_px == 32 + 2 * 4
 
@@ -352,7 +351,7 @@ def test_sizer_processed_size_accounts_for_double_sided_padding(
     array = SimpleDiffractionArray(
         'a', numpy.zeros(1, dtype=int), numpy.zeros((1, 64, 64), dtype=numpy.uint16)
     )
-    out_shape = sizer.get_prep_pipeline()(array).get_patterns().shape
+    out_shape = sizer.get_prep_pipeline(detector_extent)(array).get_patterns().shape
     assert out_shape == (1, extent.height_px, extent.width_px)
 
 
@@ -361,14 +360,13 @@ def test_sizer_processed_extent_reflects_transpose(
 ) -> None:
     """Regression: transpose must swap width/height in the processed extent + pixel geometry."""
     diff, det = settings
-    det.width_px.set_value(64)
-    det.height_px.set_value(32)
     det.pixel_width_m.set_value(1e-5)
     det.pixel_height_m.set_value(2e-5)
     diff.transpose.set_value(True)
 
     sizer = PatternSizer(det, diff)
-    extent = sizer.get_processed_image_extent()
+    detector_extent = ImageExtent(width_px=64, height_px=32)
+    extent = sizer.get_processed_image_extent(detector_extent)
     assert (extent.width_px, extent.height_px) == (32, 64)
 
     geo = sizer.get_processed_pixel_geometry()
@@ -378,7 +376,7 @@ def test_sizer_processed_extent_reflects_transpose(
     array = SimpleDiffractionArray(
         'a', numpy.zeros(1, dtype=int), numpy.zeros((1, 32, 64), dtype=numpy.uint16)
     )
-    out_shape = sizer.get_prep_pipeline()(array).get_patterns().shape
+    out_shape = sizer.get_prep_pipeline(detector_extent)(array).get_patterns().shape
     assert out_shape == (1, extent.height_px, extent.width_px)
 
 
@@ -436,7 +434,9 @@ def test_sizer_both_filter_bounds_independent(
     assert step.upper_bound == 99
 
 
-def test_sizer_no_filter_bounds(settings: tuple[DiffractionSettings, DetectorSettings]) -> None:
+def test_sizer_no_filter_bounds(
+    settings: tuple[DiffractionSettings, DetectorSettings],
+) -> None:
     """Both filter toggles off → no FilterValuesStep in the pipeline (avoid a no-op step)."""
     diff, det = settings
     diff.value_lower_bound_enabled.set_value(False)
@@ -467,19 +467,20 @@ def _crop_step(pipeline: DiffractionPrepPipeline) -> CropStep | None:
     ],
 )
 def test_sizer_safe_crop_center_matches_cropstep_bounds(
-    settings: tuple[DiffractionSettings, DetectorSettings], user_center: int, expected: int
+    settings: tuple[DiffractionSettings, DetectorSettings],
+    user_center: int,
+    expected: int,
 ) -> None:
     """The clamped center must equal the CropStep radius-based bounds (see CropStep.apply)."""
     diff, det = settings
-    det.width_px.set_value(8)
-    det.height_px.set_value(8)
     diff.crop_enabled.set_value(True)
     diff.crop_width_px.set_value(4)
     diff.crop_height_px.set_value(4)
     diff.crop_center_x_px.set_value(user_center)
     diff.crop_center_y_px.set_value(user_center)
 
-    step = _crop_step(PatternSizer(det, diff).get_prep_pipeline())
+    detector_extent = ImageExtent(width_px=8, height_px=8)
+    step = _crop_step(PatternSizer(det, diff).get_prep_pipeline(detector_extent))
     assert step is not None
     assert step.center.position_x_px == expected
     assert step.center.position_y_px == expected
@@ -490,8 +491,6 @@ def test_sizer_safe_crop_center_produces_in_bounds_slice(
 ) -> None:
     """Cross-check: a max-valid center must yield a slice fully inside the detector."""
     diff, det = settings
-    det.width_px.set_value(8)
-    det.height_px.set_value(8)
     diff.crop_enabled.set_value(True)
     diff.crop_width_px.set_value(4)
     diff.crop_height_px.set_value(4)
@@ -501,7 +500,8 @@ def test_sizer_safe_crop_center_produces_in_bounds_slice(
     array = SimpleDiffractionArray(
         'a', numpy.zeros(1, dtype=int), numpy.zeros((1, 8, 8), dtype=numpy.uint16)
     )
-    out = PatternSizer(det, diff).get_prep_pipeline()(array).get_patterns()
+    detector_extent = ImageExtent(width_px=8, height_px=8)
+    out = PatternSizer(det, diff).get_prep_pipeline(detector_extent)(array).get_patterns()
     assert out.shape == (1, 4, 4)  # no truncation from an out-of-bounds slice
 
 

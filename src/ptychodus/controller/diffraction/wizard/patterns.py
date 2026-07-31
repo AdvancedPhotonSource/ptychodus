@@ -12,10 +12,11 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable
 
-from ....model.diffraction import DetectorSettings, DiffractionSettings
+from ....model.diffraction import DiffractionSettings
 from ....view.diffraction import OpenDatasetWizardPage
 
 from ...data import FileDialogFactory
+from ..detector_extent import DetectorExtentSource
 from ...parametric import (
     CheckBoxParameterViewController,
     CheckableGroupBoxParameterViewController,
@@ -68,11 +69,11 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
         diffraction_settings: DiffractionSettings,
-        detector_settings: DetectorSettings,
+        extent_source: DetectorExtentSource,
     ) -> None:
         super().__init__(diffraction_settings.crop_enabled, 'Crop')
         self._diffraction_settings = diffraction_settings
-        self._detector_settings = detector_settings
+        self._extent_source = extent_source
 
         self._center_x_spin_box = QSpinBox()
         self._center_y_spin_box = QSpinBox()
@@ -95,8 +96,6 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
             diffraction_settings.crop_center_y_px,
             diffraction_settings.crop_width_px,
             diffraction_settings.crop_height_px,
-            detector_settings.width_px,
-            detector_settings.height_px,
         )
 
         self._sync_model_to_view()
@@ -112,10 +111,27 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
 
         for parameter in self._observed:
             parameter.add_observer(self)
+        extent_source.add_observer(self)
 
     def _sync_model_to_view(self) -> None:
-        det_w = self._detector_settings.width_px.get_value()
-        det_h = self._detector_settings.height_px.get_value()
+        extent = self._extent_source.get_extent()
+        spin_boxes = (
+            self._center_x_spin_box,
+            self._center_y_spin_box,
+            self._width_spin_box,
+            self._height_spin_box,
+        )
+
+        if extent is None:
+            for box in spin_boxes:
+                box.setEnabled(False)
+            return
+
+        for box in spin_boxes:
+            box.setEnabled(True)
+
+        det_w = extent.width_px
+        det_h = extent.height_px
 
         _set_spin_box(
             self._center_x_spin_box,
@@ -143,7 +159,7 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
         )
 
     def _update(self, observable: Observable) -> None:
-        if observable in self._observed:
+        if observable in self._observed or observable is self._extent_source:
             self._sync_model_to_view()
         else:
             super()._update(observable)
@@ -153,11 +169,11 @@ class PatternBinningViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
         diffraction_settings: DiffractionSettings,
-        detector_settings: DetectorSettings,
+        extent_source: DetectorExtentSource,
     ) -> None:
         super().__init__(diffraction_settings.binning_enabled, 'Bin Pixels')
         self._diffraction_settings = diffraction_settings
-        self._detector_settings = detector_settings
+        self._extent_source = extent_source
 
         self._bin_size_x_spin_box = QSpinBox()
         self._bin_size_y_spin_box = QSpinBox()
@@ -178,8 +194,6 @@ class PatternBinningViewController(CheckableGroupBoxParameterViewController):
             diffraction_settings.crop_enabled,
             diffraction_settings.crop_width_px,
             diffraction_settings.crop_height_px,
-            detector_settings.width_px,
-            detector_settings.height_px,
         )
 
         self._sync_model_to_view()
@@ -189,10 +203,20 @@ class PatternBinningViewController(CheckableGroupBoxParameterViewController):
 
         for parameter in self._observed:
             parameter.add_observer(self)
+        extent_source.add_observer(self)
 
     def _sync_model_to_view(self) -> None:
-        det_w = self._detector_settings.width_px.get_value()
-        det_h = self._detector_settings.height_px.get_value()
+        extent = self._extent_source.get_extent()
+        if extent is None:
+            self._bin_size_x_spin_box.setEnabled(False)
+            self._bin_size_y_spin_box.setEnabled(False)
+            return
+
+        self._bin_size_x_spin_box.setEnabled(True)
+        self._bin_size_y_spin_box.setEnabled(True)
+
+        det_w = extent.width_px
+        det_h = extent.height_px
         crop_enabled = self._diffraction_settings.crop_enabled.get_value()
         binning_enabled = self._diffraction_settings.binning_enabled.get_value()
 
@@ -225,7 +249,7 @@ class PatternBinningViewController(CheckableGroupBoxParameterViewController):
         _set_spin_box(self._bin_size_y_spin_box, bin_y_limits, bin_y_value)
 
     def _update(self, observable: Observable) -> None:
-        if observable in self._observed:
+        if observable in self._observed or observable is self._extent_source:
             self._sync_model_to_view()
         else:
             super()._update(observable)
@@ -296,17 +320,15 @@ class OpenDatasetWizardPatternsViewController(ParameterViewController):
     def __init__(
         self,
         diffraction_settings: DiffractionSettings,
-        detector_settings: DetectorSettings,
+        extent_source: DetectorExtentSource,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         self._memory_map_view_controller = PatternMemoryMapViewController(
             diffraction_settings, file_dialog_factory
         )
-        self._crop_view_controller = PatternCropViewController(
-            diffraction_settings, detector_settings
-        )
+        self._crop_view_controller = PatternCropViewController(diffraction_settings, extent_source)
         self._binning_view_controller = PatternBinningViewController(
-            diffraction_settings, detector_settings
+            diffraction_settings, extent_source
         )
         self._padding_view_controller = PatternPaddingViewController(diffraction_settings)
         self._transform_view_controller = PatternTransformViewController(

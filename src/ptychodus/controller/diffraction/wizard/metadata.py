@@ -24,9 +24,6 @@ class OpenDatasetWizardMetadataViewController:
     def import_metadata(self) -> None:
         metadata = self._get_metadata()
 
-        if self._page.detector_extent_check_box.isChecked():
-            self._presenter.sync_detector_extent(metadata)
-
         if self._page.detector_pixel_size_check_box.isChecked():
             self._presenter.sync_detector_pixel_size(metadata)
 
@@ -50,10 +47,6 @@ class OpenDatasetWizardMetadataViewController:
 
     def refresh(self) -> None:
         metadata = self._get_metadata()
-
-        can_sync_detector_extent = self._presenter.can_sync_detector_extent(metadata)
-        self._page.detector_extent_check_box.setVisible(can_sync_detector_extent)
-        self._page.detector_extent_check_box.setChecked(can_sync_detector_extent)
 
         can_sync_detector_pixel_size = self._presenter.can_sync_detector_pixel_size(metadata)
         self._page.detector_pixel_size_check_box.setVisible(can_sync_detector_pixel_size)

@@ -13,6 +13,7 @@ from ....model.diffraction import (
 from ....view.widgets import ExceptionDialog
 
 from ...data import FileDialogFactory
+from ..detector_extent import DetectorExtentSource
 from .files import OpenDatasetWizardFilesViewController
 from .metadata import OpenDatasetWizardMetadataViewController
 from .patterns import OpenDatasetWizardPatternsViewController
@@ -25,6 +26,7 @@ class OpenDatasetWizardController:
         self,
         settings: DiffractionSettings,
         detector_settings: DetectorSettings,
+        extent_source: DetectorExtentSource,
         api: DiffractionAPI,
         repository: DiffractionDatasetRepository,
         metadata_presenter: MetadataPresenter,
@@ -40,7 +42,7 @@ class OpenDatasetWizardController:
             metadata_presenter, self._get_pending_metadata
         )
         self._patterns_view_controller = OpenDatasetWizardPatternsViewController(
-            settings, detector_settings, file_dialog_factory
+            settings, extent_source, file_dialog_factory
         )
 
         self._wizard = QWizard()

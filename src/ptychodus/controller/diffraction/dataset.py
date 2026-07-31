@@ -53,6 +53,9 @@ class _DatasetTreeNode(_TreeNode):
             return 0
         return sum(child.get_counts() for child in self.child_nodes) // len(self.child_nodes)
 
+    def get_data(self) -> DiffractionPattern | None:
+        return self._dataset.get_average_pattern()
+
 
 class _ArrayTreeNode(_TreeNode):
     def __init__(self, parent_node: _TreeNode, array: AssembledDiffractionArray) -> None:

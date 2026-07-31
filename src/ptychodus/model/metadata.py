@@ -25,16 +25,6 @@ class MetadataPresenter:
         self._diffraction_settings = diffraction_settings
         self._product_settings = product_settings
 
-    def can_sync_detector_extent(self, metadata: DiffractionMetadata) -> bool:
-        return metadata.detector_extent is not None
-
-    def sync_detector_extent(self, metadata: DiffractionMetadata) -> None:
-        detector_extent = metadata.detector_extent
-
-        if detector_extent:
-            self._detector_settings.width_px.set_value(detector_extent.width_px)
-            self._detector_settings.height_px.set_value(detector_extent.height_px)
-
     def can_sync_detector_pixel_size(self, metadata: DiffractionMetadata) -> bool:
         return metadata.detector_pixel_geometry is not None
 

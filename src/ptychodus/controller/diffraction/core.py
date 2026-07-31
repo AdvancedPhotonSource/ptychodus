@@ -32,6 +32,7 @@ from ...model.diffraction import (
     DiffractionTaskMonitor,
     PatternSizer,
 )
+from .detector_extent import DetectorExtentSource
 from ...model.metadata import MetadataPresenter
 from ...model.product import ProductRepository
 from ...view.diffraction import DetectorView, DiffractionStatusView, PatternsView
@@ -43,7 +44,6 @@ from ..parametric import (
     CheckBoxParameterViewController,
     LengthWidgetParameterViewController,
     ParameterViewController,
-    SpinBoxParameterViewController,
 )
 from ..product.list_model import ProductRepositoryListModel
 from .dataset import DatasetTreeModel
@@ -145,8 +145,6 @@ class DetectorController:
         view: DetectorView,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
-        self._width_px_view_controller = SpinBoxParameterViewController(settings.width_px)
-        self._height_px_view_controller = SpinBoxParameterViewController(settings.height_px)
         self._pixel_width_view_controller = LengthWidgetParameterViewController(
             settings.pixel_width_m
         )
@@ -162,8 +160,6 @@ class DetectorController:
         )
 
         layout = QFormLayout()
-        layout.addRow('Detector Width [px]:', self._width_px_view_controller.get_widget())
-        layout.addRow('Detector Height [px]:', self._height_px_view_controller.get_widget())
         layout.addRow('Pixel Width:', self._pixel_width_view_controller.get_widget())
         layout.addRow('Pixel Height:', self._pixel_height_view_controller.get_widget())
         layout.addRow('Bad Pixels:', self._bad_pixels_view_controller.get_widget())
@@ -228,6 +224,7 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         self._pattern_sizer = pattern_sizer
         self._diffraction_api = diffraction_api
         self._repository = repository
+        self._detector_extent_source = DetectorExtentSource()
         self._current_dataset_index = -1
         self._product_list_model = ProductRepositoryListModel(product_repository)
         self._diffraction_simulator = diffraction_simulator
@@ -245,6 +242,7 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         self._wizard_controller = OpenDatasetWizardController(
             diffraction_settings,
             detector_settings,
+            self._detector_extent_source,
             diffraction_api,
             repository,
             metadata_presenter,
@@ -422,6 +420,8 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
 
     def handle_dataset_inserted(self, index: int, dataset: AssembledDiffractionDataset) -> None:
         self._on_dataset_inserted(index, dataset)
+        # Publish the newly-loaded detector extent to the wizard's crop/bin bounds.
+        self._detector_extent_source.set_extent(dataset.get_metadata().detector_extent)
         # Make a freshly loaded dataset the panel's current dataset.
         self._select_dataset_row(index)
 
@@ -466,6 +466,9 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         if dataset_row is None:
             return
         self._tree_model.refresh_dataset(dataset_row)
+        # Refresh the wizard's crop/bin bounds when a dataset is reloaded (e.g. via a
+        # streaming context or a programmatic re-open with a different file).
+        self._detector_extent_source.set_extent(dataset.get_metadata().detector_extent)
 
 
 class _PerDatasetObserver(DiffractionDatasetObserver):

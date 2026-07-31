@@ -122,15 +122,16 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         self._array_loader: LoadAllArrays | None = None
         self._scratch_tempfile: IO[bytes] | None = None
 
-        # Raw (pre-processing) bad-pixel mask; defaults to all-good sized to the
-        # current detector extent. Overridden via set_bad_pixels() or picked up
-        # from an incoming DiffractionDataset in reload().
+        # Raw (pre-processing) bad-pixel mask; starts as an empty (0, 0) placeholder
+        # and is always overwritten by reload() or by load_all_arrays() before any
+        # array is processed, so the shape here only matters when nothing is loaded.
         self._bad_pixels = self._create_default_bad_pixels()
 
     def _create_default_bad_pixels(self) -> BadPixels:
-        height_px = self._detector_settings.height_px.get_value()
-        width_px = self._detector_settings.width_px.get_value()
-        return numpy.zeros((height_px, width_px), dtype=numpy.bool_)
+        extent = self._dataset.get_metadata().detector_extent
+        if extent is None:
+            return numpy.zeros((0, 0), dtype=numpy.bool_)
+        return numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool_)
 
     def get_name(self) -> str:
         return self._name
@@ -171,6 +172,15 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
     def get_assembled_data(self) -> AssembledDiffractionData:
         return self._data
 
+    def get_average_pattern(self) -> DiffractionPattern | None:
+        if not self._array_list:
+            return None
+        weights = numpy.array(
+            [array.get_num_patterns() for array in self._array_list], dtype=numpy.float64
+        )
+        averages = numpy.stack([array.get_average_pattern() for array in self._array_list])
+        return numpy.average(averages, axis=0, weights=weights)
+
     @overload
     def __getitem__(self, index: int) -> AssembledDiffractionArray: ...
 
@@ -193,7 +203,8 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         array_index = self._array_counter
         self._array_counter += 1
 
-        pipeline = self._sizer.get_prep_pipeline() if process_patterns else None
+        detector_extent = self._dataset.get_metadata().detector_extent
+        pipeline = self._sizer.get_prep_pipeline(detector_extent) if process_patterns else None
         processed_bad_pixels = (
             pipeline.apply_to_mask(self._bad_pixels) if pipeline is not None else self._bad_pixels
         )
@@ -252,7 +263,8 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
 
     def reload(self, dataset: DiffractionDataset) -> None:
         self.clear()
-        self._dataset = SimpleDiffractionDataset(dataset.get_metadata(), dataset.get_layout(), [])
+        metadata = dataset.get_metadata()
+        self._dataset = SimpleDiffractionDataset(metadata, dataset.get_layout(), [])
         self._bad_pixels = dataset.get_bad_pixels()
         self._array_loader = LoadAllArrays(dataset, self, self._task_manager, self._task_monitor)
 
@@ -266,14 +278,10 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
 
         metadata = self._dataset.get_metadata()
 
-        if metadata.detector_extent is not None:
-            self._detector_settings.height_px.set_value(metadata.detector_extent.height_px)
-            self._detector_settings.width_px.set_value(metadata.detector_extent.width_px)
-
         bad_pixels = self._bad_pixels
 
         if process_patterns:
-            pipeline = self._sizer.get_prep_pipeline()
+            pipeline = self._sizer.get_prep_pipeline(metadata.detector_extent)
             bad_pixels = pipeline.apply_to_mask(bad_pixels)
             self._array_loader.enable_pattern_processing()
 

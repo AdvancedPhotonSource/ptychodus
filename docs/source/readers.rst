@@ -16,6 +16,7 @@ be happy to add file readers to support more ptychography instruments.
     - 31-ID-E LYNX
     - 33-ID-C PtychoProbe
     - 33-ID-C Velociprobe
+    - 34-ID-C Microdiffraction, Coherent X-ray Scattering
 - Linac Coherent Light Source (LCLS)
     - Hutch 1.3: X-ray Pump Probe (XPP)
     - SLAC NumPy Zipped Archive (``*.npz``)

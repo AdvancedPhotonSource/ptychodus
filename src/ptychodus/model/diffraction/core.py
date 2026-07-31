@@ -45,7 +45,6 @@ class DiffractionCore(Observer):
         )
         self.diffraction_api = DiffractionAPI(
             self.diffraction_settings,
-            self.detector_settings,
             self.repository,
             bad_pixels_file_reader_chooser,
             file_reader_chooser,

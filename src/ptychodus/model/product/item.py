@@ -72,6 +72,11 @@ class ProductRepositoryItem(ParameterGroup):
 
         self._index = -1  # used by ProductRepository
 
+        # Bind the geometry's detector extent to the initial dataset (if any) so
+        # downstream probe/object sizes are correct from the start.
+        if dataset is not None:
+            self._geometry.set_detector_extent(dataset.get_metadata().detector_extent)
+
     def assign(self, product: Product) -> None:
         self._metadata_item.assign(product.metadata)
         self._probe_positions_item.assign(product.probe_positions)
@@ -117,6 +122,8 @@ class ProductRepositoryItem(ParameterGroup):
     def set_dataset(self, dataset: AssembledDiffractionDataset | None) -> None:
         if self._dataset is not dataset:
             self._dataset = dataset
+            extent = dataset.get_metadata().detector_extent if dataset is not None else None
+            self._geometry.set_detector_extent(extent)
             self._parent.handle_dataset_changed(self)
 
     def _invalidate_losses(self) -> None:

@@ -12,8 +12,14 @@ from unittest.mock import MagicMock
 
 import numpy
 
-from ptychodus.api.diffraction import SimpleDiffractionArray
+from ptychodus.api.diffraction import (
+    DiffractionMetadata,
+    SimpleDiffractionArray,
+    SimpleDiffractionDataset,
+)
+from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.settings import SettingsRegistry
+from ptychodus.api.tree import SimpleTreeNode
 from ptychodus.model.diffraction.dataset import AssembledDiffractionDataset
 from ptychodus.model.diffraction.settings import DetectorSettings, DiffractionSettings
 from ptychodus.model.diffraction.sizer import PatternSizer
@@ -31,8 +37,6 @@ def _make_dataset(
     detector_settings = DetectorSettings(registry)
     diffraction_settings = DiffractionSettings(registry)
 
-    detector_settings.height_px.set_value(detector_height)
-    detector_settings.width_px.set_value(detector_width)
     diffraction_settings.crop_enabled.set_value(True)
     diffraction_settings.crop_center_y_px.set_value(crop_center_y)
     diffraction_settings.crop_center_x_px.set_value(crop_center_x)
@@ -43,13 +47,24 @@ def _make_dataset(
     task_manager = MagicMock()
     task_monitor = MagicMock()
 
-    return AssembledDiffractionDataset(
+    dataset = AssembledDiffractionDataset(
         diffraction_settings,
         sizer,
         detector_settings,
         task_manager,
         task_monitor,
     )
+    # Give the dataset a metadata source with the intended detector extent so the
+    # per-dataset extent flows through reload() -> the sizer's pipeline builder.
+    metadata = DiffractionMetadata(
+        num_patterns_per_array=[0],
+        pattern_dtype=numpy.dtype(numpy.uint16),
+        detector_extent=ImageExtent(width_px=detector_width, height_px=detector_height),
+    )
+    contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+    source = SimpleDiffractionDataset(metadata, contents_tree, [])
+    dataset.reload(source)
+    return dataset
 
 
 def test_load_array_matches_shapes_and_repairs_bad_pixels_before_crop() -> None:

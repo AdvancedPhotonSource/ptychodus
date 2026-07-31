@@ -2,7 +2,7 @@ from collections.abc import Sequence
 
 import numpy
 
-from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider
@@ -29,10 +29,20 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         self._pattern_sizer = pattern_sizer
         self._metadata_item = metadata_item
         self._scan_item = scan_item
+        # Set via set_detector_extent() when a dataset is bound (see
+        # ProductRepositoryItem.set_dataset). Derived quantities that need an extent
+        # degenerate to zero-sized while unbound.
+        self._detector_extent: ImageExtent | None = None
 
         self._pattern_sizer.add_observer(self)
         self._metadata_item.add_observer(self)
         self._scan_item.add_observer(self)
+
+    def set_detector_extent(self, extent: ImageExtent | None) -> None:
+        if extent == self._detector_extent:
+            return
+        self._detector_extent = extent
+        self.notify_observers()
 
     @property
     def probe_photon_count(self) -> float:
@@ -88,30 +98,39 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         return self._pattern_sizer.get_processed_pixel_geometry()
 
     def get_object_plane_pixel_geometry(self) -> PixelGeometry:
-        extent = self._pattern_sizer.get_processed_image_extent()
+        extent = self._pattern_sizer.get_processed_image_extent(self._detector_extent)
         detector_pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry()
         lambda_z = self._lambda_z_m2
-        return PixelGeometry(
-            width_m=lambda_z / (extent.width_px * detector_pixel_geometry.width_m),
-            height_m=lambda_z / (extent.height_px * detector_pixel_geometry.height_m),
-        )
+        try:
+            return PixelGeometry(
+                width_m=lambda_z / (extent.width_px * detector_pixel_geometry.width_m),
+                height_m=lambda_z / (extent.height_px * detector_pixel_geometry.height_m),
+            )
+        except ZeroDivisionError:
+            return PixelGeometry(width_m=0.0, height_m=0.0)
 
     @property
     def fresnel_number(self) -> float:
-        extent = self._pattern_sizer.get_processed_image_extent()
+        extent = self._pattern_sizer.get_processed_image_extent(self._detector_extent)
         pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry()
         width_m = extent.width_px * pixel_geometry.width_m
         height_m = extent.height_px * pixel_geometry.height_m
         area_m2 = width_m * height_m
-        return area_m2 / self._lambda_z_m2
+        try:
+            return area_m2 / self._lambda_z_m2
+        except ZeroDivisionError:
+            return 0.0
 
     @property
     def _detector_numerical_aperture_sq(self) -> float:
-        extent = self._pattern_sizer.get_processed_image_extent()
+        extent = self._pattern_sizer.get_processed_image_extent(self._detector_extent)
         pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry()
-        two_z_m = 2 * self.detector_distance_m
-        NA_x = (extent.width_px * pixel_geometry.width_m) / two_z_m  # noqa: N806
-        NA_y = (extent.height_px * pixel_geometry.height_m) / two_z_m  # noqa: N806
+        try:
+            two_z_m = 2 * self.detector_distance_m
+            NA_x = (extent.width_px * pixel_geometry.width_m) / two_z_m  # noqa: N806
+            NA_y = (extent.height_px * pixel_geometry.height_m) / two_z_m  # noqa: N806
+        except ZeroDivisionError:
+            return 0.0
         return NA_x * NA_y
 
     @property
@@ -123,7 +142,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         return self.probe_wavelength_m / self._detector_numerical_aperture_sq
 
     def get_probe_geometry(self) -> ProbeGeometry:
-        extent = self._pattern_sizer.get_processed_image_extent()
+        extent = self._pattern_sizer.get_processed_image_extent(self._detector_extent)
         pixel_geometry = self.get_object_plane_pixel_geometry()
         return ProbeGeometry(
             width_px=extent.width_px,

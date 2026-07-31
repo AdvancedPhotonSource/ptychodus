@@ -18,7 +18,7 @@ from ptychodus.api.tree import SimpleTreeNode
 
 from .dataset import AssembledDiffractionDataset
 from .repository import DiffractionDatasetRepository
-from .settings import DetectorSettings, DiffractionSettings
+from .settings import DiffractionSettings
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,6 @@ class DiffractionAPI:
     def __init__(
         self,
         diffraction_settings: DiffractionSettings,
-        detector_settings: DetectorSettings,
         repository: DiffractionDatasetRepository,
         bad_pixels_file_reader_chooser: PluginChooser[BadPixelsFileReader],
         file_reader_chooser: PluginChooser[DiffractionFileReader],
@@ -53,7 +52,6 @@ class DiffractionAPI:
     ) -> None:
         super().__init__()
         self._diffraction_settings = diffraction_settings
-        self._detector_settings = detector_settings
         self._repository = repository
         self._bad_pixels_file_reader_chooser = bad_pixels_file_reader_chooser
         self._file_reader_chooser = file_reader_chooser
@@ -80,7 +78,6 @@ class DiffractionAPI:
         file_type: str | None = None,
         crop_center: CropCenter | None = None,
         crop_extent: ImageExtent | None = None,
-        detector_extent: ImageExtent | None = None,
         bad_pixels_file_path: Path | None = None,
         bad_pixels_file_type: str | None = None,
         process_patterns: bool = True,
@@ -97,10 +94,6 @@ class DiffractionAPI:
         if crop_extent is not None:
             self._diffraction_settings.crop_width_px.set_value(crop_extent.width_px)
             self._diffraction_settings.crop_height_px.set_value(crop_extent.height_px)
-
-        if detector_extent is not None:
-            self._detector_settings.width_px.set_value(detector_extent.width_px)
-            self._detector_settings.height_px.set_value(detector_extent.height_px)
 
         if file_type is not None:
             self._file_reader_chooser.set_current_plugin(file_type)

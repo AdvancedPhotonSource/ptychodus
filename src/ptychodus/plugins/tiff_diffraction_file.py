@@ -57,7 +57,7 @@ class TiffDiffractionFileReader(DiffractionFileReader):
             z = re.match(file_pattern, fp.name)
 
             if z:
-                index = int(z.group(1).lstrip('0'))
+                index = int(z.group(1))
                 file_path_dict[index] = fp
 
         return file_path_dict, file_pattern

@@ -70,7 +70,6 @@ class OpenDatasetWizardPage(QWizardPage):
 class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.detector_extent_check_box = QCheckBox('Detector Extent')
         self.detector_pixel_size_check_box = QCheckBox('Detector Pixel Size')
         self.detector_distance_check_box = QCheckBox('Detector Distance')
         self.pattern_crop_center_check_box = QCheckBox('Pattern Crop Center')
@@ -82,7 +81,6 @@ class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
         self.setTitle('Import Metadata')
 
         layout = QVBoxLayout()
-        layout.addWidget(self.detector_extent_check_box)
         layout.addWidget(self.detector_pixel_size_check_box)
         layout.addWidget(self.detector_distance_check_box)
         layout.addWidget(self.pattern_crop_center_check_box)
