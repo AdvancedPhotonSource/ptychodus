@@ -127,6 +127,7 @@ class ModelCore:
             self.plugin_registry.product_file_readers,
             self.plugin_registry.product_file_writers,
             self.settings_registry,
+            self._task_manager,
         )
         self.metadata_presenter = MetadataPresenter(
             self.diffraction_core.detector_settings,

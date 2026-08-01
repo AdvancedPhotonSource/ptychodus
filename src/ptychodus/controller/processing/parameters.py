@@ -147,6 +147,11 @@ class ProductParameterViewController(ParameterViewController, ProductRepositoryO
     def handle_dataset_changed(self, index: int, item: ProductRepositoryItem) -> None:
         pass
 
+    def handle_state_changed(self, index: int, item: ProductRepositoryItem) -> None:
+        top_left = self._model.index(index, 0)
+        bottom_right = self._model.index(index, 0)
+        self._model.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole])
+
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
         parent = QModelIndex()
         self._model.beginRemoveRows(parent, index, index)

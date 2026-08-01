@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from enum import Enum
 import logging
 
 from ptychodus.api.observer import Observable
@@ -15,6 +16,12 @@ from .probe import ProbeRepositoryItem
 from .probe_positions import ProbePositionsRepositoryItem
 
 logger = logging.getLogger(__name__)
+
+
+class ProductState(Enum):
+    READY = 'ready'
+    PENDING = 'pending'
+    FAILED = 'failed'
 
 
 class ProductRepositoryItemObserver(UniqueNameFactory):
@@ -42,6 +49,10 @@ class ProductRepositoryItemObserver(UniqueNameFactory):
     def handle_dataset_changed(self, item: ProductRepositoryItem) -> None:
         pass
 
+    @abstractmethod
+    def handle_state_changed(self, item: ProductRepositoryItem) -> None:
+        pass
+
 
 class ProductRepositoryItem(ParameterGroup):
     def __init__(
@@ -54,6 +65,7 @@ class ProductRepositoryItem(ParameterGroup):
         object_item: ObjectRepositoryItem,
         losses: Sequence[LossValue],
         dataset: AssembledDiffractionDataset | None = None,
+        state: ProductState = ProductState.READY,
     ) -> None:
         super().__init__()
         self._parent = parent
@@ -64,6 +76,7 @@ class ProductRepositoryItem(ParameterGroup):
         self._object_item = object_item
         self._losses = list(losses)
         self._dataset = dataset
+        self._state: ProductState = state
 
         self._add_group('metadata', self._metadata_item, observe=True)
         self._add_group('probe_positions', self._probe_positions_item, observe=True)
@@ -83,6 +96,25 @@ class ProductRepositoryItem(ParameterGroup):
         self._probe_item.assign(product.probes)
         self._object_item.assign(product.object_)
         self._losses = list(product.losses)
+        self._parent.handle_losses_changed(self)
+
+    def copy_contents_from(
+        self,
+        source: ProductRepositoryItem,
+    ) -> None:
+        """Copy inner state from a freshly-built source item into this stub.
+
+        Uses each subgroup's assign_item so the stub's subgroup identities are
+        preserved (peripheral scan/probe/object repositories continue to observe
+        the same subgroup instances they registered at insert time). The item's
+        index in the ProductRepository never changes.
+        """
+        self._metadata_item.assign(source._metadata_item.get_metadata())
+        self._probe_positions_item.assign_item(source._probe_positions_item)
+        self._probe_item.assign_item(source._probe_item)
+        self._object_item.assign_item(source._object_item)
+        self._losses = list(source._losses)
+        self.set_dataset(source._dataset)
         self._parent.handle_losses_changed(self)
 
     def sync_to_settings(self) -> None:
@@ -125,6 +157,20 @@ class ProductRepositoryItem(ParameterGroup):
             extent = dataset.get_metadata().detector_extent if dataset is not None else None
             self._geometry.set_detector_extent(extent)
             self._parent.handle_dataset_changed(self)
+
+    def get_state(self) -> ProductState:
+        return self._state
+
+    def is_pending(self) -> bool:
+        return self._state is ProductState.PENDING
+
+    def is_failed(self) -> bool:
+        return self._state is ProductState.FAILED
+
+    def set_state(self, state: ProductState) -> None:
+        if self._state != state:
+            self._state = state
+            self._parent.handle_state_changed(self)
 
     def _invalidate_losses(self) -> None:
         self._losses = list()
@@ -188,6 +234,10 @@ class ProductRepositoryObserver(ABC):
 
     @abstractmethod
     def handle_dataset_changed(self, index: int, item: ProductRepositoryItem) -> None:
+        pass
+
+    @abstractmethod
+    def handle_state_changed(self, index: int, item: ProductRepositoryItem) -> None:
         pass
 
     @abstractmethod

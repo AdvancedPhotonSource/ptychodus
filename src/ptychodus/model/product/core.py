@@ -15,6 +15,7 @@ from ..diffraction import (
     DiffractionDatasetRepositoryObserver,
     PatternSizer,
 )
+from ..task_manager import TaskManager
 from .api import ObjectAPI, ProbeAPI, ProductAPI, ProbePositionsAPI
 from .item_factory import ProductRepositoryItemFactory
 from .object import ObjectBuilderFactory, ObjectRepositoryItemFactory, ObjectSettings
@@ -63,6 +64,7 @@ class ProductCore(Observer):
         product_file_reader_chooser: PluginChooser[ProductFileReader],
         product_file_writer_chooser: PluginChooser[ProductFileWriter],
         reinit_observable: Observable,
+        task_manager: TaskManager,
     ) -> None:
         super().__init__()
         self.settings = ProductSettings(settings_registry)
@@ -114,6 +116,7 @@ class ProductCore(Observer):
             self._item_factory,
             product_file_reader_chooser,
             product_file_writer_chooser,
+            task_manager,
         )
         self._dataset_orphan_observer = _DatasetOrphanObserver(self.product_repository)
         diffraction_api.get_repository().add_observer(self._dataset_orphan_observer)

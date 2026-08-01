@@ -40,6 +40,9 @@ class _RecordingObserver(ProductRepositoryObserver):
     def handle_dataset_changed(self, index, item) -> None:  # noqa: ANN001
         self.dataset_changed.append(index)
 
+    def handle_state_changed(self, index, item) -> None:  # noqa: ANN001
+        pass
+
     def handle_item_removed(self, index, item) -> None:  # noqa: ANN001
         pass
 

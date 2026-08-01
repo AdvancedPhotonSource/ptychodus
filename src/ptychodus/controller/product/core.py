@@ -64,7 +64,13 @@ class ProductRepositoryTableModel(QAbstractTableModel):
         value = super().flags(index)
 
         if index.isValid() and index.column() < 4:
-            value |= Qt.ItemFlag.ItemIsEditable
+            try:
+                item = self._repository[index.row()]
+            except IndexError:
+                return value
+
+            if not item.is_pending() and not item.is_failed():
+                value |= Qt.ItemFlag.ItemIsEditable
 
         return value
 
@@ -87,26 +93,48 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 
             metadata_item = item.get_metadata_item()
             geometry = item.get_geometry()
+            pending = item.is_pending()
+            failed = item.is_failed()
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 match index.column():
                     case 0:
-                        return metadata_item.name.get_value()
+                        name = metadata_item.name.get_value()
+                        if pending:
+                            return f'{name} (loading…)'
+                        if failed:
+                            return f'{name} (failed)'
+                        return name
                     case 1:
+                        if pending or failed:
+                            return '—'
                         return f'{metadata_item.detector_distance_m.get_value():.4g}'
                     case 2:
+                        if pending or failed:
+                            return '—'
                         return f'{metadata_item.probe_energy_eV.get_value() / 1e3:.4g}'
                     case 3:
+                        if pending or failed:
+                            return '—'
                         return f'{metadata_item.probe_photon_count.get_value():.4g}'
                     case 4:
+                        if pending or failed:
+                            return '—'
                         return f'{geometry.get_object_plane_pixel_geometry().width_m * 1e9:.4g}'
                     case 5:
+                        if pending or failed:
+                            return '—'
                         return f'{geometry.get_object_plane_pixel_geometry().height_m * 1e9:.4g}'
                     case 6:
+                        if pending or failed:
+                            return '—'
                         product = item.get_product()
                         return f'{product.nbytes / BYTES_PER_MEGABYTE:.2f}'
+            elif role == Qt.ItemDataRole.ForegroundRole:
+                if pending or failed:
+                    return QBrush(Qt.GlobalColor.gray)
             elif role == Qt.ItemDataRole.BackgroundRole:
-                if index.flags() & Qt.ItemFlag.ItemIsEditable:
+                if not (pending or failed) and (index.flags() & Qt.ItemFlag.ItemIsEditable):
                     return self._editable_item_brush
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
@@ -301,7 +329,9 @@ class ProductController(ProductRepositoryObserver):
                 return
 
             try:
-                self._api.open_product(file_path, file_type=name_filter, dataset=dataset)
+                self._api.open_product(
+                    file_path, file_type=name_filter, dataset=dataset, block=False
+                )
             except Exception as err:
                 logger.exception(err)
                 ExceptionDialog.show_exception('File Reader', err)
@@ -312,7 +342,7 @@ class ProductController(ProductRepositoryObserver):
         if not accepted:
             return
 
-        self._api.insert_new_product(dataset=dataset)
+        self._api.insert_new_product(dataset=dataset, block=False)
 
     def _save_current_product_to_file(self) -> None:
         current = self._table_proxy_model.mapToSource(self._view.table_view.currentIndex())
@@ -348,7 +378,9 @@ class ProductController(ProductRepositoryObserver):
 
         if current.isValid():
             like_item = self._repository[current.row()]
-            self._api.insert_product(like_item.get_product(), dataset=like_item.get_dataset())
+            self._api.insert_product(
+                like_item.get_product(), dataset=like_item.get_dataset(), block=False
+            )
         else:
             logger.error('No current item!')
 
@@ -372,10 +404,24 @@ class ProductController(ProductRepositoryObserver):
             logger.error('No current item!')
 
     def _update_enabled_buttons(self, current: QModelIndex, previous: QModelIndex) -> None:
-        enabled = current.isValid()
-        self._duplicate_action.setEnabled(enabled)
-        self._view.button_box.save_button.setEnabled(enabled)
-        self._view.button_box.edit_button.setEnabled(enabled)
+        source_index = (
+            self._table_proxy_model.mapToSource(current) if current.isValid() else current
+        )
+        enabled = source_index.isValid()
+
+        ready = False
+        if enabled:
+            try:
+                item = self._repository[source_index.row()]
+            except IndexError:
+                ready = False
+            else:
+                ready = not item.is_pending()
+
+        self._duplicate_action.setEnabled(ready)
+        self._view.button_box.save_button.setEnabled(ready)
+        self._view.button_box.edit_button.setEnabled(ready)
+        # Remove is always safe: it drops the row whether pending, failed, or ready.
         self._view.button_box.remove_button.setEnabled(enabled)
 
     def _update_info_text(self) -> None:
@@ -435,6 +481,20 @@ class ProductController(ProductRepositoryObserver):
 
     def handle_dataset_changed(self, index: int, item: ProductRepositoryItem) -> None:
         pass
+
+    def handle_state_changed(self, index: int, item: ProductRepositoryItem) -> None:
+        top_left = self._table_model.index(index, 0)
+        bottom_right = self._table_model.index(index, self._table_model.columnCount() - 1)
+        self._table_model.dataChanged.emit(
+            top_left,
+            bottom_right,
+            [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ForegroundRole],
+        )
+        self._update_info_text()
+
+        current = self._table_proxy_model.mapToSource(self._view.table_view.currentIndex())
+        if current.isValid() and current.row() == index:
+            self._update_enabled_buttons(current, QModelIndex())
 
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
         was_current = self._current_source_row() == index

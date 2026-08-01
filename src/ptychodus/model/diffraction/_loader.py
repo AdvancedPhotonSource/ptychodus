@@ -107,12 +107,17 @@ class LoadAllArrays:
         self._task_monitor = task_monitor
         self._process_patterns = False
         self._finished_event = threading.Event()
+        self._error: BaseException | None = None
 
     def enable_pattern_processing(self) -> None:
         self._process_patterns = True
 
     def get_finished_event(self) -> threading.Event:
         return self._finished_event
+
+    def get_error(self) -> BaseException | None:
+        """First per-array exception observed during __call__, or None on clean load."""
+        return self._error
 
     def __call__(self) -> None:
         try:
@@ -141,6 +146,8 @@ class LoadAllArrays:
                             pass
                         except Exception as ex:
                             logger.warning(ex)
+                            if self._error is None:
+                                self._error = ex
                         else:
                             if task is not None:
                                 self._foreground_task_manager.put_foreground_task(task)
@@ -155,5 +162,9 @@ class LoadAllArrays:
                                 f'{num_cancelled} pending arrays. In-flight reads will finish.'
                             )
                             cancelled = True
+        except BaseException as ex:
+            if self._error is None:
+                self._error = ex
+            raise
         finally:
             self._finished_event.set()

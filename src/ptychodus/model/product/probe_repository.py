@@ -71,5 +71,8 @@ class ProbeRepository(ObservableSequence[ProbeRepositoryItem], ProductRepository
     def handle_dataset_changed(self, index: int, item: ProductRepositoryItem) -> None:
         pass
 
+    def handle_state_changed(self, index: int, item: ProductRepositoryItem) -> None:
+        pass
+
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
         self.notify_observers_item_removed(index, item.get_probe_item())

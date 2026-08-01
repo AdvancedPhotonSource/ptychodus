@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import IO, overload
 import logging
 import tempfile
+import threading
 
 import numpy
 
@@ -120,6 +121,9 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         self._array_list: list[AssembledDiffractionArray] = list()
         self._array_counter = 0
         self._array_loader: LoadAllArrays | None = None
+        # Retained after dispatch so callers can detect \"still loading\" and read
+        # any error the loader stored (see is_load_in_progress / get_last_load_error).
+        self._last_array_loader: LoadAllArrays | None = None
         self._scratch_tempfile: IO[bytes] | None = None
 
         # Raw (pre-processing) bad-pixel mask; starts as an empty (0, 0) placeholder
@@ -178,6 +182,29 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
 
     def get_assembled_data(self) -> AssembledDiffractionData:
         return self._data
+
+    def is_load_in_progress(self) -> bool:
+        """True while a LoadAllArrays task is queued but has not finished.
+
+        Note: this does not track per-array append_array() streams, which are
+        used only by the pvapy streaming path; products are created there only
+        after the stream stops, so the streaming case doesn't rely on this.
+        """
+        if self._array_loader is not None:
+            return True
+
+        loader = self._last_array_loader
+        return loader is not None and not loader.get_finished_event().is_set()
+
+    def get_last_load_error(self) -> BaseException | None:
+        """First exception raised by the most recent LoadAllArrays run, or None."""
+        loader = self._last_array_loader
+        return loader.get_error() if loader is not None else None
+
+    def get_last_load_finished_event(self) -> threading.Event | None:
+        """The finished_event of the most recent LoadAllArrays task, if any."""
+        loader = self._last_array_loader
+        return loader.get_finished_event() if loader is not None else None
 
     def get_average_pattern(self) -> DiffractionPattern | None:
         if not self._array_list:
@@ -259,6 +286,7 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         self._array_list.clear()
         self._array_counter = 0
         self._array_loader = None
+        self._last_array_loader = None
         self._bad_pixels = self._create_default_bad_pixels()
 
         if self._scratch_tempfile is not None:
@@ -322,8 +350,10 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
             observer.handle_dataset_reloaded()
 
         # load all arrays in background
-        finished_event = self._array_loader.get_finished_event()
-        self._task_manager.put_background_task(self._array_loader)
+        loader = self._array_loader
+        finished_event = loader.get_finished_event()
+        self._last_array_loader = loader
+        self._task_manager.put_background_task(loader)
         self._array_loader = None
 
         if block:

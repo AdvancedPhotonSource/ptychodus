@@ -5,7 +5,7 @@ from ptychodus.api.product import Product, ProductFileReader
 
 from ..diffraction import AssembledDiffractionDataset, PatternSizer
 from .geometry import ProductGeometry
-from .item import ProductRepositoryItem
+from .item import ProductRepositoryItem, ProductState
 from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItemFactory
 from .probe import ProbeRepositoryItemFactory
@@ -112,6 +112,28 @@ class ProductRepositoryItemFactory:
             object_item=object_item,
             losses=product.losses,
             dataset=dataset,
+        )
+
+    def create_pending_stub(self, name: str = 'Unnamed') -> ProductRepositoryItem:
+        """Build a fresh ProductRepositoryItem in the 'pending' state with default
+        subgroups and no dataset. Its inner content is replaced later via
+        ProductRepositoryItem.copy_contents_from once the source dataset finishes
+        loading."""
+        metadata_item = MetadataRepositoryItem(self._settings, self._repository, name=name)
+        scan_item = self._scan_item_factory.create()
+        geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
+        probe_item = self._probe_item_factory.create(geometry)
+        object_item = self._object_item_factory.create(geometry)
+        return ProductRepositoryItem(
+            parent=self._repository,
+            metadata_item=metadata_item,
+            probe_positions_item=scan_item,
+            geometry=geometry,
+            probe_item=probe_item,
+            object_item=object_item,
+            losses=list(),
+            dataset=None,
+            state=ProductState.PENDING,
         )
 
     def create_from_settings(
