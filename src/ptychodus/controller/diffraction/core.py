@@ -45,7 +45,7 @@ from ..parametric import (
     LengthWidgetParameterViewController,
     ParameterViewController,
 )
-from ..product.list_model import ProductRepositoryListModel
+from ..product.core import ProductRepositoryComboProxyModel, ProductRepositoryTableModel
 from .dataset import DatasetTreeModel
 from .dataset_layout import DatasetLayoutViewController
 from .wizard import OpenDatasetWizardController
@@ -213,6 +213,7 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         task_monitor: DiffractionTaskMonitor,
         metadata_presenter: MetadataPresenter,
         product_repository: ProductRepository,
+        product_table_model: ProductRepositoryTableModel,
         diffraction_simulator: DiffractionSimulator,
         diffraction_simulator_settings: DiffractionSimulatorSettings,
         view: PatternsView,
@@ -226,7 +227,9 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         self._repository = repository
         self._detector_extent_source = DetectorExtentSource()
         self._current_dataset_index = -1
-        self._product_list_model = ProductRepositoryListModel(product_repository)
+        self._product_combo_model = ProductRepositoryComboProxyModel(
+            product_table_model, product_repository
+        )
         self._diffraction_simulator = diffraction_simulator
         self._view = view
         self._image_controller = image_controller
@@ -280,7 +283,7 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         simulate_action = view.button_box.analyze_menu.addAction('Simulate Diffraction...')
         connect_triggered_signal(simulate_action, self._choose_product_for_simulation)
 
-        view.simulate_dialog.product_combo_box.setModel(self._product_list_model)
+        view.simulate_dialog.product_combo_box.setModel(self._product_combo_model)
         self._poisson_view_controller = CheckBoxParameterViewController(
             diffraction_simulator_settings.add_poisson_noise,
             'Add Poisson Noise',
@@ -349,8 +352,6 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
             DatasetLayoutViewController.show_dialog(current, self._view)
 
     def _choose_product_for_simulation(self) -> None:
-        self._product_list_model.beginResetModel()
-        self._product_list_model.endResetModel()
         self._view.simulate_dialog.open()
 
     def _simulate_diffraction(self, result: int) -> None:

@@ -24,6 +24,7 @@ from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..helpers import connect_triggered_signal
 from ..parametric import ComboBoxParameterViewController
+from ..product.core import ProductRepositoryTableModel
 from .parameters import (
     ProcessingStatusController,
     ProductParameterViewController,
@@ -50,6 +51,7 @@ class ProcessingController(Observer):
         algorithm_parameter: ProcessingAlgorithmParameter,
         processing_api: ProcessingAPI,
         product_repository: ProductRepository,
+        product_table_model: ProductRepositoryTableModel,
         globus: GlobusCore,
         genesis: GenesisCore,
         view: QWidget,
@@ -85,7 +87,7 @@ class ProcessingController(Observer):
             product_repository, processing_api.task_monitor, status_view
         )
         self._product_view_controller = ProductParameterViewController(
-            product_repository, self._status_controller
+            product_repository, product_table_model, self._status_controller
         )
         self._compute_view_controller = ComputeParameterViewController(
             globus_supported=globus.is_supported,
@@ -119,8 +121,36 @@ class ProcessingController(Observer):
         )
         connect_triggered_signal(self._export_training_data_action, self._export_training_data)
 
+        combo = self._product_view_controller.get_widget()
+        combo.currentIndexChanged.connect(self._sync_action_buttons_to_selection)
+        combo_model = combo.model()
+        combo_model.dataChanged.connect(lambda *_: self._sync_action_buttons_to_selection())
+        combo_model.rowsInserted.connect(lambda *_: self._sync_action_buttons_to_selection())
+        combo_model.rowsRemoved.connect(lambda *_: self._sync_action_buttons_to_selection())
+        self._sync_action_buttons_to_selection()
+
         self._sync_model_to_view()
         algorithm_parameter.add_observer(self)
+
+    def _sync_action_buttons_to_selection(self) -> None:
+        index = self._product_view_controller.get_widget().currentIndex()
+        can_act = False
+
+        if index >= 0:
+            try:
+                item = self._product_repository[index]
+            except IndexError:
+                pass
+            else:
+                can_act = (
+                    not item.is_pending()
+                    and not item.is_failed()
+                    and item.get_dataset() is not None
+                )
+
+        self._actions_view.reconstruct_button.setEnabled(can_act)
+        self._actions_view.train_button.setEnabled(can_act)
+        self._export_training_data_action.setEnabled(can_act)
 
     def _populate_stacked_widget(
         self, view_controller_factories: Iterable[ReconstructorViewControllerFactory]

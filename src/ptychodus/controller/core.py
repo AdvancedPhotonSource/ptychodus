@@ -17,8 +17,10 @@ from .memory import MemoryController
 from .object import ObjectController
 from .probe import ProbeController
 from .probe_positions import ProbePositionsController
+from .helpers import create_brush_for_editable_cell
 from .processing import ProcessingController
 from .product import ProductController
+from .product.core import ProductRepositoryTableModel
 from .product.visualization import ProductVisualizationController
 from .ptychi import PtyChiViewControllerFactory
 from .ptychonn import PtychoNNViewControllerFactory
@@ -55,9 +57,19 @@ class ControllerCore:
             model.ptychopinn_torch_reconstructor_library,
             self._file_dialog_factory,
         )
+        # Shared product-repository table model. Constructing it here (before
+        # any consumer) lets SettingsController, DiffractionController,
+        # ProductController, and ProcessingController all bind to the same
+        # instance — one observer registration on the repository serves every
+        # widget that shows product rows.
+        self._product_table_model = ProductRepositoryTableModel(
+            model.product_core.product_repository,
+            create_brush_for_editable_cell(view.product_view.table_view),
+        )
         self._settings_controller = SettingsController(
             model.settings_registry,
             model.product_core.product_repository,
+            self._product_table_model,
             view.settings_view,
             view.settings_table_view,
             self._file_dialog_factory,
@@ -77,6 +89,7 @@ class ControllerCore:
             model.diffraction_core.task_monitor,
             model.metadata_presenter,
             model.product_core.product_repository,
+            self._product_table_model,
             model.analysis_core.diffraction_simulator,
             model.analysis_core.diffraction_simulator_settings,
             view.patterns_view,
@@ -88,6 +101,7 @@ class ControllerCore:
             model.product_core.product_repository,
             model.product_core.product_api,
             model.diffraction_core.repository,
+            self._product_table_model,
             view.product_view,
             self._file_dialog_factory,
         )
@@ -158,6 +172,7 @@ class ControllerCore:
             model.processing_core.algorithm_parameter,
             model.processing_core.processing_api,
             model.product_core.product_repository,
+            self._product_table_model,
             model.globus_core,
             model.genesis_core,
             view.processing_view,

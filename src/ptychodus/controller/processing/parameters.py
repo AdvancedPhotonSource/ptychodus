@@ -2,7 +2,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 import logging
 
-from PyQt5.QtCore import Qt, QModelIndex
 from PyQt5.QtWidgets import (
     QButtonGroup,
     QComboBox,
@@ -22,7 +21,7 @@ from ...model.product.probe import ProbeRepositoryItem
 from ...model.product.probe_positions import ProbePositionsRepositoryItem
 from ...view.processing import ProcessingStatusView
 from ..parametric import ParameterViewController
-from ..product.list_model import ProductRepositoryListModel
+from ..product.core import ProductRepositoryComboProxyModel, ProductRepositoryTableModel
 
 logger = logging.getLogger(__name__)
 
@@ -93,17 +92,25 @@ class ProcessingStatusController(Observer):
 
 
 class ProductParameterViewController(ParameterViewController, ProductRepositoryObserver):
+    """Combobox for choosing the product to reconstruct on.
+
+    The Qt model (a proxy over the shared ProductRepositoryTableModel) keeps
+    the combobox in sync with the repository automatically; the only reason
+    this class still observes the repository is to refresh the loss plot when
+    the currently-selected product finishes an epoch.
+    """
+
     def __init__(
         self,
         repository: ProductRepository,
+        product_table_model: ProductRepositoryTableModel,
         status_controller: ProcessingStatusController,
         *,
         tool_tip: str = '',
     ) -> None:
         super().__init__()
-        self._repository = repository
         self._status_controller = status_controller
-        self._model = ProductRepositoryListModel(repository)
+        self._model = ProductRepositoryComboProxyModel(product_table_model, repository)
         self._widget = QComboBox()
 
         if tool_tip:
@@ -118,14 +125,10 @@ class ProductParameterViewController(ParameterViewController, ProductRepositoryO
         return self._widget
 
     def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
-        parent = QModelIndex()
-        self._model.beginInsertRows(parent, index, index)
-        self._model.endInsertRows()
+        pass
 
     def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
-        top_left = self._model.index(index, 0)
-        bottom_right = self._model.index(index, 0)
-        self._model.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole])
+        pass
 
     def handle_probe_positions_changed(
         self, index: int, item: ProbePositionsRepositoryItem
@@ -139,23 +142,17 @@ class ProductParameterViewController(ParameterViewController, ProductRepositoryO
         pass
 
     def handle_losses_changed(self, index: int, losses: Sequence[LossValue]) -> None:
-        current_index = self._widget.currentIndex()
-
-        if index == current_index:
+        if index == self._widget.currentIndex():
             self._status_controller.plot_losses(index)
 
     def handle_dataset_changed(self, index: int, item: ProductRepositoryItem) -> None:
         pass
 
     def handle_state_changed(self, index: int, item: ProductRepositoryItem) -> None:
-        top_left = self._model.index(index, 0)
-        bottom_right = self._model.index(index, 0)
-        self._model.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole])
+        pass
 
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
-        parent = QModelIndex()
-        self._model.beginRemoveRows(parent, index, index)
-        self._model.endRemoveRows()
+        pass
 
 
 class ComputeParameterViewController(ParameterViewController):

@@ -118,6 +118,7 @@ class ProductCore(Observer):
             product_file_writer_chooser,
             task_manager,
         )
+        self._diffraction_api = diffraction_api
         self._dataset_orphan_observer = _DatasetOrphanObserver(self.product_repository)
         diffraction_api.get_repository().add_observer(self._dataset_orphan_observer)
         self.probe_positions_repository = ProbePositionsRepository(self.product_repository)
@@ -149,4 +150,9 @@ class ProductCore(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._reinit_observable:
-            self.product_api.insert_product_from_settings()
+            # Depends on DiffractionCore being registered as a reinit observer
+            # before ProductCore, so that open_patterns has already inserted the
+            # settings-driven dataset into the repository by the time we run.
+            repo = self._diffraction_api.get_repository()
+            dataset = repo[-1] if len(repo) > 0 else None
+            self.product_api.insert_product_from_settings(dataset=dataset, block=False)

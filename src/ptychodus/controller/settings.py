@@ -12,7 +12,7 @@ from ptychodus.api.settings import SettingsRegistry
 from ..model.product import ProductRepository
 from ..view.settings import SettingsView, SyncProductToSettingsDialog
 from .data import FileDialogFactory
-from .product.list_model import ProductRepositoryListModel
+from .product.core import ProductRepositoryComboProxyModel, ProductRepositoryTableModel
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,7 @@ class SettingsController(Observer):
         self,
         settings_registry: SettingsRegistry,
         product_repository: ProductRepository,
+        product_table_model: ProductRepositoryTableModel,
         settings_view: SettingsView,
         settings_table_view: QTableView,
         file_dialog_factory: FileDialogFactory,
@@ -73,7 +74,9 @@ class SettingsController(Observer):
 
         self._settings_list_model = QStringListModel()
         self._settings_table_model = SettingsTableModel()
-        self._product_list_model = ProductRepositoryListModel(product_repository)
+        self._product_combo_model = ProductRepositoryComboProxyModel(
+            product_table_model, product_repository
+        )
         self._sync_dialog = SyncProductToSettingsDialog(settings_view)
 
         settings_registry.add_observer(self)
@@ -95,7 +98,7 @@ class SettingsController(Observer):
         save_button = settings_view.button_box.button(QDialogButtonBox.StandardButton.Save)
         save_button.clicked.connect(self._sync_dialog.open)
 
-        self._sync_dialog.product_combo_box.setModel(self._product_list_model)
+        self._sync_dialog.product_combo_box.setModel(self._product_combo_model)
         self._sync_dialog.finished.connect(self._save_settings)
 
         self._sync_model_to_view()

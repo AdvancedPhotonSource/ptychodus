@@ -1,10 +1,11 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 import logging
 
 from PyQt5.QtCore import (
     QAbstractTableModel,
+    QIdentityProxyModel,
     QModelIndex,
     QObject,
     QSortFilterProxyModel,
@@ -30,17 +31,21 @@ from ...model.product.probe_positions import ProbePositionsRepositoryItem
 from ...view.product import ProductView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
-from ..helpers import (
-    connect_current_changed_signal,
-    connect_triggered_signal,
-    create_brush_for_editable_cell,
-)
+from ..helpers import connect_triggered_signal
 from .editor import ProductEditorViewController
 
 logger = logging.getLogger(__name__)
 
 
 class ProductRepositoryTableModel(QAbstractTableModel):
+    """Table model over ProductRepository.
+
+    Registers itself as a ProductRepositoryObserver and translates repository
+    change callbacks into Qt structural / dataChanged signals. Duck-typed
+    against ProductRepositoryObserver — inheriting the ABC would clash with
+    sip's wrappertype metaclass on QAbstractTableModel.
+    """
+
     def __init__(
         self,
         repository: ProductRepository,
@@ -59,6 +64,8 @@ class ProductRepositoryTableModel(QAbstractTableModel):
             'Pixel Height\n[nm]',
             'Size\n[MB]',
         ]
+        # Duck-typed; see class docstring on the ABC / sip metaclass conflict.
+        repository.add_observer(cast(ProductRepositoryObserver, self))
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
@@ -183,6 +190,80 @@ class ProductRepositoryTableModel(QAbstractTableModel):
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._header)
 
+    def _emit_row_changed(self, index: int, roles: list[int]) -> None:
+        top_left = self.index(index, 0)
+        bottom_right = self.index(index, self.columnCount() - 1)
+        self.dataChanged.emit(top_left, bottom_right, roles)
+
+    def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
+        self.beginInsertRows(QModelIndex(), index, index)
+        self.endInsertRows()
+
+    def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
+        self.beginRemoveRows(QModelIndex(), index, index)
+        self.endRemoveRows()
+
+    def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
+        self._emit_row_changed(index, [Qt.ItemDataRole.DisplayRole])
+
+    def handle_state_changed(self, index: int, item: ProductRepositoryItem) -> None:
+        self._emit_row_changed(index, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ForegroundRole])
+
+    def handle_probe_positions_changed(
+        self, index: int, item: ProbePositionsRepositoryItem
+    ) -> None:
+        pass
+
+    def handle_probe_changed(self, index: int, item: ProbeRepositoryItem) -> None:
+        pass
+
+    def handle_object_changed(self, index: int, item: ObjectRepositoryItem) -> None:
+        pass
+
+    def handle_losses_changed(self, index: int, losses: Sequence[LossValue]) -> None:
+        pass
+
+    def handle_dataset_changed(self, index: int, item: ProductRepositoryItem) -> None:
+        pass
+
+
+class ProductRepositoryComboProxyModel(QIdentityProxyModel):
+    """Presents ProductRepositoryTableModel as a single-column, non-editable
+    list suitable for a QComboBox: strips ItemIsEditable and disables pending /
+    failed items so they cannot be selected.
+    """
+
+    def __init__(
+        self,
+        source_model: ProductRepositoryTableModel,
+        repository: ProductRepository,
+        parent: QObject | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._repository = repository
+        self.setSourceModel(source_model)
+
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
+        return 1
+
+    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+        base = super().flags(index)
+
+        if not index.isValid():
+            return base
+
+        base &= ~Qt.ItemFlag.ItemIsEditable
+
+        try:
+            item = self._repository[index.row()]
+        except IndexError:
+            return base
+
+        if item.is_pending() or item.is_failed():
+            return Qt.ItemFlags(Qt.NoItemFlags)
+
+        return base
+
 
 class ProductController(ProductRepositoryObserver):
     def __init__(
@@ -212,6 +293,7 @@ class ProductController(ProductRepositoryObserver):
         repository: ProductRepository,
         api: ProductAPI,
         diffraction_repository: DiffractionDatasetRepository,
+        table_model: ProductRepositoryTableModel,
         view: ProductView,
         file_dialog_factory: FileDialogFactory,
     ) -> ProductController:
@@ -220,9 +302,6 @@ class ProductController(ProductRepositoryObserver):
         duplicate_action = view.button_box.insert_menu.addAction('Duplicate')
         save_file_action = view.button_box.save_menu.addAction('Save File...')
         sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
-
-        editable_item_brush = create_brush_for_editable_cell(view.table_view)
-        table_model = ProductRepositoryTableModel(repository, editable_item_brush)
 
         table_proxy_model = QSortFilterProxyModel()
         table_proxy_model.setSourceModel(table_model)
@@ -251,9 +330,17 @@ class ProductController(ProductRepositoryObserver):
         view.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         header = view.table_view.horizontalHeader()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
-        connect_current_changed_signal(view.table_view, controller._update_enabled_buttons)
+
+        selection_model = view.table_view.selectionModel()
+        if selection_model is not None:
+            selection_model.currentChanged.connect(controller._update_enabled_buttons)
         controller._update_enabled_buttons(QModelIndex(), QModelIndex())
-        controller._ensure_selection()
+
+        # Auto-select first row on insert if nothing is currently selected;
+        # re-select a neighbor on removal if the current row went away.
+        table_proxy_model.rowsInserted.connect(controller._on_rows_inserted)
+        table_proxy_model.rowsRemoved.connect(controller._on_rows_removed)
+        controller._auto_select_first_row_if_empty()
 
         connect_triggered_signal(open_file_action, controller._open_product_from_file)
         connect_triggered_signal(create_new_action, controller._create_new_product)
@@ -428,16 +515,6 @@ class ProductController(ProductRepositoryObserver):
         info_text = self._repository.get_info_text()
         self._view.info_label.setText(info_text)
 
-    def _ensure_selection(self) -> None:
-        if self._view.table_view.currentIndex().isValid():
-            return
-
-        if self._table_model.rowCount() > 0:
-            source_index = self._table_model.index(0, 0)
-            self._view.table_view.setCurrentIndex(
-                self._table_proxy_model.mapFromSource(source_index)
-            )
-
     def _current_source_row(self) -> int:
         proxy_index = self._view.table_view.currentIndex()
 
@@ -446,23 +523,33 @@ class ProductController(ProductRepositoryObserver):
 
         return self._table_proxy_model.mapToSource(proxy_index).row()
 
-    def _select_source_row(self, row: int) -> None:
-        source_index = self._table_model.index(row, 0)
-        self._view.table_view.setCurrentIndex(self._table_proxy_model.mapFromSource(source_index))
+    def _auto_select_first_row_if_empty(self) -> None:
+        if self._view.table_view.currentIndex().isValid():
+            return
+
+        if self._table_proxy_model.rowCount() > 0:
+            self._view.table_view.setCurrentIndex(self._table_proxy_model.index(0, 0))
+
+    def _on_rows_inserted(self, parent: QModelIndex, first: int, last: int) -> None:
+        # Auto-select the newly-inserted row if nothing is currently selected.
+        self._auto_select_first_row_if_empty()
+
+    def _on_rows_removed(self, parent: QModelIndex, first: int, last: int) -> None:
+        # Qt clears the current index when the current row is removed; pick a
+        # neighbor at the same proxy position so the user is never left without
+        # a selection while rows remain.
+        if self._view.table_view.currentIndex().isValid():
+            return
+
+        row_count = self._table_proxy_model.rowCount()
+        if row_count > 0:
+            target = min(first, row_count - 1)
+            self._view.table_view.setCurrentIndex(self._table_proxy_model.index(target, 0))
 
     def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
-        parent = QModelIndex()
-        self._table_model.beginInsertRows(parent, index, index)
-        self._table_model.endInsertRows()
         self._update_info_text()
 
-        if not self._view.table_view.currentIndex().isValid():
-            self._select_source_row(index)
-
     def handle_metadata_changed(self, index: int, item: MetadataRepositoryItem) -> None:
-        top_left = self._table_model.index(index, 0)
-        bottom_right = self._table_model.index(index, self._table_model.columnCount() - 1)
-        self._table_model.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole])
         self._update_info_text()
 
     def handle_probe_positions_changed(
@@ -483,28 +570,11 @@ class ProductController(ProductRepositoryObserver):
         pass
 
     def handle_state_changed(self, index: int, item: ProductRepositoryItem) -> None:
-        top_left = self._table_model.index(index, 0)
-        bottom_right = self._table_model.index(index, self._table_model.columnCount() - 1)
-        self._table_model.dataChanged.emit(
-            top_left,
-            bottom_right,
-            [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ForegroundRole],
-        )
         self._update_info_text()
 
-        current = self._table_proxy_model.mapToSource(self._view.table_view.currentIndex())
-        if current.isValid() and current.row() == index:
+        if self._current_source_row() == index:
+            current = self._view.table_view.currentIndex()
             self._update_enabled_buttons(current, QModelIndex())
 
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
-        was_current = self._current_source_row() == index
-        parent = QModelIndex()
-        self._table_model.beginRemoveRows(parent, index, index)
-        self._table_model.endRemoveRows()
         self._update_info_text()
-
-        if was_current:
-            row_count = self._table_model.rowCount()
-
-            if row_count > 0:
-                self._select_source_row(min(index, row_count - 1))

@@ -110,11 +110,14 @@ class ProductRepositoryItem(ParameterGroup):
         index in the ProductRepository never changes.
         """
         self._metadata_item.assign(source._metadata_item.get_metadata())
+        # Bind the dataset (and thus the detector extent on the geometry) BEFORE
+        # rebuilding probe/object subgroups — their _rebuild() otherwise sees an
+        # invalid pixel geometry and silently no-ops, leaving them empty.
+        self.set_dataset(source._dataset)
         self._probe_positions_item.assign_item(source._probe_positions_item)
         self._probe_item.assign_item(source._probe_item)
         self._object_item.assign_item(source._object_item)
         self._losses = list(source._losses)
-        self.set_dataset(source._dataset)
         self._parent.handle_losses_changed(self)
 
     def sync_to_settings(self) -> None:
