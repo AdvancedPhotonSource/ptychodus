@@ -111,31 +111,51 @@ class DiffractionAPI:
         dataset.reload(source_dataset)
 
         if bad_pixels_file_path is not None:
-            if bad_pixels_file_path.is_file():
-                if bad_pixels_file_type is not None:
-                    self._bad_pixels_file_reader_chooser.set_current_plugin(bad_pixels_file_type)
-                bad_pixels_plugin = self._bad_pixels_file_reader_chooser.get_current_plugin()
-                logger.debug(
-                    f'Reading "{bad_pixels_file_path}" as "{bad_pixels_plugin.simple_name}"'
-                )
-                try:
-                    bad_pixels = bad_pixels_plugin.strategy.read(bad_pixels_file_path)
-                except Exception:
-                    logger.warning(f'Failed to load bad pixels from "{bad_pixels_file_path}"')
-                else:
-                    try:
-                        dataset.set_bad_pixels(bad_pixels)
-                    except ValueError as exc:
-                        logger.warning(f'Ignoring bad pixels from "{bad_pixels_file_path}": {exc}')
-            else:
-                logger.warning(
-                    f'Refusing to read invalid bad pixels file path {bad_pixels_file_path}'
-                )
+            self._apply_bad_pixels_from_file(dataset, bad_pixels_file_path, bad_pixels_file_type)
 
         if block:
             dataset.load_all_arrays(process_patterns=process_patterns, block=True)
 
         return dataset_index
+
+    def _apply_bad_pixels_from_file(
+        self,
+        dataset: AssembledDiffractionDataset,
+        file_path: Path,
+        file_type: str | None,
+    ) -> None:
+        if not file_path.is_file():
+            logger.warning(f'Refusing to read invalid bad pixels file path {file_path}')
+            return
+
+        if file_type is not None:
+            self._bad_pixels_file_reader_chooser.set_current_plugin(file_type)
+        bad_pixels_plugin = self._bad_pixels_file_reader_chooser.get_current_plugin()
+        logger.debug(f'Reading "{file_path}" as "{bad_pixels_plugin.simple_name}"')
+        try:
+            bad_pixels = bad_pixels_plugin.strategy.read(file_path)
+        except Exception:
+            logger.warning(f'Failed to load bad pixels from "{file_path}"')
+            return
+
+        try:
+            dataset.set_bad_pixels(bad_pixels)
+        except ValueError as exc:
+            logger.warning(f'Ignoring bad pixels from "{file_path}": {exc}')
+
+    def apply_bad_pixels(
+        self,
+        dataset_index: int,
+        file_path: Path,
+        file_type: str | None = None,
+    ) -> None:
+        """Load a bad-pixel mask from disk and apply it to an already-open dataset."""
+        try:
+            dataset = self._repository[dataset_index]
+        except IndexError:
+            logger.warning(f'Cannot apply bad pixels: no dataset at index {dataset_index}')
+            return
+        self._apply_bad_pixels_from_file(dataset, file_path, file_type)
 
     def load_all_arrays(
         self, *, dataset_index: int, process_patterns: bool = True, block: bool = False

@@ -14,7 +14,7 @@ from ptychodus.api.geometry import ImageExtent, Interval, PixelGeometry
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import BooleanParameter, IntegerParameter
 
-from .settings import DetectorSettings, DiffractionSettings
+from .settings import DiffractionSettings
 
 
 class PatternAxisSizer(Observable, Observer):
@@ -93,11 +93,9 @@ class PatternAxisSizer(Observable, Observer):
 class PatternSizer(Observable, Observer):
     def __init__(
         self,
-        detector_settings: DetectorSettings,
         diffraction_settings: DiffractionSettings,
     ) -> None:
         super().__init__()
-        self._detector_settings = detector_settings
         self._diffraction_settings = diffraction_settings
 
         self._axis_x = PatternAxisSizer(
@@ -132,23 +130,17 @@ class PatternSizer(Observable, Observer):
         diffraction_settings.value_upper_bound_enabled.add_observer(self)
         diffraction_settings.value_upper_bound.add_observer(self)
 
-    def _get_detector_pixel_geometry(self) -> PixelGeometry:
-        return PixelGeometry(
-            width_m=self._detector_settings.pixel_width_m.get_value(),
-            height_m=self._detector_settings.pixel_height_m.get_value(),
-        )
-
     def get_processed_image_extent(self, detector_extent: ImageExtent | None = None) -> ImageExtent:
         if detector_extent is None:
             return ImageExtent(width_px=0, height_px=0)
         return self.get_prep_pipeline(detector_extent).compute_output_extent(detector_extent)
 
-    def get_processed_pixel_geometry(self) -> PixelGeometry:
+    def get_processed_pixel_geometry(self, raw_pixel_geometry: PixelGeometry) -> PixelGeometry:
         # Pixel geometry only depends on binning and transpose (see
         # DiffractionPrepStep.apply_to_pixel_geometry overrides); crop, filter, padding,
         # and flips are identity. Compute directly from the raw settings so this method
         # works without knowing the detector extent.
-        geometry = self._get_detector_pixel_geometry()
+        geometry = raw_pixel_geometry
         if self._diffraction_settings.binning_enabled.get_value():
             geometry = BinningStep(
                 bin_size_x=self._diffraction_settings.bin_size_x.get_value(),

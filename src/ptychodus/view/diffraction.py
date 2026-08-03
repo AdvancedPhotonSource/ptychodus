@@ -7,7 +7,6 @@ from PyQt5.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
-    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -23,12 +22,7 @@ from PyQt5.QtWidgets import (
 from .image import ImageView
 
 
-class DetectorView(QGroupBox):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Detector', parent)
-
-
-class PatternsButtonBox(QWidget):
+class DatasetsButtonBox(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.load_button = QPushButton('Load')
@@ -65,6 +59,14 @@ class OpenDatasetWizardPage(QWizardPage):
         if self._is_complete != complete:
             self._is_complete = complete
             self.completeChanged.emit()
+
+
+class OpenDatasetWizardBadPixelsPage(OpenDatasetWizardPage):
+    """Bad-pixels chooser page — always complete; layout populated by the controller."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._set_complete(True)
 
 
 class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
@@ -145,13 +147,12 @@ class DiffractionStatusView(QWidget):
         self.setLayout(layout)
 
 
-class PatternsView(QWidget):
+class DatasetsView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.detector_view = DetectorView()
         self.tree_view = QTreeView()
         self.info_label = QLabel()
-        self.button_box = PatternsButtonBox()
+        self.button_box = DatasetsButtonBox()
         self.simulate_dialog = SimulateDiffractionDialog(self)
 
         tree_view_header = self.tree_view.header()
@@ -160,14 +161,13 @@ class PatternsView(QWidget):
             tree_view_header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout = QVBoxLayout()
-        layout.addWidget(self.detector_view)
         layout.addWidget(self.tree_view)
         layout.addWidget(self.info_label)
         layout.addWidget(self.button_box)
         self.setLayout(layout)
 
 
-class PatternsImageView(QWidget):
+class DiffractionImageView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.image_view = ImageView()

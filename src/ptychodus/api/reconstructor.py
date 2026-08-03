@@ -30,11 +30,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ReconstructInput:
-    """All data required to start a reconstruction: patterns, bad-pixel mask, and initial product."""
+    """All data required to start a reconstruction: patterns, bad-pixel mask, initial product, and detector pixel geometry."""
 
     diffraction_patterns: DiffractionPatterns
     bad_pixels: BadPixels
     product: Product
+    pixel_geometry: PixelGeometry
 
 
 @dataclass(frozen=True)
@@ -263,6 +264,12 @@ class AssembledDiffractionData:
     def get_pixel_geometry(self) -> PixelGeometry:
         return self._pixel_geometry
 
+    def set_pixel_geometry(self, pixel_geometry: PixelGeometry) -> None:
+        # Views produced by assemble() keep their creation-time snapshot; they are
+        # only used for per-array display (average pattern, counts) and not by
+        # reconstruction, so leaving them stale is acceptable.
+        self._pixel_geometry = pixel_geometry
+
     def get_bad_pixels(self) -> BadPixels:
         return self._bad_pixels
 
@@ -417,7 +424,7 @@ class AssembledDiffractionData:
             losses=product.losses,
         )
 
-        return ReconstructInput(patterns, self._bad_pixels, product)
+        return ReconstructInput(patterns, self._bad_pixels, product, self._pixel_geometry)
 
     def __str__(self) -> str:
         number, height, width = self._patterns.shape

@@ -30,7 +30,7 @@ def _make_repository() -> DiffractionDatasetRepository:
     registry = SettingsRegistry()
     detector_settings = DetectorSettings(registry)
     diffraction_settings = DiffractionSettings(registry)
-    sizer = PatternSizer(detector_settings, diffraction_settings)
+    sizer = PatternSizer(diffraction_settings)
     task_manager = MagicMock()
     task_monitor = MagicMock()
 

@@ -32,7 +32,7 @@ class DiffractionCore(Observer):
         super().__init__()
         self.detector_settings = DetectorSettings(settings_registry)
         self.diffraction_settings = DiffractionSettings(settings_registry)
-        self.pattern_sizer = PatternSizer(self.detector_settings, self.diffraction_settings)
+        self.pattern_sizer = PatternSizer(self.diffraction_settings)
         self.task_monitor = DiffractionTaskMonitor(task_manager)
         self.repository = DiffractionDatasetRepository(
             factory=build_default_factory(

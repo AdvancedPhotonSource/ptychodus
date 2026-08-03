@@ -74,13 +74,13 @@ class ControllerCore:
             view.settings_table_view,
             self._file_dialog_factory,
         )
-        self._patterns_image_controller = ImageController(
+        self._diffraction_image_controller = ImageController(
             model.pattern_visualization_engine,
-            view.patterns_image_view.image_view,
+            view.diffraction_image_view.image_view,
             self._status_bar,
             self._file_dialog_factory,
         )
-        self._patterns_controller = DiffractionController(
+        self._diffraction_controller = DiffractionController(
             model.diffraction_core.detector_settings,
             model.diffraction_core.diffraction_settings,
             model.diffraction_core.pattern_sizer,
@@ -92,9 +92,9 @@ class ControllerCore:
             self._product_table_model,
             model.analysis_core.diffraction_simulator,
             model.analysis_core.diffraction_simulator_settings,
-            view.patterns_view,
-            view.patterns_image_view.status_view,
-            self._patterns_image_controller,
+            view.datasets_view,
+            view.diffraction_image_view.status_view,
+            self._diffraction_image_controller,
             self._file_dialog_factory,
         )
         self._product_controller = ProductController.create_instance(
@@ -225,8 +225,8 @@ class ControllerCore:
             view.genesis_action: model.genesis_core.is_supported,
         }
 
-        self._swap_central_widgets(view.patterns_action, animated=False)
-        view.patterns_action.setChecked(True)
+        self._swap_central_widgets(view.datasets_action, animated=False)
+        view.datasets_action.setChecked(True)
         view.navigation.action_group.triggered.connect(
             lambda action: self._swap_central_widgets(action)
         )

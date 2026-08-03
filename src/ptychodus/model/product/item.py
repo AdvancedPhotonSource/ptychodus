@@ -8,7 +8,7 @@ from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.product import LossValue, Product
 
-from ..diffraction import AssembledDiffractionDataset
+from ..diffraction import AssembledDiffractionDataset, DiffractionDatasetObserver
 from .geometry import ProductGeometry
 from .metadata import MetadataRepositoryItem, UniqueNameFactory
 from .object import ObjectRepositoryItem
@@ -75,7 +75,8 @@ class ProductRepositoryItem(ParameterGroup):
         self._probe_item = probe_item
         self._object_item = object_item
         self._losses = list(losses)
-        self._dataset = dataset
+        self._dataset: AssembledDiffractionDataset | None = None
+        self._dataset_observer: _BoundDatasetObserver | None = None
         self._state: ProductState = state
 
         self._add_group('metadata', self._metadata_item, observe=True)
@@ -85,10 +86,11 @@ class ProductRepositoryItem(ParameterGroup):
 
         self._index = -1  # used by ProductRepository
 
-        # Bind the geometry's detector extent to the initial dataset (if any) so
-        # downstream probe/object sizes are correct from the start.
+        # Bind the geometry's detector extent + pixel geometry to the initial
+        # dataset (if any) so downstream probe/object sizes are correct from the
+        # start.
         if dataset is not None:
-            self._geometry.set_detector_extent(dataset.get_metadata().detector_extent)
+            self._bind_dataset(dataset)
 
     def assign(self, product: Product) -> None:
         self._metadata_item.assign(product.metadata)
@@ -156,10 +158,35 @@ class ProductRepositoryItem(ParameterGroup):
 
     def set_dataset(self, dataset: AssembledDiffractionDataset | None) -> None:
         if self._dataset is not dataset:
-            self._dataset = dataset
-            extent = dataset.get_metadata().detector_extent if dataset is not None else None
-            self._geometry.set_detector_extent(extent)
+            self._bind_dataset(dataset)
             self._parent.handle_dataset_changed(self)
+
+    def _bind_dataset(self, dataset: AssembledDiffractionDataset | None) -> None:
+        # Detach the previous dataset's observer before rebinding.
+        if self._dataset is not None and self._dataset_observer is not None:
+            self._dataset.remove_observer(self._dataset_observer)
+            self._dataset_observer = None
+
+        self._dataset = dataset
+
+        if dataset is None:
+            self._geometry.set_detector_extent(None)
+            self._geometry.set_detector_pixel_geometry(None)
+            return
+
+        self._geometry.set_detector_extent(dataset.get_metadata().detector_extent)
+        self._geometry.set_detector_pixel_geometry(dataset.get_raw_pixel_geometry())
+
+        # Mirror future edits (pixel geometry, reload) from the dataset back into
+        # the geometry so probe/object sizes stay in sync.
+        self._dataset_observer = _BoundDatasetObserver(self)
+        dataset.add_observer(self._dataset_observer)
+
+    def _sync_geometry_from_dataset(self) -> None:
+        if self._dataset is None:
+            return
+        self._geometry.set_detector_extent(self._dataset.get_metadata().detector_extent)
+        self._geometry.set_detector_pixel_geometry(self._dataset.get_raw_pixel_geometry())
 
     def get_state(self) -> ProductState:
         return self._state
@@ -246,3 +273,23 @@ class ProductRepositoryObserver(ABC):
     @abstractmethod
     def handle_item_removed(self, index: int, item: ProductRepositoryItem) -> None:
         pass
+
+
+class _BoundDatasetObserver(DiffractionDatasetObserver):
+    """Mirrors dataset changes back into the bound product's geometry."""
+
+    def __init__(self, item: ProductRepositoryItem) -> None:
+        super().__init__()
+        self._item = item
+
+    def handle_array_inserted(self, index: int) -> None:
+        pass
+
+    def handle_array_changed(self, index: int) -> None:
+        pass
+
+    def handle_dataset_reloaded(self) -> None:
+        self._item._sync_geometry_from_dataset()
+
+    def handle_pixel_geometry_changed(self) -> None:
+        self._item._sync_geometry_from_dataset()

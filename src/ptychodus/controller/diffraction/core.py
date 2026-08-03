@@ -1,24 +1,13 @@
 import logging
 
-
-from pathlib import Path
-
 from PyQt5.QtCore import QModelIndex
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QDialog,
-    QFormLayout,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
     QMessageBox,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
 )
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import PathParameter, StringParameter
 
 from ...model.analysis import DiffractionSimulator, DiffractionSimulatorSettings
 from ...model.diffraction import (
@@ -35,138 +24,18 @@ from ...model.diffraction import (
 from .detector_extent import DetectorExtentSource
 from ...model.metadata import MetadataPresenter
 from ...model.product import ProductRepository
-from ...view.diffraction import DetectorView, DiffractionStatusView, PatternsView
+from ...view.diffraction import DatasetsView, DiffractionStatusView
 from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate
 from ..data import FileDialogFactory
 from ..helpers import connect_triggered_signal
 from ..image import ImageController
-from ..parametric import (
-    CheckBoxParameterViewController,
-    LengthWidgetParameterViewController,
-    ParameterViewController,
-)
+from ..parametric import CheckBoxParameterViewController
 from ..product.core import ProductRepositoryComboProxyModel, ProductRepositoryTableModel
 from .dataset import DatasetTreeModel
 from .dataset_layout import DatasetLayoutViewController
 from .wizard import OpenDatasetWizardController
 
 logger = logging.getLogger(__name__)
-
-
-class BadPixelsViewController(ParameterViewController):
-    """Edits the bad-pixels settings; the mask is applied when a dataset is (re)loaded."""
-
-    # FIXME move to wizard because this is now per-dataset.
-
-    def __init__(
-        self,
-        bad_pixels_file_path: PathParameter,
-        bad_pixels_file_type: StringParameter,
-        repository: DiffractionDatasetRepository,
-        diffraction_api: DiffractionAPI,
-        file_dialog_factory: FileDialogFactory,
-    ) -> None:
-        super().__init__()
-        self._bad_pixels_file_path = bad_pixels_file_path
-        self._bad_pixels_file_type = bad_pixels_file_type
-        self._repository = repository
-        self._diffraction_api = diffraction_api
-        self._file_dialog_factory = file_dialog_factory
-        self._dataset_index = -1
-
-        self._line_edit = QLineEdit()
-        self._line_edit.setReadOnly(True)
-        self._browse_button = QPushButton('Browse...')
-        self._browse_button.clicked.connect(self._choose_bad_pixels_file)
-        self._clear_button = QPushButton('Clear')
-        self._clear_button.clicked.connect(self._clear_bad_pixels_setting)
-        self._hint_label = QLabel('Reload dataset to apply.')
-        self._widget = QWidget()
-
-        row = QHBoxLayout()
-        row.setContentsMargins(0, 0, 0, 0)
-        row.addWidget(self._line_edit)
-        row.addWidget(self._browse_button)
-        row.addWidget(self._clear_button)
-
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addLayout(row)
-        layout.addWidget(self._hint_label)
-        self._widget.setLayout(layout)
-
-        self._sync_model_to_view()
-
-    def set_dataset_index(self, index: int) -> None:
-        self._dataset_index = index
-        self._sync_model_to_view()
-
-    def _current_dataset_index(self) -> int | None:
-        return self._dataset_index if self._dataset_index >= 0 else None
-
-    def _choose_bad_pixels_file(self) -> None:
-        file_reader_chooser = self._diffraction_api.get_bad_pixels_file_reader_chooser()
-        current_plugin = file_reader_chooser.get_current_plugin()
-        file_path, name_filter = self._file_dialog_factory.get_open_file_path(
-            self._widget,
-            'Open Bad Pixels File',
-            name_filters=[plugin.display_name for plugin in file_reader_chooser],
-            selected_name_filter=current_plugin.simple_name,
-        )
-
-        if file_path:
-            self._bad_pixels_file_path.set_value(file_path)
-            if name_filter:
-                self._bad_pixels_file_type.set_value(name_filter)
-            self._sync_model_to_view()
-
-    def _clear_bad_pixels_setting(self) -> None:
-        self._bad_pixels_file_path.set_value(Path())
-        self._sync_model_to_view()
-
-    def get_widget(self) -> QWidget:
-        return self._widget
-
-    def _sync_model_to_view(self) -> None:
-        dataset_index = self._current_dataset_index()
-        if dataset_index is None:
-            self._line_edit.setText('0')
-            return
-        bad_pixels = self._repository[dataset_index].get_bad_pixels()
-        self._line_edit.setText(str(int(bad_pixels.sum())))
-
-
-class DetectorController:
-    def __init__(
-        self,
-        settings: DetectorSettings,
-        repository: DiffractionDatasetRepository,
-        diffraction_api: DiffractionAPI,
-        view: DetectorView,
-        file_dialog_factory: FileDialogFactory,
-    ) -> None:
-        self._pixel_width_view_controller = LengthWidgetParameterViewController(
-            settings.pixel_width_m
-        )
-        self._pixel_height_view_controller = LengthWidgetParameterViewController(
-            settings.pixel_height_m
-        )
-        self._bad_pixels_view_controller = BadPixelsViewController(
-            settings.bad_pixels_file_path,
-            settings.bad_pixels_file_type,
-            repository,
-            diffraction_api,
-            file_dialog_factory,
-        )
-
-        layout = QFormLayout()
-        layout.addRow('Pixel Width:', self._pixel_width_view_controller.get_widget())
-        layout.addRow('Pixel Height:', self._pixel_height_view_controller.get_widget())
-        layout.addRow('Bad Pixels:', self._bad_pixels_view_controller.get_widget())
-        view.setLayout(layout)
-
-    def set_dataset_index(self, index: int) -> None:
-        self._bad_pixels_view_controller.set_dataset_index(index)
 
 
 class DiffractionStatusController(Observer):
@@ -202,7 +71,7 @@ class DiffractionStatusController(Observer):
             self._sync_model_to_view()
 
 
-class DiffractionController(DiffractionDatasetRepositoryObserver):
+class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
     def __init__(
         self,
         detector_settings: DetectorSettings,
@@ -216,7 +85,7 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         product_table_model: ProductRepositoryTableModel,
         diffraction_simulator: DiffractionSimulator,
         diffraction_simulator_settings: DiffractionSimulatorSettings,
-        view: PatternsView,
+        view: DatasetsView,
         status_view: DiffractionStatusView,
         image_controller: ImageController,
         file_dialog_factory: FileDialogFactory,
@@ -235,13 +104,6 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         self._image_controller = image_controller
         self._file_dialog_factory = file_dialog_factory
         self._per_dataset_observers: dict[int, _PerDatasetObserver] = {}
-        self._detector_controller = DetectorController(
-            detector_settings,
-            repository,
-            diffraction_api,
-            view.detector_view,
-            file_dialog_factory,
-        )
         self._wizard_controller = OpenDatasetWizardController(
             diffraction_settings,
             detector_settings,
@@ -252,7 +114,11 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
             file_dialog_factory,
         )
         self._status_controller = DiffractionStatusController(task_monitor, status_view)
-        self._tree_model = DatasetTreeModel()
+        self._tree_model = DatasetTreeModel(pattern_sizer)
+
+        # Sizer changes (binning toggle / bin size / transpose) shift the processed
+        # pixel geometry for every dataset, so refresh those two columns on notify.
+        pattern_sizer.add_observer(self)
 
         view.tree_view.setModel(self._tree_model)
         view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -305,7 +171,6 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
 
     def _set_current_dataset_index(self, index: int) -> None:
         self._current_dataset_index = index
-        self._detector_controller.set_dataset_index(index)
 
     def _on_tree_selection_changed(self, current: QModelIndex, previous: QModelIndex) -> None:
         # Update the image preview based on the selected tree node.
@@ -313,8 +178,19 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
             node = current.internalPointer()
             data = node.get_data()
             if data is not None:
-                pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry()
-                self._image_controller.set_array(data, pixel_geometry)
+                dataset_row = self._tree_model.dataset_row_for_index(current)
+                dataset = (
+                    self._repository[dataset_row]
+                    if dataset_row is not None and 0 <= dataset_row < len(self._repository)
+                    else None
+                )
+                if dataset is not None:
+                    pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry(
+                        dataset.get_raw_pixel_geometry()
+                    )
+                    self._image_controller.set_array(data, pixel_geometry)
+                else:
+                    self._image_controller.clear_array()
             else:
                 self._image_controller.clear_array()
         else:
@@ -471,6 +347,18 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         # streaming context or a programmatic re-open with a different file).
         self._detector_extent_source.set_extent(dataset.get_metadata().detector_extent)
 
+    def _handle_pixel_geometry_changed_for_dataset(
+        self, dataset: AssembledDiffractionDataset
+    ) -> None:
+        dataset_row = self._dataset_row(dataset)
+        if dataset_row is None:
+            return
+        self._tree_model.refresh_dataset(dataset_row)
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._pattern_sizer:
+            self._tree_model.refresh_processed_columns()
+
 
 class _PerDatasetObserver(DiffractionDatasetObserver):
     """Per-dataset observer wrapper that captures the dataset ref at registration."""
@@ -490,3 +378,6 @@ class _PerDatasetObserver(DiffractionDatasetObserver):
 
     def handle_dataset_reloaded(self) -> None:
         self._controller._handle_dataset_reloaded_for_dataset(self._dataset)
+
+    def handle_pixel_geometry_changed(self) -> None:
+        self._controller._handle_pixel_geometry_changed_for_dataset(self._dataset)

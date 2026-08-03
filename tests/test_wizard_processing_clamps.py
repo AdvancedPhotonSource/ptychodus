@@ -1,11 +1,11 @@
 """Unit tests for the wizard-side clamp helpers.
 
-These lock the pure functions used by `PatternCropViewController` and
-`PatternBinningViewController` to compute spin-box ranges.
+These lock the pure functions used by `CropViewController` and
+`BinningViewController` to compute spin-box ranges.
 """
 
 from ptychodus.api.geometry import Interval
-from ptychodus.controller.diffraction.wizard.patterns import (
+from ptychodus.controller.diffraction.wizard.processing import (
     _bin_size_limits,
     _crop_center_limits,
     _crop_size_limits,

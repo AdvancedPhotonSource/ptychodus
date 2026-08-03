@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import (
     QFormLayout,
+    QFrame,
     QGridLayout,
     QGroupBox,
     QLabel,
@@ -51,7 +52,7 @@ def _set_spin_box(box: QSpinBox, limits: Interval[int], value: int) -> None:
     box.blockSignals(False)
 
 
-class PatternMemoryMapViewController(CheckableGroupBoxParameterViewController):
+class StorageViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self, settings: DiffractionSettings, file_dialog_factory: FileDialogFactory
     ) -> None:
@@ -65,7 +66,7 @@ class PatternMemoryMapViewController(CheckableGroupBoxParameterViewController):
         self.get_widget().setLayout(layout)
 
 
-class PatternCropViewController(CheckableGroupBoxParameterViewController):
+class CropViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
         diffraction_settings: DiffractionSettings,
@@ -165,7 +166,7 @@ class PatternCropViewController(CheckableGroupBoxParameterViewController):
             super()._update(observable)
 
 
-class PatternBinningViewController(CheckableGroupBoxParameterViewController):
+class BinningViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
         diffraction_settings: DiffractionSettings,
@@ -255,7 +256,7 @@ class PatternBinningViewController(CheckableGroupBoxParameterViewController):
             super()._update(observable)
 
 
-class PatternPaddingViewController(CheckableGroupBoxParameterViewController):
+class PaddingViewController(CheckableGroupBoxParameterViewController):
     def __init__(self, diffraction_settings: DiffractionSettings) -> None:
         super().__init__(diffraction_settings.padding_enabled, 'Pad')
         self._pad_x_view_controller = SpinBoxParameterViewController(diffraction_settings.pad_x)
@@ -270,19 +271,10 @@ class PatternPaddingViewController(CheckableGroupBoxParameterViewController):
         self.get_widget().setLayout(layout)
 
 
-class PatternTransformViewController:
-    def __init__(
-        self, settings: DiffractionSettings, file_dialog_factory: FileDialogFactory
-    ) -> None:
-        self._hflip_view_controller = CheckBoxParameterViewController(
-            settings.hflip, 'Flip Horizontal'
-        )
-        self._vflip_view_controller = CheckBoxParameterViewController(
-            settings.vflip, 'Flip Vertical'
-        )
-        self._transpose_view_controller = CheckBoxParameterViewController(
-            settings.transpose, 'Transpose'
-        )
+class ValueFilterViewController:
+    """FilterValuesStep — zero pattern values outside [lower_bound, upper_bound)."""
+
+    def __init__(self, settings: DiffractionSettings) -> None:
         self._lower_bound_enabled_view_controller = CheckBoxParameterViewController(
             settings.value_lower_bound_enabled, 'Value Lower Bound:'
         )
@@ -290,61 +282,110 @@ class PatternTransformViewController:
             settings.value_lower_bound
         )
         self._upper_bound_enabled_view_controller = CheckBoxParameterViewController(
-            settings.value_upper_bound_enabled, 'Value upper Bound:'
+            settings.value_upper_bound_enabled, 'Value Upper Bound:'
         )
         self._upper_bound_view_controller = SpinBoxParameterViewController(
             settings.value_upper_bound
         )
 
         layout = QGridLayout()
-        layout.addWidget(QLabel('Axes:'), 0, 0)
-        layout.addWidget(self._hflip_view_controller.get_widget(), 0, 1)
-        layout.addWidget(self._vflip_view_controller.get_widget(), 0, 2)
-        layout.addWidget(self._transpose_view_controller.get_widget(), 0, 3)
-        layout.addWidget(self._lower_bound_enabled_view_controller.get_widget(), 1, 0)
-        layout.addWidget(self._lower_bound_view_controller.get_widget(), 1, 1, 1, 3)
-        layout.addWidget(self._upper_bound_enabled_view_controller.get_widget(), 2, 0)
-        layout.addWidget(self._upper_bound_view_controller.get_widget(), 2, 1, 1, 3)
+        layout.addWidget(self._lower_bound_enabled_view_controller.get_widget(), 0, 0)
+        layout.addWidget(self._lower_bound_view_controller.get_widget(), 0, 1)
+        layout.addWidget(self._upper_bound_enabled_view_controller.get_widget(), 1, 0)
+        layout.addWidget(self._upper_bound_view_controller.get_widget(), 1, 1)
         layout.setColumnStretch(1, 1)
-        layout.setColumnStretch(2, 1)
-        layout.setColumnStretch(3, 1)
 
-        self._widget = QGroupBox('Transform')
+        self._widget = QGroupBox('Value Filter')
         self._widget.setLayout(layout)
 
     def get_widget(self) -> QWidget:
         return self._widget
 
 
-class OpenDatasetWizardPatternsViewController(ParameterViewController):
+class FlipViewController:
+    """HorizontalFlipStep + VerticalFlipStep."""
+
+    def __init__(self, settings: DiffractionSettings) -> None:
+        self._hflip_view_controller = CheckBoxParameterViewController(
+            settings.hflip, 'Flip Horizontal'
+        )
+        self._vflip_view_controller = CheckBoxParameterViewController(
+            settings.vflip, 'Flip Vertical'
+        )
+
+        layout = QGridLayout()
+        layout.addWidget(self._hflip_view_controller.get_widget(), 0, 0)
+        layout.addWidget(self._vflip_view_controller.get_widget(), 0, 1)
+        layout.setColumnStretch(0, 1)
+        layout.setColumnStretch(1, 1)
+
+        self._widget = QGroupBox('Flip')
+        self._widget.setLayout(layout)
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+
+class TransposeViewController:
+    """TransposeStep — swap the last two axes."""
+
+    def __init__(self, settings: DiffractionSettings) -> None:
+        self._transpose_view_controller = CheckBoxParameterViewController(
+            settings.transpose, 'Transpose'
+        )
+
+        layout = QGridLayout()
+        layout.addWidget(self._transpose_view_controller.get_widget(), 0, 0)
+
+        self._widget = QGroupBox('Transpose')
+        self._widget.setLayout(layout)
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+
+class OpenDatasetWizardProcessingViewController(ParameterViewController):
+    """Processing wizard page. Groups are laid out top-to-bottom in the
+    DiffractionPrepPipeline execution order (see api/diffraction_prep.py):
+    filter → crop → binning → padding → hflip → vflip → transpose. Storage
+    (memory map) is not part of the pipeline but is retained here as a
+    load-time concern; the horizontal separator between it and Value Filter
+    marks that boundary visually.
+    """
+
     def __init__(
         self,
         diffraction_settings: DiffractionSettings,
         extent_source: DetectorExtentSource,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
-        self._memory_map_view_controller = PatternMemoryMapViewController(
+        self._storage_view_controller = StorageViewController(
             diffraction_settings, file_dialog_factory
         )
-        self._crop_view_controller = PatternCropViewController(diffraction_settings, extent_source)
-        self._binning_view_controller = PatternBinningViewController(
-            diffraction_settings, extent_source
-        )
-        self._padding_view_controller = PatternPaddingViewController(diffraction_settings)
-        self._transform_view_controller = PatternTransformViewController(
-            diffraction_settings, file_dialog_factory
-        )
+        self._value_filter_view_controller = ValueFilterViewController(diffraction_settings)
+        self._crop_view_controller = CropViewController(diffraction_settings, extent_source)
+        self._binning_view_controller = BinningViewController(diffraction_settings, extent_source)
+        self._padding_view_controller = PaddingViewController(diffraction_settings)
+        self._flip_view_controller = FlipViewController(diffraction_settings)
+        self._transpose_view_controller = TransposeViewController(diffraction_settings)
+
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
 
         layout = QVBoxLayout()
-        layout.addWidget(self._memory_map_view_controller.get_widget())
+        layout.addWidget(self._storage_view_controller.get_widget())
+        layout.addWidget(separator)
+        layout.addWidget(self._value_filter_view_controller.get_widget())
         layout.addWidget(self._crop_view_controller.get_widget())
         layout.addWidget(self._binning_view_controller.get_widget())
         layout.addWidget(self._padding_view_controller.get_widget())
-        layout.addWidget(self._transform_view_controller.get_widget())
+        layout.addWidget(self._flip_view_controller.get_widget())
+        layout.addWidget(self._transpose_view_controller.get_widget())
         layout.addStretch()
 
         self._page = OpenDatasetWizardPage()
-        self._page.setTitle('Pattern Processing')
+        self._page.setTitle('Processing')
         self._page._set_complete(True)
         self._page.setLayout(layout)
 

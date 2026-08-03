@@ -38,8 +38,8 @@ NUM_PATTERNS = 3
 class _StubPatternSizer:
     """Minimal stand-in — the options helper only reads the processed pixel geometry."""
 
-    def get_processed_pixel_geometry(self) -> PixelGeometry:
-        return PixelGeometry(width_m=1.0e-6, height_m=1.0e-6)
+    def get_processed_pixel_geometry(self, raw_pixel_geometry: PixelGeometry) -> PixelGeometry:
+        return raw_pixel_geometry
 
 
 def _make_reconstruct_input() -> ReconstructInput:
@@ -85,7 +85,12 @@ def _make_reconstruct_input() -> ReconstructInput:
     )
     patterns = rng.random((NUM_PATTERNS, PROBE_HEIGHT_PX, PROBE_WIDTH_PX)).astype(numpy.float32)
     bad_pixels = numpy.zeros((PROBE_HEIGHT_PX, PROBE_WIDTH_PX), dtype=numpy.bool_)
-    return ReconstructInput(diffraction_patterns=patterns, bad_pixels=bad_pixels, product=product)
+    return ReconstructInput(
+        diffraction_patterns=patterns,
+        bad_pixels=bad_pixels,
+        product=product,
+        pixel_geometry=PixelGeometry(width_m=1.0e-6, height_m=1.0e-6),
+    )
 
 
 def _make_library() -> PtyChiReconstructorLibrary:

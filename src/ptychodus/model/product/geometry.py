@@ -29,10 +29,11 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         self._pattern_sizer = pattern_sizer
         self._metadata_item = metadata_item
         self._scan_item = scan_item
-        # Set via set_detector_extent() when a dataset is bound (see
-        # ProductRepositoryItem.set_dataset). Derived quantities that need an extent
-        # degenerate to zero-sized while unbound.
+        # Set via set_detector_extent()/set_detector_pixel_geometry() when a dataset
+        # is bound (see ProductRepositoryItem.set_dataset). Derived quantities that
+        # need these degenerate to zero-sized while unbound.
         self._detector_extent: ImageExtent | None = None
+        self._raw_pixel_geometry: PixelGeometry | None = None
 
         self._pattern_sizer.add_observer(self)
         self._metadata_item.add_observer(self)
@@ -42,6 +43,12 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         if extent == self._detector_extent:
             return
         self._detector_extent = extent
+        self.notify_observers()
+
+    def set_detector_pixel_geometry(self, geometry: PixelGeometry | None) -> None:
+        if geometry == self._raw_pixel_geometry:
+            return
+        self._raw_pixel_geometry = geometry
         self.notify_observers()
 
     @property
@@ -94,12 +101,20 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
     def _lambda_z_m2(self) -> float:
         return self.probe_wavelength_m * self.detector_distance_m
 
+    def _processed_pixel_geometry(self) -> PixelGeometry:
+        # No dataset bound yet: degrade to a zero-sized geometry so downstream
+        # divisions bail out gracefully (they already handle ZeroDivisionError).
+        raw = self._raw_pixel_geometry
+        if raw is None:
+            return PixelGeometry(width_m=0.0, height_m=0.0)
+        return self._pattern_sizer.get_processed_pixel_geometry(raw)
+
     def get_detector_pixel_geometry(self):
-        return self._pattern_sizer.get_processed_pixel_geometry()
+        return self._processed_pixel_geometry()
 
     def get_object_plane_pixel_geometry(self) -> PixelGeometry:
         extent = self._pattern_sizer.get_processed_image_extent(self._detector_extent)
-        detector_pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry()
+        detector_pixel_geometry = self._processed_pixel_geometry()
         lambda_z = self._lambda_z_m2
         try:
             return PixelGeometry(
@@ -112,7 +127,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
     @property
     def fresnel_number(self) -> float:
         extent = self._pattern_sizer.get_processed_image_extent(self._detector_extent)
-        pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry()
+        pixel_geometry = self._processed_pixel_geometry()
         width_m = extent.width_px * pixel_geometry.width_m
         height_m = extent.height_px * pixel_geometry.height_m
         area_m2 = width_m * height_m
@@ -124,7 +139,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
     @property
     def _detector_numerical_aperture_sq(self) -> float:
         extent = self._pattern_sizer.get_processed_image_extent(self._detector_extent)
-        pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry()
+        pixel_geometry = self._processed_pixel_geometry()
         try:
             two_z_m = 2 * self.detector_distance_m
             NA_x = (extent.width_px * pixel_geometry.width_m) / two_z_m  # noqa: N806

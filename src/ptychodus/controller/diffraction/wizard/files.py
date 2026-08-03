@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 import logging
 import re
 
@@ -21,8 +22,9 @@ from PyQt5.QtWidgets import (
 
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import PathParameter
+from ptychodus.api.plugins import PluginChooser
 
-from ....model.diffraction import DetectorSettings, DiffractionAPI, DiffractionSettings
+from ....model.diffraction import DiffractionAPI, DiffractionSettings
 from ....view.diffraction import OpenDatasetWizardPage
 from ....view.widgets import ExceptionDialog
 from ...data import FileDialogFactory
@@ -220,9 +222,9 @@ class OpenDatasetWizardFilePathViewController(Observer):
 
 
 class OpenDatasetWizardFileTypeViewController(Observable, Observer):
-    def __init__(self, api: DiffractionAPI) -> None:
+    def __init__(self, file_reader_chooser: PluginChooser[Any]) -> None:
         super().__init__()
-        self._file_reader_chooser = api.get_file_reader_chooser()
+        self._file_reader_chooser = file_reader_chooser
         self._file_reader_chooser.add_observer(self)
         self._combo_box = QComboBox()
 
@@ -256,13 +258,11 @@ class OpenDatasetWizardFilesViewController(Observer):
     def __init__(
         self,
         settings: DiffractionSettings,
-        detector_settings: DetectorSettings,
         api: DiffractionAPI,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
         self._settings = settings
-        self._detector_settings = detector_settings
         self._api = api
         self._file_dialog_factory = file_dialog_factory
 
@@ -275,7 +275,9 @@ class OpenDatasetWizardFilesViewController(Observer):
         self._file_path_view_controller = OpenDatasetWizardFilePathViewController(
             settings.file_path, file_dialog_factory
         )
-        self._file_type_view_controller = OpenDatasetWizardFileTypeViewController(api)
+        self._file_type_view_controller = OpenDatasetWizardFileTypeViewController(
+            api.get_file_reader_chooser()
+        )
         self._file_type_view_controller.add_observer(self)
 
         layout = QFormLayout()
@@ -297,12 +299,7 @@ class OpenDatasetWizardFilesViewController(Observer):
         file_path = self._settings.file_path.get_value()
 
         try:
-            return self._api.open_patterns(
-                file_path,
-                file_type=file_type,
-                bad_pixels_file_path=self._detector_settings.bad_pixels_file_path.get_value(),
-                bad_pixels_file_type=self._detector_settings.bad_pixels_file_type.get_value(),
-            )
+            return self._api.open_patterns(file_path, file_type=file_type)
         except Exception as err:
             logger.exception(err)
             ExceptionDialog.show_exception('Open Dataset', err)

@@ -123,3 +123,6 @@ class DatasetLayoutViewController(DiffractionDatasetObserver):
 
     def handle_dataset_reloaded(self) -> None:
         self._sync_model_to_view()
+
+    def handle_pixel_geometry_changed(self) -> None:
+        pass

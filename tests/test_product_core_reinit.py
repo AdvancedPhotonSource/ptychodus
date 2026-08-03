@@ -41,9 +41,7 @@ def test_update_passes_last_dataset_and_block_false_when_repo_nonempty() -> None
 
     reinit.notify_observers()
 
-    product_api.insert_product_from_settings.assert_called_once_with(
-        dataset=dataset_b, block=False
-    )
+    product_api.insert_product_from_settings.assert_called_once_with(dataset=dataset_b, block=False)
 
 
 def test_update_passes_dataset_none_when_repo_empty() -> None:

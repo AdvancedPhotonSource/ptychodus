@@ -29,7 +29,7 @@ from PyQt5.QtWidgets import (
 
 from . import resources  # noqa
 from .agent import AgentView, AgentChatView
-from .diffraction import PatternsImageView, PatternsView
+from .diffraction import DatasetsView, DiffractionImageView
 from .image import ImageView
 from .product import ProductView, ProductVisualizationView
 from .processing import ProcessingStatusView
@@ -220,13 +220,13 @@ class ViewCore(QMainWindow):
             right=self.settings_table_view,
         )
 
-        self.patterns_view = PatternsView()
-        self.patterns_image_view = PatternsImageView()
-        self.patterns_action = self.navigation.add_panel(
+        self.datasets_view = DatasetsView()
+        self.diffraction_image_view = DiffractionImageView()
+        self.datasets_action = self.navigation.add_panel(
             QIcon(':/icons/patterns'),
-            'Patterns',
-            left=self.patterns_view,
-            right=self.patterns_image_view,
+            'Diffraction',
+            left=self.datasets_view,
+            right=self.diffraction_image_view,
         )
 
         self.product_view = ProductView()

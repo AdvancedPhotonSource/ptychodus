@@ -341,7 +341,7 @@ def test_sizer_processed_size_accounts_for_double_sided_padding(
     diff.pad_x.set_value(4)
     diff.pad_y.set_value(4)
 
-    sizer = PatternSizer(det, diff)
+    sizer = PatternSizer(diff)
     detector_extent = ImageExtent(width_px=64, height_px=64)
     extent = sizer.get_processed_image_extent(detector_extent)
     assert extent.width_px == 32 + 2 * 4
@@ -359,17 +359,15 @@ def test_sizer_processed_extent_reflects_transpose(
     settings: tuple[DiffractionSettings, DetectorSettings],
 ) -> None:
     """Regression: transpose must swap width/height in the processed extent + pixel geometry."""
-    diff, det = settings
-    det.pixel_width_m.set_value(1e-5)
-    det.pixel_height_m.set_value(2e-5)
+    diff, _ = settings
     diff.transpose.set_value(True)
 
-    sizer = PatternSizer(det, diff)
+    sizer = PatternSizer(diff)
     detector_extent = ImageExtent(width_px=64, height_px=32)
     extent = sizer.get_processed_image_extent(detector_extent)
     assert (extent.width_px, extent.height_px) == (32, 64)
 
-    geo = sizer.get_processed_pixel_geometry()
+    geo = sizer.get_processed_pixel_geometry(PixelGeometry(width_m=1e-5, height_m=2e-5))
     assert (geo.width_m, geo.height_m) == (2e-5, 1e-5)
 
     # Cross-check: pipeline's actual output stack shape agrees with the sizer.
@@ -396,7 +394,7 @@ def test_sizer_lower_bound_filter_uses_its_own_toggle(
     diff.value_lower_bound.set_value(7)
     diff.value_upper_bound_enabled.set_value(False)
 
-    pipeline = PatternSizer(det, diff).get_prep_pipeline()
+    pipeline = PatternSizer(diff).get_prep_pipeline()
     step = _filter_step(pipeline)
     assert step is not None
     assert step.lower_bound == 7
@@ -411,7 +409,7 @@ def test_sizer_upper_bound_filter_uses_its_own_toggle(
     diff.value_upper_bound_enabled.set_value(True)
     diff.value_upper_bound.set_value(1234)
 
-    pipeline = PatternSizer(det, diff).get_prep_pipeline()
+    pipeline = PatternSizer(diff).get_prep_pipeline()
     step = _filter_step(pipeline)
     assert step is not None
     assert step.lower_bound is None
@@ -427,7 +425,7 @@ def test_sizer_both_filter_bounds_independent(
     diff.value_upper_bound_enabled.set_value(True)
     diff.value_upper_bound.set_value(99)
 
-    pipeline = PatternSizer(det, diff).get_prep_pipeline()
+    pipeline = PatternSizer(diff).get_prep_pipeline()
     step = _filter_step(pipeline)
     assert step is not None
     assert step.lower_bound == 3
@@ -442,7 +440,7 @@ def test_sizer_no_filter_bounds(
     diff.value_lower_bound_enabled.set_value(False)
     diff.value_upper_bound_enabled.set_value(False)
 
-    pipeline = PatternSizer(det, diff).get_prep_pipeline()
+    pipeline = PatternSizer(diff).get_prep_pipeline()
     assert _filter_step(pipeline) is None
 
 
@@ -480,7 +478,7 @@ def test_sizer_safe_crop_center_matches_cropstep_bounds(
     diff.crop_center_y_px.set_value(user_center)
 
     detector_extent = ImageExtent(width_px=8, height_px=8)
-    step = _crop_step(PatternSizer(det, diff).get_prep_pipeline(detector_extent))
+    step = _crop_step(PatternSizer(diff).get_prep_pipeline(detector_extent))
     assert step is not None
     assert step.center.position_x_px == expected
     assert step.center.position_y_px == expected
@@ -501,7 +499,7 @@ def test_sizer_safe_crop_center_produces_in_bounds_slice(
         'a', numpy.zeros(1, dtype=int), numpy.zeros((1, 8, 8), dtype=numpy.uint16)
     )
     detector_extent = ImageExtent(width_px=8, height_px=8)
-    out = PatternSizer(det, diff).get_prep_pipeline(detector_extent)(array).get_patterns()
+    out = PatternSizer(diff).get_prep_pipeline(detector_extent)(array).get_patterns()
     assert out.shape == (1, 4, 4)  # no truncation from an out-of-bounds slice
 
 
@@ -533,7 +531,7 @@ def test_sizer_notifies_on_whole_image_parameter_change(
 ) -> None:
     """Whole-image settings (flips, transpose, filter bounds) must wake up sizer observers."""
     diff, det = settings
-    sizer = PatternSizer(det, diff)
+    sizer = PatternSizer(diff)
     observer = _CountingObserver()
     sizer.add_observer(observer)  # type: ignore[arg-type]
 

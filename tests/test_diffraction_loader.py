@@ -43,7 +43,7 @@ def _make_dataset(
     diffraction_settings.crop_height_px.set_value(crop_height)
     diffraction_settings.crop_width_px.set_value(crop_width)
 
-    sizer = PatternSizer(detector_settings, diffraction_settings)
+    sizer = PatternSizer(diffraction_settings)
     task_manager = MagicMock()
     task_monitor = MagicMock()
 
