@@ -288,10 +288,14 @@ class ModelCore:
             input_product_api = self.workflow_api.load_product(
                 product_in_path, diffraction=diffraction_handle
             )
-            output_product_api = input_product_api.reconstruct_local(
-                output_product_file=product_out_path,
-                block=True,
-            )
+            try:
+                output_product_api = input_product_api.reconstruct_local(
+                    output_product_file=product_out_path,
+                    block=True,
+                )
+            except Exception as exc:
+                logger.error(f'Reconstruction failed: {type(exc).__name__}: {exc}')
+                return 1
         else:
             logger.error('Input product is not a file!')
             return -1
@@ -331,9 +335,13 @@ class ModelCore:
             input_product_api = self.workflow_api.load_product(
                 product_in_path, diffraction=diffraction_handle
             )
-            input_product_api.train_reconstructor_local(
-                input_directory, output_directory, block=True
-            )
+            try:
+                input_product_api.train_reconstructor_local(
+                    input_directory, output_directory, block=True
+                )
+            except Exception as exc:
+                logger.error(f'Training failed: {type(exc).__name__}: {exc}')
+                return 1
             return 0
         else:
             logger.error('Input product is not a file!')

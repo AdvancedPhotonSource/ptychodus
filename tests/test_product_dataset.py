@@ -89,8 +89,8 @@ def test_orphan_observer_clears_only_matching_products() -> None:
 
     observer.handle_dataset_removed(0, dataset)
 
-    matching.set_dataset.assert_called_once_with(None)
-    unrelated.set_dataset.assert_not_called()
+    matching.unbind_dataset.assert_called_once_with()
+    unrelated.unbind_dataset.assert_not_called()
 
 
 def _make_workflow_api(diffraction_repository: MagicMock) -> ConcreteWorkflowAPI:

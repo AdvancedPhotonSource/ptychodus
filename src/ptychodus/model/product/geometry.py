@@ -30,8 +30,8 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         self._metadata_item = metadata_item
         self._scan_item = scan_item
         # Set via set_detector_extent()/set_detector_pixel_geometry() when a dataset
-        # is bound (see ProductRepositoryItem.set_dataset). Derived quantities that
-        # need these degenerate to zero-sized while unbound.
+        # is bound (see ProductRepositoryItem.bind_dataset / unbind_dataset). Derived
+        # quantities that need these degenerate to zero-sized while unbound.
         self._detector_extent: ImageExtent | None = None
         self._raw_pixel_geometry: PixelGeometry | None = None
 

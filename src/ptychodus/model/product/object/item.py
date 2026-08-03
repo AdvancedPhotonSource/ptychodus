@@ -29,6 +29,8 @@ class ObjectRepositoryItem(ParameterGroup):
         self._add_parameter('layer_spacing_m', self.layer_spacing_m)
 
         self._add_group('builder', builder, observe=True)
+        if isinstance(geometry_provider, Observable):
+            geometry_provider.add_observer(self)
         self.rebuild()
 
     def assign_item(self, item: ObjectRepositoryItem) -> None:
@@ -82,6 +84,10 @@ class ObjectRepositoryItem(ParameterGroup):
         self.rebuild()
 
     def rebuild(self, *, recenter: bool = False) -> None:
+        if not self._geometry_provider.get_object_geometry().get_pixel_geometry().is_valid:
+            # Geometry not yet bound; the observer wired in __init__ will re-run
+            # rebuild when the geometry becomes valid.
+            return
         try:
             object_ = self._builder.build(self._geometry_provider, self.layer_spacing_m.get_value())
         except Exception:
@@ -104,6 +110,8 @@ class ObjectRepositoryItem(ParameterGroup):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._builder:
+            self.rebuild()
+        elif observable is self._geometry_provider:
             self.rebuild()
         else:
             super()._update(observable)

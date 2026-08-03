@@ -44,7 +44,7 @@ class _DatasetOrphanObserver(DiffractionDatasetRepositoryObserver):
     def handle_dataset_removed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
         for item in self._product_repository:
             if item.get_dataset() is dataset:
-                item.set_dataset(None)
+                item.unbind_dataset()
 
 
 class ProductCore(Observer):

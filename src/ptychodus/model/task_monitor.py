@@ -57,6 +57,7 @@ class TaskProgressMonitor(Observable):
         self._is_processing = False
         self._is_stopping = False
         self._completed_runs = 0
+        self._last_error: BaseException | None = None
 
         self._progress_lock = threading.Lock()
         self._progress_goal = 0
@@ -114,6 +115,18 @@ class TaskProgressMonitor(Observable):
                 lambda: self._completed_runs > snapshot, timeout=timeout
             )
 
+    def get_last_error(self) -> BaseException | None:
+        """Return the exception captured by the most recent task run, if any."""
+        with self._state_condition:
+            return self._last_error
+
+    def raise_if_failed(self) -> None:
+        """Re-raise the exception captured by the most recent task run, if any."""
+        with self._state_condition:
+            error = self._last_error
+        if error is not None:
+            raise error
+
     def _notify_observers_foreground(self) -> None:
         task = NotifyObserversTask(self)
         self._foreground_task_manager.put_foreground_task(task)
@@ -122,6 +135,7 @@ class TaskProgressMonitor(Observable):
         with self._state_condition:
             self._is_processing = True
             self._is_stopping = False
+            self._last_error = None
             self._state_condition.notify_all()
         self._notify_observers_foreground()
         return self
@@ -146,5 +160,7 @@ class TaskProgressMonitor(Observable):
         with self._state_condition:
             self._is_processing = False
             self._completed_runs += 1
+            if exception_value is not None:
+                self._last_error = exception_value
             self._state_condition.notify_all()
         self._notify_observers_foreground()

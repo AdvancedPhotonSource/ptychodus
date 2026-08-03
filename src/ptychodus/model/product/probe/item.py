@@ -32,6 +32,8 @@ class ProbeRepositoryItem(ParameterGroup):
         self._probe_seq = ProbeSequence(array=None, opr_weights=None, pixel_geometry=None)
 
         self._add_group('builder', builder, observe=True)
+        if isinstance(geometry_provider, Observable):
+            geometry_provider.add_observer(self)
         self._rebuild()
 
     def assign_item(self, item: ProbeRepositoryItem) -> None:
@@ -100,8 +102,8 @@ class ProbeRepositoryItem(ParameterGroup):
 
     def _rebuild(self) -> None:
         if not self._geometry_provider.get_probe_geometry().get_pixel_geometry().is_valid:
-            # Geometry provider not yet bound to a dataset; a later
-            # notify_observers() from ProductGeometry will re-trigger this.
+            # Geometry not yet bound; the observer wired in __init__ will re-run
+            # _rebuild when the geometry becomes valid.
             return
         try:
             probe_seq = self._builder.build(self._geometry_provider)
@@ -113,6 +115,8 @@ class ProbeRepositoryItem(ParameterGroup):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._builder:
+            self._rebuild()
+        elif observable is self._geometry_provider:
             self._rebuild()
         else:
             super()._update(observable)

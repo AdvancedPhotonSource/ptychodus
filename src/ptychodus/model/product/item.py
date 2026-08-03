@@ -115,7 +115,9 @@ class ProductRepositoryItem(ParameterGroup):
         # Bind the dataset (and thus the detector extent on the geometry) BEFORE
         # rebuilding probe/object subgroups — their _rebuild() otherwise sees an
         # invalid pixel geometry and silently no-ops, leaving them empty.
-        self.set_dataset(source._dataset)
+        # _insert_via_queue only routes here when source has a bound dataset.
+        assert source._dataset is not None
+        self.bind_dataset(source._dataset)
         self._probe_positions_item.assign_item(source._probe_positions_item)
         self._probe_item.assign_item(source._probe_item)
         self._object_item.assign_item(source._object_item)
@@ -156,9 +158,14 @@ class ProductRepositoryItem(ParameterGroup):
         """
         return self._dataset
 
-    def set_dataset(self, dataset: AssembledDiffractionDataset | None) -> None:
+    def bind_dataset(self, dataset: AssembledDiffractionDataset) -> None:
         if self._dataset is not dataset:
             self._bind_dataset(dataset)
+            self._parent.handle_dataset_changed(self)
+
+    def unbind_dataset(self) -> None:
+        if self._dataset is not None:
+            self._bind_dataset(None)
             self._parent.handle_dataset_changed(self)
 
     def _bind_dataset(self, dataset: AssembledDiffractionDataset | None) -> None:

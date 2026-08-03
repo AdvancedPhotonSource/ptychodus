@@ -185,6 +185,7 @@ class ProcessingAPI:
                 ):
                     self._task_manager.run_foreground_tasks()
                     break
+            self._task_monitor.raise_if_failed()
 
         return output_product_index
 
@@ -288,6 +289,7 @@ class ProcessingAPI:
                     ):
                         self._task_manager.run_foreground_tasks()
                         break
+                self._task_monitor.raise_if_failed()
         else:
             logger.warning('Algorithm is not trainable!')
 

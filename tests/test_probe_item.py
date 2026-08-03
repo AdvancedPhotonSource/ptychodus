@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 import numpy
 
 from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.observer import Observable
 from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider, ProbeSequence
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.product.probe.builder import ProbeSequenceBuilder
@@ -134,6 +135,72 @@ def test_try_get_probe_returns_none_on_null_sentinel() -> None:
 
     item = ProbeRepositoryItem(provider, settings, builder)
     assert try_get_probe(item) is None
+
+
+class _ObservableProbeProvider(ProbeGeometryProvider, Observable):
+    """Test double: an Observable + ProbeGeometryProvider. Only get_probe_geometry
+    is exercised by ProbeRepositoryItem's rebuild guard; the other abstract
+    properties are stubbed with sensible defaults. set_geometry() mutates and
+    fires notify_observers, mimicking what ProductGeometry.set_detector_extent
+    does in production."""
+
+    def __init__(self, geometry: ProbeGeometry) -> None:
+        Observable.__init__(self)
+        self._geometry = geometry
+
+    def set_geometry(self, geometry: ProbeGeometry) -> None:
+        self._geometry = geometry
+        self.notify_observers()
+
+    @property
+    def detector_distance_m(self) -> float:
+        return 1.0
+
+    @property
+    def probe_photon_count(self) -> float:
+        return 1.0
+
+    @property
+    def probe_wavelength_m(self) -> float:
+        return 1e-10
+
+    @property
+    def probe_power_W(self) -> float:  # noqa: N802
+        return 1.0
+
+    @property
+    def num_scan_points(self) -> int:
+        return 1
+
+    def get_detector_pixel_geometry(self) -> PixelGeometry:
+        return PixelGeometry(width_m=1e-6, height_m=1e-6)
+
+    def get_probe_geometry(self) -> ProbeGeometry:
+        return self._geometry
+
+
+def test_rebuild_fires_on_geometry_observer_notification() -> None:
+    """When the geometry provider is Observable, ProbeRepositoryItem should
+    register itself and re-run _rebuild each time notify_observers fires
+    (matches the ProductGeometry.set_detector_extent path in production).
+    """
+    registry = SettingsRegistry()
+    settings = ProbeSettings(registry)
+    provider = _ObservableProbeProvider(
+        ProbeGeometry(width_px=64, height_px=64, pixel_width_m=0.0, pixel_height_m=0.0),
+    )
+    canned = _make_probe_seq(pixel_size_m=1e-6)
+    builder = _RecordingBuilder(settings, canned)
+
+    item = ProbeRepositoryItem(provider, settings, builder)
+    assert builder.build_calls == []  # guard blocks initial rebuild
+
+    provider.set_geometry(
+        ProbeGeometry(width_px=64, height_px=64, pixel_width_m=1e-6, pixel_height_m=1e-6),
+    )
+
+    assert len(builder.build_calls) == 1
+    assert item.get_probes().get_array() is canned.get_array()
 
 
 def test_try_get_probe_returns_probe_when_ready() -> None:
