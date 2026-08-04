@@ -5,7 +5,7 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any
-from typing import Final
+from typing import Final, cast
 import logging
 
 from matplotlib.colors import Colormap, hsv_to_rgb
@@ -22,11 +22,32 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
+class DisplayValues:
+    """Real-valued array actually shown by a renderer, with its axis label.
+
+    A renderer that maps a complex array to a single scalar component contributes one entry;
+    the cylindrical color model, which encodes amplitude and phase simultaneously, contributes
+    two.
+    """
+
+    label: str
+    values: RealArrayType
+
+
+@dataclass(frozen=True)
+class LineCutSeries:
+    """1D profile of a single displayed component, with its axis label."""
+
+    label: str
+    value: Sequence[float]
+
+
+@dataclass(frozen=True)
 class LineCut:
-    """1D profile sampled along a line: distances in meters and corresponding pixel values."""
+    """1D profile sampled along a line: distances in meters and one series per component."""
 
     distance_m: Sequence[float]
-    value: Sequence[float | complex]
+    series: Sequence[LineCutSeries]
 
 
 @dataclass(frozen=True)
@@ -50,6 +71,7 @@ class VisualizationProduct:
         rgba: RealArrayType,
         pixel_geometry: PixelGeometry,
         color_value_range: Interval[float],
+        display_values: Sequence[DisplayValues] | None = None,
     ) -> None:
         if values.ndim != 2:
             raise ValueError(f'Values must be a 2-dimensional ndarray (actual={values.ndim}).')
@@ -63,8 +85,28 @@ class VisualizationProduct:
         if values.shape[0] != rgba.shape[0] or values.shape[1] != rgba.shape[1]:
             raise ValueError(f'Shape mismatch (values={values.shape} and rgba={rgba.shape}).')
 
+        if display_values is None:
+            # No renderer told us which component is on screen; fall back to amplitude for
+            # complex input and to the values themselves otherwise.
+            fallback = numpy.absolute(values) if numpy.iscomplexobj(values) else values
+            display_values = [DisplayValues(value_label, cast(RealArrayType, fallback))]
+
+        for dv in display_values:
+            if dv.values.ndim != 2:
+                raise ValueError(
+                    f'Display values "{dv.label}" must be a 2-dimensional ndarray '
+                    f'(actual={dv.values.ndim}).'
+                )
+
+            if dv.values.shape[0] != rgba.shape[0] or dv.values.shape[1] != rgba.shape[1]:
+                raise ValueError(
+                    f'Shape mismatch (display values "{dv.label}"={dv.values.shape} '
+                    f'and rgba={rgba.shape}).'
+                )
+
         self._value_label = value_label
         self._values = values
+        self._display_values = display_values
         self._rgba = rgba
         self._pixel_width_m = pixel_geometry.width_m
         self._pixel_height_m = pixel_geometry.height_m
@@ -76,6 +118,10 @@ class VisualizationProduct:
 
     def get_values(self) -> NumberArrayType:
         return self._values
+
+    def get_display_values(self) -> Sequence[DisplayValues]:
+        """Return the real-valued arrays the renderer put on screen, in display order."""
+        return self._display_values
 
     def get_image_rgba(self) -> RealArrayType:
         return self._rgba
@@ -150,7 +196,7 @@ class VisualizationProduct:
         iy = min(iy, self._values.shape[-2])
         value = self._values[iy, ix]
 
-        if numpy.iscomplex(value):
+        if numpy.iscomplexobj(value):
             amplitude = numpy.absolute(value)
             phase = numpy.angle(value)
             return f'{x=:.1f} {y=:.1f} {amplitude=:6g} {phase=:6g}'
@@ -165,33 +211,40 @@ class VisualizationProduct:
         line_length = numpy.hypot(dx, dy)
 
         distances: list[float] = list()
-        values: list[float] = list()
+        values: list[list[float]] = [list() for dv in self._display_values]
 
         for alpha_l, alpha_r in zip(intersections[:-1], intersections[1:]):
             alpha = (alpha_l + alpha_r) / 2.0
             point = line.lerp(alpha)
-            value = self._values[int(point.y), int(point.x)]
+            iy = int(point.y)
+            ix = int(point.x)
 
             distances.append(alpha * line_length)
-            values.append(value)
 
-        return LineCut(distances, values)
+            for value_list, dv in zip(values, self._display_values):
+                value_list.append(dv.values[iy, ix].item())
+
+        series = [
+            LineCutSeries(dv.label, value_list)
+            for dv, value_list in zip(self._display_values, values)
+        ]
+        return LineCut(distances, series)
 
     def estimate_kernel_density(self, box: Box2D) -> KernelDensityEstimate:
-        x_range = Interval[int](0, self._values.shape[-1])
+        # A histogram has a single value axis, so only the primary displayed component is
+        # estimated; the cylindrical color model contributes amplitude first for this reason.
+        display_values = self._display_values[0].values
+
+        x_range = Interval[int](0, display_values.shape[-1])
         x_begin = x_range.clamp(int(box.x_begin))
         x_end = x_range.clamp(int(box.x_end) + 1)
 
-        y_range = Interval[int](0, self._values.shape[-2])
+        y_range = Interval[int](0, display_values.shape[-2])
         y_begin = y_range.clamp(int(box.y_begin))
         y_end = y_range.clamp(int(box.y_end) + 1)
 
-        values = self._values[..., y_begin:y_end, x_begin:x_end]
+        values = display_values[..., y_begin:y_end, x_begin:x_end]
         values = values.reshape(values.shape[-3], -1) if values.ndim > 2 else values.reshape(-1)
-
-        if numpy.iscomplexobj(values):
-            # TODO improve KDE for complex values
-            values = numpy.absolute(values)
 
         return KernelDensityEstimate(values.min(), values.max(), gaussian_kde(values))
 
@@ -344,12 +397,14 @@ def visualize_real_values(
         values_transformed, value_min=value_min, value_max=value_max, clip=clip
     )
     cmap = colormap if isinstance(colormap, Colormap) else get_colormap_by_name(colormap)
+    decorated_label = transform.decorate_text(value_label)
     return VisualizationProduct(
-        value_label=transform.decorate_text(value_label),
+        value_label=decorated_label,
         values=values,
         rgba=cmap(values_normalized),
         pixel_geometry=pixel_geometry,
         color_value_range=color_value_range,
+        display_values=[DisplayValues(decorated_label, values_transformed)],
     )
 
 
@@ -381,6 +436,7 @@ def visualize_complex_component(
         rgba=product.get_image_rgba(),
         pixel_geometry=product.get_pixel_geometry(),
         color_value_range=product.get_color_value_range(),
+        display_values=product.get_display_values(),
     )
 
 
@@ -488,10 +544,15 @@ def visualize_complex_values(
     )
     phase_rad = ComplexComponent.PHASE_RAD.extract_component(values)
     hue = (phase_rad + numpy.pi) / (2 * numpy.pi)
+    amplitude_label = amplitude_transform.decorate_text(amplitude_component.name.title())
     return VisualizationProduct(
-        value_label=amplitude_transform.decorate_text(amplitude_component.name.title()),
+        value_label=amplitude_label,
         values=values,
         rgba=model.render_rgba(hue, amplitude_normalized),
         pixel_geometry=pixel_geometry,
         color_value_range=color_value_range,
+        display_values=[
+            DisplayValues(amplitude_label, amplitude_transformed),
+            DisplayValues('Phase [rad]', phase_rad),
+        ],
     )

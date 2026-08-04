@@ -108,15 +108,37 @@ class VisualizationController(Observer):
             logger.warning('No visualization product!')
             return
 
-        value_label = product.get_value_label()
         line_cut = product.get_line_cut(line2d)
 
-        ax = self._line_cut_dialog.axes
-        ax.clear()
-        ax.plot(line_cut.distance_m, line_cut.value, '.-', linewidth=1.5)
-        ax.set_xlabel('Distance [m]')
-        ax.set_ylabel(value_label)
-        ax.grid(True)
+        if not line_cut.series:
+            logger.warning('Line-cut has no series!')
+            return
+
+        axes = self._line_cut_dialog.prepare_axes(len(line_cut.series))
+        artists = list()
+
+        for index, (ax, series) in enumerate(zip(axes, line_cut.series)):
+            # Each twinned axis restarts the property cycle, so assign colors explicitly.
+            color = f'C{index}'
+            (artist,) = ax.plot(
+                line_cut.distance_m,
+                series.value,
+                '.-',
+                linewidth=1.5,
+                color=color,
+                label=series.label,
+            )
+            artists.append(artist)
+            ax.set_ylabel(series.label, color=color)
+            ax.tick_params(axis='y', labelcolor=color)
+
+        primary_axis = axes[0]
+        primary_axis.set_xlabel('Distance [m]')
+        primary_axis.grid(True)
+
+        if len(artists) > 1:
+            primary_axis.legend(artists, [series.label for series in line_cut.series])
+
         self._line_cut_dialog.figure_canvas.draw()
         self._line_cut_dialog.open()
 
