@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import abstractmethod
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterator, Sequence
 import logging
 
 import numpy
@@ -50,6 +50,12 @@ class ProbePositionsBuilder(ParameterGroup):
 
         self.jitter_radius_m = settings.jitter_radius_m.copy()
         self._add_parameter('jitter_radius_m', self.jitter_radius_m)
+
+        self.num_discard_at_start = settings.num_discard_at_start.copy()
+        self._add_parameter('num_discard_at_start', self.num_discard_at_start)
+
+        self.num_discard_at_end = settings.num_discard_at_end.copy()
+        self._add_parameter('num_discard_at_end', self.num_discard_at_end)
 
     def get_name(self) -> str:
         return self._name.get_value()
@@ -125,21 +131,74 @@ class ProbePositionsBuilder(ParameterGroup):
         pass
 
     @abstractmethod
-    def build(self) -> ProbePositionSequence:
+    def _build_raw(self) -> Sequence[ProbePosition]:
+        """Return the raw, unconditioned probe positions in acquisition order.
+
+        Implementations must NOT apply the trim, affine transform, or jitter;
+        `build` owns the conditioning pipeline.
+        """
         pass
 
-    def _create_position_sequence(
-        self, positions: Iterable[ProbePosition]
-    ) -> ProbePositionSequence:
+    def build(self) -> ProbePositionSequence:
+        """Return the conditioned probe positions: trim, then affine, then jitter.
+
+        Overriding this method is reserved for builders whose positions are
+        already conditioned; see `FromMemoryProbePositionsBuilder`. Every builder
+        that ingests raw instrument coordinates must leave it alone and implement
+        `_build_raw` instead.
+        """
+        return self._condition_positions(self._build_raw())
+
+    def _condition_positions(self, positions: Sequence[ProbePosition]) -> ProbePositionSequence:
+        trimmed = self._trim_positions(positions)
         transform = self.get_transform()
         jitter_radius_m = self.jitter_radius_m.get_value()
         rng = self._rng if jitter_radius_m > 0.0 else None
         return ProbePositionSequence(
-            [*transform_probe_positions(positions, transform, rng, jitter_radius_m)]
+            [*transform_probe_positions(trimmed, transform, rng, jitter_radius_m)]
         )
+
+    def _trim_positions(self, positions: Sequence[ProbePosition]) -> Sequence[ProbePosition]:
+        """Discard points from each end of the scan, in acquisition order.
+
+        Surviving points keep their original scan indexes. Diffraction patterns
+        whose index falls outside the trimmed range are dropped downstream by
+        `AssembledDiffractionData.prepare_reconstruct_input`, which never
+        extrapolates beyond the position-index anchors.
+        """
+        num_discard_at_start = self.num_discard_at_start.get_value()
+        num_discard_at_end = self.num_discard_at_end.get_value()
+
+        if num_discard_at_start == 0 and num_discard_at_end == 0:
+            return positions
+
+        num_positions = len(positions)
+        stop = num_positions - num_discard_at_end
+
+        if stop <= num_discard_at_start:
+            logger.warning(
+                f'Discarding {num_discard_at_start} probe position(s) at the start and'
+                f' {num_discard_at_end} at the end leaves nothing of {num_positions}!'
+            )
+            return []
+
+        return positions[num_discard_at_start:stop]
 
 
 class FromMemoryProbePositionsBuilder(ProbePositionsBuilder):
+    """Probe positions that have already been conditioned.
+
+    Two things produce these. Reconstruction output, which `ProcessingTaskMonitor`
+    re-assigns to the output product item on every reconstructor iteration (see
+    `model/processing/monitor.py`), and products loaded from HDF5/NPZ, whose
+    positions were conditioned before they were saved. In both cases the trim,
+    affine transform, and jitter have already been applied upstream. Re-applying
+    them here would corrupt position-corrected output a little more on every
+    iteration, and would move the positions out of the coordinate frame the
+    reconstructed object was solved in. `build` therefore deliberately bypasses
+    the conditioning pipeline.
+    """
+
     def __init__(
         self,
         rng: numpy.random.Generator,
@@ -151,9 +210,6 @@ class FromMemoryProbePositionsBuilder(ProbePositionsBuilder):
         self._settings = settings
         self._position_seq = ProbePositionSequence(position_seq)
 
-        # set identity transformation
-        self.assign_preset_transform(0)
-
     def copy(self) -> FromMemoryProbePositionsBuilder:
         builder = FromMemoryProbePositionsBuilder(self._rng, self._settings, self._position_seq)
 
@@ -162,8 +218,11 @@ class FromMemoryProbePositionsBuilder(ProbePositionsBuilder):
 
         return builder
 
-    def build(self) -> ProbePositionSequence:
+    def _build_raw(self) -> ProbePositionSequence:
         return self._position_seq
+
+    def build(self) -> ProbePositionSequence:
+        return self._build_raw()
 
 
 class FromFileProbePositionsBuilder(ProbePositionsBuilder):
@@ -192,7 +251,7 @@ class FromFileProbePositionsBuilder(ProbePositionsBuilder):
 
         return builder
 
-    def build(self) -> ProbePositionSequence:
+    def _build_raw(self) -> ProbePositionSequence:
         file_path = self.file_path.get_value()
         file_type = self.file_type.get_value()
         logger.debug(f'Reading "{file_path}" as "{file_type}"')

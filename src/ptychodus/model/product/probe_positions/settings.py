@@ -23,6 +23,12 @@ class ProbePositionsSettings(Observable, Observer):
         self.jitter_radius_m = self._group.create_real_parameter(
             'JitterRadiusInMeters', 0.0, minimum=0.0
         )
+        self.num_discard_at_start = self._group.create_integer_parameter(
+            'NumberOfPointsToDiscardAtStart', 0, minimum=0
+        )
+        self.num_discard_at_end = self._group.create_integer_parameter(
+            'NumberOfPointsToDiscardAtEnd', 0, minimum=0
+        )
 
         self.expand_bbox = self._group.create_boolean_parameter('ExpandBoundingBox', False)
         self.expand_bbox_xmin_m = self._group.create_real_parameter(

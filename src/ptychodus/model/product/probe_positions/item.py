@@ -108,7 +108,11 @@ class ProbePositionsRepositoryItem(ParameterGroup):
             logger.exception('Failed to rebuild scan!')
             return
 
-        self._probe_positions = ProbePositionSequence(probe_positions)
+        # build() always returns a ProbePositionSequence, and the class has no
+        # mutators, so there is nothing to defend against by copying. This path
+        # runs once per reconstructor iteration; the old round-trip through
+        # Python dataclasses was O(N) every time.
+        self._probe_positions = probe_positions
         self._geometry = calculate_scan_geometry(probe_positions)
         self.notify_observers()
 

@@ -1,9 +1,10 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from enum import IntEnum
 
 import numpy
 
-from ptychodus.api.probe_positions import ProbePositionSequence
+from ptychodus.api.probe_positions import ProbePosition
 from ptychodus.api.probe_positions_gen import generate_cartesian_probe_positions
 
 from .builder import ProbePositionsBuilder
@@ -69,7 +70,7 @@ class CartesianProbePositionsBuilder(ProbePositionsBuilder):
     def is_equilateral(self) -> bool:
         return self._variant.is_equilateral
 
-    def build(self) -> ProbePositionSequence:
+    def _build_raw(self) -> Sequence[ProbePosition]:
         step_size_x_m = self.step_size_x_m.get_value()
 
         if self._variant.is_equilateral:
@@ -88,4 +89,4 @@ class CartesianProbePositionsBuilder(ProbePositionsBuilder):
             snake=self._variant.is_snaked,
             stagger=self._variant.is_staggered,
         )
-        return self._create_position_sequence(positions)
+        return [*positions]

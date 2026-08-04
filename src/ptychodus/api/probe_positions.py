@@ -76,7 +76,13 @@ class ProbePositionSequence(Sequence[ProbePosition]):
 
     def __getitem__(self, index: int | slice) -> ProbePosition | Sequence[ProbePosition]:
         if isinstance(index, slice):
-            return [self[idx] for idx in range(index.start, index.stop, index.step)]
+            # Slice the backing arrays directly rather than materializing a
+            # ProbePosition per element. Basic numpy slicing returns views; that
+            # is safe because this class exposes no mutators.
+            seq = ProbePositionSequence()
+            seq._indexes = self._indexes[index]
+            seq._coordinates_m = self._coordinates_m[index, :]
+            return seq
 
         return ProbePosition(
             index=self._indexes[index],

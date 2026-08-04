@@ -129,9 +129,33 @@ class ProbePositionsEditorViewControllerFactory:
     def _append_common_controls(
         self, dialog_builder: ParameterViewBuilder, item: ProbePositionsRepositoryItem
     ) -> None:
-        dialog_builder.add_view_controller_to_bottom(
-            ProbePositionsTransformViewController(item.get_builder())
-        )
+        builder = item.get_builder()
+
+        # A from-memory builder holds already-conditioned positions (reconstruction
+        # output, or a product loaded from file), so its trim and transform
+        # parameters are deliberately inert; do not offer controls that would do
+        # nothing. The bounding box lives on the item and only widens the object
+        # canvas, so it stays available for every builder.
+        if not isinstance(builder, FromMemoryProbePositionsBuilder):
+            trim_group = 'Trim Probe Positions'
+            dialog_builder.add_spin_box(
+                builder.num_discard_at_start,
+                'Discard at Start:',
+                tool_tip='Number of probe positions to discard from the beginning'
+                ' of the scan, in acquisition order.',
+                group=trim_group,
+            )
+            dialog_builder.add_spin_box(
+                builder.num_discard_at_end,
+                'Discard at End:',
+                tool_tip='Number of probe positions to discard from the end'
+                ' of the scan, in acquisition order.',
+                group=trim_group,
+            )
+            dialog_builder.add_view_controller_to_bottom(
+                ProbePositionsTransformViewController(builder)
+            )
+
         dialog_builder.add_view_controller_to_bottom(ScanBoundingBoxViewController(item))
 
     def create_editor_dialog(
