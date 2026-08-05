@@ -1,4 +1,4 @@
-from .builder import ObjectBuilder
+from .builder import FromFileObjectBuilder, FromMemoryObjectBuilder, ObjectBuilder
 from .builder_factory import ObjectBuilderFactory
 from .dead_leaves import DeadLeavesObjectBuilder
 from .fractal_noise import FractalNoiseObjectBuilder
@@ -13,6 +13,8 @@ from .stxm import STXMObjectBuilder
 __all__ = [
     'DeadLeavesObjectBuilder',
     'FractalNoiseObjectBuilder',
+    'FromFileObjectBuilder',
+    'FromMemoryObjectBuilder',
     'GaussianRandomFieldObjectBuilder',
     'ObjectBuilder',
     'ObjectBuilderFactory',

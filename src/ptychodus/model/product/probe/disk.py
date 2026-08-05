@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy
 
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
-from ptychodus.api.probe_gen import defocus_probe, generate_disk_probe, rescale_probe_intensity
+from ptychodus.api.probe_gen import defocus_probe, generate_disk_probe
 
 from .builder import ProbeSequenceBuilder
 from .settings import ProbeSettings
@@ -11,8 +11,7 @@ from .settings import ProbeSettings
 
 class DiskProbeBuilder(ProbeSequenceBuilder):
     def __init__(self, rng: numpy.random.Generator, settings: ProbeSettings) -> None:
-        super().__init__(settings, 'disk')
-        self._rng = rng
+        super().__init__(rng, settings, 'disk')
         self._settings = settings
 
         self.diameter_m = settings.disk_diameter_m.copy()
@@ -30,8 +29,8 @@ class DiskProbeBuilder(ProbeSequenceBuilder):
 
         return builder
 
-    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
-        probe = rescale_probe_intensity(
+    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+        return self._rescale_to_photon_count(
             defocus_probe(
                 generate_disk_probe(
                     geometry_provider.get_probe_geometry(),
@@ -40,6 +39,5 @@ class DiskProbeBuilder(ProbeSequenceBuilder):
                 probe_wavelength_m=geometry_provider.probe_wavelength_m,
                 defocus_distance_m=self.defocus_distance_m.get_value(),
             ),
-            geometry_provider.probe_photon_count,
+            geometry_provider,
         )
-        return self._build_probe_modes(self._rng, probe, geometry_provider.num_scan_points)

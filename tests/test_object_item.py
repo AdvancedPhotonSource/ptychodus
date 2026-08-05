@@ -82,13 +82,18 @@ class _RecordingObjectBuilder(ObjectBuilder):
     def copy(self) -> _RecordingObjectBuilder:
         return _RecordingObjectBuilder(self._settings, self._canned)
 
+    def _build_raw(self, geometry_provider: ObjectGeometryProvider) -> Object:
+        self.build_calls.append(geometry_provider)
+        return self._canned
+
     def build(
         self,
         geometry_provider: ObjectGeometryProvider,
         layer_spacing_m: Sequence[float],
     ) -> Object:
-        self.build_calls.append(geometry_provider)
-        return self._canned
+        # These tests exercise rebuild's geometry guard, not the conditioning
+        # pipeline, so bypass it and hand back the canned object by identity.
+        return self._build_raw(geometry_provider)
 
 
 def _make_object_geometry(pixel_width_m: float, pixel_height_m: float) -> ObjectGeometry:

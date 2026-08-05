@@ -1,5 +1,4 @@
 from __future__ import annotations
-from collections.abc import Sequence
 import logging
 
 
@@ -38,11 +37,7 @@ class PaganinObjectBuilder(ObjectBuilder):
 
         return builder
 
-    def build(
-        self,
-        geometry_provider: ObjectGeometryProvider,
-        layer_spacing_m: Sequence[float],
-    ) -> Object:
+    def _build_raw(self, geometry_provider: ObjectGeometryProvider) -> Object:
         object_ = generate_paganin_object(
             geometry_provider.get_object_geometry(),
             self._dataset.get_assembled_data(),
@@ -51,4 +46,4 @@ class PaganinObjectBuilder(ObjectBuilder):
             propagation_distance_m=self.propagation_distance_m.get_value(),
             delta_over_beta=self.delta_over_beta.get_value(),
         )
-        return self._create_object(object_, layer_spacing_m)
+        return self._pad_object(object_)

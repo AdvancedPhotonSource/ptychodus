@@ -22,11 +22,15 @@ from ptychodus.model.product.probe.item import ProbeRepositoryItem
 from ptychodus.model.product.probe.settings import ProbeSettings
 
 
+def _make_rng() -> numpy.random.Generator:
+    return numpy.random.default_rng(42)
+
+
 class _RecordingBuilder(ProbeSequenceBuilder):
     """Minimal builder that records build() invocations without touching numpy math."""
 
     def __init__(self, settings: ProbeSettings, probe_seq: ProbeSequence) -> None:
-        super().__init__(settings, 'recording')
+        super().__init__(_make_rng(), settings, 'recording')
         self._settings = settings
         self._probe_seq = probe_seq
         self.build_calls: list[ProbeGeometryProvider] = []
@@ -34,9 +38,14 @@ class _RecordingBuilder(ProbeSequenceBuilder):
     def copy(self) -> _RecordingBuilder:
         return _RecordingBuilder(self._settings, self._probe_seq)
 
-    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
         self.build_calls.append(geometry_provider)
         return self._probe_seq
+
+    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+        # These tests exercise _rebuild's geometry guard, not the conditioning
+        # pipeline, so bypass it and hand back the canned sequence by identity.
+        return self._build_raw(geometry_provider)
 
 
 def _make_provider(pixel_width_m: float, pixel_height_m: float) -> MagicMock:
@@ -68,7 +77,7 @@ def test_rebuild_skips_when_geometry_not_ready() -> None:
     canned = _make_probe_seq(pixel_size_m=1e-6)
     builder = _RecordingBuilder(settings, canned)
 
-    item = ProbeRepositoryItem(provider, settings, builder)
+    item = ProbeRepositoryItem(_make_rng(), provider, settings, builder)
 
     assert builder.build_calls == []
     # The null sentinel from ProbeRepositoryItem.__init__ has size 0; the canned
@@ -87,7 +96,7 @@ def test_rebuild_fires_when_geometry_becomes_ready() -> None:
     canned = _make_probe_seq(pixel_size_m=2e-6)
     builder = _RecordingBuilder(settings, canned)
 
-    item = ProbeRepositoryItem(provider, settings, builder)
+    item = ProbeRepositoryItem(_make_rng(), provider, settings, builder)
     assert builder.build_calls == []
 
     # Provider becomes ready (dataset would bind in production).
@@ -116,7 +125,7 @@ def test_rebuild_skips_when_only_one_dimension_is_zero() -> None:
     canned = _make_probe_seq(pixel_size_m=1e-6)
     builder = _RecordingBuilder(settings, canned)
 
-    item = ProbeRepositoryItem(provider, settings, builder)
+    item = ProbeRepositoryItem(_make_rng(), provider, settings, builder)
 
     assert builder.build_calls == []
     assert item.get_probes().get_array().size == 0
@@ -133,7 +142,7 @@ def test_try_get_probe_returns_none_on_null_sentinel() -> None:
     canned = _make_probe_seq(pixel_size_m=1e-6)
     builder = _RecordingBuilder(settings, canned)
 
-    item = ProbeRepositoryItem(provider, settings, builder)
+    item = ProbeRepositoryItem(_make_rng(), provider, settings, builder)
     assert try_get_probe(item) is None
 
 
@@ -192,7 +201,7 @@ def test_rebuild_fires_on_geometry_observer_notification() -> None:
     canned = _make_probe_seq(pixel_size_m=1e-6)
     builder = _RecordingBuilder(settings, canned)
 
-    item = ProbeRepositoryItem(provider, settings, builder)
+    item = ProbeRepositoryItem(_make_rng(), provider, settings, builder)
     assert builder.build_calls == []  # guard blocks initial rebuild
 
     provider.set_geometry(
@@ -214,7 +223,7 @@ def test_try_get_probe_returns_probe_when_ready() -> None:
     canned = _make_probe_seq(pixel_size_m=1e-6)
     builder = _RecordingBuilder(settings, canned)
 
-    item = ProbeRepositoryItem(provider, settings, builder)
+    item = ProbeRepositoryItem(_make_rng(), provider, settings, builder)
 
     provider.get_probe_geometry.return_value = ProbeGeometry(
         width_px=64,

@@ -11,7 +11,7 @@ from PyQt5.QtCore import (
     QSortFilterProxyModel,
     Qt,
 )
-from PyQt5.QtGui import QBrush
+from PyQt5.QtGui import QBrush, QFont
 from PyQt5.QtWidgets import QAbstractItemView, QAction, QInputDialog
 
 from ptychodus.api.common import BYTES_PER_MEGABYTE
@@ -106,12 +106,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 match index.column():
                     case 0:
-                        name = metadata_item.name.get_value()
-                        if pending:
-                            return f'{name} (loading…)'
-                        if failed:
-                            return f'{name} (failed)'
-                        return name
+                        return metadata_item.name.get_value()
                     case 1:
                         if pending or failed:
                             return '—'
@@ -137,6 +132,17 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                             return '—'
                         product = item.get_product()
                         return f'{product.nbytes / BYTES_PER_MEGABYTE:.2f}'
+            elif role == Qt.ItemDataRole.FontRole:
+                if pending or failed:
+                    font = QFont()
+                    font.setItalic(pending)
+                    font.setStrikeOut(failed)
+                    return font
+            elif role == Qt.ItemDataRole.ToolTipRole:
+                if pending:
+                    return 'Loading…'
+                if failed:
+                    return 'Load failed'
             elif role == Qt.ItemDataRole.ForegroundRole:
                 if pending or failed:
                     return QBrush(Qt.GlobalColor.gray)
@@ -207,7 +213,15 @@ class ProductRepositoryTableModel(QAbstractTableModel):
         self._emit_row_changed(index, [Qt.ItemDataRole.DisplayRole])
 
     def handle_state_changed(self, index: int, item: ProductRepositoryItem) -> None:
-        self._emit_row_changed(index, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ForegroundRole])
+        self._emit_row_changed(
+            index,
+            [
+                Qt.ItemDataRole.DisplayRole,
+                Qt.ItemDataRole.ForegroundRole,
+                Qt.ItemDataRole.FontRole,
+                Qt.ItemDataRole.ToolTipRole,
+            ],
+        )
 
     def handle_probe_positions_changed(
         self, index: int, item: ProbePositionsRepositoryItem

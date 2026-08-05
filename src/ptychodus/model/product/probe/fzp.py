@@ -8,7 +8,6 @@ from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
 from ptychodus.api.probe_gen import (
     FresnelZonePlate,
     generate_fresnel_zone_plate_probe,
-    rescale_probe_intensity,
 )
 
 from .builder import ProbeSequenceBuilder
@@ -22,8 +21,7 @@ class FresnelZonePlateProbeBuilder(ProbeSequenceBuilder):
         settings: ProbeSettings,
         fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
     ) -> None:
-        super().__init__(settings, 'fresnel_zone_plate')
-        self._rng = rng
+        super().__init__(rng, settings, 'fresnel_zone_plate')
         self._settings = settings
         self._fresnel_zone_plate_chooser = fresnel_zone_plate_chooser
 
@@ -61,19 +59,18 @@ class FresnelZonePlateProbeBuilder(ProbeSequenceBuilder):
         self.outermost_zone_width_m.set_value(fzp.outermost_zone_width_m)
         self.central_beamstop_diameter_m.set_value(fzp.central_beamstop_diameter_m)
 
-    def build(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
+    def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
         zone_plate = FresnelZonePlate(
             zone_plate_diameter_m=self.zone_plate_diameter_m.get_value(),
             outermost_zone_width_m=self.outermost_zone_width_m.get_value(),
             central_beamstop_diameter_m=self.central_beamstop_diameter_m.get_value(),
         )
-        probe = rescale_probe_intensity(
+        return self._rescale_to_photon_count(
             generate_fresnel_zone_plate_probe(
                 geometry=geometry_provider.get_probe_geometry(),
                 zone_plate=zone_plate,
                 probe_wavelength_m=geometry_provider.probe_wavelength_m,
                 defocus_distance_m=self.defocus_distance_m.get_value(),
             ),
-            geometry_provider.probe_photon_count,
+            geometry_provider,
         )
-        return self._build_probe_modes(self._rng, probe, geometry_provider.num_scan_points)

@@ -1,5 +1,4 @@
 from __future__ import annotations
-from collections.abc import Sequence
 import logging
 
 
@@ -31,14 +30,10 @@ class STXMObjectBuilder(ObjectBuilder):
 
         return builder
 
-    def build(
-        self,
-        geometry_provider: ObjectGeometryProvider,
-        layer_spacing_m: Sequence[float],
-    ) -> Object:
+    def _build_raw(self, geometry_provider: ObjectGeometryProvider) -> Object:
         object_ = generate_stxm_object(
             geometry_provider.get_object_geometry(),
             self._dataset.get_assembled_data(),
             geometry_provider.get_probe_positions(),
         )
-        return self._create_object(object_, layer_spacing_m)
+        return self._pad_object(object_)

@@ -105,7 +105,7 @@ class ProbeBuilderFactory(Iterable[str]):
         self._file_reader_chooser.set_current_plugin(file_filter)
         file_reader = self._file_reader_chooser.get_current_plugin().strategy
 
-        builder = FromFileProbeBuilder(self._settings, file_reader)
+        builder = FromFileProbeBuilder(self._rng, self._settings, file_reader)
         builder.file_path.set_value(file_path)
         builder.file_type.set_value(self._file_reader_chooser.get_current_plugin().simple_name)
         return builder

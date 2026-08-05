@@ -1,5 +1,4 @@
 from __future__ import annotations
-from collections.abc import Sequence
 
 import numpy
 
@@ -27,14 +26,10 @@ class GaussianRandomFieldObjectBuilder(ObjectBuilder):
 
         return builder
 
-    def build(
-        self,
-        geometry_provider: ObjectGeometryProvider,
-        layer_spacing_m: Sequence[float],
-    ) -> Object:
+    def _build_raw(self, geometry_provider: ObjectGeometryProvider) -> Object:
         object_ = generate_gaussian_random_field_object(
             self._rng,
             geometry_provider.get_object_geometry(),
             correlation_length_px=self.correlation_length_px.get_value(),
         )
-        return self._create_object(object_, layer_spacing_m)
+        return self._pad_object(object_)

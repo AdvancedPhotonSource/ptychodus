@@ -19,6 +19,7 @@ from ...model.product.probe import (
     AveragePatternProbeBuilder,
     DiskProbeBuilder,
     FresnelZonePlateProbeBuilder,
+    FromFileProbeBuilder,
     HermiteProbeBuilder,
     ProbeModeDecayType,
     ProbeRepositoryItem,
@@ -356,10 +357,16 @@ class ProbeEditorViewControllerFactory:
         probe_builder: ProbeSequenceBuilder,
         dialog_builder: ParameterViewBuilder,
     ) -> None:
+        expand_only_tool_tip = (
+            'Modes are only ever added, never removed. A probe that already has'
+            ' more modes than this keeps the ones it has.'
+        )
+
         incoherent_modes_group = 'Incoherent (Mixed State) Modes'
         dialog_builder.add_spin_box(
             probe_builder.num_incoherent_modes,
             'Number of Modes:',
+            tool_tip=expand_only_tool_tip,
             group=incoherent_modes_group,
         )
         dialog_builder.add_check_box(
@@ -382,6 +389,7 @@ class ProbeEditorViewControllerFactory:
         dialog_builder.add_spin_box(
             probe_builder.num_coherent_modes,
             'Number of Modes:',
+            tool_tip=expand_only_tool_tip,
             group=coherent_modes_group,
         )
 
@@ -395,7 +403,14 @@ class ProbeEditorViewControllerFactory:
         dialog_builder = ParameterViewBuilder()
         dialog_builder.add_view_controller_to_top(ProbeMetricsViewController('Probe Metrics', item))
 
-        if self._append_primary_mode(probe_builder, dialog_builder):
+        # A from-file probe is conditioned on the way in, so the mode parameters
+        # do something and belong in the dialog. A from-memory probe holds an
+        # already-conditioned probe -- reconstruction output, or a product loaded
+        # from file -- whose mode parameters are deliberately inert, so offering
+        # controls that would silently do nothing is worse than offering none.
+        has_primary_mode = self._append_primary_mode(probe_builder, dialog_builder)
+
+        if has_primary_mode or isinstance(probe_builder, FromFileProbeBuilder):
             self._append_additional_modes(probe_builder, dialog_builder)
         else:
             dialog_builder.add_view_controller_to_bottom(

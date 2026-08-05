@@ -603,7 +603,9 @@ class ProbeSequence(Sequence[Probe]):
 
     def __getitem__(self, index: int | slice) -> Probe | Sequence[Probe]:
         if isinstance(index, slice):
-            return [self[idx] for idx in range(index.start, index.stop, index.step)]
+            # slice.indices normalizes implicit bounds, negative indexes, and
+            # out-of-range values against the sequence length.
+            return [self[idx] for idx in range(*index.indices(len(self)))]
 
         array = self._array[0, :, :, :].copy()
 

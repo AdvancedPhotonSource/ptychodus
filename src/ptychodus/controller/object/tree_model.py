@@ -28,9 +28,16 @@ class ObjectTreeNode:
         self.parent = parent
         self.children: list[ObjectTreeNode] = list()
 
-    def insert_node(self, index: int = -1) -> ObjectTreeNode:
+    def insert_node(self, index: int | None = None) -> ObjectTreeNode:
         node = ObjectTreeNode(self)
-        self.children.insert(index, node)
+
+        if index is None:
+            # list.insert(-1, ...) inserts *before* the last child rather than
+            # appending, which scrambles the order the callers below rely on.
+            self.children.append(node)
+        else:
+            self.children.insert(index, node)
+
         return node
 
     def remove_node(self, index: int = -1) -> ObjectTreeNode:
@@ -81,8 +88,13 @@ class ObjectTreeModel(QAbstractItemModel):
         self.endInsertRows()
 
     def update_item(self, index: int, item: ObjectRepositoryItem) -> None:
+        # Qt row/column bounds are inclusive, so the last valid column is
+        # len(self._header) - 1. Asking index() for one past the end fails
+        # hasIndex and yields an invalid QModelIndex, which makes the
+        # dataChanged range malformed and the signal a no-op.
+        last_column = len(self._header) - 1
         top_left = self.index(index, 0)
-        bottom_right = self.index(index, len(self._header))
+        bottom_right = self.index(index, last_column)
         self.dataChanged.emit(top_left, bottom_right)
 
         node = self._tree_root.children[index]
@@ -90,23 +102,24 @@ class ObjectTreeModel(QAbstractItemModel):
         num_layers_new = item.get_object().num_layers
 
         if num_layers_old < num_layers_new:
-            self.beginInsertRows(top_left, num_layers_old, num_layers_new)
+            self.beginInsertRows(top_left, num_layers_old, num_layers_new - 1)
 
             while len(node.children) < num_layers_new:
                 node.insert_node()
 
             self.endInsertRows()
         elif num_layers_old > num_layers_new:
-            self.beginRemoveRows(top_left, num_layers_new, num_layers_old)
+            self.beginRemoveRows(top_left, num_layers_new, num_layers_old - 1)
 
             while len(node.children) > num_layers_new:
                 node.remove_node()
 
             self.endRemoveRows()
 
-        child_top_left = self.index(0, 0, top_left)
-        child_bottom_right = self.index(num_layers_new, len(self._header), top_left)
-        self.dataChanged.emit(child_top_left, child_bottom_right)
+        if num_layers_new > 0:
+            child_top_left = self.index(0, 0, top_left)
+            child_bottom_right = self.index(num_layers_new - 1, last_column, top_left)
+            self.dataChanged.emit(child_top_left, child_bottom_right)
 
     def remove_item(self, index: int, item: ObjectRepositoryItem) -> None:
         self.beginRemoveRows(QModelIndex(), index, index)
@@ -171,7 +184,10 @@ class ObjectTreeModel(QAbstractItemModel):
                         try:
                             return item.layer_spacing_m[index.row()]
                         except IndexError:
-                            return float('inf')
+                            # N layers have N-1 spacings, so the last layer has
+                            # no distance to the next one. flags() already makes
+                            # that cell read-only; show it blank rather than inf.
+                            return None
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush
@@ -240,7 +256,7 @@ class ObjectTreeModel(QAbstractItemModel):
                         return False
 
                     item.layer_spacing_m[index.row()] = distance_m
-                    return False
+                    return True
             else:
                 if index.column() == 0:
                     self._repository.set_name(index.row(), str(value))

@@ -1,5 +1,4 @@
 from __future__ import annotations
-from collections.abc import Sequence
 
 import numpy
 
@@ -33,11 +32,7 @@ class RandomObjectBuilder(ObjectBuilder):
 
         return builder
 
-    def build(
-        self,
-        geometry_provider: ObjectGeometryProvider,
-        layer_spacing_m: Sequence[float],
-    ) -> Object:
+    def _build_raw(self, geometry_provider: ObjectGeometryProvider) -> Object:
         object_ = generate_random_object(
             self._rng,
             geometry_provider.get_object_geometry(),
@@ -47,4 +42,4 @@ class RandomObjectBuilder(ObjectBuilder):
             phase_deviation_tr=self.phase_deviation_tr.get_value(),
             blur_deviation_px=self.blur_deviation_px.get_value(),
         )
-        return self._create_object(object_, layer_spacing_m)
+        return self._pad_object(object_)

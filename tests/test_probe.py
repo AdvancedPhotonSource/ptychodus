@@ -7,6 +7,7 @@ import pytest
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.probe import (
     Probe,
+    ProbeSequence,
     ProbeSizeMetrics,
     compute_shannon_entropy,
     estimate_probe_entropy,
@@ -229,3 +230,64 @@ class TestEstimateProbeEntropy:
 
         assert narrow.real_space_intensity_entropy < broad.real_space_intensity_entropy
         assert narrow.spectral_entropy > broad.spectral_entropy
+
+
+class TestProbeSequenceSlicing:
+    """Regression tests for ProbeSequence.__getitem__.
+
+    The slice path used to build its indices from
+    ``range(index.start, index.stop, index.step)``, so every slice with an
+    implicit bound raised TypeError. Only a fully-specified positive-step slice
+    such as ``seq[0:2:1]`` worked.
+    """
+
+    def _sequence(self, num_positions: int = 5) -> ProbeSequence:
+        """Two coherent modes over *num_positions* scan positions, so len() > 1."""
+        array = numpy.arange(2 * 1 * 4 * 4, dtype=numpy.complex128).reshape(2, 1, 4, 4)
+        opr_weights = numpy.arange(num_positions * 2, dtype=float).reshape(num_positions, 2)
+        return ProbeSequence(array, opr_weights, PIXEL_GEOMETRY)
+
+    @pytest.mark.parametrize(
+        ('index', 'expected_length'),
+        [
+            (slice(None, 2), 2),
+            (slice(1, 3), 2),
+            (slice(None), 5),
+            (slice(None, None, 2), 3),
+            (slice(-2, None), 2),
+            (slice(None, 99), 5),
+        ],
+    )
+    def test_slice_returns_expected_number_of_probes(
+        self, index: slice, expected_length: int
+    ) -> None:
+        probes = self._sequence()[index]
+        assert len(probes) == expected_length
+        assert all(isinstance(probe, Probe) for probe in probes)
+
+    def test_empty_slice_returns_empty_list(self) -> None:
+        assert len(self._sequence()[3:1]) == 0
+
+    def test_negative_step_reverses(self) -> None:
+        sequence = self._sequence()
+        reversed_probes = sequence[::-1]
+        assert len(reversed_probes) == 5
+
+        for offset, probe in enumerate(reversed_probes):
+            expected = sequence[4 - offset]
+            numpy.testing.assert_array_equal(probe.get_array(), expected.get_array())
+
+    def test_slice_agrees_with_integer_indexing(self) -> None:
+        sequence = self._sequence()
+
+        for offset, probe in enumerate(sequence[1:4]):
+            expected = sequence[1 + offset]
+            numpy.testing.assert_array_equal(probe.get_array(), expected.get_array())
+
+    def test_slice_without_opr_weights(self) -> None:
+        """__len__ reports 1 when there are no OPR weights, so [:] yields one probe."""
+        array = numpy.ones((1, 1, 4, 4), dtype=numpy.complex128)
+        sequence = ProbeSequence(array, None, PIXEL_GEOMETRY)
+
+        assert len(sequence) == 1
+        assert len(sequence[:]) == 1

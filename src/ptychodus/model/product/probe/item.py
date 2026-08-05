@@ -1,6 +1,8 @@
 from __future__ import annotations
 import logging
 
+import numpy
+
 from ptychodus.api.observer import Observable
 from ptychodus.api.parametric import ParameterGroup
 from ptychodus.api.probe import (
@@ -21,11 +23,13 @@ logger = logging.getLogger(__name__)
 class ProbeRepositoryItem(ParameterGroup):
     def __init__(
         self,
+        rng: numpy.random.Generator,
         geometry_provider: ProbeGeometryProvider,
         settings: ProbeSettings,
         builder: ProbeSequenceBuilder,
     ) -> None:
         super().__init__()
+        self._rng = rng
         self._geometry_provider = geometry_provider
         self._settings = settings
         self._builder = builder
@@ -41,7 +45,7 @@ class ProbeRepositoryItem(ParameterGroup):
         self._rebuild()
 
     def assign(self, probe: ProbeSequence) -> None:
-        builder = FromMemoryProbeBuilder(self._settings, probe)
+        builder = FromMemoryProbeBuilder(self._rng, self._settings, probe)
         self.set_builder(builder)
 
     def sync_to_settings(self) -> None:
