@@ -302,8 +302,8 @@ class ValueFilterViewController:
         return self._widget
 
 
-class FlipViewController:
-    """HorizontalFlipStep + VerticalFlipStep."""
+class TransformViewController:
+    """HorizontalFlipStep + VerticalFlipStep + TransposeStep."""
 
     def __init__(self, settings: DiffractionSettings) -> None:
         self._hflip_view_controller = CheckBoxParameterViewController(
@@ -312,32 +312,19 @@ class FlipViewController:
         self._vflip_view_controller = CheckBoxParameterViewController(
             settings.vflip, 'Flip Vertical'
         )
-
-        layout = QGridLayout()
-        layout.addWidget(self._hflip_view_controller.get_widget(), 0, 0)
-        layout.addWidget(self._vflip_view_controller.get_widget(), 0, 1)
-        layout.setColumnStretch(0, 1)
-        layout.setColumnStretch(1, 1)
-
-        self._widget = QGroupBox('Flip')
-        self._widget.setLayout(layout)
-
-    def get_widget(self) -> QWidget:
-        return self._widget
-
-
-class TransposeViewController:
-    """TransposeStep — swap the last two axes."""
-
-    def __init__(self, settings: DiffractionSettings) -> None:
         self._transpose_view_controller = CheckBoxParameterViewController(
             settings.transpose, 'Transpose'
         )
 
         layout = QGridLayout()
-        layout.addWidget(self._transpose_view_controller.get_widget(), 0, 0)
+        layout.addWidget(self._hflip_view_controller.get_widget(), 0, 0)
+        layout.addWidget(self._vflip_view_controller.get_widget(), 0, 1)
+        layout.addWidget(self._transpose_view_controller.get_widget(), 0, 2)
+        layout.setColumnStretch(0, 1)
+        layout.setColumnStretch(1, 1)
+        layout.setColumnStretch(2, 1)
 
-        self._widget = QGroupBox('Transpose')
+        self._widget = QGroupBox('Transform')
         self._widget.setLayout(layout)
 
     def get_widget(self) -> QWidget:
@@ -347,8 +334,8 @@ class TransposeViewController:
 class OpenDatasetWizardProcessingViewController(ParameterViewController):
     """Processing wizard page. Groups are laid out top-to-bottom in the
     DiffractionPrepPipeline execution order (see api/diffraction_prep.py):
-    filter → crop → binning → padding → hflip → vflip → transpose. Storage
-    (memory map) is not part of the pipeline but is retained here as a
+    filter → crop → binning → padding → transform (hflip → vflip → transpose).
+    Storage (memory map) is not part of the pipeline but is retained here as a
     load-time concern; the horizontal separator between it and Value Filter
     marks that boundary visually.
     """
@@ -366,8 +353,7 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
         self._crop_view_controller = CropViewController(diffraction_settings, extent_source)
         self._binning_view_controller = BinningViewController(diffraction_settings, extent_source)
         self._padding_view_controller = PaddingViewController(diffraction_settings)
-        self._flip_view_controller = FlipViewController(diffraction_settings)
-        self._transpose_view_controller = TransposeViewController(diffraction_settings)
+        self._transform_view_controller = TransformViewController(diffraction_settings)
 
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
@@ -380,8 +366,7 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
         layout.addWidget(self._crop_view_controller.get_widget())
         layout.addWidget(self._binning_view_controller.get_widget())
         layout.addWidget(self._padding_view_controller.get_widget())
-        layout.addWidget(self._flip_view_controller.get_widget())
-        layout.addWidget(self._transpose_view_controller.get_widget())
+        layout.addWidget(self._transform_view_controller.get_widget())
         layout.addStretch()
 
         self._page = OpenDatasetWizardPage()

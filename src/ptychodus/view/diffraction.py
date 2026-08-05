@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
-    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -72,26 +71,14 @@ class OpenDatasetWizardBadPixelsPage(OpenDatasetWizardPage):
 class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.detector_pixel_size_check_box = QCheckBox('Detector Pixel Size')
-        self.detector_distance_check_box = QCheckBox('Detector Distance')
-        self.pattern_crop_center_check_box = QCheckBox('Pattern Crop Center')
-        self.pattern_crop_extent_check_box = QCheckBox('Pattern Crop Extent')
-        self.probe_energy_check_box = QCheckBox('Probe Energy')
-        self.probe_photon_count_check_box = QCheckBox('Probe Photon Count')
-        self.exposure_time_check_box = QCheckBox('Exposure Time')
+        self.table_view = QTableView()
 
         self.setTitle('Import Metadata')
 
         layout = QVBoxLayout()
-        layout.addWidget(self.detector_pixel_size_check_box)
-        layout.addWidget(self.detector_distance_check_box)
-        layout.addWidget(self.pattern_crop_center_check_box)
-        layout.addWidget(self.pattern_crop_extent_check_box)
-        layout.addWidget(self.probe_energy_check_box)
-        layout.addWidget(self.probe_photon_count_check_box)
-        layout.addWidget(self.exposure_time_check_box)
-        layout.addStretch()
+        layout.addWidget(self.table_view)
         self.setLayout(layout)
+        self._set_complete(True)
 
 
 class DatasetEditorLayoutView(QGroupBox):

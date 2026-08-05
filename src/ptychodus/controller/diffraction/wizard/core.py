@@ -3,13 +3,13 @@ import logging
 from PyQt5.QtWidgets import QWizard
 
 from ....api.diffraction import DiffractionMetadata
-from ....model.metadata import MetadataPresenter
 from ....model.diffraction import (
     DetectorSettings,
     DiffractionAPI,
     DiffractionDatasetRepository,
     DiffractionSettings,
 )
+from ....model.product import ProductSettings
 from ....view.widgets import ExceptionDialog
 
 from ...data import FileDialogFactory
@@ -27,10 +27,10 @@ class OpenDatasetWizardController:
         self,
         settings: DiffractionSettings,
         detector_settings: DetectorSettings,
+        product_settings: ProductSettings,
         extent_source: DetectorExtentSource,
         api: DiffractionAPI,
         repository: DiffractionDatasetRepository,
-        metadata_presenter: MetadataPresenter,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         self._api = api
@@ -41,7 +41,10 @@ class OpenDatasetWizardController:
             settings, api, file_dialog_factory
         )
         self._metadata_view_controller = OpenDatasetWizardMetadataViewController(
-            metadata_presenter, self._get_pending_metadata
+            detector_settings,
+            settings,
+            product_settings,
+            self._get_pending_metadata,
         )
         self._bad_pixels_view_controller = OpenDatasetWizardBadPixelsViewController(
             detector_settings, api, file_dialog_factory

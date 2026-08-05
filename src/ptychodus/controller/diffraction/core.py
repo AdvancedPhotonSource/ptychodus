@@ -22,8 +22,7 @@ from ...model.diffraction import (
     PatternSizer,
 )
 from .detector_extent import DetectorExtentSource
-from ...model.metadata import MetadataPresenter
-from ...model.product import ProductRepository
+from ...model.product import ProductRepository, ProductSettings
 from ...view.diffraction import DatasetsView, DiffractionStatusView
 from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate
 from ..data import FileDialogFactory
@@ -76,11 +75,11 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
         self,
         detector_settings: DetectorSettings,
         diffraction_settings: DiffractionSettings,
+        product_settings: ProductSettings,
         pattern_sizer: PatternSizer,
         diffraction_api: DiffractionAPI,
         repository: DiffractionDatasetRepository,
         task_monitor: DiffractionTaskMonitor,
-        metadata_presenter: MetadataPresenter,
         product_repository: ProductRepository,
         product_table_model: ProductRepositoryTableModel,
         diffraction_simulator: DiffractionSimulator,
@@ -107,10 +106,10 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
         self._wizard_controller = OpenDatasetWizardController(
             diffraction_settings,
             detector_settings,
+            product_settings,
             self._detector_extent_source,
             diffraction_api,
             repository,
-            metadata_presenter,
             file_dialog_factory,
         )
         self._status_controller = DiffractionStatusController(task_monitor, status_view)
@@ -138,7 +137,7 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
 
         open_dataset_action = view.button_box.insert_menu.addAction('Open File...')
         connect_triggered_signal(open_dataset_action, self._wizard_controller.open_dataset)
-        simulate_action = view.button_box.insert_menu.addAction('Simulate Diffraction...')
+        simulate_action = view.button_box.insert_menu.addAction('Simulate...')
         connect_triggered_signal(simulate_action, self._choose_product_for_simulation)
 
         save_file_action = view.button_box.save_menu.addAction('Save File...')

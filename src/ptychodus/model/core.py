@@ -30,7 +30,6 @@ from .fluorescence import FluorescenceCore
 from .genesis import GenesisCore
 from .globus import GlobusCore
 from .memory import MemoryPresenter
-from .metadata import MetadataPresenter
 from .processing import ProcessingCore
 from .product import PositionsStreamingContext, ProductCore
 from .ptychi import PtyChiReconstructorLibrary
@@ -129,12 +128,6 @@ class ModelCore:
             self.settings_registry,
             self._task_manager,
         )
-        self.metadata_presenter = MetadataPresenter(
-            self.diffraction_core.detector_settings,
-            self.diffraction_core.diffraction_settings,
-            self.product_core.settings,
-        )
-
         self.pattern_visualization_engine = VisualizationEngine(is_complex=False)
         self.probe_visualization_engine = VisualizationEngine(is_complex=True)
         self.object_visualization_engine = VisualizationEngine(is_complex=True)

@@ -83,11 +83,11 @@ class ControllerCore:
         self._diffraction_controller = DiffractionController(
             model.diffraction_core.detector_settings,
             model.diffraction_core.diffraction_settings,
+            model.product_core.settings,
             model.diffraction_core.pattern_sizer,
             model.diffraction_core.diffraction_api,
             model.diffraction_core.repository,
             model.diffraction_core.task_monitor,
-            model.metadata_presenter,
             model.product_core.product_repository,
             self._product_table_model,
             model.analysis_core.diffraction_simulator,
