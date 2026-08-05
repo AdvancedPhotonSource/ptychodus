@@ -147,6 +147,23 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
     def get_name(self) -> str:
         return self._name
 
+    def set_name(self, name: str) -> None:
+        """Set the dataset's display name. Callers must ensure uniqueness themselves
+        (typically by routing the candidate through DiffractionDatasetRepository.create_unique_name).
+        """
+        self._name = name
+
+    def sync_pixel_geometry_to_settings(self) -> None:
+        """Promote this dataset's effective raw pixel geometry to the global fallback.
+
+        Writes the current raw geometry (override > metadata > current fallback) into
+        DetectorSettings.pixel_width_m / pixel_height_m so freshly loaded datasets that
+        lack pixel metadata pick it up. Leaves this dataset's override in place.
+        """
+        geometry = self.get_raw_pixel_geometry()
+        self._detector_settings.pixel_width_m.set_value(geometry.width_m)
+        self._detector_settings.pixel_height_m.set_value(geometry.height_m)
+
     def set_bad_pixels(self, bad_pixels: BadPixels) -> None:
         if bad_pixels.ndim != 2:
             raise ValueError(f'Bad pixels array must be 2D, got {bad_pixels.ndim}D.')

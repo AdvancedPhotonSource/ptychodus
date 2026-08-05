@@ -344,6 +344,7 @@ class ProductController(ProductRepositoryObserver):
         view.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         header = view.table_view.horizontalHeader()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
+        header.setHighlightSections(False)
 
         selection_model = view.table_view.selectionModel()
         if selection_model is not None:

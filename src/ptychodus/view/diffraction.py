@@ -7,12 +7,14 @@ from PyQt5.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QMenu,
     QProgressBar,
     QPushButton,
+    QTableView,
     QTreeView,
     QVBoxLayout,
     QWidget,
@@ -25,24 +27,22 @@ from .image import ImageView
 class DatasetsButtonBox(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.load_button = QPushButton('Load')
-        self.load_menu = QMenu()
+        self.insert_menu = QMenu()
+        self.insert_button = QPushButton('Insert')
+        self.save_menu = QMenu()
         self.save_button = QPushButton('Save')
-        self.close_button = QPushButton('Close')
-        self.close_menu = QMenu()
-        self.analyze_button = QPushButton('Analyze')
-        self.analyze_menu = QMenu()
+        self.edit_button = QPushButton('Edit')
+        self.remove_button = QPushButton('Remove')
 
-        self.load_button.setMenu(self.load_menu)
-        self.close_button.setMenu(self.close_menu)
-        self.analyze_button.setMenu(self.analyze_menu)
+        self.insert_button.setMenu(self.insert_menu)
+        self.save_button.setMenu(self.save_menu)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.load_button)
+        layout.addWidget(self.insert_button)
         layout.addWidget(self.save_button)
-        layout.addWidget(self.close_button)
-        layout.addWidget(self.analyze_button)
+        layout.addWidget(self.edit_button)
+        layout.addWidget(self.remove_button)
         self.setLayout(layout)
 
 
@@ -94,11 +94,10 @@ class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
         self.setLayout(layout)
 
 
-class DatasetFileLayoutDialog(QDialog):
+class DatasetEditorLayoutView(QGroupBox):
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
+        super().__init__('Layout')
         self.tree_view = QTreeView()
-        self.button_box = QDialogButtonBox()
 
         tree_header = self.tree_view.header()
 
@@ -106,13 +105,47 @@ class DatasetFileLayoutDialog(QDialog):
             tree_header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
             tree_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
 
+        layout = QVBoxLayout()
+        layout.addWidget(self.tree_view)
+        self.setLayout(layout)
+
+
+class DatasetEditorPropertiesView(QGroupBox):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__('Properties')
+        self.table_view = QTableView()
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.table_view)
+        self.setLayout(layout)
+
+
+class DatasetEditorDialog(QDialog):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.layout_view = DatasetEditorLayoutView()
+        self.properties_view = DatasetEditorPropertiesView()
+        self.button_box = QDialogButtonBox()
+
         self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
         self.button_box.accepted.connect(self.accept)
 
+        top_layout = QHBoxLayout()
+        top_layout.addWidget(self.layout_view)
+        top_layout.addWidget(self.properties_view)
+
         layout = QVBoxLayout()
-        layout.addWidget(self.tree_view)
+        layout.addLayout(top_layout)
         layout.addWidget(self.button_box)
         self.setLayout(layout)
+
+    @property
+    def tree_view(self) -> QTreeView:
+        return self.layout_view.tree_view
+
+    @property
+    def table_view(self) -> QTableView:
+        return self.properties_view.table_view
 
 
 class SimulateDiffractionDialog(QDialog):

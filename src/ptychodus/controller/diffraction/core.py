@@ -32,7 +32,7 @@ from ..image import ImageController
 from ..parametric import CheckBoxParameterViewController
 from ..product.core import ProductRepositoryComboProxyModel, ProductRepositoryTableModel
 from .dataset import DatasetTreeModel
-from .dataset_layout import DatasetLayoutViewController
+from .dataset_editor import DatasetEditorViewController
 from .wizard import OpenDatasetWizardController
 
 logger = logging.getLogger(__name__)
@@ -114,7 +114,7 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
             file_dialog_factory,
         )
         self._status_controller = DiffractionStatusController(task_monitor, status_view)
-        self._tree_model = DatasetTreeModel(pattern_sizer)
+        self._tree_model = DatasetTreeModel(pattern_sizer, repository)
 
         # Sizer changes (binning toggle / bin size / transpose) shift the processed
         # pixel geometry for every dataset, so refresh those two columns on notify.
@@ -132,22 +132,22 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
             raise ValueError('selection_model is None!')
         else:
             selection_model.currentChanged.connect(self._on_tree_selection_changed)
+            selection_model.currentChanged.connect(self._update_enabled_buttons)
 
         self._image_controller.clear_array()
 
-        open_dataset_action = view.button_box.load_menu.addAction('Open File...')
+        open_dataset_action = view.button_box.insert_menu.addAction('Open File...')
         connect_triggered_signal(open_dataset_action, self._wizard_controller.open_dataset)
-
-        view.button_box.save_button.clicked.connect(self._save_dataset)
-        remove_selected_action = view.button_box.close_menu.addAction('Remove Selected Dataset')
-        connect_triggered_signal(remove_selected_action, self._remove_selected_dataset)
-        close_all_action = view.button_box.close_menu.addAction('Close All Datasets')
-        connect_triggered_signal(close_all_action, self._close_all_datasets)
-
-        dataset_layout_action = view.button_box.analyze_menu.addAction('Dataset Layout...')
-        connect_triggered_signal(dataset_layout_action, self._show_dataset_layout)
-        simulate_action = view.button_box.analyze_menu.addAction('Simulate Diffraction...')
+        simulate_action = view.button_box.insert_menu.addAction('Simulate Diffraction...')
         connect_triggered_signal(simulate_action, self._choose_product_for_simulation)
+
+        save_file_action = view.button_box.save_menu.addAction('Save File...')
+        connect_triggered_signal(save_file_action, self._save_dataset)
+        sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
+        connect_triggered_signal(sync_to_settings_action, self._sync_current_to_settings)
+
+        view.button_box.edit_button.clicked.connect(self._edit_current_dataset)
+        view.button_box.remove_button.clicked.connect(self._remove_selected_dataset)
 
         view.simulate_dialog.product_combo_box.setModel(self._product_combo_model)
         self._poisson_view_controller = CheckBoxParameterViewController(
@@ -157,6 +157,7 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
         view.simulate_dialog.form_layout.insertRow(1, self._poisson_view_controller.get_widget())
         view.simulate_dialog.finished.connect(self._simulate_diffraction)
 
+        self._update_enabled_buttons(QModelIndex(), QModelIndex())
         repository.add_observer(self)
 
         # Populate the tree for datasets already present at construction time.
@@ -222,10 +223,15 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
                 logger.exception(exc)
                 ExceptionDialog.show_exception('File Writer', exc)
 
-    def _show_dataset_layout(self) -> None:
+    def _edit_current_dataset(self) -> None:
         current = self._current_dataset()
         if current is not None:
-            DatasetLayoutViewController.show_dialog(current, self._view)
+            DatasetEditorViewController.edit_dataset(current, self._view)
+
+    def _sync_current_to_settings(self) -> None:
+        current = self._current_dataset()
+        if current is not None:
+            current.sync_pixel_geometry_to_settings()
 
     def _choose_product_for_simulation(self) -> None:
         self._view.simulate_dialog.open()
@@ -254,22 +260,17 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
             self._diffraction_api.close_patterns(dataset_index)
             self._image_controller.clear_array()
 
-    def _close_all_datasets(self) -> None:
-        if len(self._repository) == 0:
-            return
-
-        button = QMessageBox.question(
-            self._view,
-            'Confirm Close All',
-            'Free every loaded diffraction dataset from memory?',
-        )
-
-        if button == QMessageBox.StandardButton.Yes:
-            self._diffraction_api.close_all_patterns()
-            self._image_controller.clear_array()
-
     def _update_info_text(self) -> None:
         self._view.info_label.setText(self._repository.get_info_text())
+
+    def _update_enabled_buttons(self, current: QModelIndex, previous: QModelIndex) -> None:
+        dataset = self._current_dataset()
+        ready = dataset is not None and not dataset.is_load_in_progress()
+
+        self._view.button_box.save_button.setEnabled(ready)
+        self._view.button_box.edit_button.setEnabled(ready)
+        # Remove is always safe: it drops the row whether pending, failed, or ready.
+        self._view.button_box.remove_button.setEnabled(dataset is not None)
 
     def _select_dataset_row(self, dataset_row: int) -> None:
         selection_model = self._view.tree_view.selectionModel()
@@ -314,6 +315,7 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
         current = selection_model.currentIndex() if selection_model is not None else QModelIndex()
         dataset_row = self._tree_model.dataset_row_for_index(current)
         self._set_current_dataset_index(dataset_row if dataset_row is not None else -1)
+        self._update_enabled_buttons(QModelIndex(), QModelIndex())
 
     def _dataset_row(self, dataset: AssembledDiffractionDataset) -> int | None:
         try:
@@ -329,6 +331,10 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
             return
         self._tree_model.insert_array(dataset_row, array_row, dataset[array_row])
         self._update_info_text()
+        # A landing array may flip the current dataset out of the loading state,
+        # re-enabling Save / Edit.
+        if dataset_row == self._current_dataset_index:
+            self._update_enabled_buttons(QModelIndex(), QModelIndex())
 
     def _handle_array_changed_for_dataset(
         self, dataset: AssembledDiffractionDataset, array_row: int

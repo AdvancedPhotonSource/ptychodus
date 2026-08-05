@@ -1,6 +1,5 @@
 from __future__ import annotations
 import logging
-import math
 from typing import Any, overload
 
 import numpy
@@ -14,6 +13,7 @@ from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.model.diffraction import (
     AssembledDiffractionArray,
     AssembledDiffractionDataset,
+    DiffractionDatasetRepository,
     PatternSizer,
 )
 
@@ -158,9 +158,15 @@ def _find_containing_dataset_row(node: _TreeNode) -> int | None:
 class DatasetTreeModel(QAbstractItemModel):
     """Three-level tree: root → dataset → array → frame."""
 
-    def __init__(self, sizer: PatternSizer, parent: QObject | None = None) -> None:
+    def __init__(
+        self,
+        sizer: PatternSizer,
+        repository: DiffractionDatasetRepository,
+        parent: QObject | None = None,
+    ) -> None:
         super().__init__(parent)
         self._sizer = sizer
+        self._repository = repository
         self._root = _TreeNode(None)
         self._max_counts = 1
         self._header = [
@@ -170,10 +176,10 @@ class DatasetTreeModel(QAbstractItemModel):
             'Size [MB]',
             'Width\n[px]',
             'Height\n[px]',
-            'Physical Pixel Width\n[µm]',
-            'Physical Pixel Height\n[µm]',
-            'Processed Pixel Width\n[µm]',
-            'Processed Pixel Height\n[µm]',
+            'Physical Pixel\nWidth [µm]',
+            'Physical Pixel\nHeight [µm]',
+            'Processed Pixel\nWidth [µm]',
+            'Processed Pixel\nHeight [µm]',
             'Num Bad\nPixels',
         ]
 
@@ -332,7 +338,8 @@ class DatasetTreeModel(QAbstractItemModel):
                 case _:
                     return self._dataset_column_display(node, column)
         elif role == Qt.ItemDataRole.EditRole:
-            return self._dataset_column_edit(node, column)
+            if column == _COL_LABEL and isinstance(node, _DatasetTreeNode):
+                return node.get_label()
         elif role == Qt.ItemDataRole.UserRole:
             if column == _COL_COUNTS:
                 return int(100 * node.get_counts()) // int(self._max_counts)
@@ -360,29 +367,14 @@ class DatasetTreeModel(QAbstractItemModel):
                 return node.get_num_bad_pixels()
         return None
 
-    def _dataset_column_edit(self, node: _TreeNode, column: int) -> Any:
-        if column not in (_COL_PHYSICAL_PIXEL_WIDTH_UM, _COL_PHYSICAL_PIXEL_HEIGHT_UM):
-            return None
-        if not isinstance(node, _DatasetTreeNode):
-            return None
-        geometry = node.get_raw_pixel_geometry()
-        if column == _COL_PHYSICAL_PIXEL_WIDTH_UM:
-            return geometry.width_m * 1e6
-        return geometry.height_m * 1e6
-
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:  # noqa: N802
         base = super().flags(index)
         if not index.isValid():
             return base
-        column = index.column()
-        if column not in (_COL_PHYSICAL_PIXEL_WIDTH_UM, _COL_PHYSICAL_PIXEL_HEIGHT_UM):
+        if index.column() != _COL_LABEL:
             return base
         node = index.internalPointer()
         if not isinstance(node, _DatasetTreeNode):
-            return base
-        # Do not offer editing during a load; the assembled-data snapshot would
-        # then be clobbered mid-flight.
-        if node.get_dataset().is_load_in_progress():
             return base
         return base | Qt.ItemFlag.ItemIsEditable
 
@@ -394,34 +386,25 @@ class DatasetTreeModel(QAbstractItemModel):
     ) -> bool:
         if role != Qt.ItemDataRole.EditRole or not index.isValid():
             return False
-        column = index.column()
-        if column not in (_COL_PHYSICAL_PIXEL_WIDTH_UM, _COL_PHYSICAL_PIXEL_HEIGHT_UM):
+        if index.column() != _COL_LABEL:
             return False
         node = index.internalPointer()
         if not isinstance(node, _DatasetTreeNode):
             return False
+
+        new_name = str(value).strip()
+        if not new_name:
+            return False
+
         dataset = node.get_dataset()
-        if dataset.is_load_in_progress():
-            logger.warning('Ignoring pixel-size edit while dataset is loading.')
+        if new_name == dataset.get_name():
             return False
 
-        try:
-            new_um = float(value)
-        except (TypeError, ValueError):
-            return False
-        if not math.isfinite(new_um) or new_um <= 0.0:
-            return False
-        new_m = new_um * 1e-6
-
-        current = dataset.get_raw_pixel_geometry()
-        if column == _COL_PHYSICAL_PIXEL_WIDTH_UM:
-            new_geometry = PixelGeometry(width_m=new_m, height_m=current.height_m)
-        else:
-            new_geometry = PixelGeometry(width_m=current.width_m, height_m=new_m)
-
-        dataset.set_pixel_geometry_override(new_geometry)
-        # The dataset emits handle_pixel_geometry_changed(); the controller's
-        # observer maps that to refresh_dataset(row), which spans every column.
+        unique_name = self._repository.create_unique_name(new_name)
+        dataset.set_name(unique_name)
+        row = node.get_row()
+        top_left = self.index(row, _COL_LABEL)
+        self.dataChanged.emit(top_left, top_left, [Qt.ItemDataRole.DisplayRole])
         return True
 
     def refresh_processed_columns(self) -> None:
