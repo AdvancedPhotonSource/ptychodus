@@ -6,17 +6,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ptychodus.api.observer import SequenceObserver
 
-from ptychodus.api.fluorescence import FluorescenceEnhancer
-from ptychodus.api.plugins import PluginChooser
-
 from ...model.analysis import IlluminationMapper, ProbePropagatorSettings, ProbePropagator
-from ...model.fluorescence import (
-    FluorescenceAPI,
-    FluorescenceTaskMonitor,
-    PtychozoonFluorescenceEnhancer,
-    TwoStepFluorescenceEnhancer,
-    VSPIFluorescenceEnhancer,
-)
 from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
 from ...model.visualization import VisualizationEngine
@@ -30,7 +20,6 @@ from ..data import FileDialogFactory
 from ..helpers import connect_triggered_signal, create_brush_for_editable_cell
 from ..image import ImageController
 from .editor_factory import ProbeEditorViewControllerFactory
-from .fluorescence import FluorescenceViewController
 from .illumination import IlluminationViewController
 from .propagator import ProbePropagationViewController
 from .tree_model import ProbeTreeModel, try_get_probe
@@ -49,13 +38,6 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         propagator_visualization_engine: VisualizationEngine,
         illumination_mapper: IlluminationMapper,
         illumination_visualization_engine: VisualizationEngine,
-        fluorescence_api: FluorescenceAPI,
-        fluorescence_enhancer_chooser: PluginChooser[FluorescenceEnhancer],
-        fluorescence_two_step_enhancer: TwoStepFluorescenceEnhancer,
-        fluorescence_vspi_enhancer: VSPIFluorescenceEnhancer,
-        fluorescence_ptychozoon_enhancer: PtychozoonFluorescenceEnhancer | None,
-        fluorescence_task_monitor: FluorescenceTaskMonitor,
-        fluorescence_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
@@ -74,16 +56,6 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self._illumination_view_controller = IlluminationViewController(
             illumination_mapper,
             illumination_visualization_engine,
-            file_dialog_factory,
-        )
-        self._fluorescence_view_controller = FluorescenceViewController(
-            fluorescence_api,
-            fluorescence_enhancer_chooser,
-            fluorescence_two_step_enhancer,
-            fluorescence_vspi_enhancer,
-            fluorescence_ptychozoon_enhancer,
-            fluorescence_task_monitor,
-            fluorescence_visualization_engine,
             file_dialog_factory,
         )
 
@@ -135,9 +107,6 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         illumination_action = view.button_box.analyze_menu.addAction('Map Illumination...')
         connect_triggered_signal(illumination_action, self._map_illumination)
-
-        fluorescence_action = view.button_box.analyze_menu.addAction('Enhance Fluorescence...')
-        connect_triggered_signal(fluorescence_action, self._enhance_fluorescence)
 
     def _get_current_item_index(self) -> int:
         model_index = self._view.tree_view.currentIndex()
@@ -242,14 +211,6 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             logger.warning('No current item!')
         else:
             self._illumination_view_controller.map(item_index)
-
-    def _enhance_fluorescence(self) -> None:
-        item_index = self._get_current_item_index()
-
-        if item_index < 0:
-            logger.warning('No current item!')
-        else:
-            self._fluorescence_view_controller.launch(item_index)
 
     def _update_view(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()

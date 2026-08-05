@@ -1,22 +1,15 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
-    QCheckBox,
-    QComboBox,
     QDialog,
     QFormLayout,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QListView,
-    QPlainTextEdit,
-    QProgressBar,
     QPushButton,
     QRadioButton,
     QScrollArea,
     QSlider,
-    QSpinBox,
-    QStackedWidget,
     QStatusBar,
     QVBoxLayout,
     QWidget,
@@ -200,126 +193,6 @@ class IlluminationDialog(QDialog):
 
         contents_layout = QHBoxLayout()
         contents_layout.addWidget(self.visualization_widget, 1)
-        contents_layout.addLayout(parameter_layout)
-
-        layout = QVBoxLayout()
-        layout.addLayout(contents_layout)
-        layout.addWidget(self.status_bar)
-        self.setLayout(layout)
-
-
-class FluorescenceVSPIParametersView(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.damping_factor_line_edit = DecimalLineEdit.create_instance()
-        self.max_iterations_spin_box = QSpinBox()
-
-        layout = QFormLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addRow('Damping Factor:', self.damping_factor_line_edit)
-        layout.addRow('Max Iterations:', self.max_iterations_spin_box)
-        self.setLayout(layout)
-
-
-class FluorescencePtychozoonParametersView(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.damping_factor_line_edit = DecimalLineEdit.create_instance()
-        self.gradient_smoothness_line_edit = DecimalLineEdit.create_instance()
-        self.max_iterations_spin_box = QSpinBox()
-        self.atol_line_edit = DecimalLineEdit.create_instance()
-        self.btol_line_edit = DecimalLineEdit.create_instance()
-        self.checkpoint_interval_spin_box = QSpinBox()
-        self.use_gpu_check_box = QCheckBox('Use GPU')
-        self.gpu_device_index_spin_box = QSpinBox()
-
-        layout = QFormLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addRow('Damping Factor:', self.damping_factor_line_edit)
-        layout.addRow('Gradient Smoothness:', self.gradient_smoothness_line_edit)
-        layout.addRow('Max Iterations:', self.max_iterations_spin_box)
-        layout.addRow('A Tolerance:', self.atol_line_edit)
-        layout.addRow('B Tolerance:', self.btol_line_edit)
-        layout.addRow('Checkpoint Interval:', self.checkpoint_interval_spin_box)
-        layout.addRow(self.use_gpu_check_box)
-        layout.addRow('CUDA Device Index:', self.gpu_device_index_spin_box)
-        self.setLayout(layout)
-
-
-class FluorescenceTwoStepParametersView(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.upscaling_strategy_combo_box = QComboBox()
-        self.deconvolution_strategy_combo_box = QComboBox()
-
-        layout = QFormLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addRow('Upscaling Strategy:', self.upscaling_strategy_combo_box)
-        layout.addRow('Deconvolution Strategy:', self.deconvolution_strategy_combo_box)
-        self.setLayout(layout)
-
-
-class FluorescenceParametersView(QGroupBox):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Enhancement Strategy', parent)
-        self.open_button = QPushButton('Open Measured Dataset')
-        self.algorithm_combo_box = QComboBox()
-        self.stacked_widget = QStackedWidget()
-        self.enhance_button = QPushButton('Enhance')
-        self.save_button = QPushButton('Save Enhanced Dataset')
-
-        stacked_widget_layout = self.stacked_widget.layout()
-
-        if stacked_widget_layout is not None:
-            stacked_widget_layout.setContentsMargins(0, 0, 0, 0)
-
-        layout = QFormLayout()
-        layout.addRow(self.open_button)
-        layout.addRow('Algorithm:', self.algorithm_combo_box)
-        layout.addRow(self.stacked_widget)
-        layout.addRow(self.enhance_button)
-        layout.addRow(self.save_button)
-        self.setLayout(layout)
-
-
-class FluorescenceStatusView(QGroupBox):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Status', parent)
-        self.text_edit = QPlainTextEdit()
-        self.text_edit.setReadOnly(True)
-        self.progress_bar = QProgressBar()
-        self.stop_button = QPushButton('Stop')
-
-        progress_layout = QHBoxLayout()
-        progress_layout.addWidget(self.progress_bar)
-        progress_layout.addWidget(self.stop_button)
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.text_edit)
-        layout.addLayout(progress_layout)
-        self.setLayout(layout)
-
-
-class FluorescenceDialog(QDialog):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.measured_widget = VisualizationWidget('Measured')
-        self.enhanced_widget = VisualizationWidget('Enhanced')
-        self.fluorescence_parameters_view = FluorescenceParametersView()
-        self.fluorescence_channel_list_view = QListView()
-        self.visualization_parameters_view = VisualizationParametersView()
-        self.fluorescence_status_view = FluorescenceStatusView()
-        self.status_bar = QStatusBar()
-
-        parameter_layout = QVBoxLayout()
-        parameter_layout.addWidget(self.fluorescence_parameters_view)
-        parameter_layout.addWidget(self.fluorescence_channel_list_view, 1)
-        parameter_layout.addWidget(self.visualization_parameters_view)
-        parameter_layout.addWidget(self.fluorescence_status_view, 1)
-
-        contents_layout = QHBoxLayout()
-        contents_layout.addWidget(self.measured_widget, 1)
-        contents_layout.addWidget(self.enhanced_widget, 1)
         contents_layout.addLayout(parameter_layout)
 
         layout = QVBoxLayout()

@@ -3,6 +3,7 @@
     <qresource prefix="icons">
         <file alias="automate">../../ptychodus_store/ui/icons/robot.svg</file>
         <file alias="autoscale">../../ptychodus_store/ui/icons/arrows-left-right-to-line.svg</file>
+        <file alias="fluorescence">../../ptychodus_store/ui/icons/atom.svg</file>
         <file alias="fourier">../../ptychodus_store/ui/icons/f.svg</file>
         <file alias="genesis">../../ptychodus_store/ui/icons/genesis.svg</file>
         <file alias="globus">../../ptychodus_store/ui/icons/globus.svg</file>

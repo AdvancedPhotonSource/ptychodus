@@ -10,6 +10,8 @@ from .agent import AgentChatController, AgentController
 from .automation import AutomationController
 from .data import FileDialogFactory
 from .diffraction import DiffractionController
+from .fluorescence import FluorescenceController
+from .fluorescence.enhance_dialog import FluorescenceEnhanceDialogController
 from .genesis import GenesisController
 from .globus import GlobusController
 from .image import ImageController
@@ -138,13 +140,6 @@ class ControllerCore:
             model.analysis_core.probe_propagator_visualization_engine,
             model.analysis_core.illumination_mapper,
             model.analysis_core.illumination_visualization_engine,
-            model.fluorescence_core.fluorescence_api,
-            model.fluorescence_core.enhancer_chooser,
-            model.fluorescence_core.two_step_enhancer,
-            model.fluorescence_core.vspi_enhancer,
-            model.fluorescence_core.ptychozoon_enhancer,
-            model.fluorescence_core.task_monitor,
-            model.fluorescence_core.visualization_engine,
             view.probe_view,
             self._file_dialog_factory,
         )
@@ -152,6 +147,24 @@ class ControllerCore:
             model.object_visualization_engine,
             view.object_image_view,
             self._status_bar,
+            self._file_dialog_factory,
+        )
+        self._fluorescence_enhance_dialog_controller = FluorescenceEnhanceDialogController(
+            model.fluorescence_core.fluorescence_api,
+            model.fluorescence_core.enhancer_chooser,
+            model.fluorescence_core.two_step_enhancer,
+            model.fluorescence_core.vspi_enhancer,
+            model.fluorescence_core.ptychozoon_enhancer,
+            model.fluorescence_core.task_monitor,
+        )
+        self._fluorescence_controller = FluorescenceController(
+            model.fluorescence_core.repository,
+            model.fluorescence_core.fluorescence_api,
+            model.product_core.product_repository,
+            view.fluorescence_view,
+            view.fluorescence_image_view,
+            model.fluorescence_core.visualization_engine,
+            self._fluorescence_enhance_dialog_controller,
             self._file_dialog_factory,
         )
         self._object_controller = ObjectController(

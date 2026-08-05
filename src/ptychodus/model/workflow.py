@@ -218,13 +218,14 @@ class ConcreteProductWorkflowAPI(ProductWorkflowAPI):
         algorithm: str | None = None,
         block: bool = False,
     ) -> None:
-        self._fluorescence_api.enhance_local(
-            self._product_index,
-            input_path,
-            output_path,
-            input_file_type=input_file_type,
-            output_file_type=output_file_type,
+        item_index = self._fluorescence_api.open_measured_dataset(
+            input_path, self._product_index, file_type=input_file_type
+        )
+        self._fluorescence_api.enhance(
+            item_index,
             algorithm=algorithm,
+            output_file_path=output_path,
+            output_file_type=output_file_type,
             block=block,
         )
 

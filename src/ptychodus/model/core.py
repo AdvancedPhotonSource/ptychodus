@@ -161,6 +161,7 @@ class ModelCore:
             self._task_manager,
             self.settings_registry,
             self.product_core.product_api,
+            self.product_core.product_repository,
             self.plugin_registry.upscaling_strategies,
             self.plugin_registry.deconvolution_strategies,
             self.plugin_registry.fluorescence_file_readers,

@@ -10,12 +10,13 @@ from ptychodus.api.fluorescence import (
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 
-from ..product import ProductAPI
+from ..product import ProductAPI, ProductRepository
 from ..task_manager import TaskManager
 from ..visualization import VisualizationEngine
 from .api import FluorescenceAPI
 from .monitor import FluorescenceTaskMonitor
 from .ptychozoon import PtychozoonFluorescenceEnhancer
+from .repository import FluorescenceRepository
 from .settings import FluorescenceSettings
 from .two_step import TwoStepFluorescenceEnhancer
 from .vspi import VSPIFluorescenceEnhancer
@@ -29,6 +30,7 @@ class FluorescenceCore:
         task_manager: TaskManager,
         settings_registry: SettingsRegistry,
         product_api: ProductAPI,
+        product_repository: ProductRepository,
         upscaling_strategy_chooser: PluginChooser[UpscalingStrategy],
         deconvolution_strategy_chooser: PluginChooser[DeconvolutionStrategy],
         file_reader_chooser: PluginChooser[FluorescenceFileReader],
@@ -78,10 +80,12 @@ class FluorescenceCore:
 
         self.visualization_engine = VisualizationEngine(is_complex=False)
         self.task_monitor = FluorescenceTaskMonitor(task_manager)
+        self.repository = FluorescenceRepository(product_repository)
         self.fluorescence_api = FluorescenceAPI(
             task_manager,
             self._settings,
             product_api,
+            self.repository,
             self.enhancer_chooser,
             self.task_monitor,
             file_reader_chooser,
