@@ -49,6 +49,8 @@ def test_introspect_product(tmp_path: Path) -> None:
         f.attrs['exposure_time_s'] = 0.05
         f.attrs['mass_attenuation_m2_kg'] = 0.0
         f.attrs['tomography_angle_deg'] = 30.0
+        f.attrs['tilt_angle_deg'] = 12.5
+        f.attrs['polarization'] = 'left_circular'
         obj = f.create_dataset('object', data=np.zeros((2, 32, 48), dtype=np.complex64))
         obj.attrs['pixel_width_m'] = 1e-9
         obj.attrs['pixel_height_m'] = 1e-9
@@ -67,6 +69,8 @@ def test_introspect_product(tmp_path: Path) -> None:
     assert result['num_scan_points'] == 11
     assert result['num_loss_epochs'] == 2
     assert result['tomography_angle_deg'] == 30.0
+    assert result['tilt_angle_deg'] == 12.5
+    assert result['polarization'] == 'left_circular'
 
 
 def test_introspect_fluorescence(tmp_path: Path) -> None:

@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from ptychodus.api.diffraction import Polarization
 from ptychodus_store.db.base import IngestState
 
 
@@ -48,6 +49,8 @@ class DiffractionRead(_RowBase):
     probe_photon_count: int | None
     exposure_time_s: float | None
     tomography_angle_deg: float | None
+    tilt_angle_deg: float | None = None
+    polarization: Polarization | None = None
     crop_center_x_px: int | None
     crop_center_y_px: int | None
 
@@ -70,6 +73,8 @@ class ProductRead(_RowBase):
     exposure_time_s: float | None
     mass_attenuation_m2_kg: float | None
     tomography_angle_deg: float | None
+    tilt_angle_deg: float | None = None
+    polarization: Polarization | None = None
 
     object_layers: int | None
     object_height_px: int | None

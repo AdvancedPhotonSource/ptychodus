@@ -2,6 +2,7 @@ from __future__ import annotations
 from abc import abstractmethod, ABC
 import logging
 
+from ptychodus.api.diffraction import Polarization
 from ptychodus.api.parametric import Parameter, ParameterGroup
 from ptychodus.api.product import ProductMetadata
 
@@ -61,6 +62,8 @@ class MetadataRepositoryItem(ParameterGroup):
         exposure_time_s: float | None = None,
         mass_attenuation_m2_kg: float | None = None,
         tomography_angle_deg: float | None = None,
+        tilt_angle_deg: float | None = None,
+        polarization: Polarization | None = None,
     ) -> None:
         super().__init__()
         self._settings = settings
@@ -112,6 +115,22 @@ class MetadataRepositoryItem(ParameterGroup):
 
         self._add_parameter('tomography_angle_deg', self.tomography_angle_deg)
 
+        self.tilt_angle_deg = settings.tilt_angle_deg.copy()
+
+        if tilt_angle_deg is not None:
+            self.tilt_angle_deg.set_value(tilt_angle_deg)
+
+        self._add_parameter('tilt_angle_deg', self.tilt_angle_deg)
+
+        # Polarization is stored as a string parameter for INI round-trip;
+        # empty string means "unset" (i.e. None on the ProductMetadata side).
+        self.polarization = settings.polarization.copy()
+
+        if polarization is not None:
+            self.polarization.set_value(polarization.value)
+
+        self._add_parameter('polarization', self.polarization)
+
     def assign(self, metadata: ProductMetadata) -> None:
         self.name.set_value(metadata.name)
         self.comments.set_value(metadata.comments)
@@ -121,6 +140,10 @@ class MetadataRepositoryItem(ParameterGroup):
         self.exposure_time_s.set_value(metadata.exposure_time_s)
         self.mass_attenuation_m2_kg.set_value(metadata.mass_attenuation_m2_kg)
         self.tomography_angle_deg.set_value(metadata.tomography_angle_deg)
+        self.tilt_angle_deg.set_value(metadata.tilt_angle_deg)
+        self.polarization.set_value(
+            metadata.polarization.value if metadata.polarization is not None else ''
+        )
 
     def sync_to_settings(self) -> None:
         for parameter in self.parameters().values():
@@ -136,4 +159,16 @@ class MetadataRepositoryItem(ParameterGroup):
             exposure_time_s=self.exposure_time_s.get_value(),
             mass_attenuation_m2_kg=self.mass_attenuation_m2_kg.get_value(),
             tomography_angle_deg=self.tomography_angle_deg.get_value(),
+            tilt_angle_deg=self.tilt_angle_deg.get_value(),
+            polarization=self._parse_polarization(self.polarization.get_value()),
         )
+
+    @staticmethod
+    def _parse_polarization(raw: str) -> Polarization | None:
+        if not raw:
+            return None
+        try:
+            return Polarization(raw)
+        except ValueError:
+            logger.warning('Unknown polarization value in settings: %r; treating as None.', raw)
+            return None

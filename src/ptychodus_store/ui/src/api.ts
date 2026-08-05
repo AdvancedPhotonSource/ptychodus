@@ -2,6 +2,8 @@ const API = '/api/v1';
 
 export type IngestState = 'valid' | 'invalid' | 'pending';
 
+export type Polarization = 'left_circular' | 'right_circular';
+
 export interface DerivedFromEdge {
   kind: 'diffraction' | 'product' | 'fluorescence';
   uuid: string;
@@ -24,6 +26,8 @@ export interface DiffractionRead {
   probe_energy_eV: number | null;
   probe_photon_count: number | null;
   tomography_angle_deg: number | null;
+  tilt_angle_deg: number | null;
+  polarization: Polarization | null;
   pattern_dtype: string | null;
   pattern_height_px: number | null;
   pattern_width_px: number | null;
@@ -39,6 +43,9 @@ export interface ProductRead {
   name: string | null;
   comments: string | null;
   probe_energy_eV: number | null;
+  tomography_angle_deg: number | null;
+  tilt_angle_deg: number | null;
+  polarization: Polarization | null;
   object_layers: number | null;
   object_height_px: number | null;
   object_width_px: number | null;

@@ -4,6 +4,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import overload, Any, TypeAlias
 
@@ -200,6 +201,16 @@ class SimpleDiffractionArray(DiffractionArray):
         return self._patterns
 
 
+class Polarization(StrEnum):
+    """Beam polarization state (used by XMCD analysis).
+
+    Stored as its string value for stable, human-readable HDF5/INI round-trip.
+    """
+
+    LEFT_CIRCULAR = 'left_circular'
+    RIGHT_CIRCULAR = 'right_circular'
+
+
 @dataclass(frozen=True)
 class DiffractionMetadata:
     """Metadata describing a diffraction dataset (geometry, energy, file path, etc.)."""
@@ -214,6 +225,8 @@ class DiffractionMetadata:
     probe_photon_count: int | None = None
     exposure_time_s: float | None = None
     tomography_angle_deg: float | None = None
+    tilt_angle_deg: float | None = None
+    polarization: Polarization | None = None
     file_path: Path | None = None
 
     @classmethod

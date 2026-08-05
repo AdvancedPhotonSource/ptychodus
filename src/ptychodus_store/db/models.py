@@ -70,6 +70,8 @@ class Diffraction(Base):
     probe_photon_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     exposure_time_s: Mapped[float | None] = mapped_column(Float, nullable=True)
     tomography_angle_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tilt_angle_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    polarization: Mapped[str | None] = mapped_column(String, nullable=True)
     crop_center_x_px: Mapped[int | None] = mapped_column(Integer, nullable=True)
     crop_center_y_px: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
@@ -98,6 +100,7 @@ class Diffraction(Base):
         Index('ix_diffraction_campaign_uuid', 'campaign_uuid'),
         Index('ix_diffraction_probe_energy_eV', 'probe_energy_eV'),
         Index('ix_diffraction_tomography_angle_deg', 'tomography_angle_deg'),
+        Index('ix_diffraction_tilt_angle_deg', 'tilt_angle_deg'),
         Index('ix_diffraction_ingest_state', 'ingest_state'),
     )
 
@@ -116,6 +119,8 @@ class Product(Base):
     exposure_time_s: Mapped[float | None] = mapped_column(Float, nullable=True)
     mass_attenuation_m2_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
     tomography_angle_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tilt_angle_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    polarization: Mapped[str | None] = mapped_column(String, nullable=True)
     object_layers: Mapped[int | None] = mapped_column(Integer, nullable=True)
     object_height_px: Mapped[int | None] = mapped_column(Integer, nullable=True)
     object_width_px: Mapped[int | None] = mapped_column(Integer, nullable=True)

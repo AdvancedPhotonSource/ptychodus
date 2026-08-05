@@ -2,6 +2,7 @@ from typing import Any
 import logging
 
 from PyQt5.QtCore import (
+    QAbstractItemModel,
     QAbstractTableModel,
     QModelIndex,
     QObject,
@@ -9,9 +10,9 @@ from PyQt5.QtCore import (
     Qt,
 )
 from PyQt5.QtGui import QBrush
-from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import QComboBox, QStyledItemDelegate, QStyleOptionViewItem, QWidget
 
-from ptychodus.api.diffraction import estimate_probe_photon_count
+from ptychodus.api.diffraction import Polarization, estimate_probe_photon_count
 from ptychodus.api.observer import Observable, Observer
 
 from ...model.diffraction import (
@@ -48,6 +49,8 @@ class ProductPropertyTableModel(QAbstractTableModel):
             'Exposure Time [s]',
             'Mass Attenuation [m\u00b2/kg]',
             'Tomography Angle [deg]',
+            'Tilt Angle [deg]',
+            'Polarization',
             'Fresnel Number',
             'Detector Numerical Aperture',
             'Depth of Field [nm]',
@@ -56,7 +59,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
 
-        if index.isValid() and index.row() in (7, 8, 9):
+        if index.isValid() and index.row() in (7, 8, 9, 10, 11):
             value |= Qt.ItemFlag.ItemIsEditable
 
         return value
@@ -102,16 +105,21 @@ class ProductPropertyTableModel(QAbstractTableModel):
                             case 9:
                                 return f'{metadata_item.tomography_angle_deg.get_value():.4g}'
                             case 10:
+                                return f'{metadata_item.tilt_angle_deg.get_value():.4g}'
+                            case 11:
+                                raw = metadata_item.polarization.get_value()
+                                return raw if raw else '(unset)'
+                            case 12:
                                 try:
                                     return f'{geometry.fresnel_number:.4g}'
                                 except ZeroDivisionError:
                                     return 'inf'
-                            case 11:
+                            case 13:
                                 try:
                                     return f'{geometry.detector_numerical_aperture:.4g}'
                                 except ZeroDivisionError:
                                     return 'inf'
-                            case 12:
+                            case 14:
                                 try:
                                     return f'{geometry.depth_of_field_m * 1e9:.4g}'
                                 except ZeroDivisionError:
@@ -149,6 +157,25 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
                     metadata_item.tomography_angle_deg.set_value(tomography_angle_deg)
                     return True
+                case 10:
+                    try:
+                        tilt_angle_deg = float(value)
+                    except ValueError:
+                        return False
+
+                    metadata_item.tilt_angle_deg.set_value(tilt_angle_deg)
+                    return True
+                case 11:
+                    text = str(value)
+                    if text in ('', '(unset)'):
+                        metadata_item.polarization.set_value('')
+                        return True
+                    try:
+                        parsed = Polarization(text)
+                    except ValueError:
+                        return False
+                    metadata_item.polarization.set_value(parsed.value)
+                    return True
 
         return False
 
@@ -157,6 +184,55 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._header)
+
+
+class _PolarizationDelegate(QStyledItemDelegate):
+    """Combobox editor for the polarization row of the product-property table.
+
+    Attached with ``setItemDelegateForColumn(1, ...)`` so column sorting through
+    the proxy model cannot mis-target the row. ``mapToSource`` recovers the
+    row in the underlying ProductPropertyTableModel — everything except the
+    polarization row falls through to the base delegate.
+    """
+
+    POLARIZATION_SOURCE_ROW = 11
+
+    def _is_polarization_cell(self, index: QModelIndex) -> bool:
+        if index.column() != 1:
+            return False
+        model = index.model()
+        source_index = (
+            model.mapToSource(index) if isinstance(model, QSortFilterProxyModel) else index
+        )
+        return source_index.row() == self.POLARIZATION_SOURCE_ROW
+
+    def createEditor(  # noqa: N802
+        self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex
+    ) -> QWidget:
+        if not self._is_polarization_cell(index):
+            return super().createEditor(parent, option, index)
+        combo = QComboBox(parent)
+        combo.addItem('(unset)', '')
+        for member in Polarization:
+            combo.addItem(member.value, member.value)
+        return combo
+
+    def setEditorData(self, editor: QWidget, index: QModelIndex) -> None:  # noqa: N802
+        if not isinstance(editor, QComboBox):
+            super().setEditorData(editor, index)
+            return
+        current = index.data(Qt.ItemDataRole.DisplayRole) or ''
+        lookup = '' if current == '(unset)' else str(current)
+        target = editor.findData(lookup)
+        editor.setCurrentIndex(max(0, target))
+
+    def setModelData(  # noqa: N802
+        self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex
+    ) -> None:
+        if not isinstance(editor, QComboBox):
+            super().setModelData(editor, model, index)
+            return
+        model.setData(index, editor.currentData(), Qt.ItemDataRole.EditRole)
 
 
 class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver):
@@ -191,6 +267,7 @@ class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver
 
         dialog.table_view.setModel(table_proxy_model)
         dialog.table_view.setSortingEnabled(True)
+        dialog.table_view.setItemDelegateForColumn(1, _PolarizationDelegate(dialog.table_view))
         vertical_header = dialog.table_view.verticalHeader()
 
         if vertical_header is not None:

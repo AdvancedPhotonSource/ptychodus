@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy import exists, select
 
+from ptychodus.api.diffraction import Polarization
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import load_diffraction_data
 from ptychodus.api.reconstructor import AssembledDiffractionData
@@ -35,6 +36,9 @@ async def list_diffraction(
     probe_energy_eV_max: float | None = Query(None, alias='probe_energy_eV_max'),  # noqa: N803
     tomography_angle_deg_min: float | None = None,
     tomography_angle_deg_max: float | None = None,
+    tilt_angle_deg_min: float | None = None,
+    tilt_angle_deg_max: float | None = None,
+    polarization: Polarization | None = None,
 ) -> Page[DiffractionRead]:
     where = []
     if campaign_uuid is not None:
@@ -49,6 +53,12 @@ async def list_diffraction(
         where.append(Diffraction.tomography_angle_deg >= tomography_angle_deg_min)
     if tomography_angle_deg_max is not None:
         where.append(Diffraction.tomography_angle_deg <= tomography_angle_deg_max)
+    if tilt_angle_deg_min is not None:
+        where.append(Diffraction.tilt_angle_deg >= tilt_angle_deg_min)
+    if tilt_angle_deg_max is not None:
+        where.append(Diffraction.tilt_angle_deg <= tilt_angle_deg_max)
+    if polarization is not None:
+        where.append(Diffraction.polarization == polarization.value)
     if derived_from_uuid is not None:
         edge_subq = select(DerivationEdge.source_uuid).where(
             DerivationEdge.source_uuid == Diffraction.uuid,

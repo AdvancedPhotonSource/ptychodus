@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 import logging
 
+from ptychodus.api.diffraction import Polarization
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter
 
@@ -481,6 +482,8 @@ class ProductAPI:
         exposure_time_s: float | None = None,
         mass_attenuation_m2_kg: float | None = None,
         tomography_angle_deg: float | None = None,
+        tilt_angle_deg: float | None = None,
+        polarization: Polarization | None = None,
         dataset: AssembledDiffractionDataset | None = None,
         block: bool = True,
     ) -> int:
@@ -494,6 +497,8 @@ class ProductAPI:
                 exposure_time_s=exposure_time_s,
                 mass_attenuation_m2_kg=mass_attenuation_m2_kg,
                 tomography_angle_deg=tomography_angle_deg,
+                tilt_angle_deg=tilt_angle_deg,
+                polarization=polarization,
                 dataset=dataset,
             )
 

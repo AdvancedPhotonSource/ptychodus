@@ -66,7 +66,7 @@ def introspect_product(path: Path) -> dict[str, Any]:
     Returns a dict of HDF5-derived fields:
       * name, comments
       * detector_distance_m, probe_energy_eV, probe_photon_count, exposure_time_s,
-        mass_attenuation_m2_kg, tomography_angle_deg
+        mass_attenuation_m2_kg, tomography_angle_deg, tilt_angle_deg, polarization
       * object_shape:        tuple[int, int, int] | None — (layers, h, w)
       * object_pixel_width_m, object_pixel_height_m: float | None
       * probe_shape:         tuple[int, int, int] | None — (modes, h, w)
@@ -86,6 +86,15 @@ def introspect_product(path: Path) -> dict[str, Any]:
                     return cast(raw)
                 except (TypeError, ValueError):
                     return None
+
+            def _root_str_attr(key: str) -> str | None:
+                raw = f.attrs.get(key)
+                if raw is None:
+                    return None
+                if isinstance(raw, bytes):
+                    raw = raw.decode('utf-8', errors='replace')
+                text = str(raw)
+                return text or None
 
             obj = f.get(ProductFileKeys.OBJECT_ARRAY)
             probe = f.get(ProductFileKeys.PROBE_ARRAY)
@@ -126,6 +135,8 @@ def introspect_product(path: Path) -> dict[str, Any]:
                 'exposure_time_s': _root_attr(ProductFileKeys.EXPOSURE_TIME, float),
                 'mass_attenuation_m2_kg': _root_attr(ProductFileKeys.MASS_ATTENUATION, float),
                 'tomography_angle_deg': _root_attr(ProductFileKeys.TOMOGRAPHY_ANGLE, float),
+                'tilt_angle_deg': _root_attr(ProductFileKeys.TILT_ANGLE, float),
+                'polarization': _root_str_attr(ProductFileKeys.POLARIZATION),
                 'object_shape': object_shape,
                 'object_pixel_width_m': object_pixel_width_m,
                 'object_pixel_height_m': object_pixel_height_m,

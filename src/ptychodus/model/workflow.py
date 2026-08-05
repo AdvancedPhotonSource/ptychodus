@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 import logging
 
-from ptychodus.api.diffraction import CropCenter
+from ptychodus.api.diffraction import CropCenter, Polarization
 from ptychodus.api.geometry import AffineTransform, ImageExtent
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import AssembledDiffractionData, ReconstructInput
@@ -350,6 +350,8 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         exposure_time_s: float | None = None,
         mass_attenuation_m2_kg: float | None = None,
         tomography_angle_deg: float | None = None,
+        tilt_angle_deg: float | None = None,
+        polarization: Polarization | None = None,
         diffraction: DiffractionWorkflowAPI | None = None,
     ) -> ProductWorkflowAPI:
         product_index = self._product_api.insert_new_product(
@@ -361,6 +363,8 @@ class ConcreteWorkflowAPI(WorkflowAPI):
             exposure_time_s=exposure_time_s,
             mass_attenuation_m2_kg=mass_attenuation_m2_kg,
             tomography_angle_deg=tomography_angle_deg,
+            tilt_angle_deg=tilt_angle_deg,
+            polarization=polarization,
             dataset=self._fetch_dataset(diffraction),
         )
         return self.get_product(product_index)

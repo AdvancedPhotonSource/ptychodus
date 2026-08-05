@@ -8,7 +8,7 @@ import logging
 import h5py
 import numpy
 
-from .diffraction import zero_bad_pixels
+from .diffraction import Polarization, zero_bad_pixels
 from .fluorescence import ElementMap, FluorescenceDataset
 from .geometry import PixelGeometry
 from .object import Object, ObjectCenter
@@ -126,6 +126,8 @@ class ProductFileKeys(StrEnum):
     EXPOSURE_TIME = 'exposure_time_s'
     MASS_ATTENUATION = 'mass_attenuation_m2_kg'
     TOMOGRAPHY_ANGLE = 'tomography_angle_deg'
+    TILT_ANGLE = 'tilt_angle_deg'
+    POLARIZATION = 'polarization'
     PROBE_ARRAY = 'probe'
     OPR_WEIGHTS = 'opr_weights'
     PROBE_PIXEL_HEIGHT = 'pixel_height_m'
@@ -154,6 +156,21 @@ def load_product(file: Path) -> Product:
         exposure_time_s = float(h5_file.attrs.get(ProductFileKeys.EXPOSURE_TIME, 0.0))
         mass_attenuation_m2_kg = float(h5_file.attrs.get(ProductFileKeys.MASS_ATTENUATION, 0.0))
         tomography_angle_deg = float(h5_file.attrs.get(ProductFileKeys.TOMOGRAPHY_ANGLE, 0.0))
+        tilt_angle_deg = float(h5_file.attrs.get(ProductFileKeys.TILT_ANGLE, 0.0))
+
+        polarization: Polarization | None = None
+        if ProductFileKeys.POLARIZATION in h5_file.attrs:
+            raw_polarization = h5_file.attrs[ProductFileKeys.POLARIZATION]
+            if isinstance(raw_polarization, bytes):
+                raw_polarization = raw_polarization.decode('utf-8', errors='replace')
+            try:
+                polarization = Polarization(str(raw_polarization))
+            except ValueError:
+                logger.warning(
+                    'Unknown polarization %r in %s; setting polarization=None.',
+                    raw_polarization,
+                    file,
+                )
 
         metadata = ProductMetadata(
             name=name,
@@ -164,6 +181,8 @@ def load_product(file: Path) -> Product:
             exposure_time_s=exposure_time_s,
             mass_attenuation_m2_kg=mass_attenuation_m2_kg,
             tomography_angle_deg=tomography_angle_deg,
+            tilt_angle_deg=tilt_angle_deg,
+            polarization=polarization,
         )
 
         h5_object = h5_file[ProductFileKeys.OBJECT_ARRAY]
@@ -297,6 +316,10 @@ def save_product(file: Path, product: Product) -> None:
         h5_file.attrs[ProductFileKeys.PROBE_PHOTON_COUNT] = metadata.probe_photon_count
         h5_file.attrs[ProductFileKeys.EXPOSURE_TIME] = metadata.exposure_time_s
         h5_file.attrs[ProductFileKeys.MASS_ATTENUATION] = metadata.mass_attenuation_m2_kg
+        h5_file.attrs[ProductFileKeys.TOMOGRAPHY_ANGLE] = metadata.tomography_angle_deg
+        h5_file.attrs[ProductFileKeys.TILT_ANGLE] = metadata.tilt_angle_deg
+        if metadata.polarization is not None:
+            h5_file.attrs[ProductFileKeys.POLARIZATION] = metadata.polarization.value
 
         h5_file.create_dataset(ProductFileKeys.PROBE_POSITION_INDEXES, data=scan_indexes)
         h5_file.create_dataset(ProductFileKeys.PROBE_POSITION_X, data=scan_x_m)

@@ -9,6 +9,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
+from ptychodus.api.diffraction import Polarization
+
 MANIFEST_FILENAME = 'manifest.json'
 
 
@@ -48,6 +50,8 @@ HDF5_OWNED_KEYS: dict[str, frozenset[str]] = {
             'exposure_time_s',
             'mass_attenuation_m2_kg',
             'tomography_angle_deg',
+            'tilt_angle_deg',
+            'polarization',
             'object_shape',
             'object_pixel_width_m',
             'object_pixel_height_m',
@@ -111,6 +115,8 @@ class DiffractionManifest(_ManifestBase):
     probe_photon_count: int | None = None
     exposure_time_s: float | None = None
     tomography_angle_deg: float | None = None
+    tilt_angle_deg: float | None = None
+    polarization: Polarization | None = None
     crop_center_x_px: int | None = None
     crop_center_y_px: int | None = None
     files: dict[str, str] = Field(default_factory=lambda: {'diffraction': 'diffraction.h5'})

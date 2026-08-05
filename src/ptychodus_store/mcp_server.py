@@ -14,6 +14,7 @@ from fastmcp.utilities.types import Image as MCPImage
 from sqlalchemy import String, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ptychodus.api.diffraction import Polarization
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import load_diffraction_data, load_fluorescence_data, load_product
 from ptychodus.api.visualization import (
@@ -168,6 +169,9 @@ def create_mcp_server() -> FastMCP:
         derived_from_uuid: str | None = None,
         probe_energy_eV_min: float | None = None,  # noqa: N803
         probe_energy_eV_max: float | None = None,  # noqa: N803
+        tilt_angle_deg_min: float | None = None,
+        tilt_angle_deg_max: float | None = None,
+        polarization: str | None = None,
         ingest_state: str | None = None,
     ) -> Page[DiffractionRead]:
         """List diffraction datasets."""
@@ -181,6 +185,19 @@ def create_mcp_server() -> FastMCP:
                 where.append(Diffraction.probe_energy_eV >= probe_energy_eV_min)
             if probe_energy_eV_max is not None:
                 where.append(Diffraction.probe_energy_eV <= probe_energy_eV_max)
+            if tilt_angle_deg_min is not None:
+                where.append(Diffraction.tilt_angle_deg >= tilt_angle_deg_min)
+            if tilt_angle_deg_max is not None:
+                where.append(Diffraction.tilt_angle_deg <= tilt_angle_deg_max)
+            if polarization is not None:
+                try:
+                    parsed_pol = Polarization(polarization)
+                except ValueError as exc:
+                    raise ToolError(
+                        f'Unknown polarization {polarization!r}; '
+                        f'expected one of {[p.value for p in Polarization]}.'
+                    ) from exc
+                where.append(Diffraction.polarization == parsed_pol.value)
             if derived_from_uuid is not None:
                 target = UUID(derived_from_uuid)
                 where.append(

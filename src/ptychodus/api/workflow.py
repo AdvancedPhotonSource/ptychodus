@@ -7,7 +7,7 @@ from pathlib import Path
 from enum import Enum, auto
 from typing import Any
 
-from ptychodus.api.diffraction import CropCenter
+from ptychodus.api.diffraction import CropCenter, Polarization
 from ptychodus.api.geometry import AffineTransform, ImageExtent
 from ptychodus.api.product import Product
 from ptychodus.api.reconstructor import AssembledDiffractionData, ReconstructInput
@@ -249,6 +249,8 @@ class WorkflowAPI(ABC):
         exposure_time_s: float | None = None,
         mass_attenuation_m2_kg: float | None = None,
         tomography_angle_deg: float | None = None,
+        tilt_angle_deg: float | None = None,
+        polarization: Polarization | None = None,
         diffraction: DiffractionWorkflowAPI | None = None,
     ) -> ProductWorkflowAPI:
         """Create a new product with optional metadata overrides and return a handle to it.

@@ -1,5 +1,6 @@
 import logging
 
+from ptychodus.api.diffraction import Polarization
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product, ProductFileReader
 
@@ -62,6 +63,8 @@ class ProductRepositoryItemFactory:
         exposure_time_s: float | None = None,
         mass_attenuation_m2_kg: float | None = None,
         tomography_angle_deg: float | None = None,
+        tilt_angle_deg: float | None = None,
+        polarization: Polarization | None = None,
         dataset: AssembledDiffractionDataset | None = None,
     ) -> ProductRepositoryItem:
         metadata_item = MetadataRepositoryItem(
@@ -75,6 +78,8 @@ class ProductRepositoryItemFactory:
             exposure_time_s=exposure_time_s,
             mass_attenuation_m2_kg=mass_attenuation_m2_kg,
             tomography_angle_deg=tomography_angle_deg,
+            tilt_angle_deg=tilt_angle_deg,
+            polarization=polarization,
         )
 
         # probe_photon_count auto-estimation from diffraction data now lives in the
@@ -112,6 +117,8 @@ class ProductRepositoryItemFactory:
             exposure_time_s=product.metadata.exposure_time_s,
             mass_attenuation_m2_kg=product.metadata.mass_attenuation_m2_kg,
             tomography_angle_deg=product.metadata.tomography_angle_deg,
+            tilt_angle_deg=product.metadata.tilt_angle_deg,
+            polarization=product.metadata.polarization,
         )
 
         scan_item = self._scan_item_factory.create(product.probe_positions)
