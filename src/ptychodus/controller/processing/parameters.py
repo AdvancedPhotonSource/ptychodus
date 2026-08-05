@@ -2,6 +2,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 import logging
 
+from PyQt5.QtCore import QModelIndex
 from PyQt5.QtWidgets import (
     QButtonGroup,
     QComboBox,
@@ -119,10 +120,27 @@ class ProductParameterViewController(ParameterViewController, ProductRepositoryO
         self._widget.setModel(self._model)
         self._widget.currentIndexChanged.connect(status_controller.plot_losses)
 
+        self._model.rowsInserted.connect(lambda *_: self._auto_select_first_if_empty())
+        self._model.rowsRemoved.connect(self._on_rows_removed)
+        self._auto_select_first_if_empty()
+
         repository.add_observer(self)
 
     def get_widget(self) -> QComboBox:
         return self._widget
+
+    def _auto_select_first_if_empty(self) -> None:
+        if self._widget.currentIndex() >= 0:
+            return
+        if self._widget.count() > 0:
+            self._widget.setCurrentIndex(0)
+
+    def _on_rows_removed(self, parent: QModelIndex, first: int, last: int) -> None:
+        if self._widget.currentIndex() >= 0:
+            return
+        row_count = self._widget.count()
+        if row_count > 0:
+            self._widget.setCurrentIndex(min(first, row_count - 1))
 
     def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
         pass
