@@ -1,18 +1,15 @@
 from __future__ import annotations
-from decimal import Decimal
-from typing import Final
 import logging
 
 from PyQt5.QtCore import QStringListModel
 from PyQt5.QtWidgets import QWidget
 
-from ptychodus.api.fluorescence import FluorescenceEnhancer
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.plugins import PluginChooser
 
 from ...model.fluorescence import (
-    FluorescenceAPI,
+    FluorescenceCore,
     FluorescenceItemState,
+    FluorescenceSettings,
     FluorescenceTaskMonitor,
     PtychozoonFluorescenceEnhancer,
     TwoStepFluorescenceEnhancer,
@@ -20,150 +17,58 @@ from ...model.fluorescence import (
 )
 from ...view.fluorescence import (
     FluorescenceEnhanceDialog,
-    FluorescencePtychozoonParametersView,
     FluorescenceStatusView,
-    FluorescenceTwoStepParametersView,
-    FluorescenceVSPIParametersView,
 )
 from ...view.widgets import ExceptionDialog
+from ..parametric import ParameterViewBuilder
 
 logger = logging.getLogger(__name__)
 
 
-class FluorescenceTwoStepViewController(Observer):
-    def __init__(self, enhancer: TwoStepFluorescenceEnhancer) -> None:
-        super().__init__()
-        self._enhancer = enhancer
-        self._view = FluorescenceTwoStepParametersView()
-
-        self._upscaling_model = QStringListModel()
-        self._upscaling_model.setStringList(self._enhancer.get_upscaling_strategies())
-        self._view.upscaling_strategy_combo_box.setModel(self._upscaling_model)
-        self._view.upscaling_strategy_combo_box.textActivated.connect(
-            enhancer.set_upscaling_strategy
-        )
-
-        self._deconvolution_model = QStringListModel()
-        self._deconvolution_model.setStringList(self._enhancer.get_deconvolution_strategies())
-        self._view.deconvolution_strategy_combo_box.setModel(self._deconvolution_model)
-        self._view.deconvolution_strategy_combo_box.textActivated.connect(
-            enhancer.set_deconvolution_strategy
-        )
-
-        self._sync_model_to_view()
-        enhancer.add_observer(self)
-
-    def get_widget(self) -> QWidget:
-        return self._view
-
-    def _sync_model_to_view(self) -> None:
-        self._view.upscaling_strategy_combo_box.setCurrentText(
-            self._enhancer.get_upscaling_strategy()
-        )
-        self._view.deconvolution_strategy_combo_box.setCurrentText(
-            self._enhancer.get_deconvolution_strategy()
-        )
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._enhancer:
-            self._sync_model_to_view()
+def _build_two_step_widget(core: FluorescenceCore) -> QWidget:
+    builder = ParameterViewBuilder()
+    builder.add_combo_box(
+        core.upscaling_strategy_parameter,
+        [plugin.display_name for plugin in core.upscaling_strategy_chooser],
+        'Upscaling Strategy:',
+    )
+    builder.add_combo_box(
+        core.deconvolution_strategy_parameter,
+        [plugin.display_name for plugin in core.deconvolution_strategy_chooser],
+        'Deconvolution Strategy:',
+    )
+    return _build_page(builder)
 
 
-class FluorescenceVSPIViewController(Observer):
-    MAX_INT: Final[int] = 0x7FFFFFFF
-
-    def __init__(self, enhancer: VSPIFluorescenceEnhancer) -> None:
-        super().__init__()
-        self._enhancer = enhancer
-        self._view = FluorescenceVSPIParametersView()
-
-        self._view.damping_factor_line_edit.value_changed.connect(
-            self._sync_damping_factor_to_model
-        )
-        self._view.max_iterations_spin_box.setRange(1, self.MAX_INT)
-        self._view.max_iterations_spin_box.valueChanged.connect(enhancer.set_max_iterations)
-
-        enhancer.add_observer(self)
-        self._sync_model_to_view()
-
-    def get_widget(self) -> QWidget:
-        return self._view
-
-    def _sync_damping_factor_to_model(self, value: Decimal) -> None:
-        self._enhancer.set_damping_factor(float(value))
-
-    def _sync_model_to_view(self) -> None:
-        self._view.damping_factor_line_edit.set_value(
-            Decimal(repr(self._enhancer.get_damping_factor()))
-        )
-        self._view.max_iterations_spin_box.setValue(self._enhancer.get_max_iterations())
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._enhancer:
-            self._sync_model_to_view()
+def _build_vspi_widget(settings: FluorescenceSettings) -> QWidget:
+    builder = ParameterViewBuilder()
+    builder.add_decimal_line_edit(settings.vspi_damping_factor, 'Damping Factor:')
+    builder.add_spin_box(settings.vspi_max_iterations, 'Max Iterations:')
+    return _build_page(builder)
 
 
-class FluorescencePtychozoonViewController(Observer):
-    MAX_INT: Final[int] = 0x7FFFFFFF
+def _build_ptychozoon_widget(settings: FluorescenceSettings) -> QWidget:
+    builder = ParameterViewBuilder()
+    builder.add_decimal_line_edit(settings.ptychozoon_damping_factor, 'Damping Factor:')
+    builder.add_decimal_line_edit(settings.ptychozoon_gradient_smoothness, 'Gradient Smoothness:')
+    builder.add_spin_box(settings.ptychozoon_max_iterations, 'Max Iterations:')
+    builder.add_decimal_line_edit(settings.ptychozoon_atol, 'A Tolerance:')
+    builder.add_decimal_line_edit(settings.ptychozoon_btol, 'B Tolerance:')
+    builder.add_spin_box(settings.ptychozoon_checkpoint_interval, 'Checkpoint Interval:')
+    builder.add_check_box(settings.ptychozoon_use_gpu, 'Use GPU:')
+    builder.add_spin_box(settings.ptychozoon_gpu_device_index, 'CUDA Device Index:')
+    return _build_page(builder)
 
-    def __init__(self, enhancer: PtychozoonFluorescenceEnhancer) -> None:
-        super().__init__()
-        self._enhancer = enhancer
-        self._view = FluorescencePtychozoonParametersView()
 
-        self._view.damping_factor_line_edit.value_changed.connect(
-            self._sync_damping_factor_to_model
-        )
-        self._view.gradient_smoothness_line_edit.value_changed.connect(
-            self._sync_gradient_smoothness_to_model
-        )
-        self._view.max_iterations_spin_box.setRange(1, self.MAX_INT)
-        self._view.max_iterations_spin_box.valueChanged.connect(enhancer.set_max_iterations)
-        self._view.atol_line_edit.value_changed.connect(self._sync_atol_to_model)
-        self._view.btol_line_edit.value_changed.connect(self._sync_btol_to_model)
-        self._view.checkpoint_interval_spin_box.setRange(1, self.MAX_INT)
-        self._view.checkpoint_interval_spin_box.valueChanged.connect(
-            enhancer.set_checkpoint_interval
-        )
-        self._view.use_gpu_check_box.toggled.connect(enhancer.set_gpu_enabled)
-        self._view.gpu_device_index_spin_box.setRange(0, self.MAX_INT)
-        self._view.gpu_device_index_spin_box.valueChanged.connect(enhancer.set_gpu_device_index)
+def _build_page(builder: ParameterViewBuilder) -> QWidget:
+    """Build a stacked-widget page, matching the zero margins the old views used."""
+    widget = builder.build_widget()
+    layout = widget.layout()
 
-        enhancer.add_observer(self)
-        self._sync_model_to_view()
+    if layout is not None:
+        layout.setContentsMargins(0, 0, 0, 0)
 
-    def get_widget(self) -> QWidget:
-        return self._view
-
-    def _sync_damping_factor_to_model(self, value: Decimal) -> None:
-        self._enhancer.set_damping_factor(float(value))
-
-    def _sync_gradient_smoothness_to_model(self, value: Decimal) -> None:
-        self._enhancer.set_gradient_smoothness(float(value))
-
-    def _sync_atol_to_model(self, value: Decimal) -> None:
-        self._enhancer.set_atol(float(value))
-
-    def _sync_btol_to_model(self, value: Decimal) -> None:
-        self._enhancer.set_btol(float(value))
-
-    def _sync_model_to_view(self) -> None:
-        self._view.damping_factor_line_edit.set_value(
-            Decimal(repr(self._enhancer.get_damping_factor()))
-        )
-        self._view.gradient_smoothness_line_edit.set_value(
-            Decimal(repr(self._enhancer.get_gradient_smoothness()))
-        )
-        self._view.max_iterations_spin_box.setValue(self._enhancer.get_max_iterations())
-        self._view.atol_line_edit.set_value(Decimal(repr(self._enhancer.get_atol())))
-        self._view.btol_line_edit.set_value(Decimal(repr(self._enhancer.get_btol())))
-        self._view.checkpoint_interval_spin_box.setValue(self._enhancer.get_checkpoint_interval())
-        self._view.use_gpu_check_box.setChecked(self._enhancer.is_gpu_enabled())
-        self._view.gpu_device_index_spin_box.setValue(self._enhancer.get_gpu_device_index())
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._enhancer:
-            self._sync_model_to_view()
+    return widget
 
 
 class FluorescenceStatusController(Observer):
@@ -217,15 +122,14 @@ class FluorescenceEnhanceDialogController(Observer):
 
     def __init__(
         self,
-        fluorescence_api: FluorescenceAPI,
-        enhancer_chooser: PluginChooser[FluorescenceEnhancer],
-        two_step_enhancer: TwoStepFluorescenceEnhancer,
-        vspi_enhancer: VSPIFluorescenceEnhancer,
-        ptychozoon_enhancer: PtychozoonFluorescenceEnhancer | None,
-        task_monitor: FluorescenceTaskMonitor,
+        core: FluorescenceCore,
+        *,
+        has_ptychozoon: bool,
     ) -> None:
         super().__init__()
-        self._api = fluorescence_api
+        enhancer_chooser = core.enhancer_chooser
+        task_monitor = core.task_monitor
+        self._api = core.fluorescence_api
         self._enhancer_chooser = enhancer_chooser
         self._task_monitor = task_monitor
         self._dialog = FluorescenceEnhanceDialog()
@@ -239,33 +143,27 @@ class FluorescenceEnhanceDialogController(Observer):
         self._enhancement_model.setStringList([plugin.display_name for plugin in enhancer_chooser])
 
         parameters_view = self._dialog.parameters_view
-        self._two_step_view_controller = FluorescenceTwoStepViewController(two_step_enhancer)
         parameters_view.algorithm_combo_box.addItem(
             TwoStepFluorescenceEnhancer.DISPLAY_NAME,
             parameters_view.algorithm_combo_box.count(),
         )
-        parameters_view.stacked_widget.addWidget(self._two_step_view_controller.get_widget())
+        parameters_view.stacked_widget.addWidget(_build_two_step_widget(core))
 
-        self._vspi_view_controller = FluorescenceVSPIViewController(vspi_enhancer)
         parameters_view.algorithm_combo_box.addItem(
             VSPIFluorescenceEnhancer.DISPLAY_NAME,
             parameters_view.algorithm_combo_box.count(),
         )
-        parameters_view.stacked_widget.addWidget(self._vspi_view_controller.get_widget())
+        parameters_view.stacked_widget.addWidget(_build_vspi_widget(core.settings))
 
         # Registered last, matching enhancer_chooser order so the combo-box
         # index selects the correct stacked page. Only present when ptychozoon
-        # is installed (enhancer is None otherwise).
-        self._ptychozoon_view_controller: FluorescencePtychozoonViewController | None = None
-        if ptychozoon_enhancer is not None:
-            self._ptychozoon_view_controller = FluorescencePtychozoonViewController(
-                ptychozoon_enhancer
-            )
+        # is installed.
+        if has_ptychozoon:
             parameters_view.algorithm_combo_box.addItem(
                 PtychozoonFluorescenceEnhancer.DISPLAY_NAME,
                 parameters_view.algorithm_combo_box.count(),
             )
-            parameters_view.stacked_widget.addWidget(self._ptychozoon_view_controller.get_widget())
+            parameters_view.stacked_widget.addWidget(_build_ptychozoon_widget(core.settings))
 
         parameters_view.algorithm_combo_box.textActivated.connect(
             enhancer_chooser.set_current_plugin

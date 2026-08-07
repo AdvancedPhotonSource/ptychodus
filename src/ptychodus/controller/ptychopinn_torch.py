@@ -334,6 +334,35 @@ class PtychoPINNTorchViewControllerFactory(ReconstructorViewControllerFactory):
             tool_tip='Device to train on ("cuda", "cpu", etc.)',
             group=training_group,
         )  # TODO improve
+        builder.add_integer_line_edit(
+            training_settings.n_devices,
+            'Number of GPUs:',
+            tool_tip=(
+                'Number of CUDA devices to use for training. Lightning fans out to one '
+                'process per device via the configured distributed strategy.'
+            ),
+            group=training_group,
+        )
+        builder.add_line_edit(
+            training_settings.distributed_strategy,
+            'Distributed Strategy:',
+            tool_tip=(
+                "Lightning distributed strategy. Recommended: 'ddp_spawn' for "
+                "single-node multi-GPU. 'ddp' requires torchrun and is not wired in "
+                "phase 1. 'auto' lets Lightning decide."
+            ),
+            group=training_group,
+        )
+        builder.add_line_edit(
+            training_settings.visible_gpu_indices,
+            'Visible GPU Indices:',
+            tool_tip=(
+                'Comma-separated CUDA device indices exposed to the training '
+                'subprocess (via CUDA_VISIBLE_DEVICES). Leave blank to inherit '
+                "ptychodus's environment."
+            ),
+            group=training_group,
+        )
         builder.add_combo_box(
             training_settings.learning_rate_scheduler,
             enumerators.get_learning_rate_schedulers(),

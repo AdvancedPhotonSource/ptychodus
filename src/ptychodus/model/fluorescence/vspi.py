@@ -16,7 +16,6 @@ from ptychodus.api.fluorescence import (
     FluorescenceEnhancerOutput,
 )
 from ptychodus.api.object import ObjectPosition
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.product import Product
 
 from .settings import FluorescenceSettings
@@ -120,16 +119,13 @@ class VSPILinearOperator(LinearOperator):
         return HX
 
 
-class VSPIFluorescenceEnhancer(FluorescenceEnhancer, Observable, Observer):
+class VSPIFluorescenceEnhancer(FluorescenceEnhancer):
     SIMPLE_NAME: Final[str] = 'VSPI'
     DISPLAY_NAME: Final[str] = 'Virtual Single Pixel Imaging'
 
     def __init__(self, settings: FluorescenceSettings) -> None:
         super().__init__()
         self._settings = settings
-
-        settings.vspi_damping_factor.add_observer(self)
-        settings.vspi_max_iterations.add_observer(self)
 
     @property
     def name(self) -> str:
@@ -176,21 +172,3 @@ class VSPIFluorescenceEnhancer(FluorescenceEnhancer, Observable, Observer):
                 ),
                 progress=len(element_maps),
             )
-
-    def get_damping_factor(self) -> float:
-        return self._settings.vspi_damping_factor.get_value()
-
-    def set_damping_factor(self, factor: float) -> None:
-        self._settings.vspi_damping_factor.set_value(factor)
-
-    def get_max_iterations(self) -> int:
-        return self._settings.vspi_max_iterations.get_value()
-
-    def set_max_iterations(self, number: int) -> None:
-        self._settings.vspi_max_iterations.set_value(number)
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._settings.vspi_damping_factor:
-            self.notify_observers()
-        elif observable is self._settings.vspi_max_iterations:
-            self.notify_observers()

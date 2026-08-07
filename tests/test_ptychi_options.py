@@ -27,6 +27,19 @@ from ptychodus.api.reconstructor import ReconstructInput
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.ptychi.core import PtyChiReconstructorLibrary
 
+# Concrete (child-side) reconstructor classes plus the options helper. This test
+# is an in-process validator that must reach into pty-chi's Pydantic constructors
+# directly, so it deliberately does the imports the parent avoids. This is safe
+# because the file already does ``pytest.importorskip('ptychi')`` above.
+from ptychodus.model.ptychi.autodiff import AutodiffReconstructor  # noqa: E402
+from ptychodus.model.ptychi.bh import BHReconstructor  # noqa: E402
+from ptychodus.model.ptychi.dm import DMReconstructor  # noqa: E402
+from ptychodus.model.ptychi.epie import EPIEReconstructor  # noqa: E402
+from ptychodus.model.ptychi.helper import PtyChiOptionsHelper  # noqa: E402
+from ptychodus.model.ptychi.lsqml import LSQMLReconstructor  # noqa: E402
+from ptychodus.model.ptychi.pie import PIEReconstructor  # noqa: E402
+from ptychodus.model.ptychi.rpie import RPIEReconstructor  # noqa: E402
+
 PIXEL_M = 1.0e-9
 OBJ_HEIGHT_PX = 32
 OBJ_WIDTH_PX = 40
@@ -101,8 +114,35 @@ def _make_library() -> PtyChiReconstructorLibrary:
     )
 
 
+def _make_concrete_reconstructors(library: PtyChiReconstructorLibrary) -> list:
+    """Instantiate the child-side algorithm classes directly against ``library``'s settings.
+
+    The parent-side ``library.reconstructor_list`` now holds
+    :class:`SubprocessReconstructor` shells that hide ``_create_task_options``
+    behind a process boundary. To validate defaults / bounds we need the
+    concrete classes, so build them here using the same wiring the child does.
+    """
+    helper = PtyChiOptionsHelper(
+        library.settings,
+        library.object_settings,
+        library.probe_settings,
+        library.probe_position_settings,
+        library.opr_settings,
+        _StubPatternSizer(),  # type: ignore[arg-type]
+    )
+    return [
+        DMReconstructor(helper, library.dm_settings),
+        PIEReconstructor(helper, library.pie_settings),
+        EPIEReconstructor(helper, library.pie_settings),
+        RPIEReconstructor(helper, library.pie_settings),
+        LSQMLReconstructor(helper, library.lsqml_settings),
+        AutodiffReconstructor(helper, library.autodiff_settings),
+        BHReconstructor(helper, library.bh_settings),
+    ]
+
+
 def _build_all_task_options(library: PtyChiReconstructorLibrary, parameters: ReconstructInput):
-    for reconstructor in library.reconstructor_list:
+    for reconstructor in _make_concrete_reconstructors(library):
         # Every ptychi reconstructor exposes ``_create_task_options``; building it
         # runs pty-chi's Pydantic validators over all sub-option objects.
         reconstructor._create_task_options(parameters)  # type: ignore[attr-defined]
@@ -163,7 +203,7 @@ def test_hard_limits_are_serialized_as_lists() -> None:
     obj.constrain_hard_limits_enable_abs.set_value(True)
     obj.constrain_hard_limits_enable_phase.set_value(True)
 
-    options = library.reconstructor_list[0]._create_task_options(  # type: ignore[attr-defined]
+    options = _make_concrete_reconstructors(library)[0]._create_task_options(  # type: ignore[attr-defined]
         _make_reconstruct_input()
     )
     hard_limits = options.object_options.hard_limits_magnitude_phase
@@ -180,7 +220,7 @@ def test_compact_mode_clustering_stride_is_at_least_one() -> None:
     """Disabled compact-mode clustering must still yield a stride >= 1 for pty-chi."""
     library = _make_library()
     # Default (disabled) value is 0; pty-chi's stride field is now ge=1.
-    options = library.reconstructor_list[0]._create_task_options(  # type: ignore[attr-defined]
+    options = _make_concrete_reconstructors(library)[0]._create_task_options(  # type: ignore[attr-defined]
         _make_reconstruct_input()
     )
     assert options.reconstructor_options.compact_mode_update_clustering_stride >= 1

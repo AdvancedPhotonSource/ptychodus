@@ -1,5 +1,6 @@
 from collections.abc import Iterator
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
+from importlib.util import find_spec
 import logging
 
 from ptychodus.api.reconstructor import (
@@ -28,6 +29,11 @@ from .settings import (
 logger = logging.getLogger(__name__)
 
 
+def _ptychi_available() -> bool:
+    """Return True iff ``ptychi`` is importable, without importing it."""
+    return find_spec('ptychi') is not None
+
+
 class PtyChiReconstructorLibrary(ReconstructorLibrary):
     def __init__(
         self,
@@ -53,41 +59,43 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         )
         self.reconstructor_list: list[Reconstructor] = list()
 
-        try:
-            from .autodiff import AutodiffReconstructor
-            from .bh import BHReconstructor
-            from .dm import DMReconstructor
-            from .epie import EPIEReconstructor
-            from .helper import PtyChiOptionsHelper
-            from .lsqml import LSQMLReconstructor
-            from .pie import PIEReconstructor
-            from .rpie import RPIEReconstructor
-        except ModuleNotFoundError:
+        if not _ptychi_available():
             logger.info('pty-chi not found.')
 
             if is_developer_mode_enabled:
                 for reconstructor in ('DM', 'PIE', 'ePIE', 'rPIE', 'LSQML', 'Autodiff', 'BH'):
                     self.reconstructor_list.append(NullReconstructor(reconstructor))
-        else:
-            logger.info('Pty-Chi ' + version('ptychi'))
+            return
 
-            options_helper = PtyChiOptionsHelper(
+        try:
+            ptychi_version = version('ptychi')
+        except PackageNotFoundError:
+            ptychi_version = 'unknown'
+        logger.info(f'Pty-Chi {ptychi_version}')
+
+        # Parent-side factory. Imports ptychi.api transitively (via .helper and
+        # per-algorithm modules) — that pulls torch but does not acquire a GPU
+        # context; see the invariant note in _subprocess_protocol.py.
+        from .reconstructor import PtyChiSettingsBundle, build_reconstructor_list
+
+        bundle = PtyChiSettingsBundle(
+            dm=self.dm_settings,
+            pie=self.pie_settings,
+            lsqml=self.lsqml_settings,
+            autodiff=self.autodiff_settings,
+            bh=self.bh_settings,
+        )
+        self.reconstructor_list.extend(
+            build_reconstructor_list(
                 self.settings,
                 self.object_settings,
                 self.probe_settings,
                 self.probe_position_settings,
                 self.opr_settings,
+                bundle,
                 pattern_sizer,
             )
-            self.reconstructor_list.append(DMReconstructor(options_helper, self.dm_settings))
-            self.reconstructor_list.append(PIEReconstructor(options_helper, self.pie_settings))
-            self.reconstructor_list.append(EPIEReconstructor(options_helper, self.pie_settings))
-            self.reconstructor_list.append(RPIEReconstructor(options_helper, self.pie_settings))
-            self.reconstructor_list.append(LSQMLReconstructor(options_helper, self.lsqml_settings))
-            self.reconstructor_list.append(
-                AutodiffReconstructor(options_helper, self.autodiff_settings)
-            )
-            self.reconstructor_list.append(BHReconstructor(options_helper, self.bh_settings))
+        )
 
     @property
     def name(self) -> str:

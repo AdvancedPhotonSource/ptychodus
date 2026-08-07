@@ -150,12 +150,8 @@ class ControllerCore:
             self._file_dialog_factory,
         )
         self._fluorescence_enhance_dialog_controller = FluorescenceEnhanceDialogController(
-            model.fluorescence_core.fluorescence_api,
-            model.fluorescence_core.enhancer_chooser,
-            model.fluorescence_core.two_step_enhancer,
-            model.fluorescence_core.vspi_enhancer,
-            model.fluorescence_core.ptychozoon_enhancer,
-            model.fluorescence_core.task_monitor,
+            model.fluorescence_core,
+            has_ptychozoon=model.fluorescence_core.ptychozoon_enhancer is not None,
         )
         self._fluorescence_controller = FluorescenceController(
             model.fluorescence_core.repository,

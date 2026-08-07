@@ -1,16 +1,17 @@
 """GPU-accelerated VSPI fluorescence enhancer backed by the ptychozoon package.
 
 The heavy CuPy computation runs in a freshly ``spawn``ed subprocess (see
-:mod:`._ptychozoon_subprocess`) so each run gets a clean GPU context and all GPU
-memory is released when the run finishes or is stopped. This module never imports
-ptychozoon or CuPy directly.
+:mod:`._subprocess`) so each run gets a clean GPU context and all GPU memory
+is released when the run finishes or is stopped. This module only imports the
+CPU-safe ``ptychozoon.data_structures`` and ``ptychozoon.settings`` submodules
+(needed to construct the payload); CuPy-linked submodules stay inside the
+child.
 """
 
 from __future__ import annotations
 from collections.abc import Iterator
 from typing import Final
 import logging
-import multiprocessing
 
 import numpy
 
@@ -21,11 +22,20 @@ from ptychodus.api.fluorescence import (
     FluorescenceEnhancerInput,
     FluorescenceEnhancerOutput,
 )
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.product import Product
 
-from ._ptychozoon_subprocess import PtychozoonPayload, run_vspi_enhancement
+from ..processing._subprocess_protocol import run_subprocess
+from ._payload import (
+    DeconvolutionEnhancementSettings,
+    InterpolationTypes,
+    PtychographyProduct,
+    PtychozoonPayload,
+)
+from ._payload import ElementMap as PtychozoonElementMap
+from ._payload import FluorescenceDataset as PtychozoonFluorescenceDataset
 from .settings import FluorescenceSettings
+
+_ENTRY_POINT: Final[str] = 'ptychodus.model.fluorescence._subprocess:run_vspi_enhancement'
 
 logger = logging.getLogger(__name__)
 
@@ -34,22 +44,13 @@ __all__ = [
 ]
 
 
-class PtychozoonFluorescenceEnhancer(FluorescenceEnhancer, Observable, Observer):
+class PtychozoonFluorescenceEnhancer(FluorescenceEnhancer):
     SIMPLE_NAME: Final[str] = 'VSPI-GPU'
     DISPLAY_NAME: Final[str] = 'Virtual Single Pixel Imaging (GPU)'
 
     def __init__(self, settings: FluorescenceSettings) -> None:
         super().__init__()
         self._settings = settings
-
-        settings.ptychozoon_damping_factor.add_observer(self)
-        settings.ptychozoon_gradient_smoothness.add_observer(self)
-        settings.ptychozoon_max_iterations.add_observer(self)
-        settings.ptychozoon_atol.add_observer(self)
-        settings.ptychozoon_btol.add_observer(self)
-        settings.ptychozoon_checkpoint_interval.add_observer(self)
-        settings.ptychozoon_use_gpu.add_observer(self)
-        settings.ptychozoon_gpu_device_index.add_observer(self)
 
     @property
     def name(self) -> str:
@@ -71,25 +72,44 @@ class PtychozoonFluorescenceEnhancer(FluorescenceEnhancer, Observable, Observer)
         opr_weights = product.probes.get_opr_weights_or_none()
         opr_mode_weights = None if opr_weights is None else numpy.ascontiguousarray(opr_weights.T)
 
-        return PtychozoonPayload(
-            probe_positions_m=probe_positions_m,
+        ptychozoon_product = PtychographyProduct(
+            probe_positions=probe_positions_m,
             probe=product.probes.get_array(),
             object_array=product.object_.get_layers_flattened(),
             pixel_size_m=(object_geometry.pixel_height_m, object_geometry.pixel_width_m),
             object_center_m=(object_geometry.center_y_m, object_geometry.center_x_m),
             opr_mode_weights=opr_mode_weights,
+        )
+        ptychozoon_dataset = PtychozoonFluorescenceDataset(
             element_maps=[
-                (emap.name, numpy.asarray(emap.counts_per_second)) for emap in dataset.element_maps
-            ],
-            damping_factor=self._settings.ptychozoon_damping_factor.get_value(),
-            gradient_smoothness=self._settings.ptychozoon_gradient_smoothness.get_value(),
-            max_iterations=self._settings.ptychozoon_max_iterations.get_value(),
-            atol=self._settings.ptychozoon_atol.get_value(),
-            btol=self._settings.ptychozoon_btol.get_value(),
-            checkpoint_interval=self._settings.ptychozoon_checkpoint_interval.get_value(),
-            use_gpu=self._settings.ptychozoon_use_gpu.get_value(),
-            gpu_device_index=self._settings.ptychozoon_gpu_device_index.get_value(),
-            log_level=logger.getEffectiveLevel(),
+                PtychozoonElementMap(name=emap.name, counts_per_second=emap.counts_per_second)
+                for emap in dataset.element_maps
+            ]
+        )
+
+        settings = DeconvolutionEnhancementSettings()
+        settings.lsmr.damping_factor = self._settings.ptychozoon_damping_factor.get_value()
+        settings.lsmr.gradient_smoothness = (
+            self._settings.ptychozoon_gradient_smoothness.get_value()
+        )
+        settings.lsmr.max_iter = self._settings.ptychozoon_max_iterations.get_value()
+        settings.lsmr.atol = self._settings.ptychozoon_atol.get_value()
+        settings.lsmr.btol = self._settings.ptychozoon_btol.get_value()
+        settings.lsmr.checkpoint_interval = (
+            self._settings.ptychozoon_checkpoint_interval.get_value()
+        )
+        use_gpu = self._settings.ptychozoon_use_gpu.get_value()
+        settings.gpu.enabled = use_gpu
+        settings.gpu.index = self._settings.ptychozoon_gpu_device_index.get_value()
+        # Fourier interpolation requires the GPU; fall back to Barycentric on CPU.
+        settings._interpolation = (
+            InterpolationTypes.FOURIER if use_gpu else InterpolationTypes.BARYCENTRIC
+        )
+
+        return PtychozoonPayload(
+            product=ptychozoon_product,
+            dataset=ptychozoon_dataset,
+            settings=settings,
         )
 
     def enhance(
@@ -99,110 +119,19 @@ class PtychozoonFluorescenceEnhancer(FluorescenceEnhancer, Observable, Observer)
         payload = self._build_payload(parameters)
 
         # A fresh spawned process gives ptychozoon/CuPy a clean GPU context and
-        # releases all GPU memory when it exits.
-        ctx = multiprocessing.get_context('spawn')
-        result_queue = ctx.Queue()
-        process = ctx.Process(target=run_vspi_enhancement, args=(payload, result_queue))
-        process.start()
-
-        try:
-            while True:
-                item = result_queue.get()
-
-                if item is None:
-                    break
-
-                tag = item[0]
-
-                if tag == 'log':
-                    _, levelno, message = item
-                    # Re-emit through this process's logger so it reaches the
-                    # fluorescence status view via the registered handler.
-                    logger.log(levelno, message)
+        # releases all GPU memory when it exits. Log forwarding and error
+        # marshaling live in the shared subprocess protocol.
+        with run_subprocess(_ENTRY_POINT, payload) as events:
+            for event in events:
+                if event[0] != 'result':
                     continue
-
-                if tag == 'error':
-                    raise RuntimeError(f'ptychozoon enhancement failed:\n{item[1]}')
-
-                if tag == 'result':
-                    _, iteration, enhanced_maps = item
-                    element_maps = [ElementMap(name, cps) for name, cps in enhanced_maps]
-                    yield FluorescenceEnhancerOutput(
-                        dataset=FluorescenceDataset(
-                            element_maps=element_maps,
-                            counts_per_second_path=dataset.counts_per_second_path,
-                            channel_names_path=dataset.channel_names_path,
-                        ),
-                        progress=iteration,
-                    )
-                    continue
-        finally:
-            if process.is_alive():
-                process.terminate()
-
-            process.join(timeout=10.0)
-
-            if process.is_alive():
-                process.kill()
-                process.join()
-
-    def get_damping_factor(self) -> float:
-        return self._settings.ptychozoon_damping_factor.get_value()
-
-    def set_damping_factor(self, factor: float) -> None:
-        self._settings.ptychozoon_damping_factor.set_value(factor)
-
-    def get_gradient_smoothness(self) -> float:
-        return self._settings.ptychozoon_gradient_smoothness.get_value()
-
-    def set_gradient_smoothness(self, value: float) -> None:
-        self._settings.ptychozoon_gradient_smoothness.set_value(value)
-
-    def get_max_iterations(self) -> int:
-        return self._settings.ptychozoon_max_iterations.get_value()
-
-    def set_max_iterations(self, number: int) -> None:
-        self._settings.ptychozoon_max_iterations.set_value(number)
-
-    def get_atol(self) -> float:
-        return self._settings.ptychozoon_atol.get_value()
-
-    def set_atol(self, value: float) -> None:
-        self._settings.ptychozoon_atol.set_value(value)
-
-    def get_btol(self) -> float:
-        return self._settings.ptychozoon_btol.get_value()
-
-    def set_btol(self, value: float) -> None:
-        self._settings.ptychozoon_btol.set_value(value)
-
-    def get_checkpoint_interval(self) -> int:
-        return self._settings.ptychozoon_checkpoint_interval.get_value()
-
-    def set_checkpoint_interval(self, number: int) -> None:
-        self._settings.ptychozoon_checkpoint_interval.set_value(number)
-
-    def is_gpu_enabled(self) -> bool:
-        return self._settings.ptychozoon_use_gpu.get_value()
-
-    def set_gpu_enabled(self, enabled: bool) -> None:
-        self._settings.ptychozoon_use_gpu.set_value(enabled)
-
-    def get_gpu_device_index(self) -> int:
-        return self._settings.ptychozoon_gpu_device_index.get_value()
-
-    def set_gpu_device_index(self, index: int) -> None:
-        self._settings.ptychozoon_gpu_device_index.set_value(index)
-
-    def _update(self, observable: Observable) -> None:
-        if observable in (
-            self._settings.ptychozoon_damping_factor,
-            self._settings.ptychozoon_gradient_smoothness,
-            self._settings.ptychozoon_max_iterations,
-            self._settings.ptychozoon_atol,
-            self._settings.ptychozoon_btol,
-            self._settings.ptychozoon_checkpoint_interval,
-            self._settings.ptychozoon_use_gpu,
-            self._settings.ptychozoon_gpu_device_index,
-        ):
-            self.notify_observers()
+                _, iteration, enhanced_maps = event
+                element_maps = [ElementMap(name, cps) for name, cps in enhanced_maps]
+                yield FluorescenceEnhancerOutput(
+                    dataset=FluorescenceDataset(
+                        element_maps=element_maps,
+                        counts_per_second_path=dataset.counts_per_second_path,
+                        channel_names_path=dataset.channel_names_path,
+                    ),
+                    progress=iteration,
+                )

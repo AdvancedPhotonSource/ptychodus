@@ -1,5 +1,7 @@
 from __future__ import annotations
 from collections.abc import Iterator
+from importlib.metadata import PackageNotFoundError, version
+from importlib.util import find_spec
 import logging
 
 from ptychodus.api.reconstructor import (
@@ -15,6 +17,11 @@ from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
 logger = logging.getLogger(__name__)
 
 
+def _ptychonn_available() -> bool:
+    """Return True iff ptychonn and lightning are importable, without importing them."""
+    return all(find_spec(mod) is not None for mod in ('ptychonn', 'lightning'))
+
+
 class PtychoNNReconstructorLibrary(ReconstructorLibrary):
     def __init__(
         self, settings_registry: SettingsRegistry, is_developer_mode_enabled: bool
@@ -24,33 +31,38 @@ class PtychoNNReconstructorLibrary(ReconstructorLibrary):
         self.training_settings = PtychoNNTrainingSettings(settings_registry)
         self._reconstructors: list[TrainableReconstructor] = list()
 
-        try:
-            from .model import PtychoNNModelProvider
-            from .reconstructor import PtychoNNTrainableReconstructor
-        except ModuleNotFoundError:
+        if not _ptychonn_available():
             logger.info('PtychoNN not found.')
 
             if is_developer_mode_enabled:
                 self._reconstructors.append(NullReconstructor('PhaseOnly'))
                 self._reconstructors.append(NullReconstructor('AmplitudePhase'))
-        else:
-            phase_only_model_provider = PtychoNNModelProvider(
-                self.model_settings, self.training_settings, enable_amplitude=False
-            )
-            amplitude_phase_model_provider = PtychoNNModelProvider(
-                self.model_settings, self.training_settings, enable_amplitude=True
-            )
+            return
 
-            self._reconstructors.append(
-                PtychoNNTrainableReconstructor(
-                    self.model_settings, self.training_settings, phase_only_model_provider
-                )
+        try:
+            ptychonn_version = version('ptychonn')
+        except PackageNotFoundError:
+            ptychonn_version = 'unknown'
+        logger.info(f'PtychoNN {ptychonn_version}')
+
+        from .reconstructor import build_reconstructor
+
+        self._reconstructors.append(
+            build_reconstructor(
+                'PhaseOnly',
+                enable_amplitude=False,
+                model_settings=self.model_settings,
+                training_settings=self.training_settings,
             )
-            self._reconstructors.append(
-                PtychoNNTrainableReconstructor(
-                    self.model_settings, self.training_settings, amplitude_phase_model_provider
-                )
+        )
+        self._reconstructors.append(
+            build_reconstructor(
+                'AmplitudePhase',
+                enable_amplitude=True,
+                model_settings=self.model_settings,
+                training_settings=self.training_settings,
             )
+        )
 
     @property
     def name(self) -> str:

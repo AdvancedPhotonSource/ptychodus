@@ -653,7 +653,7 @@ class ParameterViewBuilder:
 
     def add_combo_box(
         self,
-        parameter: StringParameter,
+        parameter: Parameter[str],
         items: Iterable[str],
         label: str,
         *,

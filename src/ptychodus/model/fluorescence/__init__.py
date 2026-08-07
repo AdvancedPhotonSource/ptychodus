@@ -9,6 +9,7 @@ from .repository import (
     FluorescenceRepositoryItemObserver,
     FluorescenceRepositoryObserver,
 )
+from .settings import FluorescenceSettings
 from .two_step import TwoStepFluorescenceEnhancer
 from .vspi import VSPIFluorescenceEnhancer
 
@@ -21,6 +22,7 @@ __all__ = [
     'FluorescenceRepositoryItem',
     'FluorescenceRepositoryItemObserver',
     'FluorescenceRepositoryObserver',
+    'FluorescenceSettings',
     'FluorescenceTaskMonitor',
     'PtychozoonFluorescenceEnhancer',
     'TwoStepFluorescenceEnhancer',

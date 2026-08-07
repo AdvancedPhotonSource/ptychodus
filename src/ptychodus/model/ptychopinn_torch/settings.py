@@ -165,6 +165,18 @@ class PtychoPINNTorchTrainingSettings(Observable, Observer):
             'use_negative_log_likelihood_loss', True
         )
         self.device = self._group.create_string_parameter('device', 'cuda')
+        # Number of GPU devices to use for training. Lightning's `Trainer`
+        # spawns one process per device via the configured strategy.
+        self.n_devices = self._group.create_integer_parameter('n_devices', 1, minimum=1)
+        # Valid values: 'ddp_spawn' (default, safest inside our subprocess),
+        # 'ddp' (script re-exec — requires a self-contained entry point,
+        # not wired in phase 1), 'auto'.
+        self.distributed_strategy = self._group.create_string_parameter(
+            'distributed_strategy', 'ddp_spawn'
+        )
+        # Comma-separated CUDA device indices to expose to the training subprocess
+        # via CUDA_VISIBLE_DEVICES, or empty to inherit the parent's setting.
+        self.visible_gpu_indices = self._group.create_string_parameter('visible_gpu_indices', '')
         self.learning_rate_scheduler = self._group.create_string_parameter(
             'learning_rate_scheduler', 'Default'
         )

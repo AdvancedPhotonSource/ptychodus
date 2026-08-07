@@ -12,7 +12,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 import importlib
 import logging
 import pkgutil
@@ -27,7 +27,7 @@ from .fluorescence import (
 )
 from .object import ObjectFileReader, ObjectFileWriter, Object
 from .observer import Observable, Observer
-from .parametric import StringParameter
+from .parametric import Parameter, StringParameter
 from .probe import ProbeFileReader, ProbeFileWriter, ProbeSequence
 from .probe_gen import FresnelZonePlate
 from .probe_positions import (
@@ -40,6 +40,7 @@ from .workflow import FileBasedWorkflow
 
 __all__ = [
     'PluginChooser',
+    'PluginChooserParameter',
     'PluginRegistry',
 ]
 
@@ -157,6 +158,54 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
     def _update(self, observable: Observable) -> None:
         if self._parameter is not None and observable is self._parameter:
             self.set_current_plugin(self._parameter.get_value())
+
+
+class PluginChooserParameter(Parameter[str], Observer):
+    """Parameter[str] view of a PluginChooser whose value space is plugin display names.
+
+    A chooser has two name spaces: the human-readable ``display_name`` shown in the
+    GUI and the ``simple_name`` persisted to settings. This adapter presents the
+    display name as the parameter value so that a plain combo box bound to it round
+    trips correctly, while persistence continues to flow through whatever
+    :meth:`PluginChooser.synchronize_with_parameter` was given (still storing simple
+    names). Bind the chooser to its settings parameter *before* constructing this.
+
+    Note that :meth:`get_value` raises ``LookupError`` when no plugins are registered,
+    so this must not be read before ``PluginRegistry.load_plugins()`` has run.
+    """
+
+    def __init__(self, chooser: PluginChooser[Any]) -> None:
+        super().__init__()
+        self._chooser = chooser
+        self._suppress_notify = False
+
+        chooser.add_observer(self)
+
+    def get_value(self) -> str:
+        return self._chooser.get_current_plugin().display_name
+
+    def set_value(self, value: str, *, notify: bool = True) -> None:
+        # The chooser notifies us back through _update; suppress that relay rather
+        # than notifying here, so a no-op selection stays silent either way.
+        self._suppress_notify = not notify
+
+        try:
+            self._chooser.set_current_plugin(value)
+        finally:
+            self._suppress_notify = False
+
+    def get_value_as_string(self) -> str:
+        return self.get_value()
+
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(value)
+
+    def copy(self) -> Parameter[str]:
+        return PluginChooserParameter(self._chooser)
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._chooser and not self._suppress_notify:
+            self.notify_observers()
 
 
 class PluginRegistry:
