@@ -449,17 +449,16 @@ class ReconstructionAmbiguities:
     unchanged. See :meth:`standardize_product` for what is and is not exactly
     preserved.
 
-    Attributes:
-        object_scale_factor: ``scale`` above. Must be non-zero and finite.
-        phase_offset_rad: ``phi`` above, in radians.
-        phase_ramp_x_rad_per_m: ``k_x`` above, in rad/m.
-        phase_ramp_y_rad_per_m: ``k_y`` above, in rad/m.
     """
 
     object_scale_factor: float
+    """``scale`` above. Must be non-zero and finite."""
     phase_offset_rad: float
+    """``phi`` above, in radians."""
     phase_ramp_x_rad_per_m: float
+    """``k_x`` above, in rad/m."""
     phase_ramp_y_rad_per_m: float
+    """``k_y`` above, in rad/m."""
 
     def __post_init__(self) -> None:
         for f in fields(self):

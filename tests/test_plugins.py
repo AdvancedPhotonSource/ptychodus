@@ -9,8 +9,6 @@ selection semantics that the two classes agree on at that seam:
 - an unrecognized name holds the selection *and* the persisted value, but still
   notifies so a bound view resynchronizes;
 - registering a plugin re-sorts the list without repointing the selection.
-
-No Qt is required — this is pure model-layer behavior.
 """
 
 from __future__ import annotations

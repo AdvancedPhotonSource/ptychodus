@@ -59,7 +59,7 @@ def _build_model(
     )
 
 
-def run_reconstruct(payload: ReconstructPayload, queue: 'Queue[Any]') -> None:
+def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
     """Child entry point for one PtychoNN inference pass."""
     import ptychonn
 
@@ -113,7 +113,7 @@ def run_reconstruct(payload: ReconstructPayload, queue: 'Queue[Any]') -> None:
     queue.put((TAG_OUTPUT, pickle.dumps(ReconstructOutput(product))))
 
 
-def run_train(payload: TrainPayload, queue: 'Queue[Any]') -> None:
+def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
     """Child entry point for one PtychoNN training session."""
     import ptychonn
 

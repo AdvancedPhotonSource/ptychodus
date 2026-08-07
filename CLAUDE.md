@@ -12,12 +12,16 @@ uv run ptychodus                                    # GUI
 uv run ptychodus -b reconstruct -i <in> -o <out>    # batch — reads StandardFileLayout in <in>/
 uv run pytest                                       # tests
 uv run ruff check . && uv run ruff format --check . # lint + format
-uv run mypy src/ptychodus                           # types
+uv run mypy src/ptychodus scripts                   # types
 ```
 
 Container builds: `podman build -f Dockerfile.{cuda,cpu,rocm,xpu} .`. Docs: `make -C docs html`.
 
-Other entry points (`convert-to-ptychodus`, `ptychodus-bdp`, `ptychodus-store`, `ptychodus-system-check`, `ptychodus-iri-tokens`, `ptychodus-transfer-tokens`, …) are listed in [pyproject.toml](pyproject.toml) `[project.scripts]`. The store service has its own docs: [src/ptychodus_store/README.md](src/ptychodus_store/README.md).
+Other entry points (`convert-to-ptychodus`, `ptychodus-bdp`, `ptychodus-store`, `ptychodus-system-check`) are listed in [pyproject.toml](pyproject.toml) `[project.scripts]`; their modules live in [src/ptychodus/cli/](src/ptychodus/cli/). Unpackaged operator tooling — the podman wrapper and the per-facility HPC token/submit helpers — lives in the top-level [scripts/](scripts/) and is run from a checkout, e.g. `python scripts/genesis/ptychodus_iri_tokens.py`. The store service has its own docs: [src/ptychodus_store/README.md](src/ptychodus_store/README.md).
+
+### Testing
+
+Tests cover `api/` and `model/` only — **do not add tests for `view/` or `controller/`**, including controller helper functions. `pytest tests/` must pass on a bare `pip install .` (that is what CI runs), so anything reachable from `ptychodus.model` at import time must be free of optional dependencies: gate optional backends with the `find_spec` probe + deferred factory import used in each `model/*/core.py`. Guard a test that needs an optional backend with `pytest.importorskip('ptychi')`; drop a whole optional-extra directory with `collect_ignore` in [tests/conftest.py](tests/conftest.py) — `importorskip` in a conftest is reported as an error, not a skip.
 
 ## Architecture
 
@@ -58,7 +62,7 @@ Each backend (`model/ptychi/`, `model/ptychopinn/`, `model/ptychopinn_torch/`) e
 Both providers are optional-dep gated but constructed by `ModelCore` even when disabled:
 
 - `model/globus/` — Globus Compute (original APS workflow).
-- `model/genesis/` — IRI/AmSC HPC via `facility_adapters.py`, with per-facility scripts under `src/ptychodus/scripts/genesis/{alcf,nersc,olcf}/`.
+- `model/genesis/` — IRI/AmSC HPC via `facility_adapters.py`, with per-facility scripts under `scripts/genesis/{alcf,nersc,olcf}/`.
 
 `WorkflowAPI` (`api/workflow.py`, `model/workflow.py::ConcreteWorkflowAPI`) is the unified façade GUI, batch, and remote drive.
 
@@ -75,6 +79,9 @@ Both providers are optional-dep gated but constructed by `ModelCore` even when d
 - HTTP-client code uses `httpx` throughout (sync `httpx.Client` for repeated calls, module-level `httpx.get/post` for one-shots). `requests` is not a dependency.
 - Prefer affirmative conditionals when both branches do meaningful work — `if x.is_file(): ... else: ...`, not the negated form. Guard clauses that early-return are still idiomatic.
 - The `ptychodus_store/ui/` frontend is TypeScript compiled to native ES modules with plain `tsc` — no bundler, no framework, no runtime npm deps. Wheel builds run `tsc` via a `build_py` cmdclass in `setup.py`; interactive dev needs `tsc` on PATH.
+- **`cli/` versus `scripts/`.** `src/ptychodus/cli/` holds the modules behind `[project.scripts]` — it ships in the wheel, and `cli/__init__.py` carries the shared argparse helpers (`DirectoryType`, `verify_all_arguments_parsed`). The top-level `scripts/` is **not** packaged: it is checkout-run operator tooling (podman wrapper, per-facility HPC token/submit helpers, demos) invoked as `python scripts/…`. A new console command goes in `cli/` with an entry point; a new one-off or facility script goes in `scripts/` with none. Both trees are type-checked (`mypy src/ptychodus scripts`) and linted.
+- **All documentation is Markdown.** `docs/source/*.md` is MyST, parsed by `myst_parser`; there is no reStructuredText left in the repo and no new `.rst` should be added. Sphinx constructs use MyST directive fences — ` ```{note} `, ` ```{toctree} `, ` ```{image} `, ` ```{literalinclude} ` — with `:option: value` lines directly under the opening fence and a blank line before directive content. Autodoc stanzas stay as raw reStructuredText inside ` ```{eval-rst} ` blocks. Roles use MyST syntax: `` {py:class}`…` ``, `` {py:func}`…` ``, `` {ref}`…` ``, `` {kbd}`…` ``. Enabled MyST extensions (`colon_fence`, `deflist`, `fieldlist`) are declared in [docs/source/conf.py](docs/source/conf.py).
+- **Markdown style**, enforced by `pymarkdownlnt` (`uv run pymarkdown scan $(git ls-files '*.md')`, config in `pyproject.toml` `[tool.pymarkdown]`): ATX headings only, one H1 per file, `###` max outside `docs/source/` (MyST pages may use `####`); backtick fences never tildes, and the shell tag is `sh` not `bash`; `-` bullets, ordered lists with real incrementing numbers; inline links with repo-relative paths, bare URLs as `<https://…>` autolinks; pipe tables with leading and trailing pipes and an unpadded `| --- |` separator; **no hard wrapping** — one physical line per paragraph, however long; `**bold**` for identifiers, paths, and warnings, backticks for code tokens, em dash `—` as the aside separator; no YAML front matter except `.claude/skills/*/SKILL.md`; LF endings, no trailing whitespace, one terminating newline, a blank line before every heading and fence. Fences and sub-lists nested inside a list item indent to the parent's content column — 3 spaces under an ordered marker, 2 spaces under a dash marker — with a blank line before the fence.
 
 ## Repository
 

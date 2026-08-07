@@ -343,7 +343,7 @@ def cyclic_colormap_names() -> Iterator[str]:
 
 
 def get_colormap_by_name(name: str) -> Colormap:
-    """Return the colorcet Colormap for the given short name (prefixed with 'cet_')."""
+    """Return the colorcet Colormap for the given short name (prefixed with ``cet_``)."""
     return matplotlib.colormaps[f'cet_{name}']
 
 

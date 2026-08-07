@@ -5,9 +5,6 @@ input is a 3-D pattern stack or a 2-D boolean bad-pixel mask from
 `data.dtype`. The order of operations is encoded in
 `DiffractionPrepPipeline.steps`; the canonical order emitted by the model-layer
 factory is filter → crop → binning → padding → hflip → vflip → transpose.
-
-Every model is a frozen Pydantic BaseModel so pipelines serialize to JSON for
-reuse by the REST/MCP surface in `ptychodus_store`.
 """
 
 from __future__ import annotations
@@ -32,7 +29,18 @@ def _is_mask(data: numpy.ndarray) -> bool:
 
 
 class DiffractionPrepStep(BaseModel):
-    """Abstract base for a single preprocessing step."""
+    """Abstract base for a single preprocessing step.
+
+    To add a new step:
+
+    - Declare `type: Literal['<unique_tag>'] = '<unique_tag>'`. The default is required so
+      callers never pass the tag and `model_dump_json` emits it automatically.
+    - Add the class to `DiffractionPrepStepUnion`, or it is unreachable on deserialize.
+    - Override `apply_to_extent` / `apply_to_pixel_geometry` only where the step is not
+      identity in that dimension; the defaults below pass the input through unchanged.
+    - Branch on `_is_mask(data)` in `apply` if pattern and mask behavior differ, as
+      `BinningStep` does (sum for patterns, logical-AND for masks).
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -176,6 +184,10 @@ class TransposeStep(DiffractionPrepStep):
         return PixelGeometry(width_m=geometry.height_m, height_m=geometry.width_m)
 
 
+# `Discriminator('type')` is what keeps the field-less steps distinguishable: HorizontalFlipStep,
+# VerticalFlipStep, and TransposeStep all serialize to the same empty JSON object, so shape-based
+# union resolution would silently deserialize one as another. The explicit tag is mandatory here,
+# not stylistic.
 DiffractionPrepStepUnion: TypeAlias = Annotated[
     FilterValuesStep
     | CropStep
@@ -201,6 +213,7 @@ class DiffractionPrepPipeline(BaseModel):
         return data
 
     def apply_to_patterns(self, patterns: DiffractionPatterns) -> DiffractionPatterns:
+        """Run every step over a pattern stack. A single 2-D pattern is promoted to a stack."""
         if patterns.ndim == 2:
             patterns = patterns[numpy.newaxis, ...]
         elif patterns.ndim != 3:
@@ -209,21 +222,25 @@ class DiffractionPrepPipeline(BaseModel):
         return self._apply(patterns)
 
     def apply_to_mask(self, bad_pixels: BadPixels) -> BadPixels:
+        """Run every step over a 2-D boolean bad-pixel mask."""
         if bad_pixels.ndim != 2:
             raise ValueError(f'Invalid bad_pixel dimensions! (shape={bad_pixels.shape})')
 
         return self._apply(bad_pixels)
 
     def __call__(self, array: DiffractionArray) -> DiffractionArray:
+        """Return a new array with the pipeline applied, preserving label and scan indexes."""
         patterns = self.apply_to_patterns(array.get_patterns())
         return SimpleDiffractionArray(array.get_label(), array.get_indexes(), patterns)
 
     def compute_output_extent(self, extent: ImageExtent) -> ImageExtent:
+        """Return the extent the pipeline would produce, without touching pattern data."""
         for step in self.steps:
             extent = step.apply_to_extent(extent)
         return extent
 
     def compute_output_pixel_geometry(self, geometry: PixelGeometry) -> PixelGeometry:
+        """Return the pixel geometry the pipeline would produce, without touching pattern data."""
         for step in self.steps:
             geometry = step.apply_to_pixel_geometry(geometry)
         return geometry

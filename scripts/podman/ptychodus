@@ -127,7 +127,7 @@ fi
 # --- Prerequisite checks -----------------------------------------------------
 
 command -v podman >/dev/null 2>&1 \
-    || die "podman not installed; see docs/source/getting_started.rst"
+    || die "podman not installed; see docs/source/getting_started.md"
 
 if ! podman image exists "$IMAGE"; then
     build_family="$family"

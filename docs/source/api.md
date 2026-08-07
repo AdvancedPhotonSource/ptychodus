@@ -1,223 +1,253 @@
-API Reference
-=============
+# API Reference
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents
+## Affine
 
-
-Affine
-------
-
+```{eval-rst}
 .. automodule:: ptychodus.api.affine
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Common
-------
+## Common
 
+```{eval-rst}
 .. automodule:: ptychodus.api.common
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Diffraction
------------
+## Diffraction
 
+```{eval-rst}
 .. automodule:: ptychodus.api.diffraction
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Diffraction Generators
-----------------------
+## Diffraction Preprocessing
 
+```{eval-rst}
+.. automodule:: ptychodus.api.diffraction_prep
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+## Diffraction Generators
+
+```{eval-rst}
 .. automodule:: ptychodus.api.diffraction_gen
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Fluorescence
-------------
+## Fluorescence
 
+```{eval-rst}
 .. automodule:: ptychodus.api.fluorescence
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Geometry
---------
+## Geometry
 
+```{eval-rst}
 .. automodule:: ptychodus.api.geometry
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Illumination
-------------
+## Illumination
 
+```{eval-rst}
 .. automodule:: ptychodus.api.illumination
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Input/Output (I/O)
-------------------
+## Input/Output (I/O)
 
+```{eval-rst}
 .. automodule:: ptychodus.api.io
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Interpolation
--------------
+## Interpolation
 
+```{eval-rst}
 .. automodule:: ptychodus.api.interpolate
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Metrics
--------
+## Metrics
 
+```{eval-rst}
 .. automodule:: ptychodus.api.metrics
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Object
-------
+## Object
 
+```{eval-rst}
 .. automodule:: ptychodus.api.object
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Object Generators
------------------
+## Object Generators
 
+```{eval-rst}
 .. automodule:: ptychodus.api.object_gen
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Observer
---------
+## Observer
 
+```{eval-rst}
 .. automodule:: ptychodus.api.observer
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Parametric
-----------
+## Parametric
 
+```{eval-rst}
 .. automodule:: ptychodus.api.parametric
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Plugins
--------
+## Plugins
 
+```{eval-rst}
 .. automodule:: ptychodus.api.plugins
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Probe
------
+## Probe
 
+```{eval-rst}
 .. automodule:: ptychodus.api.probe
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Probe Generators
-----------------
+## Probe Generators
 
+```{eval-rst}
 .. automodule:: ptychodus.api.probe_gen
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Probe Positions
----------------
+## Probe Positions
 
+```{eval-rst}
 .. automodule:: ptychodus.api.probe_positions
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Probe Position Generators
--------------------------
+## Probe Position Generators
 
+```{eval-rst}
 .. automodule:: ptychodus.api.probe_positions_gen
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Product
--------
+## Product
 
+```{eval-rst}
 .. automodule:: ptychodus.api.product
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Propagator
-----------
+## Propagator
 
+```{eval-rst}
 .. automodule:: ptychodus.api.propagator
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Reconstructor
--------------
+## Reconstructor
 
+```{eval-rst}
 .. automodule:: ptychodus.api.reconstructor
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Settings
---------
+## Settings
 
+```{eval-rst}
 .. automodule:: ptychodus.api.settings
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Tree
-----
+## Tree
 
+```{eval-rst}
 .. automodule:: ptychodus.api.tree
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Visualization
--------------
+## Visualization
 
+```{eval-rst}
 .. automodule:: ptychodus.api.visualization
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-Workflow
---------
+## Workflow
 
+```{eval-rst}
 .. automodule:: ptychodus.api.workflow
    :members:
    :undoc-members:
    :show-inheritance:
+```
 
-XMCD
-----
+## XMCD
 
+```{eval-rst}
 .. automodule:: ptychodus.api.xmcd
    :members:
    :undoc-members:
    :show-inheritance:
+```

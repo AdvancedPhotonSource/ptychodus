@@ -14,11 +14,13 @@ Filenames are the original Font-Awesome names, with no `solid/` vs `regular/` pr
 1. Drop the SVG file into this directory (from Font-Awesome or elsewhere).
 2. Update `src/ptychodus_store/ui/src/nav.ts` (or whichever component uses it) to reference `/ui/icons/<name>.svg`.
 3. If the PyQt GUI also needs it, add a line to `src/ptychodus/view/resources.qrc`:
+
    ```xml
    <file alias="<alias>">../../ptychodus_store/ui/icons/<name>.svg</file>
    ```
+
    then run `src/ptychodus/view/make_qrc.sh` to regenerate `resources.py`.
 
 ## Updating Font-Awesome
 
-Fetch a newer release from https://github.com/FortAwesome/Font-Awesome, replace the SVGs referenced above by name (Font-Awesome preserves filenames across minor releases), and refresh `Font-Awesome-LICENSE.txt`. Rerun `make_qrc.sh` if `resources.qrc` references changed files.
+Fetch a newer release from <https://github.com/FortAwesome/Font-Awesome>, replace the SVGs referenced above by name (Font-Awesome preserves filenames across minor releases), and refresh `Font-Awesome-LICENSE.txt`. Rerun `make_qrc.sh` if `resources.qrc` references changed files.

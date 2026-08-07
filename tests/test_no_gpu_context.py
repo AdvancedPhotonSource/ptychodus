@@ -116,7 +116,7 @@ def _gpu_context_offenders() -> tuple[list[str], list[str]]:
     return offenders, notes
 
 
-def _check_in_subprocess(result_queue: 'multiprocessing.Queue[dict[str, list[str]] | str]') -> None:
+def _check_in_subprocess(result_queue: multiprocessing.Queue[dict[str, list[str]] | str]) -> None:
     try:
         # Import the top-level package plus the main composition roots.
         import ptychodus  # noqa: F401
@@ -140,7 +140,7 @@ def _check_in_subprocess(result_queue: 'multiprocessing.Queue[dict[str, list[str
 def probe_result() -> dict[str, list[str]]:
     """Run the import/context probe once and share it across both tests."""
     ctx = multiprocessing.get_context('spawn')
-    result_queue: 'multiprocessing.Queue[dict[str, list[str]] | str]' = ctx.Queue()
+    result_queue: multiprocessing.Queue[dict[str, list[str]] | str] = ctx.Queue()
     process = ctx.Process(target=_check_in_subprocess, args=(result_queue,))
     process.start()
     process.join(timeout=60.0)

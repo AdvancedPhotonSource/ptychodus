@@ -86,4 +86,4 @@ jobs:
       - name: Install ptychodus + mypy
         run: pip install . mypy pyqt5-stubs types-psutil types-pyyaml types-requests
       - name: mypy
-        run: mypy src/ptychodus
+        run: mypy src/ptychodus scripts

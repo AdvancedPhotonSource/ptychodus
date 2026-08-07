@@ -26,7 +26,7 @@ __all__ = [
 ]
 
 
-def run_vspi_enhancement(payload: PtychozoonPayload, result_queue: 'Queue[Any]') -> None:
+def run_vspi_enhancement(payload: PtychozoonPayload, result_queue: Queue[Any]) -> None:
     """Run ptychozoon VSPI enhancement and stream checkpoint results over a queue.
 
     Intended as the ``entry_point`` for

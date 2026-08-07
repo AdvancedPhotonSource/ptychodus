@@ -59,9 +59,7 @@ class _AlgorithmSpec:
     """One row of the algorithm dispatch table used by the factory."""
 
     display_name: str
-    make_option_factory: Callable[
-        [PtyChiOptionsHelper, 'PtyChiSettingsBundle'], _TaskOptionsBuilder
-    ]
+    make_option_factory: Callable[[PtyChiOptionsHelper, PtyChiSettingsBundle], _TaskOptionsBuilder]
 
 
 @dataclass(frozen=True)

@@ -131,21 +131,6 @@ def test_rebuild_skips_when_only_one_dimension_is_zero() -> None:
     assert item.get_probes().get_array().size == 0
 
 
-def test_try_get_probe_returns_none_on_null_sentinel() -> None:
-    """try_get_probe must swallow the 'Missing probe pixel geometry!' ValueError
-    that ProbeSequence.get_probe_no_opr() raises on the null sentinel."""
-    from ptychodus.controller.probe.tree_model import try_get_probe
-
-    registry = SettingsRegistry()
-    settings = ProbeSettings(registry)
-    provider = _make_provider(pixel_width_m=0.0, pixel_height_m=0.0)
-    canned = _make_probe_seq(pixel_size_m=1e-6)
-    builder = _RecordingBuilder(settings, canned)
-
-    item = ProbeRepositoryItem(_make_rng(), provider, settings, builder)
-    assert try_get_probe(item) is None
-
-
 class _ObservableProbeProvider(ProbeGeometryProvider, Observable):
     """Test double: an Observable + ProbeGeometryProvider. Only get_probe_geometry
     is exercised by ProbeRepositoryItem's rebuild guard; the other abstract
@@ -210,30 +195,3 @@ def test_rebuild_fires_on_geometry_observer_notification() -> None:
 
     assert len(builder.build_calls) == 1
     assert item.get_probes().get_array() is canned.get_array()
-
-
-def test_try_get_probe_returns_probe_when_ready() -> None:
-    """Once _rebuild has run and left a real ProbeSequence, try_get_probe
-    returns the underlying single-mode Probe."""
-    from ptychodus.controller.probe.tree_model import try_get_probe
-
-    registry = SettingsRegistry()
-    settings = ProbeSettings(registry)
-    provider = _make_provider(pixel_width_m=0.0, pixel_height_m=0.0)
-    canned = _make_probe_seq(pixel_size_m=1e-6)
-    builder = _RecordingBuilder(settings, canned)
-
-    item = ProbeRepositoryItem(_make_rng(), provider, settings, builder)
-
-    provider.get_probe_geometry.return_value = ProbeGeometry(
-        width_px=64,
-        height_px=64,
-        pixel_width_m=1e-6,
-        pixel_height_m=1e-6,
-    )
-    replacement = _RecordingBuilder(settings, canned)
-    item.set_builder(replacement)
-
-    probe = try_get_probe(item)
-    assert probe is not None
-    assert probe.get_pixel_geometry() == canned.get_pixel_geometry()

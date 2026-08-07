@@ -1,6 +1,6 @@
 ---
 name: pre-release
-description: Run a comprehensive pre-release verification of the ptychodus repository — API docs coverage, minimal docstring presence, reader-plugin docs, README/CLAUDE.md/pyproject.toml consistency, install-instruction freshness, zero-warning Sphinx build, full CI gate, and entry-point smoke tests. Report every finding and offer per-issue fixes. Use when the user says "pre-release check", "release audit", "before we cut a release", or "verify the repo is release-ready".
+description: Run a comprehensive pre-release verification of the ptychodus repository — API docs coverage, minimal docstring presence, reader-plugin docs, README/CLAUDE.md/pyproject.toml consistency, install-instruction freshness, Markdown hygiene, zero-warning Sphinx build, full CI gate, and entry-point smoke tests. Report every finding and offer per-issue fixes. Use when the user says "pre-release check", "release audit", "before we cut a release", or "verify the repo is release-ready".
 ---
 
 # pre-release
@@ -13,31 +13,32 @@ Execute the sections in order. After each, capture pass/fail and any findings. A
 
 ---
 
-### Section 1 — API modules present in `docs/source/api.rst`
+### Section 1 — API modules present in `docs/source/api.md`
 
-For every `src/ptychodus/api/*.py` file (excluding `_*.py` private modules), confirm `docs/source/api.rst` contains a matching `.. automodule:: ptychodus.api.<stem>` directive.
+For every `src/ptychodus/api/*.py` file (excluding `_*.py` private modules), confirm `docs/source/api.md` contains a matching `.. automodule:: ptychodus.api.<stem>` directive.
 
 ```sh
 # Modules that should be documented:
 ls src/ptychodus/api/*.py | xargs -n1 basename | sed 's/\.py$//' | grep -v '^_' | grep -v '^__' | sort
 
 # Modules currently documented:
-grep -oE '\.\. automodule:: ptychodus\.api\.[a-z_]+' docs/source/api.rst | sed 's|.*ptychodus\.api\.||' | sort
+grep -oE '\.\. automodule:: ptychodus\.api\.[a-z_]+' docs/source/api.md | sed 's|.*ptychodus\.api\.||' | sort
 ```
 
 Compute the diff. `PASS` if empty. `FAIL` with the list of missing module names.
 
-**Suggested fix per missing module**: append this stanza to `docs/source/api.rst`, matching the existing pattern (title-case heading, underline of `-` the same length):
+**Suggested fix per missing module**: append this stanza to `docs/source/api.md`, matching the existing pattern (title-case `##` heading, then the autodoc directive as raw reStructuredText inside an `{eval-rst}` block):
 
-```rst
-<Title Case Name>
------------------
+````markdown
+## <Title Case Name>
 
+```{eval-rst}
 .. automodule:: ptychodus.api.<stem>
    :members:
    :undoc-members:
    :show-inheritance:
 ```
+````
 
 Ask the user to confirm the heading text before writing.
 
@@ -46,6 +47,7 @@ Ask the user to confirm the heading text before writing.
 ### Section 2 — Minimal docstring coverage in `src/ptychodus/api/`
 
 For each non-private module in `src/ptychodus/api/`, verify:
+
 - Module has a top-of-file docstring.
 - Every top-level `class` has a docstring on its first statement.
 - Every top-level `def` whose name does NOT start with `_` has a docstring on its first statement.
@@ -81,13 +83,13 @@ print(f'--- {len(missing)} missing ---')
 
 ---
 
-### Section 3 — Reader plugins represented in `docs/source/readers.rst`
+### Section 3 — Reader plugins represented in `docs/source/readers.md`
 
-`docs/source/readers.rst` is a curated bullet list, not a 1:1 file mapping. Cross-check by keyword: for every distinct beamline/format hint in `src/ptychodus/plugins/`, ensure the readers doc mentions it.
+`docs/source/readers.md` is a curated bullet list, not a 1:1 file mapping. Cross-check by keyword: for every distinct beamline/format hint in `src/ptychodus/plugins/`, ensure the readers doc mentions it.
 
 Keyword map (edit as new plugins land):
 
-| Plugin filename substring | Expected mention in readers.rst |
+| Plugin filename substring | Expected mention in readers.md |
 | --- | --- |
 | `aps02id_` | "2-ID-D Bionanoprobe" or "2-ID-D Microprobe" or "2-ID-E Microprobe" |
 | `aps04id_polar_` | "4-ID" and "Polar" (Polarization Modulation Spectroscopy) |
@@ -109,13 +111,13 @@ Keyword map (edit as new plugins land):
 # List all plugin file stems:
 ls src/ptychodus/plugins/*.py | xargs -n1 basename | sed 's/\.py$//'
 
-# For each keyword above, verify readers.rst contains the expected mention:
+# For each keyword above, verify readers.md contains the expected mention:
 for kw in "2-ID-D Bionanoprobe" "4-ID" "9-ID" "12-ID" "19-ID" "31-ID" "33-ID" "LCLS" "NanoMAX" "fold_slice" "CXI" "CSV" "MDA" "NumPy" "Space-Separated"; do
-    grep -q "$kw" docs/source/readers.rst || echo "MISSING: $kw"
+    grep -q "$kw" docs/source/readers.md || echo "MISSING: $kw"
 done
 ```
 
-Also flag *the reverse*: any bullet in `readers.rst` whose beamline has no matching plugin file — that indicates a stale doc entry.
+Also flag *the reverse*: any bullet in `readers.md` whose beamline has no matching plugin file — that indicates a stale doc entry.
 
 `PASS` if every plugin has a doc mention and every doc mention has a plugin. `FAIL` with lists of orphans in either direction.
 
@@ -125,11 +127,12 @@ Also flag *the reverse*: any bullet in `readers.rst` whose beamline has no match
 
 ### Section 4 — README, CLAUDE.md, pyproject.toml consistency
 
-**4a. Extras named in `README.rst` all exist in `pyproject.toml`.**
+**4a. Extras named in `README.md` all exist in `pyproject.toml`.**
 
 ```sh
-# Extract extras from README.rst install commands:
-grep -oE '\[[a-z,]+\]' README.rst | tr -d '[]' | tr ',' '\n' | sort -u
+# Extract extras from README.md install commands.
+# Anchor on `ptychodus[...]` so Markdown link labels ([Ptychodus], [uv]) don't match:
+grep -oE 'ptychodus\[[a-z,]+\]' README.md | sed 's/.*\[//; s/\]//' | tr ',' '\n' | sort -u
 
 # Extras declared in pyproject.toml:
 uv run python -c "
@@ -143,7 +146,7 @@ for k in sorted(p['project']['optional-dependencies']):
 
 `PASS` if the README extras are a subset of the pyproject extras. `FAIL` with the missing extras.
 
-**Suggested fix**: either add the extra to `pyproject.toml` (rare — usually intentional) or remove/rename the extra reference in `README.rst`.
+**Suggested fix**: either add the extra to `pyproject.toml` (rare — usually intentional) or remove/rename the extra reference in `README.md`.
 
 **4b. Every `[project.scripts]` entry is documented or referenced.**
 
@@ -157,7 +160,7 @@ for name in sorted(p['project'].get('scripts', {})):
 "
 ```
 
-For each script name, confirm it appears in `CLAUDE.md` OR `docs/source/getting_started.rst`. `PASS` if all are referenced.
+For each script name, confirm it appears in `CLAUDE.md` OR `docs/source/getting_started.md`. `PASS` if all are referenced.
 
 **Suggested fix**: add a `uv run <script>` example under the "Common Commands" section of CLAUDE.md (project convention — see the existing block).
 
@@ -170,23 +173,44 @@ For each script name, confirm it appears in `CLAUDE.md` OR `docs/source/getting_
 
 ### Section 5 — Installation instructions are fresh
 
-**5a. Dockerfile variants referenced still exist.** Every Dockerfile name mentioned in `docs/source/getting_started.rst` and `CLAUDE.md` should be a real file at the repo root:
+**5a. Dockerfile variants referenced still exist.** Every Dockerfile name mentioned in `docs/source/getting_started.md` and `CLAUDE.md` should be a real file at the repo root:
 
 ```sh
-grep -hoE 'Dockerfile\.[a-z]+' docs/source/getting_started.rst CLAUDE.md | sort -u | while read f; do
+grep -hoE 'Dockerfile\.[a-z]+' docs/source/getting_started.md CLAUDE.md | sort -u | while read f; do
     [ -f "$f" ] || echo "MISSING: $f"
 done
 ```
 
 `PASS` if empty. `FAIL` lists missing Dockerfiles.
 
-**5b. Extras named in `docs/source/getting_started.rst` install commands exist in pyproject.**
+**5b. Extras named in `docs/source/getting_started.md` install commands exist in pyproject.**
 
-Same technique as 4a but against getting_started.rst.
+Same technique as 4a but against getting_started.md.
 
-**5c. The `uv sync` command in README.rst uses currently-supported extras.**
+**5c. The `uv sync` command in README.md uses currently-supported extras.**
 
-Parse the `uv sync --extra <x> --extra <y> ...` line in README.rst and confirm each extra is in `pyproject.toml`.
+Parse the `uv sync --extra <x> --extra <y> ...` line in README.md and confirm each extra is in `pyproject.toml`.
+
+---
+
+### Section 5.5 — Markdown hygiene
+
+Docs are MyST Markdown; no reStructuredText should reappear, and every tracked `.md` must satisfy the house style codified in `CLAUDE.md`.
+
+```sh
+# No stray reStructuredText anywhere in the repo:
+git ls-files '*.rst'
+
+# House style, mechanically enforced:
+uv run pymarkdown scan $(git ls-files '*.md')
+
+# Shell fences use `sh`, not `bash`:
+git ls-files '*.md' | xargs grep -l '^```bash'
+```
+
+`PASS` if the first and third commands print nothing and `pymarkdown` exits 0. `FAIL` otherwise, listing each offending file.
+
+**Suggested fix**: for `.rst` files, convert to MyST Markdown and update every reference. For linter findings, apply the rule the message names — do not widen the `[tool.pymarkdown]` config in `pyproject.toml` to silence a real violation.
 
 ---
 
@@ -202,7 +226,7 @@ make -C docs html SPHINXOPTS="-W --keep-going"
 
 **Suggested fix**: hand the first warning to the user. Common causes: undocumented cross-references, autodoc import failures (usually a missing extra — retry with `uv sync --extra docs --extra ptychi --extra globus --extra gui --extra store` if autodoc can't import a module), duplicate labels. Not auto-fixable.
 
-*Note*: `-W` is strict. If the current repo has pre-existing warnings the team accepts, discuss dropping `-W` or adding a `nitpick_ignore` list to `docs/source/conf.py` — but do that as a separate change, not as a pre-release action.
+*Note*: `-W` is strict, and the prose sources are expected to build clean — treat any warning originating in `docs/source/*.md` as a regression introduced by the change under review. Warnings raised from `src/ptychodus/api/*.py` docstrings (reStructuredText syntax errors surfaced by autodoc) are a known pre-existing backlog; report the count and the first offender, but do not fold fixing them into the release gate.
 
 ---
 
@@ -242,12 +266,13 @@ done
 
 Print a summary in this exact format after all sections have run:
 
-```
+```text
 1. API modules in docs         PASS   (<covered>/<total>)
 2. Docstrings in api           PASS|FAIL   (<n> missing)
 3. Reader plugins in docs      PASS|FAIL   (<n> orphans)
 4. README/CLAUDE/pyproject     PASS|FAIL   (<one-line summary>)
 5. Install instructions        PASS|FAIL   (<one-line summary>)
+5.5 Markdown hygiene           PASS|FAIL   (<n> rst files, <n> lint findings)
 6. Sphinx build (zero warns)   PASS|FAIL   (first warning if any)
 7. Full CI gate                PASS|FAIL
 8. Entry-point smoke tests     PASS|FAIL   (<pass>/<total>)

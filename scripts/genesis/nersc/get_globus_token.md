@@ -28,7 +28,7 @@ This document explains how to use:
 1. Python 3.9+ (recommended).
 2. `globus-sdk` installed:
 
-```bash
+```sh
 pip install globus-sdk
 ```
 
@@ -36,7 +36,7 @@ pip install globus-sdk
 
 Run:
 
-```bash
+```sh
 python get_globus_token.py
 ```
 
@@ -53,13 +53,13 @@ What happens:
 
 By default, the script requests tokens for both facilities:
 
-```bash
+```sh
 python get_globus_token.py --facilities nersc alcf
 ```
 
 You can limit token acquisition to a subset:
 
-```bash
+```sh
 python get_globus_token.py --facilities nersc
 python get_globus_token.py --facilities alcf
 ```
@@ -71,7 +71,7 @@ Supported facility names are:
 
 ## Print token to terminal (optional)
 
-```bash
+```sh
 python get_globus_token.py --print-token
 ```
 
@@ -80,7 +80,7 @@ The printed tokens correspond to the selected facilities. By default that means 
 
 ## Force a new interactive login
 
-```bash
+```sh
 python get_globus_token.py --force-login
 ```
 
@@ -88,7 +88,7 @@ This skips refresh and always performs browser auth.
 
 ## Force a fresh IdP login prompt
 
-```bash
+```sh
 python get_globus_token.py --force-login --prompt-login
 ```
 
@@ -97,7 +97,7 @@ This is useful when the server side shows an empty `session_info.authentications
 
 ## Refresh saved tokens only
 
-```bash
+```sh
 python get_globus_token.py --refresh-only
 ```
 
@@ -107,13 +107,13 @@ If refresh is not possible, or if refresh does not return all requested facility
 
 ## Validate the NERSC IRI token
 
-```bash
+```sh
 python get_globus_token.py --validate-iri
 ```
 
 This calls:
 
-```bash
+```sh
 GET https://api.iri.nersc.gov/api/v1/account/projects
 ```
 
@@ -124,7 +124,7 @@ If the response includes `session_info.authentications: {}`, the script treats t
 
 You can combine validation with token printing or refresh-only mode:
 
-```bash
+```sh
 python get_globus_token.py --refresh-only --validate-iri --print-token
 python get_globus_token.py --force-login --prompt-login --validate-iri
 python get_globus_token.py --facilities nersc --validate-iri --print-token
@@ -132,7 +132,7 @@ python get_globus_token.py --facilities nersc --validate-iri --print-token
 
 ## Use a custom token file path
 
-```bash
+```sh
 python get_globus_token.py --token-file /path/to/auth_tokens.json
 ```
 

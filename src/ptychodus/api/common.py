@@ -1,5 +1,7 @@
 """Common type aliases, physical constants, and utility functions used throughout the API."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final, TypeAlias, overload
@@ -57,7 +59,7 @@ class NoiseFloor:
     median_absolute_deviation: float
 
     @classmethod
-    def from_values(cls, values: RealArrayType) -> 'NoiseFloor':
+    def from_values(cls, values: RealArrayType) -> NoiseFloor:
         background_value = numpy.median(values)
         absolute_deviation = numpy.abs(values - background_value)
         return cls(

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ptychodus"
 description = "Ptychodus is a ptychography data pipeline application."
-readme = "README.rst"
+readme = "README.md"
 requires-python = ">=3.11"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
@@ -29,17 +29,14 @@ dependencies = [
 dynamic = ["version"]
 
 [project.scripts]
-convert-to-ptychodus = "ptychodus.scripts.convert_to_ptychodus:main"
+convert-to-ptychodus = "ptychodus.cli.convert_to_ptychodus:main"
 ptychodus = "ptychodus.__main__:main"
-ptychodus-bdp = "ptychodus.scripts.ptychodus_bdp:main"
-ptychodus-ptychopinn-tf-test = "ptychodus.scripts.ptychopinn_tf_test:main"
-ptychodus-iri-tokens = "ptychodus.scripts.genesis.ptychodus_iri_tokens:main"
-ptychodus-transfer-tokens = "ptychodus.scripts.genesis.ptychodus_transfer_tokens:main"
-ptychodus-system-check = "ptychodus.scripts.ptychodus_system_check:main"
+ptychodus-bdp = "ptychodus.cli.ptychodus_bdp:main"
+ptychodus-system-check = "ptychodus.cli.ptychodus_system_check:main"
 ptychodus-store = "ptychodus_store.cli:main"
 
 [project.optional-dependencies]
-docs = ["sphinx", "sphinx-copybutton", "sphinx-rtd-theme"]
+docs = ["myst-parser", "sphinx", "sphinx-copybutton", "sphinx-rtd-theme"]
 globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
 gui = ["PyQt5"]
 #ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
@@ -85,6 +82,13 @@ where = ["src"]
 
 [tool.setuptools_scm]
 
+[tool.mypy]
+# The unpackaged scripts/ tree has same-named modules in sibling directories
+# (three genesis submit_job.py). Deriving module names from the repo root keeps
+# them distinct without adding __init__.py to a tree that is never imported.
+explicit_package_bases = true
+mypy_path = "src"
+
 [[tool.mypy.overrides]]
 module = [
     "colorcet",
@@ -122,12 +126,21 @@ select = [
     "NPY",
 ]
 
+[tool.pymarkdown]
+plugins.md003.style = "atx"      # ATX headings only, never setext
+plugins.md004.style = "dash"     # dash bullets only
+plugins.md029.style = "ordered"  # real incrementing ordered-list numbers
+plugins.md013.enabled = false    # line length — house style is no hard wrapping
+plugins.md014.enabled = false    # `$ ` shell prompts are the house convention
+extensions.front-matter.enabled = true
+
 [tool.pyright]
 pythonVersion = "3.11"
 
 [dependency-groups]
 dev = [
     "mypy",
+    "pymarkdownlnt",
     "pyqt5-stubs",
     "pytest",
     "pytest-asyncio",

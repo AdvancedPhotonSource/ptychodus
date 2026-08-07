@@ -104,7 +104,7 @@ class SubprocessLogHandler(logging.Handler):
     logging tree unchanged.
     """
 
-    def __init__(self, result_queue: 'Queue[Any]') -> None:
+    def __init__(self, result_queue: Queue[Any]) -> None:
         super().__init__()
         self._result_queue = result_queue
 
@@ -117,7 +117,7 @@ class SubprocessLogHandler(logging.Handler):
 
 
 def install_child_log_forwarder(
-    result_queue: 'Queue[Any]', level: int = logging.INFO
+    result_queue: Queue[Any], level: int = logging.INFO
 ) -> SubprocessLogHandler:
     """Install a queue-forwarding handler on the child's root logger.
 
@@ -133,7 +133,7 @@ def install_child_log_forwarder(
     return handler
 
 
-def send_error(result_queue: 'Queue[Any]', exc: BaseException) -> None:
+def send_error(result_queue: Queue[Any], exc: BaseException) -> None:
     """Marshal an unhandled child-side exception onto the queue.
 
     Pickles the exception when possible so the parent can re-raise the
@@ -155,7 +155,7 @@ def send_error(result_queue: 'Queue[Any]', exc: BaseException) -> None:
 def _child_main(
     entry_point: str,
     payload: Any,
-    result_queue: 'Queue[Any]',
+    result_queue: Queue[Any],
     log_level: int,
 ) -> None:
     """Default target for the spawned :class:`multiprocessing.Process`.
@@ -190,7 +190,7 @@ def _child_main(
 @dataclass
 class _RunState:
     process: SpawnProcess
-    queue: 'Queue[Any]'
+    queue: Queue[Any]
 
 
 @contextmanager
@@ -223,7 +223,7 @@ def run_subprocess(
         log_level = logging.getLogger().getEffectiveLevel()
 
     ctx = multiprocessing.get_context('spawn')
-    result_queue: 'Queue[Any]' = ctx.Queue()
+    result_queue: Queue[Any] = ctx.Queue()
     process = ctx.Process(
         target=_child_main,
         args=(entry_point, payload, result_queue, log_level),

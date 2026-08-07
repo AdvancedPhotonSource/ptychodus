@@ -40,22 +40,21 @@ class ObjectComparison:
     3. Flattens multi-layer objects via :meth:`Object.get_layers_flattened`.
     4. Promotes both arrays to a common complex dtype.
 
-    Attributes:
-        reference_complex: 2D complex array, the reference object's flattened layers,
-            promoted to the common dtype.
-        test_complex: 2D complex array, the standardized + aligned test object's
-            flattened layers. Same shape and dtype as ``reference_complex``.
-        pixel_geometry: Shared pixel geometry of both reconstructions (validated
-            equal by the upstream primitives).
-        ambiguities: The ambiguities removed from the test side, useful as
-            provenance (e.g. for reporting "how much ramp/scale was removed"
-            alongside the metric value).
     """
 
     reference_complex: ComplexArrayType
+    """2D complex array, the reference object's flattened layers, promoted to the common dtype."""
     test_complex: ComplexArrayType
+    """2D complex array, the standardized + aligned test object's flattened layers.
+
+    Same shape and dtype as ``reference_complex``.
+    """
     pixel_geometry: PixelGeometry
+    """Shared pixel geometry of both reconstructions (validated equal by the upstream
+    primitives)."""
     ambiguities: ReconstructionAmbiguities
+    """The ambiguities removed from the test side, useful as provenance (e.g. for reporting
+    "how much ramp/scale was removed" alongside the metric value)."""
 
     @classmethod
     def from_products(
@@ -491,32 +490,33 @@ class ReconstructionResiduals:
     as errors in predicted intensity. These maps therefore quantify detector-domain data-fit
     quality and are *not* phase-blind.
 
-    Attributes:
-        real_space_error_map: 2D array on the object grid. For each object pixel, the
-            probe-footprint-weighted aggregation of per-frame amplitude residuals over every
-            frame whose probe touched that pixel, divided by the same probe-weighted
-            aggregation of measured amplitudes. Each frame's probe-intensity patch is
-            normalized to sum to 1 before splatting, so frames contribute equally regardless
-            of probe power (relevant for variable-probe reconstructions). Scan-density
-            invariant: doubling the number of frames covering a pixel doubles both splats,
-            leaving the ratio unchanged. NaN where no R-factor is defined: un-illuminated
-            pixels (no frame contributed) and object regions touched only by frames with zero
-            measured signal (``Σ √I_meas = 0``).
-        object_pixel_geometry: Pixel geometry of ``real_space_error_map``.
-        object_center: Real-space origin of ``real_space_error_map``.
-        reciprocal_space_error_map: 2D array on the detector grid. Each pixel is
-            ``Σ_n |√I_meas,n − √I_pred,n| / Σ_n √I_meas,n``, summed across frames. NaN where
-            no R-factor is defined: bad pixels and detector pixels with no measured signal
-            across any frame.
-        detector_pixel_geometry: Pixel geometry of ``reciprocal_space_error_map`` (derived from
-            the forward propagator).
     """
 
     real_space_error_map: RealArrayType
+    """2D array on the object grid.
+
+    For each object pixel, the probe-footprint-weighted aggregation of per-frame amplitude
+    residuals over every frame whose probe touched that pixel, divided by the same
+    probe-weighted aggregation of measured amplitudes. Each frame's probe-intensity patch is
+    normalized to sum to 1 before splatting, so frames contribute equally regardless of probe
+    power (relevant for variable-probe reconstructions). Scan-density invariant: doubling the
+    number of frames covering a pixel doubles both splats, leaving the ratio unchanged. NaN
+    where no R-factor is defined: un-illuminated pixels (no frame contributed) and object
+    regions touched only by frames with zero measured signal (``Σ √I_meas = 0``).
+    """
     object_pixel_geometry: PixelGeometry
+    """Pixel geometry of ``real_space_error_map``."""
     object_center: ObjectCenter
+    """Real-space origin of ``real_space_error_map``."""
     reciprocal_space_error_map: RealArrayType
+    """2D array on the detector grid.
+
+    Each pixel is ``Σ_n |√I_meas,n − √I_pred,n| / Σ_n √I_meas,n``, summed across frames. NaN
+    where no R-factor is defined: bad pixels and detector pixels with no measured signal across
+    any frame.
+    """
     detector_pixel_geometry: PixelGeometry
+    """Pixel geometry of ``reciprocal_space_error_map`` (derived from the forward propagator)."""
 
 
 def compute_reconstruction_residuals(

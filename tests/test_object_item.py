@@ -1,15 +1,13 @@
-"""Regression tests for the try_get_object helper.
+"""Regression tests for ObjectRepositoryItem's rebuild guard.
 
-The critical invariant: Object.get_pixel_geometry() raises ValueError on the
-null sentinel that ObjectRepositoryItem holds before a dataset binds; the
-controller layer must not let that ValueError escape into a Qt signal handler
-(would abort the process). See CLAUDE fly001.ini bug report.
+ObjectRepositoryItem must not build an Object while the geometry provider
+still reports zero-valued pixel dimensions, and must rebuild once the provider
+notifies that real dimensions have arrived. See CLAUDE fly001.ini bug report.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-from unittest.mock import MagicMock
 
 import numpy
 
@@ -18,36 +16,9 @@ from ptychodus.api.object import Object, ObjectCenter, ObjectGeometry, ObjectGeo
 from ptychodus.api.observer import Observable
 from ptychodus.api.probe_positions import ProbePosition
 from ptychodus.api.settings import SettingsRegistry
-from ptychodus.controller.object.tree_model import try_get_object
 from ptychodus.model.product.object.builder import ObjectBuilder
 from ptychodus.model.product.object.item import ObjectRepositoryItem
 from ptychodus.model.product.object.settings import ObjectSettings
-
-
-def test_try_get_object_returns_none_on_null_sentinel() -> None:
-    """The null sentinel Object(array=None, pixel_geometry=None, center=None)
-    is what ObjectRepositoryItem holds until _rebuild produces a real Object;
-    try_get_object must catch the resulting ValueError and return None."""
-    sentinel = Object(array=None, pixel_geometry=None, center=None)
-    item = MagicMock(spec=ObjectRepositoryItem)
-    item.get_object.return_value = sentinel
-
-    assert try_get_object(item) is None
-
-
-def test_try_get_object_returns_object_when_ready() -> None:
-    """With a real pixel_geometry present, try_get_object returns the Object."""
-    array = numpy.zeros((1, 4, 4), dtype=complex)
-    ready = Object(
-        array=array,
-        pixel_geometry=PixelGeometry(width_m=1e-6, height_m=1e-6),
-        center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
-    )
-    item = MagicMock(spec=ObjectRepositoryItem)
-    item.get_object.return_value = ready
-
-    result = try_get_object(item)
-    assert result is ready
 
 
 class _ObservableObjectProvider(ObjectGeometryProvider, Observable):

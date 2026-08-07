@@ -70,6 +70,7 @@ class <Backend>ReconstructorLibrary(ReconstructorLibrary):
 ```
 
 Key rules:
+
 - **The `try / except ModuleNotFoundError` for the backend import goes inside `__init__`**, gating the concrete reconstructor construction. Never make the top-level `core.py` fail on a missing backend.
 - **In developer mode**, populate `NullReconstructor` stubs so the GUI still shows the algorithm names for testing. Outside developer mode, leave the list empty when the backend is missing.
 - **Add `<backend_package>` as an optional extra** in `pyproject.toml` under `[project.optional-dependencies]`.

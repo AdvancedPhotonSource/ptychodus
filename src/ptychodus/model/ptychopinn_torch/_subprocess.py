@@ -261,7 +261,7 @@ def _load_ptycho_model(model_path: Path) -> tuple[Any, Any]:
     return ptycho_model, config_manager
 
 
-def run_reconstruct(payload: ReconstructPayload, queue: 'Queue[Any]') -> None:
+def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
     """Child entry point for one inference pass. Streams a single ReconstructOutput."""
     if payload.model_path is None:
         raise RuntimeError('Cannot reconstruct: no model checkpoint has been loaded.')
@@ -343,7 +343,7 @@ def _clamp_n_devices(requested: int) -> int:
     return requested
 
 
-def run_train(payload: TrainPayload, queue: 'Queue[Any]') -> None:
+def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
     """Child entry point for one training session.
 
     Sets CUDA_VISIBLE_DEVICES before any torch import, clamps ``n_devices`` to

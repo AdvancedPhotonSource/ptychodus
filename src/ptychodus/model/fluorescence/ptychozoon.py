@@ -25,14 +25,7 @@ from ptychodus.api.fluorescence import (
 from ptychodus.api.product import Product
 
 from ..processing._subprocess_protocol import run_subprocess
-from ._payload import (
-    DeconvolutionEnhancementSettings,
-    InterpolationTypes,
-    PtychographyProduct,
-    PtychozoonPayload,
-)
-from ._payload import ElementMap as PtychozoonElementMap
-from ._payload import FluorescenceDataset as PtychozoonFluorescenceDataset
+from ._payload import PtychozoonPayload
 from .settings import FluorescenceSettings
 
 _ENTRY_POINT: Final[str] = 'ptychodus.model.fluorescence._subprocess:run_vspi_enhancement'
@@ -60,6 +53,16 @@ class PtychozoonFluorescenceEnhancer(FluorescenceEnhancer):
         return self._settings.ptychozoon_max_iterations.get_value()
 
     def _build_payload(self, parameters: FluorescenceEnhancerInput) -> PtychozoonPayload:
+        # Imported here, not at module scope, so this module stays importable without
+        # the optional ptychozoon extra. FluorescenceCore gates registration on
+        # availability, but the class itself must always import -- the GUI enhance
+        # dialog reads DISPLAY_NAME off it. Only the two CPU-safe submodules are
+        # touched; see the allow-list in tests/test_no_gpu_context.py.
+        from ptychozoon.data_structures import ElementMap as PtychozoonElementMap
+        from ptychozoon.data_structures import FluorescenceDataset as PtychozoonFluorescenceDataset
+        from ptychozoon.data_structures import PtychographyProduct
+        from ptychozoon.settings import DeconvolutionEnhancementSettings, InterpolationTypes
+
         product: Product = parameters.product
         dataset = parameters.dataset
         object_geometry = product.object_.get_geometry()

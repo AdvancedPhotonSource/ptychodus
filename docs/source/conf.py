@@ -14,6 +14,7 @@ author = 'Ptychodus Contributors'
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
+    'myst_parser',
     'sphinx.ext.autodoc',
     'sphinx_copybutton',
     'sphinx.ext.coverage',
@@ -28,11 +29,21 @@ intersphinx_mapping = {
     'scipy': ('https://docs.scipy.org/doc/scipy/', None),
 }
 
-templates_path = ['_templates']
+source_suffix = {
+    '.md': 'markdown',
+}
+
+myst_enable_extensions = [
+    'colon_fence',  # ::: admonitions that can contain ``` fences
+    'deflist',  # parameter reference lists in initial_guesses.md
+    'fieldlist',  # :field: value metadata blocks
+]
+
+myst_heading_anchors = 3
+
 exclude_patterns = []
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = 'sphinx_rtd_theme'
-html_static_path = ['_static']

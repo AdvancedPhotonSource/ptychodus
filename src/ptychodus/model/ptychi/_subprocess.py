@@ -114,7 +114,7 @@ def reconstruct_with_ptychi(
             yield ReconstructOutput(product=product, progress=epoch)
 
 
-def run_reconstruct(payload: PtyChiPayload, queue: 'Queue[Any]') -> None:
+def run_reconstruct(payload: PtyChiPayload, queue: Queue[Any]) -> None:
     """Child entry point. Acquire a GPU context via PtychographyTask, stream outputs."""
     for output in reconstruct_with_ptychi(payload.reconstruct_input, payload):
         queue.put((TAG_OUTPUT, pickle.dumps(output)))
@@ -127,6 +127,6 @@ def probe_device_list() -> list[str]:
     return [f'{d.name} ({d.torch_device})' for d in ptychi.list_available_devices()]
 
 
-def probe_devices(_payload: Any, queue: 'Queue[Any]') -> None:
+def probe_devices(_payload: Any, queue: Queue[Any]) -> None:
     """Spawn-safe entry point that emits the device list on the queue and exits."""
     queue.put((TAG_OUTPUT, pickle.dumps(probe_device_list())))

@@ -50,7 +50,7 @@ def _validate_npz_keys(file_path: Path, required_keys: set[str], label: str) -> 
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog='ptychodus-ptychopinn-tf-test',
+        prog=Path(__file__).stem.lower(),
         description='Run the PtychoPINN TF train/load/infer workflow via ptychodus.',
     )
     parser.add_argument(

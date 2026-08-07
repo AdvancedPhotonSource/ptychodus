@@ -119,7 +119,7 @@ def _resolve_bundle_dir(model_bundle_path: Path) -> Path:
     return model_bundle_path.parent
 
 
-def run_reconstruct(payload: ReconstructPayload, queue: 'Queue[Any]') -> None:
+def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
     """Child entry point for inference."""
     if payload.model_bundle_path is None:
         raise RuntimeError('Cannot reconstruct: no PtychoPINN model has been loaded.')
@@ -196,7 +196,7 @@ def run_reconstruct(payload: ReconstructPayload, queue: 'Queue[Any]') -> None:
     queue.put((TAG_OUTPUT, pickle.dumps(ReconstructOutput(product))))
 
 
-def run_train(payload: TrainPayload, queue: 'Queue[Any]') -> None:
+def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
     """Child entry point for training."""
     from ptycho.config.config import TrainingConfig, update_legacy_dict
     from ptycho.raw_data import RawData

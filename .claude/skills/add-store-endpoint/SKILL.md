@@ -76,6 +76,7 @@ async def list_<resource>(
 ```
 
 Rules:
+
 - MCP tools take `uuid: str` (they lack FastAPI's UUID coercion) — convert with `UUID(uuid_str)` inside the tool.
 - Use the same `_convert` helper as the REST route. Do not duplicate business logic.
 - Raise `ToolError` for MCP-side errors (not `HTTPException`).

@@ -468,7 +468,7 @@ class Probe:
         return numpy.sum(intensity(self._array), axis=-3)
 
     def get_power_spectrum(self) -> RealArrayType:
-        """Incoherent-sum power spectrum |FFT(psi)|^2 over the mode axis.
+        """Incoherent-sum power spectrum ``|FFT(psi)|^2`` over the mode axis.
 
         No fftshift is applied: Shannon entropy is permutation-invariant, so the
         frequency ordering is irrelevant for entropy calculations.

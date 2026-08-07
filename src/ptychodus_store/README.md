@@ -20,7 +20,7 @@ The shipped wheel already contains the compiled frontend. Rebuilding the UI in p
 
 `PTYCHODUS_STORE_STORAGE_ROOT` should point at a directory laid out like this:
 
-```
+```text
 <storage_root>/
   campaign/<uuid>/manifest.json
   diffraction/<uuid>/
@@ -101,7 +101,7 @@ This runs the same `full_rescan` the watcher invokes at startup. Safe to run whi
 
 Both application and uvicorn logs go to stdout, formatted as:
 
-```
+```text
 2026-07-20 14:23:43,857 INFO ptychodus_store.ingest.watcher: manifest watcher started on /data/ptycho-store
 ```
 
@@ -132,10 +132,13 @@ The compiled output at `src/ptychodus_store/ui/dist/` is git-ignored.
 ## Running in production
 
 - **Use a durable database.** The default `sqlite+aiosqlite:///:memory:` loses all state on restart. Point at a file, e.g.:
+
   ```sh
   PTYCHODUS_STORE_DATABASE_URL=sqlite+aiosqlite:////var/lib/ptychodus-store/store.db
   ```
+
 - **Sample systemd unit** (`/etc/systemd/system/ptychodus-store.service`):
+
   ```ini
   [Unit]
   Description=ptychodus-store HTTP+MCP service
@@ -153,6 +156,7 @@ The compiled output at `src/ptychodus_store/ui/dist/` is git-ignored.
   [Install]
   WantedBy=multi-user.target
   ```
+
   Put the `PTYCHODUS_STORE_*` variables in `/etc/ptychodus/store.env`.
 - **No built-in TLS.** Front with nginx or Caddy if you're exposing beyond `127.0.0.1`. To bind all interfaces set `PTYCHODUS_STORE_HOST=0.0.0.0`.
 - **Storage-root permissions.** The service user must be able to create per-kind subdirectories under `PTYCHODUS_STORE_STORAGE_ROOT` on first start.
