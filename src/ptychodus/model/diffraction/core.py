@@ -6,7 +6,7 @@ from ptychodus.api.diffraction import (
     DiffractionFileReader,
     DiffractionFileWriter,
 )
-from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
 from ptychodus.api.settings import SettingsRegistry
 
 from ..task_manager import TaskManager
@@ -43,18 +43,27 @@ class DiffractionCore(Observer):
                 self.task_monitor,
             )
         )
+        # Display-name views of each reader chooser, bound to the settings parameter
+        # that persists the selection. These are what the GUI binds combo boxes to.
+        self.bad_pixels_file_reader_parameter = PluginChooserParameter(
+            bad_pixels_file_reader_chooser, self.detector_settings.bad_pixels_file_type
+        )
+        self.file_reader_parameter = PluginChooserParameter(
+            file_reader_chooser, self.diffraction_settings.file_type
+        )
+
         self.diffraction_api = DiffractionAPI(
             self.diffraction_settings,
             self.repository,
             bad_pixels_file_reader_chooser,
             file_reader_chooser,
             file_writer_chooser,
+            self.bad_pixels_file_reader_parameter,
+            self.file_reader_parameter,
         )
 
-        bad_pixels_file_reader_chooser.synchronize_with_parameter(
-            self.detector_settings.bad_pixels_file_type
-        )
-        file_reader_chooser.synchronize_with_parameter(self.diffraction_settings.file_type)
+        # Deliberately unbound: the writer shares file_type with the reader above, so
+        # binding both would make them fight over the same parameter.
         file_writer_chooser.set_current_plugin(self.diffraction_settings.file_type.get_value())
 
         self._reinit_observable = reinit_observable

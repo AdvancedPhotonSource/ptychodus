@@ -8,7 +8,6 @@ from PyQt5.QtCore import Qt, QModelIndex, QSortFilterProxyModel
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QButtonGroup,
-    QComboBox,
     QFileSystemModel,
     QFormLayout,
     QHBoxLayout,
@@ -22,13 +21,14 @@ from PyQt5.QtWidgets import (
 
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parametric import PathParameter
-from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.plugins import PluginChooserParameter
 
 from ....model.diffraction import DiffractionAPI, DiffractionSettings
 from ....view.diffraction import OpenDatasetWizardPage
 from ....view.widgets import ExceptionDialog
 from ...data import FileDialogFactory
 from ...helpers import connect_current_changed_signal
+from ...parametric import ComboBoxParameterViewController
 
 logger = logging.getLogger(__name__)
 
@@ -221,37 +221,29 @@ class OpenDatasetWizardFilePathViewController(Observer):
             self._sync_model_to_view()
 
 
-class OpenDatasetWizardFileTypeViewController(Observable, Observer):
-    def __init__(self, file_reader_chooser: PluginChooser[Any]) -> None:
-        super().__init__()
-        self._file_reader_chooser = file_reader_chooser
-        self._file_reader_chooser.add_observer(self)
-        self._combo_box = QComboBox()
+class OpenDatasetWizardFileTypeViewController:
+    """Binds a file-reader chooser to a combo box and derives the file-name filters.
 
-        for plugin in self._file_reader_chooser:
-            self._combo_box.addItem(plugin.display_name)
+    Observe :meth:`get_parameter` to react to the selection changing; the parameter
+    is the chooser's display-name view, which is also the string the glob patterns
+    are parsed out of.
+    """
 
-        self._sync_model_to_view()
-        self._combo_box.textActivated.connect(self._handle_text_activated)
+    def __init__(self, file_reader_parameter: PluginChooserParameter[Any]) -> None:
+        self._file_reader_parameter = file_reader_parameter
+        self._view_controller = ComboBoxParameterViewController(
+            file_reader_parameter, file_reader_parameter.choices()
+        )
+
+    def get_parameter(self) -> PluginChooserParameter[Any]:
+        return self._file_reader_parameter
 
     def get_name_filters(self) -> Sequence[str]:
-        text = self._combo_box.currentText()
-        z = re.search(r'\((.+)\)', text)
+        z = re.search(r'\((.+)\)', self._file_reader_parameter.get_value())
         return z.group(1).split() if z else []
 
-    def _handle_text_activated(self, text: str) -> None:
-        self._file_reader_chooser.set_current_plugin(text)
-
-    def _sync_model_to_view(self) -> None:
-        self._combo_box.setCurrentText(self._file_reader_chooser.get_current_plugin().display_name)
-
     def get_widget(self) -> QWidget:
-        return self._combo_box
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._file_reader_chooser:
-            self._sync_model_to_view()
-            self.notify_observers()
+        return self._view_controller.get_widget()
 
 
 class OpenDatasetWizardFilesViewController(Observer):
@@ -276,9 +268,9 @@ class OpenDatasetWizardFilesViewController(Observer):
             settings.file_path, file_dialog_factory
         )
         self._file_type_view_controller = OpenDatasetWizardFileTypeViewController(
-            api.get_file_reader_chooser()
+            api.get_file_reader_parameter()
         )
-        self._file_type_view_controller.add_observer(self)
+        self._file_type_view_controller.get_parameter().add_observer(self)
 
         layout = QFormLayout()
         layout.addRow(self._breadcrumbs_view_controller.get_widget())
@@ -330,5 +322,5 @@ class OpenDatasetWizardFilesViewController(Observer):
     def _update(self, observable: Observable) -> None:
         if observable is self._settings.file_path:
             self._check_if_complete()
-        elif observable is self._file_type_view_controller:
+        elif observable is self._file_type_view_controller.get_parameter():
             self._handle_file_type_changed()

@@ -1,6 +1,5 @@
 from PyQt5.QtWidgets import (
     QButtonGroup,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -30,9 +29,8 @@ class FluorescenceEnhanceParametersView(QGroupBox):
     inside the modal enhance dialog.
     """
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, algorithm_widget: QWidget, parent: QWidget | None = None) -> None:
         super().__init__('Enhancement Strategy', parent)
-        self.algorithm_combo_box = QComboBox()
         self.stacked_widget = QStackedWidget()
 
         stacked_widget_layout = self.stacked_widget.layout()
@@ -41,7 +39,7 @@ class FluorescenceEnhanceParametersView(QGroupBox):
             stacked_widget_layout.setContentsMargins(0, 0, 0, 0)
 
         layout = QFormLayout()
-        layout.addRow('Algorithm:', self.algorithm_combo_box)
+        layout.addRow('Algorithm:', algorithm_widget)
         layout.addRow(self.stacked_widget)
         self.setLayout(layout)
 
@@ -71,9 +69,9 @@ class FluorescenceEnhanceDialog(QDialog):
     panel; this dialog is intentionally minimal.
     """
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, algorithm_widget: QWidget, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.parameters_view = FluorescenceEnhanceParametersView()
+        self.parameters_view = FluorescenceEnhanceParametersView(algorithm_widget)
         self.status_view = FluorescenceStatusView()
         self.run_button = QPushButton('Run')
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)

@@ -3,7 +3,7 @@ import logging
 import queue
 import threading
 
-from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
 from ptychodus.api.settings import SettingsRegistry
 
 from ..processing import ProcessingAPI
@@ -182,12 +182,22 @@ class GenesisCore:
         for name, provider in create_globus_transfer_providers().items():
             self._transfer_client_chooser.register_plugin(provider, display_name=name)
 
+        # Both choosers are empty when the IRI tokens file is absent. Binding an empty
+        # chooser is harmless but would log a spurious "invalid plugin name" warning,
+        # so stay quiet in that case.
+        self.facility_parameter: PluginChooserParameter[IRIFacilityAdapter] | None = None
+        self.transfer_client_parameter: PluginChooserParameter[AmSCGlobusTransferClient] | None = (
+            None
+        )
+
         if self._facility_chooser:
-            self._facility_chooser.synchronize_with_parameter(self.settings.facility)
+            self.facility_parameter = PluginChooserParameter(
+                self._facility_chooser, self.settings.facility
+            )
 
         if self._transfer_client_chooser:
-            self._transfer_client_chooser.synchronize_with_parameter(
-                self.settings.globus_transfer_provider
+            self.transfer_client_parameter = PluginChooserParameter(
+                self._transfer_client_chooser, self.settings.globus_transfer_provider
             )
 
         status_q: queue.Queue[GenesisStatus] = queue.Queue()

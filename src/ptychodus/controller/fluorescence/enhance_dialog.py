@@ -1,7 +1,6 @@
 from __future__ import annotations
 import logging
 
-from PyQt5.QtCore import QStringListModel
 from PyQt5.QtWidgets import QWidget
 
 from ptychodus.api.observer import Observable, Observer
@@ -20,7 +19,7 @@ from ...view.fluorescence import (
     FluorescenceStatusView,
 )
 from ...view.widgets import ExceptionDialog
-from ..parametric import ParameterViewBuilder
+from ..parametric import ComboBoxParameterViewController, ParameterViewBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +28,12 @@ def _build_two_step_widget(core: FluorescenceCore) -> QWidget:
     builder = ParameterViewBuilder()
     builder.add_combo_box(
         core.upscaling_strategy_parameter,
-        [plugin.display_name for plugin in core.upscaling_strategy_chooser],
+        core.upscaling_strategy_parameter.choices(),
         'Upscaling Strategy:',
     )
     builder.add_combo_box(
         core.deconvolution_strategy_parameter,
-        [plugin.display_name for plugin in core.deconvolution_strategy_chooser],
+        core.deconvolution_strategy_parameter.choices(),
         'Deconvolution Strategy:',
     )
     return _build_page(builder)
@@ -127,57 +126,42 @@ class FluorescenceEnhanceDialogController(Observer):
         has_ptychozoon: bool,
     ) -> None:
         super().__init__()
-        enhancer_chooser = core.enhancer_chooser
         task_monitor = core.task_monitor
         self._api = core.fluorescence_api
-        self._enhancer_chooser = enhancer_chooser
+        self._enhancer_parameter = core.enhancer_parameter
         self._task_monitor = task_monitor
-        self._dialog = FluorescenceEnhanceDialog()
+        self._algorithm_view_controller = ComboBoxParameterViewController(
+            core.enhancer_parameter, core.enhancer_parameter.choices()
+        )
+        self._dialog = FluorescenceEnhanceDialog(self._algorithm_view_controller.get_widget())
         self._item_index = -1
 
         self._status_controller = FluorescenceStatusController(
             task_monitor, self._dialog.status_view
         )
 
-        self._enhancement_model = QStringListModel()
-        self._enhancement_model.setStringList([plugin.display_name for plugin in enhancer_chooser])
-
+        # Keyed by display name rather than by index: the chooser sorts its plugins by
+        # display name, so page insertion order is not the combo-box order.
         parameters_view = self._dialog.parameters_view
-        parameters_view.algorithm_combo_box.addItem(
-            TwoStepFluorescenceEnhancer.DISPLAY_NAME,
-            parameters_view.algorithm_combo_box.count(),
-        )
-        parameters_view.stacked_widget.addWidget(_build_two_step_widget(core))
+        self._pages: dict[str, QWidget] = {
+            TwoStepFluorescenceEnhancer.DISPLAY_NAME: _build_two_step_widget(core),
+            VSPIFluorescenceEnhancer.DISPLAY_NAME: _build_vspi_widget(core.settings),
+        }
 
-        parameters_view.algorithm_combo_box.addItem(
-            VSPIFluorescenceEnhancer.DISPLAY_NAME,
-            parameters_view.algorithm_combo_box.count(),
-        )
-        parameters_view.stacked_widget.addWidget(_build_vspi_widget(core.settings))
-
-        # Registered last, matching enhancer_chooser order so the combo-box
-        # index selects the correct stacked page. Only present when ptychozoon
-        # is installed.
+        # Only present when ptychozoon is installed.
         if has_ptychozoon:
-            parameters_view.algorithm_combo_box.addItem(
-                PtychozoonFluorescenceEnhancer.DISPLAY_NAME,
-                parameters_view.algorithm_combo_box.count(),
+            self._pages[PtychozoonFluorescenceEnhancer.DISPLAY_NAME] = _build_ptychozoon_widget(
+                core.settings
             )
-            parameters_view.stacked_widget.addWidget(_build_ptychozoon_widget(core.settings))
 
-        parameters_view.algorithm_combo_box.textActivated.connect(
-            enhancer_chooser.set_current_plugin
-        )
-        parameters_view.algorithm_combo_box.currentIndexChanged.connect(
-            parameters_view.stacked_widget.setCurrentIndex
-        )
-        parameters_view.algorithm_combo_box.setModel(self._enhancement_model)
+        for page in self._pages.values():
+            parameters_view.stacked_widget.addWidget(page)
 
         self._dialog.run_button.clicked.connect(self._run)
 
-        enhancer_chooser.add_observer(self)
+        core.enhancer_parameter.add_observer(self)
         task_monitor.add_observer(self)
-        self._sync_algorithm_combo_box()
+        self._sync_algorithm_page()
         self._sync_run_button_enabled()
 
     def launch(self, item_index: int) -> None:
@@ -207,10 +191,11 @@ class FluorescenceEnhanceDialogController(Observer):
             logger.exception(err)
             ExceptionDialog.show_exception('Enhance Fluorescence', err)
 
-    def _sync_algorithm_combo_box(self) -> None:
-        self._dialog.parameters_view.algorithm_combo_box.setCurrentText(
-            self._enhancer_chooser.get_current_plugin().display_name
-        )
+    def _sync_algorithm_page(self) -> None:
+        page = self._pages.get(self._enhancer_parameter.get_value())
+
+        if page is not None:
+            self._dialog.parameters_view.stacked_widget.setCurrentWidget(page)
 
     def _sync_run_button_enabled(self) -> None:
         enabled = not self._task_monitor.is_processing and self._item_index >= 0
@@ -225,7 +210,7 @@ class FluorescenceEnhanceDialogController(Observer):
         self._dialog.run_button.setEnabled(enabled)
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._enhancer_chooser:
-            self._sync_algorithm_combo_box()
+        if observable is self._enhancer_parameter:
+            self._sync_algorithm_page()
         elif observable is self._task_monitor:
             self._sync_run_button_enabled()

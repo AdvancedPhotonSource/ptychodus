@@ -2,7 +2,7 @@ import numpy
 
 from ptychodus.api.object import ObjectFileReader, ObjectFileWriter
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
 from ptychodus.api.probe import ProbeFileReader, ProbeFileWriter
 from ptychodus.api.probe_gen import FresnelZonePlate
 from ptychodus.api.probe_positions import ProbePositionFileReader, ProbePositionFileWriter
@@ -135,13 +135,21 @@ class ProductCore(Observer):
         )
 
         # TODO vvv refactor vvv
-        product_file_reader_chooser.synchronize_with_parameter(self.settings.file_type)
+        self.product_file_reader_parameter = PluginChooserParameter(
+            product_file_reader_chooser, self.settings.file_type
+        )
         product_file_writer_chooser.set_current_plugin(self.settings.file_type.get_value())
-        scan_file_reader_chooser.synchronize_with_parameter(self._scan_settings.file_type)
+        self.scan_file_reader_parameter = PluginChooserParameter(
+            scan_file_reader_chooser, self._scan_settings.file_type
+        )
         scan_file_writer_chooser.set_current_plugin(self._scan_settings.file_type.get_value())
-        probe_file_reader_chooser.synchronize_with_parameter(self._probe_settings.file_type)
+        self.probe_file_reader_parameter = PluginChooserParameter(
+            probe_file_reader_chooser, self._probe_settings.file_type
+        )
         probe_file_writer_chooser.set_current_plugin(self._probe_settings.file_type.get_value())
-        object_file_reader_chooser.synchronize_with_parameter(self._object_settings.file_type)
+        self.object_file_reader_parameter = PluginChooserParameter(
+            object_file_reader_chooser, self._object_settings.file_type
+        )
         object_file_writer_chooser.set_current_plugin(self._object_settings.file_type.get_value())
         # TODO ^^^^^^^^^^^^^^^^
 

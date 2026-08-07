@@ -2,7 +2,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.plugins import Plugin, PluginChooser
+from ptychodus.api.plugins import Plugin, PluginChooser, PluginChooserParameter
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.api.workflow import FileBasedWorkflow, WorkflowAPI
 
@@ -27,7 +27,7 @@ class AutomationPresenter(Observable, Observer):
         self._dataset_buffer = dataset_buffer
         self._workflow_chooser = workflow_chooser
 
-        workflow_chooser.synchronize_with_parameter(self._settings.workflow)
+        self.workflow_parameter = PluginChooserParameter(workflow_chooser, self._settings.workflow)
 
         watcher.add_observer(self)
 

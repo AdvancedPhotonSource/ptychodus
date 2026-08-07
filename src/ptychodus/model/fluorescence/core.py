@@ -57,10 +57,9 @@ class FluorescenceCore:
         )
 
         # The GPU VSPI enhancer is optional: register it only when ptychozoon is
-        # installed so it silently disappears otherwise. Register it last so its
-        # combo-box entry and stacked GUI page stay aligned by index. Importing
-        # the top-level package is cheap and does not pull in CuPy (that happens
-        # only inside the spawned subprocess), so probing it here is safe.
+        # installed so it silently disappears otherwise. Importing the top-level
+        # package is cheap and does not pull in CuPy (that happens only inside the
+        # spawned subprocess), so probing it here is safe.
         self.ptychozoon_enhancer: PtychozoonFluorescenceEnhancer | None = None
 
         try:
@@ -75,22 +74,23 @@ class FluorescenceCore:
                 display_name=PtychozoonFluorescenceEnhancer.DISPLAY_NAME,
             )
 
-        self.enhancer_chooser.synchronize_with_parameter(self.settings.algorithm)
-
-        upscaling_strategy_chooser.synchronize_with_parameter(self.settings.upscaling_strategy)
-        deconvolution_strategy_chooser.synchronize_with_parameter(
-            self.settings.deconvolution_strategy
+        # Display-name views of each chooser, bound to the settings parameter that
+        # persists the selection. These are what the GUI binds combo boxes to.
+        self.enhancer_parameter = PluginChooserParameter(
+            self.enhancer_chooser, self.settings.algorithm
         )
-
-        # Display-name views of the two strategy choosers, so the GUI can bind a plain
-        # combo box to them. Must come after synchronize_with_parameter above, which
-        # is what settles each chooser onto its persisted selection.
-        self.upscaling_strategy_parameter = PluginChooserParameter(upscaling_strategy_chooser)
+        self.upscaling_strategy_parameter = PluginChooserParameter(
+            upscaling_strategy_chooser, self.settings.upscaling_strategy
+        )
         self.deconvolution_strategy_parameter = PluginChooserParameter(
-            deconvolution_strategy_chooser
+            deconvolution_strategy_chooser, self.settings.deconvolution_strategy
+        )
+        self.file_reader_parameter = PluginChooserParameter(
+            file_reader_chooser, self.settings.file_type
         )
 
-        file_reader_chooser.synchronize_with_parameter(self.settings.file_type)
+        # Deliberately unbound: the writer shares file_type with the reader above, so
+        # binding both would make them fight over the same parameter.
         file_writer_chooser.set_current_plugin(self.settings.file_type.get_value())
 
         self.visualization_engine = VisualizationEngine(is_complex=False)

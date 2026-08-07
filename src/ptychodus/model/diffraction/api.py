@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from pathlib import Path
 import logging
 
@@ -12,7 +13,7 @@ from ptychodus.api.diffraction import (
     DiffractionArray,
     SimpleDiffractionDataset,
 )
-from ptychodus.api.plugins import PluginChooser
+from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
 from ptychodus.api.reconstructor import AssembledDiffractionData
 from ptychodus.api.tree import SimpleTreeNode
 
@@ -49,6 +50,8 @@ class DiffractionAPI:
         bad_pixels_file_reader_chooser: PluginChooser[BadPixelsFileReader],
         file_reader_chooser: PluginChooser[DiffractionFileReader],
         file_writer_chooser: PluginChooser[DiffractionFileWriter],
+        bad_pixels_file_reader_parameter: PluginChooserParameter[BadPixelsFileReader],
+        file_reader_parameter: PluginChooserParameter[DiffractionFileReader],
     ) -> None:
         super().__init__()
         self._diffraction_settings = diffraction_settings
@@ -56,6 +59,8 @@ class DiffractionAPI:
         self._bad_pixels_file_reader_chooser = bad_pixels_file_reader_chooser
         self._file_reader_chooser = file_reader_chooser
         self._file_writer_chooser = file_writer_chooser
+        self._bad_pixels_file_reader_parameter = bad_pixels_file_reader_parameter
+        self._file_reader_parameter = file_reader_parameter
 
     def get_repository(self) -> DiffractionDatasetRepository:
         return self._repository
@@ -70,6 +75,12 @@ class DiffractionAPI:
 
     def get_file_reader_chooser(self) -> PluginChooser[DiffractionFileReader]:
         return self._file_reader_chooser
+
+    def get_bad_pixels_file_reader_parameter(self) -> PluginChooserParameter[BadPixelsFileReader]:
+        return self._bad_pixels_file_reader_parameter
+
+    def get_file_reader_parameter(self) -> PluginChooserParameter[DiffractionFileReader]:
+        return self._file_reader_parameter
 
     def open_patterns(
         self,
@@ -175,6 +186,13 @@ class DiffractionAPI:
 
     def get_file_writer_chooser(self) -> PluginChooser[DiffractionFileWriter]:
         return self._file_writer_chooser
+
+    def get_save_file_filters(self) -> Iterator[str]:
+        for plugin in self._file_writer_chooser:
+            yield plugin.display_name
+
+    def get_save_file_filter(self) -> str:
+        return self._file_writer_chooser.get_current_plugin().display_name
 
     def save_patterns(self, file_path: Path, file_type: str, *, dataset_index: int) -> None:
         try:

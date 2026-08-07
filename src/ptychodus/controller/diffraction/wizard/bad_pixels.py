@@ -46,9 +46,9 @@ class OpenDatasetWizardBadPixelsViewController(Observer):
             detector_settings.bad_pixels_file_path, file_dialog_factory
         )
         self._file_type_view_controller = OpenDatasetWizardFileTypeViewController(
-            api.get_bad_pixels_file_reader_chooser()
+            api.get_bad_pixels_file_reader_parameter()
         )
-        self._file_type_view_controller.add_observer(self)
+        self._file_type_view_controller.get_parameter().add_observer(self)
 
         layout = QFormLayout()
         layout.addRow(self._breadcrumbs_view_controller.get_widget())
@@ -77,5 +77,5 @@ class OpenDatasetWizardBadPixelsViewController(Observer):
         self._file_path_view_controller.set_name_filters(name_filters)
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._file_type_view_controller:
+        if observable is self._file_type_view_controller.get_parameter():
             self._handle_file_type_changed()

@@ -205,12 +205,11 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
         if dataset_index < 0:
             return
 
-        file_writer_chooser = self._diffraction_api.get_file_writer_chooser()
         file_path, name_filter = self._file_dialog_factory.get_save_file_path(
             self._view,
             'Save Diffraction File',
-            name_filters=[plugin.display_name for plugin in file_writer_chooser],
-            selected_name_filter=file_writer_chooser.get_current_plugin().display_name,
+            name_filters=[nf for nf in self._diffraction_api.get_save_file_filters()],
+            selected_name_filter=self._diffraction_api.get_save_file_filter(),
         )
 
         if file_path:
