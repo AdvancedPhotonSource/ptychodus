@@ -149,6 +149,12 @@ class ControllerCore:
             self._status_bar,
             self._file_dialog_factory,
         )
+        self._fluorescence_image_controller = ImageController(
+            model.fluorescence_core.visualization_engine,
+            view.fluorescence_image_view,
+            self._status_bar,
+            self._file_dialog_factory,
+        )
         self._fluorescence_enhance_dialog_controller = FluorescenceEnhanceDialogController(
             model.fluorescence_core,
             has_ptychozoon=model.fluorescence_core.ptychozoon_enhancer is not None,
@@ -158,8 +164,7 @@ class ControllerCore:
             model.fluorescence_core.fluorescence_api,
             model.product_core.product_repository,
             view.fluorescence_view,
-            view.fluorescence_image_view,
-            model.fluorescence_core.visualization_engine,
+            self._fluorescence_image_controller,
             self._fluorescence_enhance_dialog_controller,
             self._file_dialog_factory,
         )

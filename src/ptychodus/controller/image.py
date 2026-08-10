@@ -128,11 +128,8 @@ class ImageDataRangeController(Observer):
         self._sync_model_to_view()
         engine.add_observer(self)
 
-        view.min_display_value_slider.value_changed.connect(
-            lambda value: engine.set_min_display_value(float(value))
-        )
-        view.max_display_value_slider.value_changed.connect(
-            lambda value: engine.set_max_display_value(float(value))
+        view.display_range_slider.selection_changed.connect(
+            lambda sel: engine.set_display_value_range(float(sel.lower), float(sel.upper))
         )
         view.auto_button.clicked.connect(self._auto_display_range)
         view.edit_button.clicked.connect(self._display_range_dialog.open)
@@ -173,13 +170,13 @@ class ImageDataRangeController(Observer):
         self._display_range_dialog.min_value_line_edit.set_value(min_value)
         self._display_range_dialog.max_value_line_edit.set_value(max_value)
 
+        selection = Interval[Decimal](min_value, max_value)
         if self._display_range_is_locked:
-            self._view.min_display_value_slider.set_value(min_value)
-            self._view.max_display_value_slider.set_value(max_value)
+            self._view.display_range_slider.set_selection(selection)
         else:
-            display_range_limits = Interval[Decimal](min_value, max_value)
-            self._view.min_display_value_slider.set_value_and_range(min_value, display_range_limits)
-            self._view.max_display_value_slider.set_value_and_range(max_value, display_range_limits)
+            self._view.display_range_slider.set_selection_and_bounds(
+                selection, selection, block_signal=True
+            )
 
         self._sync_color_legend_to_view()
 

@@ -18,3 +18,6 @@ collect_ignore = []
 
 if any(find_spec(name) is None for name in _STORE_TEST_DEPS):
     collect_ignore.append('ptychodus_store')
+
+if find_spec('PyQt5') is None:
+    collect_ignore.append('view')

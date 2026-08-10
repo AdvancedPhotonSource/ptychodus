@@ -11,13 +11,10 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QRadioButton,
     QStackedWidget,
-    QStatusBar,
     QTreeView,
     QVBoxLayout,
     QWidget,
 )
-
-from .visualization import VisualizationParametersView, VisualizationWidget
 
 
 class FluorescenceEnhanceParametersView(QGroupBox):
@@ -143,23 +140,4 @@ class FluorescenceView(QWidget):
         layout.addWidget(self.tree_view, 1)
         layout.addWidget(variant_group)
         layout.addWidget(self.button_box)
-        self.setLayout(layout)
-
-
-class FluorescenceImageView(QWidget):
-    """Right-pane element-map viewer for the top-level Fluorescence subview."""
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.visualization_widget = VisualizationWidget('Element Map')
-        self.visualization_parameters_view = VisualizationParametersView()
-        self.status_bar = QStatusBar()
-
-        contents_layout = QHBoxLayout()
-        contents_layout.addWidget(self.visualization_widget, 1)
-        contents_layout.addWidget(self.visualization_parameters_view)
-
-        layout = QVBoxLayout()
-        layout.addLayout(contents_layout)
-        layout.addWidget(self.status_bar)
         self.setLayout(layout)

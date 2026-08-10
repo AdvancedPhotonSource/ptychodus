@@ -21,7 +21,7 @@ Other entry points (`convert-to-ptychodus`, `ptychodus-bdp`, `ptychodus-store`, 
 
 ### Testing
 
-Tests cover `api/` and `model/` only — **do not add tests for `view/` or `controller/`**, including controller helper functions. `pytest tests/` must pass on a bare `pip install .` (that is what CI runs), so anything reachable from `ptychodus.model` at import time must be free of optional dependencies: gate optional backends with the `find_spec` probe + deferred factory import used in each `model/*/core.py`. Guard a test that needs an optional backend with `pytest.importorskip('ptychi')`; drop a whole optional-extra directory with `collect_ignore` in [tests/conftest.py](tests/conftest.py) — `importorskip` in a conftest is reported as an error, not a skip.
+Tests cover `api/`, `model/`, and `view/widgets/` only — **do not add tests for the rest of `view/` or for `controller/`**, including controller helper functions. Widget tests depend on PyQt5, which is an optional extra (`--extra gui`); the whole `tests/view/` subtree is dropped in [tests/conftest.py](tests/conftest.py) via `collect_ignore` when `find_spec('PyQt5')` returns `None`, mirroring the `ptychodus_store` gate. `pytest tests/` must pass on a bare `pip install .` (that is what CI runs), so anything reachable from `ptychodus.model` at import time must be free of optional dependencies: gate optional backends with the `find_spec` probe + deferred factory import used in each `model/*/core.py`. Guard a test that needs an optional backend with `pytest.importorskip('ptychi')`; drop a whole optional-extra directory with `collect_ignore` in [tests/conftest.py](tests/conftest.py) — `importorskip` in a conftest is reported as an error, not a skip.
 
 ## Architecture
 

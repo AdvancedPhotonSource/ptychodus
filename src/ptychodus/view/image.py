@@ -22,7 +22,7 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.common import RealArrayType
 
 from .visualization import VisualizationView
-from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalSlider
+from .widgets import BottomTitledGroupBox, DecimalLineEdit, DecimalRangeSlider
 
 
 class ImageDisplayRangeDialog(QDialog):
@@ -124,14 +124,12 @@ class ImageRendererGroupBox(BottomTitledGroupBox):
 class ImageDataRangeGroupBox(BottomTitledGroupBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__('Data Range', parent)
-        self.min_display_value_slider = DecimalSlider.create_instance(Qt.Orientation.Horizontal)
-        self.max_display_value_slider = DecimalSlider.create_instance(Qt.Orientation.Horizontal)
+        self.display_range_slider = DecimalRangeSlider.create_instance(Qt.Orientation.Horizontal)
         self.auto_button = QPushButton('Auto')
         self.edit_button = QPushButton('Edit')
         self.color_legend_button = QPushButton('Color Legend')
 
-        self.min_display_value_slider.setToolTip('Minimum Display Value')
-        self.max_display_value_slider.setToolTip('Maximum Display Value')
+        self.display_range_slider.setToolTip('Display Value Range')
         self.auto_button.setToolTip('Rescale to Data Range')
         self.edit_button.setToolTip('Rescale to Custom Range')
         self.color_legend_button.setToolTip('Toggle Color Legend Visibility')
@@ -142,11 +140,10 @@ class ImageDataRangeGroupBox(BottomTitledGroupBox):
         button_layout.addWidget(self.edit_button)
         button_layout.addWidget(self.color_legend_button)
 
-        layout = QFormLayout()
+        layout = QVBoxLayout()
         layout.setContentsMargins(10, 10, 10, 35)
-        layout.addRow('Min:', self.min_display_value_slider)
-        layout.addRow('Max:', self.max_display_value_slider)
-        layout.addRow(button_layout)
+        layout.addWidget(self.display_range_slider)
+        layout.addLayout(button_layout)
         self.setLayout(layout)
 
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)

@@ -14,11 +14,10 @@ from ...model.fluorescence import (
     FluorescenceRepositoryObserver,
 )
 from ...model.product import ProductRepository
-from ...model.visualization import VisualizationEngine
-from ...view.fluorescence import FluorescenceImageView, FluorescenceView
+from ...view.fluorescence import FluorescenceView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
-from ..visualization import VisualizationParametersController, VisualizationWidgetController
+from ..image import ImageController
 from .enhance_dialog import FluorescenceEnhanceDialogController
 from .repository_tree_model import FluorescenceRepositoryTreeModel, Variant
 
@@ -44,8 +43,7 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         api: FluorescenceAPI,
         product_repository: ProductRepository,
         view: FluorescenceView,
-        image_view: FluorescenceImageView,
-        visualization_engine: VisualizationEngine,
+        image_controller: ImageController,
         enhance_dialog_controller: FluorescenceEnhanceDialogController,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
@@ -54,7 +52,7 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         self._api = api
         self._product_repository = product_repository
         self._view = view
-        self._image_view = image_view
+        self._image_controller = image_controller
         self._enhance_dialog_controller = enhance_dialog_controller
         self._file_dialog_factory = file_dialog_factory
         self._task_monitor = api.get_task_monitor()
@@ -76,16 +74,6 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         view.button_box.enhance_button.clicked.connect(self._enhance)
         view.button_box.save_button.clicked.connect(self._save)
         view.button_box.remove_button.clicked.connect(self._remove)
-
-        self._widget_controller = VisualizationWidgetController(
-            visualization_engine,
-            image_view.visualization_widget,
-            image_view.status_bar,
-            file_dialog_factory,
-        )
-        self._parameters_controller = VisualizationParametersController(
-            visualization_engine, image_view.visualization_parameters_view
-        )
 
         repository.add_observer(self)
         self._task_monitor.add_observer(self)
@@ -128,22 +116,22 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
     def _render_current(self) -> None:
         current = self._view.tree_view.currentIndex()
         if not current.isValid():
-            self._widget_controller.clear_array()
+            self._image_controller.clear_array()
             return
         node = current.internalPointer()
         item = self._current_item()
         if node is None or item is None:
-            self._widget_controller.clear_array()
+            self._image_controller.clear_array()
             return
 
         variant = self._current_variant()
         array = node.get_data(item, variant)
         if array is None:
-            self._widget_controller.clear_array()
+            self._image_controller.clear_array()
             return
 
         pixel_geometry = item.get_product().get_geometry().get_object_plane_pixel_geometry()
-        self._widget_controller.set_array(array, pixel_geometry)
+        self._image_controller.set_array(array, pixel_geometry)
 
     # ------------------------------------------------------------------
     # Variant toggle enable-state
