@@ -1,8 +1,10 @@
 """Child-side subprocess entry points for the PtychoPINN-Torch backend.
 
 This module runs INSIDE a spawned subprocess. It is the only place in the
-ptychodus tree that is allowed to import torch / lightning / ptycho_torch.
-The parent-side ptychodus process never imports this module.
+ptychodus tree that is allowed to import lightning or the GPU-side
+``ptycho_torch`` packages (``api.base_api``, ``model``, ``lightning_utils``).
+The parent-side ptychodus process never imports this module -- it reaches only
+``ptycho_torch.config_params``, from inside :func:`.reconstructor._build_configs`.
 
 Two entry points are exposed:
 
@@ -13,9 +15,9 @@ Two entry points are exposed:
   best checkpoint, and stream back the final :class:`TrainOutput` plus the
   saved-checkpoint path.
 
-Both entry points rehydrate the ptychodus settings groups from the INI
-string carried in the payload, so the child sees exactly the parameter
-values the parent had at call time.
+Neither entry point reads ptychodus settings. Training receives finished
+``ptycho_torch`` config objects on the payload and only assembles them into a
+``ConfigManager``; inference rebuilds its configs from the checkpoint.
 """
 
 from __future__ import annotations
@@ -34,198 +36,15 @@ from ptychodus.api.diffraction import zero_bad_pixels
 from ptychodus.api.object import Object
 from ptychodus.api.product import LossValue, Product
 from ptychodus.api.reconstructor import ReconstructOutput, TrainOutput
-from ptychodus.api.settings import SettingsRegistry
 
-from ..processing._subprocess_protocol import load_settings_registry_from_string
 from ..processing.subprocess_reconstructor import (
     TAG_MODEL_SAVED,
     TAG_OUTPUT,
     TAG_TRAIN_OUTPUT,
 )
 from ._payload import ReconstructPayload, TrainPayload
-from .settings import (
-    PtychoPINNTorchDataSettings,
-    PtychoPINNTorchInferenceSettings,
-    PtychoPINNTorchModelSettings,
-    PtychoPINNTorchTrainingSettings,
-)
 
 logger = logging.getLogger(__name__)
-
-
-def _rehydrate_settings(
-    settings_ini: str,
-) -> tuple[
-    PtychoPINNTorchDataSettings,
-    PtychoPINNTorchModelSettings,
-    PtychoPINNTorchTrainingSettings,
-    PtychoPINNTorchInferenceSettings,
-]:
-    registry = SettingsRegistry()
-    data_s = PtychoPINNTorchDataSettings(registry)
-    model_s = PtychoPINNTorchModelSettings(registry)
-    training_s = PtychoPINNTorchTrainingSettings(registry)
-    inference_s = PtychoPINNTorchInferenceSettings(registry)
-    load_settings_registry_from_string(registry, settings_ini)
-    return data_s, model_s, training_s, inference_s
-
-
-def _create_config_manager(
-    model_training_mode: str,
-    data_s: PtychoPINNTorchDataSettings,
-    model_s: PtychoPINNTorchModelSettings,
-    training_s: PtychoPINNTorchTrainingSettings,
-    inference_s: PtychoPINNTorchInferenceSettings,
-    *,
-    override_n_devices: int | None = None,
-    override_strategy: str | None = None,
-) -> Any:
-    """Build the ptycho_torch ConfigManager from ptychodus settings.
-
-    Runs inside the child (this function imports ptycho_torch types).
-    """
-    from ptycho_torch.api.base_api import ConfigManager
-    from ptycho_torch.config_params import (
-        DataConfig,
-        DatagenConfig,
-        InferenceConfig,
-        ModelConfig,
-        TrainingConfig,
-    )
-
-    grid_size = (
-        data_s.grid_size_y.get_value(),
-        data_s.grid_size_x.get_value(),
-    )
-    x_bounds = (
-        data_s.x_lower_bound.get_value(),
-        data_s.x_upper_bound.get_value(),
-    )
-    y_bounds = (
-        data_s.y_lower_bound.get_value(),
-        data_s.y_upper_bound.get_value(),
-    )
-    data_config = DataConfig(
-        N=data_s.model_size.get_value(),
-        C=data_s.num_channels.get_value(),
-        normalize=data_s.data_normalization_mode.get_value(),
-        neighbor_function=data_s.neighbor_lookup_method.get_value(),
-        scan_pattern=data_s.scan_pattern.get_value(),
-        probe_normalize=data_s.normalize_probe.get_value(),
-        x_bounds=x_bounds,
-        y_bounds=y_bounds,
-        min_neighbor_distance=data_s.min_neighbor_distance.get_value(),
-        max_neighbor_distance=data_s.max_neighbor_distance.get_value(),
-        K_quadrant=data_s.num_nearest_neighbors_for_quadrant_lookup.get_value(),
-        n_subsample=data_s.coordinate_subsampling_factor.get_value(),
-        probe_scale=data_s.probe_scale.get_value(),
-        K=data_s.num_nearest_neighbors_for_lookup.get_value(),
-        grid_size=grid_size,
-        probe_ramp_removal=data_s.probe_ramp_removal.get_value(),
-        data_scaling=data_s.data_scaling_method.get_value(),
-        phase_subtraction=data_s.subtract_mean_phase.get_value(),
-    )
-
-    amp_loss = model_s.auxiliary_amplitude_loss.get_value()
-    phase_loss = model_s.auxiliary_phase_loss.get_value()
-
-    model_config = ModelConfig(
-        mode=model_training_mode,
-        object_big=model_s.object_big.get_value(),
-        probe_big=model_s.probe_big.get_value(),
-        loss_function=model_s.loss_function.get_value(),
-        amp_activation=model_s.amplitude_activation_function.get_value(),
-        cbam_encoder=model_s.cbam_encoder.get_value(),
-        decoder_last_amp_channels=data_s.num_channels.get_value(),
-        use_shared_decoder=model_s.use_shared_decoder.get_value(),
-        intensity_scale_trainable=model_s.intensity_scale_trainable.get_value(),
-        intensity_scale=model_s.intensity_scale.get_value(),
-        max_position_jitter=model_s.max_position_jitter.get_value(),
-        num_datasets=model_s.num_datasets.get_value(),
-        C_model=data_s.num_channels.get_value(),
-        C_forward=data_s.num_channels.get_value(),
-        amp_loss=None if amp_loss.casefold() == 'none' else amp_loss,
-        phase_loss=None if phase_loss.casefold() == 'none' else phase_loss,
-        amp_loss_coeff=model_s.auxiliary_amplitude_loss_coeff.get_value(),
-        phase_loss_coeff=model_s.auxiliary_phase_loss_coeff.get_value(),
-        n_filters_scale=model_s.num_filters_scale.get_value(),
-        probe_mask=None,
-        eca_decoder=model_s.eca_decoder.get_value(),
-        batch_norm=model_s.use_batch_normalization.get_value(),
-        edge_pad=model_s.edge_pad.get_value(),
-        decoder_last_c_outer_fraction=model_s.decoder_last_c_outer_fraction.get_value(),
-        cbam_bottleneck=model_s.cbam_bottleneck.get_value(),
-        cbam_decoder=model_s.cbam_decoder.get_value(),
-        spatial_decoder=model_s.spatial_decoder.get_value(),
-        decoder_spatial_kernel=model_s.decoder_spatial_kernel.get_value(),
-        eca_encoder=model_s.eca_encoder.get_value(),
-        offset=model_s.offset.get_value(),
-        probe_reference_coeff=model_s.probe_reference_loss_coeff.get_value(),
-        amplitude_variance_loss=model_s.amplitude_variance_loss.get_value(),
-        amplitude_variance_coeff=model_s.amplitude_variance_coeff.get_value(),
-    )
-    gradient_clip_val = training_s.gradient_clip_val.get_value()
-    n_devices = (
-        training_s.n_devices.get_value() if override_n_devices is None else override_n_devices
-    )
-    strategy = (
-        training_s.distributed_strategy.get_value()
-        if override_strategy is None
-        else override_strategy
-    )
-    training_config = TrainingConfig(
-        epochs=training_s.epochs.get_value(),
-        batch_size=training_s.batch_size.get_value(),
-        learning_rate=training_s.learning_rate.get_value(),
-        n_devices=n_devices,
-        num_workers=training_s.num_dataloader_workers.get_value(),
-        accum_steps=training_s.gradient_accumulation_steps.get_value(),
-        epochs_fine_tune=training_s.epochs_finetune.get_value(),
-        fine_tune_gamma=training_s.finetune_gamma.get_value(),
-        gradient_clip_val=gradient_clip_val if gradient_clip_val > 0.0 else None,
-        nll=training_s.use_negative_log_likelihood_loss.get_value(),
-        device=training_s.device.get_value(),
-        strategy=strategy,
-        framework='Lightning',
-        orchestrator='Lightning',
-        scheduler=training_s.learning_rate_scheduler.get_value(),
-        warmup_epochs=training_s.learning_rate_warmup_epochs.get_value(),
-        min_lr_ratio=training_s.minimum_learning_rate_ratio.get_value(),
-        notes=training_s.notes.get_value(),
-        model_name=training_s.model_name.get_value(),
-        enable_staged_finetuning=training_s.enable_staged_finetuning.get_value(),
-        finetune_stage1_epochs=training_s.finetune_stage1_epochs.get_value(),
-        finetune_stage2_epochs=training_s.finetune_stage2_epochs.get_value(),
-        finetune_stage3_epochs=training_s.finetune_stage3_epochs.get_value(),
-        finetune_stage1_lr_decoder=training_s.finetune_stage1_lr_decoder.get_value(),
-        finetune_stage2_lr_encoder_top=training_s.finetune_stage2_lr_encoder_top.get_value(),
-        finetune_stage2_lr_decoder=training_s.finetune_stage2_lr_decoder.get_value(),
-        finetune_stage2_lr_phase_head=training_s.finetune_stage2_lr_phase_head.get_value(),
-        finetune_stage3_lr_encoder_bottom=training_s.finetune_stage3_lr_encoder_bottom.get_value(),
-        finetune_stage3_lr_encoder_top=training_s.finetune_stage3_lr_encoder_top.get_value(),
-        finetune_stage3_lr_decoder=training_s.finetune_stage3_lr_decoder.get_value(),
-        finetune_stage3_lr_phase_head=training_s.finetune_stage3_lr_phase_head.get_value(),
-        finetune_skip_stage3=training_s.finetune_skip_stage3.get_value(),
-        finetune_early_stop_patience=training_s.finetune_early_stop_patience.get_value(),
-        finetune_val_split=training_s.finetune_validation_split.get_value(),
-    )
-    inference_config = InferenceConfig(
-        batch_size=inference_s.batch_size.get_value(),
-        middle_trim=inference_s.middle_trim.get_value(),
-        experiment_number=inference_s.experiment_number.get_value(),
-        patch_weighting=inference_s.patch_weighting_method.get_value(),
-        pad_eval=inference_s.pad_eval.get_value(),
-        window=inference_s.window.get_value(),
-    )
-    datagen_config = DatagenConfig()
-
-    return ConfigManager(
-        data_config=data_config,
-        model_config=model_config,
-        training_config=training_config,
-        inference_config=inference_config,
-        datagen_config=datagen_config,
-    )
 
 
 def _load_ptycho_model(model_path: Path) -> tuple[Any, Any]:
@@ -319,7 +138,15 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
 
 
 def _apply_visible_devices(visible_gpu_indices: str) -> None:
-    """Set CUDA_VISIBLE_DEVICES before torch is imported anywhere in this process."""
+    """Set CUDA_VISIBLE_DEVICES before the first CUDA call in this process.
+
+    Torch has already been imported by the time this runs -- unpickling the
+    payload pulls in ``ptycho_torch.config_params``, which imports it. That is
+    fine: importing torch reads no device list. The driver resolves
+    CUDA_VISIBLE_DEVICES when the runtime is first touched, so masking works as
+    long as nothing has called ``torch.cuda.*`` yet. Keep this the first
+    statement of :func:`run_train`.
+    """
     trimmed = visible_gpu_indices.strip()
     if trimmed:
         os.environ['CUDA_VISIBLE_DEVICES'] = trimmed
@@ -346,14 +173,16 @@ def _clamp_n_devices(requested: int) -> int:
 def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
     """Child entry point for one training session.
 
-    Sets CUDA_VISIBLE_DEVICES before any torch import, clamps ``n_devices`` to
-    what's actually visible, then runs the Lightning training loop with the
-    configured DDP strategy.
+    Masks the visible GPUs, clamps ``n_devices`` to what's actually visible,
+    then runs the Lightning training loop with the configured DDP strategy.
+    The configs themselves were built parent-side; all this does with them is
+    assemble the ``ConfigManager``.
     """
     _apply_visible_devices(payload.visible_gpu_indices)
 
     from lightning.pytorch.callbacks import Callback
     from ptycho_torch.api.base_api import (
+        ConfigManager,
         DataloaderFormats,
         PtychoDataLoader,
         PtychoModel,
@@ -362,17 +191,15 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
     from ptycho_torch.lightning_utils import find_best_checkpoint
     from ptycho_torch.model import PtychoPINN_Lightning
 
-    n_devices = _clamp_n_devices(payload.n_devices)
+    training_config = payload.training_config
+    training_config.n_devices = _clamp_n_devices(training_config.n_devices)
 
-    data_s, model_s, training_s, inference_s = _rehydrate_settings(payload.settings_ini)
-    config_manager = _create_config_manager(
-        payload.model_training_mode,
-        data_s,
-        model_s,
-        training_s,
-        inference_s,
-        override_n_devices=n_devices,
-        override_strategy=payload.distributed_strategy,
+    config_manager = ConfigManager(
+        data_config=payload.data_config,
+        model_config=payload.model_config,
+        training_config=training_config,
+        inference_config=payload.inference_config,
+        datagen_config=payload.datagen_config,
     )
 
     class _LossCollectorCallback(Callback):

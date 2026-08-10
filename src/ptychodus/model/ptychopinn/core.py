@@ -64,7 +64,6 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
                     self.model_settings,
                     self.inference_settings,
                     self.training_settings,
-                    settings_registry,
                     is_developer_mode_enabled=is_developer_mode_enabled,
                 )
             )

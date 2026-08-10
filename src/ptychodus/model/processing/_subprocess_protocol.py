@@ -10,14 +10,13 @@ after. This gives each call a clean GPU context and fully releases GPU
 memory between calls, which lets ptychodus mix reconstructor backends built
 on different GPU frameworks without driver-state interference.
 
-The parent MAY import a GPU framework at module load if doing so is required
-to construct picklable configuration objects the child needs — e.g. importing
-``ptychi.api.options.*`` pulls torch in for its type annotations, but no CUDA
-runtime is initialised until a tensor is placed on a GPU. Keep this to the
-minimum needed for the payload; when in doubt, do the translation child-side.
-
-This module provides the reusable transport layer that ptychozoon,
-:class:`SubprocessReconstructor`, and any future GPU-isolated consumer share.
+The parent MAY import a GPU framework if doing so is required to construct
+picklable configuration objects the child needs — e.g. importing
+``ptychi.api.options.*`` or ``ptycho_torch.config_params`` pulls torch in for
+its type annotations, but no CUDA runtime is initialised until a tensor is
+placed on a GPU. Keep this to the minimum needed for the payload, and prefer
+importing from inside the payload builder over module scope so the cost lands
+on the first call rather than at startup.
 
 Wire protocol
 -------------
@@ -43,7 +42,6 @@ module.
 from __future__ import annotations
 
 import importlib
-import io
 import logging
 import multiprocessing
 import pickle
@@ -62,9 +60,7 @@ __all__ = [
     'TAG_LOG',
     'ChildError',
     'SubprocessLogHandler',
-    'dump_settings_registry_to_string',
     'install_child_log_forwarder',
-    'load_settings_registry_from_string',
     'run_subprocess',
     'send_error',
 ]
@@ -281,52 +277,3 @@ def _shutdown(state: _RunState, grace_sec: float) -> None:
         state.queue.join_thread()
     except Exception:
         pass
-
-
-def dump_settings_registry_to_string(registry: Any) -> str:
-    """Serialize a :class:`SettingsRegistry` to an INI-format string.
-
-    Uses the same field layout as :meth:`SettingsRegistry.save_settings` so
-    the child can rehydrate a registry with the identical parameter values.
-    """
-    import configparser
-
-    config = configparser.ConfigParser(interpolation=None)
-    setattr(config, 'optionxform', lambda option: option)
-
-    for group_name in registry:
-        config.add_section(group_name)
-        group = registry[group_name]
-        for parameter_name, parameter in group.parameters().items():
-            config.set(group_name, parameter_name, parameter.get_value_as_string())
-
-    buf = io.StringIO()
-    config.write(buf)
-    return buf.getvalue()
-
-
-def load_settings_registry_from_string(registry: Any, content: str) -> None:
-    """Populate a :class:`SettingsRegistry` in place from an INI-format string.
-
-    Only sets values on groups/parameters that already exist in ``registry``;
-    unknown sections are silently ignored, matching
-    :meth:`SettingsRegistry.open_settings`.
-    """
-    import configparser
-
-    config = configparser.ConfigParser(interpolation=None)
-    config.read_file(io.StringIO(content))
-
-    for group_name in registry:
-        try:
-            group_config = config[group_name]
-        except KeyError:
-            continue
-        group = registry[group_name]
-        for parameter_name, parameter in group.parameters().items():
-            try:
-                value_string = group_config[parameter_name]
-            except KeyError:
-                pass
-            else:
-                parameter.set_value_from_string(value_string)

@@ -49,11 +49,23 @@ CONTEXT_CAPABLE_MODULES = (
     'pytorch_lightning',
 )
 
-# Modules banned outright in the parent: importing them acquires a context, or
-# they are child-side backend packages with no parent-side use at all.
+# Modules banned from the parent AT IMPORT TIME: importing them acquires a
+# context, or they are child-side backend packages the composition roots have
+# no reason to touch.
+#
+# ``ptycho`` and ``ptycho_torch`` are a softer case than ``cupy``. Their config
+# subpackages -- ``ptycho.config.config`` and ``ptycho_torch.config_params`` --
+# are deliberately reachable from the parent AT CALL TIME, because the parent
+# builds the backend config objects it ships to the child (see
+# ``ptychopinn/_payload.py`` and ``ptychopinn_torch/_payload.py``). Neither
+# acquires a GPU context: the former pulls no heavy modules at all, the latter
+# pulls torch, which is allowed above. Both imports live inside the payload
+# builders, so they do not run until the first reconstruct/train call and this
+# import-time probe never sees them. Keep it that way -- hoisting either to
+# module scope in a ``reconstructor.py`` is what this list is here to catch.
 CHILD_ONLY_MODULES = (
     'cupy',  # links and initialises the CUDA runtime at import; no non-invasive probe
-    'ptycho',  # ptychopinn TensorFlow package; configures GPUs at import
+    'ptycho',  # ptychopinn TensorFlow package; raw_data/probe/tf_helper pull TensorFlow
     'ptycho_torch',  # ptychopinn_torch backend; child-side entry point only
 )
 
