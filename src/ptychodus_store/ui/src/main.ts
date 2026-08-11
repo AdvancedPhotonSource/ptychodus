@@ -1,6 +1,9 @@
 import { NAV, renderNav } from './nav.js';
 import { mountDiffraction } from './pages/diffraction.js';
 import { mountFluorescence } from './pages/fluorescence.js';
+import { mountObject } from './pages/object.js';
+import { mountPositions } from './pages/positions.js';
+import { mountProbe } from './pages/probe.js';
 import { mountProduct } from './pages/product.js';
 
 type Mount = (root: HTMLElement) => void | Promise<void>;
@@ -8,6 +11,9 @@ type Mount = (root: HTMLElement) => void | Promise<void>;
 const PAGES: Record<string, Mount> = {
   diffraction: mountDiffraction,
   product: mountProduct,
+  positions: mountPositions,
+  probe: mountProbe,
+  object: mountObject,
   fluorescence: mountFluorescence,
 };
 

@@ -1,4 +1,5 @@
 import { api, type DiffractionRead } from '../api.js';
+import { createDownloadBar } from '../components/download_bar.js';
 import { createImagePanel, type ImagePanel } from '../components/image_panel.js';
 import { createTree, type TreeNode } from '../components/tree.js';
 import { buildPageLayout } from '../layout.js';
@@ -11,8 +12,9 @@ export async function mountDiffraction(root: HTMLElement): Promise<void> {
 
   const tree = createTree();
   left.replaceChildren(tree.el);
+  const downloadHost = document.createElement('div');
   const image = createImagePanel();
-  right.replaceChildren(image.el);
+  right.replaceChildren(downloadHost, image.el);
   image.setEmpty();
 
   let items: DiffractionRead[] = [];
@@ -32,7 +34,7 @@ export async function mountDiffraction(root: HTMLElement): Promise<void> {
   const nodes: TreeNode[] = items.map((d) => ({
     id: `diff:${d.uuid}`,
     label: d.label || d.uuid.slice(0, 8),
-    loadChildren: () => loadPatternNodes(d, image, setActiveTab),
+    loadChildren: () => loadPatternNodes(d, image, downloadHost, setActiveTab),
   }));
   tree.setNodes(nodes);
 }
@@ -40,9 +42,13 @@ export async function mountDiffraction(root: HTMLElement): Promise<void> {
 async function loadPatternNodes(
   d: DiffractionRead,
   image: ImagePanel,
+  downloadHost: HTMLElement,
   setActiveTab: (which: 'left' | 'right') => void
 ): Promise<TreeNode[]> {
   const detail = await api.getDiffraction(d.uuid);
+  downloadHost.replaceChildren(
+    createDownloadBar(api.diffractionFileUrl(d.uuid), `${detail.label || d.uuid}.h5`)
+  );
   const total = detail.num_patterns_total ?? 0;
   const children: TreeNode[] = [
     {
