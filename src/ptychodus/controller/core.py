@@ -24,6 +24,7 @@ from .processing import ProcessingController
 from .product import ProductController
 from .product.core import ProductRepositoryTableModel
 from .product.visualization import ProductVisualizationController
+from .ptycho_fm import PtychoFMViewControllerFactory
 from .ptychi import PtyChiViewControllerFactory
 from .ptychonn import PtychoNNViewControllerFactory
 from .ptychopinn import PtychoPINNViewControllerFactory
@@ -57,6 +58,10 @@ class ControllerCore:
         )
         self._ptychopinn_torch_view_controller_factory = PtychoPINNTorchViewControllerFactory(
             model.ptychopinn_torch_reconstructor_library,
+            self._file_dialog_factory,
+        )
+        self._ptycho_fm_view_controller_factory = PtychoFMViewControllerFactory(
+            model.ptycho_fm_reconstructor_library,
             self._file_dialog_factory,
         )
         # Shared product-repository table model. Constructing it here (before
@@ -197,6 +202,7 @@ class ControllerCore:
                 self._ptychopinn_torch_view_controller_factory,
                 self._ptychopinn_view_controller_factory,
                 self._ptychonn_view_controller_factory,
+                self._ptycho_fm_view_controller_factory,
             ],
         )
         self._globus_controller = GlobusController(
