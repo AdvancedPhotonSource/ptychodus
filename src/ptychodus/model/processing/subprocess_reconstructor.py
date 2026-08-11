@@ -131,6 +131,10 @@ class SubprocessReconstructor(TrainableReconstructor):
     def name(self) -> str:
         return self._name
 
+    @property
+    def is_trainable(self) -> bool:
+        return self._is_trainable
+
     def get_progress_goal(self) -> int:
         return self._progress_goal_fn()
 
