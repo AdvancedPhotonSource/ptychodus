@@ -25,7 +25,9 @@ _COL_NAME = 0
 _COL_COUNTS = 3
 
 
-def _select_display_quantity(item: FluorescenceRepositoryItem, display_mode: DisplayMode) -> FluorescenceDataset:
+def _select_display_quantity(
+    item: FluorescenceRepositoryItem, display_mode: DisplayMode
+) -> FluorescenceDataset:
     """Return the requested display quantity, falling back to measured when enhanced is absent.
 
     The tree walks measured element names as the canonical identity, so this

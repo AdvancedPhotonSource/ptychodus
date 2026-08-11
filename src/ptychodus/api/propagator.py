@@ -18,6 +18,8 @@ def intensity(wavefield: ComplexArrayType) -> RealArrayType:
 
 @dataclass(frozen=True)
 class PropagatorParameters:
+    """Geometric parameters for a wavefield propagator: wavelength, extent, pixel size, and distance."""
+
     wavelength_m: float
     """Illumination wavelength in meters."""
     width_px: int

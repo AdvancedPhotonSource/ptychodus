@@ -15,6 +15,8 @@ from ptychodus.api.settings import PathPrefixChange
 
 
 class RemoteComputeProvider(Enum):
+    """Supported remote-compute providers for dispatching workflows off-machine."""
+
     GLOBUS = auto()
     GENESIS = auto()
 

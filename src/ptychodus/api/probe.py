@@ -66,6 +66,8 @@ class ProbeEntropyMetrics:
 
 @dataclass(frozen=True)
 class ProbeSizeMetrics:
+    """Probe size metrics: principal-axis tilt, FWHM and RMS extents, and encircled-energy diameter."""
+
     major_axis_tilt_rad: float
     minor_axis_tilt_rad: float
 
