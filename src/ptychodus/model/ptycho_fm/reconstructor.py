@@ -14,7 +14,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ptychodus.api.io import save_ptychopinn_training_data
+import h5py
+import numpy
+
+from ptychodus.api.diffraction import zero_bad_pixels
 from ptychodus.api.reconstructor import ReconstructInput
 
 from ..processing.subprocess_reconstructor import SubprocessReconstructor
@@ -162,9 +165,47 @@ def build_reconstructor(
         )
 
     def export_training_data(file_path: Path, parameters: ReconstructInput) -> None:
-        # PtychoFM's PtychographyDataset expects the ptycho-torch NPZ layout
-        # (multi-mode probeGuess as (N_modes, H, W)); reuse the shared helper.
-        save_ptychopinn_training_data(file_path, parameters, multimodal_probe=True)
+        # ptycho_vit.CombinedDataset expects one directory per scan holding
+        # two HDF5 files sharing a common stem:
+        #     <stem>_dp.hdf5    dataset 'dp'    (N, H, W) float
+        #     <stem>_para.hdf5  dataset 'object'              (1, H, W) complex
+        #                                       'probe'                (1, N_modes, H, W) complex
+        #                                       'probe_position_x_m'   (N,) float64
+        #                                       'probe_position_y_m'   (N,) float64
+        #                       'object' carries a 'pixel_height_m' attr; the
+        #                       loader auto-detects meters vs pixels from range.
+        # file_path is treated as a stem, so the picked filename itself is
+        # never created; the two derived files land next to it.
+        stem = file_path.stem
+        dp_path = file_path.with_name(f'{stem}_dp.hdf5')
+        para_path = file_path.with_name(f'{stem}_para.hdf5')
+
+        dp = zero_bad_pixels(parameters.diffraction_patterns, parameters.bad_pixels)
+        obj = parameters.product.object_
+        object_layer = obj.get_layer(0)
+        pixel_geometry = obj.get_pixel_geometry()
+        probe_array = parameters.product.probes.get_probe_no_opr().get_array()
+
+        pos_x_m: list[float] = []
+        pos_y_m: list[float] = []
+        for point in parameters.product.probe_positions:
+            pos_x_m.append(point.coordinate_x_m)
+            pos_y_m.append(point.coordinate_y_m)
+
+        with h5py.File(dp_path, 'w') as h5_dp:
+            h5_dp.create_dataset('dp', data=dp)
+
+        with h5py.File(para_path, 'w') as h5_para:
+            obj_ds = h5_para.create_dataset('object', data=object_layer[numpy.newaxis, :, :])
+            obj_ds.attrs['pixel_height_m'] = pixel_geometry.height_m
+            obj_ds.attrs['pixel_width_m'] = pixel_geometry.width_m
+            h5_para.create_dataset('probe', data=probe_array[numpy.newaxis, :, :, :])
+            h5_para.create_dataset(
+                'probe_position_x_m', data=numpy.asarray(pos_x_m, dtype=numpy.float64)
+            )
+            h5_para.create_dataset(
+                'probe_position_y_m', data=numpy.asarray(pos_y_m, dtype=numpy.float64)
+            )
 
     return SubprocessReconstructor(
         name=name,
@@ -176,6 +217,6 @@ def build_reconstructor(
         build_train_payload=build_train_payload,
         model_file_filter='PyTorch Checkpoint (*.pth *.pt)',
         model_file_extension='.pth',
-        training_data_file_filter='NumPy Zipped Archive (*.npz)',
+        training_data_file_filter='PtychoFM Training Pair (*.hdf5)',
         export_training_data=export_training_data,
     )
