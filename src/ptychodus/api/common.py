@@ -37,18 +37,26 @@ def get_ptychodus_dir() -> Path:
 def lerp(lower: float, upper: float, frac: float) -> float:
     """Linearly interpolate between *lower* and *upper* by fraction *frac* in [0, 1]."""
     ...
+
+
 @overload
 def lerp(lower: complex, upper: complex, frac: float) -> complex:
     """Linearly interpolate between *lower* and *upper* by fraction *frac* in [0, 1]."""
     ...
+
+
 @overload
 def lerp(lower: RealArrayType, upper: RealArrayType, frac: float) -> RealArrayType:
     """Linearly interpolate between *lower* and *upper* by fraction *frac* in [0, 1]."""
     ...
+
+
 @overload
 def lerp(lower: RealArrayType, upper: RealArrayType, frac: RealArrayType) -> RealArrayType:
     """Linearly interpolate between *lower* and *upper* by fraction *frac* in [0, 1]."""
     ...
+
+
 @overload
 def lerp(lower: float, upper: float, frac: RealArrayType) -> RealArrayType:
     """Linearly interpolate between *lower* and *upper* by fraction *frac* in [0, 1]."""
