@@ -5,8 +5,11 @@ export interface NavEntry {
 }
 
 export const NAV: NavEntry[] = [
-  { route: 'diffraction', label: 'Patterns', icon: 'table-cells.svg' },
+  { route: 'diffraction', label: 'Diffraction', icon: 'table-cells.svg' },
   { route: 'product', label: 'Products', icon: 'list.svg' },
+  { route: 'positions', label: 'Positions', icon: 'route.svg' },
+  { route: 'probe', label: 'Probe', icon: 'circle-radiation.svg' },
+  { route: 'object', label: 'Object', icon: 'layer-group.svg' },
   { route: 'fluorescence', label: 'Fluorescence', icon: 'atom.svg' },
 ];
 

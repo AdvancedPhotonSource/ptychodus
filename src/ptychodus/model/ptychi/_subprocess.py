@@ -51,7 +51,6 @@ def reconstruct_with_ptychi(
 
     with task:
         epoch = 0
-        step_epochs = num_sync_epochs
 
         task_reconstructor = task.reconstructor
 
@@ -61,6 +60,7 @@ def reconstruct_with_ptychi(
         loss_tracker = task_reconstructor.loss_tracker
 
         while epoch < num_epochs:
+            step_epochs = min(num_sync_epochs, num_epochs - epoch)
             task.run(step_epochs)
 
             losses: list[LossValue] = list()
@@ -109,7 +109,6 @@ def reconstruct_with_ptychi(
             )
 
             epoch += step_epochs
-            step_epochs = min(step_epochs, num_epochs - epoch)
 
             yield ReconstructOutput(product=product, progress=epoch)
 

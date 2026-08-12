@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Any, Literal, cast, overload
+from enum import Enum
+from typing import Any, cast, overload
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 from PyQt5.QtGui import QBrush, QFont
@@ -14,35 +15,37 @@ from ...model.fluorescence import (
     FluorescenceRepositoryObserver,
 )
 
-Variant = Literal['measured', 'enhanced']
+
+class DisplayMode(Enum):
+    MEASURED = 'measured'
+    ENHANCED = 'enhanced'
+
 
 _COL_NAME = 0
-_COL_COUNTS = 1
-_COL_ELEMENTS = 2
-_COL_STATE = 3
-_COL_PRODUCT = 4
-_COL_SOURCE = 5
+_COL_COUNTS = 3
 
 
-def _select_variant(item: FluorescenceRepositoryItem, variant: Variant) -> FluorescenceDataset:
-    """Return the requested variant, falling back to measured when enhanced is absent.
+def _select_display_quantity(
+    item: FluorescenceRepositoryItem, display_mode: DisplayMode
+) -> FluorescenceDataset:
+    """Return the requested display quantity, falling back to measured when enhanced is absent.
 
     The tree walks measured element names as the canonical identity, so this
     fallback keeps leaf rows renderable even when the enhancement hasn't been
     run yet or when the enhanced dataset happens to be missing an element by
     name.
     """
-    if variant == 'enhanced':
+    if display_mode is DisplayMode.ENHANCED:
         enhanced = item.get_enhanced()
         if enhanced is not None:
             return enhanced
     return item.get_measured()
 
 
-def _lookup_variant_element(
-    item: FluorescenceRepositoryItem, element_name: str, variant: Variant
+def _lookup_display_element(
+    item: FluorescenceRepositoryItem, element_name: str, display: DisplayMode
 ) -> ElementMap | None:
-    dataset = _select_variant(item, variant)
+    dataset = _select_display_quantity(item, display)
     for element_map in dataset.element_maps:
         if element_map.name == element_name:
             return element_map
@@ -59,10 +62,12 @@ class _TreeNode:
     def row(self) -> int:
         return 0 if self.parent is None else self.parent.children.index(self)
 
-    def get_data(self, item: FluorescenceRepositoryItem, variant: Variant) -> RealArrayType | None:
+    def get_data(
+        self, item: FluorescenceRepositoryItem, display: DisplayMode
+    ) -> RealArrayType | None:
         return None
 
-    def get_counts(self, item: FluorescenceRepositoryItem, variant: Variant) -> float | None:
+    def get_counts(self, item: FluorescenceRepositoryItem, display: DisplayMode) -> float | None:
         return None
 
 
@@ -70,16 +75,18 @@ class _ItemNode(_TreeNode):
     def __init__(self, parent: _TreeNode) -> None:
         super().__init__(parent)
 
-    def get_data(self, item: FluorescenceRepositoryItem, variant: Variant) -> RealArrayType | None:
-        if variant == 'enhanced':
+    def get_data(
+        self, item: FluorescenceRepositoryItem, display: DisplayMode
+    ) -> RealArrayType | None:
+        if display is DisplayMode.ENHANCED:
             enhanced = item.get_enhanced_summary()
             if enhanced is not None:
                 return enhanced
             return item.get_measured_summary()
         return item.get_measured_summary()
 
-    def get_counts(self, item: FluorescenceRepositoryItem, variant: Variant) -> float | None:
-        summary = self.get_data(item, variant)
+    def get_counts(self, item: FluorescenceRepositoryItem, display: DisplayMode) -> float | None:
+        summary = self.get_data(item, display)
         if summary is None:
             return None
         return float(summary.sum())
@@ -100,22 +107,24 @@ class _ElementNode(_TreeNode):
         measured = self._measured_element(item)
         return measured.name if measured is not None else ''
 
-    def _resolve(self, item: FluorescenceRepositoryItem, variant: Variant) -> ElementMap | None:
+    def _resolve(self, item: FluorescenceRepositoryItem, display: DisplayMode) -> ElementMap | None:
         measured = self._measured_element(item)
         if measured is None:
             return None
-        if variant == 'measured':
+        if display is DisplayMode.MEASURED:
             return measured
         # Enhanced by name — fall back to measured when the enhanced dataset
         # is absent or lacks a matching name.
-        return _lookup_variant_element(item, measured.name, 'enhanced') or measured
+        return _lookup_display_element(item, measured.name, DisplayMode.ENHANCED) or measured
 
-    def get_data(self, item: FluorescenceRepositoryItem, variant: Variant) -> RealArrayType | None:
-        element = self._resolve(item, variant)
+    def get_data(
+        self, item: FluorescenceRepositoryItem, display: DisplayMode
+    ) -> RealArrayType | None:
+        element = self._resolve(item, display)
         return None if element is None else element.counts_per_second
 
-    def get_counts(self, item: FluorescenceRepositoryItem, variant: Variant) -> float | None:
-        element = self._resolve(item, variant)
+    def get_counts(self, item: FluorescenceRepositoryItem, display: DisplayMode) -> float | None:
+        element = self._resolve(item, display)
         if element is None:
             return None
         return float(element.counts_per_second.sum())
@@ -128,15 +137,15 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
     - Level 2: `_ElementNode` per element in the item's measured dataset
       (leaves).
 
-    A single `variant` field (measured/enhanced) drives the Counts column and
+    A single `display` field (measured/enhanced) drives the Counts column and
     the array returned by ``get_data``. The controller flips it via
-    ``set_variant`` when the user toggles the panel-level radio.
+    ``set_display`` when the user toggles the panel-level radio.
 
     Duck-typed against FluorescenceRepositoryObserver — inheriting the ABC
     would clash with sip's wrappertype metaclass on QAbstractItemModel.
     """
 
-    _HEADER = ('Name', 'Counts', 'Elements', 'State', 'Product', 'Source')
+    _HEADER = ('Name', 'Product', 'Elements', 'Counts')
 
     def __init__(
         self,
@@ -146,7 +155,7 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
         super().__init__(parent)
         self._repository = repository
         self._root = _TreeNode(None)
-        self._variant: Variant = 'measured'
+        self._display = DisplayMode.MEASURED
 
         for item in repository:
             self._root.children.append(self._build_item_node(item))
@@ -157,14 +166,14 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
     # Public helpers
     # ------------------------------------------------------------------
 
-    def set_variant(self, variant: Variant) -> None:
-        if variant == self._variant:
+    def set_display(self, display: DisplayMode) -> None:
+        if display is self._display:
             return
-        self._variant = variant
+        self._display = display
         self._broadcast_counts_and_state()
 
-    def get_variant(self) -> Variant:
-        return self._variant
+    def get_display(self) -> DisplayMode:
+        return self._display
 
     def item_row_for_index(self, index: QModelIndex) -> int:
         """Repository row index for whichever node ``index`` belongs to; -1 if none."""
@@ -189,11 +198,11 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
         return item_node
 
     def _broadcast_counts_and_state(self) -> None:
-        """Refresh Counts across the whole tree after a variant switch."""
+        """Refresh Counts across the whole tree after a display switch."""
         num_rows = self.rowCount()
         if num_rows == 0:
             return
-        # Top-level rows: Counts follows the variant.
+        # Top-level rows: Counts follows the display.
         top_left = self.index(0, _COL_COUNTS)
         bottom_right = self.index(num_rows - 1, _COL_COUNTS)
         self.dataChanged.emit(top_left, bottom_right)
@@ -225,9 +234,9 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
         self._emit_row_changed(index)
 
     def handle_enhanced_changed(self, index: int, item: FluorescenceRepositoryItem) -> None:
-        # Structural change: none (the enhanced dataset is a variant, not a
+        # Structural change: none (the enhanced dataset is a display, not a
         # separate branch). Refresh Counts for the item row and its leaves,
-        # so the current variant's numbers stay in sync.
+        # so the current display's numbers stay in sync.
         self._emit_row_changed(index)
         parent_idx = self.index(index, 0)
         num_children = self.rowCount(parent_idx)
@@ -347,8 +356,8 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
                 match index.column():
                     case 0:
                         return node.element_name(item)
-                    case 1:
-                        counts = node.get_counts(item, self._variant)
+                    case 3:
+                        counts = node.get_counts(item, self._display)
                         return _format_counts(counts)
                     case _:
                         return None
@@ -364,17 +373,12 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
                 case 0:
                     return item.get_label()
                 case 1:
-                    counts = node.get_counts(item, self._variant)
-                    return _format_counts(counts)
+                    return item.get_product().get_name()
                 case 2:
                     return len(item.get_measured().element_maps)
                 case 3:
-                    return state.value
-                case 4:
-                    return item.get_product().get_name()
-                case 5:
-                    source = item.get_source_path()
-                    return source.name if source is not None else '—'
+                    counts = node.get_counts(item, self._display)
+                    return _format_counts(counts)
         elif role == Qt.ItemDataRole.FontRole:
             if state is FluorescenceItemState.ENHANCING:
                 font = QFont()

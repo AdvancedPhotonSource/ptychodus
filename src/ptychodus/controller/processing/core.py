@@ -18,6 +18,7 @@ from ptychodus.api.reconstructor import TrainableReconstructor
 from ...model.genesis import GenesisCore
 from ...model.globus import GlobusCore
 from ...model.processing import ProcessingAPI, ProcessingAlgorithmParameter
+from ...model.processing.subprocess_reconstructor import SubprocessReconstructor
 from ...model.product import ProductRepository
 from ...view.processing import ProcessingActionsView, ProcessingStatusView
 from ...view.widgets import ExceptionDialog
@@ -310,10 +311,13 @@ class ProcessingController(Observer):
             self._algorithm_view_controller.get_widget().currentIndex()
         )
         reconstructor = self._algorithm_parameter.get_current_reconstructor()
-        is_trainable = False
+        is_trainable = isinstance(reconstructor, TrainableReconstructor)
 
-        if isinstance(reconstructor, TrainableReconstructor):
-            is_trainable = True
+        if isinstance(reconstructor, SubprocessReconstructor):
+            is_trainable = reconstructor.is_trainable
+
+        if is_trainable:
+            assert isinstance(reconstructor, TrainableReconstructor)
             is_model_loaded = reconstructor.is_model_loaded()
             self._actions_view.reconstruct_button.setText('Infer')
             self._actions_view.reconstruct_button.setEnabled(is_model_loaded)

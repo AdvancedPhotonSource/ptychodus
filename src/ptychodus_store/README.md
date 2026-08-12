@@ -4,8 +4,12 @@ FastAPI service that indexes on-disk ptychodus artifacts (campaigns, diffraction
 
 - **REST**: `/api/v1/*` — list / get / render endpoints per resource kind
 - **MCP**: `/mcp` — read-only tools mirroring the REST surface
-- **Browser UI**: `/ui/` — three-page shell (Patterns, Products, Fluorescence) served from compiled TypeScript
+- **Browser UI**: `/ui/` — six-page shell (Diffraction, Products, Positions, Probe, Object, Fluorescence) served from compiled TypeScript
 - **OpenAPI**: `/openapi.json` and interactive docs at `/docs`
+
+## Scope of the browser UI
+
+The browser UI is intentionally **read-only** for this release. It browses artifacts already ingested into the storage root, previews them with the same colormap defaults as the PyQt desktop app, and offers `.h5` file downloads from each detail view. Reconstruction, settings editing, dataset ingestion, remote-compute (Globus, Genesis), fluorescence enhancement, and the automation / agent panels are only available in the desktop app (`uv run ptychodus`). Any writes to the storage root happen out of band — via the desktop app, batch runs (`uv run ptychodus -b reconstruct ...`), or the streaming processor.
 
 ## Install
 

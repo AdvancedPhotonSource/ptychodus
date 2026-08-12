@@ -19,7 +19,7 @@ from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..image import ImageController
 from .enhance_dialog import FluorescenceEnhanceDialogController
-from .repository_tree_model import FluorescenceRepositoryTreeModel, Variant
+from .repository_tree_model import FluorescenceRepositoryTreeModel, DisplayMode
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
     The dataset tree expands to element leaves (see
     :class:`FluorescenceRepositoryTreeModel`); selecting an item renders a
     summary of all element maps, selecting an element renders that map. A
-    Measured/Enhanced radio pair below the tree selects which variant drives
+    Measured/Enhanced radio pair below the tree selects which display drives
     Counts + rendering.
     """
 
@@ -67,8 +67,8 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
             raise ValueError('tree_view selection model is None!')
         selection_model.currentChanged.connect(self._on_tree_selection_changed)
 
-        view.measured_radio_button.toggled.connect(self._on_variant_toggled)
-        view.enhanced_radio_button.toggled.connect(self._on_variant_toggled)
+        view.measured_radio_button.toggled.connect(self._on_display_toggled)
+        view.enhanced_radio_button.toggled.connect(self._on_display_toggled)
 
         view.button_box.load_button.clicked.connect(self._load)
         view.button_box.enhance_button.clicked.connect(self._enhance)
@@ -78,15 +78,17 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         repository.add_observer(self)
         self._task_monitor.add_observer(self)
 
-        self._sync_variant_toggle_enabled()
+        self._sync_display_toggle_enabled()
         self._sync_buttons()
 
     # ------------------------------------------------------------------
     # Selection & rendering
     # ------------------------------------------------------------------
 
-    def _current_variant(self) -> Variant:
-        return 'enhanced' if self._view.enhanced_radio_button.isChecked() else 'measured'
+    def _current_display(self) -> DisplayMode:
+        if self._view.enhanced_radio_button.isChecked():
+            return DisplayMode.ENHANCED
+        return DisplayMode.MEASURED
 
     def _current_top_level_row(self) -> int:
         return self._tree_model.item_row_for_index(self._view.tree_view.currentIndex())
@@ -101,16 +103,16 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
             return None
 
     def _on_tree_selection_changed(self, current: QModelIndex, previous: QModelIndex) -> None:
-        self._sync_variant_toggle_enabled()
+        self._sync_display_toggle_enabled()
         self._render_current()
         self._sync_buttons()
 
-    def _on_variant_toggled(self, checked: bool) -> None:
+    def _on_display_toggled(self, checked: bool) -> None:
         # Signals fire twice per toggle (button loses check + button gains
         # check). Handle only the gain to avoid duplicate re-renders.
         if not checked:
             return
-        self._tree_model.set_variant(self._current_variant())
+        self._tree_model.set_display(self._current_display())
         self._render_current()
 
     def _render_current(self) -> None:
@@ -124,8 +126,8 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
             self._image_controller.clear_array()
             return
 
-        variant = self._current_variant()
-        array = node.get_data(item, variant)
+        display = self._current_display()
+        array = node.get_data(item, display)
         if array is None:
             self._image_controller.clear_array()
             return
@@ -134,10 +136,10 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         self._image_controller.set_array(array, pixel_geometry)
 
     # ------------------------------------------------------------------
-    # Variant toggle enable-state
+    # Display toggle enable-state
     # ------------------------------------------------------------------
 
-    def _sync_variant_toggle_enabled(self) -> None:
+    def _sync_display_toggle_enabled(self) -> None:
         item = self._current_item()
         has_enhanced = item is not None and item.get_enhanced() is not None
         self._view.enhanced_radio_button.setEnabled(has_enhanced)
@@ -262,7 +264,7 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
     def handle_item_inserted(self, index: int, item: FluorescenceRepositoryItem) -> None:
         if not self._view.tree_view.currentIndex().isValid():
             self._view.tree_view.setCurrentIndex(self._tree_model.index(index, 0))
-        self._sync_variant_toggle_enabled()
+        self._sync_display_toggle_enabled()
         self._sync_buttons()
 
     def handle_item_removed(self, index: int, item: FluorescenceRepositoryItem) -> None:
@@ -273,7 +275,7 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
                 self._view.tree_view.setCurrentIndex(self._tree_model.index(target, 0))
             else:
                 self._render_current()
-        self._sync_variant_toggle_enabled()
+        self._sync_display_toggle_enabled()
         self._sync_buttons()
 
     def handle_metadata_changed(self, index: int, item: FluorescenceRepositoryItem) -> None:
@@ -282,7 +284,7 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
 
     def handle_enhanced_changed(self, index: int, item: FluorescenceRepositoryItem) -> None:
         if index == self._current_top_level_row():
-            self._sync_variant_toggle_enabled()
+            self._sync_display_toggle_enabled()
             self._render_current()
             self._sync_buttons()
 

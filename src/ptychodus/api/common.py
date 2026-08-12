@@ -29,19 +29,38 @@ PLANCK_CONSTANT_J_PER_HZ: Final[float] = 6.62607015e-34
 
 
 def get_ptychodus_dir() -> Path:
+    """Return the user's Ptychodus configuration directory (``~/.ptychodus``)."""
     return Path.home() / '.ptychodus'
 
 
 @overload
-def lerp(lower: float, upper: float, frac: float) -> float: ...
+def lerp(lower: float, upper: float, frac: float) -> float:
+    """Linearly interpolate between *lower* and *upper* by fraction *frac* in [0, 1]."""
+    ...
+
+
 @overload
-def lerp(lower: complex, upper: complex, frac: float) -> complex: ...
+def lerp(lower: complex, upper: complex, frac: float) -> complex:
+    """Linearly interpolate between *lower* and *upper* by fraction *frac* in [0, 1]."""
+    ...
+
+
 @overload
-def lerp(lower: RealArrayType, upper: RealArrayType, frac: float) -> RealArrayType: ...
+def lerp(lower: RealArrayType, upper: RealArrayType, frac: float) -> RealArrayType:
+    """Linearly interpolate between *lower* and *upper* by fraction *frac* in [0, 1]."""
+    ...
+
+
 @overload
-def lerp(lower: RealArrayType, upper: RealArrayType, frac: RealArrayType) -> RealArrayType: ...
+def lerp(lower: RealArrayType, upper: RealArrayType, frac: RealArrayType) -> RealArrayType:
+    """Linearly interpolate between *lower* and *upper* by fraction *frac* in [0, 1]."""
+    ...
+
+
 @overload
-def lerp(lower: float, upper: float, frac: RealArrayType) -> RealArrayType: ...
+def lerp(lower: float, upper: float, frac: RealArrayType) -> RealArrayType:
+    """Linearly interpolate between *lower* and *upper* by fraction *frac* in [0, 1]."""
+    ...
 
 
 def lerp(
@@ -55,6 +74,8 @@ def lerp(
 
 @dataclass(frozen=True)
 class NoiseFloor:
+    """Robust noise-floor estimate: background value and its median absolute deviation."""
+
     background_value: float
     median_absolute_deviation: float
 

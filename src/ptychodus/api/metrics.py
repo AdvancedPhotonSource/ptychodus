@@ -132,6 +132,8 @@ class ObjectComparison:
 
 @dataclass(frozen=True)
 class FourierRingCorrelation:
+    """Per-ring Fourier ring correlation between two complex images, with resolution estimators."""
+
     spatial_frequency_per_m: RealArrayType
     correlation: RealArrayType
     pixels_per_ring: IntegerArrayType

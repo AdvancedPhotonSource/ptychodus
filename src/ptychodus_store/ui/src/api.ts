@@ -42,13 +42,17 @@ export interface ProductRead {
   derived_from: DerivedFromEdge[];
   name: string | null;
   comments: string | null;
+  detector_distance_m: number | null;
   probe_energy_eV: number | null;
+  probe_photon_count: number | null;
   tomography_angle_deg: number | null;
   tilt_angle_deg: number | null;
   polarization: Polarization | null;
   object_layers: number | null;
   object_height_px: number | null;
   object_width_px: number | null;
+  object_pixel_width_m: number | null;
+  object_pixel_height_m: number | null;
   probe_modes: number | null;
   probe_height_px: number | null;
   probe_width_px: number | null;
@@ -100,22 +104,29 @@ export const api = {
     get<RenderedImage>(`/diffraction/${uuid}/patterns/aggregate/image`),
   diffractionPatternImage: (uuid: string, index: number) =>
     get<RenderedImage>(`/diffraction/${uuid}/patterns/${index}/image`),
+  diffractionFileUrl: (uuid: string) => `${API}/diffraction/${uuid}/files/diffraction`,
 
   listProduct: (limit = 200, offset = 0) =>
     get<Page<ProductRead>>(`/product?limit=${limit}&offset=${offset}`),
   getProduct: (uuid: string) => get<ProductRead>(`/product/${uuid}`),
-  productObjectImage: (uuid: string, layer: number) =>
-    get<RenderedImage>(`/product/${uuid}/object/${layer}/image`),
-  productProbeImage: (uuid: string, incoherent = 0) =>
-    get<RenderedImage>(`/product/${uuid}/probe/image?incoherent=${incoherent}`),
+  productObjectImage: (uuid: string, layer: number, colorModel = 'hsv_value') =>
+    get<RenderedImage>(
+      `/product/${uuid}/object/${layer}/image?color_model=${encodeURIComponent(colorModel)}`
+    ),
+  productProbeModesImage: (uuid: string, colorModel = 'hsv_value') =>
+    get<RenderedImage>(
+      `/product/${uuid}/probe/modes/image?color_model=${encodeURIComponent(colorModel)}`
+    ),
   productPositionsImage: (uuid: string, canvasPx = 512, connectPath = true) =>
     get<RenderedImage>(
       `/product/${uuid}/positions/image?canvas_px=${canvasPx}&connect_path=${connectPath}`
     ),
+  productFileUrl: (uuid: string) => `${API}/product/${uuid}/files/product`,
 
   listFluorescence: (limit = 200, offset = 0) =>
     get<Page<FluorescenceRead>>(`/fluorescence?limit=${limit}&offset=${offset}`),
   getFluorescence: (uuid: string) => get<FluorescenceRead>(`/fluorescence/${uuid}`),
   fluorescenceElementImage: (uuid: string, name: string) =>
     get<RenderedImage>(`/fluorescence/${uuid}/elements/${encodeURIComponent(name)}/image`),
+  fluorescenceFileUrl: (uuid: string) => `${API}/fluorescence/${uuid}/files/fluorescence`,
 };
