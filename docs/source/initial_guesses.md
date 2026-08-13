@@ -7,37 +7,46 @@ from pathlib import Path
 
 from ptychodus.model import ModelCore
 
-with ModelCore(Path("settings.ini")) as model:
+with ModelCore(Path('settings.ini')) as model:
     product_api = model.workflow_api.create_product(
-        "initial_guess",
+        'initial_guess',
         detector_distance_m=1.0,
         probe_energy_eV=10_000.0,
         probe_photon_count=1.0e6,
     )
 
-    product_api.generate_probe_positions("rectangular_raster", {
-        "num_points_x": 20,
-        "num_points_y": 20,
-        "step_size_x_m": 75e-9,
-        "step_size_y_m": 75e-9,
-    })
+    product_api.generate_probe_positions(
+        'rectangular_raster',
+        {
+            'num_points_x': 20,
+            'num_points_y': 20,
+            'step_size_x_m': 75e-9,
+            'step_size_y_m': 75e-9,
+        },
+    )
 
-    product_api.generate_probe("disk", {
-        "diameter_m": 1.0e-6,
-        "defocus_distance_m": 0.0,
-        "num_incoherent_modes": 1,
-        "num_coherent_modes": 1,
-    })
+    product_api.generate_probe(
+        'disk',
+        {
+            'diameter_m': 1.0e-6,
+            'defocus_distance_m': 0.0,
+            'num_incoherent_modes': 1,
+            'num_coherent_modes': 1,
+        },
+    )
 
-    product_api.generate_object("random", {
-        "amplitude_mean": 1.0,
-        "amplitude_deviation": 0.0,
-        "phase_deviation_turns": 0.1,
-        "blur_deviation_px": 0.0,
-    })
+    product_api.generate_object(
+        'random',
+        {
+            'amplitude_mean': 1.0,
+            'amplitude_deviation': 0.0,
+            'phase_deviation_turns': 0.1,
+            'blur_deviation_px': 0.0,
+        },
+    )
 
     product = product_api.get_product()
-    product_api.save_product(Path("initial_guess.h5"), file_type="HDF5")
+    product_api.save_product(Path('initial_guess.h5'), file_type='HDF5')
 ```
 
 The product contains four main pieces of initial data:
@@ -217,25 +226,28 @@ from pathlib import Path
 
 from ptychodus.model import ModelCore
 
-with ModelCore(Path("settings.ini")) as model:
+with ModelCore(Path('settings.ini')) as model:
     product_api = model.workflow_api.create_product(
-        "generated_multimode_probe",
+        'generated_multimode_probe',
         detector_distance_m=1.0,
         probe_energy_eV=10_000.0,
         probe_photon_count=1.0e6,
     )
 
-    product_api.generate_probe("fresnel_zone_plate", {
-        "zone_plate_diameter_m": 180e-6,
-        "outermost_zone_width_m": 50e-9,
-        "central_beamstop_diameter_m": 60e-6,
-        "defocus_distance_m": 10e-6,
-        "num_incoherent_modes": 3,
-        "orthogonalize_incoherent_modes": True,
-        "incoherent_mode_decay_type": "polynomial",
-        "incoherent_mode_decay_ratio": 0.25,
-        "num_coherent_modes": 2,
-    })
+    product_api.generate_probe(
+        'fresnel_zone_plate',
+        {
+            'zone_plate_diameter_m': 180e-6,
+            'outermost_zone_width_m': 50e-9,
+            'central_beamstop_diameter_m': 60e-6,
+            'defocus_distance_m': 10e-6,
+            'num_incoherent_modes': 3,
+            'orthogonalize_incoherent_modes': True,
+            'incoherent_mode_decay_type': 'polynomial',
+            'incoherent_mode_decay_ratio': 0.25,
+            'num_coherent_modes': 2,
+        },
+    )
 
     product = product_api.get_product()
     probe_array = product.probes.get_array()
@@ -244,7 +256,7 @@ with ModelCore(Path("settings.ini")) as model:
     assert probe_array.shape[:2] == (2, 3)
     assert opr_weights.shape == (len(product.probe_positions), 2)
 
-    product_api.save_product(Path("generated_multimode_probe.h5"), file_type="HDF5")
+    product_api.save_product(Path('generated_multimode_probe.h5'), file_type='HDF5')
 ```
 
 The same mode parameters work with other generated probe types such as `disk`, `rectangular`, `super_gaussian`, and `zernike`.
@@ -263,15 +275,15 @@ from ptychodus.api.probe_gen import (
 )
 from ptychodus.model import ModelCore
 
-with ModelCore(Path("settings.ini")) as model:
+with ModelCore(Path('settings.ini')) as model:
     product_api = model.workflow_api.create_product(
-        "loaded_single_mode_probe",
+        'loaded_single_mode_probe',
         detector_distance_m=1.0,
         probe_energy_eV=10_000.0,
         probe_photon_count=1.0e6,
     )
 
-    product_api.load_probe(Path("single_mode_probe.npy"), file_type="NPY")
+    product_api.load_probe(Path('single_mode_probe.npy'), file_type='NPY')
 
     product = product_api.get_product()
 
@@ -302,10 +314,10 @@ with ModelCore(Path("settings.ini")) as model:
     )
 
     expanded_product_api = model.workflow_api.register_product(expanded_product)
-    expanded_product_api.rename_product("loaded_probe_with_added_modes")
+    expanded_product_api.rename_product('loaded_probe_with_added_modes')
     expanded_product_api.save_product(
-        Path("loaded_probe_with_added_modes.h5"),
-        file_type="HDF5",
+        Path('loaded_probe_with_added_modes.h5'),
+        file_type='HDF5',
     )
 ```
 
@@ -361,12 +373,14 @@ from ptychodus.api.probe_positions_gen import generate_cartesian_probe_positions
 
 rng = numpy.random.default_rng(0)
 
-positions = list(generate_cartesian_probe_positions(
-    num_points_x=20,
-    num_points_y=20,
-    step_size_x=75e-9,
-    step_size_y=75e-9,
-))
+positions = list(
+    generate_cartesian_probe_positions(
+        num_points_x=20,
+        num_points_y=20,
+        step_size_x=75e-9,
+        step_size_y=75e-9,
+    )
+)
 
 probe_geometry = ProbeGeometry(
     width_px=128,
