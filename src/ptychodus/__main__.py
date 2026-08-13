@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
+from pathlib import Path
 import argparse
 import logging
 import sys
-from pathlib import Path
 
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.cli import DirectoryType, verify_all_arguments_parsed
@@ -111,3 +111,7 @@ def main() -> int:
         controller.show_main_window(ptychodus.VERSION_STRING)
 
         return app.exec()
+
+
+if __name__ == '__main__':
+    sys.exit(main())
