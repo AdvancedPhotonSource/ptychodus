@@ -1,87 +1,131 @@
-"""RANSAC-based affine transform estimation between two corresponding sets of probe positions."""
+"""Probe-position preprocessing: the affine transform primitive and RANSAC-based estimation."""
 
 from __future__ import annotations
-from collections.abc import Iterable
+
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
+from typing import overload
 
 import numpy
 
-from .common import RealArrayType
-from .geometry import AffineTransform
-from .probe_positions import ProbePositionSequence
+from ..probe_positions import ProbePosition, ProbePositionSequence
+from ..typing import RealArrayType
 
-__all__ = ['PreprocessedCoordinates', 'estimate_affine_transform_ransac']
+__all__ = [
+    'AffineTransform',
+    'estimate_affine_transform_ransac',
+    'transform_probe_positions',
+]
 
-
-def _estimate_mean_hodges_lehman(values: RealArrayType) -> float:
-    """Robust location estimator: median of all pairwise means. O(N^2) memory."""
-    mean = numpy.median((values[numpy.newaxis, :] + values[:, numpy.newaxis]) / 2)
-    return float(mean)
+_AFFINE_MINIMUM_POINTS = 3  # 6 DOF / 2 equations per point
 
 
 @dataclass(frozen=True)
-class PreprocessedCoordinates:
+class AffineTransform:
+    """2D affine transformation expressed as a 2x3 matrix. Call it on a ``ProbePosition``
+    (returns a new ``ProbePosition`` with the same index) or on an (N, 2) array packed (x, y)."""
+
+    a00: float
+    a01: float
+    a02: float
+
+    a10: float
+    a11: float
+    a12: float
+
+    @overload
+    def __call__(self, arg: ProbePosition) -> ProbePosition: ...
+    @overload
+    def __call__(self, arg: RealArrayType) -> RealArrayType: ...
+    def __call__(self, arg: ProbePosition | RealArrayType) -> ProbePosition | RealArrayType:
+        if isinstance(arg, ProbePosition):
+            return ProbePosition(
+                index=arg.index,
+                coordinate_x_m=self.a00 * arg.coordinate_x_m
+                + self.a01 * arg.coordinate_y_m
+                + self.a02,
+                coordinate_y_m=self.a10 * arg.coordinate_x_m
+                + self.a11 * arg.coordinate_y_m
+                + self.a12,
+            )
+        linear = numpy.array([[self.a00, self.a01], [self.a10, self.a11]])
+        translation = numpy.array([self.a02, self.a12])
+        return arg @ linear.T + translation
+
+
+def _estimate_mean_hodges_lehmann(values: RealArrayType) -> float:
+    """Robust location estimator: median of all pairwise means. O(N^2) memory."""
+    return float(numpy.median(numpy.add.outer(values, values) / 2))
+
+
+@dataclass(frozen=True)
+class _PreprocessedCoordinates:
     """Centroid-subtracted, RMS-normalized (N, 2) coordinates with the parameters needed to invert
-    the normalization. Column 0 is y, column 1 is x (matching the api/probe_positions convention)."""
+    the normalization. Column 0 is x, column 1 is y."""
 
     coordinates: RealArrayType
     centroid_x: float
     centroid_y: float
     rms_distance: float
 
-    @classmethod
-    def from_coordinates(cls, coordinates: RealArrayType) -> PreprocessedCoordinates:
-        """Build a PreprocessedCoordinates from a raw (N, 2) array packed (y, x): subtract the
-        robust per-axis centroid and rescale so the resulting RMS distance from the origin is 1.
-        Raises ValueError if all points are coincident."""
-        centroid_y = _estimate_mean_hodges_lehman(coordinates[:, 0])
-        centroid_x = _estimate_mean_hodges_lehman(coordinates[:, 1])
-        centered = coordinates - numpy.array((centroid_y, centroid_x))
 
-        distance = numpy.hypot(centered[:, 0], centered[:, 1])
-        rms_distance = numpy.sqrt(numpy.mean(numpy.square(distance))).item()
+def _preprocess_coordinates(coordinates: RealArrayType) -> _PreprocessedCoordinates:
+    """Centroid-subtract and RMS-normalize a raw (N, 2) array packed (x, y): subtract the robust
+    per-axis centroid and rescale so the resulting RMS distance from the origin is 1. Raises
+    ValueError if the shape is wrong or all points are coincident."""
+    if coordinates.ndim != 2 or coordinates.shape[1] != 2:
+        raise ValueError(f'Expected (N, 2) coordinate array; got shape {coordinates.shape}.')
 
-        if rms_distance == 0.0:
-            raise ValueError('All probe positions are coincident; cannot normalize.')
+    centroid_x = _estimate_mean_hodges_lehmann(coordinates[:, 0])
+    centroid_y = _estimate_mean_hodges_lehmann(coordinates[:, 1])
+    centered = coordinates - numpy.array((centroid_x, centroid_y))
 
-        return cls(centered / rms_distance, centroid_x, centroid_y, rms_distance)
+    distance = numpy.hypot(centered[:, 0], centered[:, 1])
+    rms_distance = numpy.sqrt(numpy.mean(numpy.square(distance))).item()
+
+    if rms_distance == 0.0:
+        raise ValueError('All probe positions are coincident; cannot normalize.')
+
+    return _PreprocessedCoordinates(centered / rms_distance, centroid_x, centroid_y, rms_distance)
 
 
-def _estimate_affine_transform(
+def transform_probe_positions(
+    positions: Iterable[ProbePosition],
+    transform: AffineTransform,
+    rng: numpy.random.Generator | None = None,
+    jitter_radius_m: float = 0.0,
+) -> Iterator[ProbePosition]:
+    """Apply an affine transform (and optional random jitter) to every position in *positions*."""
+    for position in positions:
+        transformed = transform(position)
+
+        if rng is not None:
+            angle_rad = 2 * numpy.pi * rng.uniform()
+            radius_m = jitter_radius_m * numpy.sqrt(rng.uniform())
+            transformed = ProbePosition(
+                index=transformed.index,
+                coordinate_x_m=transformed.coordinate_x_m + radius_m * numpy.cos(angle_rad),
+                coordinate_y_m=transformed.coordinate_y_m + radius_m * numpy.sin(angle_rad),
+            )
+
+        yield transformed
+
+
+def _fit_affine_least_squares(
     uncorrected_coordinates: RealArrayType,
     corrected_coordinates: RealArrayType,
 ) -> AffineTransform:
     """Least-squares fit of the 6-parameter 2D affine map (uncorrected -> corrected).
 
-    Both inputs are (N, 2) with column 0 = y, column 1 = x. The design matrix is block-structured
-    so each point contributes two equations (one for x', one for y') against the six unknowns of
-    ``AffineTransform`` (which always operates on physical (x, y), regardless of array packing).
+    Both inputs are (N, 2) with column 0 = x, column 1 = y. Each point contributes a row
+    ``[x, y, 1]`` to the design matrix; the x' and y' fits share this design and are solved
+    together via a multi-column RHS.
     """
     n = uncorrected_coordinates.shape[0]
-    y_in = uncorrected_coordinates[:, 0]
-    x_in = uncorrected_coordinates[:, 1]
-
-    a = numpy.zeros((2 * n, 6))
-    a[0::2, 0] = x_in
-    a[0::2, 1] = y_in
-    a[0::2, 2] = 1.0
-    a[1::2, 3] = x_in
-    a[1::2, 4] = y_in
-    a[1::2, 5] = 1.0
-
-    b = numpy.empty(2 * n)
-    b[0::2] = corrected_coordinates[:, 1]  # x'
-    b[1::2] = corrected_coordinates[:, 0]  # y'
-
-    params, *_ = numpy.linalg.lstsq(a, b, rcond=None)
-    return AffineTransform(
-        float(params[0]),
-        float(params[1]),
-        float(params[2]),
-        float(params[3]),
-        float(params[4]),
-        float(params[5]),
-    )
+    design = numpy.column_stack((uncorrected_coordinates, numpy.ones(n)))  # (N, 3): [x, y, 1]
+    params, *_ = numpy.linalg.lstsq(design, corrected_coordinates, rcond=None)  # (3, 2)
+    (a00, a10), (a01, a11), (a02, a12) = params
+    return AffineTransform(a00, a01, a02, a10, a11, a12)
 
 
 def _evaluate_error(
@@ -89,17 +133,13 @@ def _evaluate_error(
     corrected_coordinates: RealArrayType,
     model: AffineTransform,
 ) -> RealArrayType:
-    """Per-point Euclidean residuals between ``model(uncorrected)`` and ``corrected``. The
-    ``AffineTransform.apply_transform`` API uses (x, y) packing, so flip columns on entry/exit
-    to match this module's internal (y, x) packing."""
-    predicted = model.apply_transform(uncorrected_coordinates[:, ::-1])[:, ::-1]
-    delta = predicted - corrected_coordinates
+    """Per-point Euclidean residuals between ``model(uncorrected)`` and ``corrected``."""
+    delta = model(uncorrected_coordinates) - corrected_coordinates
     return numpy.hypot(delta[:, 0], delta[:, 1])
 
 
 def _is_degenerate_sample(points: RealArrayType, eps: float = 1e-10) -> bool:
-    """Return True if three points are (near-)collinear and cannot pin down a full affine. The
-    cross-product magnitude is axis-swap invariant, so this works for (y, x) packing too."""
+    """Return True if three points are (near-)collinear and cannot pin down a full affine."""
     v1 = points[1] - points[0]
     v2 = points[2] - points[0]
     cross = v1[0] * v2[1] - v1[1] * v2[0]
@@ -108,11 +148,11 @@ def _is_degenerate_sample(points: RealArrayType, eps: float = 1e-10) -> bool:
 
 def _unscale_transform(
     t_norm: AffineTransform,
-    measured: PreprocessedCoordinates,
-    corrected: PreprocessedCoordinates,
+    measured: _PreprocessedCoordinates,
+    corrected: _PreprocessedCoordinates,
 ) -> AffineTransform:
-    """Convert a transform fitted in normalized space back to the original (measured -> corrected)
-    coordinate frame."""
+    """Convert a transform fitted in normalized (centroid-subtracted, RMS-scaled) space back to
+    the original (measured -> corrected) (x, y) coordinate frame."""
     s = corrected.rms_distance / measured.rms_distance
     a = s * t_norm.a00
     b = s * t_norm.a01
@@ -134,12 +174,12 @@ def _unscale_transform(
 
 
 def _flatten_to_array(sequences: Iterable[ProbePositionSequence]) -> RealArrayType:
-    """Concatenate position sequences into a single (N, 2) array packed (y, x)."""
+    """Concatenate position sequences into a single (N, 2) array packed (x, y)."""
     coordinates: list[float] = []
     for seq in sequences:
         for point in seq:
-            coordinates.append(point.coordinate_y_m)
             coordinates.append(point.coordinate_x_m)
+            coordinates.append(point.coordinate_y_m)
     return numpy.reshape(coordinates, (-1, 2))
 
 
@@ -192,26 +232,27 @@ def estimate_affine_transform_ransac(
             'point-by-point correspondence is required.'
         )
 
-    arity = 3  # minimum points needed to pin down a 2D affine (6 DOF / 2 eqns per point)
     n_points = measured.shape[0]
-    if n_points < arity:
-        raise ValueError(f'Need at least {arity} points to estimate an affine; got {n_points}.')
+    if n_points < _AFFINE_MINIMUM_POINTS:
+        raise ValueError(
+            f'Need at least {_AFFINE_MINIMUM_POINTS} points to estimate an affine; got {n_points}.'
+        )
 
-    measured_pre = PreprocessedCoordinates.from_coordinates(measured)
-    corrected_pre = PreprocessedCoordinates.from_coordinates(corrected)
+    measured_pre = _preprocess_coordinates(measured)
+    corrected_pre = _preprocess_coordinates(corrected)
 
     best_score = numpy.inf
     best_model_norm: AffineTransform | None = None
 
     for _ in range(num_iterations):
-        sample = rng.choice(n_points, size=arity, replace=False)
+        sample = rng.choice(n_points, size=_AFFINE_MINIMUM_POINTS, replace=False)
         measured_sample = measured_pre.coordinates[sample]
         corrected_sample = corrected_pre.coordinates[sample]
 
         if _is_degenerate_sample(measured_sample):
             continue
 
-        coarse_model = _estimate_affine_transform(measured_sample, corrected_sample)
+        coarse_model = _fit_affine_least_squares(measured_sample, corrected_sample)
         all_errors = _evaluate_error(
             measured_pre.coordinates, corrected_pre.coordinates, coarse_model
         )
@@ -222,7 +263,7 @@ def estimate_affine_transform_ransac(
 
         measured_inliers = measured_pre.coordinates[inliers]
         corrected_inliers = corrected_pre.coordinates[inliers]
-        candidate_model = _estimate_affine_transform(measured_inliers, corrected_inliers)
+        candidate_model = _fit_affine_least_squares(measured_inliers, corrected_inliers)
         candidate_errors = _evaluate_error(measured_inliers, corrected_inliers, candidate_model)
         candidate_rms = float(numpy.sqrt(numpy.mean(numpy.square(candidate_errors))))
 

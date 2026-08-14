@@ -1,10 +1,16 @@
 from pathlib import Path
-from typing import Final
 import logging
 
 import h5py
 import numpy
 
+from ptychodus.api.constants import (
+    ELECTRON_VOLT_J,
+    LIGHT_SPEED_M_PER_S,
+    ONE_MICRON_M,
+    ONE_NANOMETER_M,
+    PLANCK_CONSTANT_J_PER_HZ,
+)
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     DiffractionDataset,
@@ -13,11 +19,6 @@ from ptychodus.api.diffraction import (
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.product import (
-    ELECTRON_VOLT_J,
-    LIGHT_SPEED_M_PER_S,
-    PLANCK_CONSTANT_J_PER_HZ,
-)
 
 from .h5_diffraction_file import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
@@ -60,9 +61,6 @@ class NSLS2Style1DiffractionFileReader(DiffractionFileReader):
 
 
 class NSLS2Style2DiffractionFileReader(DiffractionFileReader):
-    ONE_MICRON_M: Final[float] = 1.0e-6
-    ONE_NANOMETER_M: Final[float] = 1.0e-9
-
     def __init__(self) -> None:
         self._tree_builder = H5DiffractionFileTreeBuilder()
 
@@ -73,8 +71,8 @@ class NSLS2Style2DiffractionFileReader(DiffractionFileReader):
             if isinstance(data, h5py.Dataset):
                 num_patterns, detector_height, detector_width = data.shape
 
-                pixel_size_m = float(h5_file['/ccd_pixel_um'][()]) * self.ONE_MICRON_M
-                wavelength_m = float(h5_file['/lambda_nm'][()]) * self.ONE_NANOMETER_M
+                pixel_size_m = float(h5_file['/ccd_pixel_um'][()]) * ONE_MICRON_M
+                wavelength_m = float(h5_file['/lambda_nm'][()]) * ONE_NANOMETER_M
                 hc_Jm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S  # noqa: N806
                 hc_eVm = hc_Jm / ELECTRON_VOLT_J  # noqa: N806
                 probe_energy_eV = hc_eVm / wavelength_m  # noqa: N806
@@ -103,8 +101,6 @@ class NSLS2Style2DiffractionFileReader(DiffractionFileReader):
 
 
 class NSLS2MATLABDiffractionFileReader(DiffractionFileReader):
-    ONE_MICRON_M: Final[float] = 1e-6
-
     def __init__(self) -> None:
         self._tree_builder = H5DiffractionFileTreeBuilder()
 
@@ -114,9 +110,7 @@ class NSLS2MATLABDiffractionFileReader(DiffractionFileReader):
 
             if isinstance(data, h5py.Dataset):
                 num_patterns, detector_height, detector_width = data.shape
-                pixel_size_m = (
-                    float(numpy.squeeze(h5_file['det_pixel_size'][()])) * self.ONE_MICRON_M
-                )
+                pixel_size_m = float(numpy.squeeze(h5_file['det_pixel_size'][()])) * ONE_MICRON_M
 
                 metadata = DiffractionMetadata(
                     num_patterns_per_array=[num_patterns],

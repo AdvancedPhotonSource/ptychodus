@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
 )
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import StringParameter
+from ptychodus.api.parameters import StringParameter
 
 from ...model.product.probe import (
     AveragePatternProbeBuilder,

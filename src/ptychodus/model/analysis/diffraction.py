@@ -3,7 +3,7 @@ import time
 
 import numpy
 
-from ptychodus.api.diffraction_gen import generate_diffraction_data
+from ptychodus.api.simulate.diffraction import generate_diffraction_data
 
 from ..diffraction import DiffractionDatasetRepository
 from ..product import ProductRepository

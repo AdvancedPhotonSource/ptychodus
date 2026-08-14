@@ -3,7 +3,7 @@ from abc import abstractmethod, ABC
 import logging
 
 from ptychodus.api.diffraction import Polarization
-from ptychodus.api.parametric import Parameter, ParameterGroup
+from ptychodus.api.parameters import Parameter, ParameterGroup
 from ptychodus.api.product import ProductMetadata
 
 from .settings import ProductSettings

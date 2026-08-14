@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy
 
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
-from ptychodus.api.probe_gen import (
+from ptychodus.api.simulate.probe import (
     defocus_probe,
     generate_rectangular_probe,
 )

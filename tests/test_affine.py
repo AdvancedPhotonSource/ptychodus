@@ -4,15 +4,15 @@ from unittest.mock import MagicMock
 import numpy
 import pytest
 
-from ptychodus.api.affine import (
-    PreprocessedCoordinates,
-    _estimate_affine_transform,
-    _estimate_mean_hodges_lehman,
+from ptychodus.api.preprocess.probe_positions import (
+    _estimate_mean_hodges_lehmann,
     _evaluate_error,
+    _fit_affine_least_squares,
+    _preprocess_coordinates,
     _unscale_transform,
     estimate_affine_transform_ransac,
 )
-from ptychodus.api.geometry import AffineTransform
+from ptychodus.api.preprocess.probe_positions import AffineTransform
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.model.analysis.affine import AffineTransformEstimator
 from ptychodus.model.analysis.settings import AffineTransformEstimatorSettings
@@ -28,63 +28,53 @@ def _params(t: AffineTransform) -> tuple[float, float, float, float, float, floa
     return (t.a00, t.a01, t.a02, t.a10, t.a11, t.a12)
 
 
-def _apply_yx(model: AffineTransform, points: numpy.ndarray) -> numpy.ndarray:
-    """Apply ``model`` to an (N, 2) array packed (y, x) and return the result in the same packing.
-    ``AffineTransform.apply_transform`` itself uses (x, y); flip columns on entry/exit."""
-    return model.apply_transform(points[:, ::-1])[:, ::-1]
-
-
-def _preprocess(points: numpy.ndarray) -> PreprocessedCoordinates:
-    return PreprocessedCoordinates.from_coordinates(points)
-
-
-def _sequence_from_yx(arr: numpy.ndarray) -> ProbePositionSequence:
-    """Build a ProbePositionSequence from an (N, 2) array packed (y, x)."""
+def _sequence_from_xy(arr: numpy.ndarray) -> ProbePositionSequence:
+    """Build a ProbePositionSequence from an (N, 2) array packed (x, y)."""
     return ProbePositionSequence(
         [
-            ProbePosition(index=i, coordinate_y_m=float(arr[i, 0]), coordinate_x_m=float(arr[i, 1]))
+            ProbePosition(index=i, coordinate_x_m=float(arr[i, 0]), coordinate_y_m=float(arr[i, 1]))
             for i in range(arr.shape[0])
         ]
     )
 
 
 # ---------------------------------------------------------------------------
-# _estimate_affine_transform: pure least-squares fit
+# _fit_affine_least_squares: pure least-squares fit
 # ---------------------------------------------------------------------------
 
 
-def test_estimate_affine_transform_recovers_known_transform() -> None:
+def test_fit_affine_recovers_known_transform() -> None:
     """Given clean point correspondences, lstsq recovers the exact 6-parameter affine."""
     truth = AffineTransform(1.7, -0.3, 0.4, 0.25, 2.1, -1.6)
     rng = numpy.random.default_rng(42)
     uncorrected = rng.uniform(-10.0, 10.0, size=(20, 2))
-    corrected = _apply_yx(truth, uncorrected)
+    corrected = truth(uncorrected)
 
-    recovered = _estimate_affine_transform(uncorrected, corrected)
+    recovered = _fit_affine_least_squares(uncorrected, corrected)
 
     numpy.testing.assert_allclose(_params(recovered), _params(truth), atol=1e-10)
 
 
-def test_estimate_affine_transform_three_points_is_exact() -> None:
+def test_fit_affine_three_points_is_exact() -> None:
     """With exactly 3 non-collinear points (6 equations, 6 unknowns), the fit is exact."""
     truth = AffineTransform(2.0, 0.5, 1.0, -0.5, 3.0, -2.0)
     uncorrected = numpy.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
-    corrected = _apply_yx(truth, uncorrected)
+    corrected = truth(uncorrected)
 
-    recovered = _estimate_affine_transform(uncorrected, corrected)
+    recovered = _fit_affine_least_squares(uncorrected, corrected)
 
     numpy.testing.assert_allclose(_params(recovered), _params(truth), atol=1e-12)
 
 
 # ---------------------------------------------------------------------------
-# _estimate_mean_hodges_lehman: robust location estimator
+# _estimate_mean_hodges_lehmann: robust location estimator
 # ---------------------------------------------------------------------------
 
 
 def test_hodges_lehmann_clean_arange() -> None:
     """For a symmetric uniform sample, the H-L mean equals the median."""
     values = numpy.arange(11, dtype=float)
-    assert _estimate_mean_hodges_lehman(values) == pytest.approx(5.0)
+    assert _estimate_mean_hodges_lehmann(values) == pytest.approx(5.0)
 
 
 def test_hodges_lehmann_resists_outliers() -> None:
@@ -92,9 +82,26 @@ def test_hodges_lehmann_resists_outliers() -> None:
     clean = numpy.arange(11, dtype=float)
     contaminated = numpy.append(clean, 1000.0)
     arithmetic_mean = float(numpy.mean(contaminated))
-    hl_mean = _estimate_mean_hodges_lehman(contaminated)
+    hl_mean = _estimate_mean_hodges_lehmann(contaminated)
     assert arithmetic_mean > 80.0  # the outlier dominates
     assert abs(hl_mean - 5.0) < 1.0  # H-L estimate stays near the true center
+
+
+# ---------------------------------------------------------------------------
+# _preprocess_coordinates: shape validation
+# ---------------------------------------------------------------------------
+
+
+def test_preprocess_rejects_wrong_shape() -> None:
+    with pytest.raises(ValueError, match='Expected .N, 2. coordinate array'):
+        _preprocess_coordinates(numpy.zeros((5, 3)))
+    with pytest.raises(ValueError, match='Expected .N, 2. coordinate array'):
+        _preprocess_coordinates(numpy.zeros(6))
+
+
+def test_preprocess_rejects_coincident_points() -> None:
+    with pytest.raises(ValueError, match='coincident'):
+        _preprocess_coordinates(numpy.zeros((5, 2)))
 
 
 # ---------------------------------------------------------------------------
@@ -109,22 +116,22 @@ def test_unscale_identity_normalizes_to_normalization() -> None:
     raw_measured = rng.uniform(-5.0, 5.0, size=(15, 2))
     raw_corrected = rng.uniform(-5.0, 5.0, size=(15, 2))
 
-    measured_pre = _preprocess(raw_measured)
-    corrected_pre = _preprocess(raw_corrected)
+    measured_pre = _preprocess_coordinates(raw_measured)
+    corrected_pre = _preprocess_coordinates(raw_corrected)
 
     identity = AffineTransform(1.0, 0.0, 0.0, 0.0, 1.0, 0.0)
     t = _unscale_transform(identity, measured_pre, corrected_pre)
 
     # Identity in normalized space means: shift to origin, rescale to corrected RMS, shift to
-    # corrected centroid. Apply that manually under (y, x) column packing and compare.
+    # corrected centroid. Apply that manually under (x, y) column packing and compare.
     s = corrected_pre.rms_distance / measured_pre.rms_distance
     expected = numpy.column_stack(
         (
-            s * (raw_measured[:, 0] - measured_pre.centroid_y) + corrected_pre.centroid_y,
-            s * (raw_measured[:, 1] - measured_pre.centroid_x) + corrected_pre.centroid_x,
+            s * (raw_measured[:, 0] - measured_pre.centroid_x) + corrected_pre.centroid_x,
+            s * (raw_measured[:, 1] - measured_pre.centroid_y) + corrected_pre.centroid_y,
         )
     )
-    actual = _apply_yx(t, raw_measured)
+    actual = t(raw_measured)
     numpy.testing.assert_allclose(actual, expected, atol=1e-10)
 
 
@@ -133,12 +140,12 @@ def test_unscale_recovers_transform_through_normalized_fit() -> None:
     truth = AffineTransform(1.4, -0.2, 3.5, 0.1, 0.9, -7.0)
     rng = numpy.random.default_rng(1)
     raw_measured = rng.uniform(-50.0, 50.0, size=(30, 2))
-    raw_corrected = _apply_yx(truth, raw_measured)
+    raw_corrected = truth(raw_measured)
 
-    measured_pre = _preprocess(raw_measured)
-    corrected_pre = _preprocess(raw_corrected)
+    measured_pre = _preprocess_coordinates(raw_measured)
+    corrected_pre = _preprocess_coordinates(raw_corrected)
 
-    t_norm = _estimate_affine_transform(measured_pre.coordinates, corrected_pre.coordinates)
+    t_norm = _fit_affine_least_squares(measured_pre.coordinates, corrected_pre.coordinates)
     recovered = _unscale_transform(t_norm, measured_pre, corrected_pre)
 
     numpy.testing.assert_allclose(_params(recovered), _params(truth), atol=1e-8)
@@ -156,15 +163,15 @@ def test_ransac_recovers_transform_with_outliers() -> None:
     truth = AffineTransform(1.05, 0.02, 1e-5, -0.03, 0.98, -2e-5)
 
     measured = rng.uniform(-1e-4, 1e-4, size=(n, 2))
-    corrected = _apply_yx(truth, measured)
+    corrected = truth(measured)
 
     n_outliers = 20
     outlier_idx = rng.choice(n, size=n_outliers, replace=False)
     corrected[outlier_idx] += rng.uniform(-1e-3, 1e-3, size=(n_outliers, 2))
 
     result = estimate_affine_transform_ransac(
-        [_sequence_from_yx(measured)],
-        [_sequence_from_yx(corrected)],
+        [_sequence_from_xy(measured)],
+        [_sequence_from_xy(corrected)],
         num_iterations=200,
         inlier_threshold=0.01,
         min_inliers=50,
@@ -189,12 +196,12 @@ def test_ransac_concatenates_multiple_sequences() -> None:
 
     measured_a = rng.uniform(-1.0, 1.0, size=(15, 2))
     measured_b = rng.uniform(-1.0, 1.0, size=(15, 2))
-    corrected_a = _apply_yx(truth, measured_a)
-    corrected_b = _apply_yx(truth, measured_b)
+    corrected_a = truth(measured_a)
+    corrected_b = truth(measured_b)
 
     result = estimate_affine_transform_ransac(
-        [_sequence_from_yx(measured_a), _sequence_from_yx(measured_b)],
-        [_sequence_from_yx(corrected_a), _sequence_from_yx(corrected_b)],
+        [_sequence_from_xy(measured_a), _sequence_from_xy(measured_b)],
+        [_sequence_from_xy(corrected_a), _sequence_from_xy(corrected_b)],
         num_iterations=100,
         inlier_threshold=0.01,
         min_inliers=20,
@@ -212,8 +219,8 @@ def test_ransac_mismatched_lengths_raises() -> None:
 
     with pytest.raises(ValueError, match='different lengths'):
         estimate_affine_transform_ransac(
-            [_sequence_from_yx(measured)],
-            [_sequence_from_yx(corrected)],
+            [_sequence_from_xy(measured)],
+            [_sequence_from_xy(corrected)],
             rng=numpy.random.default_rng(0),
         )
 
@@ -226,8 +233,8 @@ def test_ransac_too_few_points_raises() -> None:
 
     with pytest.raises(ValueError, match='at least 3 points'):
         estimate_affine_transform_ransac(
-            [_sequence_from_yx(measured)],
-            [_sequence_from_yx(corrected)],
+            [_sequence_from_xy(measured)],
+            [_sequence_from_xy(corrected)],
             rng=numpy.random.default_rng(0),
         )
 
@@ -241,8 +248,8 @@ def test_ransac_no_inliers_raises() -> None:
 
     with pytest.raises(RuntimeError, match='RANSAC did not find'):
         estimate_affine_transform_ransac(
-            [_sequence_from_yx(measured)],
-            [_sequence_from_yx(corrected)],
+            [_sequence_from_xy(measured)],
+            [_sequence_from_xy(corrected)],
             num_iterations=20,
             inlier_threshold=1e-10,
             min_inliers=15,
@@ -255,11 +262,11 @@ def test_ransac_default_rng_runs() -> None:
     truth = AffineTransform(1.0, 0.0, 0.0, 0.0, 1.0, 0.0)  # identity
     rng = numpy.random.default_rng(6)
     measured = rng.uniform(-1.0, 1.0, size=(30, 2))
-    corrected = _apply_yx(truth, measured)
+    corrected = truth(measured)
 
     result = estimate_affine_transform_ransac(
-        [_sequence_from_yx(measured)],
-        [_sequence_from_yx(corrected)],
+        [_sequence_from_xy(measured)],
+        [_sequence_from_xy(corrected)],
         num_iterations=50,
         inlier_threshold=0.01,
         min_inliers=10,
@@ -277,7 +284,7 @@ def test_evaluate_error_zero_for_perfect_model() -> None:
     truth = AffineTransform(1.5, 0.1, -0.7, -0.2, 1.3, 4.2)
     rng = numpy.random.default_rng(11)
     measured = rng.uniform(-3.0, 3.0, size=(8, 2))
-    corrected = _apply_yx(truth, measured)
+    corrected = truth(measured)
 
     errors = _evaluate_error(measured, corrected, truth)
 
@@ -292,6 +299,23 @@ def test_evaluate_error_matches_pointwise_distance() -> None:
     errors = _evaluate_error(measured, corrected, model)
 
     numpy.testing.assert_allclose(errors, [5.0, 0.0], atol=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# AffineTransform.__call__ overloads (ProbePosition variant)
+# ---------------------------------------------------------------------------
+
+
+def test_affine_transform_probe_position_overload_preserves_index() -> None:
+    """The ProbePosition overload returns a new ProbePosition with the same index."""
+    transform = AffineTransform(2.0, 0.5, 1.0, -0.5, 3.0, -2.0)
+    position = ProbePosition(index=7, coordinate_x_m=4.0, coordinate_y_m=6.0)
+
+    transformed = transform(position)
+
+    assert transformed.index == 7
+    assert transformed.coordinate_x_m == pytest.approx(2 * 4.0 + 0.5 * 6.0 + 1.0)
+    assert transformed.coordinate_y_m == pytest.approx(-0.5 * 4.0 + 3.0 * 6.0 - 2.0)
 
 
 # ---------------------------------------------------------------------------
@@ -327,10 +351,10 @@ def test_estimator_delegates_to_api() -> None:
     rng = numpy.random.default_rng(0)
     truth = AffineTransform(1.0, 0.0, 0.0, 0.0, 1.0, 0.0)
     measured = rng.uniform(-1.0, 1.0, size=(30, 2))
-    corrected = _apply_yx(truth, measured)
+    corrected = truth(measured)
 
     repo = _make_repo(
-        {0: _sequence_from_yx(measured), 1: _sequence_from_yx(corrected)},
+        {0: _sequence_from_xy(measured), 1: _sequence_from_xy(corrected)},
     )
     settings = _make_settings(num_iterations=50, threshold=0.01, min_inliers=10)
     estimator = AffineTransformEstimator(

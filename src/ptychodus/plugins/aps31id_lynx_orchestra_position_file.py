@@ -3,6 +3,7 @@ from typing import Final
 import csv
 import logging
 
+from ptychodus.api.constants import ONE_MICRON_M
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -17,7 +18,6 @@ logger = logging.getLogger(__name__)
 class LYNXOrchestraPositionFileReader(ProbePositionFileReader):
     SIMPLE_NAME: Final[str] = 'APS_LYNX_Orchestra'
     DISPLAY_NAME: Final[str] = 'APS 31-ID-E LYNX Orchestra Files (*.dat)'
-    ONE_MICRON_M: Final[float] = 1.0e-6
     DATA_POINT_COLUMN: Final[int] = 0
     X_COLUMN: Final[int] = 3
     Y_COLUMN: Final[int] = 6
@@ -78,8 +78,8 @@ class LYNXOrchestraPositionFileReader(ProbePositionFileReader):
 
                 point = ProbePosition(
                     int(row[self.DATA_POINT_COLUMN]),
-                    -float(row[self.X_COLUMN]) * self.ONE_MICRON_M,
-                    -float(row[self.Y_COLUMN]) * self.ONE_MICRON_M,
+                    -float(row[self.X_COLUMN]) * ONE_MICRON_M,
+                    -float(row[self.Y_COLUMN]) * ONE_MICRON_M,
                 )
                 point_list.append(point)
 

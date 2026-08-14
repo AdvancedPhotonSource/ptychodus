@@ -7,7 +7,7 @@ import time
 from scipy.sparse.linalg import lsmr, LinearOperator
 import numpy
 
-from ptychodus.api.common import RealArrayType
+from ptychodus.api.typing import RealArrayType
 from ptychodus.api.fluorescence import (
     ElementMap,
     FluorescenceDataset,

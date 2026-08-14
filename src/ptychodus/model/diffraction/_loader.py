@@ -11,7 +11,7 @@ from ptychodus.api.diffraction import (
     SimpleDiffractionArray,
     zero_bad_pixels,
 )
-from ptychodus.api.diffraction_prep import DiffractionPrepPipeline
+from ptychodus.api.preprocess.diffraction import DiffractionPrepPipeline
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import AssembledDiffractionData
 

@@ -6,7 +6,7 @@ import numpy
 
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import ProbeFileReader, ProbeFileWriter, ProbeSequence
-from ptychodus.api.probe_gen import FresnelZonePlate
+from ptychodus.api.simulate.probe import FresnelZonePlate
 
 from ...diffraction import AssembledDiffractionDataset
 from .average_pattern import AveragePatternProbeBuilder

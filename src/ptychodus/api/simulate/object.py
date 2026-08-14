@@ -9,11 +9,13 @@ from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 import numpy
 
-from ._phase_unwrapper import PhaseUnwrapper
-from .common import IntegerArrayType, RealArrayType, lerp
-from .object import Object, ObjectGeometry
-from .probe_positions import ProbePosition
-from .reconstructor import AssembledDiffractionData
+from ._phase_unwrap import PhaseUnwrapper
+from ..constants import TWO_PI_J
+from ..interpolate import lerp
+from ..diffraction import AssembledDiffractionData
+from ..object import Object, ObjectGeometry
+from ..probe_positions import ProbePosition
+from ..typing import IntegerArrayType, RealArrayType
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +144,7 @@ def generate_random_object(
         amplitude = gaussian_filter(amplitude, sigma=blur_deviation_px)
         phase = gaussian_filter(phase, sigma=blur_deviation_px)
 
-    array = amplitude * numpy.exp(2j * numpy.pi * phase)
+    array = amplitude * numpy.exp(TWO_PI_J * phase)
 
     return Object(
         array=array.astype('complex'),
@@ -432,7 +434,7 @@ def generate_dead_leaves_object(
         if num_covered_pixels == is_covered.size:
             break
 
-    array = amplitude * numpy.exp(2j * numpy.pi * phase_tr)
+    array = amplitude * numpy.exp(TWO_PI_J * phase_tr)
 
     return Object(
         array=array.astype('complex'),

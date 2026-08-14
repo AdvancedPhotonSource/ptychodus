@@ -7,7 +7,8 @@ from pathlib import Path
 from scipy.fft import fft2, fftfreq, fftshift, ifft2, ifftshift
 import numpy
 
-from .common import ComplexArrayType, RealArrayType
+from .constants import TWO_PI_J
+from .typing import ComplexArrayType, RealArrayType
 from .geometry import PixelGeometry
 
 
@@ -80,7 +81,7 @@ class AngularSpectrumPropagator(Propagator):
     def __init__(self, parameters: PropagatorParameters) -> None:
         ar = parameters.pixel_aspect_ratio
 
-        i2piz = 2j * numpy.pi * parameters.z
+        i2piz = TWO_PI_J * parameters.z
         FY, FX = parameters.get_frequency_coordinates()  # noqa: N806
         F2 = numpy.square(FX) + numpy.square(ar * FY)  # noqa: N806
         ratio = F2 / numpy.square(parameters.dx)
@@ -98,7 +99,7 @@ class FresnelTransferFunctionPropagator(Propagator):
     def __init__(self, parameters: PropagatorParameters) -> None:
         ar = parameters.pixel_aspect_ratio
 
-        i2piz = 2j * numpy.pi * parameters.z
+        i2piz = TWO_PI_J * parameters.z
         FY, FX = parameters.get_frequency_coordinates()  # noqa: N806
         F2 = numpy.square(FX) + numpy.square(ar * FY)  # noqa: N806
         ratio = F2 / numpy.square(parameters.dx)
@@ -122,7 +123,7 @@ class FresnelTransformPropagator(Propagator):
         YY, XX = parameters.get_spatial_coordinates()  # noqa: N806
 
         C0 = Fr / (1j * ar)  # noqa: N806
-        C1 = numpy.exp(2j * numpy.pi * parameters.z)  # noqa: N806
+        C1 = numpy.exp(TWO_PI_J * parameters.z)  # noqa: N806
         C2 = numpy.exp((numpy.square(XX / N) + numpy.square(ar * YY / M)) * ipi / Fr)  # noqa: N806
         is_forward = parameters.propagation_distance_m >= 0.0
 
@@ -150,7 +151,7 @@ class FraunhoferPropagator(Propagator):
         YY, XX = parameters.get_spatial_coordinates()  # noqa: N806
 
         C0 = Fr / (1j * ar)  # noqa: N806
-        C1 = numpy.exp(2j * numpy.pi * parameters.z)  # noqa: N806
+        C1 = numpy.exp(TWO_PI_J * parameters.z)  # noqa: N806
         C2 = numpy.exp((numpy.square(XX / N) + numpy.square(ar * YY / M)) * ipi / Fr)  # noqa: N806
         is_forward = parameters.propagation_distance_m >= 0.0
 

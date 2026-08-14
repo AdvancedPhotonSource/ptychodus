@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
-from ptychodus.api.object_gen import generate_gaussian_random_field_object
+from ptychodus.api.simulate.object import generate_gaussian_random_field_object
 
 from .builder import ObjectBuilder
 from .settings import ObjectSettings

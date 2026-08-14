@@ -162,8 +162,8 @@ The GUI builder exposes these as presets. Programmatic workflow use can pass the
 Every generated probe type uses the shared `ProbeSequenceBuilder._build_probe_modes` path:
 
 1. Generate one base {py:class}`ptychodus.api.probe.Probe`.
-2. Expand to `num_incoherent_modes` with {py:func}`ptychodus.api.probe_gen.generate_incoherent_probe_modes`.
-3. Expand to `num_coherent_modes` OPR modes with {py:func}`ptychodus.api.probe_gen.generate_coherent_probe_modes`.
+2. Expand to `num_incoherent_modes` with {py:func}`ptychodus.api.simulate.probe.generate_incoherent_probe_modes`.
+3. Expand to `num_coherent_modes` OPR modes with {py:func}`ptychodus.api.simulate.probe.generate_coherent_probe_modes`.
 4. Store the final result as a `ProbeSequence` with array shape `(num_coherent_modes, num_incoherent_modes, height, width)`.
 
 ### Incoherent Modes
@@ -269,7 +269,7 @@ The workflow API can load an existing probe with `load_probe()`, but the current
 from pathlib import Path
 
 from ptychodus.api.product import Product
-from ptychodus.api.probe_gen import (
+from ptychodus.api.simulate.probe import (
     generate_coherent_probe_modes,
     generate_incoherent_probe_modes,
 )
@@ -359,9 +359,9 @@ Typical low-level imports are:
 import numpy
 
 from ptychodus.api.object import ObjectGeometry
-from ptychodus.api.object_gen import generate_random_object
+from ptychodus.api.simulate.object import generate_random_object
 from ptychodus.api.probe import ProbeGeometry
-from ptychodus.api.probe_gen import (
+from ptychodus.api.simulate.probe import (
     FresnelZonePlate,
     generate_coherent_probe_modes,
     generate_disk_probe,
@@ -369,7 +369,7 @@ from ptychodus.api.probe_gen import (
     generate_incoherent_probe_modes,
     rescale_probe_intensity,
 )
-from ptychodus.api.probe_positions_gen import generate_cartesian_probe_positions
+from ptychodus.api.simulate.probe_positions import generate_cartesian_probe_positions
 
 rng = numpy.random.default_rng(0)
 
@@ -435,7 +435,7 @@ object_guess = generate_random_object(
 
 ## Using Generated Guesses With Pty-Chi
 
-Ptychodus has a Pty-Chi adapter in `ptychodus.model.ptychi`. When using the normal Ptychodus reconstruction path, the adapter receives a {py:class}`ptychodus.api.reconstructor.ReconstructInput` and builds Pty-Chi task options from the product:
+Ptychodus has a Pty-Chi adapter in `ptychodus.model.ptychi`. When using the normal Ptychodus reconstruction path, the adapter receives a {py:class}`ptychodus.api.reconstruct.ReconstructInput` and builds Pty-Chi task options from the product:
 
 - object initial guess: `product.object_.get_array()`;
 - probe initial guess: `product.probes.get_array()`;

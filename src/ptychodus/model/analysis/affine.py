@@ -4,8 +4,8 @@ import time
 
 import numpy
 
-from ptychodus.api.affine import estimate_affine_transform_ransac
-from ptychodus.api.geometry import AffineTransform
+from ptychodus.api.preprocess.probe_positions import estimate_affine_transform_ransac
+from ptychodus.api.preprocess.probe_positions import AffineTransform
 
 from ..product import ProbePositionsRepository
 from .settings import AffineTransformEstimatorSettings

@@ -10,8 +10,9 @@ import logging
 import numpy
 from skimage.registration import phase_cross_correlation
 
-from .common import ComplexArrayType, RealArrayType
-from .geometry import PixelGeometry, fourier_shift_2d
+from .typing import ComplexArrayType, RealArrayType
+from .fourier import fourier_shift_2d
+from .geometry import PixelGeometry
 from .probe_positions import ProbePosition
 
 logger = logging.getLogger(__name__)

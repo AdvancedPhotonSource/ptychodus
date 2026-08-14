@@ -8,14 +8,14 @@ import logging
 import h5py
 import numpy
 
-from .diffraction import Polarization, zero_bad_pixels
+from .diffraction import AssembledDiffractionData, Polarization, zero_bad_pixels
 from .fluorescence import ElementMap, FluorescenceDataset
 from .geometry import PixelGeometry
 from .object import Object, ObjectCenter
 from .probe import ProbeSequence
 from .probe_positions import ProbePositionSequence, ProbePosition
-from .product import Product, ProductMetadata
-from .reconstructor import AssembledDiffractionData, LossValue, ReconstructInput
+from .product import LossValue, Product, ProductMetadata
+from .reconstruct import ReconstructInput
 
 __all__ = [
     'FluorescenceFileKeys',

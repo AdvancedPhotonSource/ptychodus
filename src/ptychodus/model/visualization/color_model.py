@@ -1,6 +1,6 @@
-from ptychodus.api.parametric import Parameter
+from ptychodus.api.parameters import Parameter
 from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
-from ptychodus.api.visualization import CylindricalColorModel
+from ptychodus.api.visualize import CylindricalColorModel
 
 
 class CylindricalColorModelParameter(PluginChooserParameter[CylindricalColorModel]):

@@ -4,7 +4,7 @@ from importlib.metadata import PackageNotFoundError, version
 from importlib.util import find_spec
 import logging
 
-from ...api.reconstructor import (
+from ...api.reconstruct import (
     NullReconstructor,
     Reconstructor,
     ReconstructorLibrary,

@@ -8,7 +8,7 @@ from typing import Annotated, Any, TypeVar
 
 from fastapi import Depends, HTTPException, Query
 
-from ptychodus.api.visualization import (
+from ptychodus.api.visualize import (
     ComplexComponent,
     CylindricalColorModel,
     ScalarTransformation,

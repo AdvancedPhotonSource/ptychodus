@@ -26,7 +26,7 @@ from ptychodus.api.object import Object, ObjectPosition
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import LossValue, Product
-from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput
+from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
 
 from ..processing.subprocess_reconstructor import TAG_OUTPUT
 from ._payload import PtyChiPayload

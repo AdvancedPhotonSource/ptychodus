@@ -5,7 +5,7 @@ import numpy
 
 from ptychodus.api.geometry import ZernikeMode
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
-from ptychodus.api.probe_gen import generate_zernike_probe
+from ptychodus.api.simulate.probe import generate_zernike_probe
 
 from .builder import ProbeSequenceBuilder
 from .settings import ProbeSettings

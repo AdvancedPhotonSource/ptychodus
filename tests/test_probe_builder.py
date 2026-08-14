@@ -3,7 +3,7 @@
 Two invariants carry the weight here.
 
 First, conditioning is expand-only and therefore idempotent. The generators in
-ptychodus.api.probe_gen are not safe to re-apply: generate_incoherent_probe_modes
+ptychodus.api.simulate.probe are not safe to re-apply: generate_incoherent_probe_modes
 re-orthogonalizes and renormalizes every mode to the decay profile, and
 generate_coherent_probe_modes fills its output with fresh Gaussian noise, keeps
 only coherent mode zero of its input, and regenerates the OPR weights from

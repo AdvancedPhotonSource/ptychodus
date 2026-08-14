@@ -16,7 +16,7 @@ import h5py
 import numpy
 
 from ptychodus import __version__ as ptychodus_version
-from ptychodus.api.common import ELECTRON_VOLT_J
+from ptychodus.api.constants import ELECTRON_VOLT_J
 from ptychodus.api.diffraction import (
     BadPixels,
     DiffractionDataset,

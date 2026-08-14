@@ -4,6 +4,7 @@ import logging
 
 import h5py
 
+from ptychodus.api.constants import ONE_MICRON_M
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -24,7 +25,6 @@ class ISNPositionFileReader(ProbePositionFileReader):
     them sequentially rather than by the ``Trigger`` dataset.
     """
 
-    ONE_MICRON_M: Final[float] = 1.0e-6
     X_POSITION_PATH: Final[str] = '/entry/data/X_Position'
     Y_POSITION_PATH: Final[str] = '/entry/data/Y_Position'
 
@@ -45,8 +45,8 @@ class ISNPositionFileReader(ProbePositionFileReader):
             point_list.append(
                 ProbePosition(
                     idx,
-                    float(x) * self.ONE_MICRON_M,
-                    float(y) * self.ONE_MICRON_M,
+                    float(x) * ONE_MICRON_M,
+                    float(y) * ONE_MICRON_M,
                 )
             )
 

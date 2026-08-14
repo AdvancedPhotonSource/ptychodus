@@ -5,6 +5,7 @@ import logging
 import h5py
 import numpy
 
+from ptychodus.api.constants import ONE_MICRON_M
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -17,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 
 class PolarPositionFileReader(ProbePositionFileReader):
-    ONE_MICRON_M: Final[float] = 1.0e-6
     EIGER_EXTERNAL_LINK: Final[str] = '/entry/externals/eiger'
     NDARRAY_UNIQUE_ID_PATH: Final[str] = '/entry/instrument/NDAttributes/NDArrayUniqueId'
 
@@ -50,8 +50,8 @@ class PolarPositionFileReader(ProbePositionFileReader):
             point_list.append(
                 ProbePosition(
                     int(idx),
-                    float(x) * self.ONE_MICRON_M,
-                    float(y) * self.ONE_MICRON_M,
+                    float(x) * ONE_MICRON_M,
+                    float(y) * ONE_MICRON_M,
                 )
             )
 

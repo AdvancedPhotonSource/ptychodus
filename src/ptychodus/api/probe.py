@@ -11,9 +11,10 @@ import numpy
 import scipy.ndimage
 from scipy.fft import fft2
 
-from .common import ComplexArrayType, RealArrayType, estimate_noise_floor
 from .geometry import PixelGeometry
-from .propagator import intensity
+from .preprocess.noise import estimate_noise_floor
+from .propagate import intensity
+from .typing import ComplexArrayType, RealArrayType
 
 
 def compute_shannon_entropy(distribution: RealArrayType, *, normalize: bool = True) -> float:
@@ -146,7 +147,7 @@ def estimate_probe_size(
        median filter to suppress hot pixels and other isolated outliers
        (matching :func:`ptychodus.api.diffraction.estimate_crop_center`).
        Background and noise scale are then estimated via
-       :func:`ptychodus.api.common.estimate_noise_floor`, which uses Otsu's
+       :func:`ptychodus.api.preprocess.noise.estimate_noise_floor`, which uses Otsu's
        method on the filtered image to identify the background class when
        the histogram is bimodal and falls back to median / median-absolute-
        deviation over the outermost ring of pixels when it is not. The

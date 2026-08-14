@@ -4,7 +4,7 @@ import logging
 import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
-from ptychodus.api.object_gen import generate_dead_leaves_object
+from ptychodus.api.simulate.object import generate_dead_leaves_object
 
 from .builder import ObjectBuilder
 from .settings import ObjectSettings

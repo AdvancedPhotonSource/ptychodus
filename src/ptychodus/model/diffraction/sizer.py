@@ -1,5 +1,5 @@
 from ptychodus.api.diffraction import CropCenter
-from ptychodus.api.diffraction_prep import (
+from ptychodus.api.preprocess.diffraction import (
     BinningStep,
     CropStep,
     DiffractionPrepPipeline,
@@ -12,7 +12,7 @@ from ptychodus.api.diffraction_prep import (
 )
 from ptychodus.api.geometry import ImageExtent, Interval, PixelGeometry
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import BooleanParameter, IntegerParameter
+from ptychodus.api.parameters import BooleanParameter, IntegerParameter
 
 from .settings import DiffractionSettings
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 import pytest
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import ParameterGroup, StringParameter
+from ptychodus.api.parameters import ParameterGroup, StringParameter
 from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
 
 

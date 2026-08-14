@@ -7,16 +7,17 @@ import logging
 import numpy
 import scipy.linalg
 
-from .common import ComplexArrayType, RealArrayType
-from .geometry import HermiteMode, PixelGeometry, ZernikeMode
-from .probe import Probe, ProbeGeometry, ProbeSequence
-from .propagator import (
+from ..constants import TWO_PI_J
+from ..typing import ComplexArrayType, RealArrayType
+from ..geometry import HermiteMode, PixelGeometry, ZernikeMode
+from ..probe import Probe, ProbeGeometry, ProbeSequence
+from ..propagate import (
     AngularSpectrumPropagator,
     FresnelTransformPropagator,
     PropagatorParameters,
     intensity,
 )
-from .reconstructor import AssembledDiffractionData
+from ..diffraction import AssembledDiffractionData
 
 
 logger = logging.getLogger(__name__)
@@ -217,7 +218,7 @@ def generate_fresnel_zone_plate_probe(
 
     # transmission function of FZP
     T = numpy.exp(  # noqa: N806
-        -2j * numpy.pi / probe_wavelength_m * (XX_FZP**2 + YY_FZP**2) / 2 / focal_length_m
+        -TWO_PI_J / probe_wavelength_m * (XX_FZP**2 + YY_FZP**2) / 2 / focal_length_m
     )
     C = RR_FZP <= zone_plate.zone_plate_diameter_m / 2  # noqa: N806
     H = RR_FZP >= zone_plate.central_beamstop_diameter_m / 2  # noqa: N806

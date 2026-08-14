@@ -5,7 +5,7 @@ import numpy
 
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
-from ptychodus.api.probe_gen import (
+from ptychodus.api.simulate.probe import (
     FresnelZonePlate,
     generate_fresnel_zone_plate_probe,
 )

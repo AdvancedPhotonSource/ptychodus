@@ -19,11 +19,11 @@ pytest.importorskip('ptychi')
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
-from ptychodus.api.parametric import IntegerParameter, RealParameter
+from ptychodus.api.parameters import IntegerParameter, RealParameter
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.reconstructor import ReconstructInput
+from ptychodus.api.reconstruct import ReconstructInput
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.ptychi.core import PtyChiReconstructorLibrary
 
@@ -46,13 +46,6 @@ OBJ_WIDTH_PX = 40
 PROBE_HEIGHT_PX = 8
 PROBE_WIDTH_PX = 8
 NUM_PATTERNS = 3
-
-
-class _StubPatternSizer:
-    """Minimal stand-in — the options helper only reads the processed pixel geometry."""
-
-    def get_processed_pixel_geometry(self, raw_pixel_geometry: PixelGeometry) -> PixelGeometry:
-        return raw_pixel_geometry
 
 
 def _make_reconstruct_input() -> ReconstructInput:
@@ -102,14 +95,12 @@ def _make_reconstruct_input() -> ReconstructInput:
         diffraction_patterns=patterns,
         bad_pixels=bad_pixels,
         product=product,
-        pixel_geometry=PixelGeometry(width_m=1.0e-6, height_m=1.0e-6),
     )
 
 
 def _make_library() -> PtyChiReconstructorLibrary:
     return PtyChiReconstructorLibrary(
         SettingsRegistry(),
-        _StubPatternSizer(),  # type: ignore[arg-type]
         is_developer_mode_enabled=False,
     )
 
@@ -128,7 +119,6 @@ def _make_concrete_reconstructors(library: PtyChiReconstructorLibrary) -> list:
         library.probe_settings,
         library.probe_position_settings,
         library.opr_settings,
-        _StubPatternSizer(),  # type: ignore[arg-type]
     )
     return [
         DMReconstructor(helper, library.dm_settings),

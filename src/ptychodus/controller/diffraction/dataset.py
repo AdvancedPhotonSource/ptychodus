@@ -6,7 +6,7 @@ import numpy
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
-from ptychodus.api.common import BYTES_PER_MEGABYTE
+from ptychodus.api.constants import BYTES_PER_MEGABYTE, ONE_MICRON_M
 from ptychodus.api.diffraction import DiffractionPattern
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 
@@ -356,13 +356,17 @@ class DatasetTreeModel(QAbstractItemModel):
             case 5:
                 return node.get_detector_extent().height_px
             case 6:
-                return f'{node.get_raw_pixel_geometry().width_m * 1e6:.4g}'
+                return f'{node.get_raw_pixel_geometry().width_m / ONE_MICRON_M:.4g}'
             case 7:
-                return f'{node.get_raw_pixel_geometry().height_m * 1e6:.4g}'
+                return f'{node.get_raw_pixel_geometry().height_m / ONE_MICRON_M:.4g}'
             case 8:
-                return f'{node.get_processed_pixel_geometry(self._sizer).width_m * 1e6:.4g}'
+                return (
+                    f'{node.get_processed_pixel_geometry(self._sizer).width_m / ONE_MICRON_M:.4g}'
+                )
             case 9:
-                return f'{node.get_processed_pixel_geometry(self._sizer).height_m * 1e6:.4g}'
+                return (
+                    f'{node.get_processed_pixel_geometry(self._sizer).height_m / ONE_MICRON_M:.4g}'
+                )
             case 10:
                 return node.get_num_bad_pixels()
         return None

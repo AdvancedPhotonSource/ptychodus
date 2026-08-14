@@ -12,12 +12,12 @@ from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     BadPixels,
     CropCenter,
+    DiffractionArray,
     DiffractionDataset,
+    DiffractionDatasetLayoutNode,
     DiffractionFileReader,
     DiffractionMetadata,
-    DiffractionArray,
 )
-from ptychodus.api.tree import SimpleTreeNode
 
 from ..h5_diffraction_file import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
@@ -184,7 +184,7 @@ class VelociprobeDiffractionDataset(DiffractionDataset):
     def __init__(
         self,
         metadata: DiffractionMetadata,
-        contents_tree: SimpleTreeNode,
+        contents_tree: DiffractionDatasetLayoutNode,
         entry: EntryGroup,
     ) -> None:
         self._metadata = metadata
@@ -194,7 +194,7 @@ class VelociprobeDiffractionDataset(DiffractionDataset):
     def get_metadata(self) -> DiffractionMetadata:
         return self._metadata
 
-    def get_layout(self) -> SimpleTreeNode:
+    def get_layout(self) -> DiffractionDatasetLayoutNode:
         return self._contents_tree
 
     def get_bad_pixels(self) -> BadPixels:

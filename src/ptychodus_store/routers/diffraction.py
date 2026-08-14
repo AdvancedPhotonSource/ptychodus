@@ -9,7 +9,7 @@ from sqlalchemy import exists, select
 from ptychodus.api.diffraction import Polarization
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import load_diffraction_data
-from ptychodus.api.reconstructor import AssembledDiffractionData
+from ptychodus.api.diffraction import AssembledDiffractionData
 
 from ptychodus_store.db import repositories as repo
 from ptychodus_store.db.base import IngestState

@@ -3,14 +3,13 @@ from importlib.metadata import PackageNotFoundError, version
 from importlib.util import find_spec
 import logging
 
-from ptychodus.api.reconstructor import (
+from ptychodus.api.reconstruct import (
     NullReconstructor,
     Reconstructor,
     ReconstructorLibrary,
 )
 from ptychodus.api.settings import SettingsRegistry
 
-from ..diffraction import PatternSizer
 from .device import PtyChiDeviceRepository
 from .enums import PtyChiEnumerators
 from .settings import (
@@ -38,7 +37,6 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
     def __init__(
         self,
         settings_registry: SettingsRegistry,
-        pattern_sizer: PatternSizer,
         is_developer_mode_enabled: bool,
     ) -> None:
         super().__init__('ptychi')
@@ -93,7 +91,6 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
                 self.probe_position_settings,
                 self.opr_settings,
                 bundle,
-                pattern_sizer,
             )
         )
 

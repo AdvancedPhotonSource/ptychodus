@@ -5,7 +5,7 @@ from enum import IntEnum
 import numpy
 
 from ptychodus.api.probe_positions import ProbePosition
-from ptychodus.api.probe_positions_gen import generate_cartesian_probe_positions
+from ptychodus.api.simulate.probe_positions import generate_cartesian_probe_positions
 
 from .builder import ProbePositionsBuilder
 from .settings import ProbePositionsSettings

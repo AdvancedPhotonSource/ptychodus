@@ -5,14 +5,13 @@ import logging
 
 import numpy
 
-from ptychodus.api.geometry import AffineTransform
-from ptychodus.api.parametric import ParameterGroup
+from ptychodus.api.parameters import ParameterGroup
+from ptychodus.api.preprocess.probe_positions import AffineTransform, transform_probe_positions
 from ptychodus.api.probe_positions import (
     ProbePosition,
     ProbePositionFileReader,
     ProbePositionSequence,
 )
-from ptychodus.api.probe_positions_gen import transform_probe_positions
 
 from .settings import ProbePositionsSettings
 
@@ -163,7 +162,7 @@ class ProbePositionsBuilder(ParameterGroup):
 
         Surviving points keep their original scan indexes. Diffraction patterns
         whose index falls outside the trimmed range are dropped downstream by
-        `AssembledDiffractionData.prepare_reconstruct_input`, which never
+        `prepare_reconstruct_input`, which never
         extrapolates beyond the position-index anchors.
         """
         num_discard_at_start = self.num_discard_at_start.get_value()

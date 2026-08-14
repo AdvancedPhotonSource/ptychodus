@@ -15,10 +15,43 @@ import colorcet
 import matplotlib
 import numpy
 
-from .common import ComplexArrayType, NumberArrayType, RealArrayType
+from .typing import ComplexArrayType, NumberArrayType, RealArrayType
 from .geometry import Box2D, Interval, Line2D, PixelGeometry
 
 logger = logging.getLogger(__name__)
+
+_LINE_CUT_EPS: Final[float] = 1.0e-6
+
+
+def _intersect_bounding_box(begin: float, end: float, n: int) -> Interval[float]:
+    length = end - begin
+
+    if abs(length) < _LINE_CUT_EPS:
+        return Interval[float](-numpy.inf, numpy.inf)
+    else:
+        return Interval[float].from_bounds(
+            (0 - begin) / length,
+            (n - begin) / length,
+        )
+
+
+def _intersect_grid_lines(
+    begin: float, end: float, alpha_limits: Interval[float]
+) -> Iterator[float]:
+    ibegin = int(begin)
+    iend = int(end)
+
+    if iend < ibegin:
+        ibegin, iend = iend, ibegin
+
+    length = end - begin
+
+    if abs(length) > _LINE_CUT_EPS:
+        for idx in range(ibegin, iend + 1):
+            alpha = (idx - begin) / length
+
+            if alpha in alpha_limits:
+                yield alpha
 
 
 @dataclass(frozen=True)
@@ -61,8 +94,6 @@ class KernelDensityEstimate:
 
 class VisualizationProduct:
     """Colorized image with associated scalar values and pixel geometry for display and analysis."""
-
-    EPS: Final[float] = 1.0e-6
 
     def __init__(
         self,
@@ -135,54 +166,19 @@ class VisualizationProduct:
     def get_color_value_range(self) -> Interval[float]:
         return Interval[float](self._color_value_min, self._color_value_max)
 
-    @staticmethod
-    def _intersect_bounding_box(begin: float, end: float, n: int) -> Interval[float]:
-        length = end - begin
-
-        if abs(length) < VisualizationProduct.EPS:
-            return Interval[float](-numpy.inf, numpy.inf)
-        else:
-            return Interval[float].create_proper(
-                (0 - begin) / length,
-                (n - begin) / length,
-            )
-
-    @staticmethod
-    def _intersect_grid_lines(
-        begin: float, end: float, alpha_limits: Interval[float]
-    ) -> Iterator[float]:
-        ibegin = int(begin)
-        iend = int(end)
-
-        if iend < ibegin:
-            ibegin, iend = iend, ibegin
-
-        length = end - begin
-
-        if abs(length) > VisualizationProduct.EPS:
-            for idx in range(ibegin, iend + 1):
-                alpha = (idx - begin) / length
-
-                if alpha in alpha_limits:
-                    yield alpha
-
     def _clip_to_bounding_box(self, line: Line2D) -> Interval[float]:
-        alpha_x = self._intersect_bounding_box(line.begin.x, line.end.x, self._values.shape[-1])
-        alpha_y = self._intersect_bounding_box(line.begin.y, line.end.y, self._values.shape[-2])
+        alpha_x = _intersect_bounding_box(line.begin.x, line.end.x, self._values.shape[-1])
+        alpha_y = _intersect_bounding_box(line.begin.y, line.end.y, self._values.shape[-2])
 
-        return Interval[float].create_proper(
+        return Interval[float].from_bounds(
             max(0.0, max(alpha_x.lower, alpha_y.lower)),
             min(1.0, min(alpha_x.upper, alpha_y.upper)),
         )
 
     def _intersect_grid(self, line: Line2D) -> Sequence[float]:
         alpha_limits = self._clip_to_bounding_box(line)
-        x_intersections = [
-            x for x in self._intersect_grid_lines(line.begin.x, line.end.x, alpha_limits)
-        ]
-        y_intersections = [
-            x for x in self._intersect_grid_lines(line.begin.y, line.end.y, alpha_limits)
-        ]
+        x_intersections = [x for x in _intersect_grid_lines(line.begin.x, line.end.x, alpha_limits)]
+        y_intersections = [x for x in _intersect_grid_lines(line.begin.y, line.end.y, alpha_limits)]
 
         alpha = {alpha_limits.lower, alpha_limits.upper}
         alpha = alpha.union(x_intersections)

@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
-from ptychodus.api.reconstructor import ReconstructInput
+from ptychodus.api.reconstruct import ReconstructInput
 
 if TYPE_CHECKING:
     from ptycho.config.config import InferenceConfig, TrainingConfig

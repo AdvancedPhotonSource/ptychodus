@@ -16,7 +16,7 @@ import numpy
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.interpolate import BarycentricArrayInterpolator
-from ptychodus.api.reconstructor import ReconstructInput
+from ptychodus.api.reconstruct import ReconstructInput
 
 from ..processing.subprocess_reconstructor import SubprocessReconstructor
 from ._payload import (

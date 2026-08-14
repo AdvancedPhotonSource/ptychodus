@@ -2,11 +2,11 @@ from __future__ import annotations
 from collections.abc import Iterator
 import logging
 
-from ptychodus.api.common import NumberArrayType, RealArrayType
+from ptychodus.api.typing import NumberArrayType, RealArrayType
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
-from ptychodus.api.visualization import ComplexComponent, VisualizationProduct
+from ptychodus.api.visualize import ComplexComponent, VisualizationProduct
 
 from .color_axis import ColorAxis
 from .color_model_renderer import CylindricalColorModelRenderer

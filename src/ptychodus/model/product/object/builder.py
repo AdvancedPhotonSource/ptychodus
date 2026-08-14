@@ -5,8 +5,8 @@ import logging
 
 
 from ptychodus.api.object import Object, ObjectFileReader, ObjectGeometryProvider
-from ptychodus.api.object_gen import generate_layers, pad_object
-from ptychodus.api.parametric import ParameterGroup
+from ptychodus.api.simulate.object import generate_layers, pad_object
+from ptychodus.api.parameters import ParameterGroup
 
 from .settings import ObjectSettings
 

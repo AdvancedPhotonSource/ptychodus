@@ -5,6 +5,7 @@ from typing import Any
 from PyQt5.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt
 from PyQt5.QtWidgets import QHeaderView, QWizardPage
 
+from ptychodus.api.constants import ONE_MICRON_M
 from ptychodus.api.diffraction import DiffractionMetadata
 
 from ....model.diffraction import DetectorSettings, DiffractionSettings
@@ -193,7 +194,7 @@ class OpenDatasetWizardMetadataViewController:
         pixel_geometry = metadata.detector_pixel_geometry
         if pixel_geometry is None:
             return '—'
-        return f'{pixel_geometry.width_m * 1e6:.3f} × {pixel_geometry.height_m * 1e6:.3f} µm'
+        return f'{pixel_geometry.width_m / ONE_MICRON_M:.3f} × {pixel_geometry.height_m / ONE_MICRON_M:.3f} µm'
 
     def _apply_pixel_size(self, metadata: DiffractionMetadata) -> None:
         pixel_geometry = metadata.detector_pixel_geometry

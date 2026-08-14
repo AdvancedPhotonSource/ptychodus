@@ -5,7 +5,7 @@ import numpy
 
 from ptychodus.api.geometry import HermiteMode
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
-from ptychodus.api.probe_gen import generate_hermite_probe
+from ptychodus.api.simulate.probe import generate_hermite_probe
 
 from .builder import ProbeSequenceBuilder
 from .settings import ProbeSettings

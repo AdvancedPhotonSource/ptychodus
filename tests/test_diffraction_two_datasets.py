@@ -12,11 +12,14 @@ from unittest.mock import MagicMock
 import numpy
 import pytest
 
-from ptychodus.api.diffraction import DiffractionMetadata, SimpleDiffractionDataset
+from ptychodus.api.diffraction import (
+    DiffractionDatasetLayoutNode,
+    DiffractionMetadata,
+    SimpleDiffractionDataset,
+)
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.io import AssembledDiffractionData
 from ptychodus.api.settings import SettingsRegistry
-from ptychodus.api.tree import SimpleTreeNode
 from ptychodus.model.diffraction.dataset import (
     AssembledDiffractionArray,
     AssembledDiffractionDataset,
@@ -53,7 +56,7 @@ def _reload_with_extent(dataset: AssembledDiffractionDataset, extent: ImageExten
         pattern_dtype=numpy.dtype(numpy.uint16),
         detector_extent=extent,
     )
-    contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+    contents_tree = DiffractionDatasetLayoutNode.create_root()
     source = SimpleDiffractionDataset(metadata, contents_tree, [])
     dataset.reload(source)
 
@@ -164,7 +167,7 @@ def test_simple_diffraction_dataset_rejects_bad_pixels_shape_mismatch() -> None:
         pattern_dtype=numpy.dtype(numpy.uint16),
         detector_extent=ImageExtent(width_px=16, height_px=16),
     )
-    contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+    contents_tree = DiffractionDatasetLayoutNode.create_root()
     wrong_shape = numpy.zeros((8, 8), dtype=numpy.bool_)
 
     with pytest.raises(ValueError, match='does not match detector extent'):
@@ -177,7 +180,7 @@ def test_simple_diffraction_dataset_default_bad_pixels_matches_extent() -> None:
         pattern_dtype=numpy.dtype(numpy.uint16),
         detector_extent=ImageExtent(width_px=16, height_px=8),
     )
-    contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+    contents_tree = DiffractionDatasetLayoutNode.create_root()
     dataset = SimpleDiffractionDataset(metadata, contents_tree, [])
     assert dataset.get_bad_pixels().shape == (8, 16)
     assert not dataset.get_bad_pixels().any()

@@ -1,22 +1,62 @@
 """Sub-pixel array interpolation and stitching utilities."""
 
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, overload
 import logging
 
 import numpy.typing
 import numpy
 
-from ptychodus.api.common import RealArrayType
+from ptychodus.api.typing import InexactArrayType, RealArrayType
 
 __all__ = [
     'BarycentricArrayInterpolator',
     'BarycentricArrayStitcher',
     'NearestNeighborArrayInterpolator',
+    'lerp',
 ]
 
 InexactDType = TypeVar('InexactDType', bound=numpy.inexact[Any])
 
 logger = logging.getLogger(__name__)
+
+
+@overload
+def lerp(lower: float, upper: float, frac: float) -> float:
+    """Linearly interpolate between *lower* and *upper* by fraction *frac* in [0, 1]."""
+    ...
+
+
+@overload
+def lerp(lower: complex, upper: complex, frac: float) -> complex:
+    """Linearly interpolate between *lower* and *upper* by fraction *frac* in [0, 1]."""
+    ...
+
+
+@overload
+def lerp(lower: RealArrayType, upper: RealArrayType, frac: float) -> RealArrayType:
+    """Linearly interpolate between *lower* and *upper* by fraction *frac* in [0, 1]."""
+    ...
+
+
+@overload
+def lerp(lower: RealArrayType, upper: RealArrayType, frac: RealArrayType) -> RealArrayType:
+    """Linearly interpolate between *lower* and *upper* by fraction *frac* in [0, 1]."""
+    ...
+
+
+@overload
+def lerp(lower: float, upper: float, frac: RealArrayType) -> RealArrayType:
+    """Linearly interpolate between *lower* and *upper* by fraction *frac* in [0, 1]."""
+    ...
+
+
+def lerp(
+    lower: InexactArrayType | complex,
+    upper: InexactArrayType | complex,
+    frac: RealArrayType | float,
+) -> InexactArrayType | complex:
+    """Linearly interpolate between *lower* and *upper* by fraction *frac* in [0, 1]."""
+    return (1.0 - frac) * lower + frac * upper
 
 
 def calculate_support_frac(x: float, n: int) -> tuple[slice, float]:

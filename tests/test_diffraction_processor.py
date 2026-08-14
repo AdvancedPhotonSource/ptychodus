@@ -9,7 +9,7 @@ import numpy
 import pytest
 
 from ptychodus.api.diffraction import CropCenter, SimpleDiffractionArray
-from ptychodus.api.diffraction_prep import (
+from ptychodus.api.preprocess.diffraction import (
     BinningStep,
     CropStep,
     DiffractionPrepPipeline,

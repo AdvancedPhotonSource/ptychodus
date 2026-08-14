@@ -13,13 +13,13 @@ from unittest.mock import MagicMock
 import numpy
 
 from ptychodus.api.diffraction import (
+    DiffractionDatasetLayoutNode,
     DiffractionMetadata,
     SimpleDiffractionArray,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.settings import SettingsRegistry
-from ptychodus.api.tree import SimpleTreeNode
 from ptychodus.model.diffraction.dataset import AssembledDiffractionDataset
 from ptychodus.model.diffraction.settings import DetectorSettings, DiffractionSettings
 from ptychodus.model.diffraction.sizer import PatternSizer
@@ -61,7 +61,7 @@ def _make_dataset(
         pattern_dtype=numpy.dtype(numpy.uint16),
         detector_extent=ImageExtent(width_px=detector_width, height_px=detector_height),
     )
-    contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+    contents_tree = DiffractionDatasetLayoutNode.create_root()
     source = SimpleDiffractionDataset(metadata, contents_tree, [])
     dataset.reload(source)
     return dataset

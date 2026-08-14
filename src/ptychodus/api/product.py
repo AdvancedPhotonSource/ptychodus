@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from sys import getsizeof
 
-from .common import ELECTRON_VOLT_J, PLANCK_CONSTANT_J_PER_HZ, LIGHT_SPEED_M_PER_S
+from .constants import ELECTRON_VOLT_J, PLANCK_CONSTANT_J_PER_HZ, LIGHT_SPEED_M_PER_S
 from .diffraction import Polarization
 from .object import Object
 from .probe import Probe, ProbeSequence

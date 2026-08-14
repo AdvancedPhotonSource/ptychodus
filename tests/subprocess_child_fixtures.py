@@ -14,7 +14,7 @@ import pickle
 import time
 from typing import Any
 
-from ptychodus.api.reconstructor import ReconstructOutput, TrainOutput
+from ptychodus.api.reconstruct import ReconstructOutput, TrainOutput
 from ptychodus.model.processing.subprocess_reconstructor import (
     TAG_MODEL_SAVED,
     TAG_OUTPUT,

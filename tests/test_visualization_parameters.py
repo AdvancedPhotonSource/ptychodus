@@ -13,7 +13,7 @@ No Qt is required — this is pure model-layer behavior.
 from __future__ import annotations
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.visualization import CylindricalColorModel, ScalarTransformation
+from ptychodus.api.visualize import CylindricalColorModel, ScalarTransformation
 from ptychodus.model.visualization.color_model import CylindricalColorModelParameter
 from ptychodus.model.visualization.colormap import ColormapParameter
 from ptychodus.model.visualization.transformation import ScalarTransformationParameter

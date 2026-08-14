@@ -7,14 +7,14 @@ import numpy
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.diffraction import (
     DiffractionDataset,
+    DiffractionDatasetLayoutNode,
     DiffractionFileReader,
     DiffractionFileWriter,
     DiffractionMetadata,
-    SimpleDiffractionDataset,
     SimpleDiffractionArray,
+    SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)
 
@@ -50,13 +50,11 @@ class NPZDiffractionFileIO(DiffractionFileReader, DiffractionFileWriter):
             logger.warning(f'Failed to read indexes in "{file_path}".')
             indexes = numpy.arange(num_patterns)
 
-        contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
-        contents_tree.create_child(
-            [
-                file_path.stem,
-                type(patterns).__name__,
-                f'{patterns.dtype}{patterns.shape}',
-            ]
+        contents_tree = DiffractionDatasetLayoutNode.create_root()
+        contents_tree.add_child(
+            file_path.stem,
+            type(patterns).__name__,
+            f'{patterns.dtype}{patterns.shape}',
         )
 
         array = SimpleDiffractionArray(

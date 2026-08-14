@@ -3,7 +3,7 @@
 Two invariants carry the weight here.
 
 First, trimming discards points by acquisition order but must leave the surviving
-points' scan indexes untouched. AssembledDiffractionData.prepare_reconstruct_input
+points' scan indexes untouched. prepare_reconstruct_input
 joins diffraction patterns to positions by index and refuses to extrapolate beyond
 the position-index anchors, so renumbering the survivors would silently pair every
 pattern with the wrong position.

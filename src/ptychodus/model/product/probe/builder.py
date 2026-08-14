@@ -6,8 +6,8 @@ import logging
 
 import numpy
 
-from ptychodus.api.parametric import ParameterGroup
-from ptychodus.api.probe_gen import (
+from ptychodus.api.parameters import ParameterGroup
+from ptychodus.api.simulate.probe import (
     generate_coherent_probe_modes,
     generate_incoherent_probe_modes,
     rescale_probe_intensity,
@@ -137,7 +137,7 @@ class ProbeSequenceBuilder(ParameterGroup):
 
         Every step is expand-only, so the pipeline is idempotent: conditioning an
         already-conditioned probe returns it unchanged. That matters because the
-        generators in `ptychodus.api.probe_gen` are not safe to re-apply.
+        generators in `ptychodus.api.simulate.probe` are not safe to re-apply.
         `generate_incoherent_probe_modes` re-orthogonalizes and renormalizes every
         incoherent mode to the decay profile, and `generate_coherent_probe_modes`
         fills the whole output with fresh Gaussian noise, keeps only coherent mode

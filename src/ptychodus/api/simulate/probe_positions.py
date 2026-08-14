@@ -1,12 +1,10 @@
 """Probe position (scan pattern) generators: cartesian, concentric, Lissajous, and spiral grids."""
 
-from collections.abc import Iterable, Iterator
-from itertools import pairwise
+from collections.abc import Iterator
 
 import numpy
 
-from .geometry import AffineTransform
-from .probe_positions import ProbePosition, ScanGeometry
+from ..probe_positions import ProbePosition
 
 
 def generate_cartesian_probe_positions(
@@ -105,73 +103,3 @@ def generate_spiral_probe_positions(
             coordinate_x_m=radius_m * numpy.cos(theta_rad),
             coordinate_y_m=radius_m * numpy.sin(theta_rad),
         )
-
-
-def transform_probe_positions(
-    positions: Iterable[ProbePosition],
-    transform: AffineTransform,
-    rng: numpy.random.Generator | None = None,
-    jitter_radius_m: float = 0.0,
-) -> Iterator[ProbePosition]:
-    """Apply an affine transform (and optional random jitter) to every position in *positions*."""
-    for position in positions:
-        x_m, y_m = transform(position.coordinate_x_m, position.coordinate_y_m)
-
-        if rng is not None:
-            angle_rad = 2 * numpy.pi * rng.uniform()
-            radius_m = jitter_radius_m * numpy.sqrt(rng.uniform())
-
-            x_m += radius_m * numpy.cos(angle_rad)
-            y_m += radius_m * numpy.sin(angle_rad)
-
-        yield ProbePosition(
-            index=position.index,
-            coordinate_x_m=x_m,
-            coordinate_y_m=y_m,
-        )
-
-
-def calculate_scan_geometry(positions: Iterable[ProbePosition]) -> ScanGeometry | None:
-    """Compute the bounding box and total path length of a set of probe positions; returns None if empty.
-
-    ``positions`` is iterated twice (once for the bounding box, once for the
-    path length), so it must be a re-iterable sequence. Passing a one-shot
-    generator will silently report ``length_m=0``.
-    """
-    minimum_x_m = +numpy.inf
-    maximum_x_m = -numpy.inf
-    minimum_y_m = +numpy.inf
-    maximum_y_m = -numpy.inf
-    length_m = 0.0
-
-    for point in positions:
-        if point.coordinate_x_m < minimum_x_m:
-            minimum_x_m = point.coordinate_x_m
-
-        if maximum_x_m < point.coordinate_x_m:
-            maximum_x_m = point.coordinate_x_m
-
-        if point.coordinate_y_m < minimum_y_m:
-            minimum_y_m = point.coordinate_y_m
-
-        if maximum_y_m < point.coordinate_y_m:
-            maximum_y_m = point.coordinate_y_m
-
-    is_empty_x = maximum_x_m < minimum_x_m
-    is_empty_y = maximum_y_m < minimum_y_m
-
-    if is_empty_x or is_empty_y:
-        return None
-
-    for point_l, point_r in pairwise(positions):
-        dx = point_r.coordinate_x_m - point_l.coordinate_x_m
-        dy = point_r.coordinate_y_m - point_l.coordinate_y_m
-        length_m += numpy.hypot(dx, dy)
-
-    return ScanGeometry(
-        minimum_x_m=minimum_x_m,
-        maximum_x_m=maximum_x_m,
-        minimum_y_m=minimum_y_m,
-        maximum_y_m=maximum_y_m,
-        length_m=length_m,
-    )

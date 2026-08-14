@@ -4,7 +4,7 @@ import logging
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
 from ptychodus.api.observer import Observable
-from ptychodus.api.parametric import ParameterGroup
+from ptychodus.api.parameters import ParameterGroup
 
 from .builder import FromMemoryObjectBuilder, ObjectBuilder
 from .settings import ObjectSettings

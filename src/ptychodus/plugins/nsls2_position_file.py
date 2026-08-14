@@ -1,9 +1,9 @@
 from pathlib import Path
-from typing import Final
 import logging
 
 import h5py
 
+from ptychodus.api.constants import ONE_MICRON_M
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -15,8 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 class NSLS2Style1PositionFileReader(ProbePositionFileReader):
-    ONE_MICRON_M: Final[float] = 1.0e-6
-
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
 
@@ -26,8 +24,8 @@ class NSLS2Style1PositionFileReader(ProbePositionFileReader):
             for idx, row in enumerate(h5_positions[()].T):
                 point = ProbePosition(
                     idx,
-                    row[0] * self.ONE_MICRON_M,
-                    row[1] * self.ONE_MICRON_M,
+                    row[0] * ONE_MICRON_M,
+                    row[1] * ONE_MICRON_M,
                 )
                 point_list.append(point)
 
@@ -35,8 +33,6 @@ class NSLS2Style1PositionFileReader(ProbePositionFileReader):
 
 
 class NSLS2Style2PositionFileReader(ProbePositionFileReader):
-    ONE_MICRON_M: Final[float] = 1.0e-6
-
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
 
@@ -46,8 +42,8 @@ class NSLS2Style2PositionFileReader(ProbePositionFileReader):
             for idx, row in enumerate(h5_positions[()].T):
                 point = ProbePosition(
                     idx,
-                    row[0] * self.ONE_MICRON_M,
-                    row[1] * self.ONE_MICRON_M,
+                    row[0] * ONE_MICRON_M,
+                    row[1] * ONE_MICRON_M,
                 )
                 point_list.append(point)
 

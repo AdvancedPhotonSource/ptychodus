@@ -8,16 +8,17 @@ import numpy
 import numpy.testing
 import pytest
 
-from ptychodus.api.geometry import PixelGeometry, fourier_shift_2d
-from ptychodus.api.diffraction_gen import generate_diffraction_data
+from ptychodus.api.fourier import fourier_shift_2d
+from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.simulate.diffraction import generate_diffraction_data
 from ptychodus.api.illumination import compute_illumination_map
 from ptychodus.api.metrics import (
     FourierRingCorrelation,
-    ObjectComparison,
     ReconstructionResiduals,
     compute_fourier_ring_correlation,
     compute_mean_absolute_error,
     compute_normalized_mutual_information,
+    compute_object_comparison,
     compute_peak_signal_to_noise_ratio,
     compute_r_factor,
     compute_reconstruction_residuals,
@@ -28,7 +29,7 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.reconstructor import ReconstructionAmbiguities
+from ptychodus.api.reconstruct import ReconstructionAmbiguities
 
 
 def _make_frc(
@@ -723,7 +724,7 @@ def _apply_ambiguity_to_object(obj: Object, ambiguities: ReconstructionAmbiguiti
 class TestObjectComparison:
     def test_identical_products_yield_identity_ambiguities(self) -> None:
         product = _make_product()
-        comparison = ObjectComparison.from_products(reference=product, test=product)
+        comparison = compute_object_comparison(reference=product, test=product)
 
         assert comparison.ambiguities.object_scale_factor == pytest.approx(1.0, abs=1e-10)
         assert comparison.ambiguities.phase_offset_rad == pytest.approx(0.0, abs=1e-10)
@@ -735,7 +736,7 @@ class TestObjectComparison:
 
     def test_pixel_geometry_passed_through(self) -> None:
         product = _make_product()
-        comparison = ObjectComparison.from_products(reference=product, test=product)
+        comparison = compute_object_comparison(reference=product, test=product)
         assert comparison.pixel_geometry == PixelGeometry(width_m=_PIXEL_M, height_m=_PIXEL_M)
 
     def test_constant_phase_offset_recovered(self) -> None:
@@ -750,7 +751,7 @@ class TestObjectComparison:
             reference, object_=_apply_ambiguity_to_object(reference.object_, applied)
         )
 
-        comparison = ObjectComparison.from_products(reference=reference, test=perturbed)
+        comparison = compute_object_comparison(reference=reference, test=perturbed)
 
         assert comparison.ambiguities.phase_offset_rad == pytest.approx(0.4, abs=1e-6)
         numpy.testing.assert_allclose(
@@ -772,7 +773,7 @@ class TestObjectComparison:
             reference, object_=_apply_ambiguity_to_object(reference.object_, applied)
         )
 
-        comparison = ObjectComparison.from_products(reference=reference, test=perturbed)
+        comparison = compute_object_comparison(reference=reference, test=perturbed)
 
         assert comparison.ambiguities.object_scale_factor == pytest.approx(2.5, rel=1e-6)
         numpy.testing.assert_allclose(
@@ -794,7 +795,7 @@ class TestObjectComparison:
             reference, object_=_apply_ambiguity_to_object(reference.object_, applied)
         )
 
-        comparison = ObjectComparison.from_products(reference=reference, test=perturbed)
+        comparison = compute_object_comparison(reference=reference, test=perturbed)
 
         # The estimator works in the object array's intrinsic coordinate frame,
         # so recovered ramps should match the applied ramps to high precision.
@@ -844,7 +845,7 @@ class TestObjectComparison:
         )
         test = replace(reference, object_=shifted_obj)
 
-        comparison = ObjectComparison.from_products(reference=reference, test=test)
+        comparison = compute_object_comparison(reference=reference, test=test)
 
         # Crop off a few pixels at every edge — the Fourier shift wraps content
         # there and re-aligning back doesn't fully undo the wrap. The remaining
@@ -859,7 +860,7 @@ class TestObjectComparison:
         reference = _make_product(dtype=numpy.dtype(numpy.complex64), seed=0)
         test = _make_product(dtype=numpy.dtype(numpy.complex128), seed=0)
 
-        comparison = ObjectComparison.from_products(reference=reference, test=test)
+        comparison = compute_object_comparison(reference=reference, test=test)
 
         assert comparison.reference_complex.dtype == numpy.dtype(numpy.complex128)
         assert comparison.test_complex.dtype == numpy.dtype(numpy.complex128)
@@ -874,18 +875,18 @@ class TestObjectComparison:
         test = replace(reference, object_=small_object)
 
         with pytest.raises(ValueError, match='shape'):
-            ObjectComparison.from_products(reference=reference, test=test)
+            compute_object_comparison(reference=reference, test=test)
 
     def test_pixel_geometry_mismatch_raises(self) -> None:
         reference = _make_product()
         test = _make_product(pixel_m=2.0 * _PIXEL_M)
 
         with pytest.raises(ValueError, match='pixel geometry'):
-            ObjectComparison.from_products(reference=reference, test=test)
+            compute_object_comparison(reference=reference, test=test)
 
     def test_amplitude_and_phase_properties(self) -> None:
         product = _make_product()
-        comparison = ObjectComparison.from_products(reference=product, test=product)
+        comparison = compute_object_comparison(reference=product, test=product)
 
         numpy.testing.assert_array_equal(
             comparison.reference_amplitude, numpy.absolute(comparison.reference_complex)
@@ -911,7 +912,7 @@ class TestObjectComparisonMetricsIntegration:
         # Different seed → slightly different object so metrics aren't degenerate
         # (RMSE > 0, SSIM < 1).
         test = _make_product(seed=42)
-        comparison = ObjectComparison.from_products(reference=reference, test=test)
+        comparison = compute_object_comparison(reference=reference, test=test)
 
         rmse = compute_root_mean_square_error(comparison.reference_complex, comparison.test_complex)
         mae = compute_mean_absolute_error(comparison.reference_complex, comparison.test_complex)

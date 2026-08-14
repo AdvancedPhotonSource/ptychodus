@@ -3,6 +3,7 @@ from typing import Final, Sequence
 
 import h5py
 
+from ptychodus.api.constants import ONE_KILOELECTRONVOLT_EV, ONE_MICRON_M
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
@@ -14,14 +15,13 @@ from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 class NSLSIIProductFileReader(ProductFileReader):
     SIMPLE_NAME: Final[str] = 'NSLS_II_MATLAB'
     DISPLAY_NAME: Final[str] = 'NSLS-II MATLAB Files (*.mat)'
-    ONE_MICRON_M: Final[float] = 1.0e-6
 
     def read(self, file_path: Path) -> Product:
         point_list: list[ProbePosition] = list()
 
         with h5py.File(file_path, 'r') as h5_file:
-            detector_distance_m = float(h5_file['det_dist'][()]) * self.ONE_MICRON_M
-            probe_energy_eV = 1000 * float(h5_file['energy'][()])  # noqa: N806
+            detector_distance_m = float(h5_file['det_dist'][()]) * ONE_MICRON_M
+            probe_energy_eV = ONE_KILOELECTRONVOLT_EV * float(h5_file['energy'][()])  # noqa: N806
 
             metadata = ProductMetadata(
                 name=file_path.stem,
@@ -37,7 +37,7 @@ class NSLSIIProductFileReader(ProductFileReader):
             pixel_width_m = h5_file['img_pixel_size_x'][()]
             pixel_height_m = h5_file['img_pixel_size_y'][()]
             pixel_geometry = PixelGeometry(width_m=pixel_width_m, height_m=pixel_height_m)
-            positions_m = h5_file['pos_xy'][()].T * self.ONE_MICRON_M
+            positions_m = h5_file['pos_xy'][()].T * ONE_MICRON_M
 
             for index, _xy in enumerate(positions_m):
                 point = ProbePosition(

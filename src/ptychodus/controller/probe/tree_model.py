@@ -6,7 +6,7 @@ import numpy
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 from PyQt5.QtGui import QBrush
 
-from ptychodus.api.common import BYTES_PER_MEGABYTE
+from ptychodus.api.constants import BYTES_PER_MEGABYTE, ONE_NANOMETER_M
 from ptychodus.api.probe import Probe
 
 from ...model.product import ProbeAPI, ProbeRepository
@@ -224,9 +224,17 @@ class ProbeTreeModel(QAbstractItemModel):
                     case 5:
                         return probe.height_px if probe is not None else None
                     case 6:
-                        return f'{pixel_geometry.width_m * 1e9:.4g}' if pixel_geometry else None
+                        return (
+                            f'{pixel_geometry.width_m / ONE_NANOMETER_M:.4g}'
+                            if pixel_geometry
+                            else None
+                        )
                     case 7:
-                        return f'{pixel_geometry.height_m * 1e9:.4g}' if pixel_geometry else None
+                        return (
+                            f'{pixel_geometry.height_m / ONE_NANOMETER_M:.4g}'
+                            if pixel_geometry
+                            else None
+                        )
                     case 8:
                         return f'{probes.nbytes / BYTES_PER_MEGABYTE:.2f}'
             elif role == Qt.ItemDataRole.BackgroundRole:

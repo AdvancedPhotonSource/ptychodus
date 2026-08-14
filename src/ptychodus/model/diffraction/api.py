@@ -5,17 +5,17 @@ import logging
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.diffraction import (
+    AssembledDiffractionData,
     BadPixelsFileReader,
     CropCenter,
+    DiffractionArray,
+    DiffractionDatasetLayoutNode,
     DiffractionFileReader,
     DiffractionFileWriter,
     DiffractionMetadata,
-    DiffractionArray,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
-from ptychodus.api.reconstructor import AssembledDiffractionData
-from ptychodus.api.tree import SimpleTreeNode
 
 from .dataset import AssembledDiffractionDataset
 from .repository import DiffractionDatasetRepository
@@ -30,7 +30,7 @@ class PatternsStreamingContext:
         self._metadata = metadata
 
     def start(self) -> None:
-        contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+        contents_tree = DiffractionDatasetLayoutNode.create_root()
         stream_dataset = SimpleDiffractionDataset(self._metadata, contents_tree, [])
         self._dataset.reload(stream_dataset)
         self._dataset.load_all_arrays(process_patterns=True, block=True)

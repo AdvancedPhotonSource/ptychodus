@@ -1,4 +1,4 @@
-"""Unit tests for wavefield propagators in ptychodus.api.propagator."""
+"""Unit tests for wavefield propagators in ptychodus.api.propagate."""
 
 from dataclasses import FrozenInstanceError
 from pathlib import Path
@@ -8,7 +8,7 @@ import numpy.testing
 import pytest
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.propagator import (
+from ptychodus.api.propagate import (
     AngularSpectrumPropagator,
     FraunhoferPropagator,
     FresnelTransferFunctionPropagator,

@@ -3,6 +3,7 @@ from typing import Final
 import csv
 import logging
 
+from ptychodus.api.constants import ONE_MICRON_M
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -17,7 +18,6 @@ logger = logging.getLogger(__name__)
 class LYNXSoftGlueZynqPositionFileReader(ProbePositionFileReader):
     SIMPLE_NAME: Final[str] = 'APS_LYNX_SoftGlueZynq'
     DISPLAY_NAME: Final[str] = 'APS 31-ID-E LYNX SoftGlueZynq Files (*.dat)'
-    ONE_MICRON_M: Final[float] = 1.0e-6
 
     EXPECTED_HEADER_RAW: Final[list[str]] = [
         'DataPoint',
@@ -76,8 +76,8 @@ class LYNXSoftGlueZynqPositionFileReader(ProbePositionFileReader):
 
                 point = ProbePosition(
                     int(row[DETECTOR_COUNT]),
-                    -float(row[X]) * self.ONE_MICRON_M,
-                    -float(row[Y]) * self.ONE_MICRON_M,
+                    -float(row[X]) * ONE_MICRON_M,
+                    -float(row[Y]) * ONE_MICRON_M,
                 )
                 point_list.append(point)
 

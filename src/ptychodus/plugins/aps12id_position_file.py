@@ -1,10 +1,10 @@
 from collections import defaultdict
 from pathlib import Path
-from typing import Final
 import logging
 
 import numpy
 
+from ptychodus.api.constants import ONE_NANOMETER_M
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -16,8 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 class APS12IDPositionFileReader(ProbePositionFileReader):
-    ONE_NANOMETER_M: Final[float] = 1.0e-9
-
     def read(self, file_path: Path) -> ProbePositionSequence:
         stem_parts = file_path.stem.split('_')
         stem_prefix = '_'.join(stem_parts[:-2])
@@ -64,8 +62,8 @@ class APS12IDPositionFileReader(ProbePositionFileReader):
             for row in position_data:
                 scan_point = ProbePosition(
                     index=index,
-                    coordinate_x_m=-self.ONE_NANOMETER_M * row[2],
-                    coordinate_y_m=+self.ONE_NANOMETER_M * row[1],
+                    coordinate_x_m=-ONE_NANOMETER_M * row[2],
+                    coordinate_y_m=+ONE_NANOMETER_M * row[1],
                 )
                 scan_point_list.append(scan_point)
 

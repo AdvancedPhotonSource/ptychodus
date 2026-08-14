@@ -11,13 +11,193 @@ from skimage.metrics import (
     structural_similarity,
 )
 
-from .common import ComplexArrayType, IntegerArrayType, RealArrayType
+from .typing import ComplexArrayType, IntegerArrayType, RealArrayType
 from .diffraction import BadPixels, DiffractionPatterns
-from .diffraction_gen import generate_diffraction_data
-from .geometry import PixelGeometry, fourier_shift_2d
+from .fourier import fourier_shift_2d
+from .simulate.diffraction import generate_diffraction_data
+from .geometry import PixelGeometry
 from .object import ObjectCenter, align_objects
 from .product import Product
-from .reconstructor import ReconstructionAmbiguities
+from .reconstruct import ReconstructionAmbiguities
+
+
+def _validate_weights(
+    weights: RealArrayType | None, expected_shape: tuple[int, ...]
+) -> RealArrayType | None:
+    if weights is None:
+        return None
+    weights_arr = numpy.asarray(weights, dtype=numpy.float64)
+    if weights_arr.shape != expected_shape:
+        raise ValueError(
+            f'weights shape {weights_arr.shape} does not match'
+            f' object layer 0 shape {expected_shape}!'
+        )
+    if not numpy.all(numpy.isfinite(weights_arr)):
+        raise ValueError('weights must all be finite!')
+    if numpy.any(weights_arr < 0.0):
+        raise ValueError('weights must all be non-negative!')
+    return weights_arr
+
+
+def _estimate_phase_offset_and_ramp(
+    *,
+    signal: numpy.ndarray,
+    weights: RealArrayType | None,
+    pixel_width_m: float,
+    pixel_height_m: float,
+    position_x_m: RealArrayType,
+    position_y_m: RealArrayType,
+) -> tuple[float, float, float]:
+    """Recover (phi, k_x_rad_per_m, k_y_rad_per_m) from a complex 2D signal.
+
+    The signal's phase is assumed to be ``phi + k_x*x + k_y*y`` plus
+    high-frequency content; its magnitude provides the natural amplitude
+    weighting. The ramp is recovered from per-pixel complex differences along
+    each axis (so unwrapping is unnecessary), then ``phi`` is recovered as the
+    weighted circular mean of the de-ramped signal.
+    """
+    # Differential phase along x: arg(S[:, x+1] * conj(S[:, x])) carries
+    # k_x * pixel_width_m modulo 2pi without ever wrapping per-pair.
+    delta_x = signal[:, 1:] * numpy.conj(signal[:, :-1])
+    if weights is None:
+        accum_x = numpy.sum(delta_x)
+    else:
+        w_x = weights[:, 1:] * weights[:, :-1]
+        accum_x = numpy.sum(w_x * delta_x)
+    k_x_per_px = float(numpy.angle(accum_x))
+
+    delta_y = signal[1:, :] * numpy.conj(signal[:-1, :])
+    if weights is None:
+        accum_y = numpy.sum(delta_y)
+    else:
+        w_y = weights[1:, :] * weights[:-1, :]
+        accum_y = numpy.sum(w_y * delta_y)
+    k_y_per_px = float(numpy.angle(accum_y))
+
+    k_x_rad_per_m = k_x_per_px / pixel_width_m
+    k_y_rad_per_m = k_y_per_px / pixel_height_m
+
+    ramp = k_x_rad_per_m * position_x_m + k_y_rad_per_m * position_y_m
+    signal_deramped = signal * numpy.exp(-1j * ramp)
+    if weights is None:
+        phi_accum = numpy.sum(signal_deramped)
+    else:
+        phi_accum = numpy.sum(weights * signal_deramped)
+
+    if phi_accum == 0:
+        raise ValueError('Cannot estimate phase offset: weighted signal magnitude is zero.')
+
+    phi = float(numpy.angle(phi_accum))
+    return phi, k_x_rad_per_m, k_y_rad_per_m
+
+
+def estimate_reconstruction_ambiguities(
+    product: Product,
+    *,
+    reference: Product | None = None,
+    weights: RealArrayType | None = None,
+) -> ReconstructionAmbiguities:
+    """Estimate the ambiguities present in ``product``.
+
+    Without ``reference``: estimate ``(phi, k_x, k_y)`` that flatten layer
+    0's phase in the amplitude-weighted circular-mean sense.
+    ``object_scale_factor`` is fixed at ``1.0`` because there is no
+    reference amplitude to normalize against.
+
+    With ``reference``: estimate all four ambiguities ``(s, phi, k_x, k_y)``
+    on ``product`` such that
+    ``estimate.standardize_product(product)`` best matches ``reference`` in
+    the weighted least-squares sense. The two products must agree in
+    layer-0 shape and object pixel geometry. The driving signal becomes
+    ``S = product[0] * conj(reference[0])``, whose phase is exactly
+    ``phi + k_x*x + k_y*y`` and whose magnitude ``|product| * |reference|``
+    provides natural amplitude weighting (pixels where either product is
+    weak contribute little).
+
+    The estimate is fully complex-domain (sums of phasors, ``numpy.angle``
+    of complex weighted sums) and so requires no phase unwrapping. Pixels
+    of zero amplitude contribute exactly zero to the relevant sums and are
+    therefore ignored automatically.
+
+    Args:
+        product: Product whose ambiguities are being measured. The result
+            is returned in this product's coordinate frame.
+        reference: Optional anchor product. When supplied, the scale factor
+            is estimated too; when ``None``, scale is fixed at ``1.0``.
+        weights: Optional non-negative per-pixel weight array, shape
+            ``(height_px, width_px)`` matching layer 0. Multiplies the
+            natural amplitude weighting. Pass a 0/1 mask to restrict the
+            estimate to a region of interest.
+    """
+    obj = product.object_
+    layer_zero = obj.get_array()[0].astype(numpy.complex128)
+    pixel_geometry = obj.get_pixel_geometry()
+    coords = obj.get_geometry().get_transverse_coordinates()
+    weights_arr = _validate_weights(weights, layer_zero.shape)
+
+    if reference is None:
+        ref_layer_zero = None
+        signal = layer_zero
+    else:
+        ref_obj = reference.object_
+        ref_shape = ref_obj.get_array().shape[-2:]
+
+        if ref_shape != layer_zero.shape:
+            raise ValueError(
+                f'Object layer-0 shape mismatch: reference {ref_shape} vs product {layer_zero.shape}!'
+            )
+
+        ref_pixel_geometry = ref_obj.get_pixel_geometry()
+
+        if ref_pixel_geometry != pixel_geometry:
+            raise ValueError(
+                f'Object pixel geometry mismatch: reference {ref_pixel_geometry} vs product {pixel_geometry}!'
+            )
+
+        ref_layer_zero = ref_obj.get_array()[0].astype(numpy.complex128)
+        signal = layer_zero * numpy.conj(ref_layer_zero)
+
+    phi, k_x, k_y = _estimate_phase_offset_and_ramp(
+        signal=signal,
+        weights=weights_arr,
+        pixel_width_m=pixel_geometry.width_m,
+        pixel_height_m=pixel_geometry.height_m,
+        position_x_m=coords.position_x_m,
+        position_y_m=coords.position_y_m,
+    )
+
+    if ref_layer_zero is None:
+        s = 1.0
+    else:
+        # Weighted-LS solution for s in product ≈ s * exp(i(phi + k·r)) * ref:
+        # s = Re(sum w * signal * exp(-i(phi + ramp))) / sum(w * |ref|^2).
+        ramp = k_x * coords.position_x_m + k_y * coords.position_y_m
+        correction = numpy.exp(-1j * (phi + ramp))
+        ref_intensity = numpy.square(numpy.abs(ref_layer_zero))
+
+        if weights_arr is None:
+            numerator = float(numpy.real(numpy.sum(signal * correction)))
+            denominator = float(numpy.sum(ref_intensity))
+        else:
+            numerator = float(numpy.real(numpy.sum(weights_arr * signal * correction)))
+            denominator = float(numpy.sum(weights_arr * ref_intensity))
+
+        if not (denominator > 0.0):
+            raise ValueError('Cannot estimate scale: weighted reference object intensity is zero.')
+
+        s = numerator / denominator
+
+        # Convention: keep object_scale_factor > 0. Fold any sign flip into phi.
+        if s < 0.0:
+            s = -s
+            phi = phi + float(numpy.pi)
+
+    return ReconstructionAmbiguities(
+        object_scale_factor=s,
+        phase_offset_rad=phi,
+        phase_ramp_x_rad_per_m=k_x,
+        phase_ramp_y_rad_per_m=k_y,
+    )
 
 
 @dataclass(frozen=True)
@@ -32,7 +212,7 @@ class ObjectComparison:
     holds the result of removing those degrees of freedom so the same prepared
     pair can be fed to every metric.
 
-    Construct via :meth:`from_products`, which:
+    Construct via :func:`compute_object_comparison`, which:
 
     1. Sub-pixel registers the test object onto the reference (:func:`align_objects`).
     2. Estimates the four ambiguity scalars and standardizes the test product
@@ -56,58 +236,6 @@ class ObjectComparison:
     """The ambiguities removed from the test side, useful as provenance (e.g. for reporting
     "how much ramp/scale was removed" alongside the metric value)."""
 
-    @classmethod
-    def from_products(
-        cls,
-        reference: Product,
-        test: Product,
-        *,
-        upsample_factor: int = 100,
-        weights: RealArrayType | None = None,
-    ) -> ObjectComparison:
-        """Align ``test`` onto ``reference``, standardize ambiguities, and bundle the pair.
-
-        Args:
-            reference: The reconstruction treated as ground truth. Defines the
-                array indexing and ambiguity anchor.
-            test: The reconstruction being evaluated against ``reference``.
-            upsample_factor: Sub-pixel precision for
-                :func:`skimage.registration.phase_cross_correlation`, forwarded
-                through :func:`align_objects`.
-            weights: Optional non-negative per-pixel weights for the ambiguity
-                estimate, shape ``(height_px, width_px)`` matching layer 0. Pass
-                a 0/1 mask to restrict the estimate to a region of interest.
-
-        Raises:
-            ValueError: If the two products' objects disagree on pixel geometry,
-                if their flattened or layer-0 shapes differ, or if the weighted
-                reference intensity is zero. These checks come from
-                :func:`align_objects` and
-                :meth:`ReconstructionAmbiguities.estimate`; this method does not
-                duplicate them.
-        """
-        aligned_test_object = align_objects(
-            reference.object_, test.object_, upsample_factor=upsample_factor
-        )
-        aligned_test = replace(test, object_=aligned_test_object)
-
-        ambiguities = ReconstructionAmbiguities.estimate(
-            aligned_test, reference=reference, weights=weights
-        )
-        standardized_test = ambiguities.standardize_product(aligned_test)
-
-        reference_array = reference.object_.get_layers_flattened()
-        test_array = standardized_test.object_.get_layers_flattened()
-
-        common_dtype = numpy.result_type(reference_array.dtype, test_array.dtype)
-
-        return cls(
-            reference_complex=reference_array.astype(common_dtype, copy=False),
-            test_complex=test_array.astype(common_dtype, copy=False),
-            pixel_geometry=reference.object_.get_pixel_geometry().copy(),
-            ambiguities=ambiguities,
-        )
-
     @property
     def reference_amplitude(self) -> RealArrayType:
         """``|reference|`` — real-valued amplitude image for metrics like SSIM/PSNR."""
@@ -128,6 +256,57 @@ class ObjectComparison:
         """``arg(test)`` in radians, wrapped to ``(-pi, pi]``. Constant offset and
         linear ramp have been removed by :class:`ReconstructionAmbiguities`."""
         return numpy.angle(self.test_complex)
+
+
+def compute_object_comparison(
+    reference: Product,
+    test: Product,
+    *,
+    upsample_factor: int = 100,
+    weights: RealArrayType | None = None,
+) -> ObjectComparison:
+    """Align ``test`` onto ``reference``, standardize ambiguities, and bundle the pair.
+
+    Args:
+        reference: The reconstruction treated as ground truth. Defines the
+            array indexing and ambiguity anchor.
+        test: The reconstruction being evaluated against ``reference``.
+        upsample_factor: Sub-pixel precision for
+            :func:`skimage.registration.phase_cross_correlation`, forwarded
+            through :func:`align_objects`.
+        weights: Optional non-negative per-pixel weights for the ambiguity
+            estimate, shape ``(height_px, width_px)`` matching layer 0. Pass
+            a 0/1 mask to restrict the estimate to a region of interest.
+
+    Raises:
+        ValueError: If the two products' objects disagree on pixel geometry,
+            if their flattened or layer-0 shapes differ, or if the weighted
+            reference intensity is zero. These checks come from
+            :func:`align_objects` and
+            :func:`estimate_reconstruction_ambiguities`; this function does
+            not duplicate them.
+    """
+    aligned_test_object = align_objects(
+        reference.object_, test.object_, upsample_factor=upsample_factor
+    )
+    aligned_test = replace(test, object_=aligned_test_object)
+
+    ambiguities = estimate_reconstruction_ambiguities(
+        aligned_test, reference=reference, weights=weights
+    )
+    standardized_test = ambiguities.standardize_product(aligned_test)
+
+    reference_array = reference.object_.get_layers_flattened()
+    test_array = standardized_test.object_.get_layers_flattened()
+
+    common_dtype = numpy.result_type(reference_array.dtype, test_array.dtype)
+
+    return ObjectComparison(
+        reference_complex=reference_array.astype(common_dtype, copy=False),
+        test_complex=test_array.astype(common_dtype, copy=False),
+        pixel_geometry=reference.object_.get_pixel_geometry().copy(),
+        ambiguities=ambiguities,
+    )
 
 
 @dataclass(frozen=True)
@@ -549,7 +728,7 @@ def compute_reconstruction_residuals(
 
     Inputs must already be aligned: ``measured_patterns`` is shape ``(N, H, W)``
     in product position order (typically the output of
-    :meth:`AssembledDiffractionData.prepare_reconstruct_input`).
+    :func:`ptychodus.api.reconstruct.prepare_reconstruct_input`).
 
     **Hard-x-ray caveat.** At hard-x-ray energies the detector dynamic range commonly spans
     4–6 orders of magnitude and the ``√I`` transform compresses that only to ~2–3 orders, so

@@ -5,7 +5,7 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from .common import RealArrayType
+from .typing import RealArrayType
 from .product import Product
 
 

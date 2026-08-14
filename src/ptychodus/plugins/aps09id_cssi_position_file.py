@@ -1,9 +1,9 @@
 from pathlib import Path
-from typing import Final
 import logging
 
 import h5py
 
+from ptychodus.api.constants import ONE_MILLIMETER_M
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -15,8 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 class CSSIPositionFileReader(ProbePositionFileReader):
-    ONE_MILLIMETER_M: Final[float] = 1e-3
-
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
 
@@ -29,8 +27,8 @@ class CSSIPositionFileReader(ProbePositionFileReader):
                 for idx, row in enumerate(h5_positions):
                     point = ProbePosition(
                         idx,
-                        row[0] * self.ONE_MILLIMETER_M,
-                        row[1] * self.ONE_MILLIMETER_M,
+                        row[0] * ONE_MILLIMETER_M,
+                        row[1] * ONE_MILLIMETER_M,
                     )
                     point_list.append(point)
 

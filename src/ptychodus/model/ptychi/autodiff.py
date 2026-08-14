@@ -14,7 +14,7 @@ from ptychi.api import (
 from ptychodus.api.object import Object, ObjectGeometry
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import ProductMetadata
-from ptychodus.api.reconstructor import ReconstructInput
+from ptychodus.api.reconstruct import ReconstructInput
 from ptychodus.api.probe_positions import ProbePositionSequence
 
 from .helper import PtyChiOptionsHelper

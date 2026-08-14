@@ -2,6 +2,8 @@ from typing import Final
 
 from PyQt5.QtWidgets import QFrame, QLCDNumber, QSizePolicy
 
+from ptychodus.api.constants import BYTES_PER_MEGABYTE
+
 from ..model.memory import MemoryPresenter
 
 
@@ -21,10 +23,10 @@ class MemoryController:
             return
 
         stats = self._presenter.get_statistics()
-        total_MB = int(stats.total_physical_memory_bytes / 1e6)  # noqa: N806
+        total_MB = int(stats.total_physical_memory_bytes / BYTES_PER_MEGABYTE)  # noqa: N806
         total_str = f'Total Memory: {total_MB} MB'
 
-        avail_MB = int(stats.available_memory_bytes / 1e6)  # noqa: N806
+        avail_MB = int(stats.available_memory_bytes / BYTES_PER_MEGABYTE)  # noqa: N806
         avail_str = f'Available Memory: {avail_MB} MB'
 
         self._widget.display(avail_MB)

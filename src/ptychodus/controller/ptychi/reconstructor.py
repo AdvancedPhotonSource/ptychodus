@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
 )
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import BooleanParameter, RealParameter
+from ptychodus.api.parameters import BooleanParameter, RealParameter
 
 from ...model.ptychi import (
     PtyChiAutodiffSettings,

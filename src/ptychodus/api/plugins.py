@@ -27,9 +27,9 @@ from .fluorescence import (
 )
 from .object import ObjectFileReader, ObjectFileWriter, Object
 from .observer import Observable, Observer
-from .parametric import Parameter, StringParameter
+from .parameters import Parameter, StringParameter
 from .probe import ProbeFileReader, ProbeFileWriter, ProbeSequence
-from .probe_gen import FresnelZonePlate
+from .simulate.probe import FresnelZonePlate
 from .probe_positions import (
     ProbePositionFileReader,
     ProbePositionFileWriter,

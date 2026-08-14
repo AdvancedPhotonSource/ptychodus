@@ -32,7 +32,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-from ptychodus.api.visualization import VisualizationProduct
+from ptychodus.api.visualize import VisualizationProduct
 
 from .widgets import DecimalLineEdit
 

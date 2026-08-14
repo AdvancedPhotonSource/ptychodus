@@ -10,12 +10,13 @@ import threading
 
 import numpy
 
-from ptychodus.api.common import BYTES_PER_MEGABYTE
+from ptychodus.api.constants import BYTES_PER_MEGABYTE
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     BadPixels,
     DiffractionArray,
     DiffractionDataset,
+    DiffractionDatasetLayoutNode,
     DiffractionIndexes,
     DiffractionMetadata,
     DiffractionPattern,
@@ -23,7 +24,6 @@ from ptychodus.api.diffraction import (
     SimpleDiffractionDataset,
 )
 from ptychodus.api.io import AssembledDiffractionData, load_diffraction_data, save_diffraction_data
-from ptychodus.api.tree import SimpleTreeNode
 
 from ..task_manager import BackgroundTask, TaskManager
 from ._loader import ArrayAssembler, LoadAllArrays, LoadArray
@@ -194,7 +194,7 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
     def get_metadata(self) -> DiffractionMetadata:
         return self._dataset.get_metadata()
 
-    def get_layout(self) -> SimpleTreeNode:
+    def get_layout(self) -> DiffractionDatasetLayoutNode:
         return self._dataset.get_layout()
 
     def get_raw_pixel_geometry(self) -> PixelGeometry:
@@ -420,7 +420,7 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
             detector_extent=ImageExtent(detector_width, detector_height),
             file_path=file_path,
         )
-        contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+        contents_tree = DiffractionDatasetLayoutNode.create_root()
         array = AssembledDiffractionArray(
             array_index=0,
             label='In-Memory' if file_path is None else file_path.stem,

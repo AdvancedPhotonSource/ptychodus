@@ -4,10 +4,11 @@ from pathlib import Path
 from typing import Any
 import logging
 
-from ptychodus.api.diffraction import CropCenter, Polarization
-from ptychodus.api.geometry import AffineTransform, ImageExtent
+from ptychodus.api.diffraction import AssembledDiffractionData, CropCenter, Polarization
+from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.preprocess.probe_positions import AffineTransform
 from ptychodus.api.product import Product
-from ptychodus.api.reconstructor import AssembledDiffractionData, ReconstructInput
+from ptychodus.api.reconstruct import ReconstructInput
 from ptychodus.api.settings import PathPrefixChange, SettingsRegistry
 from ptychodus.api.workflow import (
     DiffractionWorkflowAPI,

@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ptychodus.api.diffraction import Polarization
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import load_diffraction_data, load_fluorescence_data, load_product
-from ptychodus.api.visualization import (
+from ptychodus.api.visualize import (
     ComplexComponent,
     CylindricalColorModel,
     ScalarTransformation,

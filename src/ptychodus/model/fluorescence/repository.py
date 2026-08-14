@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import overload
 import logging
 
-from ptychodus.api.common import RealArrayType
+from ptychodus.api.typing import RealArrayType
 from ptychodus.api.fluorescence import FluorescenceDataset
 
 from ..product import ProductRepository, ProductRepositoryItem, ProductRepositoryObserver

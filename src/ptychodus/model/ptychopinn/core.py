@@ -3,7 +3,7 @@ from importlib.metadata import PackageNotFoundError, version
 from importlib.util import find_spec
 import logging
 
-from ptychodus.api.reconstructor import (
+from ptychodus.api.reconstruct import (
     NullReconstructor,
     Reconstructor,
     ReconstructorLibrary,

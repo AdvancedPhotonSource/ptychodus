@@ -5,7 +5,7 @@ from enum import Enum
 import logging
 
 from ptychodus.api.observer import Observable
-from ptychodus.api.parametric import ParameterGroup
+from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.product import LossValue, Product
 
 from ..diffraction import AssembledDiffractionDataset, DiffractionDatasetObserver

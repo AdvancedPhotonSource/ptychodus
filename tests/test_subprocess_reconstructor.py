@@ -20,7 +20,7 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.reconstructor import ReconstructInput
+from ptychodus.api.reconstruct import ReconstructInput
 from ptychodus.model.processing._subprocess_protocol import ChildError
 from ptychodus.model.processing.subprocess_reconstructor import (
     SubprocessReconstructor,
@@ -75,7 +75,6 @@ def _minimal_reconstruct_input() -> ReconstructInput:
         diffraction_patterns=numpy.zeros((1, 4, 4), dtype=numpy.float32),
         bad_pixels=numpy.zeros((4, 4), dtype=numpy.bool_),
         product=product,
-        pixel_geometry=PixelGeometry(1.0e-9, 1.0e-9),
     )
 
 

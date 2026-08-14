@@ -134,7 +134,6 @@ class ModelCore:
 
         self.ptychi_reconstructor_library = PtyChiReconstructorLibrary(
             self.settings_registry,
-            self.diffraction_core.pattern_sizer,
             self.is_developer_mode_enabled,
         )
         self.ptychonn_reconstructor_library = PtychoNNReconstructorLibrary(

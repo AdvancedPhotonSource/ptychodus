@@ -23,7 +23,7 @@ import numpy
 
 from ptychodus.api.object import Object
 from ptychodus.api.product import LossValue, Product
-from ptychodus.api.reconstructor import ReconstructOutput, TrainOutput
+from ptychodus.api.reconstruct import ReconstructOutput, TrainOutput
 
 from ..processing.subprocess_reconstructor import (
     TAG_MODEL_SAVED,

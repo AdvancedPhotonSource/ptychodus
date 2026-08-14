@@ -1,8 +1,7 @@
 from pathlib import Path
 
-from ptychodus.api.common import get_ptychodus_dir
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.api.settings import SettingsRegistry, get_ptychodus_dir
 
 
 class DetectorSettings(Observable, Observer):

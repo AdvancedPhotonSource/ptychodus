@@ -14,7 +14,7 @@ from ptychodus.api.product import (
     ProductFileWriter,
     ProductMetadata,
 )
-from ptychodus.api.reconstructor import LossValue
+from ptychodus.api.reconstruct import LossValue
 from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 
 logger = logging.getLogger(__name__)

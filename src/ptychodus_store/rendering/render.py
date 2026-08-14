@@ -1,4 +1,4 @@
-"""Adapters from `ptychodus.api.visualization` to the store's HTTP and MCP response shapes."""
+"""Adapters from `ptychodus.api.visualize` to the store's HTTP and MCP response shapes."""
 
 from __future__ import annotations
 
@@ -9,9 +9,9 @@ import numpy
 from fastapi import HTTPException
 from PIL import Image
 
-from ptychodus.api.common import ComplexArrayType, NumberArrayType, RealArrayType
+from ptychodus.api.typing import ComplexArrayType, NumberArrayType, RealArrayType
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.visualization import (
+from ptychodus.api.visualize import (
     ComplexComponent,
     VisualizationProduct,
     visualize_complex_component,

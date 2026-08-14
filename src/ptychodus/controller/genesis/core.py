@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
 )
 
 from ptychodus.api.observer import Observable, Observer, SequenceObserver
-from ptychodus.api.parametric import StringParameter
+from ptychodus.api.parameters import StringParameter
 
 from ...model.genesis import (
     GenesisPresenter,

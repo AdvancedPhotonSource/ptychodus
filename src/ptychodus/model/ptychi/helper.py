@@ -58,14 +58,13 @@ from ptychi.api.options.base import (
     SliceSpacingOptions,
 )
 
-from ptychodus.api.common import ComplexArrayType, RealArrayType
+from ptychodus.api.typing import ComplexArrayType, RealArrayType
 from ptychodus.api.object import Object, ObjectGeometry
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import ProductMetadata
-from ptychodus.api.reconstructor import ReconstructInput
+from ptychodus.api.reconstruct import ReconstructInput
 
-from ..diffraction import PatternSizer
 from .affine import PtyChiAffineDegreesOfFreedom, PtyChiAffineDegreesOfFreedomBitField
 from .settings import (
     PtyChiOPRSettings,
@@ -740,10 +739,8 @@ class PtyChiOptionsHelper:
         probe_settings: PtyChiProbeSettings,
         probe_position_settings: PtyChiProbePositionSettings,
         opr_settings: PtyChiOPRSettings,
-        pattern_sizer: PatternSizer,
     ) -> None:
         self._reconstructor_settings = reconstructor_settings
-        self._pattern_sizer = pattern_sizer
 
         self.reconstructor_helper = PtyChiReconstructorOptionsHelper(reconstructor_settings)
         self.object_helper = PtyChiObjectOptionsHelper(object_settings)
@@ -753,7 +750,6 @@ class PtyChiOptionsHelper:
 
     def create_data_options(self, parameters: ReconstructInput) -> PtychographyDataOptions:
         metadata = parameters.product.metadata
-        pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry(parameters.pixel_geometry)
         free_space_propagation_distance_m = (
             numpy.inf
             if self._reconstructor_settings.use_far_field_propagation
@@ -764,7 +760,6 @@ class PtyChiOptionsHelper:
             free_space_propagation_distance_m=free_space_propagation_distance_m,
             wavelength_m=metadata.probe_wavelength_m,
             fft_shift=self._reconstructor_settings.fft_shift_diffraction_patterns.get_value(),
-            detector_pixel_size_m=pixel_geometry.width_m,
             valid_pixel_mask=numpy.logical_not(parameters.bad_pixels),
             save_data_on_device=self._reconstructor_settings.save_data_on_device.get_value(),
         )

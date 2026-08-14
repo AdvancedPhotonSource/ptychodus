@@ -7,6 +7,7 @@ from ptychodus.api.metrics import (
     ReconstructionResiduals,
     compute_reconstruction_residuals,
 )
+from ptychodus.api.reconstruct import prepare_reconstruct_input
 
 from ..product import ProductRepository
 
@@ -32,7 +33,7 @@ class ResidualAnalyzer:
             )
 
         product = item.get_product()
-        recon_input = dataset.get_assembled_data().prepare_reconstruct_input(product)
+        recon_input = prepare_reconstruct_input(dataset.get_assembled_data(), product)
 
         logger.info('Computing reconstruction residuals...')
         tic = time.perf_counter()

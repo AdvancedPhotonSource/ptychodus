@@ -17,7 +17,7 @@ from ptychodus.api.product import (
     ProductMetadata,
 )
 from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
-from ptychodus.api.reconstructor import LossValue
+from ptychodus.api.reconstruct import LossValue
 
 
 class FoldSliceProductFileReader(ProductFileReader):

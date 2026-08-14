@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -165,8 +165,10 @@ def test_get_reconstruct_input_uses_product_dataset() -> None:
     item.get_product.return_value = product
     api = _make_processing_api(item)
 
-    result = api.get_reconstruct_input(product_index=0)
+    with patch('ptychodus.model.processing.api.prepare_reconstruct_input') as prepare:
+        result = api.get_reconstruct_input(product_index=0)
 
+    prepare.assert_called_once()
     assembled = dataset.get_assembled_data.return_value
-    assembled.prepare_reconstruct_input.assert_called_once()
-    assert result is assembled.prepare_reconstruct_input.return_value
+    assert prepare.call_args.args[0] is assembled
+    assert result is prepare.return_value

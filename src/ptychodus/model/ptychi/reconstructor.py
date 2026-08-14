@@ -15,9 +15,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ptychodus.api.reconstructor import ReconstructInput
+from ptychodus.api.reconstruct import ReconstructInput
 
-from ..diffraction import PatternSizer
 from ..processing.subprocess_reconstructor import SubprocessReconstructor
 from ._payload import PtyChiPayload
 from .autodiff import AutodiffReconstructor
@@ -107,7 +106,6 @@ def build_reconstructor_list(
     probe_position_settings: PtyChiProbePositionSettings,
     opr_settings: PtyChiOPRSettings,
     bundle: PtyChiSettingsBundle,
-    pattern_sizer: PatternSizer,
 ) -> list[SubprocessReconstructor]:
     """Build one :class:`SubprocessReconstructor` per pty-chi algorithm."""
     options_helper = PtyChiOptionsHelper(
@@ -116,7 +114,6 @@ def build_reconstructor_list(
         probe_settings,
         probe_position_settings,
         opr_settings,
-        pattern_sizer,
     )
 
     def num_epochs() -> int:

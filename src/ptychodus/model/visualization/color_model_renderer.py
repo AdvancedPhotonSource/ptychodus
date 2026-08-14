@@ -5,9 +5,9 @@ from typing import cast
 from matplotlib.colors import Normalize
 import numpy
 
-from ptychodus.api.common import ComplexArrayType
+from ptychodus.api.typing import ComplexArrayType
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.visualization import (
+from ptychodus.api.visualize import (
     ComplexComponent,
     NumberArrayType,
     RealArrayType,

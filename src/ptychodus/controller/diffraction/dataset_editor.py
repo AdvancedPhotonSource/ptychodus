@@ -7,8 +7,9 @@ from PyQt5.QtCore import Qt, QAbstractItemModel, QAbstractTableModel, QModelInde
 from PyQt5.QtGui import QBrush
 from PyQt5.QtWidgets import QWidget
 
+from ptychodus.api.constants import ONE_MICRON_M
+from ptychodus.api.diffraction import DiffractionDatasetLayoutNode
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.tree import SimpleTreeNode
 
 from ...model.diffraction import AssembledDiffractionDataset, DiffractionDatasetObserver
 from ...view.diffraction import DatasetEditorDialog
@@ -18,11 +19,15 @@ logger = logging.getLogger(__name__)
 
 
 class SimpleTreeModel(QAbstractItemModel):
-    def __init__(self, root_node: SimpleTreeNode, parent: QObject | None = None) -> None:
+    _HEADERS = ('Name', 'Type', 'Details')
+
+    def __init__(
+        self, root_node: DiffractionDatasetLayoutNode, parent: QObject | None = None
+    ) -> None:
         super().__init__(parent)
         self._root_node = root_node
 
-    def set_root_node(self, root_node: SimpleTreeNode) -> None:
+    def set_root_node(self, root_node: DiffractionDatasetLayoutNode) -> None:
         self.beginResetModel()
         self._root_node = root_node
         self.endResetModel()
@@ -41,7 +46,7 @@ class SimpleTreeModel(QAbstractItemModel):
 
             if child.isValid():
                 child_item = child.internalPointer()
-                parent_item = child_item.parent_item
+                parent_item = child_item.parent
 
                 if parent_item is self._root_node:
                     value = QModelIndex()
@@ -56,8 +61,12 @@ class SimpleTreeModel(QAbstractItemModel):
         orientation: Qt.Orientation,
         role: int = Qt.ItemDataRole.DisplayRole,
     ) -> Any:
-        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            return self._root_node.data(section)
+        if (
+            orientation == Qt.Orientation.Horizontal
+            and role == Qt.ItemDataRole.DisplayRole
+            and 0 <= section < len(self._HEADERS)
+        ):
+            return self._HEADERS[section]
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         return super().flags(index)
@@ -67,7 +76,7 @@ class SimpleTreeModel(QAbstractItemModel):
 
         if self.hasIndex(row, column, parent):
             parent_item = parent.internalPointer() if parent.isValid() else self._root_node
-            child_item = parent_item.child_items[row]
+            child_item = parent_item.children[row]
 
             if child_item:
                 value = self.createIndex(row, column, child_item)
@@ -77,7 +86,9 @@ class SimpleTreeModel(QAbstractItemModel):
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
             node = index.internalPointer()
-            return node.data(index.column())
+            column = index.column()
+            if 0 <= column < len(self._HEADERS):
+                return (node.name, node.dtype, node.details)[column]
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         if parent.column() > 0:
@@ -88,15 +99,10 @@ class SimpleTreeModel(QAbstractItemModel):
         if parent.isValid():
             node = parent.internalPointer()
 
-        return len(node.child_items)
+        return len(node.children)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
-        node = self._root_node
-
-        if parent.isValid():
-            node = parent.internalPointer()
-
-        return len(node.item_data)
+        return len(self._HEADERS)
 
 
 _ROW_PIXEL_WIDTH_UM = 0
@@ -154,9 +160,9 @@ class DatasetPropertyTableModel(QAbstractTableModel):
                 case (0, row):
                     return self._properties[row]
                 case (1, r) if r == _ROW_PIXEL_WIDTH_UM:
-                    return f'{geometry.width_m * 1e6:.4g}'
+                    return f'{geometry.width_m / ONE_MICRON_M:.4g}'
                 case (1, r) if r == _ROW_PIXEL_HEIGHT_UM:
-                    return f'{geometry.height_m * 1e6:.4g}'
+                    return f'{geometry.height_m / ONE_MICRON_M:.4g}'
         elif role == Qt.ItemDataRole.BackgroundRole:
             if index.flags() & Qt.ItemFlag.ItemIsEditable:
                 return self._editable_item_brush
@@ -171,7 +177,7 @@ class DatasetPropertyTableModel(QAbstractTableModel):
             return False
         if not math.isfinite(new_um) or new_um <= 0.0:
             return False
-        new_m = new_um * 1e-6
+        new_m = new_um * ONE_MICRON_M
 
         current = self._dataset.get_raw_pixel_geometry()
         if index.row() == _ROW_PIXEL_WIDTH_UM:

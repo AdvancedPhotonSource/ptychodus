@@ -8,7 +8,7 @@ import json
 from pydantic import BaseModel
 import httpx
 
-from ptychodus.api.common import get_ptychodus_dir
+from ptychodus.api.settings import get_ptychodus_dir
 
 from .tokens import create_headers
 

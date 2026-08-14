@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from ptychi.api.options.task import PtychographyTaskOptions
 
-from ptychodus.api.reconstructor import ReconstructInput
+from ptychodus.api.reconstruct import ReconstructInput
 
 
 @dataclass(frozen=True)

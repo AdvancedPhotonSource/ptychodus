@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
 )
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.reconstructor import TrainableReconstructor
+from ptychodus.api.reconstruct import TrainableReconstructor
 
 from ...model.genesis import GenesisCore
 from ...model.globus import GlobusCore

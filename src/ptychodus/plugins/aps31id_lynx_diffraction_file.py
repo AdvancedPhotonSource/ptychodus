@@ -4,16 +4,17 @@ import logging
 import h5py
 import numpy
 
+from ptychodus.api.constants import ONE_KILOELECTRONVOLT_EV
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     CropCenter,
     DiffractionDataset,
+    DiffractionDatasetLayoutNode,
     DiffractionFileReader,
     DiffractionMetadata,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.tree import SimpleTreeNode
 
 from .h5_diffraction_file import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
 
@@ -107,7 +108,7 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
             )
 
     def _read_legacy(
-        self, file_path: Path, h5_file: h5py.File, contents_tree: SimpleTreeNode
+        self, file_path: Path, h5_file: h5py.File, contents_tree: DiffractionDatasetLayoutNode
     ) -> DiffractionDataset:
         data = h5_file[self._LEGACY_DATA_PATH]
 
@@ -134,7 +135,7 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
         else:
             crop_center = CropCenter(center_x_px, center_y_px)
             detector_pixel_geometry = PixelGeometry(pixel_size, pixel_size)
-            probe_energy_eV = 1000.0 * photon_energy_keV  # noqa: N806
+            probe_energy_eV = ONE_KILOELECTRONVOLT_EV * photon_energy_keV  # noqa: N806
 
         metadata = DiffractionMetadata(
             num_patterns_per_array=[num_patterns],
@@ -156,7 +157,7 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
         return SimpleDiffractionDataset(metadata, contents_tree, [array])
 
     def _read_area_detector(
-        self, file_path: Path, h5_file: h5py.File, contents_tree: SimpleTreeNode
+        self, file_path: Path, h5_file: h5py.File, contents_tree: DiffractionDatasetLayoutNode
     ) -> DiffractionDataset:
         data = h5_file[self._AD_DATA_PATH]
 

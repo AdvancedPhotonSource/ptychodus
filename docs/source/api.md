@@ -1,18 +1,9 @@
 # API Reference
 
-## Affine
+## Constants
 
 ```{eval-rst}
-.. automodule:: ptychodus.api.affine
-   :members:
-   :undoc-members:
-   :show-inheritance:
-```
-
-## Common
-
-```{eval-rst}
-.. automodule:: ptychodus.api.common
+.. automodule:: ptychodus.api.constants
    :members:
    :undoc-members:
    :show-inheritance:
@@ -27,28 +18,19 @@
    :show-inheritance:
 ```
 
-## Diffraction Preprocessing
-
-```{eval-rst}
-.. automodule:: ptychodus.api.diffraction_prep
-   :members:
-   :undoc-members:
-   :show-inheritance:
-```
-
-## Diffraction Generators
-
-```{eval-rst}
-.. automodule:: ptychodus.api.diffraction_gen
-   :members:
-   :undoc-members:
-   :show-inheritance:
-```
-
 ## Fluorescence
 
 ```{eval-rst}
 .. automodule:: ptychodus.api.fluorescence
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+## Fourier
+
+```{eval-rst}
+.. automodule:: ptychodus.api.fourier
    :members:
    :undoc-members:
    :show-inheritance:
@@ -81,7 +63,7 @@
    :show-inheritance:
 ```
 
-## Interpolation
+## Interpolate
 
 ```{eval-rst}
 .. automodule:: ptychodus.api.interpolate
@@ -108,15 +90,6 @@
    :show-inheritance:
 ```
 
-## Object Generators
-
-```{eval-rst}
-.. automodule:: ptychodus.api.object_gen
-   :members:
-   :undoc-members:
-   :show-inheritance:
-```
-
 ## Observer
 
 ```{eval-rst}
@@ -126,10 +99,10 @@
    :show-inheritance:
 ```
 
-## Parametric
+## Parameters
 
 ```{eval-rst}
-.. automodule:: ptychodus.api.parametric
+.. automodule:: ptychodus.api.parameters
    :members:
    :undoc-members:
    :show-inheritance:
@@ -144,19 +117,39 @@
    :show-inheritance:
 ```
 
-## Probe
+## Preprocess
+
+### Diffraction preprocessing
 
 ```{eval-rst}
-.. automodule:: ptychodus.api.probe
+.. automodule:: ptychodus.api.preprocess.diffraction
    :members:
    :undoc-members:
    :show-inheritance:
 ```
 
-## Probe Generators
+### Probe-position preprocessing
 
 ```{eval-rst}
-.. automodule:: ptychodus.api.probe_gen
+.. automodule:: ptychodus.api.preprocess.probe_positions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+### Noise-floor estimation
+
+```{eval-rst}
+.. automodule:: ptychodus.api.preprocess.noise
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+## Probe
+
+```{eval-rst}
+.. automodule:: ptychodus.api.probe
    :members:
    :undoc-members:
    :show-inheritance:
@@ -171,15 +164,6 @@
    :show-inheritance:
 ```
 
-## Probe Position Generators
-
-```{eval-rst}
-.. automodule:: ptychodus.api.probe_positions_gen
-   :members:
-   :undoc-members:
-   :show-inheritance:
-```
-
 ## Product
 
 ```{eval-rst}
@@ -189,19 +173,19 @@
    :show-inheritance:
 ```
 
-## Propagator
+## Propagate
 
 ```{eval-rst}
-.. automodule:: ptychodus.api.propagator
+.. automodule:: ptychodus.api.propagate
    :members:
    :undoc-members:
    :show-inheritance:
 ```
 
-## Reconstructor
+## Reconstruct
 
 ```{eval-rst}
-.. automodule:: ptychodus.api.reconstructor
+.. automodule:: ptychodus.api.reconstruct
    :members:
    :undoc-members:
    :show-inheritance:
@@ -216,19 +200,57 @@
    :show-inheritance:
 ```
 
-## Tree
+## Simulate
+
+### Diffraction simulation
 
 ```{eval-rst}
-.. automodule:: ptychodus.api.tree
+.. automodule:: ptychodus.api.simulate.diffraction
    :members:
    :undoc-members:
    :show-inheritance:
 ```
 
-## Visualization
+### Object simulation
 
 ```{eval-rst}
-.. automodule:: ptychodus.api.visualization
+.. automodule:: ptychodus.api.simulate.object
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+### Probe simulation
+
+```{eval-rst}
+.. automodule:: ptychodus.api.simulate.probe
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+### Probe-position simulation
+
+```{eval-rst}
+.. automodule:: ptychodus.api.simulate.probe_positions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+## Typing
+
+```{eval-rst}
+.. automodule:: ptychodus.api.typing
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+## Visualize
+
+```{eval-rst}
+.. automodule:: ptychodus.api.visualize
    :members:
    :undoc-members:
    :show-inheritance:

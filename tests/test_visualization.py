@@ -1,4 +1,4 @@
-"""Unit tests for ptychodus.api.visualization."""
+"""Unit tests for ptychodus.api.visualize."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import numpy.testing
 import pytest
 
 from ptychodus.api.geometry import Box2D, Interval, Line2D, PixelGeometry, Point2D
-from ptychodus.api.visualization import (
+from ptychodus.api.visualize import (
     ComplexComponent,
     CylindricalColorModel,
     DisplayValues,

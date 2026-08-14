@@ -3,7 +3,7 @@ import logging
 
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
-from ptychodus.api.object_gen import generate_stxm_object
+from ptychodus.api.simulate.object import generate_stxm_object
 
 from ...diffraction import AssembledDiffractionDataset
 from .builder import ObjectBuilder

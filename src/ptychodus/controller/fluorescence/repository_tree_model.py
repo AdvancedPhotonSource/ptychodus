@@ -5,7 +5,7 @@ from typing import Any, cast, overload
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 from PyQt5.QtGui import QBrush, QFont
 
-from ptychodus.api.common import RealArrayType
+from ptychodus.api.typing import RealArrayType
 from ptychodus.api.fluorescence import ElementMap, FluorescenceDataset
 
 from ...model.fluorescence import (

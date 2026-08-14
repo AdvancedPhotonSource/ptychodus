@@ -14,14 +14,14 @@ from typing import Annotated, Literal, TypeAlias
 import numpy
 from pydantic import BaseModel, ConfigDict, Discriminator, Field
 
-from .diffraction import (
+from ..diffraction import (
     BadPixels,
     CropCenter,
     DiffractionArray,
     DiffractionPatterns,
     SimpleDiffractionArray,
 )
-from .geometry import ImageExtent, PixelGeometry
+from ..geometry import ImageExtent, PixelGeometry
 
 
 def _is_mask(data: numpy.ndarray) -> bool:

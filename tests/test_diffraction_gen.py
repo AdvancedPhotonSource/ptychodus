@@ -1,4 +1,4 @@
-"""Unit tests for generate_diffraction_data in ptychodus.api.diffraction_gen.
+"""Unit tests for generate_diffraction_data in ptychodus.api.simulate.diffraction.
 
 Behaviors verified:
   - Output shapes, dtypes, and basic invariants (non-negativity, no bad pixels)
@@ -14,13 +14,13 @@ import numpy
 import numpy.testing
 import pytest
 
-from ptychodus.api.diffraction_gen import generate_diffraction_data
+from ptychodus.api.simulate.diffraction import generate_diffraction_data
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.propagator import FraunhoferPropagator, PropagatorParameters
+from ptychodus.api.propagate import FraunhoferPropagator, PropagatorParameters
 
 
 # ---------------------------------------------------------------------------

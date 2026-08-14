@@ -14,7 +14,7 @@ from PyQt5.QtCore import (
 from PyQt5.QtGui import QBrush, QFont
 from PyQt5.QtWidgets import QAbstractItemView, QAction, QInputDialog
 
-from ptychodus.api.common import BYTES_PER_MEGABYTE
+from ptychodus.api.constants import BYTES_PER_MEGABYTE, ONE_KILOELECTRONVOLT_EV, ONE_NANOMETER_M
 from ptychodus.api.product import LossValue
 
 from ...model.diffraction import AssembledDiffractionDataset, DiffractionDatasetRepository
@@ -114,7 +114,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                     case 2:
                         if pending or failed:
                             return '—'
-                        return f'{metadata_item.probe_energy_eV.get_value() / 1e3:.4g}'
+                        return f'{metadata_item.probe_energy_eV.get_value() / ONE_KILOELECTRONVOLT_EV:.4g}'
                     case 3:
                         if pending or failed:
                             return '—'
@@ -122,11 +122,11 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                     case 4:
                         if pending or failed:
                             return '—'
-                        return f'{geometry.get_object_plane_pixel_geometry().width_m * 1e9:.4g}'
+                        return f'{geometry.get_object_plane_pixel_geometry().width_m / ONE_NANOMETER_M:.4g}'
                     case 5:
                         if pending or failed:
                             return '—'
-                        return f'{geometry.get_object_plane_pixel_geometry().height_m * 1e9:.4g}'
+                        return f'{geometry.get_object_plane_pixel_geometry().height_m / ONE_NANOMETER_M:.4g}'
                     case 6:
                         if pending or failed:
                             return '—'
@@ -177,7 +177,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 except ValueError:
                     return False
 
-                metadata_item.probe_energy_eV.set_value(energy_keV * 1e3)
+                metadata_item.probe_energy_eV.set_value(energy_keV * ONE_KILOELECTRONVOLT_EV)
                 return True
             elif index.column() == 3:
                 try:

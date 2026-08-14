@@ -3,7 +3,7 @@ from typing import overload
 import logging
 import sys
 
-from ptychodus.api.common import BYTES_PER_MEGABYTE
+from ptychodus.api.constants import BYTES_PER_MEGABYTE
 
 from .item import ProductRepositoryItem, ProductRepositoryItemObserver, ProductRepositoryObserver
 

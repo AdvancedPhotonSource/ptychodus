@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy
 
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
-from ptychodus.api.probe_gen import generate_average_pattern_probe
+from ptychodus.api.simulate.probe import generate_average_pattern_probe
 
 from ...diffraction import AssembledDiffractionDataset
 from .builder import ProbeSequenceBuilder

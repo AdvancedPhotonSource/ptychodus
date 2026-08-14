@@ -4,7 +4,7 @@ import logging
 import numpy
 
 from ptychodus.api.observer import Observable
-from ptychodus.api.parametric import ParameterGroup
+from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.probe import (
     ProbeEntropyMetrics,
     ProbeGeometryProvider,

@@ -1,4 +1,4 @@
-"""Unit tests for ptychodus.api.reconstructor.ReconstructionAmbiguities."""
+"""Unit tests for ptychodus.api.reconstruct.ReconstructionAmbiguities."""
 
 from __future__ import annotations
 
@@ -13,11 +13,13 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.reconstructor import (
-    AssembledDiffractionData,
+from ptychodus.api.diffraction import AssembledDiffractionData
+from ptychodus.api.metrics import estimate_reconstruction_ambiguities
+from ptychodus.api.reconstruct import (
     NullReconstructor,
     PositionIndexFilter,
     ReconstructionAmbiguities,
+    prepare_reconstruct_input,
 )
 
 
@@ -388,7 +390,7 @@ class TestEstimateSingleProduct:
 
     def test_scale_factor_is_always_one(self) -> None:
         product = _make_product()
-        estimate = ReconstructionAmbiguities.estimate(product)
+        estimate = estimate_reconstruction_ambiguities(product)
         assert estimate.object_scale_factor == 1.0
 
     def test_real_positive_object_recovers_phi_and_ramp_exactly(self) -> None:
@@ -406,7 +408,7 @@ class TestEstimateSingleProduct:
         )
         perturbed = _replace_object(clean, perturbed_obj)
 
-        estimate = ReconstructionAmbiguities.estimate(perturbed)
+        estimate = estimate_reconstruction_ambiguities(perturbed)
 
         assert estimate.object_scale_factor == 1.0
         numpy.testing.assert_allclose(
@@ -423,9 +425,9 @@ class TestEstimateSingleProduct:
         # On a random object the absolute estimate has 1/sqrt(N) noise, but
         # estimating then standardizing then re-estimating should land at identity.
         product = _make_product()
-        estimate = ReconstructionAmbiguities.estimate(product)
+        estimate = estimate_reconstruction_ambiguities(product)
         standardized = estimate.standardize_product(product)
-        re_estimate = ReconstructionAmbiguities.estimate(standardized)
+        re_estimate = estimate_reconstruction_ambiguities(standardized)
 
         assert re_estimate.object_scale_factor == 1.0
         assert abs(re_estimate.phase_offset_rad) < 1.0e-10
@@ -451,8 +453,8 @@ class TestEstimateSingleProduct:
         )
         perturbed = _replace_object(clean, perturbed_obj)
 
-        clean_canonical = ReconstructionAmbiguities.estimate(clean).standardize_product(clean)
-        perturbed_canonical = ReconstructionAmbiguities.estimate(perturbed).standardize_product(
+        clean_canonical = estimate_reconstruction_ambiguities(clean).standardize_product(clean)
+        perturbed_canonical = estimate_reconstruction_ambiguities(perturbed).standardize_product(
             perturbed
         )
         numpy.testing.assert_allclose(
@@ -472,8 +474,8 @@ class TestEstimateSingleProduct:
         )
         single_layer_product = _replace_object(product, single_layer_obj)
 
-        multi_estimate = ReconstructionAmbiguities.estimate(product)
-        single_estimate = ReconstructionAmbiguities.estimate(single_layer_product)
+        multi_estimate = estimate_reconstruction_ambiguities(product)
+        single_estimate = estimate_reconstruction_ambiguities(single_layer_product)
         assert multi_estimate == single_estimate
 
     def test_all_ones_weights_match_no_weights(self) -> None:
@@ -481,8 +483,8 @@ class TestEstimateSingleProduct:
         layer_shape = product.object_.get_array()[0].shape
         ones = numpy.ones(layer_shape, dtype=numpy.float64)
 
-        unweighted = ReconstructionAmbiguities.estimate(product)
-        weighted = ReconstructionAmbiguities.estimate(product, weights=ones)
+        unweighted = estimate_reconstruction_ambiguities(product)
+        weighted = estimate_reconstruction_ambiguities(product, weights=ones)
 
         assert unweighted == weighted
 
@@ -507,7 +509,7 @@ class TestEstimateSingleProduct:
         mask[: layer_shape[0] // 4, :] = 0.0
         mask[:, : layer_shape[1] // 4] = 0.0
 
-        estimate = ReconstructionAmbiguities.estimate(perturbed, weights=mask)
+        estimate = estimate_reconstruction_ambiguities(perturbed, weights=mask)
         numpy.testing.assert_allclose(
             estimate.phase_offset_rad, applied.phase_offset_rad, atol=1.0e-10
         )
@@ -529,7 +531,7 @@ class TestEstimateSingleProduct:
         )
         product_c64 = _replace_object(product, new_obj)
 
-        estimate = ReconstructionAmbiguities.estimate(product_c64)
+        estimate = estimate_reconstruction_ambiguities(product_c64)
         assert numpy.isfinite(estimate.phase_offset_rad)
         assert numpy.isfinite(estimate.phase_ramp_x_rad_per_m)
         assert numpy.isfinite(estimate.phase_ramp_y_rad_per_m)
@@ -547,7 +549,7 @@ class TestEstimateRelative:
 
     def test_identical_products_give_identity(self) -> None:
         product = _make_product()
-        estimate = ReconstructionAmbiguities.estimate(product, reference=product)
+        estimate = estimate_reconstruction_ambiguities(product, reference=product)
         numpy.testing.assert_allclose(estimate.object_scale_factor, 1.0, rtol=1.0e-12)
         assert abs(estimate.phase_offset_rad) < 1.0e-10
         # Tolerance is per-pixel: rad/m * pixel_m. The accumulated complex sum
@@ -569,7 +571,7 @@ class TestEstimateRelative:
         )
         target = self._perturbed_product(clean, applied)
 
-        estimate = ReconstructionAmbiguities.estimate(target, reference=clean)
+        estimate = estimate_reconstruction_ambiguities(target, reference=clean)
 
         numpy.testing.assert_allclose(
             estimate.object_scale_factor, applied.object_scale_factor, rtol=1.0e-10
@@ -594,7 +596,7 @@ class TestEstimateRelative:
         )
         target = self._perturbed_product(clean, applied)
 
-        estimate = ReconstructionAmbiguities.estimate(target, reference=clean)
+        estimate = estimate_reconstruction_ambiguities(target, reference=clean)
         recovered = estimate.standardize_product(target)
 
         numpy.testing.assert_allclose(
@@ -617,7 +619,7 @@ class TestEstimateRelative:
         )
         target = self._perturbed_product(clean, applied)
 
-        estimate = ReconstructionAmbiguities.estimate(target, reference=clean)
+        estimate = estimate_reconstruction_ambiguities(target, reference=clean)
 
         assert estimate.object_scale_factor > 0.0
         numpy.testing.assert_allclose(estimate.object_scale_factor, 1.5, rtol=1.0e-10)
@@ -637,8 +639,8 @@ class TestEstimateRelative:
         target = self._perturbed_product(clean, applied)
         ones = numpy.ones(clean.object_.get_array()[0].shape, dtype=numpy.float64)
 
-        without = ReconstructionAmbiguities.estimate(target, reference=clean)
-        with_ones = ReconstructionAmbiguities.estimate(target, reference=clean, weights=ones)
+        without = estimate_reconstruction_ambiguities(target, reference=clean)
+        with_ones = estimate_reconstruction_ambiguities(target, reference=clean, weights=ones)
 
         assert without == with_ones
 
@@ -661,8 +663,8 @@ class TestEstimateRelative:
             )
             return _replace_object(p, new_obj)
 
-        multi_estimate = ReconstructionAmbiguities.estimate(target, reference=clean)
-        single_estimate = ReconstructionAmbiguities.estimate(
+        multi_estimate = estimate_reconstruction_ambiguities(target, reference=clean)
+        single_estimate = estimate_reconstruction_ambiguities(
             first_layer_product(target), reference=first_layer_product(clean)
         )
         assert multi_estimate == single_estimate
@@ -682,7 +684,7 @@ class TestEstimateRelative:
         product_b = _replace_object(product_a, small_obj)
 
         with pytest.raises(ValueError, match='shape'):
-            ReconstructionAmbiguities.estimate(product_b, reference=product_a)
+            estimate_reconstruction_ambiguities(product_b, reference=product_a)
 
     def test_pixel_geometry_mismatch_raises(self) -> None:
         product_a = _make_product()
@@ -700,7 +702,7 @@ class TestEstimateRelative:
         product_b = _replace_object(product_a, different_pixel_obj)
 
         with pytest.raises(ValueError, match='pixel geometry'):
-            ReconstructionAmbiguities.estimate(product_b, reference=product_a)
+            estimate_reconstruction_ambiguities(product_b, reference=product_a)
 
     def test_zero_reference_raises(self) -> None:
         clean = _make_product()
@@ -712,7 +714,7 @@ class TestEstimateRelative:
         )
         zero_product = _replace_object(clean, zero_obj)
         with pytest.raises(ValueError, match='zero'):
-            ReconstructionAmbiguities.estimate(clean, reference=zero_product)
+            estimate_reconstruction_ambiguities(clean, reference=zero_product)
 
 
 class TestEstimateValidation:
@@ -722,32 +724,32 @@ class TestEstimateValidation:
         product = _make_product()
         bad_weights = numpy.ones((1, 1), dtype=numpy.float64)
         with pytest.raises(ValueError, match='shape'):
-            ReconstructionAmbiguities.estimate(product, weights=bad_weights)
+            estimate_reconstruction_ambiguities(product, weights=bad_weights)
 
     def test_negative_weights_raises(self) -> None:
         product = _make_product()
         bad_weights = -numpy.ones(product.object_.get_array()[0].shape, dtype=numpy.float64)
         with pytest.raises(ValueError, match='non-negative'):
-            ReconstructionAmbiguities.estimate(product, weights=bad_weights)
+            estimate_reconstruction_ambiguities(product, weights=bad_weights)
 
     def test_non_finite_weights_raises(self) -> None:
         product = _make_product()
         bad_weights = numpy.ones(product.object_.get_array()[0].shape, dtype=numpy.float64)
         bad_weights[0, 0] = numpy.nan
         with pytest.raises(ValueError, match='finite'):
-            ReconstructionAmbiguities.estimate(product, weights=bad_weights)
+            estimate_reconstruction_ambiguities(product, weights=bad_weights)
 
     def test_all_zero_weights_raises_for_single_product(self) -> None:
         product = _make_product()
         zeros = numpy.zeros(product.object_.get_array()[0].shape, dtype=numpy.float64)
         with pytest.raises(ValueError, match='zero'):
-            ReconstructionAmbiguities.estimate(product, weights=zeros)
+            estimate_reconstruction_ambiguities(product, weights=zeros)
 
     def test_all_zero_weights_raises_for_relative(self) -> None:
         product = _make_product()
         zeros = numpy.zeros(product.object_.get_array()[0].shape, dtype=numpy.float64)
         with pytest.raises(ValueError, match='zero'):
-            ReconstructionAmbiguities.estimate(product, reference=product, weights=zeros)
+            estimate_reconstruction_ambiguities(product, reference=product, weights=zeros)
 
 
 def _make_assembled_data(indexes: list[int], pattern_hw: int = 4) -> AssembledDiffractionData:
@@ -806,26 +808,26 @@ class TestPrepareReconstructInputGuards:
         empty = _make_assembled_data([-1, -1, -1])
         product = _product_with_position_indexes([0, 1, 2])
         with pytest.raises(ValueError, match='empty diffraction dataset'):
-            empty.prepare_reconstruct_input(product)
+            prepare_reconstruct_input(empty, product)
 
     def test_empty_positions_raises(self) -> None:
         # Zero-length probe_positions: filter result is also empty.
         data = _make_assembled_data([0, 1, 2])
         product = _product_with_position_indexes([])
         with pytest.raises(ValueError, match='eliminated'):
-            data.prepare_reconstruct_input(product)
+            prepare_reconstruct_input(data, product)
 
     def test_pattern_range_above_position_range_raises(self) -> None:
         data = _make_assembled_data([10, 11, 12])
         product = _product_with_position_indexes([0, 1, 2])
         with pytest.raises(ValueError, match='No probe positions overlap'):
-            data.prepare_reconstruct_input(product)
+            prepare_reconstruct_input(data, product)
 
     def test_pattern_range_below_position_range_raises(self) -> None:
         data = _make_assembled_data([0, 1, 2])
         product = _product_with_position_indexes([10, 11, 12])
         with pytest.raises(ValueError, match=r'\[0, 2\].*\[10, 12\]'):
-            data.prepare_reconstruct_input(product)
+            prepare_reconstruct_input(data, product)
 
     def test_single_anchor_with_surrounding_patterns_drops_to_match(self) -> None:
         # One unique position at index 5; patterns at [3, 4, 5, 6, 7]. The
@@ -834,7 +836,7 @@ class TestPrepareReconstructInputGuards:
         # is needed, so the operation succeeds with a single output row.
         data = _make_assembled_data([3, 4, 5, 6, 7])
         product = _product_with_position_specs([(5, 1.0e-9, 2.0e-9), (5, 3.0e-9, 4.0e-9)])
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         out = _output_specs(result.product)
         assert len(out) == 1
         assert out[0][0] == 5
@@ -847,14 +849,14 @@ class TestPrepareReconstructInputGuards:
         data = _make_assembled_data([1, 3, 5])
         product = _product_with_position_indexes([0, 2, 4])
         with pytest.raises(ValueError, match='eliminated'):
-            data.prepare_reconstruct_input(product, PositionIndexFilter.EVEN)
+            prepare_reconstruct_input(data, product, PositionIndexFilter.EVEN)
 
     def test_filter_eliminates_all_position_indexes_raises(self) -> None:
         # Positions only at odd indexes; EVEN filter leaves nothing on the position axis.
         data = _make_assembled_data([0, 2, 4])
         product = _product_with_position_indexes([1, 3, 5])
         with pytest.raises(ValueError, match='eliminated'):
-            data.prepare_reconstruct_input(product, PositionIndexFilter.EVEN)
+            prepare_reconstruct_input(data, product, PositionIndexFilter.EVEN)
 
 
 class TestPrepareReconstructInputMerge:
@@ -866,7 +868,7 @@ class TestPrepareReconstructInputMerge:
         specs = [(i, float(i) * PIXEL_M, -float(i) * PIXEL_M) for i in range(5)]
         data = _make_assembled_data(list(range(5)))
         product = _product_with_position_specs(specs)
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         assert _output_specs(result.product) == specs
         assert result.diffraction_patterns.shape[0] == 5
 
@@ -876,7 +878,7 @@ class TestPrepareReconstructInputMerge:
         specs = [(i, float(i) * PIXEL_M, 0.0) for i in range(7)]
         data = _make_assembled_data([0, 2, 4, 6])
         product = _product_with_position_specs(specs)
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         expected = [(i, float(i) * PIXEL_M, 0.0) for i in [0, 2, 4, 6]]
         assert _output_specs(result.product) == expected
 
@@ -885,7 +887,7 @@ class TestPrepareReconstructInputMerge:
         # the merge, each surviving row should still read back its own index.
         data = _make_assembled_data([0, 2, 4, 6])
         product = _product_with_position_indexes(list(range(7)))
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         row_tags = result.diffraction_patterns[:, 0, 0]
         numpy.testing.assert_array_equal(row_tags, [0, 2, 4, 6])
 
@@ -901,7 +903,7 @@ class TestPrepareReconstructInputMerge:
         ]
         data = _make_assembled_data([0, 1, 2])
         product = _product_with_position_specs(specs)
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         out = _output_specs(result.product)
         assert out[0] == (0, 0.0, 0.0)
         assert out[1][0] == 1
@@ -920,7 +922,7 @@ class TestPrepareReconstructInputMerge:
         ]
         data = _make_assembled_data([0, 1, 2])
         product = _product_with_position_specs(specs)
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         out = _output_specs(result.product)
         assert [o[0] for o in out] == [0, 1, 2]
         numpy.testing.assert_allclose(out[0][1:], (2.0, 3.0))
@@ -939,7 +941,7 @@ class TestPrepareReconstructInputMerge:
         ]
         data = _make_assembled_data([0, 2, 4])
         product = _product_with_position_specs(specs)
-        result = data.prepare_reconstruct_input(product, PositionIndexFilter.EVEN)
+        result = prepare_reconstruct_input(data, product, PositionIndexFilter.EVEN)
         assert _output_specs(result.product) == [(0, 0.0, 0.0), (2, 2.0, 0.0), (4, 4.0, 0.0)]
 
     # ----- Interpolation -----
@@ -949,7 +951,7 @@ class TestPrepareReconstructInputMerge:
         specs = [(0, 0.0, 0.0), (2, 10.0, -6.0)]
         data = _make_assembled_data([0, 1, 2])
         product = _product_with_position_specs(specs)
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         out = _output_specs(result.product)
         assert [o[0] for o in out] == [0, 1, 2]
         numpy.testing.assert_allclose(out[0][1:], (0.0, 0.0))
@@ -961,7 +963,7 @@ class TestPrepareReconstructInputMerge:
         specs = [(0, 0.0, 0.0), (5, 5.0, 10.0)]
         data = _make_assembled_data(list(range(6)))
         product = _product_with_position_specs(specs)
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         out = _output_specs(result.product)
         assert [o[0] for o in out] == [0, 1, 2, 3, 4, 5]
         xs = [o[1] for o in out]
@@ -980,7 +982,7 @@ class TestPrepareReconstructInputMerge:
         ]
         data = _make_assembled_data([0, 1, 2, 3, 4])
         product = _product_with_position_specs(specs)
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         xs = [p.coordinate_x_m for p in result.product.probe_positions]
         ys = [p.coordinate_y_m for p in result.product.probe_positions]
         numpy.testing.assert_allclose(xs, [2.0, 4.0, 6.0, 8.0, 10.0])
@@ -992,7 +994,7 @@ class TestPrepareReconstructInputMerge:
         specs = [(0, 1.0, -7.0), (1, 100.0, 0.5), (2, -3.0, 42.0)]
         data = _make_assembled_data([0, 1, 2])
         product = _product_with_position_specs(specs)
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         assert _output_specs(result.product) == specs
 
     # ----- Out-of-range drop -----
@@ -1001,21 +1003,21 @@ class TestPrepareReconstructInputMerge:
         specs = [(0, 0.0, 0.0), (1, 1.0, 0.0), (2, 2.0, 0.0)]
         data = _make_assembled_data([0, 1, 2, 3, 4])
         product = _product_with_position_specs(specs)
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         assert [p.index for p in result.product.probe_positions] == [0, 1, 2]
 
     def test_pattern_indexes_below_range_dropped(self) -> None:
         specs = [(3, 3.0, 0.0), (4, 4.0, 0.0), (5, 5.0, 0.0)]
         data = _make_assembled_data([0, 1, 2, 3, 4, 5])
         product = _product_with_position_specs(specs)
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         assert [p.index for p in result.product.probe_positions] == [3, 4, 5]
 
     def test_pattern_indexes_straddling_both_ends_dropped(self) -> None:
         specs = [(2, 2.0, 0.0), (3, 3.0, 0.0), (4, 4.0, 0.0)]
         data = _make_assembled_data([0, 1, 2, 3, 4, 5, 6])
         product = _product_with_position_specs(specs)
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         assert [p.index for p in result.product.probe_positions] == [2, 3, 4]
 
     def test_boundary_pattern_indexes_inclusive(self) -> None:
@@ -1023,7 +1025,7 @@ class TestPrepareReconstructInputMerge:
         specs = [(2, 2.0, 0.0), (5, 5.0, 0.0)]
         data = _make_assembled_data([2, 5])
         product = _product_with_position_specs(specs)
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         assert _output_specs(result.product) == specs
 
     # ----- Extra positions dropped (no-op) -----
@@ -1032,7 +1034,7 @@ class TestPrepareReconstructInputMerge:
         specs = [(i, float(i), 0.0) for i in range(10)]
         data = _make_assembled_data([0, 5])
         product = _product_with_position_specs(specs)
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         assert _output_specs(result.product) == [(0, 0.0, 0.0), (5, 5.0, 0.0)]
         assert result.diffraction_patterns.shape[0] == 2
 
@@ -1041,13 +1043,13 @@ class TestPrepareReconstructInputMerge:
     def test_filter_even_full_overlap(self) -> None:
         data = _make_assembled_data(list(range(10)))
         product = _product_with_position_indexes(list(range(10)))
-        result = data.prepare_reconstruct_input(product, PositionIndexFilter.EVEN)
+        result = prepare_reconstruct_input(data, product, PositionIndexFilter.EVEN)
         assert [p.index for p in result.product.probe_positions] == [0, 2, 4, 6, 8]
 
     def test_filter_odd_full_overlap(self) -> None:
         data = _make_assembled_data(list(range(10)))
         product = _product_with_position_indexes(list(range(10)))
-        result = data.prepare_reconstruct_input(product, PositionIndexFilter.ODD)
+        result = prepare_reconstruct_input(data, product, PositionIndexFilter.ODD)
         assert [p.index for p in result.product.probe_positions] == [1, 3, 5, 7, 9]
 
     def test_filter_odd_with_duplicates_and_interp(self) -> None:
@@ -1065,7 +1067,7 @@ class TestPrepareReconstructInputMerge:
         ]
         data = _make_assembled_data([1, 3, 5, 7])
         product = _product_with_position_specs(specs)
-        result = data.prepare_reconstruct_input(product, PositionIndexFilter.ODD)
+        result = prepare_reconstruct_input(data, product, PositionIndexFilter.ODD)
         out = _output_specs(result.product)
         assert [o[0] for o in out] == [1, 3, 5, 7]
         numpy.testing.assert_allclose([o[1] for o in out], [2.0, 4.0, 6.0, 8.0])
@@ -1089,7 +1091,7 @@ class TestPrepareReconstructInputMerge:
         ]
         data = _make_assembled_data([0, 2, 4, 6, 8, 10])
         product = _product_with_position_specs(specs)
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         out = _output_specs(result.product)
         assert [o[0] for o in out] == [2, 4, 6, 8]
         numpy.testing.assert_allclose([o[1] for o in out], [2.0, 4.0, 6.0, 8.0])
@@ -1101,7 +1103,7 @@ class TestPrepareReconstructInputMerge:
     def test_product_metadata_probes_object_passed_through(self) -> None:
         data = _make_assembled_data([0, 1, 2])
         product = _product_with_position_indexes([0, 1, 2])
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         assert result.product.metadata is product.metadata
         assert result.product.probes is product.probes
         assert result.product.object_ is product.object_
@@ -1110,7 +1112,7 @@ class TestPrepareReconstructInputMerge:
     def test_bad_pixels_passed_through_unchanged(self) -> None:
         data = _make_assembled_data([0, 1, 2])
         product = _product_with_position_indexes([0, 1, 2])
-        result = data.prepare_reconstruct_input(product)
+        result = prepare_reconstruct_input(data, product)
         assert result.bad_pixels is data.get_bad_pixels()
 
 

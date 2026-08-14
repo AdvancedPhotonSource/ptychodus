@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from ptychodus.api.reconstructor import ReconstructorLibrary
+from ptychodus.api.reconstruct import ReconstructorLibrary
 from ptychodus.api.settings import SettingsRegistry
 
 from ..product import ProductAPI

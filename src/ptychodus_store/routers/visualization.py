@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from ptychodus.api.visualization import (
+from ptychodus.api.visualize import (
     ComplexComponent,
     CylindricalColorModel,
     ScalarTransformation,

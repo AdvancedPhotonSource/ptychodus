@@ -3,17 +3,18 @@ from pathlib import Path
 import logging
 import time
 
-from ptychodus.api.reconstructor import (
+from ptychodus.api.reconstruct import (
     NullReconstructor,
     PositionIndexFilter,
     ReconstructInput,
     Reconstructor,
     ReconstructorLibrary,
     TrainableReconstructor,
+    prepare_reconstruct_input,
 )
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import Parameter, StringParameter
+from ptychodus.api.parameters import Parameter, StringParameter
 
 from ..product import ProductAPI
 from ..task_manager import TaskManager
@@ -133,8 +134,8 @@ class ProcessingAPI:
         logger.info(f'Preparing input data for {product.metadata.name}...')
         tic = time.perf_counter()
         assembled_data = dataset.get_assembled_data()
-        reconstruct_input = assembled_data.prepare_reconstruct_input(
-            product, index_filter=index_filter
+        reconstruct_input = prepare_reconstruct_input(
+            assembled_data, product, index_filter=index_filter
         )
         toc = time.perf_counter()
         logger.info(f'Data preparation time {toc - tic:.4f} seconds.')

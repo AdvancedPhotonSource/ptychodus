@@ -8,6 +8,7 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy
 
+from ptychodus.api.constants import ONE_MICRON_M
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -24,7 +25,6 @@ logger = logging.getLogger(__name__)
 class LCLSPositionFileReader(ProbePositionFileReader):
     SIMPLE_NAME: Final[str] = 'LCLS_XPP'  # noqa: N806
     DISPLAY_NAME: Final[str] = 'LCLS X-ray Pump Probe Files (*.h5 *.hdf5)'  # noqa: N806
-    ONE_MICRON_M: Final[float] = 1e-6
 
     def __init__(
         self,
@@ -49,7 +49,7 @@ class LCLSPositionFileReader(ProbePositionFileReader):
             ipm2 = h5_file['/ipm2/sum'][:]
 
             # vertical coordinate
-            ycoords = -piezo_stage_position_z_um * self.ONE_MICRON_M
+            ycoords = -piezo_stage_position_z_um * ONE_MICRON_M
 
             # horizontal coordinate
             tomography_angle_rad = numpy.deg2rad(self._tomography_angle_deg)
@@ -57,7 +57,7 @@ class LCLSPositionFileReader(ProbePositionFileReader):
             sin_angle = numpy.sin(tomography_angle_rad)
             xcoords = (
                 cos_angle * piezo_stage_position_x_um + sin_angle * piezo_stage_position_y_um
-            ) * self.ONE_MICRON_M
+            ) * ONE_MICRON_M
 
             for index, (ipm, x, y) in enumerate(zip(ipm2, xcoords, ycoords)):
                 if self._ipm2_low_threshold <= ipm and ipm < self._ipm2_high_threshold:
