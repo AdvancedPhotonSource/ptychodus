@@ -12,7 +12,7 @@ from abc import abstractmethod
 from typing import Annotated, Literal, TypeAlias
 
 import numpy
-from pydantic import BaseModel, ConfigDict, Discriminator, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..diffraction import (
     BadPixels,
@@ -184,20 +184,15 @@ class TransposeStep(DiffractionPrepStep):
         return PixelGeometry(width_m=geometry.height_m, height_m=geometry.width_m)
 
 
-# `Discriminator('type')` is what keeps the field-less steps distinguishable: HorizontalFlipStep,
-# VerticalFlipStep, and TransposeStep all serialize to the same empty JSON object, so shape-based
-# union resolution would silently deserialize one as another. The explicit tag is mandatory here,
-# not stylistic.
-DiffractionPrepStepUnion: TypeAlias = Annotated[
+DiffractionPrepStepUnion: TypeAlias = (
     FilterValuesStep
     | CropStep
     | BinningStep
     | PaddingStep
     | HorizontalFlipStep
     | VerticalFlipStep
-    | TransposeStep,
-    Discriminator('type'),
-]
+    | TransposeStep
+)
 
 
 class DiffractionPrepPipeline(BaseModel):
@@ -205,7 +200,10 @@ class DiffractionPrepPipeline(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    steps: tuple[DiffractionPrepStepUnion, ...] = ()
+    # The `discriminator='type'` tag keeps the field-less steps distinguishable:
+    # HorizontalFlipStep, VerticalFlipStep, and TransposeStep all serialize to the same empty
+    # JSON object, so shape-based union resolution would silently deserialize one as another.
+    steps: tuple[Annotated[DiffractionPrepStepUnion, Field(discriminator='type')], ...] = ()
 
     def _apply(self, data: numpy.ndarray) -> numpy.ndarray:
         for step in self.steps:
