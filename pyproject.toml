@@ -60,6 +60,7 @@ xraydb = ["xraydb>=4.5"]
 #ptychi = { path = "../pty-chi", editable = true }
 ptychopinn = { path = "../PtychoPINN", editable = true }
 #ptychopinn = { git = "https://github.com/hoidn/PtychoPINN", branch = "main" }
+ptycho-vit = { path = "../ptycho-vit", editable = true }
 
 #[[tool.uv.index]]
 #name = "pytorch-cu132"
