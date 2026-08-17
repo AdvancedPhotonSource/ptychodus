@@ -7,23 +7,21 @@ import re
 import h5py
 import numpy
 
+from ptychodus.api.constants import HC_EV_ANGSTROM
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.diffraction import (
+    DiffractionArray,
     DiffractionDataset,
+    DiffractionDatasetLayoutNode,
     DiffractionFileReader,
     DiffractionMetadata,
-    DiffractionArray,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.tree import SimpleTreeNode
 
 from .h5_diffraction_file import H5DiffractionPatternArray
 
 logger = logging.getLogger(__name__)
-
-# eV*angstrom: E(eV) = HC_EV_ANGSTROM / wavelength(angstrom)
-HC_EV_ANGSTROM: Final[float] = 12398.4198
 
 
 class ISNDiffractionFileReader(DiffractionFileReader):
@@ -72,7 +70,7 @@ class ISNDiffractionFileReader(DiffractionFileReader):
 
         num_patterns_per_array: list[int] = []
         array_list: list[DiffractionArray] = []
-        contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+        contents_tree = DiffractionDatasetLayoutNode.create_root()
 
         pattern_dtype = numpy.dtype(numpy.int32)
         detector_extent: ImageExtent | None = None
@@ -101,7 +99,7 @@ class ISNDiffractionFileReader(DiffractionFileReader):
 
             indexes = numpy.arange(num_patterns) + offset
             array = H5DiffractionPatternArray(fp.stem, indexes, fp, self.DATA_PATH)
-            contents_tree.create_child([array.get_label(), 'HDF5', str(idx)])
+            contents_tree.add_child(array.get_label(), 'HDF5', str(idx))
             array_list.append(array)
             num_patterns_per_array.append(num_patterns)
             offset += num_patterns

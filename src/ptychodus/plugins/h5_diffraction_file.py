@@ -6,17 +6,17 @@ import numpy
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.diffraction import (
+    DiffractionArray,
     DiffractionDataset,
+    DiffractionDatasetLayoutNode,
     DiffractionFileReader,
     DiffractionFileWriter,
-    DiffractionMetadata,
-    DiffractionArray,
-    DiffractionPatterns,
     DiffractionIndexes,
+    DiffractionMetadata,
+    DiffractionPatterns,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)
 
@@ -87,9 +87,37 @@ class H5DiffractionPatternArray(DiffractionArray):
                 raise ValueError(f'Path {self._file_path}:{self._data_path} is not a dataset!')
 
 
+def _describe_h5_dataset(h5_item: h5py.Dataset) -> str:
+    space_id = h5_item.id.get_space()
+
+    if space_id.get_simple_extent_type() == h5py.h5s.SCALAR:
+        value = h5_item[()]
+
+        if isinstance(value, bytes):
+            return value.decode()
+        if isinstance(value, numpy.ndarray):
+            return f'STRING = {h5_item.asstr()}'
+
+        string_info = h5py.check_string_dtype(value.dtype)
+        if string_info:
+            return f'STRING = "{value.decode(string_info.encoding)}"'
+        return f'SCALAR {value.dtype} = {value}'
+
+    if h5_item.size == 1:
+        try:
+            value = h5_item[()]
+        except Exception:
+            return f'{h5_item.shape} {h5_item.dtype}'
+        return f'DATASET {value.dtype} = {value}'
+
+    return f'{h5_item.shape} {h5_item.dtype}'
+
+
 class H5DiffractionFileTreeBuilder:
     def _add_attributes(
-        self, tree_node: SimpleTreeNode, attribute_manager: h5py.AttributeManager
+        self,
+        tree_node: DiffractionDatasetLayoutNode,
+        attribute_manager: h5py.AttributeManager,
     ) -> None:
         for name, value in attribute_manager.items():
             item_details = ''
@@ -108,14 +136,11 @@ class H5DiffractionFileTreeBuilder:
                 else:
                     item_details = f'SCALAR {value.dtype} = {value}'
 
-            tree_node.create_child([str(name), 'Attribute', item_details])
+            tree_node.add_child(str(name), 'Attribute', item_details)
 
-    def create_root_node(self) -> SimpleTreeNode:
-        return SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
-
-    def build(self, h5_file: h5py.File) -> SimpleTreeNode:
-        root_node = self.create_root_node()
-        unvisited: list[tuple[SimpleTreeNode, h5py.Group]] = [(root_node, h5_file)]
+    def build(self, h5_file: h5py.File) -> DiffractionDatasetLayoutNode:
+        root_node = DiffractionDatasetLayoutNode.create_root()
+        unvisited: list[tuple[DiffractionDatasetLayoutNode, h5py.Group]] = [(root_node, h5_file)]
 
         while unvisited:
             parent_item, h5_group = unvisited.pop()
@@ -124,8 +149,8 @@ class H5DiffractionFileTreeBuilder:
                 item_type = 'Unknown'
                 item_details = ''
                 h5_item = h5_group.get(item_name, getlink=True)
-
-                tree_node = parent_item.create_child([])
+                attrs_to_attach: h5py.AttributeManager | None = None
+                recurse_into: h5py.Group | None = None
 
                 if isinstance(h5_item, h5py.HardLink):
                     item_type = 'Hard Link'
@@ -133,38 +158,12 @@ class H5DiffractionFileTreeBuilder:
 
                     if isinstance(h5_item, h5py.Group):
                         item_type = 'Group'
-                        self._add_attributes(tree_node, h5_item.attrs)
-                        unvisited.append((tree_node, h5_item))
+                        attrs_to_attach = h5_item.attrs
+                        recurse_into = h5_item
                     elif isinstance(h5_item, h5py.Dataset):
                         item_type = 'Dataset'
-                        self._add_attributes(tree_node, h5_item.attrs)
-                        space_id = h5_item.id.get_space()
-
-                        if space_id.get_simple_extent_type() == h5py.h5s.SCALAR:
-                            value = h5_item[()]
-
-                            if isinstance(value, bytes):
-                                item_details = value.decode()
-                            elif isinstance(value, numpy.ndarray):
-                                item_details = f'STRING = {h5_item.asstr()}'
-                            else:
-                                string_info = h5py.check_string_dtype(value.dtype)
-
-                                if string_info:
-                                    item_details = (
-                                        f'STRING = "{value.decode(string_info.encoding)}"'
-                                    )
-                                else:
-                                    item_details = f'SCALAR {value.dtype} = {value}'
-                        elif h5_item.size == 1:
-                            try:
-                                value = h5_item[()]
-                            except Exception:
-                                item_details = f'{h5_item.shape} {h5_item.dtype}'
-                            else:
-                                item_details = f'DATASET {value.dtype} = {value}'
-                        else:
-                            item_details = f'{h5_item.shape} {h5_item.dtype}'
+                        attrs_to_attach = h5_item.attrs
+                        item_details = _describe_h5_dataset(h5_item)
                 elif isinstance(h5_item, h5py.SoftLink):
                     item_type = 'Soft Link'
                     item_details = f'{h5_item.path}'
@@ -174,7 +173,11 @@ class H5DiffractionFileTreeBuilder:
                 else:
                     logger.debug(f'Unknown item "{item_name}"')
 
-                tree_node.item_data = [item_name, item_type, item_details]
+                tree_node = parent_item.add_child(str(item_name), item_type, item_details)
+                if attrs_to_attach is not None:
+                    self._add_attributes(tree_node, attrs_to_attach)
+                if recurse_into is not None:
+                    unvisited.append((tree_node, recurse_into))
 
         return root_node
 

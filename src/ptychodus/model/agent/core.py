@@ -1,48 +1,14 @@
-from collections.abc import Iterator, Sequence
-import logging
-
 from ptychodus.api.settings import SettingsRegistry
 
-from .argo import ArgoChatTerminal
-from .chat import ChatHistory, ChatTerminal
-from .settings import ArgoSettings
-
-logger = logging.getLogger(__name__)
-
-
-class AgentPresenter:
-    def __init__(self, terminal: ChatTerminal) -> None:
-        self._terminal = terminal
-
-    def get_available_chat_models(self) -> Iterator[str]:
-        for model in [
-            'gpt35',
-            'gpt35large',
-            'gpt4',
-            'gpt4large',
-            'gpt4o',
-            'gpt4olatestgpt4turbo',
-            'gpto1',
-            'gpto1mini',
-            'gpto3mini',
-        ]:
-            yield model
-
-    def send_message(self, content: str) -> None:
-        if self._terminal is not None:
-            self._terminal.send_message(content)
-
-    def get_available_embeddings_models(self) -> Iterator[str]:
-        for model in ['ada002', 'v3large', 'v3small']:
-            yield model
-
-    def embed_text(self, texts: Sequence[str]) -> Sequence[Sequence[float]]:
-        return [[]] if self._terminal is None else self._terminal.embed_texts(texts)
+from .model_catalog import ModelCatalog
+from .repository import ConversationRepository
+from .settings import AgentSettings
+from .terminal import ChatTerminal
 
 
 class AgentCore:
-    def __init__(self, settings_registry: SettingsRegistry):
-        self.settings = ArgoSettings(settings_registry)
-        self.chat_history = ChatHistory()
-        self._terminal = ArgoChatTerminal(self.settings, self.chat_history)
-        self.presenter = AgentPresenter(self._terminal)
+    def __init__(self, settings_registry: SettingsRegistry) -> None:
+        self.settings = AgentSettings(settings_registry)
+        self.repository = ConversationRepository(self.settings.database_path.get_value())
+        self.terminal = ChatTerminal(self.settings, self.repository)
+        self.catalog = ModelCatalog(self.settings)

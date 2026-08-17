@@ -6,9 +6,9 @@ from typing import Any, Final
 import json
 
 from pydantic import BaseModel
-import requests
+import httpx
 
-from ptychodus.api.common import get_ptychodus_dir
+from ptychodus.api.settings import get_ptychodus_dir
 
 from .tokens import create_headers
 
@@ -47,42 +47,42 @@ class AmSCGlobusTransferClient:
 
     def __init__(self, api_base_url: str, access_token: str) -> None:
         self._api_base_url = api_base_url.rstrip('/')
-        self._headers = create_headers(access_token)
+        self._client = httpx.Client(
+            base_url=self._api_base_url,
+            headers=create_headers(access_token),
+            timeout=30.0,
+        )
 
     def check_auth_token(self) -> Mapping[str, Any]:
-        response = requests.get(f'{self._api_base_url}/movement/auth/globus', headers=self._headers)
+        response = self._client.get('/movement/auth/globus')
         response.raise_for_status()
         return response.json()
 
     def start_transfer(self, inputs: GlobusTransferInputs) -> GlobusTransferResult:
-        response = requests.post(
-            f'{self._api_base_url}/movement/transfer/globus',
+        response = self._client.post(
+            '/movement/transfer/globus',
             json=inputs.model_dump(mode='json'),
-            headers=self._headers,
         )
         response.raise_for_status()
         return GlobusTransferResult.model_validate(response.json())
 
     def get_transfer(self, transfer_id: str) -> GlobusTransferResult:
-        response = requests.get(
-            f'{self._api_base_url}/movement/transfer/globus/{transfer_id}',
-            headers=self._headers,
-        )
+        response = self._client.get(f'/movement/transfer/globus/{transfer_id}')
         response.raise_for_status()
         return GlobusTransferResult.model_validate(response.json())
 
     def delete_transfer(self, transfer_id: str) -> GlobusTransferResult:
-        response = requests.delete(
-            f'{self._api_base_url}/movement/transfer/globus/{transfer_id}',
-            headers=self._headers,
-        )
+        response = self._client.delete(f'/movement/transfer/globus/{transfer_id}')
         response.raise_for_status()
         return GlobusTransferResult.model_validate(response.json())
 
     def print_openapi_specification(self) -> None:
-        response = requests.get(f'{self._api_base_url}/openapi.json')
+        response = httpx.get(f'{self._api_base_url}/openapi.json', timeout=30.0)
         response.raise_for_status()
         print(json.dumps(response.json(), indent=2))
+
+    def close(self) -> None:
+        self._client.close()
 
 
 def get_amsc_transfer_api_url() -> str:

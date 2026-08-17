@@ -26,7 +26,7 @@ from PyQt5.QtWidgets import (
 
 from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import (
+from ptychodus.api.parameters import (
     BooleanParameter,
     IntegerParameter,
     Parameter,
@@ -653,7 +653,7 @@ class ParameterViewBuilder:
 
     def add_combo_box(
         self,
-        parameter: StringParameter,
+        parameter: Parameter[str],
         items: Iterable[str],
         label: str,
         *,

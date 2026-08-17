@@ -11,13 +11,193 @@ from skimage.metrics import (
     structural_similarity,
 )
 
-from .common import ComplexArrayType, IntegerArrayType, RealArrayType
+from .typing import ComplexArrayType, IntegerArrayType, RealArrayType
 from .diffraction import BadPixels, DiffractionPatterns
-from .diffraction_gen import generate_diffraction_data
-from .geometry import PixelGeometry, fourier_shift_2d
+from .fourier import fourier_shift_2d
+from .simulate.diffraction import generate_diffraction_data
+from .geometry import PixelGeometry
 from .object import ObjectCenter, align_objects
 from .product import Product
-from .reconstructor import ReconstructionAmbiguities
+from .reconstruct import ReconstructionAmbiguities
+
+
+def _validate_weights(
+    weights: RealArrayType | None, expected_shape: tuple[int, ...]
+) -> RealArrayType | None:
+    if weights is None:
+        return None
+    weights_arr = numpy.asarray(weights, dtype=numpy.float64)
+    if weights_arr.shape != expected_shape:
+        raise ValueError(
+            f'weights shape {weights_arr.shape} does not match'
+            f' object layer 0 shape {expected_shape}!'
+        )
+    if not numpy.all(numpy.isfinite(weights_arr)):
+        raise ValueError('weights must all be finite!')
+    if numpy.any(weights_arr < 0.0):
+        raise ValueError('weights must all be non-negative!')
+    return weights_arr
+
+
+def _estimate_phase_offset_and_ramp(
+    *,
+    signal: numpy.ndarray,
+    weights: RealArrayType | None,
+    pixel_width_m: float,
+    pixel_height_m: float,
+    position_x_m: RealArrayType,
+    position_y_m: RealArrayType,
+) -> tuple[float, float, float]:
+    """Recover (phi, k_x_rad_per_m, k_y_rad_per_m) from a complex 2D signal.
+
+    The signal's phase is assumed to be ``phi + k_x*x + k_y*y`` plus
+    high-frequency content; its magnitude provides the natural amplitude
+    weighting. The ramp is recovered from per-pixel complex differences along
+    each axis (so unwrapping is unnecessary), then ``phi`` is recovered as the
+    weighted circular mean of the de-ramped signal.
+    """
+    # Differential phase along x: arg(S[:, x+1] * conj(S[:, x])) carries
+    # k_x * pixel_width_m modulo 2pi without ever wrapping per-pair.
+    delta_x = signal[:, 1:] * numpy.conj(signal[:, :-1])
+    if weights is None:
+        accum_x = numpy.sum(delta_x)
+    else:
+        w_x = weights[:, 1:] * weights[:, :-1]
+        accum_x = numpy.sum(w_x * delta_x)
+    k_x_per_px = numpy.angle(accum_x)
+
+    delta_y = signal[1:, :] * numpy.conj(signal[:-1, :])
+    if weights is None:
+        accum_y = numpy.sum(delta_y)
+    else:
+        w_y = weights[1:, :] * weights[:-1, :]
+        accum_y = numpy.sum(w_y * delta_y)
+    k_y_per_px = numpy.angle(accum_y)
+
+    k_x_rad_per_m = k_x_per_px / pixel_width_m
+    k_y_rad_per_m = k_y_per_px / pixel_height_m
+
+    ramp = k_x_rad_per_m * position_x_m + k_y_rad_per_m * position_y_m
+    signal_deramped = signal * numpy.exp(-1j * ramp)
+    if weights is None:
+        phi_accum = numpy.sum(signal_deramped)
+    else:
+        phi_accum = numpy.sum(weights * signal_deramped)
+
+    if phi_accum == 0:
+        raise ValueError('Cannot estimate phase offset: weighted signal magnitude is zero.')
+
+    phi = numpy.angle(phi_accum)
+    return float(phi), float(k_x_rad_per_m), float(k_y_rad_per_m)
+
+
+def estimate_reconstruction_ambiguities(
+    product: Product,
+    *,
+    reference: Product | None = None,
+    weights: RealArrayType | None = None,
+) -> ReconstructionAmbiguities:
+    """Estimate the ambiguities present in ``product``.
+
+    Without ``reference``: estimate ``(phi, k_x, k_y)`` that flatten layer
+    0's phase in the amplitude-weighted circular-mean sense.
+    ``object_scale_factor`` is fixed at ``1.0`` because there is no
+    reference amplitude to normalize against.
+
+    With ``reference``: estimate all four ambiguities ``(s, phi, k_x, k_y)``
+    on ``product`` such that
+    ``estimate.standardize_product(product)`` best matches ``reference`` in
+    the weighted least-squares sense. The two products must agree in
+    layer-0 shape and object pixel geometry. The driving signal becomes
+    ``S = product[0] * conj(reference[0])``, whose phase is exactly
+    ``phi + k_x*x + k_y*y`` and whose magnitude ``|product| * |reference|``
+    provides natural amplitude weighting (pixels where either product is
+    weak contribute little).
+
+    The estimate is fully complex-domain (sums of phasors, ``numpy.angle``
+    of complex weighted sums) and so requires no phase unwrapping. Pixels
+    of zero amplitude contribute exactly zero to the relevant sums and are
+    therefore ignored automatically.
+
+    Args:
+        product: Product whose ambiguities are being measured. The result
+            is returned in this product's coordinate frame.
+        reference: Optional anchor product. When supplied, the scale factor
+            is estimated too; when ``None``, scale is fixed at ``1.0``.
+        weights: Optional non-negative per-pixel weight array, shape
+            ``(height_px, width_px)`` matching layer 0. Multiplies the
+            natural amplitude weighting. Pass a 0/1 mask to restrict the
+            estimate to a region of interest.
+    """
+    obj = product.object_
+    layer_zero = obj.get_array()[0].astype(numpy.complex128)
+    pixel_geometry = obj.get_pixel_geometry()
+    coords = obj.get_geometry().get_transverse_coordinates()
+    weights_arr = _validate_weights(weights, layer_zero.shape)
+
+    if reference is None:
+        ref_layer_zero = None
+        signal = layer_zero
+    else:
+        ref_obj = reference.object_
+        ref_shape = ref_obj.get_array().shape[-2:]
+
+        if ref_shape != layer_zero.shape:
+            raise ValueError(
+                f'Object layer-0 shape mismatch: reference {ref_shape} vs product {layer_zero.shape}!'
+            )
+
+        ref_pixel_geometry = ref_obj.get_pixel_geometry()
+
+        if ref_pixel_geometry != pixel_geometry:
+            raise ValueError(
+                f'Object pixel geometry mismatch: reference {ref_pixel_geometry} vs product {pixel_geometry}!'
+            )
+
+        ref_layer_zero = ref_obj.get_array()[0].astype(numpy.complex128)
+        signal = layer_zero * numpy.conj(ref_layer_zero)
+
+    phi, k_x, k_y = _estimate_phase_offset_and_ramp(
+        signal=signal,
+        weights=weights_arr,
+        pixel_width_m=pixel_geometry.width_m,
+        pixel_height_m=pixel_geometry.height_m,
+        position_x_m=coords.position_x_m,
+        position_y_m=coords.position_y_m,
+    )
+
+    if ref_layer_zero is None:
+        s = 1.0
+    else:
+        # Weighted-LS solution for s in product ≈ s * exp(i(phi + k·r)) * ref:
+        # s = Re(sum w * signal * exp(-i(phi + ramp))) / sum(w * |ref|^2).
+        ramp = k_x * coords.position_x_m + k_y * coords.position_y_m
+        correction = numpy.exp(-1j * (phi + ramp))
+        ref_intensity = numpy.square(numpy.abs(ref_layer_zero))
+
+        if weights_arr is None:
+            numerator = numpy.real(numpy.sum(signal * correction))
+            denominator = numpy.sum(ref_intensity)
+        else:
+            numerator = numpy.real(numpy.sum(weights_arr * signal * correction))
+            denominator = numpy.sum(weights_arr * ref_intensity)
+
+        if not (denominator > 0.0):
+            raise ValueError('Cannot estimate scale: weighted reference object intensity is zero.')
+
+        s = numerator / denominator
+
+        # Convention: keep object_scale_factor > 0. Fold any sign flip into phi.
+        if s < 0.0:
+            s = -s
+            phi = phi + numpy.pi
+
+    return ReconstructionAmbiguities(
+        object_scale_factor=float(s),
+        phase_offset_rad=phi,
+        phase_ramp_x_rad_per_m=k_x,
+        phase_ramp_y_rad_per_m=k_y,
+    )
 
 
 @dataclass(frozen=True)
@@ -32,7 +212,7 @@ class ObjectComparison:
     holds the result of removing those degrees of freedom so the same prepared
     pair can be fed to every metric.
 
-    Construct via :meth:`from_products`, which:
+    Construct via :func:`compute_object_comparison`, which:
 
     1. Sub-pixel registers the test object onto the reference (:func:`align_objects`).
     2. Estimates the four ambiguity scalars and standardizes the test product
@@ -40,74 +220,21 @@ class ObjectComparison:
     3. Flattens multi-layer objects via :meth:`Object.get_layers_flattened`.
     4. Promotes both arrays to a common complex dtype.
 
-    Attributes:
-        reference_complex: 2D complex array, the reference object's flattened layers,
-            promoted to the common dtype.
-        test_complex: 2D complex array, the standardized + aligned test object's
-            flattened layers. Same shape and dtype as ``reference_complex``.
-        pixel_geometry: Shared pixel geometry of both reconstructions (validated
-            equal by the upstream primitives).
-        ambiguities: The ambiguities removed from the test side, useful as
-            provenance (e.g. for reporting "how much ramp/scale was removed"
-            alongside the metric value).
     """
 
     reference_complex: ComplexArrayType
+    """2D complex array, the reference object's flattened layers, promoted to the common dtype."""
     test_complex: ComplexArrayType
+    """2D complex array, the standardized + aligned test object's flattened layers.
+
+    Same shape and dtype as ``reference_complex``.
+    """
     pixel_geometry: PixelGeometry
+    """Shared pixel geometry of both reconstructions (validated equal by the upstream
+    primitives)."""
     ambiguities: ReconstructionAmbiguities
-
-    @classmethod
-    def from_products(
-        cls,
-        reference: Product,
-        test: Product,
-        *,
-        upsample_factor: int = 100,
-        weights: RealArrayType | None = None,
-    ) -> ObjectComparison:
-        """Align ``test`` onto ``reference``, standardize ambiguities, and bundle the pair.
-
-        Args:
-            reference: The reconstruction treated as ground truth. Defines the
-                array indexing and ambiguity anchor.
-            test: The reconstruction being evaluated against ``reference``.
-            upsample_factor: Sub-pixel precision for
-                :func:`skimage.registration.phase_cross_correlation`, forwarded
-                through :func:`align_objects`.
-            weights: Optional non-negative per-pixel weights for the ambiguity
-                estimate, shape ``(height_px, width_px)`` matching layer 0. Pass
-                a 0/1 mask to restrict the estimate to a region of interest.
-
-        Raises:
-            ValueError: If the two products' objects disagree on pixel geometry,
-                if their flattened or layer-0 shapes differ, or if the weighted
-                reference intensity is zero. These checks come from
-                :func:`align_objects` and
-                :meth:`ReconstructionAmbiguities.estimate`; this method does not
-                duplicate them.
-        """
-        aligned_test_object = align_objects(
-            reference.object_, test.object_, upsample_factor=upsample_factor
-        )
-        aligned_test = replace(test, object_=aligned_test_object)
-
-        ambiguities = ReconstructionAmbiguities.estimate(
-            aligned_test, reference=reference, weights=weights
-        )
-        standardized_test = ambiguities.standardize_product(aligned_test)
-
-        reference_array = reference.object_.get_layers_flattened()
-        test_array = standardized_test.object_.get_layers_flattened()
-
-        common_dtype = numpy.result_type(reference_array.dtype, test_array.dtype)
-
-        return cls(
-            reference_complex=reference_array.astype(common_dtype, copy=False),
-            test_complex=test_array.astype(common_dtype, copy=False),
-            pixel_geometry=reference.object_.get_pixel_geometry().copy(),
-            ambiguities=ambiguities,
-        )
+    """The ambiguities removed from the test side, useful as provenance (e.g. for reporting
+    "how much ramp/scale was removed" alongside the metric value)."""
 
     @property
     def reference_amplitude(self) -> RealArrayType:
@@ -131,8 +258,61 @@ class ObjectComparison:
         return numpy.angle(self.test_complex)
 
 
+def compute_object_comparison(
+    reference: Product,
+    test: Product,
+    *,
+    upsample_factor: int = 100,
+    weights: RealArrayType | None = None,
+) -> ObjectComparison:
+    """Align ``test`` onto ``reference``, standardize ambiguities, and bundle the pair.
+
+    Args:
+        reference: The reconstruction treated as ground truth. Defines the
+            array indexing and ambiguity anchor.
+        test: The reconstruction being evaluated against ``reference``.
+        upsample_factor: Sub-pixel precision for
+            :func:`skimage.registration.phase_cross_correlation`, forwarded
+            through :func:`align_objects`.
+        weights: Optional non-negative per-pixel weights for the ambiguity
+            estimate, shape ``(height_px, width_px)`` matching layer 0. Pass
+            a 0/1 mask to restrict the estimate to a region of interest.
+
+    Raises:
+        ValueError: If the two products' objects disagree on pixel geometry,
+            if their flattened or layer-0 shapes differ, or if the weighted
+            reference intensity is zero. These checks come from
+            :func:`align_objects` and
+            :func:`estimate_reconstruction_ambiguities`; this function does
+            not duplicate them.
+    """
+    aligned_test_object = align_objects(
+        reference.object_, test.object_, upsample_factor=upsample_factor
+    )
+    aligned_test = replace(test, object_=aligned_test_object)
+
+    ambiguities = estimate_reconstruction_ambiguities(
+        aligned_test, reference=reference, weights=weights
+    )
+    standardized_test = ambiguities.standardize_product(aligned_test)
+
+    reference_array = reference.object_.get_layers_flattened()
+    test_array = standardized_test.object_.get_layers_flattened()
+
+    common_dtype = numpy.result_type(reference_array.dtype, test_array.dtype)
+
+    return ObjectComparison(
+        reference_complex=reference_array.astype(common_dtype, copy=False),
+        test_complex=test_array.astype(common_dtype, copy=False),
+        pixel_geometry=reference.object_.get_pixel_geometry().copy(),
+        ambiguities=ambiguities,
+    )
+
+
 @dataclass(frozen=True)
 class FourierRingCorrelation:
+    """Per-ring Fourier ring correlation between two complex images, with resolution estimators."""
+
     spatial_frequency_per_m: RealArrayType
     correlation: RealArrayType
     pixels_per_ring: IntegerArrayType
@@ -162,7 +342,7 @@ class FourierRingCorrelation:
         re-deriving the formula.
         """
         sigma = 0.5 * (2.0**bits - 1.0)
-        sqrt_sigma = numpy.sqrt(sigma).item()
+        sqrt_sigma = numpy.sqrt(sigma)
         n_per_ring = numpy.asarray(self.pixels_per_ring, dtype=float)
 
         with numpy.errstate(divide='ignore', invalid='ignore'):
@@ -211,27 +391,27 @@ class FourierRingCorrelation:
         if max_frequency_per_m is not None:
             mask &= freq <= max_frequency_per_m
 
-        if int(mask.sum()) < 2:
+        if mask.sum() < 2:
             return float('nan')
 
         f = freq[mask]
         y = corr[mask]
-        span = float(f[-1] - f[0])
+        span = f[-1] - f[0]
 
         if span <= 0.0:
             return float('nan')
 
-        auc = numpy.trapezoid(y, f).item()
-        return auc / span if normalize else auc
+        auc = numpy.trapezoid(y, f)
+        return float(auc / span if normalize else auc)
 
     def get_average_signal_to_noise_ratio(self) -> float:
         """Mean SSNR across bins, excluding non-finite values (NaN and +inf)."""
         ssnr = self.get_spectral_signal_to_noise_ratio()
         finite = numpy.isfinite(ssnr)
-        if not bool(finite.any()):
+        if not finite.any():
             return float('nan')
 
-        return numpy.mean(ssnr[finite]).item()
+        return float(numpy.mean(ssnr[finite]))
 
     def get_resolution_m_at_signal_to_noise_threshold(self, snr: float) -> float:
         """Resolution where the FRC-derived SSNR drops below ``snr``.
@@ -254,20 +434,20 @@ class FourierRingCorrelation:
         if below.size == 0:
             return float('nan')
 
-        first = int(below[0])
+        first = below[0]
         # Only interpolate when the previous bin was strictly above the threshold.
         # If it merely touched the threshold (diff == 0, e.g. the DC bin where
         # FRC == 1 against the bit-threshold's N=1 limit of 1), the crossing
         # belongs at freq[first], not at the touchpoint.
         if first > 0 and finite[first - 1] and diff[first - 1] > 0.0:
-            g0 = diff[first - 1].item()
-            g1 = diff[first].item()
+            g0 = diff[first - 1]
+            g1 = diff[first]
             alpha = g0 / (g0 - g1)
-            crossing_freq = float(freq[first - 1]) + alpha * float(freq[first] - freq[first - 1])
+            crossing_freq = freq[first - 1] + alpha * (freq[first] - freq[first - 1])
         else:
-            crossing_freq = freq[first].item()
+            crossing_freq = freq[first]
 
-        return float('nan') if crossing_freq <= 0.0 else 1.0 / crossing_freq
+        return float('nan') if crossing_freq <= 0.0 else float(1.0 / crossing_freq)
 
 
 def compute_fourier_ring_correlation(
@@ -295,7 +475,7 @@ def compute_fourier_ring_correlation(
 
     kx_per_m = scipy.fft.fftfreq(width_px, d=pixel_width_m)
     ky_per_m = scipy.fft.fftfreq(height_px, d=pixel_height_m)
-    bin_size_per_m = max(abs(kx_per_m[1].item()), abs(ky_per_m[1].item()))
+    bin_size_per_m = max(abs(kx_per_m[1]), abs(ky_per_m[1]))
 
     radii_per_m = numpy.hypot(ky_per_m[:, None], kx_per_m[None, :])
     rings = numpy.floor(radii_per_m / bin_size_per_m).astype(numpy.intp, copy=False)
@@ -348,7 +528,7 @@ def compute_root_mean_square_error(
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
 
     diff = test - reference
-    return numpy.sqrt(numpy.mean(numpy.square(numpy.absolute(diff)))).item()
+    return float(numpy.sqrt(numpy.mean(numpy.square(numpy.absolute(diff)))))
 
 
 def compute_mean_absolute_error(
@@ -364,7 +544,7 @@ def compute_mean_absolute_error(
     if reference.shape != test.shape:
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
 
-    return numpy.mean(numpy.absolute(test - reference)).item()
+    return float(numpy.mean(numpy.absolute(test - reference)))
 
 
 def compute_r_factor(
@@ -385,12 +565,12 @@ def compute_r_factor(
     if reference.shape != test.shape:
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
 
-    denominator = numpy.sum(numpy.absolute(reference)).item()
+    denominator = numpy.sum(numpy.absolute(reference))
     if denominator == 0.0:
         return float('nan')
 
-    numerator = numpy.sum(numpy.absolute(test - reference)).item()
-    return numerator / denominator
+    numerator = numpy.sum(numpy.absolute(test - reference))
+    return float(numerator / denominator)
 
 
 def _infer_data_range(reference: RealArrayType) -> float:
@@ -399,7 +579,7 @@ def _infer_data_range(reference: RealArrayType) -> float:
     Uses ``reference.max() - reference.min()``, matching scikit-image's
     recommendation for floating-point inputs.
     """
-    return numpy.ptp(reference).item()
+    return float(numpy.ptp(reference))
 
 
 def compute_peak_signal_to_noise_ratio(
@@ -422,7 +602,7 @@ def compute_peak_signal_to_noise_ratio(
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
 
     effective_range = _infer_data_range(reference) if data_range is None else data_range
-    return peak_signal_noise_ratio(reference, test, data_range=effective_range).item()
+    return float(peak_signal_noise_ratio(reference, test, data_range=effective_range))
 
 
 def compute_structural_similarity(
@@ -441,7 +621,7 @@ def compute_structural_similarity(
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
 
     effective_range = _infer_data_range(reference) if data_range is None else data_range
-    return structural_similarity(reference, test, data_range=effective_range).item()
+    return float(structural_similarity(reference, test, data_range=effective_range))
 
 
 def compute_normalized_mutual_information(
@@ -491,32 +671,33 @@ class ReconstructionResiduals:
     as errors in predicted intensity. These maps therefore quantify detector-domain data-fit
     quality and are *not* phase-blind.
 
-    Attributes:
-        real_space_error_map: 2D array on the object grid. For each object pixel, the
-            probe-footprint-weighted aggregation of per-frame amplitude residuals over every
-            frame whose probe touched that pixel, divided by the same probe-weighted
-            aggregation of measured amplitudes. Each frame's probe-intensity patch is
-            normalized to sum to 1 before splatting, so frames contribute equally regardless
-            of probe power (relevant for variable-probe reconstructions). Scan-density
-            invariant: doubling the number of frames covering a pixel doubles both splats,
-            leaving the ratio unchanged. NaN where no R-factor is defined: un-illuminated
-            pixels (no frame contributed) and object regions touched only by frames with zero
-            measured signal (``Σ √I_meas = 0``).
-        object_pixel_geometry: Pixel geometry of ``real_space_error_map``.
-        object_center: Real-space origin of ``real_space_error_map``.
-        reciprocal_space_error_map: 2D array on the detector grid. Each pixel is
-            ``Σ_n |√I_meas,n − √I_pred,n| / Σ_n √I_meas,n``, summed across frames. NaN where
-            no R-factor is defined: bad pixels and detector pixels with no measured signal
-            across any frame.
-        detector_pixel_geometry: Pixel geometry of ``reciprocal_space_error_map`` (derived from
-            the forward propagator).
     """
 
     real_space_error_map: RealArrayType
+    """2D array on the object grid.
+
+    For each object pixel, the probe-footprint-weighted aggregation of per-frame amplitude
+    residuals over every frame whose probe touched that pixel, divided by the same
+    probe-weighted aggregation of measured amplitudes. Each frame's probe-intensity patch is
+    normalized to sum to 1 before splatting, so frames contribute equally regardless of probe
+    power (relevant for variable-probe reconstructions). Scan-density invariant: doubling the
+    number of frames covering a pixel doubles both splats, leaving the ratio unchanged. NaN
+    where no R-factor is defined: un-illuminated pixels (no frame contributed) and object
+    regions touched only by frames with zero measured signal (``Σ √I_meas = 0``).
+    """
     object_pixel_geometry: PixelGeometry
+    """Pixel geometry of ``real_space_error_map``."""
     object_center: ObjectCenter
+    """Real-space origin of ``real_space_error_map``."""
     reciprocal_space_error_map: RealArrayType
+    """2D array on the detector grid.
+
+    Each pixel is ``Σ_n |√I_meas,n − √I_pred,n| / Σ_n √I_meas,n``, summed across frames. NaN
+    where no R-factor is defined: bad pixels and detector pixels with no measured signal across
+    any frame.
+    """
     detector_pixel_geometry: PixelGeometry
+    """Pixel geometry of ``reciprocal_space_error_map`` (derived from the forward propagator)."""
 
 
 def compute_reconstruction_residuals(
@@ -547,7 +728,7 @@ def compute_reconstruction_residuals(
 
     Inputs must already be aligned: ``measured_patterns`` is shape ``(N, H, W)``
     in product position order (typically the output of
-    :meth:`AssembledDiffractionData.prepare_reconstruct_input`).
+    :func:`ptychodus.api.reconstruct.prepare_reconstruct_input`).
 
     **Hard-x-ray caveat.** At hard-x-ray energies the detector dynamic range commonly spans
     4–6 orders of magnitude and the ``√I`` transform compresses that only to ~2–3 orders, so
@@ -626,8 +807,8 @@ def compute_reconstruction_residuals(
 
         ys = slice(y_lower, y_lower + probe_geometry.height_px)
         xs = slice(x_lower, x_lower + probe_geometry.width_px)
-        numerator_splat[ys, xs] += float(num_i) * patch
-        denominator_splat[ys, xs] += float(den_i) * patch
+        numerator_splat[ys, xs] += num_i * patch
+        denominator_splat[ys, xs] += den_i * patch
 
     real_space_error_map = numpy.full_like(numerator_splat, numpy.nan)
     numpy.divide(

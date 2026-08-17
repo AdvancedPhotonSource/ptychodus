@@ -3,7 +3,7 @@ from enum import IntEnum
 from typing import overload
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import IntegerParameter
+from ptychodus.api.parameters import IntegerParameter
 
 
 class PtyChiAffineDegreesOfFreedom(IntEnum):

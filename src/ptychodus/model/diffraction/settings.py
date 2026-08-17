@@ -1,8 +1,7 @@
 from pathlib import Path
 
-from ptychodus.api.common import get_ptychodus_dir
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.settings import SettingsRegistry
+from ptychodus.api.settings import SettingsRegistry, get_ptychodus_dir
 
 
 class DetectorSettings(Observable, Observer):
@@ -11,11 +10,9 @@ class DetectorSettings(Observable, Observer):
         self._group = registry.create_group('Detector')
         self._group.add_observer(self)
 
-        self.width_px = self._group.create_integer_parameter('WidthInPixels', 1024, minimum=1)
         self.pixel_width_m = self._group.create_real_parameter(
             'PixelWidthInMeters', 75e-6, minimum=0.0
         )
-        self.height_px = self._group.create_integer_parameter('HeightInPixels', 1024, minimum=1)
         self.pixel_height_m = self._group.create_real_parameter(
             'PixelHeightInMeters', 75e-6, minimum=0.0
         )

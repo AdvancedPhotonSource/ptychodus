@@ -3,9 +3,8 @@ import logging
 
 from scipy.fft import fft2, fftshift, ifftshift
 
-from ptychodus.api.common import ComplexArrayType
+from ptychodus.api.typing import ComplexArrayType
 from ptychodus.api.geometry import Box2D, PixelGeometry
-from ptychodus.api.interpolate import NearestNeighborArrayInterpolator
 from ptychodus.api.object import Object
 
 from ..product import ProductRepository
@@ -34,11 +33,13 @@ class FourierAnalyzer:
     def analyze_roi(self, product_index: int, bounding_box: Box2D) -> FourierAnalysisResult:
         logger.debug(f'bounding_box: {bounding_box}')
         object_ = self.get_object(product_index)
-        interpolator = NearestNeighborArrayInterpolator(object_.get_layer(0))
+        layer = object_.get_layer(0)
 
         width = int(bounding_box.width + 0.5)
         height = int(bounding_box.height + 0.5)
-        roi = interpolator.get_patch(bounding_box.x_center, bounding_box.y_center, width, height)
+        y_lower = int(bounding_box.y_center - height / 2)
+        x_lower = int(bounding_box.x_center - width / 2)
+        roi = layer[..., y_lower : y_lower + height, x_lower : x_lower + width]
         logger.debug(f'roi: {roi.dtype}{roi.shape}')
         return self._analyze(roi, object_.get_pixel_geometry())
 

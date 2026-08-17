@@ -4,7 +4,7 @@ from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.visualization import (
+from ptychodus.api.visualize import (
     ComplexComponent,
     NumberArrayType,
     RealArrayType,

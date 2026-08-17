@@ -1,221 +1,161 @@
-from collections.abc import Iterator, Sequence
-from importlib.metadata import version
-from pathlib import Path
-from typing import Final
+"""Parent-side factory that builds :class:`SubprocessReconstructor`s for PtychoNN.
+
+Zero ptychonn / torch / lightning imports. All GPU work runs inside a
+spawned child; see :mod:`._subprocess` for the child entry points.
+
+Training-data export runs parent-side because it is pure-numpy (barycentric
+interpolation + numpy.savez); the ptychonn / lightning stack is not touched.
+"""
+
+from __future__ import annotations
+
 import logging
+from pathlib import Path
 
 import numpy
-import ptychonn
 
-from ptychodus.api.common import ComplexArrayType
 from ptychodus.api.geometry import ImageExtent
-from ptychodus.api.interpolate import BarycentricArrayInterpolator, BarycentricArrayStitcher
-from ptychodus.api.object import Object
-from ptychodus.api.product import Product
-from ptychodus.api.reconstructor import (
-    LossValue,
-    ReconstructInput,
-    ReconstructOutput,
-    TrainOutput,
-    TrainableReconstructor,
-)
+from ptychodus.api.interpolate import BarycentricArrayInterpolator
+from ptychodus.api.reconstruct import ReconstructInput
 
-from .model import PtychoNNModelProvider
+from ..processing.subprocess_reconstructor import SubprocessReconstructor
+from ._payload import (
+    PtychoNNReconstructConfig,
+    PtychoNNTrainConfig,
+    ReconstructPayload,
+    TrainPayload,
+)
 from .settings import PtychoNNModelSettings, PtychoNNTrainingSettings
+
+__all__ = [
+    'build_reconstructor',
+]
 
 logger = logging.getLogger(__name__)
 
 
-class CenterBoxMeanPhaseCenteringStrategy:  # TODO USE
-    def __call__(self, array: ComplexArrayType) -> ComplexArrayType:
-        one_third_height = array.shape[-2] // 3
-        one_third_width = array.shape[-1] // 3
-
-        amplitude = numpy.absolute(array)
-        phase = numpy.angle(array)
-
-        center_box_mean_phase = phase[
-            one_third_height : one_third_height * 2, one_third_width : one_third_width * 2
-        ].mean()
-
-        return amplitude * numpy.exp(1j * (phase - center_box_mean_phase))
+_RECONSTRUCT_ENTRY = 'ptychodus.model.ptychonn._subprocess:run_reconstruct'
+_TRAIN_ENTRY = 'ptychodus.model.ptychonn._subprocess:run_train'
+_PATCHES_KEY = 'real'
+_PATTERNS_KEY = 'reciprocal'
 
 
-class PtychoNNTrainableReconstructor(TrainableReconstructor):
-    MODEL_FILE_FILTER: Final[str] = 'PyTorch Lightning Checkpoint Files (*.ckpt)'
-    MODEL_FILE_EXTENSION: Final[str] = '.ckpt'
-    TRAINING_DATA_FILE_FILTER: Final[str] = 'NumPy Zipped Archive (*.npz)'
-    PATCHES_KEY: Final[str] = 'real'
-    PATTERNS_KEY: Final[str] = 'reciprocal'
+def _export_training_data(
+    file_path: Path, parameters: ReconstructInput, *, num_channels: int
+) -> None:
+    object_geometry = parameters.product.object_.get_geometry()
+    interpolator = BarycentricArrayInterpolator(parameters.product.object_.get_array())
+    probe_extent = ImageExtent(
+        width_px=parameters.product.probes.width_px,
+        height_px=parameters.product.probes.height_px,
+    )
+    patches = numpy.zeros(
+        (len(parameters.product.probe_positions), num_channels, *probe_extent.get_shape()),
+        dtype=numpy.float32,
+    )
 
-    def __init__(
-        self,
-        model_settings: PtychoNNModelSettings,
-        training_settings: PtychoNNTrainingSettings,
-        model_provider: PtychoNNModelProvider,
-    ) -> None:
-        self._model_settings = model_settings
-        self._training_settings = training_settings
-        self._model_provider = model_provider
+    for index, scan_point in enumerate(parameters.product.probe_positions):
+        object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
+        patch = interpolator.get_patch(
+            object_point.coordinate_x_px,
+            object_point.coordinate_y_px,
+            probe_extent.width_px,
+            probe_extent.height_px,
+        )
+        patches[index, 0, :, :] = numpy.angle(patch)
+        if num_channels > 1:
+            patches[index, 1, :, :] = numpy.absolute(patch)
 
-        ptychonn_version = version('ptychonn')
-        logger.info(f'\tPtychoNN {ptychonn_version}')
+    logger.debug(f'Writing "{file_path}" as "NPZ"')
+    contents = {
+        _PATTERNS_KEY: parameters.diffraction_patterns.astype(numpy.float32),
+        _PATCHES_KEY: patches,
+    }
+    numpy.savez_compressed(file_path, allow_pickle=False, **contents)
 
-    @property
-    def name(self) -> str:
-        return self._model_provider.get_model_name()
 
-    def get_progress_goal(self) -> int:
-        return 0
+def _build_reconstruct_config(
+    *,
+    enable_amplitude: bool,
+    model_settings: PtychoNNModelSettings,
+    training_settings: PtychoNNTrainingSettings,
+) -> PtychoNNReconstructConfig:
+    return PtychoNNReconstructConfig(
+        enable_amplitude=enable_amplitude,
+        num_convolution_kernels=model_settings.num_convolution_kernels.get_value(),
+        use_batch_normalization=model_settings.use_batch_normalization.get_value(),
+        max_learning_rate=float(training_settings.max_learning_rate.get_value()),
+        min_learning_rate=float(training_settings.min_learning_rate.get_value()),
+    )
 
-    def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
-        # TODO data size/shape requirements to GUI
-        data = parameters.diffraction_patterns
-        data_size = data.shape[-1]
 
-        if data_size != data.shape[-2]:
-            raise ValueError('PtychoNN expects square diffraction data!')
+def _build_train_config(
+    *,
+    enable_amplitude: bool,
+    model_settings: PtychoNNModelSettings,
+    training_settings: PtychoNNTrainingSettings,
+) -> PtychoNNTrainConfig:
+    return PtychoNNTrainConfig(
+        enable_amplitude=enable_amplitude,
+        num_convolution_kernels=model_settings.num_convolution_kernels.get_value(),
+        use_batch_normalization=model_settings.use_batch_normalization.get_value(),
+        max_learning_rate=float(training_settings.max_learning_rate.get_value()),
+        min_learning_rate=float(training_settings.min_learning_rate.get_value()),
+        batch_size=model_settings.batch_size.get_value(),
+        training_epochs=training_settings.training_epochs.get_value(),
+        status_interval_in_epochs=training_settings.status_interval_in_epochs.get_value(),
+        validation_set_fractional_size=float(
+            training_settings.validation_set_fractional_size.get_value()
+        ),
+    )
 
-        is_data_size_pow2 = data_size & (data_size - 1) == 0 and data_size > 0
 
-        if not is_data_size_pow2:
-            raise ValueError('PtychoNN expects that the diffraction data size is a power of two!')
+def build_reconstructor(
+    display_name: str,
+    *,
+    enable_amplitude: bool,
+    model_settings: PtychoNNModelSettings,
+    training_settings: PtychoNNTrainingSettings,
+) -> SubprocessReconstructor:
+    num_channels = 2 if enable_amplitude else 1
 
-        model = self._model_provider.get_model()
-
-        logger.debug('Inferring...')
-        object_patches = ptychonn.infer(
-            data=data.astype(numpy.float32),
-            model=model,
+    def build_reconstruct_payload(
+        parameters: ReconstructInput, loaded_model_path: Path | None
+    ) -> ReconstructPayload:
+        return ReconstructPayload(
+            config=_build_reconstruct_config(
+                enable_amplitude=enable_amplitude,
+                model_settings=model_settings,
+                training_settings=training_settings,
+            ),
+            model_path=loaded_model_path,
+            reconstruct_input=parameters,
         )
 
-        logger.debug('Stitching...')
-        object_array = parameters.product.object_.get_array()
-        object_geometry = parameters.product.object_.get_geometry()
-        stitcher = BarycentricArrayStitcher(
-            upper=numpy.zeros_like(object_array), lower=numpy.zeros_like(object_array, dtype=float)
+    def build_train_payload(input_path: Path, output_path: Path) -> TrainPayload:
+        return TrainPayload(
+            config=_build_train_config(
+                enable_amplitude=enable_amplitude,
+                model_settings=model_settings,
+                training_settings=training_settings,
+            ),
+            input_path=input_path,
+            output_path=output_path,
         )
 
-        for scan_point, object_patch_channels in zip(
-            parameters.product.probe_positions, object_patches
-        ):
-            patch_array = numpy.exp(1j * object_patch_channels[0])
+    def export_training_data(file_path: Path, parameters: ReconstructInput) -> None:
+        _export_training_data(file_path, parameters, num_channels=num_channels)
 
-            if object_patch_channels.shape[0] == 2:
-                patch_array *= object_patch_channels[1]
-            else:
-                patch_array *= 0.5
-
-            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-            stitcher.add_patch(
-                object_point.coordinate_x_px, object_point.coordinate_y_px, patch_array
-            )
-
-        object_ = Object(
-            array=stitcher.stitch(),
-            pixel_geometry=object_geometry.get_pixel_geometry(),
-            center=object_geometry.get_center(),
-            layer_spacing_m=parameters.product.object_.layer_spacing_m,
-        )
-        losses: Sequence[LossValue] = list()
-
-        product = Product(
-            metadata=parameters.product.metadata,
-            probe_positions=parameters.product.probe_positions,
-            probes=parameters.product.probes,
-            object_=object_,
-            losses=losses,
-        )
-
-        yield ReconstructOutput(product)
-
-    def is_model_loaded(self):
-        return True  # TODO
-
-    def get_model_file_filter(self) -> str:
-        return self.MODEL_FILE_FILTER
-
-    def get_model_file_extension(self) -> str:
-        return self.MODEL_FILE_EXTENSION
-
-    def load_model_from_file(self, file_path: Path) -> None:
-        self._model_provider.load_model_from_file(file_path)
-
-    def save_model(self, file_path: Path) -> None:
-        self._model_provider.save_model(file_path)
-
-    def get_training_data_file_filter(self) -> str:
-        return self.TRAINING_DATA_FILE_FILTER
-
-    def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
-        object_geometry = parameters.product.object_.get_geometry()
-        interpolator = BarycentricArrayInterpolator(parameters.product.object_.get_array())
-        num_channels = self._model_provider.get_num_channels()
-        probe_extent = ImageExtent(
-            width_px=parameters.product.probes.width_px,
-            height_px=parameters.product.probes.height_px,
-        )
-        patches = numpy.zeros(
-            (len(parameters.product.probe_positions), num_channels, *probe_extent.get_shape()),
-            dtype=numpy.float32,
-        )
-
-        for index, scan_point in enumerate(parameters.product.probe_positions):
-            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-            patch = interpolator.get_patch(
-                object_point.coordinate_x_px,
-                object_point.coordinate_y_px,
-                probe_extent.width_px,
-                probe_extent.height_px,
-            )
-            patches[index, 0, :, :] = numpy.angle(patch)
-
-            if num_channels > 1:
-                patches[index, 1, :, :] = numpy.absolute(patch)
-
-        logger.debug(f'Writing "{file_path}" as "NPZ"')
-        contents = {
-            self.PATTERNS_KEY: parameters.diffraction_patterns.astype(numpy.float32),
-            self.PATCHES_KEY: patches,
-        }
-        numpy.savez_compressed(file_path, allow_pickle=False, **contents)
-
-    def train(self, input_path: Path, output_path: Path) -> Iterator[TrainOutput]:
-        logger.debug(f'Reading "{input_path}" as "NPZ"')
-        training_data = numpy.load(input_path)
-
-        model = self._model_provider.get_model()
-        logger.debug('Training...')
-        training_set_fractional_size = (
-            1 - self._training_settings.validation_set_fractional_size.get_value()
-        )
-        trainer, trainer_log = ptychonn.train(
-            model=model,
-            batch_size=self._model_settings.batch_size.get_value(),
-            out_dir=None,
-            X_train=training_data[self.PATTERNS_KEY],
-            Y_train=training_data[self.PATCHES_KEY],
-            epochs=self._training_settings.training_epochs.get_value(),
-            training_fraction=float(training_set_fractional_size),
-            log_frequency=self._training_settings.status_interval_in_epochs.get_value(),
-            strategy='ddp_notebook',
-        )
-        self._model_provider.set_trainer(trainer)
-
-        training_loss: list[LossValue] = []
-        validation_loss: list[LossValue] = []
-
-        for epoch, entry in enumerate(trainer_log.logs):
-            try:
-                tloss = LossValue(epoch, entry['training_loss'])
-                vloss = LossValue(epoch, entry['validation_loss'])
-            except KeyError:
-                pass
-            else:
-                training_loss.append(tloss)
-                training_loss.append(vloss)
-
-        yield TrainOutput(
-            training_loss=training_loss,
-            validation_loss=validation_loss,
-        )
+    return SubprocessReconstructor(
+        name=display_name,
+        reconstruct_entry_point=_RECONSTRUCT_ENTRY,
+        progress_goal_fn=lambda: 0,
+        build_reconstruct_payload=build_reconstruct_payload,
+        is_trainable=True,
+        train_entry_point=_TRAIN_ENTRY,
+        build_train_payload=build_train_payload,
+        model_file_filter='PyTorch Lightning Checkpoint Files (*.ckpt)',
+        model_file_extension='.ckpt',
+        training_data_file_filter='NumPy Zipped Archive (*.npz)',
+        export_training_data=export_training_data,
+    )

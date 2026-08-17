@@ -1,8 +1,10 @@
 from __future__ import annotations
 import logging
 
+import numpy
+
 from ptychodus.api.observer import Observable
-from ptychodus.api.parametric import ParameterGroup
+from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.probe import (
     ProbeEntropyMetrics,
     ProbeGeometryProvider,
@@ -21,17 +23,21 @@ logger = logging.getLogger(__name__)
 class ProbeRepositoryItem(ParameterGroup):
     def __init__(
         self,
+        rng: numpy.random.Generator,
         geometry_provider: ProbeGeometryProvider,
         settings: ProbeSettings,
         builder: ProbeSequenceBuilder,
     ) -> None:
         super().__init__()
+        self._rng = rng
         self._geometry_provider = geometry_provider
         self._settings = settings
         self._builder = builder
         self._probe_seq = ProbeSequence(array=None, opr_weights=None, pixel_geometry=None)
 
         self._add_group('builder', builder, observe=True)
+        if isinstance(geometry_provider, Observable):
+            geometry_provider.add_observer(self)
         self._rebuild()
 
     def assign_item(self, item: ProbeRepositoryItem) -> None:
@@ -39,7 +45,7 @@ class ProbeRepositoryItem(ParameterGroup):
         self._rebuild()
 
     def assign(self, probe: ProbeSequence) -> None:
-        builder = FromMemoryProbeBuilder(self._settings, probe)
+        builder = FromMemoryProbeBuilder(self._rng, self._settings, probe)
         self.set_builder(builder)
 
     def sync_to_settings(self) -> None:
@@ -99,6 +105,10 @@ class ProbeRepositoryItem(ParameterGroup):
         self._rebuild()
 
     def _rebuild(self) -> None:
+        if not self._geometry_provider.get_probe_geometry().get_pixel_geometry().is_valid:
+            # Geometry not yet bound; the observer wired in __init__ will re-run
+            # _rebuild when the geometry becomes valid.
+            return
         try:
             probe_seq = self._builder.build(self._geometry_provider)
         except Exception:
@@ -109,6 +119,8 @@ class ProbeRepositoryItem(ParameterGroup):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._builder:
+            self._rebuild()
+        elif observable is self._geometry_provider:
             self._rebuild()
         else:
             super()._update(observable)

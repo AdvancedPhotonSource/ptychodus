@@ -1,6 +1,8 @@
 from typing import Any
+import logging
 
 from PyQt5.QtCore import (
+    QAbstractItemModel,
     QAbstractTableModel,
     QModelIndex,
     QObject,
@@ -8,15 +10,22 @@ from PyQt5.QtCore import (
     Qt,
 )
 from PyQt5.QtGui import QBrush
-from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import QComboBox, QStyledItemDelegate, QStyleOptionViewItem, QWidget
 
-from ptychodus.api.diffraction import estimate_probe_photon_count
+from ptychodus.api.constants import ONE_NANOMETER_M
+from ptychodus.api.diffraction import Polarization, estimate_probe_photon_count
 from ptychodus.api.observer import Observable, Observer
 
-from ...model.diffraction import DiffractionAPI
+from ...model.diffraction import (
+    AssembledDiffractionDataset,
+    DiffractionDatasetRepository,
+    DiffractionDatasetRepositoryObserver,
+)
 from ...model.product import ProductRepositoryItem
 from ...view.product import ProductEditorDialog
 from ..helpers import create_brush_for_editable_cell
+
+logger = logging.getLogger(__name__)
 
 
 class ProductPropertyTableModel(QAbstractTableModel):
@@ -41,6 +50,8 @@ class ProductPropertyTableModel(QAbstractTableModel):
             'Exposure Time [s]',
             'Mass Attenuation [m\u00b2/kg]',
             'Tomography Angle [deg]',
+            'Tilt Angle [deg]',
+            'Polarization',
             'Fresnel Number',
             'Detector Numerical Aperture',
             'Depth of Field [nm]',
@@ -49,7 +60,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
 
-        if index.isValid() and index.row() in (7, 8, 9):
+        if index.isValid() and index.row() in (7, 8, 9, 10, 11):
             value |= Qt.ItemFlag.ItemIsEditable
 
         return value
@@ -75,19 +86,19 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
                         match index.row():
                             case 0:
-                                return f'{geometry.probe_wavelength_m * 1e9:.4g}'
+                                return f'{geometry.probe_wavelength_m / ONE_NANOMETER_M:.4g}'
                             case 1:
-                                return f'{geometry.probe_wavelengths_per_m * 1e-9:.4g}'
+                                return f'{geometry.probe_wavelengths_per_m * ONE_NANOMETER_M:.4g}'
                             case 2:
-                                return f'{geometry.probe_radians_per_m * 1e-9:.4g}'
+                                return f'{geometry.probe_radians_per_m * ONE_NANOMETER_M:.4g}'
                             case 3:
                                 return f'{geometry.probe_photons_per_s:.4g}'
                             case 4:
                                 return f'{geometry.probe_power_W:.4g}'
                             case 5:
-                                return f'{geometry.object_plane_pixel_width_m * 1e9:.4g}'
+                                return f'{geometry.get_object_plane_pixel_geometry().width_m / ONE_NANOMETER_M:.4g}'
                             case 6:
-                                return f'{geometry.object_plane_pixel_height_m * 1e9:.4g}'
+                                return f'{geometry.get_object_plane_pixel_geometry().height_m / ONE_NANOMETER_M:.4g}'
                             case 7:
                                 return f'{metadata_item.exposure_time_s.get_value():.4g}'
                             case 8:
@@ -95,18 +106,23 @@ class ProductPropertyTableModel(QAbstractTableModel):
                             case 9:
                                 return f'{metadata_item.tomography_angle_deg.get_value():.4g}'
                             case 10:
+                                return f'{metadata_item.tilt_angle_deg.get_value():.4g}'
+                            case 11:
+                                raw = metadata_item.polarization.get_value()
+                                return raw if raw else '(unset)'
+                            case 12:
                                 try:
                                     return f'{geometry.fresnel_number:.4g}'
                                 except ZeroDivisionError:
                                     return 'inf'
-                            case 11:
+                            case 13:
                                 try:
                                     return f'{geometry.detector_numerical_aperture:.4g}'
                                 except ZeroDivisionError:
                                     return 'inf'
-                            case 12:
+                            case 14:
                                 try:
-                                    return f'{geometry.depth_of_field_m * 1e9:.4g}'
+                                    return f'{geometry.depth_of_field_m / ONE_NANOMETER_M:.4g}'
                                 except ZeroDivisionError:
                                     return 'inf'
             elif role == Qt.ItemDataRole.BackgroundRole:
@@ -142,6 +158,25 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
                     metadata_item.tomography_angle_deg.set_value(tomography_angle_deg)
                     return True
+                case 10:
+                    try:
+                        tilt_angle_deg = float(value)
+                    except ValueError:
+                        return False
+
+                    metadata_item.tilt_angle_deg.set_value(tilt_angle_deg)
+                    return True
+                case 11:
+                    text = str(value)
+                    if text in ('', '(unset)'):
+                        metadata_item.polarization.set_value('')
+                        return True
+                    try:
+                        parsed = Polarization(text)
+                    except ValueError:
+                        return False
+                    metadata_item.polarization.set_value(parsed.value)
+                    return True
 
         return False
 
@@ -152,23 +187,75 @@ class ProductPropertyTableModel(QAbstractTableModel):
         return len(self._header)
 
 
-class ProductEditorViewController(Observer):
+class _PolarizationDelegate(QStyledItemDelegate):
+    """Combobox editor for the polarization row of the product-property table.
+
+    Attached with ``setItemDelegateForColumn(1, ...)`` so column sorting through
+    the proxy model cannot mis-target the row. ``mapToSource`` recovers the
+    row in the underlying ProductPropertyTableModel — everything except the
+    polarization row falls through to the base delegate.
+    """
+
+    POLARIZATION_SOURCE_ROW = 11
+
+    def _is_polarization_cell(self, index: QModelIndex) -> bool:
+        if index.column() != 1:
+            return False
+        model = index.model()
+        source_index = (
+            model.mapToSource(index) if isinstance(model, QSortFilterProxyModel) else index
+        )
+        return source_index.row() == self.POLARIZATION_SOURCE_ROW
+
+    def createEditor(  # noqa: N802
+        self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex
+    ) -> QWidget:
+        if not self._is_polarization_cell(index):
+            return super().createEditor(parent, option, index)
+        combo = QComboBox(parent)
+        combo.addItem('(unset)', '')
+        for member in Polarization:
+            combo.addItem(member.value, member.value)
+        return combo
+
+    def setEditorData(self, editor: QWidget, index: QModelIndex) -> None:  # noqa: N802
+        if not isinstance(editor, QComboBox):
+            super().setEditorData(editor, index)
+            return
+        current = index.data(Qt.ItemDataRole.DisplayRole) or ''
+        lookup = '' if current == '(unset)' else str(current)
+        target = editor.findData(lookup)
+        editor.setCurrentIndex(max(0, target))
+
+    def setModelData(  # noqa: N802
+        self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex
+    ) -> None:
+        if not isinstance(editor, QComboBox):
+            super().setModelData(editor, model, index)
+            return
+        model.setData(index, editor.currentData(), Qt.ItemDataRole.EditRole)
+
+
+class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver):
     def __init__(
         self,
-        diffraction_api: DiffractionAPI,
+        diffraction_repository: DiffractionDatasetRepository,
         product: ProductRepositoryItem,
         table_model: ProductPropertyTableModel,
         dialog: ProductEditorDialog,
     ) -> None:
         super().__init__()
-        self._diffraction_api = diffraction_api
+        self._diffraction_repository = diffraction_repository
         self._product = product
         self._table_model = table_model
         self._dialog = dialog
 
     @classmethod
     def edit_product(
-        cls, diffraction_api: DiffractionAPI, product: ProductRepositoryItem, parent: QWidget
+        cls,
+        diffraction_repository: DiffractionDatasetRepository,
+        product: ProductRepositoryItem,
+        parent: QWidget,
     ) -> None:
         dialog = ProductEditorDialog(parent)
         dialog.setWindowTitle(f'Edit Product: {product.get_name()}')
@@ -181,6 +268,7 @@ class ProductEditorViewController(Observer):
 
         dialog.table_view.setModel(table_proxy_model)
         dialog.table_view.setSortingEnabled(True)
+        dialog.table_view.setItemDelegateForColumn(1, _PolarizationDelegate(dialog.table_view))
         vertical_header = dialog.table_view.verticalHeader()
 
         if vertical_header is not None:
@@ -190,8 +278,9 @@ class ProductEditorViewController(Observer):
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
         dialog.table_view.resizeRowsToContents()
 
-        view_controller = cls(diffraction_api, product, table_model, dialog)
+        view_controller = cls(diffraction_repository, product, table_model, dialog)
         product.add_observer(view_controller)
+        diffraction_repository.add_observer(view_controller)
         dialog.text_edit.textChanged.connect(view_controller._sync_view_to_model)
 
         view_controller._sync_model_to_view()
@@ -214,9 +303,17 @@ class ProductEditorViewController(Observer):
         metadata = self._product.get_metadata_item()
         self._dialog.text_edit.setPlainText(metadata.comments.get_value())
 
+        self._dialog.actions_view.estimate_probe_photon_count_button.setEnabled(
+            self._product.get_dataset() is not None
+        )
+
     def _estimate_probe_photon_count(self) -> None:
         metadata = self._product.get_metadata_item()
-        assembled_data = self._diffraction_api.get_assembled_data()
+        dataset = self._product.get_dataset()
+        if dataset is None:
+            logger.warning('Cannot estimate probe photon count: no diffraction dataset selected.')
+            return
+        assembled_data = dataset.get_assembled_data()
         photon_count = estimate_probe_photon_count(
             assembled_data.get_patterns(), assembled_data.get_bad_pixels()
         )
@@ -227,7 +324,14 @@ class ProductEditorViewController(Observer):
 
     def _finish(self, result: int) -> None:
         self._product.remove_observer(self)
+        self._diffraction_repository.remove_observer(self)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._product:
             self._sync_model_to_view()
+
+    def handle_dataset_inserted(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        pass
+
+    def handle_dataset_removed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        pass

@@ -4,7 +4,6 @@ import logging
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.settings import SettingsRegistry
 
-from ..diffraction import DiffractionAPI
 from ..product import ProductAPI
 from ..processing import ProcessingAPI
 from .client import GlobusClient, GlobusJob
@@ -18,7 +17,6 @@ class GlobusExecutor:
         self,
         settings: GlobusSettings,
         settings_registry: SettingsRegistry,
-        diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
         processing_api: ProcessingAPI,
         client: GlobusClient,
@@ -26,7 +24,6 @@ class GlobusExecutor:
         super().__init__()
         self._settings = settings
         self._settings_registry = settings_registry
-        self._diffraction_api = diffraction_api
         self._product_api = product_api
         self._processing_api = processing_api
         self._client = client
@@ -37,6 +34,13 @@ class GlobusExecutor:
         except IndexError:
             logger.exception(f'Failed access product for flow ({input_product_index=})!')
             raise
+
+        dataset = product_item.get_dataset()
+
+        if dataset is None:
+            raise RuntimeError(
+                f'Product "{product_item.get_name()}" has no associated diffraction dataset.'
+            )
 
         input_directory = (
             self._settings.input_collection_posix_path.get_value() / product_item.get_name()
@@ -49,9 +53,7 @@ class GlobusExecutor:
             raise
 
         self._settings_registry.save_settings(input_directory / StandardFileLayout.SETTINGS)
-        self._diffraction_api.export_assembled_patterns(
-            input_directory / StandardFileLayout.DIFFRACTION
-        )
+        dataset.export_assembled_patterns(input_directory / StandardFileLayout.DIFFRACTION)
         self._product_api.save_product(
             input_product_index,
             input_directory / StandardFileLayout.PRODUCT_IN,

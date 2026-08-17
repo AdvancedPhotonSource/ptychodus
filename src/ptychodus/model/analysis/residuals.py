@@ -7,8 +7,8 @@ from ptychodus.api.metrics import (
     ReconstructionResiduals,
     compute_reconstruction_residuals,
 )
+from ptychodus.api.reconstruct import prepare_reconstruct_input
 
-from ..diffraction import AssembledDiffractionDataset
 from ..product import ProductRepository
 
 __all__ = ['ReconstructionResiduals', 'ResidualAnalyzer']
@@ -20,14 +20,20 @@ class ResidualAnalyzer:
     def __init__(
         self,
         repository: ProductRepository,
-        dataset: AssembledDiffractionDataset,
     ) -> None:
         self._repository = repository
-        self._dataset = dataset
 
     def analyze(self, product_index: int) -> ReconstructionResiduals:
-        product = self._repository[product_index].get_product()
-        recon_input = self._dataset.get_assembled_data().prepare_reconstruct_input(product)
+        item = self._repository[product_index]
+        dataset = item.get_dataset()
+
+        if dataset is None:
+            raise RuntimeError(
+                f'Product "{item.get_name()}" has no associated diffraction dataset.'
+            )
+
+        product = item.get_product()
+        recon_input = prepare_reconstruct_input(dataset.get_assembled_data(), product)
 
         logger.info('Computing reconstruction residuals...')
         tic = time.perf_counter()

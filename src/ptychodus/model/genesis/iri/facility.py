@@ -3,7 +3,7 @@ from datetime import datetime
 import logging
 
 from pydantic import BaseModel
-import requests
+import httpx
 
 from ..tokens import create_headers
 
@@ -45,8 +45,11 @@ class IRIFacilityClient:
     # See https://api.iri.nersc.gov/#/facility
 
     def __init__(self, api_base_url: str, access_token: str) -> None:
-        self._base_url = api_base_url.rstrip('/') + '/api/v1/facility'
-        self._headers = create_headers(access_token)
+        self._client = httpx.Client(
+            base_url=api_base_url.rstrip('/') + '/api/v1/facility',
+            headers=create_headers(access_token),
+            timeout=30.0,
+        )
 
     def get_facility(self, modified_since: datetime | None = None) -> Facility:
         params: dict = {}
@@ -54,11 +57,7 @@ class IRIFacilityClient:
         if modified_since is not None:
             params['modified_since'] = modified_since.isoformat()
 
-        response = requests.get(
-            self._base_url,
-            params=params,
-            headers=self._headers,
-        )
+        response = self._client.get('', params=params)
         response.raise_for_status()
         return Facility.model_validate(response.json())
 
@@ -81,11 +80,7 @@ class IRIFacilityClient:
         if short_name is not None:
             params['short_name'] = short_name
 
-        response = requests.get(
-            f'{self._base_url}/sites',
-            params=params,
-            headers=self._headers,
-        )
+        response = self._client.get('/sites', params=params)
         response.raise_for_status()
         return [Site.model_validate(item) for item in response.json()]
 
@@ -95,10 +90,9 @@ class IRIFacilityClient:
         if modified_since is not None:
             params['modified_since'] = modified_since.isoformat()
 
-        response = requests.get(
-            f'{self._base_url}/sites/{site_id}',
-            params=params,
-            headers=self._headers,
-        )
+        response = self._client.get(f'/sites/{site_id}', params=params)
         response.raise_for_status()
         return Site.model_validate(response.json())
+
+    def close(self) -> None:
+        self._client.close()

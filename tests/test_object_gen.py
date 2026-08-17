@@ -1,4 +1,4 @@
-"""Tests for ptychodus.api.object_gen.
+"""Tests for ptychodus.api.simulate.object.
 
 Covers:
   - generate_gaussian_random_field_object
@@ -46,7 +46,7 @@ import pytest
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import ObjectGeometry
-from ptychodus.api.object_gen import (
+from ptychodus.api.simulate.object import (
     _calculate_vertex_noise_contribution,
     _generate_simplex_noise,
     _map_cartesian_to_simplex,
@@ -56,7 +56,7 @@ from ptychodus.api.object_gen import (
     generate_stxm_object,
 )
 from ptychodus.api.probe_positions import ProbePosition
-from ptychodus.api.reconstructor import AssembledDiffractionData
+from ptychodus.api.diffraction import AssembledDiffractionData
 
 
 # ---------------------------------------------------------------------------

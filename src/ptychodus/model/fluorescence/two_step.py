@@ -13,10 +13,7 @@ from ptychodus.api.fluorescence import (
     FluorescenceEnhancerOutput,
     UpscalingStrategy,
 )
-from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser
-
-from .settings import FluorescenceSettings
 
 logger = logging.getLogger(__name__)
 
@@ -25,25 +22,18 @@ __all__ = [
 ]
 
 
-class TwoStepFluorescenceEnhancer(FluorescenceEnhancer, Observable, Observer):
+class TwoStepFluorescenceEnhancer(FluorescenceEnhancer):
     SIMPLE_NAME: Final[str] = 'TwoStep'
     DISPLAY_NAME: Final[str] = 'Upscale and Deconvolve'
 
     def __init__(
         self,
-        settings: FluorescenceSettings,
         upscaling_strategy_chooser: PluginChooser[UpscalingStrategy],
         deconvolution_strategy_chooser: PluginChooser[DeconvolutionStrategy],
     ) -> None:
         super().__init__()
         self._upscaling_strategy_chooser = upscaling_strategy_chooser
         self._deconvolution_strategy_chooser = deconvolution_strategy_chooser
-
-        upscaling_strategy_chooser.synchronize_with_parameter(settings.upscaling_strategy)
-        upscaling_strategy_chooser.add_observer(self)
-
-        deconvolution_strategy_chooser.synchronize_with_parameter(settings.deconvolution_strategy)
-        deconvolution_strategy_chooser.add_observer(self)
 
     @property
     def name(self) -> str:
@@ -78,29 +68,3 @@ class TwoStepFluorescenceEnhancer(FluorescenceEnhancer, Observable, Observer):
                 ),
                 progress=len(element_maps),
             )
-
-    def get_upscaling_strategies(self) -> Iterator[str]:
-        for plugin in self._upscaling_strategy_chooser:
-            yield plugin.display_name
-
-    def get_upscaling_strategy(self) -> str:
-        return self._upscaling_strategy_chooser.get_current_plugin().display_name
-
-    def set_upscaling_strategy(self, name: str) -> None:
-        self._upscaling_strategy_chooser.set_current_plugin(name)
-
-    def get_deconvolution_strategies(self) -> Iterator[str]:
-        for plugin in self._deconvolution_strategy_chooser:
-            yield plugin.display_name
-
-    def get_deconvolution_strategy(self) -> str:
-        return self._deconvolution_strategy_chooser.get_current_plugin().display_name
-
-    def set_deconvolution_strategy(self, name: str) -> None:
-        self._deconvolution_strategy_chooser.set_current_plugin(name)
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._upscaling_strategy_chooser:
-            self.notify_observers()
-        elif observable is self._deconvolution_strategy_chooser:
-            self.notify_observers()

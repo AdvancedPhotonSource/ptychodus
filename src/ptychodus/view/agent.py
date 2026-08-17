@@ -22,16 +22,17 @@ class AgentInputView(QFrame):
         super().__init__(parent)
         self.text_edit = QPlainTextEdit()
 
-        send_button_size_policy = QSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
-        )
+        button_size_policy = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         self.send_button = QPushButton(QIcon(':/icons/send'), 'Send')
-        self.send_button.setSizePolicy(send_button_size_policy)
+        self.send_button.setSizePolicy(button_size_policy)
+        self.clear_button = QPushButton('Clear chat')
+        self.clear_button.setSizePolicy(button_size_policy)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.text_edit)
         layout.addWidget(self.send_button)
+        layout.addWidget(self.clear_button)
         self.setLayout(layout)
 
 

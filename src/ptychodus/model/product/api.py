@@ -1,12 +1,15 @@
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 import logging
 
+from ptychodus.api.diffraction import Polarization
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product, ProductFileReader, ProductFileWriter
 
-from .item import ProductRepositoryItem
+from ..diffraction import AssembledDiffractionDataset
+from ..task_manager import TaskManager
+from .item import ProductRepositoryItem, ProductState
 from .item_factory import ProductRepositoryItemFactory
 from .object.builder_factory import ObjectBuilderFactory
 from .object.settings import ObjectSettings
@@ -176,7 +179,10 @@ class ProbeAPI:
         return iter(self._builder_factory)
 
     def build_probe(
-        self, index: int, builder_name: str, builder_parameters: Mapping[str, Any] | None = None
+        self,
+        index: int,
+        builder_name: str,
+        builder_parameters: Mapping[str, Any] | None = None,
     ) -> None:
         try:
             item = self._repository[index]
@@ -184,10 +190,12 @@ class ProbeAPI:
             logger.warning(f'Failed to access item {index}!')
             return
 
+        dataset = self._repository.get_dataset(index)
+
         try:
-            builder = self._builder_factory.create(builder_name)
-        except KeyError:
-            logger.warning(f'Failed to create builder {builder_name}!')
+            builder = self._builder_factory.create(builder_name, dataset=dataset)
+        except (KeyError, RuntimeError) as exc:
+            logger.warning(f'Failed to create builder {builder_name}: {exc}')
             return
 
         if builder_parameters is not None:
@@ -211,10 +219,12 @@ class ProbeAPI:
             logger.warning(f'Failed to access item {index}!')
             return
 
+        dataset = self._repository.get_dataset(index)
+
         try:
-            builder = self._builder_factory.create_from_settings()
-        except KeyError:
-            logger.warning('Failed to create builder from settings!')
+            builder = self._builder_factory.create_from_settings(dataset=dataset)
+        except (KeyError, RuntimeError) as exc:
+            logger.warning(f'Failed to create builder from settings: {exc}')
             return
 
         item.set_builder(builder)
@@ -285,7 +295,10 @@ class ObjectAPI:
         return iter(self._builder_factory)
 
     def build_object(
-        self, index: int, builder_name: str, builder_parameters: Mapping[str, Any] | None = None
+        self,
+        index: int,
+        builder_name: str,
+        builder_parameters: Mapping[str, Any] | None = None,
     ) -> None:
         try:
             item = self._repository[index]
@@ -293,10 +306,12 @@ class ObjectAPI:
             logger.warning(f'Failed to access item {index}!')
             return
 
+        dataset = self._repository.get_dataset(index)
+
         try:
-            builder = self._builder_factory.create(builder_name)
-        except KeyError:
-            logger.warning(f'Failed to create builder {builder_name}!')
+            builder = self._builder_factory.create(builder_name, dataset=dataset)
+        except (KeyError, RuntimeError) as exc:
+            logger.warning(f'Failed to create builder {builder_name}: {exc}')
             return
 
         if builder_parameters is not None:
@@ -320,10 +335,12 @@ class ObjectAPI:
             logger.warning(f'Failed to access item {index}!')
             return
 
+        dataset = self._repository.get_dataset(index)
+
         try:
-            builder = self._builder_factory.create_from_settings()
-        except KeyError:
-            logger.warning('Failed to create builder from settings!')
+            builder = self._builder_factory.create_from_settings(dataset=dataset)
+        except (KeyError, RuntimeError) as exc:
+            logger.warning(f'Failed to create builder from settings: {exc}')
             return
 
         item.set_builder(builder)
@@ -387,12 +404,72 @@ class ProductAPI:
         item_factory: ProductRepositoryItemFactory,
         file_reader_chooser: PluginChooser[ProductFileReader],
         file_writer_chooser: PluginChooser[ProductFileWriter],
+        task_manager: TaskManager,
     ) -> None:
         self._settings = settings
         self._repository = repository
         self._item_factory = item_factory
         self._file_reader_chooser = file_reader_chooser
         self._file_writer_chooser = file_writer_chooser
+        self._task_manager = task_manager
+
+    def _insert_via_queue(
+        self,
+        dataset: AssembledDiffractionDataset | None,
+        build: Callable[[], ProductRepositoryItem],
+        *,
+        block: bool,
+        stub_name: str,
+    ) -> int:
+        """If dataset is None or already loaded, run build() synchronously and insert.
+        Otherwise, insert a pending stub, then enqueue construction to run after the
+        dataset's LoadAllArrays finishes (via the shared FIFO background worker)."""
+        if dataset is None or not dataset.is_load_in_progress():
+            item = build()
+            return self._repository.insert_product(item)
+
+        finished_event = dataset.get_last_load_finished_event()
+
+        if block:
+            if finished_event is not None:
+                while not self._task_manager.is_stopping:
+                    if finished_event.wait(timeout=TaskManager.WAIT_TIME_S):
+                        break
+            error = dataset.get_last_load_error()
+            if error is not None:
+                raise RuntimeError('Diffraction dataset failed to load') from error
+            item = build()
+            return self._repository.insert_product(item)
+
+        stub = self._item_factory.create_pending_stub(name=stub_name)
+        index = self._repository.insert_product(stub)
+
+        def background_finalize() -> Callable[[], None]:
+            error = dataset.get_last_load_error()
+
+            def foreground_finalize() -> None:
+                if error is not None:
+                    logger.error(
+                        f'Cancelling queued product {index} because dataset '
+                        f'failed to load: {error!r}'
+                    )
+                    stub.set_state(ProductState.FAILED)
+                    return
+
+                try:
+                    real = build()
+                except Exception:
+                    logger.exception(f'Queued product {index} construction failed')
+                    stub.set_state(ProductState.FAILED)
+                    return
+
+                stub.copy_contents_from(real)
+                stub.set_state(ProductState.READY)
+
+            return foreground_finalize
+
+        self._task_manager.put_background_task(background_finalize)
+        return index
 
     def insert_new_product(
         self,
@@ -405,26 +482,50 @@ class ProductAPI:
         exposure_time_s: float | None = None,
         mass_attenuation_m2_kg: float | None = None,
         tomography_angle_deg: float | None = None,
+        tilt_angle_deg: float | None = None,
+        polarization: Polarization | None = None,
+        dataset: AssembledDiffractionDataset | None = None,
+        block: bool = True,
     ) -> int:
-        item = self._item_factory.create_from_values(
-            name=name,
-            comments=comments,
-            detector_distance_m=detector_distance_m,
-            probe_energy_eV=probe_energy_eV,
-            probe_photon_count=probe_photon_count,
-            exposure_time_s=exposure_time_s,
-            mass_attenuation_m2_kg=mass_attenuation_m2_kg,
-            tomography_angle_deg=tomography_angle_deg,
-        )
-        return self._repository.insert_product(item)
+        def build() -> ProductRepositoryItem:
+            return self._item_factory.create_from_values(
+                name=name,
+                comments=comments,
+                detector_distance_m=detector_distance_m,
+                probe_energy_eV=probe_energy_eV,
+                probe_photon_count=probe_photon_count,
+                exposure_time_s=exposure_time_s,
+                mass_attenuation_m2_kg=mass_attenuation_m2_kg,
+                tomography_angle_deg=tomography_angle_deg,
+                tilt_angle_deg=tilt_angle_deg,
+                polarization=polarization,
+                dataset=dataset,
+            )
 
-    def insert_product(self, product: Product) -> int:
-        item = self._item_factory.create_from_product(product)
-        return self._repository.insert_product(item)
+        return self._insert_via_queue(dataset, build, block=block, stub_name=name)
 
-    def insert_product_from_settings(self) -> int:
-        item = self._item_factory.create_from_settings()
-        return self._repository.insert_product(item)
+    def insert_product(
+        self,
+        product: Product,
+        *,
+        dataset: AssembledDiffractionDataset | None = None,
+        block: bool = True,
+    ) -> int:
+        def build() -> ProductRepositoryItem:
+            return self._item_factory.create_from_product(product, dataset=dataset)
+
+        return self._insert_via_queue(dataset, build, block=block, stub_name=product.metadata.name)
+
+    def insert_product_from_settings(
+        self,
+        *,
+        dataset: AssembledDiffractionDataset | None = None,
+        block: bool = True,
+    ) -> int:
+        def build() -> ProductRepositoryItem:
+            return self._item_factory.create_from_settings(dataset=dataset)
+
+        return self._insert_via_queue(dataset, build, block=block, stub_name='Unnamed')
 
     def get_item(self, product_index: int) -> ProductRepositoryItem:
         return self._repository[product_index]
@@ -436,7 +537,14 @@ class ProductAPI:
     def get_open_file_filter(self) -> str:
         return self._file_reader_chooser.get_current_plugin().display_name
 
-    def open_product(self, file_path: Path, *, file_type: str | None = None) -> int:
+    def open_product(
+        self,
+        file_path: Path,
+        *,
+        file_type: str | None = None,
+        dataset: AssembledDiffractionDataset | None = None,
+        block: bool = True,
+    ) -> int:
         if file_path.is_file():
             if file_type is not None:
                 self._file_reader_chooser.set_current_plugin(file_type)
@@ -450,7 +558,7 @@ class ProductAPI:
             except Exception as exc:
                 raise RuntimeError(f'Failed to read "{file_path}"') from exc
             else:
-                return self.insert_product(product)
+                return self.insert_product(product, dataset=dataset, block=block)
         else:
             logger.warning(f'Refusing to create product with invalid file path "{file_path}"')
 

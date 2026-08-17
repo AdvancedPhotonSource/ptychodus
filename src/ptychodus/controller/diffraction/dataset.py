@@ -1,124 +1,294 @@
 from __future__ import annotations
+import logging
 from typing import Any, overload
+
+import numpy
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 
-from ptychodus.api.common import BYTES_PER_MEGABYTE
+from ptychodus.api.constants import BYTES_PER_MEGABYTE, ONE_MICRON_M
 from ptychodus.api.diffraction import DiffractionPattern
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
 
-from ptychodus.model.diffraction import AssembledDiffractionArray
+from ptychodus.model.diffraction import (
+    AssembledDiffractionArray,
+    AssembledDiffractionDataset,
+    DiffractionDatasetRepository,
+    PatternSizer,
+)
 
 __all__ = ['DatasetTreeModel']
 
+logger = logging.getLogger(__name__)
 
-class DatasetTreeNode:
-    def __init__(
-        self,
-        parent_node: DatasetTreeNode | None,
-        array: AssembledDiffractionArray,
-        frame_index: int,
-    ) -> None:
+_COL_LABEL = 0
+_COL_COUNTS = 1
+_COL_FRAMES = 2
+_COL_SIZE_MB = 3
+_COL_WIDTH_PX = 4
+_COL_HEIGHT_PX = 5
+_COL_PHYSICAL_PIXEL_WIDTH_UM = 6
+_COL_PHYSICAL_PIXEL_HEIGHT_UM = 7
+_COL_PROCESSED_PIXEL_WIDTH_UM = 8
+_COL_PROCESSED_PIXEL_HEIGHT_UM = 9
+_COL_NUM_BAD_PIXELS = 10
+
+
+class _TreeNode:
+    """Base tree node — root, dataset, array, or frame."""
+
+    def __init__(self, parent_node: _TreeNode | None) -> None:
         self.parent_node = parent_node
-        self._array = array
-        self._frame_index = frame_index
-        self.child_nodes: list[DatasetTreeNode] = list()
-
-    @classmethod
-    def create_root(cls) -> DatasetTreeNode:
-        return cls(None, AssembledDiffractionArray.create_null(), -1)
-
-    def insert_child(self, pos: int, array: AssembledDiffractionArray) -> DatasetTreeNode:
-        child = DatasetTreeNode(self, array, -1)
-
-        for frame_index in range(array.get_num_patterns()):
-            grandchild = DatasetTreeNode(child, array, frame_index)
-            child.child_nodes.append(grandchild)
-
-        self.child_nodes.insert(pos, child)
-        return child
+        self.child_nodes: list[_TreeNode] = []
 
     def get_label(self) -> str:
-        return self._array.get_label() if self._frame_index < 0 else f'Frame {self._frame_index}'
-
-    def get_data(self) -> DiffractionPattern:
-        return (
-            self._array.get_average_pattern()
-            if self._frame_index < 0
-            else self._array.get_pattern(self._frame_index)
-        )
+        return ''
 
     def get_counts(self) -> int:
-        return (
-            int(self._array.get_mean_pattern_counts())
-            if self._frame_index < 0
-            else int(self._array.get_pattern_counts(self._frame_index))
-        )
+        return 0
 
     def get_nframes(self) -> int:
-        return len(self.child_nodes) if self._frame_index < 0 else 1
+        return sum(child.get_nframes() for child in self.child_nodes)
 
     def get_nbytes(self) -> int:
-        return (
-            self._array.get_patterns().nbytes
-            if self._frame_index < 0
-            else self._array.get_pattern(self._frame_index).nbytes
-        )
+        return sum(child.get_nbytes() for child in self.child_nodes)
+
+    def get_data(self) -> DiffractionPattern | None:
+        return None
 
     def get_row(self) -> int:
         return 0 if self.parent_node is None else self.parent_node.child_nodes.index(self)
 
 
+class _DatasetTreeNode(_TreeNode):
+    def __init__(self, parent_node: _TreeNode, dataset: AssembledDiffractionDataset) -> None:
+        super().__init__(parent_node)
+        self._dataset = dataset
+
+    def get_dataset(self) -> AssembledDiffractionDataset:
+        return self._dataset
+
+    def get_label(self) -> str:
+        return self._dataset.get_name()
+
+    def get_counts(self) -> int:
+        if not self.child_nodes:
+            return 0
+        return sum(child.get_counts() for child in self.child_nodes) // len(self.child_nodes)
+
+    def get_data(self) -> DiffractionPattern | None:
+        return self._dataset.get_average_pattern()
+
+    def get_detector_extent(self) -> ImageExtent:
+        return self._dataset.get_metadata().detector_extent
+
+    def get_raw_pixel_geometry(self) -> PixelGeometry:
+        return self._dataset.get_raw_pixel_geometry()
+
+    def get_processed_pixel_geometry(self, sizer: PatternSizer) -> PixelGeometry:
+        return sizer.get_processed_pixel_geometry(self._dataset.get_raw_pixel_geometry())
+
+    def get_num_bad_pixels(self) -> int:
+        return int(numpy.count_nonzero(self._dataset.get_bad_pixels()))
+
+
+class _ArrayTreeNode(_TreeNode):
+    def __init__(self, parent_node: _TreeNode, array: AssembledDiffractionArray) -> None:
+        super().__init__(parent_node)
+        self._array = array
+        for frame_index in range(array.get_num_patterns()):
+            self.child_nodes.append(_FrameTreeNode(self, array, frame_index))
+
+    def get_label(self) -> str:
+        return self._array.get_label()
+
+    def get_counts(self) -> int:
+        return int(self._array.get_mean_pattern_counts())
+
+    def get_max_counts(self) -> int:
+        return int(self._array.get_max_pattern_counts())
+
+    def get_nframes(self) -> int:
+        return len(self.child_nodes)
+
+    def get_nbytes(self) -> int:
+        return self._array.get_patterns().nbytes
+
+    def get_data(self) -> DiffractionPattern:
+        return self._array.get_average_pattern()
+
+
+class _FrameTreeNode(_TreeNode):
+    def __init__(
+        self,
+        parent_node: _TreeNode,
+        array: AssembledDiffractionArray,
+        frame_index: int,
+    ) -> None:
+        super().__init__(parent_node)
+        self._array = array
+        self._frame_index = frame_index
+
+    def get_label(self) -> str:
+        return f'Frame {self._frame_index}'
+
+    def get_counts(self) -> int:
+        return int(self._array.get_pattern_counts(self._frame_index))
+
+    def get_nframes(self) -> int:
+        return 1
+
+    def get_nbytes(self) -> int:
+        return self._array.get_pattern(self._frame_index).nbytes
+
+    def get_data(self) -> DiffractionPattern:
+        return self._array.get_pattern(self._frame_index)
+
+
+def _find_containing_dataset_row(node: _TreeNode) -> int | None:
+    """Walk up until the dataset node is found; return its row within the root. None for the root."""
+    current: _TreeNode | None = node
+    while current is not None:
+        if isinstance(current, _DatasetTreeNode):
+            return current.get_row()
+        current = current.parent_node
+    return None
+
+
 class DatasetTreeModel(QAbstractItemModel):
-    def __init__(self, parent: QObject | None = None) -> None:
+    """Three-level tree: root → dataset → array → frame."""
+
+    def __init__(
+        self,
+        sizer: PatternSizer,
+        repository: DiffractionDatasetRepository,
+        parent: QObject | None = None,
+    ) -> None:
         super().__init__(parent)
-        self._nodes = DatasetTreeNode.create_root()
+        self._sizer = sizer
+        self._repository = repository
+        self._root = _TreeNode(None)
         self._max_counts = 1
-        self._header = ['Label', 'Counts', 'Frames', 'Size [MB]']
+        self._header = [
+            'Label',
+            'Counts',
+            'Frames',
+            'Size [MB]',
+            'Width\n[px]',
+            'Height\n[px]',
+            'Physical Pixel\nWidth [µm]',
+            'Physical Pixel\nHeight [µm]',
+            'Processed Pixel\nWidth [µm]',
+            'Processed Pixel\nHeight [µm]',
+            'Num Bad\nPixels',
+        ]
 
     def clear(self) -> None:
         self.beginResetModel()
-        self._nodes = DatasetTreeNode.create_root()
+        self._root = _TreeNode(None)
         self._max_counts = 1
         self.endResetModel()
 
-    def insert_array(self, row: int, array: AssembledDiffractionArray) -> None:
-        max_counts = array.get_max_pattern_counts()
+    def insert_dataset(self, row: int, dataset: AssembledDiffractionDataset) -> None:
+        self.beginInsertRows(QModelIndex(), row, row)
+        dataset_node = _DatasetTreeNode(self._root, dataset)
+        self._root.child_nodes.insert(row, dataset_node)
+        self.endInsertRows()
 
+    def remove_dataset(self, row: int) -> None:
+        if not 0 <= row < len(self._root.child_nodes):
+            return
+        self.beginRemoveRows(QModelIndex(), row, row)
+        del self._root.child_nodes[row]
+        self.endRemoveRows()
+
+    def _dataset_node(self, dataset_row: int) -> _DatasetTreeNode | None:
+        if not 0 <= dataset_row < len(self._root.child_nodes):
+            return None
+        node = self._root.child_nodes[dataset_row]
+        assert isinstance(node, _DatasetTreeNode)
+        return node
+
+    def insert_array(
+        self, dataset_row: int, array_row: int, array: AssembledDiffractionArray
+    ) -> None:
+        dataset_node = self._dataset_node(dataset_row)
+        if dataset_node is None:
+            return
+
+        max_counts = int(array.get_max_pattern_counts())
         if self._max_counts < max_counts:
             self._max_counts = max_counts
-            num_rows = self.rowCount()
+            self._rebroadcast_counts()
 
-            top_left = self.index(0, 1)
-            bottom_right = self.index(num_rows - 1, 1)
-            self.dataChanged.emit(top_left, bottom_right)
-
-            for row2 in range(num_rows):
-                parent_index = self.index(row2, 0)
-                num_rows2 = self.rowCount(parent_index)
-
-                child_top_left = self.index(0, 1, parent_index)
-                child_bottom_right = self.index(num_rows2 - 1, 1, parent_index)
-                self.dataChanged.emit(child_top_left, child_bottom_right)
-
-        self.beginInsertRows(QModelIndex(), row, row)
-        child_node = self._nodes.insert_child(row, array)
+        dataset_index = self.index(dataset_row, 0)
+        self.beginInsertRows(dataset_index, array_row, array_row)
+        array_node = _ArrayTreeNode(dataset_node, array)
+        dataset_node.child_nodes.insert(array_row, array_node)
         self.endInsertRows()
 
-        index = self.index(row, 0)
-        self.beginInsertRows(index, 0, len(child_node.child_nodes))
-        self.endInsertRows()
+        # Also announce the frame grandchildren.
+        array_index = self.index(array_row, 0, dataset_index)
+        num_frames = len(array_node.child_nodes)
+        if num_frames > 0:
+            self.beginInsertRows(array_index, 0, num_frames - 1)
+            self.endInsertRows()
 
-    def refresh_array(self, row: int) -> None:
-        top_left = self.index(row, 0)
-        bottom_right = self.index(row, self.columnCount() - 1)
+    def refresh_array(self, dataset_row: int, array_row: int) -> None:
+        dataset_index = self.index(dataset_row, 0)
+        if not dataset_index.isValid():
+            return
+
+        top_left = self.index(array_row, 0, dataset_index)
+        bottom_right = self.index(array_row, self.columnCount() - 1, dataset_index)
         self.dataChanged.emit(top_left, bottom_right)
 
         num_rows = self.rowCount(top_left)
         num_cols = self.columnCount(top_left)
+        if num_rows > 0:
+            child_top_left = self.index(0, 0, top_left)
+            child_bottom_right = self.index(num_rows - 1, num_cols - 1, top_left)
+            self.dataChanged.emit(child_top_left, child_bottom_right)
 
-        child_top_left = self.index(0, 0, top_left)
-        child_bottom_right = self.index(num_rows - 1, num_cols - 1, top_left)
-        self.dataChanged.emit(child_top_left, child_bottom_right)
+    def refresh_dataset(self, dataset_row: int) -> None:
+        dataset_index = self.index(dataset_row, 0)
+        if not dataset_index.isValid():
+            return
+        bottom_right = self.index(dataset_row, self.columnCount() - 1)
+        self.dataChanged.emit(dataset_index, bottom_right)
+
+    def _rebroadcast_counts(self) -> None:
+        num_rows = self.rowCount()
+        if num_rows == 0:
+            return
+        top_left = self.index(0, 1)
+        bottom_right = self.index(num_rows - 1, 1)
+        self.dataChanged.emit(top_left, bottom_right)
+
+        for dataset_row in range(num_rows):
+            dataset_index = self.index(dataset_row, 0)
+            num_arrays = self.rowCount(dataset_index)
+            if num_arrays == 0:
+                continue
+            array_top_left = self.index(0, 1, dataset_index)
+            array_bottom_right = self.index(num_arrays - 1, 1, dataset_index)
+            self.dataChanged.emit(array_top_left, array_bottom_right)
+
+            for array_row in range(num_arrays):
+                array_index = self.index(array_row, 0, dataset_index)
+                num_frames = self.rowCount(array_index)
+                if num_frames == 0:
+                    continue
+                frame_top_left = self.index(0, 1, array_index)
+                frame_bottom_right = self.index(num_frames - 1, 1, array_index)
+                self.dataChanged.emit(frame_top_left, frame_bottom_right)
+
+    def dataset_row_for_index(self, index: QModelIndex) -> int | None:
+        """Return the dataset row that contains the given tree index, or None."""
+        if not index.isValid():
+            return None
+        node = index.internalPointer()
+        return _find_containing_dataset_row(node)
 
     @overload
     def parent(self, child: QModelIndex) -> QModelIndex: ...
@@ -134,7 +304,7 @@ class DatasetTreeModel(QAbstractItemModel):
             child_node = child.internalPointer()
             parent_node = child_node.parent_node
 
-            if parent_node is not self._nodes:
+            if parent_node is not None and parent_node is not self._root:
                 return self.createIndex(parent_node.get_row(), 0, parent_node)
 
         return QModelIndex()
@@ -149,26 +319,116 @@ class DatasetTreeModel(QAbstractItemModel):
             return self._header[section]
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
-        if index.isValid():
-            node = index.internalPointer()
+        if not index.isValid():
+            return None
 
-            if role == Qt.ItemDataRole.DisplayRole:
-                match index.column():
-                    case 0:
-                        return node.get_label()
-                    case 1:
-                        return str(node.get_counts())
-                    case 2:
-                        return node.get_nframes()
-                    case 3:
-                        return f'{node.get_nbytes() / BYTES_PER_MEGABYTE:.2f}'
-            elif role == Qt.ItemDataRole.UserRole:
-                if index.column() == 1:
-                    return int(100 * node.get_counts()) // int(self._max_counts)
+        node = index.internalPointer()
+        column = index.column()
+
+        if role == Qt.ItemDataRole.DisplayRole:
+            match column:
+                case 0:
+                    return node.get_label()
+                case 1:
+                    return str(node.get_counts())
+                case 2:
+                    return node.get_nframes()
+                case 3:
+                    return f'{node.get_nbytes() / BYTES_PER_MEGABYTE:.2f}'
+                case _:
+                    return self._dataset_column_display(node, column)
+        elif role == Qt.ItemDataRole.EditRole:
+            if column == _COL_LABEL and isinstance(node, _DatasetTreeNode):
+                return node.get_label()
+        elif role == Qt.ItemDataRole.UserRole:
+            if column == _COL_COUNTS:
+                return int(100 * node.get_counts()) // int(self._max_counts)
+        return None
+
+    def _dataset_column_display(self, node: _TreeNode, column: int) -> Any:
+        # Columns 4..10 apply only to dataset rows; array/frame nodes render blank.
+        if not isinstance(node, _DatasetTreeNode):
+            return None
+
+        match column:
+            case 4:
+                return node.get_detector_extent().width_px
+            case 5:
+                return node.get_detector_extent().height_px
+            case 6:
+                return f'{node.get_raw_pixel_geometry().width_m / ONE_MICRON_M:.4g}'
+            case 7:
+                return f'{node.get_raw_pixel_geometry().height_m / ONE_MICRON_M:.4g}'
+            case 8:
+                return (
+                    f'{node.get_processed_pixel_geometry(self._sizer).width_m / ONE_MICRON_M:.4g}'
+                )
+            case 9:
+                return (
+                    f'{node.get_processed_pixel_geometry(self._sizer).height_m / ONE_MICRON_M:.4g}'
+                )
+            case 10:
+                return node.get_num_bad_pixels()
+        return None
+
+    def flags(self, index: QModelIndex) -> Qt.ItemFlags:  # noqa: N802
+        base = super().flags(index)
+        if not index.isValid():
+            return base
+        if index.column() != _COL_LABEL:
+            return base
+        node = index.internalPointer()
+        if not isinstance(node, _DatasetTreeNode):
+            return base
+        return base | Qt.ItemFlag.ItemIsEditable
+
+    def setData(  # noqa: N802
+        self,
+        index: QModelIndex,
+        value: Any,
+        role: int = Qt.ItemDataRole.EditRole,
+    ) -> bool:
+        if role != Qt.ItemDataRole.EditRole or not index.isValid():
+            return False
+        if index.column() != _COL_LABEL:
+            return False
+        node = index.internalPointer()
+        if not isinstance(node, _DatasetTreeNode):
+            return False
+
+        new_name = str(value).strip()
+        if not new_name:
+            return False
+
+        dataset = node.get_dataset()
+        if new_name == dataset.get_name():
+            return False
+
+        unique_name = self._repository.create_unique_name(new_name)
+        dataset.set_name(unique_name)
+        row = node.get_row()
+        top_left = self.index(row, _COL_LABEL)
+        self.dataChanged.emit(top_left, top_left, [Qt.ItemDataRole.DisplayRole])
+        return True
+
+    def refresh_processed_columns(self) -> None:
+        """Emit dataChanged for the processed pixel-size columns of every dataset row.
+
+        Called when the PatternSizer notifies (binning / transpose toggled or bin
+        size edited) — since the processed columns are derived from the sizer
+        transforms applied to each dataset's raw geometry, they all need to refresh
+        even though no dataset itself changed.
+        """
+        num_rows = self.rowCount()
+        if num_rows == 0:
+            return
+        top_left = self.index(0, _COL_PROCESSED_PIXEL_WIDTH_UM)
+        bottom_right = self.index(num_rows - 1, _COL_PROCESSED_PIXEL_HEIGHT_UM)
+        self.dataChanged.emit(top_left, bottom_right)
 
     def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
         if self.hasIndex(row, column, parent):
-            parent_node = parent.internalPointer() if parent.isValid() else self._nodes
+            parent_node = parent.internalPointer() if parent.isValid() else self._root
             child_node = parent_node.child_nodes[row]
 
             if child_node:
@@ -177,7 +437,7 @@ class DatasetTreeModel(QAbstractItemModel):
         return QModelIndex()
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
-        node = parent.internalPointer() if parent.isValid() else self._nodes
+        node = parent.internalPointer() if parent.isValid() else self._root
         return len(node.child_nodes)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802

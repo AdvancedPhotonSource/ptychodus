@@ -1,9 +1,9 @@
 from pathlib import Path
-from typing import Final
 import logging
 
 import h5py
 
+from ptychodus.api.constants import ONE_MICRON_M
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -16,8 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 class NanoMAXPositionFileReader(ProbePositionFileReader):
-    ONE_MICRON_M: Final[float] = 1.0e-6
-
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
 
@@ -36,8 +34,8 @@ class NanoMAXPositionFileReader(ProbePositionFileReader):
                 for idx, (x, y) in enumerate(zip(position_x, position_y)):
                     point = ProbePosition(
                         idx,
-                        x * self.ONE_MICRON_M,
-                        y * self.ONE_MICRON_M,
+                        x * ONE_MICRON_M,
+                        y * ONE_MICRON_M,
                     )
                     point_list.append(point)
 

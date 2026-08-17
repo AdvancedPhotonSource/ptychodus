@@ -27,9 +27,9 @@ from .fluorescence import (
 )
 from .object import ObjectFileReader, ObjectFileWriter, Object
 from .observer import Observable, Observer
-from .parametric import StringParameter
+from .parameters import Parameter, StringParameter
 from .probe import ProbeFileReader, ProbeFileWriter, ProbeSequence
-from .probe_gen import FresnelZonePlate
+from .simulate.probe import FresnelZonePlate
 from .probe_positions import (
     ProbePositionFileReader,
     ProbePositionFileWriter,
@@ -40,6 +40,7 @@ from .workflow import FileBasedWorkflow
 
 __all__ = [
     'PluginChooser',
+    'PluginChooserParameter',
     'PluginRegistry',
 ]
 
@@ -93,14 +94,18 @@ class Plugin(Generic[T]):
     display_name: str
 
 
-class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
-    """Observable list of typed plugins with a tracked current selection."""
+class PluginChooser(Iterable[Plugin[T]], Observable):
+    """Observable list of typed plugins with a tracked current selection.
+
+    The chooser knows nothing about settings persistence. Bind it to a settings
+    parameter by constructing a :class:`PluginChooserParameter` over it, which owns
+    the translation between the two name spaces in both directions.
+    """
 
     def __init__(self) -> None:
         super().__init__()
         self._registered_plugins: list[Plugin[T]] = list()
         self._current_index = 0
-        self._parameter: StringParameter | None = None
 
     def stringify_plugin_names(self) -> str:
         """Return a sorted, comma-separated list of registered plugin simple names."""
@@ -111,10 +116,37 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
         if not simple_name:
             simple_name = re.sub(r'\W+', '', display_name)
 
-        plugin = Plugin[T](strategy, simple_name, display_name)
-        self._registered_plugins.append(plugin)
+        # The list is kept sorted by display name, so a registration can move the
+        # selected plugin to a different index. Track it by identity across the sort
+        # rather than by value: Plugin is a frozen dataclass, so equality compares the
+        # strategy field and an array-valued strategy would break the comparison.
+        current = (
+            self._registered_plugins[self._current_index] if self._registered_plugins else None
+        )
+
+        self._registered_plugins.append(Plugin[T](strategy, simple_name, display_name))
         self._registered_plugins.sort(key=lambda x: x.display_name)
+
+        if current is not None:
+            self._current_index = next(
+                index for index, plugin in enumerate(self._registered_plugins) if plugin is current
+            )
+
         self.notify_observers()
+
+    def _find_index(self, name: str) -> int | None:
+        namecf = name.casefold()
+
+        for index, plugin in enumerate(self._registered_plugins):
+            if namecf == plugin.simple_name.casefold() or namecf == plugin.display_name.casefold():
+                return index
+
+        return None
+
+    def find_plugin(self, name: str) -> Plugin[T] | None:
+        """Return the plugin matching *name* (case-insensitive simple or display name), or None."""
+        index = self._find_index(name)
+        return None if index is None else self._registered_plugins[index]
 
     def get_current_plugin(self) -> Plugin[T]:
         """Return the currently selected plugin."""
@@ -123,29 +155,27 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
         return self._registered_plugins[self._current_index]
 
     def set_current_plugin(self, name: str) -> None:
-        """Select the plugin matching *name* (case-insensitive simple or display name); warn if none match."""
-        namecf = name.casefold()
+        """Select the plugin matching *name* (case-insensitive simple or display name).
 
-        for index, plugin in enumerate(self._registered_plugins):
-            if namecf == plugin.simple_name.casefold() or namecf == plugin.display_name.casefold():
-                if self._current_index != index:
-                    self._current_index = index
+        An unrecognized name logs a warning and leaves the selection unchanged, but
+        still notifies observers so that a bound view resynchronizes to the selection
+        the chooser actually holds.
+        """
+        index = self._find_index(name)
 
-                    if self._parameter is not None:
-                        self._parameter.set_value(self.get_current_plugin().simple_name)
+        if index is None:
+            registered_plugins = ', '.join(
+                f'"{plugin.simple_name}"' for plugin in self._registered_plugins
+            )
+            logger.warning(
+                f'Invalid plugin name "{name}". Registered plugins: {registered_plugins}.'
+            )
+            self.notify_observers()
+            return
 
-                    self.notify_observers()
-
-                return
-
-        registered_plugins = ', '.join(f'"{pi.simple_name}"' for pi in self._registered_plugins)
-        logger.warning(f'Invalid plugin name "{name}". Registered plugins: {registered_plugins}.')
-
-    def synchronize_with_parameter(self, parameter: StringParameter) -> None:
-        """Bind selection to *parameter*: the chooser tracks the parameter's value and vice versa."""
-        self._parameter = parameter
-        self.set_current_plugin(parameter.get_value())
-        self._parameter.add_observer(self)
+        if index != self._current_index:
+            self._current_index = index
+            self.notify_observers()
 
     def __iter__(self) -> Iterator[Plugin[T]]:
         for plugin in self._registered_plugins:
@@ -154,9 +184,128 @@ class PluginChooser(Iterable[Plugin[T]], Observable, Observer):
     def __bool__(self) -> bool:
         return bool(self._registered_plugins)
 
+
+class PluginChooserParameter(Parameter[str], Observer, Generic[T]):
+    """Parameter[str] view of a PluginChooser whose value space is plugin display names.
+
+    A chooser has two name spaces: the human-readable ``display_name`` shown in the
+    GUI and the ``simple_name`` persisted to settings. This adapter is the single
+    place that translates between them. Its own value space is display names, so a
+    plain combo box bound to it round trips correctly.
+
+    Passing *settings* additionally binds the chooser to that settings parameter: the
+    persisted name selects a plugin at construction and is rewritten to its canonical
+    simple name, and every later selection change writes the simple name back. A
+    persisted name that matches no registered plugin is left alone rather than
+    reconciled, because a plugin can be missing merely because its optional
+    dependency failed to import this run.
+
+    Note that :meth:`get_value` raises ``LookupError`` when no plugins are registered,
+    so this must not be read before ``PluginRegistry.load_plugins()`` has run.
+    """
+
+    def __init__(self, chooser: PluginChooser[T], settings: StringParameter | None = None) -> None:
+        super().__init__()
+        self._chooser = chooser
+        self._settings = settings
+        self._selected: Plugin[T] | None = None
+        self._suppress_notify = False
+
+        if settings is not None:
+            self._apply_settings()
+            settings.add_observer(self)
+
+        self._selected = chooser.get_current_plugin() if chooser else None
+        chooser.add_observer(self)
+
+    def choices(self) -> Iterator[str]:
+        """Yield the display names to populate a combo box with."""
+        for plugin in self._chooser:
+            yield plugin.display_name
+
+    def get_strategy(self) -> T:
+        return self._chooser.get_current_plugin().strategy
+
+    def get_value(self) -> str:
+        return self._chooser.get_current_plugin().display_name
+
+    def set_value(self, value: str, *, notify: bool = True) -> None:
+        # The chooser notifies us back through _update; suppress that relay rather
+        # than notifying here, so a no-op selection stays silent either way. Only the
+        # relay is suppressed: persistence must not depend on a view flag.
+        self._suppress_notify = not notify
+
+        try:
+            self._chooser.set_current_plugin(value)
+        finally:
+            self._suppress_notify = False
+
+    def get_value_as_string(self) -> str:
+        return self.get_value()
+
+    def set_value_from_string(self, value: str) -> None:
+        self.set_value(value)
+
+    def copy(self) -> Parameter[str]:
+        """Return an unbound view of the same chooser; the copy does not persist."""
+        return PluginChooserParameter(self._chooser)
+
+    def _apply_settings(self) -> None:
+        settings = self._settings
+
+        if settings is None:
+            return
+
+        name = settings.get_value()
+        plugin = self._chooser.find_plugin(name)
+        self._chooser.set_current_plugin(name)
+
+        if plugin is not None:
+            # Unconditional, so that a display name normalizes to its simple name even
+            # when it already resolves to the current selection. ParameterBase guards
+            # against no-op writes, so this does not notify unless the value changed.
+            settings.set_value(plugin.simple_name)
+
+    def _reconcile(self) -> None:
+        """Settle the chooser and the settings parameter against each other.
+
+        Observable notifications carry no payload, so the cached selection is what
+        distinguishes "the selection moved" from "a plugin was registered". Only the
+        former may write back; the latter must leave an unresolved setting intact.
+        """
+        settings = self._settings
+        plugin = self._chooser.get_current_plugin() if self._chooser else None
+
+        if plugin is None or settings is None:
+            self._selected = plugin
+            return
+
+        if self._selected is None:
+            # The chooser just gained its first plugin: the selection came into
+            # existence rather than moving, so the fallback must not be persisted.
+            self._selected = plugin
+
+        if plugin is not self._selected:
+            self._selected = plugin
+            settings.set_value(plugin.simple_name)
+            return
+
+        # The selection held, so this was a registration. If it has just made the
+        # persisted name resolvable, honor it now — set_current_plugin re-enters
+        # here through the chooser's notification to finish the write-back.
+        desired = self._chooser.find_plugin(settings.get_value())
+
+        if desired is not None and desired is not plugin:
+            self._apply_settings()
+
     def _update(self, observable: Observable) -> None:
-        if self._parameter is not None and observable is self._parameter:
-            self.set_current_plugin(self._parameter.get_value())
+        if observable is self._settings:
+            self._apply_settings()
+        elif observable is self._chooser:
+            self._reconcile()
+
+            if not self._suppress_notify:
+                self.notify_observers()
 
 
 class PluginRegistry:

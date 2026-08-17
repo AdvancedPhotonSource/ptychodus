@@ -3,8 +3,8 @@ from dataclasses import replace
 import logging
 import time
 
+from ptychodus.api.metrics import estimate_reconstruction_ambiguities
 from ptychodus.api.object import align_objects
-from ptychodus.api.reconstructor import ReconstructionAmbiguities
 from ptychodus.api.xmcd import XMCDResult, estimate_xmcd
 
 from ..product import ProductRepository
@@ -31,7 +31,9 @@ class XMCDAnalyzer:
 
         aligned_lcp_product = replace(lcp_product, object_=aligned_lcp_object)
 
-        ambiguities = ReconstructionAmbiguities.estimate(aligned_lcp_product, reference=rcp_product)
+        ambiguities = estimate_reconstruction_ambiguities(
+            aligned_lcp_product, reference=rcp_product
+        )
         standardized_lcp_product = ambiguities.standardize_product(aligned_lcp_product)
 
         logger.info('Computing XMCD...')

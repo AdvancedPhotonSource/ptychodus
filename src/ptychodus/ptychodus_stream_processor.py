@@ -15,6 +15,8 @@ import pvapy
 from ptychodus.model import ModelCore
 import ptychodus
 import ptychodus.api
+import ptychodus.api.diffraction
+import ptychodus.api.geometry
 
 
 class ReconstructionThread(threading.Thread):
@@ -104,10 +106,16 @@ class PtychodusAdImageProcessor(AdImageProcessor):
         num_arrays = config_dict['num_arrays']
         num_patterns_per_array = config_dict.get('num_patterns_per_array', 1)
         pattern_dtype = config_dict.get('pattern_dtype', 'uint16')
+        detector_width_px = int(config_dict['detector_width_px'])
+        detector_height_px = int(config_dict['detector_height_px'])
 
         metadata = ptychodus.api.diffraction.DiffractionMetadata(
             num_patterns_per_array=[int(num_patterns_per_array)] * int(num_arrays),
             pattern_dtype=numpy.dtype(pattern_dtype),
+            detector_extent=ptychodus.api.geometry.ImageExtent(
+                width_px=detector_width_px,
+                height_px=detector_height_px,
+            ),
         )
         self._ptychodus_streaming_context = self._ptychodus.create_streaming_context(metadata)
         self._ptychodus_streaming_context.start()  # TODO clean up

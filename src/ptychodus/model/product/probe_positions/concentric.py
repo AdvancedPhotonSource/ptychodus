@@ -1,9 +1,10 @@
 from __future__ import annotations
+from collections.abc import Sequence
 
 import numpy
 
-from ptychodus.api.probe_positions import ProbePositionSequence
-from ptychodus.api.probe_positions_gen import generate_concentric_probe_positions
+from ptychodus.api.probe_positions import ProbePosition
+from ptychodus.api.simulate.probe_positions import generate_concentric_probe_positions
 
 from .builder import ProbePositionsBuilder
 from .settings import ProbePositionsSettings
@@ -31,10 +32,10 @@ class ConcentricProbePositionsBuilder(ProbePositionsBuilder):
 
         return builder
 
-    def build(self) -> ProbePositionSequence:
+    def _build_raw(self) -> Sequence[ProbePosition]:
         positions = generate_concentric_probe_positions(
             self.radial_step_size_m.get_value(),
             self.num_shells.get_value(),
             self.num_points_1st_shell.get_value(),
         )
-        return self._create_position_sequence(positions)
+        return [*positions]

@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+# Transparent podman launcher for ptychodus.
+# Detects host GPU family, picks the matching ptychodus image, forwards X11,
+# bind-mounts $HOME / $PWD / beamline data roots, and runs rootless so files
+# written to the host are owned by the invoking user.
+#
+# Lint with: shellcheck scripts/podman/ptychodus
+#
+# Env-var overrides:
+#   PTYCHODUS_IMAGE   skip GPU detection; use this image tag verbatim
+#   PTYCHODUS_QUIET   set to any non-empty value to suppress the stderr notice
+
+set -euo pipefail
+IFS=$'\n\t'
+
+# --- Configuration (admins edit here) ----------------------------------------
+
+declare -A IMAGE_FOR=(
+    [nvidia]=ptychodus:cuda13.0
+    [rocm]=ptychodus:rocm
+    [xpu]=ptychodus:xpu
+    [cpu]=ptychodus:cpu
+)
+
+BEAMLINE_MOUNTS=(/local /gdata)
+
+# --- Helpers -----------------------------------------------------------------
+
+die() {
+    printf 'ptychodus: %s\n' "$*" >&2
+    exit 1
+}
+
+notice() {
+    [[ -n "${PTYCHODUS_QUIET:-}" ]] && return 0
+    printf 'ptychodus: %s\n' "$*" >&2
+}
+
+detect_gpu() {
+    if command -v nvidia-smi >/dev/null 2>&1 \
+       && [[ -n "$(nvidia-smi -L 2>/dev/null)" ]]; then
+        printf nvidia
+        return
+    fi
+
+    if [[ -e /dev/kfd ]]; then
+        shopt -s nullglob
+        local render_nodes=(/dev/dri/renderD*)
+        shopt -u nullglob
+        if (( ${#render_nodes[@]} > 0 )); then
+            printf rocm
+            return
+        fi
+    fi
+
+    if command -v xpu-smi >/dev/null 2>&1 \
+       && xpu-smi discovery >/dev/null 2>&1; then
+        printf xpu
+        return
+    fi
+    shopt -s nullglob
+    local vendor_files=(/sys/class/drm/card*/device/vendor)
+    shopt -u nullglob
+    local vf
+    for vf in "${vendor_files[@]}"; do
+        if [[ -r "$vf" ]] && grep -q '0x8086' "$vf"; then
+            printf xpu
+            return
+        fi
+    done
+
+    printf cpu
+}
+
+add_gpu_flags() {
+    local -n _args=$1
+    local family=$2
+    case "$family" in
+        nvidia)
+            _args+=( --device nvidia.com/gpu=all )
+            ;;
+        rocm)
+            _args+=( --device /dev/kfd --device /dev/dri
+                     --group-add video --group-add render )
+            ;;
+        xpu)
+            _args+=( --device /dev/dri
+                     --group-add video --group-add render )
+            ;;
+        cpu)
+            ;;
+        *)
+            ;;
+    esac
+}
+
+add_x11_flags() {
+    local -n _args=$1
+    _args+=( --env DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix )
+    if [[ -n "${XAUTHORITY:-}" && -r "${XAUTHORITY:-}" ]]; then
+        _args+=( --env XAUTHORITY -v "$XAUTHORITY:$XAUTHORITY:ro" )
+    fi
+}
+
+# --- Pre-scan argv for batch mode (no argv mutation) -------------------------
+
+is_batch=0
+for arg in "$@"; do
+    case "$arg" in
+        -b|--batch|--batch=*) is_batch=1 ;;
+    esac
+done
+
+# --- Choose image ------------------------------------------------------------
+
+if [[ -n "${PTYCHODUS_IMAGE:-}" ]]; then
+    IMAGE="$PTYCHODUS_IMAGE"
+    family="override"
+    notice "using image $IMAGE (override: PTYCHODUS_IMAGE)"
+else
+    family=$(detect_gpu)
+    IMAGE="${IMAGE_FOR[$family]:-}"
+    [[ -n "$IMAGE" ]] || die "no image mapped for family '$family'"
+    notice "using image $IMAGE (detected: $family)"
+fi
+
+# --- Prerequisite checks -----------------------------------------------------
+
+command -v podman >/dev/null 2>&1 \
+    || die "podman not installed; see docs/source/getting_started.md"
+
+if ! podman image exists "$IMAGE"; then
+    build_family="$family"
+    [[ "$build_family" == "override" ]] && build_family="<family>"
+    case "$build_family" in
+        nvidia) dockerfile=Dockerfile.cuda ;;
+        rocm)   dockerfile=Dockerfile.rocm ;;
+        xpu)    dockerfile=Dockerfile.xpu ;;
+        cpu)    dockerfile=Dockerfile.cpu ;;
+        *)      dockerfile="Dockerfile.<family>" ;;
+    esac
+    {
+        printf 'ptychodus: image "%s" not found in rootless podman storage.\n' "$IMAGE"
+        printf '  Build it from the repository root with:\n'
+        printf '    podman build -f %s -t %s .\n' "$dockerfile" "$IMAGE"
+    } >&2
+    exit 1
+fi
+
+# --- Assemble podman flags ---------------------------------------------------
+
+args=(
+    run --rm -i
+    --userns=keep-id
+    --security-opt label=type:container_runtime_t
+    --network host
+    --workdir "$PWD"
+    -v "$HOME:$HOME"
+    --env HOME
+)
+
+[[ -t 0 && -t 1 ]] && args+=( -t )
+
+if [[ "$PWD" != "$HOME"* ]]; then
+    args+=( -v "$PWD:$PWD" )
+fi
+
+for mount in "${BEAMLINE_MOUNTS[@]}"; do
+    [[ -e "$mount" ]] || continue
+    [[ "$mount" == "$HOME"* ]] && continue
+    [[ "$PWD" == "$mount"* ]] && continue
+    args+=( -v "$mount:$mount" )
+done
+
+add_gpu_flags args "$family"
+
+if (( is_batch == 0 )) && [[ -n "${DISPLAY:-}" ]]; then
+    add_x11_flags args
+fi
+
+# --- Launch ------------------------------------------------------------------
+
+exec podman "${args[@]}" "$IMAGE" python3 -m ptychodus "$@"

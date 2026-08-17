@@ -3,19 +3,19 @@ from pathlib import Path
 import logging
 import time
 
-from ptychodus.api.reconstructor import (
+from ptychodus.api.reconstruct import (
     NullReconstructor,
     PositionIndexFilter,
     ReconstructInput,
     Reconstructor,
     ReconstructorLibrary,
     TrainableReconstructor,
+    prepare_reconstruct_input,
 )
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import Parameter, StringParameter
+from ptychodus.api.parameters import Parameter, StringParameter
 
-from ..diffraction import DiffractionAPI
 from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .monitor import (
@@ -103,13 +103,11 @@ class ProcessingAPI:
     def __init__(
         self,
         task_manager: TaskManager,
-        diffraction_api: DiffractionAPI,
         product_api: ProductAPI,
         algorithm: ProcessingAlgorithmParameter,
         task_monitor: ProcessingTaskMonitor,
     ) -> None:
         self._task_manager = task_manager
-        self._diffraction_api = diffraction_api
         self._product_api = product_api
         self._algorithm_parameter = algorithm
         self._task_monitor = task_monitor
@@ -120,16 +118,24 @@ class ProcessingAPI:
 
     def get_reconstruct_input(
         self,
-        product_index: int,
         *,
+        product_index: int,
         index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
     ) -> ReconstructInput:
-        product = self._product_api.get_item(product_index).get_product()
+        product_item = self._product_api.get_item(product_index)
+        dataset = product_item.get_dataset()
+
+        if dataset is None:
+            raise RuntimeError(
+                f'Product "{product_item.get_name()}" has no associated diffraction dataset.'
+            )
+
+        product = product_item.get_product()
         logger.info(f'Preparing input data for {product.metadata.name}...')
         tic = time.perf_counter()
-        assembled_data = self._diffraction_api.get_assembled_data()
-        reconstruct_input = assembled_data.prepare_reconstruct_input(
-            product, index_filter=index_filter
+        assembled_data = dataset.get_assembled_data()
+        reconstruct_input = prepare_reconstruct_input(
+            assembled_data, product, index_filter=index_filter
         )
         toc = time.perf_counter()
         logger.info(f'Data preparation time {toc - tic:.4f} seconds.')
@@ -137,8 +143,8 @@ class ProcessingAPI:
 
     def reconstruct(
         self,
-        input_product_index: int,
         *,
+        product_index: int,
         algorithm: str | None = None,
         index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
         output_product_suffix: str = '',
@@ -146,8 +152,10 @@ class ProcessingAPI:
         block: bool = False,
     ) -> int:
         self.set_reconstructor_if_provided(algorithm)
-        input_product_item = self._product_api.get_item(input_product_index)
-        output_product_index = self._product_api.insert_product(input_product_item.get_product())
+        input_product_item = self._product_api.get_item(product_index)
+        output_product_index = self._product_api.insert_product(
+            input_product_item.get_product(), dataset=input_product_item.get_dataset()
+        )
         output_product_item = self._product_api.get_item(output_product_index)
         output_product_name = (
             f'{input_product_item.get_name()}_{self._algorithm_parameter.get_value()}'
@@ -158,7 +166,8 @@ class ProcessingAPI:
 
         output_product_item.set_name(output_product_name)
         reconstruct_input = self.get_reconstruct_input(
-            output_product_index, index_filter=index_filter
+            product_index=output_product_index,
+            index_filter=index_filter,
         )
         background_task = ReconstructBackgroundTask(
             self._task_monitor,
@@ -177,20 +186,21 @@ class ProcessingAPI:
                 ):
                     self._task_manager.run_foreground_tasks()
                     break
+            self._task_monitor.raise_if_failed()
 
         return output_product_index
 
     def reconstruct_split(
-        self, input_product_index: int, *, algorithm: str | None = None
+        self, *, product_index: int, algorithm: str | None = None
     ) -> tuple[int, int]:
         output_product_index_odd = self.reconstruct(
-            input_product_index,
+            product_index=product_index,
             algorithm=algorithm,
             index_filter=PositionIndexFilter.ODD,
             output_product_suffix='odd',
         )
         output_product_index_even = self.reconstruct(
-            input_product_index,
+            product_index=product_index,
             algorithm=algorithm,
             index_filter=PositionIndexFilter.EVEN,
             output_product_suffix='even',
@@ -227,6 +237,7 @@ class ProcessingAPI:
     def export_training_data(
         self,
         file_path: Path,
+        *,
         product_index: int,
         algorithm: str | None = None,
         index_filter: PositionIndexFilter = PositionIndexFilter.ALL,
@@ -235,7 +246,10 @@ class ProcessingAPI:
         trainer = self._algorithm_parameter.get_current_reconstructor()
 
         if isinstance(trainer, TrainableReconstructor):
-            reconstruct_input = self.get_reconstruct_input(product_index, index_filter=index_filter)
+            reconstruct_input = self.get_reconstruct_input(
+                product_index=product_index,
+                index_filter=index_filter,
+            )
 
             logger.info('Exporting...')
             tic = time.perf_counter()
@@ -247,10 +261,10 @@ class ProcessingAPI:
 
     def train(
         self,
-        product_index: int,
         input_path: Path,
         output_path: Path,
         *,
+        product_index: int,
         algorithm: str | None = None,
         block: bool = False,
     ) -> None:
@@ -258,7 +272,7 @@ class ProcessingAPI:
         trainer = self._algorithm_parameter.get_current_reconstructor()
 
         if isinstance(trainer, TrainableReconstructor):
-            reconstruct_input = self.get_reconstruct_input(product_index)
+            reconstruct_input = self.get_reconstruct_input(product_index=product_index)
             background_task = TrainBackgroundTask(
                 self._task_monitor,
                 trainer,
@@ -276,6 +290,7 @@ class ProcessingAPI:
                     ):
                         self._task_manager.run_foreground_tasks()
                         break
+                self._task_monitor.raise_if_failed()
         else:
             logger.warning('Algorithm is not trainable!')
 

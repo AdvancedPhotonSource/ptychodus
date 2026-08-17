@@ -6,7 +6,7 @@ import time
 
 from ptychodus.api.io import save_product
 from ptychodus.api.product import Product
-from ptychodus.api.reconstructor import (
+from ptychodus.api.reconstruct import (
     ReconstructInput,
     ReconstructOutput,
     Reconstructor,

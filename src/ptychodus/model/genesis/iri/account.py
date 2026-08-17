@@ -3,7 +3,7 @@ from datetime import datetime
 import logging
 
 from pydantic import BaseModel
-import requests
+import httpx
 
 from ..tokens import create_headers
 
@@ -23,21 +23,21 @@ class IRIAccountClient:
     # See https://api.iri.nersc.gov/#/account
 
     def __init__(self, api_base_url: str, access_token: str) -> None:
-        self._base_url = api_base_url.rstrip('/') + '/api/v1/account'
-        self._headers = create_headers(access_token)
+        self._client = httpx.Client(
+            base_url=api_base_url.rstrip('/') + '/api/v1/account',
+            headers=create_headers(access_token),
+            timeout=30.0,
+        )
 
     def get_projects(self) -> Sequence[Project]:
-        response = requests.get(
-            f'{self._base_url}/projects',
-            headers=self._headers,
-        )
+        response = self._client.get('/projects')
         response.raise_for_status()
         return [Project.model_validate(item) for item in response.json()]
 
     def get_project(self, project_id: str) -> Project:
-        response = requests.get(
-            f'{self._base_url}/projects/{project_id}',
-            headers=self._headers,
-        )
+        response = self._client.get(f'/projects/{project_id}')
         response.raise_for_status()
         return Project.model_validate(response.json())
+
+    def close(self) -> None:
+        self._client.close()

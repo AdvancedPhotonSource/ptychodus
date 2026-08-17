@@ -1,8 +1,9 @@
 from collections.abc import Iterator
 from importlib.metadata import PackageNotFoundError, version
+from importlib.util import find_spec
 import logging
 
-from ptychodus.api.reconstructor import (
+from ptychodus.api.reconstruct import (
     NullReconstructor,
     Reconstructor,
     ReconstructorLibrary,
@@ -20,6 +21,11 @@ from .settings import (
 logger = logging.getLogger(__name__)
 
 
+def _ptychopinn_available() -> bool:
+    """Return True iff the ``ptycho`` package is importable, without importing it."""
+    return find_spec('ptycho') is not None
+
+
 class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
     def __init__(
         self, settings_registry: SettingsRegistry, is_developer_mode_enabled: bool
@@ -31,34 +37,30 @@ class PtychoPINNReconstructorLibrary(ReconstructorLibrary):
         self.enumerators = PtychoPINNEnumerators()
         self._reconstructors: list[TrainableReconstructor] = list()
 
-        try:
-            from .reconstructor import PtychoPINNTrainableReconstructor
-        except ModuleNotFoundError:
+        if not _ptychopinn_available():
             logger.info('PtychoPINN not found.')
 
             if is_developer_mode_enabled:
                 for reconstructor in ('PINN', 'Supervised'):
                     self._reconstructors.append(NullReconstructor(reconstructor))
-        else:
+            return
+
+        try:
+            ptychopinn_version = version('ptychopinn')
+        except PackageNotFoundError:
             try:
-                ptychopinn_version = version('ptychopinn')
-            except PackageNotFoundError:
                 ptychopinn_version = version('ptycho')
+            except PackageNotFoundError:
+                ptychopinn_version = 'unknown'
 
-            logger.info(f'PtychoPINN {ptychopinn_version}')
+        logger.info(f'PtychoPINN {ptychopinn_version}')
 
+        from .reconstructor import build_reconstructor
+
+        for mode in ('PINN', 'Supervised'):
             self._reconstructors.append(
-                PtychoPINNTrainableReconstructor(
-                    'PINN',
-                    self.model_settings,
-                    self.inference_settings,
-                    self.training_settings,
-                    is_developer_mode_enabled=is_developer_mode_enabled,
-                )
-            )
-            self._reconstructors.append(
-                PtychoPINNTrainableReconstructor(
-                    'Supervised',
+                build_reconstructor(
+                    mode,
                     self.model_settings,
                     self.inference_settings,
                     self.training_settings,

@@ -3,7 +3,7 @@ from typing import overload
 import logging
 import sys
 
-from ptychodus.api.common import BYTES_PER_MEGABYTE
+from ptychodus.api.constants import BYTES_PER_MEGABYTE
 
 from .item import ProductRepositoryItem, ProductRepositoryItemObserver, ProductRepositoryObserver
 
@@ -136,3 +136,23 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
 
         for observer in self._observer_list:
             observer.handle_losses_changed(index, losses)
+
+    def handle_dataset_changed(self, item: ProductRepositoryItem) -> None:
+        index = item._index
+
+        if index < 0:
+            logger.warning(f'Failed to look up index for "{item.get_name()}"!')
+            return
+
+        for observer in self._observer_list:
+            observer.handle_dataset_changed(index, item)
+
+    def handle_state_changed(self, item: ProductRepositoryItem) -> None:
+        index = item._index
+
+        if index < 0:
+            logger.warning(f'Failed to look up index for "{item.get_name()}"!')
+            return
+
+        for observer in self._observer_list:
+            observer.handle_state_changed(index, item)

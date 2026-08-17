@@ -8,19 +8,23 @@ import logging
 import h5py
 import numpy
 
-from .diffraction import zero_bad_pixels
+from .diffraction import AssembledDiffractionData, Polarization, zero_bad_pixels
+from .fluorescence import ElementMap, FluorescenceDataset
 from .geometry import PixelGeometry
 from .object import Object, ObjectCenter
 from .probe import ProbeSequence
 from .probe_positions import ProbePositionSequence, ProbePosition
-from .product import Product, ProductMetadata
-from .reconstructor import AssembledDiffractionData, LossValue, ReconstructInput
+from .product import LossValue, Product, ProductMetadata
+from .reconstruct import ReconstructInput
 
 __all__ = [
+    'FluorescenceFileKeys',
     'StandardFileLayout',
     'load_diffraction_data',
+    'load_fluorescence_data',
     'load_product',
     'save_diffraction_data',
+    'save_fluorescence_data',
     'save_product',
     'save_ptychopinn_training_data',
 ]
@@ -32,6 +36,7 @@ class StandardFileLayout(StrEnum):
     """Conventional file names used in the ptychodus standard HDF5 workflow directory."""
 
     DIFFRACTION = 'diffraction.h5'
+    FLUORESCENCE = 'fluorescence.h5'
     FLUORESCENCE_IN = 'fluorescence-in.h5'
     FLUORESCENCE_OUT = 'fluorescence-out.h5'
     # Stem only; the per-backend extension comes from
@@ -121,6 +126,8 @@ class ProductFileKeys(StrEnum):
     EXPOSURE_TIME = 'exposure_time_s'
     MASS_ATTENUATION = 'mass_attenuation_m2_kg'
     TOMOGRAPHY_ANGLE = 'tomography_angle_deg'
+    TILT_ANGLE = 'tilt_angle_deg'
+    POLARIZATION = 'polarization'
     PROBE_ARRAY = 'probe'
     OPR_WEIGHTS = 'opr_weights'
     PROBE_PIXEL_HEIGHT = 'pixel_height_m'
@@ -149,6 +156,21 @@ def load_product(file: Path) -> Product:
         exposure_time_s = float(h5_file.attrs.get(ProductFileKeys.EXPOSURE_TIME, 0.0))
         mass_attenuation_m2_kg = float(h5_file.attrs.get(ProductFileKeys.MASS_ATTENUATION, 0.0))
         tomography_angle_deg = float(h5_file.attrs.get(ProductFileKeys.TOMOGRAPHY_ANGLE, 0.0))
+        tilt_angle_deg = float(h5_file.attrs.get(ProductFileKeys.TILT_ANGLE, 0.0))
+
+        polarization: Polarization | None = None
+        if ProductFileKeys.POLARIZATION in h5_file.attrs:
+            raw_polarization = h5_file.attrs[ProductFileKeys.POLARIZATION]
+            if isinstance(raw_polarization, bytes):
+                raw_polarization = raw_polarization.decode('utf-8', errors='replace')
+            try:
+                polarization = Polarization(str(raw_polarization))
+            except ValueError:
+                logger.warning(
+                    'Unknown polarization %r in %s; setting polarization=None.',
+                    raw_polarization,
+                    file,
+                )
 
         metadata = ProductMetadata(
             name=name,
@@ -159,6 +181,8 @@ def load_product(file: Path) -> Product:
             exposure_time_s=exposure_time_s,
             mass_attenuation_m2_kg=mass_attenuation_m2_kg,
             tomography_angle_deg=tomography_angle_deg,
+            tilt_angle_deg=tilt_angle_deg,
+            polarization=polarization,
         )
 
         h5_object = h5_file[ProductFileKeys.OBJECT_ARRAY]
@@ -292,6 +316,10 @@ def save_product(file: Path, product: Product) -> None:
         h5_file.attrs[ProductFileKeys.PROBE_PHOTON_COUNT] = metadata.probe_photon_count
         h5_file.attrs[ProductFileKeys.EXPOSURE_TIME] = metadata.exposure_time_s
         h5_file.attrs[ProductFileKeys.MASS_ATTENUATION] = metadata.mass_attenuation_m2_kg
+        h5_file.attrs[ProductFileKeys.TOMOGRAPHY_ANGLE] = metadata.tomography_angle_deg
+        h5_file.attrs[ProductFileKeys.TILT_ANGLE] = metadata.tilt_angle_deg
+        if metadata.polarization is not None:
+            h5_file.attrs[ProductFileKeys.POLARIZATION] = metadata.polarization.value
 
         h5_file.create_dataset(ProductFileKeys.PROBE_POSITION_INDEXES, data=scan_indexes)
         h5_file.create_dataset(ProductFileKeys.PROBE_POSITION_X, data=scan_x_m)
@@ -329,6 +357,86 @@ def save_product(file: Path, product: Product) -> None:
 
         h5_file.create_dataset(ProductFileKeys.LOSS_EPOCHS, data=loss_epochs)
         h5_file.create_dataset(ProductFileKeys.LOSS_VALUES, data=loss_values)
+
+
+class FluorescenceFileKeys(StrEnum):
+    """HDF5 paths for the primary XRF-Maps NNLS layout used by :func:`save_fluorescence_data`."""
+
+    COUNTS_PER_SECOND = '/MAPS/XRF_Analyzed/NNLS/Counts_Per_Sec'
+    CHANNEL_NAMES = '/MAPS/XRF_Analyzed/NNLS/Channel_Names'
+
+
+_FLUORESCENCE_LOAD_PATHS: tuple[tuple[str, str], ...] = (
+    (FluorescenceFileKeys.COUNTS_PER_SECOND, FluorescenceFileKeys.CHANNEL_NAMES),
+    ('/MAPS/XRF_Analyzed/Fitted/Counts_Per_Sec', '/MAPS/XRF_Analyzed/Fitted/Channel_Names'),
+    ('/MAPS/XRF_fits', '/MAPS/channel_names'),
+)
+
+
+def _locate_fluorescence_datasets(h5_file: h5py.File) -> tuple[h5py.Dataset, h5py.Dataset]:
+    for cps_path, names_path in _FLUORESCENCE_LOAD_PATHS:
+        cps = h5_file.get(cps_path)
+        names = h5_file.get(names_path)
+        if isinstance(cps, h5py.Dataset) and isinstance(names, h5py.Dataset):
+            return cps, names
+
+    tried = ', '.join(cps for cps, _ in _FLUORESCENCE_LOAD_PATHS)
+    raise KeyError(f'No known fluorescence layout in file (tried: {tried}).')
+
+
+def _split_h5_path(data_path: str) -> tuple[str, str]:
+    stripped = data_path.strip('/')
+    parts = stripped.rsplit('/', 1)
+    if len(parts) == 1:
+        return '/', parts[0]
+    return '/' + parts[0], parts[1]
+
+
+def load_fluorescence_data(file: Path) -> FluorescenceDataset:
+    """Load a fluorescence dataset from an XRF-Maps HDF5 file.
+
+    Recognises the v10 NNLS layout (``/MAPS/XRF_Analyzed/NNLS/...``, preferred),
+    the v10 iterative-matrix-fitting layout (``/MAPS/XRF_Analyzed/Fitted/...``),
+    and the legacy v9 layout (``/MAPS/XRF_fits`` + ``/MAPS/channel_names``).
+    """
+    element_maps: list[ElementMap] = []
+
+    with h5py.File(file, 'r') as h5_file:
+        h5_counts_per_second, h5_channel_names = _locate_fluorescence_datasets(h5_file)
+
+        counts_per_second = h5_counts_per_second[...]
+        channel_names = h5_channel_names[...]
+
+        for bname, cps in zip(channel_names, counts_per_second):
+            if isinstance(bname, bytes):
+                name = bname.decode('utf-8', errors='replace')
+            else:
+                name = str(bname)
+            element_maps.append(ElementMap(name, cps))
+
+        counts_per_second_path = h5_counts_per_second.name
+        channel_names_path = h5_channel_names.name
+
+    return FluorescenceDataset(
+        element_maps=element_maps,
+        counts_per_second_path=counts_per_second_path,
+        channel_names_path=channel_names_path,
+    )
+
+
+def save_fluorescence_data(file: Path, dataset: FluorescenceDataset) -> None:
+    """Write a fluorescence dataset to an HDF5 file at the paths the dataset carries."""
+    counts_group_path, counts_ds_name = _split_h5_path(dataset.counts_per_second_path)
+    names_group_path, names_ds_name = _split_h5_path(dataset.channel_names_path)
+
+    channel_names = [emap.name for emap in dataset.element_maps]
+    counts_per_second = [emap.counts_per_second for emap in dataset.element_maps]
+
+    with h5py.File(file, 'w') as h5_file:
+        counts_group = h5_file.require_group(counts_group_path)
+        counts_group.create_dataset(counts_ds_name, data=numpy.stack(counts_per_second))
+        names_group = h5_file.require_group(names_group_path)
+        names_group.create_dataset(names_ds_name, data=channel_names, dtype='S256')
 
 
 def save_ptychopinn_training_data(

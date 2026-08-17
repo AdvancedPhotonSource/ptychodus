@@ -2,8 +2,9 @@ import logging
 
 import numpy
 
+from ptychodus.api.constants import ONE_MICRON_M, ONE_NANOMETER_M
 from ptychodus.api.probe import ProbeSizeMetrics
-from ptychodus.api.propagator import PropagatedProbe
+from ptychodus.api.propagate import PropagatedProbe
 
 from ...model.analysis import ProbePropagatorSettings, ProbePropagator
 from ...model.visualization import VisualizationEngine
@@ -95,12 +96,20 @@ class ProbePropagationViewController:
 
         view.major_axis_tilt_label.setText(f'{numpy.rad2deg(metrics.major_axis_tilt_rad):.4g}')
         view.minor_axis_tilt_label.setText(f'{numpy.rad2deg(metrics.minor_axis_tilt_rad):.4g}')
-        view.fwhm_major_axis_label.setText(f'{metrics.fwhm_major_axis_length_m * 1e9:.4g}')
-        view.fwhm_minor_axis_label.setText(f'{metrics.fwhm_minor_axis_length_m * 1e9:.4g}')
-        view.rms_major_axis_label.setText(f'{metrics.rms_major_axis_length_m * 1e9:.4g}')
-        view.rms_minor_axis_label.setText(f'{metrics.rms_minor_axis_length_m * 1e9:.4g}')
+        view.fwhm_major_axis_label.setText(
+            f'{metrics.fwhm_major_axis_length_m / ONE_NANOMETER_M:.4g}'
+        )
+        view.fwhm_minor_axis_label.setText(
+            f'{metrics.fwhm_minor_axis_length_m / ONE_NANOMETER_M:.4g}'
+        )
+        view.rms_major_axis_label.setText(
+            f'{metrics.rms_major_axis_length_m / ONE_NANOMETER_M:.4g}'
+        )
+        view.rms_minor_axis_label.setText(
+            f'{metrics.rms_minor_axis_length_m / ONE_NANOMETER_M:.4g}'
+        )
         view.encircled_energy_diameter_label.setText(
-            f'{metrics.encircled_energy_diameter_m * 1e9:.4g}'
+            f'{metrics.encircled_energy_diameter_m / ONE_NANOMETER_M:.4g}'
         )
 
     def _update_z_indicators(self, step: int) -> None:
@@ -155,7 +164,7 @@ class ProbePropagationViewController:
         self._update_z_indicators(step)
 
         # TODO auto-units
-        lerp_value *= 1e6
+        lerp_value /= ONE_MICRON_M
         self._dialog.coordinate_label.setText(f'{lerp_value:.1f} µm')
 
     def _propagate(self) -> None:

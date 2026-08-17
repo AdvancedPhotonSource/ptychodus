@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from enum import auto, Enum
 import logging
 
@@ -26,11 +27,12 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from matplotlib.axes import Axes
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-from ptychodus.api.visualization import VisualizationProduct
+from ptychodus.api.visualize import VisualizationProduct
 
 from .widgets import DecimalLineEdit
 
@@ -291,6 +293,19 @@ class LineCutDialog(QDialog):
         self.setLayout(layout)
 
         self.setWindowTitle('Line-Cut Dialog')
+
+    def prepare_axes(self, count: int) -> Sequence[Axes]:
+        """Clear the figure and return `count` axes: a primary plus twinned y-axes.
+
+        The figure is rebuilt rather than cleared in place because `twinx` adds a new axis
+        every call, which would accumulate across line cuts.
+        """
+        if count < 1:
+            raise ValueError(f'Axes count must be positive (actual={count}).')
+
+        self.figure.clear()
+        self.axes = self.figure.add_subplot(111)
+        return [self.axes, *(self.axes.twinx() for _ in range(count - 1))]
 
 
 class RectangleView(QGroupBox):

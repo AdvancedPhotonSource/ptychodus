@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QFormLayout
 
-from ptychodus.api.parametric import BooleanParameter, IntegerParameter, StringParameter
+from ptychodus.api.parameters import BooleanParameter, IntegerParameter, StringParameter
 
 from ...model.ptychi import PtyChiEnumerators, PtyChiOPRSettings
 from ..parametric import (

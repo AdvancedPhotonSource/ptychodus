@@ -58,23 +58,15 @@ class DecimalSlider(QWidget):
         range_: Interval[Decimal],
         block_value_changed_signal: bool = False,
     ) -> None:
-        should_emit = False
-
         if range_.upper <= range_.lower:
             raise ValueError(f'maximum <= minimum ({range_.upper} <= {range_.lower})')
 
-        if range_.lower != self._minimum:
-            self._minimum = range_.lower
-            should_emit = True
+        self._minimum = range_.lower
+        self._maximum = range_.upper
 
-        if range_.upper != self._maximum:
-            self._maximum = range_.upper
-            should_emit = True
+        value_changed = self._set_value_to_slider(value)
 
-        if self._set_value_to_slider(value):
-            should_emit = True
-
-        if not block_value_changed_signal and should_emit:
+        if not block_value_changed_signal and value_changed:
             self._emit_value_changed()
 
     def _set_value_from_slider(self) -> None:

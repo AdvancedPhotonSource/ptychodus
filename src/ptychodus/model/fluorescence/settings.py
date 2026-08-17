@@ -21,7 +21,7 @@ class FluorescenceSettings(Observable, Observer):
         )
         self.upscaling_strategy = self._group.create_string_parameter('UpscalingStrategy', 'Linear')
         self.deconvolution_strategy = self._group.create_string_parameter(
-            'DeconvolutionStrategy', 'Richardson-Lucy'
+            'DeconvolutionStrategy', 'RichardsonLucy'
         )
 
         # Ptychozoon (GPU VSPI) settings

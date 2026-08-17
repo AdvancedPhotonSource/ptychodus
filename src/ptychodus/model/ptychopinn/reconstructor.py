@@ -1,31 +1,28 @@
-from collections.abc import Iterator, Sequence
-from pathlib import Path
-from typing import Any, Final
+"""Parent-side factory that builds a :class:`SubprocessReconstructor` for PtychoPINN.
+
+Zero tensorflow imports. All GPU work runs inside a spawned child; see
+:mod:`._subprocess` for the child entry points.
+
+This module does reach ``ptycho.config.config`` -- but only from inside the
+config builders, so the import happens on the first reconstruct/train call
+rather than at composition-root time. That subpackage is TensorFlow-free; see
+the note in :mod:`._payload` for why it is allowed parent-side.
+"""
+
+from __future__ import annotations
+
 import logging
 import shutil
 import tempfile
 import zipfile
-
-import numpy
-
-from ptycho.config.config import InferenceConfig, ModelConfig, TrainingConfig, update_legacy_dict
-from ptycho.raw_data import RawData
-from ptycho.workflows.components import load_inference_bundle
-import ptycho.loader
-import ptycho.model_manager
-import ptycho.params
+from pathlib import Path
+from typing import Any
 
 from ptychodus.api.io import save_ptychopinn_training_data
-from ptychodus.api.object import Object
-from ptychodus.api.product import Product
-from ptychodus.api.reconstructor import (
-    LossValue,
-    ReconstructInput,
-    ReconstructOutput,
-    TrainOutput,
-    TrainableReconstructor,
-)
+from ptychodus.api.reconstruct import ReconstructInput
 
+from ..processing.subprocess_reconstructor import SubprocessReconstructor
+from ._payload import MODEL_FILE_NAME, ReconstructPayload, TrainPayload
 from .settings import (
     PtychoPINNInferenceSettings,
     PtychoPINNModelSettings,
@@ -33,236 +30,195 @@ from .settings import (
 )
 
 __all__ = [
-    'PtychoPINNTrainableReconstructor',
+    'build_reconstructor',
 ]
 
 logger = logging.getLogger(__name__)
 
 
-def create_raw_data(parameters: ReconstructInput) -> RawData:
-    object_geometry = parameters.product.object_.get_geometry()
-    position_x_px: list[float] = list()
-    position_y_px: list[float] = list()
+_RECONSTRUCT_ENTRY = 'ptychodus.model.ptychopinn._subprocess:run_reconstruct'
+_TRAIN_ENTRY = 'ptychodus.model.ptychopinn._subprocess:run_train'
 
-    for scan_point in parameters.product.probe_positions:
-        object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        position_x_px.append(object_point.coordinate_x_px)
-        position_y_px.append(object_point.coordinate_y_px)
 
-    return RawData.from_coords_without_pc(
-        xcoords=numpy.array(position_x_px),
-        ycoords=numpy.array(position_y_px),
-        diff3d=parameters.diffraction_patterns,
-        probeGuess=parameters.product.probes.get_probe_no_opr().get_incoherent_mode(0),
-        # assume that all patches are from the same object
-        scan_index=numpy.zeros(len(parameters.product.probe_positions), dtype=int),
-        objectGuess=parameters.product.object_.get_layer(0),
+def _build_model_config(model_settings: PtychoPINNModelSettings, name: str, model_size: int) -> Any:
+    from ptycho.config.config import ModelConfig
+
+    return ModelConfig(
+        N=model_size,
+        gridsize=model_settings.gridsize.get_value(),
+        n_filters_scale=model_settings.n_filters_scale.get_value(),
+        model_type=name.lower(),
+        amp_activation=model_settings.amp_activation.get_value(),
+        object_big=model_settings.object_big.get_value(),
+        probe_big=model_settings.probe_big.get_value(),
+        probe_mask=model_settings.probe_mask.get_value(),
+        pad_object=model_settings.pad_object.get_value(),
+        probe_scale=model_settings.probe_scale.get_value(),
+        gaussian_smoothing_sigma=model_settings.gaussian_smoothing_sigma.get_value(),
     )
 
 
-class PtychoPINNTrainableReconstructor(TrainableReconstructor):
-    MODEL_FILE_NAME: Final[str] = 'wts.h5.zip'
+def _build_inference_config(
+    model_settings: PtychoPINNModelSettings,
+    name: str,
+    model_size: int,
+    *,
+    is_developer_mode_enabled: bool,
+) -> Any:
+    from ptycho.config.config import InferenceConfig
 
-    def __init__(
-        self,
-        name: str,
-        model_settings: PtychoPINNModelSettings,
-        inference_settings: PtychoPINNInferenceSettings,
-        training_settings: PtychoPINNTrainingSettings,
-        *,
-        is_developer_mode_enabled: bool,
-    ) -> None:
-        super().__init__()
-        self._name = name
-        self._model_settings = model_settings
-        self._inference_settings = inference_settings
-        self._training_settings = training_settings
-        self.__model: Any = None
-        self._config: dict[str, Any] = dict()
-        self._is_developer_mode_enabled = is_developer_mode_enabled
-        self._model_bundle_dir: Path | None = None
+    return InferenceConfig(
+        model=_build_model_config(model_settings, name, model_size),
+        model_path=Path(),  # not used
+        test_data_file=Path(),  # not used
+        debug=is_developer_mode_enabled,
+        output_dir=Path(),  # not used
+    )
 
-    def _create_model_config(self, model_size: int) -> ModelConfig:
-        return ModelConfig(
-            N=model_size,
-            gridsize=self._model_settings.gridsize.get_value(),
-            n_filters_scale=self._model_settings.n_filters_scale.get_value(),
-            model_type=self._name.lower(),
-            amp_activation=self._model_settings.amp_activation.get_value(),
-            object_big=self._model_settings.object_big.get_value(),
-            probe_big=self._model_settings.probe_big.get_value(),
-            probe_mask=self._model_settings.probe_mask.get_value(),
-            pad_object=self._model_settings.pad_object.get_value(),
-            probe_scale=self._model_settings.probe_scale.get_value(),
-            gaussian_smoothing_sigma=self._model_settings.gaussian_smoothing_sigma.get_value(),
-        )
 
-    @property
-    def name(self) -> str:
-        return self._name
+def _build_training_config(
+    model_settings: PtychoPINNModelSettings,
+    training_settings: PtychoPINNTrainingSettings,
+    name: str,
+) -> Any:
+    from ptycho.config.config import TrainingConfig
 
-    def get_progress_goal(self) -> int:
-        return 0
+    # ``N`` is unknown here: it comes from the training data the child loads.
+    # The child overwrites ``model.N`` before using this config.
+    return TrainingConfig(
+        model=_build_model_config(model_settings, name, model_size=0),
+        train_data_file=Path(),
+        test_data_file=None,
+        batch_size=training_settings.batch_size.get_value(),
+        nepochs=training_settings.nepochs.get_value(),
+        mae_weight=training_settings.mae_weight.get_value(),
+        nll_weight=training_settings.nll_weight.get_value(),
+        realspace_mae_weight=training_settings.realspace_mae_weight.get_value(),
+        realspace_weight=training_settings.realspace_weight.get_value(),
+        nphotons=training_settings.nphotons.get_value(),
+        positions_provided=training_settings.positions_provided.get_value(),
+        probe_trainable=training_settings.probe_trainable.get_value(),
+        intensity_scale_trainable=training_settings.intensity_scale_trainable.get_value(),
+        output_dir=Path(),
+    )
 
-    @property
-    def _model(self) -> Any:  # TODO tensorflow.keras.Model | None
-        if self.__model is None:
-            raise RuntimeError('Model not loaded!')
 
-        return self.__model
+def _extract_bundle_dir(model_bundle_path: Path) -> Path:
+    """Resolve the recorded model path to a directory the child can load from.
 
-    def _reconstruct_image(self, test_data: ptycho.loader.PtychoDataContainer) -> Any:
-        try:
-            intensity_scale = ptycho.params.get('intensity_scale')
-        except KeyError as exc:
-            raise RuntimeError('Missing intensity_scale in ptycho.params.cfg') from exc
-        return self._model.predict([test_data.X * intensity_scale, test_data.local_offsets])
+    Accepts the bundle directory itself, a ``wts.h5.zip`` inside a bundle
+    directory, or an outer zip archive to unpack into a fresh tempdir. Runs
+    parent-side because it is pure zipfile/tempfile work with no GPU
+    involvement.
+    """
+    if model_bundle_path.name == MODEL_FILE_NAME:
+        return model_bundle_path.parent
 
-    def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
+    if model_bundle_path.suffix == '.zip':
+        bundle_dir = Path(tempfile.mkdtemp(prefix='ptychopinn-bundle-'))
+        logger.debug(f'Extracting bundle "{model_bundle_path}" -> "{bundle_dir}"')
+
+        with zipfile.ZipFile(model_bundle_path) as archive:
+            archive.extractall(bundle_dir)
+
+        return bundle_dir
+
+    logger.warning(
+        f'PtychoPINN expected the file name {MODEL_FILE_NAME!r}; got {model_bundle_path.name!r}.'
+    )
+    return model_bundle_path.parent
+
+
+def _save_model_bundle(loaded_from: Path, dest: Path) -> None:
+    """Archive the loaded bundle directory (or copy the bundle .zip) to ``dest``.
+
+    The child records either a bundle directory (right after training) or a
+    ``wts.h5.zip`` file (right after inference load). This function normalises
+    to a zip archive at ``dest``.
+    """
+    if loaded_from.is_dir():
+        archive_stem = str(dest.with_suffix(''))
+        logger.debug(f'Archiving bundle {loaded_from!r} -> {dest!r}')
+        shutil.make_archive(archive_stem, 'zip', root_dir=loaded_from)
+        return
+
+    if loaded_from.suffix == '.zip':
+        shutil.copyfile(loaded_from, dest)
+        return
+
+    # wts.h5.zip inside a bundle dir — archive the parent dir.
+    if loaded_from.name.endswith('.zip'):
+        parent = loaded_from.parent
+        archive_stem = str(dest.with_suffix(''))
+        shutil.make_archive(archive_stem, 'zip', root_dir=parent)
+        return
+
+    raise RuntimeError(f'Cannot save PtychoPINN model: unrecognized source path {loaded_from!r}.')
+
+
+def build_reconstructor(
+    name: str,
+    model_settings: PtychoPINNModelSettings,
+    inference_settings: PtychoPINNInferenceSettings,
+    training_settings: PtychoPINNTrainingSettings,
+    *,
+    is_developer_mode_enabled: bool,
+) -> SubprocessReconstructor:
+    # Source model path -> extracted bundle directory, so repeated reconstructs
+    # against the same model unpack the archive only once.
+    bundle_dir_cache: dict[Path, Path] = dict()
+
+    def build_reconstruct_payload(
+        parameters: ReconstructInput, loaded_model_path: Path | None
+    ) -> ReconstructPayload:
+        if loaded_model_path is None:
+            raise RuntimeError('Cannot reconstruct: no PtychoPINN model has been loaded.')
+
         model_size = parameters.diffraction_patterns.shape[-1]
 
         if parameters.diffraction_patterns.shape[-2] != model_size:
             raise ValueError('Model requires square diffraction patterns!')
 
-        model_config = self._create_model_config(model_size)
-        inference_config = InferenceConfig(
-            model=model_config,
-            model_path=Path(),  # not used
-            test_data_file=Path(),  # not used
-            debug=self._is_developer_mode_enabled,
-            output_dir=Path(),  # not used
+        try:
+            bundle_dir = bundle_dir_cache[loaded_model_path]
+        except KeyError:
+            bundle_dir = _extract_bundle_dir(loaded_model_path)
+            bundle_dir_cache[loaded_model_path] = bundle_dir
+
+        return ReconstructPayload(
+            inference_config=_build_inference_config(
+                model_settings,
+                name,
+                model_size,
+                is_developer_mode_enabled=is_developer_mode_enabled,
+            ),
+            model_bundle_dir=bundle_dir,
+            n_nearest_neighbors=inference_settings.n_nearest_neighbors.get_value(),
+            n_samples=inference_settings.n_samples.get_value(),
+            reconstruct_input=parameters,
         )
 
-        # Update global params with new-style config
-        update_legacy_dict(ptycho.params.cfg, inference_config)
-
-        # Create RawData
-        test_raw_data = create_raw_data(parameters)
-        ptycho.probe.set_probe_guess(None, test_raw_data.probeGuess)
-
-        # Group overlapping scan positions
-        test_dataset = test_raw_data.generate_grouped_data(
-            model_config.N,
-            K=self._inference_settings.n_nearest_neighbors.get_value(),
-            nsamples=self._inference_settings.n_samples.get_value(),
+    def build_train_payload(input_path: Path, output_path: Path) -> TrainPayload:
+        return TrainPayload(
+            training_config=_build_training_config(model_settings, training_settings, name),
+            input_path=input_path,
+            output_path=output_path,
         )
 
-        # Create PtychoDataContainer
-        test_data_container = ptycho.loader.load(
-            lambda: test_dataset, test_raw_data.probeGuess, which=None, create_split=False
-        )
-
-        # Perform reconstruction
-        obj_tensor_full = self._reconstruct_image(test_data_container)
-
-        # Process the reconstructed image
-        object_out_array = ptycho.tf_helper.reassemble_position(
-            obj_tensor_full, test_data_container.global_offsets, M=20
-        )
-
-        object_in = parameters.product.object_
-        object_out = Object(
-            array=numpy.squeeze(object_out_array),
-            layer_spacing_m=object_in.layer_spacing_m,
-            pixel_geometry=object_in.get_pixel_geometry(),
-            center=object_in.get_center(),
-        )
-        losses: Sequence[LossValue] = list()
-
-        product = Product(
-            metadata=parameters.product.metadata,
-            probe_positions=parameters.product.probe_positions,
-            probes=parameters.product.probes,
-            object_=object_out,
-            losses=losses,
-        )
-
-        yield ReconstructOutput(product)
-
-    def is_model_loaded(self):
-        return True  # TODO
-
-    def get_model_file_filter(self) -> str:
-        return 'Zipped Archive (*.zip)'
-
-    def get_model_file_extension(self) -> str:
-        return '.zip'
-
-    def load_model_from_file(self, file_path: Path) -> None:
-        # TODO model path to/from settings
-        self._inference_settings.model_path.set_value(file_path)
-
-        if file_path.name == self.MODEL_FILE_NAME:
-            # Loose bundle directory containing wts.h5.zip + auxiliary files.
-            bundle_dir = file_path.parent
-        elif file_path.suffix == '.zip':
-            # Zipped bundle (e.g. produced by save_model). Unpack to a tempdir
-            # that lives for the process lifetime; load_inference_bundle may
-            # keep lazy file handles open against this directory.
-            bundle_dir = Path(tempfile.mkdtemp(prefix='ptychopinn-bundle-'))
-            with zipfile.ZipFile(file_path) as archive:
-                archive.extractall(bundle_dir)
-        else:
-            logger.warning(f"PtychoPINN expects the file name '{self.MODEL_FILE_NAME}'.")
-            bundle_dir = file_path.parent
-
-        # global config (ptycho.params.cfg) updated during load
-        self.__model, self._config = load_inference_bundle(bundle_dir)
-        self._model_bundle_dir = bundle_dir
-        # TODO sync ptycho.params.cfg with settings after load
-
-    def save_model(self, file_path: Path) -> None:
-        if self._model_bundle_dir is None:
-            raise RuntimeError('Cannot save PtychoPINN model: model is not loaded.')
-        archive_stem = str(file_path.with_suffix(''))
-        logger.debug(f'Archiving bundle "{self._model_bundle_dir}" -> "{file_path}"')
-        shutil.make_archive(archive_stem, 'zip', root_dir=self._model_bundle_dir)
-
-    def get_training_data_file_filter(self) -> str:
-        return 'NumPy Zipped Archive (*.npz)'
-
-    def export_training_data(self, file_path: Path, parameters: ReconstructInput) -> None:
+    def export_training_data(file_path: Path, parameters: ReconstructInput) -> None:
         save_ptychopinn_training_data(file_path, parameters, multimodal_probe=False)
 
-    def train(self, input_path: Path, output_path: Path) -> Iterator[TrainOutput]:
-        test_raw_data = RawData.from_file(input_path / 'test_data.npz')  # TODO RawData | None
-        train_raw_data = RawData.from_file(input_path / 'train_data.npz')
-
-        model_size = train_raw_data.diff3d.shape[-1]
-
-        if train_raw_data.diff3d.shape[-2] != model_size:
-            raise ValueError('Model requires square diffraction patterns!')
-
-        model_config = self._create_model_config(model_size)
-        training_config = TrainingConfig(
-            model=model_config,
-            train_data_file=Path(),  # not used
-            test_data_file=None,  # not used
-            batch_size=self._training_settings.batch_size.get_value(),
-            nepochs=self._training_settings.nepochs.get_value(),
-            mae_weight=self._training_settings.mae_weight.get_value(),
-            nll_weight=self._training_settings.nll_weight.get_value(),
-            realspace_mae_weight=self._training_settings.realspace_mae_weight.get_value(),
-            realspace_weight=self._training_settings.realspace_weight.get_value(),
-            nphotons=self._training_settings.nphotons.get_value(),  # TODO get from product
-            positions_provided=self._training_settings.positions_provided.get_value(),
-            probe_trainable=self._training_settings.probe_trainable.get_value(),
-            intensity_scale_trainable=self._training_settings.intensity_scale_trainable.get_value(),
-            output_dir=Path(),  # not used
-        )
-
-        # Update global params with new-style config
-        update_legacy_dict(ptycho.params.cfg, training_config)
-
-        from ptycho.workflows.components import run_cdi_example, save_outputs
-
-        recon_amp, recon_phase, train_results = run_cdi_example(
-            train_raw_data, test_raw_data, training_config
-        )
-        model_path = output_path / self.MODEL_FILE_NAME
-        ptycho.model_manager.save(output_path)
-        self._model_bundle_dir = output_path
-        save_outputs(recon_amp, recon_phase, train_results, str(output_path))
-        self.load_model_from_file(model_path)
-
-        yield TrainOutput()  # TODO yield losses & progress
+    return SubprocessReconstructor(
+        name=name,
+        reconstruct_entry_point=_RECONSTRUCT_ENTRY,
+        progress_goal_fn=lambda: 0,
+        build_reconstruct_payload=build_reconstruct_payload,
+        is_trainable=True,
+        train_entry_point=_TRAIN_ENTRY,
+        build_train_payload=build_train_payload,
+        model_file_filter='Zipped Archive (*.zip)',
+        model_file_extension='.zip',
+        training_data_file_filter='NumPy Zipped Archive (*.npz)',
+        export_training_data=export_training_data,
+        save_model=_save_model_bundle,
+    )

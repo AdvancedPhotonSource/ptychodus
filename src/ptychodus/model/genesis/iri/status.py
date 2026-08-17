@@ -4,7 +4,7 @@ from enum import StrEnum, auto
 import logging
 
 from pydantic import BaseModel
-import requests
+import httpx
 
 from ..tokens import create_headers
 
@@ -51,8 +51,11 @@ class IRIStatusClient:
     # See https://api.iri.nersc.gov/#/status
 
     def __init__(self, api_base_url: str, access_token: str) -> None:
-        self._base_url = api_base_url.rstrip('/') + '/api/v1/status'
-        self._headers = create_headers(access_token)
+        self._client = httpx.Client(
+            base_url=api_base_url.rstrip('/') + '/api/v1/status',
+            headers=create_headers(access_token),
+            timeout=30.0,
+        )
 
     def get_resources(
         self,
@@ -81,18 +84,14 @@ class IRIStatusClient:
             params['current_status'] = current_status
         if capability is not None:
             params['capability'] = [c.value for c in capability]
-        response = requests.get(
-            f'{self._base_url}/resources',
-            params=params,
-            headers=self._headers,
-        )
+        response = self._client.get('/resources', params=params)
         response.raise_for_status()
         return [Resource.model_validate(item) for item in response.json()]
 
     def get_resource(self, resource_id: str) -> Resource:
-        response = requests.get(
-            f'{self._base_url}/resources/{resource_id}',
-            headers=self._headers,
-        )
+        response = self._client.get(f'/resources/{resource_id}')
         response.raise_for_status()
         return Resource.model_validate(response.json())
+
+    def close(self) -> None:
+        self._client.close()

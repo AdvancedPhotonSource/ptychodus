@@ -11,9 +11,10 @@ import numpy
 import scipy.ndimage
 from scipy.fft import fft2
 
-from .common import ComplexArrayType, RealArrayType, estimate_noise_floor
 from .geometry import PixelGeometry
-from .propagator import intensity
+from .preprocess.noise import estimate_noise_floor
+from .propagate import intensity
+from .typing import ComplexArrayType, RealArrayType
 
 
 def compute_shannon_entropy(distribution: RealArrayType, *, normalize: bool = True) -> float:
@@ -38,19 +39,19 @@ def compute_shannon_entropy(distribution: RealArrayType, *, normalize: bool = Tr
         distribution has no positive mass.
     """
     values = numpy.clip(numpy.asarray(distribution, dtype=numpy.float64).ravel(), 0.0, None)
-    total = float(values.sum())
+    total = values.sum()
 
     if total <= 0.0:
         return 0.0
 
     p = values / total
     nonzero = p[p > 0.0]
-    entropy = float(-numpy.sum(nonzero * numpy.log2(nonzero)))
+    entropy = -numpy.sum(nonzero * numpy.log2(nonzero))
 
     if normalize and p.size > 1:
         entropy /= numpy.log2(p.size)
 
-    return entropy
+    return float(entropy)
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,8 @@ class ProbeEntropyMetrics:
 
 @dataclass(frozen=True)
 class ProbeSizeMetrics:
+    """Probe size metrics: principal-axis tilt, FWHM and RMS extents, and encircled-energy diameter."""
+
     major_axis_tilt_rad: float
     minor_axis_tilt_rad: float
 
@@ -86,8 +89,8 @@ def _projected_fwhm(
     """FWHM of a 2D intensity distribution projected onto an arbitrary axis."""
     coord_flat = coordinate.ravel()
     intensity_flat = intensity.ravel()
-    cmin = coord_flat.min().item()
-    cmax = coord_flat.max().item()
+    cmin = coord_flat.min()
+    cmax = coord_flat.max()
 
     if cmax <= cmin:
         return 0.0
@@ -96,7 +99,7 @@ def _projected_fwhm(
         coord_flat, bins=num_bins, range=(cmin, cmax), weights=intensity_flat
     )
     centers = 0.5 * (edges[:-1] + edges[1:])
-    peak = hist.max().item()
+    peak = hist.max()
 
     if peak <= 0.0:
         return 0.0
@@ -105,28 +108,28 @@ def _projected_fwhm(
     above = hist >= half_max
     # Use the outermost crossings so isolated noise spikes inside the profile
     # don't fragment the half-max interval.
-    left_idx = numpy.argmax(above).item()
-    right_idx = len(above) - 1 - numpy.argmax(above[::-1]).item()
+    left_idx = numpy.argmax(above)
+    right_idx = len(above) - 1 - numpy.argmax(above[::-1])
 
     if left_idx == 0:
-        left_x = float(centers[0])
+        left_x = centers[0]
     else:
-        y0 = float(hist[left_idx - 1])
-        y1 = float(hist[left_idx])
-        x0 = float(centers[left_idx - 1])
-        x1 = float(centers[left_idx])
+        y0 = hist[left_idx - 1]
+        y1 = hist[left_idx]
+        x0 = centers[left_idx - 1]
+        x1 = centers[left_idx]
         left_x = x0 + (half_max - y0) * (x1 - x0) / (y1 - y0) if y1 > y0 else x0
 
     if right_idx >= len(centers) - 1:
-        right_x = float(centers[-1])
+        right_x = centers[-1]
     else:
-        y0 = float(hist[right_idx])
-        y1 = float(hist[right_idx + 1])
-        x0 = float(centers[right_idx])
-        x1 = float(centers[right_idx + 1])
+        y0 = hist[right_idx]
+        y1 = hist[right_idx + 1]
+        x0 = centers[right_idx]
+        x1 = centers[right_idx + 1]
         right_x = x0 + (half_max - y0) * (x1 - x0) / (y1 - y0) if y0 > y1 else x1
 
-    return right_x - left_x
+    return float(right_x - left_x)
 
 
 def estimate_probe_size(
@@ -144,7 +147,7 @@ def estimate_probe_size(
        median filter to suppress hot pixels and other isolated outliers
        (matching :func:`ptychodus.api.diffraction.estimate_crop_center`).
        Background and noise scale are then estimated via
-       :func:`ptychodus.api.common.estimate_noise_floor`, which uses Otsu's
+       :func:`ptychodus.api.preprocess.noise.estimate_noise_floor`, which uses Otsu's
        method on the filtered image to identify the background class when
        the histogram is bimodal and falls back to median / median-absolute-
        deviation over the outermost ring of pixels when it is not. The
@@ -228,7 +231,7 @@ def estimate_probe_size(
     threshold = noise_floor.get_significance_threshold(mad_threshold)
 
     cleaned = numpy.clip(filtered - threshold, 0.0, None)
-    total_power = float(cleaned.sum())
+    total_power = cleaned.sum()
 
     if total_power <= 0.0:
         return ProbeSizeMetrics(
@@ -245,27 +248,27 @@ def estimate_probe_size(
     x_m = (x_idx - (width_px - 1) / 2.0) * pixel_geometry.width_m
     y_m = (y_idx - (height_px - 1) / 2.0) * pixel_geometry.height_m
 
-    centroid_x = float((cleaned * x_m).sum() / total_power)
-    centroid_y = float((cleaned * y_m).sum() / total_power)
+    centroid_x = (cleaned * x_m).sum() / total_power
+    centroid_y = (cleaned * y_m).sum() / total_power
 
     dx = x_m - centroid_x
     dy = y_m - centroid_y
 
-    mxx = float((cleaned * dx * dx).sum() / total_power)
-    myy = float((cleaned * dy * dy).sum() / total_power)
-    mxy = float((cleaned * dx * dy).sum() / total_power)
+    mxx = (cleaned * dx * dx).sum() / total_power
+    myy = (cleaned * dy * dy).sum() / total_power
+    mxy = (cleaned * dx * dy).sum() / total_power
     covariance = numpy.array([[mxx, mxy], [mxy, myy]])
 
     eigenvalues, eigenvectors = numpy.linalg.eigh(covariance)
-    rms_minor_m = 2.0 * float(numpy.sqrt(max(float(eigenvalues[0]), 0.0)))
-    rms_major_m = 2.0 * float(numpy.sqrt(max(float(eigenvalues[1]), 0.0)))
+    rms_minor_m = 2.0 * numpy.sqrt(max(eigenvalues[0], 0.0))
+    rms_major_m = 2.0 * numpy.sqrt(max(eigenvalues[1], 0.0))
     minor_axis = eigenvectors[:, 0]
     major_axis = eigenvectors[:, 1]
 
     def _axis_tilt(axis: RealArrayType) -> float:
         # axis direction is sign-ambiguous; fold the angle into [-pi/2, pi/2)
-        angle = float(numpy.arctan2(axis[1], axis[0]))
-        return (angle + numpy.pi / 2.0) % numpy.pi - numpy.pi / 2.0
+        angle = numpy.arctan2(axis[1], axis[0])
+        return float((angle + numpy.pi / 2.0) % numpy.pi - numpy.pi / 2.0)
 
     major_tilt = _axis_tilt(major_axis)
     minor_tilt = _axis_tilt(minor_axis)
@@ -282,18 +285,18 @@ def estimate_probe_size(
     sorted_radii = radial[order]
     sorted_power = intensity_flat[order]
     cumulative = numpy.cumsum(sorted_power)
-    target = energy_fraction * float(cumulative[-1])
-    idx = numpy.searchsorted(cumulative, target).item()
+    target = energy_fraction * cumulative[-1]
+    idx = numpy.searchsorted(cumulative, target)
 
     if idx <= 0:
-        encircled_radius = float(sorted_radii[0])
+        encircled_radius = sorted_radii[0]
     elif idx >= len(sorted_radii):
-        encircled_radius = float(sorted_radii[-1])
+        encircled_radius = sorted_radii[-1]
     else:
-        c0 = float(cumulative[idx - 1])
-        c1 = float(cumulative[idx])
-        r0 = float(sorted_radii[idx - 1])
-        r1 = float(sorted_radii[idx])
+        c0 = cumulative[idx - 1]
+        c1 = cumulative[idx]
+        r0 = sorted_radii[idx - 1]
+        r1 = sorted_radii[idx]
         encircled_radius = r0 + (target - c0) * (r1 - r0) / (c1 - c0) if c1 > c0 else r1
 
     return ProbeSizeMetrics(
@@ -301,9 +304,9 @@ def estimate_probe_size(
         minor_axis_tilt_rad=minor_tilt,
         fwhm_major_axis_length_m=fwhm_major,
         fwhm_minor_axis_length_m=fwhm_minor,
-        rms_major_axis_length_m=rms_major_m,
-        rms_minor_axis_length_m=rms_minor_m,
-        encircled_energy_diameter_m=2.0 * encircled_radius,
+        rms_major_axis_length_m=float(rms_major_m),
+        rms_minor_axis_length_m=float(rms_minor_m),
+        encircled_energy_diameter_m=float(2.0 * encircled_radius),
     )
 
 
@@ -468,7 +471,7 @@ class Probe:
         return numpy.sum(intensity(self._array), axis=-3)
 
     def get_power_spectrum(self) -> RealArrayType:
-        """Incoherent-sum power spectrum |FFT(psi)|^2 over the mode axis.
+        """Incoherent-sum power spectrum ``|FFT(psi)|^2`` over the mode axis.
 
         No fftshift is applied: Shannon entropy is permutation-invariant, so the
         frequency ordering is irrelevant for entropy calculations.
@@ -603,7 +606,9 @@ class ProbeSequence(Sequence[Probe]):
 
     def __getitem__(self, index: int | slice) -> Probe | Sequence[Probe]:
         if isinstance(index, slice):
-            return [self[idx] for idx in range(index.start, index.stop, index.step)]
+            # slice.indices normalizes implicit bounds, negative indexes, and
+            # out-of-range values against the sequence length.
+            return [self[idx] for idx in range(*index.indices(len(self)))]
 
         array = self._array[0, :, :, :].copy()
 

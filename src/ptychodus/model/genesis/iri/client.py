@@ -1,9 +1,9 @@
 from pathlib import Path
 import json
 
-import requests
+import httpx
 
-from ptychodus.api.common import get_ptychodus_dir
+from ptychodus.api.settings import get_ptychodus_dir
 
 from .account import IRIAccountClient
 from .compute import IRIComputeClient
@@ -25,7 +25,7 @@ class IRIClient:
         return self._api_base_url
 
     def print_openapi_specification(self) -> None:
-        response = requests.get(f'{self._api_base_url}/openapi.json')
+        response = httpx.get(f'{self._api_base_url}/openapi.json', timeout=30.0)
         response.raise_for_status()
         print(json.dumps(response.json(), indent=2))
 

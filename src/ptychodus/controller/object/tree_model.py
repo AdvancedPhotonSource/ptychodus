@@ -4,10 +4,23 @@ from typing import Any, overload
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 from PyQt5.QtGui import QBrush
 
-from ptychodus.api.common import BYTES_PER_MEGABYTE
+from ptychodus.api.constants import BYTES_PER_MEGABYTE, ONE_NANOMETER_M
+from ptychodus.api.object import Object
 
 from ...model.product import ObjectAPI, ObjectRepository
 from ...model.product.object import ObjectRepositoryItem
+
+
+def try_get_object(item: ObjectRepositoryItem) -> Object | None:
+    # Returns None when the object is the null sentinel (no dataset bound yet
+    # — see ObjectRepositoryItem.__init__). Callers skip work rather than
+    # letting the ValueError from Object.get_pixel_geometry() escape.
+    object_ = item.get_object()
+    try:
+        object_.get_pixel_geometry()
+    except ValueError:
+        return None
+    return object_
 
 
 class ObjectTreeNode:
@@ -15,9 +28,16 @@ class ObjectTreeNode:
         self.parent = parent
         self.children: list[ObjectTreeNode] = list()
 
-    def insert_node(self, index: int = -1) -> ObjectTreeNode:
+    def insert_node(self, index: int | None = None) -> ObjectTreeNode:
         node = ObjectTreeNode(self)
-        self.children.insert(index, node)
+
+        if index is None:
+            # list.insert(-1, ...) inserts *before* the last child rather than
+            # appending, which scrambles the order the callers below rely on.
+            self.children.append(node)
+        else:
+            self.children.insert(index, node)
+
         return node
 
     def remove_node(self, index: int = -1) -> ObjectTreeNode:
@@ -68,8 +88,13 @@ class ObjectTreeModel(QAbstractItemModel):
         self.endInsertRows()
 
     def update_item(self, index: int, item: ObjectRepositoryItem) -> None:
+        # Qt row/column bounds are inclusive, so the last valid column is
+        # len(self._header) - 1. Asking index() for one past the end fails
+        # hasIndex and yields an invalid QModelIndex, which makes the
+        # dataChanged range malformed and the signal a no-op.
+        last_column = len(self._header) - 1
         top_left = self.index(index, 0)
-        bottom_right = self.index(index, len(self._header))
+        bottom_right = self.index(index, last_column)
         self.dataChanged.emit(top_left, bottom_right)
 
         node = self._tree_root.children[index]
@@ -77,23 +102,24 @@ class ObjectTreeModel(QAbstractItemModel):
         num_layers_new = item.get_object().num_layers
 
         if num_layers_old < num_layers_new:
-            self.beginInsertRows(top_left, num_layers_old, num_layers_new)
+            self.beginInsertRows(top_left, num_layers_old, num_layers_new - 1)
 
             while len(node.children) < num_layers_new:
                 node.insert_node()
 
             self.endInsertRows()
         elif num_layers_old > num_layers_new:
-            self.beginRemoveRows(top_left, num_layers_new, num_layers_old)
+            self.beginRemoveRows(top_left, num_layers_new, num_layers_old - 1)
 
             while len(node.children) > num_layers_new:
                 node.remove_node()
 
             self.endRemoveRows()
 
-        child_top_left = self.index(0, 0, top_left)
-        child_bottom_right = self.index(num_layers_new, len(self._header), top_left)
-        self.dataChanged.emit(child_top_left, child_bottom_right)
+        if num_layers_new > 0:
+            child_top_left = self.index(0, 0, top_left)
+            child_bottom_right = self.index(num_layers_new - 1, last_column, top_left)
+            self.dataChanged.emit(child_top_left, child_bottom_right)
 
     def remove_item(self, index: int, item: ObjectRepositoryItem) -> None:
         self.beginRemoveRows(QModelIndex(), index, index)
@@ -158,35 +184,50 @@ class ObjectTreeModel(QAbstractItemModel):
                         try:
                             return item.layer_spacing_m[index.row()]
                         except IndexError:
-                            return float('inf')
+                            # N layers have N-1 spacings, so the last layer has
+                            # no distance to the next one. flags() already makes
+                            # that cell read-only; show it blank rather than inf.
+                            return None
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush
         else:
             item = self._repository[index.row()]
-            object_ = item.get_object()
-            pixel_geometry = object_.get_pixel_geometry()
+            raw_object = item.get_object()
+            object_ = try_get_object(item)
+            # None when the object is not yet built (see ObjectRepositoryItem
+            # null sentinel): pixel-geometry- and array-dependent columns return
+            # None; name/thickness/builder/size still show.
+            pixel_geometry = object_.get_pixel_geometry() if object_ is not None else None
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 match index.column():
                     case 0:
                         return self._repository.get_name(index.row())
                     case 1:
-                        return object_.get_total_thickness_m()
+                        return raw_object.get_total_thickness_m()
                     case 2:
                         return item.get_builder().get_name()
                     case 3:
-                        return str(object_.dtype)
+                        return str(object_.dtype) if object_ is not None else None
                     case 4:
-                        return object_.width_px
+                        return object_.width_px if object_ is not None else None
                     case 5:
-                        return object_.height_px
+                        return object_.height_px if object_ is not None else None
                     case 6:
-                        return f'{pixel_geometry.width_m * 1e9:.4g}'
+                        return (
+                            f'{pixel_geometry.width_m / ONE_NANOMETER_M:.4g}'
+                            if pixel_geometry
+                            else None
+                        )
                     case 7:
-                        return f'{pixel_geometry.height_m * 1e9:.4g}'
+                        return (
+                            f'{pixel_geometry.height_m / ONE_NANOMETER_M:.4g}'
+                            if pixel_geometry
+                            else None
+                        )
                     case 8:
-                        return f'{object_.nbytes / BYTES_PER_MEGABYTE:.2f}'
+                        return f'{raw_object.nbytes / BYTES_PER_MEGABYTE:.2f}'
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush
@@ -223,7 +264,7 @@ class ObjectTreeModel(QAbstractItemModel):
                         return False
 
                     item.layer_spacing_m[index.row()] = distance_m
-                    return False
+                    return True
             else:
                 if index.column() == 0:
                     self._repository.set_name(index.row(), str(value))

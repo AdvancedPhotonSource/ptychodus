@@ -62,13 +62,11 @@ class APS12IDDiffractionFileReader(DiffractionFileReader):
 
             try:
                 h5_data = h5_file[self.DATA_PATH]
-            except KeyError:
-                logger.warning(f'File "{file_path}" is not an APS 12-ID data file.')
-                return SimpleDiffractionDataset.create_null(file_path)
+            except KeyError as exc:
+                raise ValueError(f'File "{file_path}" is not an APS 12-ID data file.') from exc
 
             if not isinstance(h5_data, h5py.Dataset):
-                logger.warning(f'Data path "{self.DATA_PATH}" in "{file_path}" is not a dataset.')
-                return SimpleDiffractionDataset.create_null(file_path)
+                raise ValueError(f'Data path "{self.DATA_PATH}" in "{file_path}" is not a dataset.')
 
             data_shape = h5_data.shape
             data_dtype = h5_data.dtype
@@ -114,10 +112,9 @@ class APS12IDDiffractionFileReader(DiffractionFileReader):
             )
             return SimpleDiffractionDataset(metadata, contents_tree, array_list)
 
-        logger.warning(
+        raise ValueError(
             f'Data path "{self.DATA_PATH}" in "{file_path}" has unsupported shape {data_shape}.'
         )
-        return SimpleDiffractionDataset.create_null(file_path)
 
 
 def register_plugins(registry: PluginRegistry) -> None:

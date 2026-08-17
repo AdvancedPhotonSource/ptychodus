@@ -1,11 +1,11 @@
 from __future__ import annotations
 from enum import IntEnum
 from pathlib import Path
-from typing import Final
 import csv
 
 import numpy
 
+from ptychodus.api.constants import ONE_NANOMETER_M
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
     ProbePositionFileReader,
@@ -27,8 +27,6 @@ class VelociprobePositionFileColumn(IntEnum):
 
 
 class VelociprobePositionFileReader(ProbePositionFileReader):
-    ONE_NANOMETER_M: Final[float] = 1.0e-9
-
     def __init__(self, diffraction_reader: VelociprobeDiffractionFileReader, y_column: int) -> None:
         self._diffraction_reader = diffraction_reader
         self._y_column = y_column
@@ -86,8 +84,8 @@ class VelociprobePositionFileReader(ProbePositionFileReader):
 
                 point = ProbePosition(
                     trigger,
-                    x_nm * self.ONE_NANOMETER_M,
-                    y_nm * self.ONE_NANOMETER_M,
+                    x_nm * ONE_NANOMETER_M,
+                    y_nm * ONE_NANOMETER_M,
                 )
                 point_list.append(point)
 

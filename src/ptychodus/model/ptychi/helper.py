@@ -1,7 +1,18 @@
-from collections.abc import Sequence
+"""Parent-safe pty-chi option builders.
+
+Every class here reads ptychodus settings via ``.get_value()`` and constructs
+pydantic ``*Options`` dataclasses from ``ptychi.api``. None of it acquires a
+GPU context — importing ``ptychi.api`` pulls torch in for its type
+annotations, but no CUDA runtime is initialised until a ``PtychographyTask``
+is actually constructed. That happens child-side in ``_subprocess.py``.
+
+The parent-side factory in ``reconstructor.py`` uses these builders to
+assemble a fully-populated ``PtychographyTaskOptions`` and ships it as the
+subprocess payload.
+"""
+
 import logging
 
-import torch
 import numpy
 
 import math
@@ -47,14 +58,13 @@ from ptychi.api.options.base import (
     SliceSpacingOptions,
 )
 
-from ptychodus.api.common import ComplexArrayType, RealArrayType
-from ptychodus.api.object import Object, ObjectGeometry, ObjectPosition
+from ptychodus.api.typing import ComplexArrayType, RealArrayType
+from ptychodus.api.object import Object, ObjectGeometry
 from ptychodus.api.probe import ProbeSequence
-from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
-from ptychodus.api.product import LossValue, Product, ProductMetadata
-from ptychodus.api.reconstructor import ReconstructInput
+from ptychodus.api.probe_positions import ProbePositionSequence
+from ptychodus.api.product import ProductMetadata
+from ptychodus.api.reconstruct import ReconstructInput
 
-from ..diffraction import PatternSizer
 from .affine import PtyChiAffineDegreesOfFreedom, PtyChiAffineDegreesOfFreedomBitField
 from .settings import (
     PtyChiOPRSettings,
@@ -729,10 +739,8 @@ class PtyChiOptionsHelper:
         probe_settings: PtyChiProbeSettings,
         probe_position_settings: PtyChiProbePositionSettings,
         opr_settings: PtyChiOPRSettings,
-        pattern_sizer: PatternSizer,
     ) -> None:
         self._reconstructor_settings = reconstructor_settings
-        self._pattern_sizer = pattern_sizer
 
         self.reconstructor_helper = PtyChiReconstructorOptionsHelper(reconstructor_settings)
         self.object_helper = PtyChiObjectOptionsHelper(object_settings)
@@ -742,7 +750,6 @@ class PtyChiOptionsHelper:
 
     def create_data_options(self, parameters: ReconstructInput) -> PtychographyDataOptions:
         metadata = parameters.product.metadata
-        pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry()
         free_space_propagation_distance_m = (
             numpy.inf
             if self._reconstructor_settings.use_far_field_propagation
@@ -753,57 +760,8 @@ class PtyChiOptionsHelper:
             free_space_propagation_distance_m=free_space_propagation_distance_m,
             wavelength_m=metadata.probe_wavelength_m,
             fft_shift=self._reconstructor_settings.fft_shift_diffraction_patterns.get_value(),
-            detector_pixel_size_m=pixel_geometry.width_m,
             valid_pixel_mask=numpy.logical_not(parameters.bad_pixels),
             save_data_on_device=self._reconstructor_settings.save_data_on_device.get_value(),
-        )
-
-    def create_product(
-        self,
-        product: Product,
-        position_x_px: torch.Tensor | numpy.ndarray,
-        position_y_px: torch.Tensor | numpy.ndarray,
-        probe_array: torch.Tensor | numpy.ndarray,
-        object_array: torch.Tensor | numpy.ndarray,
-        opr_weights: torch.Tensor | numpy.ndarray,
-        losses: Sequence[LossValue],
-    ) -> Product:
-        object_in = product.object_
-        object_out = Object(
-            array=numpy.array(object_array),
-            layer_spacing_m=object_in.layer_spacing_m,
-            pixel_geometry=object_in.get_pixel_geometry(),
-            center=object_in.get_center(),
-        )
-
-        probe_out = ProbeSequence(
-            array=numpy.array(probe_array),
-            opr_weights=numpy.array(opr_weights),
-            pixel_geometry=product.probes.get_pixel_geometry(),
-        )
-
-        corrected_scan_points: list[ProbePosition] = list()
-        object_geometry = object_in.get_geometry()
-
-        for uncorrected_point, pos_x_px, pos_y_px in zip(
-            product.probe_positions, position_x_px, position_y_px
-        ):
-            object_point = ObjectPosition(
-                index=uncorrected_point.index,
-                coordinate_x_px=float(pos_x_px),
-                coordinate_y_px=float(pos_y_px),
-            )
-            scan_point = object_geometry.map_coordinates_object_to_probe(object_point)
-            corrected_scan_points.append(scan_point)
-
-        scan_out = ProbePositionSequence(corrected_scan_points)
-
-        return Product(
-            metadata=product.metadata,
-            probe_positions=scan_out,
-            probes=probe_out,
-            object_=object_out,
-            losses=losses,
         )
 
     @property

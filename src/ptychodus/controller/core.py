@@ -10,6 +10,8 @@ from .agent import AgentChatController, AgentController
 from .automation import AutomationController
 from .data import FileDialogFactory
 from .diffraction import DiffractionController
+from .fluorescence import FluorescenceController
+from .fluorescence.enhance_dialog import FluorescenceEnhanceDialogController
 from .genesis import GenesisController
 from .globus import GlobusController
 from .image import ImageController
@@ -17,8 +19,10 @@ from .memory import MemoryController
 from .object import ObjectController
 from .probe import ProbeController
 from .probe_positions import ProbePositionsController
+from .helpers import create_brush_for_editable_cell
 from .processing import ProcessingController
 from .product import ProductController
+from .product.core import ProductRepositoryTableModel
 from .product.visualization import ProductVisualizationController
 from .ptychi import PtyChiViewControllerFactory
 from .ptychonn import PtychoNNViewControllerFactory
@@ -55,40 +59,51 @@ class ControllerCore:
             model.ptychopinn_torch_reconstructor_library,
             self._file_dialog_factory,
         )
+        # Shared product-repository table model. Constructing it here (before
+        # any consumer) lets SettingsController, DiffractionController,
+        # ProductController, and ProcessingController all bind to the same
+        # instance — one observer registration on the repository serves every
+        # widget that shows product rows.
+        self._product_table_model = ProductRepositoryTableModel(
+            model.product_core.product_repository,
+            create_brush_for_editable_cell(view.product_view.table_view),
+        )
         self._settings_controller = SettingsController(
             model.settings_registry,
             model.product_core.product_repository,
+            self._product_table_model,
             view.settings_view,
             view.settings_table_view,
             self._file_dialog_factory,
         )
-        self._patterns_image_controller = ImageController(
+        self._diffraction_image_controller = ImageController(
             model.pattern_visualization_engine,
-            view.patterns_image_view.image_view,
+            view.diffraction_image_view.image_view,
             self._status_bar,
             self._file_dialog_factory,
         )
-        self._patterns_controller = DiffractionController(
+        self._diffraction_controller = DiffractionController(
             model.diffraction_core.detector_settings,
             model.diffraction_core.diffraction_settings,
+            model.product_core.settings,
             model.diffraction_core.pattern_sizer,
-            model.diffraction_core.detector,
             model.diffraction_core.diffraction_api,
-            model.diffraction_core.dataset,
+            model.diffraction_core.repository,
             model.diffraction_core.task_monitor,
-            model.metadata_presenter,
             model.product_core.product_repository,
+            self._product_table_model,
             model.analysis_core.diffraction_simulator,
             model.analysis_core.diffraction_simulator_settings,
-            view.patterns_view,
-            view.patterns_image_view.status_view,
-            self._patterns_image_controller,
+            view.datasets_view,
+            view.diffraction_image_view.status_view,
+            self._diffraction_image_controller,
             self._file_dialog_factory,
         )
         self._product_controller = ProductController.create_instance(
-            model.diffraction_core.diffraction_api,
             model.product_core.product_repository,
             model.product_core.product_api,
+            model.diffraction_core.repository,
+            self._product_table_model,
             view.product_view,
             self._file_dialog_factory,
         )
@@ -125,13 +140,6 @@ class ControllerCore:
             model.analysis_core.probe_propagator_visualization_engine,
             model.analysis_core.illumination_mapper,
             model.analysis_core.illumination_visualization_engine,
-            model.fluorescence_core.fluorescence_api,
-            model.fluorescence_core.enhancer_chooser,
-            model.fluorescence_core.two_step_enhancer,
-            model.fluorescence_core.vspi_enhancer,
-            model.fluorescence_core.ptychozoon_enhancer,
-            model.fluorescence_core.task_monitor,
-            model.fluorescence_core.visualization_engine,
             view.probe_view,
             self._file_dialog_factory,
         )
@@ -139,6 +147,25 @@ class ControllerCore:
             model.object_visualization_engine,
             view.object_image_view,
             self._status_bar,
+            self._file_dialog_factory,
+        )
+        self._fluorescence_image_controller = ImageController(
+            model.fluorescence_core.visualization_engine,
+            view.fluorescence_image_view,
+            self._status_bar,
+            self._file_dialog_factory,
+        )
+        self._fluorescence_enhance_dialog_controller = FluorescenceEnhanceDialogController(
+            model.fluorescence_core,
+            has_ptychozoon=model.fluorescence_core.ptychozoon_enhancer is not None,
+        )
+        self._fluorescence_controller = FluorescenceController(
+            model.fluorescence_core.repository,
+            model.fluorescence_core.fluorescence_api,
+            model.product_core.product_repository,
+            view.fluorescence_view,
+            self._fluorescence_image_controller,
+            self._fluorescence_enhance_dialog_controller,
             self._file_dialog_factory,
         )
         self._object_controller = ObjectController(
@@ -159,6 +186,7 @@ class ControllerCore:
             model.processing_core.algorithm_parameter,
             model.processing_core.processing_api,
             model.product_core.product_repository,
+            self._product_table_model,
             model.globus_core,
             model.genesis_core,
             view.processing_view,
@@ -195,10 +223,10 @@ class ControllerCore:
             self._file_dialog_factory,
         )
         self._agent_controller = AgentController(
-            model.agent_core.settings, model.agent_core.presenter, view.agent_view
+            model.agent_core.settings, model.agent_core.catalog, view.agent_view
         )
         self._agent_chat_controller = AgentChatController(
-            model.agent_core.chat_history, model.agent_core.presenter, view.agent_chat_view
+            model.agent_core.repository, model.agent_core.terminal, view.agent_chat_view
         )
 
         self._one_second_counter = 0
@@ -211,8 +239,8 @@ class ControllerCore:
             view.genesis_action: model.genesis_core.is_supported,
         }
 
-        self._swap_central_widgets(view.patterns_action, animated=False)
-        view.patterns_action.setChecked(True)
+        self._swap_central_widgets(view.datasets_action, animated=False)
+        view.datasets_action.setChecked(True)
         view.navigation.action_group.triggered.connect(
             lambda action: self._swap_central_widgets(action)
         )

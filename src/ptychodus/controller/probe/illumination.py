@@ -3,7 +3,7 @@ import logging
 
 from PyQt5.QtWidgets import QButtonGroup
 
-from ptychodus.api.common import RealArrayType
+from ptychodus.api.typing import RealArrayType
 
 from ...model.analysis import IlluminationMap, IlluminationMapper
 from ...model.visualization import VisualizationEngine

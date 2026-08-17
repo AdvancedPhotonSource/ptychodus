@@ -7,7 +7,7 @@ import numpy
 from ptychodus.api.object import Object, ObjectFileReader, ObjectFileWriter
 from ptychodus.api.plugins import PluginChooser
 
-from ...diffraction import DiffractionAPI
+from ...diffraction import AssembledDiffractionDataset
 from .builder import FromFileObjectBuilder, ObjectBuilder
 from .dead_leaves import DeadLeavesObjectBuilder
 from .fractal_noise import FractalNoiseObjectBuilder
@@ -25,37 +25,53 @@ class ObjectBuilderFactory(Iterable[str]):
         self,
         rng: numpy.random.Generator,
         settings: ObjectSettings,
-        diffraction_api: DiffractionAPI,
         file_reader_chooser: PluginChooser[ObjectFileReader],
         file_writer_chooser: PluginChooser[ObjectFileWriter],
     ) -> None:
+        self._rng = rng
         self._settings = settings
         self._file_reader_chooser = file_reader_chooser
         self._file_writer_chooser = file_writer_chooser
-        self._builders: Mapping[str, Callable[[], ObjectBuilder]] = {
+        self._non_diffraction_builders: Mapping[str, Callable[[], ObjectBuilder]] = {
             'random': lambda: RandomObjectBuilder(rng, settings),
             'dead_leaves': lambda: DeadLeavesObjectBuilder(rng, settings),
             'fractal_noise': lambda: FractalNoiseObjectBuilder(rng, settings),
             'grf': lambda: GaussianRandomFieldObjectBuilder(rng, settings),
-            'stxm': lambda: STXMObjectBuilder(settings, diffraction_api),
-            'paganin': lambda: PaganinObjectBuilder(settings, diffraction_api),
+        }
+        self._diffraction_builders: Mapping[
+            str, Callable[[AssembledDiffractionDataset], ObjectBuilder]
+        ] = {
+            'stxm': lambda dataset: STXMObjectBuilder(settings, dataset),
+            'paganin': lambda dataset: PaganinObjectBuilder(settings, dataset),
         }
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self._builders)
+        yield from self._non_diffraction_builders
+        yield from self._diffraction_builders
 
-    def create(self, name: str) -> ObjectBuilder:
+    def create(
+        self, name: str, *, dataset: AssembledDiffractionDataset | None = None
+    ) -> ObjectBuilder:
+        diffraction_factory = self._diffraction_builders.get(name)
+        if diffraction_factory is not None:
+            if dataset is None:
+                raise RuntimeError(
+                    f'Object builder "{name}" requires an associated diffraction dataset.'
+                )
+            return diffraction_factory(dataset)
+
         try:
-            factory = self._builders[name]
+            factory = self._non_diffraction_builders[name]
         except KeyError as exc:
             raise KeyError(f'Unknown object builder "{name}"!') from exc
-
         return factory()
 
     def create_default(self) -> ObjectBuilder:
-        return next(iter(self._builders.values()))()
+        return next(iter(self._non_diffraction_builders.values()))()
 
-    def create_from_settings(self) -> ObjectBuilder:
+    def create_from_settings(
+        self, *, dataset: AssembledDiffractionDataset | None = None
+    ) -> ObjectBuilder:
         name = self._settings.builder.get_value()
         name_repaired = name.casefold()
 
@@ -65,7 +81,7 @@ class ObjectBuilderFactory(Iterable[str]):
                 self._settings.file_type.get_value(),
             )
 
-        return self.create(name_repaired)
+        return self.create(name_repaired, dataset=dataset)
 
     def get_open_file_filters(self) -> Iterator[str]:
         for plugin in self._file_reader_chooser:

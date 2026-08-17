@@ -18,7 +18,7 @@ except ModuleNotFoundError:
 
 import numpy
 
-from ptychodus.api.common import RealArrayType
+from ptychodus.api.typing import RealArrayType
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,

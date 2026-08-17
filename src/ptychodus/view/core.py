@@ -29,7 +29,8 @@ from PyQt5.QtWidgets import (
 
 from . import resources  # noqa
 from .agent import AgentView, AgentChatView
-from .diffraction import PatternsImageView, PatternsView
+from .diffraction import DatasetsView, DiffractionImageView
+from .fluorescence import FluorescenceView
 from .image import ImageView
 from .product import ProductView, ProductVisualizationView
 from .processing import ProcessingStatusView
@@ -220,13 +221,13 @@ class ViewCore(QMainWindow):
             right=self.settings_table_view,
         )
 
-        self.patterns_view = PatternsView()
-        self.patterns_image_view = PatternsImageView()
-        self.patterns_action = self.navigation.add_panel(
+        self.datasets_view = DatasetsView()
+        self.diffraction_image_view = DiffractionImageView()
+        self.datasets_action = self.navigation.add_panel(
             QIcon(':/icons/patterns'),
-            'Patterns',
-            left=self.patterns_view,
-            right=self.patterns_image_view,
+            'Diffraction',
+            left=self.datasets_view,
+            right=self.diffraction_image_view,
         )
 
         self.product_view = ProductView()
@@ -305,6 +306,15 @@ class ViewCore(QMainWindow):
             right=self.automation_widget,
         )
 
+        self.fluorescence_view = FluorescenceView()
+        self.fluorescence_image_view = ImageView()
+        self.fluorescence_action = self.navigation.add_panel(
+            QIcon(':/icons/fluorescence'),
+            'Fluorescence',
+            left=self.fluorescence_view,
+            right=self.fluorescence_image_view,
+        )
+
         self.agent_view = AgentView()
         self.agent_chat_view = AgentChatView()
         self.agent_action = self.navigation.add_panel(
@@ -325,14 +335,18 @@ class ViewCore(QMainWindow):
 
         self.navigation.add_subview_group(
             parent_action=self.product_action,
-            child_actions=(self.positions_action, self.probe_action, self.object_action),
+            child_actions=(
+                self.positions_action,
+                self.probe_action,
+                self.object_action,
+            ),
             insert_before=self.processing_action,
             child_icon_size=QSize(24, 24),
         )
         self.navigation.add_subview_group(
             parent_action=self.processing_action,
             child_actions=(self.globus_action, self.genesis_action, self.automation_action),
-            insert_before=self.agent_action,
+            insert_before=self.fluorescence_action,
             child_icon_size=QSize(24, 24),
         )
 

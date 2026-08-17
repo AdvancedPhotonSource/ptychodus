@@ -1,0 +1,14 @@
+# Keep the action versions in .github/workflows/ current. Python dependencies
+# are managed through pyproject.toml extras and uv.lock, so no pip ecosystem
+# entry here.
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns:
+          - "*"

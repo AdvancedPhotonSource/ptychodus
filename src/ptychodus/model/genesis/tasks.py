@@ -5,7 +5,7 @@ import logging
 import threading
 import time
 
-import requests
+import httpx
 
 from .iri import IRIComputeClient, JobSpecification, JobState
 from .transfer import AmSCGlobusTransferClient, GlobusTransferInputs, TransferStatus
@@ -98,7 +98,7 @@ def compute_task(
 
         try:
             job_response = client.submit_job(resource_id, spec)
-        except requests.HTTPError as exc:
+        except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 404:
                 if attempt == max_retries:
                     yield GenesisStatus(
@@ -135,7 +135,7 @@ def compute_task(
     while not stop_event.is_set():
         try:
             response = client.get_job_status(resource_id, job_id)
-        except requests.HTTPError as exc:
+        except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 400:
                 logger.warning('Invalid request parameters.')
                 break

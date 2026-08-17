@@ -1,16 +1,16 @@
-"""Unit tests for probe generation functions in ptychodus.api.probe_gen."""
+"""Unit tests for probe generation functions in ptychodus.api.simulate.probe."""
 
 import numpy
 import numpy.testing
 
 from ptychodus.api.geometry import HermiteMode, PixelGeometry
 from ptychodus.api.probe import Probe, ProbeGeometry
-from ptychodus.api.probe_gen import (
+from ptychodus.api.simulate.probe import (
     generate_coherent_probe_modes,
     generate_hermite_probe,
     generate_incoherent_probe_modes,
 )
-from ptychodus.api.propagator import intensity
+from ptychodus.api.propagate import intensity
 
 
 PIXEL_GEOMETRY = PixelGeometry(width_m=1e-8, height_m=1e-8)

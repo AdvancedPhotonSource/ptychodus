@@ -1,4 +1,4 @@
-"""Unit tests for ptychodus.api.visualization."""
+"""Unit tests for ptychodus.api.visualize."""
 
 from __future__ import annotations
 
@@ -7,9 +7,10 @@ import numpy.testing
 import pytest
 
 from ptychodus.api.geometry import Box2D, Interval, Line2D, PixelGeometry, Point2D
-from ptychodus.api.visualization import (
+from ptychodus.api.visualize import (
     ComplexComponent,
     CylindricalColorModel,
+    DisplayValues,
     KernelDensityEstimate,
     LineCut,
     ScalarTransformation,
@@ -83,6 +84,37 @@ class TestVisualizationProductConstruction:
         with pytest.raises(ValueError, match='Shape mismatch'):
             VisualizationProduct('x', values, rgba, _pixel_geo(), Interval[float](0.0, 1.0))
 
+    def test_rejects_1d_display_values(self):
+        values = numpy.ones((4, 4))
+        rgba = numpy.ones((4, 4, 4))
+        display_values = [DisplayValues('bad', numpy.ones(4))]
+        with pytest.raises(ValueError, match='2-dimensional'):
+            VisualizationProduct(
+                'x', values, rgba, _pixel_geo(), Interval[float](0.0, 1.0), display_values
+            )
+
+    def test_rejects_display_values_shape_mismatch(self):
+        values = numpy.ones((4, 4))
+        rgba = numpy.ones((4, 4, 4))
+        display_values = [DisplayValues('bad', numpy.ones((3, 4)))]
+        with pytest.raises(ValueError, match='Shape mismatch'):
+            VisualizationProduct(
+                'x', values, rgba, _pixel_geo(), Interval[float](0.0, 1.0), display_values
+            )
+
+    def test_default_display_values_for_real_input(self):
+        vp = _make_product()
+        (dv,) = vp.get_display_values()
+        assert dv.label == 'test'
+        numpy.testing.assert_array_equal(dv.values, vp.get_values())
+
+    def test_default_display_values_for_complex_input(self):
+        values = numpy.ones((4, 4), dtype=complex) * (3 + 4j)
+        rgba = numpy.ones((4, 4, 4), dtype=numpy.float32)
+        vp = VisualizationProduct('c', values, rgba, _pixel_geo(), Interval[float](0.0, 1.0))
+        (dv,) = vp.get_display_values()
+        numpy.testing.assert_allclose(dv.values, 5.0)
+
 
 # ---------------------------------------------------------------------------
 # VisualizationProduct accessors
@@ -130,6 +162,16 @@ class TestGetInfoText:
         assert 'amplitude=' in text
         assert 'phase=' in text
 
+    def test_complex_value_with_zero_imaginary_part(self):
+        # A complex-dtype pixel whose imaginary part is exactly zero must still take the
+        # amplitude/phase branch; formatting a complex with '6g' raises TypeError.
+        values = numpy.zeros((4, 4), dtype=complex)
+        rgba = numpy.ones((4, 4, 4), dtype=numpy.float32)
+        vp = VisualizationProduct('c', values, rgba, _pixel_geo(), Interval[float](0.0, 1.0))
+        text = vp.get_info_text(1.0, 1.0)
+        assert 'amplitude=' in text
+        assert 'phase=' in text
+
     def test_clamps_negative_coords(self):
         vp = _make_product()
         text = vp.get_info_text(-5.0, -5.0)
@@ -155,6 +197,14 @@ class TestGetLineCut:
         lc = vp.get_line_cut(line)
         assert isinstance(lc, LineCut)
 
+    def test_single_series_for_real_values(self):
+        vp = self._make_gradient()
+        line = Line2D(Point2D(0.0, 0.0), Point2D(3.0, 0.0))
+        lc = vp.get_line_cut(line)
+        assert len(lc.series) == 1
+        assert lc.series[0].label == 'grad'
+        assert len(lc.series[0].value) == len(lc.distance_m)
+
     def test_distances_are_nonneg(self):
         vp = self._make_gradient()
         line = Line2D(Point2D(0.0, 0.0), Point2D(3.0, 0.0))
@@ -177,6 +227,83 @@ class TestGetLineCut:
         # Degenerate lines expand bounding-box intersection to (-inf, inf),
         # yielding no grid crossings; the result has no well-defined midpoints.
         assert isinstance(lc, LineCut)
+
+
+# ---------------------------------------------------------------------------
+# VisualizationProduct.get_line_cut over complex arrays
+# ---------------------------------------------------------------------------
+
+
+def _complex_gradient() -> numpy.ndarray:
+    """4x4 complex array with varying amplitude and phase, and no wrapped-phase ambiguity."""
+    amplitude = numpy.arange(1.0, 17.0, dtype=numpy.float32).reshape(4, 4)
+    phase_rad = numpy.linspace(-1.5, 1.5, 16, dtype=numpy.float32).reshape(4, 4)
+    return amplitude * numpy.exp(1j * phase_rad)
+
+
+# A horizontal line across the top row samples pixels (0, 0..3) exactly once each.
+_TOP_ROW_LINE = Line2D(Point2D(0.0, 0.5), Point2D(4.0, 0.5))
+
+
+class TestGetLineCutComplex:
+    @pytest.mark.parametrize('component', list(ComplexComponent))
+    def test_matches_selected_component(self, component: ComplexComponent):
+        # Regression: the line cut used to sample the original complex array, so every
+        # component silently plotted the real part.
+        arr = _complex_gradient()
+        vp = visualize_complex_component(arr, _pixel_geo(), component)
+        lc = vp.get_line_cut(_TOP_ROW_LINE)
+        expected = component.extract_component(arr)[0, :]
+        assert len(lc.series) == 1
+        numpy.testing.assert_allclose(lc.series[0].value, expected, rtol=1e-6)
+
+    @pytest.mark.parametrize('component', list(ComplexComponent))
+    def test_series_label_matches_value_label(self, component: ComplexComponent):
+        arr = _complex_gradient()
+        vp = visualize_complex_component(arr, _pixel_geo(), component)
+        lc = vp.get_line_cut(_TOP_ROW_LINE)
+        assert lc.series[0].label == vp.get_value_label()
+
+    def test_components_differ_from_each_other(self):
+        arr = _complex_gradient()
+        cuts = {
+            component: tuple(
+                visualize_complex_component(arr, _pixel_geo(), component)
+                .get_line_cut(_TOP_ROW_LINE)
+                .series[0]
+                .value
+            )
+            for component in ComplexComponent
+        }
+        # REAL and IMAGINARY must not coincide; if they did, the sampling would be ignoring
+        # the component selection entirely.
+        assert cuts[ComplexComponent.REAL] != cuts[ComplexComponent.IMAGINARY]
+        assert cuts[ComplexComponent.AMPLITUDE] != cuts[ComplexComponent.REAL]
+
+    def test_applies_scalar_transform(self):
+        arr = _complex_gradient()
+        vp = visualize_complex_component(
+            arr, _pixel_geo(), ComplexComponent.AMPLITUDE, transform=ScalarTransformation.SQRT
+        )
+        lc = vp.get_line_cut(_TOP_ROW_LINE)
+        expected = numpy.sqrt(ComplexComponent.AMPLITUDE.extract_component(arr)[0, :])
+        numpy.testing.assert_allclose(lc.series[0].value, expected, rtol=1e-6)
+
+    def test_cylindrical_model_yields_amplitude_and_phase(self):
+        arr = _complex_gradient()
+        vp = visualize_complex_values(
+            arr,
+            _pixel_geo(),
+            CylindricalColorModel.HSV_VALUE,
+            amplitude_transform=ScalarTransformation.IDENTITY,
+        )
+        lc = vp.get_line_cut(_TOP_ROW_LINE)
+        assert len(lc.series) == 2
+        amplitude_series, phase_series = lc.series
+        assert amplitude_series.label == 'Amplitude'
+        assert phase_series.label == 'Phase [rad]'
+        numpy.testing.assert_allclose(amplitude_series.value, numpy.absolute(arr)[0, :], rtol=1e-6)
+        numpy.testing.assert_allclose(phase_series.value, numpy.angle(arr)[0, :], rtol=1e-5)
 
 
 # ---------------------------------------------------------------------------
@@ -214,6 +341,36 @@ class TestEstimateKernelDensity:
         box = Box2D(x=-10, y=-10, width=100, height=100)
         kde = vp.estimate_kernel_density(box)
         assert kde.value_lower <= kde.value_upper
+
+    def test_phase_component_spans_phase_range(self):
+        # Regression: the histogram used to hardcode amplitude for any complex array, so a
+        # phase histogram silently showed amplitudes.
+        rng = numpy.random.default_rng(11)
+        amplitude = rng.random((8, 8)) + 10.0
+        phase_rad = rng.uniform(-numpy.pi, numpy.pi, (8, 8))
+        arr = amplitude * numpy.exp(1j * phase_rad)
+        vp = visualize_complex_component(arr, _pixel_geo(), ComplexComponent.PHASE_RAD)
+        box = Box2D(x=0, y=0, width=8, height=8)
+        kde = vp.estimate_kernel_density(box)
+        assert kde.value_lower == pytest.approx(phase_rad.min(), rel=1e-4)
+        assert kde.value_upper == pytest.approx(phase_rad.max(), rel=1e-4)
+
+    def test_cylindrical_model_uses_amplitude(self):
+        # A histogram has one value axis, so the Complex renderer keeps showing amplitude.
+        rng = numpy.random.default_rng(13)
+        amplitude = rng.random((8, 8)) + 1.0
+        phase_rad = rng.uniform(-numpy.pi, numpy.pi, (8, 8))
+        arr = amplitude * numpy.exp(1j * phase_rad)
+        vp = visualize_complex_values(
+            arr,
+            _pixel_geo(),
+            CylindricalColorModel.HSV_VALUE,
+            amplitude_transform=ScalarTransformation.IDENTITY,
+        )
+        box = Box2D(x=0, y=0, width=8, height=8)
+        kde = vp.estimate_kernel_density(box)
+        assert kde.value_lower == pytest.approx(amplitude.min(), rel=1e-4)
+        assert kde.value_upper == pytest.approx(amplitude.max(), rel=1e-4)
 
 
 # ---------------------------------------------------------------------------
@@ -456,6 +613,15 @@ class TestVisualizeRealValues:
         values = numpy.arange(16, dtype=numpy.float32).reshape(4, 4)
         vp = visualize_real_values('I', values, _pixel_geo())
         numpy.testing.assert_array_equal(vp.get_values(), values)
+
+    def test_display_values_are_transformed(self):
+        # The value label is decorated with the transform, so the displayed values must be
+        # transformed too or the axis label lies.
+        values = numpy.arange(1, 17, dtype=numpy.float32).reshape(4, 4)
+        vp = visualize_real_values('I', values, _pixel_geo(), transform=ScalarTransformation.SQRT)
+        (dv,) = vp.get_display_values()
+        assert dv.label == vp.get_value_label()
+        numpy.testing.assert_allclose(dv.values, numpy.sqrt(values), rtol=1e-6)
 
     def test_with_transform(self):
         values = numpy.array([[1.0, 4.0], [9.0, 16.0]], dtype=numpy.float32)

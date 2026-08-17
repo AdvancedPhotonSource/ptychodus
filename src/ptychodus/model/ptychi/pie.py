@@ -1,4 +1,3 @@
-from collections.abc import Iterator
 import logging
 
 
@@ -10,12 +9,10 @@ from ptychi.api import (
     PIEProbePositionOptions,
     PIEReconstructorOptions,
 )
-from ptychi.api.task import PtychographyTask
-
 from ptychodus.api.object import Object, ObjectGeometry
 from ptychodus.api.probe import ProbeSequence
-from ptychodus.api.product import LossValue, ProductMetadata
-from ptychodus.api.reconstructor import ReconstructInput, ReconstructOutput, Reconstructor
+from ptychodus.api.product import ProductMetadata
+from ptychodus.api.reconstruct import ReconstructInput
 from ptychodus.api.probe_positions import ProbePositionSequence
 
 from .helper import PtyChiOptionsHelper
@@ -24,16 +21,10 @@ from .settings import PtyChiPIESettings
 logger = logging.getLogger(__name__)
 
 
-class PIEReconstructor(Reconstructor):
+class PIEReconstructor:
     def __init__(self, options_helper: PtyChiOptionsHelper, settings: PtyChiPIESettings) -> None:
-        super().__init__()
         self._options_helper = options_helper
         self._settings = settings
-        self._epoch = 0
-
-    @property
-    def name(self) -> str:
-        return 'PIE'
 
     def _create_reconstructor_options(self) -> PIEReconstructorOptions:
         helper = self._options_helper.reconstructor_helper
@@ -146,49 +137,3 @@ class PIEReconstructor(Reconstructor):
             ),
             opr_mode_weight_options=self._create_opr_mode_weight_options(product.probes),
         )
-
-    def get_progress_goal(self) -> int:
-        return self._options_helper.num_epochs
-
-    def reconstruct(self, parameters: ReconstructInput) -> Iterator[ReconstructOutput]:
-        task_options = self._create_task_options(parameters)
-        num_epochs = task_options.reconstructor_options.num_epochs
-
-        task = PtychographyTask(task_options)
-
-        with task:
-            self._epoch = 0
-            step_epochs = self._options_helper.num_sync_epochs
-
-            task_reconstructor = task.reconstructor
-
-            if task_reconstructor is None:
-                raise RuntimeError('Task reconstructor is None!')
-
-            loss_tracker = task_reconstructor.loss_tracker
-
-            while self._epoch < num_epochs:
-                task.run(step_epochs)
-
-                losses: list[LossValue] = list()
-                epoch_array = loss_tracker.table['epoch'].to_numpy()
-                loss_array = loss_tracker.table['loss'].to_numpy()
-
-                for epoch, loss in zip(epoch_array.flat, loss_array.flat):
-                    loss_value = LossValue(epoch=epoch, value=loss.item())
-                    losses.append(loss_value)
-
-                product = self._options_helper.create_product(
-                    product=parameters.product,
-                    position_x_px=task.get_probe_positions_x(as_numpy=True),
-                    position_y_px=task.get_probe_positions_y(as_numpy=True),
-                    probe_array=task.get_data_to_cpu('probe', as_numpy=True),
-                    object_array=task.get_data_to_cpu('object', as_numpy=True),
-                    opr_weights=task.get_data_to_cpu('opr_mode_weights', as_numpy=True),
-                    losses=losses,
-                )
-
-                self._epoch += step_epochs
-                step_epochs = min(step_epochs, num_epochs - self._epoch)
-
-                yield ReconstructOutput(product=product, progress=self._epoch)

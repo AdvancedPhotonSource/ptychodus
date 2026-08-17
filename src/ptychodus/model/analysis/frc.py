@@ -5,8 +5,8 @@ import time
 
 from ptychodus.api.metrics import (
     FourierRingCorrelation,
-    ObjectComparison,
     compute_fourier_ring_correlation,
+    compute_object_comparison,
 )
 
 from ..product import ProductRepository
@@ -24,7 +24,7 @@ class FourierRingCorrelator:
         product1 = self._repository[product_index_1].get_product()
         product2 = self._repository[product_index_2].get_product()
 
-        comparison = ObjectComparison.from_products(reference=product1, test=product2)
+        comparison = compute_object_comparison(reference=product1, test=product2)
 
         # TODO apply soft-edged mask
         logger.info('Computing Fourier ring correlation...')

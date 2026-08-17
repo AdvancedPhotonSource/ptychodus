@@ -5,40 +5,12 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Generic, TypeVar
 
-from scipy.fft import fft, fft2, fftfreq, ifft, ifft2
 import numpy
 import scipy.special
 
-from .common import ComplexArrayType, RealArrayType
+from .typing import ComplexArrayType, RealArrayType
 
 T = TypeVar('T', int, float, Decimal)
-
-
-@dataclass(frozen=True)
-class AffineTransform:
-    """2D affine transformation expressed as a 2x3 matrix; callable as transform(x, y) -> (x', y')."""
-
-    a00: float
-    a01: float
-    a02: float
-
-    a10: float
-    a11: float
-    a12: float
-
-    def __call__(self, x: float, y: float) -> tuple[float, float]:
-        xp = self.a00 * x + self.a01 * y + self.a02
-        yp = self.a10 * x + self.a11 * y + self.a12
-        return xp, yp
-
-    def apply_transform(self, points: RealArrayType) -> RealArrayType:
-        """Vectorized form of ``__call__``: apply this transform to an (N, 2) array of (x, y)
-        points and return an (N, 2) array of (x', y')."""
-        x = points[:, 0]
-        y = points[:, 1]
-        xp = self.a00 * x + self.a01 * y + self.a02
-        yp = self.a10 * x + self.a11 * y + self.a12
-        return numpy.column_stack((xp, yp))
 
 
 @dataclass(frozen=True)
@@ -51,6 +23,10 @@ class PixelGeometry:
     @property
     def is_square(self) -> bool:
         return self.width_m == self.height_m
+
+    @property
+    def is_valid(self) -> bool:
+        return self.width_m > 0.0 and self.height_m > 0.0
 
     def get_area_m2(self) -> float:
         return self.width_m * self.height_m
@@ -147,7 +123,7 @@ class Interval(Generic[T]):
         self.upper: T = upper
 
     @classmethod
-    def create_proper(cls, a: T, b: T) -> Interval[T]:
+    def from_bounds(cls, a: T, b: T) -> Interval[T]:
         if b < a:
             return Interval[T](b, a)
         else:
@@ -238,36 +214,3 @@ class HermiteMode:
 
     def __str__(self) -> str:
         return f'{self.coefficient}$H_{{{self.order_x},{self.order_y}}}(x,y)$'
-
-
-def fourier_gradient(
-    image: ComplexArrayType, pixel_geometry: PixelGeometry | None = None
-) -> tuple[ComplexArrayType, ComplexArrayType]:
-    """Calculate the Fourier-differentiation gradient of an image.
-
-    If ``pixel_geometry`` is provided, the returned gradient is in units of
-    ``image_units / m``; otherwise it is in ``image_units / pixel``.
-    """
-    dy = pixel_geometry.height_m if pixel_geometry is not None else 1.0
-    dx = pixel_geometry.width_m if pixel_geometry is not None else 1.0
-
-    u = fftfreq(image.shape[-2], d=dy).reshape(-1, 1)
-    v = fftfreq(image.shape[-1], d=dx)
-
-    grad_y = ifft(fft(image, axis=-2) * (2j * numpy.pi * u), axis=-2)
-    grad_x = ifft(fft(image, axis=-1) * (2j * numpy.pi * v), axis=-1)
-
-    return grad_y, grad_x
-
-
-def fourier_shift_2d(array: ComplexArrayType, dx: float, dy: float) -> ComplexArrayType:
-    """Translate the last two axes of ``array`` by ``(dx, dy)`` pixels via
-    a Fourier phase ramp. Subpixel shifts are exact for bandlimited signals; positive
-    shifts move features toward larger x/y indices. Leading axes are treated as a
-    batch dimension. The output preserves the input's dtype."""
-    height_px, width_px = array.shape[-2:]
-    fy = fftfreq(height_px).reshape(-1, 1)
-    fx = fftfreq(width_px)
-    phase = numpy.exp(-2j * numpy.pi * (fy * dy + fx * dx))
-    shifted = ifft2(fft2(array, axes=(-2, -1)) * phase, axes=(-2, -1))
-    return shifted.astype(array.dtype)

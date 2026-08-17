@@ -30,7 +30,6 @@ from .fluorescence import FluorescenceCore
 from .genesis import GenesisCore
 from .globus import GlobusCore
 from .memory import MemoryPresenter
-from .metadata import MetadataPresenter
 from .processing import ProcessingCore
 from .product import PositionsStreamingContext, ProductCore
 from .ptychi import PtyChiReconstructorLibrary
@@ -117,7 +116,6 @@ class ModelCore:
             self.settings_registry,
             self.diffraction_core.pattern_sizer,
             self.diffraction_core.diffraction_api,
-            self.diffraction_core.dataset,
             self.plugin_registry.probe_position_file_readers,
             self.plugin_registry.probe_position_file_writers,
             self.plugin_registry.fresnel_zone_plates,
@@ -128,21 +126,14 @@ class ModelCore:
             self.plugin_registry.product_file_readers,
             self.plugin_registry.product_file_writers,
             self.settings_registry,
+            self._task_manager,
         )
-        self.metadata_presenter = MetadataPresenter(
-            self.diffraction_core.detector_settings,
-            self.diffraction_core.diffraction_settings,
-            self.diffraction_core.dataset,
-            self.product_core.settings,
-        )
-
         self.pattern_visualization_engine = VisualizationEngine(is_complex=False)
         self.probe_visualization_engine = VisualizationEngine(is_complex=True)
         self.object_visualization_engine = VisualizationEngine(is_complex=True)
 
         self.ptychi_reconstructor_library = PtyChiReconstructorLibrary(
             self.settings_registry,
-            self.diffraction_core.pattern_sizer,
             self.is_developer_mode_enabled,
         )
         self.ptychonn_reconstructor_library = PtychoNNReconstructorLibrary(
@@ -157,7 +148,6 @@ class ModelCore:
         self.processing_core = ProcessingCore(
             self._task_manager,
             self.settings_registry,
-            self.diffraction_core.diffraction_api,
             self.product_core.product_api,
             [
                 self.ptychi_reconstructor_library,
@@ -170,6 +160,7 @@ class ModelCore:
             self._task_manager,
             self.settings_registry,
             self.product_core.product_api,
+            self.product_core.product_repository,
             self.plugin_registry.upscaling_strategies,
             self.plugin_registry.deconvolution_strategies,
             self.plugin_registry.fluorescence_file_readers,
@@ -178,20 +169,18 @@ class ModelCore:
         self.analysis_core = AnalysisCore(
             self.rng,
             self.settings_registry,
-            self.diffraction_core.dataset,
+            self.diffraction_core.repository,
             self.product_core.product_repository,
             self.product_core.probe_positions_repository,
         )
         self.globus_core = GlobusCore(
             self.settings_registry,
-            self.diffraction_core.diffraction_api,
             self.product_core.product_api,
             self.processing_core.processing_api,
         )
         self.genesis_core = GenesisCore(
             self._task_manager,
             self.settings_registry,
-            self.diffraction_core.diffraction_api,
             self.product_core.product_api,
             self.processing_core.processing_api,
         )
@@ -262,7 +251,7 @@ class ModelCore:
         diffraction_path = input_directory / StandardFileLayout.DIFFRACTION
 
         if diffraction_path.is_file():
-            self.workflow_api.load_assembled_diffraction_data(diffraction_path)
+            diffraction_handle = self.workflow_api.load_assembled_diffraction_data(diffraction_path)
         else:
             logger.error('Diffraction data is not a file!')
             return -1
@@ -289,10 +278,17 @@ class ModelCore:
             if product_out_path.is_file():
                 logger.warning('Output product file will be overwritten!')
 
-            input_product_api = self.workflow_api.load_product(product_in_path)
-            output_product_api = input_product_api.reconstruct_local(
-                output_product_file=product_out_path, block=True
+            input_product_api = self.workflow_api.load_product(
+                product_in_path, diffraction=diffraction_handle
             )
+            try:
+                output_product_api = input_product_api.reconstruct_local(
+                    output_product_file=product_out_path,
+                    block=True,
+                )
+            except Exception as exc:
+                logger.error(f'Reconstruction failed: {type(exc).__name__}: {exc}')
+                return 1
         else:
             logger.error('Input product is not a file!')
             return -1
@@ -318,13 +314,27 @@ class ModelCore:
         return 0
 
     def _batch_mode_train(self, input_directory: Path, output_directory: Path) -> int:
+        diffraction_path = input_directory / StandardFileLayout.DIFFRACTION
+
+        if diffraction_path.is_file():
+            diffraction_handle = self.workflow_api.load_assembled_diffraction_data(diffraction_path)
+        else:
+            logger.error('Diffraction data is not a file!')
+            return -1
+
         product_in_path = input_directory / StandardFileLayout.PRODUCT_IN
 
         if product_in_path.is_file():
-            input_product_api = self.workflow_api.load_product(product_in_path)
-            input_product_api.train_reconstructor_local(
-                input_directory, output_directory, block=True
+            input_product_api = self.workflow_api.load_product(
+                product_in_path, diffraction=diffraction_handle
             )
+            try:
+                input_product_api.train_reconstructor_local(
+                    input_directory, output_directory, block=True
+                )
+            except Exception as exc:
+                logger.error(f'Training failed: {type(exc).__name__}: {exc}')
+                return 1
             return 0
         else:
             logger.error('Input product is not a file!')

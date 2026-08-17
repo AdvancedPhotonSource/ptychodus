@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
-    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -14,6 +13,7 @@ from PyQt5.QtWidgets import (
     QMenu,
     QProgressBar,
     QPushButton,
+    QTableView,
     QTreeView,
     QVBoxLayout,
     QWidget,
@@ -23,30 +23,25 @@ from PyQt5.QtWidgets import (
 from .image import ImageView
 
 
-class DetectorView(QGroupBox):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Detector', parent)
-
-
-class PatternsButtonBox(QWidget):
+class DatasetsButtonBox(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.load_button = QPushButton('Load')
-        self.load_menu = QMenu()
+        self.insert_menu = QMenu()
+        self.insert_button = QPushButton('Insert')
+        self.save_menu = QMenu()
         self.save_button = QPushButton('Save')
-        self.close_button = QPushButton('Close')
-        self.analyze_button = QPushButton('Analyze')
-        self.analyze_menu = QMenu()
+        self.edit_button = QPushButton('Edit')
+        self.remove_button = QPushButton('Remove')
 
-        self.load_button.setMenu(self.load_menu)
-        self.analyze_button.setMenu(self.analyze_menu)
+        self.insert_button.setMenu(self.insert_menu)
+        self.save_button.setMenu(self.save_menu)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.load_button)
+        layout.addWidget(self.insert_button)
         layout.addWidget(self.save_button)
-        layout.addWidget(self.close_button)
-        layout.addWidget(self.analyze_button)
+        layout.addWidget(self.edit_button)
+        layout.addWidget(self.remove_button)
         self.setLayout(layout)
 
 
@@ -65,38 +60,31 @@ class OpenDatasetWizardPage(QWizardPage):
             self.completeChanged.emit()
 
 
+class OpenDatasetWizardBadPixelsPage(OpenDatasetWizardPage):
+    """Bad-pixels chooser page — always complete; layout populated by the controller."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._set_complete(True)
+
+
 class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.detector_extent_check_box = QCheckBox('Detector Extent')
-        self.detector_pixel_size_check_box = QCheckBox('Detector Pixel Size')
-        self.detector_distance_check_box = QCheckBox('Detector Distance')
-        self.pattern_crop_center_check_box = QCheckBox('Pattern Crop Center')
-        self.pattern_crop_extent_check_box = QCheckBox('Pattern Crop Extent')
-        self.probe_energy_check_box = QCheckBox('Probe Energy')
-        self.probe_photon_count_check_box = QCheckBox('Probe Photon Count')
-        self.exposure_time_check_box = QCheckBox('Exposure Time')
+        self.table_view = QTableView()
 
         self.setTitle('Import Metadata')
 
         layout = QVBoxLayout()
-        layout.addWidget(self.detector_extent_check_box)
-        layout.addWidget(self.detector_pixel_size_check_box)
-        layout.addWidget(self.detector_distance_check_box)
-        layout.addWidget(self.pattern_crop_center_check_box)
-        layout.addWidget(self.pattern_crop_extent_check_box)
-        layout.addWidget(self.probe_energy_check_box)
-        layout.addWidget(self.probe_photon_count_check_box)
-        layout.addWidget(self.exposure_time_check_box)
-        layout.addStretch()
+        layout.addWidget(self.table_view)
         self.setLayout(layout)
+        self._set_complete(True)
 
 
-class DatasetFileLayoutDialog(QDialog):
+class DatasetEditorLayoutView(QGroupBox):
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
+        super().__init__('Layout')
         self.tree_view = QTreeView()
-        self.button_box = QDialogButtonBox()
 
         tree_header = self.tree_view.header()
 
@@ -104,13 +92,47 @@ class DatasetFileLayoutDialog(QDialog):
             tree_header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
             tree_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
 
+        layout = QVBoxLayout()
+        layout.addWidget(self.tree_view)
+        self.setLayout(layout)
+
+
+class DatasetEditorPropertiesView(QGroupBox):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__('Properties')
+        self.table_view = QTableView()
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.table_view)
+        self.setLayout(layout)
+
+
+class DatasetEditorDialog(QDialog):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.layout_view = DatasetEditorLayoutView()
+        self.properties_view = DatasetEditorPropertiesView()
+        self.button_box = QDialogButtonBox()
+
         self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
         self.button_box.accepted.connect(self.accept)
 
+        top_layout = QHBoxLayout()
+        top_layout.addWidget(self.layout_view)
+        top_layout.addWidget(self.properties_view)
+
         layout = QVBoxLayout()
-        layout.addWidget(self.tree_view)
+        layout.addLayout(top_layout)
         layout.addWidget(self.button_box)
         self.setLayout(layout)
+
+    @property
+    def tree_view(self) -> QTreeView:
+        return self.layout_view.tree_view
+
+    @property
+    def table_view(self) -> QTableView:
+        return self.properties_view.table_view
 
 
 class SimulateDiffractionDialog(QDialog):
@@ -145,13 +167,12 @@ class DiffractionStatusView(QWidget):
         self.setLayout(layout)
 
 
-class PatternsView(QWidget):
+class DatasetsView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.detector_view = DetectorView()
         self.tree_view = QTreeView()
         self.info_label = QLabel()
-        self.button_box = PatternsButtonBox()
+        self.button_box = DatasetsButtonBox()
         self.simulate_dialog = SimulateDiffractionDialog(self)
 
         tree_view_header = self.tree_view.header()
@@ -160,14 +181,13 @@ class PatternsView(QWidget):
             tree_view_header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout = QVBoxLayout()
-        layout.addWidget(self.detector_view)
         layout.addWidget(self.tree_view)
         layout.addWidget(self.info_label)
         layout.addWidget(self.button_box)
         self.setLayout(layout)
 
 
-class PatternsImageView(QWidget):
+class DiffractionImageView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.image_view = ImageView()

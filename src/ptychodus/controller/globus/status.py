@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 )
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import BooleanParameter, IntegerParameter
+from ptychodus.api.parameters import BooleanParameter, IntegerParameter
 
 from ...controller.parametric import SpinBoxParameterViewController
 from ...model.globus import GlobusStatusRepository

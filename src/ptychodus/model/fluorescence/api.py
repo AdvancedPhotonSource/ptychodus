@@ -3,20 +3,19 @@ from pathlib import Path
 import logging
 
 from ptychodus.api.fluorescence import (
-    FluorescenceDataset,
     FluorescenceEnhancer,
     FluorescenceFileReader,
     FluorescenceFileWriter,
 )
-from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.plugins import PluginChooser
 
 from ..product import ProductAPI
 from ..task_manager import TaskManager
-from .monitor import (
-    EnhanceFluorescenceBackgroundTask,
-    FluorescenceDatasetEmitter,
-    FluorescenceTaskMonitor,
+from .monitor import EnhanceFluorescenceBackgroundTask, FluorescenceTaskMonitor
+from .repository import (
+    FluorescenceItemState,
+    FluorescenceRepository,
+    FluorescenceRepositoryItem,
 )
 from .settings import FluorescenceSettings
 
@@ -29,6 +28,7 @@ class FluorescenceAPI:
         task_manager: TaskManager,
         settings: FluorescenceSettings,
         product_api: ProductAPI,
+        repository: FluorescenceRepository,
         enhancer_chooser: PluginChooser[FluorescenceEnhancer],
         task_monitor: FluorescenceTaskMonitor,
         file_reader_chooser: PluginChooser[FluorescenceFileReader],
@@ -37,20 +37,17 @@ class FluorescenceAPI:
         self._task_manager = task_manager
         self._settings = settings
         self._product_api = product_api
+        self._repository = repository
         self._enhancer_chooser = enhancer_chooser
         self._task_monitor = task_monitor
         self._file_reader_chooser = file_reader_chooser
         self._file_writer_chooser = file_writer_chooser
 
-    def get_dataset_emitter(self) -> FluorescenceDatasetEmitter:
-        return self._task_monitor.get_dataset_emitter()
+    def get_task_monitor(self) -> FluorescenceTaskMonitor:
+        return self._task_monitor
 
-    def get_product_name(self, product_index: int) -> str:
-        return self._product_api.get_item(product_index).get_name()
-
-    def get_pixel_geometry(self, product_index: int) -> PixelGeometry:
-        item = self._product_api.get_item(product_index)
-        return item.get_geometry().get_object_plane_pixel_geometry()
+    def get_item(self, item_index: int) -> FluorescenceRepositoryItem:
+        return self._repository[item_index]
 
     def get_open_file_filters(self) -> Iterator[str]:
         for plugin in self._file_reader_chooser:
@@ -66,13 +63,17 @@ class FluorescenceAPI:
     def get_save_file_filter(self) -> str:
         return self._file_writer_chooser.get_current_plugin().display_name
 
-    def load_measured_dataset(
-        self, file_path: Path, *, file_type: str | None = None
-    ) -> FluorescenceDataset:
+    def open_measured_dataset(
+        self, file_path: Path, product_index: int, *, file_type: str | None = None
+    ) -> int:
         if not file_path.is_file():
             raise FileNotFoundError(
                 f'Refusing to load dataset from invalid file path "{file_path}"'
             )
+
+        # Resolve the product first — a bad product_index should fail before we
+        # touch the file, so an orphaned item is never inserted.
+        product_item = self._product_api.get_item(product_index)
 
         if file_type is not None:
             self._file_reader_chooser.set_current_plugin(file_type)
@@ -87,11 +88,33 @@ class FluorescenceAPI:
             raise RuntimeError(f'Failed to read "{file_path}"') from exc
 
         self._settings.file_path.set_value(file_path)
-        return dataset
+
+        label = self._repository.create_unique_name(file_path.stem)
+        item = FluorescenceRepositoryItem(
+            self._repository,
+            label=label,
+            product=product_item,
+            measured=dataset,
+            source_path=file_path,
+            source_file_type=resolved_type,
+        )
+        return self._repository.insert_item(item)
+
+    def remove_item(self, item_index: int) -> None:
+        self._repository.remove_item(item_index)
 
     def save_enhanced_dataset(
-        self, dataset: FluorescenceDataset, file_path: Path, *, file_type: str | None = None
+        self, item_index: int, file_path: Path, *, file_type: str | None = None
     ) -> None:
+        try:
+            item = self._repository[item_index]
+        except IndexError as exc:
+            raise ValueError(f'No fluorescence item at index {item_index}') from exc
+
+        dataset = item.get_enhanced()
+        if dataset is None:
+            raise ValueError(f'Item "{item.get_label()}" has no enhanced dataset to save')
+
         if file_type is not None:
             self._file_writer_chooser.set_current_plugin(file_type)
 
@@ -102,14 +125,26 @@ class FluorescenceAPI:
 
     def enhance(
         self,
-        product_index: int,
-        dataset: FluorescenceDataset,
+        item_index: int,
         *,
         algorithm: str | None = None,
         output_file_path: Path | None = None,
         output_file_type: str | None = None,
         block: bool = False,
     ) -> None:
+        try:
+            item = self._repository[item_index]
+        except IndexError as exc:
+            raise ValueError(f'No fluorescence item at index {item_index}') from exc
+
+        if item.get_state() is FluorescenceItemState.ORPHANED:
+            raise RuntimeError(
+                f'Cannot enhance item "{item.get_label()}": target product was removed'
+            )
+
+        if self._task_monitor.is_processing:
+            raise RuntimeError('Fluorescence enhancement is already in progress')
+
         if algorithm is not None:
             self._enhancer_chooser.set_current_plugin(algorithm)
 
@@ -121,12 +156,15 @@ class FluorescenceAPI:
 
             output_file_writer = self._file_writer_chooser.get_current_plugin().strategy
 
-        product = self._product_api.get_item(product_index).get_product()
+        product = item.get_product().get_product()
+        item.set_state(FluorescenceItemState.ENHANCING)
+
         background_task = EnhanceFluorescenceBackgroundTask(
             self._task_monitor,
             self._enhancer_chooser.get_current_plugin().strategy,
-            dataset,
+            item.get_measured(),
             product,
+            item,
             output_file_path,
             output_file_writer,
         )
@@ -140,24 +178,3 @@ class FluorescenceAPI:
                 ):
                     self._task_manager.run_foreground_tasks()
                     break
-
-    def enhance_local(
-        self,
-        product_index: int,
-        input_file_path: Path,
-        output_file_path: Path,
-        *,
-        input_file_type: str | None = None,
-        output_file_type: str | None = None,
-        algorithm: str | None = None,
-        block: bool = False,
-    ) -> None:
-        dataset = self.load_measured_dataset(input_file_path, file_type=input_file_type)
-        self.enhance(
-            product_index,
-            dataset,
-            algorithm=algorithm,
-            output_file_path=output_file_path,
-            output_file_type=output_file_type,
-            block=block,
-        )

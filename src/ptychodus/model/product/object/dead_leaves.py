@@ -1,11 +1,10 @@
 from __future__ import annotations
-from collections.abc import Sequence
 import logging
 
 import numpy
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
-from ptychodus.api.object_gen import generate_dead_leaves_object
+from ptychodus.api.simulate.object import generate_dead_leaves_object
 
 from .builder import ObjectBuilder
 from .settings import ObjectSettings
@@ -44,11 +43,7 @@ class DeadLeavesObjectBuilder(ObjectBuilder):
 
         return builder
 
-    def build(
-        self,
-        geometry_provider: ObjectGeometryProvider,
-        layer_spacing_m: Sequence[float],
-    ) -> Object:
+    def _build_raw(self, geometry_provider: ObjectGeometryProvider) -> Object:
         object_ = generate_dead_leaves_object(
             self._rng,
             geometry_provider.get_object_geometry(),
@@ -60,4 +55,4 @@ class DeadLeavesObjectBuilder(ObjectBuilder):
             leaf_phase_lower_tr=self.leaf_phase_lower_tr.get_value(),
             leaf_phase_upper_tr=self.leaf_phase_upper_tr.get_value(),
         )
-        return self._create_object(object_, layer_spacing_m)
+        return self._pad_object(object_)

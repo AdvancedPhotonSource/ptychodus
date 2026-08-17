@@ -1,12 +1,11 @@
 from __future__ import annotations
-from collections.abc import Sequence
 import logging
 
 
 from ptychodus.api.object import Object, ObjectGeometryProvider
-from ptychodus.api.object_gen import generate_stxm_object
+from ptychodus.api.simulate.object import generate_stxm_object
 
-from ...diffraction import DiffractionAPI
+from ...diffraction import AssembledDiffractionDataset
 from .builder import ObjectBuilder
 from .settings import ObjectSettings
 
@@ -17,28 +16,24 @@ class STXMObjectBuilder(ObjectBuilder):
     def __init__(
         self,
         settings: ObjectSettings,
-        diffraction_api: DiffractionAPI,
+        dataset: AssembledDiffractionDataset,
     ) -> None:
         super().__init__(settings, 'stxm')
         self._settings = settings
-        self._diffraction_api = diffraction_api
+        self._dataset = dataset
 
     def copy(self) -> STXMObjectBuilder:
-        builder = STXMObjectBuilder(self._settings, self._diffraction_api)
+        builder = STXMObjectBuilder(self._settings, self._dataset)
 
         for key, value in self.parameters().items():
             builder.parameters()[key].set_value(value.get_value())
 
         return builder
 
-    def build(
-        self,
-        geometry_provider: ObjectGeometryProvider,
-        layer_spacing_m: Sequence[float],
-    ) -> Object:
+    def _build_raw(self, geometry_provider: ObjectGeometryProvider) -> Object:
         object_ = generate_stxm_object(
             geometry_provider.get_object_geometry(),
-            self._diffraction_api.get_assembled_data(),
+            self._dataset.get_assembled_data(),
             geometry_provider.get_probe_positions(),
         )
-        return self._create_object(object_, layer_spacing_m)
+        return self._pad_object(object_)

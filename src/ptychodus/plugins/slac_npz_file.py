@@ -4,21 +4,21 @@ import logging
 
 import numpy
 
-from ptychodus.api.common import ELECTRON_VOLT_J, LIGHT_SPEED_M_PER_S, PLANCK_CONSTANT_J_PER_HZ
+from ptychodus.api.constants import ELECTRON_VOLT_J, LIGHT_SPEED_M_PER_S, PLANCK_CONSTANT_J_PER_HZ
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.object import Object
 from ptychodus.api.diffraction import (
     DiffractionDataset,
+    DiffractionDatasetLayoutNode,
     DiffractionFileReader,
     DiffractionMetadata,
-    SimpleDiffractionDataset,
     SimpleDiffractionArray,
+    SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.product import LossValue, Product, ProductFileReader, ProductMetadata
 from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
-from ptychodus.api.tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +66,9 @@ class SLACDiffractionFileReader(DiffractionFileReader):
             file_path=file_path,
         )
 
-        contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
-        contents_tree.create_child(
-            [file_path.stem, type(patterns).__name__, f'{patterns.dtype}{patterns.shape}']
+        contents_tree = DiffractionDatasetLayoutNode.create_root()
+        contents_tree.add_child(
+            file_path.stem, type(patterns).__name__, f'{patterns.dtype}{patterns.shape}'
         )
 
         array = SimpleDiffractionArray(

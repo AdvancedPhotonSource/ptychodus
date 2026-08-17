@@ -4,7 +4,7 @@ from typing import Any
 import logging
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
-import requests
+import httpx
 
 from ..tokens import create_headers
 
@@ -88,23 +88,24 @@ class IRIComputeClient:
     # See https://api.iri.nersc.gov/#/compute
 
     def __init__(self, api_base_url: str, access_token: str) -> None:
-        self._base_url = api_base_url.rstrip('/') + '/api/v1/compute'
-        self._headers = create_headers(access_token)
+        self._client = httpx.Client(
+            base_url=api_base_url.rstrip('/') + '/api/v1/compute',
+            headers=create_headers(access_token),
+            timeout=30.0,
+        )
 
     def submit_job(self, resource_id: str, spec: JobSpecification) -> JobResponse:
-        response = requests.post(
-            f'{self._base_url}/job/{resource_id}',
+        response = self._client.post(
+            f'/job/{resource_id}',
             json=spec.model_dump(mode='json'),
-            headers=self._headers,
         )
         response.raise_for_status()
         return JobResponse.model_validate(response.json())
 
     def update_job(self, resource_id: str, job_id: str, spec: JobSpecification) -> JobResponse:
-        response = requests.put(
-            f'{self._base_url}/job/{resource_id}/{job_id}',
+        response = self._client.put(
+            f'/job/{resource_id}/{job_id}',
             json=spec.model_dump(mode='json'),
-            headers=self._headers,
         )
         response.raise_for_status()
         return JobResponse.model_validate(response.json())
@@ -116,10 +117,9 @@ class IRIComputeClient:
         historical: bool = False,
         include_spec: bool = False,
     ) -> JobResponse:
-        response = requests.get(
-            f'{self._base_url}/status/{resource_id}/{job_id}',
+        response = self._client.get(
+            f'/status/{resource_id}/{job_id}',
             params={'historical': historical, 'include_spec': include_spec},
-            headers=self._headers,
         )
         response.raise_for_status()
         return JobResponse.model_validate(response.json())
@@ -132,22 +132,22 @@ class IRIComputeClient:
         historical: bool = False,
         include_spec: bool = False,
     ) -> Sequence[JobResponse]:
-        response = requests.post(
-            f'{self._base_url}/status/{resource_id}',
+        response = self._client.post(
+            f'/status/{resource_id}',
             params={
                 'offset': offset,
                 'limit': limit,
                 'historical': historical,
                 'include_spec': include_spec,
             },
-            headers=self._headers,
         )
         response.raise_for_status()
         return [JobResponse.model_validate(item) for item in response.json()]
 
     def cancel_job(self, resource_id: str, job_id: str) -> bool:
-        response = requests.delete(
-            f'{self._base_url}/cancel/{resource_id}/{job_id}', headers=self._headers
-        )
+        response = self._client.delete(f'/cancel/{resource_id}/{job_id}')
         response.raise_for_status()
         return response.status_code == 204
+
+    def close(self) -> None:
+        self._client.close()

@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from sys import getsizeof
 
-from .common import ELECTRON_VOLT_J, PLANCK_CONSTANT_J_PER_HZ, LIGHT_SPEED_M_PER_S
+from .constants import ELECTRON_VOLT_J, PLANCK_CONSTANT_J_PER_HZ, LIGHT_SPEED_M_PER_S
+from .diffraction import Polarization
 from .object import Object
 from .probe import Probe, ProbeSequence
 from .probe_positions import ProbePosition, ProbePositionSequence
@@ -24,6 +25,8 @@ class ProductMetadata:
     exposure_time_s: float
     mass_attenuation_m2_kg: float
     tomography_angle_deg: float
+    tilt_angle_deg: float = 0.0
+    polarization: Polarization | None = None
 
     @property
     def probe_energy_J(self) -> float:  # noqa: N802
@@ -48,6 +51,8 @@ class ProductMetadata:
         sz += getsizeof(self.exposure_time_s)
         sz += getsizeof(self.mass_attenuation_m2_kg)
         sz += getsizeof(self.tomography_angle_deg)
+        sz += getsizeof(self.tilt_angle_deg)
+        sz += getsizeof(self.polarization)
         return sz
 
 

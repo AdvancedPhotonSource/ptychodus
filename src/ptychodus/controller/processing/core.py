@@ -13,17 +13,19 @@ from PyQt5.QtWidgets import (
 )
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.reconstructor import TrainableReconstructor
+from ptychodus.api.reconstruct import TrainableReconstructor
 
 from ...model.genesis import GenesisCore
 from ...model.globus import GlobusCore
 from ...model.processing import ProcessingAPI, ProcessingAlgorithmParameter
+from ...model.processing.subprocess_reconstructor import SubprocessReconstructor
 from ...model.product import ProductRepository
 from ...view.processing import ProcessingActionsView, ProcessingStatusView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..helpers import connect_triggered_signal
 from ..parametric import ComboBoxParameterViewController
+from ..product.core import ProductRepositoryTableModel
 from .parameters import (
     ProcessingStatusController,
     ProductParameterViewController,
@@ -50,6 +52,7 @@ class ProcessingController(Observer):
         algorithm_parameter: ProcessingAlgorithmParameter,
         processing_api: ProcessingAPI,
         product_repository: ProductRepository,
+        product_table_model: ProductRepositoryTableModel,
         globus: GlobusCore,
         genesis: GenesisCore,
         view: QWidget,
@@ -85,7 +88,7 @@ class ProcessingController(Observer):
             product_repository, processing_api.task_monitor, status_view
         )
         self._product_view_controller = ProductParameterViewController(
-            product_repository, self._status_controller
+            product_repository, product_table_model, self._status_controller
         )
         self._compute_view_controller = ComputeParameterViewController(
             globus_supported=globus.is_supported,
@@ -119,8 +122,36 @@ class ProcessingController(Observer):
         )
         connect_triggered_signal(self._export_training_data_action, self._export_training_data)
 
+        combo = self._product_view_controller.get_widget()
+        combo.currentIndexChanged.connect(self._sync_action_buttons_to_selection)
+        combo_model = combo.model()
+        combo_model.dataChanged.connect(lambda *_: self._sync_action_buttons_to_selection())
+        combo_model.rowsInserted.connect(lambda *_: self._sync_action_buttons_to_selection())
+        combo_model.rowsRemoved.connect(lambda *_: self._sync_action_buttons_to_selection())
+        self._sync_action_buttons_to_selection()
+
         self._sync_model_to_view()
         algorithm_parameter.add_observer(self)
+
+    def _sync_action_buttons_to_selection(self) -> None:
+        index = self._product_view_controller.get_widget().currentIndex()
+        can_act = False
+
+        if index >= 0:
+            try:
+                item = self._product_repository[index]
+            except IndexError:
+                pass
+            else:
+                can_act = (
+                    not item.is_pending()
+                    and not item.is_failed()
+                    and item.get_dataset() is not None
+                )
+
+        self._actions_view.reconstruct_button.setEnabled(can_act)
+        self._actions_view.train_button.setEnabled(can_act)
+        self._export_training_data_action.setEnabled(can_act)
 
     def _populate_stacked_widget(
         self, view_controller_factories: Iterable[ReconstructorViewControllerFactory]
@@ -140,10 +171,29 @@ class ProcessingController(Observer):
 
             self._stacked_widget.addWidget(widget)
 
+    def _has_dataset_or_warn(self, product_index: int, action: str) -> bool:
+        try:
+            item = self._product_repository[product_index]
+        except IndexError:
+            logger.warning(f'Cannot {action}: no product at index {product_index}.')
+            return False
+
+        if item.get_dataset() is None:
+            logger.warning(
+                f'Cannot {action}: product "{item.get_name()}" '
+                'has no associated diffraction dataset.'
+            )
+            return False
+
+        return True
+
     def _reconstruct(self) -> None:
         input_product_index = self._product_view_controller.get_widget().currentIndex()
 
         if input_product_index < 0:
+            return
+
+        if not self._has_dataset_or_warn(input_product_index, 'reconstruct'):
             return
 
         if self._compute_view_controller.is_globus_button_checked():
@@ -160,7 +210,9 @@ class ProcessingController(Observer):
                 ExceptionDialog.show_exception('Reconstruct Remote (Genesis)', exc)
         else:  # local
             try:
-                output_product_index = self._processing_api.reconstruct(input_product_index)
+                output_product_index = self._processing_api.reconstruct(
+                    product_index=input_product_index
+                )
             except Exception as exc:
                 logger.exception(exc)
                 ExceptionDialog.show_exception('Reconstruct Local', exc)
@@ -171,6 +223,9 @@ class ProcessingController(Observer):
         product_index = self._product_view_controller.get_widget().currentIndex()
 
         if product_index < 0:
+            return
+
+        if not self._has_dataset_or_warn(product_index, 'train'):
             return
 
         if self._compute_view_controller.is_globus_button_checked():
@@ -194,7 +249,11 @@ class ProcessingController(Observer):
                 return
 
             try:
-                self._processing_api.train(product_index, data_path, data_path)
+                self._processing_api.train(
+                    data_path,
+                    data_path,
+                    product_index=product_index,
+                )
             except Exception as exc:
                 logger.exception(exc)
                 ExceptionDialog.show_exception('Train Local', exc)
@@ -238,8 +297,11 @@ class ProcessingController(Observer):
         if not file_path:
             return
 
+        if not self._has_dataset_or_warn(input_product_index, 'export training data'):
+            return
+
         try:
-            self._processing_api.export_training_data(file_path, input_product_index)
+            self._processing_api.export_training_data(file_path, product_index=input_product_index)
         except Exception as exc:
             logger.exception(exc)
             ExceptionDialog.show_exception('Export Training Data', exc)
@@ -249,10 +311,13 @@ class ProcessingController(Observer):
             self._algorithm_view_controller.get_widget().currentIndex()
         )
         reconstructor = self._algorithm_parameter.get_current_reconstructor()
-        is_trainable = False
+        is_trainable = isinstance(reconstructor, TrainableReconstructor)
 
-        if isinstance(reconstructor, TrainableReconstructor):
-            is_trainable = True
+        if isinstance(reconstructor, SubprocessReconstructor):
+            is_trainable = reconstructor.is_trainable
+
+        if is_trainable:
+            assert isinstance(reconstructor, TrainableReconstructor)
             is_model_loaded = reconstructor.is_model_loaded()
             self._actions_view.reconstruct_button.setText('Infer')
             self._actions_view.reconstruct_button.setEnabled(is_model_loaded)

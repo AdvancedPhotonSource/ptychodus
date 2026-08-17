@@ -1,11 +1,12 @@
 import logging
 
+from ptychodus.api.diffraction import Polarization
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product, ProductFileReader
 
 from ..diffraction import AssembledDiffractionDataset, PatternSizer
 from .geometry import ProductGeometry
-from .item import ProductRepositoryItem
+from .item import ProductRepositoryItem, ProductState
 from .metadata import MetadataRepositoryItem
 from .object import ObjectRepositoryItemFactory
 from .probe import ProbeRepositoryItemFactory
@@ -21,7 +22,6 @@ class ProductRepositoryItemFactory:
         self,
         settings: ProductSettings,
         pattern_sizer: PatternSizer,
-        dataset: AssembledDiffractionDataset,
         scan_item_factory: ProbePositionsRepositoryItemFactory,
         probe_item_factory: ProbeRepositoryItemFactory,
         object_item_factory: ObjectRepositoryItemFactory,
@@ -31,12 +31,26 @@ class ProductRepositoryItemFactory:
         super().__init__()
         self._settings = settings
         self._pattern_sizer = pattern_sizer
-        self._dataset = dataset
         self._scan_item_factory = scan_item_factory
         self._probe_item_factory = probe_item_factory
         self._object_item_factory = object_item_factory
         self._repository = repository
         self._file_reader_chooser = file_reader_chooser
+
+    @staticmethod
+    def _bind_dataset_geometry(
+        geometry: ProductGeometry, dataset: AssembledDiffractionDataset | None
+    ) -> None:
+        """Push the dataset's detector extent and raw pixel geometry into ``geometry``
+        so probe & object items built next see a valid geometry inside their own
+        __init__ rebuild. This keeps the observer-triggered rebuild that fires later
+        (from ProductRepositoryItem._bind_dataset) a no-op — the setters short-circuit
+        on unchanged values, avoiding a spurious rebuild during ProductRepositoryItem
+        construction (which would fire index<0 warnings from the repository)."""
+        if dataset is None:
+            return
+        geometry.set_detector_extent(dataset.get_metadata().detector_extent)
+        geometry.set_detector_pixel_geometry(dataset.get_raw_pixel_geometry())
 
     def create_from_values(
         self,
@@ -49,6 +63,9 @@ class ProductRepositoryItemFactory:
         exposure_time_s: float | None = None,
         mass_attenuation_m2_kg: float | None = None,
         tomography_angle_deg: float | None = None,
+        tilt_angle_deg: float | None = None,
+        polarization: Polarization | None = None,
+        dataset: AssembledDiffractionDataset | None = None,
     ) -> ProductRepositoryItem:
         metadata_item = MetadataRepositoryItem(
             self._settings,
@@ -61,15 +78,17 @@ class ProductRepositoryItemFactory:
             exposure_time_s=exposure_time_s,
             mass_attenuation_m2_kg=mass_attenuation_m2_kg,
             tomography_angle_deg=tomography_angle_deg,
+            tilt_angle_deg=tilt_angle_deg,
+            polarization=polarization,
         )
 
-        if metadata_item.probe_photon_count.get_value() <= 0:
-            assembled_data = self._dataset.get_assembled_data()
-            max_pattern_counts = assembled_data.get_pattern_counts().max()
-            metadata_item.probe_photon_count.set_value(max_pattern_counts)
+        # probe_photon_count auto-estimation from diffraction data now lives in the
+        # controller layer (see ProductEditorViewController._estimate_probe_photon_count).
+        # This factory takes whatever value the caller supplied.
 
         scan_item = self._scan_item_factory.create()
         geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
+        self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create(geometry)
         object_item = self._object_item_factory.create(geometry)
 
@@ -81,9 +100,12 @@ class ProductRepositoryItemFactory:
             probe_item=probe_item,
             object_item=object_item,
             losses=list(),
+            dataset=dataset,
         )
 
-    def create_from_product(self, product: Product) -> ProductRepositoryItem:
+    def create_from_product(
+        self, product: Product, *, dataset: AssembledDiffractionDataset | None = None
+    ) -> ProductRepositoryItem:
         metadata_item = MetadataRepositoryItem(
             self._settings,
             self._repository,
@@ -95,10 +117,13 @@ class ProductRepositoryItemFactory:
             exposure_time_s=product.metadata.exposure_time_s,
             mass_attenuation_m2_kg=product.metadata.mass_attenuation_m2_kg,
             tomography_angle_deg=product.metadata.tomography_angle_deg,
+            tilt_angle_deg=product.metadata.tilt_angle_deg,
+            polarization=product.metadata.polarization,
         )
 
         scan_item = self._scan_item_factory.create(product.probe_positions)
         geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
+        self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create(geometry, product.probes)
         object_item = self._object_item_factory.create(geometry, product.object_)
 
@@ -110,9 +135,34 @@ class ProductRepositoryItemFactory:
             probe_item=probe_item,
             object_item=object_item,
             losses=product.losses,
+            dataset=dataset,
         )
 
-    def create_from_settings(self) -> ProductRepositoryItem:
+    def create_pending_stub(self, name: str = 'Unnamed') -> ProductRepositoryItem:
+        """Build a fresh ProductRepositoryItem in the 'pending' state with default
+        subgroups and no dataset. Its inner content is replaced later via
+        ProductRepositoryItem.copy_contents_from once the source dataset finishes
+        loading."""
+        metadata_item = MetadataRepositoryItem(self._settings, self._repository, name=name)
+        scan_item = self._scan_item_factory.create()
+        geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
+        probe_item = self._probe_item_factory.create(geometry)
+        object_item = self._object_item_factory.create(geometry)
+        return ProductRepositoryItem(
+            parent=self._repository,
+            metadata_item=metadata_item,
+            probe_positions_item=scan_item,
+            geometry=geometry,
+            probe_item=probe_item,
+            object_item=object_item,
+            losses=list(),
+            dataset=None,
+            state=ProductState.PENDING,
+        )
+
+    def create_from_settings(
+        self, *, dataset: AssembledDiffractionDataset | None = None
+    ) -> ProductRepositoryItem:
         file_path = self._settings.file_path.get_value()
 
         if file_path.is_file():
@@ -125,13 +175,14 @@ class ProductRepositoryItemFactory:
             except Exception as exc:
                 raise RuntimeError(f'Failed to read "{file_path}"') from exc
             else:
-                return self.create_from_product(product)
+                return self.create_from_product(product, dataset=dataset)
 
         metadata_item = MetadataRepositoryItem(self._settings, self._repository)
         scan_item = self._scan_item_factory.create_from_settings()
         geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
-        probe_item = self._probe_item_factory.create_from_settings(geometry)
-        object_item = self._object_item_factory.create_from_settings(geometry)
+        self._bind_dataset_geometry(geometry, dataset)
+        probe_item = self._probe_item_factory.create_from_settings(geometry, dataset=dataset)
+        object_item = self._object_item_factory.create_from_settings(geometry, dataset=dataset)
 
         item = ProductRepositoryItem(
             parent=self._repository,
@@ -141,6 +192,7 @@ class ProductRepositoryItemFactory:
             probe_item=probe_item,
             object_item=object_item,
             losses=list(),
+            dataset=dataset,
         )
         logger.debug(f'Created product from settings: {item.get_name()}')
         return item

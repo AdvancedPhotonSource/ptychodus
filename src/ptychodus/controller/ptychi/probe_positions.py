@@ -4,7 +4,7 @@ from PyQt5.QtCore import Qt, QAbstractListModel, QModelIndex, QObject
 from PyQt5.QtWidgets import QFormLayout, QFrame, QListView, QWidget
 
 from ptychodus.api.observer import Observable, Observer
-from ptychodus.api.parametric import (
+from ptychodus.api.parameters import (
     BooleanParameter,
     IntegerParameter,
     RealParameter,

@@ -6,15 +6,17 @@ from pathlib import Path
 from typing import IO, overload
 import logging
 import tempfile
+import threading
 
 import numpy
 
-from ptychodus.api.common import BYTES_PER_MEGABYTE
+from ptychodus.api.constants import BYTES_PER_MEGABYTE
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     BadPixels,
     DiffractionArray,
     DiffractionDataset,
+    DiffractionDatasetLayoutNode,
     DiffractionIndexes,
     DiffractionMetadata,
     DiffractionPattern,
@@ -22,13 +24,11 @@ from ptychodus.api.diffraction import (
     SimpleDiffractionDataset,
 )
 from ptychodus.api.io import AssembledDiffractionData, load_diffraction_data, save_diffraction_data
-from ptychodus.api.tree import SimpleTreeNode
 
 from ..task_manager import BackgroundTask, TaskManager
 from ._loader import ArrayAssembler, LoadAllArrays, LoadArray
-from .detector import Detector
 from .monitor import DiffractionTaskMonitor
-from .settings import DiffractionSettings
+from .settings import DetectorSettings, DiffractionSettings
 from .sizer import PatternSizer
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,10 @@ class DiffractionDatasetObserver(ABC):
 
     @abstractmethod
     def handle_dataset_reloaded(self) -> None:
+        pass
+
+    @abstractmethod
+    def handle_pixel_geometry_changed(self) -> None:
         pass
 
 
@@ -101,14 +105,17 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         self,
         settings: DiffractionSettings,
         sizer: PatternSizer,
-        detector: Detector,
+        detector_settings: DetectorSettings,
         task_manager: TaskManager,
         task_monitor: DiffractionTaskMonitor,
+        *,
+        name: str = 'default',
     ) -> None:
         super().__init__()
+        self._name = name
         self._settings = settings
         self._sizer = sizer
-        self._detector = detector
+        self._detector_settings = detector_settings
         self._task_manager = task_manager
         self._task_monitor = task_monitor
         self._observer_list: list[DiffractionDatasetObserver] = []
@@ -118,7 +125,61 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         self._array_list: list[AssembledDiffractionArray] = list()
         self._array_counter = 0
         self._array_loader: LoadAllArrays | None = None
+        # Retained after dispatch so callers can detect \"still loading\" and read
+        # any error the loader stored (see is_load_in_progress / get_last_load_error).
+        self._last_array_loader: LoadAllArrays | None = None
         self._scratch_tempfile: IO[bytes] | None = None
+
+        # Raw (pre-processing) bad-pixel mask; starts as an empty (0, 0) placeholder
+        # and is always overwritten by reload() or by load_all_arrays() before any
+        # array is processed, so the shape here only matters when nothing is loaded.
+        self._bad_pixels = self._create_default_bad_pixels()
+
+        # Per-dataset override for the raw detector pixel geometry. When set, takes
+        # priority over metadata and DetectorSettings in get_raw_pixel_geometry().
+        # Cleared by clear()/reload() so freshly-read metadata is the new source of truth.
+        self._pixel_geometry_override: PixelGeometry | None = None
+
+    def _create_default_bad_pixels(self) -> BadPixels:
+        extent = self._dataset.get_metadata().detector_extent
+        return numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool_)
+
+    def get_name(self) -> str:
+        return self._name
+
+    def set_name(self, name: str) -> None:
+        """Set the dataset's display name. Callers must ensure uniqueness themselves
+        (typically by routing the candidate through DiffractionDatasetRepository.create_unique_name).
+        """
+        self._name = name
+
+    def sync_pixel_geometry_to_settings(self) -> None:
+        """Promote this dataset's effective raw pixel geometry to the global fallback.
+
+        Writes the current raw geometry (override > metadata > current fallback) into
+        DetectorSettings.pixel_width_m / pixel_height_m so freshly loaded datasets that
+        lack pixel metadata pick it up. Leaves this dataset's override in place.
+        """
+        geometry = self.get_raw_pixel_geometry()
+        self._detector_settings.pixel_width_m.set_value(geometry.width_m)
+        self._detector_settings.pixel_height_m.set_value(geometry.height_m)
+
+    def set_bad_pixels(self, bad_pixels: BadPixels) -> None:
+        if bad_pixels.ndim != 2:
+            raise ValueError(f'Bad pixels array must be 2D, got {bad_pixels.ndim}D.')
+
+        extent = self._dataset.get_metadata().detector_extent
+
+        if bad_pixels.shape != extent.get_shape():
+            raise ValueError(
+                f'Bad pixels shape {bad_pixels.shape} does not match '
+                f'loaded detector extent {extent.get_shape()}.'
+            )
+
+        self._bad_pixels = bad_pixels
+
+    def reset_bad_pixels(self) -> None:
+        self._bad_pixels = self._create_default_bad_pixels()
 
     def add_observer(self, observer: DiffractionDatasetObserver) -> None:
         if observer not in self._observer_list:
@@ -133,17 +194,76 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
     def get_metadata(self) -> DiffractionMetadata:
         return self._dataset.get_metadata()
 
-    def get_layout(self) -> SimpleTreeNode:
+    def get_layout(self) -> DiffractionDatasetLayoutNode:
         return self._dataset.get_layout()
 
-    def _get_pixel_geometry(self) -> PixelGeometry:
-        return self._detector.get_pixel_geometry()
+    def get_raw_pixel_geometry(self) -> PixelGeometry:
+        """Resolve the raw (pre-processing) detector pixel geometry for this dataset.
 
-    def get_bad_pixels(self) -> BadPixels | None:
-        return self._dataset.get_bad_pixels()
+        Priority: user override > metadata > global DetectorSettings fallback.
+        """
+        if self._pixel_geometry_override is not None:
+            return self._pixel_geometry_override
+
+        metadata_geometry = self._dataset.get_metadata().detector_pixel_geometry
+        if metadata_geometry is not None:
+            return metadata_geometry
+
+        return PixelGeometry(
+            width_m=self._detector_settings.pixel_width_m.get_value(),
+            height_m=self._detector_settings.pixel_height_m.get_value(),
+        )
+
+    def set_pixel_geometry_override(self, geometry: PixelGeometry | None) -> None:
+        """Set (or clear when None) the per-dataset raw pixel geometry override.
+
+        Also mutates the assembled-data snapshot so consumers reading
+        AssembledDiffractionData.get_pixel_geometry() see the update, and notifies
+        observers so downstream views (tree columns, bound products) can refresh.
+        """
+        self._pixel_geometry_override = geometry
+        self._data.set_pixel_geometry(self.get_raw_pixel_geometry())
+
+        for observer in self._observer_list:
+            observer.handle_pixel_geometry_changed()
+
+    def get_bad_pixels(self) -> BadPixels:
+        return self._bad_pixels
 
     def get_assembled_data(self) -> AssembledDiffractionData:
         return self._data
+
+    def is_load_in_progress(self) -> bool:
+        """True while a LoadAllArrays task is queued but has not finished.
+
+        Note: this does not track per-array append_array() streams, which are
+        used only by the pvapy streaming path; products are created there only
+        after the stream stops, so the streaming case doesn't rely on this.
+        """
+        if self._array_loader is not None:
+            return True
+
+        loader = self._last_array_loader
+        return loader is not None and not loader.get_finished_event().is_set()
+
+    def get_last_load_error(self) -> BaseException | None:
+        """First exception raised by the most recent LoadAllArrays run, or None."""
+        loader = self._last_array_loader
+        return loader.get_error() if loader is not None else None
+
+    def get_last_load_finished_event(self) -> threading.Event | None:
+        """The finished_event of the most recent LoadAllArrays task, if any."""
+        loader = self._last_array_loader
+        return loader.get_finished_event() if loader is not None else None
+
+    def get_average_pattern(self) -> DiffractionPattern | None:
+        if not self._array_list:
+            return None
+        weights = numpy.array(
+            [array.get_num_patterns() for array in self._array_list], dtype=numpy.float64
+        )
+        averages = numpy.stack([array.get_average_pattern() for array in self._array_list])
+        return numpy.average(averages, axis=0, weights=weights)
 
     @overload
     def __getitem__(self, index: int) -> AssembledDiffractionArray: ...
@@ -164,22 +284,22 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
     ) -> BackgroundTask:
         """Build a loader task for one array. Loaders are assigned a monotonic array_index;
         arrays may complete out of order and are sorted on insertion via bisect."""
-        bad_pixels = self._dataset.get_bad_pixels()
-
-        if bad_pixels is None:
-            raise RuntimeError('Cannot load array without bad pixel map!')
-
         array_index = self._array_counter
         self._array_counter += 1
 
-        processor = self._sizer.get_processor()
+        detector_extent = self._dataset.get_metadata().detector_extent
+        pipeline = self._sizer.get_prep_pipeline(detector_extent) if process_patterns else None
+        processed_bad_pixels = (
+            pipeline.apply_to_mask(self._bad_pixels) if pipeline is not None else self._bad_pixels
+        )
         return LoadArray(
             array_index,
             array,
-            self._get_pixel_geometry(),
-            bad_pixels,
-            processor if process_patterns else None,
-            self,
+            self.get_raw_pixel_geometry(),
+            raw_bad_pixels=self._bad_pixels,
+            processed_bad_pixels=processed_bad_pixels,
+            pipeline=pipeline,
+            assembler=self,
         )
 
     def append_array(self, array: DiffractionArray, *, process_patterns: bool = True) -> None:
@@ -216,6 +336,9 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         self._array_list.clear()
         self._array_counter = 0
         self._array_loader = None
+        self._last_array_loader = None
+        self._bad_pixels = self._create_default_bad_pixels()
+        self._pixel_geometry_override = None
 
         if self._scratch_tempfile is not None:
             self._scratch_tempfile.close()
@@ -226,7 +349,9 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
 
     def reload(self, dataset: DiffractionDataset) -> None:
         self.clear()
-        self._dataset = SimpleDiffractionDataset(dataset.get_metadata(), dataset.get_layout(), [])
+        metadata = dataset.get_metadata()
+        self._dataset = SimpleDiffractionDataset(metadata, dataset.get_layout(), [])
+        self._bad_pixels = dataset.get_bad_pixels()
         self._array_loader = LoadAllArrays(dataset, self, self._task_manager, self._task_monitor)
 
         for observer in self._observer_list:
@@ -239,19 +364,12 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
 
         metadata = self._dataset.get_metadata()
 
-        if metadata.detector_extent is not None:
-            self._detector.set_extent(metadata.detector_extent)
-
-        bad_pixels = self._detector.get_bad_pixels()
+        bad_pixels = self._bad_pixels
 
         if process_patterns:
-            processor = self._sizer.get_processor()
-            bad_pixels = processor.process_bad_pixels(bad_pixels)
+            pipeline = self._sizer.get_prep_pipeline(metadata.detector_extent)
+            bad_pixels = pipeline.apply_to_mask(bad_pixels)
             self._array_loader.enable_pattern_processing()
-
-        self._dataset = SimpleDiffractionDataset(
-            metadata, self._dataset.get_layout(), [], bad_pixels
-        )
 
         num_patterns_total = sum(metadata.num_patterns_per_array)
         indexes = -numpy.ones(num_patterns_total, dtype=int)
@@ -276,15 +394,17 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
             logger.debug(f'{patterns.nbytes / BYTES_PER_MEGABYTE:.2f}MB allocated for patterns')
 
         self._data = AssembledDiffractionData(
-            indexes, patterns, self._get_pixel_geometry(), bad_pixels
+            indexes, patterns, self.get_raw_pixel_geometry(), bad_pixels
         )
 
         for observer in self._observer_list:
             observer.handle_dataset_reloaded()
 
         # load all arrays in background
-        finished_event = self._array_loader.get_finished_event()
-        self._task_manager.put_background_task(self._array_loader)
+        loader = self._array_loader
+        finished_event = loader.get_finished_event()
+        self._last_array_loader = loader
+        self._task_manager.put_background_task(loader)
         self._array_loader = None
 
         if block:
@@ -300,15 +420,14 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
             detector_extent=ImageExtent(detector_width, detector_height),
             file_path=file_path,
         )
-        contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+        contents_tree = DiffractionDatasetLayoutNode.create_root()
         array = AssembledDiffractionArray(
             array_index=0,
             label='In-Memory' if file_path is None else file_path.stem,
             data=self._data,
         )
-        bad_pixels = self._data.get_bad_pixels()
-
-        self._dataset = SimpleDiffractionDataset(metadata, contents_tree, [], bad_pixels)
+        self._bad_pixels = self._data.get_bad_pixels()
+        self._dataset = SimpleDiffractionDataset(metadata, contents_tree, [], self._bad_pixels)
         self._array_list = [array]
         self._array_counter = 1
 

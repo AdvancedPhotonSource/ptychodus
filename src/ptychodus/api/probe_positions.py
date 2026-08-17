@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from itertools import pairwise
 from pathlib import Path
 from typing import overload
 
@@ -76,7 +77,13 @@ class ProbePositionSequence(Sequence[ProbePosition]):
 
     def __getitem__(self, index: int | slice) -> ProbePosition | Sequence[ProbePosition]:
         if isinstance(index, slice):
-            return [self[idx] for idx in range(index.start, index.stop, index.step)]
+            # Slice the backing arrays directly rather than materializing a
+            # ProbePosition per element. Basic numpy slicing returns views; that
+            # is safe because this class exposes no mutators.
+            seq = ProbePositionSequence()
+            seq._indexes = self._indexes[index]
+            seq._coordinates_m = self._coordinates_m[index, :]
+            return seq
 
         return ProbePosition(
             index=self._indexes[index],
@@ -117,3 +124,49 @@ class ProbePositionFileWriter(ABC):
     def write(self, file_path: Path, positions: ProbePositionSequence) -> None:
         """Write probe positions to file."""
         pass
+
+
+def calculate_scan_geometry(positions: Iterable[ProbePosition]) -> ScanGeometry | None:
+    """Compute the bounding box and total path length of a set of probe positions; returns None if empty.
+
+    ``positions`` is iterated twice (once for the bounding box, once for the
+    path length), so it must be a re-iterable sequence. Passing a one-shot
+    generator will silently report ``length_m=0``.
+    """
+    minimum_x_m = +numpy.inf
+    maximum_x_m = -numpy.inf
+    minimum_y_m = +numpy.inf
+    maximum_y_m = -numpy.inf
+    length_m = 0.0
+
+    for point in positions:
+        if point.coordinate_x_m < minimum_x_m:
+            minimum_x_m = point.coordinate_x_m
+
+        if maximum_x_m < point.coordinate_x_m:
+            maximum_x_m = point.coordinate_x_m
+
+        if point.coordinate_y_m < minimum_y_m:
+            minimum_y_m = point.coordinate_y_m
+
+        if maximum_y_m < point.coordinate_y_m:
+            maximum_y_m = point.coordinate_y_m
+
+    is_empty_x = maximum_x_m < minimum_x_m
+    is_empty_y = maximum_y_m < minimum_y_m
+
+    if is_empty_x or is_empty_y:
+        return None
+
+    for point_l, point_r in pairwise(positions):
+        dx = point_r.coordinate_x_m - point_l.coordinate_x_m
+        dy = point_r.coordinate_y_m - point_l.coordinate_y_m
+        length_m += numpy.hypot(dx, dy)
+
+    return ScanGeometry(
+        minimum_x_m=minimum_x_m,
+        maximum_x_m=maximum_x_m,
+        minimum_y_m=minimum_y_m,
+        maximum_y_m=maximum_y_m,
+        length_m=length_m,
+    )

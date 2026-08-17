@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
+import h5py
 import numpy
 import numpy.testing
 import pytest
 
+from ptychodus.api.diffraction import Polarization
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import (
+    ProductFileKeys,
     StandardFileLayout,
     load_diffraction_data,
     load_product,
@@ -20,7 +24,7 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import LossValue, Product, ProductMetadata
-from ptychodus.api.reconstructor import AssembledDiffractionData
+from ptychodus.api.diffraction import AssembledDiffractionData
 
 
 # ---------------------------------------------------------------------------
@@ -280,6 +284,9 @@ class TestProductRoundTrip:
         assert a.probe_photon_count == pytest.approx(b.probe_photon_count)
         assert a.exposure_time_s == pytest.approx(b.exposure_time_s)
         assert a.mass_attenuation_m2_kg == pytest.approx(b.mass_attenuation_m2_kg)
+        assert a.tomography_angle_deg == pytest.approx(b.tomography_angle_deg)
+        assert a.tilt_angle_deg == pytest.approx(b.tilt_angle_deg)
+        assert a.polarization == b.polarization
 
     def test_basic_round_trip(self, tmp_path: Path) -> None:
         original = _make_product()
@@ -421,3 +428,66 @@ class TestProductRoundTrip:
         loaded = load_product(file)
         assert loaded.metadata.name == 'Unnamed'
         assert loaded.metadata.comments == ''
+
+    def test_tomography_angle_round_trip(self, tmp_path: Path) -> None:
+        original = _make_product()
+        original = Product(
+            metadata=replace(original.metadata, tomography_angle_deg=42.5),
+            probe_positions=original.probe_positions,
+            probes=original.probes,
+            object_=original.object_,
+            losses=original.losses,
+        )
+        file = tmp_path / 'product.h5'
+
+        save_product(file, original)
+        loaded = load_product(file)
+
+        assert loaded.metadata.tomography_angle_deg == pytest.approx(42.5)
+
+    def test_tilt_and_polarization_round_trip(self, tmp_path: Path) -> None:
+        original = _make_product()
+        original = Product(
+            metadata=replace(
+                original.metadata,
+                tilt_angle_deg=12.5,
+                polarization=Polarization.LEFT_CIRCULAR,
+            ),
+            probe_positions=original.probe_positions,
+            probes=original.probes,
+            object_=original.object_,
+            losses=original.losses,
+        )
+        file = tmp_path / 'product.h5'
+
+        save_product(file, original)
+        loaded = load_product(file)
+
+        assert loaded.metadata.tilt_angle_deg == pytest.approx(12.5)
+        assert loaded.metadata.polarization is Polarization.LEFT_CIRCULAR
+
+    def test_polarization_absent_reads_none(self, tmp_path: Path) -> None:
+        original = _make_product()
+        file = tmp_path / 'product.h5'
+
+        save_product(file, original)
+        loaded = load_product(file)
+
+        assert loaded.metadata.polarization is None
+        assert loaded.metadata.tilt_angle_deg == pytest.approx(0.0)
+
+    def test_polarization_invalid_string_falls_back_to_none(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        original = _make_product()
+        file = tmp_path / 'product.h5'
+        save_product(file, original)
+
+        with h5py.File(file, 'a') as f:
+            f.attrs[ProductFileKeys.POLARIZATION] = 'bogus_value'
+
+        with caplog.at_level('WARNING'):
+            loaded = load_product(file)
+
+        assert loaded.metadata.polarization is None
+        assert 'Unknown polarization' in caplog.text

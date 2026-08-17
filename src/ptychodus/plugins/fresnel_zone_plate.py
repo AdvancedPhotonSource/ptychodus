@@ -1,4 +1,4 @@
-from ptychodus.api.probe_gen import FresnelZonePlate
+from ptychodus.api.simulate.probe import FresnelZonePlate
 from ptychodus.api.plugins import PluginRegistry
 
 

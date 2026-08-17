@@ -3,7 +3,7 @@ import logging
 import time
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.propagator import PropagatedProbe, propagate_probe
+from ptychodus.api.propagate import PropagatedProbe, propagate_probe
 
 from ..product import ProductRepository
 from .settings import ProbePropagatorSettings

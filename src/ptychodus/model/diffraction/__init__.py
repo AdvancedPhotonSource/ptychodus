@@ -5,19 +5,20 @@ from .dataset import (
     AssembledDiffractionDataset,
     DiffractionDatasetObserver,
 )
-from .detector import Detector
 from .monitor import DiffractionTaskMonitor
+from .repository import DiffractionDatasetRepository, DiffractionDatasetRepositoryObserver
 from .settings import DetectorSettings, DiffractionSettings
 from .sizer import PatternSizer
 
 __all__ = [
     'AssembledDiffractionArray',
     'AssembledDiffractionDataset',
-    'Detector',
     'DetectorSettings',
     'DiffractionAPI',
     'DiffractionCore',
     'DiffractionDatasetObserver',
+    'DiffractionDatasetRepository',
+    'DiffractionDatasetRepositoryObserver',
     'DiffractionSettings',
     'DiffractionTaskMonitor',
     'PatternSizer',

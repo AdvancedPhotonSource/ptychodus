@@ -1,9 +1,10 @@
 from __future__ import annotations
+from collections.abc import Sequence
 
 import numpy
 
-from ptychodus.api.probe_positions import ProbePositionSequence
-from ptychodus.api.probe_positions_gen import generate_spiral_probe_positions
+from ptychodus.api.probe_positions import ProbePosition
+from ptychodus.api.simulate.probe_positions import generate_spiral_probe_positions
 
 from .builder import ProbePositionsBuilder
 from .settings import ProbePositionsSettings
@@ -38,8 +39,8 @@ class SpiralProbePositionsBuilder(ProbePositionsBuilder):
 
         return builder
 
-    def build(self) -> ProbePositionSequence:
+    def _build_raw(self) -> Sequence[ProbePosition]:
         positions = generate_spiral_probe_positions(
             self.num_points.get_value(), self.radius_scalar_m.get_value()
         )
-        return self._create_position_sequence(positions)
+        return [*positions]

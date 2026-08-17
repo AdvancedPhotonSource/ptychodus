@@ -9,16 +9,16 @@ import numpy
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.diffraction import (
-    DiffractionDataset,
-    DiffractionFileReader,
-    DiffractionMetadata,
     DiffractionArray,
-    DiffractionPatterns,
+    DiffractionDataset,
+    DiffractionDatasetLayoutNode,
+    DiffractionFileReader,
     DiffractionIndexes,
+    DiffractionMetadata,
+    DiffractionPatterns,
     SimpleDiffractionDataset,
 )
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.tree import SimpleTreeNode
 
 logger = logging.getLogger(__name__)
 
@@ -57,19 +57,19 @@ class TiffDiffractionFileReader(DiffractionFileReader):
             z = re.match(file_pattern, fp.name)
 
             if z:
-                index = int(z.group(1).lstrip('0'))
+                index = int(z.group(1))
                 file_path_dict[index] = fp
 
         return file_path_dict, file_pattern
 
     def read(self, file_path: Path) -> DiffractionDataset:
         file_path_mapping, file_pattern = self._get_file_series(file_path)
-        contents_tree = SimpleTreeNode.create_root(['Name', 'Type', 'Details'])
+        contents_tree = DiffractionDatasetLayoutNode.create_root()
         array_list: list[DiffractionArray] = list()
 
         for idx, (_, fp) in enumerate(sorted(file_path_mapping.items())):  # TODO use keys
             array = TiffDiffractionPatternArray(fp, idx)
-            contents_tree.create_child([array.get_label(), 'TIFF', str(idx)])
+            contents_tree.add_child(array.get_label(), 'TIFF', str(idx))
             array_list.append(array)
 
         with TiffFile(file_path) as tiff:

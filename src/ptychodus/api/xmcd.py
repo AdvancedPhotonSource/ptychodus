@@ -1,7 +1,7 @@
 """XMCD (X-ray Magnetic Circular Dichroism) decomposition math.
 
 The decomposition models the helicity-dependent complex transmission of a
-magnetic sample as
+magnetic sample as::
 
     O_+  (RCP)  =  O_struct  *  M
     O_-  (LCP)  =  O_struct  /  M
@@ -9,13 +9,13 @@ magnetic sample as
 where ``O_struct`` is the helicity-independent (structural) transmission and
 ``M = |M| * exp(i * alpha)`` is the magnetic factor (carrying both absorption
 and phase contributions). Given the two reconstructed objects ``O_+`` and
-``O_-``, three helicity products are formed:
+``O_-``, three helicity products are formed::
 
     parallel_helicity_product  =  O_+ * O_-            =  O_struct**2
     parallel_helicity_ratio    =  O_+ / O_-            =  M**2
     cross_helicity_product     =  O_+ * conj(O_-)      =  |O_struct|**2 * exp(2i * alpha)
 
-from which the structural and magnetic objects are recovered as
+from which the structural and magnetic objects are recovered as::
 
     structural_object  =  sqrt(|parallel_helicity_product|) * exp(0.5i * angle(parallel_helicity_product))
     magnetic_object    =  sqrt(|parallel_helicity_ratio|)   * exp(0.5i * angle(cross_helicity_product))

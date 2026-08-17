@@ -1,10 +1,10 @@
 from pathlib import Path
-from typing import Final
 import logging
 
 import h5py
 import numpy
 
+from ptychodus.api.constants import ONE_KILOELECTRONVOLT_EV, ONE_MICRON_M, ONE_MILLIMETER_M
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     DiffractionDataset,
@@ -20,9 +20,6 @@ logger = logging.getLogger(__name__)
 
 
 class CSAXSDiffractionFileReader(DiffractionFileReader):
-    ONE_MICRON_M: Final[float] = 1e-6
-    ONE_MILLIMETER_M: Final[float] = 1e-3
-
     def __init__(self) -> None:
         self._data_path = '/entry/data/data'
         self._tree_builder = H5DiffractionFileTreeBuilder()
@@ -42,13 +39,13 @@ class CSAXSDiffractionFileReader(DiffractionFileReader):
                 metadata = DiffractionMetadata(
                     num_patterns_per_array=[num_patterns],
                     pattern_dtype=data.dtype,
-                    detector_distance_m=abs(float(distance_mm[()])) * self.ONE_MILLIMETER_M,
+                    detector_distance_m=abs(float(distance_mm[()])) * ONE_MILLIMETER_M,
                     detector_extent=ImageExtent(detector_width, detector_height),
                     detector_pixel_geometry=PixelGeometry(
-                        width_m=float(x_pixel_size_um[()]) * self.ONE_MICRON_M,
-                        height_m=float(y_pixel_size_um[()]) * self.ONE_MICRON_M,
+                        width_m=float(x_pixel_size_um[()]) * ONE_MICRON_M,
+                        height_m=float(y_pixel_size_um[()]) * ONE_MICRON_M,
                     ),
-                    probe_energy_eV=1000 * float(energy_keV[()]),
+                    probe_energy_eV=ONE_KILOELECTRONVOLT_EV * float(energy_keV[()]),
                     file_path=file_path,
                 )
                 contents_tree = self._tree_builder.build(h5_file)

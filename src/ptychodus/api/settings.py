@@ -8,12 +8,17 @@ import configparser
 import logging
 
 from .observer import Observable
-from .parametric import (
+from .parameters import (
     ParameterGroup,
     PathParameter,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def get_ptychodus_dir() -> Path:
+    """Return the user's Ptychodus configuration directory (``~/.ptychodus``)."""
+    return Path.home() / '.ptychodus'
 
 
 @dataclass(frozen=True)

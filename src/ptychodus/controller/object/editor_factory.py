@@ -5,6 +5,7 @@ from ptychodus.api.observer import Observable, Observer
 from ...model.product.object import (
     DeadLeavesObjectBuilder,
     FractalNoiseObjectBuilder,
+    FromFileObjectBuilder,
     GaussianRandomFieldObjectBuilder,
     ObjectRepositoryItem,
     PaganinObjectBuilder,
@@ -20,6 +21,10 @@ class MultisliceViewController(ParameterViewController, Observer):
         self._item = item
         self._parameter = item.layer_spacing_m
         self._widget = QSpinBox()
+        self._widget.setToolTip(
+            'Layers are only ever added, never removed. An object that already has'
+            ' more layers than this keeps the ones it has.'
+        )
 
         self._sync_model_to_view()
         self._widget.valueChanged.connect(self._sync_view_to_model)
@@ -213,6 +218,18 @@ class ObjectEditorViewControllerFactory:
                 'Delta / Beta:',
                 group=first_layer_group,
             )
+            dialog_builder.add_view_controller(
+                MultisliceViewController(item),
+                'Number of Layers:',
+                group=additional_layers_group,
+            )
+            return dialog_builder.build_dialog(title, parent)
+        elif isinstance(object_builder, FromFileObjectBuilder):
+            # A from-file object is conditioned on the way in, but only the layer
+            # spacing applies -- the extra padding is generation-only, so its spin
+            # boxes are deliberately absent here. A from-memory object falls
+            # through to the message box below, since nothing about it is editable.
+            dialog_builder = ParameterViewBuilder()
             dialog_builder.add_view_controller(
                 MultisliceViewController(item),
                 'Number of Layers:',
