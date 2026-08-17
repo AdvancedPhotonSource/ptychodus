@@ -64,7 +64,7 @@ def _estimate_phase_offset_and_ramp(
     else:
         w_x = weights[:, 1:] * weights[:, :-1]
         accum_x = numpy.sum(w_x * delta_x)
-    k_x_per_px = float(numpy.angle(accum_x))
+    k_x_per_px = numpy.angle(accum_x)
 
     delta_y = signal[1:, :] * numpy.conj(signal[:-1, :])
     if weights is None:
@@ -72,7 +72,7 @@ def _estimate_phase_offset_and_ramp(
     else:
         w_y = weights[1:, :] * weights[:-1, :]
         accum_y = numpy.sum(w_y * delta_y)
-    k_y_per_px = float(numpy.angle(accum_y))
+    k_y_per_px = numpy.angle(accum_y)
 
     k_x_rad_per_m = k_x_per_px / pixel_width_m
     k_y_rad_per_m = k_y_per_px / pixel_height_m
@@ -87,8 +87,8 @@ def _estimate_phase_offset_and_ramp(
     if phi_accum == 0:
         raise ValueError('Cannot estimate phase offset: weighted signal magnitude is zero.')
 
-    phi = float(numpy.angle(phi_accum))
-    return phi, k_x_rad_per_m, k_y_rad_per_m
+    phi = numpy.angle(phi_accum)
+    return float(phi), float(k_x_rad_per_m), float(k_y_rad_per_m)
 
 
 def estimate_reconstruction_ambiguities(
@@ -176,11 +176,11 @@ def estimate_reconstruction_ambiguities(
         ref_intensity = numpy.square(numpy.abs(ref_layer_zero))
 
         if weights_arr is None:
-            numerator = float(numpy.real(numpy.sum(signal * correction)))
-            denominator = float(numpy.sum(ref_intensity))
+            numerator = numpy.real(numpy.sum(signal * correction))
+            denominator = numpy.sum(ref_intensity)
         else:
-            numerator = float(numpy.real(numpy.sum(weights_arr * signal * correction)))
-            denominator = float(numpy.sum(weights_arr * ref_intensity))
+            numerator = numpy.real(numpy.sum(weights_arr * signal * correction))
+            denominator = numpy.sum(weights_arr * ref_intensity)
 
         if not (denominator > 0.0):
             raise ValueError('Cannot estimate scale: weighted reference object intensity is zero.')
@@ -190,10 +190,10 @@ def estimate_reconstruction_ambiguities(
         # Convention: keep object_scale_factor > 0. Fold any sign flip into phi.
         if s < 0.0:
             s = -s
-            phi = phi + float(numpy.pi)
+            phi = phi + numpy.pi
 
     return ReconstructionAmbiguities(
-        object_scale_factor=s,
+        object_scale_factor=float(s),
         phase_offset_rad=phi,
         phase_ramp_x_rad_per_m=k_x,
         phase_ramp_y_rad_per_m=k_y,
@@ -342,7 +342,7 @@ class FourierRingCorrelation:
         re-deriving the formula.
         """
         sigma = 0.5 * (2.0**bits - 1.0)
-        sqrt_sigma = numpy.sqrt(sigma).item()
+        sqrt_sigma = numpy.sqrt(sigma)
         n_per_ring = numpy.asarray(self.pixels_per_ring, dtype=float)
 
         with numpy.errstate(divide='ignore', invalid='ignore'):
@@ -391,27 +391,27 @@ class FourierRingCorrelation:
         if max_frequency_per_m is not None:
             mask &= freq <= max_frequency_per_m
 
-        if int(mask.sum()) < 2:
+        if mask.sum() < 2:
             return float('nan')
 
         f = freq[mask]
         y = corr[mask]
-        span = float(f[-1] - f[0])
+        span = f[-1] - f[0]
 
         if span <= 0.0:
             return float('nan')
 
-        auc = numpy.trapezoid(y, f).item()
-        return auc / span if normalize else auc
+        auc = numpy.trapezoid(y, f)
+        return float(auc / span if normalize else auc)
 
     def get_average_signal_to_noise_ratio(self) -> float:
         """Mean SSNR across bins, excluding non-finite values (NaN and +inf)."""
         ssnr = self.get_spectral_signal_to_noise_ratio()
         finite = numpy.isfinite(ssnr)
-        if not bool(finite.any()):
+        if not finite.any():
             return float('nan')
 
-        return numpy.mean(ssnr[finite]).item()
+        return float(numpy.mean(ssnr[finite]))
 
     def get_resolution_m_at_signal_to_noise_threshold(self, snr: float) -> float:
         """Resolution where the FRC-derived SSNR drops below ``snr``.
@@ -434,20 +434,20 @@ class FourierRingCorrelation:
         if below.size == 0:
             return float('nan')
 
-        first = int(below[0])
+        first = below[0]
         # Only interpolate when the previous bin was strictly above the threshold.
         # If it merely touched the threshold (diff == 0, e.g. the DC bin where
         # FRC == 1 against the bit-threshold's N=1 limit of 1), the crossing
         # belongs at freq[first], not at the touchpoint.
         if first > 0 and finite[first - 1] and diff[first - 1] > 0.0:
-            g0 = diff[first - 1].item()
-            g1 = diff[first].item()
+            g0 = diff[first - 1]
+            g1 = diff[first]
             alpha = g0 / (g0 - g1)
-            crossing_freq = float(freq[first - 1]) + alpha * float(freq[first] - freq[first - 1])
+            crossing_freq = freq[first - 1] + alpha * (freq[first] - freq[first - 1])
         else:
-            crossing_freq = freq[first].item()
+            crossing_freq = freq[first]
 
-        return float('nan') if crossing_freq <= 0.0 else 1.0 / crossing_freq
+        return float('nan') if crossing_freq <= 0.0 else float(1.0 / crossing_freq)
 
 
 def compute_fourier_ring_correlation(
@@ -475,7 +475,7 @@ def compute_fourier_ring_correlation(
 
     kx_per_m = scipy.fft.fftfreq(width_px, d=pixel_width_m)
     ky_per_m = scipy.fft.fftfreq(height_px, d=pixel_height_m)
-    bin_size_per_m = max(abs(kx_per_m[1].item()), abs(ky_per_m[1].item()))
+    bin_size_per_m = max(abs(kx_per_m[1]), abs(ky_per_m[1]))
 
     radii_per_m = numpy.hypot(ky_per_m[:, None], kx_per_m[None, :])
     rings = numpy.floor(radii_per_m / bin_size_per_m).astype(numpy.intp, copy=False)
@@ -528,7 +528,7 @@ def compute_root_mean_square_error(
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
 
     diff = test - reference
-    return numpy.sqrt(numpy.mean(numpy.square(numpy.absolute(diff)))).item()
+    return float(numpy.sqrt(numpy.mean(numpy.square(numpy.absolute(diff)))))
 
 
 def compute_mean_absolute_error(
@@ -544,7 +544,7 @@ def compute_mean_absolute_error(
     if reference.shape != test.shape:
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
 
-    return numpy.mean(numpy.absolute(test - reference)).item()
+    return float(numpy.mean(numpy.absolute(test - reference)))
 
 
 def compute_r_factor(
@@ -565,12 +565,12 @@ def compute_r_factor(
     if reference.shape != test.shape:
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
 
-    denominator = numpy.sum(numpy.absolute(reference)).item()
+    denominator = numpy.sum(numpy.absolute(reference))
     if denominator == 0.0:
         return float('nan')
 
-    numerator = numpy.sum(numpy.absolute(test - reference)).item()
-    return numerator / denominator
+    numerator = numpy.sum(numpy.absolute(test - reference))
+    return float(numerator / denominator)
 
 
 def _infer_data_range(reference: RealArrayType) -> float:
@@ -579,7 +579,7 @@ def _infer_data_range(reference: RealArrayType) -> float:
     Uses ``reference.max() - reference.min()``, matching scikit-image's
     recommendation for floating-point inputs.
     """
-    return numpy.ptp(reference).item()
+    return float(numpy.ptp(reference))
 
 
 def compute_peak_signal_to_noise_ratio(
@@ -602,7 +602,7 @@ def compute_peak_signal_to_noise_ratio(
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
 
     effective_range = _infer_data_range(reference) if data_range is None else data_range
-    return peak_signal_noise_ratio(reference, test, data_range=effective_range).item()
+    return float(peak_signal_noise_ratio(reference, test, data_range=effective_range))
 
 
 def compute_structural_similarity(
@@ -621,7 +621,7 @@ def compute_structural_similarity(
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
 
     effective_range = _infer_data_range(reference) if data_range is None else data_range
-    return structural_similarity(reference, test, data_range=effective_range).item()
+    return float(structural_similarity(reference, test, data_range=effective_range))
 
 
 def compute_normalized_mutual_information(
@@ -807,8 +807,8 @@ def compute_reconstruction_residuals(
 
         ys = slice(y_lower, y_lower + probe_geometry.height_px)
         xs = slice(x_lower, x_lower + probe_geometry.width_px)
-        numerator_splat[ys, xs] += float(num_i) * patch
-        denominator_splat[ys, xs] += float(den_i) * patch
+        numerator_splat[ys, xs] += num_i * patch
+        denominator_splat[ys, xs] += den_i * patch
 
     real_space_error_map = numpy.full_like(numerator_splat, numpy.nan)
     numpy.divide(

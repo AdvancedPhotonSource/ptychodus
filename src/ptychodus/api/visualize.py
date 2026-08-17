@@ -218,7 +218,7 @@ class VisualizationProduct:
             distances.append(alpha * line_length)
 
             for value_list, dv in zip(values, self._display_values):
-                value_list.append(dv.values[iy, ix].item())
+                value_list.append(float(dv.values[iy, ix]))
 
         series = [
             LineCutSeries(dv.label, value_list)
@@ -357,12 +357,12 @@ def _normalize(
         logger.warning(f'Encountered {num_nonfinite} non-finite value(s) during normalization!')
 
     if value_min is None:
-        value_min = numpy.min(values[mask]).item()
+        value_min = float(numpy.min(values[mask]))
     elif clip:
         values = numpy.maximum(value_min, values)
 
     if value_max is None:
-        value_max = numpy.max(values[mask]).item()
+        value_max = float(numpy.max(values[mask]))
     elif clip:
         values = numpy.minimum(value_max, values)
 

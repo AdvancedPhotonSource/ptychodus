@@ -1,7 +1,6 @@
 """Sub-pixel array interpolation and stitching utilities."""
 
 from typing import Any, Generic, TypeVar, overload
-import logging
 
 import numpy.typing
 import numpy
@@ -11,13 +10,10 @@ from ptychodus.api.typing import InexactArrayType, RealArrayType
 __all__ = [
     'BarycentricArrayInterpolator',
     'BarycentricArrayStitcher',
-    'NearestNeighborArrayInterpolator',
     'lerp',
 ]
 
 InexactDType = TypeVar('InexactDType', bound=numpy.inexact[Any])
-
-logger = logging.getLogger(__name__)
 
 
 @overload
@@ -59,7 +55,7 @@ def lerp(
     return (1.0 - frac) * lower + frac * upper
 
 
-def calculate_support_frac(x: float, n: int) -> tuple[slice, float]:
+def _calculate_support_frac(x: float, n: int) -> tuple[slice, float]:
     """Return the integer support slice and sub-pixel fractional offset for a width-n window centered at x.
 
     The returned slice spans ``n + 1`` samples so bilinear interpolation
@@ -68,27 +64,6 @@ def calculate_support_frac(x: float, n: int) -> tuple[slice, float]:
     lower = x - n / 2
     whole = int(lower)
     return slice(whole, whole + n + 1), lower - whole
-
-
-class NearestNeighborArrayInterpolator(Generic[InexactDType]):
-    """Extract patches from an array using integer (nearest-neighbor) pixel centering."""
-
-    def __init__(self, array: numpy.typing.NDArray[InexactDType]) -> None:
-        super().__init__()
-        self._array = array
-
-    def get_patch(
-        self, center_x: float, center_y: float, width: int, height: int
-    ) -> numpy.typing.NDArray[InexactDType]:
-        y_lower = int(center_y - height / 2)
-        y_support = slice(y_lower, y_lower + height)
-        logger.debug(f'{y_support=}')
-
-        x_lower = int(center_x - width / 2)
-        x_support = slice(x_lower, x_lower + width)
-        logger.debug(f'{x_support=}')
-
-        return self._array[..., y_support, x_support]
 
 
 class BarycentricArrayInterpolator(Generic[InexactDType]):
@@ -101,8 +76,28 @@ class BarycentricArrayInterpolator(Generic[InexactDType]):
     def get_patch(
         self, center_x: float, center_y: float, width: int, height: int
     ) -> numpy.typing.NDArray[InexactDType]:
-        x_support, x_frac = calculate_support_frac(center_x, width)
-        y_support, y_frac = calculate_support_frac(center_y, height)
+        x_support, x_frac = _calculate_support_frac(center_x, width)
+        y_support, y_frac = _calculate_support_frac(center_y, height)
+
+        support = self._array[..., y_support, x_support]
+        # separable bilinear as fused in-place lerp: lower + frac * (upper - lower)
+        y_interp = numpy.subtract(support[..., 1:, :], support[..., :-1, :])
+        y_interp *= y_frac
+        y_interp += support[..., :-1, :]
+        patch = numpy.subtract(y_interp[..., :, 1:], y_interp[..., :, :-1])
+        patch *= x_frac
+        patch += y_interp[..., :, :-1]
+        return patch  # type: ignore
+
+    def add_patch(
+        self,
+        center_x: float,
+        center_y: float,
+        patch: numpy.typing.NDArray[InexactDType],
+    ) -> None:
+        """Bilinear-scatter *patch* back into the underlying array (transpose of get_patch)."""
+        x_support, x_frac = _calculate_support_frac(center_x, patch.shape[-1])
+        y_support, y_frac = _calculate_support_frac(center_y, patch.shape[-2])
 
         # reused quantities
         x_frac_c = 1.0 - x_frac
@@ -115,11 +110,15 @@ class BarycentricArrayInterpolator(Generic[InexactDType]):
         weight11 = y_frac * x_frac
 
         support = self._array[..., y_support, x_support]
-        patch = weight00 * support[..., :-1, :-1]
-        patch = patch + weight01 * support[..., :-1, 1:]
-        patch = patch + weight10 * support[..., 1:, :-1]
-        patch = patch + weight11 * support[..., 1:, 1:]
-        return patch  # type: ignore
+        scratch = numpy.empty(patch.shape, dtype=patch.dtype)
+        numpy.multiply(patch, weight00, out=scratch)
+        support[..., :-1, :-1] += scratch
+        numpy.multiply(patch, weight01, out=scratch)
+        support[..., :-1, 1:] += scratch
+        numpy.multiply(patch, weight10, out=scratch)
+        support[..., 1:, :-1] += scratch
+        numpy.multiply(patch, weight11, out=scratch)
+        support[..., 1:, 1:] += scratch
 
 
 class BarycentricArrayStitcher(Generic[InexactDType]):
@@ -152,8 +151,8 @@ class BarycentricArrayStitcher(Generic[InexactDType]):
             if value.shape != weight.shape:
                 raise ValueError(f'Mismatched patch shapes! ({value.shape=} != {weight.shape=})')
 
-        x_support, x_frac = calculate_support_frac(center_x, value.shape[-1])
-        y_support, y_frac = calculate_support_frac(center_y, value.shape[-2])
+        x_support, x_frac = _calculate_support_frac(center_x, value.shape[-1])
+        y_support, y_frac = _calculate_support_frac(center_y, value.shape[-2])
 
         # reused quantities
         x_frac_c = 1.0 - x_frac
@@ -168,18 +167,28 @@ class BarycentricArrayStitcher(Generic[InexactDType]):
         # add patch update to upper array support
         uvalue = value if weight is None else weight * value
         usupport = self._upper[..., y_support, x_support]
-        usupport[..., :-1, :-1] = usupport[..., :-1, :-1] + weight00 * uvalue
-        usupport[..., :-1, 1:] = usupport[..., :-1, 1:] + weight01 * uvalue
-        usupport[..., 1:, :-1] = usupport[..., 1:, :-1] + weight10 * uvalue
-        usupport[..., 1:, 1:] = usupport[..., 1:, 1:] + weight11 * uvalue
+        u_scratch = numpy.empty(uvalue.shape, dtype=uvalue.dtype)
+        numpy.multiply(uvalue, weight00, out=u_scratch)
+        usupport[..., :-1, :-1] += u_scratch
+        numpy.multiply(uvalue, weight01, out=u_scratch)
+        usupport[..., :-1, 1:] += u_scratch
+        numpy.multiply(uvalue, weight10, out=u_scratch)
+        usupport[..., 1:, :-1] += u_scratch
+        numpy.multiply(uvalue, weight11, out=u_scratch)
+        usupport[..., 1:, 1:] += u_scratch
 
         if self._lower is not None and weight is not None:
             # add patch update to lower array support
             lsupport = self._lower[..., y_support, x_support]
-            lsupport[..., :-1, :-1] += weight00 * weight
-            lsupport[..., :-1, 1:] += weight01 * weight
-            lsupport[..., 1:, :-1] += weight10 * weight
-            lsupport[..., 1:, 1:] += weight11 * weight
+            l_scratch = numpy.empty(weight.shape, dtype=weight.dtype)
+            numpy.multiply(weight, weight00, out=l_scratch)
+            lsupport[..., :-1, :-1] += l_scratch
+            numpy.multiply(weight, weight01, out=l_scratch)
+            lsupport[..., :-1, 1:] += l_scratch
+            numpy.multiply(weight, weight10, out=l_scratch)
+            lsupport[..., 1:, :-1] += l_scratch
+            numpy.multiply(weight, weight11, out=l_scratch)
+            lsupport[..., 1:, 1:] += l_scratch
 
     def stitch(self) -> numpy.typing.NDArray[InexactDType]:
         """Return the accumulated canvas divided by the weight array; pixels with zero weight remain zero."""

@@ -426,7 +426,7 @@ def generate_dead_leaves_object(
         phase_tr = lerp(phase_tr, leaf_phase_tr, leaf_coverage)
 
         is_covered |= leaf_counts == num_samples
-        num_covered_pixels = numpy.count_nonzero(is_covered).item()
+        num_covered_pixels = int(numpy.count_nonzero(is_covered))
 
         covered_pct = 100 * num_covered_pixels / is_covered.size
         logger.info(f'leaves = {leaf}, covered = {covered_pct:.2f}%')

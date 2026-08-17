@@ -258,15 +258,15 @@ def prepare_reconstruct_input(
     mean_x = numpy.bincount(inverse, weights=pos_x) / counts
     mean_y = numpy.bincount(inverse, weights=pos_y) / counts
 
-    lo = int(unique_pos_indexes[0])
-    hi = int(unique_pos_indexes[-1])
+    lo = unique_pos_indexes[0]
+    hi = unique_pos_indexes[-1]
     in_range_mask = (filtered_pattern_indexes >= lo) & (filtered_pattern_indexes <= hi)
     in_range_pattern_indexes = filtered_pattern_indexes[in_range_mask]
     in_range_pattern_offsets = filtered_pattern_offsets[in_range_mask]
 
     if in_range_pattern_indexes.size == 0:
-        pat_lo = int(filtered_pattern_indexes[0])
-        pat_hi = int(filtered_pattern_indexes[-1])
+        pat_lo = filtered_pattern_indexes[0]
+        pat_hi = filtered_pattern_indexes[-1]
         raise ValueError(
             'No probe positions overlap the diffraction pattern indexes; '
             f'pattern indexes span [{pat_lo}, {pat_hi}] and position indexes '

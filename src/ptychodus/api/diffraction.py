@@ -37,7 +37,7 @@ def estimate_probe_photon_count(
     else:
         per_pattern = numpy.sum(patterns[:, numpy.logical_not(bad_pixels)], axis=-1)
 
-    return per_pattern.max().item()
+    return int(per_pattern.max())
 
 
 def zero_bad_pixels(
@@ -237,6 +237,43 @@ class DiffractionMetadata:
             detector_extent=ImageExtent(width_px=0, height_px=0),
             file_path=file_path,
         )
+
+
+@dataclass
+class DiffractionDatasetLayoutNode:
+    """Node in the layout tree returned by DiffractionFileReader.
+
+    Each node describes one entry (HDF5 group/dataset/attribute, NPZ array,
+    TIFF file, ...) with three display columns: name, dtype, details.
+    """
+
+    name: str
+    dtype: str
+    details: str
+    parent: DiffractionDatasetLayoutNode | None = None
+    children: list[DiffractionDatasetLayoutNode] = field(default_factory=list)
+
+    @classmethod
+    def create_root(cls) -> DiffractionDatasetLayoutNode:
+        return cls(name='', dtype='', details='')
+
+    def add_child(self, name: str, dtype: str, details: str) -> DiffractionDatasetLayoutNode:
+        child = DiffractionDatasetLayoutNode(name, dtype, details, parent=self)
+        self.children.append(child)
+        return child
+
+    @property
+    def is_root(self) -> bool:
+        return self.parent is None
+
+    @property
+    def is_leaf(self) -> bool:
+        return not self.children
+
+    def row(self) -> int:
+        if self.parent is None:
+            return 0
+        return self.parent.children.index(self)
 
 
 class DiffractionDataset(Sequence[DiffractionArray], ABC):
@@ -451,40 +488,3 @@ class AssembledDiffractionData:
         dtype = str(self._patterns.dtype)
         size_MB = self._patterns.nbytes / BYTES_PER_MEGABYTE  # noqa: N806
         return f'{number} x {height}H x {width}W {dtype} [{size_MB:.2f}MB]'
-
-
-@dataclass
-class DiffractionDatasetLayoutNode:
-    """Node in the layout tree returned by DiffractionFileReader.
-
-    Each node describes one entry (HDF5 group/dataset/attribute, NPZ array,
-    TIFF file, ...) with three display columns: name, dtype, details.
-    """
-
-    name: str
-    dtype: str
-    details: str
-    parent: DiffractionDatasetLayoutNode | None = None
-    children: list[DiffractionDatasetLayoutNode] = field(default_factory=list)
-
-    @classmethod
-    def create_root(cls) -> DiffractionDatasetLayoutNode:
-        return cls(name='', dtype='', details='')
-
-    def add_child(self, name: str, dtype: str, details: str) -> DiffractionDatasetLayoutNode:
-        child = DiffractionDatasetLayoutNode(name, dtype, details, parent=self)
-        self.children.append(child)
-        return child
-
-    @property
-    def is_root(self) -> bool:
-        return self.parent is None
-
-    @property
-    def is_leaf(self) -> bool:
-        return not self.children
-
-    def row(self) -> int:
-        if self.parent is None:
-            return 0
-        return self.parent.children.index(self)

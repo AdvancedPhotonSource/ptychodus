@@ -21,8 +21,8 @@ class NoiseFloor:
         background_value = numpy.median(values)
         absolute_deviation = numpy.abs(values - background_value)
         return cls(
-            background_value=background_value.item(),
-            median_absolute_deviation=numpy.median(absolute_deviation).item(),
+            background_value=float(background_value),
+            median_absolute_deviation=float(numpy.median(absolute_deviation)),
         )
 
     def get_significance_threshold(self, mad_threshold: float) -> float:
@@ -68,15 +68,15 @@ def estimate_noise_floor(
     if flat.size == 0:
         return NoiseFloor.from_values(fallback)
 
-    pmin = flat.min().item()
-    pmax = flat.max().item()
+    pmin = flat.min()
+    pmax = flat.max()
 
     if pmax <= pmin:
         # Degenerate histogram (single intensity value): Otsu has no split.
         return NoiseFloor.from_values(fallback)
 
     hist, edges = numpy.histogram(flat, bins=num_bins, range=(pmin, pmax))
-    total_count = int(hist.sum())
+    total_count = hist.sum()
 
     if total_count == 0:
         return NoiseFloor.from_values(fallback)
@@ -86,7 +86,7 @@ def estimate_noise_floor(
     probability = hist.astype(numpy.float64) / total_count
     cumulative_weight = numpy.cumsum(probability)
     cumulative_mean = numpy.cumsum(probability * bin_centers)
-    total_mean = float(cumulative_mean[-1])
+    total_mean = cumulative_mean[-1]
 
     # sigma_B^2(t) = (mu_T * w(t) - mu(t))^2 / (w(t) * (1 - w(t)))
     denominator = cumulative_weight * (1.0 - cumulative_weight)
@@ -98,16 +98,16 @@ def estimate_noise_floor(
         where=denominator > 0.0,
     )
 
-    total_variance = float(numpy.sum(probability * (bin_centers - total_mean) ** 2))
+    total_variance = numpy.sum(probability * (bin_centers - total_mean) ** 2)
 
-    best_bin = int(numpy.argmax(between_class_variance))
-    best_between_class_variance = float(between_class_variance[best_bin])
+    best_bin = numpy.argmax(between_class_variance)
+    best_between_class_variance = between_class_variance[best_bin]
     separability = best_between_class_variance / total_variance if total_variance > 0.0 else 0.0
 
     if separability < bimodality_threshold:
         return NoiseFloor.from_values(fallback)
 
-    otsu_threshold = float(edges[best_bin + 1])
+    otsu_threshold = edges[best_bin + 1]
     background_pool = flat[flat < otsu_threshold]
 
     if background_pool.size == 0:

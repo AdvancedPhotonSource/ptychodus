@@ -81,7 +81,7 @@ def _preprocess_coordinates(coordinates: RealArrayType) -> _PreprocessedCoordina
     centered = coordinates - numpy.array((centroid_x, centroid_y))
 
     distance = numpy.hypot(centered[:, 0], centered[:, 1])
-    rms_distance = numpy.sqrt(numpy.mean(numpy.square(distance))).item()
+    rms_distance = float(numpy.sqrt(numpy.mean(numpy.square(distance))))
 
     if rms_distance == 0.0:
         raise ValueError('All probe positions are coincident; cannot normalize.')
@@ -265,7 +265,7 @@ def estimate_affine_transform_ransac(
         corrected_inliers = corrected_pre.coordinates[inliers]
         candidate_model = _fit_affine_least_squares(measured_inliers, corrected_inliers)
         candidate_errors = _evaluate_error(measured_inliers, corrected_inliers, candidate_model)
-        candidate_rms = float(numpy.sqrt(numpy.mean(numpy.square(candidate_errors))))
+        candidate_rms = numpy.sqrt(numpy.mean(numpy.square(candidate_errors)))
 
         if candidate_rms < best_score:
             best_score = candidate_rms
