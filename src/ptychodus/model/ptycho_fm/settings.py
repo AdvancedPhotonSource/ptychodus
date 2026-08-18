@@ -12,7 +12,6 @@ class PtychoFMDataSettings(Observable, Observer):
         self.default_normalization = self._group.create_real_parameter(
             'default_normalization', 100000.0, minimum=0.0
         )
-        self.packed = self._group.create_boolean_parameter('packed', True)
         self.cache_object = self._group.create_boolean_parameter('cache_object', True)
         self.max_probe_modes = self._group.create_integer_parameter(
             'max_probe_modes', 10, minimum=1
@@ -22,12 +21,10 @@ class PtychoFMDataSettings(Observable, Observer):
             'train_split', 0.80, minimum=0.0, maximum=1.0
         )
         self.random_seed = self._group.create_integer_parameter('random_seed', 8)
-        self.sharding_strategy = self._group.create_string_parameter('sharding_strategy', 'dynamic')
         # 0 → treat as "use all files" (null in the YAML).
         self.max_files = self._group.create_integer_parameter('max_files', 0, minimum=0)
         self.num_workers = self._group.create_integer_parameter('num_workers', 4, minimum=0)
         self.prefetch_factor = self._group.create_integer_parameter('prefetch_factor', 2, minimum=0)
-        self.use_cuda_prefetcher = self._group.create_boolean_parameter('use_cuda_prefetcher', True)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:
@@ -86,10 +83,6 @@ class PtychoFMTrainingSettings(Observable, Observer):
         self._group = registry.create_group('PtychoFMTraining')
         self._group.add_observer(self)
 
-        # ``mode`` is kept independent from the per-reconstructor mode split so
-        # that a checkpoint trained supervised can be evaluated as unsupervised
-        # (and vice-versa) without touching the file.
-        self.mode = self._group.create_string_parameter('mode', 'unsupervised')
         self.batch_size = self._group.create_integer_parameter('batch_size', 64, minimum=1)
         self.learning_rate = self._group.create_real_parameter('learning_rate', 1.0e-5, minimum=0.0)
         self.epochs = self._group.create_integer_parameter('epochs', 11, minimum=1)
@@ -99,14 +92,7 @@ class PtychoFMTrainingSettings(Observable, Observer):
             'weighted_loss_threshold', 0.0
         )
         self.weighted_loss_alpha = self._group.create_real_parameter('weighted_loss_alpha', 1.0)
-        self.validation_plot_freq = self._group.create_integer_parameter(
-            'validation_plot_freq', 1, minimum=1
-        )
-        self.checkpoint_freq = self._group.create_integer_parameter('checkpoint_freq', 1, minimum=0)
         self.save_epoch_models = self._group.create_boolean_parameter('save_epoch_models', True)
-        self.resume_from_checkpoint = self._group.create_boolean_parameter(
-            'resume_from_checkpoint', False
-        )
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:

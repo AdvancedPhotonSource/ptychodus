@@ -7,8 +7,9 @@ by the factory. Dicts are picklable and pull in no framework, so the parent
 never touches torch just to build a payload.
 
 The training mode (``'Unsupervised'`` / ``'Supervised'``) is carried in the
-``name`` field, matching PtychoPINN's ``model_type`` convention. The child
-warns if it disagrees with the mode baked into the training config.
+``name`` field, matching PtychoPINN's ``model_type`` convention. ptycho_vit
+``.pth`` files store a bare ``state_dict`` with no mode metadata, so no
+checkpoint-vs-reconstructor mode check is possible today.
 """
 
 from __future__ import annotations
@@ -29,8 +30,7 @@ __all__ = [
 class ReconstructPayload:
     """Everything the child needs to load a checkpoint and run inference once."""
 
-    # 'Unsupervised' or 'Supervised' — becomes the display name and is logged
-    # for the checkpoint-mode consistency warning.
+    # 'Unsupervised' or 'Supervised' — the reconstructor's display name.
     name: str
 
     # ptycho_vit config as a nested dict (data/model/training/inference sections),

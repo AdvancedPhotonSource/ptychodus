@@ -56,18 +56,15 @@ def _build_config(
     data_config: dict[str, Any] = {
         'scale': data_settings.scale.get_value(),
         'default_normalization': data_settings.default_normalization.get_value(),
-        'packed': data_settings.packed.get_value(),
         'cache_object': data_settings.cache_object.get_value(),
         'max_probe_modes': data_settings.max_probe_modes.get_value(),
         'target_size': data_settings.target_size.get_value(),
         'train_split': data_settings.train_split.get_value(),
         'random_seed': data_settings.random_seed.get_value(),
-        'sharding_strategy': data_settings.sharding_strategy.get_value(),
         # 0 in settings means "no cap" (null in the YAML).
         'max_files': max_files if max_files > 0 else None,
         'num_workers': data_settings.num_workers.get_value(),
         'prefetch_factor': data_settings.prefetch_factor.get_value(),
-        'use_cuda_prefetcher': data_settings.use_cuda_prefetcher.get_value(),
     }
 
     model_config: dict[str, Any] = {
@@ -99,7 +96,6 @@ def _build_config(
     }
 
     training_config: dict[str, Any] = {
-        'mode': training_settings.mode.get_value(),
         'batch_size': training_settings.batch_size.get_value(),
         'learning_rate': training_settings.learning_rate.get_value(),
         'epochs': training_settings.epochs.get_value(),
@@ -109,10 +105,7 @@ def _build_config(
             'threshold': training_settings.weighted_loss_threshold.get_value(),
             'alpha': training_settings.weighted_loss_alpha.get_value(),
         },
-        'validation_plot_freq': training_settings.validation_plot_freq.get_value(),
-        'checkpoint_freq': training_settings.checkpoint_freq.get_value(),
         'save_epoch_models': training_settings.save_epoch_models.get_value(),
-        'resume_from_checkpoint': training_settings.resume_from_checkpoint.get_value(),
     }
 
     inference_config: dict[str, Any] = {

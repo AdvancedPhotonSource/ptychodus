@@ -67,6 +67,7 @@ CHILD_ONLY_MODULES = (
     'cupy',  # links and initialises the CUDA runtime at import; no non-invasive probe
     'ptycho',  # ptychopinn TensorFlow package; raw_data/probe/tf_helper pull TensorFlow
     'ptycho_torch',  # ptychopinn_torch backend; child-side entry point only
+    'ptycho_vit',  # ptycho_fm backend; child-side entry point only
 )
 
 # ``ptychozoon.data_structures`` and ``ptychozoon.settings`` are CPU-only --
