@@ -1,11 +1,11 @@
 ---
 name: pre-release
-description: Run a comprehensive pre-release verification of the ptychodus repository — API docs coverage, minimal docstring presence, reader-plugin docs, README/CLAUDE.md/pyproject.toml consistency, install-instruction freshness, Markdown hygiene, zero-warning Sphinx build, full CI gate, and entry-point smoke tests. Report every finding and offer per-issue fixes. Use when the user says "pre-release check", "release audit", "before we cut a release", or "verify the repo is release-ready".
+description: Run a comprehensive pre-release verification of the ptychodus repository — API docs coverage, minimal docstring presence, reader-plugin docs, README/CLAUDE.md/pyproject.toml consistency, install-instruction freshness, Markdown hygiene, zero-warning Sphinx build, full CI gate, entry-point smoke tests, and distribution-artifact contents. Report every finding and offer per-issue fixes. Use when the user says "pre-release check", "release audit", "before we cut a release", or "verify the repo is release-ready".
 ---
 
 # pre-release
 
-Comprehensive gate for cutting a release. Runs eight verification sections in order, reports pass/fail for each, and — for every failure — proposes a specific fix and asks the user before applying it. **Never fixes silently. Never commits.**
+Comprehensive gate for cutting a release. Runs nine verification sections in order, reports pass/fail for each, and — for every failure — proposes a specific fix and asks the user before applying it. **Never fixes silently. Never commits.**
 
 ## How to run the check
 
@@ -260,6 +260,31 @@ done
 
 `PASS` if every script exits 0. `FAIL` lists the broken entry points — usually caused by import-time errors introduced by an unrelated change.
 
+### Section 9 — Distribution artifacts
+
+The release artifacts are what PyPI users actually get, and nothing else in this audit inspects them. In particular the `ptychodus-store` web UI is compiled TypeScript that is gitignored, so it can silently go missing from a build.
+
+First, fail if a stale `build/` tree is present — `setuptools` reuses `build/lib/`, so a leftover from an earlier build can ship outdated modules:
+
+```sh
+test -d build && echo "FAIL: stale build/ present — rm -rf build dist src/*.egg-info" || echo "PASS: no stale build/"
+```
+
+Then build both artifacts into a temp directory with the UI requirement enforced, and confirm the compiled UI landed in each. Do not build into `./dist/` — that is the maintainer's release output.
+
+```sh
+out=$(mktemp -d)
+PTYCHODUS_STORE_REQUIRE_UI_BUILD=1 uv build --no-sources --out-dir "$out" || echo "FAIL: uv build"
+ts=$(find src/ptychodus_store/ui/src -name '*.ts' | wc -l)
+sdist=$(tar -tzf "$out"/ptychodus-*.tar.gz | grep -c 'ui/dist/.*\.js$')
+wheel=$(unzip -Z1 "$out"/ptychodus-*.whl | grep -c 'ui/dist/.*\.js$')
+echo "ts=$ts sdist=$sdist wheel=$wheel"
+[ "$ts" = "$sdist" ] && [ "$ts" = "$wheel" ] && echo "PASS: UI in both artifacts" || echo "FAIL: compiled UI missing or incomplete"
+uvx twine check "$out"/* || echo "FAIL: twine check"
+```
+
+`FAIL` on a count mismatch means the `sdist`/`build_py` hooks in `setup.py` did not compile the UI — check that `tsc` is on `PATH`. Report the temp directory path so the user can inspect the artifacts, and do not copy them into `./dist/`.
+
 ---
 
 ## Final report
@@ -276,6 +301,7 @@ Print a summary in this exact format after all sections have run:
 6. Sphinx build (zero warns)   PASS|FAIL   (first warning if any)
 7. Full CI gate                PASS|FAIL
 8. Entry-point smoke tests     PASS|FAIL   (<pass>/<total>)
+9. Distribution artifacts      PASS|FAIL   (ui .js sdist/wheel vs .ts count)
 ```
 
 Then, and only then, walk through each `FAIL` with the user: state the finding, propose the fix, ask "apply it?" per item, and Edit/Write only after they confirm.

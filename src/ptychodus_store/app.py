@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from ptychodus_store import __version__
 from ptychodus_store.config import Settings, get_settings
 from ptychodus_store.db.session import SessionProvider, create_engine, create_schema
 from ptychodus_store.ingest.reconciler import full_rescan
@@ -79,7 +80,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 watcher.stop()
             await session_provider.dispose()
 
-    app = FastAPI(title='ptychodus-store', version='0.1.0', lifespan=lifespan)
+    app = FastAPI(title='ptychodus-store', version=__version__, lifespan=lifespan)
     app.state.settings = settings
     app.state.layout = layout
     app.state.session_provider = session_provider
