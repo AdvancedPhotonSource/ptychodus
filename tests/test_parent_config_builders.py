@@ -104,14 +104,40 @@ def _build_ptychopinn_torch_configs() -> list[Any]:
     )
 
 
+def _build_ptycho_fm_configs() -> list[Any]:
+    from ptychodus.api.settings import SettingsRegistry
+    from ptychodus.model.ptycho_fm.reconstructor import _build_config
+    from ptychodus.model.ptycho_fm.settings import (
+        PtychoFMDataSettings,
+        PtychoFMInferenceSettings,
+        PtychoFMModelSettings,
+        PtychoFMTrainingSettings,
+    )
+
+    registry = SettingsRegistry()
+
+    return [
+        _build_config(
+            PtychoFMDataSettings(registry),
+            PtychoFMModelSettings(registry),
+            PtychoFMTrainingSettings(registry),
+            PtychoFMInferenceSettings(registry),
+        )
+    ]
+
+
 _BUILDERS = {
     'ptychopinn': _build_ptychopinn_configs,
     'ptychopinn_torch': _build_ptychopinn_torch_configs,
+    'ptycho_fm': _build_ptycho_fm_configs,
 }
 
-_REQUIRED_MODULES = {
+_REQUIRED_MODULES: dict[str, tuple[str, ...]] = {
     'ptychopinn': ('ptycho',),
     'ptychopinn_torch': ('ptycho_torch',),
+    # ptycho_fm's _build_config is a pure-Python dict factory; it does not
+    # import ptycho_vit or torch, so this test can run everywhere.
+    'ptycho_fm': (),
 }
 
 
