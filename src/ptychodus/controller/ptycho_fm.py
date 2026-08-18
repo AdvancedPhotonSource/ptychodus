@@ -39,12 +39,6 @@ class PtychoFMViewControllerFactory(ReconstructorViewControllerFactory):
             group=data_group,
         )
         builder.add_check_box(
-            data_settings.packed,
-            'Packed Dataset',
-            tool_tip='Use pre-packed dataset shards instead of paired HDF5 files.',
-            group=data_group,
-        )
-        builder.add_check_box(
             data_settings.cache_object,
             'Cache Object In Memory',
             group=data_group,
@@ -71,12 +65,6 @@ class PtychoFMViewControllerFactory(ReconstructorViewControllerFactory):
             'Random Seed:',
             group=data_group,
         )
-        builder.add_combo_box(
-            data_settings.sharding_strategy,
-            enumerators.get_sharding_strategies(),
-            'Sharding Strategy:',
-            group=data_group,
-        )
         builder.add_integer_line_edit(
             data_settings.max_files,
             'Max Files (0 = no cap):',
@@ -90,11 +78,6 @@ class PtychoFMViewControllerFactory(ReconstructorViewControllerFactory):
         builder.add_integer_line_edit(
             data_settings.prefetch_factor,
             'Prefetch Factor:',
-            group=data_group,
-        )
-        builder.add_check_box(
-            data_settings.use_cuda_prefetcher,
-            'Use CUDA Prefetcher',
             group=data_group,
         )
 
@@ -202,12 +185,6 @@ class PtychoFMViewControllerFactory(ReconstructorViewControllerFactory):
         # Training
         training_group = 'Training'
         training_settings = self._model.training_settings
-        builder.add_combo_box(
-            training_settings.mode,
-            enumerators.get_training_modes(),
-            'Mode:',
-            group=training_group,
-        )
         builder.add_integer_line_edit(
             training_settings.epochs,
             'Epochs:',
@@ -246,24 +223,9 @@ class PtychoFMViewControllerFactory(ReconstructorViewControllerFactory):
             'Weighted Loss Alpha:',
             group=training_group,
         )
-        builder.add_integer_line_edit(
-            training_settings.validation_plot_freq,
-            'Validation Plot Freq:',
-            group=training_group,
-        )
-        builder.add_integer_line_edit(
-            training_settings.checkpoint_freq,
-            'Checkpoint Freq:',
-            group=training_group,
-        )
         builder.add_check_box(
             training_settings.save_epoch_models,
             'Save Per-Epoch Models',
-            group=training_group,
-        )
-        builder.add_check_box(
-            training_settings.resume_from_checkpoint,
-            'Resume From Checkpoint',
             group=training_group,
         )
 
