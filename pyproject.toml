@@ -40,6 +40,7 @@ docs = ["myst-parser", "sphinx", "sphinx-copybutton", "sphinx-rtd-theme"]
 globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
 gui = ["PyQt5"]
 #ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
+ptycho-fm = ["ptycho-vit"]
 ptychi = ["ptychi==1.5.*"]
 ptychopinn = ["ptychopinn"]
 ptychozoon = ["ptychozoon"]
@@ -59,6 +60,7 @@ xraydb = ["xraydb>=4.5"]
 #ptychi = { path = "../pty-chi", editable = true }
 ptychopinn = { path = "../PtychoPINN", editable = true }
 #ptychopinn = { git = "https://github.com/hoidn/PtychoPINN", branch = "main" }
+ptycho-vit = { path = "../ptycho-vit", editable = true }
 
 #[[tool.uv.index]]
 #name = "pytorch-cu132"
@@ -101,6 +103,7 @@ module = [
     "ptychi.*",
     "ptycho.*",
     "ptycho_torch.*",
+    "ptycho_vit.*",
     "ptychonn.*",
     "ptychozoon.*",
     "pvaccess",
@@ -108,6 +111,7 @@ module = [
     "scipy.*",
     "tifffile",
     "torch",
+    "torch.*",
     "xraydb.*",
 ]
 ignore_missing_imports = true
