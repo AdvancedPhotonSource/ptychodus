@@ -113,7 +113,7 @@ Raise or lower volume with `PTYCHODUS_STORE_LOG_LEVEL=DEBUG` / `WARNING`. For fi
 
 ## Rebuild the frontend
 
-The wheel build (`python -m build` or `pip install .`) runs `tsc` automatically via a `build_py` hook in `setup.py`. For interactive UI development, run `tsc` directly.
+Installing from PyPI needs no Node.js — the release sdist and wheel both ship the compiled `ui/dist/`. Building from a source checkout compiles it via `sdist`/`build_py` hooks in `setup.py` when `tsc` is on `PATH`, and warns and builds without the web UI when it is not. Release builds set `PTYCHODUS_STORE_REQUIRE_UI_BUILD=1` so a missing or stale UI fails the build instead. For interactive UI development, run `tsc` directly.
 
 One-time setup on hosts without Node.js:
 
@@ -131,7 +131,7 @@ cd src/ptychodus_store/ui && tsc            # one-shot
 cd src/ptychodus_store/ui && tsc --watch    # incremental during dev
 ```
 
-The compiled output at `src/ptychodus_store/ui/dist/` is git-ignored.
+The compiled output at `src/ptychodus_store/ui/dist/` is git-ignored. It reaches the sdist through `[tool.setuptools.package-data]`, which is why the `sdist` command compiles it too — `setuptools` finalizes `build_py` to collect package data but never runs it.
 
 ## Running in production
 

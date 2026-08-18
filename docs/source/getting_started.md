@@ -219,30 +219,71 @@ VS Code will build the image and reopen the workspace inside the container.
 
 ## For Maintainers: Publishing Releases
 
-### Via pip / build + twine
+The version is derived from the git tag by `setuptools-scm` — there is no version string to edit anywhere in the tree. Tag first, then build.
 
-From the directory that contains `pyproject.toml`, create a wheel in `./dist/`:
+The `ptychodus-store` web UI is compiled TypeScript that is not tracked in git. Both the `sdist` and `build_py` steps compile it, so the release sdist and wheel each carry `ptychodus_store/ui/dist/`, and consumers installing from PyPI never need Node. Setting `PTYCHODUS_STORE_REQUIRE_UI_BUILD=1` turns a missing or stale UI into a build failure instead of a warning — always set it when publishing, so a release can never ship a stale or empty UI.
 
-```sh
-$ python -m build
-```
+### Prepare
 
-Upload to PyPI:
+1. Confirm the release tag is on `HEAD` and no tracked file is modified:
 
-```sh
-$ python -m twine upload --verbose dist/*
-```
+   ```sh
+   $ git describe --tags --dirty --match 'v[0-9]*'
+   ```
 
-### Via uv
+   A `-dirty` suffix or a commit distance means the artifacts will carry a development version, not the release version.
 
-From the directory that contains `pyproject.toml`, create a wheel in `./dist/`:
+2. Remove stale build artifacts. `setuptools` reuses `build/lib/`, so a leftover tree from an earlier build can ship outdated modules:
 
-```sh
-$ uv build --no-sources
-```
+   ```sh
+   $ rm -rf build dist src/*.egg-info
+   ```
 
-Upload to PyPI:
+3. Put `tsc` on `PATH`. On a host with no Node.js, bootstrap one with `nodeenv`:
+
+   ```sh
+   $ uv tool install nodeenv
+   $ nodeenv --node=lts --prebuilt ~/.local/node-lts
+   $ export PATH="$HOME/.local/node-lts/bin:$PATH"
+   $ npm install -g typescript
+   ```
+
+   See the "Rebuild the frontend" section of `src/ptychodus_store/README.md` for the UI development workflow.
+
+### Build and verify
+
+1. Build the sdist and wheel into `./dist/`. `--no-sources` is required: `[tool.uv.sources]` points `ptychopinn` at a local checkout, which must not leak into the published metadata.
+
+   ```sh
+   $ PTYCHODUS_STORE_REQUIRE_UI_BUILD=1 uv build --no-sources
+   ```
+
+   The equivalent with `build` is `PTYCHODUS_STORE_REQUIRE_UI_BUILD=1 python -m build`.
+
+2. Confirm the compiled UI is in **both** artifacts. Each count must equal the number of TypeScript sources:
+
+   ```sh
+   $ tar -tzf dist/ptychodus-*.tar.gz | grep -c 'ui/dist/.*\.js$'
+   $ unzip -Z1 dist/ptychodus-*.whl | grep -c 'ui/dist/.*\.js$'
+   $ find src/ptychodus_store/ui/src -name '*.ts' | wc -l
+   ```
+
+3. Confirm the metadata renders on PyPI:
+
+   ```sh
+   $ uvx twine check dist/*
+   ```
+
+### Publish
+
+Uploading is irreversible — PyPI does not allow reusing a filename, even after a release is deleted.
 
 ```sh
 $ uv publish
+```
+
+`uv publish` reads a PyPI API token from `UV_PUBLISH_TOKEN`, or accepts `--token`. The equivalent with `twine` is:
+
+```sh
+$ python -m twine upload --verbose dist/*
 ```
