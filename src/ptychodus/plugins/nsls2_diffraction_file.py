@@ -136,15 +136,15 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         NSLS2Style1DiffractionFileReader(),
         simple_name='NSLS_II_1',
-        display_name='NSLS-II Style 1 Files (*.h5 *.hdf5)',
+        display_name='NSLS-II 3-ID HXN Style 1 Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_readers.register_plugin(
         NSLS2Style2DiffractionFileReader(),
         simple_name='NSLS_II_2',
-        display_name='NSLS-II Style 2 Files (*.h5 *.hdf5)',
+        display_name='NSLS-II 3-ID HXN Style 2 Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_readers.register_plugin(
         NSLS2MATLABDiffractionFileReader(),
         simple_name='NSLS_II_MATLAB',
-        display_name='NSLS-II MATLAB Files (*.mat)',
+        display_name='NSLS-II 3-ID HXN MATLAB Files (*.mat)',
     )
