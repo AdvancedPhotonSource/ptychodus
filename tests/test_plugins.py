@@ -13,11 +13,14 @@ selection semantics that the two classes agree on at that seam:
 
 from __future__ import annotations
 
+from collections import Counter
+import logging
+
 import pytest
 
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parameters import ParameterGroup, StringParameter
-from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
+from ptychodus.api.plugins import PluginChooser, PluginChooserParameter, PluginRegistry
 
 
 class _Counter(Observer):
@@ -202,3 +205,60 @@ def test_two_adapters_over_one_chooser_both_track_it() -> None:
     assert parameter_b.get_value() == 'Zeta'
     assert settings_a.get_value() == 'Zeta'
     assert settings_b.get_value() == 'Zeta'
+
+
+def test_register_duplicate_simple_name_warns(caplog: pytest.LogCaptureFixture) -> None:
+    """A shadowed registration is announced rather than failing silently.
+
+    Settings persist the simple name and lookup returns the first match, so the
+    second registration under a taken name can never be selected from settings.
+    Registration still succeeds: plugin loading must never be fatal.
+    """
+    chooser: PluginChooser[str] = PluginChooser()
+    chooser.register_plugin('h5', display_name='Example Files (*.h5)', simple_name='example')
+
+    with caplog.at_level(logging.WARNING, logger='ptychodus.api.plugins'):
+        chooser.register_plugin('mat', display_name='Example Files (*.mat)', simple_name='example')
+
+    assert 'Example Files (*.h5)' in caplog.text
+    assert 'Example Files (*.mat)' in caplog.text
+
+    plugin = chooser.find_plugin('example')
+    assert plugin is not None
+    assert plugin.strategy == 'h5'
+
+
+def test_register_distinct_simple_names_is_quiet(caplog: pytest.LogCaptureFixture) -> None:
+    chooser: PluginChooser[str] = PluginChooser()
+    chooser.register_plugin('h5', display_name='Example Files (*.h5)', simple_name='example')
+
+    with caplog.at_level(logging.WARNING, logger='ptychodus.api.plugins'):
+        chooser.register_plugin(
+            'mat', display_name='Example Files (*.mat)', simple_name='example_mat'
+        )
+
+    assert 'Duplicate plugin simple name' not in caplog.text
+
+
+def test_load_plugins_has_no_duplicate_simple_names() -> None:
+    """Every chooser resolves each simple name to exactly one plugin.
+
+    A duplicate makes the later registration unreachable from settings, which is
+    how the two fold_slice probe-position readers once shadowed each other.
+    """
+    registry = PluginRegistry.load_plugins()
+    duplicates: list[str] = []
+
+    for attribute in dir(registry):
+        if attribute.startswith('_'):
+            continue
+
+        chooser = getattr(registry, attribute)
+
+        if not isinstance(chooser, PluginChooser):
+            continue
+
+        counter = Counter(plugin.simple_name.casefold() for plugin in chooser)
+        duplicates.extend(f'{attribute}: {name}' for name, count in counter.items() if count > 1)
+
+    assert not duplicates

@@ -21,7 +21,7 @@ from ptychodus.api.reconstruct import LossValue
 
 
 class FoldSliceProductFileReader(ProductFileReader):
-    SIMPLE_NAME: Final[str] = 'fold_slice'
+    SIMPLE_NAME: Final[str] = 'fold_slice_mat'
     DISPLAY_NAME: Final[str] = 'fold_slice Files (*.mat)'
 
     def read(self, file_path: Path) -> Product:

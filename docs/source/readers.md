@@ -12,7 +12,6 @@ File readers are implemented using a Python namespace plugin system. We would be
   - 19-ID-E In-Situ Nanoprobe (ISN)
   - 26-ID-C CNM/APS Hard X-ray Nanoprobe (HXN)
   - 31-ID-E LYNX
-  - 33-ID-C PtychoProbe
   - 33-ID-C Velociprobe
   - 34-ID-C Microdiffraction, Coherent X-ray Scattering
 - Linac Coherent Light Source (LCLS)

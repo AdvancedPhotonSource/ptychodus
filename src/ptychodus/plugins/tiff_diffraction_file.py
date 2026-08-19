@@ -91,10 +91,21 @@ class TiffDiffractionFileReader(DiffractionFileReader):
 
 
 def register_plugins(registry: PluginRegistry) -> None:
+    file_reader = TiffDiffractionFileReader()
     registry.diffraction_file_readers.register_plugin(
-        TiffDiffractionFileReader(),
+        file_reader,
         simple_name='TIFF',
         display_name='Tagged Image File Format Files (*.tif *.tiff)',
+    )
+    registry.diffraction_file_readers.register_plugin(
+        file_reader,
+        simple_name='CNM_APS_HXN_TIFF',
+        display_name='CNM/APS 26-ID Hard X-ray Nanoprobe Files (*.tif *.tiff)',
+    )
+    registry.diffraction_file_readers.register_plugin(
+        file_reader,
+        simple_name='APS_34IDC',
+        display_name='APS 34-ID-C Microdiffraction Files (*.tif *.tiff)',
     )
 
 

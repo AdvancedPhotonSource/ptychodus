@@ -116,6 +116,19 @@ class PluginChooser(Iterable[Plugin[T]], Observable):
         if not simple_name:
             simple_name = re.sub(r'\W+', '', display_name)
 
+        # Settings persist the simple name, and lookup returns the first match, so a
+        # duplicate silently shadows the later registration and breaks its round trip.
+        # Warn rather than raise: load_plugins catches only AttributeError, and plugin
+        # loading must never be fatal.
+        for plugin in self._registered_plugins:
+            if plugin.simple_name.casefold() == simple_name.casefold():
+                logger.warning(
+                    f'Duplicate plugin simple name "{simple_name}": '
+                    f'"{display_name}" will be unreachable by that name '
+                    f'because "{plugin.display_name}" already claims it.'
+                )
+                break
+
         # The list is kept sorted by display name, so a registration can move the
         # selected plugin to a different index. Track it by identity across the sort
         # rather than by value: Plugin is a frozen dataclass, so equality compares the
