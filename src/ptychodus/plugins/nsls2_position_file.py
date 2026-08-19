@@ -54,10 +54,10 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         NSLS2Style1PositionFileReader(),
         simple_name='NSLS_II_1',
-        display_name='NSLS-II Style 1 Files (*.h5 *.hdf5)',
+        display_name='NSLS-II 3-ID HXN Style 1 Files (*.h5 *.hdf5)',
     )
     registry.probe_position_file_readers.register_plugin(
         NSLS2Style2PositionFileReader(),
         simple_name='NSLS_II_2',
-        display_name='NSLS-II Style 2 Files (*.h5 *.hdf5)',
+        display_name='NSLS-II 3-ID HXN Style 2 Files (*.h5 *.hdf5)',
     )

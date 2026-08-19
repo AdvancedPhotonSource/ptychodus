@@ -528,7 +528,7 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         MDAFlatScanPositionFileReader(scale_to_meters=1.0e-6),
         simple_name='CNM_APS_HXN',
-        display_name='CNM/APS Hard X-ray Nanoprobe Files (*.mda)',
+        display_name='CNM/APS 26-ID Hard X-ray Nanoprobe Files (*.mda)',
     )
 
 

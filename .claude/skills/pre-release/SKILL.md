@@ -15,17 +15,34 @@ Execute the sections in order. After each, capture pass/fail and any findings. A
 
 ### Section 1 — API modules present in `docs/source/api.md`
 
-For every `src/ptychodus/api/*.py` file (excluding `_*.py` private modules), confirm `docs/source/api.md` contains a matching `.. automodule:: ptychodus.api.<stem>` directive.
+For every `src/ptychodus/api/**/*.py` file, confirm `docs/source/api.md` contains a matching `.. automodule:: ptychodus.api.<dotted.name>` directive. The scan is recursive, so subpackage modules (`preprocess/`, `simulate/`) are covered under their dotted names. A path component starting with `_` is skipped at any depth — that covers `__init__.py`, `simulate/_phase_unwrap.py`, and any future private subpackage.
+
+Do not enumerate with a flat `ls src/ptychodus/api/*.py`, and do not match the directive with a `[a-z_]+` character class: the former misses every subpackage module, and the latter has no `.` so `preprocess.diffraction` truncates to `preprocess`. The two errors cancel out and the section reports `PASS` while blind to an undocumented subpackage module.
 
 ```sh
-# Modules that should be documented:
-ls src/ptychodus/api/*.py | xargs -n1 basename | sed 's/\.py$//' | grep -v '^_' | grep -v '^__' | sort
-
-# Modules currently documented:
-grep -oE '\.\. automodule:: ptychodus\.api\.[a-z_]+' docs/source/api.md | sed 's|.*ptychodus\.api\.||' | sort
+uv run python -c "
+import pathlib, re
+root = pathlib.Path('src/ptychodus/api')
+have = set()
+for p in sorted(root.rglob('*.py')):
+    rel = p.relative_to(root).with_suffix('')
+    if any(part.startswith('_') for part in rel.parts):
+        continue
+    have.add('.'.join(rel.parts))
+doc = set(re.findall(r'\.\. automodule:: ptychodus\.api\.([A-Za-z_][A-Za-z_0-9.]*)',
+                     pathlib.Path('docs/source/api.md').read_text()))
+print(f'modules={len(have)} documented={len(doc)}')
+for m in sorted(have - doc):
+    print(f'MISSING FROM DOCS: ptychodus.api.{m}')
+for m in sorted(doc - have):
+    print(f'STALE DOC ENTRY:   ptychodus.api.{m}')
+print('PASS' if have == doc else 'FAIL')
+"
 ```
 
-Compute the diff. `PASS` if empty. `FAIL` with the list of missing module names.
+`PASS` if the script prints `PASS`. `FAIL` with the list of `MISSING FROM DOCS` and `STALE DOC ENTRY` lines.
+
+A `STALE DOC ENTRY` is a module that `api.md` documents but that no longer exists. Sphinx catches this downstream as an autodoc import failure under Section 6's `-W`, but naming it here gives a far better message. The fix is to delete the orphaned stanza from `docs/source/api.md`.
 
 **Suggested fix per missing module**: append this stanza to `docs/source/api.md`, matching the existing pattern (title-case `##` heading, then the autodoc directive as raw reStructuredText inside an `{eval-rst}` block):
 
@@ -85,41 +102,63 @@ print(f'--- {len(missing)} missing ---')
 
 ### Section 3 — Reader plugins represented in `docs/source/readers.md`
 
-`docs/source/readers.md` is a curated bullet list, not a 1:1 file mapping. Cross-check by keyword: for every distinct beamline/format hint in `src/ptychodus/plugins/`, ensure the readers doc mentions it.
+`docs/source/readers.md` is a curated bullet list of user-facing names, not a 1:1 file mapping. Cross-check it against the plugin registry rather than against filenames: every plugin already declares a user-facing `display_name` in its `register_plugins` hook, and those strings are the authoritative source.
 
-Keyword map (edit as new plugins land):
+Drive the check from `PluginRegistry.load_plugins()` so it reuses the exact discovery path the application uses. This matters because `pkgutil.iter_modules` is non-recursive: it yields `aps33id_velociprobe` as a *package* and calls the `register_plugins` in its `__init__.py`. A flat `ls src/ptychodus/plugins/*.py` misses that package entirely, and a hand-maintained keyword table drifts silently as new plugins land — do not reintroduce either.
 
-| Plugin filename substring | Expected mention in readers.md |
-| --- | --- |
-| `aps02id_` | "2-ID-D Bionanoprobe" or "2-ID-D Microprobe" or "2-ID-E Microprobe" |
-| `aps04id_polar_` | "4-ID" and "Polar" (Polarization Modulation Spectroscopy) |
-| `aps09id_cssi_` | "9-ID" and "CSSI" |
-| `aps12id_` | "12-ID" and "SAXS" |
-| `aps19id_isn_` | "19-ID" and "ISN" |
-| `aps31id_lynx_` | "31-ID" and "LYNX" |
-| `aps33id_velociprobe` | "33-ID" and "Velociprobe" |
-| `lcls_` | "LCLS" |
-| `max_iv_nanomax_` | "MAX IV" or "NanoMAX" |
-| `fold_slice_` | "fold_slice" |
-| `cxi_` | "CXI" or "*.cxi" |
-| `csv_` | "CSV" or "Comma-Separated" |
-| `mda_` | "MDA" or "*.mda" |
-| `npy_` | "NumPy" or "*.npy" |
-| `delimited_position_` | "Space-Separated" or "*.txt" |
+Comparison is by facility token and beamline token, in two tiers:
+
+- **FAIL** — a token a plugin registers that `readers.md` never mentions. This is the real drift risk: a new beamline reader lands and the doc is not updated.
+- **REVIEW** — a token the doc claims that no plugin display name mentions. Report-only, because the doc legitimately uses friendlier names than the plugins do. Making this a hard failure would produce false alarms.
 
 ```sh
-# List all plugin file stems:
-ls src/ptychodus/plugins/*.py | xargs -n1 basename | sed 's/\.py$//'
+uv run python -c "
+import logging, re, pathlib
 
-# For each keyword above, verify readers.md contains the expected mention:
-for kw in "2-ID-D Bionanoprobe" "4-ID" "9-ID" "12-ID" "19-ID" "31-ID" "33-ID" "LCLS" "NanoMAX" "fold_slice" "CXI" "CSV" "MDA" "NumPy" "Space-Separated"; do
-    grep -q "$kw" docs/source/readers.md || echo "MISSING: $kw"
-done
+skipped = []
+class _H(logging.Handler):
+    def emit(self, record):
+        m = record.getMessage()
+        if m.startswith(('Skipping ', 'Failed to register ')):
+            skipped.append(m)
+_lg = logging.getLogger('ptychodus.api.plugins')
+_lg.addHandler(_H())
+_lg.setLevel(logging.WARNING)
+
+from ptychodus.api.plugins import PluginRegistry
+registry = PluginRegistry.load_plugins()
+names = {p.display_name
+         for a in vars(registry) if a.endswith('_file_readers')
+         for p in getattr(registry, a)}
+doc = pathlib.Path('docs/source/readers.md').read_text()
+
+FACILITIES = ['APS', 'CNM', 'LCLS', 'MAX IV', 'NSLS-II', 'SLAC', 'SLS']
+BEAMLINE = re.compile(r'\b\d+-ID\b')
+
+def tokens(text):
+    found = {f for f in FACILITIES if re.search(rf'\b{re.escape(f)}\b', text)}
+    return found | set(BEAMLINE.findall(text))
+
+plug = tokens(' | '.join(names))
+docs = tokens(doc)
+print(f'reader plugins registered: {len(names)}; modules skipped at load: {len(skipped)}')
+for m in skipped:
+    print(f'  {m}')
+fails = sorted(plug - docs)
+for t in fails:
+    print(f'FAIL   in plugins, missing from readers.md: {t}')
+for t in sorted(docs - plug):
+    print(f'REVIEW in readers.md, no plugin names it: {t}')
+print('PASS' if not fails else 'FAIL')
+"
 ```
 
-Also flag *the reverse*: any bullet in `readers.md` whose beamline has no matching plugin file — that indicates a stale doc entry.
+Two details in that script are load-bearing:
 
-`PASS` if every plugin has a doc mention and every doc mention has a plugin. `FAIL` with lists of orphans in either direction.
+- Facility matching uses `\b...\b`, not substring. A plain `'SLS' in text` also matches **NSLS-II**, which would silently mask a missing SLS entry.
+- The script reports `modules skipped at load`. An optional-dependency plugin that fails to import registers nothing, which shrinks the plugin token set and weakens the check in the safe direction — under-reporting, never a false `FAIL`. Run the release gate in an environment with the full extras, and treat a nonzero skip count as a caveat on this section's coverage.
+
+`PASS` if the script prints `PASS` (no `FAIL` lines). `REVIEW` lines do not fail the gate, but report them so a human can adjudicate.
 
 **Suggested fix per finding**: propose a bullet insertion under the correct facility heading, matching the existing style (`- <Beamline name> (<abbreviation>)`). Ask the user to confirm the heading and wording — the doc uses friendly names, not filenames.
 
