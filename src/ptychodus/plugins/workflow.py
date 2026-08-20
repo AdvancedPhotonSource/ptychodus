@@ -167,8 +167,8 @@ def register_plugins(registry: PluginRegistry) -> None:
     )
     registry.file_based_workflows.register_plugin(
         APS26IDFileBasedWorkflow(),
-        simple_name='APS_26ID',
-        display_name='APS 26-ID',
+        simple_name='APS_26IDC',
+        display_name='APS 26-ID-C',
     )
     registry.file_based_workflows.register_plugin(
         APS31IDEFileBasedWorkflow(),

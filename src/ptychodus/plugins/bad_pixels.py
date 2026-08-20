@@ -42,5 +42,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.bad_pixels_file_readers.register_plugin(
         APS12IDValidPixelMaskFileReader(),
         simple_name='APS_12ID_Valid_Pixel_Mask',
-        display_name='APS 12-ID Valid Pixel Mask Files (*.h5 *.hdf5)',
+        display_name='APS 12-ID-E Valid Pixel Mask Files (*.h5 *.hdf5)',
     )

@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class PolarSoftGlueZynqPositionFileReader(ProbePositionFileReader):
-    """Reader for APS 4-ID Polar softGlueZynq position-stream files.
+    """Reader for APS 4-ID-B,G,H POLAR softGlueZynq position-stream files.
 
     The pos_stream is oversampled relative to the detector: many raw
     samples share a single trigger index. This reader aggregates by
@@ -96,5 +96,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         PolarSoftGlueZynqPositionFileReader(),
         simple_name='APS_Polar_SGZ',
-        display_name='APS 4-ID Polar softGlueZynq Files (*.h5)',
+        display_name='APS 4-ID-B,G,H POLAR softGlueZynq Files (*.h5)',
     )

@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 class LCLSPositionFileReader(ProbePositionFileReader):
     SIMPLE_NAME: Final[str] = 'LCLS_XPP'  # noqa: N806
-    DISPLAY_NAME: Final[str] = 'LCLS X-ray Pump Probe Files (*.h5 *.hdf5)'  # noqa: N806
+    DISPLAY_NAME: Final[str] = 'LCLS XPP X-ray Pump Probe Files (*.h5 *.hdf5)'  # noqa: N806
 
     def __init__(
         self,

@@ -10,15 +10,15 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         diffraction_file_reader,
         simple_name='APS_Velociprobe',
-        display_name='APS 33-ID Velociprobe Files (*.h5 *.hdf5)',
+        display_name='APS 33-ID-C VelociProbe Files (*.h5 *.hdf5)',
     )
     registry.probe_position_file_readers.register_plugin(
         VelociprobePositionFileReader.create_laser_interferometer_instance(diffraction_file_reader),
         simple_name='APS_Velociprobe_LI',
-        display_name='APS 33-ID Velociprobe Files - Laser Interferometer (*.txt)',
+        display_name='APS 33-ID-C VelociProbe Files - Laser Interferometer (*.txt)',
     )
     registry.probe_position_file_readers.register_plugin(
         VelociprobePositionFileReader.create_position_encoder_instance(diffraction_file_reader),
         simple_name='APS_Velociprobe_PE',
-        display_name='APS 33-ID Velociprobe Files - Position Encoder (*.txt)',
+        display_name='APS 33-ID-C VelociProbe Files - Position Encoder (*.txt)',
     )

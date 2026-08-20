@@ -65,5 +65,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         CSAXSDiffractionFileReader(),
         simple_name='SLS_cSAXS',
-        display_name='SLS cSAXS Files (*.h5 *.hdf5)',
+        display_name='SLS X12SA cSAXS Files (*.h5 *.hdf5)',
     )

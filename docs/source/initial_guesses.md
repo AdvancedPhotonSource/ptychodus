@@ -149,11 +149,11 @@ Use `WorkflowProductAPI.generate_probe(name, parameters)`. All generated probe b
 
 Ptychodus registers Fresnel zone plate presets as plugins. The current presets are:
 
-- `2-ID-D`: `160e-6` m diameter, `70e-9` m outermost zone width, `60e-6` m central beamstop.
-- `HXN`: `160e-6` m diameter, `30e-9` m outermost zone width, `80e-6` m central beamstop.
-- `LYNX`: `114.8e-6` m diameter, `60e-9` m outermost zone width, `40e-6` m central beamstop.
-- `PtychoProbe`: `180e-6` m diameter, `15e-9` m outermost zone width, `15e-6` m central beamstop.
-- `Velociprobe`: `180e-6` m diameter, `50e-9` m outermost zone width, `60e-6` m central beamstop.
+- `APS 2-ID-D`: `160e-6` m diameter, `70e-9` m outermost zone width, `60e-6` m central beamstop.
+- `CNM/APS 26-ID-C HXN`: `160e-6` m diameter, `30e-9` m outermost zone width, `80e-6` m central beamstop.
+- `APS 31-ID-E LYNX`: `114.8e-6` m diameter, `60e-9` m outermost zone width, `40e-6` m central beamstop.
+- `APS 33-ID-C PtychoProbe`: `180e-6` m diameter, `15e-9` m outermost zone width, `15e-6` m central beamstop.
+- `APS 33-ID-C VelociProbe`: `180e-6` m diameter, `50e-9` m outermost zone width, `60e-6` m central beamstop.
 
 The GUI builder exposes these as presets. Programmatic workflow use can pass the physical values directly.
 

@@ -39,5 +39,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         CSSIPositionFileReader(),
         simple_name='APS_CSSI',
-        display_name='APS 9-ID CSSI Files (*.h5 *.hdf5)',
+        display_name='APS 9-ID-D CSSI Files (*.h5 *.hdf5)',
     )

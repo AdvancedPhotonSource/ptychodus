@@ -46,5 +46,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         NanoMAXPositionFileReader(),
         simple_name='MAX_IV_NanoMAX',
-        display_name='MAX IV NanoMAX Diffraction Endstation Files (*.h5 *.hdf5)',
+        display_name='MAX IV NanoMAX Files (*.h5 *.hdf5)',
     )

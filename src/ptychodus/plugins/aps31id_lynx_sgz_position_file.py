@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class LYNXSoftGlueZynqPositionFileReader(ProbePositionFileReader):
     SIMPLE_NAME: Final[str] = 'APS_LYNX_SoftGlueZynq'
-    DISPLAY_NAME: Final[str] = 'APS 31-ID-E LYNX SoftGlueZynq Files (*.dat)'
+    DISPLAY_NAME: Final[str] = 'APS 31-ID-E LYNX softGlueZynq Files (*.dat)'
 
     EXPECTED_HEADER_RAW: Final[list[str]] = [
         'DataPoint',
@@ -64,7 +64,7 @@ class LYNXSoftGlueZynqPositionFileReader(ProbePositionFileReader):
                 Y = 3  # noqa: N806
             else:
                 raise ProbePositionParseError(
-                    f'Bad LYNX SoftGlueZynq header!\nFound:    {column_header_row}\n'
+                    f'Bad LYNX softGlueZynq header!\nFound:    {column_header_row}\n'
                 )
 
             for row in csv_iterator:

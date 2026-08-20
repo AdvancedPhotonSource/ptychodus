@@ -100,7 +100,7 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         file_reader,
         simple_name='CNM_APS_HXN_TIFF',
-        display_name='CNM/APS 26-ID Hard X-ray Nanoprobe Files (*.tif *.tiff)',
+        display_name='CNM/APS 26-ID-C Hard X-ray Nanoprobe Files (*.tif *.tiff)',
     )
     registry.diffraction_file_readers.register_plugin(
         file_reader,

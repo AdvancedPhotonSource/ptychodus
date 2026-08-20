@@ -74,5 +74,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         APS12IDPositionFileReader(),
         simple_name='APS_PtychoSAXS',
-        display_name='APS 12-ID PtychoSAXS Files (*.dat)',
+        display_name='APS 12-ID-E Ptycho-SAXS Files (*.dat)',
     )

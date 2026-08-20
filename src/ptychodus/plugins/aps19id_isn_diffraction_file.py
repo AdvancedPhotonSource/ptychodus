@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class ISNDiffractionFileReader(DiffractionFileReader):
-    """Reader for APS 19-ID In-Situ Nanoprobe diffraction data.
+    """Reader for APS 19-ID-E In-situ Nanoprobe diffraction data.
 
     The new ISN format stores diffraction frames across many sibling
     per-file HDF5s in a single directory (e.g. ``scan_1307_00001.h5`` ...
@@ -123,5 +123,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         ISNDiffractionFileReader(),
         simple_name='APS_ISN',
-        display_name='APS 19-ID In-Situ Nanoprobe Files (*.h5 *.hdf5)',
+        display_name='APS 19-ID-E In-situ Nanoprobe Files (*.h5 *.hdf5)',
     )
