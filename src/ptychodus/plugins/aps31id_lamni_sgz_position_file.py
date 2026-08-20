@@ -15,9 +15,9 @@ from ptychodus.api.probe_positions import (
 logger = logging.getLogger(__name__)
 
 
-class LYNXSoftGlueZynqPositionFileReader(ProbePositionFileReader):
-    SIMPLE_NAME: Final[str] = 'APS_LYNX_SoftGlueZynq'
-    DISPLAY_NAME: Final[str] = 'APS 31-ID-E LYNX softGlueZynq Files (*.dat)'
+class LamNISoftGlueZynqPositionFileReader(ProbePositionFileReader):
+    SIMPLE_NAME: Final[str] = 'APS_LamNI_SoftGlueZynq'
+    DISPLAY_NAME: Final[str] = 'APS 31-ID-E LamNI softGlueZynq Files (*.dat)'
 
     EXPECTED_HEADER_RAW: Final[list[str]] = [
         'DataPoint',
@@ -52,19 +52,19 @@ class LYNXSoftGlueZynqPositionFileReader(ProbePositionFileReader):
 
             column_header_row = next(csv_iterator)
 
-            if column_header_row == LYNXSoftGlueZynqPositionFileReader.EXPECTED_HEADER_RAW:
+            if column_header_row == LamNISoftGlueZynqPositionFileReader.EXPECTED_HEADER_RAW:
                 logger.debug(f'Reading raw scan positions for "{scan_name}"...')
                 X = 1  # noqa: N806
                 Y = 2  # noqa: N806
                 DETECTOR_COUNT = 4  # noqa: N806
-            elif column_header_row == LYNXSoftGlueZynqPositionFileReader.EXPECTED_HEADER_PROCESSED:
+            elif column_header_row == LamNISoftGlueZynqPositionFileReader.EXPECTED_HEADER_PROCESSED:
                 logger.debug(f'Reading processed scan positions for "{scan_name}"...')
                 DETECTOR_COUNT = 0  # noqa: N806
                 X = 1  # noqa: N806
                 Y = 3  # noqa: N806
             else:
                 raise ProbePositionParseError(
-                    f'Bad LYNX softGlueZynq header!\nFound:    {column_header_row}\n'
+                    f'Bad LamNI softGlueZynq header!\nFound:    {column_header_row}\n'
                 )
 
             for row in csv_iterator:
@@ -86,7 +86,7 @@ class LYNXSoftGlueZynqPositionFileReader(ProbePositionFileReader):
 
 def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
-        LYNXSoftGlueZynqPositionFileReader(),
-        simple_name=LYNXSoftGlueZynqPositionFileReader.SIMPLE_NAME,
-        display_name=LYNXSoftGlueZynqPositionFileReader.DISPLAY_NAME,
+        LamNISoftGlueZynqPositionFileReader(),
+        simple_name=LamNISoftGlueZynqPositionFileReader.SIMPLE_NAME,
+        display_name=LamNISoftGlueZynqPositionFileReader.DISPLAY_NAME,
     )

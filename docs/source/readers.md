@@ -13,7 +13,7 @@ File readers are implemented using a Python namespace plugin system. We would be
   - [12-ID-E High Resolution Small Angle X-ray Scattering (Ptycho-SAXS)](https://www.aps.anl.gov/Beamlines/Beamline-Directory/228)
   - [19-ID-E In-situ Nanoprobe (ISN)](https://www.aps.anl.gov/Beamlines/Beamline-Directory/232)
   - [26-ID-C CNM/APS Hard X-ray Nanoprobe (HXN)](https://www.aps.anl.gov/Beamlines/Beamline-Directory/92)
-  - [31-ID-E Ptychography-Laminography (LYNX)](https://www.aps.anl.gov/Beamlines/Beamline-Directory/240)
+  - [31-ID-E Ptychography-Laminography (LamNI)](https://www.aps.anl.gov/Beamlines/Beamline-Directory/240)
   - [33-ID-C PtychoProbe, VelociProbe endstation](https://www.aps.anl.gov/Beamlines/Beamline-Directory/241)
   - [34-ID-C Microdiffraction, Coherent X-ray Scattering](https://www.aps.anl.gov/Beamlines/Beamline-Directory/242) — now listed as 34-ID-F Atomic
 - [Linac Coherent Light Source (LCLS)](https://lcls.slac.stanford.edu/instruments)

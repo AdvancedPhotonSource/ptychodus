@@ -15,9 +15,9 @@ from ptychodus.api.probe_positions import (
 logger = logging.getLogger(__name__)
 
 
-class LYNXOrchestraPositionFileReader(ProbePositionFileReader):
-    SIMPLE_NAME: Final[str] = 'APS_LYNX_Orchestra'
-    DISPLAY_NAME: Final[str] = 'APS 31-ID-E LYNX Orchestra Files (*.dat)'
+class LamNIOrchestraPositionFileReader(ProbePositionFileReader):
+    SIMPLE_NAME: Final[str] = 'APS_LamNI_Orchestra'
+    DISPLAY_NAME: Final[str] = 'APS 31-ID-E LamNI Orchestra Files (*.dat)'
     DATA_POINT_COLUMN: Final[int] = 0
     X_COLUMN: Final[int] = 3
     Y_COLUMN: Final[int] = 6
@@ -60,12 +60,12 @@ class LYNXOrchestraPositionFileReader(ProbePositionFileReader):
 
             column_header_row = next(csv_iterator)
 
-            if column_header_row == LYNXOrchestraPositionFileReader.EXPECTED_HEADER:
+            if column_header_row == LamNIOrchestraPositionFileReader.EXPECTED_HEADER:
                 logger.debug(f'Reading scan positions for "{scan_name}"...')
             else:
                 raise ProbePositionParseError(
-                    'Bad LYNX Orchestra header!\n'
-                    f'Expected: {LYNXOrchestraPositionFileReader.EXPECTED_HEADER}\n'
+                    'Bad LamNI Orchestra header!\n'
+                    f'Expected: {LamNIOrchestraPositionFileReader.EXPECTED_HEADER}\n'
                     f'Found:    {column_header_row}\n'
                 )
 
@@ -88,7 +88,7 @@ class LYNXOrchestraPositionFileReader(ProbePositionFileReader):
 
 def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
-        LYNXOrchestraPositionFileReader(),
-        simple_name=LYNXOrchestraPositionFileReader.SIMPLE_NAME,
-        display_name=LYNXOrchestraPositionFileReader.DISPLAY_NAME,
+        LamNIOrchestraPositionFileReader(),
+        simple_name=LamNIOrchestraPositionFileReader.SIMPLE_NAME,
+        display_name=LamNIOrchestraPositionFileReader.DISPLAY_NAME,
     )

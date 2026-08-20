@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from enum import Enum
 import logging
 
+from ptychodus.api.diffraction import estimate_probe_photon_count
 from ptychodus.api.observer import Observable
 from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.product import LossValue, Product
@@ -189,6 +190,24 @@ class ProductRepositoryItem(ParameterGroup):
         self._dataset_observer = _BoundDatasetObserver(self)
         dataset.add_observer(self._dataset_observer)
 
+        self._auto_estimate_probe_photon_count()
+
+    def _auto_estimate_probe_photon_count(self) -> None:
+        # Guard on the default sentinel so a user- or file-supplied value is
+        # never overwritten. A real measurement never sums to exactly zero on
+        # the brightest pattern.
+        if self._dataset is None:
+            return
+        if self._metadata_item.probe_photon_count.get_value() != 0.0:
+            return
+        assembled = self._dataset.get_assembled_data()
+        patterns = assembled.get_patterns()
+        if patterns.size == 0:
+            return
+        self._metadata_item.probe_photon_count.set_value(
+            float(estimate_probe_photon_count(patterns, assembled.get_bad_pixels()))
+        )
+
     def _sync_geometry_from_dataset(self) -> None:
         if self._dataset is None:
             return
@@ -297,6 +316,7 @@ class _BoundDatasetObserver(DiffractionDatasetObserver):
 
     def handle_dataset_reloaded(self) -> None:
         self._item._sync_geometry_from_dataset()
+        self._item._auto_estimate_probe_photon_count()
 
     def handle_pixel_geometry_changed(self) -> None:
         self._item._sync_geometry_from_dataset()

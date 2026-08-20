@@ -82,10 +82,6 @@ class ProductRepositoryItemFactory:
             polarization=polarization,
         )
 
-        # probe_photon_count auto-estimation from diffraction data now lives in the
-        # controller layer (see ProductEditorViewController._estimate_probe_photon_count).
-        # This factory takes whatever value the caller supplied.
-
         scan_item = self._scan_item_factory.create()
         geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)

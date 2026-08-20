@@ -86,7 +86,7 @@ def _to_ev(value: float, egu: str) -> float:
         return value
 
 
-class LYNXDiffractionFileReader(DiffractionFileReader):
+class LamNIDiffractionFileReader(DiffractionFileReader):
     _LEGACY_DATA_PATH = '/entry/data/eiger_4'
     _AD_DATA_PATH = '/entry/data/data'
 
@@ -103,7 +103,7 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
                 return self._read_legacy(file_path, h5_file, contents_tree)
 
             raise KeyError(
-                f'No LYNX diffraction data found in {file_path} '
+                f'No LamNI diffraction data found in {file_path} '
                 f'(expected {self._AD_DATA_PATH} or {self._LEGACY_DATA_PATH})'
             )
 
@@ -218,7 +218,7 @@ class LYNXDiffractionFileReader(DiffractionFileReader):
 
 def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
-        LYNXDiffractionFileReader(),
-        simple_name='APS_LYNX',
-        display_name='APS 31-ID-E LYNX Files (*.h5 *.hdf5)',
+        LamNIDiffractionFileReader(),
+        simple_name='APS_LamNI',
+        display_name='APS 31-ID-E LamNI Files (*.h5 *.hdf5)',
     )

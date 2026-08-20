@@ -13,7 +13,7 @@ def register_plugins(registry: PluginRegistry) -> None:
     )
     registry.fresnel_zone_plates.register_plugin(
         FresnelZonePlate(114.8e-6, 60e-9, 40e-6),
-        display_name='APS 31-ID-E LYNX',
+        display_name='APS 31-ID-E LamNI',
     )
     registry.fresnel_zone_plates.register_plugin(
         FresnelZonePlate(180e-6, 15e-9, 15e-6),
