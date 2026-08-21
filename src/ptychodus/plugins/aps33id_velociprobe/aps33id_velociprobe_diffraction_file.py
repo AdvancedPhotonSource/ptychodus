@@ -42,9 +42,7 @@ class DataGroup:
                     label=name,
                     indexes=numpy.arange(num_patterns_per_array)
                     + len(array_list) * num_patterns_per_array,
-                    file_path=resolve_external_link_path(
-                        master_file_path.parent, h5_item.filename
-                    ),
+                    file_path=resolve_external_link_path(master_file_path.parent, h5_item.filename),
                     data_path=str(h5_item.path),
                 )
                 array_list.append(array)
