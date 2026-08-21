@@ -138,6 +138,25 @@ def _values_for_fluorescence(
     }
 
 
+class DeclaredFileError(Exception):
+    """Raised when a manifest declares a file name that is not a plain child of its folder."""
+
+
+def _declared_file(folder: Path, files: dict[str, str], key: str, default: str) -> Path:
+    """Resolve a manifest-declared file name against its resource folder.
+
+    Manifest contents are untrusted: anyone able to write into the storage root controls this
+    string, and ``folder / value`` silently accepts both absolute paths and ``..`` segments.
+    Requiring a bare file name keeps introspection inside the resource folder.
+    """
+    name = files.get(key, default)
+
+    if name != Path(name).name or name in ('', '.', '..'):
+        raise DeclaredFileError(f'{key!r} must be a plain file name, got {name!r}')
+
+    return folder / name
+
+
 def _introspect(
     kind: str, folder: Path, files: dict[str, str]
 ) -> tuple[dict[str, Any] | None, IngestState, str | None]:
@@ -147,24 +166,26 @@ def _introspect(
     """
     try:
         if kind == ResourceKind.DIFFRACTION:
-            target = folder / files.get('diffraction', 'diffraction.h5')
+            target = _declared_file(folder, files, 'diffraction', 'diffraction.h5')
             if not target.is_file():
                 return None, IngestState.MISSING_FILES, f'missing file: {target.name}'
             return h5_introspect.introspect_diffraction(target), IngestState.VALID, None
 
         if kind == ResourceKind.PRODUCT:
-            target = folder / files.get('product', 'product.h5')
+            target = _declared_file(folder, files, 'product', 'product.h5')
             if not target.is_file():
                 return None, IngestState.MISSING_FILES, f'missing file: {target.name}'
             return h5_introspect.introspect_product(target), IngestState.VALID, None
 
         if kind == ResourceKind.FLUORESCENCE:
-            target = folder / files.get('fluorescence', 'fluorescence.h5')
+            target = _declared_file(folder, files, 'fluorescence', 'fluorescence.h5')
             if not target.is_file():
                 return None, IngestState.MISSING_FILES, f'missing file: {target.name}'
             return h5_introspect.introspect_fluorescence(target), IngestState.VALID, None
 
         return None, IngestState.VALID, None
+    except DeclaredFileError as exc:
+        return None, IngestState.INVALID, str(exc)
     except h5_introspect.IntrospectionError as exc:
         return None, IngestState.INVALID, str(exc)
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from getpass import getpass
 from typing import Any
 import argparse
 import json
@@ -28,7 +29,7 @@ def store_tokens() -> None:
         if not facility:
             break
 
-        access_token = input('Enter the access token: ').strip()
+        access_token = getpass('Enter the access token: ').strip()
         access_tokens.append(
             GenesisAccessTokens(
                 facility=facility,

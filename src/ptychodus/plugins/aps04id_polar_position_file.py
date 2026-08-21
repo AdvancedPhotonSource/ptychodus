@@ -6,6 +6,7 @@ import h5py
 import numpy
 
 from ptychodus.api.constants import ONE_MICRON_M
+from ptychodus.api.io import resolve_external_link_path
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -98,7 +99,7 @@ class PolarPositionFileReader(ProbePositionFileReader):
         link = h5_file.get(self.EIGER_EXTERNAL_LINK, getlink=True)
         if not isinstance(link, h5py.ExternalLink):
             return None
-        target = file_path.parent / link.filename
+        target = resolve_external_link_path(file_path.parent, link.filename)
         try:
             with h5py.File(target, 'r') as ext:
                 return self._try_read_uid_here(ext, n_frames)

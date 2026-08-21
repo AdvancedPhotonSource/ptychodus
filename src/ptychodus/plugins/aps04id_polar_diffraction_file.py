@@ -11,6 +11,7 @@ from ptychodus.api.diffraction import (
     DiffractionMetadata,
     SimpleDiffractionDataset,
 )
+from ptychodus.api.io import resolve_external_link_path
 from ptychodus.api.plugins import PluginRegistry
 
 from .h5_diffraction_file import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
@@ -59,7 +60,7 @@ class PolarDiffractionFileReader(DiffractionFileReader):
                 f'Expected "{self._data_path}" to be an external link; got {type(data_link)}.'
             )
 
-        data_file_path = file_path.parent / data_link.filename
+        data_file_path = resolve_external_link_path(file_path.parent, data_link.filename)
         logger.debug(f'Opening "{data_file_path}"...')
 
         with h5py.File(data_file_path, 'r') as h5_file:

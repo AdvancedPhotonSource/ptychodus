@@ -4,6 +4,7 @@ from __future__ import annotations
 from enum import StrEnum
 from pathlib import Path
 import logging
+import re
 
 import h5py
 import numpy
@@ -27,9 +28,41 @@ __all__ = [
     'save_fluorescence_data',
     'save_product',
     'save_ptychopinn_training_data',
+    'sanitize_path_component',
+    'resolve_external_link_path',
 ]
 
 logger = logging.getLogger(__name__)
+
+_UNSAFE_PATH_CHARS = re.compile(r'[^A-Za-z0-9._-]')
+_MAX_PATH_COMPONENT_LENGTH = 128
+
+
+def sanitize_path_component(name: str, *, fallback: str = 'unnamed') -> str:
+    """Reduce an untrusted name to a single safe path component.
+
+    Product names are read verbatim from user-supplied files, so they must never reach a
+    filesystem join or a remote shell command unfiltered. Separators, shell metacharacters,
+    and leading dots are replaced so the result cannot traverse directories, expand in a
+    shell, or create a hidden entry.
+    """
+    cleaned = _UNSAFE_PATH_CHARS.sub('_', name).strip(' .')
+    return cleaned[:_MAX_PATH_COMPONENT_LENGTH] or fallback
+
+
+def resolve_external_link_path(base_directory: Path, filename: str) -> Path:
+    """Resolve an HDF5 external-link target against the directory holding the master file.
+
+    The target is chosen by whoever wrote the master file, so an absolute path or a parent
+    traversal would let a crafted dataset pull in any HDF5 file the user can read. Symlinks
+    are deliberately not resolved: beamline data directories legitimately contain them.
+    """
+    link_path = Path(filename)
+
+    if link_path.is_absolute() or '..' in link_path.parts:
+        raise ValueError(f'Refusing external link outside the data directory: {filename!r}')
+
+    return base_directory / link_path
 
 
 class StandardFileLayout(StrEnum):

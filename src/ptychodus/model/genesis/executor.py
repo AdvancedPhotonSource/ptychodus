@@ -5,7 +5,7 @@ import logging
 import queue
 import threading
 
-from ptychodus.api.io import StandardFileLayout
+from ptychodus.api.io import StandardFileLayout, sanitize_path_component
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 
@@ -92,7 +92,8 @@ class GenesisExecutor:
             )
 
         local_dir_struct = WorkflowDirectoryStructure(
-            self._settings.local_collection_posix_path.get_value() / product_item.get_name()
+            self._settings.local_collection_posix_path.get_value()
+            / sanitize_path_component(product_item.get_name())
         )
 
         try:
