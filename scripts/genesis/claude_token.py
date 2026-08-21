@@ -112,8 +112,13 @@ def alcf_get_time_until_expiration(units: str = 'seconds') -> float:
 
 
 def _ensure_private_parent_dir(path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    os.chmod(path.parent, 0o700)
+    # Tighten only a directory this script creates. --token-file is user-supplied, so an
+    # unconditional chmod here would clamp an existing home or shared project directory to
+    # 0700 and lock out its other users.
+    try:
+        path.parent.mkdir(mode=0o700, parents=True)
+    except FileExistsError:
+        pass
 
 
 def _load_tokens(token_file: Path) -> dict | None:
@@ -126,8 +131,12 @@ def _load_tokens(token_file: Path) -> dict | None:
 def _save_tokens(token_file: Path, tokens: dict) -> None:
     _ensure_private_parent_dir(token_file)
     tmp = token_file.with_suffix('.tmp')
+    # The temp path is predictable, so refuse to write through a pre-planted file or symlink.
+    tmp.unlink(missing_ok=True)
     with os.fdopen(
-        os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'w', encoding='utf-8'
+        os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600),
+        'w',
+        encoding='utf-8',
     ) as f:
         json.dump(tokens, f, indent=2)
     os.replace(tmp, token_file)

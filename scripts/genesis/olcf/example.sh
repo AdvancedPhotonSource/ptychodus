@@ -7,11 +7,17 @@ OLCF_ALLOCATION="OLCF_ALLOCATION"
 echo "JWT Decode"
 jq -R 'split(".") | .[0],.[1] | @base64d | fromjson' <<< "${S3M_TOKEN}"
 
+# Login nodes are shared, and anything on the curl command line is visible to every user on
+# the node via `ps`. Pass the credential on stdin with --config instead of -H.
+auth_config() {
+    printf 'header = "Authorization: Bearer %s"\n' "${S3M_TOKEN}"
+}
+
 echo "Token Introspection"
-curl -H "Authorization: Bearer $S3M_TOKEN" https://s3m.olcf.ornl.gov/olcf/v1/token/ctls/introspect -s | jq
+auth_config | curl --config - https://s3m.olcf.ornl.gov/olcf/v1/token/ctls/introspect -s | jq
 
 echo "Job Submission"
-curl -i -s -H "Authorization: Bearer $S3M_TOKEN" \
+auth_config | curl -i -s --config - \
     -H "Content-Type: application/json" \
     -X POST \
     -d "{

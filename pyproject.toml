@@ -50,9 +50,9 @@ store = [
     "uvicorn[standard]>=0.30",
     "sqlalchemy[asyncio]>=2.0",
     "aiosqlite>=0.20",
-    "pillow>=10",
+    "pillow>=10.3",
     "pydantic-settings>=2.5",
-    "python-multipart",
+    "python-multipart>=0.0.18",
 ]
 xraydb = ["xraydb>=4.5"]
 

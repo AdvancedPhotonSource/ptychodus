@@ -1,7 +1,7 @@
 from pathlib import Path
 import logging
 
-from ptychodus.api.io import StandardFileLayout
+from ptychodus.api.io import StandardFileLayout, sanitize_path_component
 from ptychodus.api.settings import SettingsRegistry
 
 from ..product import ProductAPI
@@ -42,8 +42,8 @@ class GlobusExecutor:
                 f'Product "{product_item.get_name()}" has no associated diffraction dataset.'
             )
 
-        input_directory = (
-            self._settings.input_collection_posix_path.get_value() / product_item.get_name()
+        input_directory = self._settings.input_collection_posix_path.get_value() / (
+            sanitize_path_component(product_item.get_name())
         )
 
         try:
