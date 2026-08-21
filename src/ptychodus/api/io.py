@@ -3,6 +3,7 @@
 from __future__ import annotations
 from enum import StrEnum
 from pathlib import Path
+from typing import Any, Final
 import logging
 import re
 
@@ -91,11 +92,39 @@ class DiffractionFileKeys(StrEnum):
     BAD_PIXELS = 'bad_pixels'
 
 
-def load_diffraction_data(file: Path, *, mmap_file: Path | None = None) -> AssembledDiffractionData:
-    """Load assembled diffraction data from an HDF5 file written by :func:`save_diffraction_data`."""
-    if mmap_file is not None:
-        raise NotImplementedError('Load to memory map not implemented yet!')
+_MMAP_CHUNK_FRAMES: Final[int] = 1024
+"""Frames staged per read when copying patterns into a memory map."""
 
+
+def _stage_patterns_to_memory_map(
+    h5_patterns: h5py.Dataset, mmap_file: Path
+) -> numpy.memmap[Any, Any]:
+    """Copy an HDF5 patterns dataset into a memory map and reopen it read-only.
+
+    HDF5 cannot be memory mapped directly, so the patterns are staged block by block
+    into ``mmap_file``. The caller owns that file: it is overwritten if it already
+    exists and it is never deleted.
+    """
+    staging = numpy.memmap(mmap_file, dtype=h5_patterns.dtype, mode='w+', shape=h5_patterns.shape)
+
+    for lo in range(0, h5_patterns.shape[0], _MMAP_CHUNK_FRAMES):
+        hi = lo + _MMAP_CHUNK_FRAMES
+        staging[lo:hi] = h5_patterns[lo:hi]
+
+    staging.flush()
+    del staging
+
+    # Reopen read-only so nothing downstream can dirty the caller's scratch file.
+    return numpy.memmap(mmap_file, dtype=h5_patterns.dtype, mode='r', shape=h5_patterns.shape)
+
+
+def load_diffraction_data(file: Path, *, mmap_file: Path | None = None) -> AssembledDiffractionData:
+    """Load assembled diffraction data from an HDF5 file written by :func:`save_diffraction_data`.
+
+    When ``mmap_file`` is given, the patterns are staged into a read-only ``numpy.memmap``
+    backed by that path rather than held in RAM; indexes and bad pixels are small and load
+    normally. The caller owns ``mmap_file`` — it is overwritten if present and never removed.
+    """
     with h5py.File(file, 'r') as h5_file:
         h5_indexes = h5_file[DiffractionFileKeys.INDEXES]
 
@@ -117,9 +146,15 @@ def load_diffraction_data(file: Path, *, mmap_file: Path | None = None) -> Assem
         if not isinstance(h5_bad_pixels, h5py.Dataset):
             raise ValueError('Bad pixels are not a dataset!')
 
+        patterns = (
+            h5_patterns[()]
+            if mmap_file is None
+            else _stage_patterns_to_memory_map(h5_patterns, mmap_file)
+        )
+
         return AssembledDiffractionData(
             h5_indexes[()],
-            h5_patterns[()],
+            patterns,
             detector_pixel_geometry,
             h5_bad_pixels[()],
         )

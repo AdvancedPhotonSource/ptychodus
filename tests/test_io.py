@@ -14,6 +14,7 @@ from ptychodus.api.diffraction import Polarization
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import (
     ProductFileKeys,
+    _MMAP_CHUNK_FRAMES,
     StandardFileLayout,
     load_diffraction_data,
     load_product,
@@ -186,13 +187,62 @@ class TestDiffractionRoundTrip:
 
         numpy.testing.assert_array_equal(loaded._patterns, original._patterns)
 
-    def test_mmap_raises_not_implemented(self, tmp_path: Path) -> None:
+    def test_mmap_round_trip_matches_in_memory_load(self, tmp_path: Path) -> None:
         original = _make_diffraction_data()
         file = tmp_path / 'diff.h5'
         save_diffraction_data(file, original)
 
-        with pytest.raises(NotImplementedError):
-            load_diffraction_data(file, mmap_file=tmp_path / 'mmap.bin')
+        in_memory = load_diffraction_data(file)
+        mapped = load_diffraction_data(file, mmap_file=tmp_path / 'mmap.bin')
+
+        numpy.testing.assert_array_equal(mapped._patterns, in_memory._patterns)
+        numpy.testing.assert_array_equal(mapped._indexes, in_memory._indexes)
+        numpy.testing.assert_array_equal(mapped._bad_pixels, in_memory._bad_pixels)
+
+    def test_mmap_patterns_are_a_read_only_memory_map(self, tmp_path: Path) -> None:
+        original = _make_diffraction_data()
+        file = tmp_path / 'diff.h5'
+        save_diffraction_data(file, original)
+
+        mmap_file = tmp_path / 'mmap.bin'
+        mapped = load_diffraction_data(file, mmap_file=mmap_file)
+
+        assert mmap_file.is_file()
+        assert isinstance(mapped._patterns, numpy.memmap)
+        assert not mapped._patterns.flags.writeable
+        # Indexes and bad pixels are small and stay in RAM.
+        assert not isinstance(mapped._indexes, numpy.memmap)
+        assert not isinstance(mapped._bad_pixels, numpy.memmap)
+
+    def test_mmap_nbytes_reports_full_logical_size(self, tmp_path: Path) -> None:
+        original = _make_diffraction_data()
+        file = tmp_path / 'diff.h5'
+        save_diffraction_data(file, original)
+
+        in_memory = load_diffraction_data(file)
+        mapped = load_diffraction_data(file, mmap_file=tmp_path / 'mmap.bin')
+
+        # A memory map is backed by disk but still reports its whole logical size.
+        assert mapped.nbytes == in_memory.nbytes
+
+    def test_mmap_spans_multiple_staging_chunks(self, tmp_path: Path) -> None:
+        num_patterns = 3 * _MMAP_CHUNK_FRAMES + 7
+        indexes = numpy.arange(num_patterns, dtype=numpy.int32)
+        patterns = numpy.arange(num_patterns * 2 * 2, dtype=numpy.uint16).reshape(
+            num_patterns, 2, 2
+        )
+        original = AssembledDiffractionData(
+            indexes,
+            patterns,
+            PixelGeometry(width_m=1e-4, height_m=1e-4),
+            numpy.zeros((2, 2), dtype=numpy.bool_),
+        )
+        file = tmp_path / 'diff_big.h5'
+        save_diffraction_data(file, original)
+
+        mapped = load_diffraction_data(file, mmap_file=tmp_path / 'mmap.bin')
+
+        numpy.testing.assert_array_equal(mapped._patterns, patterns)
 
     def test_bad_pixels_preserved(self, tmp_path: Path) -> None:
         original = _make_diffraction_data()

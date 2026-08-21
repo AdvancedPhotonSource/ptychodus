@@ -471,11 +471,15 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         self._data = data
         self._generate_dataset_for_assembled_data(file_path=None)
 
-    def import_assembled_patterns(self, file_path: Path) -> None:
+    def import_assembled_patterns(self, file_path: Path, *, mmap_file: Path | None = None) -> None:
+        """Import an assembled dataset, optionally staging patterns into a memory map.
+
+        The caller owns ``mmap_file``; see :func:`load_diffraction_data`.
+        """
         if file_path.is_file():
             self.clear()
             logger.info(f'Importing assembled dataset from "{file_path}"')
-            self._data = load_diffraction_data(file_path)
+            self._data = load_diffraction_data(file_path, mmap_file=mmap_file)
             self._generate_dataset_for_assembled_data(file_path=file_path)
         else:
             logger.warning(f'Refusing to read invalid file path {file_path}')
