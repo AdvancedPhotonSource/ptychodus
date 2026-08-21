@@ -24,6 +24,7 @@ from .processing import ProcessingController
 from .product import ProductController
 from .product.core import ProductRepositoryTableModel
 from .product.visualization import ProductVisualizationController
+from .task_status import TaskStatusController
 from .ptycho_fm import PtychoFMViewControllerFactory
 from .ptychi import PtyChiViewControllerFactory
 from .ptychonn import PtychoNNViewControllerFactory
@@ -71,6 +72,7 @@ class ControllerCore:
         # widget that shows product rows.
         self._product_table_model = ProductRepositoryTableModel(
             model.product_core.product_repository,
+            model.diffraction_core.repository,
             create_brush_for_editable_cell(view.product_view.table_view),
         )
         self._settings_controller = SettingsController(
@@ -99,7 +101,7 @@ class ControllerCore:
             self._product_table_model,
             model.analysis_core.diffraction_simulator,
             model.analysis_core.diffraction_simulator_settings,
-            view.datasets_view,
+            view.diffraction_view,
             view.diffraction_image_view.status_view,
             self._diffraction_image_controller,
             self._file_dialog_factory,
@@ -111,6 +113,10 @@ class ControllerCore:
             self._product_table_model,
             view.product_view,
             self._file_dialog_factory,
+        )
+        self._product_status_controller = TaskStatusController(
+            model.product_core.task_monitor,
+            view.product_right_view.status_view,
         )
         if is_developer_mode_enabled:
             self._product_visualization_controller = ProductVisualizationController(
@@ -168,6 +174,7 @@ class ControllerCore:
             model.fluorescence_core.repository,
             model.fluorescence_core.fluorescence_api,
             model.product_core.product_repository,
+            self._product_table_model,
             view.fluorescence_view,
             self._fluorescence_image_controller,
             self._fluorescence_enhance_dialog_controller,
@@ -245,8 +252,8 @@ class ControllerCore:
             view.genesis_action: model.genesis_core.is_supported,
         }
 
-        self._swap_central_widgets(view.datasets_action, animated=False)
-        view.datasets_action.setChecked(True)
+        self._swap_central_widgets(view.diffraction_action, animated=False)
+        view.diffraction_action.setChecked(True)
         view.navigation.action_group.triggered.connect(
             lambda action: self._swap_central_widgets(action)
         )

@@ -2,6 +2,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 import logging
+import threading
 
 from ptychodus.api.diffraction import Polarization
 from ptychodus.api.plugins import PluginChooser
@@ -11,6 +12,7 @@ from ..diffraction import AssembledDiffractionDataset
 from ..task_manager import TaskManager
 from .item import ProductRepositoryItem, ProductState
 from .item_factory import ProductRepositoryItemFactory
+from .monitor import ProductTaskMonitor
 from .object.builder_factory import ObjectBuilderFactory
 from .object.settings import ObjectSettings
 from .object_repository import ObjectRepository
@@ -405,6 +407,7 @@ class ProductAPI:
         file_reader_chooser: PluginChooser[ProductFileReader],
         file_writer_chooser: PluginChooser[ProductFileWriter],
         task_manager: TaskManager,
+        task_monitor: ProductTaskMonitor,
     ) -> None:
         self._settings = settings
         self._repository = repository
@@ -412,6 +415,34 @@ class ProductAPI:
         self._file_reader_chooser = file_reader_chooser
         self._file_writer_chooser = file_writer_chooser
         self._task_manager = task_manager
+        self._task_monitor = task_monitor
+        self._queue_lock = threading.Lock()
+        self._queued_total = 0
+        self._queued_done = 0
+
+    def get_task_monitor(self) -> ProductTaskMonitor:
+        return self._task_monitor
+
+    def _begin_queued_product(self) -> None:
+        """Register one queued product, entering the monitor for the first of a burst."""
+        with self._queue_lock:
+            if self._queued_total == 0:
+                self._queued_done = 0
+                self._task_monitor.__enter__()
+
+            self._queued_total += 1
+            self._task_monitor.update_progress(self._queued_done, self._queued_total)
+
+    def _end_queued_product(self) -> None:
+        """Retire one queued product, leaving the monitor once the burst is drained."""
+        with self._queue_lock:
+            self._queued_done += 1
+            self._task_monitor.update_progress(self._queued_done, self._queued_total)
+
+            if self._queued_done >= self._queued_total:
+                self._queued_total = 0
+                self._queued_done = 0
+                self._task_monitor.__exit__(None, None, None)
 
     def _insert_via_queue(
         self,
@@ -444,27 +475,41 @@ class ProductAPI:
         stub = self._item_factory.create_pending_stub(name=stub_name)
         index = self._repository.insert_product(stub)
 
+        # Mark the monitor busy from enqueue, not from when the background step runs:
+        # a queued product spends nearly all its life waiting behind the dataset load,
+        # and that is exactly the window in which Stop has to be reachable.
+        self._begin_queued_product()
+
         def background_finalize() -> Callable[[], None]:
-            error = dataset.get_last_load_error()
+            stopping = self._task_monitor.is_stopping
+            error = None if stopping else dataset.get_last_load_error()
 
             def foreground_finalize() -> None:
-                if error is not None:
-                    logger.error(
-                        f'Cancelling queued product {index} because dataset '
-                        f'failed to load: {error!r}'
-                    )
-                    stub.set_state(ProductState.FAILED)
-                    return
-
                 try:
-                    real = build()
-                except Exception:
-                    logger.exception(f'Queued product {index} construction failed')
-                    stub.set_state(ProductState.FAILED)
-                    return
+                    if stopping:
+                        logger.info(f'Cancelling queued product {index}: stop requested.')
+                        stub.set_state(ProductState.FAILED)
+                        return
 
-                stub.copy_contents_from(real)
-                stub.set_state(ProductState.READY)
+                    if error is not None:
+                        logger.error(
+                            f'Cancelling queued product {index} because dataset '
+                            f'failed to load: {error!r}'
+                        )
+                        stub.set_state(ProductState.FAILED)
+                        return
+
+                    try:
+                        real = build()
+                    except Exception:
+                        logger.exception(f'Queued product {index} construction failed')
+                        stub.set_state(ProductState.FAILED)
+                        return
+
+                    stub.copy_contents_from(real)
+                    stub.set_state(ProductState.READY)
+                finally:
+                    self._end_queued_product()
 
             return foreground_finalize
 

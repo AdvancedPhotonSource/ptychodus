@@ -2,6 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from bisect import bisect
 from collections.abc import Sequence
+from enum import Enum
 from pathlib import Path
 from typing import IO, overload
 import logging
@@ -10,7 +11,7 @@ import threading
 
 import numpy
 
-from ptychodus.api.constants import BYTES_PER_MEGABYTE
+from ptychodus.api.constants import format_bytes
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     BadPixels,
@@ -32,6 +33,19 @@ from .settings import DetectorSettings, DiffractionSettings
 from .sizer import PatternSizer
 
 logger = logging.getLogger(__name__)
+
+
+class DiffractionDatasetState(Enum):
+    """Load state of an AssembledDiffractionDataset.
+
+    Mirrors ProductState so the three repository items expose the same vocabulary.
+    Derived from the loader handles rather than stored, so there is no extra
+    invariant to keep in sync.
+    """
+
+    READY = 'ready'
+    PENDING = 'pending'
+    FAILED = 'failed'
 
 
 class DiffractionDatasetObserver(ABC):
@@ -233,6 +247,9 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
     def get_assembled_data(self) -> AssembledDiffractionData:
         return self._data
 
+    def get_nbytes(self) -> int:
+        return self._data.nbytes
+
     def is_load_in_progress(self) -> bool:
         """True while a LoadAllArrays task is queued but has not finished.
 
@@ -245,6 +262,21 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
 
         loader = self._last_array_loader
         return loader is not None and not loader.get_finished_event().is_set()
+
+    def get_state(self) -> DiffractionDatasetState:
+        if self.is_load_in_progress():
+            return DiffractionDatasetState.PENDING
+
+        if self.get_last_load_error() is not None:
+            return DiffractionDatasetState.FAILED
+
+        return DiffractionDatasetState.READY
+
+    def is_pending(self) -> bool:
+        return self.get_state() is DiffractionDatasetState.PENDING
+
+    def is_failed(self) -> bool:
+        return self.get_state() is DiffractionDatasetState.FAILED
 
     def get_last_load_error(self) -> BaseException | None:
         """First exception raised by the most recent LoadAllArrays run, or None."""
@@ -391,7 +423,7 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         else:
             logger.info(f'Scratch memory is {patterns_shape}')
             patterns = numpy.zeros(patterns_shape, dtype=patterns_dtype)
-            logger.debug(f'{patterns.nbytes / BYTES_PER_MEGABYTE:.2f}MB allocated for patterns')
+            logger.debug(f'{format_bytes(patterns.nbytes)} allocated for patterns')
 
         self._data = AssembledDiffractionData(
             indexes, patterns, self.get_raw_pixel_geometry(), bad_pixels
@@ -451,8 +483,3 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
     def export_assembled_patterns(self, file_path: Path, compression: str = 'lzf') -> None:
         logger.info(f'Exporting assembled dataset to "{file_path}"')
         save_diffraction_data(file_path, self._data, compression=compression)
-
-    def get_info_text(self) -> str:
-        file_path = self.get_metadata().file_path
-        label = file_path.stem if file_path else 'None'
-        return f'{label}: {self._data}'

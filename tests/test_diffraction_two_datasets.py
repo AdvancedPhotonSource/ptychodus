@@ -21,6 +21,7 @@ from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.io import AssembledDiffractionData
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.diffraction.dataset import (
+    DiffractionDatasetState,
     AssembledDiffractionArray,
     AssembledDiffractionDataset,
 )
@@ -230,3 +231,40 @@ def test_dataset_average_pattern_is_weighted_mean_across_arrays() -> None:
     result = dataset.get_average_pattern()
     assert result is not None
     numpy.testing.assert_allclose(result, numpy.full((4, 4), 4.8))
+
+
+def test_a_freshly_built_dataset_is_ready() -> None:
+    dataset = _make_repository().create_dataset('a')
+
+    assert dataset.get_state() is DiffractionDatasetState.READY
+    assert not dataset.is_pending()
+    assert not dataset.is_failed()
+
+
+def test_state_is_pending_while_a_load_is_in_flight() -> None:
+    dataset = _make_repository().create_dataset('a')
+    loader = MagicMock()
+    loader.get_finished_event.return_value.is_set.return_value = False
+    dataset._last_array_loader = loader
+
+    assert dataset.is_pending()
+    assert dataset.get_state() is DiffractionDatasetState.PENDING
+
+
+def test_state_is_failed_when_the_last_load_raised() -> None:
+    dataset = _make_repository().create_dataset('a')
+    loader = MagicMock()
+    loader.get_finished_event.return_value.is_set.return_value = True
+    loader.get_error.return_value = RuntimeError('boom')
+    dataset._last_array_loader = loader
+
+    assert dataset.is_failed()
+    assert dataset.get_state() is DiffractionDatasetState.FAILED
+
+
+def test_get_nbytes_reports_the_assembled_data_size() -> None:
+    dataset = _make_repository().create_dataset('a')
+
+    # A fresh dataset holds the 1x1x1 null sentinel, not an empty array.
+    assert dataset.get_nbytes() == dataset.get_assembled_data().nbytes
+    assert dataset.get_nbytes() > 0

@@ -8,6 +8,7 @@ from .exception_dialog import ExceptionDialog
 from .length_widget import LengthWidget
 from .power_two_spin_box import PowerTwoSpinBox
 from .progress_bar_item_delegate import ProgressBarItemDelegate
+from .task_status_view import TaskStatusView
 from .uuid_line_edit import UUIDLineEdit
 
 __all__ = [
@@ -23,5 +24,6 @@ __all__ = [
     'LengthWidget',
     'PowerTwoSpinBox',
     'ProgressBarItemDelegate',
+    'TaskStatusView',
     'UUIDLineEdit',
 ]

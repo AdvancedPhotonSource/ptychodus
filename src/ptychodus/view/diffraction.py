@@ -10,9 +10,6 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
-    QMenu,
-    QProgressBar,
-    QPushButton,
     QTableView,
     QTreeView,
     QVBoxLayout,
@@ -21,28 +18,8 @@ from PyQt5.QtWidgets import (
 )
 
 from .image import ImageView
-
-
-class DatasetsButtonBox(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.insert_menu = QMenu()
-        self.insert_button = QPushButton('Insert')
-        self.save_menu = QMenu()
-        self.save_button = QPushButton('Save')
-        self.edit_button = QPushButton('Edit')
-        self.remove_button = QPushButton('Remove')
-
-        self.insert_button.setMenu(self.insert_menu)
-        self.save_button.setMenu(self.save_menu)
-
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.insert_button)
-        layout.addWidget(self.save_button)
-        layout.addWidget(self.edit_button)
-        layout.addWidget(self.remove_button)
-        self.setLayout(layout)
+from .repository import InsertSaveEditRemoveButtonBox
+from .widgets import TaskStatusView
 
 
 class OpenDatasetWizardPage(QWizardPage):
@@ -154,25 +131,12 @@ class SimulateDiffractionDialog(QDialog):
         self.setWindowTitle('Simulate Diffraction Patterns')
 
 
-class DiffractionStatusView(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.progress_bar = QProgressBar()
-        self.stop_button = QPushButton('Stop')
-
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.progress_bar)
-        layout.addWidget(self.stop_button)
-        self.setLayout(layout)
-
-
-class DatasetsView(QWidget):
+class DiffractionView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.tree_view = QTreeView()
         self.info_label = QLabel()
-        self.button_box = DatasetsButtonBox()
+        self.button_box = InsertSaveEditRemoveButtonBox()
         self.simulate_dialog = SimulateDiffractionDialog(self)
 
         tree_view_header = self.tree_view.header()
@@ -191,7 +155,7 @@ class DiffractionImageView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.image_view = ImageView()
-        self.status_view = DiffractionStatusView()
+        self.status_view = TaskStatusView()
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)

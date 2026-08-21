@@ -1,3 +1,4 @@
+from enum import IntEnum
 from typing import Any
 import logging
 
@@ -21,6 +22,7 @@ from ...model.diffraction import (
     DiffractionDatasetRepository,
     DiffractionDatasetRepositoryObserver,
 )
+from ..diffraction.dataset import UNBOUND_DATASET, DiffractionDatasetComboModel
 from ...model.product import ProductRepositoryItem
 from ...view.product import ProductEditorDialog
 from ..helpers import create_brush_for_editable_cell
@@ -28,15 +30,65 @@ from ..helpers import create_brush_for_editable_cell
 logger = logging.getLogger(__name__)
 
 
+class _Row(IntEnum):
+    """Row order of ProductPropertyTableModel.
+
+    An enum rather than module-level ints so that ``match`` arms are value patterns:
+    a bare name would be a capture pattern that swallows every row.
+    """
+
+    PROBE_WAVELENGTH_NM = 0
+    PROBE_WAVENUMBER_PER_NM = 1
+    PROBE_ANGULAR_WAVENUMBER_RAD_PER_NM = 2
+    PROBE_PHOTON_FLUX_PER_S = 3
+    PROBE_POWER_W = 4
+    OBJECT_PLANE_PIXEL_WIDTH_NM = 5
+    OBJECT_PLANE_PIXEL_HEIGHT_NM = 6
+    EXPOSURE_TIME_S = 7
+    MASS_ATTENUATION_M2_KG = 8
+    TOMOGRAPHY_ANGLE_DEG = 9
+    TILT_ANGLE_DEG = 10
+    POLARIZATION = 11
+    FRESNEL_NUMBER = 12
+    DETECTOR_NUMERICAL_APERTURE = 13
+    DEPTH_OF_FIELD_NM = 14
+    DIFFRACTION_DATASET = 15
+
+
+class _Col(IntEnum):
+    """Column order of ProductPropertyTableModel.
+
+    An enum for the same reason as _Row: bare names in a ``match`` arm are capture
+    patterns, not value patterns.
+    """
+
+    PROPERTY = 0
+    VALUE = 1
+
+
+_EDITABLE_ROWS = frozenset(
+    {
+        _Row.EXPOSURE_TIME_S,
+        _Row.MASS_ATTENUATION_M2_KG,
+        _Row.TOMOGRAPHY_ANGLE_DEG,
+        _Row.TILT_ANGLE_DEG,
+        _Row.POLARIZATION,
+        _Row.DIFFRACTION_DATASET,
+    }
+)
+
+
 class ProductPropertyTableModel(QAbstractTableModel):
     def __init__(
         self,
         product_item: ProductRepositoryItem,
+        diffraction_repository: DiffractionDatasetRepository,
         editable_item_brush: QBrush,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._product_item = product_item
+        self._diffraction_repository = diffraction_repository
         self._editable_item_brush = editable_item_brush
         self._header = ['Property', 'Value']
         self._properties = [
@@ -55,12 +107,15 @@ class ProductPropertyTableModel(QAbstractTableModel):
             'Fresnel Number',
             'Detector Numerical Aperture',
             'Depth of Field [nm]',
+            'Diffraction Dataset',
         ]
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
 
-        if index.isValid() and index.row() in (7, 8, 9, 10, 11):
+        # Only the Value column is editable: the Property column holds the row's
+        # read-only label, and setData keys off the row alone.
+        if index.isValid() and index.column() == _Col.VALUE and index.row() in _EDITABLE_ROWS:
             value |= Qt.ItemFlag.ItemIsEditable
 
         return value
@@ -78,9 +133,9 @@ class ProductPropertyTableModel(QAbstractTableModel):
         if index.isValid():
             if role == Qt.ItemDataRole.DisplayRole:
                 match index.column():
-                    case 0:
+                    case _Col.PROPERTY:
                         return self._properties[index.row()]
-                    case 1:
+                    case _Col.VALUE:
                         metadata_item = self._product_item.get_metadata_item()
                         geometry = self._product_item.get_geometry()
 
@@ -125,12 +180,15 @@ class ProductPropertyTableModel(QAbstractTableModel):
                                     return f'{geometry.depth_of_field_m / ONE_NANOMETER_M:.4g}'
                                 except ZeroDivisionError:
                                     return 'inf'
+                            case _Row.DIFFRACTION_DATASET:
+                                dataset = self._product_item.get_dataset()
+                                return UNBOUND_DATASET if dataset is None else dataset.get_name()
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
-        if index.isValid() and role == Qt.ItemDataRole.EditRole:
+        if index.isValid() and index.column() == _Col.VALUE and role == Qt.ItemDataRole.EditRole:
             metadata_item = self._product_item.get_metadata_item()
 
             match index.row():
@@ -177,6 +235,19 @@ class ProductPropertyTableModel(QAbstractTableModel):
                         return False
                     metadata_item.polarization.set_value(parsed.value)
                     return True
+                case _Row.DIFFRACTION_DATASET:
+                    text = str(value)
+
+                    if text == UNBOUND_DATASET:
+                        self._product_item.unbind_dataset()
+                        return True
+
+                    for dataset in self._diffraction_repository:
+                        if dataset.get_name() == text:
+                            self._product_item.bind_dataset(dataset)
+                            return True
+
+                    return False
 
         return False
 
@@ -187,36 +258,53 @@ class ProductPropertyTableModel(QAbstractTableModel):
         return len(self._header)
 
 
-class _PolarizationDelegate(QStyledItemDelegate):
-    """Combobox editor for the polarization row of the product-property table.
+class _PropertyValueDelegate(QStyledItemDelegate):
+    """Combobox editor for the combo-valued rows of the product-property table.
 
     Attached with ``setItemDelegateForColumn(1, ...)`` so column sorting through
-    the proxy model cannot mis-target the row. ``mapToSource`` recovers the
-    row in the underlying ProductPropertyTableModel — everything except the
-    polarization row falls through to the base delegate.
+    the proxy model cannot mis-target the row; only one delegate can be installed
+    per column, so this one serves both combo rows and dispatches on the mapped
+    source row. ``mapToSource`` recovers the row in the underlying
+    ProductPropertyTableModel — every other row falls through to the base delegate.
     """
 
-    POLARIZATION_SOURCE_ROW = 11
+    def __init__(self, dataset_combo_model: DiffractionDatasetComboModel, parent: QWidget) -> None:
+        super().__init__(parent)
+        self._dataset_combo_model = dataset_combo_model
 
-    def _is_polarization_cell(self, index: QModelIndex) -> bool:
-        if index.column() != 1:
-            return False
+    def _source_row(self, index: QModelIndex) -> int | None:
+        if index.column() != _Col.VALUE:
+            return None
         model = index.model()
         source_index = (
             model.mapToSource(index) if isinstance(model, QSortFilterProxyModel) else index
         )
-        return source_index.row() == self.POLARIZATION_SOURCE_ROW
+        return source_index.row()
 
     def createEditor(  # noqa: N802
         self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex
     ) -> QWidget:
-        if not self._is_polarization_cell(index):
-            return super().createEditor(parent, option, index)
-        combo = QComboBox(parent)
-        combo.addItem('(unset)', '')
-        for member in Polarization:
-            combo.addItem(member.value, member.value)
-        return combo
+        match self._source_row(index):
+            case _Row.POLARIZATION:
+                combo = QComboBox(parent)
+                combo.addItem('(unset)', '')
+
+                for member in Polarization:
+                    combo.addItem(member.value, member.value)
+
+                return combo
+            case _Row.DIFFRACTION_DATASET:
+                combo = QComboBox(parent)
+                # Shared live model: stays current as datasets are added or renamed.
+                model = self._dataset_combo_model
+
+                for row in range(model.rowCount()):
+                    name = str(model.index(row, 0).data())
+                    combo.addItem(name, name)
+
+                return combo
+            case _:
+                return super().createEditor(parent, option, index)
 
     def setEditorData(self, editor: QWidget, index: QModelIndex) -> None:  # noqa: N802
         if not isinstance(editor, QComboBox):
@@ -254,6 +342,7 @@ class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver
     def edit_product(
         cls,
         diffraction_repository: DiffractionDatasetRepository,
+        dataset_combo_model: DiffractionDatasetComboModel,
         product: ProductRepositoryItem,
         parent: QWidget,
     ) -> None:
@@ -261,14 +350,18 @@ class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver
         dialog.setWindowTitle(f'Edit Product: {product.get_name()}')
 
         editable_item_brush = create_brush_for_editable_cell(dialog.table_view)
-        table_model = ProductPropertyTableModel(product, editable_item_brush)
+        table_model = ProductPropertyTableModel(
+            product, diffraction_repository, editable_item_brush
+        )
 
         table_proxy_model = QSortFilterProxyModel()
         table_proxy_model.setSourceModel(table_model)
 
         dialog.table_view.setModel(table_proxy_model)
         dialog.table_view.setSortingEnabled(True)
-        dialog.table_view.setItemDelegateForColumn(1, _PolarizationDelegate(dialog.table_view))
+        dialog.table_view.setItemDelegateForColumn(
+            _Col.VALUE, _PropertyValueDelegate(dataset_combo_model, dialog.table_view)
+        )
         vertical_header = dialog.table_view.verticalHeader()
 
         if vertical_header is not None:
@@ -330,8 +423,17 @@ class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver
         if observable is self._product:
             self._sync_model_to_view()
 
+    # The Diffraction Dataset row renders a repository name and its editor enumerates
+    # the repository, so any change to the dataset list has to redraw the table.
+
     def handle_dataset_inserted(self, index: int, dataset: AssembledDiffractionDataset) -> None:
-        pass
+        self._sync_model_to_view()
 
     def handle_dataset_removed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        self._sync_model_to_view()
+
+    def handle_metadata_changed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        self._sync_model_to_view()
+
+    def handle_state_changed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
         pass

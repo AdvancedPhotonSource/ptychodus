@@ -20,12 +20,20 @@ class _RecordingObserver(DiffractionDatasetRepositoryObserver):
     def __init__(self) -> None:
         self.inserted: list[tuple[int, str]] = []
         self.removed: list[tuple[int, str]] = []
+        self.metadata_changed: list[tuple[int, str]] = []
+        self.state_changed: list[tuple[int, str]] = []
 
     def handle_dataset_inserted(self, index, dataset) -> None:  # noqa: ANN001
         self.inserted.append((index, dataset.get_name()))
 
     def handle_dataset_removed(self, index, dataset) -> None:  # noqa: ANN001
         self.removed.append((index, dataset.get_name()))
+
+    def handle_metadata_changed(self, index, dataset) -> None:  # noqa: ANN001
+        self.metadata_changed.append((index, dataset.get_name()))
+
+    def handle_state_changed(self, index, dataset) -> None:  # noqa: ANN001
+        self.state_changed.append((index, dataset.get_name()))
 
 
 def test_empty_repository_is_empty() -> None:
@@ -164,3 +172,28 @@ def test_create_dataset_with_factory_uses_unique_name() -> None:
     repo.insert_dataset(_make_dataset('foo'))
     repo.create_dataset('foo')
     assert called_with == ['foo-1']
+
+
+def _make_sized_dataset(name: str, nbytes: int) -> MagicMock:
+    dataset = _make_dataset(name)
+    dataset.get_nbytes.return_value = nbytes
+    return dataset
+
+
+def test_info_text_of_an_empty_repository() -> None:
+    assert DiffractionDatasetRepository().get_info_text() == 'Datasets: 0 [0 B]'
+
+
+def test_info_text_counts_datasets_and_sums_bytes() -> None:
+    repo = DiffractionDatasetRepository()
+    repo.insert_dataset(_make_sized_dataset('a', 4_000_000_000))
+    repo.insert_dataset(_make_sized_dataset('b', 100_000_000))
+
+    assert repo.get_info_text() == 'Datasets: 2 [4.10 GB]'
+
+
+def test_info_text_of_a_single_dataset() -> None:
+    repo = DiffractionDatasetRepository()
+    repo.insert_dataset(_make_sized_dataset('a', 12_340_000))
+
+    assert repo.get_info_text() == 'Datasets: 1 [12.34 MB]'

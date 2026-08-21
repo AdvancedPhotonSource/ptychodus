@@ -5,12 +5,14 @@ from PyQt5.QtWidgets import (
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
+    QLabel,
     QMenu,
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
     QRadioButton,
     QStackedWidget,
+    QTableView,
     QTreeView,
     QVBoxLayout,
     QWidget,
@@ -86,22 +88,54 @@ class FluorescenceEnhanceDialog(QDialog):
         self.setLayout(layout)
 
 
-class FluorescenceButtonBox(QWidget):
+class FluorescenceEditorDialog(QDialog):
+    """Property editor for one fluorescence repository item.
+
+    Follows ProductEditorDialog: a property table plus a close button. Name and the
+    bound product are editable; everything else is provenance shown read-only.
+    """
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.load_button = QPushButton('Load')
-        self.enhance_menu = QMenu()
+        self.table_view = QTableView()
+        self.button_box = QDialogButtonBox()
+
+        self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
+        self.button_box.accepted.connect(self.accept)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.table_view)
+        layout.addWidget(self.button_box)
+        self.setLayout(layout)
+
+
+class FluorescenceButtonBox(QWidget):
+    """Insert / Enhance / Save / Edit / Remove strip for the fluorescence panel.
+
+    Matches InsertSaveEditRemoveButtonBox, with Enhance added between Insert and
+    Save. Enhance is a plain push button: it acts immediately rather than opening
+    a menu, so attaching one would suppress its clicked signal.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.insert_menu = QMenu()
+        self.insert_button = QPushButton('Insert')
         self.enhance_button = QPushButton('Enhance')
+        self.save_menu = QMenu()
         self.save_button = QPushButton('Save')
+        self.edit_button = QPushButton('Edit')
         self.remove_button = QPushButton('Remove')
 
-        self.enhance_button.setMenu(self.enhance_menu)
+        self.insert_button.setMenu(self.insert_menu)
+        self.save_button.setMenu(self.save_menu)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.load_button)
+        layout.addWidget(self.insert_button)
         layout.addWidget(self.enhance_button)
         layout.addWidget(self.save_button)
+        layout.addWidget(self.edit_button)
         layout.addWidget(self.remove_button)
         self.setLayout(layout)
 
@@ -128,6 +162,7 @@ class FluorescenceView(QWidget):
         self.variant_button_group.setExclusive(True)
         self.variant_button_group.addButton(self.measured_radio_button)
         self.variant_button_group.addButton(self.enhanced_radio_button)
+        self.info_label = QLabel()
         self.button_box = FluorescenceButtonBox()
 
         variant_group = QGroupBox('Variant')
@@ -138,6 +173,7 @@ class FluorescenceView(QWidget):
 
         layout = QVBoxLayout()
         layout.addWidget(self.tree_view, 1)
+        layout.addWidget(self.info_label)
         layout.addWidget(variant_group)
         layout.addWidget(self.button_box)
         self.setLayout(layout)

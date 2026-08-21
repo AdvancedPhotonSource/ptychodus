@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 
-from PyQt5.QtCore import QModelIndex, QSortFilterProxyModel, QStringListModel
+from PyQt5.QtCore import QModelIndex, QStringListModel
 from PyQt5.QtWidgets import QAbstractItemView, QDialog, QMessageBox
 
 from ptychodus.api.observer import SequenceObserver
@@ -13,6 +13,7 @@ from ...view.probe_positions import ProbePositionsPlotView
 from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
 from ..helpers import (
+    UserRoleSortFilterProxyModel,
     connect_current_changed_signal,
     connect_triggered_signal,
     create_brush_for_editable_cell,
@@ -43,7 +44,7 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
         self._table_model = ProbePositionsTableModel(
             repository, api, create_brush_for_editable_cell(view)
         )
-        self._table_proxy_model = QSortFilterProxyModel()
+        self._table_proxy_model = UserRoleSortFilterProxyModel()
         self._editor_factory = ProbePositionsEditorViewControllerFactory()
 
         self._table_proxy_model.setSourceModel(self._table_model)
@@ -51,6 +52,7 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
             lambda top_left, bottom_right, roles: self._redraw_plot()
         )
         repository.add_observer(self)
+        self._update_info_text()
 
         builder_list_model = QStringListModel()
         builder_list_model.setStringList([name for name in api.builder_names()])
@@ -221,14 +223,20 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
         self._view.button_box.analyze_button.setEnabled(enabled)
         self._redraw_plot()
 
+    def _update_info_text(self) -> None:
+        self._view.info_label.setText(self._repository.get_info_text())
+
     def handle_item_inserted(self, index: int, item: ProbePositionsRepositoryItem) -> None:
+        self._update_info_text()
         self._table_model.insert_item(index, item)
 
     def handle_item_changed(self, index: int, item: ProbePositionsRepositoryItem) -> None:
+        self._update_info_text()
         self._table_model.update_item(index, item)
 
         if self._table_model.is_item_checked(index):
             self._redraw_plot()
 
     def handle_item_removed(self, index: int, item: ProbePositionsRepositoryItem) -> None:
+        self._update_info_text()
         self._table_model.remove_item(index, item)

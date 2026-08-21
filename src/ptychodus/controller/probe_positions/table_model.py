@@ -3,10 +3,13 @@ from typing import Any
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QObject
 from PyQt5.QtGui import QBrush
 
-from ptychodus.api.constants import BYTES_PER_MEGABYTE
+from ptychodus.api.constants import format_bytes
 
 from ...model.product import ProbePositionsAPI, ProbePositionsRepository
 from ...model.product.probe_positions import ProbePositionsRepositoryItem
+
+
+_COL_SIZE = 5
 
 
 class ProbePositionsTableModel(QAbstractTableModel):
@@ -21,7 +24,7 @@ class ProbePositionsTableModel(QAbstractTableModel):
         self._repository = repository
         self._api = api
         self._editable_item_brush = editable_item_brush
-        self._header = ['Name', 'Plot', 'Builder', 'Points', 'Length [m]', 'Size [MB]']
+        self._header = ['Name', 'Plot', 'Builder', 'Points', 'Length [m]', 'Size']
         self._checked_item_indexes: set[int] = set()
 
     def insert_item(self, index: int, item: ProbePositionsRepositoryItem) -> None:
@@ -69,8 +72,13 @@ class ProbePositionsTableModel(QAbstractTableModel):
                 return len(probe_positions)
             elif index.column() == 4:
                 return f'{length_m:.6f}'
-            elif index.column() == 5:
-                return f'{probe_positions.nbytes / BYTES_PER_MEGABYTE:.2f}'
+            elif index.column() == _COL_SIZE:
+                return format_bytes(probe_positions.nbytes)
+        elif role == Qt.ItemDataRole.UserRole:
+            if index.column() == _COL_SIZE:
+                # Numeric sort key: the display text mixes units and cannot be
+                # ordered as a string.
+                return probe_positions.nbytes
         elif role == Qt.ItemDataRole.CheckStateRole:
             if index.column() == 1:
                 return (

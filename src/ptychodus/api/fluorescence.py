@@ -1,9 +1,11 @@
 """Fluorescence data structures and enhancement plugin interfaces."""
 
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import overload
 
 from .typing import RealArrayType
 from .product import Product
@@ -16,9 +18,13 @@ class ElementMap:
     name: str
     counts_per_second: RealArrayType
 
+    @property
+    def nbytes(self) -> int:
+        return self.counts_per_second.nbytes
+
 
 @dataclass(frozen=True)
-class FluorescenceDataset:
+class FluorescenceDataset(Sequence[ElementMap]):
     """Collection of element maps with metadata."""
 
     element_maps: Sequence[ElementMap]
@@ -28,6 +34,26 @@ class FluorescenceDataset:
     # TODO need to communicate association between element map pixels and scan order.
     #      integer-valued, same shape as counts_per_second
     # scan_indexes: IntegerArray
+
+    @property
+    def nbytes(self) -> int:
+        return sum(element_map.nbytes for element_map in self.element_maps)
+
+    @overload
+    def __getitem__(self, index: int) -> ElementMap: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[ElementMap]: ...
+
+    def __getitem__(self, index: int | slice) -> ElementMap | Sequence[ElementMap]:
+        return self.element_maps[index]
+
+    def __len__(self) -> int:
+        return len(self.element_maps)
+
+    def __repr__(self) -> str:
+        names = ', '.join(element_map.name for element_map in self.element_maps)
+        return f'{type(self).__name__}({len(self)} maps: {names})'
 
 
 @dataclass(frozen=True)

@@ -15,11 +15,14 @@ from ...model.fluorescence import (
 )
 from ...model.product import ProductRepository
 from ...view.fluorescence import FluorescenceView
-from ...view.widgets import ExceptionDialog
+from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
+from ..helpers import connect_triggered_signal, create_brush_for_editable_cell
 from ..image import ImageController
+from .editor import FluorescenceEditorViewController
 from .enhance_dialog import FluorescenceEnhanceDialogController
-from .repository_tree_model import FluorescenceRepositoryTreeModel, DisplayMode
+from ..product.core import ProductRepositoryComboProxyModel, ProductRepositoryTableModel
+from .repository_tree_model import COL_PRODUCT, FluorescenceRepositoryTreeModel, DisplayMode
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +45,7 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         repository: FluorescenceRepository,
         api: FluorescenceAPI,
         product_repository: ProductRepository,
+        product_table_model: ProductRepositoryTableModel,
         view: FluorescenceView,
         image_controller: ImageController,
         enhance_dialog_controller: FluorescenceEnhanceDialogController,
@@ -57,8 +61,18 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         self._file_dialog_factory = file_dialog_factory
         self._task_monitor = api.get_task_monitor()
 
-        self._tree_model = FluorescenceRepositoryTreeModel(repository)
+        self._tree_model = FluorescenceRepositoryTreeModel(
+            repository, product_repository, create_brush_for_editable_cell(view)
+        )
+        # Live list of selectable products, shared with the product-facing combos:
+        # it disables pending / failed products so they cannot be picked as a target.
+        self._product_combo_model = ProductRepositoryComboProxyModel(
+            product_table_model, product_repository
+        )
         view.tree_view.setModel(self._tree_model)
+        view.tree_view.setItemDelegateForColumn(
+            COL_PRODUCT, ComboBoxItemDelegate(self._product_combo_model, view.tree_view)
+        )
         header = view.tree_view.header()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
 
@@ -70,16 +84,24 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         view.measured_radio_button.toggled.connect(self._on_display_toggled)
         view.enhanced_radio_button.toggled.connect(self._on_display_toggled)
 
-        view.button_box.load_button.clicked.connect(self._load)
+        open_file_action = view.button_box.insert_menu.addAction('Open File...')
+        connect_triggered_signal(open_file_action, self._load)
+
+        save_file_action = view.button_box.save_menu.addAction('Save File...')
+        connect_triggered_signal(save_file_action, self._save)
+        sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
+        connect_triggered_signal(sync_to_settings_action, self._sync_current_to_settings)
+
         view.button_box.enhance_button.clicked.connect(self._enhance)
-        view.button_box.save_button.clicked.connect(self._save)
+        view.button_box.edit_button.clicked.connect(self._edit_current_item)
         view.button_box.remove_button.clicked.connect(self._remove)
 
         repository.add_observer(self)
+        self._update_info_text()
         self._task_monitor.add_observer(self)
 
         self._sync_display_toggle_enabled()
-        self._sync_buttons()
+        self._refresh_enabled_buttons()
 
     # ------------------------------------------------------------------
     # Selection & rendering
@@ -94,7 +116,9 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
         return self._tree_model.item_row_for_index(self._view.tree_view.currentIndex())
 
     def _current_item(self) -> FluorescenceRepositoryItem | None:
-        row = self._current_top_level_row()
+        return self._item_at(self._current_top_level_row())
+
+    def _item_at(self, row: int) -> FluorescenceRepositoryItem | None:
         if row < 0:
             return None
         try:
@@ -105,7 +129,7 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
     def _on_tree_selection_changed(self, current: QModelIndex, previous: QModelIndex) -> None:
         self._sync_display_toggle_enabled()
         self._render_current()
-        self._sync_buttons()
+        self._refresh_enabled_buttons()
 
     def _on_display_toggled(self, checked: bool) -> None:
         # Signals fire twice per toggle (button loses check + button gains
@@ -205,6 +229,22 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
             logger.exception(err)
             ExceptionDialog.show_exception(title, err)
 
+    def _sync_current_to_settings(self) -> None:
+        row = self._current_top_level_row()
+        if row < 0:
+            return
+        self._api.sync_to_settings(row)
+
+    def _edit_current_item(self) -> None:
+        row = self._current_top_level_row()
+        if row < 0:
+            return
+        try:
+            item = self._repository[row]
+        except IndexError:
+            return
+        FluorescenceEditorViewController.edit_item(self._product_repository, item, self._view)
+
     def _enhance(self) -> None:
         row = self._current_top_level_row()
         if row < 0:
@@ -242,8 +282,16 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
             return
         self._api.remove_item(row)
 
-    def _sync_buttons(self) -> None:
-        item = self._current_item()
+    def _refresh_enabled_buttons(self) -> None:
+        """Re-run the button gating against whatever the tree currently has selected.
+
+        Used for programmatic refreshes; the currentChanged signal calls
+        _update_enabled_buttons directly with the new index.
+        """
+        self._update_enabled_buttons(self._view.tree_view.currentIndex(), QModelIndex())
+
+    def _update_enabled_buttons(self, current: QModelIndex, previous: QModelIndex) -> None:
+        item = self._item_at(self._tree_model.item_row_for_index(current))
         has_item = item is not None
         has_enhanced = item is not None and item.get_enhanced() is not None
         can_enhance = (
@@ -252,22 +300,27 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
             and not self._task_monitor.is_processing
         )
 
-        self._view.button_box.load_button.setEnabled(True)
         self._view.button_box.enhance_button.setEnabled(can_enhance)
         self._view.button_box.save_button.setEnabled(has_enhanced)
+        self._view.button_box.edit_button.setEnabled(has_item)
         self._view.button_box.remove_button.setEnabled(has_item)
+
+    def _update_info_text(self) -> None:
+        self._view.info_label.setText(self._repository.get_info_text())
 
     # ------------------------------------------------------------------
     # Observers
     # ------------------------------------------------------------------
 
     def handle_item_inserted(self, index: int, item: FluorescenceRepositoryItem) -> None:
+        self._update_info_text()
         if not self._view.tree_view.currentIndex().isValid():
             self._view.tree_view.setCurrentIndex(self._tree_model.index(index, 0))
         self._sync_display_toggle_enabled()
-        self._sync_buttons()
+        self._refresh_enabled_buttons()
 
     def handle_item_removed(self, index: int, item: FluorescenceRepositoryItem) -> None:
+        self._update_info_text()
         if not self._view.tree_view.currentIndex().isValid():
             row_count = self._tree_model.rowCount()
             if row_count > 0:
@@ -276,26 +329,29 @@ class FluorescenceController(FluorescenceRepositoryObserver, Observer):
             else:
                 self._render_current()
         self._sync_display_toggle_enabled()
-        self._sync_buttons()
+        self._refresh_enabled_buttons()
 
     def handle_metadata_changed(self, index: int, item: FluorescenceRepositoryItem) -> None:
+        self._update_info_text()
         if index == self._current_top_level_row():
-            self._sync_buttons()
+            self._refresh_enabled_buttons()
 
     def handle_enhanced_changed(self, index: int, item: FluorescenceRepositoryItem) -> None:
+        self._update_info_text()
         if index == self._current_top_level_row():
             self._sync_display_toggle_enabled()
             self._render_current()
-            self._sync_buttons()
+            self._refresh_enabled_buttons()
 
     def handle_state_changed(self, index: int, item: FluorescenceRepositoryItem) -> None:
+        self._update_info_text()
         if index == self._current_top_level_row():
             if item.get_state() is FluorescenceItemState.FAILED:
-                logger.warning(f'Enhancement failed for item "{item.get_label()}"')
+                logger.warning(f'Enhancement failed for item "{item.get_name()}"')
             elif item.get_state() is FluorescenceItemState.ORPHANED:
-                logger.info(f'Fluorescence item "{item.get_label()}" orphaned by product removal')
-            self._sync_buttons()
+                logger.info(f'Fluorescence item "{item.get_name()}" orphaned by product removal')
+            self._refresh_enabled_buttons()
 
     def _update(self, observable: Observable) -> None:
         if observable is self._task_monitor:
-            self._sync_buttons()
+            self._refresh_enabled_buttons()

@@ -7,6 +7,7 @@ from ptychodus.api.fluorescence import (
     FluorescenceFileWriter,
     UpscalingStrategy,
 )
+from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.plugins import PluginChooser, PluginChooserParameter
 from ptychodus.api.settings import SettingsRegistry
 
@@ -24,7 +25,7 @@ from .vspi import VSPIFluorescenceEnhancer
 logger = logging.getLogger(__name__)
 
 
-class FluorescenceCore:
+class FluorescenceCore(Observer):
     def __init__(
         self,
         task_manager: TaskManager,
@@ -35,7 +36,10 @@ class FluorescenceCore:
         deconvolution_strategy_chooser: PluginChooser[DeconvolutionStrategy],
         file_reader_chooser: PluginChooser[FluorescenceFileReader],
         file_writer_chooser: PluginChooser[FluorescenceFileWriter],
+        reinit_observable: Observable,
     ) -> None:
+        super().__init__()
+        self._product_repository = product_repository
         self.settings = FluorescenceSettings(settings_registry)
         self.upscaling_strategy_chooser = upscaling_strategy_chooser
         self.deconvolution_strategy_chooser = deconvolution_strategy_chooser
@@ -110,3 +114,20 @@ class FluorescenceCore:
         logging.getLogger('ptychodus.model.fluorescence').addHandler(
             self.task_monitor.get_log_handler()
         )
+
+        self._reinit_observable = reinit_observable
+        reinit_observable.add_observer(self)
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._reinit_observable:
+            # Runs after ProductCore has inserted the settings-driven product, so the
+            # measured dataset binds to it. The default file path is a placeholder, so
+            # stay quiet unless it names a real file.
+            file_path = self.settings.file_path.get_value()
+
+            if file_path.is_file() and len(self._product_repository) > 0:
+                self.fluorescence_api.open_measured_dataset(
+                    file_path,
+                    len(self._product_repository) - 1,
+                    file_type=self.settings.file_type.get_value(),
+                )

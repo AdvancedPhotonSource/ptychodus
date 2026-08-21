@@ -5,13 +5,14 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
+from sys import getsizeof
 from pathlib import Path
 from typing import overload, Any, TypeAlias
 
 import numpy
 from scipy import ndimage
 
-from .constants import BYTES_PER_MEGABYTE
+from .constants import format_bytes
 from .geometry import ImageExtent, PixelGeometry
 from .preprocess.noise import estimate_noise_floor
 
@@ -200,6 +201,10 @@ class SimpleDiffractionArray(DiffractionArray):
     def get_patterns(self) -> DiffractionPatterns:
         return self._patterns
 
+    @property
+    def nbytes(self) -> int:
+        return self._indexes.nbytes + self._patterns.nbytes
+
 
 class Polarization(StrEnum):
     """Beam polarization state (used by XMCD analysis).
@@ -228,6 +233,23 @@ class DiffractionMetadata:
     tilt_angle_deg: float | None = None
     polarization: Polarization | None = None
     file_path: Path | None = None
+
+    @property
+    def nbytes(self) -> int:
+        sz = getsizeof(self.num_patterns_per_array)
+        sz += getsizeof(self.pattern_dtype)
+        sz += getsizeof(self.detector_extent)
+        sz += getsizeof(self.detector_distance_m)
+        sz += getsizeof(self.detector_pixel_geometry)
+        sz += getsizeof(self.crop_center)
+        sz += getsizeof(self.probe_energy_eV)
+        sz += getsizeof(self.probe_photon_count)
+        sz += getsizeof(self.exposure_time_s)
+        sz += getsizeof(self.tomography_angle_deg)
+        sz += getsizeof(self.tilt_angle_deg)
+        sz += getsizeof(self.polarization)
+        sz += getsizeof(self.file_path)
+        return sz
 
     @classmethod
     def create_null(cls, file_path: Path | None = None) -> DiffractionMetadata:
@@ -483,8 +505,16 @@ class AssembledDiffractionData:
         assembled_patterns = self.get_patterns()
         return numpy.mean(assembled_patterns, axis=0)
 
+    @property
+    def nbytes(self) -> int:
+        """Logical size of the arrays this holds.
+
+        A memory-mapped patterns array (see ``load_diffraction_data``) reports its full
+        logical size here even though it is backed by disk rather than RAM.
+        """
+        return self._indexes.nbytes + self._patterns.nbytes + self._bad_pixels.nbytes
+
     def __str__(self) -> str:
         number, height, width = self._patterns.shape
         dtype = str(self._patterns.dtype)
-        size_MB = self._patterns.nbytes / BYTES_PER_MEGABYTE  # noqa: N806
-        return f'{number} x {height}H x {width}W {dtype} [{size_MB:.2f}MB]'
+        return f'{number} x {height}H x {width}W {dtype} [{format_bytes(self._patterns.nbytes)}]'

@@ -427,6 +427,10 @@ class Probe:
 
         self._mode_relative_power = power.tolist()
 
+    @property
+    def nbytes(self) -> int:
+        return self._array.nbytes
+
     def copy(self) -> Probe:
         return Probe(
             array=self._array.copy(),

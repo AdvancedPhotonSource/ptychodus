@@ -4,6 +4,7 @@ from .dataset import (
     AssembledDiffractionArray,
     AssembledDiffractionDataset,
     DiffractionDatasetObserver,
+    DiffractionDatasetState,
 )
 from .monitor import DiffractionTaskMonitor
 from .repository import DiffractionDatasetRepository, DiffractionDatasetRepositoryObserver
@@ -19,6 +20,7 @@ __all__ = [
     'DiffractionDatasetObserver',
     'DiffractionDatasetRepository',
     'DiffractionDatasetRepositoryObserver',
+    'DiffractionDatasetState',
     'DiffractionSettings',
     'DiffractionTaskMonitor',
     'PatternSizer',

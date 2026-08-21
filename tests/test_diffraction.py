@@ -17,7 +17,14 @@ Behaviors verified for Fresnel-zone-plate (with central stop) patterns:
 import numpy
 import pytest
 
-from ptychodus.api.diffraction import CropCenter, estimate_crop_center
+from ptychodus.api.diffraction import (
+    AssembledDiffractionData,
+    CropCenter,
+    DiffractionMetadata,
+    SimpleDiffractionArray,
+    estimate_crop_center,
+)
+from ptychodus.api.geometry import PixelGeometry
 
 
 def _fzp_pattern(
@@ -152,3 +159,27 @@ def test_asymmetric_bright_peak_does_not_bias_centroid() -> None:
     center = estimate_crop_center(pattern + blob)
     assert abs(center.position_y_px - 32) <= 1
     assert abs(center.position_x_px - 32) <= 1
+
+
+class TestNbytes:
+    def test_simple_array_sums_indexes_and_patterns(self) -> None:
+        indexes = numpy.arange(3, dtype=numpy.int32)
+        patterns = numpy.zeros((3, 4, 5), dtype=numpy.uint16)
+        array = SimpleDiffractionArray('a', indexes, patterns)
+
+        assert array.nbytes == indexes.nbytes + patterns.nbytes
+
+    def test_assembled_data_sums_all_three_arrays(self) -> None:
+        indexes = numpy.arange(3, dtype=numpy.int32)
+        patterns = numpy.zeros((3, 4, 5), dtype=numpy.uint16)
+        bad_pixels = numpy.zeros((4, 5), dtype=numpy.bool_)
+        data = AssembledDiffractionData(
+            indexes, patterns, PixelGeometry(width_m=1e-4, height_m=1e-4), bad_pixels
+        )
+
+        assert data.nbytes == indexes.nbytes + patterns.nbytes + bad_pixels.nbytes
+
+    def test_metadata_nbytes_is_positive(self) -> None:
+        metadata = DiffractionMetadata.create_null()
+
+        assert metadata.nbytes > 0

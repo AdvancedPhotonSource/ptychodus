@@ -1,5 +1,6 @@
 from __future__ import annotations
 from collections.abc import Sequence
+from enum import IntEnum
 from typing import Any, cast
 import logging
 
@@ -14,10 +15,15 @@ from PyQt5.QtCore import (
 from PyQt5.QtGui import QBrush, QFont
 from PyQt5.QtWidgets import QAbstractItemView, QAction, QInputDialog
 
-from ptychodus.api.constants import BYTES_PER_MEGABYTE, ONE_KILOELECTRONVOLT_EV, ONE_NANOMETER_M
+from ptychodus.api.constants import (
+    ONE_KILOELECTRONVOLT_EV,
+    ONE_NANOMETER_M,
+    format_bytes,
+)
 from ptychodus.api.product import LossValue
 
 from ...model.diffraction import AssembledDiffractionDataset, DiffractionDatasetRepository
+from ..diffraction.dataset import UNBOUND_DATASET, DiffractionDatasetComboModel
 from ...model.product import (
     ProductAPI,
     ProductRepository,
@@ -29,12 +35,40 @@ from ...model.product.object import ObjectRepositoryItem
 from ...model.product.probe import ProbeRepositoryItem
 from ...model.product.probe_positions import ProbePositionsRepositoryItem
 from ...view.product import ProductView
-from ...view.widgets import ExceptionDialog
+from ...view.widgets import ComboBoxItemDelegate, ExceptionDialog
 from ..data import FileDialogFactory
-from ..helpers import connect_triggered_signal
+from ..helpers import UserRoleSortFilterProxyModel, connect_triggered_signal
 from .editor import ProductEditorViewController
 
 logger = logging.getLogger(__name__)
+
+
+class _Column(IntEnum):
+    """Column order of ProductRepositoryTableModel.
+
+    An enum rather than module-level ints so that ``match`` arms are value patterns:
+    a bare name would be a capture pattern that swallows every column.
+    """
+
+    NAME = 0
+    DIFFRACTION_DATASET = 1
+    DETECTOR_DISTANCE_M = 2
+    PROBE_ENERGY_KEV = 3
+    PROBE_PHOTON_COUNT = 4
+    PIXEL_WIDTH_NM = 5
+    PIXEL_HEIGHT_NM = 6
+    SIZE = 7
+
+
+_EDITABLE_COLUMNS = frozenset(
+    {
+        _Column.NAME,
+        _Column.DIFFRACTION_DATASET,
+        _Column.DETECTOR_DISTANCE_M,
+        _Column.PROBE_ENERGY_KEV,
+        _Column.PROBE_PHOTON_COUNT,
+    }
+)
 
 
 class ProductRepositoryTableModel(QAbstractTableModel):
@@ -49,20 +83,23 @@ class ProductRepositoryTableModel(QAbstractTableModel):
     def __init__(
         self,
         repository: ProductRepository,
+        diffraction_repository: DiffractionDatasetRepository,
         editable_item_brush: QBrush,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._repository = repository
+        self._diffraction_repository = diffraction_repository
         self._editable_item_brush = editable_item_brush
         self._header = [
             'Name',
+            'Diffraction\nDataset',
             'Detector-Object\nDistance [m]',
             'Probe Energy\n[keV]',
             'Probe Photon\nCount',
             'Pixel Width\n[nm]',
             'Pixel Height\n[nm]',
-            'Size\n[MB]',
+            'Size',
         ]
         # Duck-typed; see class docstring on the ABC / sip metaclass conflict.
         repository.add_observer(cast(ProductRepositoryObserver, self))
@@ -70,7 +107,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         value = super().flags(index)
 
-        if index.isValid() and index.column() < 4:
+        if index.isValid() and index.column() in _EDITABLE_COLUMNS:
             try:
                 item = self._repository[index.row()]
             except IndexError:
@@ -105,33 +142,43 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 
             if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
                 match index.column():
-                    case 0:
+                    case _Column.NAME:
                         return metadata_item.name.get_value()
-                    case 1:
+                    case _Column.DIFFRACTION_DATASET:
+                        if pending or failed:
+                            return '—'
+                        dataset = item.get_dataset()
+                        return UNBOUND_DATASET if dataset is None else dataset.get_name()
+                    case _Column.DETECTOR_DISTANCE_M:
                         if pending or failed:
                             return '—'
                         return f'{metadata_item.detector_distance_m.get_value():.4g}'
-                    case 2:
+                    case _Column.PROBE_ENERGY_KEV:
                         if pending or failed:
                             return '—'
                         return f'{metadata_item.probe_energy_eV.get_value() / ONE_KILOELECTRONVOLT_EV:.4g}'
-                    case 3:
+                    case _Column.PROBE_PHOTON_COUNT:
                         if pending or failed:
                             return '—'
                         return f'{metadata_item.probe_photon_count.get_value():.4g}'
-                    case 4:
+                    case _Column.PIXEL_WIDTH_NM:
                         if pending or failed:
                             return '—'
                         return f'{geometry.get_object_plane_pixel_geometry().width_m / ONE_NANOMETER_M:.4g}'
-                    case 5:
+                    case _Column.PIXEL_HEIGHT_NM:
                         if pending or failed:
                             return '—'
                         return f'{geometry.get_object_plane_pixel_geometry().height_m / ONE_NANOMETER_M:.4g}'
-                    case 6:
+                    case _Column.SIZE:
                         if pending or failed:
                             return '—'
-                        product = item.get_product()
-                        return f'{product.nbytes / BYTES_PER_MEGABYTE:.2f}'
+                        return format_bytes(item.get_product().nbytes)
+            elif role == Qt.ItemDataRole.UserRole:
+                if index.column() == _Column.SIZE:
+                    # Numeric sort key: the display text mixes units and cannot be
+                    # ordered as a string. Pending and failed rows sort as zero so the
+                    # comparator stays total.
+                    return 0 if pending or failed else item.get_product().nbytes
             elif role == Qt.ItemDataRole.FontRole:
                 if pending or failed:
                     font = QFont()
@@ -143,8 +190,14 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                     return 'Loading…'
                 if failed:
                     return 'Load failed'
+                if index.column() == _Column.DIFFRACTION_DATASET and item.get_dataset() is None:
+                    # Surface why Reconstruct / Train are greyed out in the Processing
+                    # panel; otherwise an unbound product fails silently.
+                    return 'No diffraction dataset — reconstruction unavailable'
             elif role == Qt.ItemDataRole.ForegroundRole:
                 if pending or failed:
+                    return QBrush(Qt.GlobalColor.gray)
+                if index.column() == _Column.DIFFRACTION_DATASET and item.get_dataset() is None:
                     return QBrush(Qt.GlobalColor.gray)
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if not (pending or failed) and (index.flags() & Qt.ItemFlag.ItemIsEditable):
@@ -160,10 +213,23 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 
             metadata_item = item.get_metadata_item()
 
-            if index.column() == 0:
+            if index.column() == _Column.NAME:
                 metadata_item.name.set_value(str(value))
                 return True
-            elif index.column() == 1:
+            elif index.column() == _Column.DIFFRACTION_DATASET:
+                text = str(value)
+
+                if text == UNBOUND_DATASET:
+                    item.unbind_dataset()
+                    return True
+
+                for dataset in self._diffraction_repository:
+                    if dataset.get_name() == text:
+                        item.bind_dataset(dataset)
+                        return True
+
+                return False
+            elif index.column() == _Column.DETECTOR_DISTANCE_M:
                 try:
                     distance_m = float(value)
                 except ValueError:
@@ -171,7 +237,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 
                 metadata_item.detector_distance_m.set_value(distance_m)
                 return True
-            elif index.column() == 2:
+            elif index.column() == _Column.PROBE_ENERGY_KEV:
                 try:
                     energy_keV = float(value)  # noqa: N806
                 except ValueError:
@@ -179,7 +245,7 @@ class ProductRepositoryTableModel(QAbstractTableModel):
 
                 metadata_item.probe_energy_eV.set_value(energy_keV * ONE_KILOELECTRONVOLT_EV)
                 return True
-            elif index.column() == 3:
+            elif index.column() == _Column.PROBE_PHOTON_COUNT:
                 try:
                     photon_count = float(value)
                 except ValueError:
@@ -238,7 +304,17 @@ class ProductRepositoryTableModel(QAbstractTableModel):
         pass
 
     def handle_dataset_changed(self, index: int, item: ProductRepositoryItem) -> None:
-        pass
+        # Repaints the whole row: rebinding changes the Diffraction Dataset cell and
+        # re-syncs the geometry-derived pixel columns. Also the only signal that a
+        # dataset removal silently unbound this product.
+        self._emit_row_changed(
+            index,
+            [
+                Qt.ItemDataRole.DisplayRole,
+                Qt.ItemDataRole.ToolTipRole,
+                Qt.ItemDataRole.ForegroundRole,
+            ],
+        )
 
 
 class ProductRepositoryComboProxyModel(QIdentityProxyModel):
@@ -300,6 +376,9 @@ class ProductController(ProductRepositoryObserver):
         self._duplicate_action = duplicate_action
         self._table_model = table_model
         self._table_proxy_model = table_proxy_model
+        self._dataset_combo_model = DiffractionDatasetComboModel(
+            diffraction_repository, unbound_label=UNBOUND_DATASET
+        )
 
     @classmethod
     def create_instance(
@@ -317,7 +396,7 @@ class ProductController(ProductRepositoryObserver):
         save_file_action = view.button_box.save_menu.addAction('Save File...')
         sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
 
-        table_proxy_model = QSortFilterProxyModel()
+        table_proxy_model = UserRoleSortFilterProxyModel()
         table_proxy_model.setSourceModel(table_model)
 
         controller = cls(
@@ -342,6 +421,10 @@ class ProductController(ProductRepositoryObserver):
             vertical_header.hide()
 
         view.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        view.table_view.setItemDelegateForColumn(
+            _Column.DIFFRACTION_DATASET,
+            ComboBoxItemDelegate(controller._dataset_combo_model, view.table_view),
+        )
         header = view.table_view.horizontalHeader()
         header.setSectionResizeMode(header.ResizeMode.ResizeToContents)
         header.setHighlightSections(False)
@@ -384,21 +467,15 @@ class ProductController(ProductRepositoryObserver):
 
         return -1
 
-    def _get_current_item_index(self) -> int:
-        item_index = self.get_current_item_index()
-
-        if item_index < 0:
-            logger.warning('No current index!')
-
-        return item_index
-
     def _choose_dataset(self, title: str) -> tuple[bool, AssembledDiffractionDataset | None]:
         """Prompt the user to bind the new product to a diffraction dataset.
 
-        Returns (accepted, dataset). ``dataset`` is None when the user selects "None".
+        Returns (accepted, dataset). ``dataset`` is None when the user picks the
+        unbound entry. Shares the combo model with the table column and the editor
+        dialog so all three offer the same list.
         """
-        datasets = list(self._diffraction_repository)
-        labels = ['None', *(dataset.get_name() for dataset in datasets)]
+        model = self._dataset_combo_model
+        labels = [str(model.index(row, 0).data()) for row in range(model.rowCount())]
 
         label, accepted = QInputDialog.getItem(
             self._view,
@@ -412,9 +489,7 @@ class ProductController(ProductRepositoryObserver):
         if not accepted:
             return False, None
 
-        row = labels.index(label) - 1
-        dataset = datasets[row] if 0 <= row < len(datasets) else None
-        return True, dataset
+        return True, model.dataset_at(labels.index(label))
 
     def _open_product_from_file(self) -> None:
         file_path, name_filter = self._file_dialog_factory.get_open_file_path(
@@ -447,9 +522,9 @@ class ProductController(ProductRepositoryObserver):
         self._api.insert_new_product(dataset=dataset, block=False)
 
     def _save_current_product_to_file(self) -> None:
-        current = self._table_proxy_model.mapToSource(self._view.table_view.currentIndex())
+        item_index = self.get_current_item_index()
 
-        if current.isValid():
+        if item_index >= 0:
             file_path, name_filter = self._file_dialog_factory.get_save_file_path(
                 self._view,
                 'Save Product',
@@ -459,7 +534,7 @@ class ProductController(ProductRepositoryObserver):
 
             if file_path:
                 try:
-                    self._api.save_product(current.row(), file_path, file_type=name_filter)
+                    self._api.save_product(item_index, file_path, file_type=name_filter)
                 except Exception as err:
                     logger.exception(err)
                     ExceptionDialog.show_exception('File Writer', err)
@@ -467,7 +542,7 @@ class ProductController(ProductRepositoryObserver):
             logger.error('No current item!')
 
     def _sync_current_product_to_settings(self) -> None:
-        item_index = self._get_current_item_index()
+        item_index = self.get_current_item_index()
 
         if item_index < 0:
             logger.warning('No current item!')
@@ -476,10 +551,10 @@ class ProductController(ProductRepositoryObserver):
             item.sync_to_settings()
 
     def _duplicate_current_product(self) -> None:
-        current = self._table_proxy_model.mapToSource(self._view.table_view.currentIndex())
+        item_index = self.get_current_item_index()
 
-        if current.isValid():
-            like_item = self._repository[current.row()]
+        if item_index >= 0:
+            like_item = self._repository[item_index]
             self._api.insert_product(
                 like_item.get_product(), dataset=like_item.get_dataset(), block=False
             )
@@ -487,21 +562,21 @@ class ProductController(ProductRepositoryObserver):
             logger.error('No current item!')
 
     def _edit_current_product(self) -> None:
-        current = self._table_proxy_model.mapToSource(self._view.table_view.currentIndex())
+        item_index = self.get_current_item_index()
 
-        if current.isValid():
-            product = self._repository[current.row()]
+        if item_index >= 0:
+            product = self._repository[item_index]
             ProductEditorViewController.edit_product(
-                self._diffraction_repository, product, self._view
+                self._diffraction_repository, self._dataset_combo_model, product, self._view
             )
         else:
             logger.error('No current item!')
 
     def _remove_current_product(self) -> None:
-        current = self._table_proxy_model.mapToSource(self._view.table_view.currentIndex())
+        item_index = self.get_current_item_index()
 
-        if current.isValid():
-            self._repository.remove_product(current.row())
+        if item_index >= 0:
+            self._repository.remove_product(item_index)
         else:
             logger.error('No current item!')
 
@@ -529,14 +604,6 @@ class ProductController(ProductRepositoryObserver):
     def _update_info_text(self) -> None:
         info_text = self._repository.get_info_text()
         self._view.info_label.setText(info_text)
-
-    def _current_source_row(self) -> int:
-        proxy_index = self._view.table_view.currentIndex()
-
-        if not proxy_index.isValid():
-            return -1
-
-        return self._table_proxy_model.mapToSource(proxy_index).row()
 
     def _auto_select_first_row_if_empty(self) -> None:
         if self._view.table_view.currentIndex().isValid():
@@ -582,12 +649,12 @@ class ProductController(ProductRepositoryObserver):
         self._update_info_text()
 
     def handle_dataset_changed(self, index: int, item: ProductRepositoryItem) -> None:
-        pass
+        self._update_info_text()
 
     def handle_state_changed(self, index: int, item: ProductRepositoryItem) -> None:
         self._update_info_text()
 
-        if self._current_source_row() == index:
+        if self.get_current_item_index() == index:
             current = self._view.table_view.currentIndex()
             self._update_enabled_buttons(current, QModelIndex())
 

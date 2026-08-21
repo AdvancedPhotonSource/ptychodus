@@ -4,7 +4,7 @@ from typing import Any, overload
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 from PyQt5.QtGui import QBrush
 
-from ptychodus.api.constants import BYTES_PER_MEGABYTE, ONE_NANOMETER_M
+from ptychodus.api.constants import ONE_NANOMETER_M, format_bytes
 from ptychodus.api.object import Object
 
 from ...model.product import ObjectAPI, ObjectRepository
@@ -69,7 +69,7 @@ class ObjectTreeModel(QAbstractItemModel):
             'Height [px]',
             'Pixel Width\n[nm]',
             'Pixel Height\n[nm]',
-            'Size [MB]',
+            'Size',
         ]
 
         for index, item in enumerate(repository):
@@ -227,7 +227,7 @@ class ObjectTreeModel(QAbstractItemModel):
                             else None
                         )
                     case 8:
-                        return f'{raw_object.nbytes / BYTES_PER_MEGABYTE:.2f}'
+                        return format_bytes(raw_object.nbytes)
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import overload
 import logging
 
+from ptychodus.api.constants import format_bytes
 from ptychodus.api.typing import RealArrayType
 from ptychodus.api.fluorescence import FluorescenceDataset
 
@@ -45,14 +46,14 @@ class FluorescenceRepositoryItem:
         self,
         parent: FluorescenceRepositoryItemObserver,
         *,
-        label: str,
+        name: str,
         product: ProductRepositoryItem,
         measured: FluorescenceDataset,
         source_path: Path | None = None,
         source_file_type: str | None = None,
     ) -> None:
         self._parent = parent
-        self._label = label
+        self._name = name
         self._product = product
         self._measured = measured
         self._source_path = source_path
@@ -63,16 +64,34 @@ class FluorescenceRepositoryItem:
         self._state = FluorescenceItemState.READY
         self._index = -1  # used by FluorescenceRepository
 
-    def get_label(self) -> str:
-        return self._label
+    def get_name(self) -> str:
+        return self._name
 
-    def set_label(self, label: str) -> None:
-        if self._label != label:
-            self._label = label
+    def set_name(self, name: str) -> None:
+        if self._name != name:
+            self._name = name
             self._parent.handle_metadata_changed(self)
 
     def get_product(self) -> ProductRepositoryItem:
         return self._product
+
+    def set_product(self, product: ProductRepositoryItem) -> None:
+        """Re-bind this item to a different product.
+
+        An ORPHANED item returns to READY: the state means "the product this pointed at
+        was removed", and re-binding answers that. A FAILED item keeps its state, which
+        records an enhancement failure rather than a missing product.
+        """
+        if self._product is product:
+            return
+
+        self._product = product
+
+        if self._state is FluorescenceItemState.ORPHANED:
+            self._state = FluorescenceItemState.READY
+            self._parent.handle_state_changed(self)
+
+        self._parent.handle_metadata_changed(self)
 
     def get_source_path(self) -> Path | None:
         return self._source_path
@@ -85,6 +104,19 @@ class FluorescenceRepositoryItem:
 
     def get_enhanced(self) -> FluorescenceDataset | None:
         return self._enhanced
+
+    def get_nbytes(self) -> int:
+        """Bytes held by the measured and enhanced element maps.
+
+        The derived summary caches are excluded so that element-map sizes sum exactly
+        to their item, and items sum exactly to the repository total.
+        """
+        sz = self._measured.nbytes
+
+        if self._enhanced is not None:
+            sz += self._enhanced.nbytes
+
+        return sz
 
     def set_enhanced(self, dataset: FluorescenceDataset) -> None:
         self._enhanced = dataset
@@ -126,8 +158,8 @@ class FluorescenceRepositoryItem:
             self._parent.handle_state_changed(self)
 
     def mark_orphaned(self) -> None:
-        # Idempotent; once orphaned, an item cannot un-orphan even if the same
-        # product were re-added — the stored reference is to the old instance.
+        # Idempotent. Re-adding the same product does not clear this by itself — the
+        # stored reference is to the old instance — but set_product() does.
         if self._state is not FluorescenceItemState.ORPHANED:
             self._state = FluorescenceItemState.ORPHANED
             self._parent.handle_state_changed(self)
@@ -225,7 +257,7 @@ class FluorescenceRepository(
         return len(self._item_list)
 
     def create_unique_name(self, candidate_name: str) -> str:
-        reserved_names = {item.get_label() for item in self._item_list}
+        reserved_names = {item.get_name() for item in self._item_list}
         name = candidate_name or 'Unnamed'
         match = 0
 
@@ -271,6 +303,10 @@ class FluorescenceRepository(
             if item.get_product() is removed_product:
                 item.mark_orphaned()
 
+    def get_info_text(self) -> str:
+        nbytes = sum(item.get_nbytes() for item in self._item_list)
+        return f'Datasets: {len(self)} [{format_bytes(nbytes)}]'
+
     def add_observer(self, observer: FluorescenceRepositoryObserver) -> None:
         if observer not in self._observer_list:
             self._observer_list.append(observer)
@@ -284,7 +320,7 @@ class FluorescenceRepository(
     def handle_metadata_changed(self, item: FluorescenceRepositoryItem) -> None:
         index = item._index
         if index < 0:
-            logger.warning(f'Failed to look up index for "{item.get_label()}"!')
+            logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
         for observer in self._observer_list:
             observer.handle_metadata_changed(index, item)
@@ -292,7 +328,7 @@ class FluorescenceRepository(
     def handle_enhanced_changed(self, item: FluorescenceRepositoryItem) -> None:
         index = item._index
         if index < 0:
-            logger.warning(f'Failed to look up index for "{item.get_label()}"!')
+            logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
         for observer in self._observer_list:
             observer.handle_enhanced_changed(index, item)
@@ -300,7 +336,7 @@ class FluorescenceRepository(
     def handle_state_changed(self, item: FluorescenceRepositoryItem) -> None:
         index = item._index
         if index < 0:
-            logger.warning(f'Failed to look up index for "{item.get_label()}"!')
+            logger.warning(f'Failed to look up index for "{item.get_name()}"!')
             return
         for observer in self._observer_list:
             observer.handle_state_changed(index, item)

@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from typing import overload
 import logging
 
+from ptychodus.api.constants import format_bytes
 from ptychodus.api.observer import ObservableSequence
 from ptychodus.api.product import LossValue
 
@@ -47,6 +48,10 @@ class ProbeRepository(ObservableSequence[ProbeRepositoryItem], ProductRepository
 
     def __len__(self) -> int:
         return len(self._repository)
+
+    def get_info_text(self) -> str:
+        nbytes = sum(item.get_probes().nbytes for item in self)
+        return f'Probes: {len(self)} [{format_bytes(nbytes)}]'
 
     def handle_item_inserted(self, index: int, item: ProductRepositoryItem) -> None:
         self.notify_observers_item_inserted(index, item.get_probe_item())

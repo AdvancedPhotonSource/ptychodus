@@ -2,9 +2,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from typing import overload
 import logging
-import sys
 
-from ptychodus.api.constants import BYTES_PER_MEGABYTE
+from ptychodus.api.constants import format_bytes
 
 from ..task_manager import TaskManager
 from .dataset import AssembledDiffractionDataset
@@ -42,6 +41,14 @@ class DiffractionDatasetRepositoryObserver(ABC):
 
     @abstractmethod
     def handle_dataset_removed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        pass
+
+    @abstractmethod
+    def handle_metadata_changed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        pass
+
+    @abstractmethod
+    def handle_state_changed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
         pass
 
 
@@ -124,6 +131,32 @@ class DiffractionDatasetRepository(Sequence[AssembledDiffractionDataset]):
         for idx in range(len(self._dataset_list) - 1, -1, -1):
             self.remove_dataset(idx)
 
+    def handle_metadata_changed(self, dataset: AssembledDiffractionDataset) -> None:
+        index = self._dataset_row(dataset)
+
+        if index is None:
+            logger.warning(f'Failed to look up index for "{dataset.get_name()}"!')
+            return
+
+        for observer in self._observer_list:
+            observer.handle_metadata_changed(index, dataset)
+
+    def handle_state_changed(self, dataset: AssembledDiffractionDataset) -> None:
+        index = self._dataset_row(dataset)
+
+        if index is None:
+            logger.warning(f'Failed to look up index for "{dataset.get_name()}"!')
+            return
+
+        for observer in self._observer_list:
+            observer.handle_state_changed(index, dataset)
+
+    def _dataset_row(self, dataset: AssembledDiffractionDataset) -> int | None:
+        try:
+            return self._dataset_list.index(dataset)
+        except ValueError:
+            return None
+
     def get_info_text(self) -> str:
-        size_MB = sum(sys.getsizeof(ds) for ds in self._dataset_list) / BYTES_PER_MEGABYTE  # noqa: N806
-        return f'Total: {len(self)} [{size_MB:.2f}MB]'
+        nbytes = sum(dataset.get_nbytes() for dataset in self._dataset_list)
+        return f'Datasets: {len(self)} [{format_bytes(nbytes)}]'

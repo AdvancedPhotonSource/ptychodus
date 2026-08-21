@@ -5,9 +5,11 @@ from typing import Any, cast, overload
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 from PyQt5.QtGui import QBrush, QFont
 
+from ptychodus.api.constants import format_bytes
 from ptychodus.api.typing import RealArrayType
 from ptychodus.api.fluorescence import ElementMap, FluorescenceDataset
 
+from ...model.product import ProductRepository
 from ...model.fluorescence import (
     FluorescenceItemState,
     FluorescenceRepository,
@@ -22,7 +24,10 @@ class DisplayMode(Enum):
 
 
 _COL_NAME = 0
+# Public: the controller installs the product combo delegate on this column.
+COL_PRODUCT = 1
 _COL_COUNTS = 3
+_COL_SIZE = 4
 
 
 def _select_display_quantity(
@@ -70,6 +75,15 @@ class _TreeNode:
     def get_counts(self, item: FluorescenceRepositoryItem, display: DisplayMode) -> float | None:
         return None
 
+    def get_nbytes(self, item: FluorescenceRepositoryItem) -> int:
+        """Total resident bytes for this row.
+
+        Deliberately independent of the measured/enhanced display: the column reports
+        what is held in memory, so leaf sizes sum to their item and items sum to the
+        panel's info label regardless of which variant is on screen.
+        """
+        return 0
+
 
 class _ItemNode(_TreeNode):
     def __init__(self, parent: _TreeNode) -> None:
@@ -90,6 +104,9 @@ class _ItemNode(_TreeNode):
         if summary is None:
             return None
         return float(summary.sum())
+
+    def get_nbytes(self, item: FluorescenceRepositoryItem) -> int:
+        return item.get_nbytes()
 
 
 class _ElementNode(_TreeNode):
@@ -129,6 +146,19 @@ class _ElementNode(_TreeNode):
             return None
         return float(element.counts_per_second.sum())
 
+    def get_nbytes(self, item: FluorescenceRepositoryItem) -> int:
+        measured = self._measured_element(item)
+        if measured is None:
+            return 0
+
+        sz = measured.nbytes
+        enhanced = _lookup_display_element(item, measured.name, DisplayMode.ENHANCED)
+
+        if enhanced is not None and enhanced is not measured:
+            sz += enhanced.nbytes
+
+        return sz
+
 
 class FluorescenceRepositoryTreeModel(QAbstractItemModel):
     """Two-level tree over FluorescenceRepository.
@@ -145,15 +175,19 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
     would clash with sip's wrappertype metaclass on QAbstractItemModel.
     """
 
-    _HEADER = ('Name', 'Product', 'Elements', 'Counts')
+    _HEADER = ('Name', 'Product', 'Elements', 'Counts', 'Size')
 
     def __init__(
         self,
         repository: FluorescenceRepository,
+        product_repository: ProductRepository,
+        editable_item_brush: QBrush,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._repository = repository
+        self._product_repository = product_repository
+        self._editable_item_brush = editable_item_brush
         self._root = _TreeNode(None)
         self._display = DisplayMode.MEASURED
 
@@ -241,8 +275,9 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
         parent_idx = self.index(index, 0)
         num_children = self.rowCount(parent_idx)
         if num_children > 0:
+            # Spans Counts..Size: an enhance run adds element maps, so both move.
             top_left = self.index(0, _COL_COUNTS, parent_idx)
-            bottom_right = self.index(num_children - 1, _COL_COUNTS, parent_idx)
+            bottom_right = self.index(num_children - 1, _COL_SIZE, parent_idx)
             self.dataChanged.emit(top_left, bottom_right)
 
     def handle_state_changed(self, index: int, item: FluorescenceRepositoryItem) -> None:
@@ -320,16 +355,16 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
         node = index.internalPointer()
         if not isinstance(node, _ItemNode):
             return value
-        if index.column() != _COL_NAME:
+        if index.column() not in (_COL_NAME, COL_PRODUCT):
             return value
 
         try:
             item = self._repository[index.row()]
         except IndexError:
             return value
-        # ORPHANED items can still be renamed — label is metadata, not tied to
-        # product lifetime; ENHANCING items lock the label so the user doesn't
-        # rename a row mid-task.
+        # ORPHANED items can still be renamed and re-bound — both are metadata edits,
+        # and re-binding is exactly how an orphan recovers. ENHANCING items lock both
+        # so the user doesn't retarget a row mid-task.
         if item.get_state() is not FluorescenceItemState.ENHANCING:
             value |= Qt.ItemFlag.ItemIsEditable
         return value
@@ -359,19 +394,27 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
                     case 3:
                         counts = node.get_counts(item, self._display)
                         return _format_counts(counts)
+                    case 4:
+                        return format_bytes(node.get_nbytes(item))
                     case _:
                         return None
             elif role == Qt.ItemDataRole.FontRole:
-                font = QFont()
-                font.setItalic(True)
-                return font
+                # Leaves carry no cue of their own: italic means ENHANCING on item
+                # rows, and reusing it here would collide with that meaning.
+                return _state_font(state)
+            elif role == Qt.ItemDataRole.ForegroundRole:
+                # Element rows are subordinate detail, so they stay grey regardless
+                # of state; a non-READY item greys anyway.
+                return QBrush(Qt.GlobalColor.gray)
+            elif role == Qt.ItemDataRole.ToolTipRole:
+                return _state_tool_tip(state)
             return None
 
         # Item row.
         if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
             match index.column():
                 case 0:
-                    return item.get_label()
+                    return item.get_name()
                 case 1:
                     return item.get_product().get_name()
                 case 2:
@@ -379,32 +422,71 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
                 case 3:
                     counts = node.get_counts(item, self._display)
                     return _format_counts(counts)
+                case 4:
+                    return format_bytes(node.get_nbytes(item))
         elif role == Qt.ItemDataRole.FontRole:
-            if state is FluorescenceItemState.ENHANCING:
-                font = QFont()
-                font.setItalic(True)
-                return font
-            if state is FluorescenceItemState.FAILED or state is FluorescenceItemState.ORPHANED:
-                font = QFont()
-                font.setStrikeOut(True)
-                return font
+            return _state_font(state)
         elif role == Qt.ItemDataRole.ForegroundRole:
             if state is not FluorescenceItemState.READY:
                 return QBrush(Qt.GlobalColor.gray)
+        elif role == Qt.ItemDataRole.ToolTipRole:
+            return _state_tool_tip(state)
+        elif role == Qt.ItemDataRole.BackgroundRole:
+            if index.flags() & Qt.ItemFlag.ItemIsEditable:
+                return self._editable_item_brush
         return None
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
         if not index.isValid() or role != Qt.ItemDataRole.EditRole:
             return False
         node = index.internalPointer()
-        if not isinstance(node, _ItemNode) or index.column() != _COL_NAME:
+        if not isinstance(node, _ItemNode):
+            return False
+        if index.column() not in (_COL_NAME, COL_PRODUCT):
             return False
         try:
             item = self._repository[index.row()]
         except IndexError:
             return False
-        item.set_label(str(value))
-        return True
+
+        if index.column() == _COL_NAME:
+            item.set_name(str(value))
+            return True
+
+        text = str(value)
+
+        for product in self._product_repository:
+            if product.get_name() == text:
+                # Clears ORPHANED back to READY when the item had lost its product.
+                item.set_product(product)
+                return True
+
+        return False
+
+
+def _state_font(state: FluorescenceItemState) -> QFont | None:
+    """Italic while enhancing, struck through when failed or orphaned."""
+    if state is FluorescenceItemState.READY:
+        return None
+
+    font = QFont()
+    font.setItalic(state is FluorescenceItemState.ENHANCING)
+    font.setStrikeOut(
+        state is FluorescenceItemState.FAILED or state is FluorescenceItemState.ORPHANED
+    )
+    return font
+
+
+def _state_tool_tip(state: FluorescenceItemState) -> str | None:
+    match state:
+        case FluorescenceItemState.ENHANCING:
+            return 'Enhancing…'
+        case FluorescenceItemState.FAILED:
+            return 'Enhancement failed'
+        case FluorescenceItemState.ORPHANED:
+            return 'Target product was removed'
+        case FluorescenceItemState.READY:
+            return None
 
 
 def _format_counts(counts: float | None) -> str:

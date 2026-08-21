@@ -170,6 +170,7 @@ class ModelCore:
             self.plugin_registry.deconvolution_strategies,
             self.plugin_registry.fluorescence_file_readers,
             self.plugin_registry.fluorescence_file_writers,
+            self.settings_registry,
         )
         self.analysis_core = AnalysisCore(
             self.rng,

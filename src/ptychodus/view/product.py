@@ -6,7 +6,6 @@ from PyQt5.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QMenu,
     QPlainTextEdit,
     QPushButton,
     QSizePolicy,
@@ -17,6 +16,8 @@ from PyQt5.QtWidgets import (
 )
 
 from .image import ImageView
+from .repository import InsertSaveEditRemoveButtonBox
+from .widgets import TaskStatusView
 
 
 class ProductEditorPropertiesView(QGroupBox):
@@ -80,34 +81,12 @@ class ProductEditorDialog(QDialog):
         return self.comments_view.text_edit
 
 
-class ProductButtonBox(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.insert_menu = QMenu()
-        self.insert_button = QPushButton('Insert')
-        self.save_menu = QMenu()
-        self.save_button = QPushButton('Save')
-        self.edit_button = QPushButton('Edit')
-        self.remove_button = QPushButton('Remove')
-
-        self.insert_button.setMenu(self.insert_menu)
-        self.save_button.setMenu(self.save_menu)
-
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.insert_button)
-        layout.addWidget(self.save_button)
-        layout.addWidget(self.edit_button)
-        layout.addWidget(self.remove_button)
-        self.setLayout(layout)
-
-
 class ProductView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.table_view = QTableView()
         self.info_label = QLabel()
-        self.button_box = ProductButtonBox()
+        self.button_box = InsertSaveEditRemoveButtonBox()
 
         layout = QVBoxLayout()
         layout.addWidget(self.table_view)
@@ -137,3 +116,32 @@ class ProductVisualizationView(QWidget):
         self.setLayout(layout)
 
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
+
+
+class ProductRightPanelView(QWidget):
+    """Right-hand Products panel: optional residual visualization over a status strip.
+
+    The visualization is developer-mode only, but the status strip is not — queued
+    product construction has to be visible in either mode, so this wrapper is always
+    the panel's right widget and only its upper half is conditional.
+    """
+
+    def __init__(
+        self,
+        visualization_view: ProductVisualizationView | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.visualization_view = visualization_view
+        self.status_view = TaskStatusView()
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        if visualization_view is None:
+            layout.addStretch()
+        else:
+            layout.addWidget(visualization_view)
+
+        layout.addWidget(self.status_view)
+        self.setLayout(layout)
