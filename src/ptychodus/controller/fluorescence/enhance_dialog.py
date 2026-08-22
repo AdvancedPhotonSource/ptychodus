@@ -19,7 +19,7 @@ from ...view.fluorescence import (
     FluorescenceStatusView,
 )
 from ...view.widgets import ExceptionDialog
-from ..parametric import ComboBoxParameterViewController, ParameterViewBuilder
+from ..parameters import ComboBoxParameterViewController, ParameterViewBuilder
 
 logger = logging.getLogger(__name__)
 

@@ -4,7 +4,7 @@ import logging
 
 import h5py
 
-from ptychodus.api.constants import ONE_MICRON_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -45,8 +45,8 @@ class ISNPositionFileReader(ProbePositionFileReader):
             point_list.append(
                 ProbePosition(
                     idx,
-                    float(x) * ONE_MICRON_M,
-                    float(y) * ONE_MICRON_M,
+                    LengthUnit.MICROMETER.to_meters(float(x)),
+                    LengthUnit.MICROMETER.to_meters(float(y)),
                 )
             )
 

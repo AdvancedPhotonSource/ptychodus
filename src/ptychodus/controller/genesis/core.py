@@ -17,7 +17,7 @@ from ...model.genesis import (
     GenesisStatusRepository,
 )
 from ..data import FileDialogFactory
-from ..parametric import (
+from ..parameters import (
     LineEditParameterViewController,
     ParameterViewBuilder,
     ParameterViewController,

@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import QFormLayout
 from ptychodus.api.parameters import BooleanParameter, IntegerParameter, StringParameter
 
 from ...model.ptychi import PtyChiEnumerators, PtyChiOPRSettings
-from ..parametric import (
+from ..parameters import (
     CheckBoxParameterViewController,
     CheckableGroupBoxParameterViewController,
     ComboBoxParameterViewController,

@@ -12,7 +12,7 @@ from ...model.product.object import (
     RandomObjectBuilder,
     STXMObjectBuilder,
 )
-from ..parametric import ParameterViewBuilder, ParameterViewController
+from ..parameters import ParameterViewBuilder, ParameterViewController
 
 
 class MultisliceViewController(ParameterViewController, Observer):

@@ -4,6 +4,8 @@ import math
 
 import numpy
 
+from ptychodus.api.constants import LengthUnit
+
 from ...model.analysis import FourierRingCorrelator
 from ...view.object import FourierRingCorrelationDialog
 from .tree_model import ObjectTreeModel
@@ -85,7 +87,9 @@ class FourierRingCorrelationViewController:
             _format_scalar(frc.get_average_signal_to_noise_ratio())
         )
         resolution_m = frc.get_resolution_m_at_signal_to_noise_threshold(_SNR_THRESHOLD)
-        self._dialog.resolution_label.setText(_format_scalar(1.0e9 * resolution_m, suffix=' nm'))
+        self._dialog.resolution_label.setText(
+            _format_scalar(LengthUnit.NANOMETER.convert(resolution_m), suffix=' nm')
+        )
 
         self._dialog.figure.tight_layout()
         self._dialog.figure_canvas.draw()

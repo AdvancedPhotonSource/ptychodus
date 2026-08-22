@@ -3,7 +3,7 @@ from typing import Final, Sequence
 
 import h5py
 
-from ptychodus.api.constants import ONE_KILOELECTRONVOLT_EV, ONE_MICRON_M
+from ptychodus.api.constants import LengthUnit, ONE_KILOELECTRONVOLT_EV
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
@@ -20,7 +20,7 @@ class NSLSIIProductFileReader(ProductFileReader):
         point_list: list[ProbePosition] = list()
 
         with h5py.File(file_path, 'r') as h5_file:
-            detector_distance_m = float(h5_file['det_dist'][()]) * ONE_MICRON_M
+            detector_distance_m = LengthUnit.MICROMETER.to_meters(float(h5_file['det_dist'][()]))
             probe_energy_eV = ONE_KILOELECTRONVOLT_EV * float(h5_file['energy'][()])  # noqa: N806
 
             metadata = ProductMetadata(
@@ -37,7 +37,7 @@ class NSLSIIProductFileReader(ProductFileReader):
             pixel_width_m = h5_file['img_pixel_size_x'][()]
             pixel_height_m = h5_file['img_pixel_size_y'][()]
             pixel_geometry = PixelGeometry(width_m=pixel_width_m, height_m=pixel_height_m)
-            positions_m = h5_file['pos_xy'][()].T * ONE_MICRON_M
+            positions_m = h5_file['pos_xy'][()].T * LengthUnit.MICROMETER.meters_per_unit
 
             for index, _xy in enumerate(positions_m):
                 point = ProbePosition(

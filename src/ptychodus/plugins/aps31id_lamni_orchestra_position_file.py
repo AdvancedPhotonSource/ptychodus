@@ -3,7 +3,7 @@ from typing import Final
 import csv
 import logging
 
-from ptychodus.api.constants import ONE_MICRON_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -78,8 +78,8 @@ class LamNIOrchestraPositionFileReader(ProbePositionFileReader):
 
                 point = ProbePosition(
                     int(row[self.DATA_POINT_COLUMN]),
-                    -float(row[self.X_COLUMN]) * ONE_MICRON_M,
-                    -float(row[self.Y_COLUMN]) * ONE_MICRON_M,
+                    -LengthUnit.MICROMETER.to_meters(float(row[self.X_COLUMN])),
+                    -LengthUnit.MICROMETER.to_meters(float(row[self.Y_COLUMN])),
                 )
                 point_list.append(point)
 

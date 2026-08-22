@@ -3,7 +3,7 @@ import logging
 
 import h5py
 
-from ptychodus.api.constants import ONE_MICRON_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -34,8 +34,8 @@ class NanoMAXPositionFileReader(ProbePositionFileReader):
                 for idx, (x, y) in enumerate(zip(position_x, position_y)):
                     point = ProbePosition(
                         idx,
-                        x * ONE_MICRON_M,
-                        y * ONE_MICRON_M,
+                        x * LengthUnit.MICROMETER.meters_per_unit,
+                        y * LengthUnit.MICROMETER.meters_per_unit,
                     )
                     point_list.append(point)
 

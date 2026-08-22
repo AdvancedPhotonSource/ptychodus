@@ -148,6 +148,7 @@ dev = [
     "pyqt5-stubs",
     "pytest",
     "pytest-asyncio",
+    "pytest-xdist",
     "ruff",
     "types-psutil",
     "types-pyyaml",

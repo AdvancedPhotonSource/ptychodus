@@ -10,6 +10,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from ptychodus.api.constants import LengthUnit
+
 from ...model.product.probe_positions import (
     CartesianProbePositionsBuilder,
     ConcentricProbePositionsBuilder,
@@ -20,10 +22,10 @@ from ...model.product.probe_positions import (
     ProbePositionsRepositoryItem,
     SpiralProbePositionsBuilder,
 )
-from ..parametric import (
+from ..parameters import (
     CheckableGroupBoxParameterViewController,
     DecimalLineEditParameterViewController,
-    LengthWidgetParameterViewController,
+    LengthParameterViewController,
     ParameterViewBuilder,
     ParameterViewController,
 )
@@ -53,9 +55,7 @@ class ProbePositionsTransformViewController(ParameterViewController):
             builder.affine01, is_signed=True
         )
         self._label_yp0 = QLabel('y +')
-        self._affine02_view_controller = LengthWidgetParameterViewController(
-            builder.affine02, is_signed=True
-        )
+        self._affine02_view_controller = LengthParameterViewController(builder.affine02)
 
         self._label_ye = QLabel('y\u2032 =')
         self._label_ye.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -67,13 +67,11 @@ class ProbePositionsTransformViewController(ParameterViewController):
             builder.affine11, is_signed=True
         )
         self._label_yp1 = QLabel('y +')
-        self._affine12_view_controller = LengthWidgetParameterViewController(
-            builder.affine12, is_signed=True
-        )
+        self._affine12_view_controller = LengthParameterViewController(builder.affine12)
 
         self._jitter_radius_label = QLabel('Jitter Radius:')
-        self._jitter_radius_view_controller = LengthWidgetParameterViewController(
-            builder.jitter_radius_m, is_signed=False
+        self._jitter_radius_view_controller = LengthParameterViewController(
+            builder.jitter_radius_m, default_unit=LengthUnit.MICROMETER
         )
 
         layout = QGridLayout()
@@ -104,18 +102,10 @@ class ProbePositionsTransformViewController(ParameterViewController):
 class ScanBoundingBoxViewController(CheckableGroupBoxParameterViewController):
     def __init__(self, item: ProbePositionsRepositoryItem) -> None:
         super().__init__(item.expand_bbox, 'Expand Bounding Box')
-        self._xmin_controller = LengthWidgetParameterViewController(
-            item.expand_bbox_xmin_m, is_signed=True
-        )
-        self._xmax_controller = LengthWidgetParameterViewController(
-            item.expand_bbox_xmax_m, is_signed=True
-        )
-        self._ymin_controller = LengthWidgetParameterViewController(
-            item.expand_bbox_ymin_m, is_signed=True
-        )
-        self._ymax_controller = LengthWidgetParameterViewController(
-            item.expand_bbox_ymax_m, is_signed=True
-        )
+        self._xmin_controller = LengthParameterViewController(item.expand_bbox_xmin_m)
+        self._xmax_controller = LengthParameterViewController(item.expand_bbox_xmax_m)
+        self._ymin_controller = LengthParameterViewController(item.expand_bbox_ymin_m)
+        self._ymax_controller = LengthParameterViewController(item.expand_bbox_ymax_m)
 
         layout = QFormLayout()
         layout.addRow('Minimum X:', self._xmin_controller.get_widget())

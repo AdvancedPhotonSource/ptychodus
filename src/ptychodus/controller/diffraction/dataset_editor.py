@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt, QAbstractItemModel, QAbstractTableModel, QModelInde
 from PyQt5.QtGui import QBrush
 from PyQt5.QtWidgets import QWidget
 
-from ptychodus.api.constants import ONE_MICRON_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.diffraction import DiffractionDatasetLayoutNode
 from ptychodus.api.geometry import PixelGeometry
 
@@ -160,9 +160,9 @@ class DatasetPropertyTableModel(QAbstractTableModel):
                 case (0, row):
                     return self._properties[row]
                 case (1, r) if r == _ROW_PIXEL_WIDTH_UM:
-                    return f'{geometry.width_m / ONE_MICRON_M:.4g}'
+                    return f'{LengthUnit.MICROMETER.convert(geometry.width_m):.4g}'
                 case (1, r) if r == _ROW_PIXEL_HEIGHT_UM:
-                    return f'{geometry.height_m / ONE_MICRON_M:.4g}'
+                    return f'{LengthUnit.MICROMETER.convert(geometry.height_m):.4g}'
         elif role == Qt.ItemDataRole.BackgroundRole:
             if index.flags() & Qt.ItemFlag.ItemIsEditable:
                 return self._editable_item_brush
@@ -177,7 +177,7 @@ class DatasetPropertyTableModel(QAbstractTableModel):
             return False
         if not math.isfinite(new_um) or new_um <= 0.0:
             return False
-        new_m = new_um * ONE_MICRON_M
+        new_m = LengthUnit.MICROMETER.to_meters(new_um)
 
         current = self._dataset.get_raw_pixel_geometry()
         if index.row() == _ROW_PIXEL_WIDTH_UM:

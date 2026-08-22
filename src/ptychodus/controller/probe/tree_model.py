@@ -6,7 +6,7 @@ import numpy
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
 from PyQt5.QtGui import QBrush
 
-from ptychodus.api.constants import ONE_NANOMETER_M, format_bytes
+from ptychodus.api.constants import LengthUnit, format_bytes
 from ptychodus.api.probe import Probe
 
 from ...model.product import ProbeAPI, ProbeRepository
@@ -225,13 +225,13 @@ class ProbeTreeModel(QAbstractItemModel):
                         return probe.height_px if probe is not None else None
                     case 6:
                         return (
-                            f'{pixel_geometry.width_m / ONE_NANOMETER_M:.4g}'
+                            f'{LengthUnit.NANOMETER.convert(pixel_geometry.width_m):.4g}'
                             if pixel_geometry
                             else None
                         )
                     case 7:
                         return (
-                            f'{pixel_geometry.height_m / ONE_NANOMETER_M:.4g}'
+                            f'{LengthUnit.NANOMETER.convert(pixel_geometry.height_m):.4g}'
                             if pixel_geometry
                             else None
                         )

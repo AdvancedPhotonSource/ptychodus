@@ -13,7 +13,7 @@ from ptychodus.api.observer import SequenceObserver
 
 from ...model.globus import GlobusAuthorizer, GlobusSettings, GlobusStatus, GlobusStatusRepository
 from ..data import FileDialogFactory
-from ..parametric import ParameterViewBuilder, PathLineEditParameterViewController
+from ..parameters import ParameterViewBuilder, PathLineEditParameterViewController
 from .authorization import GlobusAuthorizationController
 from .status import GlobusStatusViewController
 from .table_model import GlobusStatusTableModel

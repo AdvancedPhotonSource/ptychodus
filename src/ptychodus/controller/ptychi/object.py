@@ -14,13 +14,13 @@ from ...model.ptychi import (
     PtyChiObjectSettings,
     PtyChiPIESettings,
 )
-from ..parametric import (
+from ..parameters import (
     CheckBoxParameterViewController,
     CheckableGroupBoxParameterViewController,
     ComboBoxParameterViewController,
     DecimalLineEditParameterViewController,
     DecimalSliderParameterViewController,
-    LengthWidgetParameterViewController,
+    LengthParameterViewController,
     SpinBoxParameterViewController,
 )
 from .optimizer import PtyChiOptimizationPlanViewController, PtyChiOptimizerParameterViewController
@@ -204,10 +204,10 @@ class PtyChiRemoveGridArtifactsViewController(CheckableGroupBoxParameterViewCont
         self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
-        self._period_x_view_controller = LengthWidgetParameterViewController(
+        self._period_x_view_controller = LengthParameterViewController(
             period_x_m, tool_tip='Horizontal period of grid artifacts in meters'
         )
-        self._period_y_view_controller = LengthWidgetParameterViewController(
+        self._period_y_view_controller = LengthParameterViewController(
             period_y_m, tool_tip='Vertical period of grid artifacts in meters'
         )
         self._window_size_view_controller = SpinBoxParameterViewController(

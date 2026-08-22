@@ -16,8 +16,8 @@ from PyQt5.QtGui import QBrush, QFont
 from PyQt5.QtWidgets import QAbstractItemView, QAction, QInputDialog
 
 from ptychodus.api.constants import (
+    LengthUnit,
     ONE_KILOELECTRONVOLT_EV,
-    ONE_NANOMETER_M,
     format_bytes,
 )
 from ptychodus.api.product import LossValue
@@ -164,11 +164,11 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                     case _Column.PIXEL_WIDTH_NM:
                         if pending or failed:
                             return '—'
-                        return f'{geometry.get_object_plane_pixel_geometry().width_m / ONE_NANOMETER_M:.4g}'
+                        return f'{LengthUnit.NANOMETER.convert(geometry.get_object_plane_pixel_geometry().width_m):.4g}'
                     case _Column.PIXEL_HEIGHT_NM:
                         if pending or failed:
                             return '—'
-                        return f'{geometry.get_object_plane_pixel_geometry().height_m / ONE_NANOMETER_M:.4g}'
+                        return f'{LengthUnit.NANOMETER.convert(geometry.get_object_plane_pixel_geometry().height_m):.4g}'
                     case _Column.SIZE:
                         if pending or failed:
                             return '—'

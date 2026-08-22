@@ -4,7 +4,7 @@ import logging
 
 import numpy
 
-from ptychodus.api.constants import ONE_NANOMETER_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -62,8 +62,8 @@ class APS12IDPositionFileReader(ProbePositionFileReader):
             for row in position_data:
                 scan_point = ProbePosition(
                     index=index,
-                    coordinate_x_m=-ONE_NANOMETER_M * row[2],
-                    coordinate_y_m=+ONE_NANOMETER_M * row[1],
+                    coordinate_x_m=-LengthUnit.NANOMETER.meters_per_unit * row[2],
+                    coordinate_y_m=+LengthUnit.NANOMETER.meters_per_unit * row[1],
                 )
                 scan_point_list.append(scan_point)
 

@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parameters import StringParameter
 
@@ -29,8 +30,8 @@ from ...model.product.probe import (
     ZernikeProbeBuilder,
 )
 from ...view.widgets import GroupBoxWithPresets
-from ..parametric import (
-    LengthWidgetParameterViewController,
+from ..parameters import (
+    LengthParameterViewController,
     ParameterViewBuilder,
     ParameterViewController,
 )
@@ -56,17 +57,17 @@ class FresnelZonePlateViewController(ParameterViewController):
             else:
                 action.triggered.connect(lambda _, label=label: probe_builder.apply_presets(label))
 
-        self._zone_plate_diameter_view_controller = LengthWidgetParameterViewController(
+        self._zone_plate_diameter_view_controller = LengthParameterViewController(
             probe_builder.zone_plate_diameter_m
         )
-        self._outermost_zone_width_view_controller = LengthWidgetParameterViewController(
+        self._outermost_zone_width_view_controller = LengthParameterViewController(
             probe_builder.outermost_zone_width_m
         )
-        self._central_beamstop_diameter_view_controller = LengthWidgetParameterViewController(
+        self._central_beamstop_diameter_view_controller = LengthParameterViewController(
             probe_builder.central_beamstop_diameter_m
         )
-        self._defocus_distance_view_controller = LengthWidgetParameterViewController(
-            probe_builder.defocus_distance_m
+        self._defocus_distance_view_controller = LengthParameterViewController(
+            probe_builder.defocus_distance_m, default_unit=LengthUnit.MICROMETER
         )
 
         layout = QFormLayout()
@@ -97,9 +98,7 @@ class ZernikeViewController(ParameterViewController, Observer):
         self._order_spin_box = QSpinBox()
         self._coefficients_table_model = ZernikeTableModel(probe_builder)
         self._coefficients_table_view = QTableView()
-        self._diameter_view_controller = LengthWidgetParameterViewController(
-            probe_builder.diameter_m
-        )
+        self._diameter_view_controller = LengthParameterViewController(probe_builder.diameter_m)
 
         self._coefficients_table_view.setModel(self._coefficients_table_model)
         header = self._coefficients_table_view.horizontalHeader()
@@ -139,8 +138,8 @@ class HermiteViewController(ParameterViewController, Observer):
         self._order_y_spin_box = QSpinBox()
         self._coefficients_table_model = HermiteTableModel(probe_builder)
         self._coefficients_table_view = QTableView()
-        self._width_view_controller = LengthWidgetParameterViewController(probe_builder.width_m)
-        self._height_view_controller = LengthWidgetParameterViewController(probe_builder.height_m)
+        self._width_view_controller = LengthParameterViewController(probe_builder.width_m)
+        self._height_view_controller = LengthParameterViewController(probe_builder.height_m)
 
         self._coefficients_table_view.setModel(self._coefficients_table_model)
         header = self._coefficients_table_view.horizontalHeader()
@@ -297,6 +296,7 @@ class ProbeEditorViewControllerFactory:
             dialog_builder.add_length_widget(
                 probe_builder.defocus_distance_m,
                 'Defocus Distance:',
+                default_unit=LengthUnit.MICROMETER,
                 group=primary_mode_group,
             )
             return True
@@ -324,6 +324,7 @@ class ProbeEditorViewControllerFactory:
             dialog_builder.add_length_widget(
                 probe_builder.defocus_distance_m,
                 'Defocus Distance:',
+                default_unit=LengthUnit.MICROMETER,
                 group=primary_mode_group,
             )
             return True
@@ -331,6 +332,7 @@ class ProbeEditorViewControllerFactory:
             dialog_builder.add_length_widget(
                 probe_builder.annular_radius_m,
                 'Annular Radius:',
+                default_unit=LengthUnit.MICROMETER,
                 group=primary_mode_group,
             )
             dialog_builder.add_length_widget(

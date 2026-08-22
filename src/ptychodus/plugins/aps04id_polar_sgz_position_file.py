@@ -5,7 +5,7 @@ import logging
 import h5py
 import numpy
 
-from ptychodus.api.constants import ONE_NANOMETER_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -84,8 +84,8 @@ class PolarSoftGlueZynqPositionFileReader(ProbePositionFileReader):
         point_list = [
             ProbePosition(
                 int(trigger_index),
-                float(x) * ONE_NANOMETER_M,
-                float(y) * ONE_NANOMETER_M,
+                LengthUnit.NANOMETER.to_meters(float(x)),
+                LengthUnit.NANOMETER.to_meters(float(y)),
             )
             for trigger_index, x, y in zip(trigger_indexes, xs, ys)
         ]

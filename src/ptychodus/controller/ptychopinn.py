@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QWidget
 
 from ..model.ptychopinn.core import PtychoPINNReconstructorLibrary
 from .data import FileDialogFactory
-from .parametric import ParameterViewBuilder, PowerTwoSpinBoxParameterViewController
+from .parameters import ParameterViewBuilder, PowerTwoSpinBoxParameterViewController
 from .processing import ReconstructorViewControllerFactory
 
 

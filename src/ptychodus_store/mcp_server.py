@@ -14,6 +14,7 @@ from fastmcp.utilities.types import Image as MCPImage
 from sqlalchemy import String, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.diffraction import Polarization
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import load_diffraction_data, load_fluorescence_data, load_product
@@ -59,7 +60,10 @@ from ptychodus_store.storage.manifest import ResourceKind
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_FLUORESCENCE_PIXEL_GEOMETRY = PixelGeometry(width_m=1e-6, height_m=1e-6)
+_DEFAULT_FLUORESCENCE_PIXEL_GEOMETRY = PixelGeometry(
+    width_m=LengthUnit.MICROMETER.meters_per_unit,
+    height_m=LengthUnit.MICROMETER.meters_per_unit,
+)
 
 
 class _Ctx:

@@ -8,7 +8,7 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy
 
-from ptychodus.api.constants import ONE_MICRON_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -49,7 +49,7 @@ class LCLSPositionFileReader(ProbePositionFileReader):
             ipm2 = h5_file['/ipm2/sum'][:]
 
             # vertical coordinate
-            ycoords = -piezo_stage_position_z_um * ONE_MICRON_M
+            ycoords = -piezo_stage_position_z_um * LengthUnit.MICROMETER.meters_per_unit
 
             # horizontal coordinate
             tomography_angle_rad = numpy.deg2rad(self._tomography_angle_deg)
@@ -57,7 +57,7 @@ class LCLSPositionFileReader(ProbePositionFileReader):
             sin_angle = numpy.sin(tomography_angle_rad)
             xcoords = (
                 cos_angle * piezo_stage_position_x_um + sin_angle * piezo_stage_position_y_um
-            ) * ONE_MICRON_M
+            ) * LengthUnit.MICROMETER.meters_per_unit
 
             for index, (ipm, x, y) in enumerate(zip(ipm2, xcoords, ycoords)):
                 if self._ipm2_low_threshold <= ipm and ipm < self._ipm2_high_threshold:

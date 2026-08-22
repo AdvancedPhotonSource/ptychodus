@@ -5,7 +5,7 @@ import numpy
 
 from PyQt5.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt
 
-from ptychodus.api.constants import ONE_NANOMETER_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.typing import RealArrayType
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.probe import (
@@ -75,15 +75,19 @@ class ProbeMetricsTableModel(QAbstractTableModel):
                 case 1:
                     return f'{numpy.rad2deg(self._metrics.minor_axis_tilt_rad):.4g}'
                 case 2:
-                    return f'{self._metrics.fwhm_major_axis_length_m / ONE_NANOMETER_M:.4g}'
+                    return f'{LengthUnit.NANOMETER.convert(self._metrics.fwhm_major_axis_length_m):.4g}'
                 case 3:
-                    return f'{self._metrics.fwhm_minor_axis_length_m / ONE_NANOMETER_M:.4g}'
+                    return f'{LengthUnit.NANOMETER.convert(self._metrics.fwhm_minor_axis_length_m):.4g}'
                 case 4:
-                    return f'{self._metrics.rms_major_axis_length_m / ONE_NANOMETER_M:.4g}'
+                    return (
+                        f'{LengthUnit.NANOMETER.convert(self._metrics.rms_major_axis_length_m):.4g}'
+                    )
                 case 5:
-                    return f'{self._metrics.rms_minor_axis_length_m / ONE_NANOMETER_M:.4g}'
+                    return (
+                        f'{LengthUnit.NANOMETER.convert(self._metrics.rms_minor_axis_length_m):.4g}'
+                    )
                 case 6:
-                    return f'{self._metrics.encircled_energy_diameter_m / ONE_NANOMETER_M:.4g}'
+                    return f'{LengthUnit.NANOMETER.convert(self._metrics.encircled_energy_diameter_m):.4g}'
         else:
             if self._entropy_metrics is None:
                 return 'N/A'

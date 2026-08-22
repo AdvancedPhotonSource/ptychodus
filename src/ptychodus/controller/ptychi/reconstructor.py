@@ -21,7 +21,7 @@ from ...model.ptychi import (
     PtyChiLSQMLSettings,
     PtyChiSettings,
 )
-from ..parametric import (
+from ..parameters import (
     CheckBoxParameterViewController,
     CheckableGroupBoxParameterViewController,
     ComboBoxParameterViewController,

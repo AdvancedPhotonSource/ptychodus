@@ -8,9 +8,9 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parameters import BooleanParameter, IntegerParameter
 
-from ...controller.parametric import SpinBoxParameterViewController
+from ...controller.parameters import SpinBoxParameterViewController
 from ...model.globus import GlobusStatusRepository
-from ..parametric import CheckBoxParameterViewController, ParameterViewController
+from ..parameters import CheckBoxParameterViewController, ParameterViewController
 
 
 class GlobusStatusViewController(ParameterViewController, Observer):

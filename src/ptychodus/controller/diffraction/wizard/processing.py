@@ -18,7 +18,7 @@ from ....view.diffraction import OpenDatasetWizardPage
 
 from ...data import FileDialogFactory
 from ..detector_extent import DetectorExtentSource
-from ...parametric import (
+from ...parameters import (
     CheckBoxParameterViewController,
     CheckableGroupBoxParameterViewController,
     ParameterViewController,

@@ -5,7 +5,7 @@ import logging
 import h5py
 import numpy
 
-from ptychodus.api.constants import ONE_MICRON_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.io import resolve_external_link_path
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
@@ -51,8 +51,8 @@ class PolarPositionFileReader(ProbePositionFileReader):
             point_list.append(
                 ProbePosition(
                     int(idx),
-                    float(x) * ONE_MICRON_M,
-                    float(y) * ONE_MICRON_M,
+                    LengthUnit.MICROMETER.to_meters(float(x)),
+                    LengthUnit.MICROMETER.to_meters(float(y)),
                 )
             )
 

@@ -7,7 +7,7 @@ import numpy
 from PyQt5.QtCore import Qt, QAbstractItemModel, QAbstractListModel, QModelIndex, QObject
 from PyQt5.QtGui import QBrush, QFont
 
-from ptychodus.api.constants import ONE_MICRON_M, format_bytes
+from ptychodus.api.constants import LengthUnit, format_bytes
 from ptychodus.api.diffraction import DiffractionPattern
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 
@@ -472,17 +472,15 @@ class DiffractionTreeModel(QAbstractItemModel):
             case 4:
                 return node.get_detector_extent().height_px
             case 5:
-                return f'{node.get_raw_pixel_geometry().width_m / ONE_MICRON_M:.4g}'
+                return f'{LengthUnit.MICROMETER.convert(node.get_raw_pixel_geometry().width_m):.4g}'
             case 6:
-                return f'{node.get_raw_pixel_geometry().height_m / ONE_MICRON_M:.4g}'
+                return (
+                    f'{LengthUnit.MICROMETER.convert(node.get_raw_pixel_geometry().height_m):.4g}'
+                )
             case 7:
-                return (
-                    f'{node.get_processed_pixel_geometry(self._sizer).width_m / ONE_MICRON_M:.4g}'
-                )
+                return f'{LengthUnit.MICROMETER.convert(node.get_processed_pixel_geometry(self._sizer).width_m):.4g}'
             case 8:
-                return (
-                    f'{node.get_processed_pixel_geometry(self._sizer).height_m / ONE_MICRON_M:.4g}'
-                )
+                return f'{LengthUnit.MICROMETER.convert(node.get_processed_pixel_geometry(self._sizer).height_m):.4g}'
             case 9:
                 return node.get_num_bad_pixels()
         return None

@@ -4,11 +4,10 @@ from collections.abc import Iterable, Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import Final
-from uuid import UUID
 import logging
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIntValidator, QValidator
+from PyQt5.QtCore import QRegularExpression, Qt
+from PyQt5.QtGui import QIntValidator, QRegularExpressionValidator, QValidator
 from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -24,6 +23,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from ptychodus.api.constants import AngleUnit, LengthUnit
 from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parameters import (
@@ -36,13 +36,7 @@ from ptychodus.api.parameters import (
     UUIDParameter,
 )
 
-from ..view.widgets import (
-    AngleWidget,
-    DecimalLineEdit,
-    DecimalSlider,
-    LengthWidget,
-    PowerTwoSpinBox,
-)
+from ..view.widgets import DecimalLineEdit, DecimalSlider, PowerTwoSpinBox
 from .data import FileDialogFactory
 
 logger = logging.getLogger(__name__)
@@ -528,11 +522,18 @@ class DecimalSliderParameterViewController(ParameterViewController, Observer):
             self.__sync_model_to_view()
 
 
+def _create_uuid_validator() -> QRegularExpressionValidator:
+    hexre = '[0-9A-Fa-f]'
+    uuidre = f'{hexre}{{8}}-{hexre}{{4}}-{hexre}{{4}}-{hexre}{{4}}-{hexre}{{12}}'
+    return QRegularExpressionValidator(QRegularExpression(uuidre))
+
+
 class UUIDLineEditParameterViewController(ParameterViewController, Observer):
     def __init__(self, parameter: UUIDParameter, *, tool_tip: str = '') -> None:
         super().__init__()
         self._parameter = parameter
         self._widget = QLineEdit()
+        self._widget.setValidator(_create_uuid_validator())
 
         if tool_tip:
             self._widget.setToolTip(tool_tip)
@@ -545,66 +546,185 @@ class UUIDLineEditParameterViewController(ParameterViewController, Observer):
         return self._widget
 
     def __sync_view_to_model(self) -> None:
-        self._parameter.set_value(UUID(self._widget.text()))
+        text = self._widget.text()
+
+        try:
+            self._parameter.set_value_from_string(text)
+        except ValueError:
+            logger.warning(f'Failed to convert "{text}" to UUID!')
 
     def __sync_model_to_view(self) -> None:
-        self._widget.setText(str(self._parameter.get_value()))
+        self._widget.setText(self._parameter.get_value_as_string())
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
             self.__sync_model_to_view()
 
 
-class LengthWidgetParameterViewController(ParameterViewController, Observer):
+def _is_signed(parameter: RealParameter, is_signed: bool | None) -> bool:
+    """Whether the editor accepts negatives, inferred from the parameter's own bounds."""
+    if is_signed is not None:
+        return is_signed
+
+    minimum = parameter.get_minimum()
+    return minimum is None or minimum < 0.0
+
+
+class LengthParameterViewController(ParameterViewController, Observer):
+    """Binds a length parameter in meters to a magnitude line edit plus a unit combo box.
+
+    The parameter is the only place the value lives; the widgets carry the display unit and
+    the magnitude rendered in it. Values auto-scale to the largest SI-prefixed unit that
+    keeps them at or above one, until the user picks a unit, after which their choice sticks.
+    """
+
     def __init__(
-        self, parameter: RealParameter, *, is_signed: bool = False, tool_tip: str = ''
+        self,
+        parameter: RealParameter,
+        *,
+        is_signed: bool | None = None,
+        default_unit: LengthUnit = LengthUnit.METER,
+        tool_tip: str = '',
     ) -> None:
         super().__init__()
         self._parameter = parameter
-        self._widget = LengthWidget(is_signed=is_signed)
+        self._unit_is_explicit = False
+        signed = _is_signed(parameter, is_signed)
+        self._line_edit = DecimalLineEdit.create_instance(is_signed=signed)
+
+        if not signed:
+            # create_instance only installs a typing validator; this clamps get_value too.
+            self._line_edit.set_minimum(Decimal())
+
+        self._units_combo_box = QComboBox()
+        self._unit_indexes: dict[LengthUnit, int] = {}
+        self._widget = QWidget()
+
+        # Largest unit first, so the combo box reads m, mm, um, nm, angstrom, pm.
+        for unit in reversed(LengthUnit):
+            self._unit_indexes[unit] = self._units_combo_box.count()
+            self._units_combo_box.addItem(unit.label, unit)
+
+        self._select_unit(default_unit)
 
         if tool_tip:
-            self._widget.setToolTip(tool_tip)
+            self._line_edit.setToolTip(tool_tip)
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._line_edit)
+        layout.addWidget(self._units_combo_box)
+        self._widget.setLayout(layout)
 
         self.__sync_model_to_view()
-        self._widget.length_changed.connect(self.__sync_view_to_model)
+        self._line_edit.value_changed.connect(self.__sync_view_to_model)
+        self._units_combo_box.activated.connect(self.__handle_unit_activated)
         parameter.add_observer(self)
 
     def get_widget(self) -> QWidget:
         return self._widget
 
+    @property
+    def _current_unit(self) -> LengthUnit:
+        return self._units_combo_box.currentData()
+
+    def _select_unit(self, unit: LengthUnit) -> None:
+        self._units_combo_box.setCurrentIndex(self._unit_indexes[unit])
+
+    def __handle_unit_activated(self, index: int) -> None:
+        # An explicit choice sticks: stop auto-scaling and re-render in the chosen unit.
+        self._unit_is_explicit = True
+        self.__sync_model_to_view()
+
     def __sync_view_to_model(self, value: Decimal) -> None:
-        self._parameter.set_value(float(value))
+        # Read back rather than trusting the payload: DecimalLineEdit emits its raw input,
+        # while get_value applies the minimum that the unsigned case installs.
+        magnitude = self._line_edit.get_value()
+        self._parameter.set_value(float(magnitude * self._current_unit.decimal_meters_per_unit))
 
     def __sync_model_to_view(self) -> None:
-        self._widget.set_length_m(Decimal(str(self._parameter.get_value())))
+        length_m = Decimal(str(self._parameter.get_value()))
+
+        # Zero carries no magnitude to infer a unit from, so default_unit is what shows.
+        if not self._unit_is_explicit and not length_m.is_zero():
+            self._select_unit(LengthUnit.from_meters(float(length_m)))
+
+        self._line_edit.set_value(length_m / self._current_unit.decimal_meters_per_unit)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
             self.__sync_model_to_view()
 
 
-class AngleWidgetParameterViewController(ParameterViewController, Observer):
-    def __init__(self, parameter: RealParameter, *, tool_tip: str = '') -> None:
+class AngleParameterViewController(ParameterViewController, Observer):
+    """Binds an angle parameter in turns to a magnitude line edit plus a unit combo box.
+
+    Unlike :class:`LengthParameterViewController` there is no auto-selection: turn, degree,
+    and radian are a presentation choice rather than a magnitude ladder, so the displayed
+    unit changes only when the user picks one.
+    """
+
+    def __init__(
+        self,
+        parameter: RealParameter,
+        *,
+        is_signed: bool | None = None,
+        default_unit: AngleUnit = AngleUnit.TURN,
+        tool_tip: str = '',
+    ) -> None:
         super().__init__()
         self._parameter = parameter
-        self._widget = AngleWidget()
+        signed = _is_signed(parameter, is_signed)
+        self._line_edit = DecimalLineEdit.create_instance(is_signed=signed)
+
+        if not signed:
+            # create_instance only installs a typing validator; this clamps get_value too.
+            self._line_edit.set_minimum(Decimal())
+
+        self._units_combo_box = QComboBox()
+        self._unit_indexes: dict[AngleUnit, int] = {}
+        self._widget = QWidget()
+
+        for unit in AngleUnit:
+            self._unit_indexes[unit] = self._units_combo_box.count()
+            self._units_combo_box.addItem(unit.label, unit)
+
+        self._select_unit(default_unit)
 
         if tool_tip:
-            self._widget.setToolTip(tool_tip)
+            self._line_edit.setToolTip(tool_tip)
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._line_edit)
+        layout.addWidget(self._units_combo_box)
+        self._widget.setLayout(layout)
 
         self.__sync_model_to_view()
-        self._widget.angle_changed.connect(self.__sync_view_to_model)
+        self._line_edit.value_changed.connect(self.__sync_view_to_model)
+        self._units_combo_box.activated.connect(self.__handle_unit_activated)
         parameter.add_observer(self)
 
     def get_widget(self) -> QWidget:
         return self._widget
 
+    @property
+    def _current_unit(self) -> AngleUnit:
+        return self._units_combo_box.currentData()
+
+    def _select_unit(self, unit: AngleUnit) -> None:
+        self._units_combo_box.setCurrentIndex(self._unit_indexes[unit])
+
+    def __handle_unit_activated(self, index: int) -> None:
+        self.__sync_model_to_view()
+
     def __sync_view_to_model(self, value: Decimal) -> None:
-        self._parameter.set_value(float(value))
+        magnitude = self._line_edit.get_value()
+        self._parameter.set_value(float(magnitude / self._current_unit.decimal_units_per_turn))
 
     def __sync_model_to_view(self) -> None:
-        self._widget.set_angle_in_turns(Decimal(str(self._parameter.get_value())))
+        angle_turns = Decimal(str(self._parameter.get_value()))
+        self._line_edit.set_value(angle_turns * self._current_unit.decimal_units_per_turn)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._parameter:
@@ -802,10 +922,14 @@ class ParameterViewBuilder:
         parameter: RealParameter,
         label: str,
         *,
+        is_signed: bool | None = None,
+        default_unit: LengthUnit = LengthUnit.METER,
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        view_controller = LengthWidgetParameterViewController(parameter, tool_tip=tool_tip)
+        view_controller = LengthParameterViewController(
+            parameter, is_signed=is_signed, default_unit=default_unit, tool_tip=tool_tip
+        )
         self.add_view_controller(view_controller, label, group=group)
 
     def add_angle_widget(
@@ -813,10 +937,14 @@ class ParameterViewBuilder:
         parameter: RealParameter,
         label: str,
         *,
+        is_signed: bool | None = None,
+        default_unit: AngleUnit = AngleUnit.TURN,
         tool_tip: str = '',
         group: str = '',
     ) -> None:
-        view_controller = AngleWidgetParameterViewController(parameter, tool_tip=tool_tip)
+        view_controller = AngleParameterViewController(
+            parameter, is_signed=is_signed, default_unit=default_unit, tool_tip=tool_tip
+        )
         self.add_view_controller(view_controller, label, group=group)
 
     def add_view_controller_to_top(self, view_controller: ParameterViewController) -> None:

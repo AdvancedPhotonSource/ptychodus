@@ -13,7 +13,7 @@ from PyQt5.QtCore import (
 from PyQt5.QtGui import QBrush
 from PyQt5.QtWidgets import QComboBox, QStyledItemDelegate, QStyleOptionViewItem, QWidget
 
-from ptychodus.api.constants import ONE_NANOMETER_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.diffraction import Polarization, estimate_probe_photon_count
 from ptychodus.api.observer import Observable, Observer
 
@@ -141,19 +141,19 @@ class ProductPropertyTableModel(QAbstractTableModel):
 
                         match index.row():
                             case 0:
-                                return f'{geometry.probe_wavelength_m / ONE_NANOMETER_M:.4g}'
+                                return f'{LengthUnit.NANOMETER.convert(geometry.probe_wavelength_m):.4g}'
                             case 1:
-                                return f'{geometry.probe_wavelengths_per_m * ONE_NANOMETER_M:.4g}'
+                                return f'{geometry.probe_wavelengths_per_m * LengthUnit.NANOMETER.meters_per_unit:.4g}'
                             case 2:
-                                return f'{geometry.probe_radians_per_m * ONE_NANOMETER_M:.4g}'
+                                return f'{geometry.probe_radians_per_m * LengthUnit.NANOMETER.meters_per_unit:.4g}'
                             case 3:
                                 return f'{geometry.probe_photons_per_s:.4g}'
                             case 4:
                                 return f'{geometry.probe_power_W:.4g}'
                             case 5:
-                                return f'{geometry.get_object_plane_pixel_geometry().width_m / ONE_NANOMETER_M:.4g}'
+                                return f'{LengthUnit.NANOMETER.convert(geometry.get_object_plane_pixel_geometry().width_m):.4g}'
                             case 6:
-                                return f'{geometry.get_object_plane_pixel_geometry().height_m / ONE_NANOMETER_M:.4g}'
+                                return f'{LengthUnit.NANOMETER.convert(geometry.get_object_plane_pixel_geometry().height_m):.4g}'
                             case 7:
                                 return f'{metadata_item.exposure_time_s.get_value():.4g}'
                             case 8:
@@ -177,7 +177,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
                                     return 'inf'
                             case 14:
                                 try:
-                                    return f'{geometry.depth_of_field_m / ONE_NANOMETER_M:.4g}'
+                                    return f'{LengthUnit.NANOMETER.convert(geometry.depth_of_field_m):.4g}'
                                 except ZeroDivisionError:
                                     return 'inf'
                             case _Row.DIFFRACTION_DATASET:

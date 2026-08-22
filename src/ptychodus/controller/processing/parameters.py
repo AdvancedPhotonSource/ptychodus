@@ -21,7 +21,7 @@ from ...model.product.object import ObjectRepositoryItem
 from ...model.product.probe import ProbeRepositoryItem
 from ...model.product.probe_positions import ProbePositionsRepositoryItem
 from ...view.processing import ProcessingStatusView
-from ..parametric import ParameterViewController
+from ..parameters import ParameterViewController
 from ..product.core import ProductRepositoryComboProxyModel, ProductRepositoryTableModel
 
 logger = logging.getLogger(__name__)

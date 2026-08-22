@@ -28,7 +28,7 @@ from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate, TaskStatus
 from ..data import FileDialogFactory
 from ..helpers import connect_triggered_signal
 from ..image import ImageController
-from ..parametric import CheckBoxParameterViewController
+from ..parameters import CheckBoxParameterViewController
 from ..task_status import TaskStatusController
 from ..product.core import ProductRepositoryComboProxyModel, ProductRepositoryTableModel
 from .dataset import DiffractionTreeModel

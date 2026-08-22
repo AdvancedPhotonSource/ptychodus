@@ -14,7 +14,7 @@ from ...model.ptychi import (
     PtyChiPIESettings,
     PtyChiProbeSettings,
 )
-from ..parametric import (
+from ..parameters import (
     CheckBoxParameterViewController,
     CheckableGroupBoxParameterViewController,
     ComboBoxParameterViewController,

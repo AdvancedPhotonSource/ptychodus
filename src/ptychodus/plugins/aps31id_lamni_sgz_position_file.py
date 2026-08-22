@@ -3,7 +3,7 @@ from typing import Final
 import csv
 import logging
 
-from ptychodus.api.constants import ONE_MICRON_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -76,8 +76,8 @@ class LamNISoftGlueZynqPositionFileReader(ProbePositionFileReader):
 
                 point = ProbePosition(
                     int(row[DETECTOR_COUNT]),
-                    -float(row[X]) * ONE_MICRON_M,
-                    -float(row[Y]) * ONE_MICRON_M,
+                    -LengthUnit.MICROMETER.to_meters(float(row[X])),
+                    -LengthUnit.MICROMETER.to_meters(float(row[Y])),
                 )
                 point_list.append(point)
 

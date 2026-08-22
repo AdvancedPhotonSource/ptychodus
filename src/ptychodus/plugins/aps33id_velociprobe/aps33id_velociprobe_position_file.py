@@ -5,7 +5,7 @@ import csv
 
 import numpy
 
-from ptychodus.api.constants import ONE_NANOMETER_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
     ProbePositionFileReader,
@@ -84,8 +84,8 @@ class VelociprobePositionFileReader(ProbePositionFileReader):
 
                 point = ProbePosition(
                     trigger,
-                    x_nm * ONE_NANOMETER_M,
-                    y_nm * ONE_NANOMETER_M,
+                    x_nm * LengthUnit.NANOMETER.meters_per_unit,
+                    y_nm * LengthUnit.NANOMETER.meters_per_unit,
                 )
                 point_list.append(point)
 

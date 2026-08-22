@@ -3,7 +3,7 @@ import logging
 
 import h5py
 
-from ptychodus.api.constants import ONE_MICRON_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -24,8 +24,8 @@ class NSLS2Style1PositionFileReader(ProbePositionFileReader):
             for idx, row in enumerate(h5_positions[()].T):
                 point = ProbePosition(
                     idx,
-                    row[0] * ONE_MICRON_M,
-                    row[1] * ONE_MICRON_M,
+                    row[0] * LengthUnit.MICROMETER.meters_per_unit,
+                    row[1] * LengthUnit.MICROMETER.meters_per_unit,
                 )
                 point_list.append(point)
 
@@ -42,8 +42,8 @@ class NSLS2Style2PositionFileReader(ProbePositionFileReader):
             for idx, row in enumerate(h5_positions[()].T):
                 point = ProbePosition(
                     idx,
-                    row[0] * ONE_MICRON_M,
-                    row[1] * ONE_MICRON_M,
+                    row[0] * LengthUnit.MICROMETER.meters_per_unit,
+                    row[1] * LengthUnit.MICROMETER.meters_per_unit,
                 )
                 point_list.append(point)
 

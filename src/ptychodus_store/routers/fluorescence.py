@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy import String, exists, func, select
 
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import load_fluorescence_data, load_product
 
@@ -19,7 +20,10 @@ from ptychodus_store.routers.deps import LayoutDep, SessionDep
 from ptychodus_store.routers.schemas import FluorescenceRead, Page
 from ptychodus_store.storage.manifest import ResourceKind
 
-_DEFAULT_FLUORESCENCE_PIXEL_GEOMETRY = PixelGeometry(width_m=1e-6, height_m=1e-6)
+_DEFAULT_FLUORESCENCE_PIXEL_GEOMETRY = PixelGeometry(
+    width_m=LengthUnit.MICROMETER.meters_per_unit,
+    height_m=LengthUnit.MICROMETER.meters_per_unit,
+)
 
 router = APIRouter(prefix='/fluorescence', tags=['fluorescence'])
 

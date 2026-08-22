@@ -9,7 +9,28 @@ Comprehensive gate for cutting a release. Runs nine verification sections in ord
 
 ## How to run the check
 
-Execute the sections in order. After each, capture pass/fail and any findings. At the end, print the summary table (last section). Only then walk the user through fixing failures one at a time.
+The sections split into two phases by whether they touch the environment. Run Phase A concurrently, then Phase B strictly in order. Capture pass/fail and any findings for each section. At the end, print the summary table (last section) in its numeric order regardless of execution order — it doubles as reading order. Only then walk the user through fixing failures one at a time.
+
+### Phase A — concurrent, read-only
+
+Sections 1, 2, 3, 4a-c, 5a-c, 5.5, and 8 are pure inspection and share nothing. Fan them out and collect the results:
+
+```sh
+d=$(mktemp -d)
+run() { local n=$1; shift; ( "$@" >"$d/$n.log" 2>&1; echo $? >"$d/$n.rc" ) & }
+```
+
+Launch each section's command with `run <section-name> <command>`, then `wait`, then read the logs. This takes about 15s against roughly 60s sequential.
+
+### Phase B — sequential, environment-mutating
+
+Sync **once**, naming every extra the gate depends on, then run Sections 6, 7, and 9 in order:
+
+```sh
+uv sync --extra docs --extra gui --extra globus --extra ptychi --extra store
+```
+
+Sections 6, 7, and 9 must not overlap — with each other or with Phase A. See "Why the phases" below.
 
 ---
 
@@ -256,10 +277,11 @@ git ls-files '*.md' | xargs grep -l '^```bash'
 ### Section 6 — Sphinx build with zero warnings
 
 ```sh
-uv sync --extra docs
 make -C docs clean
 make -C docs html SPHINXOPTS="-W --keep-going"
 ```
+
+The sync happens once at the top of Phase B, not here. A bare `uv sync --extra docs` at this point would uninstall `gui`, `globus`, `ptychi`, and `store` before Section 7 runs — see "Why the phases".
 
 `PASS` if exit code 0. `FAIL` on any warning or error.
 
@@ -271,7 +293,7 @@ make -C docs html SPHINXOPTS="-W --keep-going"
 
 ### Section 7 — Full CI gate (chain `pre-push`)
 
-Invoke the `pre-push` skill. All four steps (ruff check, ruff format --check, mypy, pytest) must be green.
+Invoke the `pre-push` skill. Both of its tiers must be green — Tier 1 (ruff check, ruff format --check, pymarkdown) and Tier 2 (mypy, pytest). Let it run its own two-tier schedule; do not re-run its checks here.
 
 `PASS` if `pre-push` finishes clean. `FAIL` on any failing step; hand the failure back to the user without attempting fixes here (the `pre-push` skill knows how to offer format fixes; deeper fixes belong outside the release gate).
 
@@ -286,15 +308,16 @@ uv run python -c "
 import tomllib
 with open('pyproject.toml','rb') as f:
     print('\n'.join(tomllib.load(f)['project']['scripts']))
-" | while read script; do
-    if uv run "$script" --version >/dev/null 2>&1; then
-        echo "PASS: $script"
-    elif uv run "$script" --help >/dev/null 2>&1; then
-        echo "PASS: $script (--help)"
+" | xargs -P 8 -I{} sh -c '
+    s=$1
+    if uv run "$s" --version >/dev/null 2>&1; then
+        echo "PASS: $s"
+    elif uv run "$s" --help >/dev/null 2>&1; then
+        echo "PASS: $s (--help)"
     else
-        echo "FAIL: $script"
+        echo "FAIL: $s"
     fi
-done
+' _ {}
 ```
 
 `PASS` if every script exits 0. `FAIL` lists the broken entry points — usually caused by import-time errors introduced by an unrelated change.
@@ -344,6 +367,18 @@ Print a summary in this exact format after all sections have run:
 ```
 
 Then, and only then, walk through each `FAIL` with the user: state the finding, propose the fix, ask "apply it?" per item, and Edit/Write only after they confirm.
+
+## Why the phases
+
+Three constraints force Phase B to be serial. Do not re-flatten the phases without addressing them:
+
+- **`uv sync` is exact by default.** It uninstalls anything outside the extras named on that one invocation (`--inexact` opts out). A narrow `uv sync --extra docs` therefore strips `gui`, `globus`, `ptychi`, and `store` — which silently narrows Section 7's pytest collection and inflates Section 3's "modules skipped at load" count. That is why the sync is hoisted to the top of Phase B and names every extra at once.
+- **`uv build` and `uv sync` contend on the same project lock.** Section 9 must not overlap Section 6 or the hoisted sync.
+- **Section 9's stale-`build/` guard only means something if nothing else is building.** A concurrent build would create the very directory the guard is checking for.
+
+Phase A is safe to fan out because every section in it only reads: filesystem scans, an AST walk, a plugin-registry load, and `--version`/`--help` invocations of the entry points.
+
+One harmless overlap is left alone: Section 5.5 and Section 7's Tier 1 both run `pymarkdown scan` over the same file set, about 2.3s, kept so the two sections stay independently runnable.
 
 ## Do not
 
