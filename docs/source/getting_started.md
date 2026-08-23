@@ -73,6 +73,7 @@ The repository ships one Dockerfile per accelerator family. Pick the variant tha
 | `Dockerfile.cuda` | NVIDIA GPUs (e.g. ALCF Polaris, NERSC Perlmutter); CUDA minor version is a build ARG |
 | `Dockerfile.rocm` | AMD GPUs (e.g. OLCF Frontier); ROCm is a build ARG |
 | `Dockerfile.xpu` | Intel XPU (e.g. ALCF Aurora); base tag is a build ARG |
+| `Dockerfile.dectris` | Ubuntu 24.04 + PtychoPINN alongside ptychi, for Dectris detector workstations; installs from PyPI (not the checkout) and is outside `scripts/podman/build` |
 
 The GPU files default to recent versions and expose `--build-arg` knobs to switch:
 
@@ -143,10 +144,11 @@ $ xhost -local:docker
 
 ## Apptainer / Singularity
 
-The images above are OCI-compliant and can be converted to SIF for HPC sites (NERSC, OLCF, ALCF) that prefer Apptainer. After building an OCI image locally, convert it:
+The images above are OCI-compliant and can be converted to SIF for HPC sites (NERSC, OLCF, ALCF) that prefer Apptainer. After building an OCI image locally, convert it from the engine's local storage. Match the transport to the engine that built the image:
 
 ```sh
-$ apptainer build ptychodus-1.5.1-cuda13.0.sif docker-daemon://localhost/ptychodus:1.5.1-cuda13.0
+$ apptainer build ptychodus-1.5.1-cuda13.0.sif podman-daemon:ptychodus:1.5.1-cuda13.0  # built with podman
+$ apptainer build ptychodus-1.5.1-cuda13.0.sif docker-daemon:ptychodus:1.5.1-cuda13.0  # built with docker
 ```
 
 If the image lives in a registry, pull directly with `docker://` instead.

@@ -15,7 +15,7 @@ uv run ruff check . && uv run ruff format --check . # lint + format
 uv run mypy src/ptychodus scripts                   # types
 ```
 
-Container builds: `podman build -f Dockerfile.{cuda,cpu,rocm,xpu} .`. Docs: `make -C docs html`.
+Container builds: `scripts/podman/build` (produces `ptychodus:<version>-{cpu,cuda12.8,cuda13.0,cuda13.2,rocm7.2.0,xpu}`); launcher `scripts/podman/ptychodus` auto-detects GPU. Docs: `make -C docs html`.
 
 Other entry points (`convert-to-ptychodus`, `ptychodus-bdp`, `ptychodus-store`, `ptychodus-system-check`) are listed in [pyproject.toml](pyproject.toml) `[project.scripts]`; their modules live in [src/ptychodus/cli/](src/ptychodus/cli/). Unpackaged operator tooling — the podman wrapper and the per-facility HPC token/submit helpers — lives in the top-level [scripts/](scripts/) and is run from a checkout, e.g. `python scripts/genesis/ptychodus_iri_tokens.py`. The store service has its own docs: [src/ptychodus_store/README.md](src/ptychodus_store/README.md).
 
