@@ -82,15 +82,21 @@ The GPU files default to recent versions and expose `--build-arg` knobs to switc
 
 ## Podman
 
-Build Podman image
+The repository ships [scripts/podman/build](../../scripts/podman/build), a helper that builds the CPU image plus the three CUDA variants in one shot and threads the checkout's PEP 440 version (from `setuptools_scm`) in as `--build-arg PTYCHODUS_VERSION=…` so `ptychodus --version` inside the container reports the real value instead of the `setuptools_scm` fallback.
 
 ```sh
-$ podman build -f Dockerfile.cpu                                -t ptychodus:cpu       .
-$ podman build -f Dockerfile.cuda                               -t ptychodus:cuda13.0  .
-$ podman build -f Dockerfile.cuda --build-arg CUDA_VERSION=12.6 -t ptychodus:cuda12.6  .
-$ podman build -f Dockerfile.cuda --build-arg CUDA_VERSION=13.2 -t ptychodus:cuda13.2  .
-$ podman build -f Dockerfile.rocm                               -t ptychodus:rocm      .
-$ podman build -f Dockerfile.xpu                                -t ptychodus:xpu       .
+$ scripts/podman/build                       # cpu + cuda12.8 + cuda13.0 + cuda13.2
+$ scripts/podman/build cpu cuda13.0          # subset
+$ PTYCHODUS_VERSION=1.5.1 scripts/podman/build cuda13.0    # explicit version
+$ CONTAINER_ENGINE=docker scripts/podman/build cpu         # use docker instead
+```
+
+To build a variant not covered by the helper (ROCm, XPU, or a CUDA/PyTorch pair not in the matrix), invoke podman directly and pass the version yourself:
+
+```sh
+$ VER=$(uv run --with setuptools-scm python -m setuptools_scm)
+$ podman build --build-arg PTYCHODUS_VERSION="$VER" -f Dockerfile.rocm -t ptychodus:rocm .
+$ podman build --build-arg PTYCHODUS_VERSION="$VER" -f Dockerfile.xpu  -t ptychodus:xpu  .
 ```
 
 Run container
@@ -108,13 +114,18 @@ $ xhost -local:podman
 
 ## Docker
 
-Build Docker image
+Build Docker image with the helper (works with either engine):
 
 ```sh
-$ docker build -f Dockerfile.cuda -t ptychodus:cuda13.0 .
+$ CONTAINER_ENGINE=docker scripts/podman/build cuda13.0
 ```
 
-(Substitute any variant file and tag as in the Podman section above.)
+or directly:
+
+```sh
+$ VER=$(uv run --with setuptools-scm python -m setuptools_scm)
+$ docker build --build-arg PTYCHODUS_VERSION="$VER" -f Dockerfile.cuda -t ptychodus:cuda13.0 .
+```
 
 Run container
 

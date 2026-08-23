@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Build the CPU and CUDA ptychodus container images with the current
+# ptychodus version threaded in as a build arg.
+#
+# Usage:
+#   scripts/podman/build                     # cpu + cuda12.8 + cuda13.0 + cuda13.2
+#   scripts/podman/build cpu cuda13.0        # subset from the matrix below
+#
+# Env-var overrides:
+#   PTYCHODUS_VERSION   PEP 440 version to bake in (default: `uv run --with
+#                       setuptools-scm python -m setuptools_scm` in the
+#                       checkout, matching what a normal pip install would
+#                       derive from git).
+#   CONTAINER_ENGINE    build engine (default: podman; e.g. docker)
+#
+# Lint with: shellcheck scripts/podman/build
+
+set -euo pipefail
+IFS=$'\n\t'
+
+# --- Configuration -----------------------------------------------------------
+
+# Pair each CUDA_VERSION with a PYTORCH_VERSION that is actually published
+# on Docker Hub as pytorch/pytorch:${PYTORCH_VERSION}-cuda${CUDA_VERSION}-cudnn9-devel.
+# The Dockerfile.cuda default (2.12.0) is not published for CUDA 12.8, so
+# that row overrides.
+declare -A VARIANT_ARGS=(
+    [cpu]="-f Dockerfile.cpu"
+    [cuda12.8]="-f Dockerfile.cuda --build-arg CUDA_VERSION=12.8 --build-arg PYTORCH_VERSION=2.11.0"
+    [cuda13.0]="-f Dockerfile.cuda --build-arg CUDA_VERSION=13.0 --build-arg PYTORCH_VERSION=2.12.0"
+    [cuda13.2]="-f Dockerfile.cuda --build-arg CUDA_VERSION=13.2 --build-arg PYTORCH_VERSION=2.12.0"
+)
+
+DEFAULT_VARIANTS=(cpu cuda12.8 cuda13.0 cuda13.2)
+
+# --- Helpers -----------------------------------------------------------------
+
+die() {
+    printf 'build: %s\n' "$*" >&2
+    exit 1
+}
+
+# --- Setup -------------------------------------------------------------------
+
+cd "$(git rev-parse --show-toplevel)" \
+    || die "must be run inside the ptychodus git checkout"
+
+if [[ -n "${PTYCHODUS_VERSION:-}" ]]; then
+    VERSION="$PTYCHODUS_VERSION"
+else
+    command -v uv >/dev/null 2>&1 \
+        || die "uv not on PATH; set PTYCHODUS_VERSION explicitly (PEP 440) instead"
+    VERSION=$(uv run --quiet --with setuptools-scm python -m setuptools_scm) \
+        || die "setuptools_scm failed; set PTYCHODUS_VERSION explicitly (PEP 440) instead"
+fi
+
+ENGINE="${CONTAINER_ENGINE:-podman}"
+command -v "$ENGINE" >/dev/null 2>&1 \
+    || die "$ENGINE not on PATH (set CONTAINER_ENGINE=docker to use docker)"
+
+# --- Resolve requested variants ----------------------------------------------
+
+if (( $# == 0 )); then
+    variants=("${DEFAULT_VARIANTS[@]}")
+else
+    variants=("$@")
+    for v in "${variants[@]}"; do
+        [[ -n "${VARIANT_ARGS[$v]+set}" ]] \
+            || die "unknown variant '$v' (choose from: $(IFS=' '; echo "${!VARIANT_ARGS[*]}"))"
+    done
+fi
+
+# --- Build -------------------------------------------------------------------
+
+for tag in "${variants[@]}"; do
+    printf '\n=== ptychodus:%s (version=%s) ===\n' "$tag" "$VERSION"
+    # word-splitting VARIANT_ARGS[$tag] is intentional.
+    # shellcheck disable=SC2086
+    "$ENGINE" build ${VARIANT_ARGS[$tag]} \
+        --build-arg "PTYCHODUS_VERSION=$VERSION" \
+        -t "ptychodus:$tag" .
+done

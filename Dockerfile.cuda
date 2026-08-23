@@ -3,16 +3,18 @@ ARG PYTORCH_VERSION=2.12.0
 ARG CUDNN_VERSION=9
 FROM pytorch/pytorch:${PYTORCH_VERSION}-cuda${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel
 
+ARG PTYCHODUS_VERSION
+ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PTYCHODUS=${PTYCHODUS_VERSION}
+
 WORKDIR /app
 COPY . /src
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends git libqt5gui5 && \
+    apt-get install -y --no-install-recommends libqt5gui5 && \
     rm -rf /var/lib/apt/lists/* && \
     python3 -m pip install --root-user-action=ignore --no-cache-dir --upgrade pip && \
     python3 -m pip install --root-user-action=ignore --no-cache-dir \
-        /src[globus,gui] \
-        git+https://github.com/AdvancedPhotonSource/pty-chi.git && \
+        /src[globus,gui,ptychi] && \
     rm -rf /src
 
 CMD ["python3", "-m", "ptychodus"]
