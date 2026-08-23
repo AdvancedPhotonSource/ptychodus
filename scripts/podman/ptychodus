@@ -15,11 +15,15 @@ IFS=$'\n\t'
 
 # --- Configuration (admins edit here) ----------------------------------------
 
-declare -A IMAGE_FOR=(
-    [nvidia]=ptychodus:cuda13.0
-    [rocm]=ptychodus:rocm
-    [xpu]=ptychodus:xpu
-    [cpu]=ptychodus:cpu
+# Backend suffix that pairs with each detected GPU family. The actual image
+# tag is `ptychodus:<version>-<suffix>`; the newest matching versioned tag
+# in local podman storage is picked at runtime so a rebuild "just works"
+# without editing this file.
+declare -A BACKEND_FOR=(
+    [nvidia]=cuda13.0
+    [rocm]=rocm7.2.0
+    [xpu]=xpu
+    [cpu]=cpu
 )
 
 BEAMLINE_MOUNTS=(/local /gdata)
@@ -113,14 +117,29 @@ done
 
 # --- Choose image ------------------------------------------------------------
 
+# Print the newest ptychodus:*-<suffix> tag in local storage (empty if none).
+newest_image_for_suffix() {
+    local suffix=$1
+    podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
+        | awk -F: -v s="$suffix" '$1=="ptychodus" && $2 ~ ("-"s"$") {print}' \
+        | sort -V \
+        | tail -n1
+}
+
 if [[ -n "${PTYCHODUS_IMAGE:-}" ]]; then
     IMAGE="$PTYCHODUS_IMAGE"
     family="override"
     notice "using image $IMAGE (override: PTYCHODUS_IMAGE)"
 else
     family=$(detect_gpu)
-    IMAGE="${IMAGE_FOR[$family]:-}"
-    [[ -n "$IMAGE" ]] || die "no image mapped for family '$family'"
+    suffix="${BACKEND_FOR[$family]:-}"
+    [[ -n "$suffix" ]] || die "no backend mapped for family '$family'"
+    IMAGE=$(newest_image_for_suffix "$suffix")
+    if [[ -z "$IMAGE" ]]; then
+        # Fall back to the unversioned tag so the "not found" branch below
+        # can print an actionable build command.
+        IMAGE="ptychodus:$suffix"
+    fi
     notice "using image $IMAGE (detected: $family)"
 fi
 
@@ -130,19 +149,15 @@ command -v podman >/dev/null 2>&1 \
     || die "podman not installed; see docs/source/getting_started.md"
 
 if ! podman image exists "$IMAGE"; then
-    build_family="$family"
-    [[ "$build_family" == "override" ]] && build_family="<family>"
-    case "$build_family" in
-        nvidia) dockerfile=Dockerfile.cuda ;;
-        rocm)   dockerfile=Dockerfile.rocm ;;
-        xpu)    dockerfile=Dockerfile.xpu ;;
-        cpu)    dockerfile=Dockerfile.cpu ;;
-        *)      dockerfile="Dockerfile.<family>" ;;
-    esac
     {
-        printf 'ptychodus: image "%s" not found in rootless podman storage.\n' "$IMAGE"
-        printf '  Build it from the repository root with:\n'
-        printf '    podman build -f %s -t %s .\n' "$dockerfile" "$IMAGE"
+        if [[ -n "${suffix:-}" ]]; then
+            printf 'ptychodus: no ptychodus:*-%s image found in rootless podman storage.\n' "$suffix"
+            printf '  Build it from the repository root with:\n'
+            printf '    scripts/podman/build %s\n' "$suffix"
+        else
+            printf 'ptychodus: image "%s" not found in rootless podman storage.\n' "$IMAGE"
+            printf '  Build the desired variant with scripts/podman/build from the repository root.\n'
+        fi
     } >&2
     exit 1
 fi

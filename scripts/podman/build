@@ -1,10 +1,21 @@
 #!/usr/bin/env bash
-# Build the CPU and CUDA ptychodus container images with the current
-# ptychodus version threaded in as a build arg.
+# Build the CPU, CUDA, ROCm, and XPU ptychodus container images with the
+# current ptychodus version threaded in as a build arg and included in the
+# image tag.
+#
+# Tag format:
+#   ptychodus:<pep440-version>-<backend>
+#
+#   backend ∈ { cpu, cuda12.8, cuda13.0, cuda13.2, rocm7.2.0, xpu }
+#
+# Dectris is intentionally excluded: Dockerfile.dectris installs ptychodus
+# from PyPI rather than the checkout, so a version-in-tag would misrepresent
+# the image. Build it separately with a plain `podman build -f Dockerfile.dectris
+# -t ptychodus:dectris .`.
 #
 # Usage:
-#   scripts/podman/build                     # cpu + cuda12.8 + cuda13.0 + cuda13.2
-#   scripts/podman/build cpu cuda13.0        # subset from the matrix below
+#   scripts/podman/build                                # cpu + all cuda + rocm + xpu
+#   scripts/podman/build cpu cuda13.0                   # subset from the matrix below
 #
 # Env-var overrides:
 #   PTYCHODUS_VERSION   PEP 440 version to bake in (default: `uv run --with
@@ -20,6 +31,10 @@ IFS=$'\n\t'
 
 # --- Configuration -----------------------------------------------------------
 
+# ROCm version is pinned to what OLCF Frontier documents. Keep in sync with
+# Dockerfile.rocm's ARG default.
+ROCM_VERSION=7.2.0
+
 # Pair each CUDA_VERSION with a PYTORCH_VERSION that is actually published
 # on Docker Hub as pytorch/pytorch:${PYTORCH_VERSION}-cuda${CUDA_VERSION}-cudnn9-devel.
 # The Dockerfile.cuda default (2.12.0) is not published for CUDA 12.8, so
@@ -29,9 +44,11 @@ declare -A VARIANT_ARGS=(
     [cuda12.8]="-f Dockerfile.cuda --build-arg CUDA_VERSION=12.8 --build-arg PYTORCH_VERSION=2.11.0"
     [cuda13.0]="-f Dockerfile.cuda --build-arg CUDA_VERSION=13.0 --build-arg PYTORCH_VERSION=2.12.0"
     [cuda13.2]="-f Dockerfile.cuda --build-arg CUDA_VERSION=13.2 --build-arg PYTORCH_VERSION=2.12.0"
+    [rocm${ROCM_VERSION}]="-f Dockerfile.rocm --build-arg ROCM_VERSION=${ROCM_VERSION}"
+    [xpu]="-f Dockerfile.xpu"
 )
 
-DEFAULT_VARIANTS=(cpu cuda12.8 cuda13.0 cuda13.2)
+DEFAULT_VARIANTS=(cpu cuda12.8 cuda13.0 cuda13.2 "rocm${ROCM_VERSION}" xpu)
 
 # --- Helpers -----------------------------------------------------------------
 
@@ -72,11 +89,12 @@ fi
 
 # --- Build -------------------------------------------------------------------
 
-for tag in "${variants[@]}"; do
-    printf '\n=== ptychodus:%s (version=%s) ===\n' "$tag" "$VERSION"
-    # word-splitting VARIANT_ARGS[$tag] is intentional.
+for backend in "${variants[@]}"; do
+    tag="ptychodus:${VERSION}-${backend}"
+    printf '\n=== %s (version=%s) ===\n' "$tag" "$VERSION"
+    # word-splitting VARIANT_ARGS[$backend] is intentional.
     # shellcheck disable=SC2086
-    "$ENGINE" build ${VARIANT_ARGS[$tag]} \
+    "$ENGINE" build ${VARIANT_ARGS[$backend]} \
         --build-arg "PTYCHODUS_VERSION=$VERSION" \
-        -t "ptychodus:$tag" .
+        -t "$tag" .
 done

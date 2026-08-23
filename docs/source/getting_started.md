@@ -77,26 +77,27 @@ The repository ships one Dockerfile per accelerator family. Pick the variant tha
 The GPU files default to recent versions and expose `--build-arg` knobs to switch:
 
 - `Dockerfile.cuda`: `CUDA_VERSION` (default `13.0`), `PYTORCH_VERSION`, `CUDNN_VERSION`. The base image is `pytorch/pytorch:${PYTORCH_VERSION}-cuda${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel`; override any args if a given combination isn't published upstream.
-- `Dockerfile.rocm`: `ROCM_VERSION` (default `7.2.4`), `UBUNTU_VERSION`, `PYTHON_VERSION`, `PYTORCH_VERSION`. Base image is `rocm/pytorch:rocm${ROCM_VERSION}_ubuntu${UBUNTU_VERSION}_py${PYTHON_VERSION}_pytorch_release_${PYTORCH_VERSION}`.
+- `Dockerfile.rocm`: `ROCM_VERSION` (default `7.2.0`, matching OLCF Frontier), `UBUNTU_VERSION`, `PYTHON_VERSION`, `PYTORCH_VERSION`. Base image is `rocm/pytorch:rocm${ROCM_VERSION}_ubuntu${UBUNTU_VERSION}_py${PYTHON_VERSION}_pytorch_release_${PYTORCH_VERSION}`.
 - `Dockerfile.xpu`: `BASE_TAG` (default `latest`). Base image is `intel/intel-optimized-pytorch:${BASE_TAG}`; pin to a dated tag for reproducibility.
 
 ## Podman
 
-The repository ships [scripts/podman/build](../../scripts/podman/build), a helper that builds the CPU image plus the three CUDA variants in one shot and threads the checkout's PEP 440 version (from `setuptools_scm`) in as `--build-arg PTYCHODUS_VERSION=…` so `ptychodus --version` inside the container reports the real value instead of the `setuptools_scm` fallback.
+The repository ships [scripts/podman/build](../../scripts/podman/build), a helper that builds every backend in one shot and threads the checkout's PEP 440 version (from `setuptools_scm`) into both the tag and the image so `ptychodus --version` inside the container reports the real value instead of the `setuptools_scm` fallback. Tags follow the pytorch/pytorch shape: **`ptychodus:<pep440-version>-<backend>`**, where `<backend>` is `cpu`, `cuda12.8`, `cuda13.0`, `cuda13.2`, `rocm7.2.0`, or `xpu`.
 
 ```sh
-$ scripts/podman/build                       # cpu + cuda12.8 + cuda13.0 + cuda13.2
+$ scripts/podman/build                       # cpu + cuda12.8/13.0/13.2 + rocm7.2.0 + xpu
 $ scripts/podman/build cpu cuda13.0          # subset
-$ PTYCHODUS_VERSION=1.5.1 scripts/podman/build cuda13.0    # explicit version
+$ PTYCHODUS_VERSION=1.5.1 scripts/podman/build cuda13.0    # explicit version → ptychodus:1.5.1-cuda13.0
 $ CONTAINER_ENGINE=docker scripts/podman/build cpu         # use docker instead
 ```
 
-To build a variant not covered by the helper (ROCm, XPU, or a CUDA/PyTorch pair not in the matrix), invoke podman directly and pass the version yourself:
+Dectris and any CUDA/PyTorch pair not in the matrix above are outside the helper. Invoke the engine directly and pick your own tag:
 
 ```sh
 $ VER=$(uv run --with setuptools-scm python -m setuptools_scm)
-$ podman build --build-arg PTYCHODUS_VERSION="$VER" -f Dockerfile.rocm -t ptychodus:rocm .
-$ podman build --build-arg PTYCHODUS_VERSION="$VER" -f Dockerfile.xpu  -t ptychodus:xpu  .
+$ podman build -f Dockerfile.dectris -t ptychodus:dectris .
+$ podman build --build-arg PTYCHODUS_VERSION="$VER" --build-arg CUDA_VERSION=12.6 \
+    -f Dockerfile.cuda -t "ptychodus:${VER}-cuda12.6" .
 ```
 
 Run container
@@ -108,7 +109,7 @@ GPU access requires CDI (Container Device Interface) to be configured on the hos
 ```sh
 $ xhost +local:podman
 $ podman run -it --rm --env DISPLAY --security-opt label=type:container_runtime_t --network host \
-    --device nvidia.com/gpu=all ptychodus:cuda13.0
+    --device nvidia.com/gpu=all ptychodus:1.5.1-cuda13.0
 $ xhost -local:podman
 ```
 
@@ -124,7 +125,7 @@ or directly:
 
 ```sh
 $ VER=$(uv run --with setuptools-scm python -m setuptools_scm)
-$ docker build --build-arg PTYCHODUS_VERSION="$VER" -f Dockerfile.cuda -t ptychodus:cuda13.0 .
+$ docker build --build-arg PTYCHODUS_VERSION="$VER" -f Dockerfile.cuda -t "ptychodus:${VER}-cuda13.0" .
 ```
 
 Run container
@@ -136,7 +137,7 @@ GPU access requires [nvidia-container-toolkit](https://docs.nvidia.com/datacente
 ```sh
 $ xhost +local:docker
 $ docker run -it --rm  -e "DISPLAY=$DISPLAY" -v "$HOME/.Xauthority:/root/.Xauthority:ro" --network host \
-      --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 ptychodus:cuda13.0
+      --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 ptychodus:1.5.1-cuda13.0
 $ xhost -local:docker
 ```
 
@@ -145,7 +146,7 @@ $ xhost -local:docker
 The images above are OCI-compliant and can be converted to SIF for HPC sites (NERSC, OLCF, ALCF) that prefer Apptainer. After building an OCI image locally, convert it:
 
 ```sh
-$ apptainer build ptychodus-cuda13.0.sif docker-daemon://localhost/ptychodus:cuda13.0
+$ apptainer build ptychodus-1.5.1-cuda13.0.sif docker-daemon://localhost/ptychodus:1.5.1-cuda13.0
 ```
 
 If the image lives in a registry, pull directly with `docker://` instead.
@@ -186,7 +187,7 @@ Sanity check:
 $ ptychodus --version
 ```
 
-stderr will show a one-line notice such as `ptychodus: using image ptychodus:cuda13.0 (detected: nvidia)`; stdout prints the version reported by the in-container `ptychodus`.
+stderr will show a one-line notice such as `ptychodus: using image ptychodus:1.5.1-cuda13.0 (detected: nvidia)` — the wrapper resolves the newest `ptychodus:*-cuda13.0` tag in local podman storage at each launch. stdout prints the version reported by the in-container `ptychodus`.
 
 ### Usage
 
@@ -194,7 +195,7 @@ stderr will show a one-line notice such as `ptychodus: using image ptychodus:cud
 $ ptychodus                                          # GUI, auto-detect GPU
 $ ptychodus -s settings.ini                          # GUI with settings
 $ ptychodus -b reconstruct -i ./input -o ./output    # headless batch
-$ PTYCHODUS_IMAGE=ptychodus:cpu ptychodus            # force CPU image
+$ PTYCHODUS_IMAGE=ptychodus:1.5.1-cpu ptychodus      # force a specific image
 $ PTYCHODUS_QUIET=1 ptychodus -v                     # silent, version only
 ```
 
@@ -207,14 +208,14 @@ File paths passed via `-i`, `-o`, `-s`, or as positional arguments resolve natur
 | `PTYCHODUS_IMAGE` | Skip GPU auto-detection; use this image tag verbatim. |
 | `PTYCHODUS_QUIET` | Suppress the stderr "using image" notice. |
 
-The image tag map and the list of beamline mounts live near the top of `scripts/podman/ptychodus` and can be edited in place to retag or add sites (for example `/data`, `/nsls2`).
+The `BACKEND_FOR` map (which backend suffix pairs with each detected GPU family) and the `BEAMLINE_MOUNTS` list live near the top of `scripts/podman/ptychodus` and can be edited in place to change the default CUDA/ROCm version per site or to add mount points (for example `/data`, `/nsls2`). The wrapper joins the suffix to the newest matching `ptychodus:*-<suffix>` image at runtime, so a rebuild does not require editing the script.
 
 ### Troubleshooting
 
-- **"image … not found in rootless podman storage"** — run the `podman build` command printed in the error.
+- **"no ptychodus:\*-\<suffix\> image found in rootless podman storage"** — run the `scripts/podman/build` invocation printed in the error.
 - **"cannot open display"** — confirm `$DISPLAY` is set in the shell, then run `xhost +local:` once per X session. Wayland desktops work via XWayland as long as `$DISPLAY` is set (the default on GNOME and KDE).
 - **"podman: command not found"** — ask facility IT to install rootless podman.
-- **Wrong GPU family detected** — override with `PTYCHODUS_IMAGE=ptychodus:cpu` (or any other tag).
+- **Wrong GPU family detected** — override with `PTYCHODUS_IMAGE=ptychodus:1.5.1-cpu` (or any other versioned tag).
 - **Files written by the container are owned by root** — rootless `--userns=keep-id` is not in effect; check `podman info` for `rootless: true`.
 - **"permission denied" on a path argument** — the path is outside the bind-mounted set. Run from under `$HOME` or one of the beamline roots, or add the path to `BEAMLINE_MOUNTS` at the top of the wrapper.
 
