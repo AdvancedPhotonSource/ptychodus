@@ -324,6 +324,16 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         processed_bad_pixels = (
             pipeline.apply_to_mask(self._bad_pixels) if pipeline is not None else self._bad_pixels
         )
+        total_counts_lower_bound = (
+            self._settings.total_counts_lower_bound.get_value()
+            if self._settings.total_counts_lower_bound_enabled.get_value()
+            else None
+        )
+        total_counts_upper_bound = (
+            self._settings.total_counts_upper_bound.get_value()
+            if self._settings.total_counts_upper_bound_enabled.get_value()
+            else None
+        )
         return LoadArray(
             array_index,
             array,
@@ -332,6 +342,8 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
             processed_bad_pixels=processed_bad_pixels,
             pipeline=pipeline,
             assembler=self,
+            total_counts_lower_bound=total_counts_lower_bound,
+            total_counts_upper_bound=total_counts_upper_bound,
         )
 
     def append_array(self, array: DiffractionArray, *, process_patterns: bool = True) -> None:

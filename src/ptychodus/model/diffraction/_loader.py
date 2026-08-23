@@ -5,10 +5,13 @@ import concurrent.futures
 import logging
 import threading
 
+import numpy
+
 from ptychodus.api.diffraction import (
     BadPixels,
     DiffractionArray,
     SimpleDiffractionArray,
+    compute_pattern_counts,
     zero_bad_pixels,
 )
 from ptychodus.api.preprocess.diffraction import DiffractionPrepPipeline
@@ -49,6 +52,8 @@ class LoadArray:
         processed_bad_pixels: BadPixels,
         pipeline: DiffractionPrepPipeline | None,
         assembler: ArrayAssembler,
+        total_counts_lower_bound: int | None = None,
+        total_counts_upper_bound: int | None = None,
     ) -> None:
         super().__init__()
         self._array_index = array_index
@@ -58,6 +63,8 @@ class LoadArray:
         self._processed_bad_pixels = processed_bad_pixels
         self._pipeline = pipeline
         self._assembler = assembler
+        self._total_counts_lower_bound = total_counts_lower_bound
+        self._total_counts_upper_bound = total_counts_upper_bound
 
     def __call__(self) -> ForegroundTask | None:
         label = self._array.get_label()
@@ -77,9 +84,34 @@ class LoadArray:
             repaired_patterns,
         )
         processed_array = loaded_array if self._pipeline is None else self._pipeline(loaded_array)
+        indexes = processed_array.get_indexes()
+        patterns = processed_array.get_patterns()
+
+        # Drop patterns whose good-pixel total counts fall outside the (inclusive) bounds.
+        # This runs after the prep pipeline so the counts reflect the same pattern the
+        # reconstructor sees. Filtering both arrays in lockstep preserves the index/pattern
+        # 1:1 invariant that prepare_reconstruct_input relies on.
+        lower = self._total_counts_lower_bound
+        upper = self._total_counts_upper_bound
+        if lower is not None or upper is not None:
+            counts = compute_pattern_counts(patterns, self._processed_bad_pixels)
+            keep = numpy.ones(len(counts), dtype=bool)
+            if lower is not None:
+                keep &= counts >= lower
+            if upper is not None:
+                keep &= counts <= upper
+            n_dropped = int((~keep).sum())
+            if n_dropped:
+                logger.info(
+                    f'Total counts filter dropped {n_dropped}/{len(counts)} patterns '
+                    f"from '{label}' (kept {int(keep.sum())})."
+                )
+                indexes = indexes[keep]
+                patterns = patterns[keep]
+
         data = AssembledDiffractionData(
-            indexes=processed_array.get_indexes(),
-            patterns=processed_array.get_patterns(),
+            indexes=indexes,
+            patterns=patterns,
             pixel_geometry=self._pixel_geometry,
             bad_pixels=self._processed_bad_pixels,
         )

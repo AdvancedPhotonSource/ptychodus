@@ -302,6 +302,40 @@ class ValueFilterViewController:
         return self._widget
 
 
+class TotalCountsFilterViewController:
+    """Drop patterns whose good-pixel total counts fall outside [lower_bound, upper_bound]
+    (inclusive). Runs after the prep pipeline, so counts reflect the same patterns the
+    reconstructor sees (i.e. after any pixel-value zeroing, crop, binning, and padding).
+    """
+
+    def __init__(self, settings: DiffractionSettings) -> None:
+        self._lower_bound_enabled_view_controller = CheckBoxParameterViewController(
+            settings.total_counts_lower_bound_enabled, 'Total Counts Lower Bound:'
+        )
+        self._lower_bound_view_controller = SpinBoxParameterViewController(
+            settings.total_counts_lower_bound
+        )
+        self._upper_bound_enabled_view_controller = CheckBoxParameterViewController(
+            settings.total_counts_upper_bound_enabled, 'Total Counts Upper Bound:'
+        )
+        self._upper_bound_view_controller = SpinBoxParameterViewController(
+            settings.total_counts_upper_bound
+        )
+
+        layout = QGridLayout()
+        layout.addWidget(self._lower_bound_enabled_view_controller.get_widget(), 0, 0)
+        layout.addWidget(self._lower_bound_view_controller.get_widget(), 0, 1)
+        layout.addWidget(self._upper_bound_enabled_view_controller.get_widget(), 1, 0)
+        layout.addWidget(self._upper_bound_view_controller.get_widget(), 1, 1)
+        layout.setColumnStretch(1, 1)
+
+        self._widget = QGroupBox('Total Counts Filter')
+        self._widget.setLayout(layout)
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+
 class TransformViewController:
     """HorizontalFlipStep + VerticalFlipStep + TransposeStep."""
 
@@ -337,7 +371,9 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
     filter → crop → binning → padding → transform (hflip → vflip → transpose).
     Storage (memory map) is not part of the pipeline but is retained here as a
     load-time concern; the horizontal separator between it and Value Filter
-    marks that boundary visually.
+    marks that boundary visually. Total Counts Filter is grouped next to
+    Value Filter for user clarity but runs after the pipeline completes —
+    it drops whole patterns, which no pipeline step is allowed to do.
     """
 
     def __init__(
@@ -350,6 +386,9 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
             diffraction_settings, file_dialog_factory
         )
         self._value_filter_view_controller = ValueFilterViewController(diffraction_settings)
+        self._total_counts_filter_view_controller = TotalCountsFilterViewController(
+            diffraction_settings
+        )
         self._crop_view_controller = CropViewController(diffraction_settings, extent_source)
         self._binning_view_controller = BinningViewController(diffraction_settings, extent_source)
         self._padding_view_controller = PaddingViewController(diffraction_settings)
@@ -363,6 +402,7 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
         layout.addWidget(self._storage_view_controller.get_widget())
         layout.addWidget(separator)
         layout.addWidget(self._value_filter_view_controller.get_widget())
+        layout.addWidget(self._total_counts_filter_view_controller.get_widget())
         layout.addWidget(self._crop_view_controller.get_widget())
         layout.addWidget(self._binning_view_controller.get_widget())
         layout.addWidget(self._padding_view_controller.get_widget())

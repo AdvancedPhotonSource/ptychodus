@@ -11,6 +11,7 @@ from typing import overload, Any, TypeAlias
 
 import numpy
 from scipy import ndimage
+from skimage.restoration import inpaint_biharmonic
 
 from .constants import format_bytes
 from .geometry import ImageExtent, PixelGeometry
@@ -56,6 +57,29 @@ def zero_bad_pixels(
     cleaned = patterns.copy()
     cleaned[:, bad_pixels] = 0
     return cleaned
+
+
+def compute_pattern_counts(
+    patterns: DiffractionPatterns, bad_pixels: BadPixels
+) -> DiffractionPatternCounts:
+    """Sum each pattern over the good (non-bad) pixels."""
+    good_pixels = numpy.logical_not(bad_pixels)
+    return numpy.sum(patterns[:, good_pixels], axis=-1)
+
+
+def inpaint_bad_pixels(
+    pattern: DiffractionPattern, bad_pixels: BadPixels | None
+) -> DiffractionPattern:
+    """Return `pattern` with bad-pixel positions filled by biharmonic inpainting.
+
+    Returns the input unchanged when `bad_pixels` is None or all-False so the
+    (expensive) skimage call is skipped. When inpainting runs the result is
+    float64; the input dtype is preserved when it does not.
+    """
+    if bad_pixels is None or not numpy.any(bad_pixels):
+        return pattern
+
+    return inpaint_biharmonic(pattern.astype(numpy.float64), bad_pixels)
 
 
 @dataclass(frozen=True)
@@ -496,10 +520,7 @@ class AssembledDiffractionData:
         return self._patterns[self._indexes >= 0]
 
     def get_pattern_counts(self) -> DiffractionPatternCounts:
-        good_pixels = numpy.logical_not(self._bad_pixels)
-        assembled_patterns = self.get_patterns()
-        pattern_counts = numpy.sum(assembled_patterns[:, good_pixels], axis=-1)
-        return pattern_counts
+        return compute_pattern_counts(self.get_patterns(), self._bad_pixels)
 
     def get_average_pattern(self) -> DiffractionPattern:
         assembled_patterns = self.get_patterns()
@@ -518,3 +539,85 @@ class AssembledDiffractionData:
         number, height, width = self._patterns.shape
         dtype = str(self._patterns.dtype)
         return f'{number} x {height}H x {width}W {dtype} [{format_bytes(self._patterns.nbytes)}]'
+
+
+@dataclass(frozen=True)
+class DiffractionSummary:
+    """Per-pixel and per-pattern statistics for a diffraction dataset.
+
+    The frame-shaped arrays have bad-pixel positions filled by
+    :func:`inpaint_bad_pixels` so the maps stay smooth for display and
+    thresholding. Per-pattern ``total_counts`` sum only the good pixels.
+    """
+
+    minimum_pattern: DiffractionPattern
+    mean_pattern: DiffractionPattern
+    maximum_pattern: DiffractionPattern
+    indexes: DiffractionIndexes
+    total_counts: DiffractionPatternCounts
+
+
+def compute_diffraction_summary(dataset: DiffractionDataset) -> DiffractionSummary:
+    """Summarize a diffraction dataset with per-pixel and per-pattern statistics.
+
+    Streams one :class:`DiffractionArray` at a time so the full dataset does not
+    need to be assembled in memory. Bad-pixel positions in the frame-shaped
+    min/mean/max arrays are inpainted with biharmonic fill; per-pattern totals
+    are summed over the good pixels only.
+    """
+    bad_pixels = dataset.get_bad_pixels()
+    height, width = bad_pixels.shape
+    total_num_patterns = sum(dataset.get_metadata().num_patterns_per_array)
+
+    indexes = numpy.zeros(total_num_patterns, dtype=numpy.intp)
+    total_counts = numpy.zeros(total_num_patterns, dtype=numpy.float64)
+
+    if total_num_patterns == 0:
+        return DiffractionSummary(
+            minimum_pattern=numpy.zeros((height, width), dtype=numpy.float64),
+            mean_pattern=numpy.zeros((height, width), dtype=numpy.float64),
+            maximum_pattern=numpy.zeros((height, width), dtype=numpy.float64),
+            indexes=indexes,
+            total_counts=total_counts,
+        )
+
+    min_frame: DiffractionPattern | None = None
+    max_frame: DiffractionPattern | None = None
+    sum_frame = numpy.zeros((height, width), dtype=numpy.float64)
+    offset = 0
+
+    for array in dataset:
+        patterns = array.get_patterns()
+        num_patterns = patterns.shape[0]
+
+        if num_patterns == 0:
+            continue
+
+        stop = offset + num_patterns
+        indexes[offset:stop] = array.get_indexes()
+        total_counts[offset:stop] = compute_pattern_counts(patterns, bad_pixels)
+
+        chunk_min = patterns.min(axis=0)
+        chunk_max = patterns.max(axis=0)
+        sum_frame += patterns.sum(axis=0, dtype=numpy.float64)
+
+        if min_frame is None:
+            min_frame = chunk_min
+            max_frame = chunk_max
+        else:
+            assert max_frame is not None
+            min_frame = numpy.minimum(min_frame, chunk_min)
+            max_frame = numpy.maximum(max_frame, chunk_max)
+
+        offset = stop
+
+    assert min_frame is not None and max_frame is not None
+    mean_frame = sum_frame / total_num_patterns
+
+    return DiffractionSummary(
+        minimum_pattern=inpaint_bad_pixels(min_frame, bad_pixels),
+        mean_pattern=inpaint_bad_pixels(mean_frame, bad_pixels),
+        maximum_pattern=inpaint_bad_pixels(max_frame, bad_pixels),
+        indexes=indexes,
+        total_counts=total_counts,
+    )
