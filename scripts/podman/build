@@ -92,9 +92,11 @@ fi
 for backend in "${variants[@]}"; do
     tag="ptychodus:${VERSION}-${backend}"
     printf '\n=== %s (version=%s) ===\n' "$tag" "$VERSION"
-    # word-splitting VARIANT_ARGS[$backend] is intentional.
-    # shellcheck disable=SC2086
-    "$ENGINE" build ${VARIANT_ARGS[$backend]} \
+    # VARIANT_ARGS entries are space-separated argv, but the strict-mode IFS
+    # set above contains no space, so unquoted word-splitting would hand the
+    # engine one giant argument. Split on spaces explicitly instead.
+    IFS=' ' read -r -a variant_args <<<"${VARIANT_ARGS[$backend]}"
+    "$ENGINE" build "${variant_args[@]}" \
         --build-arg "PTYCHODUS_VERSION=$VERSION" \
         -t "$tag" .
 done
