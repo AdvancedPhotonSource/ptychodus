@@ -1,0 +1,38 @@
+ARG CUDA_VERSION=13.0
+ARG PYTORCH_VERSION=2.12.0
+ARG CUDNN_VERSION=9
+FROM pytorch/pytorch:${PYTORCH_VERSION}-cuda${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel
+
+ARG PTYCHODUS_VERSION
+ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PTYCHODUS=${PTYCHODUS_VERSION} \
+    VIRTUAL_ENV=/opt/venv \
+    PATH=/opt/venv/bin:$PATH
+
+WORKDIR /app
+COPY . /src
+
+# The base image's python3 is the distro-managed system Python, which carries
+# the PEP 668 EXTERNALLY-MANAGED marker and refuses a plain `pip install`, so
+# ptychodus goes into a venv. Three details are load-bearing:
+#
+#   * python3-venv supplies the ensurepip that this base image omits; without
+#     it `python3 -m venv` fails outright.
+#   * --system-site-packages keeps the base image's CUDA-matched torch (in
+#     /usr/local/lib/python3.12/dist-packages) visible. A sealed venv would
+#     make pip pull a second, generic torch from PyPI. The venv's own
+#     site-packages still precedes dist-packages on sys.path, so ptychodus's
+#     dependencies shadow the base image's copies as usual.
+#   * The venv is addressed by absolute path below. PATH puts /opt/venv/bin
+#     first, but the shell has already resolved and hashed /usr/bin/python3
+#     for the `python3 -m venv` call, so a bare `python3` later in this same
+#     RUN would still reach the system interpreter and trip PEP 668 again.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libqt5gui5 python3-venv && \
+    rm -rf /var/lib/apt/lists/* && \
+    python3 -m venv --system-site-packages "${VIRTUAL_ENV}" && \
+    "${VIRTUAL_ENV}/bin/python" -m pip install --no-cache-dir --upgrade pip && \
+    "${VIRTUAL_ENV}/bin/python" -m pip install --no-cache-dir \
+        /src[globus,gui,ptychi] && \
+    rm -rf /src
+
+CMD ["python3", "-m", "ptychodus"]

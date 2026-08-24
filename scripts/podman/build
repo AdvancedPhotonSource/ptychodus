@@ -4,14 +4,20 @@
 # image tag.
 #
 # Tag format:
-#   ptychodus:<pep440-version>-<backend>
+#   ptychodus:<tag-safe-version>-<backend>
 #
-#   backend ∈ { cpu, cuda12.8, cuda13.0, cuda13.2, rocm7.2.0, xpu }
+#   backend ∈ { cpu, cuda12.8, cuda13.0, cuda13.2, rocm7.2.4, xpu }
 #
-# Dectris is intentionally excluded: Dockerfile.dectris installs ptychodus
-# from PyPI rather than the checkout, so a version-in-tag would misrepresent
-# the image. Build it separately with a plain `podman build -f Dockerfile.dectris
-# -t ptychodus:dectris .`.
+# The PEP 440 version goes into the image verbatim via the PTYCHODUS_VERSION
+# build arg, but OCI tags only accept [A-Za-z0-9._-], so characters outside
+# that set are replaced with `_` in the tag. In practice this is the `+` of a
+# dev checkout's local segment: 1.5.2.dev14+g79157a2b2 tags as
+# 1.5.2.dev14_g79157a2b2, while a clean release tag is unchanged.
+#
+# Dectris is intentionally excluded: containers/Dockerfile.dectris installs
+# ptychodus from PyPI rather than the checkout, so a version-in-tag would
+# misrepresent the image. Build it separately with a plain `podman build
+# -f containers/Dockerfile.dectris -t ptychodus:dectris .`.
 #
 # Usage:
 #   scripts/podman/build                                # cpu + all cuda + rocm + xpu
@@ -31,21 +37,22 @@ IFS=$'\n\t'
 
 # --- Configuration -----------------------------------------------------------
 
-# ROCm version is pinned to what OLCF Frontier documents. Keep in sync with
-# Dockerfile.rocm's ARG default.
-ROCM_VERSION=7.2.0
+# ROCm version tracks the OLCF Frontier line, pinned to a patch release that
+# rocm/pytorch actually publishes -- plain 7.2.0 has no tag on Docker Hub.
+# Keep in sync with containers/Dockerfile.rocm's ARG default.
+ROCM_VERSION=7.2.4
 
 # Pair each CUDA_VERSION with a PYTORCH_VERSION that is actually published
 # on Docker Hub as pytorch/pytorch:${PYTORCH_VERSION}-cuda${CUDA_VERSION}-cudnn9-devel.
-# The Dockerfile.cuda default (2.12.0) is not published for CUDA 12.8, so
-# that row overrides.
+# The containers/Dockerfile.cuda default (2.12.0) is not published for
+# CUDA 12.8, so that row overrides.
 declare -A VARIANT_ARGS=(
-    [cpu]="-f Dockerfile.cpu"
-    [cuda12.8]="-f Dockerfile.cuda --build-arg CUDA_VERSION=12.8 --build-arg PYTORCH_VERSION=2.11.0"
-    [cuda13.0]="-f Dockerfile.cuda --build-arg CUDA_VERSION=13.0 --build-arg PYTORCH_VERSION=2.12.0"
-    [cuda13.2]="-f Dockerfile.cuda --build-arg CUDA_VERSION=13.2 --build-arg PYTORCH_VERSION=2.12.0"
-    [rocm${ROCM_VERSION}]="-f Dockerfile.rocm --build-arg ROCM_VERSION=${ROCM_VERSION}"
-    [xpu]="-f Dockerfile.xpu"
+    [cpu]="-f containers/Dockerfile.cpu"
+    [cuda12.8]="-f containers/Dockerfile.cuda --build-arg CUDA_VERSION=12.8 --build-arg PYTORCH_VERSION=2.11.0"
+    [cuda13.0]="-f containers/Dockerfile.cuda --build-arg CUDA_VERSION=13.0 --build-arg PYTORCH_VERSION=2.12.0"
+    [cuda13.2]="-f containers/Dockerfile.cuda --build-arg CUDA_VERSION=13.2 --build-arg PYTORCH_VERSION=2.12.0"
+    [rocm${ROCM_VERSION}]="-f containers/Dockerfile.rocm --build-arg ROCM_VERSION=${ROCM_VERSION}"
+    [xpu]="-f containers/Dockerfile.xpu"
 )
 
 DEFAULT_VARIANTS=(cpu cuda12.8 cuda13.0 cuda13.2 "rocm${ROCM_VERSION}" xpu)
@@ -63,7 +70,7 @@ die() {
 # `git rev-parse --show-toplevel` against the caller's cwd succeeds in
 # whatever repo the caller happens to be sitting in, so a build launched from
 # an unrelated checkout would silently cd there and fail later on a missing
-# Dockerfile instead of reporting the real problem here.
+# containers/Dockerfile instead of reporting the real problem here.
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P) \
     || die "cannot resolve the directory containing this script"
 repo_root=$(git -C "$script_dir" rev-parse --show-toplevel) \
@@ -78,6 +85,11 @@ else
     VERSION=$(uv run --quiet --with setuptools-scm python -m setuptools_scm) \
         || die "setuptools_scm failed; set PTYCHODUS_VERSION explicitly (PEP 440) instead"
 fi
+
+# OCI tags allow only [A-Za-z0-9._-] after a leading alphanumeric/underscore,
+# so a PEP 440 local segment ('+g79157a2b2') is rejected outright. Sanitize for
+# the tag only; PTYCHODUS_VERSION keeps the real version.
+TAG_VERSION="${VERSION//[^A-Za-z0-9._-]/_}"
 
 ENGINE="${CONTAINER_ENGINE:-podman}"
 command -v "$ENGINE" >/dev/null 2>&1 \
@@ -98,7 +110,7 @@ fi
 # --- Build -------------------------------------------------------------------
 
 for backend in "${variants[@]}"; do
-    tag="ptychodus:${VERSION}-${backend}"
+    tag="ptychodus:${TAG_VERSION}-${backend}"
     printf '\n=== %s (version=%s) ===\n' "$tag" "$VERSION"
     # VARIANT_ARGS entries are space-separated argv, but the strict-mode IFS
     # set above contains no space, so unquoted word-splitting would hand the

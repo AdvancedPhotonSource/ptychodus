@@ -1,8 +1,5 @@
-ARG ROCM_VERSION=7.2.0
-ARG UBUNTU_VERSION=24.04
-ARG PYTHON_VERSION=3.12
-ARG PYTORCH_VERSION=2.10.0
-FROM rocm/pytorch:rocm${ROCM_VERSION}_ubuntu${UBUNTU_VERSION}_py${PYTHON_VERSION}_pytorch_release_${PYTORCH_VERSION}
+ARG BASE_TAG=2.8.10-xpu
+FROM intel/intel-extension-for-pytorch:${BASE_TAG}
 
 ARG PTYCHODUS_VERSION
 ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PTYCHODUS=${PTYCHODUS_VERSION}
@@ -10,8 +7,11 @@ ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PTYCHODUS=${PTYCHODUS_VERSION}
 WORKDIR /app
 COPY . /src
 
-# The base image already includes a ROCm-built torch; pip sees the torch
-# requirement satisfied and leaves it alone.
+# The base image ships torch 2.8.0+xpu alongside intel_extension_for_pytorch
+# (the IPEX / XPU stack for ALCF Aurora) on Python 3.11; pip sees the torch
+# requirement satisfied and leaves it alone. Intel's own build of this image
+# deletes /usr/lib/python3.11/EXTERNALLY-MANAGED, so installing into the
+# system tree is the sanctioned path here and no venv is needed.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libqt5gui5 && \
     rm -rf /var/lib/apt/lists/* && \

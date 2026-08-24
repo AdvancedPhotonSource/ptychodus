@@ -1,9 +1,15 @@
 .git
 .github
+.claude
 dist/
 build/
 docs/build/
 memoized_data/
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
 *.h5
 *.npy
 *.ini

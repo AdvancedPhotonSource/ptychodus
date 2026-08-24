@@ -233,11 +233,11 @@ For each script name, confirm it appears in `CLAUDE.md` OR `docs/source/getting_
 
 ### Section 5 — Installation instructions are fresh
 
-**5a. Dockerfile variants referenced still exist.** Every Dockerfile name mentioned in `docs/source/getting_started.md` and `CLAUDE.md` should be a real file at the repo root:
+**5a. Dockerfile variants referenced still exist.** Every Dockerfile name mentioned in `docs/source/getting_started.md` and `CLAUDE.md` should be a real file in `containers/`:
 
 ```sh
 grep -hoE 'Dockerfile\.[a-z]+' docs/source/getting_started.md CLAUDE.md | sort -u | while read f; do
-    [ -f "$f" ] || echo "MISSING: $f"
+    [ -f "containers/$f" ] || echo "MISSING: containers/$f"
 done
 ```
 

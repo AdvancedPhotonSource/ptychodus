@@ -21,7 +21,7 @@ IFS=$'\n\t'
 # without editing this file.
 declare -A BACKEND_FOR=(
     [nvidia]=cuda13.0
-    [rocm]=rocm7.2.0
+    [rocm]=rocm7.2.4
     [xpu]=xpu
     [cpu]=cpu
 )

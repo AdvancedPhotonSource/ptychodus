@@ -65,28 +65,28 @@ $ python -m pip install ptychodus[globus,gui,ptychi]
 
 ## Container image variants
 
-The repository ships one Dockerfile per accelerator family. Pick the variant that matches your hardware and select an explicit file with `-f`:
+The repository ships one Dockerfile per accelerator family under [containers/](../../containers/). Pick the variant that matches your hardware and select an explicit file with `-f`:
 
 | Dockerfile | Use it for |
 | --- | --- |
-| `Dockerfile.cpu` | CPU-only hosts (no GPU; ptychi runs on CPU torch) |
-| `Dockerfile.cuda` | NVIDIA GPUs (e.g. ALCF Polaris, NERSC Perlmutter); CUDA minor version is a build ARG |
-| `Dockerfile.rocm` | AMD GPUs (e.g. OLCF Frontier); ROCm is a build ARG |
-| `Dockerfile.xpu` | Intel XPU (e.g. ALCF Aurora); base tag is a build ARG |
-| `Dockerfile.dectris` | Ubuntu 24.04 + PtychoPINN alongside ptychi, for Dectris detector workstations; installs from PyPI (not the checkout) and is outside `scripts/podman/build` |
+| `containers/Dockerfile.cpu` | CPU-only hosts (no GPU; ptychi runs on CPU torch) |
+| `containers/Dockerfile.cuda` | NVIDIA GPUs (e.g. ALCF Polaris, NERSC Perlmutter); CUDA minor version is a build ARG |
+| `containers/Dockerfile.rocm` | AMD GPUs (e.g. OLCF Frontier); ROCm is a build ARG |
+| `containers/Dockerfile.xpu` | Intel XPU (e.g. ALCF Aurora); base tag is a build ARG |
+| `containers/Dockerfile.dectris` | Ubuntu 24.04 + PtychoPINN alongside ptychi, for Dectris detector workstations; installs from PyPI (not the checkout) and is outside `scripts/podman/build` |
 
 The GPU files default to recent versions and expose `--build-arg` knobs to switch:
 
-- `Dockerfile.cuda`: `CUDA_VERSION` (default `13.0`), `PYTORCH_VERSION`, `CUDNN_VERSION`. The base image is `pytorch/pytorch:${PYTORCH_VERSION}-cuda${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel`; override any args if a given combination isn't published upstream.
-- `Dockerfile.rocm`: `ROCM_VERSION` (default `7.2.0`, matching OLCF Frontier), `UBUNTU_VERSION`, `PYTHON_VERSION`, `PYTORCH_VERSION`. Base image is `rocm/pytorch:rocm${ROCM_VERSION}_ubuntu${UBUNTU_VERSION}_py${PYTHON_VERSION}_pytorch_release_${PYTORCH_VERSION}`.
-- `Dockerfile.xpu`: `BASE_TAG` (default `latest`). Base image is `intel/intel-optimized-pytorch:${BASE_TAG}`; pin to a dated tag for reproducibility.
+- `containers/Dockerfile.cuda`: `CUDA_VERSION` (default `13.0`), `PYTORCH_VERSION`, `CUDNN_VERSION`. The base image is `pytorch/pytorch:${PYTORCH_VERSION}-cuda${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel`; override any args if a given combination isn't published upstream. That base image's `python3` is the distro-managed system Python, so ptychodus is installed into a `--system-site-packages` venv at **`/opt/venv`** which reuses the CUDA-matched torch the base image already ships.
+- `containers/Dockerfile.rocm`: `ROCM_VERSION` (default `7.2.4`, the published patch release on the OLCF Frontier line), `UBUNTU_VERSION`, `PYTHON_VERSION`, `PYTORCH_VERSION`. Base image is `rocm/pytorch:rocm${ROCM_VERSION}_ubuntu${UBUNTU_VERSION}_py${PYTHON_VERSION}_pytorch_release_${PYTORCH_VERSION}`; it already provides a venv at `/opt/venv` holding the ROCm-built torch, and ptychodus installs into it.
+- `containers/Dockerfile.xpu`: `BASE_TAG` (default `2.8.10-xpu`). Base image is `intel/intel-extension-for-pytorch:${BASE_TAG}`, which ships torch and `intel_extension_for_pytorch` built for XPU; pin to a dated tag for reproducibility.
 
 ## Podman
 
-The repository ships [scripts/podman/build](../../scripts/podman/build), a helper that builds every backend in one shot and threads the checkout's PEP 440 version (from `setuptools_scm`) into both the tag and the image so `ptychodus --version` inside the container reports the real value instead of the `setuptools_scm` fallback. Tags follow the pytorch/pytorch shape: **`ptychodus:<pep440-version>-<backend>`**, where `<backend>` is `cpu`, `cuda12.8`, `cuda13.0`, `cuda13.2`, `rocm7.2.0`, or `xpu`.
+The repository ships [scripts/podman/build](../../scripts/podman/build), a helper that builds every backend in one shot and threads the checkout's PEP 440 version (from `setuptools_scm`) into both the tag and the image so `ptychodus --version` inside the container reports the real value instead of the `setuptools_scm` fallback. Tags follow the pytorch/pytorch shape: **`ptychodus:<version>-<backend>`**, where `<backend>` is `cpu`, `cuda12.8`, `cuda13.0`, `cuda13.2`, `rocm7.2.4`, or `xpu`. OCI tags accept only `[A-Za-z0-9._-]`, so any character outside that set is replaced with `_` in the tag — a dev checkout's `1.5.2.dev14+g79157a2b2` tags as **`1.5.2.dev14_g79157a2b2`** while the image itself still reports the true PEP 440 version.
 
 ```sh
-$ scripts/podman/build                       # cpu + cuda12.8/13.0/13.2 + rocm7.2.0 + xpu
+$ scripts/podman/build                       # cpu + cuda12.8/13.0/13.2 + rocm7.2.4 + xpu
 $ scripts/podman/build cpu cuda13.0          # subset
 $ PTYCHODUS_VERSION=1.5.1 scripts/podman/build cuda13.0    # explicit version → ptychodus:1.5.1-cuda13.0
 $ CONTAINER_ENGINE=docker scripts/podman/build cpu         # use docker instead
@@ -96,9 +96,9 @@ Dectris and any CUDA/PyTorch pair not in the matrix above are outside the helper
 
 ```sh
 $ VER=$(uv run --with setuptools-scm python -m setuptools_scm)
-$ podman build -f Dockerfile.dectris -t ptychodus:dectris .
+$ podman build -f containers/Dockerfile.dectris -t ptychodus:dectris .
 $ podman build --build-arg PTYCHODUS_VERSION="$VER" --build-arg CUDA_VERSION=12.6 \
-    -f Dockerfile.cuda -t "ptychodus:${VER}-cuda12.6" .
+    -f containers/Dockerfile.cuda -t "ptychodus:${VER}-cuda12.6" .
 ```
 
 Run container
@@ -126,7 +126,7 @@ or directly:
 
 ```sh
 $ VER=$(uv run --with setuptools-scm python -m setuptools_scm)
-$ docker build --build-arg PTYCHODUS_VERSION="$VER" -f Dockerfile.cuda -t "ptychodus:${VER}-cuda13.0" .
+$ docker build --build-arg PTYCHODUS_VERSION="$VER" -f containers/Dockerfile.cuda -t "ptychodus:${VER}-cuda13.0" .
 ```
 
 Run container
@@ -223,7 +223,7 @@ The `BACKEND_FOR` map (which backend suffix pairs with each detected GPU family)
 
 ## VS Code Dev Container
 
-The repository includes a [Dev Container](https://containers.dev/) configuration at `.devcontainer/devcontainer.json` that builds from `Dockerfile.cpu` — the safe default for contributors without a local GPU. GPU users can edit the `dockerfile:` field to point at `Dockerfile.cuda` (or `Dockerfile.rocm`) before reopening in the container.
+The repository includes a [Dev Container](https://containers.dev/) configuration at `.devcontainer/devcontainer.json` that builds from `containers/Dockerfile.cpu` — the safe default for contributors without a local GPU. GPU users can edit the `dockerfile:` field to point at `containers/Dockerfile.cuda` (or `containers/Dockerfile.rocm`) before reopening in the container.
 
 1. Install the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension for VS Code.
 

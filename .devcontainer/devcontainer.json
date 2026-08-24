@@ -2,7 +2,7 @@
   "name": "ptychodus (CPU)",
   "build": {
     "context": "..",
-    "dockerfile": "../Dockerfile.cpu"
+    "dockerfile": "../containers/Dockerfile.cpu"
   },
   "postCreateCommand": "pip install -e .",
   "customizations": {
