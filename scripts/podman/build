@@ -59,8 +59,16 @@ die() {
 
 # --- Setup -------------------------------------------------------------------
 
-cd "$(git rev-parse --show-toplevel)" \
-    || die "must be run inside the ptychodus git checkout"
+# Resolve the checkout from this script's own location rather than $PWD.
+# `git rev-parse --show-toplevel` against the caller's cwd succeeds in
+# whatever repo the caller happens to be sitting in, so a build launched from
+# an unrelated checkout would silently cd there and fail later on a missing
+# Dockerfile instead of reporting the real problem here.
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P) \
+    || die "cannot resolve the directory containing this script"
+repo_root=$(git -C "$script_dir" rev-parse --show-toplevel) \
+    || die "$script_dir is not inside a git checkout; run this script from a ptychodus clone"
+cd "$repo_root" || die "cannot enter the ptychodus checkout at $repo_root"
 
 if [[ -n "${PTYCHODUS_VERSION:-}" ]]; then
     VERSION="$PTYCHODUS_VERSION"
