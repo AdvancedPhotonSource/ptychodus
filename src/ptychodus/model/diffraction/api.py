@@ -136,8 +136,7 @@ class DiffractionAPI:
         file_type: str | None,
     ) -> None:
         if not file_path.is_file():
-            logger.warning(f'Refusing to read invalid bad pixels file path {file_path}')
-            return
+            raise FileNotFoundError(f'Invalid bad pixels file path "{file_path}"')
 
         if file_type is not None:
             self._bad_pixels_file_reader_chooser.set_current_plugin(file_type)
@@ -145,14 +144,10 @@ class DiffractionAPI:
         logger.debug(f'Reading "{file_path}" as "{bad_pixels_plugin.simple_name}"')
         try:
             bad_pixels = bad_pixels_plugin.strategy.read(file_path)
-        except Exception:
-            logger.warning(f'Failed to load bad pixels from "{file_path}"')
-            return
+        except Exception as exc:
+            raise RuntimeError(f'Failed to load bad pixels from "{file_path}"') from exc
 
-        try:
-            dataset.set_bad_pixels(bad_pixels)
-        except ValueError as exc:
-            logger.warning(f'Ignoring bad pixels from "{file_path}": {exc}')
+        dataset.set_bad_pixels(bad_pixels)
 
     def apply_bad_pixels(
         self,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import Final
@@ -272,6 +272,7 @@ class PathParameterViewController(ParameterViewController, Observer):
         mime_type_filters: Sequence[str] | None,
         selected_name_filter: str | None,
         tool_tip: str,
+        on_filter_selected: Callable[[str], None] | None = None,
     ) -> None:
         super().__init__()
         self._parameter = parameter
@@ -280,6 +281,7 @@ class PathParameterViewController(ParameterViewController, Observer):
         self._name_filters = name_filters
         self._mime_type_filters = mime_type_filters
         self._selected_name_filter = selected_name_filter
+        self._on_filter_selected = on_filter_selected
         self._line_edit = QLineEdit()
         self._browse_button = QPushButton('Browse')
         self._widget = QWidget()
@@ -308,6 +310,7 @@ class PathParameterViewController(ParameterViewController, Observer):
         mime_type_filters: Sequence[str] | None = None,
         selected_name_filter: str | None = None,
         tool_tip: str = '',
+        on_filter_selected: Callable[[str], None] | None = None,
     ) -> PathParameterViewController:
         view_controller = cls(
             parameter,
@@ -317,6 +320,7 @@ class PathParameterViewController(ParameterViewController, Observer):
             mime_type_filters=mime_type_filters,
             selected_name_filter=selected_name_filter,
             tool_tip=tool_tip,
+            on_filter_selected=on_filter_selected,
         )
         view_controller._browse_button.clicked.connect(view_controller._choose_file_to_open)
         return view_controller
@@ -369,12 +373,15 @@ class PathParameterViewController(ParameterViewController, Observer):
     def get_widget(self) -> QWidget:
         return self._widget
 
+    def set_selected_name_filter(self, name: str | None) -> None:
+        self._selected_name_filter = name
+
     def __sync_path_to_model(self) -> None:
         path = Path(self._line_edit.text())
         self._parameter.set_value(path)
 
     def _choose_file_to_open(self) -> None:
-        path, _ = self._file_dialog_factory.get_open_file_path(
+        path, name_filter = self._file_dialog_factory.get_open_file_path(
             self._widget,
             self._caption,
             self._name_filters,
@@ -384,6 +391,8 @@ class PathParameterViewController(ParameterViewController, Observer):
 
         if path:
             self._parameter.set_value(path)
+            if name_filter and self._on_filter_selected is not None:
+                self._on_filter_selected(name_filter)
 
     def _choose_file_to_save(self) -> None:
         path, _ = self._file_dialog_factory.get_save_file_path(

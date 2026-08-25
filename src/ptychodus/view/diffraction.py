@@ -37,14 +37,6 @@ class OpenDatasetWizardPage(QWizardPage):
             self.completeChanged.emit()
 
 
-class OpenDatasetWizardBadPixelsPage(OpenDatasetWizardPage):
-    """Bad-pixels chooser page — always complete; layout populated by the controller."""
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self._set_complete(True)
-
-
 class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)

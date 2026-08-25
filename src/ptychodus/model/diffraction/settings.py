@@ -17,6 +17,7 @@ class DetectorSettings(Observable, Observer):
             'PixelHeightInMeters', 75e-6, minimum=0.0
         )
 
+        self.bad_pixels_enabled = self._group.create_boolean_parameter('BadPixelsEnabled', False)
         self.bad_pixels_file_type = self._group.create_string_parameter(
             'BadPixelsFileType', 'NPY_Bad_Pixels'
         )

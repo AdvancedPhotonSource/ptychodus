@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
 from ptychodus.api.geometry import Interval
 from ptychodus.api.observer import Observable
 
-from ....model.diffraction import DiffractionSettings
+from ....model.diffraction import DetectorSettings, DiffractionAPI, DiffractionSettings
 from ....view.diffraction import OpenDatasetWizardPage
 
 from ...data import FileDialogFactory
@@ -64,6 +64,39 @@ class StorageViewController(CheckableGroupBoxParameterViewController):
         layout = QFormLayout()
         layout.addRow('Scratch Directory:', self._view_controller.get_widget())
         self.get_widget().setLayout(layout)
+
+
+class BadPixelsViewController(CheckableGroupBoxParameterViewController):
+    def __init__(
+        self,
+        detector_settings: DetectorSettings,
+        api: DiffractionAPI,
+        file_dialog_factory: FileDialogFactory,
+    ) -> None:
+        super().__init__(detector_settings.bad_pixels_enabled, 'Apply Bad Pixels Mask')
+        self._file_reader_parameter = api.get_bad_pixels_file_reader_parameter()
+        self._file_path_view_controller = PathParameterViewController.create_file_opener(
+            detector_settings.bad_pixels_file_path,
+            file_dialog_factory,
+            caption='Open Bad Pixels File',
+            name_filters=list(self._file_reader_parameter.choices()),
+            selected_name_filter=self._file_reader_parameter.get_value(),
+            on_filter_selected=self._file_reader_parameter.set_value,
+        )
+
+        layout = QFormLayout()
+        layout.addRow('File:', self._file_path_view_controller.get_widget())
+        self.get_widget().setLayout(layout)
+
+        self._file_reader_parameter.add_observer(self)
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._file_reader_parameter:
+            self._file_path_view_controller.set_selected_name_filter(
+                self._file_reader_parameter.get_value()
+            )
+        else:
+            super()._update(observable)
 
 
 class CropViewController(CheckableGroupBoxParameterViewController):
@@ -369,21 +402,27 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
     """Processing wizard page. Groups are laid out top-to-bottom in the
     DiffractionPrepPipeline execution order (see api/diffraction_prep.py):
     filter → crop → binning → padding → transform (hflip → vflip → transpose).
-    Storage (memory map) is not part of the pipeline but is retained here as a
-    load-time concern; the horizontal separator between it and Value Filter
-    marks that boundary visually. Total Counts Filter is grouped next to
-    Value Filter for user clarity but runs after the pipeline completes —
-    it drops whole patterns, which no pipeline step is allowed to do.
+    Storage (memory map) and Bad Pixels are not part of the pipeline but are
+    retained here as load-time concerns; the horizontal separator between them
+    and Value Filter marks that boundary visually. Total Counts Filter is
+    grouped next to Value Filter for user clarity but runs after the pipeline
+    completes — it drops whole patterns, which no pipeline step is allowed to
+    do.
     """
 
     def __init__(
         self,
         diffraction_settings: DiffractionSettings,
+        detector_settings: DetectorSettings,
         extent_source: DetectorExtentSource,
+        api: DiffractionAPI,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         self._storage_view_controller = StorageViewController(
             diffraction_settings, file_dialog_factory
+        )
+        self._bad_pixels_view_controller = BadPixelsViewController(
+            detector_settings, api, file_dialog_factory
         )
         self._value_filter_view_controller = ValueFilterViewController(diffraction_settings)
         self._total_counts_filter_view_controller = TotalCountsFilterViewController(
@@ -400,6 +439,7 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
 
         layout = QVBoxLayout()
         layout.addWidget(self._storage_view_controller.get_widget())
+        layout.addWidget(self._bad_pixels_view_controller.get_widget())
         layout.addWidget(separator)
         layout.addWidget(self._value_filter_view_controller.get_widget())
         layout.addWidget(self._total_counts_filter_view_controller.get_widget())
