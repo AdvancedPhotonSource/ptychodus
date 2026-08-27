@@ -287,3 +287,51 @@ class TestComputeIlluminationMap:
         m = compute_illumination_map(product)
         expected_patch = numpy.abs(mode_a) ** 2 + numpy.abs(mode_b) ** 2
         numpy.testing.assert_allclose(m.photon_number[4:12, 4:12], expected_patch, atol=1e-12)
+
+    def test_probe_photon_counts_weight_patches_and_preserve_budget(self) -> None:
+        """Per-scan-index weights redistribute photons across positions without
+        changing the total photon budget on the canvas."""
+        probe = _gaussian_probe(8, 8, sigma=1.0)
+        pixel_size_m = 1.0e-7
+        positions = [
+            ProbePosition(index=0, coordinate_x_m=-8 * pixel_size_m, coordinate_y_m=0.0),
+            ProbePosition(index=1, coordinate_x_m=+8 * pixel_size_m, coordinate_y_m=0.0),
+        ]
+        product = _make_product(
+            object_array=_delta_object(16, 32),
+            probe_array=probe,
+            positions=positions,
+            pixel_size_m=pixel_size_m,
+        )
+        uniform = compute_illumination_map(product)
+        # Weight index 0 at 100, index 1 at 300 -> mean 200 -> factors 0.5, 1.5.
+        weighted = compute_illumination_map(
+            product, probe_photon_counts_by_index={0: 100.0, 1: 300.0}
+        )
+        expected_patch = numpy.abs(probe) ** 2
+        numpy.testing.assert_allclose(weighted.photon_number[4:12, 4:12], 0.5 * expected_patch)
+        numpy.testing.assert_allclose(weighted.photon_number[4:12, 20:28], 1.5 * expected_patch)
+        # Preserved total budget.
+        assert float(weighted.photon_number.sum()) == pytest.approx(
+            float(uniform.photon_number.sum())
+        )
+
+    def test_probe_photon_counts_missing_index_gets_unit_weight(self) -> None:
+        """A scan index absent from the mapping is weighted by the provided mean."""
+        probe = _gaussian_probe(8, 8, sigma=1.0)
+        pixel_size_m = 1.0e-7
+        positions = [
+            ProbePosition(index=0, coordinate_x_m=-8 * pixel_size_m, coordinate_y_m=0.0),
+            ProbePosition(index=1, coordinate_x_m=+8 * pixel_size_m, coordinate_y_m=0.0),
+        ]
+        product = _make_product(
+            object_array=_delta_object(16, 32),
+            probe_array=probe,
+            positions=positions,
+            pixel_size_m=pixel_size_m,
+        )
+        # Only index 0 is in the mapping; index 1 gets the mean of the mapping (=100)
+        # divided by the mean (=100) -> unit weight.
+        weighted = compute_illumination_map(product, probe_photon_counts_by_index={0: 100.0})
+        expected_patch = numpy.abs(probe) ** 2
+        numpy.testing.assert_allclose(weighted.photon_number[4:12, 20:28], expected_patch)

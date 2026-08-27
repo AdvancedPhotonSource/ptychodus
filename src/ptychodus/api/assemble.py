@@ -79,11 +79,13 @@ class AssembledDiffractionData:
         patterns: DiffractionPatterns,
         pixel_geometry: PixelGeometry,
         bad_pixels: BadPixels,
+        probe_photon_counts: DiffractionPatternCounts | None = None,
     ) -> None:
         self._indexes = indexes
         self._patterns = patterns
         self._pixel_geometry = pixel_geometry
         self._bad_pixels = bad_pixels
+        self._probe_photon_counts = probe_photon_counts
 
         if indexes.ndim != 1:
             raise ValueError(
@@ -108,6 +110,15 @@ class AssembledDiffractionData:
                 'Patterns shape does not match bad pixels shape! '
                 f'(actual={patterns.shape[1:]} expected={bad_pixels.shape})'
             )
+
+        if probe_photon_counts is not None:
+            if probe_photon_counts.ndim != 1:
+                raise ValueError(
+                    'Unexpected number of dimensions for probe photon counts! '
+                    f'(actual={probe_photon_counts.ndim} expected=1)'
+                )
+            if probe_photon_counts.shape[0] != patterns.shape[0]:
+                raise ValueError('Number of probe photon counts does not match number of patterns!')
 
     @classmethod
     def create_null(cls) -> AssembledDiffractionData:
@@ -164,11 +175,18 @@ class AssembledDiffractionData:
         patterns_view = self._patterns[assembled_indexes, :, :]
         patterns_view.flags.writeable = False
 
+        probe_photon_counts_view: DiffractionPatternCounts | None = None
+        if self._probe_photon_counts is not None and data._probe_photon_counts is not None:
+            self._probe_photon_counts[assembled_indexes] = data._probe_photon_counts
+            probe_photon_counts_view = self._probe_photon_counts[assembled_indexes]
+            probe_photon_counts_view.flags.writeable = False
+
         return AssembledDiffractionData(
             indexes=indexes_view,
             patterns=patterns_view,
             pixel_geometry=self._pixel_geometry,
             bad_pixels=data._bad_pixels,
+            probe_photon_counts=probe_photon_counts_view,
         )
 
     def get_indexes(self) -> DiffractionIndexes:
@@ -180,15 +198,36 @@ class AssembledDiffractionData:
     def get_total_counts(self) -> DiffractionPatternCounts:
         return compute_total_counts(self.get_patterns(), self._bad_pixels)
 
+    def has_measured_probe_photon_counts(self) -> bool:
+        """True when real hardware flux measurements were supplied for every valid pattern."""
+        if self._probe_photon_counts is None:
+            return False
+        valid = self._probe_photon_counts[self._indexes >= 0]
+        return valid.size > 0 and not bool(numpy.any(numpy.isnan(valid)))
+
+    def get_probe_photon_counts(self) -> DiffractionPatternCounts:
+        """Per-pattern incident probe photon counts.
+
+        Returns measured counts when :meth:`has_measured_probe_photon_counts` is
+        true; otherwise falls back to :meth:`get_total_counts` — the sum over good
+        pixels for each pattern. Always returns a valid array so callers need no
+        None branch.
+        """
+        if self.has_measured_probe_photon_counts():
+            assert self._probe_photon_counts is not None
+            return self._probe_photon_counts[self._indexes >= 0]
+        return self.get_total_counts()
+
     def get_probe_photon_count(self) -> int:
         """Estimate the per-snapshot probe photon count.
 
-        Heuristic: total counts of the brightest pattern over good pixels. The
-        brightest pattern bounds the photons reaching the detector when the probe
-        is least obstructed by the sample. Returns 0 when nothing is assembled.
+        Returns ``max(get_probe_photon_counts())`` — measured maximum when hardware
+        flux data is available, otherwise the brightest pattern's total counts over
+        good pixels (which bounds the photons reaching the detector when the probe
+        is least obstructed by the sample). Returns 0 when nothing is assembled.
         """
-        total_counts = self.get_total_counts()
-        return int(total_counts.max()) if total_counts.size > 0 else 0
+        counts = self.get_probe_photon_counts()
+        return int(counts.max()) if counts.size > 0 else 0
 
     def get_mean_pattern(self) -> DiffractionPattern:
         assembled_patterns = self.get_patterns()
@@ -201,7 +240,10 @@ class AssembledDiffractionData:
         A memory-mapped patterns array (see ``load_diffraction_data``) reports its full
         logical size here even though it is backed by disk rather than RAM.
         """
-        return self._indexes.nbytes + self._patterns.nbytes + self._bad_pixels.nbytes
+        sz = self._indexes.nbytes + self._patterns.nbytes + self._bad_pixels.nbytes
+        if self._probe_photon_counts is not None:
+            sz += self._probe_photon_counts.nbytes
+        return sz
 
     def __str__(self) -> str:
         number, height, width = self._patterns.shape
@@ -331,7 +373,23 @@ def allocate_assembled_data(
             raise ValueError('Supplied patterns buffer is read-only!')
 
     indexes = -numpy.ones(num_patterns_total, dtype=int)
-    return AssembledDiffractionData(indexes, patterns, pixel_geometry, processed_bad_pixels)
+
+    # Reserve a per-pattern probe photon counts buffer only when at least one
+    # array offers hardware flux measurements. Slots for arrays without flux
+    # stay NaN, so has_measured_probe_photon_counts() reports False for mixed
+    # datasets and downstream falls back to per-pattern total counts uniformly.
+    any_probe_flux = any(array.get_probe_photon_flux_Hz() is not None for array in dataset)
+    probe_photon_counts: DiffractionPatternCounts | None = None
+    if any_probe_flux:
+        probe_photon_counts = numpy.full(num_patterns_total, numpy.nan, dtype=numpy.float64)
+
+    return AssembledDiffractionData(
+        indexes,
+        patterns,
+        pixel_geometry,
+        processed_bad_pixels,
+        probe_photon_counts=probe_photon_counts,
+    )
 
 
 def preprocess_array(
@@ -343,11 +401,19 @@ def preprocess_array(
     raw_pixel_geometry: PixelGeometry,
     total_counts_lower_bound: int | None = None,
     total_counts_upper_bound: int | None = None,
+    exposure_time_s: float | None = None,
 ) -> AssembledDiffractionData:
     """Read one array and preprocess it into a dense block of patterns.
 
     Bad pixels are zeroed in raw detector coordinates *before* the pipeline runs,
     then patterns outside the (inclusive) total-counts bounds are dropped.
+
+    When ``array`` provides per-pattern probe photon flux (Hz) and
+    ``exposure_time_s`` is a positive number, the flux is converted to per-pattern
+    photon counts and attached to the returned block. A reader that reports flux
+    without a positive exposure logs a warning and the measurement is dropped for
+    that array; the assembled buffer's fallback (per-pattern total counts) still
+    applies.
 
     Propagates :class:`FileNotFoundError` from the underlying read; callers that
     treat a missing array as a skip must catch it. The returned block carries the
@@ -366,10 +432,24 @@ def preprocess_array(
     indexes = processed_array.get_indexes()
     patterns = processed_array.get_patterns()
 
+    # Convert per-pattern probe photon flux (Hz) to counts using the shared
+    # exposure. Flux and counts are per-pattern scalars, unaffected by any
+    # detector-image transform in the prep pipeline.
+    probe_photon_counts: DiffractionPatternCounts | None = None
+    probe_photon_flux_Hz = array.get_probe_photon_flux_Hz()  # noqa: N806
+    if probe_photon_flux_Hz is not None:
+        if exposure_time_s is not None and exposure_time_s > 0.0:
+            probe_photon_counts = probe_photon_flux_Hz * exposure_time_s
+        else:
+            logger.warning(
+                f"Dropping probe photon flux measurements from '{label}': "
+                f'exposure_time_s is {exposure_time_s!r}.'
+            )
+
     # Drop patterns whose good-pixel total counts fall outside the (inclusive) bounds.
     # This runs after the prep pipeline so the counts reflect the same pattern the
-    # reconstructor sees. Filtering both arrays in lockstep preserves the index/pattern
-    # 1:1 invariant that prepare_reconstruct_input relies on.
+    # reconstructor sees. Filtering all per-pattern arrays in lockstep preserves the
+    # index/pattern 1:1 invariant that prepare_reconstruct_input relies on.
     lower = total_counts_lower_bound
     upper = total_counts_upper_bound
 
@@ -392,6 +472,8 @@ def preprocess_array(
             )
             indexes = indexes[keep]
             patterns = patterns[keep]
+            if probe_photon_counts is not None:
+                probe_photon_counts = probe_photon_counts[keep]
 
     pixel_geometry = (
         raw_pixel_geometry
@@ -403,6 +485,7 @@ def preprocess_array(
         patterns=patterns,
         pixel_geometry=pixel_geometry,
         bad_pixels=processed_bad_pixels,
+        probe_photon_counts=probe_photon_counts,
     )
 
 
@@ -557,6 +640,7 @@ def assemble_dataset(
             raw_pixel_geometry=block_pixel_geometry,
             total_counts_lower_bound=total_counts_lower_bound,
             total_counts_upper_bound=total_counts_upper_bound,
+            exposure_time_s=metadata.exposure_time_s,
         )
         num_patterns = block.get_patterns_shape()[0]
         capacity = num_patterns_per_array[array_index]

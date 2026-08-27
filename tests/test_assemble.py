@@ -48,6 +48,7 @@ def _make_dataset(
     bad_pixels: BadPixels | None = None,
     num_patterns_per_array: Sequence[int] | None = None,
     pixel_geometry: PixelGeometry | None = GEOMETRY,
+    exposure_time_s: float | None = None,
 ) -> SimpleDiffractionDataset:
     height, width = frame_shape
     metadata = DiffractionMetadata(
@@ -59,6 +60,7 @@ def _make_dataset(
         pattern_dtype=arrays[0].get_patterns().dtype if arrays else numpy.dtype(numpy.uint16),
         detector_extent=ImageExtent(width_px=width, height_px=height),
         detector_pixel_geometry=pixel_geometry,
+        exposure_time_s=exposure_time_s,
     )
     return SimpleDiffractionDataset(
         metadata, DiffractionDatasetLayoutNode.create_root(), arrays, bad_pixels
@@ -634,3 +636,192 @@ def test_assemble_accepts_an_empty_array_list_with_reserved_capacity() -> None:
 
     assert data.get_patterns_shape() == (4, 4, 4)
     assert data.get_indexes().size == 0
+
+
+# ---------- probe_photon_counts on AssembledDiffractionData ----------
+
+
+def _bare_data(
+    num_patterns: int = 3,
+    *,
+    probe_photon_counts: numpy.ndarray | None = None,
+    fill: int = 4,
+) -> AssembledDiffractionData:
+    patterns = numpy.full((num_patterns, 4, 4), fill, dtype=numpy.int32)
+    return AssembledDiffractionData(
+        indexes=numpy.arange(num_patterns, dtype=numpy.intp),
+        patterns=patterns,
+        pixel_geometry=GEOMETRY,
+        bad_pixels=numpy.zeros((4, 4), dtype=numpy.bool_),
+        probe_photon_counts=probe_photon_counts,
+    )
+
+
+def test_missing_probe_photon_counts_falls_back_to_total_counts() -> None:
+    data = _bare_data(num_patterns=3, fill=4)  # total_counts = 4 * 16 = 64 per pattern
+
+    assert not data.has_measured_probe_photon_counts()
+    numpy.testing.assert_array_equal(data.get_probe_photon_counts(), [64, 64, 64])
+    numpy.testing.assert_array_equal(data.get_probe_photon_counts(), data.get_total_counts())
+    assert data.get_probe_photon_count() == 64
+
+
+def test_measured_probe_photon_counts_take_priority_over_total_counts() -> None:
+    measured = numpy.array([100.0, 500.0, 200.0], dtype=numpy.float64)
+    data = _bare_data(num_patterns=3, fill=4, probe_photon_counts=measured)
+
+    assert data.has_measured_probe_photon_counts()
+    numpy.testing.assert_array_equal(data.get_probe_photon_counts(), measured)
+    # Scalar backward-compat: max of measured, not max of total counts.
+    assert data.get_probe_photon_count() == 500
+
+
+def test_probe_photon_counts_wrong_ndim_is_rejected() -> None:
+    with pytest.raises(ValueError, match='probe photon counts'):
+        _bare_data(probe_photon_counts=numpy.zeros((3, 2), dtype=numpy.float64))
+
+
+def test_probe_photon_counts_wrong_length_is_rejected() -> None:
+    with pytest.raises(ValueError, match='probe photon counts'):
+        _bare_data(num_patterns=3, probe_photon_counts=numpy.zeros(4, dtype=numpy.float64))
+
+
+def test_partial_probe_photon_counts_are_not_considered_measured() -> None:
+    """NaN in any valid slot means the fallback is used uniformly."""
+    partial = numpy.array([100.0, numpy.nan, 200.0], dtype=numpy.float64)
+    data = _bare_data(num_patterns=3, fill=4, probe_photon_counts=partial)
+
+    assert not data.has_measured_probe_photon_counts()
+    numpy.testing.assert_array_equal(data.get_probe_photon_counts(), data.get_total_counts())
+
+
+# ---------- Hz -> counts bridge through preprocess_array / assemble_dataset ----------
+
+
+def _array_with_flux(
+    label: str,
+    first_index: int,
+    num_patterns: int,
+    fill: int,
+    flux_hz: numpy.ndarray | None,
+) -> SimpleDiffractionArray:
+    patterns = numpy.full((num_patterns, 4, 4), fill, dtype=numpy.int32)
+    indexes = numpy.arange(first_index, first_index + num_patterns, dtype=numpy.intp)
+    return SimpleDiffractionArray(label, indexes, patterns, probe_photon_flux_Hz=flux_hz)
+
+
+def test_preprocess_array_converts_flux_Hz_to_counts_using_exposure() -> None:  # noqa: N802
+    flux_hz = numpy.array([1000.0, 2000.0, 500.0], dtype=numpy.float64)
+    array = _array_with_flux('a', 0, 3, 4, flux_hz)
+    good = numpy.zeros((4, 4), dtype=numpy.bool_)
+
+    block = preprocess_array(
+        array,
+        raw_bad_pixels=good,
+        processed_bad_pixels=good,
+        raw_pixel_geometry=GEOMETRY,
+        exposure_time_s=0.5,
+    )
+
+    assert block.has_measured_probe_photon_counts()
+    numpy.testing.assert_array_equal(block.get_probe_photon_counts(), [500.0, 1000.0, 250.0])
+
+
+def test_preprocess_array_drops_flux_when_exposure_is_missing(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    flux_hz = numpy.array([1000.0, 2000.0], dtype=numpy.float64)
+    array = _array_with_flux('a', 0, 2, 4, flux_hz)
+    good = numpy.zeros((4, 4), dtype=numpy.bool_)
+
+    with caplog.at_level('WARNING', logger='ptychodus.api.assemble'):
+        block = preprocess_array(
+            array,
+            raw_bad_pixels=good,
+            processed_bad_pixels=good,
+            raw_pixel_geometry=GEOMETRY,
+            exposure_time_s=None,
+        )
+
+    assert not block.has_measured_probe_photon_counts()
+    assert 'exposure_time_s' in caplog.text
+
+
+def test_preprocess_array_drops_flux_when_exposure_is_zero(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    flux_hz = numpy.array([1000.0, 2000.0], dtype=numpy.float64)
+    array = _array_with_flux('a', 0, 2, 4, flux_hz)
+    good = numpy.zeros((4, 4), dtype=numpy.bool_)
+
+    with caplog.at_level('WARNING', logger='ptychodus.api.assemble'):
+        block = preprocess_array(
+            array,
+            raw_bad_pixels=good,
+            processed_bad_pixels=good,
+            raw_pixel_geometry=GEOMETRY,
+            exposure_time_s=0.0,
+        )
+
+    assert not block.has_measured_probe_photon_counts()
+    assert 'exposure_time_s' in caplog.text
+
+
+def test_counts_filter_keeps_probe_photon_counts_aligned_with_patterns() -> None:
+    good = numpy.zeros((2, 2), dtype=numpy.bool_)
+    patterns = numpy.stack(
+        [
+            numpy.full((2, 2), 1, dtype=numpy.int32),  # sum = 4  (dropped)
+            numpy.full((2, 2), 5, dtype=numpy.int32),  # sum = 20 (kept)
+            numpy.full((2, 2), 10, dtype=numpy.int32),  # sum = 40 (kept)
+        ]
+    )
+    flux_hz = numpy.array([100.0, 500.0, 200.0], dtype=numpy.float64)
+    array = SimpleDiffractionArray(
+        'a', numpy.array([7, 8, 9], dtype=numpy.intp), patterns, probe_photon_flux_Hz=flux_hz
+    )
+
+    block = preprocess_array(
+        array,
+        raw_bad_pixels=good,
+        processed_bad_pixels=good,
+        raw_pixel_geometry=GEOMETRY,
+        exposure_time_s=1.0,
+        total_counts_lower_bound=10,
+    )
+
+    numpy.testing.assert_array_equal(block.get_indexes(), [8, 9])
+    numpy.testing.assert_array_equal(block.get_probe_photon_counts(), [500.0, 200.0])
+
+
+def test_assemble_dataset_allocates_counts_buffer_only_when_flux_is_available() -> None:
+    flux_hz = numpy.array([10.0, 20.0, 30.0], dtype=numpy.float64)
+
+    with_flux = _make_dataset(
+        [_array_with_flux('a', 0, 3, 4, flux_hz)], (4, 4), exposure_time_s=0.5
+    )
+    data = assemble_dataset(with_flux)
+
+    assert data.has_measured_probe_photon_counts()
+    numpy.testing.assert_array_equal(data.get_probe_photon_counts(), [5.0, 10.0, 15.0])
+
+    without_flux = _make_dataset([_array('a', 0, 3, 4)], (4, 4), exposure_time_s=0.5)
+    data_no_flux = assemble_dataset(without_flux)
+
+    assert not data_no_flux.has_measured_probe_photon_counts()
+    # Fallback path is total counts (fill=4, 4x4 patterns => 64 per pattern).
+    numpy.testing.assert_array_equal(data_no_flux.get_probe_photon_counts(), [64, 64, 64])
+
+
+def test_assemble_dataset_marks_mixed_arrays_as_unmeasured() -> None:
+    flux_hz = numpy.array([10.0, 20.0], dtype=numpy.float64)
+    a_with = _array_with_flux('a', 0, 2, 4, flux_hz)
+    b_without = _array('b', 2, 2, 5)  # No flux -> its slice stays NaN.
+
+    dataset = _make_dataset([a_with, b_without], (4, 4), exposure_time_s=0.5)
+
+    data = assemble_dataset(dataset)
+
+    # Any NaN in a valid-index slot -> not fully measured -> fallback path used.
+    assert not data.has_measured_probe_photon_counts()
+    numpy.testing.assert_array_equal(data.get_probe_photon_counts(), data.get_total_counts())

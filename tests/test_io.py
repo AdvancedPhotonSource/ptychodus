@@ -264,6 +264,54 @@ class TestDiffractionRoundTrip:
 
         numpy.testing.assert_array_equal(loaded._indexes, numpy.arange(6))
 
+    def test_probe_photon_counts_absent_when_unmeasured(self, tmp_path: Path) -> None:
+        original = _make_diffraction_data()
+        file = tmp_path / 'diff.h5'
+
+        save_diffraction_data(file, original)
+
+        with h5py.File(file, 'r') as h5_file:
+            assert 'probe_photon_counts' not in h5_file
+
+        loaded = load_diffraction_data(file)
+        assert not loaded.has_measured_probe_photon_counts()
+
+    def test_probe_photon_counts_round_trip(self, tmp_path: Path) -> None:
+        base = _make_diffraction_data(num_patterns=4)
+        counts = numpy.array([100.0, 200.0, 300.0, 400.0], dtype=numpy.float64)
+        original = AssembledDiffractionData(
+            base._indexes,
+            base._patterns,
+            base.get_pixel_geometry(),
+            base._bad_pixels,
+            probe_photon_counts=counts,
+        )
+        file = tmp_path / 'diff.h5'
+
+        save_diffraction_data(file, original)
+
+        with h5py.File(file, 'r') as h5_file:
+            assert 'probe_photon_counts' in h5_file
+
+        loaded = load_diffraction_data(file)
+        assert loaded.has_measured_probe_photon_counts()
+        numpy.testing.assert_array_equal(loaded.get_probe_photon_counts(), counts)
+
+    def test_legacy_file_without_probe_photon_counts_still_loads(self, tmp_path: Path) -> None:
+        """A file written before this feature (no probe_photon_counts dataset) must load."""
+        original = _make_diffraction_data(num_patterns=3)
+        file = tmp_path / 'diff.h5'
+        save_diffraction_data(file, original)
+
+        # Simulate a pre-existing file: the fresh save already omits the new dataset.
+        with h5py.File(file, 'r') as h5_file:
+            assert 'probe_photon_counts' not in h5_file
+
+        loaded = load_diffraction_data(file)
+        assert not loaded.has_measured_probe_photon_counts()
+        # Fallback path returns total counts, always a valid array.
+        assert loaded.get_probe_photon_counts().shape == (3,)
+
 
 # ---------------------------------------------------------------------------
 # Diffraction data error handling

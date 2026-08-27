@@ -92,6 +92,7 @@ class DiffractionFileKeys(StrEnum):
     DETECTOR_PIXEL_WIDTH = 'detector_pixel_width_m'
     INDEXES = 'indexes'
     BAD_PIXELS = 'bad_pixels'
+    PROBE_PHOTON_COUNTS = 'probe_photon_counts'
 
 
 _MMAP_CHUNK_FRAMES: Final[int] = 1024
@@ -154,11 +155,17 @@ def load_diffraction_data(file: Path, *, mmap_file: Path | None = None) -> Assem
             else _stage_patterns_to_memory_map(h5_patterns, mmap_file)
         )
 
+        probe_photon_counts = None
+        h5_probe_photon_counts = h5_file.get(DiffractionFileKeys.PROBE_PHOTON_COUNTS)
+        if isinstance(h5_probe_photon_counts, h5py.Dataset):
+            probe_photon_counts = h5_probe_photon_counts[()]
+
         return AssembledDiffractionData(
             h5_indexes[()],
             patterns,
             detector_pixel_geometry,
             h5_bad_pixels[()],
+            probe_photon_counts=probe_photon_counts,
         )
 
 
@@ -183,6 +190,13 @@ def save_diffraction_data(
         h5_file.create_dataset(
             DiffractionFileKeys.BAD_PIXELS, data=data._bad_pixels, compression=compression
         )
+        if data.has_measured_probe_photon_counts():
+            assert data._probe_photon_counts is not None
+            h5_file.create_dataset(
+                DiffractionFileKeys.PROBE_PHOTON_COUNTS,
+                data=data._probe_photon_counts,
+                compression=compression,
+            )
 
 
 class ProductFileKeys(StrEnum):

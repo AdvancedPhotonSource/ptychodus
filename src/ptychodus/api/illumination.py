@@ -2,6 +2,7 @@
 from a ptychography product by summing subpixel-shifted probe intensities."""
 
 from __future__ import annotations
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -73,13 +74,29 @@ class IlluminationMap:
         )
 
 
-def compute_illumination_map(product: Product) -> IlluminationMap:
+def compute_illumination_map(
+    product: Product,
+    *,
+    probe_photon_counts_by_index: Mapping[int, float] | None = None,
+) -> IlluminationMap:
     """Build a per-object-pixel photon-count canvas by summing the subpixel-shifted
     probe intensities at every scan position, packaged with the metadata needed to
-    derive fluence, dose, and intensity quantities."""
+    derive fluence, dose, and intensity quantities.
+
+    Pass ``probe_photon_counts_by_index`` (per-scan-index photon counts) to weight
+    each scan-point contribution by its true exposure. Weights are normalized to
+    the mean of the provided counts so the total photon budget across the canvas
+    matches the uniform-weight case; a scan index missing from the mapping gets
+    the unit weight. Without a mapping the accumulation is uniform, matching the
+    prior behavior.
+    """
     object_geometry = product.object_.get_geometry()
     probe_geometry = product.probes.get_geometry()
     canvas = numpy.zeros((object_geometry.height_px, object_geometry.width_px))
+
+    mean_counts: float | None = None
+    if probe_photon_counts_by_index:
+        mean_counts = float(numpy.mean(list(probe_photon_counts_by_index.values())))
 
     for scan_point, probe in product.iter_position_probes():
         object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
@@ -94,6 +111,12 @@ def compute_illumination_map(product: Product) -> IlluminationMap:
 
         shifted_modes = fourier_shift_2d(probe.get_array(), dx=dx, dy=dy)
         patch = numpy.sum(numpy.abs(shifted_modes) ** 2, axis=0)
+
+        if mean_counts is not None and mean_counts > 0.0:
+            assert probe_photon_counts_by_index is not None
+            counts = probe_photon_counts_by_index.get(scan_point.index, mean_counts)
+            patch = patch * (counts / mean_counts)
+
         canvas[
             y_lower : y_lower + probe_geometry.height_px,
             x_lower : x_lower + probe_geometry.width_px,
