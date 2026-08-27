@@ -5,7 +5,7 @@ import numpy
 from ..diffraction import BadPixels, DiffractionIndexes, DiffractionPatterns
 from ..fourier import fourier_shift_2d
 from ..geometry import PixelGeometry
-from ..diffraction import AssembledDiffractionData
+from ..assemble import AssembledDiffractionData
 from ..product import Product
 from ..propagate import AngularSpectrumPropagator, FraunhoferPropagator, PropagatorParameters
 

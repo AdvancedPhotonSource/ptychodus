@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import logging
 import sys
+from collections.abc import Generator
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy
 import pytest
@@ -20,7 +21,7 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.reconstruct import ReconstructInput
+from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
 from ptychodus.model.processing._subprocess_protocol import ChildError
 from ptychodus.model.processing.subprocess_reconstructor import (
     SubprocessReconstructor,
@@ -132,7 +133,9 @@ def test_hanging_child_is_terminated_on_iterator_close() -> None:
     # Get one message (there is none coming) - close the iterator to trigger cleanup.
     iterator = adapter.reconstruct(_minimal_reconstruct_input())
     # Close immediately; the context manager's finally must terminate the child.
-    iterator.close()
+    # Reconstructor.reconstruct is declared Iterator, but the generator-close path
+    # is exactly what this test exercises.
+    cast(Generator[ReconstructOutput, None, None], iterator).close()
 
 
 def test_child_log_is_forwarded_to_parent_logger(caplog: pytest.LogCaptureFixture) -> None:

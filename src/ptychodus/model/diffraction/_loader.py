@@ -1,148 +1,53 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
-from collections.abc import Sequence
-import concurrent.futures
+from collections.abc import Callable
 import logging
 import threading
 
-import numpy
-
-from ptychodus.api.diffraction import (
-    BadPixels,
-    DiffractionArray,
-    SimpleDiffractionArray,
-    compute_pattern_counts,
-    zero_bad_pixels,
-)
-from ptychodus.api.preprocess.diffraction import DiffractionPrepPipeline
+from ptychodus.api.assemble import AssembledDiffractionData, assemble_dataset
+from ptychodus.api.diffraction import BadPixels, DiffractionDataset
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.io import AssembledDiffractionData
+from ptychodus.api.preprocess.diffraction import DiffractionPrepPipeline
 
-from ..task_manager import BackgroundTask, ForegroundTask, ForegroundTaskManager
 from ..task_monitor import TaskProgressMonitor
 
 logger = logging.getLogger(__name__)
 
 
-class ArrayAssembler(ABC):
-    @abstractmethod
-    def create_array_loader(
-        self, array: DiffractionArray, *, process_patterns: bool
-    ) -> BackgroundTask:
-        pass
+class LoadDiffractionDataset:
+    """Background task adapting :func:`assemble_dataset` to the task manager.
 
-    @abstractmethod
-    def assemble_array(
-        self,
-        array_index: int,
-        label: str,
-        data: AssembledDiffractionData,
-    ) -> None:
-        pass
+    Everything the assembly needs is snapshotted by the caller before this task
+    is queued, so a settings change while the load runs cannot leave some arrays
+    processed differently from others. The task itself only bridges the
+    :class:`TaskProgressMonitor` protocol to the callback parameters and records
+    the first per-array failure for :meth:`get_error`.
+    """
 
-
-class LoadArray:
     def __init__(
         self,
-        array_index: int,
-        array: DiffractionArray,
-        pixel_geometry: PixelGeometry,
-        *,
-        raw_bad_pixels: BadPixels,
-        processed_bad_pixels: BadPixels,
+        source: DiffractionDataset,
+        out: AssembledDiffractionData,
         pipeline: DiffractionPrepPipeline | None,
-        assembler: ArrayAssembler,
-        total_counts_lower_bound: int | None = None,
-        total_counts_upper_bound: int | None = None,
-    ) -> None:
-        super().__init__()
-        self._array_index = array_index
-        self._array = array
-        self._pixel_geometry = pixel_geometry
-        self._raw_bad_pixels = raw_bad_pixels
-        self._processed_bad_pixels = processed_bad_pixels
-        self._pipeline = pipeline
-        self._assembler = assembler
-        self._total_counts_lower_bound = total_counts_lower_bound
-        self._total_counts_upper_bound = total_counts_upper_bound
-
-    def __call__(self) -> ForegroundTask | None:
-        label = self._array.get_label()
-
-        try:
-            raw_patterns = self._array.get_patterns()
-        except FileNotFoundError:
-            logger.warning(f'File not found for "{label}"!')
-            return None
-
-        # Zero bad pixels in raw detector coords before crop/bin/pad/flip/transpose so
-        # saturated pixel values can't leak into neighboring bins downstream.
-        repaired_patterns = zero_bad_pixels(raw_patterns, self._raw_bad_pixels)
-        loaded_array = SimpleDiffractionArray(
-            label,
-            self._array.get_indexes(),
-            repaired_patterns,
-        )
-        processed_array = loaded_array if self._pipeline is None else self._pipeline(loaded_array)
-        indexes = processed_array.get_indexes()
-        patterns = processed_array.get_patterns()
-
-        # Drop patterns whose good-pixel total counts fall outside the (inclusive) bounds.
-        # This runs after the prep pipeline so the counts reflect the same pattern the
-        # reconstructor sees. Filtering both arrays in lockstep preserves the index/pattern
-        # 1:1 invariant that prepare_reconstruct_input relies on.
-        lower = self._total_counts_lower_bound
-        upper = self._total_counts_upper_bound
-        if lower is not None or upper is not None:
-            counts = compute_pattern_counts(patterns, self._processed_bad_pixels)
-            keep = numpy.ones(len(counts), dtype=bool)
-            if lower is not None:
-                keep &= counts >= lower
-            if upper is not None:
-                keep &= counts <= upper
-            n_dropped = int((~keep).sum())
-            if n_dropped:
-                logger.info(
-                    f'Total counts filter dropped {n_dropped}/{len(counts)} patterns '
-                    f"from '{label}' (kept {int(keep.sum())})."
-                )
-                indexes = indexes[keep]
-                patterns = patterns[keep]
-
-        data = AssembledDiffractionData(
-            indexes=indexes,
-            patterns=patterns,
-            pixel_geometry=self._pixel_geometry,
-            bad_pixels=self._processed_bad_pixels,
-        )
-        self._assembler.assemble_array(
-            self._array_index,
-            label,
-            data,
-        )
-
-        return None
-
-
-class LoadAllArrays:
-    def __init__(
-        self,
-        array_seq: Sequence[DiffractionArray],
-        assembler: ArrayAssembler,
-        foreground_task_manager: ForegroundTaskManager,
+        *,
+        bad_pixels: BadPixels,
+        raw_pixel_geometry: PixelGeometry,
+        total_counts_lower_bound: int | None,
+        total_counts_upper_bound: int | None,
+        on_array_assembled: Callable[[int, str, AssembledDiffractionData], None],
         task_monitor: TaskProgressMonitor,
     ) -> None:
         super().__init__()
-        self._array_seq = array_seq
-        self._assembler = assembler
-        self._foreground_task_manager = foreground_task_manager
+        self._source = source
+        self._out = out
+        self._pipeline = pipeline
+        self._bad_pixels = bad_pixels
+        self._raw_pixel_geometry = raw_pixel_geometry
+        self._total_counts_lower_bound = total_counts_lower_bound
+        self._total_counts_upper_bound = total_counts_upper_bound
+        self._on_array_assembled = on_array_assembled
         self._task_monitor = task_monitor
-        self._process_patterns = False
         self._finished_event = threading.Event()
         self._error: BaseException | None = None
-
-    def enable_pattern_processing(self) -> None:
-        self._process_patterns = True
 
     def get_finished_event(self) -> threading.Event:
         return self._finished_event
@@ -151,49 +56,26 @@ class LoadAllArrays:
         """First per-array exception observed during __call__, or None on clean load."""
         return self._error
 
+    def _handle_array_error(self, array_index: int, label: str, error: Exception) -> None:
+        if self._error is None:
+            self._error = error
+
     def __call__(self) -> None:
         try:
             with self._task_monitor as monitor:
-                total = len(self._array_seq)
-                monitor.update_progress(0, total)
-
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future_list = [
-                        executor.submit(
-                            self._assembler.create_array_loader(
-                                array,
-                                process_patterns=self._process_patterns,
-                            )
-                        )
-                        for array in self._array_seq
-                    ]
-
-                    completed = 0
-                    cancelled = False
-
-                    for future in concurrent.futures.as_completed(future_list):
-                        try:
-                            task = future.result()
-                        except concurrent.futures.CancelledError:
-                            pass
-                        except Exception as ex:
-                            logger.warning(ex)
-                            if self._error is None:
-                                self._error = ex
-                        else:
-                            if task is not None:
-                                self._foreground_task_manager.put_foreground_task(task)
-
-                        completed += 1
-                        monitor.update_progress(completed, total)
-
-                        if not cancelled and monitor.is_stopping:
-                            num_cancelled = sum(1 for f in future_list if f.cancel())
-                            logger.info(
-                                f'Diffraction load stop requested; cancelled '
-                                f'{num_cancelled} pending arrays. In-flight reads will finish.'
-                            )
-                            cancelled = True
+                assemble_dataset(
+                    self._source,
+                    self._pipeline,
+                    bad_pixels=self._bad_pixels,
+                    raw_pixel_geometry=self._raw_pixel_geometry,
+                    out=self._out,
+                    total_counts_lower_bound=self._total_counts_lower_bound,
+                    total_counts_upper_bound=self._total_counts_upper_bound,
+                    on_array_assembled=self._on_array_assembled,
+                    on_progress=monitor.update_progress,
+                    on_array_error=self._handle_array_error,
+                    should_stop=lambda: monitor.is_stopping,
+                )
         except BaseException as ex:
             if self._error is None:
                 self._error = ex

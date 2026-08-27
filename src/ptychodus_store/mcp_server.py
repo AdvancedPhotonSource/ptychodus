@@ -409,7 +409,7 @@ def create_mcp_server() -> FastMCP:
         )
         try:
             vp = build_visualization_real(
-                data.get_average_pattern(),
+                data.get_mean_pattern(),
                 data.get_pixel_geometry(),
                 params,
                 value_label='Mean Counts',

@@ -109,6 +109,7 @@ module = [
     "pvaccess",
     "pvapy.*",
     "scipy.*",
+    "tensorflow.*",
     "tifffile",
     "torch",
     "torch.*",

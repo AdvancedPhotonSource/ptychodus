@@ -13,7 +13,7 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
-from ptychodus.api.diffraction import AssembledDiffractionData
+from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.metrics import estimate_reconstruction_ambiguities
 from ptychodus.api.reconstruct import (
     NullReconstructor,

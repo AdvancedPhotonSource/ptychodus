@@ -31,7 +31,7 @@ from typing import Any
 
 import numpy
 
-from ptychodus.api.diffraction import zero_bad_pixels
+from ptychodus.api.preprocess.diffraction import zero_bad_pixels
 from ptychodus.api.object import Object
 from ptychodus.api.product import LossValue, Product
 from ptychodus.api.reconstruct import ReconstructOutput, TrainOutput

@@ -7,7 +7,8 @@ from pathlib import Path
 from enum import Enum, auto
 from typing import Any
 
-from ptychodus.api.diffraction import AssembledDiffractionData, CropCenter, Polarization
+from ptychodus.api.assemble import AssembledDiffractionData
+from ptychodus.api.diffraction import CropCenter, Polarization
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.preprocess.probe_positions import AffineTransform
 from ptychodus.api.product import Product

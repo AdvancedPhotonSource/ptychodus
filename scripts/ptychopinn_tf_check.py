@@ -168,14 +168,14 @@ def main() -> int:
                 process_patterns=True,
                 block=True,
             )
-            max_pattern_counts = (
-                workflow_diffraction_api.get_assembled_data().get_pattern_counts().max()
+            max_total_counts = (
+                workflow_diffraction_api.get_assembled_data().get_total_counts().max()
             )
             input_product_api = model.workflow_api.create_product(
                 name='Run1084_recon3_postPC_shrunk_3',
                 detector_distance_m=args.detector_distance_m,
                 probe_energy_eV=args.probe_energy_ev,
-                probe_photon_count=max_pattern_counts,
+                probe_photon_count=max_total_counts,
                 exposure_time_s=args.exposure_time_s,
                 diffraction=workflow_diffraction_api,
             )

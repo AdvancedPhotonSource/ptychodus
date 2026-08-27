@@ -4,7 +4,6 @@ from collections.abc import Sequence
 from enum import Enum
 import logging
 
-from ptychodus.api.diffraction import estimate_probe_photon_count
 from ptychodus.api.observer import Observable
 from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.product import LossValue, Product
@@ -200,13 +199,8 @@ class ProductRepositoryItem(ParameterGroup):
             return
         if self._metadata_item.probe_photon_count.get_value() != 0.0:
             return
-        assembled = self._dataset.get_assembled_data()
-        patterns = assembled.get_patterns()
-        if patterns.size == 0:
-            return
-        self._metadata_item.probe_photon_count.set_value(
-            float(estimate_probe_photon_count(patterns, assembled.get_bad_pixels()))
-        )
+        photon_count = self._dataset.get_assembled_data().get_probe_photon_count()
+        self._metadata_item.probe_photon_count.set_value(float(photon_count))
 
     def _sync_geometry_from_dataset(self) -> None:
         if self._dataset is None:

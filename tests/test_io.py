@@ -27,7 +27,7 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import LossValue, Product, ProductMetadata
-from ptychodus.api.diffraction import AssembledDiffractionData
+from ptychodus.api.assemble import AssembledDiffractionData
 
 
 # ---------------------------------------------------------------------------

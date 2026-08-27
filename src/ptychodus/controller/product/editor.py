@@ -14,7 +14,7 @@ from PyQt5.QtGui import QBrush
 from PyQt5.QtWidgets import QComboBox, QStyledItemDelegate, QStyleOptionViewItem, QWidget
 
 from ptychodus.api.constants import LengthUnit
-from ptychodus.api.diffraction import Polarization, estimate_probe_photon_count
+from ptychodus.api.diffraction import Polarization
 from ptychodus.api.observer import Observable, Observer
 
 from ...model.diffraction import (
@@ -406,10 +406,7 @@ class ProductEditorViewController(Observer, DiffractionDatasetRepositoryObserver
         if dataset is None:
             logger.warning('Cannot estimate probe photon count: no diffraction dataset selected.')
             return
-        assembled_data = dataset.get_assembled_data()
-        photon_count = estimate_probe_photon_count(
-            assembled_data.get_patterns(), assembled_data.get_bad_pixels()
-        )
+        photon_count = dataset.get_assembled_data().get_probe_photon_count()
         metadata.probe_photon_count.set_value(photon_count)
 
         self._table_model.beginResetModel()

@@ -10,7 +10,9 @@ import re
 import h5py
 import numpy
 
-from .diffraction import AssembledDiffractionData, Polarization, zero_bad_pixels
+from .assemble import AssembledDiffractionData
+from .diffraction import Polarization
+from .preprocess.diffraction import zero_bad_pixels
 from .fluorescence import ElementMap, FluorescenceDataset
 from .geometry import PixelGeometry
 from .object import Object, ObjectCenter

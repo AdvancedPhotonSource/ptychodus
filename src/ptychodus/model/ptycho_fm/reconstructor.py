@@ -17,7 +17,7 @@ from typing import Any
 import h5py
 import numpy
 
-from ptychodus.api.diffraction import zero_bad_pixels
+from ptychodus.api.preprocess.diffraction import zero_bad_pixels
 from ptychodus.api.reconstruct import ReconstructInput
 
 from ..processing.subprocess_reconstructor import SubprocessReconstructor

@@ -56,7 +56,7 @@ from ptychodus.api.simulate.object import (
     generate_stxm_object,
 )
 from ptychodus.api.probe_positions import ProbePosition
-from ptychodus.api.diffraction import AssembledDiffractionData
+from ptychodus.api.assemble import AssembledDiffractionData
 
 
 # ---------------------------------------------------------------------------

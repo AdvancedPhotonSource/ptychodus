@@ -17,7 +17,7 @@ from ..propagate import (
     PropagatorParameters,
     intensity,
 )
-from ..diffraction import AssembledDiffractionData
+from ..assemble import AssembledDiffractionData
 
 
 logger = logging.getLogger(__name__)

@@ -10,7 +10,8 @@ import logging
 
 import numpy
 
-from .diffraction import AssembledDiffractionData, BadPixels, DiffractionPatterns
+from .assemble import AssembledDiffractionData
+from .diffraction import BadPixels, DiffractionPatterns
 from .object import Object
 from .probe import ProbeSequence
 from .probe_positions import ProbePositionSequence, ProbePosition

@@ -1,4 +1,4 @@
-"""Unit tests for ptychodus.api.diffraction.estimate_centroid.
+"""Unit tests for ptychodus.api.preprocess.diffraction.estimate_crop_center.
 
 Behaviors verified for Fresnel-zone-plate (with central stop) patterns:
   - Centered annular pattern returns the geometric center
@@ -17,13 +17,13 @@ Behaviors verified for Fresnel-zone-plate (with central stop) patterns:
 import numpy
 import pytest
 
+from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import (
-    AssembledDiffractionData,
     CropCenter,
     DiffractionMetadata,
     SimpleDiffractionArray,
-    estimate_crop_center,
 )
+from ptychodus.api.preprocess.diffraction import estimate_crop_center
 from ptychodus.api.geometry import PixelGeometry
 
 

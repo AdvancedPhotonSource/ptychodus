@@ -8,6 +8,7 @@ import numpy
 import numpy.testing
 import pytest
 
+from ptychodus.api.diffraction import BadPixels, DiffractionPatterns
 from ptychodus.api.fourier import fourier_shift_2d
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.simulate.diffraction import generate_diffraction_data
@@ -960,15 +961,20 @@ class TestObjectComparisonMetricsIntegration:
         assert frc.correlation.shape == frc.spatial_frequency_per_m.shape
 
 
-def _simulate_measured(product: Product) -> numpy.ndarray:
+def _simulate_measured(product: Product) -> DiffractionPatterns:
     return generate_diffraction_data(product).get_patterns()
+
+
+def _no_bad_pixels(measured: DiffractionPatterns) -> BadPixels:
+    """An all-good detector mask shaped to match one frame of *measured*."""
+    return numpy.zeros(measured.shape[1:], dtype=bool)
 
 
 class TestComputeReconstructionResiduals:
     def test_self_consistent_inputs_yield_zero_residuals(self) -> None:
         product = _make_product()
         measured = _simulate_measured(product)
-        bad_pixels = numpy.zeros(measured.shape[1:], dtype=bool)
+        bad_pixels = _no_bad_pixels(measured)
 
         result = compute_reconstruction_residuals(product, measured, bad_pixels)
 
@@ -988,7 +994,7 @@ class TestComputeReconstructionResiduals:
         baseline = _simulate_measured(product)
         offset = 0.25
         measured = baseline + offset
-        bad_pixels = numpy.zeros(measured.shape[1:], dtype=bool)
+        bad_pixels = _no_bad_pixels(measured)
 
         result = compute_reconstruction_residuals(product, measured, bad_pixels)
 
@@ -1007,7 +1013,7 @@ class TestComputeReconstructionResiduals:
     def test_un_illuminated_pixels_are_nan(self) -> None:
         product = _make_product()
         measured = _simulate_measured(product) + 0.5
-        bad_pixels = numpy.zeros(measured.shape[1:], dtype=bool)
+        bad_pixels = _no_bad_pixels(measured)
 
         result = compute_reconstruction_residuals(product, measured, bad_pixels)
 
@@ -1023,7 +1029,7 @@ class TestComputeReconstructionResiduals:
         baseline = _simulate_measured(product)
         offset = 0.5
         measured = baseline + offset
-        bad_pixels = numpy.zeros(measured.shape[1:], dtype=bool)
+        bad_pixels = _no_bad_pixels(measured)
         bad_pixels[0, 0] = True
 
         result = compute_reconstruction_residuals(product, measured, bad_pixels)
@@ -1042,7 +1048,7 @@ class TestComputeReconstructionResiduals:
     def test_geometry_passthrough_matches_product(self) -> None:
         product = _make_product()
         measured = _simulate_measured(product)
-        bad_pixels = numpy.zeros(measured.shape[1:], dtype=bool)
+        bad_pixels = _no_bad_pixels(measured)
 
         result = compute_reconstruction_residuals(product, measured, bad_pixels)
 
@@ -1071,7 +1077,7 @@ class TestComputeReconstructionResiduals:
         product = _make_product()
         baseline = _simulate_measured(product)
         measured = baseline + 0.5
-        bad_pixels = numpy.zeros(measured.shape[1:], dtype=bool)
+        bad_pixels = _no_bad_pixels(measured)
 
         positions = list(product.probe_positions)
         doubled_positions = ProbePositionSequence(positions + positions)

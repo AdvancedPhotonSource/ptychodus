@@ -11,7 +11,6 @@ import threading
 
 import numpy
 
-from ptychodus.api.constants import format_bytes
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     BadPixels,
@@ -24,10 +23,18 @@ from ptychodus.api.diffraction import (
     DiffractionPatterns,
     SimpleDiffractionDataset,
 )
-from ptychodus.api.io import AssembledDiffractionData, load_diffraction_data, save_diffraction_data
+from ptychodus.api.assemble import (
+    AssembledDiffractionData,
+    allocate_assembled_data,
+    compute_array_offsets,
+    compute_assembled_patterns_shape,
+    preprocess_array,
+)
+from ptychodus.api.io import load_diffraction_data, save_diffraction_data
+from ptychodus.api.preprocess.diffraction import DiffractionPrepPipeline
 
-from ..task_manager import BackgroundTask, TaskManager
-from ._loader import ArrayAssembler, LoadAllArrays, LoadArray
+from ..task_manager import TaskManager
+from ._loader import LoadDiffractionDataset
 from .monitor import DiffractionTaskMonitor
 from .settings import DetectorSettings, DiffractionSettings
 from .sizer import PatternSizer
@@ -77,8 +84,8 @@ class AssembledDiffractionArray(DiffractionArray):
         self._array_index = array_index
         self._label = label
         self._data = data
-        self._pattern_counts = data.get_pattern_counts()
-        self._average_pattern = data.get_average_pattern()
+        self._total_counts = data.get_total_counts()
+        self._mean_pattern = data.get_mean_pattern()
 
     @classmethod
     def create_null(cls) -> AssembledDiffractionArray:
@@ -101,20 +108,20 @@ class AssembledDiffractionArray(DiffractionArray):
     def get_pattern(self, index: int) -> DiffractionPattern:
         return self._data.get_pattern(index)
 
-    def get_pattern_counts(self, index: int) -> int:
-        return self._pattern_counts[index]
+    def get_total_counts(self, index: int) -> int:
+        return self._total_counts[index]
 
-    def get_mean_pattern_counts(self) -> float:
-        return numpy.mean(self._pattern_counts).item()
+    def get_mean_total_counts(self) -> float:
+        return numpy.mean(self._total_counts).item()
 
-    def get_max_pattern_counts(self) -> int:
-        return self._pattern_counts.max().item()
+    def get_max_total_counts(self) -> int:
+        return self._total_counts.max().item()
 
-    def get_average_pattern(self) -> DiffractionPattern:
-        return self._average_pattern
+    def get_mean_pattern(self) -> DiffractionPattern:
+        return self._mean_pattern
 
 
-class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
+class AssembledDiffractionDataset(DiffractionDataset):
     def __init__(
         self,
         settings: DiffractionSettings,
@@ -138,11 +145,18 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         self._data = AssembledDiffractionData.create_null()
         self._array_list: list[AssembledDiffractionArray] = list()
         self._array_counter = 0
-        self._array_loader: LoadAllArrays | None = None
         # Retained after dispatch so callers can detect \"still loading\" and read
         # any error the loader stored (see is_load_in_progress / get_last_load_error).
-        self._last_array_loader: LoadAllArrays | None = None
+        self._last_array_loader: LoadDiffractionDataset | None = None
         self._scratch_tempfile: IO[bytes] | None = None
+        # Source dataset queued by reload() and consumed by load_all_arrays().
+        # self._dataset drops the array list, so this is the only handle on the
+        # lazy arrays; cleared once dispatched, since the task then owns it.
+        self._source: DiffractionDataset | None = None
+        # Pipeline snapshot taken when the current buffer was allocated, so the
+        # processed pixel geometry can be recomputed without consulting live
+        # settings that may have moved on since the load.
+        self._prep_pipeline: DiffractionPrepPipeline | None = None
 
         # Raw (pre-processing) bad-pixel mask; starts as an empty (0, 0) placeholder
         # and is always overwritten by reload() or by load_all_arrays() before any
@@ -228,6 +242,17 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
             height_m=self._detector_settings.pixel_height_m.get_value(),
         )
 
+    def get_processed_pixel_geometry(self) -> PixelGeometry:
+        """Resolve the pixel geometry of the assembled patterns.
+
+        Folds the pipeline snapshot taken at load time through the raw geometry, so
+        binning and transposition are accounted for. Uses the snapshot rather than
+        live settings, which may have changed since the buffer was filled.
+        """
+        raw = self.get_raw_pixel_geometry()
+        pipeline = self._prep_pipeline
+        return raw if pipeline is None else pipeline.compute_output_pixel_geometry(raw)
+
     def set_pixel_geometry_override(self, geometry: PixelGeometry | None) -> None:
         """Set (or clear when None) the per-dataset raw pixel geometry override.
 
@@ -236,7 +261,7 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         observers so downstream views (tree columns, bound products) can refresh.
         """
         self._pixel_geometry_override = geometry
-        self._data.set_pixel_geometry(self.get_raw_pixel_geometry())
+        self._data.set_pixel_geometry(self.get_processed_pixel_geometry())
 
         for observer in self._observer_list:
             observer.handle_pixel_geometry_changed()
@@ -251,13 +276,13 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         return self._data.nbytes
 
     def is_load_in_progress(self) -> bool:
-        """True while a LoadAllArrays task is queued but has not finished.
+        """True while a load task is queued but has not finished.
 
         Note: this does not track per-array append_array() streams, which are
         used only by the pvapy streaming path; products are created there only
         after the stream stops, so the streaming case doesn't rely on this.
         """
-        if self._array_loader is not None:
+        if self._source is not None:
             return True
 
         loader = self._last_array_loader
@@ -279,23 +304,23 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         return self.get_state() is DiffractionDatasetState.FAILED
 
     def get_last_load_error(self) -> BaseException | None:
-        """First exception raised by the most recent LoadAllArrays run, or None."""
+        """First exception raised by the most recent load run, or None."""
         loader = self._last_array_loader
         return loader.get_error() if loader is not None else None
 
     def get_last_load_finished_event(self) -> threading.Event | None:
-        """The finished_event of the most recent LoadAllArrays task, if any."""
+        """The finished_event of the most recent load task, if any."""
         loader = self._last_array_loader
         return loader.get_finished_event() if loader is not None else None
 
-    def get_average_pattern(self) -> DiffractionPattern | None:
+    def get_mean_pattern(self) -> DiffractionPattern | None:
         if not self._array_list:
             return None
         weights = numpy.array(
             [array.get_num_patterns() for array in self._array_list], dtype=numpy.float64
         )
-        averages = numpy.stack([array.get_average_pattern() for array in self._array_list])
-        return numpy.average(averages, axis=0, weights=weights)
+        means = numpy.stack([array.get_mean_pattern() for array in self._array_list])
+        return numpy.average(means, axis=0, weights=weights)
 
     @overload
     def __getitem__(self, index: int) -> AssembledDiffractionArray: ...
@@ -311,44 +336,61 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
     def __len__(self) -> int:
         return len(self._array_list)
 
-    def create_array_loader(
-        self, array: DiffractionArray, *, process_patterns: bool
-    ) -> BackgroundTask:
-        """Build a loader task for one array. Loaders are assigned a monotonic array_index;
-        arrays may complete out of order and are sorted on insertion via bisect."""
-        array_index = self._array_counter
-        self._array_counter += 1
-
-        detector_extent = self._dataset.get_metadata().detector_extent
-        pipeline = self._sizer.get_prep_pipeline(detector_extent) if process_patterns else None
-        processed_bad_pixels = (
-            pipeline.apply_to_mask(self._bad_pixels) if pipeline is not None else self._bad_pixels
-        )
-        total_counts_lower_bound = (
+    def _get_total_counts_bounds(self) -> tuple[int | None, int | None]:
+        """Snapshot the enabled total-counts bounds from settings."""
+        lower = (
             self._settings.total_counts_lower_bound.get_value()
             if self._settings.total_counts_lower_bound_enabled.get_value()
             else None
         )
-        total_counts_upper_bound = (
+        upper = (
             self._settings.total_counts_upper_bound.get_value()
             if self._settings.total_counts_upper_bound_enabled.get_value()
             else None
         )
-        return LoadArray(
-            array_index,
-            array,
-            self.get_raw_pixel_geometry(),
-            raw_bad_pixels=self._bad_pixels,
-            processed_bad_pixels=processed_bad_pixels,
-            pipeline=pipeline,
-            assembler=self,
-            total_counts_lower_bound=total_counts_lower_bound,
-            total_counts_upper_bound=total_counts_upper_bound,
+        return lower, upper
+
+    def _append_array(self, array: DiffractionArray, *, process_patterns: bool) -> None:
+        """Preprocess one array and scatter it into the current buffer.
+
+        Unlike load_all_arrays this reads settings at call time, because the
+        streaming path wants each appended frame to reflect the live
+        configuration rather than a snapshot taken when the dataset was opened.
+        """
+        array_index = self._array_counter
+        self._array_counter += 1
+
+        metadata = self._dataset.get_metadata()
+        pipeline = (
+            self._sizer.get_prep_pipeline(metadata.detector_extent) if process_patterns else None
         )
+        processed_bad_pixels = (
+            self._bad_pixels if pipeline is None else pipeline.apply_to_mask(self._bad_pixels)
+        )
+        lower, upper = self._get_total_counts_bounds()
+        label = array.get_label()
+
+        try:
+            data = preprocess_array(
+                array,
+                pipeline,
+                raw_bad_pixels=self._bad_pixels,
+                processed_bad_pixels=processed_bad_pixels,
+                raw_pixel_geometry=self.get_raw_pixel_geometry(),
+                total_counts_lower_bound=lower,
+                total_counts_upper_bound=upper,
+            )
+        except FileNotFoundError:
+            logger.warning(f'File not found for "{label}"!')
+            return
+
+        offset = compute_array_offsets(metadata)[array_index]
+        self._on_array_assembled(array_index, label, self._data.assemble(data, offset))
 
     def append_array(self, array: DiffractionArray, *, process_patterns: bool = True) -> None:
-        task = self.create_array_loader(array, process_patterns=process_patterns)
-        self._task_manager.put_background_task(task)
+        self._task_manager.put_background_task(
+            lambda: self._append_array(array, process_patterns=process_patterns)
+        )
 
     def _insert_array(self, array: AssembledDiffractionArray) -> None:
         pos = bisect(self._array_list, array.array_index, key=lambda x: x.array_index)
@@ -357,20 +399,19 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         for observer in self._observer_list:
             observer.handle_array_inserted(pos)
 
-    def assemble_array(
-        self,
-        array_index: int,
-        label: str,
-        data: AssembledDiffractionData,
+    def _on_array_assembled(
+        self, array_index: int, label: str, view: AssembledDiffractionData
     ) -> None:
-        metadata = self.get_metadata()
-        num_patterns_per_array = metadata.num_patterns_per_array
-        offset = sum(num_patterns_per_array[:array_index])
-        assembled_data_view = self._data.assemble(data, offset)
+        """Publish one assembled array. Called from an assembly worker thread.
+
+        The list insert is bounced to the foreground queue so the bisect stays
+        single-threaded; arrays may complete out of order and are sorted there by
+        their monotonic array_index.
+        """
         assembled_array = AssembledDiffractionArray(
             array_index=array_index,
             label=label,
-            data=assembled_data_view,
+            data=view,
         )
         self._task_manager.put_foreground_task(lambda: self._insert_array(assembled_array))
 
@@ -379,7 +420,8 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         self._data = AssembledDiffractionData.create_null()
         self._array_list.clear()
         self._array_counter = 0
-        self._array_loader = None
+        self._source = None
+        self._prep_pipeline = None
         self._last_array_loader = None
         self._bad_pixels = self._create_default_bad_pixels()
         self._pixel_geometry_override = None
@@ -396,30 +438,31 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
         metadata = dataset.get_metadata()
         self._dataset = SimpleDiffractionDataset(metadata, dataset.get_layout(), [])
         self._bad_pixels = dataset.get_bad_pixels()
-        self._array_loader = LoadAllArrays(dataset, self, self._task_manager, self._task_monitor)
+        # self._dataset drops the array list, so the source is the only handle on the
+        # lazy arrays that load_all_arrays will read.
+        self._source = dataset
 
         for observer in self._observer_list:
             observer.handle_dataset_reloaded()
 
     def load_all_arrays(self, *, process_patterns: bool, block: bool) -> None:
-        if self._array_loader is None:
+        source = self._source
+
+        if source is None:
             logger.warning('No dataset queued for loading; call reload() first.')
             return
 
         metadata = self._dataset.get_metadata()
+        pipeline = (
+            self._sizer.get_prep_pipeline(metadata.detector_extent) if process_patterns else None
+        )
+        raw_pixel_geometry = self.get_raw_pixel_geometry()
+        lower, upper = self._get_total_counts_bounds()
 
-        bad_pixels = self._bad_pixels
-
-        if process_patterns:
-            pipeline = self._sizer.get_prep_pipeline(metadata.detector_extent)
-            bad_pixels = pipeline.apply_to_mask(bad_pixels)
-            self._array_loader.enable_pattern_processing()
-
-        num_patterns_total = sum(metadata.num_patterns_per_array)
-        indexes = -numpy.ones(num_patterns_total, dtype=int)
-
-        patterns_shape = num_patterns_total, bad_pixels.shape[-2], bad_pixels.shape[-1]
-        patterns_dtype = metadata.pattern_dtype
+        patterns_shape = compute_assembled_patterns_shape(
+            source, pipeline, bad_pixels=self._bad_pixels
+        )
+        patterns: DiffractionPatterns | None = None
 
         if self._settings.memmap_enabled.get_value():
             scratch_dir = self._settings.scratch_directory.get_value()
@@ -428,28 +471,42 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
             # released in clear().
             self._scratch_tempfile = tempfile.NamedTemporaryFile(dir=scratch_dir, suffix='.npy')
             logger.info(f'Scratch data file {self._scratch_tempfile.name} is {patterns_shape}')
-            patterns: DiffractionPatterns = numpy.memmap(
-                self._scratch_tempfile, dtype=patterns_dtype, shape=patterns_shape
+            patterns = numpy.memmap(
+                self._scratch_tempfile, dtype=metadata.pattern_dtype, shape=patterns_shape
             )
             patterns[:] = 0
         else:
             logger.info(f'Scratch memory is {patterns_shape}')
-            patterns = numpy.zeros(patterns_shape, dtype=patterns_dtype)
-            logger.debug(f'{format_bytes(patterns.nbytes)} allocated for patterns')
 
-        self._data = AssembledDiffractionData(
-            indexes, patterns, self.get_raw_pixel_geometry(), bad_pixels
+        self._prep_pipeline = pipeline
+        self._data = allocate_assembled_data(
+            source,
+            pipeline,
+            bad_pixels=self._bad_pixels,
+            raw_pixel_geometry=raw_pixel_geometry,
+            patterns=patterns,
         )
+        self._array_counter = len(source)
 
         for observer in self._observer_list:
             observer.handle_dataset_reloaded()
 
         # load all arrays in background
-        loader = self._array_loader
+        loader = LoadDiffractionDataset(
+            source,
+            self._data,
+            pipeline,
+            bad_pixels=self._bad_pixels,
+            raw_pixel_geometry=raw_pixel_geometry,
+            total_counts_lower_bound=lower,
+            total_counts_upper_bound=upper,
+            on_array_assembled=self._on_array_assembled,
+            task_monitor=self._task_monitor,
+        )
         finished_event = loader.get_finished_event()
         self._last_array_loader = loader
         self._task_manager.put_background_task(loader)
-        self._array_loader = None
+        self._source = None
 
         if block:
             while not self._task_manager.is_stopping:
@@ -462,6 +519,11 @@ class AssembledDiffractionDataset(DiffractionDataset, ArrayAssembler):
             num_patterns_per_array=[num_patterns],
             pattern_dtype=self._data.get_patterns_dtype(),
             detector_extent=ImageExtent(detector_width, detector_height),
+            # Deliberately no detector_pixel_geometry: self._data already holds the
+            # processed value, but ProductGeometry re-derives from get_raw_pixel_geometry()
+            # through the live PatternSizer, so surfacing the processed value here would
+            # apply binning twice. Falling through to DetectorSettings keeps that path
+            # correct until ProductGeometry learns to consult the assembled data directly.
             file_path=file_path,
         )
         contents_tree = DiffractionDatasetLayoutNode.create_root()

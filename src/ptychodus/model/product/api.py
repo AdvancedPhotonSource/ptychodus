@@ -454,7 +454,7 @@ class ProductAPI:
     ) -> int:
         """If dataset is None or already loaded, run build() synchronously and insert.
         Otherwise, insert a pending stub, then enqueue construction to run after the
-        dataset's LoadAllArrays finishes (via the shared FIFO background worker)."""
+        dataset's load task finishes (via the shared FIFO background worker)."""
         if dataset is None or not dataset.is_load_in_progress():
             item = build()
             return self._repository.insert_product(item)

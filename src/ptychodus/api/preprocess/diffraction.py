@@ -1,10 +1,19 @@
-"""Diffraction pattern preprocessing pipeline.
+"""Diffraction pattern preprocessing: the step pipeline and standalone helpers.
 
 Steps share a single `apply(data) -> ndarray` interface and infer whether the
 input is a 3-D pattern stack or a 2-D boolean bad-pixel mask from
 `data.dtype`. The order of operations is encoded in
 `DiffractionPrepPipeline.steps`; the canonical order emitted by the model-layer
 factory is filter → crop → binning → padding → hflip → vflip → transpose.
+
+The free functions at the end of the module are helpers used *alongside* the
+pipeline rather than steps within it, and they deliberately stay that way.
+`zero_bad_pixels` runs in raw detector coordinates before the pipeline, and
+`inpaint_bad_pixels` and `estimate_crop_center` take a whole frame at once. A
+step that repaired or dropped frames would also break the index/pattern 1:1
+invariant that `prepare_reconstruct_input` relies on, because
+`DiffractionPrepPipeline.__call__` passes the original indexes through
+unchanged.
 """
 
 from __future__ import annotations
@@ -13,15 +22,19 @@ from typing import Annotated, Literal, TypeAlias
 
 import numpy
 from pydantic import BaseModel, ConfigDict, Field
+from scipy import ndimage
+from skimage.restoration import inpaint_biharmonic
 
 from ..diffraction import (
     BadPixels,
     CropCenter,
     DiffractionArray,
+    DiffractionPattern,
     DiffractionPatterns,
     SimpleDiffractionArray,
 )
 from ..geometry import ImageExtent, PixelGeometry
+from .noise import estimate_noise_floor
 
 
 def _is_mask(data: numpy.ndarray) -> bool:
@@ -242,3 +255,128 @@ class DiffractionPrepPipeline(BaseModel):
         for step in self.steps:
             geometry = step.apply_to_pixel_geometry(geometry)
         return geometry
+
+
+def zero_bad_pixels(
+    patterns: DiffractionPatterns, bad_pixels: BadPixels | None
+) -> DiffractionPatterns:
+    """Return a copy of `patterns` with bad pixels zeroed.
+
+    Zero is a neutral choice (no photons measured) but does mildly bias any
+    consumer toward predicting low intensity at those locations. Returns the
+    input unchanged when `bad_pixels` is None or all-False to avoid a copy.
+    """
+    if bad_pixels is None or not numpy.any(bad_pixels):
+        return patterns
+
+    cleaned = patterns.copy()
+    cleaned[:, bad_pixels] = 0
+    return cleaned
+
+
+def inpaint_bad_pixels(
+    pattern: DiffractionPattern, bad_pixels: BadPixels | None
+) -> DiffractionPattern:
+    """Return `pattern` with bad-pixel positions filled by biharmonic inpainting.
+
+    Returns the input unchanged when `bad_pixels` is None or all-False so the
+    (expensive) skimage call is skipped. When inpainting runs the result is
+    float64; the input dtype is preserved when it does not.
+    """
+    if bad_pixels is None or not numpy.any(bad_pixels):
+        return pattern
+
+    return inpaint_biharmonic(pattern.astype(numpy.float64), bad_pixels)
+
+
+def estimate_crop_center(
+    pattern: DiffractionPattern,
+    bad_pixels: BadPixels | None = None,
+    *,
+    mad_threshold: float = 4.5,
+) -> CropCenter:
+    """Estimate the pixel centroid of a diffraction pattern.
+
+    Two passes: pass 1 takes the global intensity-weighted center; pass 2
+    re-centroids inside a window around the pass-1 estimate so bright
+    asymmetric peaks outside the central region cannot bias the result.
+
+    Falls back to the geometric center if all pixels are masked or rejected.
+    """
+    height, width = pattern.shape[-2:]
+    geometric_center = CropCenter(position_x_px=width // 2, position_y_px=height // 2)
+
+    # Median-filter a float copy with bad pixels zeroed.
+    working_pattern = pattern.astype(numpy.float64, copy=True)
+
+    if bad_pixels is not None and numpy.any(bad_pixels):
+        good_pixel_mask = numpy.logical_not(bad_pixels)
+        working_pattern[bad_pixels] = 0.0
+    else:
+        good_pixel_mask = numpy.ones(pattern.shape[-2:], dtype=bool)
+
+    filtered_pattern = ndimage.median_filter(working_pattern, size=3)
+
+    # Convert intensities to non-negative weights by subtracting the background
+    # and rejecting pixels below background + mad_threshold * MAD. Otsu's
+    # threshold is used to identify the background pool when the histogram is
+    # bimodal; for unimodal noise-only inputs the helper falls back to
+    # median/MAD over all good pixels.
+    good_pixel_intensities = filtered_pattern[good_pixel_mask]
+
+    if good_pixel_intensities.size == 0:
+        return geometric_center
+
+    noise_floor = estimate_noise_floor(good_pixel_intensities)
+    background_intensity = noise_floor.background_value
+    significance_threshold = noise_floor.get_significance_threshold(mad_threshold)
+    centroid_weights = filtered_pattern - background_intensity
+    centroid_weights[~good_pixel_mask] = 0.0
+    centroid_weights[filtered_pattern < significance_threshold] = 0.0
+    numpy.clip(centroid_weights, 0.0, None, out=centroid_weights)
+
+    # Pixel-coordinate axes centered on the array midpoint, so symmetric weight
+    # distributions sum to ~0 rather than relying on catastrophic cancellation.
+    midpoint_y = (height - 1) / 2.0
+    midpoint_x = (width - 1) / 2.0
+    centered_y_axis = numpy.arange(height, dtype=numpy.float64).reshape(-1, 1) - midpoint_y
+    centered_x_axis = numpy.arange(width, dtype=numpy.float64).reshape(1, -1) - midpoint_x
+
+    # Pass 1: global intensity-weighted centroid.
+    coarse_total_weight = float(centroid_weights.sum())
+
+    if coarse_total_weight <= 0.0:
+        return geometric_center
+
+    coarse_center_y = midpoint_y + float(
+        (centroid_weights * centered_y_axis).sum() / coarse_total_weight
+    )
+    coarse_center_x = midpoint_x + float(
+        (centroid_weights * centered_x_axis).sum() / coarse_total_weight
+    )
+
+    # Pass 2: re-centroid inside a square window around the pass-1 estimate.
+    half_window_size = min(height, width) // 4
+    pixel_y = numpy.arange(height).reshape(-1, 1)
+    pixel_x = numpy.arange(width).reshape(1, -1)
+    in_central_window = (numpy.abs(pixel_y - coarse_center_y) <= half_window_size) & (
+        numpy.abs(pixel_x - coarse_center_x) <= half_window_size
+    )
+    windowed_weights = centroid_weights * in_central_window
+    refined_total_weight = float(windowed_weights.sum())
+
+    if refined_total_weight > 0.0:
+        refined_center_y = midpoint_y + float(
+            (windowed_weights * centered_y_axis).sum() / refined_total_weight
+        )
+        refined_center_x = midpoint_x + float(
+            (windowed_weights * centered_x_axis).sum() / refined_total_weight
+        )
+    else:
+        refined_center_y = coarse_center_y
+        refined_center_x = coarse_center_x
+
+    return CropCenter(
+        position_x_px=int(round(refined_center_x)),
+        position_y_px=int(round(refined_center_y)),
+    )

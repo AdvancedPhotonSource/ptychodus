@@ -4,8 +4,8 @@ import logging
 
 
 from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import (
-    AssembledDiffractionData,
     BadPixelsFileReader,
     CropCenter,
     DiffractionArray,

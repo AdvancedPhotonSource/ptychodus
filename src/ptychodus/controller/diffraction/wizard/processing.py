@@ -400,7 +400,7 @@ class TransformViewController:
 
 class OpenDatasetWizardProcessingViewController(ParameterViewController):
     """Processing wizard page. Groups are laid out top-to-bottom in the
-    DiffractionPrepPipeline execution order (see api/diffraction_prep.py):
+    DiffractionPrepPipeline execution order (see api/preprocess/diffraction.py):
     filter → crop → binning → padding → transform (hflip → vflip → transpose).
     Storage (memory map) and Bad Pixels are not part of the pipeline but are
     retained here as load-time concerns; the horizontal separator between them

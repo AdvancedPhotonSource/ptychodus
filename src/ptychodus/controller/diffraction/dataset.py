@@ -88,7 +88,7 @@ class _DatasetTreeNode(_TreeNode):
         return sum(child.get_counts() for child in self.child_nodes) // len(self.child_nodes)
 
     def get_data(self) -> DiffractionPattern | None:
-        return self._dataset.get_average_pattern()
+        return self._dataset.get_mean_pattern()
 
     def get_detector_extent(self) -> ImageExtent:
         return self._dataset.get_metadata().detector_extent
@@ -120,10 +120,10 @@ class _ArrayTreeNode(_TreeNode):
         return self._array.get_label()
 
     def get_counts(self) -> int:
-        return int(self._array.get_mean_pattern_counts())
+        return int(self._array.get_mean_total_counts())
 
     def get_max_counts(self) -> int:
-        return int(self._array.get_max_pattern_counts())
+        return int(self._array.get_max_total_counts())
 
     def get_nframes(self) -> int:
         return len(self.child_nodes)
@@ -132,7 +132,7 @@ class _ArrayTreeNode(_TreeNode):
         return self._array.get_patterns().nbytes
 
     def get_data(self) -> DiffractionPattern:
-        return self._array.get_average_pattern()
+        return self._array.get_mean_pattern()
 
 
 class _FrameTreeNode(_TreeNode):
@@ -150,7 +150,7 @@ class _FrameTreeNode(_TreeNode):
         return f'Frame {self._frame_index}'
 
     def get_counts(self) -> int:
-        return int(self._array.get_pattern_counts(self._frame_index))
+        return int(self._array.get_total_counts(self._frame_index))
 
     def get_nframes(self) -> int:
         return 1
@@ -303,7 +303,7 @@ class DiffractionTreeModel(QAbstractItemModel):
         if dataset_node is None:
             return
 
-        max_counts = int(array.get_max_pattern_counts())
+        max_counts = int(array.get_max_total_counts())
         if self._max_counts < max_counts:
             self._max_counts = max_counts
             self._rebroadcast_counts()

@@ -12,7 +12,7 @@ import numpy
 from ._phase_unwrap import PhaseUnwrapper
 from ..constants import TWO_PI_J
 from ..interpolate import lerp
-from ..diffraction import AssembledDiffractionData
+from ..assemble import AssembledDiffractionData
 from ..object import Object, ObjectGeometry
 from ..probe_positions import ProbePosition
 from ..typing import IntegerArrayType, RealArrayType
@@ -30,12 +30,12 @@ def generate_stxm_object(
     values: list[float] = list()
 
     assembled_indexes = assembled_data.get_indexes().tolist()
-    assembled_pattern_counts = assembled_data.get_pattern_counts().tolist()
-    pattern_counts_lut = dict(zip(assembled_indexes, assembled_pattern_counts))
+    assembled_total_counts = assembled_data.get_total_counts().tolist()
+    total_counts_lut = dict(zip(assembled_indexes, assembled_total_counts))
 
     for scan_point in probe_positions:
         try:
-            value = pattern_counts_lut[scan_point.index]
+            value = total_counts_lut[scan_point.index]
         except KeyError:
             logger.debug(f'Skipping missing scan point index={scan_point.index}!')
         else:

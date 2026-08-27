@@ -18,7 +18,7 @@ from ptychodus.api.diffraction import (
     SimpleDiffractionDataset,
 )
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.io import AssembledDiffractionData
+from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.diffraction.dataset import (
     DiffractionDatasetState,
@@ -221,14 +221,14 @@ def test_dataset_average_pattern_is_weighted_mean_across_arrays() -> None:
     repo.insert_dataset(dataset)
 
     # No arrays yet -> no preview to show.
-    assert dataset.get_average_pattern() is None
+    assert dataset.get_mean_pattern() is None
 
     # Two arrays of different sizes with distinct uniform fills — the correct
     # weighted mean is (3*2 + 7*6) / (3 + 7) = 4.8 everywhere.
     dataset._insert_array(_make_array(0, 'a', 2.0, 3, (4, 4), index_offset=0))
     dataset._insert_array(_make_array(1, 'b', 6.0, 7, (4, 4), index_offset=3))
 
-    result = dataset.get_average_pattern()
+    result = dataset.get_mean_pattern()
     assert result is not None
     numpy.testing.assert_allclose(result, numpy.full((4, 4), 4.8))
 
