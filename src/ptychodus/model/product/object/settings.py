@@ -72,6 +72,25 @@ class ObjectSettings(Observable, Observer):
             'FractalLacunarity', 2.0, minimum=0.0
         )
 
+        self.siemens_star_num_spokes = self._group.create_integer_parameter(
+            'SiemensStarNumSpokes', 32, minimum=2
+        )
+        self.siemens_star_outer_radius_fraction = self._group.create_real_parameter(
+            'SiemensStarOuterRadiusFraction', 0.45, minimum=0.0, maximum=1.0
+        )
+        self.siemens_star_spoke_amplitude = self._group.create_real_parameter(
+            'SiemensStarSpokeAmplitude', 0.0, minimum=0.0, maximum=1.0
+        )
+        self.siemens_star_background_amplitude = self._group.create_real_parameter(
+            'SiemensStarBackgroundAmplitude', 1.0, minimum=0.0, maximum=1.0
+        )
+        self.siemens_star_spoke_phase_tr = self._group.create_real_parameter(
+            'SiemensStarSpokePhaseInTurns', -0.25
+        )
+        self.siemens_star_background_phase_tr = self._group.create_real_parameter(
+            'SiemensStarBackgroundPhaseInTurns', 0.0
+        )
+
         self.paganin_probe_wavelength_m = self._group.create_real_parameter(
             'PaganinProbeWavelengthInMeters', 1.0e-10, minimum=1e-12
         )

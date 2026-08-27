@@ -15,6 +15,7 @@ from .grf import GaussianRandomFieldObjectBuilder
 from .paganin import PaganinObjectBuilder
 from .random import RandomObjectBuilder
 from .settings import ObjectSettings
+from .siemens_star import SiemensStarObjectBuilder
 from .stxm import STXMObjectBuilder
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ class ObjectBuilderFactory(Iterable[str]):
             'dead_leaves': lambda: DeadLeavesObjectBuilder(rng, settings),
             'fractal_noise': lambda: FractalNoiseObjectBuilder(rng, settings),
             'grf': lambda: GaussianRandomFieldObjectBuilder(rng, settings),
+            'siemens_star': lambda: SiemensStarObjectBuilder(settings),
         }
         self._diffraction_builders: Mapping[
             str, Callable[[AssembledDiffractionDataset], ObjectBuilder]

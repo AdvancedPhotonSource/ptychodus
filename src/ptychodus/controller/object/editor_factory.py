@@ -11,6 +11,7 @@ from ...model.product.object import (
     PaganinObjectBuilder,
     RandomObjectBuilder,
     STXMObjectBuilder,
+    SiemensStarObjectBuilder,
 )
 from ..parameters import ParameterViewBuilder, ParameterViewController
 
@@ -174,6 +175,48 @@ class ObjectEditorViewControllerFactory:
             )
             dialog_builder.add_decimal_line_edit(
                 object_builder.blur_deviation_px, 'Blur Deviation [px]:', group=first_layer_group
+            )
+            dialog_builder.add_view_controller(
+                MultisliceViewController(item),
+                'Number of Layers:',
+                group=additional_layers_group,
+            )
+            return dialog_builder.build_dialog(title, parent)
+        elif isinstance(object_builder, SiemensStarObjectBuilder):
+            dialog_builder = ParameterViewBuilder()
+            dialog_builder.add_spin_box(
+                object_builder.extra_padding_x, 'Extra Padding X:', group=first_layer_group
+            )
+            dialog_builder.add_spin_box(
+                object_builder.extra_padding_y, 'Extra Padding Y:', group=first_layer_group
+            )
+            dialog_builder.add_spin_box(
+                object_builder.num_spokes, 'Number of Spokes:', group=first_layer_group
+            )
+            dialog_builder.add_decimal_slider(
+                object_builder.outer_radius_fraction,
+                'Outer Radius Fraction:',
+                group=first_layer_group,
+            )
+            dialog_builder.add_decimal_slider(
+                object_builder.spoke_amplitude,
+                'Spoke Amplitude:',
+                group=first_layer_group,
+            )
+            dialog_builder.add_decimal_slider(
+                object_builder.background_amplitude,
+                'Background Amplitude:',
+                group=first_layer_group,
+            )
+            dialog_builder.add_decimal_line_edit(
+                object_builder.spoke_phase_tr,
+                'Spoke Phase [turns]:',
+                group=first_layer_group,
+            )
+            dialog_builder.add_decimal_line_edit(
+                object_builder.background_phase_tr,
+                'Background Phase [turns]:',
+                group=first_layer_group,
             )
             dialog_builder.add_view_controller(
                 MultisliceViewController(item),

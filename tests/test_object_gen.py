@@ -53,6 +53,7 @@ from ptychodus.api.simulate.object import (
     _map_simplex_to_cartesian,
     generate_gaussian_random_field_object,
     generate_paganin_object,
+    generate_siemens_star_object,
     generate_stxm_object,
 )
 from ptychodus.api.probe_positions import ProbePosition
@@ -927,3 +928,187 @@ class TestPaganinObject:
         numpy.testing.assert_allclose(
             obj.get_array()[0][interior], expected[interior], rtol=1e-6, atol=1e-12
         )
+
+
+# ===========================================================================
+# generate_siemens_star_object
+# ===========================================================================
+
+
+def _default_star_kwargs(
+    num_spokes: int = 8,
+    outer_radius_fraction: float = 0.9,
+    spoke_amplitude: float = 0.0,
+    background_amplitude: float = 1.0,
+    spoke_phase_tr: float = 0.0,
+    background_phase_tr: float = 0.0,
+) -> dict:
+    return dict(
+        num_spokes=num_spokes,
+        outer_radius_fraction=outer_radius_fraction,
+        spoke_amplitude=spoke_amplitude,
+        background_amplitude=background_amplitude,
+        spoke_phase_tr=spoke_phase_tr,
+        background_phase_tr=background_phase_tr,
+    )
+
+
+class TestSiemensStarOutputShapeAndDtype:
+    def test_square_shape(self) -> None:
+        obj = generate_siemens_star_object(_make_geometry(64, 64), **_default_star_kwargs())
+        assert obj.get_array().shape == (1, 64, 64)
+
+    def test_rectangular_wide_shape(self) -> None:
+        obj = generate_siemens_star_object(_make_geometry(80, 40), **_default_star_kwargs())
+        assert obj.get_array().shape == (1, 40, 80)
+
+    def test_rectangular_tall_shape(self) -> None:
+        obj = generate_siemens_star_object(_make_geometry(40, 80), **_default_star_kwargs())
+        assert obj.get_array().shape == (1, 80, 40)
+
+    def test_dtype_is_complex(self) -> None:
+        obj = generate_siemens_star_object(_make_geometry(), **_default_star_kwargs())
+        assert numpy.issubdtype(obj.get_array().dtype, numpy.complexfloating)
+
+    def test_no_nans(self) -> None:
+        obj = generate_siemens_star_object(_make_geometry(), **_default_star_kwargs())
+        assert not numpy.any(numpy.isnan(obj.get_array()))
+
+    def test_no_infs(self) -> None:
+        obj = generate_siemens_star_object(_make_geometry(), **_default_star_kwargs())
+        assert not numpy.any(numpy.isinf(obj.get_array()))
+
+
+class TestSiemensStarDeterminism:
+    def test_identical_calls_are_bit_identical(self) -> None:
+        """No RNG dependency: two calls with the same args produce the same array."""
+        geom = _make_geometry(128, 128)
+        arr1 = generate_siemens_star_object(geom, **_default_star_kwargs()).get_array()
+        arr2 = generate_siemens_star_object(geom, **_default_star_kwargs()).get_array()
+        numpy.testing.assert_array_equal(arr1, arr2)
+
+
+class TestSiemensStarGeometryMetadata:
+    def test_pixel_geometry_preserved(self) -> None:
+        geom = _make_geometry(pixel_width_m=2e-9, pixel_height_m=3e-9)
+        obj = generate_siemens_star_object(geom, **_default_star_kwargs())
+        pg = obj.get_pixel_geometry()
+        assert pg.width_m == pytest.approx(2e-9)
+        assert pg.height_m == pytest.approx(3e-9)
+
+    def test_center_preserved(self) -> None:
+        geom = _make_geometry(center_x_m=1e-6, center_y_m=-2e-6)
+        obj = generate_siemens_star_object(geom, **_default_star_kwargs())
+        center = obj.get_center()
+        assert center.coordinate_x_m == pytest.approx(1e-6)
+        assert center.coordinate_y_m == pytest.approx(-2e-6)
+
+    def test_single_layer(self) -> None:
+        obj = generate_siemens_star_object(_make_geometry(), **_default_star_kwargs())
+        assert obj.get_array().shape[0] == 1
+
+
+class TestSiemensStarContrast:
+    """Amplitude values inside and outside the disk match the configured spoke /
+    background values, and the phase channel behaves the same way.
+    """
+
+    def test_corners_are_background_amplitude(self) -> None:
+        """Corner pixels lie outside the outer disk and take the background value."""
+        obj = generate_siemens_star_object(
+            _make_geometry(128, 128), **_default_star_kwargs(outer_radius_fraction=0.5)
+        )
+        array = obj.get_array()[0]
+        amplitude = numpy.abs(array)
+        numpy.testing.assert_allclose(amplitude[0, 0], 1.0, atol=1e-12)
+        numpy.testing.assert_allclose(amplitude[0, -1], 1.0, atol=1e-12)
+        numpy.testing.assert_allclose(amplitude[-1, 0], 1.0, atol=1e-12)
+        numpy.testing.assert_allclose(amplitude[-1, -1], 1.0, atol=1e-12)
+
+    def test_wedge_interior_matches_expected_value(self) -> None:
+        """A pixel deep inside a spoke wedge is opaque; deep inside a background wedge is transparent."""
+        # num_spokes=4 → 8 wedges of 45° each. Wedge 0 spans angle [0, π/4); it is
+        # a spoke because floor(angle*4/π) % 2 == 0. The angular center of wedge 0
+        # is π/8 = 22.5°. Sample a pixel at radius 20 along that direction.
+        obj = generate_siemens_star_object(
+            _make_geometry(128, 128),
+            **_default_star_kwargs(num_spokes=4, outer_radius_fraction=0.9),
+        )
+        amplitude = numpy.abs(obj.get_array()[0])
+        # spoke wedge center: angle = π/8 (below-right at 22.5° in row/col coords)
+        row_spoke = int(round(64 + 20 * numpy.sin(numpy.pi / 8)))
+        col_spoke = int(round(64 + 20 * numpy.cos(numpy.pi / 8)))
+        # background wedge center: angle = 3π/8 (further below-right, in wedge 1)
+        row_bg = int(round(64 + 20 * numpy.sin(3 * numpy.pi / 8)))
+        col_bg = int(round(64 + 20 * numpy.cos(3 * numpy.pi / 8)))
+        assert amplitude[row_spoke, col_spoke] == pytest.approx(0.0, abs=1e-9)
+        assert amplitude[row_bg, col_bg] == pytest.approx(1.0, abs=1e-9)
+
+    def test_wedge_count_matches_num_spokes(self) -> None:
+        """Traversing a mid-radius circle yields ``2 * num_spokes`` boundary crossings."""
+        num_spokes = 8
+        obj = generate_siemens_star_object(
+            _make_geometry(256, 256),
+            **_default_star_kwargs(num_spokes=num_spokes, outer_radius_fraction=0.9),
+        )
+        amplitude = numpy.abs(obj.get_array()[0])
+        # Sample a circular path at radius 60 (well inside the disk of radius 115.2)
+        num_samples = 4096
+        angles = numpy.linspace(0.0, 2.0 * numpy.pi, num_samples, endpoint=False)
+        rows = numpy.round(128 + 60 * numpy.sin(angles)).astype(int)
+        cols = numpy.round(128 + 60 * numpy.cos(angles)).astype(int)
+        # Binary classification (threshold at 0.5) treats each anti-aliased edge
+        # pixel as belonging to one side or the other, so we count 2*num_spokes
+        # transitions exactly rather than the higher count sign() reports when
+        # AA leaves samples at 0.5.
+        is_background = amplitude[rows, cols] > 0.5
+        transitions = int(numpy.sum(numpy.diff(is_background.astype(int)) != 0))
+        assert transitions == 2 * num_spokes
+
+    def test_phase_only_mode_has_unit_amplitude(self) -> None:
+        """With both amplitudes = 1, |array| = 1 everywhere (only the phase channel differs)."""
+        obj = generate_siemens_star_object(
+            _make_geometry(64, 64),
+            **_default_star_kwargs(
+                spoke_amplitude=1.0,
+                background_amplitude=1.0,
+                spoke_phase_tr=0.25,
+                background_phase_tr=0.0,
+                outer_radius_fraction=0.9,
+            ),
+        )
+        amplitude = numpy.abs(obj.get_array()[0])
+        numpy.testing.assert_allclose(amplitude, 1.0, atol=1e-12)
+
+    def test_phase_only_mode_has_nonzero_phase_variation(self) -> None:
+        """Phase-only mode still produces the star pattern in the phase channel."""
+        obj = generate_siemens_star_object(
+            _make_geometry(64, 64),
+            **_default_star_kwargs(
+                spoke_amplitude=1.0,
+                background_amplitude=1.0,
+                spoke_phase_tr=0.25,
+                background_phase_tr=0.0,
+                outer_radius_fraction=0.9,
+            ),
+        )
+        phase = numpy.angle(obj.get_array()[0])
+        assert phase.std() > 0.0
+
+
+class TestSiemensStarValidation:
+    def test_rejects_single_spoke(self) -> None:
+        with pytest.raises(ValueError, match='num_spokes'):
+            generate_siemens_star_object(_make_geometry(), **_default_star_kwargs(num_spokes=1))
+
+    def test_rejects_zero_radius_fraction(self) -> None:
+        with pytest.raises(ValueError, match='outer_radius_fraction'):
+            generate_siemens_star_object(
+                _make_geometry(), **_default_star_kwargs(outer_radius_fraction=0.0)
+            )
+
+    def test_rejects_negative_radius_fraction(self) -> None:
+        with pytest.raises(ValueError, match='outer_radius_fraction'):
+            generate_siemens_star_object(
+                _make_geometry(), **_default_star_kwargs(outer_radius_fraction=-0.5)
+            )
