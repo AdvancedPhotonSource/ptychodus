@@ -327,9 +327,9 @@ def estimate_crop_center(
     if good_pixel_intensities.size == 0:
         return geometric_center
 
-    noise_floor = estimate_noise_floor(good_pixel_intensities)
-    background_intensity = noise_floor.background_value
-    significance_threshold = noise_floor.get_significance_threshold(mad_threshold)
+    robust_statistics = estimate_noise_floor(good_pixel_intensities)
+    background_intensity = robust_statistics.median
+    significance_threshold = robust_statistics.get_significance_threshold(mad_threshold)
     centroid_weights = filtered_pattern - background_intensity
     centroid_weights[~good_pixel_mask] = 0.0
     centroid_weights[filtered_pattern < significance_threshold] = 0.0

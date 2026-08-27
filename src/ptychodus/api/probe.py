@@ -227,8 +227,8 @@ def estimate_probe_size(
             filtered[1:-1, -1].ravel(),
         ]
     )
-    noise_floor = estimate_noise_floor(filtered, fallback_values=border)
-    threshold = noise_floor.get_significance_threshold(mad_threshold)
+    robust_statistics = estimate_noise_floor(filtered, fallback_values=border)
+    threshold = robust_statistics.get_significance_threshold(mad_threshold)
 
     cleaned = numpy.clip(filtered - threshold, 0.0, None)
     total_power = cleaned.sum()
