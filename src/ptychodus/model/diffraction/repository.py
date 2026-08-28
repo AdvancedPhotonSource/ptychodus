@@ -9,14 +9,12 @@ from ..task_manager import TaskManager
 from .dataset import AssembledDiffractionDataset
 from .monitor import DiffractionTaskMonitor
 from .settings import DetectorSettings, DiffractionSettings
-from .sizer import PatternSizer
 
 logger = logging.getLogger(__name__)
 
 
 def build_default_factory(
     diffraction_settings: DiffractionSettings,
-    pattern_sizer: PatternSizer,
     detector_settings: DetectorSettings,
     task_manager: TaskManager,
     task_monitor: DiffractionTaskMonitor,
@@ -24,7 +22,6 @@ def build_default_factory(
     def _factory(name: str) -> AssembledDiffractionDataset:
         return AssembledDiffractionDataset(
             diffraction_settings,
-            pattern_sizer,
             detector_settings,
             task_manager,
             task_monitor,

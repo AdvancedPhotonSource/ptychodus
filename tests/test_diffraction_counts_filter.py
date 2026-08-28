@@ -26,7 +26,6 @@ from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.diffraction.dataset import AssembledDiffractionDataset
 from ptychodus.model.diffraction.monitor import DiffractionTaskMonitor
 from ptychodus.model.diffraction.settings import DetectorSettings, DiffractionSettings
-from ptychodus.model.diffraction.sizer import PatternSizer
 
 
 # ---------- compute_total_counts ----------
@@ -127,7 +126,6 @@ def _load_with_bounds(
     task_manager = _InlineTaskManager()
     dataset = AssembledDiffractionDataset(
         diffraction_settings,
-        PatternSizer(diffraction_settings),
         detector_settings,
         task_manager,  # type: ignore[arg-type]
         DiffractionTaskMonitor(task_manager),  # type: ignore[arg-type]

@@ -13,7 +13,6 @@ from ..diffraction import (
     AssembledDiffractionDataset,
     DiffractionAPI,
     DiffractionDatasetRepositoryObserver,
-    PatternSizer,
 )
 from ..task_manager import TaskManager
 from .api import ObjectAPI, ProbeAPI, ProductAPI, ProbePositionsAPI
@@ -59,7 +58,6 @@ class ProductCore(Observer):
         self,
         rng: numpy.random.Generator,
         settings_registry: SettingsRegistry,
-        pattern_sizer: PatternSizer,
         diffraction_api: DiffractionAPI,
         scan_file_reader_chooser: PluginChooser[ProbePositionFileReader],
         scan_file_writer_chooser: PluginChooser[ProbePositionFileWriter],
@@ -110,7 +108,6 @@ class ProductCore(Observer):
         self.product_repository = ProductRepository()
         self._item_factory = ProductRepositoryItemFactory(
             self.settings,
-            pattern_sizer,
             self._scan_repository_item_factory,
             self._probe_repository_item_factory,
             self._object_repository_item_factory,

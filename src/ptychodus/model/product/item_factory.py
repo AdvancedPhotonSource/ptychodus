@@ -4,7 +4,7 @@ from ptychodus.api.diffraction import Polarization
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.product import Product, ProductFileReader
 
-from ..diffraction import AssembledDiffractionDataset, PatternSizer
+from ..diffraction import AssembledDiffractionDataset
 from .geometry import ProductGeometry
 from .item import ProductRepositoryItem, ProductState
 from .metadata import MetadataRepositoryItem
@@ -21,7 +21,6 @@ class ProductRepositoryItemFactory:
     def __init__(
         self,
         settings: ProductSettings,
-        pattern_sizer: PatternSizer,
         scan_item_factory: ProbePositionsRepositoryItemFactory,
         probe_item_factory: ProbeRepositoryItemFactory,
         object_item_factory: ObjectRepositoryItemFactory,
@@ -30,7 +29,6 @@ class ProductRepositoryItemFactory:
     ) -> None:
         super().__init__()
         self._settings = settings
-        self._pattern_sizer = pattern_sizer
         self._scan_item_factory = scan_item_factory
         self._probe_item_factory = probe_item_factory
         self._object_item_factory = object_item_factory
@@ -41,16 +39,17 @@ class ProductRepositoryItemFactory:
     def _bind_dataset_geometry(
         geometry: ProductGeometry, dataset: AssembledDiffractionDataset | None
     ) -> None:
-        """Push the dataset's detector extent and raw pixel geometry into ``geometry``
-        so probe & object items built next see a valid geometry inside their own
-        __init__ rebuild. This keeps the observer-triggered rebuild that fires later
-        (from ProductRepositoryItem._bind_dataset) a no-op — the setters short-circuit
-        on unchanged values, avoiding a spurious rebuild during ProductRepositoryItem
-        construction (which would fire index<0 warnings from the repository)."""
+        """Push the dataset's processed detector extent and pixel geometry into
+        ``geometry`` so probe & object items built next see a valid geometry inside
+        their own __init__ rebuild. This keeps the observer-triggered rebuild that
+        fires later (from ProductRepositoryItem._bind_dataset) a no-op — the setters
+        short-circuit on unchanged values, avoiding a spurious rebuild during
+        ProductRepositoryItem construction (which would fire index<0 warnings from
+        the repository)."""
         if dataset is None:
             return
-        geometry.set_detector_extent(dataset.get_metadata().detector_extent)
-        geometry.set_detector_pixel_geometry(dataset.get_raw_pixel_geometry())
+        geometry.set_detector_extent(dataset.get_processed_image_extent())
+        geometry.set_detector_pixel_geometry(dataset.get_processed_pixel_geometry())
 
     def create_from_values(
         self,
@@ -83,7 +82,7 @@ class ProductRepositoryItemFactory:
         )
 
         scan_item = self._scan_item_factory.create()
-        geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
+        geometry = ProductGeometry(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create(geometry)
         object_item = self._object_item_factory.create(geometry)
@@ -118,7 +117,7 @@ class ProductRepositoryItemFactory:
         )
 
         scan_item = self._scan_item_factory.create(product.probe_positions)
-        geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
+        geometry = ProductGeometry(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create(geometry, product.probes)
         object_item = self._object_item_factory.create(geometry, product.object_)
@@ -141,7 +140,7 @@ class ProductRepositoryItemFactory:
         loading."""
         metadata_item = MetadataRepositoryItem(self._settings, self._repository, name=name)
         scan_item = self._scan_item_factory.create()
-        geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
+        geometry = ProductGeometry(metadata_item, scan_item)
         probe_item = self._probe_item_factory.create(geometry)
         object_item = self._object_item_factory.create(geometry)
         return ProductRepositoryItem(
@@ -175,7 +174,7 @@ class ProductRepositoryItemFactory:
 
         metadata_item = MetadataRepositoryItem(self._settings, self._repository)
         scan_item = self._scan_item_factory.create_from_settings()
-        geometry = ProductGeometry(self._pattern_sizer, metadata_item, scan_item)
+        geometry = ProductGeometry(metadata_item, scan_item)
         self._bind_dataset_geometry(geometry, dataset)
         probe_item = self._probe_item_factory.create_from_settings(geometry, dataset=dataset)
         object_item = self._object_item_factory.create_from_settings(geometry, dataset=dataset)

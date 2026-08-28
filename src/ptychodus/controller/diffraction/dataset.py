@@ -18,7 +18,6 @@ from ptychodus.model.diffraction import (
     DiffractionDatasetRepository,
     DiffractionDatasetRepositoryObserver,
     DiffractionDatasetState,
-    PatternSizer,
 )
 
 __all__ = [
@@ -39,8 +38,6 @@ _COL_WIDTH_PX = 3
 _COL_HEIGHT_PX = 4
 _COL_PHYSICAL_PIXEL_WIDTH_UM = 5
 _COL_PHYSICAL_PIXEL_HEIGHT_UM = 6
-_COL_PROCESSED_PIXEL_WIDTH_UM = 7
-_COL_PROCESSED_PIXEL_HEIGHT_UM = 8
 _COL_NUM_BAD_PIXELS = 9
 _COL_SIZE = 10
 
@@ -96,8 +93,8 @@ class _DatasetTreeNode(_TreeNode):
     def get_raw_pixel_geometry(self) -> PixelGeometry:
         return self._dataset.get_raw_pixel_geometry()
 
-    def get_processed_pixel_geometry(self, sizer: PatternSizer) -> PixelGeometry:
-        return sizer.get_processed_pixel_geometry(self._dataset.get_raw_pixel_geometry())
+    def get_processed_pixel_geometry(self) -> PixelGeometry:
+        return self._dataset.get_processed_pixel_geometry()
 
     def get_num_bad_pixels(self) -> int:
         return int(numpy.count_nonzero(self._dataset.get_bad_pixels()))
@@ -188,12 +185,10 @@ class DiffractionTreeModel(QAbstractItemModel):
 
     def __init__(
         self,
-        sizer: PatternSizer,
         repository: DiffractionDatasetRepository,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
-        self._sizer = sizer
         self._repository = repository
         self._root = _TreeNode(None)
         self._max_counts = 1
@@ -478,9 +473,9 @@ class DiffractionTreeModel(QAbstractItemModel):
                     f'{LengthUnit.MICROMETER.convert(node.get_raw_pixel_geometry().height_m):.4g}'
                 )
             case 7:
-                return f'{LengthUnit.MICROMETER.convert(node.get_processed_pixel_geometry(self._sizer).width_m):.4g}'
+                return f'{LengthUnit.MICROMETER.convert(node.get_processed_pixel_geometry().width_m):.4g}'
             case 8:
-                return f'{LengthUnit.MICROMETER.convert(node.get_processed_pixel_geometry(self._sizer).height_m):.4g}'
+                return f'{LengthUnit.MICROMETER.convert(node.get_processed_pixel_geometry().height_m):.4g}'
             case 9:
                 return node.get_num_bad_pixels()
         return None
@@ -525,21 +520,6 @@ class DiffractionTreeModel(QAbstractItemModel):
         # combo model, the product editor) have no other way to learn about it.
         self._repository.handle_metadata_changed(dataset)
         return True
-
-    def refresh_processed_columns(self) -> None:
-        """Emit dataChanged for the processed pixel-size columns of every dataset row.
-
-        Called when the PatternSizer notifies (binning / transpose toggled or bin
-        size edited) — since the processed columns are derived from the sizer
-        transforms applied to each dataset's raw geometry, they all need to refresh
-        even though no dataset itself changed.
-        """
-        num_rows = self.rowCount()
-        if num_rows == 0:
-            return
-        top_left = self.index(0, _COL_PROCESSED_PIXEL_WIDTH_UM)
-        bottom_right = self.index(num_rows - 1, _COL_PROCESSED_PIXEL_HEIGHT_UM)
-        self.dataChanged.emit(top_left, bottom_right)
 
     def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
         if self.hasIndex(row, column, parent):

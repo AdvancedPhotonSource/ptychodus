@@ -36,8 +36,8 @@ from ptychodus.api.preprocess.diffraction import DiffractionPrepPipeline
 from ..task_manager import TaskManager
 from ._loader import LoadDiffractionDataset
 from .monitor import DiffractionTaskMonitor
+from .prep_pipeline import build_prep_pipeline
 from .settings import DetectorSettings, DiffractionSettings
-from .sizer import PatternSizer
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,6 @@ class AssembledDiffractionDataset(DiffractionDataset):
     def __init__(
         self,
         settings: DiffractionSettings,
-        sizer: PatternSizer,
         detector_settings: DetectorSettings,
         task_manager: TaskManager,
         task_monitor: DiffractionTaskMonitor,
@@ -135,7 +134,6 @@ class AssembledDiffractionDataset(DiffractionDataset):
         super().__init__()
         self._name = name
         self._settings = settings
-        self._sizer = sizer
         self._detector_settings = detector_settings
         self._task_manager = task_manager
         self._task_monitor = task_monitor
@@ -243,15 +241,25 @@ class AssembledDiffractionDataset(DiffractionDataset):
         )
 
     def get_processed_pixel_geometry(self) -> PixelGeometry:
-        """Resolve the pixel geometry of the assembled patterns.
+        """Return the pixel geometry that matches the assembled patterns.
 
-        Folds the pipeline snapshot taken at load time through the raw geometry, so
-        binning and transposition are accounted for. Uses the snapshot rather than
-        live settings, which may have changed since the buffer was filled.
+        Delegates to the AssembledDiffractionData snapshot, which is authoritative
+        for both load-from-raw (allocate_assembled_data folds the pipeline through
+        raw geometry at buffer-allocation time) and import-from-exported (the
+        processed value is read back from the file's DETECTOR_PIXEL_WIDTH/HEIGHT
+        attributes). Consulting live pipeline settings here would double-apply
+        binning on re-import.
         """
-        raw = self.get_raw_pixel_geometry()
-        pipeline = self._prep_pipeline
-        return raw if pipeline is None else pipeline.compute_output_pixel_geometry(raw)
+        return self._data.get_pixel_geometry()
+
+    def get_processed_image_extent(self) -> ImageExtent:
+        """Return the image extent that matches the assembled patterns.
+
+        Derived from the stored pattern shape rather than metadata + live pipeline,
+        for the same reason as get_processed_pixel_geometry.
+        """
+        _, height_px, width_px = self._data.get_patterns_shape()
+        return ImageExtent(width_px=width_px, height_px=height_px)
 
     def set_pixel_geometry_override(self, geometry: PixelGeometry | None) -> None:
         """Set (or clear when None) the per-dataset raw pixel geometry override.
@@ -261,7 +269,10 @@ class AssembledDiffractionDataset(DiffractionDataset):
         observers so downstream views (tree columns, bound products) can refresh.
         """
         self._pixel_geometry_override = geometry
-        self._data.set_pixel_geometry(self.get_processed_pixel_geometry())
+        raw = self.get_raw_pixel_geometry()
+        pipeline = self._prep_pipeline
+        processed = raw if pipeline is None else pipeline.compute_output_pixel_geometry(raw)
+        self._data.set_pixel_geometry(processed)
 
         for observer in self._observer_list:
             observer.handle_pixel_geometry_changed()
@@ -362,7 +373,9 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
         metadata = self._dataset.get_metadata()
         pipeline = (
-            self._sizer.get_prep_pipeline(metadata.detector_extent) if process_patterns else None
+            build_prep_pipeline(self._settings, metadata.detector_extent)
+            if process_patterns
+            else None
         )
         processed_bad_pixels = (
             self._bad_pixels if pipeline is None else pipeline.apply_to_mask(self._bad_pixels)
@@ -454,7 +467,9 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
         metadata = self._dataset.get_metadata()
         pipeline = (
-            self._sizer.get_prep_pipeline(metadata.detector_extent) if process_patterns else None
+            build_prep_pipeline(self._settings, metadata.detector_extent)
+            if process_patterns
+            else None
         )
         raw_pixel_geometry = self.get_raw_pixel_geometry()
         lower, upper = self._get_total_counts_bounds()
@@ -520,10 +535,11 @@ class AssembledDiffractionDataset(DiffractionDataset):
             pattern_dtype=self._data.get_patterns_dtype(),
             detector_extent=ImageExtent(detector_width, detector_height),
             # Deliberately no detector_pixel_geometry: self._data already holds the
-            # processed value, but ProductGeometry re-derives from get_raw_pixel_geometry()
-            # through the live PatternSizer, so surfacing the processed value here would
-            # apply binning twice. Falling through to DetectorSettings keeps that path
-            # correct until ProductGeometry learns to consult the assembled data directly.
+            # processed value and downstream consumers read it via
+            # get_processed_pixel_geometry(). The raw detector geometry is not
+            # recoverable from an exported file (only the processed value is
+            # persisted), so leave get_raw_pixel_geometry() to fall through to
+            # DetectorSettings for the rare consumer that needs it.
             file_path=file_path,
         )
         contents_tree = DiffractionDatasetLayoutNode.create_root()

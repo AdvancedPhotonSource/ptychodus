@@ -93,7 +93,6 @@ class ControllerCore:
             model.diffraction_core.detector_settings,
             model.diffraction_core.diffraction_settings,
             model.product_core.settings,
-            model.diffraction_core.pattern_sizer,
             model.diffraction_core.diffraction_api,
             model.diffraction_core.repository,
             model.diffraction_core.task_monitor,

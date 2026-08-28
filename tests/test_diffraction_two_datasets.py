@@ -27,21 +27,18 @@ from ptychodus.model.diffraction.dataset import (
 )
 from ptychodus.model.diffraction.repository import DiffractionDatasetRepository
 from ptychodus.model.diffraction.settings import DetectorSettings, DiffractionSettings
-from ptychodus.model.diffraction.sizer import PatternSizer
 
 
 def _make_repository() -> DiffractionDatasetRepository:
     registry = SettingsRegistry()
     detector_settings = DetectorSettings(registry)
     diffraction_settings = DiffractionSettings(registry)
-    sizer = PatternSizer(diffraction_settings)
     task_manager = MagicMock()
     task_monitor = MagicMock()
 
     def _factory(name: str) -> AssembledDiffractionDataset:
         return AssembledDiffractionDataset(
             diffraction_settings,
-            sizer,
             detector_settings,
             task_manager,
             task_monitor,

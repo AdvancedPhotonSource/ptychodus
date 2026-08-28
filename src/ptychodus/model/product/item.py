@@ -181,8 +181,8 @@ class ProductRepositoryItem(ParameterGroup):
             self._geometry.set_detector_pixel_geometry(None)
             return
 
-        self._geometry.set_detector_extent(dataset.get_metadata().detector_extent)
-        self._geometry.set_detector_pixel_geometry(dataset.get_raw_pixel_geometry())
+        self._geometry.set_detector_extent(dataset.get_processed_image_extent())
+        self._geometry.set_detector_pixel_geometry(dataset.get_processed_pixel_geometry())
 
         # Mirror future edits (pixel geometry, reload) from the dataset back into
         # the geometry so probe/object sizes stay in sync.
@@ -205,8 +205,8 @@ class ProductRepositoryItem(ParameterGroup):
     def _sync_geometry_from_dataset(self) -> None:
         if self._dataset is None:
             return
-        self._geometry.set_detector_extent(self._dataset.get_metadata().detector_extent)
-        self._geometry.set_detector_pixel_geometry(self._dataset.get_raw_pixel_geometry())
+        self._geometry.set_detector_extent(self._dataset.get_processed_image_extent())
+        self._geometry.set_detector_pixel_geometry(self._dataset.get_processed_pixel_geometry())
 
     def get_state(self) -> ProductState:
         return self._state

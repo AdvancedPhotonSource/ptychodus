@@ -7,8 +7,6 @@ from PyQt5.QtWidgets import (
     QMessageBox,
 )
 
-from ptychodus.api.observer import Observable, Observer
-
 from ...model.analysis import DiffractionSimulator, DiffractionSimulatorSettings
 from ...model.diffraction import (
     AssembledDiffractionDataset,
@@ -19,7 +17,6 @@ from ...model.diffraction import (
     DiffractionDatasetRepositoryObserver,
     DiffractionSettings,
     DiffractionTaskMonitor,
-    PatternSizer,
 )
 from .detector_extent import DetectorExtentSource
 from ...model.product import ProductRepository, ProductSettings
@@ -38,13 +35,12 @@ from .wizard import OpenDatasetWizardController
 logger = logging.getLogger(__name__)
 
 
-class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
+class DiffractionController(DiffractionDatasetRepositoryObserver):
     def __init__(
         self,
         detector_settings: DetectorSettings,
         diffraction_settings: DiffractionSettings,
         product_settings: ProductSettings,
-        pattern_sizer: PatternSizer,
         diffraction_api: DiffractionAPI,
         repository: DiffractionDatasetRepository,
         task_monitor: DiffractionTaskMonitor,
@@ -58,7 +54,6 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
-        self._pattern_sizer = pattern_sizer
         self._diffraction_api = diffraction_api
         self._repository = repository
         self._detector_extent_source = DetectorExtentSource()
@@ -81,11 +76,7 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
             file_dialog_factory,
         )
         self._status_controller = TaskStatusController(task_monitor, status_view)
-        self._tree_model = DiffractionTreeModel(pattern_sizer, repository)
-
-        # Sizer changes (binning toggle / bin size / transpose) shift the processed
-        # pixel geometry for every dataset, so refresh those two columns on notify.
-        pattern_sizer.add_observer(self)
+        self._tree_model = DiffractionTreeModel(repository)
 
         view.tree_view.setModel(self._tree_model)
         view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -154,9 +145,7 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
                     else None
                 )
                 if dataset is not None:
-                    pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry(
-                        dataset.get_raw_pixel_geometry()
-                    )
+                    pixel_geometry = dataset.get_processed_pixel_geometry()
                     self._image_controller.set_array(data, pixel_geometry)
                 else:
                     self._image_controller.clear_array()
@@ -335,10 +324,6 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
         # Refresh the wizard's crop/bin bounds when a dataset is reloaded (e.g. via a
         # streaming context or a programmatic re-open with a different file).
         self._detector_extent_source.set_extent(dataset.get_metadata().detector_extent)
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._pattern_sizer:
-            self._tree_model.refresh_processed_columns()
 
 
 class _PerDatasetObserver(DiffractionDatasetObserver):

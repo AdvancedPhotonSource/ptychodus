@@ -1,7 +1,7 @@
 """Unit tests for the diffraction preprocessing pipeline and the settings → pipeline factory.
 
 These tests lock the intended behavior of `DiffractionPrepPipeline` step ops and
-`PatternSizer.get_prep_pipeline()` so regressions in the op chain (crop, binning, upsample,
+`build_prep_pipeline()` so regressions in the op chain (crop, binning, upsample,
 padding, transpose, value filtering) and the processed-extent math are caught at the unit level.
 """
 
@@ -24,8 +24,8 @@ from ptychodus.api.preprocess.diffraction import (
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.settings import SettingsRegistry
 
+from ptychodus.model.diffraction.prep_pipeline import build_prep_pipeline
 from ptychodus.model.diffraction.settings import DetectorSettings, DiffractionSettings
-from ptychodus.model.diffraction.sizer import PatternSizer
 
 
 def _zeros_patterns(shape: tuple[int, int, int]) -> numpy.ndarray:
@@ -448,9 +448,9 @@ def test_sizer_processed_size_accounts_for_double_sided_padding(
     diff.pad_x.set_value(4)
     diff.pad_y.set_value(4)
 
-    sizer = PatternSizer(diff)
     detector_extent = ImageExtent(width_px=64, height_px=64)
-    extent = sizer.get_processed_image_extent(detector_extent)
+    pipeline = build_prep_pipeline(diff, detector_extent)
+    extent = pipeline.compute_output_extent(detector_extent)
     assert extent.width_px == 32 + 2 * 4
     assert extent.height_px == 32 + 2 * 4
 
@@ -458,7 +458,7 @@ def test_sizer_processed_size_accounts_for_double_sided_padding(
     array = SimpleDiffractionArray(
         'a', numpy.zeros(1, dtype=int), numpy.zeros((1, 64, 64), dtype=numpy.uint16)
     )
-    out_shape = sizer.get_prep_pipeline(detector_extent)(array).get_patterns().shape
+    out_shape = pipeline(array).get_patterns().shape
     assert out_shape == (1, extent.height_px, extent.width_px)
 
 
@@ -481,7 +481,7 @@ def test_sizer_upsample_inserts_step_after_binning_before_padding(
     diff.pad_x.set_value(1)
     diff.pad_y.set_value(1)
 
-    pipeline = PatternSizer(diff).get_prep_pipeline(ImageExtent(width_px=64, height_px=64))
+    pipeline = build_prep_pipeline(diff, ImageExtent(width_px=64, height_px=64))
     type_order = [type(step) for step in pipeline.steps]
     bin_idx = type_order.index(BinningStep)
     upsample_idx = type_order.index(UpsampleStep)
@@ -500,12 +500,12 @@ def test_sizer_upsample_multiplies_processed_extent_and_divides_pixel_geometry(
     diff.upsample_enabled.set_value(True)
     diff.upsample_factor.set_value(2)
 
-    sizer = PatternSizer(diff)
     detector_extent = ImageExtent(width_px=32, height_px=32)
-    extent = sizer.get_processed_image_extent(detector_extent)
+    pipeline = build_prep_pipeline(diff, detector_extent)
+    extent = pipeline.compute_output_extent(detector_extent)
     assert (extent.width_px, extent.height_px) == (64, 64)
 
-    geo = sizer.get_processed_pixel_geometry(PixelGeometry(width_m=1e-5, height_m=2e-5))
+    geo = pipeline.compute_output_pixel_geometry(PixelGeometry(width_m=1e-5, height_m=2e-5))
     assert (geo.width_m, geo.height_m) == (5e-6, 1e-5)
 
 
@@ -520,7 +520,7 @@ def test_sizer_upsample_factor_one_is_pipeline_noop(
     diff.upsample_enabled.set_value(True)
     diff.upsample_factor.set_value(1)
 
-    pipeline = PatternSizer(diff).get_prep_pipeline(ImageExtent(width_px=32, height_px=32))
+    pipeline = build_prep_pipeline(diff, ImageExtent(width_px=32, height_px=32))
     assert not any(isinstance(step, UpsampleStep) for step in pipeline.steps)
 
 
@@ -531,19 +531,19 @@ def test_sizer_processed_extent_reflects_transpose(
     diff, _ = settings
     diff.transpose.set_value(True)
 
-    sizer = PatternSizer(diff)
     detector_extent = ImageExtent(width_px=64, height_px=32)
-    extent = sizer.get_processed_image_extent(detector_extent)
+    pipeline = build_prep_pipeline(diff, detector_extent)
+    extent = pipeline.compute_output_extent(detector_extent)
     assert (extent.width_px, extent.height_px) == (32, 64)
 
-    geo = sizer.get_processed_pixel_geometry(PixelGeometry(width_m=1e-5, height_m=2e-5))
+    geo = pipeline.compute_output_pixel_geometry(PixelGeometry(width_m=1e-5, height_m=2e-5))
     assert (geo.width_m, geo.height_m) == (2e-5, 1e-5)
 
-    # Cross-check: pipeline's actual output stack shape agrees with the sizer.
+    # Cross-check: pipeline's actual output stack shape agrees with compute_output_extent.
     array = SimpleDiffractionArray(
         'a', numpy.zeros(1, dtype=int), numpy.zeros((1, 32, 64), dtype=numpy.uint16)
     )
-    out_shape = sizer.get_prep_pipeline(detector_extent)(array).get_patterns().shape
+    out_shape = pipeline(array).get_patterns().shape
     assert out_shape == (1, extent.height_px, extent.width_px)
 
 
@@ -563,7 +563,7 @@ def test_sizer_lower_bound_filter_uses_its_own_toggle(
     diff.value_lower_bound.set_value(7)
     diff.value_upper_bound_enabled.set_value(False)
 
-    pipeline = PatternSizer(diff).get_prep_pipeline()
+    pipeline = build_prep_pipeline(diff)
     step = _filter_step(pipeline)
     assert step is not None
     assert step.lower_bound == 7
@@ -578,7 +578,7 @@ def test_sizer_upper_bound_filter_uses_its_own_toggle(
     diff.value_upper_bound_enabled.set_value(True)
     diff.value_upper_bound.set_value(1234)
 
-    pipeline = PatternSizer(diff).get_prep_pipeline()
+    pipeline = build_prep_pipeline(diff)
     step = _filter_step(pipeline)
     assert step is not None
     assert step.lower_bound is None
@@ -594,7 +594,7 @@ def test_sizer_both_filter_bounds_independent(
     diff.value_upper_bound_enabled.set_value(True)
     diff.value_upper_bound.set_value(99)
 
-    pipeline = PatternSizer(diff).get_prep_pipeline()
+    pipeline = build_prep_pipeline(diff)
     step = _filter_step(pipeline)
     assert step is not None
     assert step.lower_bound == 3
@@ -609,7 +609,7 @@ def test_sizer_no_filter_bounds(
     diff.value_lower_bound_enabled.set_value(False)
     diff.value_upper_bound_enabled.set_value(False)
 
-    pipeline = PatternSizer(diff).get_prep_pipeline()
+    pipeline = build_prep_pipeline(diff)
     assert _filter_step(pipeline) is None
 
 
@@ -647,7 +647,7 @@ def test_sizer_safe_crop_center_matches_cropstep_bounds(
     diff.crop_center_y_px.set_value(user_center)
 
     detector_extent = ImageExtent(width_px=8, height_px=8)
-    step = _crop_step(PatternSizer(diff).get_prep_pipeline(detector_extent))
+    step = _crop_step(build_prep_pipeline(diff, detector_extent))
     assert step is not None
     assert step.center.position_x_px == expected
     assert step.center.position_y_px == expected
@@ -668,46 +668,5 @@ def test_sizer_safe_crop_center_produces_in_bounds_slice(
         'a', numpy.zeros(1, dtype=int), numpy.zeros((1, 8, 8), dtype=numpy.uint16)
     )
     detector_extent = ImageExtent(width_px=8, height_px=8)
-    out = PatternSizer(diff).get_prep_pipeline(detector_extent)(array).get_patterns()
+    out = build_prep_pipeline(diff, detector_extent)(array).get_patterns()
     assert out.shape == (1, 4, 4)  # no truncation from an out-of-bounds slice
-
-
-# ---------- Observer notifications ----------
-
-
-class _CountingObserver:
-    def __init__(self) -> None:
-        self.n_updates = 0
-
-    def _update(self, observable: object) -> None:
-        self.n_updates += 1
-
-
-@pytest.mark.parametrize(
-    'attr',
-    [
-        'hflip',
-        'vflip',
-        'transpose',
-        'upsample_enabled',
-        'upsample_factor',
-        'value_lower_bound_enabled',
-        'value_lower_bound',
-        'value_upper_bound_enabled',
-        'value_upper_bound',
-    ],
-)
-def test_sizer_notifies_on_whole_image_parameter_change(
-    settings: tuple[DiffractionSettings, DetectorSettings], attr: str
-) -> None:
-    """Whole-image settings (flips, transpose, filter bounds) must wake up sizer observers."""
-    diff, det = settings
-    sizer = PatternSizer(diff)
-    observer = _CountingObserver()
-    sizer.add_observer(observer)  # type: ignore[arg-type]
-
-    parameter = getattr(diff, attr)
-    current = parameter.get_value()
-    parameter.set_value(current + 1 if isinstance(current, int) else not current)
-
-    assert observer.n_updates >= 1

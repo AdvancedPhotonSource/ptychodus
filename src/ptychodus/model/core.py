@@ -115,7 +115,6 @@ class ModelCore:
         self.product_core = ProductCore(
             self.rng,
             self.settings_registry,
-            self.diffraction_core.pattern_sizer,
             self.diffraction_core.diffraction_api,
             self.plugin_registry.probe_position_file_readers,
             self.plugin_registry.probe_position_file_writers,

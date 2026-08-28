@@ -13,6 +13,7 @@ from collections.abc import Callable, Sequence
 
 import numpy
 
+from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import (
     DiffractionArray,
     DiffractionDatasetLayoutNode,
@@ -25,7 +26,6 @@ from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.diffraction.dataset import AssembledDiffractionDataset
 from ptychodus.model.diffraction.monitor import DiffractionTaskMonitor
 from ptychodus.model.diffraction.settings import DetectorSettings, DiffractionSettings
-from ptychodus.model.diffraction.sizer import PatternSizer
 
 
 class InlineTaskManager:
@@ -66,7 +66,6 @@ def make_dataset(
     task_manager = InlineTaskManager()
     dataset = AssembledDiffractionDataset(
         diffraction_settings,
-        PatternSizer(diffraction_settings),
         detector_settings,
         task_manager,  # type: ignore[arg-type]
         DiffractionTaskMonitor(task_manager),  # type: ignore[arg-type]
@@ -176,3 +175,74 @@ def test_processed_pixel_geometry_folds_binning_into_the_assembled_data() -> Non
     # Crop alone leaves the pixel size untouched.
     assert dataset.get_assembled_data().get_pixel_geometry() == PixelGeometry(1e-4, 2e-4)
     assert dataset.get_raw_pixel_geometry() == PixelGeometry(1e-4, 2e-4)
+    assert dataset.get_processed_pixel_geometry() == PixelGeometry(1e-4, 2e-4)
+
+
+def _dataset_with_binning(
+    *, bin_x: int = 2, bin_y: int = 2, raw: PixelGeometry = PixelGeometry(1e-4, 2e-4)
+) -> AssembledDiffractionDataset:
+    """A 40x60 dataset with crop + binning enabled and a per-dataset raw pixel-geometry
+    override, so the load path folds `raw` through binning into the assembled buffer."""
+    dataset = make_dataset(
+        arrays=[_saturated_array('a', 2, 0)],
+        crop_height=12,
+        crop_width=16,
+    )
+    dataset._settings.binning_enabled.set_value(True)  # noqa: SLF001
+    dataset._settings.bin_size_x.set_value(bin_x)  # noqa: SLF001
+    dataset._settings.bin_size_y.set_value(bin_y)  # noqa: SLF001
+    dataset.set_pixel_geometry_override(raw)
+    dataset.load_all_arrays(process_patterns=True, block=True)
+    return dataset
+
+
+def test_processed_pixel_geometry_reports_binned_size_after_load() -> None:
+    """Sanity: with binning on, processed = raw * bin_size on each axis."""
+    dataset = _dataset_with_binning()
+
+    assert dataset.get_raw_pixel_geometry() == PixelGeometry(1e-4, 2e-4)
+    assert dataset.get_processed_pixel_geometry() == PixelGeometry(2e-4, 4e-4)
+
+
+def test_processed_image_extent_reports_pattern_shape() -> None:
+    """The new accessor mirrors the actual assembled buffer, not raw metadata."""
+    dataset = _dataset_with_binning()
+
+    # Crop 12x16 then bin 2x2 -> 6x8 assembled patterns.
+    _, patterns_h, patterns_w = dataset.get_assembled_data().get_patterns_shape()
+    extent = dataset.get_processed_image_extent()
+    assert extent == ImageExtent(width_px=patterns_w, height_px=patterns_h)
+    assert extent == ImageExtent(width_px=8, height_px=6)
+    # Raw metadata extent is unchanged (40x60), so ProductGeometry must NOT read it.
+    assert dataset.get_metadata().detector_extent == ImageExtent(width_px=60, height_px=40)
+
+
+def test_processed_geometry_survives_reimport_without_double_binning() -> None:
+    """Regression: importing already-processed patterns must not re-apply binning.
+
+    Simulates the export-then-reimport flow: pull the assembled data out of a
+    binning-enabled dataset, drop it into a fresh dataset whose bin settings are
+    still on. get_processed_pixel_geometry must return the *stored* processed
+    geometry (raw * 2), not raw * 4.
+    """
+    original = _dataset_with_binning()
+    processed_data = original.get_assembled_data()
+
+    # Fresh dataset with the same live settings (crop + bin still enabled).
+    reimported = make_dataset(crop_height=12, crop_width=16)
+    reimported._settings.binning_enabled.set_value(True)  # noqa: SLF001
+    reimported._settings.bin_size_x.set_value(2)  # noqa: SLF001
+    reimported._settings.bin_size_y.set_value(2)  # noqa: SLF001
+    # Round-trip a fresh AssembledDiffractionData carrying the *processed* geometry,
+    # matching what load_diffraction_data returns from an exported HDF5.
+    reimported.set_assembled_patterns(
+        AssembledDiffractionData(
+            indexes=processed_data.get_indexes().copy(),
+            patterns=processed_data.get_patterns().copy(),
+            pixel_geometry=processed_data.get_pixel_geometry(),
+            bad_pixels=processed_data.get_bad_pixels().copy(),
+        )
+    )
+
+    assert reimported.get_processed_pixel_geometry() == PixelGeometry(2e-4, 4e-4)
+    assert reimported.get_processed_image_extent() == ImageExtent(width_px=8, height_px=6)

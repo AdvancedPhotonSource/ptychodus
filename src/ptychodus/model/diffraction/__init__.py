@@ -7,9 +7,9 @@ from .dataset import (
     DiffractionDatasetState,
 )
 from .monitor import DiffractionTaskMonitor
+from .prep_pipeline import build_prep_pipeline
 from .repository import DiffractionDatasetRepository, DiffractionDatasetRepositoryObserver
 from .settings import DetectorSettings, DiffractionSettings
-from .sizer import PatternSizer
 
 __all__ = [
     'AssembledDiffractionArray',
@@ -23,6 +23,6 @@ __all__ = [
     'DiffractionDatasetState',
     'DiffractionSettings',
     'DiffractionTaskMonitor',
-    'PatternSizer',
     'PatternsStreamingContext',
+    'build_prep_pipeline',
 ]
