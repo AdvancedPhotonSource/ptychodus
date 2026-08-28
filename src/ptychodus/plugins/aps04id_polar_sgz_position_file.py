@@ -86,8 +86,9 @@ class PolarSoftGlueZynqPositionFileReader(ProbePositionFileReader):
                 int(trigger_index),
                 LengthUnit.NANOMETER.to_meters(float(x)),
                 LengthUnit.NANOMETER.to_meters(float(y)),
+                probe_photon_count=float(i0),
             )
-            for trigger_index, x, y in zip(trigger_indexes, xs, ys)
+            for trigger_index, x, y, i0 in zip(trigger_indexes, xs, ys, i0s)
         ]
         return ProbePositionSequence(point_list)
 

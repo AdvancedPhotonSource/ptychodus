@@ -686,13 +686,16 @@ def test_probe_photon_counts_wrong_length_is_rejected() -> None:
         _bare_data(num_patterns=3, probe_photon_counts=numpy.zeros(4, dtype=numpy.float64))
 
 
-def test_partial_probe_photon_counts_are_not_considered_measured() -> None:
-    """NaN in any valid slot means the fallback is used uniformly."""
+def test_probe_photon_counts_reject_non_finite() -> None:
     partial = numpy.array([100.0, numpy.nan, 200.0], dtype=numpy.float64)
-    data = _bare_data(num_patterns=3, fill=4, probe_photon_counts=partial)
+    with pytest.raises(ValueError, match='finite and non-negative'):
+        _bare_data(num_patterns=3, fill=4, probe_photon_counts=partial)
 
-    assert not data.has_measured_probe_photon_counts()
-    numpy.testing.assert_array_equal(data.get_probe_photon_counts(), data.get_total_counts())
+
+def test_probe_photon_counts_reject_negative() -> None:
+    negative = numpy.array([100.0, -1.0, 200.0], dtype=numpy.float64)
+    with pytest.raises(ValueError, match='finite and non-negative'):
+        _bare_data(num_patterns=3, fill=4, probe_photon_counts=negative)
 
 
 # ---------- Hz -> counts bridge through preprocess_array / assemble_dataset ----------
@@ -813,15 +816,15 @@ def test_assemble_dataset_allocates_counts_buffer_only_when_flux_is_available() 
     numpy.testing.assert_array_equal(data_no_flux.get_probe_photon_counts(), [64, 64, 64])
 
 
-def test_assemble_dataset_marks_mixed_arrays_as_unmeasured() -> None:
+def test_assemble_dataset_uses_fallback_when_any_array_lacks_flux() -> None:
     flux_hz = numpy.array([10.0, 20.0], dtype=numpy.float64)
     a_with = _array_with_flux('a', 0, 2, 4, flux_hz)
-    b_without = _array('b', 2, 2, 5)  # No flux -> its slice stays NaN.
+    b_without = _array('b', 2, 2, 5)  # No flux -> no counts buffer reserved.
 
     dataset = _make_dataset([a_with, b_without], (4, 4), exposure_time_s=0.5)
 
     data = assemble_dataset(dataset)
 
-    # Any NaN in a valid-index slot -> not fully measured -> fallback path used.
+    # All-or-nothing: any array without flux -> no buffer -> fallback path used.
     assert not data.has_measured_probe_photon_counts()
     numpy.testing.assert_array_equal(data.get_probe_photon_counts(), data.get_total_counts())

@@ -3,7 +3,6 @@
 from __future__ import annotations
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Final
 import logging
 import re
 
@@ -95,38 +94,19 @@ class DiffractionFileKeys(StrEnum):
     PROBE_PHOTON_COUNTS = 'probe_photon_counts'
 
 
-_MMAP_CHUNK_FRAMES: Final[int] = 1024
-"""Frames staged per read when copying patterns into a memory map."""
-
-
-def _stage_patterns_to_memory_map(
-    h5_patterns: h5py.Dataset, mmap_file: Path
-) -> numpy.memmap[Any, Any]:
-    """Copy an HDF5 patterns dataset into a memory map and reopen it read-only.
-
-    HDF5 cannot be memory mapped directly, so the patterns are staged block by block
-    into ``mmap_file``. The caller owns that file: it is overwritten if it already
-    exists and it is never deleted.
-    """
-    staging = numpy.memmap(mmap_file, dtype=h5_patterns.dtype, mode='w+', shape=h5_patterns.shape)
-
-    for lo in range(0, h5_patterns.shape[0], _MMAP_CHUNK_FRAMES):
-        hi = lo + _MMAP_CHUNK_FRAMES
-        staging[lo:hi] = h5_patterns[lo:hi]
-
-    staging.flush()
-    del staging
-
-    # Reopen read-only so nothing downstream can dirty the caller's scratch file.
-    return numpy.memmap(mmap_file, dtype=h5_patterns.dtype, mode='r', shape=h5_patterns.shape)
-
-
-def load_diffraction_data(file: Path, *, mmap_file: Path | None = None) -> AssembledDiffractionData:
+def load_diffraction_data(
+    file: Path,
+    *,
+    mmap_file: Path | None = None,
+    mmap_chunk_frames: int = 1024,
+) -> AssembledDiffractionData:
     """Load assembled diffraction data from an HDF5 file written by :func:`save_diffraction_data`.
 
     When ``mmap_file`` is given, the patterns are staged into a read-only ``numpy.memmap``
     backed by that path rather than held in RAM; indexes and bad pixels are small and load
     normally. The caller owns ``mmap_file`` — it is overwritten if present and never removed.
+    ``mmap_chunk_frames`` sets how many frames are copied from HDF5 into the memory map
+    per read.
     """
     with h5py.File(file, 'r') as h5_file:
         h5_indexes = h5_file[DiffractionFileKeys.INDEXES]
@@ -149,11 +129,23 @@ def load_diffraction_data(file: Path, *, mmap_file: Path | None = None) -> Assem
         if not isinstance(h5_bad_pixels, h5py.Dataset):
             raise ValueError('Bad pixels are not a dataset!')
 
-        patterns = (
-            h5_patterns[()]
-            if mmap_file is None
-            else _stage_patterns_to_memory_map(h5_patterns, mmap_file)
-        )
+        if mmap_file is None:
+            patterns = h5_patterns[()]
+        else:
+            # HDF5 cannot be memory mapped directly, so stage patterns block by block into
+            # mmap_file, then reopen read-only so nothing downstream can dirty the caller's
+            # scratch file.
+            staging = numpy.memmap(
+                mmap_file, dtype=h5_patterns.dtype, mode='w+', shape=h5_patterns.shape
+            )
+            for lo in range(0, h5_patterns.shape[0], mmap_chunk_frames):
+                hi = lo + mmap_chunk_frames
+                staging[lo:hi] = h5_patterns[lo:hi]
+            staging.flush()
+            del staging
+            patterns = numpy.memmap(
+                mmap_file, dtype=h5_patterns.dtype, mode='r', shape=h5_patterns.shape
+            )
 
         probe_photon_counts = None
         h5_probe_photon_counts = h5_file.get(DiffractionFileKeys.PROBE_PHOTON_COUNTS)
@@ -219,6 +211,7 @@ class ProductFileKeys(StrEnum):
     PROBE_POSITION_INDEXES = 'probe_position_indexes'
     PROBE_POSITION_X = 'probe_position_x_m'
     PROBE_POSITION_Y = 'probe_position_y_m'
+    PROBE_PHOTON_COUNTS = 'probe_photon_counts'
     OBJECT_ARRAY = 'object'
     OBJECT_CENTER_X = 'center_x_m'
     OBJECT_CENTER_Y = 'center_y_m'
@@ -349,8 +342,24 @@ def load_product(file: Path) -> Product:
         if not isinstance(h5_position_y, h5py.Dataset):
             raise ValueError('Probe position Y is not a dataset!')
 
-        for idx, x_m, y_m in zip(h5_position_indexes[()], h5_position_x[()], h5_position_y[()]):
-            point = ProbePosition(idx, x_m, y_m)
+        # The all-or-nothing invariant on ProbePositionSequence means save_product only
+        # writes probe_photon_counts when every position had a count; a present
+        # dataset therefore aligns 1:1 with probe_position_indexes and needs no dict.
+        position_photon_counts_array: numpy.ndarray | None = None
+        h5_position_photon_counts = h5_file.get(ProductFileKeys.PROBE_PHOTON_COUNTS)
+        if isinstance(h5_position_photon_counts, h5py.Dataset):
+            position_photon_counts_array = h5_position_photon_counts[()]
+
+        indexes = h5_position_indexes[()]
+        xs = h5_position_x[()]
+        ys = h5_position_y[()]
+        for i, (idx, x_m, y_m) in enumerate(zip(indexes, xs, ys)):
+            photon_count = (
+                None
+                if position_photon_counts_array is None
+                else float(position_photon_counts_array[i])
+            )
+            point = ProbePosition(idx, x_m, y_m, probe_photon_count=photon_count)
             point_list.append(point)
 
         losses: list[LossValue] = []
@@ -391,6 +400,8 @@ def save_product(file: Path, product: Product) -> None:
         scan_x_m.append(point.coordinate_x_m)
         scan_y_m.append(point.coordinate_y_m)
 
+    position_photon_counts = product.probe_positions.get_probe_photon_counts()
+
     with h5py.File(file, 'w') as h5_file:
         metadata = product.metadata
         h5_file.attrs[ProductFileKeys.NAME] = metadata.name
@@ -408,6 +419,11 @@ def save_product(file: Path, product: Product) -> None:
         h5_file.create_dataset(ProductFileKeys.PROBE_POSITION_INDEXES, data=scan_indexes)
         h5_file.create_dataset(ProductFileKeys.PROBE_POSITION_X, data=scan_x_m)
         h5_file.create_dataset(ProductFileKeys.PROBE_POSITION_Y, data=scan_y_m)
+        if position_photon_counts is not None:
+            h5_file.create_dataset(
+                ProductFileKeys.PROBE_PHOTON_COUNTS,
+                data=position_photon_counts,
+            )
 
         probe = product.probes
         h5_probe = h5_file.create_dataset(ProductFileKeys.PROBE_ARRAY, data=probe.get_array())

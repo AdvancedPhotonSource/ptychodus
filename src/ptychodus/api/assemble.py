@@ -47,6 +47,7 @@ from .preprocess.diffraction import (
     inpaint_bad_pixels,
     zero_bad_pixels,
 )
+from .probe_positions import ProbePositionSequence
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,7 @@ __all__ = [
     'assemble_dataset',
     'compute_array_offsets',
     'compute_assembled_patterns_shape',
+    'compute_probe_photon_counts_by_index',
     'preprocess_array',
     'summarize_dataset',
 ]
@@ -68,6 +70,50 @@ def compute_total_counts(
     """Sum each pattern over the good (non-bad) pixels."""
     good_pixels = numpy.logical_not(bad_pixels)
     return numpy.sum(patterns[:, good_pixels], axis=-1)
+
+
+def compute_probe_photon_counts_by_index(
+    assembled_data: AssembledDiffractionData,
+    positions: ProbePositionSequence,
+) -> dict[int, float]:
+    """Merge diffraction-side and position-side per-pattern counts, keyed by scan index.
+
+    Precedence for each assembled pattern index:
+
+    1. Diffraction-side measured counts (from a reader that populated
+       :meth:`~ptychodus.api.diffraction.DiffractionArray.get_probe_photon_flux_Hz`) --
+       always used when :meth:`AssembledDiffractionData.has_measured_probe_photon_counts`
+       is true, even if the position side also supplied counts (logged at DEBUG).
+    2. Position-side :attr:`ProbePosition.probe_photon_count` for indexes that appear in
+       both the assembled data and the position sequence. The all-or-nothing invariant on
+       :class:`ProbePositionSequence` guarantees the counts array is either fully populated
+       or absent.
+    3. Per-pattern total counts as a final fallback so consumers such as
+       :func:`~ptychodus.api.illumination.compute_illumination_map` always receive
+       weights and never silently degrade to uniform accumulation.
+    """
+    indexes = assembled_data.get_indexes()
+    position_counts = positions.get_probe_photon_counts()
+
+    if assembled_data.has_measured_probe_photon_counts():
+        counts = assembled_data.get_probe_photon_counts()
+        if position_counts is not None:
+            logger.debug(
+                'Diffraction side supplied per-pattern probe photon counts; '
+                'position-side counts overridden.'
+            )
+        return {int(idx): float(c) for idx, c in zip(indexes, counts)}
+
+    position_counts_by_index: dict[int, float] = {}
+    if position_counts is not None:
+        for position, count in zip(positions, position_counts):
+            position_counts_by_index[int(position.index)] = float(count)
+
+    total_counts = assembled_data.get_total_counts()
+    return {
+        int(idx): position_counts_by_index.get(int(idx), float(fallback))
+        for idx, fallback in zip(indexes, total_counts)
+    }
 
 
 class AssembledDiffractionData:
@@ -119,6 +165,13 @@ class AssembledDiffractionData:
                 )
             if probe_photon_counts.shape[0] != patterns.shape[0]:
                 raise ValueError('Number of probe photon counts does not match number of patterns!')
+            bad = ~numpy.isfinite(probe_photon_counts) | (probe_photon_counts < 0.0)
+            if bad.any():
+                first = int(numpy.argmax(bad))
+                raise ValueError(
+                    'Probe photon counts must be finite and non-negative; '
+                    f'got {probe_photon_counts[first]!r} at position {first}.'
+                )
 
     @classmethod
     def create_null(cls) -> AssembledDiffractionData:
@@ -199,11 +252,14 @@ class AssembledDiffractionData:
         return compute_total_counts(self.get_patterns(), self._bad_pixels)
 
     def has_measured_probe_photon_counts(self) -> bool:
-        """True when real hardware flux measurements were supplied for every valid pattern."""
-        if self._probe_photon_counts is None:
-            return False
-        valid = self._probe_photon_counts[self._indexes >= 0]
-        return valid.size > 0 and not bool(numpy.any(numpy.isnan(valid)))
+        """True when real hardware flux measurements are attached to this buffer.
+
+        All-or-nothing at every layer: :func:`allocate_assembled_data` only reserves
+        the counts buffer when every array in the dataset reports flux, and
+        :meth:`AssembledDiffractionData.__init__` rejects non-finite / negative
+        values. So a non-None buffer is fully populated by construction.
+        """
+        return self._probe_photon_counts is not None
 
     def get_probe_photon_counts(self) -> DiffractionPatternCounts:
         """Per-pattern incident probe photon counts.
@@ -213,8 +269,7 @@ class AssembledDiffractionData:
         pixels for each pattern. Always returns a valid array so callers need no
         None branch.
         """
-        if self.has_measured_probe_photon_counts():
-            assert self._probe_photon_counts is not None
+        if self._probe_photon_counts is not None:
             return self._probe_photon_counts[self._indexes >= 0]
         return self.get_total_counts()
 
@@ -374,14 +429,14 @@ def allocate_assembled_data(
 
     indexes = -numpy.ones(num_patterns_total, dtype=int)
 
-    # Reserve a per-pattern probe photon counts buffer only when at least one
-    # array offers hardware flux measurements. Slots for arrays without flux
-    # stay NaN, so has_measured_probe_photon_counts() reports False for mixed
-    # datasets and downstream falls back to per-pattern total counts uniformly.
-    any_probe_flux = any(array.get_probe_photon_flux_Hz() is not None for array in dataset)
+    # All-or-nothing: reserve the per-pattern probe photon counts buffer only when
+    # every array in the dataset reports flux. If any array lacks flux the buffer
+    # stays None, has_measured_probe_photon_counts() reports False, and downstream
+    # falls back to per-pattern total counts uniformly. Streaming datasets can start
+    # empty and grow, so an empty dataset also skips the buffer.
     probe_photon_counts: DiffractionPatternCounts | None = None
-    if any_probe_flux:
-        probe_photon_counts = numpy.full(num_patterns_total, numpy.nan, dtype=numpy.float64)
+    if len(dataset) > 0 and all(array.get_probe_photon_flux_Hz() is not None for array in dataset):
+        probe_photon_counts = numpy.zeros(num_patterns_total, dtype=numpy.float64)
 
     return AssembledDiffractionData(
         indexes,

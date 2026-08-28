@@ -2,6 +2,7 @@ from __future__ import annotations
 import logging
 import time
 
+from ptychodus.api.assemble import compute_probe_photon_counts_by_index
 from ptychodus.api.illumination import IlluminationMap, compute_illumination_map
 
 from ..product import ProductRepository
@@ -30,10 +31,9 @@ class IlluminationMapper:
         dataset = item.get_dataset()
         if dataset is not None:
             assembled = dataset.get_assembled_data()
-            probe_photon_counts_by_index = {
-                int(idx): float(counts)
-                for idx, counts in zip(assembled.get_indexes(), assembled.get_probe_photon_counts())
-            }
+            probe_photon_counts_by_index = compute_probe_photon_counts_by_index(
+                assembled, product.probe_positions
+            )
 
         logger.info('Computing illumination map...')
         tic = time.perf_counter()

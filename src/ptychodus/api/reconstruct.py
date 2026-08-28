@@ -239,6 +239,8 @@ def prepare_reconstruct_input(
         pos_x_all[k] = position.coordinate_x_m
         pos_y_all[k] = position.coordinate_y_m
 
+    src_photon_counts = product.probe_positions.get_probe_photon_counts()
+
     pos_keep = numpy.fromiter(
         (index_filter(int(i)) for i in pos_indexes_all),
         dtype=numpy.bool_,
@@ -247,6 +249,7 @@ def prepare_reconstruct_input(
     pos_indexes = pos_indexes_all[pos_keep]
     pos_x = pos_x_all[pos_keep]
     pos_y = pos_y_all[pos_keep]
+    pos_photon_counts = None if src_photon_counts is None else src_photon_counts[pos_keep]
 
     if filtered_pattern_indexes.size == 0 or pos_indexes.size == 0:
         raise ValueError('Index filter eliminated all pattern indexes and/or all position indexes.')
@@ -258,6 +261,18 @@ def prepare_reconstruct_input(
     counts = numpy.bincount(inverse)
     mean_x = numpy.bincount(inverse, weights=pos_x) / counts
     mean_y = numpy.bincount(inverse, weights=pos_y) / counts
+
+    # Averaging duplicate-index photon counts uses the arithmetic mean because the
+    # position readers store per-trigger integrated *counts* over equal-length trigger
+    # windows -- each duplicate is an independent sample of the same per-trigger count.
+    # A harmonic or geometric mean would only apply if a future reader supplied true
+    # rates (Hz) over unequal integration windows. NaN placeholders (positions whose
+    # reader did not supply a count) propagate through bincount -> mean, marking the
+    # anchor invalid so the subsequent interp yields NaN for any pattern index derived
+    # from it.
+    mean_photon_counts: numpy.ndarray | None = None
+    if pos_photon_counts is not None:
+        mean_photon_counts = numpy.bincount(inverse, weights=pos_photon_counts) / counts
 
     lo = unique_pos_indexes[0]
     hi = unique_pos_indexes[-1]
@@ -286,6 +301,11 @@ def prepare_reconstruct_input(
     # because in_range_mask already trimmed to [lo, hi].
     x_coords = numpy.interp(in_range_pattern_indexes, unique_pos_indexes, mean_x)
     y_coords = numpy.interp(in_range_pattern_indexes, unique_pos_indexes, mean_y)
+    photon_counts: numpy.ndarray | None = None
+    if mean_photon_counts is not None:
+        photon_counts = numpy.interp(
+            in_range_pattern_indexes, unique_pos_indexes, mean_photon_counts
+        )
 
     n_averaged = pos_indexes.size - unique_pos_indexes.size
     n_interpolated = int((~exact_match).sum())
@@ -295,9 +315,19 @@ def prepare_reconstruct_input(
         f'duplicate positions; interpolated {n_interpolated} positions'
     )
 
+    # The all-or-nothing invariant on ProbePositionSequence means photon_counts is either
+    # None (no reader ever measured it) or a fully-populated finite array; interpolation
+    # over a fully-populated anchor array preserves that. So the output list carries a
+    # count on every point or on none of them, preserving the invariant for the trimmed
+    # ProbePositionSequence built below.
     point_list = [
-        ProbePosition(index=int(i), coordinate_x_m=float(x), coordinate_y_m=float(y))
-        for i, x, y in zip(in_range_pattern_indexes, x_coords, y_coords)
+        ProbePosition(
+            index=int(i),
+            coordinate_x_m=float(x),
+            coordinate_y_m=float(y),
+            probe_photon_count=None if photon_counts is None else float(photon_counts[k]),
+        )
+        for k, (i, x, y) in enumerate(zip(in_range_pattern_indexes, x_coords, y_coords))
     ]
     patterns = valid_patterns[in_range_pattern_offsets]
 

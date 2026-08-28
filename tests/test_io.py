@@ -14,7 +14,6 @@ from ptychodus.api.diffraction import Polarization
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import (
     ProductFileKeys,
-    _MMAP_CHUNK_FRAMES,
     StandardFileLayout,
     load_diffraction_data,
     load_product,
@@ -226,7 +225,8 @@ class TestDiffractionRoundTrip:
         assert mapped.nbytes == in_memory.nbytes
 
     def test_mmap_spans_multiple_staging_chunks(self, tmp_path: Path) -> None:
-        num_patterns = 3 * _MMAP_CHUNK_FRAMES + 7
+        chunk_frames = 8
+        num_patterns = 3 * chunk_frames + 7
         indexes = numpy.arange(num_patterns, dtype=numpy.int32)
         patterns = numpy.arange(num_patterns * 2 * 2, dtype=numpy.uint16).reshape(
             num_patterns, 2, 2
@@ -240,7 +240,9 @@ class TestDiffractionRoundTrip:
         file = tmp_path / 'diff_big.h5'
         save_diffraction_data(file, original)
 
-        mapped = load_diffraction_data(file, mmap_file=tmp_path / 'mmap.bin')
+        mapped = load_diffraction_data(
+            file, mmap_file=tmp_path / 'mmap.bin', mmap_chunk_frames=chunk_frames
+        )
 
         numpy.testing.assert_array_equal(mapped._patterns, patterns)
 
@@ -453,6 +455,41 @@ class TestProductRoundTrip:
             assert load.index == orig.index
             assert load.coordinate_x_m == pytest.approx(orig.coordinate_x_m)
             assert load.coordinate_y_m == pytest.approx(orig.coordinate_y_m)
+
+    def test_product_probe_photon_counts_absent_when_unmeasured(self, tmp_path: Path) -> None:
+        original = _make_product(num_positions=3)
+        file = tmp_path / 'product.h5'
+        save_product(file, original)
+
+        with h5py.File(file, 'r') as h5_file:
+            assert 'probe_photon_counts' not in h5_file
+
+        loaded = load_product(file)
+        assert loaded.probe_positions.get_probe_photon_counts() is None
+
+    def test_product_probe_photon_counts_round_trip(self, tmp_path: Path) -> None:
+        original = _make_product(num_positions=3)
+        # Rebuild the positions with photon counts on every point.
+        positions = ProbePositionSequence(
+            [ProbePosition(i, i * 1e-6, i * 2e-6, probe_photon_count=100.0 + i) for i in range(3)]
+        )
+        original = Product(
+            metadata=original.metadata,
+            probe_positions=positions,
+            probes=original.probes,
+            object_=original.object_,
+            losses=original.losses,
+        )
+        file = tmp_path / 'product.h5'
+        save_product(file, original)
+
+        with h5py.File(file, 'r') as h5_file:
+            assert 'probe_photon_counts' in h5_file
+
+        loaded = load_product(file)
+        assert loaded.probe_positions.get_probe_photon_counts() is not None
+        for i, point in enumerate(loaded.probe_positions):
+            assert point.probe_photon_count == pytest.approx(100.0 + i)
 
     def test_losses_preserved(self, tmp_path: Path) -> None:
         original = _make_product(with_losses=True)
