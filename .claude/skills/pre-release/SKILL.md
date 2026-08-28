@@ -368,6 +368,48 @@ Print a summary in this exact format after all sections have run:
 
 Then, and only then, walk through each `FAIL` with the user: state the finding, propose the fix, ask "apply it?" per item, and Edit/Write only after they confirm.
 
+Once the gate is clean (or the user accepts the outstanding findings), run the **Draft release notes** step below.
+
+## Draft release notes
+
+Advisory step, not a gate. Synthesize a bulleted draft the user pastes into `git tag -a` or the PR description — never commit, never tag, never write to a file.
+
+**Step 1 — Read prior tags to internalize the style.** This is the single most important instruction; every release note in this repo follows the convention set by prior tags, so seeing them fresh anchors the draft:
+
+```sh
+for tag in $(git tag --sort=-creatordate | head -5); do
+    echo "===== $tag ====="
+    git tag -l --format='%(contents)' "$tag"
+    echo
+done
+```
+
+The convention you should see: title line `<Short title> (#<PR-number>)`, blank line, flat `-` bullets, one user-visible change per bullet. Past-tense or imperative voice. Backticks on paths, extras, CLI names, module names, file names. No sub-bullets. Bugfix-only tags (`v1.4.1`) legitimately have zero bullets — just the title. Big releases (`v1.4.0`, `v1.5.0`) run 20–30 bullets.
+
+**Step 2 — Gather raw material since the previous tag:**
+
+```sh
+prev=$(git describe --tags --abbrev=0)
+echo "Since $prev"
+git log --oneline "$prev..HEAD"
+git log "$prev..HEAD"
+git diff --stat "$prev..HEAD" -- CLAUDE.md README.md docs/source/
+```
+
+The `--oneline` view gives you the merge granularity (usually one bullet per merged PR); the full log gives you the "what" behind each merge; the doc `--stat` flags the notable user-facing changes.
+
+**Step 3 — Optionally consult Claude Code session transcripts** under `~/.claude/projects/-home-beams0-SHENKE-Ptychography-ptychodus/*.jsonl` when a commit message is thin — the *why* often lives in a conversation, not the message. Read-only; sample only when needed to explain a specific commit.
+
+**Step 4 — Draft the bullet list applying the convention:**
+
+- Past-tense or imperative voice, backticked identifiers, flat structure, no sub-bullets, one short line per bullet.
+- **Frame every bullet in terms of value to the user** — the new capability, the fixed symptom, the new supported hardware/format, the faster or simpler workflow. Ask "what does this let the user do or stop worrying about?" and lead with that. Do not paraphrase the commit message or the file-level diff. Compare: the actual `v1.5.0` tag says *"GPU contexts are now acquired only inside reconstruction subprocesses, so the parent process no longer holds device state"* (observable behavior, with the "so that" the user cares about); a bad draft would say *"Moved GPU context acquisition into `ReconstructorLibrary._acquire_context`"* (file-level restatement of a diff).
+- **Keep each bullet as terse as it can be while still conveying the value.** Target the median density of `v1.4.0` and `v1.5.0` — a phrase or a short sentence. A longer bullet is warranted only when the scope genuinely needs it (headline features spanning multiple surfaces, like the `v1.5.0` opening bullet). A bullet that reads like a full paragraph is a signal to split it or to drop the implementation detail. Do not pad with rationale that a reader can infer from the phrase itself.
+- Skip release-noise commits (version bumps, formatting, typo fixes) and internal refactors the user cannot observe. A pure rename earns a bullet only when downstream code or documentation had to change. A dependency swap earns a bullet only when a downstream packager or user notices — e.g., `v1.5.0`'s *"HTTP client is `httpx` everywhere (`requests` removed)"* is worth it because transitive pins move.
+- Scale total density to the release: a bugfix-only diff may warrant just the title with zero bullets.
+
+**Step 5 — Print the draft** to the terminal inside a fenced code block so the user can copy it verbatim. Do not write it to a file, do not commit, do not `git tag`.
+
 ## Why the phases
 
 Three constraints force Phase B to be serial. Do not re-flatten the phases without addressing them:
