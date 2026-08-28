@@ -8,6 +8,7 @@ from ptychodus.api.preprocess.diffraction import (
     HorizontalFlipStep,
     PaddingStep,
     TransposeStep,
+    UpsampleStep,
     VerticalFlipStep,
 )
 from ptychodus.api.geometry import ImageExtent, Interval, PixelGeometry
@@ -125,6 +126,8 @@ class PatternSizer(Observable, Observer):
         diffraction_settings.hflip.add_observer(self)
         diffraction_settings.vflip.add_observer(self)
         diffraction_settings.transpose.add_observer(self)
+        diffraction_settings.upsample_enabled.add_observer(self)
+        diffraction_settings.upsample_factor.add_observer(self)
         diffraction_settings.value_lower_bound_enabled.add_observer(self)
         diffraction_settings.value_lower_bound.add_observer(self)
         diffraction_settings.value_upper_bound_enabled.add_observer(self)
@@ -136,7 +139,7 @@ class PatternSizer(Observable, Observer):
         return self.get_prep_pipeline(detector_extent).compute_output_extent(detector_extent)
 
     def get_processed_pixel_geometry(self, raw_pixel_geometry: PixelGeometry) -> PixelGeometry:
-        # Pixel geometry only depends on binning and transpose (see
+        # Pixel geometry only depends on binning, upsample, and transpose (see
         # DiffractionPrepStep.apply_to_pixel_geometry overrides); crop, filter, padding,
         # and flips are identity. Compute directly from the raw settings so this method
         # works without knowing the detector extent.
@@ -146,6 +149,10 @@ class PatternSizer(Observable, Observer):
                 bin_size_x=self._diffraction_settings.bin_size_x.get_value(),
                 bin_size_y=self._diffraction_settings.bin_size_y.get_value(),
             ).apply_to_pixel_geometry(geometry)
+        if self._diffraction_settings.upsample_enabled.get_value():
+            factor = self._diffraction_settings.upsample_factor.get_value()
+            if factor > 1:
+                geometry = UpsampleStep(factor=factor).apply_to_pixel_geometry(geometry)
         if self._diffraction_settings.transpose.get_value():
             geometry = TransposeStep().apply_to_pixel_geometry(geometry)
         return geometry
@@ -160,7 +167,7 @@ class PatternSizer(Observable, Observer):
         detector. Callers that will feed real patterns through the pipeline must pass
         an extent.
 
-        Canonical order: filter → crop → binning → padding → hflip → vflip → transpose.
+        Canonical order: filter → crop → binning → upsample → padding → hflip → vflip → transpose.
         """
         det_w = detector_extent.width_px if detector_extent is not None else None
         det_h = detector_extent.height_px if detector_extent is not None else None
@@ -203,6 +210,11 @@ class PatternSizer(Observable, Observer):
                     bin_size_y=self._axis_y.get_bin_size(det_h),
                 )
             )
+
+        if self._diffraction_settings.upsample_enabled.get_value():
+            factor = self._diffraction_settings.upsample_factor.get_value()
+            if factor > 1:
+                steps.append(UpsampleStep(factor=factor))
 
         if self._diffraction_settings.padding_enabled.get_value():
             steps.append(

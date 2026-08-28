@@ -289,6 +289,22 @@ class BinningViewController(CheckableGroupBoxParameterViewController):
             super()._update(observable)
 
 
+class UpsampleViewController(CheckableGroupBoxParameterViewController):
+    """UpsampleStep — FFT zero-pad upsampling by an isotropic integer factor."""
+
+    def __init__(self, diffraction_settings: DiffractionSettings) -> None:
+        super().__init__(diffraction_settings.upsample_enabled, 'Upsample')
+        self._factor_view_controller = SpinBoxParameterViewController(
+            diffraction_settings.upsample_factor
+        )
+
+        layout = QGridLayout()
+        layout.addWidget(QLabel('Factor:'), 0, 0)
+        layout.addWidget(self._factor_view_controller.get_widget(), 0, 1)
+        layout.setColumnStretch(1, 1)
+        self.get_widget().setLayout(layout)
+
+
 class PaddingViewController(CheckableGroupBoxParameterViewController):
     def __init__(self, diffraction_settings: DiffractionSettings) -> None:
         super().__init__(diffraction_settings.padding_enabled, 'Pad')
@@ -401,7 +417,7 @@ class TransformViewController:
 class OpenDatasetWizardProcessingViewController(ParameterViewController):
     """Processing wizard page. Groups are laid out top-to-bottom in the
     DiffractionPrepPipeline execution order (see api/preprocess/diffraction.py):
-    filter → crop → binning → padding → transform (hflip → vflip → transpose).
+    filter → crop → binning → upsample → padding → transform (hflip → vflip → transpose).
     Storage (memory map) and Bad Pixels are not part of the pipeline but are
     retained here as load-time concerns; the horizontal separator between them
     and Value Filter marks that boundary visually. Total Counts Filter is
@@ -430,6 +446,7 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
         )
         self._crop_view_controller = CropViewController(diffraction_settings, extent_source)
         self._binning_view_controller = BinningViewController(diffraction_settings, extent_source)
+        self._upsample_view_controller = UpsampleViewController(diffraction_settings)
         self._padding_view_controller = PaddingViewController(diffraction_settings)
         self._transform_view_controller = TransformViewController(diffraction_settings)
 
@@ -445,6 +462,7 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
         layout.addWidget(self._total_counts_filter_view_controller.get_widget())
         layout.addWidget(self._crop_view_controller.get_widget())
         layout.addWidget(self._binning_view_controller.get_widget())
+        layout.addWidget(self._upsample_view_controller.get_widget())
         layout.addWidget(self._padding_view_controller.get_widget())
         layout.addWidget(self._transform_view_controller.get_widget())
         layout.addStretch()

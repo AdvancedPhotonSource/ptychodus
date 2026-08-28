@@ -61,6 +61,9 @@ class DiffractionSettings(Observable, Observer):
         self.bin_size_x = self._group.create_integer_parameter('BinSizeX', 1, minimum=1)
         self.bin_size_y = self._group.create_integer_parameter('BinSizeY', 1, minimum=1)
 
+        self.upsample_enabled = self._group.create_boolean_parameter('UpsampleEnabled', False)
+        self.upsample_factor = self._group.create_integer_parameter('UpsampleFactor', 1, minimum=1)
+
         self.padding_enabled = self._group.create_boolean_parameter('PaddingEnabled', False)
         self.pad_x = self._group.create_integer_parameter('PadX', 0, minimum=0)
         self.pad_y = self._group.create_integer_parameter('PadY', 0, minimum=0)
