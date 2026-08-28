@@ -866,17 +866,30 @@ class TestObjectComparison:
         assert comparison.reference_complex.dtype == numpy.dtype(numpy.complex128)
         assert comparison.test_complex.dtype == numpy.dtype(numpy.complex128)
 
-    def test_shape_mismatch_raises(self) -> None:
+    def test_mismatched_shapes_are_trimmed_to_common_shape(self) -> None:
+        """Mismatched shapes no longer raise; align_objects trims both to the common shape.
+
+        Verifies the pixel-geometry-preserving trim of the reference plus the aligned test
+        produces an ObjectComparison whose reference/test arrays share the min-in-each-axis
+        shape and pixel grid.
+        """
         reference = _make_product()
+        # Center-crop the reference's own object array to build a mismatched-shape test object
+        # that shares the pixel grid — non-zero content is required for the ambiguity fit.
+        target_h = _OBJ_HEIGHT_PX - 2
+        target_w = _OBJ_WIDTH_PX - 4
+        ref_array = reference.object_.get_array()
+        cropped_test_array = ref_array[..., 1 : 1 + target_h, 2 : 2 + target_w].copy()
         small_object = Object(
-            array=numpy.zeros((_OBJ_HEIGHT_PX, _OBJ_WIDTH_PX // 2), dtype=numpy.complex128),
+            array=cropped_test_array,
             pixel_geometry=PixelGeometry(width_m=_PIXEL_M, height_m=_PIXEL_M),
             center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
         )
         test = replace(reference, object_=small_object)
 
-        with pytest.raises(ValueError, match='shape'):
-            compute_object_comparison(reference=reference, test=test)
+        comparison = compute_object_comparison(reference=reference, test=test)
+        assert comparison.reference_complex.shape == (target_h, target_w)
+        assert comparison.test_complex.shape == (target_h, target_w)
 
     def test_pixel_geometry_mismatch_raises(self) -> None:
         reference = _make_product()

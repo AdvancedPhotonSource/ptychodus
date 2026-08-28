@@ -241,8 +241,8 @@ def test_estimate_xmcd_end_to_end_with_align_objects_recovers_known_signal() -> 
     lcp_shifted_array = numpy.roll(lcp.get_array(), shift=shift_yx, axis=(-2, -1))
     lcp_shifted = _make_object(lcp_shifted_array[0])
 
-    aligned_lcp = align_objects(rcp, lcp_shifted)
-    result = estimate_xmcd(rcp, aligned_lcp)
+    cropped_rcp, aligned_lcp = align_objects(rcp, lcp_shifted)
+    result = estimate_xmcd(cropped_rcp, aligned_lcp)
 
     structural = result.structural_object.get_array()[0]
     magnetic = result.magnetic_object.get_array()[0]
@@ -255,4 +255,55 @@ def test_estimate_xmcd_end_to_end_with_align_objects_recovers_known_signal() -> 
     )
     numpy.testing.assert_allclose(
         numpy.abs(magnetic)[support], numpy.abs(m_factor)[support], atol=2e-3
+    )
+
+
+def test_estimate_xmcd_end_to_end_with_mismatched_shapes_recovers_known_signal() -> None:
+    """Integration: RCP and LCP with different shapes → align_objects trims and aligns.
+
+    Simulates the pty-chi failure mode this fix targets: rounding/padding leaves the
+    two reconstructions with slightly different array shapes. The full
+    align_objects → estimate_xmcd chain must trim to a common shape and still
+    recover the known structural + magnetic signal on that shared region.
+    """
+    rng = numpy.random.default_rng(9)
+
+    # Reference (RCP) at 48x48; moving (LCP) built at 50x52 with a small integer
+    # shift so both pieces of the fix — trimming and sub-pixel alignment — are exercised.
+    def _feature(shape: tuple[int, int], center_yx: tuple[float, float]) -> numpy.ndarray:
+        h, w = shape
+        y = numpy.arange(h)[:, None]
+        x = numpy.arange(w)[None, :]
+        cy, cx = center_yx
+        return numpy.exp(-(((y - cy) ** 2 + (x - cx) ** 2) / 60.0))
+
+    amp_rcp = _feature((48, 48), center_yx=(24.0, 24.0))
+    o_struct_rcp = (amp_rcp * (0.7 + 0.05 * rng.standard_normal(amp_rcp.shape))).astype(
+        numpy.complex128
+    )
+    m_factor_rcp = (1.0 + 0.05 * amp_rcp).astype(numpy.complex128)
+    # For the LCP side, take the corresponding physical content by center-embedding
+    # the same underlying feature into the larger array.
+    o_struct_lcp = numpy.zeros((50, 52), dtype=numpy.complex128)
+    m_factor_lcp = numpy.ones((50, 52), dtype=numpy.complex128)
+    o_struct_lcp[1:49, 2:50] = o_struct_rcp
+    m_factor_lcp[1:49, 2:50] = m_factor_rcp
+
+    rcp = _make_object((o_struct_rcp * m_factor_rcp)[numpy.newaxis])
+    lcp = _make_object((o_struct_lcp / m_factor_lcp)[numpy.newaxis])
+
+    cropped_rcp, aligned_lcp = align_objects(rcp, lcp)
+    assert cropped_rcp.get_array().shape == (1, 48, 48)
+    assert aligned_lcp.get_array().shape == (1, 48, 48)
+
+    result = estimate_xmcd(cropped_rcp, aligned_lcp)
+    structural = result.structural_object.get_array()[0]
+    magnetic = result.magnetic_object.get_array()[0]
+
+    support = amp_rcp > 0.2
+    numpy.testing.assert_allclose(
+        numpy.abs(structural)[support], numpy.abs(o_struct_rcp)[support], atol=5e-3
+    )
+    numpy.testing.assert_allclose(
+        numpy.abs(magnetic)[support], numpy.abs(m_factor_rcp)[support], atol=5e-3
     )

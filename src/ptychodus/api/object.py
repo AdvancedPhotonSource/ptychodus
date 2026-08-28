@@ -249,34 +249,102 @@ class Object:
         return f'{self._array.dtype}{self._array.shape}'
 
 
+def _center_crop_object(obj: Object, target_h: int, target_w: int) -> Object:
+    """Center-crop ``obj`` to ``(target_h, target_w)`` and update its center.
+
+    Uses an asymmetric-toward-higher-index bias for odd differences
+    (``start = delta // 2``), so an even shape difference preserves the object
+    center exactly and an odd difference shifts it by half a pixel — the shift
+    is absorbed into :class:`ObjectCenter` to keep the world-coordinate frame
+    correct. All layers are sliced together.
+    """
+    array = obj.get_array()
+    h_current = array.shape[-2]
+    w_current = array.shape[-1]
+    delta_h = h_current - target_h
+    delta_w = w_current - target_w
+
+    if delta_h < 0 or delta_w < 0:
+        raise ValueError(
+            f'Center-crop target ({target_h}, {target_w}) exceeds source '
+            f'shape ({h_current}, {w_current})!'
+        )
+
+    if delta_h == 0 and delta_w == 0:
+        return obj
+
+    h_start = delta_h // 2
+    w_start = delta_w // 2
+    cropped_array = array[..., h_start : h_start + target_h, w_start : w_start + target_w].copy()
+
+    pixel_geometry = obj.get_pixel_geometry()
+    old_center = obj.get_center()
+    # ObjectGeometry places pixel i at world offset (i - (N-1)/2) * pixel from center.
+    # Cropping to [start : start + N_new] moves the array-center pixel by
+    # (start - delta / 2) in original pixel units.
+    center_shift_y_px = h_start - delta_h / 2.0
+    center_shift_x_px = w_start - delta_w / 2.0
+    new_center = ObjectCenter(
+        coordinate_x_m=old_center.coordinate_x_m + center_shift_x_px * pixel_geometry.width_m,
+        coordinate_y_m=old_center.coordinate_y_m + center_shift_y_px * pixel_geometry.height_m,
+    )
+
+    return Object(
+        array=cropped_array,
+        pixel_geometry=pixel_geometry.copy(),
+        center=new_center,
+        layer_spacing_m=list(obj.layer_spacing_m),
+    )
+
+
 def align_objects(
     reference_object: Object, moving_object: Object, *, upsample_factor: int = 100
-) -> Object:
-    """Sub-pixel align ``moving_object`` to ``reference_object``.
+) -> tuple[Object, Object]:
+    """Sub-pixel align ``moving_object`` to ``reference_object`` on a common shape.
 
-    Estimates the sub-pixel translation between the two reconstructions with
-    ``skimage.registration.phase_cross_correlation`` (run on layer-flattened
-    amplitudes), then applies the shift to every layer of the complex
-    ``moving_object`` array via a Fourier phase ramp so the complex phase is
-    preserved across the interpolation.
+    If the two inputs disagree on ``(height, width)``, both are first
+    center-cropped to their common (min-in-each-axis) shape. Each object's
+    center is updated so the crop preserves world coordinates: even shape
+    differences preserve the center exactly; odd differences shift it by half
+    a pixel, absorbed into :class:`ObjectCenter`. A sub-pixel translation
+    between the cropped pair is then estimated with
+    ``skimage.registration.phase_cross_correlation`` on layer-flattened
+    amplitudes and applied to every layer of the complex moving array via a
+    Fourier phase ramp so the complex phase is preserved across the
+    interpolation.
 
-    The returned object's ``center`` is offset from the moving object's center
-    by ``-shift_yx * pixel_size`` (in meters). This preserves the
-    world-coordinate mapping of every probe position that was previously valid
-    against ``moving_object``: a probe at world coordinate ``W`` that addressed
-    a particular piece of content in ``moving_object`` will, after alignment,
-    address that same content at its new array index in the returned object.
-    The returned center therefore differs from ``reference_object.get_center()``
-    by the alignment shift.
+    The returned aligned moving object's ``center`` is offset from the
+    (cropped) moving center by ``-shift_yx * pixel_size`` (in meters). This
+    preserves the world-coordinate mapping of every probe position that was
+    previously valid against ``moving_object``: a probe at world coordinate
+    ``W`` that addressed a particular piece of content in ``moving_object``
+    will, after alignment, address that same content at its new array index in
+    the returned object. Both returned objects share the common shape and pixel
+    grid so downstream elementwise math (e.g. :func:`ptychodus.api.xmcd.estimate_xmcd`)
+    can be applied directly.
+
+    The geometric-center crop assumes the two arrays' array-centers correspond
+    to approximately the same physical point (the regime of pty-chi
+    probe-position rounding and padding mismatches, which are on the order of
+    one to a few pixels). Systematic integer-pixel offsets larger than
+    ``ceil(delta / 2)`` in either axis are outside the recovery envelope of
+    this scheme because the geometric crop discards the very content the
+    correlator would need to see.
 
     Args:
         reference_object: The reconstruction whose array indices the result is
             aligned to.
         moving_object: The reconstruction to be re-registered. Must share
-            ``reference_object``'s pixel geometry and flattened array shape.
+            ``reference_object``'s pixel geometry; flattened array shapes may
+            differ and will be trimmed to their common shape.
         upsample_factor: Sub-pixel precision passed to
             ``phase_cross_correlation``. Higher values find finer shifts at
             roughly linear cost.
+
+    Returns:
+        ``(cropped_reference, aligned_moving)``: both objects sharing the
+        common ``(height, width)`` on the same pixel grid, with centers
+        reflecting any crop-driven and shift-driven world-coordinate updates.
     """
     reference_pixel_geometry = reference_object.get_pixel_geometry()
     moving_pixel_geometry = moving_object.get_pixel_geometry()
@@ -286,13 +354,13 @@ def align_objects(
             f'vs moving {moving_pixel_geometry}!'
         )
 
-    reference_flat = reference_object.get_layers_flattened()
-    moving_flat = moving_object.get_layers_flattened()
-    if reference_flat.shape != moving_flat.shape:
-        raise ValueError(
-            f'Object array shape mismatch: reference {reference_flat.shape} '
-            f'vs moving {moving_flat.shape}!'
-        )
+    common_h = min(reference_object.height_px, moving_object.height_px)
+    common_w = min(reference_object.width_px, moving_object.width_px)
+    cropped_reference = _center_crop_object(reference_object, common_h, common_w)
+    cropped_moving = _center_crop_object(moving_object, common_h, common_w)
+
+    reference_flat = cropped_reference.get_layers_flattened()
+    moving_flat = cropped_moving.get_layers_flattened()
 
     shift_yx, _, _ = phase_cross_correlation(
         numpy.absolute(reference_flat),
@@ -301,23 +369,26 @@ def align_objects(
     )
     logger.info(f'align_objects sub-pixel shift (y, x) = {tuple(shift_yx)} px')
 
-    moving_array = moving_object.get_array()
-    aligned_array = fourier_shift_2d(moving_array, dx=float(shift_yx[1]), dy=float(shift_yx[0]))
+    aligned_array = fourier_shift_2d(
+        cropped_moving.get_array(), dx=float(shift_yx[1]), dy=float(shift_yx[0])
+    )
 
-    moving_center = moving_object.get_center()
+    cropped_moving_center = cropped_moving.get_center()
     new_center = ObjectCenter(
-        coordinate_x_m=moving_center.coordinate_x_m
+        coordinate_x_m=cropped_moving_center.coordinate_x_m
         - float(shift_yx[1]) * moving_pixel_geometry.width_m,
-        coordinate_y_m=moving_center.coordinate_y_m
+        coordinate_y_m=cropped_moving_center.coordinate_y_m
         - float(shift_yx[0]) * moving_pixel_geometry.height_m,
     )
 
-    return Object(
+    aligned_moving = Object(
         array=aligned_array,
         pixel_geometry=moving_pixel_geometry.copy(),
         center=new_center,
-        layer_spacing_m=list(moving_object.layer_spacing_m),
+        layer_spacing_m=list(cropped_moving.layer_spacing_m),
     )
+
+    return cropped_reference, aligned_moving
 
 
 class ObjectFileReader(ABC):

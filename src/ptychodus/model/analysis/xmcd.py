@@ -25,21 +25,24 @@ class XMCDAnalyzer:
 
         logger.info('Computing object alignment...')
         tic = time.perf_counter()
-        aligned_lcp_object = align_objects(rcp_product.object_, lcp_product.object_)
+        cropped_rcp_object, aligned_lcp_object = align_objects(
+            rcp_product.object_, lcp_product.object_
+        )
         toc = time.perf_counter()
         logger.info(f'Computed object alignment in {toc - tic:.4f} seconds.')
 
+        cropped_rcp_product = replace(rcp_product, object_=cropped_rcp_object)
         aligned_lcp_product = replace(lcp_product, object_=aligned_lcp_object)
 
         ambiguities = estimate_reconstruction_ambiguities(
-            aligned_lcp_product, reference=rcp_product
+            aligned_lcp_product, reference=cropped_rcp_product
         )
         standardized_lcp_product = ambiguities.standardize_product(aligned_lcp_product)
 
         logger.info('Computing XMCD...')
         tic = time.perf_counter()
         result = estimate_xmcd(
-            rcp_object=rcp_product.object_,
+            rcp_object=cropped_rcp_object,
             lcp_object_aligned=standardized_lcp_product.object_,
         )
         toc = time.perf_counter()

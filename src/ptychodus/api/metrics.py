@@ -279,24 +279,26 @@ def compute_object_comparison(
             a 0/1 mask to restrict the estimate to a region of interest.
 
     Raises:
-        ValueError: If the two products' objects disagree on pixel geometry,
-            if their flattened or layer-0 shapes differ, or if the weighted
-            reference intensity is zero. These checks come from
+        ValueError: If the two products' objects disagree on pixel geometry, or
+            if the weighted reference intensity is zero. These checks come from
             :func:`align_objects` and
-            :func:`estimate_reconstruction_ambiguities`; this function does
-            not duplicate them.
+            :func:`estimate_reconstruction_ambiguities`; this function does not
+            duplicate them. Mismatched object shapes are handled by
+            :func:`align_objects`, which trims both objects to their common
+            shape before returning the aligned pair.
     """
-    aligned_test_object = align_objects(
+    cropped_reference_object, aligned_test_object = align_objects(
         reference.object_, test.object_, upsample_factor=upsample_factor
     )
+    cropped_reference = replace(reference, object_=cropped_reference_object)
     aligned_test = replace(test, object_=aligned_test_object)
 
     ambiguities = estimate_reconstruction_ambiguities(
-        aligned_test, reference=reference, weights=weights
+        aligned_test, reference=cropped_reference, weights=weights
     )
     standardized_test = ambiguities.standardize_product(aligned_test)
 
-    reference_array = reference.object_.get_layers_flattened()
+    reference_array = cropped_reference_object.get_layers_flattened()
     test_array = standardized_test.object_.get_layers_flattened()
 
     common_dtype = numpy.result_type(reference_array.dtype, test_array.dtype)
@@ -304,7 +306,7 @@ def compute_object_comparison(
     return ObjectComparison(
         reference_complex=reference_array.astype(common_dtype, copy=False),
         test_complex=test_array.astype(common_dtype, copy=False),
-        pixel_geometry=reference.object_.get_pixel_geometry().copy(),
+        pixel_geometry=cropped_reference_object.get_pixel_geometry().copy(),
         ambiguities=ambiguities,
     )
 
