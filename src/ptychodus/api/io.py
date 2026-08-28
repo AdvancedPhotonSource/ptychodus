@@ -518,7 +518,7 @@ def load_fluorescence_data(file: Path) -> FluorescenceDataset:
         channel_names_path = h5_channel_names.name
 
     return FluorescenceDataset(
-        element_maps=element_maps,
+        _element_maps=element_maps,
         counts_per_second_path=counts_per_second_path,
         channel_names_path=channel_names_path,
     )
@@ -529,8 +529,8 @@ def save_fluorescence_data(file: Path, dataset: FluorescenceDataset) -> None:
     counts_group_path, counts_ds_name = _split_h5_path(dataset.counts_per_second_path)
     names_group_path, names_ds_name = _split_h5_path(dataset.channel_names_path)
 
-    channel_names = [emap.name for emap in dataset.element_maps]
-    counts_per_second = [emap.counts_per_second for emap in dataset.element_maps]
+    channel_names = [emap.name for emap in dataset]
+    counts_per_second = [emap.counts_per_second for emap in dataset]
 
     with h5py.File(file, 'w') as h5_file:
         counts_group = h5_file.require_group(counts_group_path)

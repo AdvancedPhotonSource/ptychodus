@@ -113,13 +113,13 @@ async def get_fluorescence_element_image(
         raise HTTPException(status_code=404, detail='fluorescence.h5 not present on disk')
 
     dataset = load_fluorescence_data(path)
-    matches = [emap for emap in dataset.element_maps if emap.name == name]
+    matches = [emap for emap in dataset if emap.name == name]
     if not matches:
         raise HTTPException(
             status_code=404,
             detail={
                 'error': f'element {name!r} not found',
-                'available': [emap.name for emap in dataset.element_maps],
+                'available': [emap.name for emap in dataset],
             },
         )
     emap = matches[0]

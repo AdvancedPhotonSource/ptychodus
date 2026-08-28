@@ -51,7 +51,7 @@ class TwoStepFluorescenceEnhancer(FluorescenceEnhancer):
         product = parameters.product
         element_maps: list[ElementMap] = list()
 
-        for emap in dataset.element_maps:
+        for emap in dataset:
             logger.info(f'Enhancing "{emap.name}"...')
             tic = time.perf_counter()
             emap_upscaled = upscaler(emap, product)
@@ -62,7 +62,7 @@ class TwoStepFluorescenceEnhancer(FluorescenceEnhancer):
             element_maps.append(emap_enhanced)
             yield FluorescenceEnhancerOutput(
                 dataset=FluorescenceDataset(
-                    element_maps=list(element_maps),
+                    _element_maps=list(element_maps),
                     counts_per_second_path=dataset.counts_per_second_path,
                     channel_names_path=dataset.channel_names_path,
                 ),

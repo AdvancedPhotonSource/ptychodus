@@ -127,11 +127,10 @@ class FluorescenceRepositoryItem:
 
     @staticmethod
     def _sum_element_maps(dataset: FluorescenceDataset) -> RealArrayType | None:
-        maps = dataset.element_maps
-        if not maps:
+        if not len(dataset):
             return None
-        total = maps[0].counts_per_second.copy()
-        for element_map in maps[1:]:
+        total = dataset[0].counts_per_second.copy()
+        for element_map in dataset[1:]:
             total += element_map.counts_per_second
         return total
 

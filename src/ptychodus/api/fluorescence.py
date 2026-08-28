@@ -27,7 +27,7 @@ class ElementMap:
 class FluorescenceDataset(Sequence[ElementMap]):
     """Collection of element maps with metadata."""
 
-    element_maps: Sequence[ElementMap]
+    _element_maps: Sequence[ElementMap]
     counts_per_second_path: str
     channel_names_path: str
 
@@ -37,7 +37,7 @@ class FluorescenceDataset(Sequence[ElementMap]):
 
     @property
     def nbytes(self) -> int:
-        return sum(element_map.nbytes for element_map in self.element_maps)
+        return sum(element_map.nbytes for element_map in self._element_maps)
 
     @overload
     def __getitem__(self, index: int) -> ElementMap: ...
@@ -46,13 +46,13 @@ class FluorescenceDataset(Sequence[ElementMap]):
     def __getitem__(self, index: slice) -> Sequence[ElementMap]: ...
 
     def __getitem__(self, index: int | slice) -> ElementMap | Sequence[ElementMap]:
-        return self.element_maps[index]
+        return self._element_maps[index]
 
     def __len__(self) -> int:
-        return len(self.element_maps)
+        return len(self._element_maps)
 
     def __repr__(self) -> str:
-        names = ', '.join(element_map.name for element_map in self.element_maps)
+        names = ', '.join(element_map.name for element_map in self._element_maps)
         return f'{type(self).__name__}({len(self)} maps: {names})'
 
 

@@ -19,7 +19,7 @@ def _make_dataset(num_maps: int, shape: tuple[int, int]) -> FluorescenceDataset:
         for index in range(num_maps)
     ]
     return FluorescenceDataset(
-        element_maps=element_maps,
+        _element_maps=element_maps,
         counts_per_second_path='/counts',
         channel_names_path='/names',
     )

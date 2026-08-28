@@ -86,7 +86,7 @@ class PtychozoonFluorescenceEnhancer(FluorescenceEnhancer):
         ptychozoon_dataset = PtychozoonFluorescenceDataset(
             element_maps=[
                 PtychozoonElementMap(name=emap.name, counts_per_second=emap.counts_per_second)
-                for emap in dataset.element_maps
+                for emap in dataset
             ]
         )
 
@@ -132,7 +132,7 @@ class PtychozoonFluorescenceEnhancer(FluorescenceEnhancer):
                 element_maps = [ElementMap(name, cps) for name, cps in enhanced_maps]
                 yield FluorescenceEnhancerOutput(
                     dataset=FluorescenceDataset(
-                        element_maps=element_maps,
+                        _element_maps=element_maps,
                         counts_per_second_path=dataset.counts_per_second_path,
                         channel_names_path=dataset.channel_names_path,
                     ),

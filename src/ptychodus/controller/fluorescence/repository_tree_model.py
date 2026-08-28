@@ -51,7 +51,7 @@ def _lookup_display_element(
     item: FluorescenceRepositoryItem, element_name: str, display: DisplayMode
 ) -> ElementMap | None:
     dataset = _select_display_quantity(item, display)
-    for element_map in dataset.element_maps:
+    for element_map in dataset:
         if element_map.name == element_name:
             return element_map
     return None
@@ -115,7 +115,7 @@ class _ElementNode(_TreeNode):
         self.element_index = element_index
 
     def _measured_element(self, item: FluorescenceRepositoryItem) -> ElementMap | None:
-        maps = item.get_measured().element_maps
+        maps = item.get_measured()
         if 0 <= self.element_index < len(maps):
             return maps[self.element_index]
         return None
@@ -227,7 +227,7 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
 
     def _build_item_node(self, item: FluorescenceRepositoryItem) -> _ItemNode:
         item_node = _ItemNode(self._root)
-        for element_index in range(len(item.get_measured().element_maps)):
+        for element_index in range(len(item.get_measured())):
             item_node.children.append(_ElementNode(item_node, element_index))
         return item_node
 
@@ -418,7 +418,7 @@ class FluorescenceRepositoryTreeModel(QAbstractItemModel):
                 case 1:
                     return item.get_product().get_name()
                 case 2:
-                    return len(item.get_measured().element_maps)
+                    return len(item.get_measured())
                 case 3:
                     counts = node.get_counts(item, self._display)
                     return _format_counts(counts)

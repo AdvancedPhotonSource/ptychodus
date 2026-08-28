@@ -531,9 +531,9 @@ def create_mcp_server() -> FastMCP:
         await _ensure_row_exists(ResourceKind.FLUORESCENCE, target)
         path = _resolve_resource_file(ResourceKind.FLUORESCENCE, target, 'fluorescence.h5')
         dataset = load_fluorescence_data(path)
-        matches = [emap for emap in dataset.element_maps if emap.name == name]
+        matches = [emap for emap in dataset if emap.name == name]
         if not matches:
-            available = ', '.join(emap.name for emap in dataset.element_maps)
+            available = ', '.join(emap.name for emap in dataset)
             raise ToolError(f'element {name!r} not found; available: [{available}]')
         emap = matches[0]
 
