@@ -228,6 +228,19 @@ def test_allocation_honors_an_explicit_dtype_override() -> None:
     assert data.get_patterns_dtype() == numpy.dtype(numpy.int64)
 
 
+def test_allocation_promotes_buffer_dtype_for_binning_pipeline() -> None:
+    """A uint16 dataset binned 4x4 needs at least uint32 headroom (65535*16 = 1048560)."""
+    patterns = numpy.full((3, 4, 4), 1, dtype=numpy.uint16)
+    array = SimpleDiffractionArray('a', numpy.arange(3, dtype=numpy.intp), patterns)
+    dataset = _make_dataset([array], (4, 4))
+    pipeline = DiffractionPrepPipeline(steps=(BinningStep(bin_size_x=4, bin_size_y=4),))
+
+    data = allocate_assembled_data(dataset, pipeline)
+
+    assert numpy.issubdtype(data.get_patterns_dtype(), numpy.unsignedinteger)
+    assert numpy.iinfo(data.get_patterns_dtype()).max >= 65535 * 16
+
+
 # ---------- processed pixel geometry ----------
 
 

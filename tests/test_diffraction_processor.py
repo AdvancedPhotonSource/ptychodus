@@ -106,6 +106,30 @@ def test_binning_rejects_zero_bin_size() -> None:
         BinningStep(bin_size_x=0, bin_size_y=1)
 
 
+def test_binning_apply_promotes_dtype_to_avoid_overflow() -> None:
+    """A saturated uint16 frame binned 2x2 must not wrap: 65535*4 = 262140 exceeds uint16."""
+    data = numpy.full((1, 4, 4), 65535, dtype=numpy.uint16)
+    out = BinningStep(bin_size_x=2, bin_size_y=2).apply(data)
+    assert out.shape == (1, 2, 2)
+    assert numpy.issubdtype(out.dtype, numpy.unsignedinteger)
+    assert numpy.iinfo(out.dtype).max >= 65535 * 4
+    assert (out == 65535 * 4).all()
+
+
+def test_binning_apply_preserves_dtype_when_bin_is_one() -> None:
+    """A 1x1 bin is a no-op on values; the dtype must not be widened."""
+    data = numpy.ones((1, 4, 4), dtype=numpy.uint16)
+    out = BinningStep(bin_size_x=1, bin_size_y=1).apply(data)
+    assert out.dtype == numpy.dtype(numpy.uint16)
+
+
+def test_binning_apply_preserves_float_dtype() -> None:
+    """Floats have the headroom; the promotion path must not force a widening."""
+    data = numpy.ones((1, 4, 4), dtype=numpy.float32)
+    out = BinningStep(bin_size_x=2, bin_size_y=2).apply(data)
+    assert out.dtype == numpy.dtype(numpy.float32)
+
+
 # ---------- Upsample ----------
 
 
@@ -363,6 +387,22 @@ def test_pipeline_compute_output_pixel_geometry_composes_binning_and_transpose()
     # bin: width 2e-5, height 8e-5; transpose swaps → width 8e-5, height 2e-5
     assert out.width_m == 8e-5
     assert out.height_m == 2e-5
+
+
+def test_default_apply_to_dtype_is_identity() -> None:
+    """Steps that don't override apply_to_dtype must pass the dtype through unchanged."""
+    assert TransposeStep().apply_to_dtype(numpy.dtype(numpy.uint16)) == numpy.dtype(numpy.uint16)
+
+
+def test_pipeline_compute_output_dtype_folds_over_steps() -> None:
+    """The pipeline fold must promote via BinningStep and identity-through TransposeStep."""
+    pipeline = _pipeline(
+        BinningStep(bin_size_x=4, bin_size_y=4),
+        TransposeStep(),
+    )
+    out = pipeline.compute_output_dtype(numpy.dtype(numpy.uint16))
+    assert numpy.issubdtype(out, numpy.unsignedinteger)
+    assert numpy.iinfo(out).max >= 65535 * 16
 
 
 # ---------- Serialization ----------

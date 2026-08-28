@@ -396,7 +396,10 @@ def allocate_assembled_data(
     file for no benefit.
 
     `raw_pixel_geometry` is the *raw* detector geometry; the value stored on the
-    result is the processed one. `dtype` defaults to ``metadata.pattern_dtype``.
+    result is the processed one. `dtype` defaults to
+    ``pipeline.compute_output_dtype(metadata.pattern_dtype)`` -- the pattern dtype
+    itself when no pipeline step widens it (crop, flip, pad, transpose, upsample),
+    wider when a step does (binning).
     """
     metadata = dataset.get_metadata()
     _, processed_bad_pixels = _resolve_bad_pixels(dataset, pipeline, bad_pixels)
@@ -405,7 +408,12 @@ def allocate_assembled_data(
     num_patterns_total = sum(metadata.num_patterns_per_array)
     height, width = processed_bad_pixels.shape
     patterns_shape = (num_patterns_total, height, width)
-    patterns_dtype = metadata.pattern_dtype if dtype is None else dtype
+    if dtype is not None:
+        patterns_dtype = dtype
+    elif pipeline is not None:
+        patterns_dtype = pipeline.compute_output_dtype(metadata.pattern_dtype)
+    else:
+        patterns_dtype = metadata.pattern_dtype
 
     if patterns is None:
         logger.debug(f'Allocating {patterns_shape} {patterns_dtype} patterns buffer')

@@ -49,8 +49,8 @@ class DiffractionPrepStep(BaseModel):
     - Declare `type: Literal['<unique_tag>'] = '<unique_tag>'`. The default is required so
       callers never pass the tag and `model_dump_json` emits it automatically.
     - Add the class to `DiffractionPrepStepUnion`, or it is unreachable on deserialize.
-    - Override `apply_to_extent` / `apply_to_pixel_geometry` only where the step is not
-      identity in that dimension; the defaults below pass the input through unchanged.
+    - Override `apply_to_extent` / `apply_to_pixel_geometry` / `apply_to_dtype` only where the
+      step is not identity in that dimension; the defaults below pass the input through unchanged.
     - Branch on `_is_mask(data)` in `apply` if pattern and mask behavior differ, as
       `BinningStep` does (sum for patterns, logical-AND for masks).
     """
@@ -68,6 +68,10 @@ class DiffractionPrepStep(BaseModel):
     def apply_to_pixel_geometry(self, geometry: PixelGeometry) -> PixelGeometry:
         """Return the pixel geometry this step would produce. Default: identity."""
         return geometry
+
+    def apply_to_dtype(self, dtype: numpy.dtype) -> numpy.dtype:
+        """Return the dtype this step would produce given `dtype`. Default: identity."""
+        return dtype
 
 
 class FilterValuesStep(DiffractionPrepStep):
@@ -128,7 +132,9 @@ class BinningStep(DiffractionPrepStep):
         reshaped = data.reshape(shape)
         if _is_mask(data):
             return numpy.logical_and.reduce(reshaped, axis=(-3, -1), keepdims=False)
-        return numpy.sum(reshaped, axis=(-3, -1), keepdims=False)
+        return numpy.sum(
+            reshaped, axis=(-3, -1), keepdims=False, dtype=self.apply_to_dtype(data.dtype)
+        )
 
     def apply_to_extent(self, extent: ImageExtent) -> ImageExtent:
         return ImageExtent(
@@ -141,6 +147,15 @@ class BinningStep(DiffractionPrepStep):
             width_m=geometry.width_m * self.bin_size_x,
             height_m=geometry.height_m * self.bin_size_y,
         )
+
+    def apply_to_dtype(self, dtype: numpy.dtype) -> numpy.dtype:
+        if not numpy.issubdtype(dtype, numpy.integer):
+            return dtype
+        factor = self.bin_size_x * self.bin_size_y
+        if factor <= 1:
+            return dtype
+        needed_max = int(numpy.iinfo(dtype).max) * factor
+        return numpy.promote_types(dtype, numpy.min_scalar_type(needed_max))
 
 
 class UpsampleStep(DiffractionPrepStep):
@@ -303,6 +318,12 @@ class DiffractionPrepPipeline(BaseModel):
         for step in self.steps:
             geometry = step.apply_to_pixel_geometry(geometry)
         return geometry
+
+    def compute_output_dtype(self, dtype: numpy.dtype) -> numpy.dtype:
+        """Return the dtype the pipeline would produce, sized for every step's promotion."""
+        for step in self.steps:
+            dtype = step.apply_to_dtype(dtype)
+        return dtype
 
 
 def zero_bad_pixels(
