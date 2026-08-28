@@ -13,7 +13,7 @@ class DetectorExtentSource(Observable):
 
     Not accessed from the model layer — dataset processing derives the extent from
     each dataset's own metadata (see ``AssembledDiffractionDataset.reload`` and
-    ``build_prep_pipeline``), and product geometry derives it from the dataset
+    ``PrepPipelineBuilder``), and product geometry derives it from the dataset
     paired via ``ProductRepositoryItem.bind_dataset`` / ``unbind_dataset``.
     """
 

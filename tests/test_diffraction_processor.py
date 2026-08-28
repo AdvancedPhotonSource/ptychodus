@@ -1,7 +1,7 @@
 """Unit tests for the diffraction preprocessing pipeline and the settings → pipeline factory.
 
 These tests lock the intended behavior of `DiffractionPrepPipeline` step ops and
-`build_prep_pipeline()` so regressions in the op chain (crop, binning, upsample,
+`PrepPipelineBuilder.get_pipeline()` so regressions in the op chain (crop, binning, upsample,
 padding, transpose, value filtering) and the processed-extent math are caught at the unit level.
 """
 
@@ -24,7 +24,7 @@ from ptychodus.api.preprocess.diffraction import (
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.settings import SettingsRegistry
 
-from ptychodus.model.diffraction.prep_pipeline import build_prep_pipeline
+from ptychodus.model.diffraction.prep_pipeline import PrepPipelineBuilder
 from ptychodus.model.diffraction.settings import DetectorSettings, DiffractionSettings
 
 
@@ -449,7 +449,7 @@ def test_sizer_processed_size_accounts_for_double_sided_padding(
     diff.pad_y.set_value(4)
 
     detector_extent = ImageExtent(width_px=64, height_px=64)
-    pipeline = build_prep_pipeline(diff, detector_extent)
+    pipeline = PrepPipelineBuilder(diff).get_pipeline(detector_extent)
     extent = pipeline.compute_output_extent(detector_extent)
     assert extent.width_px == 32 + 2 * 4
     assert extent.height_px == 32 + 2 * 4
@@ -481,7 +481,7 @@ def test_sizer_upsample_inserts_step_after_binning_before_padding(
     diff.pad_x.set_value(1)
     diff.pad_y.set_value(1)
 
-    pipeline = build_prep_pipeline(diff, ImageExtent(width_px=64, height_px=64))
+    pipeline = PrepPipelineBuilder(diff).get_pipeline(ImageExtent(width_px=64, height_px=64))
     type_order = [type(step) for step in pipeline.steps]
     bin_idx = type_order.index(BinningStep)
     upsample_idx = type_order.index(UpsampleStep)
@@ -501,7 +501,7 @@ def test_sizer_upsample_multiplies_processed_extent_and_divides_pixel_geometry(
     diff.upsample_factor.set_value(2)
 
     detector_extent = ImageExtent(width_px=32, height_px=32)
-    pipeline = build_prep_pipeline(diff, detector_extent)
+    pipeline = PrepPipelineBuilder(diff).get_pipeline(detector_extent)
     extent = pipeline.compute_output_extent(detector_extent)
     assert (extent.width_px, extent.height_px) == (64, 64)
 
@@ -520,7 +520,7 @@ def test_sizer_upsample_factor_one_is_pipeline_noop(
     diff.upsample_enabled.set_value(True)
     diff.upsample_factor.set_value(1)
 
-    pipeline = build_prep_pipeline(diff, ImageExtent(width_px=32, height_px=32))
+    pipeline = PrepPipelineBuilder(diff).get_pipeline(ImageExtent(width_px=32, height_px=32))
     assert not any(isinstance(step, UpsampleStep) for step in pipeline.steps)
 
 
@@ -532,7 +532,7 @@ def test_sizer_processed_extent_reflects_transpose(
     diff.transpose.set_value(True)
 
     detector_extent = ImageExtent(width_px=64, height_px=32)
-    pipeline = build_prep_pipeline(diff, detector_extent)
+    pipeline = PrepPipelineBuilder(diff).get_pipeline(detector_extent)
     extent = pipeline.compute_output_extent(detector_extent)
     assert (extent.width_px, extent.height_px) == (32, 64)
 
@@ -563,7 +563,7 @@ def test_sizer_lower_bound_filter_uses_its_own_toggle(
     diff.value_lower_bound.set_value(7)
     diff.value_upper_bound_enabled.set_value(False)
 
-    pipeline = build_prep_pipeline(diff)
+    pipeline = PrepPipelineBuilder(diff).get_pipeline()
     step = _filter_step(pipeline)
     assert step is not None
     assert step.lower_bound == 7
@@ -578,7 +578,7 @@ def test_sizer_upper_bound_filter_uses_its_own_toggle(
     diff.value_upper_bound_enabled.set_value(True)
     diff.value_upper_bound.set_value(1234)
 
-    pipeline = build_prep_pipeline(diff)
+    pipeline = PrepPipelineBuilder(diff).get_pipeline()
     step = _filter_step(pipeline)
     assert step is not None
     assert step.lower_bound is None
@@ -594,7 +594,7 @@ def test_sizer_both_filter_bounds_independent(
     diff.value_upper_bound_enabled.set_value(True)
     diff.value_upper_bound.set_value(99)
 
-    pipeline = build_prep_pipeline(diff)
+    pipeline = PrepPipelineBuilder(diff).get_pipeline()
     step = _filter_step(pipeline)
     assert step is not None
     assert step.lower_bound == 3
@@ -609,7 +609,7 @@ def test_sizer_no_filter_bounds(
     diff.value_lower_bound_enabled.set_value(False)
     diff.value_upper_bound_enabled.set_value(False)
 
-    pipeline = build_prep_pipeline(diff)
+    pipeline = PrepPipelineBuilder(diff).get_pipeline()
     assert _filter_step(pipeline) is None
 
 
@@ -647,7 +647,7 @@ def test_sizer_safe_crop_center_matches_cropstep_bounds(
     diff.crop_center_y_px.set_value(user_center)
 
     detector_extent = ImageExtent(width_px=8, height_px=8)
-    step = _crop_step(build_prep_pipeline(diff, detector_extent))
+    step = _crop_step(PrepPipelineBuilder(diff).get_pipeline(detector_extent))
     assert step is not None
     assert step.center.position_x_px == expected
     assert step.center.position_y_px == expected
@@ -668,5 +668,5 @@ def test_sizer_safe_crop_center_produces_in_bounds_slice(
         'a', numpy.zeros(1, dtype=int), numpy.zeros((1, 8, 8), dtype=numpy.uint16)
     )
     detector_extent = ImageExtent(width_px=8, height_px=8)
-    out = build_prep_pipeline(diff, detector_extent)(array).get_patterns()
+    out = PrepPipelineBuilder(diff).get_pipeline(detector_extent)(array).get_patterns()
     assert out.shape == (1, 4, 4)  # no truncation from an out-of-bounds slice

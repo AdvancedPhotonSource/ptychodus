@@ -2,7 +2,7 @@
 
 Covers the pure assembly layer: buffer allocation, the per-array preprocessing
 step, and the threaded fan-out over a whole dataset. No ptychodus.model import --
-pipelines are built by hand rather than derived from build_prep_pipeline.
+pipelines are built by hand rather than derived from PrepPipelineBuilder.
 """
 
 from collections.abc import Sequence

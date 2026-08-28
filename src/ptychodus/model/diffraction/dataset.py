@@ -36,7 +36,7 @@ from ptychodus.api.preprocess.diffraction import DiffractionPrepPipeline
 from ..task_manager import TaskManager
 from ._loader import LoadDiffractionDataset
 from .monitor import DiffractionTaskMonitor
-from .prep_pipeline import build_prep_pipeline
+from .prep_pipeline import PrepPipelineBuilder
 from .settings import DetectorSettings, DiffractionSettings
 
 logger = logging.getLogger(__name__)
@@ -134,6 +134,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
         super().__init__()
         self._name = name
         self._settings = settings
+        self._pipeline_builder = PrepPipelineBuilder(settings)
         self._detector_settings = detector_settings
         self._task_manager = task_manager
         self._task_monitor = task_monitor
@@ -373,7 +374,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
         metadata = self._dataset.get_metadata()
         pipeline = (
-            build_prep_pipeline(self._settings, metadata.detector_extent)
+            self._pipeline_builder.get_pipeline(metadata.detector_extent)
             if process_patterns
             else None
         )
@@ -467,7 +468,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
 
         metadata = self._dataset.get_metadata()
         pipeline = (
-            build_prep_pipeline(self._settings, metadata.detector_extent)
+            self._pipeline_builder.get_pipeline(metadata.detector_extent)
             if process_patterns
             else None
         )
