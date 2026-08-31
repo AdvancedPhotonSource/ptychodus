@@ -68,10 +68,18 @@ class DiffractionCore(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._reinit_observable:
+            # BadPixelsFilePath defaults to a placeholder, so honoring the enable
+            # flag here is what keeps a settings file that never opted in from
+            # failing the load outright. The GUI wizard gates on the same flag.
+            bad_pixels_file_path = (
+                self.detector_settings.bad_pixels_file_path.get_value()
+                if self.detector_settings.bad_pixels_enabled.get_value()
+                else None
+            )
             dataset_index = self.diffraction_api.open_patterns(
                 file_path=self.diffraction_settings.file_path.get_value(),
                 file_type=self.diffraction_settings.file_type.get_value(),
-                bad_pixels_file_path=self.detector_settings.bad_pixels_file_path.get_value(),
+                bad_pixels_file_path=bad_pixels_file_path,
                 bad_pixels_file_type=self.detector_settings.bad_pixels_file_type.get_value(),
             )
 
