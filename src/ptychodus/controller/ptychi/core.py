@@ -6,6 +6,7 @@ from ...model.ptychi import (
     PtyChiDMSettings,
     PtyChiLSQMLSettings,
     PtyChiPIESettings,
+    PtyChiRAARSettings,
     PtyChiReconstructorLibrary,
 )
 
@@ -32,6 +33,7 @@ class PtyChiViewController(QWidget):
         dm_settings: PtyChiDMSettings | None = None
         lsqml_settings: PtyChiLSQMLSettings | None = None
         pie_settings: PtyChiPIESettings | None = None
+        raar_settings: PtyChiRAARSettings | None = None
 
         match reconstructor_name.lower():
             case 'autodiff':
@@ -44,6 +46,8 @@ class PtyChiViewController(QWidget):
                 lsqml_settings = model.lsqml_settings
             case 'pie' | 'epie' | 'rpie':
                 pie_settings = model.pie_settings
+            case 'raar':
+                raar_settings = model.raar_settings
             case _:
                 raise ValueError(f'Unknown reconstructor name: {reconstructor_name}')
 
@@ -53,6 +57,7 @@ class PtyChiViewController(QWidget):
             bh_settings,
             dm_settings,
             lsqml_settings,
+            raar_settings,
             model.enumerators,
             model.device_repository,
         )
@@ -61,6 +66,7 @@ class PtyChiViewController(QWidget):
             dm_settings,
             lsqml_settings,
             pie_settings,
+            raar_settings,
             model.settings.num_epochs,
             model.enumerators,
         )
@@ -69,6 +75,7 @@ class PtyChiViewController(QWidget):
             dm_settings,
             lsqml_settings,
             pie_settings,
+            raar_settings,
             model.settings.num_epochs,
             model.enumerators,
         )

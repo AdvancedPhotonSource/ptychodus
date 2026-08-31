@@ -518,6 +518,15 @@ class PtyChiOPRSettings(Observable, Observer):
             'OptimizeIntensityVariation', False
         )
 
+        # pty-chi types the floor as Optional[float] with ge=0; the enable flag
+        # is how ptychodus spells "None", matching ExcludeMeasuredPixelsBelow.
+        self.enable_primary_mode_weight_floor = self._group.create_boolean_parameter(
+            'EnablePrimaryModeWeightFloor', False
+        )
+        self.primary_mode_weight_floor = self._group.create_real_parameter(
+            'PrimaryModeWeightFloor', 0.0, minimum=0.0
+        )
+
         self.smooth_mode_weights = self._group.create_boolean_parameter('SmoothModeWeights', False)
         self.smooth_mode_weights_start = self._group.create_integer_parameter(
             'SmoothModeWeightsStart', 0, minimum=0
@@ -568,6 +577,33 @@ class PtyChiDMSettings(Observable, Observer):
 
         self.exit_wave_update_relaxation = self._group.create_real_parameter(
             'ExitWaveUpdateRelaxation', 1.0, minimum=0.0, maximum=1.0
+        )
+        self.chunk_length = self._group.create_integer_parameter('ChunkLength', 1, minimum=1)
+        self.object_amplitude_clamp_limit = self._group.create_real_parameter(
+            'ObjectAmplitudeClampLimit', 1000, minimum=_STRICTLY_POSITIVE_MIN
+        )
+        self.object_inertia = self._group.create_real_parameter(
+            'ObjectInertia', 0.0, minimum=0.0, maximum=1.0
+        )
+        self.probe_inertia = self._group.create_real_parameter(
+            'ProbeInertia', 0.0, minimum=0.0, maximum=1.0
+        )
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._group:
+            self.notify_observers()
+
+
+class PtyChiRAARSettings(Observable, Observer):
+    def __init__(self, registry: SettingsRegistry) -> None:
+        super().__init__()
+        self._group = registry.create_group('PtyChiRAAR')
+        self._group.add_observer(self)
+
+        # pty-chi declares beta as gt=0.5, le=1; see the _STRICTLY_POSITIVE_MIN
+        # note above for why the inclusive minimum is nudged off 0.5.
+        self.beta = self._group.create_real_parameter(
+            'Beta', 0.75, minimum=0.5 + _STRICTLY_POSITIVE_MIN, maximum=1.0
         )
         self.chunk_length = self._group.create_integer_parameter('ChunkLength', 1, minimum=1)
         self.object_amplitude_clamp_limit = self._group.create_real_parameter(

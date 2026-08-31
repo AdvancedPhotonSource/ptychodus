@@ -13,6 +13,7 @@ from ...model.ptychi import (
     PtyChiLSQMLSettings,
     PtyChiPIESettings,
     PtyChiProbeSettings,
+    PtyChiRAARSettings,
 )
 from ..parameters import (
     CheckBoxParameterViewController,
@@ -196,6 +197,7 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
         dm_settings: PtyChiDMSettings | None,
         lsqml_settings: PtyChiLSQMLSettings | None,
         pie_settings: PtyChiPIESettings | None,
+        raar_settings: PtyChiRAARSettings | None,
         num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
@@ -279,9 +281,17 @@ class PtyChiProbeViewController(CheckableGroupBoxParameterViewController):
             self._eigenmode_update_relaxation_view_controller.get_widget(),
         )
 
+        # At most one of dm_settings / raar_settings is ever set; the caller
+        # dispatches on the reconstructor name.
         if dm_settings is not None:
             self._inertia_view_controller = DecimalLineEditParameterViewController(
                 dm_settings.probe_inertia,
+                tool_tip='Inertia of the probe update; should be between 0 and 1.',
+            )
+            layout.addRow('Inertia:', self._inertia_view_controller.get_widget())
+        elif raar_settings is not None:
+            self._inertia_view_controller = DecimalLineEditParameterViewController(
+                raar_settings.probe_inertia,
                 tool_tip='Inertia of the probe update; should be between 0 and 1.',
             )
             layout.addRow('Inertia:', self._inertia_view_controller.get_widget())

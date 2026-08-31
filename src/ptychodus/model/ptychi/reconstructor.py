@@ -26,6 +26,7 @@ from .epie import EPIEReconstructor
 from .helper import PtyChiOptionsHelper
 from .lsqml import LSQMLReconstructor
 from .pie import PIEReconstructor
+from .raar import RAARReconstructor
 from .rpie import RPIEReconstructor
 from .settings import (
     PtyChiAutodiffSettings,
@@ -37,6 +38,7 @@ from .settings import (
     PtyChiPIESettings,
     PtyChiProbePositionSettings,
     PtyChiProbeSettings,
+    PtyChiRAARSettings,
     PtyChiSettings,
 )
 
@@ -66,6 +68,7 @@ class PtyChiSettingsBundle:
     """The algorithm-specific settings groups held by :class:`PtyChiReconstructorLibrary`."""
 
     dm: PtyChiDMSettings
+    raar: PtyChiRAARSettings
     pie: PtyChiPIESettings
     lsqml: PtyChiLSQMLSettings
     autodiff: PtyChiAutodiffSettings
@@ -75,6 +78,9 @@ class PtyChiSettingsBundle:
 _ALGORITHMS: tuple[_AlgorithmSpec, ...] = (
     _AlgorithmSpec(
         'DM', lambda helper, bundle: DMReconstructor(helper, bundle.dm)._create_task_options
+    ),
+    _AlgorithmSpec(
+        'RAAR', lambda helper, bundle: RAARReconstructor(helper, bundle.raar)._create_task_options
     ),
     _AlgorithmSpec(
         'PIE', lambda helper, bundle: PIEReconstructor(helper, bundle.pie)._create_task_options

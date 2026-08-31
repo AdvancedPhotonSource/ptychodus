@@ -22,6 +22,7 @@ from .settings import (
     PtyChiPIESettings,
     PtyChiProbePositionSettings,
     PtyChiProbeSettings,
+    PtyChiRAARSettings,
     PtyChiSettings,
 )
 
@@ -49,6 +50,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         self.pie_settings = PtyChiPIESettings(settings_registry)
         self.probe_position_settings = PtyChiProbePositionSettings(settings_registry)
         self.probe_settings = PtyChiProbeSettings(settings_registry)
+        self.raar_settings = PtyChiRAARSettings(settings_registry)
         self.settings = PtyChiSettings(settings_registry)
 
         self.enumerators = PtyChiEnumerators()
@@ -61,7 +63,16 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
             logger.info('pty-chi not found.')
 
             if is_developer_mode_enabled:
-                for reconstructor in ('DM', 'PIE', 'ePIE', 'rPIE', 'LSQML', 'Autodiff', 'BH'):
+                for reconstructor in (
+                    'DM',
+                    'RAAR',
+                    'PIE',
+                    'ePIE',
+                    'rPIE',
+                    'LSQML',
+                    'Autodiff',
+                    'BH',
+                ):
                     self.reconstructor_list.append(NullReconstructor(reconstructor))
             return
 
@@ -78,6 +89,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
 
         bundle = PtyChiSettingsBundle(
             dm=self.dm_settings,
+            raar=self.raar_settings,
             pie=self.pie_settings,
             lsqml=self.lsqml_settings,
             autodiff=self.autodiff_settings,

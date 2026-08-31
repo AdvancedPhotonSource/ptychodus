@@ -12,6 +12,7 @@ from .settings import (
     PtyChiPIESettings,
     PtyChiProbePositionSettings,
     PtyChiProbeSettings,
+    PtyChiRAARSettings,
     PtyChiSettings,
 )
 
@@ -28,6 +29,7 @@ __all__ = [
     'PtyChiPIESettings',
     'PtyChiProbePositionSettings',
     'PtyChiProbeSettings',
+    'PtyChiRAARSettings',
     'PtyChiReconstructorLibrary',
     'PtyChiSettings',
 ]

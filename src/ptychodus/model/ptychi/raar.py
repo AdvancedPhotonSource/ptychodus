@@ -2,12 +2,12 @@ import logging
 
 
 from ptychi.api import (
-    DMOPRModeWeightsOptions,
-    DMObjectOptions,
-    DMOptions,
-    DMProbeOptions,
-    DMProbePositionOptions,
-    DMReconstructorOptions,
+    RAAROPRModeWeightsOptions,
+    RAARObjectOptions,
+    RAAROptions,
+    RAARProbeOptions,
+    RAARProbePositionOptions,
+    RAARReconstructorOptions,
 )
 
 from ptychodus.api.object import Object
@@ -15,19 +15,19 @@ from ptychodus.api.product import ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput
 
 from .helper import PtyChiOptionsHelper
-from .settings import PtyChiDMSettings
+from .settings import PtyChiRAARSettings
 
 logger = logging.getLogger(__name__)
 
 
-class DMReconstructor:
-    def __init__(self, options_helper: PtyChiOptionsHelper, settings: PtyChiDMSettings) -> None:
+class RAARReconstructor:
+    def __init__(self, options_helper: PtyChiOptionsHelper, settings: PtyChiRAARSettings) -> None:
         self._options_helper = options_helper
         self._settings = settings
 
-    def _create_reconstructor_options(self) -> DMReconstructorOptions:
+    def _create_reconstructor_options(self) -> RAARReconstructorOptions:
         helper = self._options_helper.reconstructor_helper
-        return DMReconstructorOptions(
+        return RAARReconstructorOptions(
             num_epochs=helper.num_epochs,
             batch_size=helper.batch_size,
             batching_mode=helper.batching_mode,
@@ -41,13 +41,13 @@ class DMReconstructor:
             displayed_loss_function=helper.displayed_loss_function,
             exclude_measured_pixels_below=helper.exclude_measured_pixels_below,
             forward_model_options=helper.forward_model_options,
-            exit_wave_update_relaxation=self._settings.exit_wave_update_relaxation.get_value(),
+            beta=self._settings.beta.get_value(),
             chunk_length=self._settings.chunk_length.get_value(),
         )
 
-    def _create_object_options(self, object_: Object) -> DMObjectOptions:
+    def _create_object_options(self, object_: Object) -> RAARObjectOptions:
         helper = self._options_helper.object_helper
-        return DMObjectOptions(
+        return RAARObjectOptions(
             optimizable=helper.optimizable,
             optimization_plan=helper.optimization_plan,
             optimizer=helper.optimizer,
@@ -73,9 +73,9 @@ class DMReconstructor:
             inertia=self._settings.object_inertia.get_value(),
         )
 
-    def _create_probe_options(self, metadata: ProductMetadata) -> DMProbeOptions:
+    def _create_probe_options(self, metadata: ProductMetadata) -> RAARProbeOptions:
         helper = self._options_helper.probe_helper
-        return DMProbeOptions(
+        return RAARProbeOptions(
             optimizable=helper.optimizable,
             optimization_plan=helper.optimization_plan,
             optimizer=helper.optimizer,
@@ -90,9 +90,9 @@ class DMReconstructor:
             inertia=self._settings.probe_inertia.get_value(),
         )
 
-    def _create_probe_position_options(self) -> DMProbePositionOptions:
+    def _create_probe_position_options(self) -> RAARProbePositionOptions:
         helper = self._options_helper.probe_position_helper
-        return DMProbePositionOptions(
+        return RAARProbePositionOptions(
             optimizable=helper.optimizable,
             optimization_plan=helper.optimization_plan,
             optimizer=helper.optimizer,
@@ -103,9 +103,9 @@ class DMReconstructor:
             affine_transform_constraint=helper.affine_transform_constraint,
         )
 
-    def _create_opr_mode_weight_options(self) -> DMOPRModeWeightsOptions:
+    def _create_opr_mode_weight_options(self) -> RAAROPRModeWeightsOptions:
         helper = self._options_helper.opr_helper
-        return DMOPRModeWeightsOptions(
+        return RAAROPRModeWeightsOptions(
             optimizable=helper.optimizable,
             optimization_plan=helper.optimization_plan,
             optimizer=helper.optimizer,
@@ -118,9 +118,9 @@ class DMReconstructor:
             update_relaxation=helper.update_relaxation,
         )
 
-    def _create_task_options(self, parameters: ReconstructInput) -> DMOptions:
+    def _create_task_options(self, parameters: ReconstructInput) -> RAAROptions:
         product = parameters.product
-        return DMOptions(
+        return RAAROptions(
             data_options=self._options_helper.create_data_options(product.metadata),
             reconstructor_options=self._create_reconstructor_options(),
             object_options=self._create_object_options(product.object_),

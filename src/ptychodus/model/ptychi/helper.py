@@ -8,7 +8,10 @@ is actually constructed. That happens child-side in ``_subprocess.py``.
 
 The parent-side factory in ``reconstructor.py`` uses these builders to
 assemble a fully-populated ``PtychographyTaskOptions`` and ships it as the
-subprocess payload.
+subprocess payload. Options and data are kept strictly separate: pty-chi still
+accepts data through the ``*Options`` objects, but that path is deprecated, so
+no builder here ever puts an array into an option. The child derives the task
+data it passes to ``PtychographyTask`` from the ``ReconstructInput``.
 """
 
 import logging
@@ -58,12 +61,8 @@ from ptychi.api.options.base import (
     SliceSpacingOptions,
 )
 
-from ptychodus.api.typing import ComplexArrayType, RealArrayType
-from ptychodus.api.object import Object, ObjectGeometry
-from ptychodus.api.probe import ProbeSequence
-from ptychodus.api.probe_positions import ProbePositionSequence
+from ptychodus.api.object import Object
 from ptychodus.api.product import ProductMetadata
-from ptychodus.api.reconstruct import ReconstructInput
 
 from .affine import PtyChiAffineDegreesOfFreedom, PtyChiAffineDegreesOfFreedomBitField
 from .settings import (
@@ -394,9 +393,6 @@ class PtyChiObjectOptionsHelper:
     def determine_position_origin_coords_by(self) -> ObjectPosOriginCoordsMethods:
         return ObjectPosOriginCoordsMethods.SPECIFIED
 
-    def get_initial_guess(self, object_: Object) -> ComplexArrayType:
-        return object_.get_array()
-
     def get_slice_spacings_m(self, object_: Object) -> list[float] | None:
         # pty-chi types slice spacings as a serializable list/tuple, not an ndarray.
         slice_spacings_m = object_.layer_spacing_m
@@ -512,9 +508,6 @@ class PtyChiProbeOptionsHelper:
     @property
     def eigenmode_update_relaxation(self) -> float:
         return self._settings.eigenmode_update_relaxation.get_value()
-
-    def get_initial_guess(self, probe: ProbeSequence) -> ComplexArrayType:
-        return probe.get_array()
 
     def get_power_constraint(self, metadata: ProductMetadata) -> ProbePowerConstraintOptions:
         return ProbePowerConstraintOptions(
@@ -645,19 +638,6 @@ class PtyChiProbePositionOptionsHelper:
             override_update_flexibility=override_update_flexibility,
         )
 
-    def get_positions_px(
-        self, scan: ProbePositionSequence, object_geometry: ObjectGeometry
-    ) -> tuple[RealArrayType, RealArrayType]:
-        position_x_px: list[float] = list()
-        position_y_px: list[float] = list()
-
-        for scan_point in scan:
-            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-            position_x_px.append(object_point.coordinate_x_px)
-            position_y_px.append(object_point.coordinate_y_px)
-
-        return numpy.array(position_x_px), numpy.array(position_y_px)
-
 
 class PtyChiOPROptionsHelper:
     def __init__(self, settings: PtyChiOPRSettings) -> None:
@@ -696,6 +676,13 @@ class PtyChiOPROptionsHelper:
         return self._settings.optimize_intensity_variation.get_value()
 
     @property
+    def primary_mode_weight_floor(self) -> float | None:
+        if self._settings.enable_primary_mode_weight_floor.get_value():
+            return self._settings.primary_mode_weight_floor.get_value()
+
+        return None
+
+    @property
     def smoothing(self) -> OPRModeWeightsSmoothingOptions:
         method_str = self._settings.smoothing_method.get_value()
 
@@ -720,16 +707,6 @@ class PtyChiOPROptionsHelper:
     def update_relaxation(self) -> float:
         return self._settings.update_relaxation.get_value()
 
-    def get_initial_weights(self, probe: ProbeSequence) -> RealArrayType:
-        try:
-            return probe.get_opr_weights()
-        except ValueError:
-            pass
-
-        initial_weights = numpy.zeros((probe.num_coherent_modes))
-        initial_weights[0] = 1.0
-        return initial_weights
-
 
 class PtyChiOptionsHelper:
     def __init__(
@@ -748,19 +725,16 @@ class PtyChiOptionsHelper:
         self.probe_position_helper = PtyChiProbePositionOptionsHelper(probe_position_settings)
         self.opr_helper = PtyChiOPROptionsHelper(opr_settings)
 
-    def create_data_options(self, parameters: ReconstructInput) -> PtychographyDataOptions:
-        metadata = parameters.product.metadata
+    def create_data_options(self, metadata: ProductMetadata) -> PtychographyDataOptions:
         free_space_propagation_distance_m = (
             numpy.inf
-            if self._reconstructor_settings.use_far_field_propagation
+            if self._reconstructor_settings.use_far_field_propagation.get_value()
             else metadata.detector_distance_m
         )
         return PtychographyDataOptions(
-            data=parameters.diffraction_patterns,
             free_space_propagation_distance_m=free_space_propagation_distance_m,
             wavelength_m=metadata.probe_wavelength_m,
             fft_shift=self._reconstructor_settings.fft_shift_diffraction_patterns.get_value(),
-            valid_pixel_mask=numpy.logical_not(parameters.bad_pixels),
             save_data_on_device=self._reconstructor_settings.save_data_on_device.get_value(),
         )
 

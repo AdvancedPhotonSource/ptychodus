@@ -19,6 +19,7 @@ from ...model.ptychi import (
     PtyChiDeviceRepository,
     PtyChiEnumerators,
     PtyChiLSQMLSettings,
+    PtyChiRAARSettings,
     PtyChiSettings,
 )
 from ..parameters import (
@@ -135,6 +136,7 @@ class PtyChiReconstructorViewController(ParameterViewController):
         bh_settings: PtyChiBHSettings | None,
         dm_settings: PtyChiDMSettings | None,
         lsqml_settings: PtyChiLSQMLSettings | None,
+        raar_settings: PtyChiRAARSettings | None,
         enumerators: PtyChiEnumerators,
         repository: PtyChiDeviceRepository,
     ) -> None:
@@ -247,7 +249,9 @@ class PtyChiReconstructorViewController(ParameterViewController):
         layout.addRow('Number of Epochs:', self._num_epochs_view_controller.get_widget())
         layout.addRow('Update Interval:', self._num_sync_epochs_view_controller.get_widget())
 
-        if dm_settings is None:
+        # DM and RAAR both retain the full exit-wave stack between epochs, so
+        # both ignore batch_size and size their working set with chunk_length.
+        if dm_settings is None and raar_settings is None:
             layout.addRow('Batch Size:', self._batch_size_view_controller.get_widget())
             layout.addRow('Batch Mode:', self._batching_mode_view_controller.get_widget())
             layout.addRow(
@@ -296,14 +300,32 @@ class PtyChiReconstructorViewController(ParameterViewController):
                 self._exit_wave_update_relaxation_view_controller.get_widget(),
             )
 
-            self._chunk_length_view_controller = SpinBoxParameterViewController(
+            self._dm_chunk_length_view_controller = SpinBoxParameterViewController(
                 dm_settings.chunk_length,
                 tool_tip=(
                     'Number of scan points per chunk of the exit-wave update loop; smaller values '
                     'use less memory but can be slower.'
                 ),
             )
-            layout.addRow('Chunk Length:', self._chunk_length_view_controller.get_widget())
+            layout.addRow('Chunk Length:', self._dm_chunk_length_view_controller.get_widget())
+
+        if raar_settings is not None:
+            self._beta_view_controller = DecimalSliderParameterViewController(
+                raar_settings.beta,
+                tool_tip=(
+                    'RAAR relaxation parameter from equation (16) of Marchesini et al. (2016)'
+                ),
+            )
+            layout.addRow('Beta:', self._beta_view_controller.get_widget())
+
+            self._raar_chunk_length_view_controller = SpinBoxParameterViewController(
+                raar_settings.chunk_length,
+                tool_tip=(
+                    'Number of scan points per chunk of the exit-wave update loop; smaller values '
+                    'use less memory but can be slower.'
+                ),
+            )
+            layout.addRow('Chunk Length:', self._raar_chunk_length_view_controller.get_widget())
 
         if lsqml_settings is not None:
             self._noise_model_view_controller = ComboBoxParameterViewController(

@@ -435,7 +435,7 @@ object_guess = generate_random_object(
 
 ## Using Generated Guesses With Pty-Chi
 
-Ptychodus has a Pty-Chi adapter in `ptychodus.model.ptychi`. When using the normal Ptychodus reconstruction path, the adapter receives a {py:class}`ptychodus.api.reconstruct.ReconstructInput` and builds Pty-Chi task options from the product:
+Ptychodus has a Pty-Chi adapter in `ptychodus.model.ptychi`. When using the normal Ptychodus reconstruction path, the adapter receives a {py:class}`ptychodus.api.reconstruct.ReconstructInput`, builds Pty-Chi task options from the settings, and passes the following data from the product to `PtychographyTask` as keyword arguments:
 
 - object initial guess: `product.object_.get_array()`;
 - probe initial guess: `product.probes.get_array()`;
@@ -454,7 +454,7 @@ This matches Ptychodus `ProbeSequence.get_array()`:
 - Ptychodus `num_coherent_modes` maps to Pty-Chi `n_opr_modes`;
 - Ptychodus `num_incoherent_modes` maps to Pty-Chi `n_modes`.
 
-Pty-Chi requires a four-dimensional probe initial guess. Therefore, when constructing Pty-Chi options manually, pass `product.probes.get_array()` rather than indexing the probe sequence down to a single `Probe`.
+Pty-Chi requires a four-dimensional probe initial guess. Therefore, when calling Pty-Chi manually, pass `product.probes.get_array()` as the `probe_data` argument to `PtychographyTask` rather than indexing the probe sequence down to a single `Probe`.
 
 Pty-Chi's planar object convention is `(n_slices, height, width)`, which matches Ptychodus `Object.get_array()`. Pty-Chi also expects multislice `slice_spacings_m` to contain `n_slices - 1` spacings, matching Ptychodus `Object.layer_spacing_m`.
 
@@ -471,7 +471,7 @@ If the probe has more than one OPR mode, Pty-Chi requires initial OPR weights. P
 
 ### Positions and Object Origin
 
-Ptychodus stores probe positions in meters. Pty-Chi stores probe positions in object pixel units, with order `(y, x)`. The Ptychodus Pty-Chi helper converts positions by calling `object_geometry.map_coordinates_probe_to_object(scan_point)` and then passing the resulting pixel `x` and `y` arrays into Pty-Chi probe-position options.
+Ptychodus stores probe positions in meters. Pty-Chi stores probe positions in object pixel units, with order `(y, x)`. The Ptychodus Pty-Chi helper converts positions by calling `object_geometry.map_coordinates_probe_to_object(scan_point)` and then passing the resulting pixel `x` and `y` arrays to `PtychographyTask` as `probe_position_x_px` and `probe_position_y_px`.
 
 The current Ptychodus helper chooses Pty-Chi's `SPECIFIED` position-origin mode and returns an origin coordinate of zero. This works together with the absolute object-pixel coordinates produced by the mapping above. If bypassing the Ptychodus helper and creating Pty-Chi options directly, make sure the position origin convention is consistent with the positions you pass:
 
@@ -506,15 +506,23 @@ for scan_point in product.probe_positions:
     position_x_px.append(object_point.coordinate_x_px)
 ```
 
-Then configure Pty-Chi with:
+Pty-Chi separates settings from data. Set these on the options object:
 
-- `object_options.initial_guess = object_initial_guess`;
 - `object_options.pixel_size_m = object_pixel_size_m`;
-- `object_options.slice_spacings_m = slice_spacings_m` for multislice;
-- `probe_options.initial_guess = probe_initial_guess`;
-- `probe_position_options.position_y_px = position_y_px`;
-- `probe_position_options.position_x_px = position_x_px`;
-- `opr_mode_weight_options.initial_weights = opr_initial_weights` when `probe_initial_guess.shape[0] > 1`.
+- `object_options.slice_spacings_m = slice_spacings_m` for multislice.
+
+Pass the rest as `PtychographyTask` keyword arguments:
+
+- `object_data=object_initial_guess`;
+- `probe_data=probe_initial_guess`;
+- `probe_position_x_px=position_x_px`;
+- `probe_position_y_px=position_y_px`;
+- `opr_mode_weights_data=opr_initial_weights` when `probe_initial_guess.shape[0] > 1`;
+- `diffraction_data` and `valid_pixel_mask` for the measured patterns and their mask.
+
+```{note}
+Pty-Chi still accepts this data through the corresponding `*_options` fields — `object_options.initial_guess`, `probe_position_options.position_x_px`, and so on — but that path is deprecated and emits a `DeprecationWarning` for each field. Prefer the keyword arguments.
+```
 
 ## Practical Notes
 

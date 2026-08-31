@@ -1,6 +1,11 @@
 from PyQt5.QtWidgets import QFormLayout
 
-from ptychodus.api.parameters import BooleanParameter, IntegerParameter, StringParameter
+from ptychodus.api.parameters import (
+    BooleanParameter,
+    IntegerParameter,
+    RealParameter,
+    StringParameter,
+)
 
 from ...model.ptychi import PtyChiEnumerators, PtyChiOPRSettings
 from ..parameters import (
@@ -53,6 +58,22 @@ class PtyChiSmoothOPRModeWeightsViewController(CheckableGroupBoxParameterViewCon
         self.get_widget().setLayout(layout)
 
 
+class PtyChiPrimaryModeWeightFloorViewController(CheckableGroupBoxParameterViewController):
+    def __init__(self, enable_floor: BooleanParameter, floor: RealParameter) -> None:
+        super().__init__(
+            enable_floor,
+            'Primary Mode Weight Floor',
+            tool_tip='Clamp the weight of the primary (0th) OPR mode to a lower bound',
+        )
+        self._floor_view_controller = DecimalLineEditParameterViewController(
+            floor, tool_tip='Lower bound applied to the primary OPR mode weight.'
+        )
+
+        layout = QFormLayout()
+        layout.addRow('Floor:', self._floor_view_controller.get_widget())
+        self.get_widget().setLayout(layout)
+
+
 class PtyChiOPRViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
@@ -87,6 +108,12 @@ class PtyChiOPRViewController(CheckableGroupBoxParameterViewController):
             'Optimize Intensities',
             tool_tip='Whether to optimize intensity variation (i.e., the weight of the first OPR mode)',
         )
+        self._primary_mode_weight_floor_view_controller = (
+            PtyChiPrimaryModeWeightFloorViewController(
+                settings.enable_primary_mode_weight_floor,
+                settings.primary_mode_weight_floor,
+            )
+        )
         self._smooth_mode_weights_view_controller = PtyChiSmoothOPRModeWeightsViewController(
             settings.smooth_mode_weights,
             settings.smooth_mode_weights_start,
@@ -108,6 +135,7 @@ class PtyChiOPRViewController(CheckableGroupBoxParameterViewController):
         layout.addRow('Step Size:', self._step_size_view_controller.get_widget())
         layout.addRow(self._optimize_intensity_variation_view_controller.get_widget())
         layout.addRow(self._optimize_eigenmode_weights_view_controller.get_widget())
+        layout.addRow(self._primary_mode_weight_floor_view_controller.get_widget())
         layout.addRow(self._smooth_mode_weights_view_controller.get_widget())
         layout.addRow('Relax Update:', self._update_relaxation_view_controller.get_widget())
         self.get_widget().setLayout(layout)
