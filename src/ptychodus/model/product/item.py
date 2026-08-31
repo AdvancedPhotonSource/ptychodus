@@ -311,6 +311,3 @@ class _BoundDatasetObserver(DiffractionDatasetObserver):
     def handle_dataset_reloaded(self) -> None:
         self._item._sync_geometry_from_dataset()
         self._item._auto_estimate_probe_photon_count()
-
-    def handle_pixel_geometry_changed(self) -> None:
-        self._item._sync_geometry_from_dataset()

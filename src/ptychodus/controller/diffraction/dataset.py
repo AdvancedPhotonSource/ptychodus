@@ -563,9 +563,6 @@ class _DatasetRowObserver(DiffractionDatasetObserver):
     def handle_dataset_reloaded(self) -> None:
         self._tree_model._on_dataset_refreshed(self._dataset)
 
-    def handle_pixel_geometry_changed(self) -> None:
-        self._tree_model._on_dataset_refreshed(self._dataset)
-
 
 class DiffractionDatasetComboModel(QAbstractListModel):
     """Single-column list of dataset names for a QComboBox, with an optional unbound entry.

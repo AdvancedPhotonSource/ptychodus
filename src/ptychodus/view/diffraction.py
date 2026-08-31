@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
     QGroupBox,
-    QHBoxLayout,
     QHeaderView,
     QLabel,
     QTableView,
@@ -40,11 +40,24 @@ class OpenDatasetWizardPage(QWizardPage):
 class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        # Slot for the controller to populate with two LengthParameterViewController
+        # widgets bound to scratch RealParameters. The sync checkbox mirrors the
+        # per-row Sync column in the table below: when checked, the widget values
+        # are written into DetectorSettings on wizard-accept.
+        self.pixel_size_form = QFormLayout()
+        self.sync_pixel_size_check_box = QCheckBox('Sync pixel size to detector settings')
+        self.pixel_size_group_box = QGroupBox('Detector Pixel Size')
+        pixel_size_layout = QVBoxLayout()
+        pixel_size_layout.addLayout(self.pixel_size_form)
+        pixel_size_layout.addWidget(self.sync_pixel_size_check_box)
+        self.pixel_size_group_box.setLayout(pixel_size_layout)
+
         self.table_view = QTableView()
 
         self.setTitle('Import Metadata')
 
         layout = QVBoxLayout()
+        layout.addWidget(self.pixel_size_group_box)
         layout.addWidget(self.table_view)
         self.setLayout(layout)
         self._set_complete(True)
@@ -66,42 +79,23 @@ class DatasetEditorLayoutView(QGroupBox):
         self.setLayout(layout)
 
 
-class DatasetEditorPropertiesView(QGroupBox):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Properties')
-        self.table_view = QTableView()
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.table_view)
-        self.setLayout(layout)
-
-
 class DatasetEditorDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.layout_view = DatasetEditorLayoutView()
-        self.properties_view = DatasetEditorPropertiesView()
         self.button_box = QDialogButtonBox()
 
         self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
         self.button_box.accepted.connect(self.accept)
 
-        top_layout = QHBoxLayout()
-        top_layout.addWidget(self.layout_view)
-        top_layout.addWidget(self.properties_view)
-
         layout = QVBoxLayout()
-        layout.addLayout(top_layout)
+        layout.addWidget(self.layout_view)
         layout.addWidget(self.button_box)
         self.setLayout(layout)
 
     @property
     def tree_view(self) -> QTreeView:
         return self.layout_view.tree_view
-
-    @property
-    def table_view(self) -> QTableView:
-        return self.properties_view.table_view
 
 
 class SimulateDiffractionDialog(QDialog):

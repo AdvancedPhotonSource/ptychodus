@@ -133,9 +133,9 @@ def build_reconstructor_list(
             _build: _TaskOptionsBuilder = build_task_options,
         ) -> PtyChiPayload:
             return PtyChiPayload(
+                reconstruct_input=parameters,
                 task_options=_build(parameters),
                 num_sync_epochs=num_sync_epochs(),
-                reconstruct_input=parameters,
             )
 
         reconstructors.append(

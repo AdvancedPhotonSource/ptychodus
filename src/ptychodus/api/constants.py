@@ -143,19 +143,22 @@ def format_length(length_m: float) -> str:
 class ByteUnit(Enum):
     """Decimal (SI) byte units, ordered smallest to largest.
 
-    The member value pairs the number of bytes in one unit with its display suffix.
+    The member value pairs the unit's power of ten relative to the byte with its display
+    suffix. The exponent, not the multiplier, is the source of truth: ``bytes_per_unit`` is
+    derived from it so the two cannot drift, matching the shape of :class:`LengthUnit`.
     """
 
-    B = (1, 'B')
-    KB = (1000, 'kB')
-    MB = (1000**2, 'MB')
-    GB = (1000**3, 'GB')
-    TB = (1000**4, 'TB')
-    PB = (1000**5, 'PB')
+    B = (0, 'B')
+    KB = (3, 'kB')
+    MB = (6, 'MB')
+    GB = (9, 'GB')
+    TB = (12, 'TB')
+    PB = (15, 'PB')
 
-    def __init__(self, bytes_per_unit: int, label: str) -> None:
-        self.bytes_per_unit = bytes_per_unit
+    def __init__(self, power_of_ten: int, label: str) -> None:
+        self.power_of_ten = power_of_ten
         self.label = label
+        self.bytes_per_unit: int = 10**power_of_ten
 
     @classmethod
     def from_bytes(cls, nbytes: int) -> ByteUnit:

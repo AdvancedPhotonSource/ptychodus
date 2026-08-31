@@ -101,8 +101,6 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
 
         save_file_action = view.button_box.save_menu.addAction('Save File...')
         connect_triggered_signal(save_file_action, self._save_dataset)
-        sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
-        connect_triggered_signal(sync_to_settings_action, self._sync_current_to_settings)
 
         view.button_box.edit_button.clicked.connect(self._edit_current_dataset)
         view.button_box.remove_button.clicked.connect(self._remove_selected_dataset)
@@ -183,11 +181,6 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         current = self._current_dataset()
         if current is not None:
             DatasetEditorViewController.edit_dataset(current, self._view)
-
-    def _sync_current_to_settings(self) -> None:
-        current = self._current_dataset()
-        if current is not None:
-            current.sync_pixel_geometry_to_settings()
 
     def _choose_product_for_simulation(self) -> None:
         self._view.simulate_dialog.open()
@@ -349,6 +342,3 @@ class _PerDatasetObserver(DiffractionDatasetObserver):
 
     def handle_dataset_reloaded(self) -> None:
         self._controller._handle_dataset_reloaded_for_dataset(self._dataset)
-
-    def handle_pixel_geometry_changed(self) -> None:
-        pass

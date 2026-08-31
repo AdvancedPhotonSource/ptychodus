@@ -166,9 +166,17 @@ def test_append_array_after_a_load_continues_past_the_loaded_arrays() -> None:
     numpy.testing.assert_array_equal(dataset.get_assembled_data().get_indexes(), [0, 1, 10, 11])
 
 
+def _set_raw_pixel_size(dataset: AssembledDiffractionDataset, geometry: PixelGeometry) -> None:
+    """Seed DetectorSettings with a raw pixel geometry; the dataset picks it up
+    through get_raw_pixel_geometry's metadata→settings fallback when metadata carries
+    no detector_pixel_geometry (make_dataset builds metadata without it)."""
+    dataset._detector_settings.pixel_width_m.set_value(geometry.width_m)  # noqa: SLF001
+    dataset._detector_settings.pixel_height_m.set_value(geometry.height_m)  # noqa: SLF001
+
+
 def test_processed_pixel_geometry_folds_binning_into_the_assembled_data() -> None:
     dataset = make_dataset(arrays=[_saturated_array('a', 2, 0)])
-    dataset.set_pixel_geometry_override(PixelGeometry(width_m=1e-4, height_m=2e-4))
+    _set_raw_pixel_size(dataset, PixelGeometry(width_m=1e-4, height_m=2e-4))
 
     dataset.load_all_arrays(process_patterns=True, block=True)
 
@@ -181,8 +189,9 @@ def test_processed_pixel_geometry_folds_binning_into_the_assembled_data() -> Non
 def _dataset_with_binning(
     *, bin_x: int = 2, bin_y: int = 2, raw: PixelGeometry = PixelGeometry(1e-4, 2e-4)
 ) -> AssembledDiffractionDataset:
-    """A 40x60 dataset with crop + binning enabled and a per-dataset raw pixel-geometry
-    override, so the load path folds `raw` through binning into the assembled buffer."""
+    """A 40x60 dataset with crop + binning enabled and a raw pixel geometry seeded
+    into DetectorSettings, so the load path folds `raw` through binning into the
+    assembled buffer."""
     dataset = make_dataset(
         arrays=[_saturated_array('a', 2, 0)],
         crop_height=12,
@@ -191,7 +200,7 @@ def _dataset_with_binning(
     dataset._settings.binning_enabled.set_value(True)  # noqa: SLF001
     dataset._settings.bin_size_x.set_value(bin_x)  # noqa: SLF001
     dataset._settings.bin_size_y.set_value(bin_y)  # noqa: SLF001
-    dataset.set_pixel_geometry_override(raw)
+    _set_raw_pixel_size(dataset, raw)
     dataset.load_all_arrays(process_patterns=True, block=True)
     return dataset
 

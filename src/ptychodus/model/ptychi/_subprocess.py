@@ -22,6 +22,8 @@ from typing import Any
 
 import numpy
 
+from ptychi.api.options.task import PtychographyTaskOptions
+
 from ptychodus.api.object import Object, ObjectPosition
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
@@ -36,7 +38,8 @@ logger = logging.getLogger(__name__)
 
 def reconstruct_with_ptychi(
     parameters: ReconstructInput,
-    payload: PtyChiPayload,
+    task_options: PtychographyTaskOptions,
+    num_sync_epochs: int,
 ) -> Iterator[ReconstructOutput]:
     """Instantiate ``PtychographyTask`` and yield a ``ReconstructOutput`` every
     ``num_sync_epochs`` epochs. The ``PtychographyTask`` import is deferred to
@@ -44,8 +47,6 @@ def reconstruct_with_ptychi(
     happens) does not acquire a GPU context."""
     from ptychi.api.task import PtychographyTask
 
-    task_options = payload.task_options
-    num_sync_epochs = payload.num_sync_epochs
     num_epochs = task_options.reconstructor_options.num_epochs
     task = PtychographyTask(task_options)
 
@@ -115,7 +116,9 @@ def reconstruct_with_ptychi(
 
 def run_reconstruct(payload: PtyChiPayload, queue: Queue[Any]) -> None:
     """Child entry point. Acquire a GPU context via PtychographyTask, stream outputs."""
-    for output in reconstruct_with_ptychi(payload.reconstruct_input, payload):
+    for output in reconstruct_with_ptychi(
+        payload.reconstruct_input, payload.task_options, payload.num_sync_epochs
+    ):
         queue.put((TAG_OUTPUT, pickle.dumps(output)))
 
 

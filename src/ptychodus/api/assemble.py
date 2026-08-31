@@ -1,22 +1,4 @@
-"""Assemble diffraction datasets into contiguous, indexed pattern buffers.
-
-A :class:`~ptychodus.api.diffraction.DiffractionDataset` is a sequence of
-:class:`~ptychodus.api.diffraction.DiffractionArray` blocks, each of which may
-read lazily from disk. :func:`assemble_dataset` walks those blocks on a thread
-pool, applies the preprocessing pipeline to each, and scatters the results into
-one :class:`AssembledDiffractionData` buffer laid out by scan index.
-
-:func:`summarize_dataset` is the non-materializing alternative: it streams the
-same arrays to produce per-pixel and per-pattern statistics without ever holding
-the whole stack in memory. It reports those statistics in *raw* detector
-coordinates and applies no prep pipeline, because it is the pass a caller runs
-first to choose the crop window and the total-counts bounds that later feed
-:func:`assemble_dataset`.
-
-Both walk the dataset through the same private fan-out driver, so they tell one
-story about concurrency, progress reporting, cancellation, and what happens when
-a single array fails to read.
-"""
+"""Assemble a DiffractionDataset into an indexed pattern buffer."""
 
 from __future__ import annotations
 from collections.abc import Callable, Sequence
@@ -78,19 +60,8 @@ def compute_probe_photon_counts_by_index(
 ) -> dict[int, float]:
     """Merge diffraction-side and position-side per-pattern counts, keyed by scan index.
 
-    Precedence for each assembled pattern index:
-
-    1. Diffraction-side measured counts (from a reader that populated
-       :meth:`~ptychodus.api.diffraction.DiffractionArray.get_probe_photon_flux_Hz`) --
-       always used when :meth:`AssembledDiffractionData.has_measured_probe_photon_counts`
-       is true, even if the position side also supplied counts (logged at DEBUG).
-    2. Position-side :attr:`ProbePosition.probe_photon_count` for indexes that appear in
-       both the assembled data and the position sequence. The all-or-nothing invariant on
-       :class:`ProbePositionSequence` guarantees the counts array is either fully populated
-       or absent.
-    3. Per-pattern total counts as a final fallback so consumers such as
-       :func:`~ptychodus.api.illumination.compute_illumination_map` always receive
-       weights and never silently degrade to uniform accumulation.
+    Precedence: measured diffraction-side counts, then position-side counts, then
+    per-pattern total counts as fallback.
     """
     indexes = assembled_data.get_indexes()
     position_counts = positions.get_probe_photon_counts()
@@ -192,32 +163,14 @@ class AssembledDiffractionData:
         return self._patterns[index]
 
     def get_pixel_geometry(self) -> PixelGeometry:
-        """Return the pixel geometry of the stored patterns.
-
-        This is the *processed* geometry: :func:`allocate_assembled_data` folds
-        binning and transposition through
-        :meth:`DiffractionPrepPipeline.compute_output_pixel_geometry` before
-        constructing the buffer, so it describes the patterns actually held here
-        rather than the raw detector.
-        """
+        """Processed pixel geometry of the stored patterns."""
         return self._pixel_geometry
-
-    def set_pixel_geometry(self, pixel_geometry: PixelGeometry) -> None:
-        # Views produced by assemble() keep their creation-time snapshot; they are
-        # only used for per-array display (mean pattern, total counts) and not by
-        # reconstruction, so leaving them stale is acceptable.
-        self._pixel_geometry = pixel_geometry
 
     def get_bad_pixels(self) -> BadPixels:
         return self._bad_pixels
 
     def assemble(self, data: AssembledDiffractionData, offset: int) -> AssembledDiffractionData:
-        """Scatter a dense block into this buffer at `offset` and return a read-only view.
-
-        Thread-safe for concurrent calls that target disjoint slices: no shared
-        mutable state is touched, and the ``writeable`` flag is cleared on the
-        freshly created view rather than on the underlying buffer.
-        """
+        """Scatter a dense block into this buffer at `offset` and return a read-only view."""
         assembled_indexes = slice(offset, offset + len(data._indexes))
 
         self._indexes[assembled_indexes] = data._indexes
@@ -252,22 +205,14 @@ class AssembledDiffractionData:
         return compute_total_counts(self.get_patterns(), self._bad_pixels)
 
     def has_measured_probe_photon_counts(self) -> bool:
-        """True when real hardware flux measurements are attached to this buffer.
-
-        All-or-nothing at every layer: :func:`allocate_assembled_data` only reserves
-        the counts buffer when every array in the dataset reports flux, and
-        :meth:`AssembledDiffractionData.__init__` rejects non-finite / negative
-        values. So a non-None buffer is fully populated by construction.
-        """
+        """True when real hardware flux measurements are attached to this buffer."""
         return self._probe_photon_counts is not None
 
     def get_probe_photon_counts(self) -> DiffractionPatternCounts:
         """Per-pattern incident probe photon counts.
 
         Returns measured counts when :meth:`has_measured_probe_photon_counts` is
-        true; otherwise falls back to :meth:`get_total_counts` — the sum over good
-        pixels for each pattern. Always returns a valid array so callers need no
-        None branch.
+        true; otherwise falls back to the sum over good pixels for each pattern.
         """
         if self._probe_photon_counts is not None:
             return self._probe_photon_counts[self._indexes >= 0]
@@ -292,8 +237,8 @@ class AssembledDiffractionData:
     def nbytes(self) -> int:
         """Logical size of the arrays this holds.
 
-        A memory-mapped patterns array (see ``load_diffraction_data``) reports its full
-        logical size here even though it is backed by disk rather than RAM.
+        A memory-mapped patterns array reports its full logical size here even
+        though it is backed by disk rather than RAM.
         """
         sz = self._indexes.nbytes + self._patterns.nbytes + self._bad_pixels.nbytes
         if self._probe_photon_counts is not None:
@@ -311,9 +256,7 @@ def compute_array_offsets(metadata: DiffractionMetadata) -> Sequence[int]:
 
     Offsets come from ``num_patterns_per_array`` rather than a running cursor, so
     each array owns a fixed slice of the buffer. An array that yields fewer
-    patterns than metadata reserves simply under-fills its slice; the unwritten
-    tail keeps its `-1` sentinel index and is elided by
-    :meth:`AssembledDiffractionData.get_indexes`.
+    patterns than metadata reserves simply under-fills its slice.
     """
     return list(accumulate(metadata.num_patterns_per_array, initial=0))
 
@@ -386,10 +329,6 @@ def allocate_assembled_data(
 ) -> AssembledDiffractionData:
     """Allocate an empty buffer sized for the whole dataset.
 
-    Indexes are prefilled with `-1` so that unwritten slots are invisible to
-    :meth:`AssembledDiffractionData.get_indexes` and
-    :meth:`~AssembledDiffractionData.get_patterns`.
-
     Pass `patterns` to supply the storage yourself -- typically a writable
     :class:`numpy.memmap` -- in which case it is used in place and never
     re-zeroed, since zeroing a fresh memmap dirties every page of its backing
@@ -397,9 +336,7 @@ def allocate_assembled_data(
 
     `raw_pixel_geometry` is the *raw* detector geometry; the value stored on the
     result is the processed one. `dtype` defaults to
-    ``pipeline.compute_output_dtype(metadata.pattern_dtype)`` -- the pattern dtype
-    itself when no pipeline step widens it (crop, flip, pad, transpose, upsample),
-    wider when a step does (binning).
+    ``pipeline.compute_output_dtype(metadata.pattern_dtype)``.
     """
     metadata = dataset.get_metadata()
     _, processed_bad_pixels = _resolve_bad_pixels(dataset, pipeline, bad_pixels)
@@ -437,11 +374,7 @@ def allocate_assembled_data(
 
     indexes = -numpy.ones(num_patterns_total, dtype=int)
 
-    # All-or-nothing: reserve the per-pattern probe photon counts buffer only when
-    # every array in the dataset reports flux. If any array lacks flux the buffer
-    # stays None, has_measured_probe_photon_counts() reports False, and downstream
-    # falls back to per-pattern total counts uniformly. Streaming datasets can start
-    # empty and grow, so an empty dataset also skips the buffer.
+    # All-or-nothing: reserve the counts buffer only when every array reports flux.
     probe_photon_counts: DiffractionPatternCounts | None = None
     if len(dataset) > 0 and all(array.get_probe_photon_flux_Hz() is not None for array in dataset):
         probe_photon_counts = numpy.zeros(num_patterns_total, dtype=numpy.float64)
@@ -475,29 +408,19 @@ def preprocess_array(
     ``exposure_time_s`` is a positive number, the flux is converted to per-pattern
     photon counts and attached to the returned block. A reader that reports flux
     without a positive exposure logs a warning and the measurement is dropped for
-    that array; the assembled buffer's fallback (per-pattern total counts) still
-    applies.
-
-    Propagates :class:`FileNotFoundError` from the underlying read; callers that
-    treat a missing array as a skip must catch it. The returned block carries the
-    processed pixel geometry, though :meth:`AssembledDiffractionData.assemble`
-    replaces it with the destination buffer's geometry when the block is
-    scattered by :func:`assemble_dataset`.
+    that array.
     """
     label = array.get_label()
     raw_patterns = array.get_patterns()
 
-    # Zero bad pixels in raw detector coords before crop/bin/pad/flip/transpose so
-    # saturated pixel values can't leak into neighboring bins downstream.
+    # Zero bad pixels in raw detector coords so saturated values don't leak into
+    # neighboring bins under crop/bin/pad/flip/transpose.
     repaired_patterns = zero_bad_pixels(raw_patterns, raw_bad_pixels)
     loaded_array = SimpleDiffractionArray(label, array.get_indexes(), repaired_patterns)
     processed_array = loaded_array if pipeline is None else pipeline(loaded_array)
     indexes = processed_array.get_indexes()
     patterns = processed_array.get_patterns()
 
-    # Convert per-pattern probe photon flux (Hz) to counts using the shared
-    # exposure. Flux and counts are per-pattern scalars, unaffected by any
-    # detector-image transform in the prep pipeline.
     probe_photon_counts: DiffractionPatternCounts | None = None
     probe_photon_flux_Hz = array.get_probe_photon_flux_Hz()  # noqa: N806
     if probe_photon_flux_Hz is not None:
@@ -509,10 +432,8 @@ def preprocess_array(
                 f'exposure_time_s is {exposure_time_s!r}.'
             )
 
-    # Drop patterns whose good-pixel total counts fall outside the (inclusive) bounds.
-    # This runs after the prep pipeline so the counts reflect the same pattern the
-    # reconstructor sees. Filtering all per-pattern arrays in lockstep preserves the
-    # index/pattern 1:1 invariant that prepare_reconstruct_input relies on.
+    # Filter after the pipeline so counts reflect the same pattern the reconstructor sees;
+    # filter every per-pattern array in lockstep to preserve the index/pattern 1:1 invariant.
     lower = total_counts_lower_bound
     upper = total_counts_upper_bound
 
@@ -562,15 +483,6 @@ def _map_arrays(
     max_workers: int | None = None,
 ) -> None:
     """Run `work` over every array of a dataset on a thread pool.
-
-    Shared driver for :func:`assemble_dataset` and :func:`summarize_dataset`, so
-    the two agree on concurrency, progress reporting, cancellation, and per-array
-    failure handling. Reads and numpy reductions both release the GIL, so this
-    overlaps usefully even though the work is nominally CPU-bound.
-
-    `work` receives the array index alongside the array and is responsible for
-    confining its writes to a slice no other array touches; that disjointness is
-    what lets the fan-out run without a lock.
 
     A missing array is logged and skipped. Any other per-array exception is
     reported through `on_array_error` and does not abort the remaining arrays.
@@ -645,15 +557,6 @@ def assemble_dataset(
 ) -> AssembledDiffractionData:
     """Load, preprocess, and assemble every array of a dataset on a thread pool.
 
-    Each array is read, preprocessed, and scattered into its own slice of the
-    output buffer by a worker thread; the slices are disjoint, so no locking is
-    required. Reads and numpy reductions both release the GIL, so this overlaps
-    usefully even though the work is nominally CPU-bound.
-
-    Masks, pixel geometry, and the counts bounds are resolved once up front, so a
-    concurrent settings change cannot leave some arrays processed differently
-    from others.
-
     Pass `out` to assemble into a buffer you allocated yourself (see
     :func:`allocate_assembled_data`); it is returned unchanged, and its pixel
     geometry wins over `raw_pixel_geometry`. Otherwise a fresh buffer is
@@ -687,9 +590,8 @@ def assemble_dataset(
     else:
         data = out
 
-    # preprocess_array wants the raw geometry and folds the pipeline itself. The
-    # value is discarded by assemble() below, which stamps the destination
-    # buffer's geometry onto every view, so any valid placeholder would do.
+    # preprocess_array needs the raw geometry; the value on each returned block
+    # is overwritten when scattered.
     block_pixel_geometry = _resolve_pixel_geometry(metadata, None, raw_pixel_geometry)
     offsets = compute_array_offsets(metadata)
 
@@ -734,10 +636,8 @@ def assemble_dataset(
 class _FrameStatistics:
     """Thread-safe running minimum/mean/maximum over chunks of patterns.
 
-    Each chunk is reduced by the calling worker *outside* the lock; the lock is
-    held only long enough to fold that chunk's three frames into the running
-    totals, so concurrent workers spend their time in numpy rather than waiting
-    on each other.
+    Each chunk is reduced outside the lock; the lock is held only long enough to
+    fold that chunk's three frames into the running totals.
     """
 
     def __init__(self, height: int, width: int) -> None:
@@ -810,13 +710,6 @@ def summarize_dataset(
     in memory. Bad-pixel positions in the frame-shaped min/mean/max arrays are
     inpainted with biharmonic fill; per-pattern totals are summed over the good
     pixels only.
-
-    Unlike :func:`assemble_dataset` this takes neither a prep pipeline nor counts
-    bounds: it reports the *raw* detector-coordinate statistics a caller needs in
-    order to choose those very settings. Everything else matches -- the two share
-    one fan-out driver, so `on_progress`, `on_array_error`, `should_stop`, and
-    `max_workers` behave identically, a missing array is skipped rather than
-    fatal, and stopping early yields a summary of whatever was read.
 
     Per-pattern results are written at the offsets metadata reserves and then
     compacted, so they come back in array order whatever the completion order,

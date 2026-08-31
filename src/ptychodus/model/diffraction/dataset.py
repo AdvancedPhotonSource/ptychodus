@@ -68,10 +68,6 @@ class DiffractionDatasetObserver(ABC):
     def handle_dataset_reloaded(self) -> None:
         pass
 
-    @abstractmethod
-    def handle_pixel_geometry_changed(self) -> None:
-        pass
-
 
 class AssembledDiffractionArray(DiffractionArray):
     def __init__(
@@ -162,11 +158,6 @@ class AssembledDiffractionDataset(DiffractionDataset):
         # array is processed, so the shape here only matters when nothing is loaded.
         self._bad_pixels = self._create_default_bad_pixels()
 
-        # Per-dataset override for the raw detector pixel geometry. When set, takes
-        # priority over metadata and DetectorSettings in get_raw_pixel_geometry().
-        # Cleared by clear()/reload() so freshly-read metadata is the new source of truth.
-        self._pixel_geometry_override: PixelGeometry | None = None
-
     def _create_default_bad_pixels(self) -> BadPixels:
         extent = self._dataset.get_metadata().detector_extent
         return numpy.zeros((extent.height_px, extent.width_px), dtype=numpy.bool_)
@@ -179,17 +170,6 @@ class AssembledDiffractionDataset(DiffractionDataset):
         (typically by routing the candidate through DiffractionDatasetRepository.create_unique_name).
         """
         self._name = name
-
-    def sync_pixel_geometry_to_settings(self) -> None:
-        """Promote this dataset's effective raw pixel geometry to the global fallback.
-
-        Writes the current raw geometry (override > metadata > current fallback) into
-        DetectorSettings.pixel_width_m / pixel_height_m so freshly loaded datasets that
-        lack pixel metadata pick it up. Leaves this dataset's override in place.
-        """
-        geometry = self.get_raw_pixel_geometry()
-        self._detector_settings.pixel_width_m.set_value(geometry.width_m)
-        self._detector_settings.pixel_height_m.set_value(geometry.height_m)
 
     def set_bad_pixels(self, bad_pixels: BadPixels) -> None:
         if bad_pixels.ndim != 2:
@@ -227,11 +207,10 @@ class AssembledDiffractionDataset(DiffractionDataset):
     def get_raw_pixel_geometry(self) -> PixelGeometry:
         """Resolve the raw (pre-processing) detector pixel geometry for this dataset.
 
-        Priority: user override > metadata > global DetectorSettings fallback.
+        Priority: metadata > global DetectorSettings fallback. Users who need to
+        change the value edit DetectorSettings from the wizard's metadata page
+        before the dataset is loaded.
         """
-        if self._pixel_geometry_override is not None:
-            return self._pixel_geometry_override
-
         metadata_geometry = self._dataset.get_metadata().detector_pixel_geometry
         if metadata_geometry is not None:
             return metadata_geometry
@@ -244,12 +223,13 @@ class AssembledDiffractionDataset(DiffractionDataset):
     def get_processed_pixel_geometry(self) -> PixelGeometry:
         """Return the pixel geometry that matches the assembled patterns.
 
-        Delegates to the AssembledDiffractionData snapshot, which is authoritative
-        for both load-from-raw (allocate_assembled_data folds the pipeline through
-        raw geometry at buffer-allocation time) and import-from-exported (the
-        processed value is read back from the file's DETECTOR_PIXEL_WIDTH/HEIGHT
-        attributes). Consulting live pipeline settings here would double-apply
-        binning on re-import.
+        Delegates to the AssembledDiffractionData snapshot, which is immutable
+        after construction and authoritative for both load-from-raw
+        (allocate_assembled_data folds the pipeline through raw geometry at
+        buffer-allocation time) and import-from-exported (the processed value is
+        read back from the file's DETECTOR_PIXEL_WIDTH/HEIGHT attributes).
+        Consulting live pipeline settings here would double-apply binning on
+        re-import.
         """
         return self._data.get_pixel_geometry()
 
@@ -261,22 +241,6 @@ class AssembledDiffractionDataset(DiffractionDataset):
         """
         _, height_px, width_px = self._data.get_patterns_shape()
         return ImageExtent(width_px=width_px, height_px=height_px)
-
-    def set_pixel_geometry_override(self, geometry: PixelGeometry | None) -> None:
-        """Set (or clear when None) the per-dataset raw pixel geometry override.
-
-        Also mutates the assembled-data snapshot so consumers reading
-        AssembledDiffractionData.get_pixel_geometry() see the update, and notifies
-        observers so downstream views (tree columns, bound products) can refresh.
-        """
-        self._pixel_geometry_override = geometry
-        raw = self.get_raw_pixel_geometry()
-        pipeline = self._prep_pipeline
-        processed = raw if pipeline is None else pipeline.compute_output_pixel_geometry(raw)
-        self._data.set_pixel_geometry(processed)
-
-        for observer in self._observer_list:
-            observer.handle_pixel_geometry_changed()
 
     def get_bad_pixels(self) -> BadPixels:
         return self._bad_pixels
@@ -438,7 +402,6 @@ class AssembledDiffractionDataset(DiffractionDataset):
         self._prep_pipeline = None
         self._last_array_loader = None
         self._bad_pixels = self._create_default_bad_pixels()
-        self._pixel_geometry_override = None
 
         if self._scratch_tempfile is not None:
             self._scratch_tempfile.close()

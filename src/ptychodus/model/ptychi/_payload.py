@@ -26,6 +26,6 @@ class PtyChiPayload:
     child hands it straight to ``PtychographyTask``.
     """
 
+    reconstruct_input: ReconstructInput
     task_options: PtychographyTaskOptions
     num_sync_epochs: int
-    reconstruct_input: ReconstructInput
