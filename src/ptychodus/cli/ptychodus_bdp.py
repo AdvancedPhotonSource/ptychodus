@@ -196,7 +196,7 @@ def main() -> int:
         staging_dir.mkdir(parents=True, exist_ok=True)
         workflow_diffraction_api.save_assembled_data(staging_dir / StandardFileLayout.DIFFRACTION)
         workflow_product_api.save_product(
-            staging_dir / StandardFileLayout.PRODUCT_IN, file_type='HDF5'
+            staging_dir / StandardFileLayout.PRODUCT, file_type='HDF5'
         )
         model.workflow_api.save_settings(staging_dir / StandardFileLayout.SETTINGS)
 

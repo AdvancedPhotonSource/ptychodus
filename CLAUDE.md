@@ -51,7 +51,7 @@ Settings flow through `api/parameters.py::Parameter[T]` and `ParameterGroup`. Ea
 
 ### Standard HDF5 layout (external interface — change carefully)
 
-`api/io.py::StandardFileLayout` is the canonical contract for batch mode and remote workflows: `diffraction.h5`, `product-in.h5`, `product-out.h5`, `fluorescence-in.h5`, `fluorescence-out.h5`, `settings.ini`. Key names live in `DiffractionFileKeys` / `ProductFileKeys` enums — external consumers depend on them.
+`api/io.py::StandardFileLayout` is the canonical contract for batch mode and remote workflows: `diffraction.h5`, `product.h5`, `fluorescence.h5`, `settings.ini`. The input/output distinction lives in the containing directory (batch mode takes `-i` and `-o`; remote-workflow backends stage under `<workflow_root>/input/` and `<workflow_root>/output/`). The enum also exposes `path(directory)` and `checkpoint_path(directory, epoch)` helpers — the latter builds `<stem>.<epoch:06d><suffix>` per the streaming-checkpoint convention shared by `scripts/ptychodus_reconstruct.py` and `model/processing/monitor.py::ReconstructBackgroundTask`. Key names live in `DiffractionFileKeys` / `ProductFileKeys` enums — external consumers depend on them.
 
 ### Reconstructor libraries
 

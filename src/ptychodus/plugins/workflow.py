@@ -16,7 +16,11 @@ class PtychodusAutoloadProductFileBasedWorkflow(FileBasedWorkflow):
         return True
 
     def get_watch_file_pattern(self) -> str:
-        return 'product-out.h5'
+        # Match only products landing in an 'output/' subdirectory — remote
+        # workflows (Globus, Genesis) return results under
+        # <workflow_root>/output/product.h5. Path.match matches from the right,
+        # so this rejects input-side product.h5 files.
+        return 'output/product.h5'
 
     def execute(self, api: WorkflowAPI, file_path: Path) -> None:
         api.load_product(file_path)

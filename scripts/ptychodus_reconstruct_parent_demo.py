@@ -9,9 +9,9 @@ Optionally cancels the run part-way to exercise the signal path.
 
     python scripts/ptychodus_reconstruct_parent_demo.py \\
         --diffraction-input staging/diffraction.h5 \\
-        --product-input     staging/product-in.h5 \\
+        --product-input     staging/product.h5 \\
         --settings          staging/settings.ini \\
-        --product-output    out/product-out.h5 \\
+        --product-output    out/product.h5 \\
         --num-epochs 6 [--cancel-after-s 10]
 """
 

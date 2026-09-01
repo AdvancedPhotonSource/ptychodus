@@ -275,20 +275,20 @@ class ModelCore:
                     'reconstructor will run without a preloaded model.'
                 )
 
-        product_in_path = input_directory / StandardFileLayout.PRODUCT_IN
+        input_product_path = input_directory / StandardFileLayout.PRODUCT
 
-        if product_in_path.is_file():
-            product_out_path = output_directory / StandardFileLayout.PRODUCT_OUT
+        if input_product_path.is_file():
+            output_product_path = output_directory / StandardFileLayout.PRODUCT
 
-            if product_out_path.is_file():
+            if output_product_path.is_file():
                 logger.warning('Output product file will be overwritten!')
 
             input_product_api = self.workflow_api.load_product(
-                product_in_path, diffraction=diffraction_handle
+                input_product_path, diffraction=diffraction_handle
             )
             try:
                 output_product_api = input_product_api.reconstruct_local(
-                    output_product_file=product_out_path,
+                    output_product_file=output_product_path,
                     block=True,
                 )
             except Exception as exc:
@@ -298,19 +298,19 @@ class ModelCore:
             logger.error('Input product is not a file!')
             return -1
 
-        fluorescence_in_path = input_directory / StandardFileLayout.FLUORESCENCE_IN
+        input_fluorescence_path = input_directory / StandardFileLayout.FLUORESCENCE
 
-        if fluorescence_in_path.is_file():
-            fluorescence_out_path = output_directory / StandardFileLayout.FLUORESCENCE_OUT
+        if input_fluorescence_path.is_file():
+            output_fluorescence_path = output_directory / StandardFileLayout.FLUORESCENCE
 
-            if fluorescence_out_path.is_file():
+            if output_fluorescence_path.is_file():
                 logger.warning('Output fluorescence file will be overwritten!')
 
             logger.info('Enhancing fluorescence...')
 
             output_product_api.enhance_fluorescence_local(
-                fluorescence_in_path,
-                fluorescence_out_path,
+                input_fluorescence_path,
+                output_fluorescence_path,
                 block=True,
             )
         else:
@@ -327,11 +327,11 @@ class ModelCore:
             logger.error('Diffraction data is not a file!')
             return -1
 
-        product_in_path = input_directory / StandardFileLayout.PRODUCT_IN
+        input_product_path = input_directory / StandardFileLayout.PRODUCT
 
-        if product_in_path.is_file():
+        if input_product_path.is_file():
             input_product_api = self.workflow_api.load_product(
-                product_in_path, diffraction=diffraction_handle
+                input_product_path, diffraction=diffraction_handle
             )
             try:
                 input_product_api.train_reconstructor_local(

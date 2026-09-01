@@ -110,7 +110,7 @@ class GenesisExecutor:
         )
         self._product_api.save_product(
             input_product_index,
-            local_dir_struct.input_directory / StandardFileLayout.PRODUCT_IN,
+            local_dir_struct.input_directory / StandardFileLayout.PRODUCT,
             file_type='HDF5',
         )
 
@@ -167,7 +167,7 @@ class GenesisExecutor:
 
         status_interval_s = self._settings.status_refresh_interval_s.get_value()
         load_product_path = (
-            local_dir_struct.output_directory / StandardFileLayout.PRODUCT_OUT
+            local_dir_struct.output_directory / StandardFileLayout.PRODUCT
             if ptychodus_action == 'reconstruct'
             else None
         )

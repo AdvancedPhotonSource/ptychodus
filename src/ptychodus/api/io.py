@@ -72,15 +72,23 @@ class StandardFileLayout(StrEnum):
 
     DIFFRACTION = 'diffraction.h5'
     FLUORESCENCE = 'fluorescence.h5'
-    FLUORESCENCE_IN = 'fluorescence-in.h5'
-    FLUORESCENCE_OUT = 'fluorescence-out.h5'
     # Stem only; the per-backend extension comes from
     # TrainableReconstructor.get_model_file_extension(). The full path is
     # f'{input_directory}/{MODEL_BASENAME}{ext}'.
     MODEL_BASENAME = 'model'
-    PRODUCT_IN = 'product-in.h5'
-    PRODUCT_OUT = 'product-out.h5'
+    PRODUCT = 'product.h5'
     SETTINGS = 'settings.ini'
+
+    def path(self, directory: Path) -> Path:
+        return directory / self.value
+
+    def checkpoint_path(self, directory: Path, epoch: int) -> Path:
+        # Convention shared by scripts/ptychodus_reconstruct.py and
+        # model/processing/monitor.py::ReconstructBackgroundTask, which write
+        # per-epoch snapshots beside the final artifact during streaming
+        # reconstructions.
+        p = Path(self.value)
+        return directory / f'{p.stem}.{epoch:06d}{p.suffix}'
 
 
 class DiffractionFileKeys(StrEnum):

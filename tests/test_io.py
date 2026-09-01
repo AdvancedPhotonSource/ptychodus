@@ -128,18 +128,14 @@ class TestStandardFileLayout:
     def test_diffraction_filename(self) -> None:
         assert StandardFileLayout.DIFFRACTION == 'diffraction.h5'
 
-    def test_product_in_filename(self) -> None:
-        assert StandardFileLayout.PRODUCT_IN == 'product-in.h5'
-
-    def test_product_out_filename(self) -> None:
-        assert StandardFileLayout.PRODUCT_OUT == 'product-out.h5'
+    def test_product_filename(self) -> None:
+        assert StandardFileLayout.PRODUCT == 'product.h5'
 
     def test_settings_filename(self) -> None:
         assert StandardFileLayout.SETTINGS == 'settings.ini'
 
-    def test_fluorescence_filenames(self) -> None:
-        assert StandardFileLayout.FLUORESCENCE_IN == 'fluorescence-in.h5'
-        assert StandardFileLayout.FLUORESCENCE_OUT == 'fluorescence-out.h5'
+    def test_fluorescence_filename(self) -> None:
+        assert StandardFileLayout.FLUORESCENCE == 'fluorescence.h5'
 
     def test_model_basename(self) -> None:
         assert StandardFileLayout.MODEL_BASENAME == 'model'
@@ -147,6 +143,19 @@ class TestStandardFileLayout:
     def test_all_values_are_strings(self) -> None:
         for member in StandardFileLayout:
             assert isinstance(member.value, str)
+
+    def test_path_builds_under_directory(self) -> None:
+        assert StandardFileLayout.PRODUCT.path(Path('/x')) == Path('/x/product.h5')
+        assert StandardFileLayout.FLUORESCENCE.path(Path('/x')) == Path('/x/fluorescence.h5')
+        assert StandardFileLayout.SETTINGS.path(Path('/x')) == Path('/x/settings.ini')
+
+    def test_checkpoint_path_inserts_zero_padded_epoch(self) -> None:
+        assert StandardFileLayout.PRODUCT.checkpoint_path(Path('/x'), 42) == Path(
+            '/x/product.000042.h5'
+        )
+        assert StandardFileLayout.FLUORESCENCE.checkpoint_path(Path('/x'), 42) == Path(
+            '/x/fluorescence.000042.h5'
+        )
 
 
 # ---------------------------------------------------------------------------

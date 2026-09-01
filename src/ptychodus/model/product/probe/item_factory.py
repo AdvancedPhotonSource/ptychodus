@@ -29,7 +29,7 @@ class ProbeRepositoryItemFactory:
 
         A probe supplied in memory comes from reconstruction output or a product
         loaded from file, so its mode structure is already what the reconstructor
-        solved for. Batch mode reads product-in.h5 through this path, where a user
+        solved for. Batch mode reads product.h5 through this path, where a user
         who sets a mode count in settings.ini would otherwise see it silently do
         nothing. Set the mode counts on the run that produces the probe instead --
         ptychodus-bdp reads probes through the from-file builder, which does

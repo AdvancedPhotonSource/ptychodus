@@ -42,9 +42,10 @@ class GlobusExecutor:
                 f'Product "{product_item.get_name()}" has no associated diffraction dataset.'
             )
 
-        input_directory = self._settings.input_collection_posix_path.get_value() / (
+        base_directory = self._settings.input_collection_posix_path.get_value() / (
             sanitize_path_component(product_item.get_name())
         )
+        input_directory = base_directory / 'input'
 
         try:
             input_directory.mkdir(mode=0o755, parents=True, exist_ok=True)
@@ -56,26 +57,30 @@ class GlobusExecutor:
         dataset.export_assembled_patterns(input_directory / StandardFileLayout.DIFFRACTION)
         self._product_api.save_product(
             input_product_index,
-            input_directory / StandardFileLayout.PRODUCT_IN,
+            input_directory / StandardFileLayout.PRODUCT,
             file_type='HDF5',
         )
 
-        return input_directory
+        return base_directory
 
     def _run_flow(self, ptychodus_action: str, flow_label: str) -> None:
         compute_data_posix_path = (
             self._settings.compute_collection_posix_path.get_value() / flow_label
         )
+        compute_input_posix_path = compute_data_posix_path / 'input'
+        compute_output_posix_path = compute_data_posix_path / 'output'
 
-        input_data_globus_path = (
-            f'{self._settings.input_collection_globus_path.get_value()}/{flow_label}'
-        )
-        compute_data_globus_path = (
-            f'{self._settings.compute_collection_globus_path.get_value()}/{flow_label}'
-        )
-        output_data_globus_path = (
-            f'{self._settings.output_collection_globus_path.get_value()}/{flow_label}'
-        )
+        input_collection_globus_path = self._settings.input_collection_globus_path.get_value()
+        compute_collection_globus_path = self._settings.compute_collection_globus_path.get_value()
+        output_collection_globus_path = self._settings.output_collection_globus_path.get_value()
+
+        # Remote-workflow directory layout mirrors Genesis: input artifacts sit
+        # under <flow_label>/input/, results are written to <flow_label>/output/.
+        # Transfer only the relevant subtree in each direction.
+        input_data_globus_path = f'{input_collection_globus_path}/{flow_label}/input'
+        compute_input_globus_path = f'{compute_collection_globus_path}/{flow_label}/input'
+        compute_output_globus_path = f'{compute_collection_globus_path}/{flow_label}/output'
+        output_data_globus_path = f'{output_collection_globus_path}/{flow_label}/output'
 
         flow_input = {
             'transfer_input_data': {
@@ -85,7 +90,7 @@ class GlobusExecutor:
                 },
                 'destination': {
                     'id': str(self._settings.compute_collection_id.get_value()),
-                    'path': compute_data_globus_path,
+                    'path': compute_input_globus_path,
                 },
                 'sync_level': self._settings.transfer_sync_level.get_value(),
                 'recursive': True,
@@ -95,14 +100,14 @@ class GlobusExecutor:
                 # NOTE: 'function_id': compute_function_id, # added in globus.py
                 'function_kwargs': {
                     'action': ptychodus_action,
-                    'input_directory': str(compute_data_posix_path),
-                    'output_directory': str(compute_data_posix_path),
+                    'input_directory': str(compute_input_posix_path),
+                    'output_directory': str(compute_output_posix_path),
                 },
             },
             'transfer_output_data': {
                 'source': {
                     'id': str(self._settings.compute_collection_id.get_value()),
-                    'path': compute_data_globus_path,
+                    'path': compute_output_globus_path,
                 },
                 'destination': {
                     'id': str(self._settings.output_collection_id.get_value()),
@@ -119,15 +124,15 @@ class GlobusExecutor:
 
     def reconstruct(self, input_product_index: int, *, algorithm: str | None = None) -> None:
         self._processing_api.set_reconstructor_if_provided(algorithm)
-        input_directory = self.populate_input_directory(input_product_index)
+        base_directory = self.populate_input_directory(input_product_index)
 
         if self._processing_api.is_reconstructor_trainable():
             pass  # TODO get model from mlflow
 
-        self._run_flow('reconstruct', input_directory.name)
+        self._run_flow('reconstruct', base_directory.name)
 
     def train(self, input_product_index: int, *, algorithm: str | None = None) -> None:
         self._processing_api.set_reconstructor_if_provided(algorithm)
-        input_directory = self.populate_input_directory(input_product_index)
-        self._run_flow('train', input_directory.name)
+        base_directory = self.populate_input_directory(input_product_index)
+        self._run_flow('train', base_directory.name)
         # TODO customize input/output directories; put model to mlflow
