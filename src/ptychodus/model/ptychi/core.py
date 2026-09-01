@@ -1,8 +1,7 @@
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator
 from importlib.metadata import PackageNotFoundError, version
-from importlib.util import find_spec
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import (
@@ -29,7 +28,6 @@ from .settings import (
 )
 
 if TYPE_CHECKING:
-    from ptychi.api import Reconstructors
     from ptychi.api.options.task import PtychographyTaskOptions
 
     from .algorithms import PtyChiCommon
@@ -38,14 +36,9 @@ logger = logging.getLogger(__name__)
 
 
 # Kept in sync with the display names in algorithms.py::ALGORITHMS. Duplicated
-# here because algorithms.py imports ptychi.api, which is exactly what
-# _ptychi_available() is guarding against.
+# here because algorithms.py imports ptychi.api, which is what the try/except
+# below is guarding against.
 _DEVELOPER_MODE_DISPLAY_NAMES = ('DM', 'RAAR', 'PIE', 'ePIE', 'rPIE', 'LSQML', 'Autodiff', 'BH')
-
-
-def _ptychi_available() -> bool:
-    """Return True iff ``ptychi`` is importable, without importing it."""
-    return find_spec('ptychi') is not None
 
 
 class PtyChiReconstructorLibrary(ReconstructorLibrary):
@@ -73,52 +66,54 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         )
         self.reconstructor_list: list[Reconstructor] = list()
         self._common: 'PtyChiCommon | None' = None
-        self._settings_by_reconstructor: 'Mapping[Reconstructors, Any]' = {}
 
-        if not _ptychi_available():
+        # One try/except/else: import the minimal pty-chi surface needed to
+        # construct the wrappers (ptychi.api pulls torch for type annotations
+        # only -- no CUDA context), then either build the real reconstructors
+        # or fall back to NullReconstructors.
+        try:
+            from .algorithms import (
+                PtyChiCommon,
+                create_autodiff_reconstructor,
+                create_bh_reconstructor,
+                create_dm_reconstructor,
+                create_epie_reconstructor,
+                create_lsqml_reconstructor,
+                create_pie_reconstructor,
+                create_raar_reconstructor,
+                create_rpie_reconstructor,
+            )
+        except ImportError:
             logger.info('pty-chi not found.')
-
             if is_developer_mode_enabled:
                 for display_name in _DEVELOPER_MODE_DISPLAY_NAMES:
                     self.reconstructor_list.append(NullReconstructor(display_name))
-            return
+        else:
+            try:
+                ptychi_version = version('ptychi')
+            except PackageNotFoundError:
+                ptychi_version = 'unknown'
+            logger.info(f'Pty-Chi {ptychi_version}')
 
-        try:
-            ptychi_version = version('ptychi')
-        except PackageNotFoundError:
-            ptychi_version = 'unknown'
-        logger.info(f'Pty-Chi {ptychi_version}')
-
-        # Deferred import: pulls ptychi.api (via .algorithms) which pulls torch
-        # for its type annotations, but acquires no GPU context.
-        from .algorithms import PtyChiCommon, build_reconstructor_list
-
-        self._common = PtyChiCommon(
-            self.settings,
-            self.object_settings,
-            self.probe_settings,
-            self.probe_position_settings,
-            self.opr_settings,
-        )
-        self._settings_by_reconstructor = self._build_settings_by_reconstructor()
-        self.reconstructor_list.extend(
-            build_reconstructor_list(self._common, self._settings_by_reconstructor)
-        )
-
-    def _build_settings_by_reconstructor(self) -> 'Mapping[Reconstructors, Any]':
-        # Local import to keep ptychi off the module-level path.
-        from ptychi.api import Reconstructors
-
-        return {
-            Reconstructors.DM: self.dm_settings,
-            Reconstructors.RAAR: self.raar_settings,
-            Reconstructors.PIE: self.pie_settings,
-            Reconstructors.EPIE: self.pie_settings,
-            Reconstructors.RPIE: self.pie_settings,
-            Reconstructors.LSQML: self.lsqml_settings,
-            Reconstructors.AD_PTYCHO: self.autodiff_settings,
-            Reconstructors.BH: self.bh_settings,
-        }
+            self._common = PtyChiCommon(
+                self.settings,
+                self.object_settings,
+                self.probe_settings,
+                self.probe_position_settings,
+                self.opr_settings,
+            )
+            self.reconstructor_list.extend(
+                [
+                    create_dm_reconstructor(self._common, self.dm_settings),
+                    create_raar_reconstructor(self._common, self.raar_settings),
+                    create_pie_reconstructor(self._common, self.pie_settings),
+                    create_epie_reconstructor(self._common, self.pie_settings),
+                    create_rpie_reconstructor(self._common, self.pie_settings),
+                    create_lsqml_reconstructor(self._common, self.lsqml_settings),
+                    create_autodiff_reconstructor(self._common, self.autodiff_settings),
+                    create_bh_reconstructor(self._common, self.bh_settings),
+                ]
+            )
 
     def build_task_options(
         self, algorithm_name: str, product: Product
@@ -132,14 +127,19 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         if self._common is None:
             raise RuntimeError('pty-chi is not available; cannot build task options.')
 
-        from .algorithms import ALGORITHMS
+        from .algorithms import build_task_options_for_algorithm
 
-        for reconstructor, algo_cls in ALGORITHMS.items():
-            if algo_cls.spec.display_name.casefold() == algorithm_name.casefold():
-                algorithm = algo_cls(self._common, self._settings_by_reconstructor[reconstructor])
-                return algorithm.build_task_options(product)
-
-        raise KeyError(f'Unknown pty-chi algorithm "{algorithm_name}"!')
+        return build_task_options_for_algorithm(
+            self._common,
+            algorithm_name,
+            product,
+            dm_settings=self.dm_settings,
+            raar_settings=self.raar_settings,
+            pie_settings=self.pie_settings,
+            lsqml_settings=self.lsqml_settings,
+            autodiff_settings=self.autodiff_settings,
+            bh_settings=self.bh_settings,
+        )
 
     @property
     def name(self) -> str:

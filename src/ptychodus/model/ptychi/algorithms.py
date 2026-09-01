@@ -1,11 +1,11 @@
-"""Parent-safe pty-chi algorithm layer: shared kwarg builders and per-algorithm specs.
+"""Parent-safe pty-chi algorithm layer: shared kwarg builders and per-algorithm factories.
 
-This module is the single source of truth for the pty-chi algorithm registry.
-Both the parent-side reconstructor factory (:func:`build_reconstructor_list`)
-and the child-side task-options loader (:func:`ptychodus.model.ptychi.task.load_task_options`)
-look up algorithms through :data:`ALGORITHMS`, keyed by pty-chi's own
-``Reconstructors`` enum. Adding a new pty-chi engine means writing one
-``PtyChiAlgorithm`` subclass and adding one entry to :data:`ALGORITHMS`.
+Each pty-chi engine has one :class:`PtyChiAlgorithm` subclass (strictly typed on
+its settings group via ``PtyChiAlgorithm[SettingsT]``) plus one module-level
+``create_<name>_reconstructor`` factory that produces a
+:class:`SubprocessReconstructor`. Adding a new engine means writing one
+subclass, one factory, one line in :mod:`ptychodus.model.ptychi.core`, and one
+entry in :data:`ptychodus.model.ptychi.task._TASK_OPTIONS_CLS_BY_RECONSTRUCTOR`.
 
 The module imports ``ptychi.api`` (for the Options dataclasses and enums),
 which pulls torch in for type annotations only -- no CUDA runtime is acquired.
@@ -17,11 +17,10 @@ from __future__ import annotations
 
 import logging
 import math
-from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar, Final, TypeVar
+from typing import Any, ClassVar, Generic, TypeVar
 
 from ptychi.api import (
     AffineDegreesOfFreedom,
@@ -83,7 +82,6 @@ from ptychi.api import (
     RAARReconstructorOptions,
     RPIEOptions,
     RPIEReconstructorOptions,
-    Reconstructors,
 )
 from ptychi.api.options.base import (
     ForwardModelOptions,
@@ -129,7 +127,19 @@ from .settings import (
     PtyChiSettings,
 )
 
-__all__ = ['ALGORITHMS', 'PtyChiAlgorithm', 'PtyChiCommon', 'build_reconstructor_list']
+__all__ = [
+    'PtyChiAlgorithm',
+    'PtyChiCommon',
+    'build_task_options_for_algorithm',
+    'create_autodiff_reconstructor',
+    'create_bh_reconstructor',
+    'create_dm_reconstructor',
+    'create_epie_reconstructor',
+    'create_lsqml_reconstructor',
+    'create_pie_reconstructor',
+    'create_raar_reconstructor',
+    'create_rpie_reconstructor',
+]
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +148,7 @@ _RECONSTRUCT_ENTRY = 'ptychodus.model.ptychi._subprocess:run_reconstruct'
 
 
 _E = TypeVar('_E', bound=Enum)
+SettingsT = TypeVar('SettingsT')
 
 
 def _optimization_plan(start: int, stop: int, stride: int) -> OptimizationPlan:
@@ -577,9 +588,8 @@ class PtyChiCommon:
 
 @dataclass(frozen=True)
 class _Spec:
-    """Names the six pty-chi ``*Options`` classes plus enum + display name."""
+    """Names the six pty-chi ``*Options`` classes plus the algorithm's display name."""
 
-    reconstructor: Reconstructors
     display_name: str
     task_options_cls: type[PtychographyTaskOptions]
     reconstructor_options_cls: type
@@ -589,18 +599,22 @@ class _Spec:
     opr_options_cls: type
 
 
-class PtyChiAlgorithm:
+class PtyChiAlgorithm(Generic[SettingsT]):
     """One pty-chi algorithm's parent-side view.
 
     Subclasses supply ``spec`` (the six Options classes to instantiate) and, if
     the algorithm has fields on top of the base ``*Options``, override the
     matching ``_extra_*_kwargs`` hook. Base hooks return empty dicts, so an
     algorithm that only reuses the base fields is a two-line subclass.
+
+    Parametrize the subclass with its settings type -- e.g.
+    ``LSQMLAlgorithm(PtyChiAlgorithm[PtyChiLSQMLSettings])`` -- so
+    ``self._settings`` is strictly typed inside the extra-kwarg hooks.
     """
 
     spec: ClassVar[_Spec]
 
-    def __init__(self, common: PtyChiCommon, algorithm_settings: Any) -> None:
+    def __init__(self, common: PtyChiCommon, algorithm_settings: SettingsT) -> None:
         self._common = common
         self._settings = algorithm_settings
 
@@ -640,9 +654,8 @@ class PtyChiAlgorithm:
         return {}
 
 
-class DMAlgorithm(PtyChiAlgorithm):
+class DMAlgorithm(PtyChiAlgorithm[PtyChiDMSettings]):
     spec = _Spec(
-        Reconstructors.DM,
         'DM',
         DMOptions,
         DMReconstructorOptions,
@@ -651,7 +664,6 @@ class DMAlgorithm(PtyChiAlgorithm):
         DMProbePositionOptions,
         DMOPRModeWeightsOptions,
     )
-    _settings: PtyChiDMSettings
 
     def _extra_reconstructor_kwargs(self) -> dict[str, Any]:
         return {
@@ -669,9 +681,8 @@ class DMAlgorithm(PtyChiAlgorithm):
         return {'inertia': self._settings.probe_inertia.get_value()}
 
 
-class RAARAlgorithm(PtyChiAlgorithm):
+class RAARAlgorithm(PtyChiAlgorithm[PtyChiRAARSettings]):
     spec = _Spec(
-        Reconstructors.RAAR,
         'RAAR',
         RAAROptions,
         RAARReconstructorOptions,
@@ -680,7 +691,6 @@ class RAARAlgorithm(PtyChiAlgorithm):
         RAARProbePositionOptions,
         RAAROPRModeWeightsOptions,
     )
-    _settings: PtyChiRAARSettings
 
     def _extra_reconstructor_kwargs(self) -> dict[str, Any]:
         return {
@@ -698,9 +708,8 @@ class RAARAlgorithm(PtyChiAlgorithm):
         return {'inertia': self._settings.probe_inertia.get_value()}
 
 
-class PIEAlgorithm(PtyChiAlgorithm):
+class PIEAlgorithm(PtyChiAlgorithm[PtyChiPIESettings]):
     spec = _Spec(
-        Reconstructors.PIE,
         'PIE',
         PIEOptions,
         PIEReconstructorOptions,
@@ -709,7 +718,6 @@ class PIEAlgorithm(PtyChiAlgorithm):
         PIEProbePositionOptions,
         PIEOPRModeWeightsOptions,
     )
-    _settings: PtyChiPIESettings
 
     def _extra_object_kwargs(self, object_: Object) -> dict[str, Any]:
         return {'alpha': self._settings.object_alpha.get_value()}
@@ -720,7 +728,6 @@ class PIEAlgorithm(PtyChiAlgorithm):
 
 class EPIEAlgorithm(PIEAlgorithm):
     spec = _Spec(
-        Reconstructors.EPIE,
         'ePIE',
         EPIEOptions,
         EPIEReconstructorOptions,
@@ -733,7 +740,6 @@ class EPIEAlgorithm(PIEAlgorithm):
 
 class RPIEAlgorithm(PIEAlgorithm):
     spec = _Spec(
-        Reconstructors.RPIE,
         'rPIE',
         RPIEOptions,
         RPIEReconstructorOptions,
@@ -744,9 +750,8 @@ class RPIEAlgorithm(PIEAlgorithm):
     )
 
 
-class LSQMLAlgorithm(PtyChiAlgorithm):
+class LSQMLAlgorithm(PtyChiAlgorithm[PtyChiLSQMLSettings]):
     spec = _Spec(
-        Reconstructors.LSQML,
         'LSQML',
         LSQMLOptions,
         LSQMLReconstructorOptions,
@@ -755,7 +760,6 @@ class LSQMLAlgorithm(PtyChiAlgorithm):
         LSQMLProbePositionOptions,
         LSQMLOPRModeWeightsOptions,
     )
-    _settings: PtyChiLSQMLSettings
 
     def _extra_reconstructor_kwargs(self) -> dict[str, Any]:
         s = self._settings
@@ -803,9 +807,8 @@ class LSQMLAlgorithm(PtyChiAlgorithm):
         }
 
 
-class AutodiffAlgorithm(PtyChiAlgorithm):
+class AutodiffAlgorithm(PtyChiAlgorithm[PtyChiAutodiffSettings]):
     spec = _Spec(
-        Reconstructors.AD_PTYCHO,
         'Autodiff',
         AutodiffPtychographyOptions,
         AutodiffPtychographyReconstructorOptions,
@@ -814,7 +817,6 @@ class AutodiffAlgorithm(PtyChiAlgorithm):
         AutodiffPtychographyProbePositionOptions,
         AutodiffPtychographyOPRModeWeightsOptions,
     )
-    _settings: PtyChiAutodiffSettings
 
     def _extra_reconstructor_kwargs(self) -> dict[str, Any]:
         s = self._settings
@@ -831,9 +833,8 @@ class AutodiffAlgorithm(PtyChiAlgorithm):
         }
 
 
-class BHAlgorithm(PtyChiAlgorithm):
+class BHAlgorithm(PtyChiAlgorithm[PtyChiBHSettings]):
     spec = _Spec(
-        Reconstructors.BH,
         'BH',
         BHOptions,
         BHReconstructorOptions,
@@ -842,7 +843,6 @@ class BHAlgorithm(PtyChiAlgorithm):
         BHProbePositionOptions,
         BHOPRModeWeightsOptions,
     )
-    _settings: PtyChiBHSettings
 
     def _extra_reconstructor_kwargs(self) -> dict[str, Any]:
         return {'method': self._settings.method.get_value()}
@@ -854,51 +854,120 @@ class BHAlgorithm(PtyChiAlgorithm):
         return {'rho': self._settings.probe_position_rho.get_value()}
 
 
-ALGORITHMS: Final[Mapping[Reconstructors, type[PtyChiAlgorithm]]] = {
-    Reconstructors.DM: DMAlgorithm,
-    Reconstructors.RAAR: RAARAlgorithm,
-    Reconstructors.PIE: PIEAlgorithm,
-    Reconstructors.EPIE: EPIEAlgorithm,
-    Reconstructors.RPIE: RPIEAlgorithm,
-    Reconstructors.LSQML: LSQMLAlgorithm,
-    Reconstructors.AD_PTYCHO: AutodiffAlgorithm,
-    Reconstructors.BH: BHAlgorithm,
-}
-
-
-def build_reconstructor_list(
+def _to_subprocess_reconstructor(
+    algorithm: PtyChiAlgorithm[Any],
     common: PtyChiCommon,
-    settings_by_reconstructor: Mapping[Reconstructors, Any],
-) -> list[SubprocessReconstructor]:
-    """Build one :class:`SubprocessReconstructor` per pty-chi algorithm."""
-
-    reconstructors: list[SubprocessReconstructor] = []
-
+) -> SubprocessReconstructor:
     def progress_goal() -> int:
         return common.num_epochs
 
-    for reconstructor, algo_cls in ALGORITHMS.items():
-        algorithm = algo_cls(common, settings_by_reconstructor[reconstructor])
-
-        def build_payload(
-            parameters: ReconstructInput,
-            _loaded_model_path: Path | None,
-            _algorithm: PtyChiAlgorithm = algorithm,
-            _common: PtyChiCommon = common,
-        ) -> PtyChiPayload:
-            return PtyChiPayload(
-                reconstruct_input=parameters,
-                task_options=_algorithm.build_task_options(parameters.product),
-                num_sync_epochs=_common.num_sync_epochs,
-            )
-
-        reconstructors.append(
-            SubprocessReconstructor(
-                name=algorithm.spec.display_name,
-                reconstruct_entry_point=_RECONSTRUCT_ENTRY,
-                progress_goal_fn=progress_goal,
-                build_reconstruct_payload=build_payload,
-            )
+    def build_payload(
+        parameters: ReconstructInput,
+        _loaded_model_path: Path | None,
+    ) -> PtyChiPayload:
+        return PtyChiPayload(
+            reconstruct_input=parameters,
+            task_options=algorithm.build_task_options(parameters.product),
+            num_sync_epochs=common.num_sync_epochs,
         )
 
-    return reconstructors
+    return SubprocessReconstructor(
+        name=algorithm.spec.display_name,
+        reconstruct_entry_point=_RECONSTRUCT_ENTRY,
+        progress_goal_fn=progress_goal,
+        build_reconstruct_payload=build_payload,
+    )
+
+
+def create_dm_reconstructor(
+    common: PtyChiCommon,
+    settings: PtyChiDMSettings,
+) -> SubprocessReconstructor:
+    return _to_subprocess_reconstructor(DMAlgorithm(common, settings), common)
+
+
+def create_raar_reconstructor(
+    common: PtyChiCommon,
+    settings: PtyChiRAARSettings,
+) -> SubprocessReconstructor:
+    return _to_subprocess_reconstructor(RAARAlgorithm(common, settings), common)
+
+
+def create_pie_reconstructor(
+    common: PtyChiCommon,
+    settings: PtyChiPIESettings,
+) -> SubprocessReconstructor:
+    return _to_subprocess_reconstructor(PIEAlgorithm(common, settings), common)
+
+
+def create_epie_reconstructor(
+    common: PtyChiCommon,
+    settings: PtyChiPIESettings,
+) -> SubprocessReconstructor:
+    return _to_subprocess_reconstructor(EPIEAlgorithm(common, settings), common)
+
+
+def create_rpie_reconstructor(
+    common: PtyChiCommon,
+    settings: PtyChiPIESettings,
+) -> SubprocessReconstructor:
+    return _to_subprocess_reconstructor(RPIEAlgorithm(common, settings), common)
+
+
+def create_lsqml_reconstructor(
+    common: PtyChiCommon,
+    settings: PtyChiLSQMLSettings,
+) -> SubprocessReconstructor:
+    return _to_subprocess_reconstructor(LSQMLAlgorithm(common, settings), common)
+
+
+def create_autodiff_reconstructor(
+    common: PtyChiCommon,
+    settings: PtyChiAutodiffSettings,
+) -> SubprocessReconstructor:
+    return _to_subprocess_reconstructor(AutodiffAlgorithm(common, settings), common)
+
+
+def create_bh_reconstructor(
+    common: PtyChiCommon,
+    settings: PtyChiBHSettings,
+) -> SubprocessReconstructor:
+    return _to_subprocess_reconstructor(BHAlgorithm(common, settings), common)
+
+
+def build_task_options_for_algorithm(
+    common: PtyChiCommon,
+    algorithm_name: str,
+    product: Product,
+    *,
+    dm_settings: PtyChiDMSettings,
+    raar_settings: PtyChiRAARSettings,
+    pie_settings: PtyChiPIESettings,
+    lsqml_settings: PtyChiLSQMLSettings,
+    autodiff_settings: PtyChiAutodiffSettings,
+    bh_settings: PtyChiBHSettings,
+) -> PtychographyTaskOptions:
+    """Build a pty-chi ``PtychographyTaskOptions`` for the named algorithm.
+
+    Case-insensitive on the display name, so 'rPIE' and 'rpie' both resolve.
+    """
+    name = algorithm_name.casefold()
+
+    if name == 'dm':
+        return DMAlgorithm(common, dm_settings).build_task_options(product)
+    if name == 'raar':
+        return RAARAlgorithm(common, raar_settings).build_task_options(product)
+    if name == 'pie':
+        return PIEAlgorithm(common, pie_settings).build_task_options(product)
+    if name == 'epie':
+        return EPIEAlgorithm(common, pie_settings).build_task_options(product)
+    if name == 'rpie':
+        return RPIEAlgorithm(common, pie_settings).build_task_options(product)
+    if name == 'lsqml':
+        return LSQMLAlgorithm(common, lsqml_settings).build_task_options(product)
+    if name == 'autodiff':
+        return AutodiffAlgorithm(common, autodiff_settings).build_task_options(product)
+    if name == 'bh':
+        return BHAlgorithm(common, bh_settings).build_task_options(product)
+
+    raise KeyError(f'Unknown pty-chi algorithm "{algorithm_name}"!')

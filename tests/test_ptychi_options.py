@@ -35,10 +35,20 @@ from ptychi.api import Reconstructors
 
 from ptychodus.model.ptychi.core import PtyChiReconstructorLibrary
 
-# The registry + shared kwarg builder replace the per-algorithm classes and the
-# 6-helper facade the pre-refactor tests reached into. Deliberately imported at
-# module scope: this file already does ``pytest.importorskip('ptychi')`` above.
-from ptychodus.model.ptychi.algorithms import ALGORITHMS, PtyChiCommon  # noqa: E402
+# Deliberately imported at module scope: this file already does
+# ``pytest.importorskip('ptychi')`` above.
+from ptychodus.model.ptychi.algorithms import (  # noqa: E402
+    AutodiffAlgorithm,
+    BHAlgorithm,
+    DMAlgorithm,
+    EPIEAlgorithm,
+    LSQMLAlgorithm,
+    PIEAlgorithm,
+    PtyChiAlgorithm,
+    PtyChiCommon,
+    RAARAlgorithm,
+    RPIEAlgorithm,
+)
 from ptychodus.model.ptychi.task import (  # noqa: E402
     _initial_opr_mode_weights,
     dump_task_options,
@@ -120,29 +130,21 @@ def _make_common(library: PtyChiReconstructorLibrary) -> PtyChiCommon:
     )
 
 
-def _settings_for(library: PtyChiReconstructorLibrary, reconstructor: Reconstructors):
-    return {
-        Reconstructors.DM: library.dm_settings,
-        Reconstructors.RAAR: library.raar_settings,
-        Reconstructors.PIE: library.pie_settings,
-        Reconstructors.EPIE: library.pie_settings,
-        Reconstructors.RPIE: library.pie_settings,
-        Reconstructors.LSQML: library.lsqml_settings,
-        Reconstructors.AD_PTYCHO: library.autodiff_settings,
-        Reconstructors.BH: library.bh_settings,
-    }[reconstructor]
-
-
-def _make_algorithms(library: PtyChiReconstructorLibrary) -> list:
+def _make_algorithms(library: PtyChiReconstructorLibrary) -> list[PtyChiAlgorithm]:
     """Instantiate the algorithm wrappers directly against ``library``'s settings.
 
-    Iteration order matches ``ALGORITHMS`` (DM first), which the two positional
-    ``[0]`` assertions below rely on to get "the DM one".
+    DM is first because the two ``[0]`` assertions below rely on it.
     """
     common = _make_common(library)
     return [
-        algo_cls(common, _settings_for(library, reconstructor))
-        for reconstructor, algo_cls in ALGORITHMS.items()
+        DMAlgorithm(common, library.dm_settings),
+        RAARAlgorithm(common, library.raar_settings),
+        PIEAlgorithm(common, library.pie_settings),
+        EPIEAlgorithm(common, library.pie_settings),
+        RPIEAlgorithm(common, library.pie_settings),
+        LSQMLAlgorithm(common, library.lsqml_settings),
+        AutodiffAlgorithm(common, library.autodiff_settings),
+        BHAlgorithm(common, library.bh_settings),
     ]
 
 
@@ -336,7 +338,7 @@ def test_lsqml_algorithm_specific_field_survives_round_trip() -> None:
     library = _make_library()
     library.lsqml_settings.momentum_acceleration_gain.set_value(0.75)
 
-    algorithm = ALGORITHMS[Reconstructors.LSQML](_make_common(library), library.lsqml_settings)
+    algorithm = LSQMLAlgorithm(_make_common(library), library.lsqml_settings)
     task_options = algorithm.build_task_options(_make_reconstruct_input().product)
 
     loaded = load_task_options(dump_task_options(task_options))
@@ -344,26 +346,37 @@ def test_lsqml_algorithm_specific_field_survives_round_trip() -> None:
     assert loaded.reconstructor_options.momentum_acceleration_gain == pytest.approx(0.75)
 
 
-def test_registry_task_options_class_matches_built_options() -> None:
-    """Each registered algorithm must build the ``task_options_cls`` its spec names.
+def test_algorithm_task_options_class_matches_built_options() -> None:
+    """Each algorithm must build the ``task_options_cls`` its spec names.
 
     Fails when a subclass sets ``spec.task_options_cls`` to a class whose
-    ``get_reconstructor_type()`` disagrees with the registry key, and when two
-    entries map to the same reconstructor type.
+    ``get_reconstructor_type()`` disagrees with the expected reconstructor, and
+    when two subclasses map to the same reconstructor type.
     """
     library = _make_library()
     parameters = _make_reconstruct_input()
+    common = _make_common(library)
+
+    cases: list[tuple[PtyChiAlgorithm, Reconstructors]] = [
+        (DMAlgorithm(common, library.dm_settings), Reconstructors.DM),
+        (RAARAlgorithm(common, library.raar_settings), Reconstructors.RAAR),
+        (PIEAlgorithm(common, library.pie_settings), Reconstructors.PIE),
+        (EPIEAlgorithm(common, library.pie_settings), Reconstructors.EPIE),
+        (RPIEAlgorithm(common, library.pie_settings), Reconstructors.RPIE),
+        (LSQMLAlgorithm(common, library.lsqml_settings), Reconstructors.LSQML),
+        (AutodiffAlgorithm(common, library.autodiff_settings), Reconstructors.AD_PTYCHO),
+        (BHAlgorithm(common, library.bh_settings), Reconstructors.BH),
+    ]
 
     reconstructors_seen: set[Reconstructors] = set()
 
-    for reconstructor, algo_cls in ALGORITHMS.items():
-        algorithm = algo_cls(_make_common(library), _settings_for(library, reconstructor))
+    for algorithm, expected_reconstructor in cases:
         options = algorithm.build_task_options(parameters.product)
 
-        assert type(options) is algo_cls.spec.task_options_cls
-        assert options.reconstructor_options.get_reconstructor_type() == reconstructor
-        assert reconstructor not in reconstructors_seen
-        reconstructors_seen.add(reconstructor)
+        assert type(options) is type(algorithm).spec.task_options_cls
+        assert options.reconstructor_options.get_reconstructor_type() == expected_reconstructor
+        assert expected_reconstructor not in reconstructors_seen
+        reconstructors_seen.add(expected_reconstructor)
 
 
 def test_wire_format_envelope_carries_reconstructor() -> None:
@@ -373,7 +386,7 @@ def test_wire_format_envelope_carries_reconstructor() -> None:
     to a bare-dict payload (which would let PIE/ePIE/rPIE alias each other).
     """
     library = _make_library()
-    algorithm = ALGORITHMS[Reconstructors.LSQML](_make_common(library), library.lsqml_settings)
+    algorithm = LSQMLAlgorithm(_make_common(library), library.lsqml_settings)
     task_options = algorithm.build_task_options(_make_reconstruct_input().product)
 
     envelope = json.loads(dump_task_options(task_options))

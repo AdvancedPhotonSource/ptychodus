@@ -35,7 +35,17 @@ from collections.abc import Iterator
 
 import numpy
 
-from ptychi.api import Reconstructors
+from ptychi.api import (
+    AutodiffPtychographyOptions,
+    BHOptions,
+    DMOptions,
+    EPIEOptions,
+    LSQMLOptions,
+    PIEOptions,
+    RAAROptions,
+    RPIEOptions,
+    Reconstructors,
+)
 from ptychi.api.options.task import PtychographyTaskOptions
 
 from ptychodus.api.object import Object, ObjectPosition
@@ -45,8 +55,6 @@ from ptychodus.api.product import LossValue, Product
 from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
 from ptychodus.api.typing import RealArrayType
 
-from .algorithms import ALGORITHMS
-
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -54,6 +62,18 @@ __all__ = [
     'load_task_options',
     'reconstruct_with_ptychi',
 ]
+
+
+_TASK_OPTIONS_CLS_BY_RECONSTRUCTOR: dict[Reconstructors, type[PtychographyTaskOptions]] = {
+    Reconstructors.DM: DMOptions,
+    Reconstructors.RAAR: RAAROptions,
+    Reconstructors.PIE: PIEOptions,
+    Reconstructors.EPIE: EPIEOptions,
+    Reconstructors.RPIE: RPIEOptions,
+    Reconstructors.LSQML: LSQMLOptions,
+    Reconstructors.AD_PTYCHO: AutodiffPtychographyOptions,
+    Reconstructors.BH: BHOptions,
+}
 
 
 def dump_task_options(options: PtychographyTaskOptions) -> str:
@@ -87,7 +107,7 @@ def load_task_options(text: str) -> PtychographyTaskOptions:
         raise ValueError(f'Unknown pty-chi reconstructor "{envelope["reconstructor"]}"!') from None
 
     try:
-        algorithm_cls = ALGORITHMS[reconstructor]
+        task_options_cls = _TASK_OPTIONS_CLS_BY_RECONSTRUCTOR[reconstructor]
     except KeyError:
         raise ValueError(f'Unknown pty-chi reconstructor "{reconstructor}"!') from None
 
@@ -95,7 +115,7 @@ def load_task_options(text: str) -> PtychographyTaskOptions:
     if not isinstance(options_dict, dict):
         raise ValueError('Options envelope "options" field must be a JSON object!')
 
-    options = algorithm_cls.spec.task_options_cls()
+    options = task_options_cls()
     options.load_from_dict(options_dict)
     return options
 
