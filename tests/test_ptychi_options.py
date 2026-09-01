@@ -48,6 +48,7 @@ from ptychodus.model.ptychi.algorithms import (  # noqa: E402
     PtyChiCommon,
     RAARAlgorithm,
     RPIEAlgorithm,
+    build_algorithms,
 )
 from ptychodus.model.ptychi.task import (  # noqa: E402
     _initial_opr_mode_weights,
@@ -133,19 +134,19 @@ def _make_common(library: PtyChiReconstructorLibrary) -> PtyChiCommon:
 def _make_algorithms(library: PtyChiReconstructorLibrary) -> list[PtyChiAlgorithm]:
     """Instantiate the algorithm wrappers directly against ``library``'s settings.
 
-    DM is first because the two ``[0]`` assertions below rely on it.
+    DM is first because the two ``[0]`` assertions below rely on it —
+    ``build_algorithms`` guarantees that ordering.
     """
-    common = _make_common(library)
-    return [
-        DMAlgorithm(common, library.dm_settings),
-        RAARAlgorithm(common, library.raar_settings),
-        PIEAlgorithm(common, library.pie_settings),
-        EPIEAlgorithm(common, library.pie_settings),
-        RPIEAlgorithm(common, library.pie_settings),
-        LSQMLAlgorithm(common, library.lsqml_settings),
-        AutodiffAlgorithm(common, library.autodiff_settings),
-        BHAlgorithm(common, library.bh_settings),
-    ]
+    algorithms = build_algorithms(
+        _make_common(library),
+        dm_settings=library.dm_settings,
+        raar_settings=library.raar_settings,
+        pie_settings=library.pie_settings,
+        lsqml_settings=library.lsqml_settings,
+        autodiff_settings=library.autodiff_settings,
+        bh_settings=library.bh_settings,
+    )
+    return list(algorithms.values())
 
 
 def _build_all_task_options(library: PtyChiReconstructorLibrary, parameters: ReconstructInput):

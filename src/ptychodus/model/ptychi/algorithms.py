@@ -1,11 +1,13 @@
-"""Parent-safe pty-chi algorithm layer: shared kwarg builders and per-algorithm factories.
+"""Parent-safe pty-chi algorithm layer: shared kwarg builders and the algorithm registry.
 
 Each pty-chi engine has one :class:`PtyChiAlgorithm` subclass (strictly typed on
-its settings group via ``PtyChiAlgorithm[SettingsT]``) plus one module-level
-``create_<name>_reconstructor`` factory that produces a
+its settings group via ``PtyChiAlgorithm[SettingsT]``). :func:`build_algorithms`
+instantiates one of every subclass and returns them keyed by casefolded display
+name; :func:`wrap_as_subprocess_reconstructor` wraps a single algorithm as a
 :class:`SubprocessReconstructor`. Adding a new engine means writing one
-subclass, one factory, one line in :mod:`ptychodus.model.ptychi.core`, and one
-entry in :data:`ptychodus.model.ptychi.task._TASK_OPTIONS_CLS_BY_RECONSTRUCTOR`.
+subclass, listing it in :func:`build_algorithms`, adding its display name to
+:data:`ptychodus.model.ptychi._names.DISPLAY_NAMES`, and adding one entry in
+:data:`ptychodus.model.ptychi.task._TASK_OPTIONS_CLS_BY_RECONSTRUCTOR`.
 
 The module imports ``ptychi.api`` (for the Options dataclasses and enums),
 which pulls torch in for type annotations only -- no CUDA runtime is acquired.
@@ -111,6 +113,7 @@ from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput
 
 from ..processing.subprocess_reconstructor import SubprocessReconstructor
+from ._names import DISPLAY_NAMES
 from ._payload import PtyChiPayload
 from .affine import PtyChiAffineDegreesOfFreedom, PtyChiAffineDegreesOfFreedomBitField
 from .settings import (
@@ -130,15 +133,8 @@ from .settings import (
 __all__ = [
     'PtyChiAlgorithm',
     'PtyChiCommon',
-    'build_task_options_for_algorithm',
-    'create_autodiff_reconstructor',
-    'create_bh_reconstructor',
-    'create_dm_reconstructor',
-    'create_epie_reconstructor',
-    'create_lsqml_reconstructor',
-    'create_pie_reconstructor',
-    'create_raar_reconstructor',
-    'create_rpie_reconstructor',
+    'build_algorithms',
+    'wrap_as_subprocess_reconstructor',
 ]
 
 logger = logging.getLogger(__name__)
@@ -854,7 +850,7 @@ class BHAlgorithm(PtyChiAlgorithm[PtyChiBHSettings]):
         return {'rho': self._settings.probe_position_rho.get_value()}
 
 
-def _to_subprocess_reconstructor(
+def wrap_as_subprocess_reconstructor(
     algorithm: PtyChiAlgorithm[Any],
     common: PtyChiCommon,
 ) -> SubprocessReconstructor:
@@ -879,66 +875,8 @@ def _to_subprocess_reconstructor(
     )
 
 
-def create_dm_reconstructor(
+def build_algorithms(
     common: PtyChiCommon,
-    settings: PtyChiDMSettings,
-) -> SubprocessReconstructor:
-    return _to_subprocess_reconstructor(DMAlgorithm(common, settings), common)
-
-
-def create_raar_reconstructor(
-    common: PtyChiCommon,
-    settings: PtyChiRAARSettings,
-) -> SubprocessReconstructor:
-    return _to_subprocess_reconstructor(RAARAlgorithm(common, settings), common)
-
-
-def create_pie_reconstructor(
-    common: PtyChiCommon,
-    settings: PtyChiPIESettings,
-) -> SubprocessReconstructor:
-    return _to_subprocess_reconstructor(PIEAlgorithm(common, settings), common)
-
-
-def create_epie_reconstructor(
-    common: PtyChiCommon,
-    settings: PtyChiPIESettings,
-) -> SubprocessReconstructor:
-    return _to_subprocess_reconstructor(EPIEAlgorithm(common, settings), common)
-
-
-def create_rpie_reconstructor(
-    common: PtyChiCommon,
-    settings: PtyChiPIESettings,
-) -> SubprocessReconstructor:
-    return _to_subprocess_reconstructor(RPIEAlgorithm(common, settings), common)
-
-
-def create_lsqml_reconstructor(
-    common: PtyChiCommon,
-    settings: PtyChiLSQMLSettings,
-) -> SubprocessReconstructor:
-    return _to_subprocess_reconstructor(LSQMLAlgorithm(common, settings), common)
-
-
-def create_autodiff_reconstructor(
-    common: PtyChiCommon,
-    settings: PtyChiAutodiffSettings,
-) -> SubprocessReconstructor:
-    return _to_subprocess_reconstructor(AutodiffAlgorithm(common, settings), common)
-
-
-def create_bh_reconstructor(
-    common: PtyChiCommon,
-    settings: PtyChiBHSettings,
-) -> SubprocessReconstructor:
-    return _to_subprocess_reconstructor(BHAlgorithm(common, settings), common)
-
-
-def build_task_options_for_algorithm(
-    common: PtyChiCommon,
-    algorithm_name: str,
-    product: Product,
     *,
     dm_settings: PtyChiDMSettings,
     raar_settings: PtyChiRAARSettings,
@@ -946,28 +884,25 @@ def build_task_options_for_algorithm(
     lsqml_settings: PtyChiLSQMLSettings,
     autodiff_settings: PtyChiAutodiffSettings,
     bh_settings: PtyChiBHSettings,
-) -> PtychographyTaskOptions:
-    """Build a pty-chi ``PtychographyTaskOptions`` for the named algorithm.
+) -> dict[str, PtyChiAlgorithm[Any]]:
+    """Instantiate every pty-chi algorithm, keyed by casefolded display name.
 
-    Case-insensitive on the display name, so 'rPIE' and 'rpie' both resolve.
+    The single source of truth for "which algorithms exist and what settings
+    each one reads". PIE/ePIE/rPIE share ``pie_settings`` — that stays explicit
+    here. Insertion order matches :data:`_names.DISPLAY_NAMES` so callers that
+    iterate ``.values()`` get a stable ordering.
     """
-    name = algorithm_name.casefold()
-
-    if name == 'dm':
-        return DMAlgorithm(common, dm_settings).build_task_options(product)
-    if name == 'raar':
-        return RAARAlgorithm(common, raar_settings).build_task_options(product)
-    if name == 'pie':
-        return PIEAlgorithm(common, pie_settings).build_task_options(product)
-    if name == 'epie':
-        return EPIEAlgorithm(common, pie_settings).build_task_options(product)
-    if name == 'rpie':
-        return RPIEAlgorithm(common, pie_settings).build_task_options(product)
-    if name == 'lsqml':
-        return LSQMLAlgorithm(common, lsqml_settings).build_task_options(product)
-    if name == 'autodiff':
-        return AutodiffAlgorithm(common, autodiff_settings).build_task_options(product)
-    if name == 'bh':
-        return BHAlgorithm(common, bh_settings).build_task_options(product)
-
-    raise KeyError(f'Unknown pty-chi algorithm "{algorithm_name}"!')
+    algorithms: list[PtyChiAlgorithm[Any]] = [
+        DMAlgorithm(common, dm_settings),
+        RAARAlgorithm(common, raar_settings),
+        PIEAlgorithm(common, pie_settings),
+        EPIEAlgorithm(common, pie_settings),
+        RPIEAlgorithm(common, pie_settings),
+        LSQMLAlgorithm(common, lsqml_settings),
+        AutodiffAlgorithm(common, autodiff_settings),
+        BHAlgorithm(common, bh_settings),
+    ]
+    # Locks the display names in the _Spec entries above to the ptychi-free
+    # DISPLAY_NAMES tuple that core.py's fallback branch also consumes.
+    assert tuple(a.spec.display_name for a in algorithms) == DISPLAY_NAMES
+    return {a.spec.display_name.casefold(): a for a in algorithms}
