@@ -395,8 +395,10 @@ class PtyChiObjectOptionsHelper:
 
     def get_slice_spacings_m(self, object_: Object) -> list[float] | None:
         # pty-chi types slice spacings as a serializable list/tuple, not an ndarray.
+        # Test the length rather than truthiness: a product read back from HDF5
+        # carries an ndarray here, and ``if array`` raises for every length but one.
         slice_spacings_m = object_.layer_spacing_m
-        return list(slice_spacings_m) if slice_spacings_m else None
+        return list(slice_spacings_m) if len(slice_spacings_m) > 0 else None
 
     def get_pixel_size_m(self, object_: Object) -> float:
         pixel_geometry = object_.get_pixel_geometry()

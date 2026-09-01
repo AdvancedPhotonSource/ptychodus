@@ -16,6 +16,8 @@ these tests also pin down that separation.
 
 from __future__ import annotations
 
+import json
+
 import numpy
 import pytest
 
@@ -29,13 +31,14 @@ from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput
 from ptychodus.api.settings import SettingsRegistry
+from ptychi.api import Reconstructors
+
 from ptychodus.model.ptychi.core import PtyChiReconstructorLibrary
 
 # Concrete (child-side) reconstructor classes plus the options helper. This test
 # is an in-process validator that must reach into pty-chi's Pydantic constructors
 # directly, so it deliberately does the imports the parent avoids. This is safe
 # because the file already does ``pytest.importorskip('ptychi')`` above.
-from ptychodus.model.ptychi._subprocess import _initial_opr_mode_weights  # noqa: E402
 from ptychodus.model.ptychi.autodiff import AutodiffReconstructor  # noqa: E402
 from ptychodus.model.ptychi.bh import BHReconstructor  # noqa: E402
 from ptychodus.model.ptychi.dm import DMReconstructor  # noqa: E402
@@ -45,6 +48,14 @@ from ptychodus.model.ptychi.lsqml import LSQMLReconstructor  # noqa: E402
 from ptychodus.model.ptychi.pie import PIEReconstructor  # noqa: E402
 from ptychodus.model.ptychi.raar import RAARReconstructor  # noqa: E402
 from ptychodus.model.ptychi.rpie import RPIEReconstructor  # noqa: E402
+from ptychodus.model.ptychi.task import (  # noqa: E402
+    OPTIONS_CLASSES,
+    RECONSTRUCTOR_CHOICES,
+    _initial_opr_mode_weights,
+    dump_task_options,
+    load_task_options,
+    reconstructor_argument,
+)
 
 PIXEL_M = 1.0e-9
 OBJ_HEIGHT_PX = 32
@@ -146,10 +157,12 @@ def _make_concrete_reconstructors(library: PtyChiReconstructorLibrary) -> list:
 
 
 def _build_all_task_options(library: PtyChiReconstructorLibrary, parameters: ReconstructInput):
-    for reconstructor in _make_concrete_reconstructors(library):
-        # Every ptychi reconstructor exposes ``_create_task_options``; building it
-        # runs pty-chi's Pydantic validators over all sub-option objects.
+    # Every ptychi reconstructor exposes ``_create_task_options``; building it
+    # runs pty-chi's Pydantic validators over all sub-option objects.
+    return [
         reconstructor._create_task_options(parameters)  # type: ignore[attr-defined]
+        for reconstructor in _make_concrete_reconstructors(library)
+    ]
 
 
 def _numeric_parameters(library: PtyChiReconstructorLibrary):
@@ -310,3 +323,74 @@ def test_far_field_propagation_flag_is_read_by_value() -> None:
     assert helper.create_data_options(metadata).free_space_propagation_distance_m == pytest.approx(
         metadata.detector_distance_m
     )
+
+
+def test_options_round_trip_through_the_wire_format() -> None:
+    """Serializing and reloading must preserve the algorithm-specific subclass.
+
+    ``load_from_dict`` resolves nested options through declared field
+    annotations, so loading into a plain ``PtychographyTaskOptions`` would
+    downcast ``reconstructor_options`` to its base class and silently drop
+    every algorithm-specific field. The subclass check below is what catches
+    that.
+    """
+    library = _make_library()
+
+    for task_options in _build_all_task_options(library, _make_reconstruct_input()):
+        reconstructor = Reconstructors(reconstructor_argument(task_options))
+        loaded = load_task_options(dump_task_options(task_options), reconstructor)
+
+        assert type(loaded) is type(task_options)
+        # Compare the parsed wire content rather than get_dict() directly:
+        # pydantic coerces int defaults to float on load and JSON has no
+        # tuples, so a raw dict comparison would test those artifacts.
+        assert json.loads(dump_task_options(loaded)) == json.loads(dump_task_options(task_options))
+
+
+def test_lsqml_algorithm_specific_field_survives_round_trip() -> None:
+    """A field that exists only on the subclass must come back with its value."""
+    library = _make_library()
+    library.lsqml_settings.momentum_acceleration_gain.set_value(0.75)
+
+    task_options = LSQMLReconstructor(
+        _make_options_helper(library), library.lsqml_settings
+    )._create_task_options(_make_reconstruct_input())
+
+    loaded = load_task_options(
+        dump_task_options(task_options), Reconstructors(reconstructor_argument(task_options))
+    )
+
+    assert loaded.reconstructor_options.momentum_acceleration_gain == pytest.approx(0.75)
+
+
+def test_every_built_options_class_is_in_the_map() -> None:
+    """The codec map must cover every algorithm ptychodus can build.
+
+    Keys come from pty-chi's own ``get_reconstructor_type()``, so this fails
+    when an engine is added to the algorithm table without a matching entry in
+    ``_TASK_OPTIONS_CLASSES``, and when an entry maps to the wrong class.
+    """
+    library = _make_library()
+    built = _build_all_task_options(library, _make_reconstruct_input())
+
+    for task_options in built:
+        reconstructor = task_options.reconstructor_options.get_reconstructor_type()
+        assert OPTIONS_CLASSES[reconstructor] is type(task_options)
+
+    reconstructors = {
+        task_options.reconstructor_options.get_reconstructor_type() for task_options in built
+    }
+    assert len(reconstructors) == len(built), 'two algorithms share a reconstructor type'
+
+
+def test_reconstructor_argument_matches_the_command_line_choices() -> None:
+    """The launcher helper and the CLI must agree on the accepted vocabulary."""
+    library = _make_library()
+
+    for task_options in _build_all_task_options(library, _make_reconstruct_input()):
+        assert reconstructor_argument(task_options) in RECONSTRUCTOR_CHOICES
+
+
+def test_load_task_options_rejects_a_non_object_payload() -> None:
+    with pytest.raises(ValueError):
+        load_task_options('[1, 2, 3]', Reconstructors.LSQML)

@@ -5,7 +5,7 @@ This module imports ``ptychi.api`` (via the per-algorithm modules and
 ``PtychographyTaskOptions``. That import chain pulls torch in — but torch's
 CUDA runtime is lazy, so no GPU context is acquired here. The context is
 acquired only in the spawned child when it instantiates ``PtychographyTask``
-(see :mod:`._subprocess`).
+(see :mod:`.task`).
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ from .settings import (
     PtyChiSettings,
 )
 
-__all__ = ['build_reconstructor_list']
+__all__ = ['build_reconstructor_list', 'create_task_options']
 
 
 _RECONSTRUCT_ENTRY = 'ptychodus.model.ptychi._subprocess:run_reconstruct'
@@ -105,6 +105,27 @@ _ALGORITHMS: tuple[_AlgorithmSpec, ...] = (
 )
 
 
+def create_task_options(
+    algorithm: str,
+    options_helper: PtyChiOptionsHelper,
+    bundle: PtyChiSettingsBundle,
+    parameters: ReconstructInput,
+) -> Any:
+    """Build the pty-chi task options for one algorithm from live settings.
+
+    This is the single dispatch point into the algorithm table: the payload
+    builders below route through it too, so an out-of-process launcher that
+    wants a ``PtychographyTaskOptions`` gets exactly what the GUI would build.
+    ``algorithm`` is a display name from :data:`_ALGORITHMS` and is matched
+    case-insensitively, so 'rPIE' and 'rpie' both resolve.
+    """
+    for spec in _ALGORITHMS:
+        if spec.display_name.casefold() == algorithm.casefold():
+            return spec.make_option_factory(options_helper, bundle)(parameters)
+
+    raise KeyError(f'Unknown pty-chi algorithm "{algorithm}"!')
+
+
 def build_reconstructor_list(
     reconstructor_settings: PtyChiSettings,
     object_settings: PtyChiObjectSettings,
@@ -131,16 +152,15 @@ def build_reconstructor_list(
     reconstructors: list[SubprocessReconstructor] = []
 
     for spec in _ALGORITHMS:
-        build_task_options = spec.make_option_factory(options_helper, bundle)
 
         def build_payload(
             parameters: ReconstructInput,
             _loaded_model_path: Path | None,
-            _build: _TaskOptionsBuilder = build_task_options,
+            _algorithm: str = spec.display_name,
         ) -> PtyChiPayload:
             return PtyChiPayload(
                 reconstruct_input=parameters,
-                task_options=_build(parameters),
+                task_options=create_task_options(_algorithm, options_helper, bundle, parameters),
                 num_sync_epochs=num_sync_epochs(),
             )
 
