@@ -2,10 +2,10 @@
 """Reference launcher for ``scripts/ptychodus_reconstruct.py``.
 
 Shows the whole contract in one place: build a pty-chi options object from
-ptychodus settings exactly as the GUI would, derive the ``--reconstructor``
-token *from that object*, hand the serialized options to the child on stdin,
-and consume its JSON event stream. Optionally cancels the run part-way to
-exercise the signal path.
+ptychodus settings exactly as the GUI would, serialize it, and hand the blob to
+the child on stdin. The envelope in :func:`dump_task_options` carries the
+reconstructor identity, so nothing algorithm-specific rides on argv.
+Optionally cancels the run part-way to exercise the signal path.
 
     python scripts/ptychodus_reconstruct_parent_demo.py \\
         --diffraction-input staging/diffraction.h5 \\
@@ -25,20 +25,17 @@ import threading
 import time
 from pathlib import Path
 
-from ptychodus.api.io import load_diffraction_data, load_product
-from ptychodus.api.reconstruct import prepare_reconstruct_input
+from ptychodus.api.io import load_product
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.processing.api import ProcessingAlgorithmParameter
 from ptychodus.model.processing.settings import ProcessingSettings
 from ptychodus.model.ptychi.core import PtyChiReconstructorLibrary
-from ptychodus.model.ptychi.helper import PtyChiOptionsHelper
-from ptychodus.model.ptychi.reconstructor import PtyChiSettingsBundle, create_task_options
-from ptychodus.model.ptychi.task import dump_task_options, reconstructor_argument
+from ptychodus.model.ptychi.task import dump_task_options
 
 CHILD = Path(__file__).parent / 'ptychodus_reconstruct.py'
 
 
-def _parse_arguments() -> argparse.Namespace:
+def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -76,68 +73,29 @@ def _parse_arguments() -> argparse.Namespace:
         type=float,
         help='Seconds after the child reports "started" before sending SIGTERM.',
     )
-    return parser.parse_args()
+    args = parser.parse_args()
 
-
-def _build_task_options(args: argparse.Namespace):
-    """Build the options the way ptychodus itself does, from a settings INI."""
+    # Build the options the way ptychodus itself does, from a settings INI.
     registry = SettingsRegistry()
     registry.open_settings(args.settings)
     library = PtyChiReconstructorLibrary(registry, is_developer_mode_enabled=False)
 
-    options_helper = PtyChiOptionsHelper(
-        library.settings,
-        library.object_settings,
-        library.probe_settings,
-        library.probe_position_settings,
-        library.opr_settings,
-    )
-    bundle = PtyChiSettingsBundle(
-        dm=library.dm_settings,
-        raar=library.raar_settings,
-        pie=library.pie_settings,
-        lsqml=library.lsqml_settings,
-        autodiff=library.autodiff_settings,
-        bh=library.bh_settings,
-    )
-
     # The chosen algorithm lives in the settings as '<library>_<reconstructor>'
     # (e.g. 'pty-chi_lsqml'); split off the library half and hand the
-    # reconstructor name to create_task_options, which case-folds it.
+    # reconstructor name to library.build_task_options, which case-folds it.
     processing_settings = ProcessingSettings(registry)
     _library, algorithm = ProcessingAlgorithmParameter.split_key(
         processing_settings.algorithm.get_value()
     )
 
-    # create_task_options still takes a full ReconstructInput, though after the
-    # pty-chi v2.0 move the builders only read the product. Loading the
-    # diffraction data here is therefore pure overhead for a launcher -- worth
-    # narrowing that signature to Product.
-    reconstruct_input = prepare_reconstruct_input(
-        load_diffraction_data(args.diffraction_input),
-        load_product(args.product_input),
-    )
-    return create_task_options(algorithm, options_helper, bundle, reconstruct_input)
-
-
-def main() -> int:
-    args = _parse_arguments()
-
-    task_options = _build_task_options(args)
+    task_options = library.build_task_options(algorithm, load_product(args.product_input))
 
     if args.num_epochs is not None:
         task_options.reconstructor_options.num_epochs = args.num_epochs
 
-    # The token and the blob must come from the same object. Never a literal:
-    # naming a class with a different field set fails loudly child-side, but
-    # PIE, ePIE and rPIE are indistinguishable once serialized.
-    reconstructor = reconstructor_argument(task_options)
-
     command = [
         sys.executable,
         str(CHILD),
-        '--reconstructor',
-        reconstructor,
         '--diffraction-input',
         str(args.diffraction_input),
         '--product-input',

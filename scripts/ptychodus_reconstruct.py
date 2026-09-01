@@ -11,18 +11,11 @@ Protocol
 --------
 
 stdin
-    The bare ``json.dumps(options.get_dict())`` produced by
-    :func:`ptychodus.model.ptychi.task.dump_task_options`, read to EOF. Nothing
-    else is read from stdin, so the launcher should close it immediately.
-
-``--reconstructor``
-    Selects the algorithm-specific options subclass the stdin dictionary is
-    loaded into. The blob cannot record this itself (see the wire-format notes
-    in :mod:`ptychodus.model.ptychi.task`). Naming a class with a different
-    field set fails loudly, but PIE, ePIE and rPIE serialize identically and
-    swap for each other in silence, running a different algorithm. Launchers
-    must derive the token from the options object with
-    ``task.reconstructor_argument(options)``, never hand-write it.
+    A JSON envelope ``{"reconstructor": "<enum-value>", "options": {...}}``
+    produced by :func:`ptychodus.model.ptychi.task.dump_task_options`, read to
+    EOF. The envelope carries the algorithm identity, so PIE/ePIE/rPIE cannot
+    silently swap for each other on the way through. Nothing else is read from
+    stdin, so the launcher should close it immediately.
 
 stdout
     One JSON object per line: ``started``, ``epoch``, ``checkpoint``,
@@ -59,8 +52,6 @@ from pathlib import Path
 from types import FrameType
 from typing import IO, Any
 
-from ptychi.api import Reconstructors
-
 import ptychodus
 from ptychodus.api.io import load_diffraction_data, load_product, save_product
 from ptychodus.api.reconstruct import (
@@ -68,11 +59,7 @@ from ptychodus.api.reconstruct import (
     ReconstructOutput,
     prepare_reconstruct_input,
 )
-from ptychodus.model.ptychi.task import (
-    RECONSTRUCTOR_CHOICES,
-    load_task_options,
-    reconstruct_with_ptychi,
-)
+from ptychodus.model.ptychi.task import load_task_options, reconstruct_with_ptychi
 
 logger = logging.getLogger('ptychodus_reconstruct')
 
@@ -152,7 +139,7 @@ def _reconstruct(run: _Run, args: argparse.Namespace, log_file: Path) -> ExitCod
     product_output_file: Path = args.product_output
 
     try:
-        task_options = load_task_options(sys.stdin.read(), Reconstructors(args.reconstructor))
+        task_options = load_task_options(sys.stdin.read())
     except (TypeError, ValueError) as exc:
         run.emit_exception(exc)
         logger.exception('Failed to parse pty-chi options from stdin.')
@@ -168,11 +155,12 @@ def _reconstruct(run: _Run, args: argparse.Namespace, log_file: Path) -> ExitCod
     task_options.check()
 
     num_epochs = int(task_options.reconstructor_options.num_epochs)
+    reconstructor_token = task_options.reconstructor_options.get_reconstructor_type().value
 
     run.emit(
         'started',
         pid=os.getpid(),
-        reconstructor=args.reconstructor,
+        reconstructor=reconstructor_token,
         options_class=type(task_options).__name__,
         num_epochs=num_epochs,
         num_sync_epochs=args.num_sync_epochs,
@@ -238,12 +226,6 @@ def main() -> ExitCode:
     parser = argparse.ArgumentParser(
         description='Run one pty-chi reconstruction, reading options from stdin.',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument(
-        '--reconstructor',
-        required=True,
-        choices=RECONSTRUCTOR_CHOICES,
-        help='pty-chi algorithm that produced the options on stdin.',
     )
     parser.add_argument(
         '--diffraction-input',

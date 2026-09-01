@@ -35,26 +35,14 @@ from ptychi.api import Reconstructors
 
 from ptychodus.model.ptychi.core import PtyChiReconstructorLibrary
 
-# Concrete (child-side) reconstructor classes plus the options helper. This test
-# is an in-process validator that must reach into pty-chi's Pydantic constructors
-# directly, so it deliberately does the imports the parent avoids. This is safe
-# because the file already does ``pytest.importorskip('ptychi')`` above.
-from ptychodus.model.ptychi.autodiff import AutodiffReconstructor  # noqa: E402
-from ptychodus.model.ptychi.bh import BHReconstructor  # noqa: E402
-from ptychodus.model.ptychi.dm import DMReconstructor  # noqa: E402
-from ptychodus.model.ptychi.epie import EPIEReconstructor  # noqa: E402
-from ptychodus.model.ptychi.helper import PtyChiOptionsHelper  # noqa: E402
-from ptychodus.model.ptychi.lsqml import LSQMLReconstructor  # noqa: E402
-from ptychodus.model.ptychi.pie import PIEReconstructor  # noqa: E402
-from ptychodus.model.ptychi.raar import RAARReconstructor  # noqa: E402
-from ptychodus.model.ptychi.rpie import RPIEReconstructor  # noqa: E402
+# The registry + shared kwarg builder replace the per-algorithm classes and the
+# 6-helper facade the pre-refactor tests reached into. Deliberately imported at
+# module scope: this file already does ``pytest.importorskip('ptychi')`` above.
+from ptychodus.model.ptychi.algorithms import ALGORITHMS, PtyChiCommon  # noqa: E402
 from ptychodus.model.ptychi.task import (  # noqa: E402
-    OPTIONS_CLASSES,
-    RECONSTRUCTOR_CHOICES,
     _initial_opr_mode_weights,
     dump_task_options,
     load_task_options,
-    reconstructor_argument,
 )
 
 PIXEL_M = 1.0e-9
@@ -122,8 +110,8 @@ def _make_library() -> PtyChiReconstructorLibrary:
     )
 
 
-def _make_options_helper(library: PtyChiReconstructorLibrary) -> PtyChiOptionsHelper:
-    return PtyChiOptionsHelper(
+def _make_common(library: PtyChiReconstructorLibrary) -> PtyChiCommon:
+    return PtyChiCommon(
         library.settings,
         library.object_settings,
         library.probe_settings,
@@ -132,36 +120,37 @@ def _make_options_helper(library: PtyChiReconstructorLibrary) -> PtyChiOptionsHe
     )
 
 
-def _make_concrete_reconstructors(library: PtyChiReconstructorLibrary) -> list:
-    """Instantiate the child-side algorithm classes directly against ``library``'s settings.
+def _settings_for(library: PtyChiReconstructorLibrary, reconstructor: Reconstructors):
+    return {
+        Reconstructors.DM: library.dm_settings,
+        Reconstructors.RAAR: library.raar_settings,
+        Reconstructors.PIE: library.pie_settings,
+        Reconstructors.EPIE: library.pie_settings,
+        Reconstructors.RPIE: library.pie_settings,
+        Reconstructors.LSQML: library.lsqml_settings,
+        Reconstructors.AD_PTYCHO: library.autodiff_settings,
+        Reconstructors.BH: library.bh_settings,
+    }[reconstructor]
 
-    The parent-side ``library.reconstructor_list`` now holds
-    :class:`SubprocessReconstructor` shells that hide ``_create_task_options``
-    behind a process boundary. To validate defaults / bounds we need the
-    concrete classes, so build them here using the same wiring the child does.
 
-    Index 0 must stay ``DMReconstructor``: two tests below index this list
-    positionally to get "the DM one".
+def _make_algorithms(library: PtyChiReconstructorLibrary) -> list:
+    """Instantiate the algorithm wrappers directly against ``library``'s settings.
+
+    Iteration order matches ``ALGORITHMS`` (DM first), which the two positional
+    ``[0]`` assertions below rely on to get "the DM one".
     """
-    helper = _make_options_helper(library)
+    common = _make_common(library)
     return [
-        DMReconstructor(helper, library.dm_settings),
-        RAARReconstructor(helper, library.raar_settings),
-        PIEReconstructor(helper, library.pie_settings),
-        EPIEReconstructor(helper, library.pie_settings),
-        RPIEReconstructor(helper, library.pie_settings),
-        LSQMLReconstructor(helper, library.lsqml_settings),
-        AutodiffReconstructor(helper, library.autodiff_settings),
-        BHReconstructor(helper, library.bh_settings),
+        algo_cls(common, _settings_for(library, reconstructor))
+        for reconstructor, algo_cls in ALGORITHMS.items()
     ]
 
 
 def _build_all_task_options(library: PtyChiReconstructorLibrary, parameters: ReconstructInput):
-    # Every ptychi reconstructor exposes ``_create_task_options``; building it
-    # runs pty-chi's Pydantic validators over all sub-option objects.
+    # Building each task-options tree runs pty-chi's Pydantic validators over
+    # every sub-option object.
     return [
-        reconstructor._create_task_options(parameters)  # type: ignore[attr-defined]
-        for reconstructor in _make_concrete_reconstructors(library)
+        algorithm.build_task_options(parameters.product) for algorithm in _make_algorithms(library)
     ]
 
 
@@ -221,9 +210,7 @@ def test_hard_limits_are_serialized_as_lists() -> None:
     obj.constrain_hard_limits_enable_abs.set_value(True)
     obj.constrain_hard_limits_enable_phase.set_value(True)
 
-    options = _make_concrete_reconstructors(library)[0]._create_task_options(  # type: ignore[attr-defined]
-        _make_reconstruct_input()
-    )
+    options = _make_algorithms(library)[0].build_task_options(_make_reconstruct_input().product)
     hard_limits = options.object_options.hard_limits_magnitude_phase
     assert isinstance(hard_limits.abs_lim, list)
     assert isinstance(hard_limits.phase_lim, list)
@@ -238,9 +225,7 @@ def test_compact_mode_clustering_stride_is_at_least_one() -> None:
     """Disabled compact-mode clustering must still yield a stride >= 1 for pty-chi."""
     library = _make_library()
     # Default (disabled) value is 0; pty-chi's stride field is now ge=1.
-    options = _make_concrete_reconstructors(library)[0]._create_task_options(  # type: ignore[attr-defined]
-        _make_reconstruct_input()
-    )
+    options = _make_algorithms(library)[0].build_task_options(_make_reconstruct_input().product)
     assert options.reconstructor_options.compact_mode_update_clustering_stride >= 1
     assert options.reconstructor_options.compact_mode_update_clustering is False
 
@@ -256,8 +241,8 @@ def test_built_options_carry_no_task_data() -> None:
     library = _make_library()
     parameters = _make_reconstruct_input()
 
-    for reconstructor in _make_concrete_reconstructors(library):
-        options = reconstructor._create_task_options(parameters)  # type: ignore[attr-defined]
+    for algorithm in _make_algorithms(library):
+        options = algorithm.build_task_options(parameters.product)
         assert options.data_options.data is None
         assert options.data_options.valid_pixel_mask is None
         assert options.object_options.initial_guess is None
@@ -314,13 +299,13 @@ def test_far_field_propagation_flag_is_read_by_value() -> None:
     """
     library = _make_library()
     metadata = _make_reconstruct_input().product.metadata
-    helper = _make_options_helper(library)
+    common = _make_common(library)
 
     library.settings.use_far_field_propagation.set_value(True)
-    assert helper.create_data_options(metadata).free_space_propagation_distance_m == numpy.inf
+    assert common.data_options(metadata).free_space_propagation_distance_m == numpy.inf
 
     library.settings.use_far_field_propagation.set_value(False)
-    assert helper.create_data_options(metadata).free_space_propagation_distance_m == pytest.approx(
+    assert common.data_options(metadata).free_space_propagation_distance_m == pytest.approx(
         metadata.detector_distance_m
     )
 
@@ -337,8 +322,7 @@ def test_options_round_trip_through_the_wire_format() -> None:
     library = _make_library()
 
     for task_options in _build_all_task_options(library, _make_reconstruct_input()):
-        reconstructor = Reconstructors(reconstructor_argument(task_options))
-        loaded = load_task_options(dump_task_options(task_options), reconstructor)
+        loaded = load_task_options(dump_task_options(task_options))
 
         assert type(loaded) is type(task_options)
         # Compare the parsed wire content rather than get_dict() directly:
@@ -352,45 +336,70 @@ def test_lsqml_algorithm_specific_field_survives_round_trip() -> None:
     library = _make_library()
     library.lsqml_settings.momentum_acceleration_gain.set_value(0.75)
 
-    task_options = LSQMLReconstructor(
-        _make_options_helper(library), library.lsqml_settings
-    )._create_task_options(_make_reconstruct_input())
+    algorithm = ALGORITHMS[Reconstructors.LSQML](_make_common(library), library.lsqml_settings)
+    task_options = algorithm.build_task_options(_make_reconstruct_input().product)
 
-    loaded = load_task_options(
-        dump_task_options(task_options), Reconstructors(reconstructor_argument(task_options))
-    )
+    loaded = load_task_options(dump_task_options(task_options))
 
     assert loaded.reconstructor_options.momentum_acceleration_gain == pytest.approx(0.75)
 
 
-def test_every_built_options_class_is_in_the_map() -> None:
-    """The codec map must cover every algorithm ptychodus can build.
+def test_registry_task_options_class_matches_built_options() -> None:
+    """Each registered algorithm must build the ``task_options_cls`` its spec names.
 
-    Keys come from pty-chi's own ``get_reconstructor_type()``, so this fails
-    when an engine is added to the algorithm table without a matching entry in
-    ``_TASK_OPTIONS_CLASSES``, and when an entry maps to the wrong class.
+    Fails when a subclass sets ``spec.task_options_cls`` to a class whose
+    ``get_reconstructor_type()`` disagrees with the registry key, and when two
+    entries map to the same reconstructor type.
     """
     library = _make_library()
-    built = _build_all_task_options(library, _make_reconstruct_input())
+    parameters = _make_reconstruct_input()
 
-    for task_options in built:
-        reconstructor = task_options.reconstructor_options.get_reconstructor_type()
-        assert OPTIONS_CLASSES[reconstructor] is type(task_options)
+    reconstructors_seen: set[Reconstructors] = set()
 
-    reconstructors = {
-        task_options.reconstructor_options.get_reconstructor_type() for task_options in built
-    }
-    assert len(reconstructors) == len(built), 'two algorithms share a reconstructor type'
+    for reconstructor, algo_cls in ALGORITHMS.items():
+        algorithm = algo_cls(_make_common(library), _settings_for(library, reconstructor))
+        options = algorithm.build_task_options(parameters.product)
+
+        assert type(options) is algo_cls.spec.task_options_cls
+        assert options.reconstructor_options.get_reconstructor_type() == reconstructor
+        assert reconstructor not in reconstructors_seen
+        reconstructors_seen.add(reconstructor)
 
 
-def test_reconstructor_argument_matches_the_command_line_choices() -> None:
-    """The launcher helper and the CLI must agree on the accepted vocabulary."""
+def test_wire_format_envelope_carries_reconstructor() -> None:
+    """The dumped JSON must be an envelope carrying the reconstructor token.
+
+    Locks in the new wire format so a future refactor cannot silently revert
+    to a bare-dict payload (which would let PIE/ePIE/rPIE alias each other).
+    """
     library = _make_library()
+    algorithm = ALGORITHMS[Reconstructors.LSQML](_make_common(library), library.lsqml_settings)
+    task_options = algorithm.build_task_options(_make_reconstruct_input().product)
 
-    for task_options in _build_all_task_options(library, _make_reconstruct_input()):
-        assert reconstructor_argument(task_options) in RECONSTRUCTOR_CHOICES
+    envelope = json.loads(dump_task_options(task_options))
+
+    assert set(envelope) == {'reconstructor', 'options'}
+    assert envelope['reconstructor'] == Reconstructors.LSQML.value
+    assert isinstance(envelope['options'], dict)
 
 
-def test_load_task_options_rejects_a_non_object_payload() -> None:
+def test_load_task_options_rejects_a_non_object_envelope() -> None:
     with pytest.raises(ValueError):
-        load_task_options('[1, 2, 3]', Reconstructors.LSQML)
+        load_task_options('[1, 2, 3]')
+
+
+def test_load_task_options_rejects_an_unknown_reconstructor() -> None:
+    with pytest.raises(ValueError):
+        load_task_options(json.dumps({'reconstructor': 'not-a-real-algorithm', 'options': {}}))
+
+
+def test_load_task_options_rejects_a_missing_reconstructor_field() -> None:
+    with pytest.raises(ValueError):
+        load_task_options(json.dumps({'options': {}}))
+
+
+def test_load_task_options_rejects_a_non_object_options_field() -> None:
+    with pytest.raises(ValueError):
+        load_task_options(
+            json.dumps({'reconstructor': Reconstructors.LSQML.value, 'options': [1, 2, 3]})
+        )

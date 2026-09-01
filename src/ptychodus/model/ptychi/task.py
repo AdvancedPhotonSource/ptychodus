@@ -10,45 +10,32 @@ class is deferred to call time so the module itself stays context-free.
 Wire format
 -----------
 
-:func:`dump_task_options` emits a bare ``json.dumps(options.get_dict())`` with
-no envelope, matching the ``settings.json`` pattern documented in pty-chi's own
-``using_pty_chi/io.rst``. ``get_dict()`` drops the large array fields, which
-costs nothing here: ptychodus never puts data into an options object, because
-pty-chi takes task data as ``PtychographyTask`` keyword arguments instead.
+:func:`dump_task_options` emits a JSON envelope::
 
-The blob does not record which algorithm produced it, and it cannot:
-``get_reconstructor_type()`` is a method, so it never lands in the dict.
-:func:`load_task_options` therefore takes the reconstructor as an argument.
+    {"reconstructor": "<enum-value>", "options": <options.get_dict()>}
 
-Two classes with different field sets do not silently mix -- ``load_from_dict``
-raises on the first unrecognized key -- but ``EPIEReconstructorOptions`` and
-``RPIEReconstructorOptions`` add no fields over ``PIEReconstructorOptions``, so
-PIE, ePIE and rPIE serialize to identical dictionaries and swap for each other
-without a murmur, quietly running a different algorithm. Callers must therefore
-derive the value from the options object with :func:`reconstructor_argument`
-rather than hand-writing the token.
+The ``reconstructor`` field carries the pty-chi ``Reconstructors`` enum value
+that :meth:`get_reconstructor_type` returns for these options. Envelope + token
+together let :func:`load_task_options` pick the right algorithm-specific
+subclass (``DMOptions``, ``LSQMLOptions``, ...) without a side-channel argument.
+
+Without the envelope, PIE, ePIE and rPIE would serialize to identical
+dictionaries -- ``EPIEReconstructorOptions`` and ``RPIEReconstructorOptions``
+add no fields over ``PIEReconstructorOptions`` -- and could swap for each other
+silently, running a different algorithm. The envelope closes that hazard: the
+token is what selects the subclass, and it comes from the options object at
+serialization time.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Iterator, Mapping
-from typing import Final
+from collections.abc import Iterator
 
 import numpy
 
-from ptychi.api import (
-    AutodiffPtychographyOptions,
-    BHOptions,
-    DMOptions,
-    EPIEOptions,
-    LSQMLOptions,
-    PIEOptions,
-    RAAROptions,
-    Reconstructors,
-    RPIEOptions,
-)
+from ptychi.api import Reconstructors
 from ptychi.api.options.task import PtychographyTaskOptions
 
 from ptychodus.api.object import Object, ObjectPosition
@@ -58,117 +45,58 @@ from ptychodus.api.product import LossValue, Product
 from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
 from ptychodus.api.typing import RealArrayType
 
+from .algorithms import ALGORITHMS
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    'OPTIONS_CLASSES',
-    'RECONSTRUCTOR_CHOICES',
     'dump_task_options',
     'load_task_options',
     'reconstruct_with_ptychi',
-    'reconstructor_argument',
 ]
 
 
-# The task-options classes ptychodus builds, one per entry in the algorithm
-# table in :mod:`.reconstructor`. ``AutodiffOptions`` (``AD_GENERAL``) is
-# deliberately absent: ``ptychi/api/options/__init__.py`` does not import
-# ``ad_general``, so it is not reachable as ``ptychi.api.AutodiffOptions``.
-_TASK_OPTIONS_CLASSES: Final[tuple[type[PtychographyTaskOptions], ...]] = (
-    DMOptions,
-    RAAROptions,
-    PIEOptions,
-    EPIEOptions,
-    RPIEOptions,
-    LSQMLOptions,
-    AutodiffPtychographyOptions,
-    BHOptions,
-)
-
-
-def _build_options_classes() -> dict[Reconstructors, type[PtychographyTaskOptions]]:
-    """Invert pty-chi's ``get_reconstructor_type()`` into a lookup table.
-
-    pty-chi maps the reconstructor enum to the reconstructor *implementation*
-    class (``ptychi.maps``) but provides no map to the task-options class, so
-    ptychodus builds that half here. Deriving the keys from pty-chi rather than
-    hardcoding them keeps this vocabulary from drifting; only the class tuple
-    above is hand-maintained.
-    """
-    classes: dict[Reconstructors, type[PtychographyTaskOptions]] = dict()
-
-    for options_class in _TASK_OPTIONS_CLASSES:
-        reconstructor = options_class().reconstructor_options.get_reconstructor_type()
-        collision = classes.get(reconstructor)
-
-        if collision is not None:
-            raise RuntimeError(
-                f'pty-chi reports reconstructor type "{reconstructor}" for both'
-                f' {collision.__name__} and {options_class.__name__}!'
-            )
-
-        classes[reconstructor] = options_class
-
-    return classes
-
-
-OPTIONS_CLASSES: Final[Mapping[Reconstructors, type[PtychographyTaskOptions]]] = (
-    _build_options_classes()
-)
-"""Reconstructor type to task-options class."""
-
-RECONSTRUCTOR_CHOICES: Final[tuple[str, ...]] = tuple(
-    reconstructor.value for reconstructor in OPTIONS_CLASSES
-)
-"""The accepted reconstructor tokens, for a command-line ``choices`` list."""
-
-
 def dump_task_options(options: PtychographyTaskOptions) -> str:
-    """Serialize a fully-built options object for transport to a child process."""
-    return json.dumps(options.get_dict())
+    """Serialize a fully-built options object for transport to a child process.
 
-
-def reconstructor_argument(options: PtychographyTaskOptions) -> str:
-    """Return the reconstructor token that matches these options.
-
-    Launchers must derive the token from the options object rather than
-    hand-writing it; see the module docstring.
+    The envelope carries the reconstructor token so PIE/ePIE/rPIE (which share
+    a serialized field set) survive the round-trip as the correct subclass.
     """
-    return str(options.reconstructor_options.get_reconstructor_type().value)
+    reconstructor = options.reconstructor_options.get_reconstructor_type()
+    return json.dumps({'reconstructor': reconstructor.value, 'options': options.get_dict()})
 
 
-def load_task_options(text: str, reconstructor: Reconstructors) -> PtychographyTaskOptions:
+def load_task_options(text: str) -> PtychographyTaskOptions:
     """Rebuild the options object that :func:`dump_task_options` serialized.
 
-    ``reconstructor`` selects the algorithm-specific subclass. It is required
-    because ``load_from_dict`` resolves nested options through declared field
-    annotations, so loading into a plain ``PtychographyTaskOptions`` would
-    downcast ``reconstructor_options`` to its base class and silently drop
-    every algorithm-specific field.
+    The reconstructor token in the envelope selects the algorithm-specific
+    subclass; ``load_from_dict`` then resolves nested options through the
+    subclass's declared field annotations so no algorithm-specific field is
+    silently dropped.
     """
+    envelope = json.loads(text)
+
+    if not isinstance(envelope, dict):
+        raise ValueError(f'Expected a JSON object envelope; got {type(envelope).__name__}!')
+
     try:
-        options_class = OPTIONS_CLASSES[reconstructor]
+        reconstructor = Reconstructors(envelope['reconstructor'])
+    except KeyError as exc:
+        raise ValueError(f'Options envelope is missing "{exc.args[0]}"!') from None
+    except ValueError:
+        raise ValueError(f'Unknown pty-chi reconstructor "{envelope["reconstructor"]}"!') from None
+
+    try:
+        algorithm_cls = ALGORITHMS[reconstructor]
     except KeyError:
         raise ValueError(f'Unknown pty-chi reconstructor "{reconstructor}"!') from None
 
-    contents = json.loads(text)
+    options_dict = envelope.get('options')
+    if not isinstance(options_dict, dict):
+        raise ValueError('Options envelope "options" field must be a JSON object!')
 
-    if not isinstance(contents, dict):
-        raise ValueError(
-            f'Expected a JSON object of pty-chi options; got {type(contents).__name__}!'
-        )
-
-    options = options_class()
-    options.load_from_dict(contents)
-
-    loaded_reconstructor = options.reconstructor_options.get_reconstructor_type()
-
-    if loaded_reconstructor != reconstructor:
-        raise RuntimeError(
-            f'{options_class.__name__} reports reconstructor type'
-            f' "{loaded_reconstructor}" but "{reconstructor}" was requested!'
-        )
-
+    options = algorithm_cls.spec.task_options_cls()
+    options.load_from_dict(options_dict)
     return options
 
 
