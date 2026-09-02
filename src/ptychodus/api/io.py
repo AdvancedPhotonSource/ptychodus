@@ -280,8 +280,8 @@ def load_product(file: Path) -> Product:
             height_m=float(h5_object.attrs[ProductFileKeys.OBJECT_PIXEL_HEIGHT]),
         )
         object_center = ObjectCenter(
-            coordinate_x_m=float(h5_object.attrs[ProductFileKeys.OBJECT_CENTER_X]),
-            coordinate_y_m=float(h5_object.attrs[ProductFileKeys.OBJECT_CENTER_Y]),
+            x_m=float(h5_object.attrs[ProductFileKeys.OBJECT_CENTER_X]),
+            y_m=float(h5_object.attrs[ProductFileKeys.OBJECT_CENTER_Y]),
         )
 
         try:
@@ -405,8 +405,8 @@ def save_product(file: Path, product: Product) -> None:
 
     for point in product.probe_positions:
         scan_indexes.append(point.index)
-        scan_x_m.append(point.coordinate_x_m)
-        scan_y_m.append(point.coordinate_y_m)
+        scan_x_m.append(point.x_m)
+        scan_y_m.append(point.y_m)
 
     position_photon_counts = product.probe_positions.get_probe_photon_counts()
 
@@ -567,8 +567,8 @@ def save_ptychopinn_training_data(
 
     for scan_point in parameters.product.probe_positions:
         object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        position_x_px.append(object_point.coordinate_x_px)
-        position_y_px.append(object_point.coordinate_y_px)
+        position_x_px.append(object_point.x_px)
+        position_y_px.append(object_point.y_px)
 
     xcoords = numpy.array(position_x_px)
     ycoords = numpy.array(position_y_px)

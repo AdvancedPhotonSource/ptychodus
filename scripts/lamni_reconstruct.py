@@ -14,6 +14,7 @@ from ptychi.api import LSQMLOptions
 
 from ptychodus.api.assemble import assemble_dataset
 from ptychodus.api.constants import energy_eV_to_wavelength_m
+from ptychodus.api.diffraction import CropRegion
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.io import save_product
 from ptychodus.api.object import compute_object_geometry
@@ -148,8 +149,10 @@ def main() -> int:
         pipeline = DiffractionPrepPipeline(
             steps=(
                 CropStep(
-                    center=metadata.crop_center,
-                    extent=ImageExtent(width_px=args.crop_extent_px, height_px=args.crop_extent_px),
+                    region=CropRegion.from_center_extent(
+                        metadata.crop_center,
+                        ImageExtent(width_px=args.crop_extent_px, height_px=args.crop_extent_px),
+                    ),
                 ),
             )
         )

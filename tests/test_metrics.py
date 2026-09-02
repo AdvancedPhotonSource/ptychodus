@@ -663,7 +663,7 @@ def _make_object(
     return Object(
         array=array,
         pixel_geometry=PixelGeometry(width_m=pixel_m, height_m=pixel_m),
-        center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
         layer_spacing_m=[1.0e-6] * (num_layers - 1),
     )
 
@@ -681,7 +681,7 @@ def _make_probes() -> ProbeSequence:
 
 def _make_positions() -> ProbePositionSequence:
     points = [
-        ProbePosition(index=i, coordinate_x_m=x, coordinate_y_m=y)
+        ProbePosition(index=i, x_m=x, y_m=y)
         for i, (x, y) in enumerate(
             [(0.0, 0.0), (3 * _PIXEL_M, -2 * _PIXEL_M), (-4 * _PIXEL_M, 1 * _PIXEL_M)]
         )
@@ -708,8 +708,8 @@ def _make_product(
 def _apply_ambiguity_to_object(obj: Object, ambiguities: ReconstructionAmbiguities) -> Object:
     coords = obj.get_geometry().get_transverse_coordinates()
     ramp = (
-        ambiguities.phase_ramp_x_rad_per_m * coords.position_x_m
-        + ambiguities.phase_ramp_y_rad_per_m * coords.position_y_m
+        ambiguities.phase_ramp_x_rad_per_m * coords.x_m
+        + ambiguities.phase_ramp_y_rad_per_m * coords.y_m
     )
     factor = ambiguities.object_scale_factor * numpy.exp(1j * (ambiguities.phase_offset_rad + ramp))
     new_array = obj.get_array().copy()
@@ -827,7 +827,7 @@ class TestObjectComparison:
         reference_obj = Object(
             array=smooth,
             pixel_geometry=PixelGeometry(width_m=_PIXEL_M, height_m=_PIXEL_M),
-            center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+            center=ObjectCenter(x_m=0.0, y_m=0.0),
         )
         reference = Product(
             metadata=_metadata(),
@@ -842,7 +842,7 @@ class TestObjectComparison:
         shifted_obj = Object(
             array=shifted,
             pixel_geometry=PixelGeometry(width_m=_PIXEL_M, height_m=_PIXEL_M),
-            center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+            center=ObjectCenter(x_m=0.0, y_m=0.0),
         )
         test = replace(reference, object_=shifted_obj)
 
@@ -883,7 +883,7 @@ class TestObjectComparison:
         small_object = Object(
             array=cropped_test_array,
             pixel_geometry=PixelGeometry(width_m=_PIXEL_M, height_m=_PIXEL_M),
-            center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+            center=ObjectCenter(x_m=0.0, y_m=0.0),
         )
         test = replace(reference, object_=small_object)
 

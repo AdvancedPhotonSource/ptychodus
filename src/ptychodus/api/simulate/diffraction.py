@@ -65,8 +65,8 @@ def generate_diffraction_data(
     for index, (probe_position, probe) in enumerate(product.iter_position_probes()):
         object_position = object_geometry.map_coordinates_probe_to_object(probe_position)
 
-        cx = object_position.coordinate_x_px
-        cy = object_position.coordinate_y_px
+        cx = object_position.x_px
+        cy = object_position.y_px
 
         x_lower = int(cx - probe_geometry.width_px / 2)
         y_lower = int(cy - probe_geometry.height_px / 2)

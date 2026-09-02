@@ -102,7 +102,7 @@ def _make_product(
     object_ = Object(
         array=obj_array,
         pixel_geometry=PixelGeometry(width_m=10e-9, height_m=10e-9),
-        center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
         layer_spacing_m=layer_spacing,
     )
 
@@ -449,8 +449,8 @@ class TestProductRoundTrip:
         loaded = load_product(file)
 
         center = loaded.object_.get_center()
-        assert center.coordinate_x_m == pytest.approx(0.0)
-        assert center.coordinate_y_m == pytest.approx(0.0)
+        assert center.x_m == pytest.approx(0.0)
+        assert center.y_m == pytest.approx(0.0)
 
     def test_probe_positions_preserved(self, tmp_path: Path) -> None:
         original = _make_product(num_positions=3)
@@ -462,8 +462,8 @@ class TestProductRoundTrip:
         assert len(loaded.probe_positions) == 3
         for i, (orig, load) in enumerate(zip(original.probe_positions, loaded.probe_positions)):
             assert load.index == orig.index
-            assert load.coordinate_x_m == pytest.approx(orig.coordinate_x_m)
-            assert load.coordinate_y_m == pytest.approx(orig.coordinate_y_m)
+            assert load.x_m == pytest.approx(orig.x_m)
+            assert load.y_m == pytest.approx(orig.y_m)
 
     def test_product_probe_photon_counts_absent_when_unmeasured(self, tmp_path: Path) -> None:
         original = _make_product(num_positions=3)

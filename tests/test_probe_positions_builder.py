@@ -52,7 +52,7 @@ def _make_line(num_points: int) -> ProbePositionSequence:
     """A horizontal line of positions whose index equals its ordinal."""
     return ProbePositionSequence(
         [
-            ProbePosition(index=idx, coordinate_x_m=float(idx), coordinate_y_m=0.0)
+            ProbePosition(index=idx, x_m=float(idx), y_m=0.0)
             for idx in range(num_points)
         ]
     )
@@ -88,7 +88,7 @@ def test_slice_returns_subsequence() -> None:
     assert [p.index for p in seq[1:3]] == [1, 2]
     assert [p.index for p in seq[-1:]] == [4]
     assert len(seq[5:5]) == 0
-    assert [p.coordinate_x_m for p in seq[1:3]] == [1.0, 2.0]
+    assert [p.x_m for p in seq[1:3]] == [1.0, 2.0]
 
 
 def test_generator_builder_trims_by_acquisition_order() -> None:
@@ -140,7 +140,7 @@ def test_from_file_builder_applies_affine_and_trim() -> None:
     positions = builder.build()
 
     assert [p.index for p in positions] == [1, 2, 3]
-    assert [p.coordinate_x_m for p in positions] == [-1.0, -2.0, -3.0]
+    assert [p.x_m for p in positions] == [-1.0, -2.0, -3.0]
 
 
 def test_from_memory_builder_ignores_conditioning() -> None:
@@ -157,7 +157,7 @@ def test_from_memory_builder_ignores_conditioning() -> None:
     positions = builder.build()
 
     assert [p.index for p in positions] == [0, 1, 2, 3, 4]
-    assert [p.coordinate_x_m for p in positions] == [0.0, 1.0, 2.0, 3.0, 4.0]
+    assert [p.x_m for p in positions] == [0.0, 1.0, 2.0, 3.0, 4.0]
 
 
 def test_repeated_from_memory_builds_are_idempotent() -> None:
@@ -174,7 +174,7 @@ def test_repeated_from_memory_builds_are_idempotent() -> None:
         positions = builder.build()
 
     assert [p.index for p in positions] == [0, 1, 2, 3, 4]
-    assert [p.coordinate_x_m for p in positions] == [0.0, 1.0, 2.0, 3.0, 4.0]
+    assert [p.x_m for p in positions] == [0.0, 1.0, 2.0, 3.0, 4.0]
 
 
 @pytest.mark.parametrize('builder_name', ['cartesian', 'from_file'])

@@ -315,16 +315,16 @@ def estimate_probe_size(
 class ProbeTransverseCoordinates:
     """2D Cartesian coordinate arrays for the transverse plane of the probe, in meters."""
 
-    position_x_m: RealArrayType
-    position_y_m: RealArrayType
+    x_m: RealArrayType
+    y_m: RealArrayType
 
     @property
     def position_r_m(self) -> RealArrayType:
-        return numpy.hypot(self.position_y_m, self.position_x_m)
+        return numpy.hypot(self.y_m, self.x_m)
 
     @property
     def angle_rad(self) -> RealArrayType:
-        return numpy.arctan2(self.position_y_m, self.position_x_m)
+        return numpy.arctan2(self.y_m, self.x_m)
 
 
 @dataclass(frozen=True)
@@ -372,15 +372,10 @@ class ProbeGeometry:
 
     def get_transverse_coordinates(self) -> ProbeTransverseCoordinates:
         Y, X = numpy.mgrid[: self.height_px, : self.width_px]  # noqa: N806
-        position_x_px = X - (self.width_px - 1) / 2
-        position_y_px = Y - (self.height_px - 1) / 2
-
-        position_x_m = position_x_px * self.pixel_width_m
-        position_y_m = position_y_px * self.pixel_height_m
-
+        x_px = X - (self.width_px - 1) / 2
+        y_px = Y - (self.height_px - 1) / 2
         return ProbeTransverseCoordinates(
-            position_x_m=position_x_m,
-            position_y_m=position_y_m,
+            x_m=x_px * self.pixel_width_m, y_m=y_px * self.pixel_height_m
         )
 
     def __str__(self) -> str:

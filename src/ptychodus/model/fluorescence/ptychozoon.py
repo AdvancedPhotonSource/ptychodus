@@ -68,7 +68,7 @@ class PtychozoonFluorescenceEnhancer(FluorescenceEnhancer):
         object_geometry = product.object_.get_geometry()
 
         probe_positions_m = numpy.array(
-            [[p.coordinate_y_m, p.coordinate_x_m] for p in product.probe_positions],
+            [[p.y_m, p.x_m] for p in product.probe_positions],
             dtype=float,
         ).reshape((-1, 2))
 

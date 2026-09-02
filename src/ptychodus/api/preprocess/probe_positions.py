@@ -41,12 +41,8 @@ class AffineTransform:
         if isinstance(arg, ProbePosition):
             return ProbePosition(
                 index=arg.index,
-                coordinate_x_m=self.a00 * arg.coordinate_x_m
-                + self.a01 * arg.coordinate_y_m
-                + self.a02,
-                coordinate_y_m=self.a10 * arg.coordinate_x_m
-                + self.a11 * arg.coordinate_y_m
-                + self.a12,
+                x_m=self.a00 * arg.x_m + self.a01 * arg.y_m + self.a02,
+                y_m=self.a10 * arg.x_m + self.a11 * arg.y_m + self.a12,
             )
         linear = numpy.array([[self.a00, self.a01], [self.a10, self.a11]])
         translation = numpy.array([self.a02, self.a12])
@@ -104,8 +100,8 @@ def transform_probe_positions(
             radius_m = jitter_radius_m * numpy.sqrt(rng.uniform())
             transformed = ProbePosition(
                 index=transformed.index,
-                coordinate_x_m=transformed.coordinate_x_m + radius_m * numpy.cos(angle_rad),
-                coordinate_y_m=transformed.coordinate_y_m + radius_m * numpy.sin(angle_rad),
+                x_m=transformed.x_m + radius_m * numpy.cos(angle_rad),
+                y_m=transformed.y_m + radius_m * numpy.sin(angle_rad),
             )
 
         yield transformed
@@ -178,8 +174,8 @@ def _flatten_to_array(sequences: Iterable[ProbePositionSequence]) -> RealArrayTy
     coordinates: list[float] = []
     for seq in sequences:
         for point in seq:
-            coordinates.append(point.coordinate_x_m)
-            coordinates.append(point.coordinate_y_m)
+            coordinates.append(point.x_m)
+            coordinates.append(point.y_m)
     return numpy.reshape(coordinates, (-1, 2))
 
 

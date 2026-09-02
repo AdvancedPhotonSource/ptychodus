@@ -66,8 +66,8 @@ class XMCDResult:
             magnetic_object=self.magnetic_object.get_array(),
             pixel_height_m=pixel_geometry.height_m,
             pixel_width_m=pixel_geometry.width_m,
-            center_x_m=center.coordinate_x_m,
-            center_y_m=center.coordinate_y_m,
+            center_x_m=center.x_m,
+            center_y_m=center.y_m,
         )
 
 

@@ -72,7 +72,7 @@ def _make_reconstruct_input() -> ReconstructInput:
             + 1j * rng.standard_normal((1, OBJ_HEIGHT_PX, OBJ_WIDTH_PX))
         ).astype(numpy.complex128),
         pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=PIXEL_M),
-        center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
         layer_spacing_m=[],
     )
     probes = ProbeSequence(
@@ -85,7 +85,7 @@ def _make_reconstruct_input() -> ReconstructInput:
     )
     positions = ProbePositionSequence(
         [
-            ProbePosition(index=i, coordinate_x_m=i * PIXEL_M, coordinate_y_m=-i * PIXEL_M)
+            ProbePosition(index=i, x_m=i * PIXEL_M, y_m=-i * PIXEL_M)
             for i in range(NUM_PATTERNS)
         ]
     )

@@ -157,7 +157,7 @@ def _make_probe_positions_grid(
     for y in ys:
         for x in xs:
             positions.append(
-                ProbePosition(index=index, coordinate_x_m=float(x), coordinate_y_m=float(y))
+                ProbePosition(index=index, x_m=float(x), y_m=float(y))
             )
             index += 1
     return positions
@@ -366,8 +366,8 @@ class TestGrfGeometryMetadata:
         geom = _make_geometry(center_x_m=1e-6, center_y_m=-2e-6)
         obj = generate_gaussian_random_field_object(_rng(), geom, correlation_length_px=8.0)
         center = obj.get_center()
-        assert center.coordinate_x_m == pytest.approx(1e-6)
-        assert center.coordinate_y_m == pytest.approx(-2e-6)
+        assert center.x_m == pytest.approx(1e-6)
+        assert center.y_m == pytest.approx(-2e-6)
 
     def test_single_layer(self) -> None:
         """Output should have exactly one slice (layer) on the first axis."""
@@ -723,8 +723,8 @@ class TestStxmObject:
         obj = generate_stxm_object(geometry, data, positions)
         assert obj.get_pixel_geometry().width_m == pytest.approx(2.5e-9)
         assert obj.get_pixel_geometry().height_m == pytest.approx(3.5e-9)
-        assert obj.get_center().coordinate_x_m == pytest.approx(1.0e-6)
-        assert obj.get_center().coordinate_y_m == pytest.approx(-2.0e-6)
+        assert obj.get_center().x_m == pytest.approx(1.0e-6)
+        assert obj.get_center().y_m == pytest.approx(-2.0e-6)
 
     def test_constant_counts_yield_constant_intensity_interior(self) -> None:
         geometry = _make_geometry(64, 64)
@@ -739,7 +739,7 @@ class TestStxmObject:
         geometry = _make_geometry(64, 64)
         positions = _make_probe_positions_grid(geometry, (5, 5))
         counts = [
-            int(1000 + 5000 * (p.coordinate_x_m - geometry.minimum_x_m) / geometry.width_m)
+            int(1000 + 5000 * (p.x_m - geometry.minimum_x_m) / geometry.width_m)
             for p in positions
         ]
         data = _make_assembled_data(counts)
@@ -810,8 +810,8 @@ class TestPaganinObject:
         )
         assert obj.get_pixel_geometry().width_m == pytest.approx(2.0e-9)
         assert obj.get_pixel_geometry().height_m == pytest.approx(4.0e-9)
-        assert obj.get_center().coordinate_x_m == pytest.approx(5.0e-6)
-        assert obj.get_center().coordinate_y_m == pytest.approx(-3.0e-6)
+        assert obj.get_center().x_m == pytest.approx(5.0e-6)
+        assert obj.get_center().y_m == pytest.approx(-3.0e-6)
 
     def test_rejects_nonpositive_propagation_distance(self) -> None:
         geometry, data, positions = _paganin_common_inputs()
@@ -1000,8 +1000,8 @@ class TestSiemensStarGeometryMetadata:
         geom = _make_geometry(center_x_m=1e-6, center_y_m=-2e-6)
         obj = generate_siemens_star_object(geom, **_default_star_kwargs())
         center = obj.get_center()
-        assert center.coordinate_x_m == pytest.approx(1e-6)
-        assert center.coordinate_y_m == pytest.approx(-2e-6)
+        assert center.x_m == pytest.approx(1e-6)
+        assert center.y_m == pytest.approx(-2e-6)
 
     def test_single_layer(self) -> None:
         obj = generate_siemens_star_object(_make_geometry(), **_default_star_kwargs())

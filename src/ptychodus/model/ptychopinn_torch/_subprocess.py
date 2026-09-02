@@ -105,8 +105,8 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
 
     for position in parameters.product.probe_positions:
         object_point = object_geometry.map_coordinates_probe_to_object(position)
-        positions_px.append(object_point.coordinate_y_px)
-        positions_px.append(object_point.coordinate_x_px)
+        positions_px.append(object_point.y_px)
+        positions_px.append(object_point.x_px)
 
     diff_patterns = zero_bad_pixels(parameters.diffraction_patterns, parameters.bad_pixels)
     data_loader = PtychoDataLoader.from_np(

@@ -236,8 +236,8 @@ def prepare_reconstruct_input(
     pos_y_all = numpy.empty(n_positions, dtype=numpy.float64)
     for k, position in enumerate(product.probe_positions):
         pos_indexes_all[k] = position.index
-        pos_x_all[k] = position.coordinate_x_m
-        pos_y_all[k] = position.coordinate_y_m
+        pos_x_all[k] = position.x_m
+        pos_y_all[k] = position.y_m
 
     src_photon_counts = product.probe_positions.get_probe_photon_counts()
 
@@ -323,8 +323,8 @@ def prepare_reconstruct_input(
     point_list = [
         ProbePosition(
             index=int(i),
-            coordinate_x_m=float(x),
-            coordinate_y_m=float(y),
+            x_m=float(x),
+            y_m=float(y),
             probe_photon_count=None if photon_counts is None else float(photon_counts[k]),
         )
         for k, (i, x, y) in enumerate(zip(in_range_pattern_indexes, x_coords, y_coords))
@@ -426,7 +426,7 @@ class ReconstructionAmbiguities:
         obj_geometry = obj.get_geometry()
         obj_coords = obj_geometry.get_transverse_coordinates()
 
-        obj_ramp = self._phase_ramp_grid(obj_coords.position_x_m, obj_coords.position_y_m)
+        obj_ramp = self._phase_ramp_grid(obj_coords.x_m, obj_coords.y_m)
         obj_correction = (
             numpy.exp(-1j * (self.phase_offset_rad + obj_ramp)) / self.object_scale_factor
         )
@@ -443,7 +443,7 @@ class ReconstructionAmbiguities:
         probe_array = probes.get_array()
         probe_coords = probes.get_geometry().get_transverse_coordinates()
 
-        probe_ramp = self._phase_ramp_grid(probe_coords.position_x_m, probe_coords.position_y_m)
+        probe_ramp = self._phase_ramp_grid(probe_coords.x_m, probe_coords.y_m)
         probe_correction = self.object_scale_factor * numpy.exp(
             1j * (self.phase_offset_rad + probe_ramp)
         )

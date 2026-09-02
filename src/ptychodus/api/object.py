@@ -25,13 +25,13 @@ logger = logging.getLogger(__name__)
 class ObjectCenter:
     """Physical center coordinates of the object array in meters."""
 
-    coordinate_x_m: float
-    coordinate_y_m: float
+    x_m: float
+    y_m: float
 
     def copy(self) -> ObjectCenter:
         return ObjectCenter(
-            coordinate_x_m=float(self.coordinate_x_m),
-            coordinate_y_m=float(self.coordinate_y_m),
+            x_m=float(self.x_m),
+            y_m=float(self.y_m),
         )
 
 
@@ -40,16 +40,16 @@ class ObjectPosition:
     """Position expressed in object pixel coordinates."""
 
     index: int
-    coordinate_x_px: float
-    coordinate_y_px: float
+    x_px: float
+    y_px: float
 
 
 @dataclass(frozen=True)
 class ObjectTransverseCoordinates:
     """2D Cartesian coordinate arrays for the transverse plane of the object, in meters."""
 
-    position_x_m: RealArrayType
-    position_y_m: RealArrayType
+    x_m: RealArrayType
+    y_m: RealArrayType
 
 
 @dataclass(frozen=True)
@@ -87,21 +87,16 @@ class ObjectGeometry:
 
     def get_center(self) -> ObjectCenter:
         return ObjectCenter(
-            coordinate_x_m=self.center_x_m,
-            coordinate_y_m=self.center_y_m,
+            x_m=self.center_x_m,
+            y_m=self.center_y_m,
         )
 
     def get_transverse_coordinates(self) -> ObjectTransverseCoordinates:
         Y, X = numpy.mgrid[: self.height_px, : self.width_px]  # noqa: N806
-        position_x_px = X - (self.width_px - 1) / 2
-        position_y_px = Y - (self.height_px - 1) / 2
-
-        position_x_m = position_x_px * self.pixel_width_m
-        position_y_m = position_y_px * self.pixel_height_m
-
+        x_px = X - (self.width_px - 1) / 2
+        y_px = Y - (self.height_px - 1) / 2
         return ObjectTransverseCoordinates(
-            position_x_m=position_x_m,
-            position_y_m=position_y_m,
+            x_m=x_px * self.pixel_width_m, y_m=y_px * self.pixel_height_m
         )
 
     def map_coordinates_object_to_probe(self, position: ObjectPosition) -> ProbePosition:
@@ -110,8 +105,8 @@ class ObjectGeometry:
         dx_m = self.pixel_width_m
         dy_m = self.pixel_height_m
 
-        x_m = self.center_x_m + dx_m * (position.coordinate_x_px - rx_px)
-        y_m = self.center_y_m + dy_m * (position.coordinate_y_px - ry_px)
+        x_m = self.center_x_m + dx_m * (position.x_px - rx_px)
+        y_m = self.center_y_m + dy_m * (position.y_px - ry_px)
 
         return ProbePosition(position.index, x_m, y_m)
 
@@ -121,8 +116,8 @@ class ObjectGeometry:
         dx_m = self.pixel_width_m
         dy_m = self.pixel_height_m
 
-        x_px = (position.coordinate_x_m - self.center_x_m) / dx_m + rx_px
-        y_px = (position.coordinate_y_m - self.center_y_m) / dy_m + ry_px
+        x_px = (position.x_m - self.center_x_m) / dx_m + rx_px
+        y_px = (position.y_m - self.center_y_m) / dy_m + ry_px
 
         return ObjectPosition(position.index, x_px, y_px)
 
@@ -237,8 +232,8 @@ class Object:
             height_px=self.height_px,
             pixel_width_m=pixel_geometry.width_m,
             pixel_height_m=pixel_geometry.height_m,
-            center_x_m=center.coordinate_x_m,
-            center_y_m=center.coordinate_y_m,
+            center_x_m=center.x_m,
+            center_y_m=center.y_m,
         )
 
     def get_layer(self, number: int) -> ComplexArrayType:
@@ -294,8 +289,8 @@ def _center_crop_object(obj: Object, target_h: int, target_w: int) -> Object:
     center_shift_y_px = h_start - delta_h / 2.0
     center_shift_x_px = w_start - delta_w / 2.0
     new_center = ObjectCenter(
-        coordinate_x_m=old_center.coordinate_x_m + center_shift_x_px * pixel_geometry.width_m,
-        coordinate_y_m=old_center.coordinate_y_m + center_shift_y_px * pixel_geometry.height_m,
+        x_m=old_center.x_m + center_shift_x_px * pixel_geometry.width_m,
+        y_m=old_center.y_m + center_shift_y_px * pixel_geometry.height_m,
     )
 
     return Object(
@@ -384,10 +379,8 @@ def align_objects(
 
     cropped_moving_center = cropped_moving.get_center()
     new_center = ObjectCenter(
-        coordinate_x_m=cropped_moving_center.coordinate_x_m
-        - float(shift_yx[1]) * moving_pixel_geometry.width_m,
-        coordinate_y_m=cropped_moving_center.coordinate_y_m
-        - float(shift_yx[0]) * moving_pixel_geometry.height_m,
+        x_m=cropped_moving_center.x_m - float(shift_yx[1]) * moving_pixel_geometry.width_m,
+        y_m=cropped_moving_center.y_m - float(shift_yx[0]) * moving_pixel_geometry.height_m,
     )
 
     aligned_moving = Object(

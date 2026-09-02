@@ -155,8 +155,8 @@ def reconstruct_with_ptychi(
 
     for scan_point in product_in.probe_positions:
         object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        position_x_px.append(object_point.coordinate_x_px)
-        position_y_px.append(object_point.coordinate_y_px)
+        position_x_px.append(object_point.x_px)
+        position_y_px.append(object_point.y_px)
 
     # Task data goes in as keyword arguments; passing it through the *Options
     # objects still works but is deprecated and warns per field.
@@ -213,8 +213,8 @@ def reconstruct_with_ptychi(
             ):
                 object_point = ObjectPosition(
                     index=uncorrected_point.index,
-                    coordinate_x_px=float(pos_x_px),
-                    coordinate_y_px=float(pos_y_px),
+                    x_px=float(pos_x_px),
+                    y_px=float(pos_y_px),
                 )
                 scan_point = object_geometry.map_coordinates_object_to_probe(object_point)
                 corrected_scan_points.append(scan_point)

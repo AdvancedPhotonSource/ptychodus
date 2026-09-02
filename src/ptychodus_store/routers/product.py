@@ -155,8 +155,8 @@ async def get_positions_image(
     if n_points == 0:
         raise HTTPException(status_code=404, detail='product has no probe positions')
 
-    xs = numpy.array([positions[i].coordinate_x_m for i in range(n_points)], dtype=float)
-    ys = numpy.array([positions[i].coordinate_y_m for i in range(n_points)], dtype=float)
+    xs = numpy.array([positions[i].x_m for i in range(n_points)], dtype=float)
+    ys = numpy.array([positions[i].y_m for i in range(n_points)], dtype=float)
 
     x_min, x_max = float(xs.min()), float(xs.max())
     y_min, y_max = float(ys.min()), float(ys.max())

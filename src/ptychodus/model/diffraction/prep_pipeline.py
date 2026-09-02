@@ -1,4 +1,4 @@
-from ptychodus.api.diffraction import CropCenter
+from ptychodus.api.diffraction import CropRegion
 from ptychodus.api.preprocess.diffraction import (
     BinningStep,
     CropStep,
@@ -17,7 +17,7 @@ from .settings import DiffractionSettings
 
 
 def _clamp_size(requested: int, upper: int | None) -> int:
-    """Clamp a requested extent (crop size, bin size) to ``[1, upper]``.
+    """Clamp a requested bin size to ``[1, upper]``.
 
     When ``upper is None`` (no detector loaded yet), degrade to ``max(1, requested)``
     so pipeline construction still succeeds for GUI preview.
@@ -25,18 +25,6 @@ def _clamp_size(requested: int, upper: int | None) -> int:
     if upper is None:
         return max(1, requested)
     return Interval[int](1, upper).clamp(requested)
-
-
-def _clamp_center(requested: int, upper: int | None, crop_size: int) -> int:
-    """Clamp a crop center so the ``crop_size``-wide window fits inside ``[0, upper)``.
-
-    CropStep slices ``[center - radius, center + radius)`` with ``radius = crop_size // 2``,
-    so valid centers satisfy ``radius <= center <= upper - radius``.
-    """
-    radius = crop_size // 2
-    if upper is None:
-        return max(radius, requested)
-    return Interval[int](radius, upper - radius).clamp(requested)
 
 
 class PrepPipelineBuilder:
@@ -78,18 +66,15 @@ class PrepPipelineBuilder:
                 if detector_extent is not None
                 else None
             )
-            pre_w = pre.width_px if pre is not None else None
-            pre_h = pre.height_px if pre is not None else None
-            crop_w = _clamp_size(s.crop_width_px.get_value(), pre_w)
-            crop_h = _clamp_size(s.crop_height_px.get_value(), pre_h)
-            cx = _clamp_center(s.crop_center_x_px.get_value(), pre_w, crop_w)
-            cy = _clamp_center(s.crop_center_y_px.get_value(), pre_h, crop_h)
-            steps.append(
-                CropStep(
-                    center=CropCenter(cx, cy),
-                    extent=ImageExtent(width_px=crop_w, height_px=crop_h),
-                )
+            region = CropRegion(
+                center_x_px=s.crop_center_x_px.get_value(),
+                center_y_px=s.crop_center_y_px.get_value(),
+                width_px=max(1, s.crop_width_px.get_value()),
+                height_px=max(1, s.crop_height_px.get_value()),
             )
+            if pre is not None:
+                region = region.clamp_to_detector_extent(pre)
+            steps.append(CropStep(region=region))
 
         # Binning: clamped against post-crop extent, again from compute_output_extent.
         if s.binning_enabled.get_value():

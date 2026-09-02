@@ -84,7 +84,7 @@ def _make_object(num_layers: int) -> Object:
     return Object(
         array=array.astype(complex),
         pixel_geometry=PixelGeometry(width_m=PIXEL_SIZE_M, height_m=PIXEL_SIZE_M),
-        center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
         layer_spacing_m=[LAYER_SPACING_M] * (num_layers - 1),
     )
 

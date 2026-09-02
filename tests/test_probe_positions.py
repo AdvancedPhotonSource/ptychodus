@@ -15,12 +15,12 @@ from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 
 class TestProbePositionPhotonCount:
     def test_default_is_none(self) -> None:
-        point = ProbePosition(index=0, coordinate_x_m=1.0, coordinate_y_m=2.0)
+        point = ProbePosition(index=0, x_m=1.0, y_m=2.0)
         assert point.probe_photon_count is None
 
     def test_value_is_carried(self) -> None:
         point = ProbePosition(
-            index=0, coordinate_x_m=1.0, coordinate_y_m=2.0, probe_photon_count=7.5
+            index=0, x_m=1.0, y_m=2.0, probe_photon_count=7.5
         )
         assert point.probe_photon_count == pytest.approx(7.5)
 

@@ -56,7 +56,7 @@ def _make_product(
     obj = Object(
         array=object_array.astype(complex),
         pixel_geometry=pixel_geometry,
-        center=ObjectCenter(coordinate_x_m=object_center[0], coordinate_y_m=object_center[1]),
+        center=ObjectCenter(x_m=object_center[0], y_m=object_center[1]),
     )
     probes = ProbeSequence(
         array=probe_array.astype(complex),
@@ -106,7 +106,7 @@ def _make_illumination_map(
         exposure_time_s=exposure_time_s,
         mass_attenuation_m2_kg=mass_attenuation_m2_kg,
         pixel_geometry=PixelGeometry(width_m=pixel_size_m, height_m=pixel_size_m),
-        center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
     )
 
 
@@ -153,7 +153,7 @@ class TestComputeIlluminationMap:
         product = _make_product(
             object_array=_delta_object(16, 16),
             probe_array=probe,
-            positions=[ProbePosition(index=0, coordinate_x_m=0.0, coordinate_y_m=0.0)],
+            positions=[ProbePosition(index=0, x_m=0.0, y_m=0.0)],
         )
         m = compute_illumination_map(product)
         expected_patch = numpy.abs(probe) ** 2
@@ -176,8 +176,8 @@ class TestComputeIlluminationMap:
             positions=[
                 ProbePosition(
                     index=0,
-                    coordinate_x_m=0.5 * pixel_size_m,
-                    coordinate_y_m=0.5 * pixel_size_m,
+                    x_m=0.5 * pixel_size_m,
+                    y_m=0.5 * pixel_size_m,
                 )
             ],
             pixel_size_m=pixel_size_m,
@@ -197,8 +197,8 @@ class TestComputeIlluminationMap:
         # x-center at column 8 (world x = -8 * pixel) and column 24 (world x = +8 * pixel).
         # The two 8x8 patches then span cols [4:12] and [20:28] — disjoint.
         positions = [
-            ProbePosition(index=0, coordinate_x_m=-8 * pixel_size_m, coordinate_y_m=0.0),
-            ProbePosition(index=1, coordinate_x_m=+8 * pixel_size_m, coordinate_y_m=0.0),
+            ProbePosition(index=0, x_m=-8 * pixel_size_m, y_m=0.0),
+            ProbePosition(index=1, x_m=+8 * pixel_size_m, y_m=0.0),
         ]
         product = _make_product(
             object_array=_delta_object(16, 32),
@@ -219,9 +219,9 @@ class TestComputeIlluminationMap:
         probe = _gaussian_probe(8, 8, sigma=1.0)
         pixel_size_m = 1.0e-7
         positions = [
-            ProbePosition(index=0, coordinate_x_m=-12 * pixel_size_m, coordinate_y_m=0.0),
-            ProbePosition(index=1, coordinate_x_m=0.0, coordinate_y_m=0.0),
-            ProbePosition(index=2, coordinate_x_m=+12 * pixel_size_m, coordinate_y_m=0.0),
+            ProbePosition(index=0, x_m=-12 * pixel_size_m, y_m=0.0),
+            ProbePosition(index=1, x_m=0.0, y_m=0.0),
+            ProbePosition(index=2, x_m=+12 * pixel_size_m, y_m=0.0),
         ]
         product = _make_product(
             object_array=_delta_object(16, 48),
@@ -249,7 +249,7 @@ class TestComputeIlluminationMap:
         product = _make_product(
             object_array=_delta_object(16, 16),
             probe_array=probe,
-            positions=[ProbePosition(index=0, coordinate_x_m=0.0, coordinate_y_m=0.0)],
+            positions=[ProbePosition(index=0, x_m=0.0, y_m=0.0)],
             pixel_size_m=pixel_size_m,
             object_center=(3.0e-7, -2.0e-7),
             metadata=metadata,
@@ -260,14 +260,14 @@ class TestComputeIlluminationMap:
         assert m.photon_energy_J == pytest.approx(metadata.probe_energy_J)
         assert m.photon_flux_Hz == pytest.approx(2.0e9 / 0.25)
         assert m.pixel_geometry == PixelGeometry(width_m=pixel_size_m, height_m=pixel_size_m)
-        assert m.center == ObjectCenter(coordinate_x_m=3.0e-7, coordinate_y_m=-2.0e-7)
+        assert m.center == ObjectCenter(x_m=3.0e-7, y_m=-2.0e-7)
 
     def test_zero_exposure_time_gives_nan_flux(self) -> None:
         metadata = _make_metadata(probe_photon_count=1.0e9, exposure_time_s=0.0)
         product = _make_product(
             object_array=_delta_object(16, 16),
             probe_array=_gaussian_probe(8, 8),
-            positions=[ProbePosition(index=0, coordinate_x_m=0.0, coordinate_y_m=0.0)],
+            positions=[ProbePosition(index=0, x_m=0.0, y_m=0.0)],
             metadata=metadata,
         )
         m = compute_illumination_map(product)
@@ -282,7 +282,7 @@ class TestComputeIlluminationMap:
         product = _make_product(
             object_array=_delta_object(16, 16),
             probe_array=probe_array,
-            positions=[ProbePosition(index=0, coordinate_x_m=0.0, coordinate_y_m=0.0)],
+            positions=[ProbePosition(index=0, x_m=0.0, y_m=0.0)],
         )
         m = compute_illumination_map(product)
         expected_patch = numpy.abs(mode_a) ** 2 + numpy.abs(mode_b) ** 2
@@ -294,8 +294,8 @@ class TestComputeIlluminationMap:
         probe = _gaussian_probe(8, 8, sigma=1.0)
         pixel_size_m = 1.0e-7
         positions = [
-            ProbePosition(index=0, coordinate_x_m=-8 * pixel_size_m, coordinate_y_m=0.0),
-            ProbePosition(index=1, coordinate_x_m=+8 * pixel_size_m, coordinate_y_m=0.0),
+            ProbePosition(index=0, x_m=-8 * pixel_size_m, y_m=0.0),
+            ProbePosition(index=1, x_m=+8 * pixel_size_m, y_m=0.0),
         ]
         product = _make_product(
             object_array=_delta_object(16, 32),
@@ -321,8 +321,8 @@ class TestComputeIlluminationMap:
         probe = _gaussian_probe(8, 8, sigma=1.0)
         pixel_size_m = 1.0e-7
         positions = [
-            ProbePosition(index=0, coordinate_x_m=-8 * pixel_size_m, coordinate_y_m=0.0),
-            ProbePosition(index=1, coordinate_x_m=+8 * pixel_size_m, coordinate_y_m=0.0),
+            ProbePosition(index=0, x_m=-8 * pixel_size_m, y_m=0.0),
+            ProbePosition(index=1, x_m=+8 * pixel_size_m, y_m=0.0),
         ]
         product = _make_product(
             object_array=_delta_object(16, 32),

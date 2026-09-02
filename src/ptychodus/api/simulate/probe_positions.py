@@ -38,8 +38,8 @@ def generate_cartesian_probe_positions(
 
         yield ProbePosition(
             index=index,
-            coordinate_x_m=xf,
-            coordinate_y_m=yf,
+            x_m=xf,
+            y_m=yf,
         )
 
 
@@ -63,8 +63,8 @@ def generate_concentric_probe_positions(
 
         yield ProbePosition(
             index=index,
-            coordinate_x_m=radius_m * numpy.cos(theta_rad),
-            coordinate_y_m=radius_m * numpy.sin(theta_rad),
+            x_m=radius_m * numpy.cos(theta_rad),
+            y_m=radius_m * numpy.sin(theta_rad),
         )
 
 
@@ -84,8 +84,8 @@ def generate_lissajous_probe_positions(
 
         yield ProbePosition(
             index=index,
-            coordinate_x_m=amplitude_x_m * numpy.sin(theta_x),
-            coordinate_y_m=amplitude_y_m * numpy.sin(theta_y),
+            x_m=amplitude_x_m * numpy.sin(theta_x),
+            y_m=amplitude_y_m * numpy.sin(theta_y),
         )
 
 
@@ -100,6 +100,6 @@ def generate_spiral_probe_positions(
 
         yield ProbePosition(
             index=index,
-            coordinate_x_m=radius_m * numpy.cos(theta_rad),
-            coordinate_y_m=radius_m * numpy.sin(theta_rad),
+            x_m=radius_m * numpy.cos(theta_rad),
+            y_m=radius_m * numpy.sin(theta_rad),
         )

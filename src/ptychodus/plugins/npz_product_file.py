@@ -111,8 +111,8 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
                 height_m=float(npz_file[self.OBJECT_PIXEL_HEIGHT]),
             )
             object_center = ObjectCenter(
-                coordinate_x_m=float(npz_file[self.OBJECT_CENTER_X]),
-                coordinate_y_m=float(npz_file[self.OBJECT_CENTER_Y]),
+                x_m=float(npz_file[self.OBJECT_CENTER_X]),
+                y_m=float(npz_file[self.OBJECT_CENTER_Y]),
             )
             object_ = Object(
                 array=npz_file[self.OBJECT_ARRAY],
@@ -159,8 +159,8 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
 
         for point in product.probe_positions:
             scan_indexes.append(point.index)
-            scan_x_m.append(point.coordinate_x_m)
-            scan_y_m.append(point.coordinate_y_m)
+            scan_x_m.append(point.x_m)
+            scan_y_m.append(point.y_m)
 
         metadata = product.metadata
         contents[self.NAME] = metadata.name

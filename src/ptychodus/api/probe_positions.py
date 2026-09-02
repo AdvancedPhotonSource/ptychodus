@@ -16,8 +16,8 @@ class ProbePosition:
     """Probe position with its scan index and (x, y) physical coordinates in meters."""
 
     index: int
-    coordinate_x_m: float
-    coordinate_y_m: float
+    x_m: float
+    y_m: float
     probe_photon_count: float | None = None
 
 
@@ -59,8 +59,8 @@ class ProbePositionSequence(Sequence[ProbePosition]):
         if point_seq is not None:
             for point in point_seq:
                 indexes.append(point.index)
-                coordinates_m.append(point.coordinate_y_m)
-                coordinates_m.append(point.coordinate_x_m)
+                coordinates_m.append(point.y_m)
+                coordinates_m.append(point.x_m)
                 if point.probe_photon_count is not None:
                     photon_counts.append(point.probe_photon_count)
 
@@ -122,8 +122,8 @@ class ProbePositionSequence(Sequence[ProbePosition]):
 
         return ProbePosition(
             index=self._indexes[index],
-            coordinate_x_m=self._coordinates_m[index, -1],
-            coordinate_y_m=self._coordinates_m[index, -2],
+            x_m=self._coordinates_m[index, -1],
+            y_m=self._coordinates_m[index, -2],
             probe_photon_count=photon_count,
         )
 
@@ -187,17 +187,17 @@ def calculate_scan_geometry(positions: Iterable[ProbePosition]) -> ScanGeometry 
     length_m = 0.0
 
     for point in positions:
-        if point.coordinate_x_m < minimum_x_m:
-            minimum_x_m = point.coordinate_x_m
+        if point.x_m < minimum_x_m:
+            minimum_x_m = point.x_m
 
-        if maximum_x_m < point.coordinate_x_m:
-            maximum_x_m = point.coordinate_x_m
+        if maximum_x_m < point.x_m:
+            maximum_x_m = point.x_m
 
-        if point.coordinate_y_m < minimum_y_m:
-            minimum_y_m = point.coordinate_y_m
+        if point.y_m < minimum_y_m:
+            minimum_y_m = point.y_m
 
-        if maximum_y_m < point.coordinate_y_m:
-            maximum_y_m = point.coordinate_y_m
+        if maximum_y_m < point.y_m:
+            maximum_y_m = point.y_m
 
     is_empty_x = maximum_x_m < minimum_x_m
     is_empty_y = maximum_y_m < minimum_y_m
@@ -206,8 +206,8 @@ def calculate_scan_geometry(positions: Iterable[ProbePosition]) -> ScanGeometry 
         return None
 
     for point_l, point_r in pairwise(positions):
-        dx = point_r.coordinate_x_m - point_l.coordinate_x_m
-        dy = point_r.coordinate_y_m - point_l.coordinate_y_m
+        dx = point_r.x_m - point_l.x_m
+        dy = point_r.y_m - point_l.y_m
         length_m += numpy.hypot(dx, dy)
 
     return ScanGeometry(

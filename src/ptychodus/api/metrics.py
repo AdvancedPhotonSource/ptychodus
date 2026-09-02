@@ -162,8 +162,8 @@ def estimate_reconstruction_ambiguities(
         weights=weights_arr,
         pixel_width_m=pixel_geometry.width_m,
         pixel_height_m=pixel_geometry.height_m,
-        position_x_m=coords.position_x_m,
-        position_y_m=coords.position_y_m,
+        position_x_m=coords.x_m,
+        position_y_m=coords.y_m,
     )
 
     if ref_layer_zero is None:
@@ -171,7 +171,7 @@ def estimate_reconstruction_ambiguities(
     else:
         # Weighted-LS solution for s in product ≈ s * exp(i(phi + k·r)) * ref:
         # s = Re(sum w * signal * exp(-i(phi + ramp))) / sum(w * |ref|^2).
-        ramp = k_x * coords.position_x_m + k_y * coords.position_y_m
+        ramp = k_x * coords.x_m + k_y * coords.y_m
         correction = numpy.exp(-1j * (phi + ramp))
         ref_intensity = numpy.square(numpy.abs(ref_layer_zero))
 
@@ -751,8 +751,8 @@ def compute_reconstruction_residuals(
         per_frame_numerator, per_frame_denominator, product.iter_position_probes()
     ):
         object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        cx = object_point.coordinate_x_px
-        cy = object_point.coordinate_y_px
+        cx = object_point.x_px
+        cy = object_point.y_px
 
         x_lower = int(cx - probe_geometry.width_px / 2)
         y_lower = int(cy - probe_geometry.height_px / 2)

@@ -42,8 +42,8 @@ class NSLSIIProductFileReader(ProductFileReader):
             for index, _xy in enumerate(positions_m):
                 point = ProbePosition(
                     index=index,
-                    coordinate_x_m=_xy[1],
-                    coordinate_y_m=_xy[2],
+                    x_m=_xy[1],
+                    y_m=_xy[2],
                 )
                 point_list.append(point)
 

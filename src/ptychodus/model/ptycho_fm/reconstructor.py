@@ -182,8 +182,8 @@ def build_reconstructor(
         pos_x_m: list[float] = []
         pos_y_m: list[float] = []
         for point in parameters.product.probe_positions:
-            pos_x_m.append(point.coordinate_x_m)
-            pos_y_m.append(point.coordinate_y_m)
+            pos_x_m.append(point.x_m)
+            pos_y_m.append(point.y_m)
 
         with h5py.File(dp_path, 'w') as h5_dp:
             h5_dp.create_dataset('dp', data=dp)

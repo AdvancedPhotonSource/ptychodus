@@ -28,6 +28,7 @@ from skimage.restoration import inpaint_biharmonic
 from ..diffraction import (
     BadPixels,
     CropCenter,
+    CropRegion,
     DiffractionArray,
     DiffractionPattern,
     DiffractionPatterns,
@@ -100,22 +101,21 @@ class FilterValuesStep(DiffractionPrepStep):
 
 
 class CropStep(DiffractionPrepStep):
-    """Center-crop the last two axes to `extent` about `center` (pixel coords)."""
+    """Center-crop the last two axes to `region.width_px` × `region.height_px` about `region`'s center."""
 
     type: Literal['crop'] = 'crop'
-    center: CropCenter
-    extent: ImageExtent
+    region: CropRegion
 
     def apply(self, data: numpy.ndarray) -> numpy.ndarray:
-        radius_x = self.extent.width_px // 2
-        slice_x = slice(self.center.position_x_px - radius_x, self.center.position_x_px + radius_x)
-        radius_y = self.extent.height_px // 2
-        slice_y = slice(self.center.position_y_px - radius_y, self.center.position_y_px + radius_y)
+        radius_x = self.region.width_px // 2
+        slice_x = slice(self.region.center_x_px - radius_x, self.region.center_x_px + radius_x)
+        radius_y = self.region.height_px // 2
+        slice_y = slice(self.region.center_y_px - radius_y, self.region.center_y_px + radius_y)
         leading = (slice(None),) * (data.ndim - 2)
         return data[(*leading, slice_y, slice_x)]
 
     def apply_to_extent(self, extent: ImageExtent) -> ImageExtent:
-        return self.extent
+        return ImageExtent(width_px=self.region.width_px, height_px=self.region.height_px)
 
 
 class BinningStep(DiffractionPrepStep):
@@ -373,7 +373,7 @@ def estimate_crop_center(
     Falls back to the geometric center if all pixels are masked or rejected.
     """
     height, width = pattern.shape[-2:]
-    geometric_center = CropCenter(position_x_px=width // 2, position_y_px=height // 2)
+    geometric_center = CropCenter(x_px=width // 2, y_px=height // 2)
 
     # Median-filter a float copy with bad pixels zeroed.
     working_pattern = pattern.astype(numpy.float64, copy=True)
@@ -446,6 +446,6 @@ def estimate_crop_center(
         refined_center_x = coarse_center_x
 
     return CropCenter(
-        position_x_px=int(round(refined_center_x)),
-        position_y_px=int(round(refined_center_y)),
+        x_px=int(round(refined_center_x)),
+        y_px=int(round(refined_center_y)),
     )

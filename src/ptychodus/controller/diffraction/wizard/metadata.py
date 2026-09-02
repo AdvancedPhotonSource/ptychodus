@@ -107,7 +107,7 @@ def _format_detector_distance(metadata: DiffractionMetadata) -> str:
 def _format_crop_center(metadata: DiffractionMetadata) -> str:
     crop_center = metadata.crop_center
     if crop_center is not None:
-        return f'({crop_center.position_x_px}, {crop_center.position_y_px}) px'
+        return f'({crop_center.x_px}, {crop_center.y_px}) px'
     extent = metadata.detector_extent
     if extent is not None:
         return f'({int(extent.width_px) // 2}, {int(extent.height_px) // 2}) px'
@@ -271,8 +271,8 @@ class OpenDatasetWizardMetadataViewController:
     def _apply_crop_center(self, metadata: DiffractionMetadata) -> None:
         crop_center = metadata.crop_center
         if crop_center is not None:
-            self._diffraction_settings.crop_center_x_px.set_value(crop_center.position_x_px)
-            self._diffraction_settings.crop_center_y_px.set_value(crop_center.position_y_px)
+            self._diffraction_settings.crop_center_x_px.set_value(crop_center.x_px)
+            self._diffraction_settings.crop_center_y_px.set_value(crop_center.y_px)
         elif metadata.detector_extent is not None:
             self._diffraction_settings.crop_center_x_px.set_value(
                 int(metadata.detector_extent.width_px) // 2

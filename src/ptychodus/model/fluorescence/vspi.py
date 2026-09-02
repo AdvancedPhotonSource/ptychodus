@@ -53,8 +53,8 @@ class VSPILinearOperator(LinearOperator):
             probe_intensity = probe.get_intensity()
             psf = probe_intensity / probe_intensity.sum()
             patch = interpolator.get_patch(
-                object_point.coordinate_x_px,
-                object_point.coordinate_y_px,
+                object_point.x_px,
+                object_point.y_px,
                 psf.shape[-1],
                 psf.shape[-2],
             )
@@ -72,8 +72,8 @@ class VSPILinearOperator(LinearOperator):
             probe_intensity = probe.get_intensity()
             psf = probe_intensity / probe_intensity.sum()
             interpolator.add_patch(
-                object_point.coordinate_x_px,
-                object_point.coordinate_y_px,
+                object_point.x_px,
+                object_point.y_px,
                 x[index] * psf,
             )
 

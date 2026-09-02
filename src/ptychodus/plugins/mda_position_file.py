@@ -469,8 +469,8 @@ class MDAPositionFileReader(ProbePositionFileReader):
             for x in xarray:
                 point = ProbePosition(
                     index=len(point_list),
-                    coordinate_x_m=float(x) * self._scale_to_meters,
-                    coordinate_y_m=float(y) * self._scale_to_meters,
+                    x_m=float(x) * self._scale_to_meters,
+                    y_m=float(y) * self._scale_to_meters,
                 )
                 point_list.append(point)
 
@@ -491,8 +491,8 @@ class MDAFlatScanPositionFileReader(ProbePositionFileReader):
         for idx, (x, y) in enumerate(zip(xarray, yarray)):
             point = ProbePosition(
                 index=idx,
-                coordinate_x_m=float(x) * self._scale_to_meters,
-                coordinate_y_m=float(y) * self._scale_to_meters,
+                x_m=float(x) * self._scale_to_meters,
+                y_m=float(y) * self._scale_to_meters,
             )
             point_list.append(point)
 

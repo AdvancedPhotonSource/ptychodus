@@ -93,7 +93,7 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
         else:
             patch_array *= 0.5
         object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        stitcher.add_patch(object_point.coordinate_x_px, object_point.coordinate_y_px, patch_array)
+        stitcher.add_patch(object_point.x_px, object_point.y_px, patch_array)
 
     object_ = Object(
         array=stitcher.stitch(),

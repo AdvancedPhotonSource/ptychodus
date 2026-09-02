@@ -72,7 +72,7 @@ def _make_product(specs: list[tuple[int, float, float, float | None]]) -> Produc
     Uses a minimally-sized probe/object; the tests only exercise position wiring, not physics.
     """
     points = [
-        ProbePosition(index=i, coordinate_x_m=x, coordinate_y_m=y, probe_photon_count=c)
+        ProbePosition(index=i, x_m=x, y_m=y, probe_photon_count=c)
         for i, x, y, c in specs
     ]
     positions = ProbePositionSequence(points)
@@ -84,7 +84,7 @@ def _make_product(specs: list[tuple[int, float, float, float | None]]) -> Produc
     object_ = Object(
         array=obj_array,
         pixel_geometry=_pixel(),
-        center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
         layer_spacing_m=[],
     )
     return Product(

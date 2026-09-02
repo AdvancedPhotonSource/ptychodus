@@ -51,7 +51,7 @@ def _make_object(num_layers: int = 1, *, seed: int = 0) -> Object:
     return Object(
         array=array,
         pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=PIXEL_M),
-        center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
         layer_spacing_m=[1.0e-6] * (num_layers - 1),
     )
 
@@ -74,7 +74,7 @@ def _make_probes(
 def _make_positions() -> ProbePositionSequence:
     # A handful of positions spread around the object center.
     points = [
-        ProbePosition(index=i, coordinate_x_m=x, coordinate_y_m=y)
+        ProbePosition(index=i, x_m=x, y_m=y)
         for i, (x, y) in enumerate(
             [(0.0, 0.0), (3 * PIXEL_M, -2 * PIXEL_M), (-4 * PIXEL_M, 1 * PIXEL_M)]
         )
@@ -117,10 +117,10 @@ def _exit_waves(product: Product) -> list[numpy.ndarray]:
 
     for position in product.probe_positions:
         cx_px = int(
-            round(obj_center_x_px + (position.coordinate_x_m - obj_center.coordinate_x_m) / PIXEL_M)
+            round(obj_center_x_px + (position.x_m - obj_center.x_m) / PIXEL_M)
         )
         cy_px = int(
-            round(obj_center_y_px + (position.coordinate_y_m - obj_center.coordinate_y_m) / PIXEL_M)
+            round(obj_center_y_px + (position.y_m - obj_center.y_m) / PIXEL_M)
         )
         window = obj_total[
             cy_px - half_h : cy_px - half_h + PROBE_HEIGHT_PX,
@@ -206,8 +206,8 @@ class TestStandardizeProductRoundTrip:
     def _apply_ambiguity_to_object(obj: Object, ambiguities: ReconstructionAmbiguities) -> Object:
         coords = obj.get_geometry().get_transverse_coordinates()
         ramp = (
-            ambiguities.phase_ramp_x_rad_per_m * coords.position_x_m
-            + ambiguities.phase_ramp_y_rad_per_m * coords.position_y_m
+            ambiguities.phase_ramp_x_rad_per_m * coords.x_m
+            + ambiguities.phase_ramp_y_rad_per_m * coords.y_m
         )
         factor = ambiguities.object_scale_factor * numpy.exp(
             1j * (ambiguities.phase_offset_rad + ramp)
@@ -370,7 +370,7 @@ def _make_real_positive_object(seed: int = 7) -> Object:
     return Object(
         array=array,
         pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=PIXEL_M),
-        center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
         layer_spacing_m=[],
     )
 
@@ -678,7 +678,7 @@ class TestEstimateRelative:
         small_obj = Object(
             array=small_array,
             pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=PIXEL_M),
-            center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+            center=ObjectCenter(x_m=0.0, y_m=0.0),
             layer_spacing_m=[],
         )
         product_b = _replace_object(product_a, small_obj)
@@ -696,7 +696,7 @@ class TestEstimateRelative:
         different_pixel_obj = Object(
             array=array,
             pixel_geometry=PixelGeometry(width_m=2.0 * PIXEL_M, height_m=PIXEL_M),
-            center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+            center=ObjectCenter(x_m=0.0, y_m=0.0),
             layer_spacing_m=[],
         )
         product_b = _replace_object(product_a, different_pixel_obj)
@@ -709,7 +709,7 @@ class TestEstimateRelative:
         zero_obj = Object(
             array=numpy.zeros((1, OBJ_HEIGHT_PX, OBJ_WIDTH_PX), dtype=numpy.complex128),
             pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=PIXEL_M),
-            center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+            center=ObjectCenter(x_m=0.0, y_m=0.0),
             layer_spacing_m=[],
         )
         zero_product = _replace_object(clean, zero_obj)
@@ -774,7 +774,7 @@ def _make_assembled_data(indexes: list[int], pattern_hw: int = 4) -> AssembledDi
 
 
 def _product_with_position_indexes(indexes: list[int]) -> Product:
-    points = [ProbePosition(index=i, coordinate_x_m=0.0, coordinate_y_m=0.0) for i in indexes]
+    points = [ProbePosition(index=i, x_m=0.0, y_m=0.0) for i in indexes]
     return Product(
         metadata=_metadata(),
         probe_positions=ProbePositionSequence(points),
@@ -786,7 +786,7 @@ def _product_with_position_indexes(indexes: list[int]) -> Product:
 
 def _product_with_position_specs(specs: list[tuple[int, float, float]]) -> Product:
     """Build a Product from (index, coordinate_x_m, coordinate_y_m) tuples."""
-    points = [ProbePosition(index=i, coordinate_x_m=x, coordinate_y_m=y) for i, x, y in specs]
+    points = [ProbePosition(index=i, x_m=x, y_m=y) for i, x, y in specs]
     return Product(
         metadata=_metadata(),
         probe_positions=ProbePositionSequence(points),
@@ -797,7 +797,7 @@ def _product_with_position_specs(specs: list[tuple[int, float, float]]) -> Produ
 
 
 def _output_specs(result_product: Product) -> list[tuple[int, float, float]]:
-    return [(p.index, p.coordinate_x_m, p.coordinate_y_m) for p in result_product.probe_positions]
+    return [(p.index, p.x_m, p.y_m) for p in result_product.probe_positions]
 
 
 class TestPrepareReconstructInputGuards:
@@ -983,8 +983,8 @@ class TestPrepareReconstructInputMerge:
         data = _make_assembled_data([0, 1, 2, 3, 4])
         product = _product_with_position_specs(specs)
         result = prepare_reconstruct_input(data, product)
-        xs = [p.coordinate_x_m for p in result.product.probe_positions]
-        ys = [p.coordinate_y_m for p in result.product.probe_positions]
+        xs = [p.x_m for p in result.product.probe_positions]
+        ys = [p.y_m for p in result.product.probe_positions]
         numpy.testing.assert_allclose(xs, [2.0, 4.0, 6.0, 8.0, 10.0])
         numpy.testing.assert_allclose(ys, [0.0, 5.0, 10.0, 15.0, 20.0])
 

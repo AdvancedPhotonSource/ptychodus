@@ -30,7 +30,7 @@ def _make_object(
     if pixel_geometry is None:
         pixel_geometry = PixelGeometry(width_m=1.0e-9, height_m=1.0e-9)
     if center is None:
-        center = ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0)
+        center = ObjectCenter(x_m=0.0, y_m=0.0)
     if layer_spacing_m is None:
         layer_spacing_m = []
     return Object(
@@ -206,8 +206,8 @@ def test_estimate_xmcd_output_inherits_rcp_pixel_geometry_and_center() -> None:
     o_struct = rng.uniform(0.4, 0.9, size=(8, 8)).astype(numpy.complex128)
     m_factor = rng.uniform(0.8, 1.2, size=(8, 8)).astype(numpy.complex128)
     pixel_geom = PixelGeometry(width_m=2.5e-9, height_m=3.5e-9)
-    rcp_center = ObjectCenter(coordinate_x_m=11.0e-9, coordinate_y_m=-7.0e-9)
-    lcp_center = ObjectCenter(coordinate_x_m=99.0e-9, coordinate_y_m=99.0e-9)
+    rcp_center = ObjectCenter(x_m=11.0e-9, y_m=-7.0e-9)
+    lcp_center = ObjectCenter(x_m=99.0e-9, y_m=99.0e-9)
     rcp, lcp = _build_xmcd_pair(
         o_struct,
         m_factor,

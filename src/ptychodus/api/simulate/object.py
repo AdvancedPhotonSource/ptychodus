@@ -40,8 +40,8 @@ def generate_stxm_object(
             logger.debug(f'Skipping missing scan point index={scan_point.index}!')
         else:
             object_point = geometry.map_coordinates_probe_to_object(scan_point)
-            coordinates_px.append(object_point.coordinate_y_px)
-            coordinates_px.append(object_point.coordinate_x_px)
+            coordinates_px.append(object_point.y_px)
+            coordinates_px.append(object_point.x_px)
             values.append(value)
 
     points = numpy.reshape(coordinates_px, (-1, 2))

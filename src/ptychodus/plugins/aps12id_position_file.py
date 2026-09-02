@@ -62,8 +62,8 @@ class APS12IDPositionFileReader(ProbePositionFileReader):
             for row in position_data:
                 scan_point = ProbePosition(
                     index=index,
-                    coordinate_x_m=-LengthUnit.NANOMETER.meters_per_unit * row[2],
-                    coordinate_y_m=+LengthUnit.NANOMETER.meters_per_unit * row[1],
+                    x_m=-LengthUnit.NANOMETER.meters_per_unit * row[2],
+                    y_m=+LengthUnit.NANOMETER.meters_per_unit * row[1],
                 )
                 scan_point_list.append(scan_point)
 

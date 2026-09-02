@@ -69,8 +69,8 @@ class IlluminationMap:
             dose_rate_Gy_s=self.dose_rate_Gy_s,
             pixel_height_m=self.pixel_geometry.height_m,
             pixel_width_m=self.pixel_geometry.width_m,
-            center_x_m=self.center.coordinate_x_m,
-            center_y_m=self.center.coordinate_y_m,
+            center_x_m=self.center.x_m,
+            center_y_m=self.center.y_m,
         )
 
 
@@ -100,8 +100,8 @@ def compute_illumination_map(
 
     for scan_point, probe in product.iter_position_probes():
         object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        cx = object_point.coordinate_x_px
-        cy = object_point.coordinate_y_px
+        cx = object_point.x_px
+        cy = object_point.y_px
 
         x_lower = int(cx - probe_geometry.width_px / 2)
         y_lower = int(cy - probe_geometry.height_px / 2)

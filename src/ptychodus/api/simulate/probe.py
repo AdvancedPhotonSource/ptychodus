@@ -88,8 +88,8 @@ def generate_rectangular_probe(
     """Generate a binary rectangular aperture probe with the given physical dimensions."""
     coords = geometry.get_transverse_coordinates()
     is_inside = numpy.logical_and(
-        numpy.fabs(coords.position_x_m) < 0.5 * width_m,
-        numpy.fabs(coords.position_y_m) < 0.5 * height_m,
+        numpy.fabs(coords.x_m) < 0.5 * width_m,
+        numpy.fabs(coords.y_m) < 0.5 * height_m,
     )
     return Probe(
         array=numpy.where(is_inside, 1, 0) + 0j,
@@ -266,8 +266,8 @@ def generate_hermite_probe(
 ) -> Probe:
     """Generate a probe as a superposition of 2D Hermite polynomial modes with characteristic widths *width_m* (x) and *height_m* (y)."""
     coords = geometry.get_transverse_coordinates()
-    x = coords.position_x_m / width_m
-    y = coords.position_y_m / height_m
+    x = coords.x_m / width_m
+    y = coords.y_m / height_m
     array = numpy.zeros_like(x, dtype=complex)
 
     for mode in polynomial:

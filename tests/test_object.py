@@ -54,7 +54,7 @@ def test_align_objects_identity_returns_unchanged_array_and_center() -> None:
         numpy.complex128
     )
     pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=2.0e-9)
-    center = ObjectCenter(coordinate_x_m=5.0e-6, coordinate_y_m=-3.0e-6)
+    center = ObjectCenter(x_m=5.0e-6, y_m=-3.0e-6)
     obj = Object(array=array, pixel_geometry=pixel_geom, center=center)
 
     cropped_reference, aligned = align_objects(obj, obj)
@@ -62,10 +62,10 @@ def test_align_objects_identity_returns_unchanged_array_and_center() -> None:
     assert cropped_reference.get_array().shape == array.shape
     numpy.testing.assert_allclose(cropped_reference.get_array(), array, atol=1.0e-15)
     numpy.testing.assert_allclose(
-        aligned.get_center().coordinate_x_m, center.coordinate_x_m, atol=1.0e-15
+        aligned.get_center().x_m, center.x_m, atol=1.0e-15
     )
     numpy.testing.assert_allclose(
-        aligned.get_center().coordinate_y_m, center.coordinate_y_m, atol=1.0e-15
+        aligned.get_center().y_m, center.y_m, atol=1.0e-15
     )
     numpy.testing.assert_allclose(aligned.get_array(), array, atol=1.0e-10)
 
@@ -75,7 +75,7 @@ def test_align_objects_integer_pixel_shift_y_axis_recovers_feature_position() ->
     reference_array = _make_gaussian_feature((1, 32, 32), center_yx=(16.0, 16.0))
     moving_array = _make_gaussian_feature((1, 32, 32), center_yx=(18.0, 16.0))
     pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=2.0e-9)
-    center = ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0)
+    center = ObjectCenter(x_m=0.0, y_m=0.0)
 
     reference = Object(array=reference_array, pixel_geometry=pixel_geom, center=center)
     moving = Object(array=moving_array, pixel_geometry=pixel_geom, center=center)
@@ -86,8 +86,8 @@ def test_align_objects_integer_pixel_shift_y_axis_recovers_feature_position() ->
 
     assert peak_idx == (16, 16)
     # shift_yx = (-2, 0), so new_center.y = 0 - (-2) * 2e-9 = 4e-9
-    numpy.testing.assert_allclose(aligned.get_center().coordinate_y_m, 4.0e-9, atol=1.0e-15)
-    numpy.testing.assert_allclose(aligned.get_center().coordinate_x_m, 0.0, atol=1.0e-15)
+    numpy.testing.assert_allclose(aligned.get_center().y_m, 4.0e-9, atol=1.0e-15)
+    numpy.testing.assert_allclose(aligned.get_center().x_m, 0.0, atol=1.0e-15)
 
 
 def test_align_objects_integer_pixel_shift_x_axis_recovers_feature_position() -> None:
@@ -95,7 +95,7 @@ def test_align_objects_integer_pixel_shift_x_axis_recovers_feature_position() ->
     reference_array = _make_gaussian_feature((1, 32, 32), center_yx=(16.0, 16.0))
     moving_array = _make_gaussian_feature((1, 32, 32), center_yx=(16.0, 19.0))
     pixel_geom = PixelGeometry(width_m=3.0e-9, height_m=1.0e-9)
-    center = ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0)
+    center = ObjectCenter(x_m=0.0, y_m=0.0)
 
     reference = Object(array=reference_array, pixel_geometry=pixel_geom, center=center)
     moving = Object(array=moving_array, pixel_geometry=pixel_geom, center=center)
@@ -106,8 +106,8 @@ def test_align_objects_integer_pixel_shift_x_axis_recovers_feature_position() ->
 
     assert peak_idx == (16, 16)
     # shift_yx = (0, -3), so new_center.x = 0 - (-3) * 3e-9 = 9e-9
-    numpy.testing.assert_allclose(aligned.get_center().coordinate_x_m, 9.0e-9, atol=1.0e-15)
-    numpy.testing.assert_allclose(aligned.get_center().coordinate_y_m, 0.0, atol=1.0e-15)
+    numpy.testing.assert_allclose(aligned.get_center().x_m, 9.0e-9, atol=1.0e-15)
+    numpy.testing.assert_allclose(aligned.get_center().y_m, 0.0, atol=1.0e-15)
 
 
 def test_align_objects_subpixel_shift_recovered_within_upsample_tolerance() -> None:
@@ -116,7 +116,7 @@ def test_align_objects_subpixel_shift_recovered_within_upsample_tolerance() -> N
     moving_layer = _fft_shift_2d(reference_array[0], shift_yx=(1.5, -0.75))
     moving_array = moving_layer[numpy.newaxis]
     pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=1.0e-9)
-    center = ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0)
+    center = ObjectCenter(x_m=0.0, y_m=0.0)
 
     reference = Object(array=reference_array, pixel_geometry=pixel_geom, center=center)
     moving = Object(array=moving_array, pixel_geometry=pixel_geom, center=center)
@@ -134,10 +134,10 @@ def test_align_objects_subpixel_shift_recovered_within_upsample_tolerance() -> N
     expected_x_m = -(0.75) * pixel_geom.width_m
     tolerance_m = pixel_geom.width_m / upsample_factor
     numpy.testing.assert_allclose(
-        aligned.get_center().coordinate_y_m, expected_y_m, atol=tolerance_m
+        aligned.get_center().y_m, expected_y_m, atol=tolerance_m
     )
     numpy.testing.assert_allclose(
-        aligned.get_center().coordinate_x_m, expected_x_m, atol=tolerance_m
+        aligned.get_center().x_m, expected_x_m, atol=tolerance_m
     )
 
 
@@ -151,12 +151,12 @@ def test_align_objects_probe_position_consistency_world_coordinate_invariant() -
     moving_array = _make_gaussian_feature((1, 32, 32), center_yx=moving_feature_yx)
     reference_array = _make_gaussian_feature((1, 32, 32), center_yx=reference_feature_yx)
     pixel_geom = PixelGeometry(width_m=2.0e-9, height_m=3.0e-9)
-    moving_center = ObjectCenter(coordinate_x_m=7.0e-9, coordinate_y_m=-5.0e-9)
+    moving_center = ObjectCenter(x_m=7.0e-9, y_m=-5.0e-9)
 
     reference = Object(
         array=reference_array,
         pixel_geometry=pixel_geom,
-        center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
     )
     moving = Object(array=moving_array, pixel_geometry=pixel_geom, center=moving_center)
 
@@ -165,20 +165,20 @@ def test_align_objects_probe_position_consistency_world_coordinate_invariant() -
     rx_px = moving.width_px / 2
     ry_px = moving.height_px / 2
     feature_world_x = (
-        moving_center.coordinate_x_m + (moving_feature_yx[1] - rx_px) * pixel_geom.width_m
+        moving_center.x_m + (moving_feature_yx[1] - rx_px) * pixel_geom.width_m
     )
     feature_world_y = (
-        moving_center.coordinate_y_m + (moving_feature_yx[0] - ry_px) * pixel_geom.height_m
+        moving_center.y_m + (moving_feature_yx[0] - ry_px) * pixel_geom.height_m
     )
 
     probe_at_feature = ProbePosition(
-        index=0, coordinate_x_m=feature_world_x, coordinate_y_m=feature_world_y
+        index=0, x_m=feature_world_x, y_m=feature_world_y
     )
 
     # Sanity check: in moving's frame, this probe maps to the feature pixel.
     pre_align_pos = moving_geometry.map_coordinates_probe_to_object(probe_at_feature)
-    numpy.testing.assert_allclose(pre_align_pos.coordinate_y_px, moving_feature_yx[0], atol=1e-9)
-    numpy.testing.assert_allclose(pre_align_pos.coordinate_x_px, moving_feature_yx[1], atol=1e-9)
+    numpy.testing.assert_allclose(pre_align_pos.y_px, moving_feature_yx[0], atol=1e-9)
+    numpy.testing.assert_allclose(pre_align_pos.x_px, moving_feature_yx[1], atol=1e-9)
 
     _, aligned = align_objects(reference, moving)
     aligned_geometry = aligned.get_geometry()
@@ -187,10 +187,10 @@ def test_align_objects_probe_position_consistency_world_coordinate_invariant() -
     # The aligned array now has the feature at the reference's pixel location; the same probe
     # (in world coordinates) must map to that new pixel location.
     numpy.testing.assert_allclose(
-        post_align_pos.coordinate_y_px, reference_feature_yx[0], atol=1e-9
+        post_align_pos.y_px, reference_feature_yx[0], atol=1e-9
     )
     numpy.testing.assert_allclose(
-        post_align_pos.coordinate_x_px, reference_feature_yx[1], atol=1e-9
+        post_align_pos.x_px, reference_feature_yx[1], atol=1e-9
     )
 
     # And the aligned-array amplitude at that pixel should be near the peak of the moving feature
@@ -198,8 +198,8 @@ def test_align_objects_probe_position_consistency_world_coordinate_invariant() -
     aligned_amplitude = numpy.abs(aligned.get_array()[0])
     peak_value = aligned_amplitude.max()
     value_at_probe = aligned_amplitude[
-        int(round(post_align_pos.coordinate_y_px)),
-        int(round(post_align_pos.coordinate_x_px)),
+        int(round(post_align_pos.y_px)),
+        int(round(post_align_pos.x_px)),
     ]
     assert value_at_probe > 0.99 * peak_value
 
@@ -218,7 +218,7 @@ def test_align_objects_preserves_complex_phase() -> None:
     moving_layer = _fft_shift_2d(reference_layer, shift_yx=shift_yx)
 
     pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=1.0e-9)
-    center = ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0)
+    center = ObjectCenter(x_m=0.0, y_m=0.0)
     reference = Object(
         array=reference_layer[numpy.newaxis], pixel_geometry=pixel_geom, center=center
     )
@@ -251,19 +251,19 @@ def test_align_objects_new_center_independent_of_reference_center() -> None:
     moving_array = _make_gaussian_feature((1, 32, 32), center_yx=(18.0, 16.0))
     pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=1.0e-9)
 
-    reference_center = ObjectCenter(coordinate_x_m=100.0e-9, coordinate_y_m=200.0e-9)
-    moving_center = ObjectCenter(coordinate_x_m=7.0e-9, coordinate_y_m=-5.0e-9)
+    reference_center = ObjectCenter(x_m=100.0e-9, y_m=200.0e-9)
+    moving_center = ObjectCenter(x_m=7.0e-9, y_m=-5.0e-9)
 
     reference = Object(array=reference_array, pixel_geometry=pixel_geom, center=reference_center)
     moving = Object(array=moving_array, pixel_geometry=pixel_geom, center=moving_center)
 
     _, aligned = align_objects(reference, moving)
     # shift_yx = (-2, 0), so expected new_center = moving.center - shift_yx * pixel
-    expected_y_m = moving_center.coordinate_y_m - (-2.0) * pixel_geom.height_m
-    expected_x_m = moving_center.coordinate_x_m - 0.0 * pixel_geom.width_m
+    expected_y_m = moving_center.y_m - (-2.0) * pixel_geom.height_m
+    expected_x_m = moving_center.x_m - 0.0 * pixel_geom.width_m
 
-    numpy.testing.assert_allclose(aligned.get_center().coordinate_x_m, expected_x_m, atol=1.0e-15)
-    numpy.testing.assert_allclose(aligned.get_center().coordinate_y_m, expected_y_m, atol=1.0e-15)
+    numpy.testing.assert_allclose(aligned.get_center().x_m, expected_x_m, atol=1.0e-15)
+    numpy.testing.assert_allclose(aligned.get_center().y_m, expected_y_m, atol=1.0e-15)
     # Crucially, the result is NOT just reference's center.
     assert aligned.get_center() != reference_center
 
@@ -278,7 +278,7 @@ def test_align_objects_preserves_multi_layer_count_and_spacing() -> None:
     moving_array = numpy.stack([moving_layer_a, moving_layer_b], axis=0)
 
     pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=1.0e-9)
-    center = ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0)
+    center = ObjectCenter(x_m=0.0, y_m=0.0)
     layer_spacing_m = [1.5e-6]
 
     reference = Object(
@@ -312,7 +312,7 @@ def test_align_objects_preserves_multi_layer_count_and_spacing() -> None:
 
 def test_align_objects_raises_on_pixel_geometry_mismatch() -> None:
     array = _make_gaussian_feature((1, 16, 16), center_yx=(8.0, 8.0))
-    center = ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0)
+    center = ObjectCenter(x_m=0.0, y_m=0.0)
     reference = Object(
         array=array, pixel_geometry=PixelGeometry(width_m=1.0e-9, height_m=1.0e-9), center=center
     )
@@ -328,8 +328,8 @@ def test_align_objects_trims_to_common_shape_even_delta() -> None:
     reference_array = _make_gaussian_feature((1, 32, 32), center_yx=(16.0, 16.0))
     moving_array = _make_gaussian_feature((1, 34, 36), center_yx=(17.0, 18.0))
     pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=2.0e-9)
-    reference_center = ObjectCenter(coordinate_x_m=5.0e-9, coordinate_y_m=-3.0e-9)
-    moving_center = ObjectCenter(coordinate_x_m=5.0e-9, coordinate_y_m=-3.0e-9)
+    reference_center = ObjectCenter(x_m=5.0e-9, y_m=-3.0e-9)
+    moving_center = ObjectCenter(x_m=5.0e-9, y_m=-3.0e-9)
 
     reference = Object(array=reference_array, pixel_geometry=pixel_geom, center=reference_center)
     moving = Object(array=moving_array, pixel_geometry=pixel_geom, center=moving_center)
@@ -340,10 +340,10 @@ def test_align_objects_trims_to_common_shape_even_delta() -> None:
     assert aligned_moving.get_array().shape == (1, 32, 32)
     # Reference had no crop; center preserved exactly.
     numpy.testing.assert_allclose(
-        cropped_reference.get_center().coordinate_x_m, reference_center.coordinate_x_m, atol=1.0e-15
+        cropped_reference.get_center().x_m, reference_center.x_m, atol=1.0e-15
     )
     numpy.testing.assert_allclose(
-        cropped_reference.get_center().coordinate_y_m, reference_center.coordinate_y_m, atol=1.0e-15
+        cropped_reference.get_center().y_m, reference_center.y_m, atol=1.0e-15
     )
     # Moving had an even shape delta; the crop preserves its center exactly, then the sub-pixel
     # correlator adjusts it. Verify the aligned peak lands at reference's peak pixel.
@@ -357,8 +357,8 @@ def test_align_objects_trims_to_common_shape_odd_delta_adjusts_center() -> None:
     reference_array = _make_gaussian_feature((1, 33, 32), center_yx=(16.0, 16.0))
     moving_array = _make_gaussian_feature((1, 32, 32), center_yx=(16.0, 16.0))
     pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=2.0e-9)
-    reference_center = ObjectCenter(coordinate_x_m=5.0e-9, coordinate_y_m=-3.0e-9)
-    moving_center = ObjectCenter(coordinate_x_m=5.0e-9, coordinate_y_m=-3.0e-9)
+    reference_center = ObjectCenter(x_m=5.0e-9, y_m=-3.0e-9)
+    moving_center = ObjectCenter(x_m=5.0e-9, y_m=-3.0e-9)
 
     reference = Object(array=reference_array, pixel_geometry=pixel_geom, center=reference_center)
     moving = Object(array=moving_array, pixel_geometry=pixel_geom, center=moving_center)
@@ -366,13 +366,13 @@ def test_align_objects_trims_to_common_shape_odd_delta_adjusts_center() -> None:
     cropped_reference, _ = align_objects(reference, moving)
 
     # Reference height: 33 → 32, delta 1, h_start = 0; center shift = 0 - 0.5 = -0.5 px in y.
-    expected_reference_y_m = reference_center.coordinate_y_m + (-0.5) * pixel_geom.height_m
+    expected_reference_y_m = reference_center.y_m + (-0.5) * pixel_geom.height_m
     numpy.testing.assert_allclose(
-        cropped_reference.get_center().coordinate_y_m, expected_reference_y_m, atol=1.0e-15
+        cropped_reference.get_center().y_m, expected_reference_y_m, atol=1.0e-15
     )
     # x axis: delta 0, no shift.
     numpy.testing.assert_allclose(
-        cropped_reference.get_center().coordinate_x_m, reference_center.coordinate_x_m, atol=1.0e-15
+        cropped_reference.get_center().x_m, reference_center.x_m, atol=1.0e-15
     )
     assert cropped_reference.get_array().shape == (1, 32, 32)
 
@@ -395,7 +395,7 @@ def test_align_objects_subpixel_alignment_survives_trimming() -> None:
     moving_layer_full[0, 1:33, 1:33] = shifted_layer
 
     pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=1.0e-9)
-    center = ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0)
+    center = ObjectCenter(x_m=0.0, y_m=0.0)
     reference = Object(
         array=reference_layer[numpy.newaxis], pixel_geometry=pixel_geom, center=center
     )
@@ -418,7 +418,7 @@ def test_align_objects_subpixel_alignment_survives_trimming() -> None:
 
 def _make_positions(*coords_xy_m: tuple[float, float]) -> list[ProbePosition]:
     return [
-        ProbePosition(index=i, coordinate_x_m=x, coordinate_y_m=y)
+        ProbePosition(index=i, x_m=x, y_m=y)
         for i, (x, y) in enumerate(coords_xy_m)
     ]
 

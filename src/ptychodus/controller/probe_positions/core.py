@@ -187,8 +187,8 @@ class ProbePositionsController(SequenceObserver[ProbePositionsRepositoryItem]):
             if self._table_model.is_item_checked(item_index):
                 item_name = self._repository.get_name(item_index)
                 probe_positions = self._repository[item_index].get_probe_positions()
-                x = [point.coordinate_x_m for point in probe_positions]
-                y = [point.coordinate_y_m for point in probe_positions]
+                x = [point.x_m for point in probe_positions]
+                y = [point.y_m for point in probe_positions]
                 self._plot_view.axes.plot(x, y, '.-', label=item_name, linewidth=1.5)
 
         self._plot_view.axes.invert_yaxis()

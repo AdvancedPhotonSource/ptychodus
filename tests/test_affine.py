@@ -32,7 +32,7 @@ def _sequence_from_xy(arr: numpy.ndarray) -> ProbePositionSequence:
     """Build a ProbePositionSequence from an (N, 2) array packed (x, y)."""
     return ProbePositionSequence(
         [
-            ProbePosition(index=i, coordinate_x_m=float(arr[i, 0]), coordinate_y_m=float(arr[i, 1]))
+            ProbePosition(index=i, x_m=float(arr[i, 0]), y_m=float(arr[i, 1]))
             for i in range(arr.shape[0])
         ]
     )
@@ -309,13 +309,13 @@ def test_evaluate_error_matches_pointwise_distance() -> None:
 def test_affine_transform_probe_position_overload_preserves_index() -> None:
     """The ProbePosition overload returns a new ProbePosition with the same index."""
     transform = AffineTransform(2.0, 0.5, 1.0, -0.5, 3.0, -2.0)
-    position = ProbePosition(index=7, coordinate_x_m=4.0, coordinate_y_m=6.0)
+    position = ProbePosition(index=7, x_m=4.0, y_m=6.0)
 
     transformed = transform(position)
 
     assert transformed.index == 7
-    assert transformed.coordinate_x_m == pytest.approx(2 * 4.0 + 0.5 * 6.0 + 1.0)
-    assert transformed.coordinate_y_m == pytest.approx(-0.5 * 4.0 + 3.0 * 6.0 - 2.0)
+    assert transformed.x_m == pytest.approx(2 * 4.0 + 0.5 * 6.0 + 1.0)
+    assert transformed.y_m == pytest.approx(-0.5 * 4.0 + 3.0 * 6.0 - 2.0)
 
 
 # ---------------------------------------------------------------------------

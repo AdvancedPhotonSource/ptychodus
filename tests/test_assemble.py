@@ -22,7 +22,7 @@ from ptychodus.api.assemble import (
 )
 from ptychodus.api.diffraction import (
     BadPixels,
-    CropCenter,
+    CropRegion,
     DiffractionArray,
     DiffractionDatasetLayoutNode,
     DiffractionIndexes,
@@ -361,12 +361,7 @@ def test_bad_pixels_are_zeroed_in_raw_coords_before_cropping() -> None:
     raw_bad = numpy.zeros((40, 60), dtype=numpy.bool_)
     raw_bad[18, 30] = True
     pipeline = DiffractionPrepPipeline(
-        steps=(
-            CropStep(
-                center=CropCenter(position_x_px=30, position_y_px=18),
-                extent=ImageExtent(width_px=16, height_px=12),
-            ),
-        )
+        steps=(CropStep(region=CropRegion(center_x_px=30, center_y_px=18, width_px=16, height_px=12)),)
     )
     processed_bad = pipeline.apply_to_mask(raw_bad)
 

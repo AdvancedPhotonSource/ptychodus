@@ -149,8 +149,8 @@ def main() -> int:
 
     if args.crop_center_x_px is not None and args.crop_center_y_px is not None:
         crop_center = CropCenter(
-            position_x_px=args.crop_center_x_px,
-            position_y_px=args.crop_center_y_px,
+            x_px=args.crop_center_x_px,
+            y_px=args.crop_center_y_px,
         )
     elif bool(args.crop_center_x_px) ^ bool(args.crop_center_y_px):
         parser.error('--crop-center-x-px and --crop-center-y-px must be given together.')

@@ -71,7 +71,7 @@ def _flat_object(num_layers: int = 1, layer_spacing_m: list[float] = []) -> Obje
     return Object(
         array=array,
         pixel_geometry=_pixel_geometry(),
-        center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
         layer_spacing_m=layer_spacing_m,
     )
 
@@ -80,7 +80,7 @@ def _make_object(array: numpy.ndarray, layer_spacing_m: list[float] = []) -> Obj
     return Object(
         array=array,
         pixel_geometry=_pixel_geometry(),
-        center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
         layer_spacing_m=layer_spacing_m,
     )
 
@@ -103,7 +103,7 @@ def _make_product(
 
 def _center_pos(index: int = 0) -> ProbePosition:
     """Probe at the object center, which maps to an exact integer object pixel (dx=dy=0)."""
-    return ProbePosition(index=index, coordinate_x_m=0.0, coordinate_y_m=0.0)
+    return ProbePosition(index=index, x_m=0.0, y_m=0.0)
 
 
 def _fraunhofer_intensity(probe_mode: numpy.ndarray, product: Product) -> numpy.ndarray:
@@ -193,8 +193,8 @@ class TestPatternValues:
         ).astype(complex)
         object_ = _make_object(obj_layer)
 
-        pos_int = ProbePosition(index=0, coordinate_x_m=0.0, coordinate_y_m=0.0)
-        pos_half = ProbePosition(index=0, coordinate_x_m=0.5 * _PIXEL_SIZE_M, coordinate_y_m=0.0)
+        pos_int = ProbePosition(index=0, x_m=0.0, y_m=0.0)
+        pos_half = ProbePosition(index=0, x_m=0.5 * _PIXEL_SIZE_M, y_m=0.0)
 
         result_int = generate_diffraction_data(_make_product([pos_int], probe, object_))
         result_half = generate_diffraction_data(_make_product([pos_half], probe, object_))
@@ -317,9 +317,9 @@ class TestMultiPositionWithoutOpr:
         rng = numpy.random.default_rng(40)
         probe = _random_probe(rng)
         positions = [
-            ProbePosition(index=0, coordinate_x_m=-8 * _PIXEL_SIZE_M, coordinate_y_m=0.0),
-            ProbePosition(index=1, coordinate_x_m=0.0, coordinate_y_m=0.0),
-            ProbePosition(index=2, coordinate_x_m=+8 * _PIXEL_SIZE_M, coordinate_y_m=0.0),
+            ProbePosition(index=0, x_m=-8 * _PIXEL_SIZE_M, y_m=0.0),
+            ProbePosition(index=1, x_m=0.0, y_m=0.0),
+            ProbePosition(index=2, x_m=+8 * _PIXEL_SIZE_M, y_m=0.0),
         ]
         # _make_probe_seq constructs a ProbeSequence with opr_weights=None.
         product = _make_product(positions, probe, _flat_object())

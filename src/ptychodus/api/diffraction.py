@@ -28,8 +28,66 @@ DiffractionPatternPhotonFluxes: TypeAlias = numpy.ndarray[
 class CropCenter:
     """Pixel coordinates of the center used when cropping diffraction patterns."""
 
-    position_x_px: int
-    position_y_px: int
+    x_px: int
+    y_px: int
+
+
+@dataclass(frozen=True)
+class CropRegion:
+    """Rectangular crop window on a detector: center in pixels + width/height in pixels.
+
+    The window matches `CropStep`'s slice semantics: half-open
+    `[x_px - width_px // 2, x_px + width_px // 2)` on x, same on y.
+    """
+
+    x_px: int
+    y_px: int
+    width_px: int
+    height_px: int
+
+    @classmethod
+    def from_center_extent(cls, center: CropCenter, extent: ImageExtent) -> CropRegion:
+        """Build a region from a separate center and extent."""
+        return cls(
+            x_px=center.x_px,
+            y_px=center.y_px,
+            width_px=extent.width_px,
+            height_px=extent.height_px,
+        )
+
+    @classmethod
+    def from_largest_pow2(cls, center: CropCenter, detector_extent: ImageExtent) -> CropRegion:
+        """Largest power-of-two square region centered at `center` fitting in `detector_extent`.
+
+        Returns a zero-size region when `center` lies on the detector boundary or outside it
+        (no positive-radius square exists).
+        """
+        max_radius = min(
+            center.x_px,
+            detector_extent.width_px - center.x_px,
+            center.y_px,
+            detector_extent.height_px - center.y_px,
+        )
+        if max_radius < 1:
+            return cls(x_px=center.x_px, y_px=center.y_px, width_px=0, height_px=0)
+        # Largest s = 2^k satisfying s <= 2 * max_radius. bit_length() gives floor(log2)+1.
+        size = 1 << ((2 * max_radius).bit_length() - 1)
+        return cls(x_px=center.x_px, y_px=center.y_px, width_px=size, height_px=size)
+
+    def clamp_to_detector_extent(self, detector_extent: ImageExtent) -> CropRegion:
+        """Return a new region shrunk and shifted so its window fits inside `detector_extent`.
+
+        Width and height are capped at the detector's (floored at 1); the center is then
+        clamped into `[radius, detector - radius]` on each axis, so the half-open window
+        `[c - radius, c + radius)` lies entirely inside `[0, detector)`.
+        """
+        width = max(1, min(self.width_px, detector_extent.width_px))
+        height = max(1, min(self.height_px, detector_extent.height_px))
+        radius_x = width // 2
+        radius_y = height // 2
+        x = max(radius_x, min(self.x_px, detector_extent.width_px - radius_x))
+        y = max(radius_y, min(self.y_px, detector_extent.height_px - radius_y))
+        return CropRegion(x_px=x, y_px=y, width_px=width, height_px=height)
 
 
 class DiffractionArray(ABC):

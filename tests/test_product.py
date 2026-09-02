@@ -35,7 +35,7 @@ def _make_product(
     obj = Object(
         array=numpy.zeros((8, 8), dtype=complex),
         pixel_geometry=pixel_geometry,
-        center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
     )
     probes = ProbeSequence(
         array=probe_array.astype(complex),
@@ -59,7 +59,7 @@ class TestIterPositionProbes:
         ``zip(positions, probes)`` to truncate after the first position.
         """
         positions = [
-            ProbePosition(index=i, coordinate_x_m=float(i), coordinate_y_m=0.0) for i in range(3)
+            ProbePosition(index=i, x_m=float(i), y_m=0.0) for i in range(3)
         ]
         probe = numpy.ones((4, 4), dtype=complex)
         product = _make_product(positions=positions, probe_array=probe)
@@ -73,7 +73,7 @@ class TestIterPositionProbes:
     def test_yields_all_positions_with_opr(self) -> None:
         """OPR-equipped products are unchanged: same length, OPR-weighted per index."""
         positions = [
-            ProbePosition(index=i, coordinate_x_m=float(i), coordinate_y_m=0.0) for i in range(3)
+            ProbePosition(index=i, x_m=float(i), y_m=0.0) for i in range(3)
         ]
         # 2 coherent modes, 1 incoherent mode, 4x4 spatial. OPR mixes them per position.
         probe = numpy.stack(
@@ -96,8 +96,8 @@ class TestIterPositionProbes:
 
     def test_yields_position_objects_with_correct_fields(self) -> None:
         positions = [
-            ProbePosition(index=0, coordinate_x_m=1.5e-7, coordinate_y_m=-2.5e-7),
-            ProbePosition(index=1, coordinate_x_m=3.5e-7, coordinate_y_m=+0.5e-7),
+            ProbePosition(index=0, x_m=1.5e-7, y_m=-2.5e-7),
+            ProbePosition(index=1, x_m=3.5e-7, y_m=+0.5e-7),
         ]
         # OPR weights so we genuinely walk both positions (also covered by the no-OPR test).
         opr_weights = numpy.ones((2, 1), dtype=float)
@@ -109,8 +109,8 @@ class TestIterPositionProbes:
 
         pairs = list(product.iter_position_probes())
         assert pairs[0][0].index == 0
-        assert pairs[0][0].coordinate_x_m == 1.5e-7
-        assert pairs[0][0].coordinate_y_m == -2.5e-7
+        assert pairs[0][0].x_m == 1.5e-7
+        assert pairs[0][0].y_m == -2.5e-7
         assert pairs[1][0].index == 1
-        assert pairs[1][0].coordinate_x_m == 3.5e-7
-        assert pairs[1][0].coordinate_y_m == +0.5e-7
+        assert pairs[1][0].x_m == 3.5e-7
+        assert pairs[1][0].y_m == +0.5e-7
