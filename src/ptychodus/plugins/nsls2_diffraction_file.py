@@ -4,12 +4,7 @@ import logging
 import h5py
 import numpy
 
-from ptychodus.api.constants import (
-    ELECTRON_VOLT_J,
-    LIGHT_SPEED_M_PER_S,
-    LengthUnit,
-    PLANCK_CONSTANT_J_PER_HZ,
-)
+from ptychodus.api.constants import LengthUnit, wavelength_m_to_energy_eV
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     DiffractionDataset,
@@ -72,9 +67,7 @@ class NSLS2Style2DiffractionFileReader(DiffractionFileReader):
 
                 pixel_size_m = LengthUnit.MICROMETER.to_meters(float(h5_file['/ccd_pixel_um'][()]))
                 wavelength_m = LengthUnit.NANOMETER.to_meters(float(h5_file['/lambda_nm'][()]))
-                hc_Jm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S  # noqa: N806
-                hc_eVm = hc_Jm / ELECTRON_VOLT_J  # noqa: N806
-                probe_energy_eV = hc_eVm / wavelength_m  # noqa: N806
+                probe_energy_eV = wavelength_m_to_energy_eV(wavelength_m)  # noqa: N806
 
                 metadata = DiffractionMetadata(
                     num_patterns_per_array=[num_patterns],

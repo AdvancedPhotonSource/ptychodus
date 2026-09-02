@@ -11,7 +11,8 @@ import numpy
 import scipy.ndimage
 from scipy.fft import fft2
 
-from .geometry import PixelGeometry
+from .constants import format_length
+from .geometry import ImageExtent, PixelGeometry
 from .preprocess.noise import estimate_noise_floor
 from .propagate import intensity
 from .typing import ComplexArrayType, RealArrayType
@@ -335,6 +336,26 @@ class ProbeGeometry:
     pixel_width_m: float
     pixel_height_m: float
 
+    @classmethod
+    def from_far_field(
+        cls,
+        detector_pixel_geometry: PixelGeometry,
+        image_extent: ImageExtent,
+        *,
+        wavelength_m: float,
+        distance_m: float,
+    ) -> ProbeGeometry:
+        """Sample-plane probe geometry from the Fraunhofer relation ``dx_sample = lambda * |z| / (N * dx_detector)``."""
+        width_px = image_extent.width_px
+        height_px = image_extent.height_px
+        numerator_m2 = wavelength_m * abs(distance_m)
+        return cls(
+            width_px=width_px,
+            height_px=height_px,
+            pixel_width_m=numerator_m2 / (detector_pixel_geometry.width_m * width_px),
+            pixel_height_m=numerator_m2 / (detector_pixel_geometry.height_m * height_px),
+        )
+
     @property
     def width_m(self) -> float:
         return self.width_px * self.pixel_width_m
@@ -361,6 +382,17 @@ class ProbeGeometry:
             position_x_m=position_x_m,
             position_y_m=position_y_m,
         )
+
+    def __str__(self) -> str:
+        pixel_geometry = self.get_pixel_geometry()
+        width_label = format_length(self.pixel_width_m)
+
+        if pixel_geometry.is_square:
+            pitch = f'{width_label}/px'
+        else:
+            pitch = f'{width_label} x {format_length(self.pixel_height_m)}/px'
+
+        return f'{self.width_px} x {self.height_px} px @ {pitch}'
 
 
 class ProbeGeometryProvider(ABC):
@@ -547,6 +579,15 @@ class ProbeSequence(Sequence[Probe]):
             raise TypeError('opr_weights must be a floating-point ndarray')
 
         self._pixel_geometry = pixel_geometry
+
+    @classmethod
+    def from_probe(cls, probe: Probe) -> ProbeSequence:
+        """Wrap a single :class:`Probe` as a length-1 sequence with no OPR basis."""
+        return cls(
+            array=probe.get_array(),
+            opr_weights=None,
+            pixel_geometry=probe.get_pixel_geometry(),
+        )
 
     def copy(self) -> ProbeSequence:
         return ProbeSequence(

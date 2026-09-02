@@ -239,8 +239,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
         Derived from the stored pattern shape rather than metadata + live pipeline,
         for the same reason as get_processed_pixel_geometry.
         """
-        _, height_px, width_px = self._data.get_patterns_shape()
-        return ImageExtent(width_px=width_px, height_px=height_px)
+        return self._data.get_image_extent()
 
     def get_bad_pixels(self) -> BadPixels:
         return self._bad_pixels

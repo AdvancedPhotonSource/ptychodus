@@ -161,6 +161,15 @@ class PluginChooser(Iterable[Plugin[T]], Observable):
         index = self._find_index(name)
         return None if index is None else self._registered_plugins[index]
 
+    def get_strategy_by_name(self, name: str) -> T:
+        """Return the strategy of the plugin matching *name*; raise LookupError otherwise."""
+        plugin = self.find_plugin(name)
+        if plugin is None:
+            raise LookupError(
+                f'No plugin matches "{name}". Registered: {self.stringify_plugin_names()}.'
+            )
+        return plugin.strategy
+
     def get_current_plugin(self) -> Plugin[T]:
         """Return the currently selected plugin."""
         if not self._registered_plugins:

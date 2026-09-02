@@ -4,7 +4,7 @@ import logging
 
 import numpy
 
-from ptychodus.api.constants import ELECTRON_VOLT_J, LIGHT_SPEED_M_PER_S, PLANCK_CONSTANT_J_PER_HZ
+from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.object import Object
 from ptychodus.api.diffraction import (
@@ -37,14 +37,6 @@ def _get_scalar(npz_file: numpy.lib.npyio.NpzFile, key: str, fallback: float) ->
     except (TypeError, ValueError):
         logger.warning('Failed to parse %s from NPZ; using default %s', key, fallback)
         return fallback
-
-
-def _probe_wavelength_m(energy_ev: float) -> float:
-    if energy_ev <= 0.0:
-        return 0.0
-
-    hc_jm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S
-    return hc_jm / (energy_ev * ELECTRON_VOLT_J)
 
 
 def _coords_in_pixels(scan_x: numpy.ndarray, scan_y: numpy.ndarray) -> bool:
@@ -106,7 +98,7 @@ class SLACProductFileReader(ProductFileReader):
             detector_width_m = detector_pixel_size_m * width_px
             pixel_size_m = 0.0
             if detector_width_m > 0.0:
-                pixel_size_m = _probe_wavelength_m(probe_energy_ev) * detector_distance_m
+                pixel_size_m = energy_eV_to_wavelength_m(probe_energy_ev) * detector_distance_m
                 pixel_size_m /= detector_width_m
 
             if pixel_size_m > 0.0:

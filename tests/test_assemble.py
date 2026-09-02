@@ -841,3 +841,18 @@ def test_assemble_dataset_uses_fallback_when_any_array_lacks_flux() -> None:
     # All-or-nothing: any array without flux -> no buffer -> fallback path used.
     assert not data.has_measured_probe_photon_counts()
     numpy.testing.assert_array_equal(data.get_probe_photon_counts(), data.get_total_counts())
+
+
+class TestGetImageExtent:
+    def test_matches_last_two_dims_of_the_stored_patterns(self) -> None:
+        # A single 5x7 pattern to prove the width_px/height_px axis assignment.
+        data = AssembledDiffractionData(
+            indexes=numpy.zeros(1, dtype=numpy.intp),
+            patterns=numpy.zeros((1, 5, 7), dtype=numpy.uint16),
+            pixel_geometry=PixelGeometry(width_m=1e-6, height_m=1e-6),
+            bad_pixels=numpy.zeros((5, 7), dtype=numpy.bool_),
+        )
+
+        extent = data.get_image_extent()
+
+        assert extent == ImageExtent(width_px=7, height_px=5)

@@ -9,7 +9,7 @@ import scipy.linalg
 
 from ..constants import TWO_PI_J
 from ..typing import ComplexArrayType, RealArrayType
-from ..geometry import HermiteMode, PixelGeometry, ZernikeMode
+from ..geometry import HermiteMode, ImageExtent, PixelGeometry, ZernikeMode
 from ..probe import Probe, ProbeGeometry, ProbeSequence
 from ..propagate import (
     AngularSpectrumPropagator,
@@ -139,21 +139,20 @@ def generate_average_pattern_probe(
         )
 
     detector_pixel_geometry = assembled_data.get_pixel_geometry()
-    implied_pixel_width_m = (
-        probe_wavelength_m * abs(detector_distance_m) / (width_px * detector_pixel_geometry.width_m)
-    )
-    implied_pixel_height_m = (
-        probe_wavelength_m
-        * abs(detector_distance_m)
-        / (height_px * detector_pixel_geometry.height_m)
+    implied_geometry = ProbeGeometry.from_far_field(
+        detector_pixel_geometry,
+        ImageExtent(width_px=width_px, height_px=height_px),
+        wavelength_m=probe_wavelength_m,
+        distance_m=detector_distance_m,
     )
 
-    if not numpy.isclose(implied_pixel_width_m, geometry.pixel_width_m, rtol=rtol) or not (
-        numpy.isclose(implied_pixel_height_m, geometry.pixel_height_m, rtol=rtol)
-    ):
+    if not numpy.isclose(
+        implied_geometry.pixel_width_m, geometry.pixel_width_m, rtol=rtol
+    ) or not numpy.isclose(implied_geometry.pixel_height_m, geometry.pixel_height_m, rtol=rtol):
         raise ValueError(
             'Fresnel-transform output pixel size '
-            f'({implied_pixel_width_m:.3e} x {implied_pixel_height_m:.3e} m) does not match '
+            f'({implied_geometry.pixel_width_m:.3e} x '
+            f'{implied_geometry.pixel_height_m:.3e} m) does not match '
             f'probe geometry ({geometry.pixel_width_m:.3e} x {geometry.pixel_height_m:.3e} m) '
             f'within rtol={rtol}.'
         )

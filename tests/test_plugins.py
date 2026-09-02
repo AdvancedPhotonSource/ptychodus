@@ -207,6 +207,35 @@ def test_two_adapters_over_one_chooser_both_track_it() -> None:
     assert settings_b.get_value() == 'Zeta'
 
 
+def test_get_strategy_by_name_resolves_either_name_space_case_insensitively() -> None:
+    chooser: PluginChooser[str] = PluginChooser()
+    chooser.register_plugin('rl-strategy', display_name='Richardson-Lucy')
+
+    assert chooser.get_strategy_by_name('richardson-lucy') == 'rl-strategy'
+    assert chooser.get_strategy_by_name('RICHARDSONLUCY') == 'rl-strategy'
+
+
+def test_get_strategy_by_name_raises_lookup_error_with_registered_names_in_message() -> None:
+    chooser: PluginChooser[str] = PluginChooser()
+    chooser.register_plugin('a', display_name='Alpha')
+    chooser.register_plugin('b', display_name='Beta')
+
+    with pytest.raises(LookupError) as info:
+        chooser.get_strategy_by_name('missing')
+
+    message = str(info.value)
+    assert 'missing' in message
+    assert 'Alpha' in message
+    assert 'Beta' in message
+
+
+def test_get_strategy_by_name_empty_chooser_raises_lookup_error() -> None:
+    chooser: PluginChooser[str] = PluginChooser()
+
+    with pytest.raises(LookupError):
+        chooser.get_strategy_by_name('anything')
+
+
 def test_register_duplicate_simple_name_warns(caplog: pytest.LogCaptureFixture) -> None:
     """A shadowed registration is announced rather than failing silently.
 
@@ -223,9 +252,7 @@ def test_register_duplicate_simple_name_warns(caplog: pytest.LogCaptureFixture) 
     assert 'Example Files (*.h5)' in caplog.text
     assert 'Example Files (*.mat)' in caplog.text
 
-    plugin = chooser.find_plugin('example')
-    assert plugin is not None
-    assert plugin.strategy == 'h5'
+    assert chooser.get_strategy_by_name('example') == 'h5'
 
 
 def test_register_distinct_simple_names_is_quiet(caplog: pytest.LogCaptureFixture) -> None:

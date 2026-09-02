@@ -4,18 +4,12 @@ from typing import Final, Sequence
 import numpy
 import scipy.io
 
+from ptychodus.api.constants import wavelength_m_to_energy_eV
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe import ProbeSequence
-from ptychodus.api.product import (
-    ELECTRON_VOLT_J,
-    LIGHT_SPEED_M_PER_S,
-    PLANCK_CONSTANT_J_PER_HZ,
-    Product,
-    ProductFileReader,
-    ProductMetadata,
-)
+from ptychodus.api.product import Product, ProductFileReader, ProductMetadata
 from ptychodus.api.probe_positions import ProbePositionSequence, ProbePosition
 from ptychodus.api.reconstruct import LossValue
 
@@ -27,7 +21,6 @@ class FoldSliceProductFileReader(ProductFileReader):
     def read(self, file_path: Path) -> Product:
         point_list: list[ProbePosition] = list()
 
-        hc_eVm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S / ELECTRON_VOLT_J  # noqa: N806
         mat_dict = scipy.io.loadmat(file_path, simplify_cells=True)
         p_struct = mat_dict['p']
 
@@ -36,7 +29,7 @@ class FoldSliceProductFileReader(ProductFileReader):
         except KeyError:
             probe_energy_eV = 0.0  # noqa: N806
         else:
-            probe_energy_eV = hc_eVm / wavelength_m  # noqa: N806
+            probe_energy_eV = wavelength_m_to_energy_eV(wavelength_m)  # noqa: N806
 
         try:
             tomography_angle_deg = p_struct['angle']

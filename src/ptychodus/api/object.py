@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 import logging
+import math
 
 import numpy
 from skimage.registration import phase_cross_correlation
 
 from .typing import ComplexArrayType, RealArrayType
+from .constants import format_length
 from .fourier import fourier_shift_2d
 from .geometry import PixelGeometry
-from .probe_positions import ProbePosition
+from .probe import ProbeGeometry
+from .probe_positions import ProbePosition, calculate_scan_geometry
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +132,12 @@ class ObjectGeometry:
         dw = self.width_m - geometry.width_m
         dh = self.height_m - geometry.height_m
         return abs(dx) <= dw and abs(dy) <= dh
+
+    def __str__(self) -> str:
+        return (
+            f'{self.width_px} x {self.height_px} px around '
+            f'({format_length(self.center_x_m)}, {format_length(self.center_y_m)})'
+        )
 
 
 class ObjectGeometryProvider(ABC):
@@ -389,6 +398,39 @@ def align_objects(
     )
 
     return cropped_reference, aligned_moving
+
+
+def compute_object_geometry(
+    positions: Iterable[ProbePosition],
+    probe_geometry: ProbeGeometry,
+    *,
+    padding_px: int = 0,
+) -> ObjectGeometry:
+    """Size an object canvas covering the scan bounding box plus a probe-extent border on each side, with optional additional padding in pixels.
+
+    Raises :class:`ValueError` when ``positions`` is empty. Pass a re-iterable
+    sequence: :func:`calculate_scan_geometry` iterates twice.
+    """
+    scan = calculate_scan_geometry(positions)
+
+    if scan is None:
+        raise ValueError('Probe positions are empty; cannot compute an object geometry.')
+
+    core_width_px = math.ceil(
+        (scan.width_m + probe_geometry.width_m) / probe_geometry.pixel_width_m
+    )
+    core_height_px = math.ceil(
+        (scan.height_m + probe_geometry.height_m) / probe_geometry.pixel_height_m
+    )
+
+    return ObjectGeometry(
+        width_px=core_width_px + 2 * padding_px,
+        height_px=core_height_px + 2 * padding_px,
+        pixel_width_m=probe_geometry.pixel_width_m,
+        pixel_height_m=probe_geometry.pixel_height_m,
+        center_x_m=scan.center_x_m,
+        center_y_m=scan.center_y_m,
+    )
 
 
 class ObjectFileReader(ABC):

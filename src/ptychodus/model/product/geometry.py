@@ -2,15 +2,11 @@ from collections.abc import Sequence
 
 import numpy
 
+from ptychodus.api.constants import ELECTRON_VOLT_J, energy_eV_to_wavelength_m
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider
+from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider, compute_object_geometry
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider
-from ptychodus.api.product import (
-    ELECTRON_VOLT_J,
-    LIGHT_SPEED_M_PER_S,
-    PLANCK_CONSTANT_J_PER_HZ,
-)
 from ptychodus.api.probe_positions import ProbePosition
 
 from .metadata import MetadataRepositoryItem
@@ -61,12 +57,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     @property
     def probe_wavelength_m(self) -> float:
-        hc_Jm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S  # noqa: N806
-
-        try:
-            return hc_Jm / self.probe_energy_J
-        except ZeroDivisionError:
-            return 0.0
+        return energy_eV_to_wavelength_m(self._metadata_item.probe_energy_eV.get_value())
 
     @property
     def probe_wavelengths_per_m(self) -> float:
@@ -182,34 +173,23 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     def get_object_geometry(self) -> ObjectGeometry:
         probe_geometry = self.get_probe_geometry()
-        width_m = probe_geometry.width_m
-        height_m = probe_geometry.height_m
-        center_x_m = 0.0
-        center_y_m = 0.0
-
-        scan_bbox = self._scan_item.get_geometry()
-
-        if scan_bbox is not None:
-            width_m += scan_bbox.width_m
-            height_m += scan_bbox.height_m
-            center_x_m = scan_bbox.center_x_m
-            center_y_m = scan_bbox.center_y_m
-
         pixel_geometry = self.get_object_plane_pixel_geometry()
-        if pixel_geometry.is_valid:
-            width_px = width_m / pixel_geometry.width_m
-            height_px = height_m / pixel_geometry.height_m
-        else:
-            width_px = 0.0
-            height_px = 0.0
 
+        if pixel_geometry.is_valid:
+            try:
+                return compute_object_geometry(self.get_probe_positions(), probe_geometry)
+            except ValueError:
+                pass  # Empty scan — fall through to the probe-sized default below.
+
+        # Detector unbound or scan not yet loaded: degrade to a probe-sized canvas at
+        # the origin so downstream UI has valid dimensions to render.
         return ObjectGeometry(
-            width_px=int(numpy.ceil(width_px)),
-            height_px=int(numpy.ceil(height_px)),
+            width_px=probe_geometry.width_px if pixel_geometry.is_valid else 0,
+            height_px=probe_geometry.height_px if pixel_geometry.is_valid else 0,
             pixel_width_m=pixel_geometry.width_m,
             pixel_height_m=pixel_geometry.height_m,
-            center_x_m=center_x_m,
-            center_y_m=center_y_m,
+            center_x_m=0.0,
+            center_y_m=0.0,
         )
 
     def is_object_geometry_valid(self, geometry: ObjectGeometry) -> bool:

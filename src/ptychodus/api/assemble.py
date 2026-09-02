@@ -23,7 +23,7 @@ from .diffraction import (
     DiffractionPatterns,
     SimpleDiffractionArray,
 )
-from .geometry import PixelGeometry
+from .geometry import ImageExtent, PixelGeometry
 from .preprocess.diffraction import (
     DiffractionPrepPipeline,
     inpaint_bad_pixels,
@@ -155,6 +155,11 @@ class AssembledDiffractionData:
 
     def get_patterns_shape(self) -> tuple[int, int, int]:
         return self._patterns.shape
+
+    def get_image_extent(self) -> ImageExtent:
+        """Post-preprocessing per-pattern extent as an :class:`ImageExtent`."""
+        height_px, width_px = self._patterns.shape[-2:]
+        return ImageExtent(width_px=width_px, height_px=height_px)
 
     def get_patterns_dtype(self) -> DiffractionPatternDType:
         return self._patterns.dtype

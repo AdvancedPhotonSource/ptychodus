@@ -11,7 +11,14 @@ import numpy.testing
 import pytest
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.object import Object, ObjectCenter, align_objects
+from ptychodus.api.object import (
+    Object,
+    ObjectCenter,
+    ObjectGeometry,
+    align_objects,
+    compute_object_geometry,
+)
+from ptychodus.api.probe import ProbeGeometry
 from ptychodus.api.probe_positions import ProbePosition
 
 
@@ -407,3 +414,86 @@ def test_align_objects_subpixel_alignment_survives_trimming() -> None:
     support = numpy.abs(reference_layer) > 0.05
     residual = numpy.abs(aligned_moving.get_array()[0] - reference_layer)[support].max()
     assert residual < 5.0e-3
+
+
+def _make_positions(*coords_xy_m: tuple[float, float]) -> list[ProbePosition]:
+    return [
+        ProbePosition(index=i, coordinate_x_m=x, coordinate_y_m=y)
+        for i, (x, y) in enumerate(coords_xy_m)
+    ]
+
+
+def _make_probe_geometry(width_px: int = 64, pixel_m: float = 1.0e-8) -> ProbeGeometry:
+    return ProbeGeometry(
+        width_px=width_px,
+        height_px=width_px,
+        pixel_width_m=pixel_m,
+        pixel_height_m=pixel_m,
+    )
+
+
+class TestComputeObjectGeometry:
+    def test_empty_positions_raise_value_error(self) -> None:
+        with pytest.raises(ValueError, match='empty'):
+            compute_object_geometry([], _make_probe_geometry())
+
+    def test_single_position_covers_probe_extent_at_that_point(self) -> None:
+        probe = _make_probe_geometry(width_px=32, pixel_m=1.0e-8)
+        positions = _make_positions((5.0e-7, -3.0e-7))
+
+        geometry = compute_object_geometry(positions, probe)
+
+        # A single scan point has zero bounding-box extent, so the object is exactly
+        # the probe canvas centered on that point (rounded up by math.ceil).
+        assert geometry.width_px == 32
+        assert geometry.height_px == 32
+        numpy.testing.assert_allclose(geometry.center_x_m, 5.0e-7)
+        numpy.testing.assert_allclose(geometry.center_y_m, -3.0e-7)
+        numpy.testing.assert_allclose(geometry.pixel_width_m, 1.0e-8)
+        numpy.testing.assert_allclose(geometry.pixel_height_m, 1.0e-8)
+
+    def test_bounding_box_arithmetic_expands_canvas_by_scan_span(self) -> None:
+        probe = _make_probe_geometry(width_px=32, pixel_m=1.0e-8)
+        # scan spans 200 nm in x, 100 nm in y around (100 nm, 50 nm)
+        positions = _make_positions(
+            (0.0, 0.0),
+            (2.0e-7, 1.0e-7),
+        )
+
+        geometry = compute_object_geometry(positions, probe)
+
+        # width_m = scan_span + probe_width = 2e-7 + 32 * 1e-8 = 5.2e-7 -> 52 px
+        # height_m = scan_span + probe_height = 1e-7 + 32 * 1e-8 = 4.2e-7 -> 42 px
+        assert geometry.width_px == 52
+        assert geometry.height_px == 42
+        numpy.testing.assert_allclose(geometry.center_x_m, 1.0e-7)
+        numpy.testing.assert_allclose(geometry.center_y_m, 5.0e-8)
+
+    def test_padding_widens_the_canvas_on_both_sides(self) -> None:
+        probe = _make_probe_geometry(width_px=32, pixel_m=1.0e-8)
+        positions = _make_positions((0.0, 0.0))
+
+        no_padding = compute_object_geometry(positions, probe)
+        with_padding = compute_object_geometry(positions, probe, padding_px=5)
+
+        # 5 pixels per side on each axis; 10 pixels total per dimension.
+        assert with_padding.width_px == no_padding.width_px + 10
+        assert with_padding.height_px == no_padding.height_px + 10
+        # Center is unchanged by symmetric padding.
+        numpy.testing.assert_allclose(with_padding.center_x_m, no_padding.center_x_m)
+        numpy.testing.assert_allclose(with_padding.center_y_m, no_padding.center_y_m)
+
+
+class TestObjectGeometryStr:
+    def test_renders_pixel_count_and_center_with_si_prefixes(self) -> None:
+        geometry = ObjectGeometry(
+            width_px=1024,
+            height_px=1024,
+            pixel_width_m=8.06e-9,
+            pixel_height_m=8.06e-9,
+            center_x_m=1.234e-6,
+            center_y_m=-3.456e-6,
+        )
+        rendered = str(geometry)
+        assert rendered.startswith('1024 x 1024 px around ')
+        assert 'µm' in rendered  # SI prefix selected by magnitude

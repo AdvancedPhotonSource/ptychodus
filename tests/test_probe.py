@@ -4,9 +4,10 @@ import numpy
 import numpy.testing
 import pytest
 
-from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.probe import (
     Probe,
+    ProbeGeometry,
     ProbeSequence,
     ProbeSizeMetrics,
     compute_shannon_entropy,
@@ -291,3 +292,101 @@ class TestProbeSequenceSlicing:
 
         assert len(sequence) == 1
         assert len(sequence[:]) == 1
+
+
+class TestProbeGeometryFromFarField:
+    """The Fraunhofer sample-plane relation dx_sample = lambda * |z| / (N * dx_detector)."""
+
+    def test_returns_expected_pixel_size_for_square_setup(self) -> None:
+        detector = PixelGeometry(width_m=75e-6, height_m=75e-6)
+        wavelength_m = 1.55e-10
+        distance_m = 0.1
+
+        geometry = ProbeGeometry.from_far_field(
+            detector,
+            ImageExtent(width_px=256, height_px=256),
+            wavelength_m=wavelength_m,
+            distance_m=distance_m,
+        )
+
+        expected_pixel_m = wavelength_m * distance_m / (256 * 75e-6)
+        assert geometry.width_px == 256
+        assert geometry.height_px == 256
+        numpy.testing.assert_allclose(geometry.pixel_width_m, expected_pixel_m, rtol=1.0e-12)
+        numpy.testing.assert_allclose(geometry.pixel_height_m, expected_pixel_m, rtol=1.0e-12)
+
+    def test_maps_each_axis_independently_for_non_square(self) -> None:
+        detector = PixelGeometry(width_m=50e-6, height_m=100e-6)
+        wavelength_m = 1.0e-10
+        distance_m = 2.0
+
+        geometry = ProbeGeometry.from_far_field(
+            detector,
+            ImageExtent(width_px=256, height_px=128),
+            wavelength_m=wavelength_m,
+            distance_m=distance_m,
+        )
+
+        assert geometry.height_px == 128
+        assert geometry.width_px == 256
+        numpy.testing.assert_allclose(
+            geometry.pixel_width_m, wavelength_m * distance_m / (256 * 50e-6), rtol=1.0e-12
+        )
+        numpy.testing.assert_allclose(
+            geometry.pixel_height_m, wavelength_m * distance_m / (128 * 100e-6), rtol=1.0e-12
+        )
+
+    def test_negative_distance_uses_magnitude(self) -> None:
+        detector = PixelGeometry(width_m=75e-6, height_m=75e-6)
+        wavelength_m = 1.55e-10
+        extent = ImageExtent(width_px=256, height_px=256)
+
+        forward = ProbeGeometry.from_far_field(
+            detector, extent, wavelength_m=wavelength_m, distance_m=0.1
+        )
+        backward = ProbeGeometry.from_far_field(
+            detector, extent, wavelength_m=wavelength_m, distance_m=-0.1
+        )
+
+        assert forward == backward
+
+
+class TestProbeGeometryStr:
+    def test_square_pixels_collapse_to_single_value(self) -> None:
+        geometry = ProbeGeometry(
+            width_px=256, height_px=256, pixel_width_m=8.06e-9, pixel_height_m=8.06e-9
+        )
+        rendered = str(geometry)
+        assert rendered.startswith('256 x 256 px @ ')
+        # Single "x" between px count and pitch means no second axis rendered.
+        assert rendered.count(' x ') == 1
+        assert '/px' in rendered
+
+    def test_non_square_pixels_render_both_axes(self) -> None:
+        geometry = ProbeGeometry(
+            width_px=128, height_px=256, pixel_width_m=8.06e-9, pixel_height_m=4.03e-9
+        )
+        rendered = str(geometry)
+        assert rendered.startswith('128 x 256 px @ ')
+        # Two "x" separators: one for the pixel count, one for the pitch axes.
+        assert rendered.count(' x ') == 2
+        assert '/px' in rendered
+
+
+class TestProbeSequenceFromProbe:
+    def test_wraps_probe_as_length_1_sequence_with_matching_array_and_geometry(self) -> None:
+        rng = numpy.random.default_rng(0)
+        pixel_geometry = PixelGeometry(width_m=1e-9, height_m=2e-9)
+        array = (rng.standard_normal((3, 8, 8)) + 1j * rng.standard_normal((3, 8, 8))).astype(
+            numpy.complex128
+        )
+        probe = Probe(array=array, pixel_geometry=pixel_geometry)
+
+        sequence = ProbeSequence.from_probe(probe)
+
+        assert len(sequence) == 1
+        assert sequence.num_coherent_modes == 1
+        assert sequence.num_incoherent_modes == 3
+        assert sequence.get_opr_weights_or_none() is None
+        assert sequence.get_pixel_geometry() == pixel_geometry
+        numpy.testing.assert_array_equal(sequence.get_probe_no_opr().get_array(), array)

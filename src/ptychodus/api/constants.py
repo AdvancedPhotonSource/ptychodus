@@ -135,6 +135,26 @@ HC_EV_ANGSTROM: Final[float] = LengthUnit.ANGSTROM.convert(
 )
 
 
+def energy_eV_to_wavelength_m(energy_eV: float) -> float:  # noqa: N802, N803
+    """Photon wavelength (m) for a photon energy in electron-volts; 0.0 at zero energy."""
+    hc_Jm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S  # noqa: N806
+
+    try:
+        return hc_Jm / (energy_eV * ELECTRON_VOLT_J)
+    except ZeroDivisionError:
+        return 0.0
+
+
+def wavelength_m_to_energy_eV(wavelength_m: float) -> float:  # noqa: N802
+    """Photon energy (eV) for a wavelength in meters; 0.0 at zero wavelength."""
+    hc_Jm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S  # noqa: N806
+
+    try:
+        return hc_Jm / (wavelength_m * ELECTRON_VOLT_J)
+    except ZeroDivisionError:
+        return 0.0
+
+
 def format_length(length_m: float) -> str:
     """Render a length in the largest SI-prefixed unit keeping it at or above one."""
     return LengthUnit.from_meters(length_m).format(length_m)
