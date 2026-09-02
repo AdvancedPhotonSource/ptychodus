@@ -64,32 +64,15 @@ def generate_diffraction_data(
 
     for index, (probe_position, probe) in enumerate(product.iter_position_probes()):
         object_position = object_geometry.map_coordinates_probe_to_object(probe_position)
-
-        cx = object_position.x_px
-        cy = object_position.y_px
-
-        # Centered-pixel convention: the probe's array-center pixel sits at (N-1)/2,
-        # matching map_coordinates_probe_to_object above and Probe.get_transverse_coordinates.
-        rx_px = (probe_geometry.width_px - 1) / 2
-        ry_px = (probe_geometry.height_px - 1) / 2
-
-        x_lower = int(cx - rx_px)
-        y_lower = int(cy - ry_px)
+        bounds = probe_geometry.resolve_patch_bounds(object_position.x_px, object_position.y_px)
 
         # Extract patches from all layers at the same integer position
         object_patches = [
-            object_.get_layer(ilayer)[
-                y_lower : y_lower + probe_geometry.height_px,
-                x_lower : x_lower + probe_geometry.width_px,
-            ]
+            object_.get_layer(ilayer)[bounds.y_slice, bounds.x_slice]
             for ilayer in range(object_.num_layers)
         ]
 
-        # Subpixel offsets between the true position and the integer extraction position
-        dx = cx - (x_lower + rx_px)
-        dy = cy - (y_lower + ry_px)
-
-        shifted_modes = fourier_shift_2d(probe.get_array(), dx=dx, dy=dy)
+        shifted_modes = fourier_shift_2d(probe.get_array(), dx=bounds.dx, dy=bounds.dy)
 
         for wavefield in shifted_modes:
             # Multislice: apply each layer then propagate to the next; last layer has no propagation

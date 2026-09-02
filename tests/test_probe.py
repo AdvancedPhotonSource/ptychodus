@@ -6,6 +6,7 @@ import pytest
 
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.probe import (
+    PatchBounds,
     Probe,
     ProbeGeometry,
     ProbeSequence,
@@ -371,6 +372,56 @@ class TestProbeGeometryStr:
         # Two "x" separators: one for the pixel count, one for the pitch axes.
         assert rendered.count(' x ') == 2
         assert '/px' in rendered
+
+
+class TestProbeGeometryResolvePatchBounds:
+    """The (N-1)/2 patch-center split shared with ``get_transverse_coordinates``."""
+
+    def test_even_extent_integer_center_yields_zero_offset(self) -> None:
+        geometry = ProbeGeometry(
+            width_px=4, height_px=4, pixel_width_m=PIXEL_M, pixel_height_m=PIXEL_M
+        )
+
+        bounds = geometry.resolve_patch_bounds(cx=10.5, cy=10.5)
+
+        assert bounds == PatchBounds(
+            x_slice=slice(9, 13),
+            y_slice=slice(9, 13),
+            dx=0.0,
+            dy=0.0,
+        )
+
+    def test_odd_extent_integer_center_yields_half_pixel_offset(self) -> None:
+        geometry = ProbeGeometry(
+            width_px=5, height_px=5, pixel_width_m=PIXEL_M, pixel_height_m=PIXEL_M
+        )
+
+        bounds = geometry.resolve_patch_bounds(cx=10.5, cy=10.5)
+
+        assert bounds.x_slice == slice(8, 13)
+        assert bounds.y_slice == slice(8, 13)
+        numpy.testing.assert_allclose(bounds.dx, 0.5, rtol=1.0e-12)
+        numpy.testing.assert_allclose(bounds.dy, 0.5, rtol=1.0e-12)
+
+    def test_negative_center_truncates_toward_zero_not_floor(self) -> None:
+        """Pins Python ``int()`` semantics: for ``cx - (W-1)/2 < 0`` the lower
+        corner is ``ceil``, not ``floor``. Callers must keep object-canvas
+        coordinates non-negative in practice; the helper's docstring says so.
+        """
+        geometry = ProbeGeometry(
+            width_px=3, height_px=5, pixel_width_m=PIXEL_M, pixel_height_m=2 * PIXEL_M
+        )
+
+        bounds = geometry.resolve_patch_bounds(cx=-0.4, cy=-1.6)
+
+        # int(-0.4 - 1.0) == int(-1.4) == -1  (floor would be -2)
+        # int(-1.6 - 2.0) == int(-3.6) == -3  (floor would be -4)
+        assert bounds.x_slice == slice(-1, 2)
+        assert bounds.y_slice == slice(-3, 2)
+        # dx = cx - (x_lower + rx) = -0.4 - (-1 + 1.0) = -0.4
+        # dy = cy - (y_lower + ry) = -1.6 - (-3 + 2.0) = -0.6
+        numpy.testing.assert_allclose(bounds.dx, -0.4, atol=1.0e-12)
+        numpy.testing.assert_allclose(bounds.dy, -0.6, atol=1.0e-12)
 
 
 class TestProbeSequenceFromProbe:

@@ -328,6 +328,22 @@ class ProbeTransverseCoordinates:
 
 
 @dataclass(frozen=True)
+class PatchBounds:
+    """Indexing bounds and sub-pixel offset for a probe-sized patch anchored at a float object-pixel center.
+
+    ``x_slice`` and ``y_slice`` are numpy slices that select a
+    ``height_px x width_px`` region from an object canvas at the integer
+    lower-left corner. ``dx`` and ``dy`` are the residual sub-pixel offsets
+    that a Fourier shift must apply to the probe.
+    """
+
+    x_slice: slice
+    y_slice: slice
+    dx: float
+    dy: float
+
+
+@dataclass(frozen=True)
 class ProbeGeometry:
     """Pixel dimensions and physical size of the probe array."""
 
@@ -376,6 +392,30 @@ class ProbeGeometry:
         y_px = Y - (self.height_px - 1) / 2
         return ProbeTransverseCoordinates(
             x_m=x_px * self.pixel_width_m, y_m=y_px * self.pixel_height_m
+        )
+
+    def resolve_patch_bounds(self, cx: float, cy: float) -> PatchBounds:
+        """Locate a ``height_px x width_px`` patch anchored at object-pixel center ``(cx, cy)``.
+
+        Under the (N-1)/2 centered-pixel convention shared with
+        ``get_transverse_coordinates``, returns the numpy slices for the
+        integer lower-left corner and the residual sub-pixel offset that a
+        Fourier shift must apply.
+
+        The integer split uses Python ``int()`` (truncate toward zero), which
+        equals ``math.floor`` when ``cx - (width_px - 1) / 2`` and
+        ``cy - (height_px - 1) / 2`` are non-negative — the standard case for
+        object-canvas coordinates. Behavior differs for negative arguments.
+        """
+        rx_px = (self.width_px - 1) / 2
+        ry_px = (self.height_px - 1) / 2
+        x_lower = int(cx - rx_px)
+        y_lower = int(cy - ry_px)
+        return PatchBounds(
+            x_slice=slice(x_lower, x_lower + self.width_px),
+            y_slice=slice(y_lower, y_lower + self.height_px),
+            dx=cx - (x_lower + rx_px),
+            dy=cy - (y_lower + ry_px),
         )
 
     def __str__(self) -> str:

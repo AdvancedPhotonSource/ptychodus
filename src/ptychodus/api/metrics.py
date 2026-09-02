@@ -751,27 +751,15 @@ def compute_reconstruction_residuals(
         per_frame_numerator, per_frame_denominator, product.iter_position_probes()
     ):
         object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        cx = object_point.x_px
-        cy = object_point.y_px
+        bounds = probe_geometry.resolve_patch_bounds(object_point.x_px, object_point.y_px)
 
-        # Centered-pixel convention: the probe's array-center pixel sits at (N-1)/2,
-        # matching map_coordinates_probe_to_object above and Probe.get_transverse_coordinates.
-        rx_px = (probe_geometry.width_px - 1) / 2
-        ry_px = (probe_geometry.height_px - 1) / 2
-        x_lower = int(cx - rx_px)
-        y_lower = int(cy - ry_px)
-        dx = cx - (x_lower + rx_px)
-        dy = cy - (y_lower + ry_px)
-
-        shifted_modes = fourier_shift_2d(probe.get_array(), dx=dx, dy=dy)
+        shifted_modes = fourier_shift_2d(probe.get_array(), dx=bounds.dx, dy=bounds.dy)
         intensity = numpy.sum(numpy.abs(shifted_modes) ** 2, axis=0)
         total = intensity.sum()
         patch = intensity / total if total > 0.0 else intensity
 
-        ys = slice(y_lower, y_lower + probe_geometry.height_px)
-        xs = slice(x_lower, x_lower + probe_geometry.width_px)
-        numerator_splat[ys, xs] += num_i * patch
-        denominator_splat[ys, xs] += den_i * patch
+        numerator_splat[bounds.y_slice, bounds.x_slice] += num_i * patch
+        denominator_splat[bounds.y_slice, bounds.x_slice] += den_i * patch
 
     real_space_error_map = numpy.full_like(numerator_splat, numpy.nan)
     numpy.divide(
