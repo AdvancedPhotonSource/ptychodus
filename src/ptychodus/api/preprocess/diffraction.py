@@ -357,47 +357,37 @@ def inpaint_bad_pixels(
 
 def estimate_beam_center(
     pattern: DiffractionPattern,
-    bad_pixels: BadPixels | None = None,
     *,
     mad_threshold: float = 4.5,
 ) -> BeamCenter:
     """Estimate the direct-beam pixel of a diffraction pattern.
 
-    Two passes: pass 1 takes the global intensity-weighted center; pass 2
-    re-centroids inside a window around the pass-1 estimate so bright
-    asymmetric peaks outside the central region cannot bias the result.
+    Pipeline: 3x3 median filter -> Otsu-based noise-floor estimate ->
+    2-pass intensity-weighted centroid. Pass 1 takes the global centroid;
+    pass 2 re-centroids inside a window around the pass-1 estimate so
+    bright asymmetric peaks outside the central region cannot bias the
+    result.
 
-    Falls back to the geometric center if all pixels are masked or rejected.
+    Bad pixels must already be handled by the caller (e.g. via
+    :func:`inpaint_bad_pixels`) before invoking this function.
+
+    Falls back to the geometric center if every pixel is rejected as noise.
     """
     height, width = pattern.shape[-2:]
     geometric_center = BeamCenter(x_px=width // 2, y_px=height // 2)
 
-    # Median-filter a float copy with bad pixels zeroed.
     working_pattern = pattern.astype(numpy.float64, copy=True)
-
-    if bad_pixels is not None and numpy.any(bad_pixels):
-        good_pixel_mask = numpy.logical_not(bad_pixels)
-        working_pattern[bad_pixels] = 0.0
-    else:
-        good_pixel_mask = numpy.ones(pattern.shape[-2:], dtype=bool)
-
     filtered_pattern = ndimage.median_filter(working_pattern, size=3)
 
     # Convert intensities to non-negative weights by subtracting the background
     # and rejecting pixels below background + mad_threshold * MAD. Otsu's
     # threshold is used to identify the background pool when the histogram is
     # bimodal; for unimodal noise-only inputs the helper falls back to
-    # median/MAD over all good pixels.
-    good_pixel_intensities = filtered_pattern[good_pixel_mask]
-
-    if good_pixel_intensities.size == 0:
-        return geometric_center
-
-    robust_statistics = estimate_noise_floor(good_pixel_intensities)
+    # median/MAD over the whole frame.
+    robust_statistics = estimate_noise_floor(filtered_pattern)
     background_intensity = robust_statistics.median
     significance_threshold = robust_statistics.get_significance_threshold(mad_threshold)
     centroid_weights = filtered_pattern - background_intensity
-    centroid_weights[~good_pixel_mask] = 0.0
     centroid_weights[filtered_pattern < significance_threshold] = 0.0
     numpy.clip(centroid_weights, 0.0, None, out=centroid_weights)
 
