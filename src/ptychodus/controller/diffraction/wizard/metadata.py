@@ -6,7 +6,8 @@ from PyQt5.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt
 from PyQt5.QtWidgets import QHeaderView, QWizardPage
 
 from ptychodus.api.constants import LengthUnit
-from ptychodus.api.diffraction import DiffractionMetadata
+from ptychodus.api.diffraction import CropCenter, CropRegion, DiffractionMetadata
+from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.parameters import RealParameter
 
 from ....model.diffraction import DetectorSettings, DiffractionSettings
@@ -288,22 +289,17 @@ class OpenDatasetWizardMetadataViewController:
         if extent is None:
             return
 
-        center_x = self._diffraction_settings.crop_center_x_px.get_value()
-        center_y = self._diffraction_settings.crop_center_y_px.get_value()
-
-        extent_x = int(extent.width_px)
-        extent_y = int(extent.height_px)
-
-        max_radius_x = min(center_x, extent_x - center_x)
-        max_radius_y = min(center_y, extent_y - center_y)
-        max_radius = min(max_radius_x, max_radius_y)
-        crop_diameter = 1
-
-        while crop_diameter < max_radius:
-            crop_diameter <<= 1
-
-        self._diffraction_settings.crop_width_px.set_value(crop_diameter)
-        self._diffraction_settings.crop_height_px.set_value(crop_diameter)
+        center = CropCenter(
+            x_px=self._diffraction_settings.crop_center_x_px.get_value(),
+            y_px=self._diffraction_settings.crop_center_y_px.get_value(),
+        )
+        detector_extent = ImageExtent(
+            width_px=int(extent.width_px),
+            height_px=int(extent.height_px),
+        )
+        region = CropRegion.from_largest_pow2(center, detector_extent)
+        self._diffraction_settings.crop_width_px.set_value(region.width_px)
+        self._diffraction_settings.crop_height_px.set_value(region.height_px)
 
     # --- Probe energy ---
 

@@ -3,11 +3,10 @@ from pathlib import Path
 import logging
 
 
-from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import (
     BadPixelsFileReader,
-    CropCenter,
+    CropRegion,
     DiffractionArray,
     DiffractionDatasetLayoutNode,
     DiffractionFileReader,
@@ -87,8 +86,7 @@ class DiffractionAPI:
         file_path: Path,
         *,
         file_type: str | None = None,
-        crop_center: CropCenter | None = None,
-        crop_extent: ImageExtent | None = None,
+        crop_region: CropRegion | None = None,
         bad_pixels_file_path: Path | None = None,
         bad_pixels_file_type: str | None = None,
         process_patterns: bool = True,
@@ -98,13 +96,11 @@ class DiffractionAPI:
             logger.warning(f'Refusing to read invalid file path {file_path}')
             return -1
 
-        if crop_center is not None:
-            self._diffraction_settings.crop_center_x_px.set_value(crop_center.x_px)
-            self._diffraction_settings.crop_center_y_px.set_value(crop_center.y_px)
-
-        if crop_extent is not None:
-            self._diffraction_settings.crop_width_px.set_value(crop_extent.width_px)
-            self._diffraction_settings.crop_height_px.set_value(crop_extent.height_px)
+        if crop_region is not None:
+            self._diffraction_settings.crop_center_x_px.set_value(crop_region.center_x_px)
+            self._diffraction_settings.crop_center_y_px.set_value(crop_region.center_y_px)
+            self._diffraction_settings.crop_width_px.set_value(crop_region.width_px)
+            self._diffraction_settings.crop_height_px.set_value(crop_region.height_px)
 
         if file_type is not None:
             self._file_reader_chooser.set_current_plugin(file_type)

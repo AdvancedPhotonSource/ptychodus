@@ -8,8 +8,7 @@ from enum import Enum, auto
 from typing import Any
 
 from ptychodus.api.assemble import AssembledDiffractionData
-from ptychodus.api.diffraction import CropCenter, Polarization
-from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.diffraction import CropRegion, Polarization
 from ptychodus.api.preprocess.probe_positions import AffineTransform
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import ReconstructInput
@@ -198,8 +197,7 @@ class WorkflowAPI(ABC):
         file_path: Path,
         *,
         file_type: str | None = None,
-        crop_center: CropCenter | None = None,
-        crop_extent: ImageExtent | None = None,
+        crop_region: CropRegion | None = None,
         bad_pixels_file_path: Path | None = None,
         bad_pixels_file_type: str | None = None,
         process_patterns: bool = True,

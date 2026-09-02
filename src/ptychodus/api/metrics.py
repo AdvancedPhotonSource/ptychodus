@@ -754,10 +754,14 @@ def compute_reconstruction_residuals(
         cx = object_point.x_px
         cy = object_point.y_px
 
-        x_lower = int(cx - probe_geometry.width_px / 2)
-        y_lower = int(cy - probe_geometry.height_px / 2)
-        dx = cx - (x_lower + probe_geometry.width_px / 2)
-        dy = cy - (y_lower + probe_geometry.height_px / 2)
+        # Centered-pixel convention: the probe's array-center pixel sits at (N-1)/2,
+        # matching map_coordinates_probe_to_object above and Probe.get_transverse_coordinates.
+        rx_px = (probe_geometry.width_px - 1) / 2
+        ry_px = (probe_geometry.height_px - 1) / 2
+        x_lower = int(cx - rx_px)
+        y_lower = int(cy - ry_px)
+        dx = cx - (x_lower + rx_px)
+        dy = cy - (y_lower + ry_px)
 
         shifted_modes = fourier_shift_2d(probe.get_array(), dx=dx, dy=dy)
         intensity = numpy.sum(numpy.abs(shifted_modes) ** 2, axis=0)

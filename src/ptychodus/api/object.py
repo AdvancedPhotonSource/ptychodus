@@ -100,8 +100,10 @@ class ObjectGeometry:
         )
 
     def map_coordinates_object_to_probe(self, position: ObjectPosition) -> ProbePosition:
-        rx_px = self.width_px / 2
-        ry_px = self.height_px / 2
+        # Centered-pixel convention: the world center sits at pixel index (N-1)/2,
+        # matching get_transverse_coordinates above.
+        rx_px = (self.width_px - 1) / 2
+        ry_px = (self.height_px - 1) / 2
         dx_m = self.pixel_width_m
         dy_m = self.pixel_height_m
 
@@ -111,8 +113,8 @@ class ObjectGeometry:
         return ProbePosition(position.index, x_m, y_m)
 
     def map_coordinates_probe_to_object(self, position: ProbePosition) -> ObjectPosition:
-        rx_px = self.width_px / 2
-        ry_px = self.height_px / 2
+        rx_px = (self.width_px - 1) / 2
+        ry_px = (self.height_px - 1) / 2
         dx_m = self.pixel_width_m
         dy_m = self.pixel_height_m
 

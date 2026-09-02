@@ -162,8 +162,8 @@ def test_align_objects_probe_position_consistency_world_coordinate_invariant() -
 
     moving_geometry = moving.get_geometry()
     # World coord of the moving feature, by moving's own coordinate frame:
-    rx_px = moving.width_px / 2
-    ry_px = moving.height_px / 2
+    rx_px = (moving.width_px - 1) / 2
+    ry_px = (moving.height_px - 1) / 2
     feature_world_x = (
         moving_center.x_m + (moving_feature_yx[1] - rx_px) * pixel_geom.width_m
     )
@@ -482,6 +482,74 @@ class TestComputeObjectGeometry:
         # Center is unchanged by symmetric padding.
         numpy.testing.assert_allclose(with_padding.center_x_m, no_padding.center_x_m)
         numpy.testing.assert_allclose(with_padding.center_y_m, no_padding.center_y_m)
+
+
+class TestObjectGeometryMapCoordinates:
+    """Cover the centered-pixel convention shared by map_coordinates_* and get_transverse_coordinates."""
+
+    def _make_geometry(self, width_px: int, height_px: int) -> ObjectGeometry:
+        return ObjectGeometry(
+            width_px=width_px,
+            height_px=height_px,
+            pixel_width_m=2.0e-9,
+            pixel_height_m=3.0e-9,
+            center_x_m=7.0e-9,
+            center_y_m=-5.0e-9,
+        )
+
+    def test_probe_at_world_center_maps_to_centered_pixel_even(self) -> None:
+        geometry = self._make_geometry(width_px=64, height_px=32)
+        world_center = ProbePosition(index=0, x_m=geometry.center_x_m, y_m=geometry.center_y_m)
+        pixel_position = geometry.map_coordinates_probe_to_object(world_center)
+        numpy.testing.assert_allclose(pixel_position.x_px, 31.5)
+        numpy.testing.assert_allclose(pixel_position.y_px, 15.5)
+
+    def test_probe_at_world_center_maps_to_centered_pixel_odd(self) -> None:
+        geometry = self._make_geometry(width_px=65, height_px=33)
+        world_center = ProbePosition(index=0, x_m=geometry.center_x_m, y_m=geometry.center_y_m)
+        pixel_position = geometry.map_coordinates_probe_to_object(world_center)
+        numpy.testing.assert_allclose(pixel_position.x_px, 32.0)
+        numpy.testing.assert_allclose(pixel_position.y_px, 16.0)
+
+    @pytest.mark.parametrize('shape', [(64, 32), (65, 33), (8, 8), (9, 9)])
+    def test_round_trip_probe_object_probe(self, shape: tuple[int, int]) -> None:
+        width_px, height_px = shape
+        geometry = self._make_geometry(width_px=width_px, height_px=height_px)
+        rng = numpy.random.default_rng(0)
+
+        for _ in range(5):
+            x_m = geometry.center_x_m + rng.uniform(-1.0, 1.0) * 1.0e-8
+            y_m = geometry.center_y_m + rng.uniform(-1.0, 1.0) * 1.0e-8
+            probe = ProbePosition(index=0, x_m=x_m, y_m=y_m)
+            round_trip = geometry.map_coordinates_object_to_probe(
+                geometry.map_coordinates_probe_to_object(probe)
+            )
+            numpy.testing.assert_allclose(round_trip.x_m, x_m, atol=1.0e-20)
+            numpy.testing.assert_allclose(round_trip.y_m, y_m, atol=1.0e-20)
+
+    @pytest.mark.parametrize('shape', [(64, 32), (65, 33)])
+    def test_map_coordinates_agrees_with_get_transverse_coordinates(
+        self, shape: tuple[int, int]
+    ) -> None:
+        """A random object-pixel index, converted via get_transverse_coordinates to a
+        physical position and then back via map_coordinates_probe_to_object, must round
+        trip to the original pixel index exactly."""
+        width_px, height_px = shape
+        geometry = self._make_geometry(width_px=width_px, height_px=height_px)
+        coords = geometry.get_transverse_coordinates()
+        rng = numpy.random.default_rng(1)
+
+        for _ in range(5):
+            ix = int(rng.integers(0, width_px))
+            iy = int(rng.integers(0, height_px))
+            probe = ProbePosition(
+                index=0,
+                x_m=float(coords.x_m[iy, ix]) + geometry.center_x_m,
+                y_m=float(coords.y_m[iy, ix]) + geometry.center_y_m,
+            )
+            pixel_position = geometry.map_coordinates_probe_to_object(probe)
+            numpy.testing.assert_allclose(pixel_position.x_px, float(ix))
+            numpy.testing.assert_allclose(pixel_position.y_px, float(iy))
 
 
 class TestObjectGeometryStr:

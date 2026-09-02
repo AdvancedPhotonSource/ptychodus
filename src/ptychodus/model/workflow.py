@@ -5,8 +5,7 @@ from typing import Any
 import logging
 
 from ptychodus.api.assemble import AssembledDiffractionData
-from ptychodus.api.diffraction import CropCenter, Polarization
-from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.diffraction import CropRegion, Polarization
 from ptychodus.api.preprocess.probe_positions import AffineTransform
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import ReconstructInput
@@ -276,8 +275,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         file_path: Path,
         *,
         file_type: str | None = None,
-        crop_center: CropCenter | None = None,
-        crop_extent: ImageExtent | None = None,
+        crop_region: CropRegion | None = None,
         bad_pixels_file_path: Path | None = None,
         bad_pixels_file_type: str | None = None,
         process_patterns: bool = True,
@@ -286,8 +284,7 @@ class ConcreteWorkflowAPI(WorkflowAPI):
         dataset_index = self._diffraction_api.open_patterns(
             file_path,
             file_type=file_type,
-            crop_center=crop_center,
-            crop_extent=crop_extent,
+            crop_region=crop_region,
             bad_pixels_file_path=bad_pixels_file_path,
             bad_pixels_file_type=bad_pixels_file_type,
             process_patterns=process_patterns,
