@@ -26,7 +26,6 @@ from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.io import save_product
 from ptychodus.api.object import compute_object_geometry
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.preprocess.diffraction import CropStep, DiffractionPrepPipeline
 from ptychodus.api.probe import ProbeGeometry, ProbeSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import prepare_reconstruct_input
@@ -149,23 +148,17 @@ def main() -> int:
     detector_distance_m = metadata.detector_distance_m
     probe_energy_eV = metadata.probe_energy_eV  # noqa: N806
 
-    pipeline: DiffractionPrepPipeline | None = None
+    read_region: CropRegion | None = None
     if args.crop_extent_px is not None:
-        if metadata.crop_center is None:
+        if metadata.beam_center is None:
             raise ValueError('--crop-extent-px was set but the HDF5 provides no beam center.')
-        pipeline = DiffractionPrepPipeline(
-            steps=(
-                CropStep(
-                    region=CropRegion.from_center_extent(
-                        metadata.crop_center,
-                        ImageExtent(width_px=args.crop_extent_px, height_px=args.crop_extent_px),
-                    ),
-                ),
-            )
+        read_region = CropRegion.from_center_extent(
+            metadata.beam_center,
+            ImageExtent(width_px=args.crop_extent_px, height_px=args.crop_extent_px),
         )
 
     logger.info('Assembling diffraction patterns')
-    assembled_data = assemble_dataset(raw_dataset, pipeline)
+    assembled_data = assemble_dataset(raw_dataset, read_region=read_region)
 
     logger.info('Reading probe positions from %s', args.position_file)
     positions = position_reader.read(args.position_file)

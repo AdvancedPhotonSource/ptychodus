@@ -14,6 +14,7 @@ import numpy
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     BadPixels,
+    CropRegion,
     DiffractionArray,
     DiffractionDataset,
     DiffractionDatasetLayoutNode,
@@ -31,7 +32,7 @@ from ptychodus.api.assemble import (
     preprocess_array,
 )
 from ptychodus.api.io import load_diffraction_data, save_diffraction_data
-from ptychodus.api.preprocess.diffraction import DiffractionPrepPipeline
+from ptychodus.api.preprocess.diffraction import DiffractionPrepPlan
 
 from ..task_manager import TaskManager
 from ._loader import LoadDiffractionDataset
@@ -98,8 +99,11 @@ class AssembledDiffractionArray(DiffractionArray):
     def get_indexes(self) -> DiffractionIndexes:
         return self._data.get_indexes()
 
-    def get_patterns(self) -> DiffractionPatterns:
-        return self._data.get_patterns()
+    def get_patterns(self, *, read_region: CropRegion | None = None) -> DiffractionPatterns:
+        patterns = self._data.get_patterns()
+        if read_region is None:
+            return patterns
+        return read_region.apply_to(patterns)
 
     def get_pattern(self, index: int) -> DiffractionPattern:
         return self._data.get_pattern(index)
@@ -148,10 +152,10 @@ class AssembledDiffractionDataset(DiffractionDataset):
         # self._dataset drops the array list, so this is the only handle on the
         # lazy arrays; cleared once dispatched, since the task then owns it.
         self._source: DiffractionDataset | None = None
-        # Pipeline snapshot taken when the current buffer was allocated, so the
+        # Plan snapshot taken when the current buffer was allocated, so the
         # processed pixel geometry can be recomputed without consulting live
         # settings that may have moved on since the load.
-        self._prep_pipeline: DiffractionPrepPipeline | None = None
+        self._prep_plan: DiffractionPrepPlan | None = None
 
         # Raw (pre-processing) bad-pixel mask; starts as an empty (0, 0) placeholder
         # and is always overwritten by reload() or by load_all_arrays() before any
@@ -336,13 +340,16 @@ class AssembledDiffractionDataset(DiffractionDataset):
         self._array_counter += 1
 
         metadata = self._dataset.get_metadata()
-        pipeline = (
-            self._pipeline_builder.get_pipeline(metadata.detector_extent)
-            if process_patterns
-            else None
+        plan = (
+            self._pipeline_builder.get_plan(metadata.detector_extent) if process_patterns else None
+        )
+        read_region = plan.read_region if plan is not None else None
+        pipeline = plan.pipeline if plan is not None else None
+        raw_bad_pixels = (
+            self._bad_pixels if read_region is None else read_region.apply_to(self._bad_pixels)
         )
         processed_bad_pixels = (
-            self._bad_pixels if pipeline is None else pipeline.apply_to_mask(self._bad_pixels)
+            raw_bad_pixels if pipeline is None else pipeline.apply_to_mask(raw_bad_pixels)
         )
         lower, upper = self._get_total_counts_bounds()
         label = array.get_label()
@@ -351,11 +358,12 @@ class AssembledDiffractionDataset(DiffractionDataset):
             data = preprocess_array(
                 array,
                 pipeline,
-                raw_bad_pixels=self._bad_pixels,
+                raw_bad_pixels=raw_bad_pixels,
                 processed_bad_pixels=processed_bad_pixels,
                 raw_pixel_geometry=self.get_raw_pixel_geometry(),
                 total_counts_lower_bound=lower,
                 total_counts_upper_bound=upper,
+                read_region=read_region,
             )
         except FileNotFoundError:
             logger.warning(f'File not found for "{label}"!')
@@ -398,7 +406,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
         self._array_list.clear()
         self._array_counter = 0
         self._source = None
-        self._prep_pipeline = None
+        self._prep_plan = None
         self._last_array_loader = None
         self._bad_pixels = self._create_default_bad_pixels()
 
@@ -429,16 +437,16 @@ class AssembledDiffractionDataset(DiffractionDataset):
             return
 
         metadata = self._dataset.get_metadata()
-        pipeline = (
-            self._pipeline_builder.get_pipeline(metadata.detector_extent)
-            if process_patterns
-            else None
+        plan = (
+            self._pipeline_builder.get_plan(metadata.detector_extent) if process_patterns else None
         )
+        read_region = plan.read_region if plan is not None else None
+        pipeline = plan.pipeline if plan is not None else None
         raw_pixel_geometry = self.get_raw_pixel_geometry()
         lower, upper = self._get_total_counts_bounds()
 
         patterns_shape = compute_assembled_patterns_shape(
-            source, pipeline, bad_pixels=self._bad_pixels
+            source, pipeline, bad_pixels=self._bad_pixels, read_region=read_region
         )
         patterns: DiffractionPatterns | None = None
 
@@ -456,13 +464,14 @@ class AssembledDiffractionDataset(DiffractionDataset):
         else:
             logger.info(f'Scratch memory is {patterns_shape}')
 
-        self._prep_pipeline = pipeline
+        self._prep_plan = plan
         self._data = allocate_assembled_data(
             source,
             pipeline,
             bad_pixels=self._bad_pixels,
             raw_pixel_geometry=raw_pixel_geometry,
             patterns=patterns,
+            read_region=read_region,
         )
         self._array_counter = len(source)
 
@@ -478,6 +487,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
             raw_pixel_geometry=raw_pixel_geometry,
             total_counts_lower_bound=lower,
             total_counts_upper_bound=upper,
+            read_region=read_region,
             on_array_assembled=self._on_array_assembled,
             task_monitor=self._task_monitor,
         )

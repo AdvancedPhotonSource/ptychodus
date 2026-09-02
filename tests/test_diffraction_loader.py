@@ -46,8 +46,8 @@ def make_dataset(
     *,
     detector_height: int = 40,
     detector_width: int = 60,
-    crop_center_y: int = 20,
-    crop_center_x: int = 30,
+    beam_center_y: int = 20,
+    beam_center_x: int = 30,
     crop_height: int = 12,
     crop_width: int = 16,
     arrays: Sequence[DiffractionArray] = (),
@@ -58,8 +58,8 @@ def make_dataset(
     diffraction_settings = DiffractionSettings(registry)
 
     diffraction_settings.crop_enabled.set_value(True)
-    diffraction_settings.crop_center_y_px.set_value(crop_center_y)
-    diffraction_settings.crop_center_x_px.set_value(crop_center_x)
+    diffraction_settings.beam_center_y_px.set_value(beam_center_y)
+    diffraction_settings.beam_center_x_px.set_value(beam_center_x)
     diffraction_settings.crop_height_px.set_value(crop_height)
     diffraction_settings.crop_width_px.set_value(crop_width)
 

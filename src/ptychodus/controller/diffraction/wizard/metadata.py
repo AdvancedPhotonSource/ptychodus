@@ -6,7 +6,7 @@ from PyQt5.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt
 from PyQt5.QtWidgets import QHeaderView, QWizardPage
 
 from ptychodus.api.constants import LengthUnit
-from ptychodus.api.diffraction import CropCenter, CropRegion, DiffractionMetadata
+from ptychodus.api.diffraction import BeamCenter, CropRegion, DiffractionMetadata
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.parameters import RealParameter
 
@@ -105,10 +105,10 @@ def _format_detector_distance(metadata: DiffractionMetadata) -> str:
     return '—' if distance_m is None else f'{distance_m:.3f} m'
 
 
-def _format_crop_center(metadata: DiffractionMetadata) -> str:
-    crop_center = metadata.crop_center
-    if crop_center is not None:
-        return f'({crop_center.x_px}, {crop_center.y_px}) px'
+def _format_beam_center(metadata: DiffractionMetadata) -> str:
+    beam_center = metadata.beam_center
+    if beam_center is not None:
+        return f'({beam_center.x_px}, {beam_center.y_px}) px'
     extent = metadata.detector_extent
     if extent is not None:
         return f'({int(extent.width_px) // 2}, {int(extent.height_px) // 2}) px'
@@ -196,10 +196,10 @@ class OpenDatasetWizardMetadataViewController:
                 apply=self._apply_detector_distance,
             ),
             _MetadataRow(
-                name='Pattern Crop Center',
-                is_present=lambda m: m.crop_center is not None or m.detector_extent is not None,
-                format_value=_format_crop_center,
-                apply=self._apply_crop_center,
+                name='Beam Center',
+                is_present=lambda m: m.beam_center is not None or m.detector_extent is not None,
+                format_value=_format_beam_center,
+                apply=self._apply_beam_center,
             ),
             _MetadataRow(
                 name='Pattern Crop Extent',
@@ -267,18 +267,18 @@ class OpenDatasetWizardMetadataViewController:
         if distance_m:
             self._product_settings.detector_distance_m.set_value(distance_m)
 
-    # --- Crop center ---
+    # --- Beam center ---
 
-    def _apply_crop_center(self, metadata: DiffractionMetadata) -> None:
-        crop_center = metadata.crop_center
-        if crop_center is not None:
-            self._diffraction_settings.crop_center_x_px.set_value(crop_center.x_px)
-            self._diffraction_settings.crop_center_y_px.set_value(crop_center.y_px)
+    def _apply_beam_center(self, metadata: DiffractionMetadata) -> None:
+        beam_center = metadata.beam_center
+        if beam_center is not None:
+            self._diffraction_settings.beam_center_x_px.set_value(beam_center.x_px)
+            self._diffraction_settings.beam_center_y_px.set_value(beam_center.y_px)
         elif metadata.detector_extent is not None:
-            self._diffraction_settings.crop_center_x_px.set_value(
+            self._diffraction_settings.beam_center_x_px.set_value(
                 int(metadata.detector_extent.width_px) // 2
             )
-            self._diffraction_settings.crop_center_y_px.set_value(
+            self._diffraction_settings.beam_center_y_px.set_value(
                 int(metadata.detector_extent.height_px) // 2
             )
 
@@ -289,9 +289,9 @@ class OpenDatasetWizardMetadataViewController:
         if extent is None:
             return
 
-        center = CropCenter(
-            x_px=self._diffraction_settings.crop_center_x_px.get_value(),
-            y_px=self._diffraction_settings.crop_center_y_px.get_value(),
+        center = BeamCenter(
+            x_px=self._diffraction_settings.beam_center_x_px.get_value(),
+            y_px=self._diffraction_settings.beam_center_y_px.get_value(),
         )
         detector_extent = ImageExtent(
             width_px=int(extent.width_px),

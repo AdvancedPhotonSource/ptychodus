@@ -4,7 +4,7 @@ import logging
 import threading
 
 from ptychodus.api.assemble import AssembledDiffractionData, assemble_dataset
-from ptychodus.api.diffraction import BadPixels, DiffractionDataset
+from ptychodus.api.diffraction import BadPixels, CropRegion, DiffractionDataset
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.preprocess.diffraction import DiffractionPrepPipeline
 
@@ -33,6 +33,7 @@ class LoadDiffractionDataset:
         raw_pixel_geometry: PixelGeometry,
         total_counts_lower_bound: int | None,
         total_counts_upper_bound: int | None,
+        read_region: CropRegion | None,
         on_array_assembled: Callable[[int, str, AssembledDiffractionData], None],
         task_monitor: TaskProgressMonitor,
     ) -> None:
@@ -44,6 +45,7 @@ class LoadDiffractionDataset:
         self._raw_pixel_geometry = raw_pixel_geometry
         self._total_counts_lower_bound = total_counts_lower_bound
         self._total_counts_upper_bound = total_counts_upper_bound
+        self._read_region = read_region
         self._on_array_assembled = on_array_assembled
         self._task_monitor = task_monitor
         self._finished_event = threading.Event()
@@ -71,6 +73,7 @@ class LoadDiffractionDataset:
                     out=self._out,
                     total_counts_lower_bound=self._total_counts_lower_bound,
                     total_counts_upper_bound=self._total_counts_upper_bound,
+                    read_region=self._read_region,
                     on_array_assembled=self._on_array_assembled,
                     on_progress=monitor.update_progress,
                     on_array_error=self._handle_array_error,

@@ -8,7 +8,7 @@ import argparse
 import logging
 import sys
 
-from ptychodus.api.diffraction import CropCenter, CropRegion
+from ptychodus.api.diffraction import BeamCenter, CropRegion
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.cli import DirectoryType
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> int:
-    crop_center: CropCenter | None = None
+    crop_center: BeamCenter | None = None
     crop_extent: ImageExtent | None = None
     crop_region: CropRegion | None = None
 
@@ -149,7 +149,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.crop_center_x_px is not None and args.crop_center_y_px is not None:
-        crop_center = CropCenter(
+        crop_center = BeamCenter(
             x_px=args.crop_center_x_px,
             y_px=args.crop_center_y_px,
         )

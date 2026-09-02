@@ -44,11 +44,11 @@ class DiffractionSettings(Observable, Observer):
         )
 
         self.crop_enabled = self._group.create_boolean_parameter('CropEnabled', True)
-        self.crop_center_x_px = self._group.create_integer_parameter(
-            'CropCenterXInPixels', 32, minimum=0
+        self.beam_center_x_px = self._group.create_integer_parameter(
+            'BeamCenterXInPixels', 32, minimum=0
         )
-        self.crop_center_y_px = self._group.create_integer_parameter(
-            'CropCenterYInPixels', 32, minimum=0
+        self.beam_center_y_px = self._group.create_integer_parameter(
+            'BeamCenterYInPixels', 32, minimum=0
         )
         self.crop_width_px = self._group.create_integer_parameter(
             'CropWidthInPixels', 64, minimum=1

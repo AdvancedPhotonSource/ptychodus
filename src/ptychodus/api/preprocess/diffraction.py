@@ -4,12 +4,14 @@ Steps share a single `apply(data) -> ndarray` interface and infer whether the
 input is a 3-D pattern stack or a 2-D boolean bad-pixel mask from
 `data.dtype`. The order of operations is encoded in
 `DiffractionPrepPipeline.steps`; the canonical order emitted by the model-layer
-factory is filter → crop → binning → upsample → padding → hflip → vflip → transpose.
+factory is filter → binning → upsample → padding → hflip → vflip → transpose.
+Cropping is hoisted to load time (see :class:`DiffractionPrepPlan`) so readers
+that support partial reads (HDF5) only fetch the crop rectangle from disk.
 
 The free functions at the end of the module are helpers used *alongside* the
 pipeline rather than steps within it, and they deliberately stay that way.
 `zero_bad_pixels` runs in raw detector coordinates before the pipeline, and
-`inpaint_bad_pixels` and `estimate_crop_center` take a whole frame at once. A
+`inpaint_bad_pixels` and `estimate_beam_center` take a whole frame at once. A
 step that repaired or dropped frames would also break the index/pattern 1:1
 invariant that `prepare_reconstruct_input` relies on, because
 `DiffractionPrepPipeline.__call__` passes the original indexes through
@@ -18,6 +20,7 @@ unchanged.
 
 from __future__ import annotations
 from abc import abstractmethod
+from dataclasses import dataclass
 from typing import Annotated, Literal, TypeAlias
 
 import numpy
@@ -27,7 +30,7 @@ from skimage.restoration import inpaint_biharmonic
 
 from ..diffraction import (
     BadPixels,
-    CropCenter,
+    BeamCenter,
     CropRegion,
     DiffractionArray,
     DiffractionPattern,
@@ -98,20 +101,6 @@ class FilterValuesStep(DiffractionPrepStep):
             out[out >= self.upper_bound] = 0
 
         return out
-
-
-class CropStep(DiffractionPrepStep):
-    """Crop the last two axes to the half-open window described by `region`."""
-
-    type: Literal['crop'] = 'crop'
-    region: CropRegion
-
-    def apply(self, data: numpy.ndarray) -> numpy.ndarray:
-        leading = (slice(None),) * (data.ndim - 2)
-        return data[(*leading, self.region.y_slice, self.region.x_slice)]
-
-    def apply_to_extent(self, extent: ImageExtent) -> ImageExtent:
-        return ImageExtent(width_px=self.region.width_px, height_px=self.region.height_px)
 
 
 class BinningStep(DiffractionPrepStep):
@@ -257,7 +246,6 @@ class TransposeStep(DiffractionPrepStep):
 
 DiffractionPrepStepUnion: TypeAlias = (
     FilterValuesStep
-    | CropStep
     | BinningStep
     | UpsampleStep
     | PaddingStep
@@ -322,6 +310,19 @@ class DiffractionPrepPipeline(BaseModel):
         return dtype
 
 
+@dataclass(frozen=True)
+class DiffractionPrepPlan:
+    """A load-time crop region paired with the in-memory preprocessing pipeline.
+
+    The `read_region` is passed to :meth:`DiffractionArray.get_patterns` so readers
+    that support partial reads (HDF5) only fetch the crop rectangle from disk. The
+    `pipeline` runs on whatever the reader returns and never re-crops.
+    """
+
+    read_region: CropRegion | None
+    pipeline: DiffractionPrepPipeline
+
+
 def zero_bad_pixels(
     patterns: DiffractionPatterns, bad_pixels: BadPixels | None
 ) -> DiffractionPatterns:
@@ -354,13 +355,13 @@ def inpaint_bad_pixels(
     return inpaint_biharmonic(pattern.astype(numpy.float64), bad_pixels)
 
 
-def estimate_crop_center(
+def estimate_beam_center(
     pattern: DiffractionPattern,
     bad_pixels: BadPixels | None = None,
     *,
     mad_threshold: float = 4.5,
-) -> CropCenter:
-    """Estimate the pixel centroid of a diffraction pattern.
+) -> BeamCenter:
+    """Estimate the direct-beam pixel of a diffraction pattern.
 
     Two passes: pass 1 takes the global intensity-weighted center; pass 2
     re-centroids inside a window around the pass-1 estimate so bright
@@ -369,7 +370,7 @@ def estimate_crop_center(
     Falls back to the geometric center if all pixels are masked or rejected.
     """
     height, width = pattern.shape[-2:]
-    geometric_center = CropCenter(x_px=width // 2, y_px=height // 2)
+    geometric_center = BeamCenter(x_px=width // 2, y_px=height // 2)
 
     # Median-filter a float copy with bad pixels zeroed.
     working_pattern = pattern.astype(numpy.float64, copy=True)
@@ -441,7 +442,7 @@ def estimate_crop_center(
         refined_center_y = coarse_center_y
         refined_center_x = coarse_center_x
 
-    return CropCenter(
+    return BeamCenter(
         x_px=int(round(refined_center_x)),
         y_px=int(round(refined_center_y)),
     )

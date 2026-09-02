@@ -9,6 +9,7 @@ import numpy
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.diffraction import (
+    CropRegion,
     DiffractionArray,
     DiffractionDataset,
     DiffractionDatasetLayoutNode,
@@ -35,14 +36,16 @@ class TiffDiffractionPatternArray(DiffractionArray):
     def get_indexes(self) -> DiffractionIndexes:
         return self._indexes
 
-    def get_patterns(self) -> DiffractionPatterns:
+    def get_patterns(self, *, read_region: CropRegion | None = None) -> DiffractionPatterns:
         with TiffFile(self._file_path) as tiff:
             data = tiff.asarray()
 
         if data.ndim == 2:
             data = data[numpy.newaxis, :, :]
 
-        return data
+        if read_region is None:
+            return data
+        return read_region.apply_to(data)
 
 
 class TiffDiffractionFileReader(DiffractionFileReader):

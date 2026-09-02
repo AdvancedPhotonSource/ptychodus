@@ -126,8 +126,8 @@ class CropViewController(CheckableGroupBoxParameterViewController):
         self.get_widget().setLayout(layout)
 
         self._observed = (
-            diffraction_settings.crop_center_x_px,
-            diffraction_settings.crop_center_y_px,
+            diffraction_settings.beam_center_x_px,
+            diffraction_settings.beam_center_y_px,
             diffraction_settings.crop_width_px,
             diffraction_settings.crop_height_px,
         )
@@ -135,10 +135,10 @@ class CropViewController(CheckableGroupBoxParameterViewController):
         self._sync_model_to_view()
 
         self._center_x_spin_box.valueChanged.connect(
-            diffraction_settings.crop_center_x_px.set_value
+            diffraction_settings.beam_center_x_px.set_value
         )
         self._center_y_spin_box.valueChanged.connect(
-            diffraction_settings.crop_center_y_px.set_value
+            diffraction_settings.beam_center_y_px.set_value
         )
         self._width_spin_box.valueChanged.connect(diffraction_settings.crop_width_px.set_value)
         self._height_spin_box.valueChanged.connect(diffraction_settings.crop_height_px.set_value)
@@ -171,14 +171,14 @@ class CropViewController(CheckableGroupBoxParameterViewController):
             self._center_x_spin_box,
             _crop_center_limits(det_w),
             _crop_center_limits(det_w).clamp(
-                self._diffraction_settings.crop_center_x_px.get_value()
+                self._diffraction_settings.beam_center_x_px.get_value()
             ),
         )
         _set_spin_box(
             self._center_y_spin_box,
             _crop_center_limits(det_h),
             _crop_center_limits(det_h).clamp(
-                self._diffraction_settings.crop_center_y_px.get_value()
+                self._diffraction_settings.beam_center_y_px.get_value()
             ),
         )
         _set_spin_box(

@@ -97,8 +97,8 @@ class DiffractionAPI:
             return -1
 
         if crop_region is not None:
-            self._diffraction_settings.crop_center_x_px.set_value(crop_region.center_x_px)
-            self._diffraction_settings.crop_center_y_px.set_value(crop_region.center_y_px)
+            self._diffraction_settings.beam_center_x_px.set_value(crop_region.center_x_px)
+            self._diffraction_settings.beam_center_y_px.set_value(crop_region.center_y_px)
             self._diffraction_settings.crop_width_px.set_value(crop_region.width_px)
             self._diffraction_settings.crop_height_px.set_value(crop_region.height_px)
 

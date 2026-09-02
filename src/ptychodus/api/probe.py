@@ -146,7 +146,7 @@ def estimate_probe_size(
 
     1. **Pre-filter and noise floor.** The input is passed through a 3x3
        median filter to suppress hot pixels and other isolated outliers
-       (matching :func:`ptychodus.api.preprocess.diffraction.estimate_crop_center`).
+       (matching :func:`ptychodus.api.preprocess.diffraction.estimate_beam_center`).
        Background and noise scale are then estimated via
        :func:`ptychodus.api.preprocess.noise.estimate_noise_floor`, which uses Otsu's
        method on the filtered image to identify the background class when

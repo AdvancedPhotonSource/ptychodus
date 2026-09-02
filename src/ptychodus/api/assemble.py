@@ -13,6 +13,7 @@ import numpy
 from .constants import format_bytes
 from .diffraction import (
     BadPixels,
+    CropRegion,
     DiffractionArray,
     DiffractionDataset,
     DiffractionIndexes,
@@ -270,8 +271,15 @@ def _resolve_bad_pixels(
     dataset: DiffractionDataset,
     pipeline: DiffractionPrepPipeline | None,
     bad_pixels: BadPixels | None,
+    read_region: CropRegion | None = None,
 ) -> tuple[BadPixels, BadPixels]:
-    """Return the (raw, processed) bad-pixel masks for a dataset."""
+    """Return the (raw-in-read-region, processed) bad-pixel masks for a dataset.
+
+    When `read_region` is set, the raw mask is first cropped to that region so the
+    returned pair matches what a reader with load-time cropping delivers: the
+    "raw" mask is the cropped detector mask (still pre-pipeline), and the
+    "processed" mask is that cropped mask run through the pipeline.
+    """
     raw_bad_pixels = dataset.get_bad_pixels() if bad_pixels is None else bad_pixels
     expected_shape = dataset.get_metadata().detector_extent.get_shape()
 
@@ -280,6 +288,9 @@ def _resolve_bad_pixels(
             'Bad pixels shape does not match the detector extent! '
             f'(actual={raw_bad_pixels.shape} expected={expected_shape})'
         )
+
+    if read_region is not None:
+        raw_bad_pixels = read_region.apply_to(raw_bad_pixels)
 
     processed_bad_pixels = (
         raw_bad_pixels if pipeline is None else pipeline.apply_to_mask(raw_bad_pixels)
@@ -311,13 +322,15 @@ def compute_assembled_patterns_shape(
     pipeline: DiffractionPrepPipeline | None = None,
     *,
     bad_pixels: BadPixels | None = None,
+    read_region: CropRegion | None = None,
 ) -> tuple[int, int, int]:
     """Return the `(num_patterns, height, width)` shape an assembled buffer needs.
 
     The frame dimensions come from the *processed* bad-pixel mask, so they already
-    account for cropping, binning, padding, and transposition.
+    account for load-time cropping (`read_region`), binning, padding, and
+    transposition.
     """
-    _, processed_bad_pixels = _resolve_bad_pixels(dataset, pipeline, bad_pixels)
+    _, processed_bad_pixels = _resolve_bad_pixels(dataset, pipeline, bad_pixels, read_region)
     num_patterns_total = sum(dataset.get_metadata().num_patterns_per_array)
     height, width = processed_bad_pixels.shape
     return num_patterns_total, height, width
@@ -331,6 +344,7 @@ def allocate_assembled_data(
     raw_pixel_geometry: PixelGeometry | None = None,
     patterns: DiffractionPatterns | None = None,
     dtype: DiffractionPatternDType | None = None,
+    read_region: CropRegion | None = None,
 ) -> AssembledDiffractionData:
     """Allocate an empty buffer sized for the whole dataset.
 
@@ -344,7 +358,7 @@ def allocate_assembled_data(
     ``pipeline.compute_output_dtype(metadata.pattern_dtype)``.
     """
     metadata = dataset.get_metadata()
-    _, processed_bad_pixels = _resolve_bad_pixels(dataset, pipeline, bad_pixels)
+    _, processed_bad_pixels = _resolve_bad_pixels(dataset, pipeline, bad_pixels, read_region)
     pixel_geometry = _resolve_pixel_geometry(metadata, pipeline, raw_pixel_geometry)
 
     num_patterns_total = sum(metadata.num_patterns_per_array)
@@ -403,11 +417,16 @@ def preprocess_array(
     total_counts_lower_bound: int | None = None,
     total_counts_upper_bound: int | None = None,
     exposure_time_s: float | None = None,
+    read_region: CropRegion | None = None,
 ) -> AssembledDiffractionData:
     """Read one array and preprocess it into a dense block of patterns.
 
-    Bad pixels are zeroed in raw detector coordinates *before* the pipeline runs,
-    then patterns outside the (inclusive) total-counts bounds are dropped.
+    Bad pixels are zeroed *before* the pipeline runs; when `read_region` is set,
+    the reader is asked for the crop rectangle directly (HDF5 partial read) and
+    `raw_bad_pixels` must already be the same-region slice of the detector mask.
+    Zero-then-crop and crop-then-zero commute for per-pixel masks, so the result
+    matches full-frame preprocessing followed by cropping. Patterns outside the
+    (inclusive) total-counts bounds are dropped after the pipeline runs.
 
     When ``array`` provides per-pattern probe photon flux (Hz) and
     ``exposure_time_s`` is a positive number, the flux is converted to per-pattern
@@ -416,10 +435,11 @@ def preprocess_array(
     that array.
     """
     label = array.get_label()
-    raw_patterns = array.get_patterns()
+    raw_patterns = array.get_patterns(read_region=read_region)
 
-    # Zero bad pixels in raw detector coords so saturated values don't leak into
-    # neighboring bins under crop/bin/pad/flip/transpose.
+    # Zero bad pixels before the pipeline so saturated values don't leak into
+    # neighboring bins under bin/pad/flip/transpose. When read_region is set,
+    # raw_bad_pixels is the cropped mask matching the pre-cropped patterns.
     repaired_patterns = zero_bad_pixels(raw_patterns, raw_bad_pixels)
     loaded_array = SimpleDiffractionArray(label, array.get_indexes(), repaired_patterns)
     processed_array = loaded_array if pipeline is None else pipeline(loaded_array)
@@ -554,6 +574,7 @@ def assemble_dataset(
     out: AssembledDiffractionData | None = None,
     total_counts_lower_bound: int | None = None,
     total_counts_upper_bound: int | None = None,
+    read_region: CropRegion | None = None,
     on_array_assembled: Callable[[int, str, AssembledDiffractionData], None] | None = None,
     on_progress: Callable[[int, int], None] | None = None,
     on_array_error: Callable[[int, str, Exception], None] | None = None,
@@ -583,14 +604,17 @@ def assemble_dataset(
             f'(actual={num_arrays} expected at most {len(num_patterns_per_array)})'
         )
 
-    raw_bad_pixels, processed_bad_pixels = _resolve_bad_pixels(dataset, pipeline, bad_pixels)
+    raw_bad_pixels, processed_bad_pixels = _resolve_bad_pixels(
+        dataset, pipeline, bad_pixels, read_region
+    )
 
     if out is None:
         data = allocate_assembled_data(
             dataset,
             pipeline,
-            bad_pixels=raw_bad_pixels,
+            bad_pixels=bad_pixels,
             raw_pixel_geometry=raw_pixel_geometry,
+            read_region=read_region,
         )
     else:
         data = out
@@ -611,6 +635,7 @@ def assemble_dataset(
             total_counts_lower_bound=total_counts_lower_bound,
             total_counts_upper_bound=total_counts_upper_bound,
             exposure_time_s=metadata.exposure_time_s,
+            read_region=read_region,
         )
         num_patterns = block.get_patterns_shape()[0]
         capacity = num_patterns_per_array[array_index]

@@ -7,7 +7,7 @@ import numpy
 from ptychodus.api.constants import ONE_KILOELECTRONVOLT_EV
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
-    CropCenter,
+    BeamCenter,
     DiffractionDataset,
     DiffractionDatasetLayoutNode,
     DiffractionFileReader,
@@ -117,7 +117,7 @@ class LamNIDiffractionFileReader(DiffractionFileReader):
 
         num_patterns, detector_height, detector_width = data.shape
 
-        crop_center: CropCenter | None = None
+        beam_center: BeamCenter | None = None
         detector_distance_m: float | None = None
         detector_pixel_geometry: PixelGeometry | None = None
         exposure_time_s: float | None = None
@@ -133,7 +133,7 @@ class LamNIDiffractionFileReader(DiffractionFileReader):
         except KeyError:
             pass
         else:
-            crop_center = CropCenter(center_x_px, center_y_px)
+            beam_center = BeamCenter(center_x_px, center_y_px)
             detector_pixel_geometry = PixelGeometry(pixel_size, pixel_size)
             probe_energy_eV = ONE_KILOELECTRONVOLT_EV * photon_energy_keV  # noqa: N806
 
@@ -143,7 +143,7 @@ class LamNIDiffractionFileReader(DiffractionFileReader):
             detector_distance_m=detector_distance_m,
             detector_extent=ImageExtent(detector_width, detector_height),
             detector_pixel_geometry=detector_pixel_geometry,
-            crop_center=crop_center,
+            beam_center=beam_center,
             probe_energy_eV=probe_energy_eV,
             exposure_time_s=exposure_time_s,
             file_path=file_path,
@@ -166,7 +166,7 @@ class LamNIDiffractionFileReader(DiffractionFileReader):
 
         num_patterns, detector_height, detector_width = data.shape
 
-        crop_center: CropCenter | None = None
+        beam_center: BeamCenter | None = None
         detector_distance_m: float | None = None
         detector_pixel_geometry: PixelGeometry | None = None
         exposure_time_s: float | None = None
@@ -194,7 +194,7 @@ class LamNIDiffractionFileReader(DiffractionFileReader):
             )
             probe_energy_eV = _to_ev(energy_raw, energy_egu)  # noqa: N806
             exposure_time_s = exposure_raw
-            crop_center = CropCenter(int(round(beam_center_x)), int(round(beam_center_y)))
+            beam_center = BeamCenter(int(round(beam_center_x)), int(round(beam_center_y)))
 
         metadata = DiffractionMetadata(
             num_patterns_per_array=[num_patterns],
@@ -202,7 +202,7 @@ class LamNIDiffractionFileReader(DiffractionFileReader):
             detector_distance_m=detector_distance_m,
             detector_extent=ImageExtent(detector_width, detector_height),
             detector_pixel_geometry=detector_pixel_geometry,
-            crop_center=crop_center,
+            beam_center=beam_center,
             probe_energy_eV=probe_energy_eV,
             exposure_time_s=exposure_time_s,
             file_path=file_path,

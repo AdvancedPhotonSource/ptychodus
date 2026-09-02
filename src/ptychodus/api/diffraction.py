@@ -25,8 +25,8 @@ DiffractionPatternPhotonFluxes: TypeAlias = numpy.ndarray[
 
 
 @dataclass(frozen=True)
-class CropCenter:
-    """Pixel coordinates of the center used when cropping diffraction patterns."""
+class BeamCenter:
+    """Pixel coordinates of the direct-beam center on a detector."""
 
     x_px: int
     y_px: int
@@ -71,7 +71,7 @@ class CropRegion:
         return (self.y_range[0] + self.y_range[1]) // 2
 
     @classmethod
-    def from_center_extent(cls, center: CropCenter, extent: ImageExtent) -> CropRegion:
+    def from_center_extent(cls, center: BeamCenter, extent: ImageExtent) -> CropRegion:
         """Build a half-open region from a center pixel and (width, height).
 
         For odd width or height the window is biased one pixel toward the origin
@@ -86,7 +86,7 @@ class CropRegion:
         )
 
     @classmethod
-    def from_largest_pow2(cls, center: CropCenter, detector_extent: ImageExtent) -> CropRegion:
+    def from_largest_pow2(cls, center: BeamCenter, detector_extent: ImageExtent) -> CropRegion:
         """Largest power-of-two square region centered at `center` fitting in `detector_extent`.
 
         Returns a zero-size region when `center` lies on the detector boundary or outside it
@@ -127,6 +127,11 @@ class CropRegion:
             y_range=(y_start, y_start + height),
         )
 
+    def apply_to(self, data: numpy.ndarray) -> numpy.ndarray:
+        """Slice the last two axes of `data` to this region; leading axes pass through."""
+        leading = (slice(None),) * (data.ndim - 2)
+        return data[(*leading, self.y_slice, self.x_slice)]
+
 
 class DiffractionArray(ABC):
     """A block of diffraction patterns with associated scan indexes."""
@@ -140,8 +145,13 @@ class DiffractionArray(ABC):
         pass
 
     @abstractmethod
-    def get_patterns(self) -> DiffractionPatterns:
-        pass
+    def get_patterns(self, *, read_region: CropRegion | None = None) -> DiffractionPatterns:
+        """Return the patterns for this array.
+
+        When `read_region` is set, subclasses that can slice at load time (e.g.
+        HDF5 partial reads) do so; others fall back to loading the full frames and
+        cropping with :meth:`CropRegion.apply_to`.
+        """
 
     def get_num_patterns(self) -> int:
         return self.get_patterns().shape[0]
@@ -179,8 +189,10 @@ class SimpleDiffractionArray(DiffractionArray):
     def get_indexes(self) -> DiffractionIndexes:
         return self._indexes
 
-    def get_patterns(self) -> DiffractionPatterns:
-        return self._patterns
+    def get_patterns(self, *, read_region: CropRegion | None = None) -> DiffractionPatterns:
+        if read_region is None:
+            return self._patterns
+        return read_region.apply_to(self._patterns)
 
     def get_probe_photon_flux_Hz(self) -> DiffractionPatternPhotonFluxes | None:  # noqa: N802
         return self._probe_photon_flux_Hz
@@ -212,7 +224,7 @@ class DiffractionMetadata:
     detector_extent: ImageExtent
     detector_distance_m: float | None = None
     detector_pixel_geometry: PixelGeometry | None = None
-    crop_center: CropCenter | None = None
+    beam_center: BeamCenter | None = None
     probe_energy_eV: float | None = None  # noqa: N815
     probe_photon_count: int | None = None
     exposure_time_s: float | None = None
@@ -228,7 +240,7 @@ class DiffractionMetadata:
         sz += getsizeof(self.detector_extent)
         sz += getsizeof(self.detector_distance_m)
         sz += getsizeof(self.detector_pixel_geometry)
-        sz += getsizeof(self.crop_center)
+        sz += getsizeof(self.beam_center)
         sz += getsizeof(self.probe_energy_eV)
         sz += getsizeof(self.probe_photon_count)
         sz += getsizeof(self.exposure_time_s)

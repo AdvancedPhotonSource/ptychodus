@@ -1,17 +1,17 @@
-"""Unit tests for the diffraction preprocessing pipeline and the settings → pipeline factory.
+"""Unit tests for the diffraction preprocessing pipeline and the settings → plan factory.
 
 These tests lock the intended behavior of `DiffractionPrepPipeline` step ops and
-`PrepPipelineBuilder.get_pipeline()` so regressions in the op chain (crop, binning, upsample,
-padding, transpose, value filtering) and the processed-extent math are caught at the unit level.
+`PrepPipelineBuilder.get_plan()` so regressions in the op chain (binning, upsample,
+padding, transpose, value filtering), the processed-extent math, and the load-time
+crop region are caught at the unit level.
 """
 
 import numpy
 import pytest
 
-from ptychodus.api.diffraction import CropCenter, CropRegion, SimpleDiffractionArray
+from ptychodus.api.diffraction import BeamCenter, CropRegion, SimpleDiffractionArray
 from ptychodus.api.preprocess.diffraction import (
     BinningStep,
-    CropStep,
     DiffractionPrepPipeline,
     DiffractionPrepStepUnion,
     FilterValuesStep,
@@ -62,30 +62,26 @@ def test_filter_is_noop_on_mask() -> None:
     assert numpy.array_equal(out, mask)
 
 
-# ---------- Crop ----------
+# ---------- CropRegion.apply_to (replaces removed CropStep) ----------
 
 
-def test_crop_apply_reduces_shape_around_center() -> None:
+def test_crop_region_apply_to_reduces_stack_shape_around_center() -> None:
     data = numpy.arange(2 * 8 * 8, dtype=numpy.uint16).reshape(2, 8, 8)
-    crop = CropStep(
-        region=CropRegion.from_center_extent(
-            CropCenter(x_px=4, y_px=4), ImageExtent(width_px=4, height_px=4)
-        )
+    region = CropRegion.from_center_extent(
+        BeamCenter(x_px=4, y_px=4), ImageExtent(width_px=4, height_px=4)
     )
-    out = crop.apply(data)
+    out = region.apply_to(data)
     assert out.shape == (2, 4, 4)
     # Center-crop of 8x8 around (4,4) with radius 2 = rows 2:6, cols 2:6
     assert numpy.array_equal(out[0], data[0, 2:6, 2:6])
 
 
-def test_crop_apply_mask_reduces_shape() -> None:
+def test_crop_region_apply_to_reduces_2d_mask_shape() -> None:
     data = numpy.ones((8, 8), dtype=bool)
-    crop = CropStep(
-        region=CropRegion.from_center_extent(
-            CropCenter(x_px=4, y_px=4), ImageExtent(width_px=4, height_px=4)
-        )
+    region = CropRegion.from_center_extent(
+        BeamCenter(x_px=4, y_px=4), ImageExtent(width_px=4, height_px=4)
     )
-    assert crop.apply(data).shape == (4, 4)
+    assert region.apply_to(data).shape == (4, 4)
 
 
 # ---------- Binning ----------
@@ -297,33 +293,24 @@ def test_apply_to_mask_padding_does_not_crash() -> None:
     assert out.shape == (6, 6)
 
 
-def test_apply_to_mask_full_pipeline() -> None:
+def test_apply_to_mask_full_pipeline_with_load_time_crop() -> None:
+    """The pipeline no longer includes a crop step; callers crop the mask up front
+    with `CropRegion.apply_to`, then run the pipeline (bin, pad, ...) on the
+    cropped mask."""
     bad = numpy.zeros((8, 8), dtype=bool)
     bad[4, 4] = True
+    region = CropRegion.from_center_extent(
+        BeamCenter(x_px=4, y_px=4), ImageExtent(width_px=4, height_px=4)
+    )
     out = _pipeline(
-        CropStep(
-            region=CropRegion.from_center_extent(
-                CropCenter(x_px=4, y_px=4), ImageExtent(width_px=4, height_px=4)
-            )
-        ),
         BinningStep(bin_size_x=2, bin_size_y=2),
         PaddingStep(pad_x=1, pad_y=1),
-    ).apply_to_mask(bad)
+    ).apply_to_mask(region.apply_to(bad))
     # 8x8 → crop to 4x4 (rows 2:6, cols 2:6, bad[4,4] inside) → bin 2x2 to 2x2 (logical AND so False) → pad to 4x4
     assert out.shape == (4, 4)
 
 
 # ---------- Step extent / pixel-geometry ----------
-
-
-def test_crop_apply_to_extent_returns_configured_extent() -> None:
-    step = CropStep(
-        region=CropRegion.from_center_extent(
-            CropCenter(x_px=4, y_px=4), ImageExtent(width_px=4, height_px=6)
-        )
-    )
-    out = step.apply_to_extent(ImageExtent(64, 64))
-    assert (out.width_px, out.height_px) == (4, 6)
 
 
 def test_binning_apply_to_extent_floor_divides() -> None:
@@ -384,18 +371,15 @@ def test_identity_steps_do_not_change_extent_or_geometry() -> None:
 
 
 def test_pipeline_compute_output_extent_composes_all_shape_steps() -> None:
+    """With crop hoisted to load time, the pipeline sees an already-cropped input;
+    compute_output_extent folds only the remaining shape-affecting steps."""
     pipeline = _pipeline(
-        CropStep(
-            region=CropRegion.from_center_extent(
-                CropCenter(x_px=32, y_px=32), ImageExtent(width_px=16, height_px=16)
-            )
-        ),
         BinningStep(bin_size_x=2, bin_size_y=2),
         PaddingStep(pad_x=1, pad_y=1),
         TransposeStep(),
     )
-    # 64x64 → crop 16x16 → bin 2x2 → 8x8 → pad → 10x10 → transpose → 10x10
-    assert pipeline.compute_output_extent(ImageExtent(64, 64)) == ImageExtent(10, 10)
+    # 16x16 (already-cropped input) → bin 2x2 → 8x8 → pad → 10x10 → transpose → 10x10
+    assert pipeline.compute_output_extent(ImageExtent(16, 16)) == ImageExtent(10, 10)
 
 
 def test_pipeline_compute_output_pixel_geometry_composes_binning_and_transpose() -> None:
@@ -432,11 +416,6 @@ def test_pipeline_serializes_and_round_trips() -> None:
     """Pydantic tagged-union round-trip so `ptychodus_store` can persist a pipeline."""
     original = _pipeline(
         FilterValuesStep(lower_bound=1, upper_bound=99),
-        CropStep(
-            region=CropRegion.from_center_extent(
-                CropCenter(x_px=4, y_px=4), ImageExtent(width_px=4, height_px=4)
-            )
-        ),
         BinningStep(bin_size_x=2, bin_size_y=2),
         UpsampleStep(factor=2),
         PaddingStep(pad_x=1, pad_y=1),
@@ -460,42 +439,53 @@ def settings() -> tuple[DiffractionSettings, DetectorSettings]:
 def test_sizer_processed_size_accounts_for_double_sided_padding(
     settings: tuple[DiffractionSettings, DetectorSettings],
 ) -> None:
-    """B4: padding is applied on both sides; processed size adds 2 * pad."""
+    """B4: padding is applied on both sides; processed size adds 2 * pad.
+
+    Crop is hoisted to a load-time read_region, so the pipeline sees the
+    cropped input and compute_output_extent is folded from the region extent.
+    """
     diff, det = settings
     diff.crop_enabled.set_value(True)
     diff.crop_width_px.set_value(32)
     diff.crop_height_px.set_value(32)
-    diff.crop_center_x_px.set_value(32)
-    diff.crop_center_y_px.set_value(32)
+    diff.beam_center_x_px.set_value(32)
+    diff.beam_center_y_px.set_value(32)
     diff.binning_enabled.set_value(False)
     diff.padding_enabled.set_value(True)
     diff.pad_x.set_value(4)
     diff.pad_y.set_value(4)
 
     detector_extent = ImageExtent(width_px=64, height_px=64)
-    pipeline = PrepPipelineBuilder(diff).get_pipeline(detector_extent)
-    extent = pipeline.compute_output_extent(detector_extent)
+    plan = PrepPipelineBuilder(diff).get_plan(detector_extent)
+    assert plan.read_region is not None
+    cropped_extent = ImageExtent(
+        width_px=plan.read_region.width_px, height_px=plan.read_region.height_px
+    )
+    extent = plan.pipeline.compute_output_extent(cropped_extent)
     assert extent.width_px == 32 + 2 * 4
     assert extent.height_px == 32 + 2 * 4
 
-    # Cross-check against the pipeline's actual output shape.
+    # Cross-check against the pipeline's actual output shape on the cropped input.
     array = SimpleDiffractionArray(
-        'a', numpy.zeros(1, dtype=int), numpy.zeros((1, 64, 64), dtype=numpy.uint16)
+        'a',
+        numpy.zeros(1, dtype=int),
+        numpy.zeros((1, cropped_extent.height_px, cropped_extent.width_px), dtype=numpy.uint16),
     )
-    out_shape = pipeline(array).get_patterns().shape
+    out_shape = plan.pipeline(array).get_patterns().shape
     assert out_shape == (1, extent.height_px, extent.width_px)
 
 
 def test_sizer_upsample_inserts_step_after_binning_before_padding(
     settings: tuple[DiffractionSettings, DetectorSettings],
 ) -> None:
-    """Canonical order: filter -> crop -> binning -> upsample -> padding -> ..."""
+    """Canonical residual-pipeline order (crop is a load-time read_region):
+    filter -> binning -> upsample -> padding -> ..."""
     diff, _ = settings
     diff.crop_enabled.set_value(True)
     diff.crop_width_px.set_value(32)
     diff.crop_height_px.set_value(32)
-    diff.crop_center_x_px.set_value(32)
-    diff.crop_center_y_px.set_value(32)
+    diff.beam_center_x_px.set_value(32)
+    diff.beam_center_y_px.set_value(32)
     diff.binning_enabled.set_value(True)
     diff.bin_size_x.set_value(2)
     diff.bin_size_y.set_value(2)
@@ -505,8 +495,9 @@ def test_sizer_upsample_inserts_step_after_binning_before_padding(
     diff.pad_x.set_value(1)
     diff.pad_y.set_value(1)
 
-    pipeline = PrepPipelineBuilder(diff).get_pipeline(ImageExtent(width_px=64, height_px=64))
-    type_order = [type(step) for step in pipeline.steps]
+    plan = PrepPipelineBuilder(diff).get_plan(ImageExtent(width_px=64, height_px=64))
+    assert plan.read_region is not None
+    type_order = [type(step) for step in plan.pipeline.steps]
     bin_idx = type_order.index(BinningStep)
     upsample_idx = type_order.index(UpsampleStep)
     pad_idx = type_order.index(PaddingStep)
@@ -525,11 +516,12 @@ def test_sizer_upsample_multiplies_processed_extent_and_divides_pixel_geometry(
     diff.upsample_factor.set_value(2)
 
     detector_extent = ImageExtent(width_px=32, height_px=32)
-    pipeline = PrepPipelineBuilder(diff).get_pipeline(detector_extent)
-    extent = pipeline.compute_output_extent(detector_extent)
+    plan = PrepPipelineBuilder(diff).get_plan(detector_extent)
+    assert plan.read_region is None
+    extent = plan.pipeline.compute_output_extent(detector_extent)
     assert (extent.width_px, extent.height_px) == (64, 64)
 
-    geo = pipeline.compute_output_pixel_geometry(PixelGeometry(width_m=1e-5, height_m=2e-5))
+    geo = plan.pipeline.compute_output_pixel_geometry(PixelGeometry(width_m=1e-5, height_m=2e-5))
     assert (geo.width_m, geo.height_m) == (5e-6, 1e-5)
 
 
@@ -544,8 +536,8 @@ def test_sizer_upsample_factor_one_is_pipeline_noop(
     diff.upsample_enabled.set_value(True)
     diff.upsample_factor.set_value(1)
 
-    pipeline = PrepPipelineBuilder(diff).get_pipeline(ImageExtent(width_px=32, height_px=32))
-    assert not any(isinstance(step, UpsampleStep) for step in pipeline.steps)
+    plan = PrepPipelineBuilder(diff).get_plan(ImageExtent(width_px=32, height_px=32))
+    assert not any(isinstance(step, UpsampleStep) for step in plan.pipeline.steps)
 
 
 def test_sizer_processed_extent_reflects_transpose(
@@ -553,21 +545,23 @@ def test_sizer_processed_extent_reflects_transpose(
 ) -> None:
     """Regression: transpose must swap width/height in the processed extent + pixel geometry."""
     diff, _ = settings
+    diff.crop_enabled.set_value(False)
     diff.transpose.set_value(True)
 
     detector_extent = ImageExtent(width_px=64, height_px=32)
-    pipeline = PrepPipelineBuilder(diff).get_pipeline(detector_extent)
-    extent = pipeline.compute_output_extent(detector_extent)
+    plan = PrepPipelineBuilder(diff).get_plan(detector_extent)
+    assert plan.read_region is None
+    extent = plan.pipeline.compute_output_extent(detector_extent)
     assert (extent.width_px, extent.height_px) == (32, 64)
 
-    geo = pipeline.compute_output_pixel_geometry(PixelGeometry(width_m=1e-5, height_m=2e-5))
+    geo = plan.pipeline.compute_output_pixel_geometry(PixelGeometry(width_m=1e-5, height_m=2e-5))
     assert (geo.width_m, geo.height_m) == (2e-5, 1e-5)
 
     # Cross-check: pipeline's actual output stack shape agrees with compute_output_extent.
     array = SimpleDiffractionArray(
         'a', numpy.zeros(1, dtype=int), numpy.zeros((1, 32, 64), dtype=numpy.uint16)
     )
-    out_shape = pipeline(array).get_patterns().shape
+    out_shape = plan.pipeline(array).get_patterns().shape
     assert out_shape == (1, extent.height_px, extent.width_px)
 
 
@@ -587,8 +581,7 @@ def test_sizer_lower_bound_filter_uses_its_own_toggle(
     diff.value_lower_bound.set_value(7)
     diff.value_upper_bound_enabled.set_value(False)
 
-    pipeline = PrepPipelineBuilder(diff).get_pipeline()
-    step = _filter_step(pipeline)
+    step = _filter_step(PrepPipelineBuilder(diff).get_plan().pipeline)
     assert step is not None
     assert step.lower_bound == 7
     assert step.upper_bound is None
@@ -602,8 +595,7 @@ def test_sizer_upper_bound_filter_uses_its_own_toggle(
     diff.value_upper_bound_enabled.set_value(True)
     diff.value_upper_bound.set_value(1234)
 
-    pipeline = PrepPipelineBuilder(diff).get_pipeline()
-    step = _filter_step(pipeline)
+    step = _filter_step(PrepPipelineBuilder(diff).get_plan().pipeline)
     assert step is not None
     assert step.lower_bound is None
     assert step.upper_bound == 1234
@@ -618,8 +610,7 @@ def test_sizer_both_filter_bounds_independent(
     diff.value_upper_bound_enabled.set_value(True)
     diff.value_upper_bound.set_value(99)
 
-    pipeline = PrepPipelineBuilder(diff).get_pipeline()
-    step = _filter_step(pipeline)
+    step = _filter_step(PrepPipelineBuilder(diff).get_plan().pipeline)
     assert step is not None
     assert step.lower_bound == 3
     assert step.upper_bound == 99
@@ -633,18 +624,10 @@ def test_sizer_no_filter_bounds(
     diff.value_lower_bound_enabled.set_value(False)
     diff.value_upper_bound_enabled.set_value(False)
 
-    pipeline = PrepPipelineBuilder(diff).get_pipeline()
-    assert _filter_step(pipeline) is None
+    assert _filter_step(PrepPipelineBuilder(diff).get_plan().pipeline) is None
 
 
-# ---------- Safe crop center ----------
-
-
-def _crop_step(pipeline: DiffractionPrepPipeline) -> CropStep | None:
-    for step in pipeline.steps:
-        if isinstance(step, CropStep):
-            return step
-    return None
+# ---------- Load-time crop region ----------
 
 
 @pytest.mark.parametrize(
@@ -657,40 +640,48 @@ def _crop_step(pipeline: DiffractionPrepPipeline) -> CropStep | None:
         (4, 4),  # in-range identity
     ],
 )
-def test_sizer_safe_crop_center_matches_cropstep_bounds(
+def test_sizer_safe_beam_center_matches_radius_bounds(
     settings: tuple[DiffractionSettings, DetectorSettings],
     user_center: int,
     expected: int,
 ) -> None:
-    """The clamped center must equal the CropStep radius-based bounds (see CropStep.apply)."""
+    """The clamped center on the load-time read_region must equal the radius-based bounds."""
     diff, det = settings
     diff.crop_enabled.set_value(True)
     diff.crop_width_px.set_value(4)
     diff.crop_height_px.set_value(4)
-    diff.crop_center_x_px.set_value(user_center)
-    diff.crop_center_y_px.set_value(user_center)
+    diff.beam_center_x_px.set_value(user_center)
+    diff.beam_center_y_px.set_value(user_center)
 
     detector_extent = ImageExtent(width_px=8, height_px=8)
-    step = _crop_step(PrepPipelineBuilder(diff).get_pipeline(detector_extent))
-    assert step is not None
-    assert step.region.center_x_px == expected
-    assert step.region.center_y_px == expected
+    plan = PrepPipelineBuilder(diff).get_plan(detector_extent)
+    assert plan.read_region is not None
+    assert plan.read_region.center_x_px == expected
+    assert plan.read_region.center_y_px == expected
 
 
-def test_sizer_safe_crop_center_produces_in_bounds_slice(
+def test_sizer_safe_beam_center_produces_in_bounds_slice(
     settings: tuple[DiffractionSettings, DetectorSettings],
 ) -> None:
-    """Cross-check: a max-valid center must yield a slice fully inside the detector."""
+    """Cross-check: a max-valid center must yield a load-time slice fully inside the detector."""
     diff, det = settings
     diff.crop_enabled.set_value(True)
     diff.crop_width_px.set_value(4)
     diff.crop_height_px.set_value(4)
-    diff.crop_center_x_px.set_value(6)  # max valid; radius = 2 → slice [4:8]
-    diff.crop_center_y_px.set_value(6)
+    diff.beam_center_x_px.set_value(6)  # max valid; radius = 2 → slice [4:8]
+    diff.beam_center_y_px.set_value(6)
 
+    detector_extent = ImageExtent(width_px=8, height_px=8)
+    plan = PrepPipelineBuilder(diff).get_plan(detector_extent)
+    assert plan.read_region is not None
     array = SimpleDiffractionArray(
         'a', numpy.zeros(1, dtype=int), numpy.zeros((1, 8, 8), dtype=numpy.uint16)
     )
-    detector_extent = ImageExtent(width_px=8, height_px=8)
-    out = PrepPipelineBuilder(diff).get_pipeline(detector_extent)(array).get_patterns()
+    out = plan.pipeline(
+        SimpleDiffractionArray(
+            array.get_label(),
+            array.get_indexes(),
+            array.get_patterns(read_region=plan.read_region),
+        )
+    ).get_patterns()
     assert out.shape == (1, 4, 4)  # no truncation from an out-of-bounds slice

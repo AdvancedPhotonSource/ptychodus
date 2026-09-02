@@ -22,7 +22,7 @@ from ptychodus.api.assemble import (
 )
 from ptychodus.api.diffraction import (
     BadPixels,
-    CropCenter,
+    BeamCenter,
     CropRegion,
     DiffractionArray,
     DiffractionDatasetLayoutNode,
@@ -35,7 +35,6 @@ from ptychodus.api.diffraction import (
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.preprocess.diffraction import (
     BinningStep,
-    CropStep,
     DiffractionPrepPipeline,
     TransposeStep,
 )
@@ -88,7 +87,7 @@ class _FailingArray(DiffractionArray):
     def get_indexes(self) -> DiffractionIndexes:
         return numpy.arange(self._num_patterns, dtype=numpy.intp)
 
-    def get_patterns(self) -> DiffractionPatterns:
+    def get_patterns(self, *, read_region: CropRegion | None = None) -> DiffractionPatterns:
         raise self._error
 
     def get_num_patterns(self) -> int:
@@ -125,7 +124,7 @@ class _BlockingArray(DiffractionArray):
     def get_indexes(self) -> DiffractionIndexes:
         return self._inner.get_indexes()
 
-    def get_patterns(self) -> DiffractionPatterns:
+    def get_patterns(self, *, read_region: CropRegion | None = None) -> DiffractionPatterns:
         self.entered.set()
 
         # The timeout is a deadlock guard, not a synchronization mechanism; a test
@@ -136,7 +135,7 @@ class _BlockingArray(DiffractionArray):
         if self._release_delay_sec > 0.0:
             time.sleep(self._release_delay_sec)
 
-        return self._inner.get_patterns()
+        return self._inner.get_patterns(read_region=read_region)
 
     def get_num_patterns(self) -> int:
         return self._inner.get_num_patterns()
@@ -353,31 +352,30 @@ def _preprocess_counts(
     )
 
 
-def test_bad_pixels_are_zeroed_in_raw_coords_before_cropping() -> None:
-    """A saturated bad pixel must not survive into the cropped output."""
-    patterns = numpy.zeros((2, 40, 60), dtype=numpy.uint16)
-    patterns[:, 18, 30] = 65535
-    array = SimpleDiffractionArray('a', numpy.arange(2, dtype=numpy.intp), patterns)
+def test_bad_pixels_are_zeroed_in_cropped_coords_after_load_time_crop() -> None:
+    """A saturated bad pixel inside the load-time crop must not survive the pipeline.
 
-    raw_bad = numpy.zeros((40, 60), dtype=numpy.bool_)
-    raw_bad[18, 30] = True
-    pipeline = DiffractionPrepPipeline(
-        steps=(
-            CropStep(
-                region=CropRegion.from_center_extent(
-                    CropCenter(x_px=30, y_px=18), ImageExtent(width_px=16, height_px=12)
-                )
-            ),
-        )
+    With crop hoisted to load time, the reader delivers pre-cropped patterns and
+    preprocess_array zeroes bad pixels against a matching cropped mask. Result must
+    match the pre-hoist behavior of zero-in-raw-coords-then-crop.
+    """
+    full_patterns = numpy.zeros((2, 40, 60), dtype=numpy.uint16)
+    full_patterns[:, 18, 30] = 65535
+    full_bad = numpy.zeros((40, 60), dtype=numpy.bool_)
+    full_bad[18, 30] = True
+
+    read_region = CropRegion.from_center_extent(
+        BeamCenter(x_px=30, y_px=18), ImageExtent(width_px=16, height_px=12)
     )
-    processed_bad = pipeline.apply_to_mask(raw_bad)
+    array = SimpleDiffractionArray('a', numpy.arange(2, dtype=numpy.intp), full_patterns)
+    cropped_bad = read_region.apply_to(full_bad)
 
     data = preprocess_array(
         array,
-        pipeline,
-        raw_bad_pixels=raw_bad,
-        processed_bad_pixels=processed_bad,
+        raw_bad_pixels=cropped_bad,
+        processed_bad_pixels=cropped_bad,
         raw_pixel_geometry=GEOMETRY,
+        read_region=read_region,
     )
 
     assert data.get_patterns_shape() == (2, 12, 16)
