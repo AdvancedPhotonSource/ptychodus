@@ -34,25 +34,55 @@ class CropCenter:
 
 @dataclass(frozen=True)
 class CropRegion:
-    """Rectangular crop window on a detector: center in pixels + width/height in pixels.
+    """Rectangular half-open crop window on a detector, stored as slice ranges.
 
-    The window matches `CropStep`'s slice semantics: half-open
-    `[x_px - width_px // 2, x_px + width_px // 2)` on x, same on y.
+    Fields hold half-open ``(start, stop)`` intervals that index the detector's last
+    two axes directly: `x_range` selects columns ``[x_range[0], x_range[1])`` and
+    `y_range` selects rows ``[y_range[0], y_range[1])`` (matching Python slice
+    semantics). Derived properties expose the equivalent slice / width / height /
+    center forms without duplicating storage.
     """
 
-    x_px: int
-    y_px: int
-    width_px: int
-    height_px: int
+    x_range: tuple[int, int]
+    y_range: tuple[int, int]
+
+    @property
+    def x_slice(self) -> slice:
+        return slice(*self.x_range)
+
+    @property
+    def y_slice(self) -> slice:
+        return slice(*self.y_range)
+
+    @property
+    def width_px(self) -> int:
+        return self.x_range[1] - self.x_range[0]
+
+    @property
+    def height_px(self) -> int:
+        return self.y_range[1] - self.y_range[0]
+
+    @property
+    def center_x_px(self) -> int:
+        return (self.x_range[0] + self.x_range[1]) // 2
+
+    @property
+    def center_y_px(self) -> int:
+        return (self.y_range[0] + self.y_range[1]) // 2
 
     @classmethod
     def from_center_extent(cls, center: CropCenter, extent: ImageExtent) -> CropRegion:
-        """Build a region from a separate center and extent."""
+        """Build a half-open region from a center pixel and (width, height).
+
+        For odd width or height the window is biased one pixel toward the origin
+        (start = center - size // 2, stop = start + size), preserving the requested
+        size exactly rather than silently truncating by one.
+        """
+        x_start = center.x_px - extent.width_px // 2
+        y_start = center.y_px - extent.height_px // 2
         return cls(
-            x_px=center.x_px,
-            y_px=center.y_px,
-            width_px=extent.width_px,
-            height_px=extent.height_px,
+            x_range=(x_start, x_start + extent.width_px),
+            y_range=(y_start, y_start + extent.height_px),
         )
 
     @classmethod
@@ -69,25 +99,33 @@ class CropRegion:
             detector_extent.height_px - center.y_px,
         )
         if max_radius < 1:
-            return cls(x_px=center.x_px, y_px=center.y_px, width_px=0, height_px=0)
+            return cls(
+                x_range=(center.x_px, center.x_px),
+                y_range=(center.y_px, center.y_px),
+            )
         # Largest s = 2^k satisfying s <= 2 * max_radius. bit_length() gives floor(log2)+1.
         size = 1 << ((2 * max_radius).bit_length() - 1)
-        return cls(x_px=center.x_px, y_px=center.y_px, width_px=size, height_px=size)
+        return cls.from_center_extent(center, ImageExtent(width_px=size, height_px=size))
 
     def clamp_to_detector_extent(self, detector_extent: ImageExtent) -> CropRegion:
         """Return a new region shrunk and shifted so its window fits inside `detector_extent`.
 
-        Width and height are capped at the detector's (floored at 1); the center is then
-        clamped into `[radius, detector - radius]` on each axis, so the half-open window
-        `[c - radius, c + radius)` lies entirely inside `[0, detector)`.
+        Width and height are capped at the detector's (floored at 1); each range is then
+        shifted (preserving size) so the half-open ``[start, stop)`` lies entirely inside
+        ``[0, detector)``.
         """
         width = max(1, min(self.width_px, detector_extent.width_px))
         height = max(1, min(self.height_px, detector_extent.height_px))
-        radius_x = width // 2
-        radius_y = height // 2
-        x = max(radius_x, min(self.x_px, detector_extent.width_px - radius_x))
-        y = max(radius_y, min(self.y_px, detector_extent.height_px - radius_y))
-        return CropRegion(x_px=x, y_px=y, width_px=width, height_px=height)
+        # Preserve the requested center where the shrunk size allows, then clip the
+        # start into [0, detector - size] so [start, start + size) fits.
+        preferred_x_start = self.center_x_px - width // 2
+        preferred_y_start = self.center_y_px - height // 2
+        x_start = max(0, min(detector_extent.width_px - width, preferred_x_start))
+        y_start = max(0, min(detector_extent.height_px - height, preferred_y_start))
+        return CropRegion(
+            x_range=(x_start, x_start + width),
+            y_range=(y_start, y_start + height),
+        )
 
 
 class DiffractionArray(ABC):

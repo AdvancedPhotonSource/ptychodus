@@ -191,7 +191,21 @@ class TestCropRegionFromCenterExtent:
         region = CropRegion.from_center_extent(
             CropCenter(x_px=10, y_px=20), ImageExtent(width_px=4, height_px=6)
         )
-        assert region == CropRegion(center_x_px=10, center_y_px=20, width_px=4, height_px=6)
+        # center 10, width 4 → x_start = 10 - 2 = 8, x_range = [8, 12)
+        # center 20, height 6 → y_start = 20 - 3 = 17, y_range = [17, 23)
+        assert region == CropRegion(x_range=(8, 12), y_range=(17, 23))
+        assert (region.width_px, region.height_px) == (4, 6)
+        assert (region.center_x_px, region.center_y_px) == (10, 20)
+
+    def test_odd_width_preserves_requested_size(self) -> None:
+        # Odd width used to silently narrow by one under the center + width // 2 math.
+        region = CropRegion.from_center_extent(
+            CropCenter(x_px=10, y_px=10), ImageExtent(width_px=5, height_px=5)
+        )
+        assert (region.width_px, region.height_px) == (5, 5)
+        # Bias one pixel toward the origin: start = 10 - 5 // 2 = 8.
+        assert region.x_range == (8, 13)
+        assert region.y_range == (8, 13)
 
 
 class TestCropRegionFromLargestPow2:
@@ -227,22 +241,26 @@ class TestCropRegionFromLargestPow2:
 
 class TestCropRegionClampToDetectorExtent:
     def test_in_bounds_region_is_unchanged(self) -> None:
-        region = CropRegion(center_x_px=4, center_y_px=4, width_px=4, height_px=4)
+        region = CropRegion(x_range=(2, 6), y_range=(2, 6))
         assert region.clamp_to_detector_extent(ImageExtent(width_px=8, height_px=8)) == region
 
-    def test_center_shifted_to_fit_radius(self) -> None:
-        # width=4 → radius=2; center x=0 must clamp to 2. Center y in range untouched.
-        region = CropRegion(center_x_px=0, center_y_px=4, width_px=4, height_px=4)
+    def test_range_shifted_to_fit(self) -> None:
+        # center 0, width 4 → x_range = [-2, 2); must shift so start >= 0.
+        region = CropRegion.from_center_extent(
+            CropCenter(x_px=0, y_px=4), ImageExtent(width_px=4, height_px=4)
+        )
         clamped = region.clamp_to_detector_extent(ImageExtent(width_px=8, height_px=8))
-        assert clamped == CropRegion(center_x_px=2, center_y_px=4, width_px=4, height_px=4)
+        assert clamped == CropRegion(x_range=(0, 4), y_range=(2, 6))
 
     def test_extent_shrunk_to_detector(self) -> None:
-        # requested 20x20 in an 8x8 detector: cap at 8x8, then center clamped to (4,4).
-        region = CropRegion(center_x_px=100, center_y_px=100, width_px=20, height_px=20)
+        # requested 20x20 in an 8x8 detector: cap at 8x8, then range clamped to [0, 8).
+        region = CropRegion.from_center_extent(
+            CropCenter(x_px=100, y_px=100), ImageExtent(width_px=20, height_px=20)
+        )
         clamped = region.clamp_to_detector_extent(ImageExtent(width_px=8, height_px=8))
-        assert clamped == CropRegion(center_x_px=4, center_y_px=4, width_px=8, height_px=8)
+        assert clamped == CropRegion(x_range=(0, 8), y_range=(0, 8))
 
     def test_zero_width_floors_to_one(self) -> None:
-        region = CropRegion(center_x_px=4, center_y_px=4, width_px=0, height_px=0)
+        region = CropRegion(x_range=(4, 4), y_range=(4, 4))
         clamped = region.clamp_to_detector_extent(ImageExtent(width_px=8, height_px=8))
         assert (clamped.width_px, clamped.height_px) == (1, 1)

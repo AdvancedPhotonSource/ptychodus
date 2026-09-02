@@ -1,4 +1,4 @@
-from ptychodus.api.diffraction import CropRegion
+from ptychodus.api.diffraction import CropCenter, CropRegion
 from ptychodus.api.preprocess.diffraction import (
     BinningStep,
     CropStep,
@@ -66,11 +66,15 @@ class PrepPipelineBuilder:
                 if detector_extent is not None
                 else None
             )
-            region = CropRegion(
-                center_x_px=s.crop_center_x_px.get_value(),
-                center_y_px=s.crop_center_y_px.get_value(),
-                width_px=max(1, s.crop_width_px.get_value()),
-                height_px=max(1, s.crop_height_px.get_value()),
+            region = CropRegion.from_center_extent(
+                CropCenter(
+                    x_px=s.crop_center_x_px.get_value(),
+                    y_px=s.crop_center_y_px.get_value(),
+                ),
+                ImageExtent(
+                    width_px=max(1, s.crop_width_px.get_value()),
+                    height_px=max(1, s.crop_height_px.get_value()),
+                ),
             )
             if pre is not None:
                 region = region.clamp_to_detector_extent(pre)

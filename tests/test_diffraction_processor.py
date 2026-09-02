@@ -8,7 +8,7 @@ padding, transpose, value filtering) and the processed-extent math are caught at
 import numpy
 import pytest
 
-from ptychodus.api.diffraction import CropRegion, SimpleDiffractionArray
+from ptychodus.api.diffraction import CropCenter, CropRegion, SimpleDiffractionArray
 from ptychodus.api.preprocess.diffraction import (
     BinningStep,
     CropStep,
@@ -67,7 +67,11 @@ def test_filter_is_noop_on_mask() -> None:
 
 def test_crop_apply_reduces_shape_around_center() -> None:
     data = numpy.arange(2 * 8 * 8, dtype=numpy.uint16).reshape(2, 8, 8)
-    crop = CropStep(region=CropRegion(center_x_px=4, center_y_px=4, width_px=4, height_px=4))
+    crop = CropStep(
+        region=CropRegion.from_center_extent(
+            CropCenter(x_px=4, y_px=4), ImageExtent(width_px=4, height_px=4)
+        )
+    )
     out = crop.apply(data)
     assert out.shape == (2, 4, 4)
     # Center-crop of 8x8 around (4,4) with radius 2 = rows 2:6, cols 2:6
@@ -76,7 +80,11 @@ def test_crop_apply_reduces_shape_around_center() -> None:
 
 def test_crop_apply_mask_reduces_shape() -> None:
     data = numpy.ones((8, 8), dtype=bool)
-    crop = CropStep(region=CropRegion(center_x_px=4, center_y_px=4, width_px=4, height_px=4))
+    crop = CropStep(
+        region=CropRegion.from_center_extent(
+            CropCenter(x_px=4, y_px=4), ImageExtent(width_px=4, height_px=4)
+        )
+    )
     assert crop.apply(data).shape == (4, 4)
 
 
@@ -293,7 +301,11 @@ def test_apply_to_mask_full_pipeline() -> None:
     bad = numpy.zeros((8, 8), dtype=bool)
     bad[4, 4] = True
     out = _pipeline(
-        CropStep(region=CropRegion(center_x_px=4, center_y_px=4, width_px=4, height_px=4)),
+        CropStep(
+            region=CropRegion.from_center_extent(
+                CropCenter(x_px=4, y_px=4), ImageExtent(width_px=4, height_px=4)
+            )
+        ),
         BinningStep(bin_size_x=2, bin_size_y=2),
         PaddingStep(pad_x=1, pad_y=1),
     ).apply_to_mask(bad)
@@ -305,7 +317,11 @@ def test_apply_to_mask_full_pipeline() -> None:
 
 
 def test_crop_apply_to_extent_returns_configured_extent() -> None:
-    step = CropStep(region=CropRegion(center_x_px=4, center_y_px=4, width_px=4, height_px=6))
+    step = CropStep(
+        region=CropRegion.from_center_extent(
+            CropCenter(x_px=4, y_px=4), ImageExtent(width_px=4, height_px=6)
+        )
+    )
     out = step.apply_to_extent(ImageExtent(64, 64))
     assert (out.width_px, out.height_px) == (4, 6)
 
@@ -369,7 +385,11 @@ def test_identity_steps_do_not_change_extent_or_geometry() -> None:
 
 def test_pipeline_compute_output_extent_composes_all_shape_steps() -> None:
     pipeline = _pipeline(
-        CropStep(region=CropRegion(center_x_px=32, center_y_px=32, width_px=16, height_px=16)),
+        CropStep(
+            region=CropRegion.from_center_extent(
+                CropCenter(x_px=32, y_px=32), ImageExtent(width_px=16, height_px=16)
+            )
+        ),
         BinningStep(bin_size_x=2, bin_size_y=2),
         PaddingStep(pad_x=1, pad_y=1),
         TransposeStep(),
@@ -412,7 +432,11 @@ def test_pipeline_serializes_and_round_trips() -> None:
     """Pydantic tagged-union round-trip so `ptychodus_store` can persist a pipeline."""
     original = _pipeline(
         FilterValuesStep(lower_bound=1, upper_bound=99),
-        CropStep(region=CropRegion(center_x_px=4, center_y_px=4, width_px=4, height_px=4)),
+        CropStep(
+            region=CropRegion.from_center_extent(
+                CropCenter(x_px=4, y_px=4), ImageExtent(width_px=4, height_px=4)
+            )
+        ),
         BinningStep(bin_size_x=2, bin_size_y=2),
         UpsampleStep(factor=2),
         PaddingStep(pad_x=1, pad_y=1),

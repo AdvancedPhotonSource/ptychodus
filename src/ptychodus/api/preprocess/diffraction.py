@@ -101,18 +101,14 @@ class FilterValuesStep(DiffractionPrepStep):
 
 
 class CropStep(DiffractionPrepStep):
-    """Center-crop the last two axes to `region.width_px` × `region.height_px` about `region`'s center."""
+    """Crop the last two axes to the half-open window described by `region`."""
 
     type: Literal['crop'] = 'crop'
     region: CropRegion
 
     def apply(self, data: numpy.ndarray) -> numpy.ndarray:
-        radius_x = self.region.width_px // 2
-        slice_x = slice(self.region.center_x_px - radius_x, self.region.center_x_px + radius_x)
-        radius_y = self.region.height_px // 2
-        slice_y = slice(self.region.center_y_px - radius_y, self.region.center_y_px + radius_y)
         leading = (slice(None),) * (data.ndim - 2)
-        return data[(*leading, slice_y, slice_x)]
+        return data[(*leading, self.region.y_slice, self.region.x_slice)]
 
     def apply_to_extent(self, extent: ImageExtent) -> ImageExtent:
         return ImageExtent(width_px=self.region.width_px, height_px=self.region.height_px)
