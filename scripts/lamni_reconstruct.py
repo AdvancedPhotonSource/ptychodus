@@ -10,7 +10,14 @@ from pathlib import Path
 
 import numpy
 
-from ptychi.api import LSQMLOptions
+from ptychi.api.options.lsqml import (
+    LSQMLObjectOptions,
+    LSQMLOPRModeWeightsOptions,
+    LSQMLProbeOptions,
+    LSQMLProbePositionOptions,
+    LSQMLReconstructorOptions,
+)
+from ptychi.api.options.task import PtychographyTaskOptions
 
 from ptychodus.api.assemble import assemble_dataset
 from ptychodus.api.constants import energy_eV_to_wavelength_m
@@ -223,7 +230,13 @@ def main() -> int:
     )
 
     # USER: customize pty-chi options here (edit fields on `options` before the loop).
-    options = LSQMLOptions()
+    options = PtychographyTaskOptions(
+        reconstructor_options=LSQMLReconstructorOptions(),
+        object_options=LSQMLObjectOptions(),
+        probe_options=LSQMLProbeOptions(),
+        probe_position_options=LSQMLProbePositionOptions(),
+        opr_mode_weight_options=LSQMLOPRModeWeightsOptions(),
+    )
 
     options.check()
 
