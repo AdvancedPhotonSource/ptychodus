@@ -1,3 +1,5 @@
+import logging
+
 from ptychodus.api.diffraction import BeamCenter, CropRegion
 from ptychodus.api.preprocess.diffraction import (
     BinningStep,
@@ -14,6 +16,8 @@ from ptychodus.api.preprocess.diffraction import (
 from ptychodus.api.geometry import ImageExtent, Interval
 
 from .settings import DiffractionSettings
+
+logger = logging.getLogger(__name__)
 
 
 def _clamp_size(requested: int, upper: int | None) -> int:
@@ -78,7 +82,19 @@ class PrepPipelineBuilder:
                 ),
             )
             if detector_extent is not None:
-                region = region.clamp_to_detector_extent(detector_extent)
+                clamped_region = region.clamp_to_detector_extent(detector_extent)
+
+                if clamped_region != region:
+                    logger.warning(
+                        f'Requested crop region x={region.x_range} y={region.y_range} does not'
+                        f' fit detector {detector_extent.width_px}x{detector_extent.height_px};'
+                        f' clamped to x={clamped_region.x_range} y={clamped_region.y_range}!'
+                        ' Check BeamCenterXInPixels/BeamCenterYInPixels and'
+                        ' CropWidthInPixels/CropHeightInPixels.'
+                    )
+
+                region = clamped_region
+
             read_region = region
 
         # Binning: clamped against the extent that patterns will have when the

@@ -10,6 +10,7 @@ from .monitor import DiffractionTaskMonitor
 from .prep_pipeline import PrepPipelineBuilder
 from .repository import DiffractionDatasetRepository, DiffractionDatasetRepositoryObserver
 from .settings import DetectorSettings, DiffractionSettings
+from .summary import DiffractionSummaryService, DiffractionSummaryTaskMonitor
 
 __all__ = [
     'AssembledDiffractionArray',
@@ -22,6 +23,8 @@ __all__ = [
     'DiffractionDatasetRepositoryObserver',
     'DiffractionDatasetState',
     'DiffractionSettings',
+    'DiffractionSummaryService',
+    'DiffractionSummaryTaskMonitor',
     'DiffractionTaskMonitor',
     'PatternsStreamingContext',
     'PrepPipelineBuilder',

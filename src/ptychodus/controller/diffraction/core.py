@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
     QAbstractItemView,
     QDialog,
     QMessageBox,
+    QStatusBar,
 )
 
 from ...model.analysis import DiffractionSimulator, DiffractionSimulatorSettings
@@ -16,10 +17,12 @@ from ...model.diffraction import (
     DiffractionDatasetRepository,
     DiffractionDatasetRepositoryObserver,
     DiffractionSettings,
+    DiffractionSummaryService,
     DiffractionTaskMonitor,
 )
 from .detector_extent import DetectorExtentSource
 from ...model.product import ProductRepository, ProductSettings
+from ...model.visualization import VisualizationEngine
 from ...view.diffraction import DiffractionView
 from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate, TaskStatusView
 from ..data import FileDialogFactory
@@ -51,6 +54,9 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         view: DiffractionView,
         status_view: TaskStatusView,
         image_controller: ImageController,
+        summary_service: DiffractionSummaryService,
+        summary_visualization_engine: VisualizationEngine,
+        status_bar: QStatusBar,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
@@ -73,6 +79,9 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
             self._detector_extent_source,
             diffraction_api,
             repository,
+            summary_service,
+            summary_visualization_engine,
+            status_bar,
             file_dialog_factory,
         )
         self._status_controller = TaskStatusController(task_monitor, status_view)

@@ -152,10 +152,6 @@ class AssembledDiffractionDataset(DiffractionDataset):
         # self._dataset drops the array list, so this is the only handle on the
         # lazy arrays; cleared once dispatched, since the task then owns it.
         self._source: DiffractionDataset | None = None
-        # Plan snapshot taken when the current buffer was allocated, so the
-        # processed pixel geometry can be recomputed without consulting live
-        # settings that may have moved on since the load.
-        self._prep_plan: DiffractionPrepPlan | None = None
 
         # Raw (pre-processing) bad-pixel mask; starts as an empty (0, 0) placeholder
         # and is always overwritten by reload() or by load_all_arrays() before any
@@ -251,6 +247,16 @@ class AssembledDiffractionDataset(DiffractionDataset):
     def get_assembled_data(self) -> AssembledDiffractionData:
         return self._data
 
+    def get_source(self) -> DiffractionDataset:
+        """Return the raw source dataset queued for load, or the currently-loaded one.
+
+        `reload()` stores the source on the dataset until `load_all_arrays()`
+        dispatches; after dispatch the arrays live on `_dataset`. Callers that
+        want to summarize the pre-processing patterns (for example, the wizard's
+        Summary panel) can iterate this without waiting for the load pipeline.
+        """
+        return self._source if self._source is not None else self._dataset
+
     def get_nbytes(self) -> int:
         return self._data.nbytes
 
@@ -329,6 +335,38 @@ class AssembledDiffractionDataset(DiffractionDataset):
         )
         return lower, upper
 
+    def _resolve_prep_plan(
+        self,
+        detector_extent: ImageExtent,
+        *,
+        process_patterns: bool,
+        log_level: int = logging.DEBUG,
+    ) -> DiffractionPrepPlan | None:
+        """Resolve the prep plan and report the region patterns will be read from.
+
+        A mis-centered or off-detector crop silently starves the reconstruction of
+        signal, so the resolved region is always reported. load_all_arrays raises
+        log_level to INFO because it resolves the plan once per dataset; the
+        streaming path in _append_array resolves it once per incoming array and
+        leaves the DEBUG default, so a live feed does not emit a line per frame.
+        """
+        if not process_patterns:
+            return None
+
+        plan = self._pipeline_builder.get_plan(detector_extent)
+        read_region = plan.read_region
+        region_text = (
+            'the full frame'
+            if read_region is None
+            else f'x={read_region.x_range} y={read_region.y_range}'
+        )
+        logger.log(
+            log_level,
+            f'Detector is {detector_extent.width_px}x{detector_extent.height_px};'
+            f' reading {region_text}.',
+        )
+        return plan
+
     def _append_array(self, array: DiffractionArray, *, process_patterns: bool) -> None:
         """Preprocess one array and scatter it into the current buffer.
 
@@ -340,9 +378,7 @@ class AssembledDiffractionDataset(DiffractionDataset):
         self._array_counter += 1
 
         metadata = self._dataset.get_metadata()
-        plan = (
-            self._pipeline_builder.get_plan(metadata.detector_extent) if process_patterns else None
-        )
+        plan = self._resolve_prep_plan(metadata.detector_extent, process_patterns=process_patterns)
         read_region = plan.read_region if plan is not None else None
         pipeline = plan.pipeline if plan is not None else None
         raw_bad_pixels = (
@@ -406,7 +442,6 @@ class AssembledDiffractionDataset(DiffractionDataset):
         self._array_list.clear()
         self._array_counter = 0
         self._source = None
-        self._prep_plan = None
         self._last_array_loader = None
         self._bad_pixels = self._create_default_bad_pixels()
 
@@ -437,8 +472,10 @@ class AssembledDiffractionDataset(DiffractionDataset):
             return
 
         metadata = self._dataset.get_metadata()
-        plan = (
-            self._pipeline_builder.get_plan(metadata.detector_extent) if process_patterns else None
+        plan = self._resolve_prep_plan(
+            metadata.detector_extent,
+            process_patterns=process_patterns,
+            log_level=logging.INFO,
         )
         read_region = plan.read_region if plan is not None else None
         pipeline = plan.pipeline if plan is not None else None
@@ -464,7 +501,6 @@ class AssembledDiffractionDataset(DiffractionDataset):
         else:
             logger.info(f'Scratch memory is {patterns_shape}')
 
-        self._prep_plan = plan
         self._data = allocate_assembled_data(
             source,
             pipeline,

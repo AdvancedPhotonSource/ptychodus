@@ -5,6 +5,7 @@ import logging
 
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import (
+    BadPixels,
     BadPixelsFileReader,
     CropRegion,
     DiffractionArray,
@@ -125,12 +126,14 @@ class DiffractionAPI:
 
         return dataset_index
 
-    def _apply_bad_pixels_from_file(
-        self,
-        dataset: AssembledDiffractionDataset,
-        file_path: Path,
-        file_type: str | None,
-    ) -> None:
+    def load_bad_pixels(self, file_path: Path, file_type: str | None = None) -> BadPixels:
+        """Load a bad-pixel mask from disk without applying it to any dataset.
+
+        The wizard's Summary panel needs the mask before Finish so it can pass
+        it to `summarize_dataset` (whose inpainting keeps the mean pattern
+        smooth for `estimate_beam_center`) without mutating a dataset that
+        hasn't been loaded yet.
+        """
         if not file_path.is_file():
             raise FileNotFoundError(f'Invalid bad pixels file path "{file_path}"')
 
@@ -139,11 +142,17 @@ class DiffractionAPI:
         bad_pixels_plugin = self._bad_pixels_file_reader_chooser.get_current_plugin()
         logger.debug(f'Reading "{file_path}" as "{bad_pixels_plugin.simple_name}"')
         try:
-            bad_pixels = bad_pixels_plugin.strategy.read(file_path)
+            return bad_pixels_plugin.strategy.read(file_path)
         except Exception as exc:
             raise RuntimeError(f'Failed to load bad pixels from "{file_path}"') from exc
 
-        dataset.set_bad_pixels(bad_pixels)
+    def _apply_bad_pixels_from_file(
+        self,
+        dataset: AssembledDiffractionDataset,
+        file_path: Path,
+        file_type: str | None,
+    ) -> None:
+        dataset.set_bad_pixels(self.load_bad_pixels(file_path, file_type))
 
     def apply_bad_pixels(
         self,

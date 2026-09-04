@@ -103,6 +103,9 @@ class ControllerCore:
             view.diffraction_view,
             view.diffraction_image_view.status_view,
             self._diffraction_image_controller,
+            model.diffraction_core.summary_service,
+            model.summary_visualization_engine,
+            self._status_bar,
             self._file_dialog_factory,
         )
         self._product_controller = ProductController.create_instance(

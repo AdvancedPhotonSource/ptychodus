@@ -14,6 +14,7 @@ from .api import DiffractionAPI
 from .monitor import DiffractionTaskMonitor
 from .repository import DiffractionDatasetRepository, build_default_factory
 from .settings import DetectorSettings, DiffractionSettings
+from .summary import DiffractionSummaryService
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,9 @@ class DiffractionCore(Observer):
             file_writer_chooser,
             self.bad_pixels_file_reader_parameter,
             self.file_reader_parameter,
+        )
+        self.summary_service = DiffractionSummaryService(
+            task_manager, self.diffraction_api, self.detector_settings
         )
 
         # Deliberately unbound: the writer shares file_type with the reader above, so

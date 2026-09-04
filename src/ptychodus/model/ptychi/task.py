@@ -29,9 +29,12 @@ serialization time.
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
+import math
 from collections.abc import Iterator
+from typing import Any
 
 import numpy
 
@@ -41,6 +44,7 @@ from ptychi.api import (
     DMOptions,
     EPIEOptions,
     LSQMLOptions,
+    ObjectPosOriginCoordsMethods,
     PIEOptions,
     RAAROptions,
     RPIEOptions,
@@ -58,6 +62,7 @@ from ptychodus.api.typing import RealArrayType
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    'align_task_options_with_product',
     'dump_task_options',
     'load_task_options',
     'reconstruct_with_ptychi',
@@ -132,6 +137,135 @@ def _initial_opr_mode_weights(probe: ProbeSequence) -> RealArrayType:
     return initial_weights
 
 
+def _differs(lhs: Any, rhs: Any) -> bool:
+    """Compare two option values, reading an equal list and tuple as the same.
+
+    ``position_origin_coords`` and ``slice_spacings_m`` are typed ``list |
+    tuple``, so a bare ``!=`` would call ``[0.0, 0.0]`` and ``(0.0, 0.0)`` a
+    change. Numbers compare exactly: the question is whether the caller supplied
+    a different value, and a tolerance would only hide genuine disagreement
+    between two products.
+    """
+    if isinstance(lhs, (list, tuple)) and isinstance(rhs, (list, tuple)):
+        return list(lhs) != list(rhs)
+
+    return bool(lhs != rhs)
+
+
+def _overwrite(options: Any, name: str, value: Any, *, unset: bool = False) -> None:
+    """Write `value` onto `options.name`, logging what changed.
+
+    Warns only when the caller had expressed an intent that disagrees, i.e. the
+    old value was neither pty-chi's default nor the value being written. Pass
+    `unset` for a field whose incoming value is an internal placeholder rather
+    than a caller's intent; it suppresses the warning but not the debug line.
+    """
+    options_cls = type(options)
+    old = getattr(options, name)
+    setattr(options, name, value)
+    # Read back rather than reusing `value`: pty-chi's mode='before' validators
+    # normalize array-likes to lists, so both the log line and the comparison
+    # below see the stored form and an ndarray does not warn against itself.
+    new = getattr(options, name)
+    logger.debug('%s.%s: %r -> %r', options_cls.__name__, name, old, new)
+
+    if unset:
+        return
+
+    # Defaults come off a throwaway instance rather than ``dataclasses.fields``:
+    # pty-chi declares its constrained scalars with ``PydanticField(...)``, whose
+    # ``.default`` is a ``FieldInfo`` and not the value -- and it does so
+    # inconsistently, so the field route cannot be used uniformly. Construction
+    # costs ~100 us against the eight writes one alignment performs.
+    default = getattr(options_cls(), name)
+
+    if _differs(old, default) and _differs(old, new):
+        logger.warning(
+            '%s.%s was %r but the product requires %r; overwriting.',
+            options_cls.__name__,
+            name,
+            old,
+            new,
+        )
+
+
+def align_task_options_with_product(
+    task_options: PtychographyTaskOptions, product: Product
+) -> PtychographyTaskOptions:
+    """Return a copy of `task_options` whose product-derived fields agree with `product`.
+
+    This is the single source of truth for which pty-chi options describe the
+    ptychodus product rather than user settings. Everything it writes is either
+    a value read off `product` or the position-origin convention that
+    :func:`reconstruct_with_ptychi` relies on when it maps probe positions to
+    object pixels.
+
+    `task_options` is not modified, so a caller can compare before against
+    after::
+
+        aligned = align_task_options_with_product(options, product)
+        before, after = dump_task_options(options), dump_task_options(aligned)
+
+    ``get_dict`` strips the task-data arrays, so that pair is a readable diff of
+    the settings alone. The copy is deep: a caller that has attached task arrays
+    to the options pays to duplicate them, though no in-ptychodus path does.
+
+    `free_space_propagation_distance_m` is the one field split between a setting
+    and the product. An infinite incoming value means the caller chose far-field
+    propagation and is left alone; anything else is near-field, and the product
+    supplies the distance.
+
+    Per-field pydantic validation runs on each assignment, so a degenerate
+    product (`pixel_size_m` must be > 0, `probe_power` >= 0) raises
+    ``ValidationError`` from here rather than from the options constructor.
+    """
+    aligned = copy.deepcopy(task_options)
+    metadata = product.metadata
+    object_geometry = product.object_.get_pixel_geometry()
+
+    object_options = aligned.object_options
+    _overwrite(object_options, 'pixel_size_m', object_geometry.width_m)
+    _overwrite(object_options, 'pixel_size_aspect_ratio', object_geometry.get_aspect_ratio())
+
+    # pty-chi types slice spacings as a serializable list, not an ndarray. Test
+    # length rather than truthiness: a product read back from HDF5 carries an
+    # ndarray, and `if array` raises for every length but one.
+    slice_spacings_m = product.object_.layer_spacing_m
+    _overwrite(
+        object_options,
+        'slice_spacings_m',
+        [float(spacing) for spacing in slice_spacings_m] if len(slice_spacings_m) > 0 else None,
+    )
+
+    # ptychodus hands pty-chi probe positions already mapped to 0-based object
+    # pixel indices (see `map_coordinates_probe_to_object` below), and pty-chi
+    # computes `positions_pxind = positions + position_origin_coords`. A zero
+    # origin is what makes those two agree; the default of SUPPORT would add
+    # half the object shape to every position.
+    _overwrite(
+        object_options,
+        'determine_position_origin_coords_by',
+        ObjectPosOriginCoordsMethods.SPECIFIED,
+    )
+    _overwrite(object_options, 'position_origin_coords', [0.0, 0.0])
+
+    _overwrite(aligned.data_options, 'wavelength_m', metadata.probe_wavelength_m)
+
+    propagation_distance_m = aligned.data_options.free_space_propagation_distance_m
+
+    if not math.isinf(propagation_distance_m):
+        _overwrite(
+            aligned.data_options,
+            'free_space_propagation_distance_m',
+            metadata.detector_distance_m,
+            unset=math.isnan(propagation_distance_m),
+        )
+
+    _overwrite(aligned.probe_options.power_constraint, 'probe_power', metadata.probe_photon_count)
+
+    return aligned
+
+
 def reconstruct_with_ptychi(
     parameters: ReconstructInput,
     task_options: PtychographyTaskOptions,
@@ -142,6 +276,16 @@ def reconstruct_with_ptychi(
     call time so importing this module parent-side does not acquire a GPU
     context."""
     from ptychi.api.task import PtychographyTask
+
+    # The near-field placeholder that PtyChiCommon emits, escaping into a run.
+    # pty-chi neither validates it nor warns -- both of its near-field guards
+    # test `< inf`, which NaN fails -- so the only other symptom would be a NaN
+    # loss on the first epoch.
+    if math.isnan(task_options.data_options.free_space_propagation_distance_m):
+        raise ValueError(
+            'free_space_propagation_distance_m is NaN; call '
+            'align_task_options_with_product() before reconstructing.'
+        )
 
     num_epochs = task_options.reconstructor_options.num_epochs
     product_in = parameters.product

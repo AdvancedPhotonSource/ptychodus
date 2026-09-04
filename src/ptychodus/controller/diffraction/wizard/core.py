@@ -1,6 +1,6 @@
 import logging
 
-from PyQt5.QtWidgets import QWizard
+from PyQt5.QtWidgets import QStatusBar, QWizard
 
 from ....api.diffraction import DiffractionMetadata
 from ....model.diffraction import (
@@ -8,8 +8,10 @@ from ....model.diffraction import (
     DiffractionAPI,
     DiffractionDatasetRepository,
     DiffractionSettings,
+    DiffractionSummaryService,
 )
 from ....model.product import ProductSettings
+from ....model.visualization import VisualizationEngine
 from ....view.widgets import ExceptionDialog
 
 from ...data import FileDialogFactory
@@ -30,6 +32,9 @@ class OpenDatasetWizardController:
         extent_source: DetectorExtentSource,
         api: DiffractionAPI,
         repository: DiffractionDatasetRepository,
+        summary_service: DiffractionSummaryService,
+        summary_visualization_engine: VisualizationEngine,
+        status_bar: QStatusBar,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         self._api = api
@@ -46,7 +51,15 @@ class OpenDatasetWizardController:
             self._get_pending_metadata,
         )
         self._processing_view_controller = OpenDatasetWizardProcessingViewController(
-            settings, detector_settings, extent_source, api, file_dialog_factory
+            settings,
+            detector_settings,
+            extent_source,
+            api,
+            summary_service,
+            summary_visualization_engine,
+            status_bar,
+            file_dialog_factory,
+            self._get_pending_dataset_index,
         )
 
         self._wizard = QWizard()
@@ -73,6 +86,9 @@ class OpenDatasetWizardController:
         if self._pending_dataset_index < 0:
             return DiffractionMetadata.create_null()
         return self._repository[self._pending_dataset_index].get_metadata()
+
+    def _get_pending_dataset_index(self) -> int:
+        return self._pending_dataset_index
 
     def _execute_next_button_action(self) -> None:
         # Handlers fire AFTER Qt has advanced the wizard, so currentPage() is the

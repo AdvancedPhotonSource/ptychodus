@@ -63,7 +63,6 @@ from ptychi.api import (
     MagPhaseComponents,
     NoiseModels,
     OPRWeightSmoothingMethods,
-    ObjectPosOriginCoordsMethods,
     Optimizers,
     OrthogonalizationMethods,
     PIEOPRModeWeightsOptions,
@@ -108,8 +107,7 @@ from ptychi.api.options.base import (
 )
 from ptychi.api.options.task import PtychographyTaskOptions
 
-from ptychodus.api.object import Object
-from ptychodus.api.product import Product, ProductMetadata
+from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import ReconstructInput
 
 from ..processing.subprocess_reconstructor import SubprocessReconstructor
@@ -129,6 +127,7 @@ from .settings import (
     PtyChiRAARSettings,
     PtyChiSettings,
 )
+from .task import align_task_options_with_product
 
 __all__ = [
     'PtyChiAlgorithm',
@@ -207,15 +206,22 @@ class PtyChiCommon:
     def num_sync_epochs(self) -> int:
         return self._reconstructor.num_sync_epochs.get_value()
 
-    def data_options(self, metadata: ProductMetadata) -> PtychographyDataOptions:
+    def data_options(self) -> PtychographyDataOptions:
+        """Return the settings-derived data options.
+
+        `free_space_propagation_distance_m` carries only the propagation *mode*:
+        infinite for far field, NaN as a placeholder for near field, whose
+        distance comes from the product. The NaN never escapes -- it lives
+        between this call and the
+        :func:`~ptychodus.model.ptychi.task.align_task_options_with_product`
+        call at the end of ``build_task_options`` -- which matters because
+        ``json.dumps`` emits it as the bare token ``NaN``, invalid strict JSON.
+        """
         free_space_propagation_distance_m = (
-            math.inf
-            if self._reconstructor.use_far_field_propagation.get_value()
-            else metadata.detector_distance_m
+            math.inf if self._reconstructor.use_far_field_propagation.get_value() else math.nan
         )
         return PtychographyDataOptions(
             free_space_propagation_distance_m=free_space_propagation_distance_m,
-            wavelength_m=metadata.probe_wavelength_m,
             fft_shift=self._reconstructor.fft_shift_diffraction_patterns.get_value(),
             save_data_on_device=self._reconstructor.save_data_on_device.get_value(),
         )
@@ -259,15 +265,8 @@ class PtyChiCommon:
             ),
         }
 
-    def object_kwargs(self, object_: Object) -> dict[str, Any]:
+    def object_kwargs(self) -> dict[str, Any]:
         s = self._object
-        # pty-chi types slice spacings + hard limits + origin as serializable
-        # list/tuple, not ndarray. Test length rather than truthiness: a product
-        # read back from HDF5 carries an ndarray, and `if array` raises for
-        # every length but one.
-        slice_spacings_m = object_.layer_spacing_m
-        slice_spacings_out = list(slice_spacings_m) if len(slice_spacings_m) > 0 else None
-        pixel_geometry = object_.get_pixel_geometry()
         return {
             'optimizable': s.is_optimizable.get_value(),
             'optimization_plan': _optimization_plan(
@@ -278,7 +277,6 @@ class PtyChiCommon:
             'optimizer': _parse_optimizer(s.optimizer.get_value()),
             'step_size': s.step_size.get_value(),
             'optimizer_params': {},
-            'slice_spacings_m': slice_spacings_out,
             'slice_spacing_options': SliceSpacingOptions(
                 optimizable=s.optimize_slice_spacing.get_value(),
                 optimization_plan=_optimization_plan(
@@ -289,8 +287,6 @@ class PtyChiCommon:
                 optimizer=_parse_optimizer(s.optimize_slice_spacing_optimizer.get_value()),
                 step_size=s.optimize_slice_spacing_step_size.get_value(),
             ),
-            'pixel_size_m': pixel_geometry.width_m,
-            'pixel_size_aspect_ratio': pixel_geometry.get_aspect_ratio(),
             'l1_norm_constraint': ObjectL1NormConstraintOptions(
                 enabled=s.constrain_l1_norm.get_value(),
                 optimization_plan=_optimization_plan(
@@ -380,8 +376,7 @@ class PtyChiCommon:
                 ),
             ),
             'build_preconditioner_with_all_modes': s.build_preconditioner_with_all_modes.get_value(),
-            'determine_position_origin_coords_by': ObjectPosOriginCoordsMethods.SPECIFIED,
-            'position_origin_coords': [0.0, 0.0],
+            # pty-chi types the hard limits as serializable lists, not ndarrays.
             'hard_limits_magnitude_phase': ObjectHardLimitsMagnitudePhase(
                 enabled=s.constrain_hard_limits.get_value(),
                 optimization_plan=_optimization_plan(
@@ -408,7 +403,7 @@ class PtyChiCommon:
             ),
         }
 
-    def probe_kwargs(self, metadata: ProductMetadata) -> dict[str, Any]:
+    def probe_kwargs(self) -> dict[str, Any]:
         s = self._probe
         return {
             'optimizable': s.is_optimizable.get_value(),
@@ -427,7 +422,6 @@ class PtyChiCommon:
                     s.constrain_probe_power_stop.get_value(),
                     s.constrain_probe_power_stride.get_value(),
                 ),
-                probe_power=metadata.probe_photon_count,
                 scale_object=s.constrain_probe_power_scale_object.get_value(),
             ),
             'orthogonalize_incoherent_modes': ProbeOrthogonalizeIncoherentModesOptions(
@@ -615,20 +609,27 @@ class PtyChiAlgorithm(Generic[SettingsT]):
         self._settings = algorithm_settings
 
     def build_task_options(self, product: Product) -> PtychographyTaskOptions:
+        """Build this algorithm's options for `product`.
+
+        The sub-option kwargs carry the settings; every field that must instead
+        agree with the product is applied by
+        :func:`~ptychodus.model.ptychi.task.align_task_options_with_product`,
+        which owns that mapping in one place.
+        """
         s = self.spec
-        return s.task_options_cls(
-            data_options=self._common.data_options(product.metadata),
+        task_options = s.task_options_cls(
+            data_options=self._common.data_options(),
             reconstructor_options=s.reconstructor_options_cls(
                 **self._common.reconstructor_kwargs(),
                 **self._extra_reconstructor_kwargs(),
             ),
             object_options=s.object_options_cls(
-                **self._common.object_kwargs(product.object_),
-                **self._extra_object_kwargs(product.object_),
+                **self._common.object_kwargs(),
+                **self._extra_object_kwargs(),
             ),
             probe_options=s.probe_options_cls(
-                **self._common.probe_kwargs(product.metadata),
-                **self._extra_probe_kwargs(product.metadata),
+                **self._common.probe_kwargs(),
+                **self._extra_probe_kwargs(),
             ),
             probe_position_options=s.probe_position_options_cls(
                 **self._common.probe_position_kwargs(),
@@ -636,14 +637,15 @@ class PtyChiAlgorithm(Generic[SettingsT]):
             ),
             opr_mode_weight_options=s.opr_options_cls(**self._common.opr_kwargs()),
         )
+        return align_task_options_with_product(task_options, product)
 
     def _extra_reconstructor_kwargs(self) -> dict[str, Any]:
         return {}
 
-    def _extra_object_kwargs(self, object_: Object) -> dict[str, Any]:
+    def _extra_object_kwargs(self) -> dict[str, Any]:
         return {}
 
-    def _extra_probe_kwargs(self, metadata: ProductMetadata) -> dict[str, Any]:
+    def _extra_probe_kwargs(self) -> dict[str, Any]:
         return {}
 
     def _extra_probe_position_kwargs(self) -> dict[str, Any]:
@@ -667,13 +669,13 @@ class DMAlgorithm(PtyChiAlgorithm[PtyChiDMSettings]):
             'chunk_length': self._settings.chunk_length.get_value(),
         }
 
-    def _extra_object_kwargs(self, object_: Object) -> dict[str, Any]:
+    def _extra_object_kwargs(self) -> dict[str, Any]:
         return {
             'amplitude_clamp_limit': self._settings.object_amplitude_clamp_limit.get_value(),
             'inertia': self._settings.object_inertia.get_value(),
         }
 
-    def _extra_probe_kwargs(self, metadata: ProductMetadata) -> dict[str, Any]:
+    def _extra_probe_kwargs(self) -> dict[str, Any]:
         return {'inertia': self._settings.probe_inertia.get_value()}
 
 
@@ -694,13 +696,13 @@ class RAARAlgorithm(PtyChiAlgorithm[PtyChiRAARSettings]):
             'chunk_length': self._settings.chunk_length.get_value(),
         }
 
-    def _extra_object_kwargs(self, object_: Object) -> dict[str, Any]:
+    def _extra_object_kwargs(self) -> dict[str, Any]:
         return {
             'amplitude_clamp_limit': self._settings.object_amplitude_clamp_limit.get_value(),
             'inertia': self._settings.object_inertia.get_value(),
         }
 
-    def _extra_probe_kwargs(self, metadata: ProductMetadata) -> dict[str, Any]:
+    def _extra_probe_kwargs(self) -> dict[str, Any]:
         return {'inertia': self._settings.probe_inertia.get_value()}
 
 
@@ -715,10 +717,10 @@ class PIEAlgorithm(PtyChiAlgorithm[PtyChiPIESettings]):
         PIEOPRModeWeightsOptions,
     )
 
-    def _extra_object_kwargs(self, object_: Object) -> dict[str, Any]:
+    def _extra_object_kwargs(self) -> dict[str, Any]:
         return {'alpha': self._settings.object_alpha.get_value()}
 
-    def _extra_probe_kwargs(self, metadata: ProductMetadata) -> dict[str, Any]:
+    def _extra_probe_kwargs(self) -> dict[str, Any]:
         return {'alpha': self._settings.probe_alpha.get_value()}
 
 
@@ -778,13 +780,13 @@ class LSQMLAlgorithm(PtyChiAlgorithm[PtyChiLSQMLSettings]):
             'preconditioning_damping_factor': s.preconditioning_damping_factor.get_value(),
         }
 
-    def _extra_object_kwargs(self, object_: Object) -> dict[str, Any]:
+    def _extra_object_kwargs(self) -> dict[str, Any]:
         return {
             'optimal_step_size_scaler': self._settings.object_optimal_step_size_scaler.get_value(),
             'multimodal_update': self._settings.object_multimodal_update.get_value(),
         }
 
-    def _extra_probe_kwargs(self, metadata: ProductMetadata) -> dict[str, Any]:
+    def _extra_probe_kwargs(self) -> dict[str, Any]:
         return {
             'optimal_step_size_scaler': self._settings.probe_optimal_step_size_scaler.get_value()
         }
@@ -843,7 +845,7 @@ class BHAlgorithm(PtyChiAlgorithm[PtyChiBHSettings]):
     def _extra_reconstructor_kwargs(self) -> dict[str, Any]:
         return {'method': self._settings.method.get_value()}
 
-    def _extra_probe_kwargs(self, metadata: ProductMetadata) -> dict[str, Any]:
+    def _extra_probe_kwargs(self) -> dict[str, Any]:
         return {'rho': self._settings.probe_rho.get_value()}
 
     def _extra_probe_position_kwargs(self) -> dict[str, Any]:

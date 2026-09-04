@@ -31,7 +31,10 @@ from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import prepare_reconstruct_input
 from ptychodus.api.simulate.object import generate_random_object
 from ptychodus.api.simulate.probe import generate_fresnel_zone_plate_probe
-from ptychodus.model.ptychi.task import reconstruct_with_ptychi
+from ptychodus.model.ptychi.task import (
+    align_task_options_with_product,
+    reconstruct_with_ptychi,
+)
 
 logger = logging.getLogger('lamni_reconstruct')
 
@@ -231,6 +234,7 @@ def main() -> int:
         opr_mode_weight_options=LSQMLOPRModeWeightsOptions(),
     )
 
+    options = align_task_options_with_product(options, product)
     options.check()
 
     reconstruct_input = prepare_reconstruct_input(assembled_data, product)

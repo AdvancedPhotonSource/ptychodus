@@ -685,3 +685,51 @@ def test_sizer_safe_beam_center_produces_in_bounds_slice(
         )
     ).get_patterns()
     assert out.shape == (1, 4, 4)  # no truncation from an out-of-bounds slice
+
+
+def test_get_plan_warns_when_crop_region_is_clamped(
+    settings: tuple[DiffractionSettings, DetectorSettings],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A crop window that overhangs the detector is a misconfiguration; say so loudly.
+
+    Regression guard for the fly001 case: a stale settings key left the beam center at
+    its default, so the requested window fell off the detector and was silently shifted
+    onto a signal-free corner.
+    """
+    diff, _ = settings
+    diff.crop_enabled.set_value(True)
+    diff.crop_width_px.set_value(128)
+    diff.crop_height_px.set_value(128)
+    diff.beam_center_x_px.set_value(32)
+    diff.beam_center_y_px.set_value(32)
+
+    detector_extent = ImageExtent(width_px=1030, height_px=514)
+
+    with caplog.at_level('WARNING', logger='ptychodus.model.diffraction.prep_pipeline'):
+        plan = PrepPipelineBuilder(diff).get_plan(detector_extent)
+
+    assert plan.read_region == CropRegion(x_range=(0, 128), y_range=(0, 128))
+    assert len(caplog.records) == 1
+    assert 'BeamCenterXInPixels' in caplog.records[0].message
+
+
+def test_get_plan_is_quiet_when_crop_region_fits(
+    settings: tuple[DiffractionSettings, DetectorSettings],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A crop that fits must not warn -- a warning that always fires stops being read."""
+    diff, _ = settings
+    diff.crop_enabled.set_value(True)
+    diff.crop_width_px.set_value(128)
+    diff.crop_height_px.set_value(128)
+    diff.beam_center_x_px.set_value(540)
+    diff.beam_center_y_px.set_value(259)
+
+    detector_extent = ImageExtent(width_px=1030, height_px=514)
+
+    with caplog.at_level('WARNING', logger='ptychodus.model.diffraction.prep_pipeline'):
+        plan = PrepPipelineBuilder(diff).get_plan(detector_extent)
+
+    assert plan.read_region == CropRegion(x_range=(476, 604), y_range=(195, 323))
+    assert not caplog.records

@@ -59,7 +59,11 @@ from ptychodus.api.reconstruct import (
     ReconstructOutput,
     prepare_reconstruct_input,
 )
-from ptychodus.model.ptychi.task import load_task_options, reconstruct_with_ptychi
+from ptychodus.model.ptychi.task import (
+    align_task_options_with_product,
+    load_task_options,
+    reconstruct_with_ptychi,
+)
 
 logger = logging.getLogger('ptychodus_reconstruct')
 
@@ -152,6 +156,7 @@ def _reconstruct(run: _Run, args: argparse.Namespace, log_file: Path) -> ExitCod
         product,
         index_filter=PositionIndexFilter[args.index_filter.upper()],
     )
+    task_options = align_task_options_with_product(task_options, reconstruct_input.product)
     task_options.check()
 
     num_epochs = int(task_options.reconstructor_options.num_epochs)

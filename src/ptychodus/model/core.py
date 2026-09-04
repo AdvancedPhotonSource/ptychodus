@@ -129,6 +129,7 @@ class ModelCore:
             self._task_manager,
         )
         self.pattern_visualization_engine = VisualizationEngine(is_complex=False)
+        self.summary_visualization_engine = VisualizationEngine(is_complex=False)
         self.probe_visualization_engine = VisualizationEngine(is_complex=True)
         self.object_visualization_engine = VisualizationEngine(is_complex=True)
 

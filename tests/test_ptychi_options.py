@@ -16,7 +16,11 @@ these tests also pin down that separation.
 
 from __future__ import annotations
 
+import dataclasses
 import json
+import logging
+import math
+import operator
 
 import numpy
 import pytest
@@ -31,7 +35,8 @@ from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput
 from ptychodus.api.settings import SettingsRegistry
-from ptychi.api import Reconstructors
+from ptychi.api import LSQMLOptions, ObjectPosOriginCoordsMethods, Reconstructors
+from ptychi.api.options.data import PtychographyDataOptions
 
 from ptychodus.model.ptychi.core import PtyChiReconstructorLibrary
 
@@ -52,11 +57,18 @@ from ptychodus.model.ptychi.algorithms import (  # noqa: E402
 )
 from ptychodus.model.ptychi.task import (  # noqa: E402
     _initial_opr_mode_weights,
+    align_task_options_with_product,
     dump_task_options,
     load_task_options,
 )
 
 PIXEL_M = 1.0e-9
+# Every expected value below is a distinct witness: none coincides with a
+# pty-chi default (1.0 m, 1e-9 m, inf, 0.0), so a test cannot pass by accident
+# if the helper drops the field it is checking.
+DETECTOR_DISTANCE_M = 2.5
+PROBE_ENERGY_EV = 10_000.0
+PROBE_PHOTON_COUNT = 1.25e6
 OBJ_HEIGHT_PX = 32
 OBJ_WIDTH_PX = 40
 PROBE_HEIGHT_PX = 8
@@ -84,18 +96,15 @@ def _make_reconstruct_input() -> ReconstructInput:
         pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=PIXEL_M),
     )
     positions = ProbePositionSequence(
-        [
-            ProbePosition(index=i, x_m=i * PIXEL_M, y_m=-i * PIXEL_M)
-            for i in range(NUM_PATTERNS)
-        ]
+        [ProbePosition(index=i, x_m=i * PIXEL_M, y_m=-i * PIXEL_M) for i in range(NUM_PATTERNS)]
     )
     product = Product(
         metadata=ProductMetadata(
             name='test',
             comments='',
-            detector_distance_m=1.0,
-            probe_energy_eV=10_000.0,
-            probe_photon_count=1.0,
+            detector_distance_m=DETECTOR_DISTANCE_M,
+            probe_energy_eV=PROBE_ENERGY_EV,
+            probe_photon_count=PROBE_PHOTON_COUNT,
             exposure_time_s=1.0,
             mass_attenuation_m2_kg=0.0,
             tomography_angle_deg=0.0,
@@ -219,6 +228,11 @@ def test_hard_limits_are_serialized_as_lists() -> None:
     assert isinstance(hard_limits.phase_lim, list)
     # Other serializable-array object fields must also be plain lists/tuples.
     assert isinstance(options.object_options.position_origin_coords, (list, tuple))
+    assert list(options.object_options.position_origin_coords) == [0.0, 0.0]
+    assert (
+        options.object_options.determine_position_origin_coords_by
+        is ObjectPosOriginCoordsMethods.SPECIFIED
+    )
     assert options.object_options.slice_spacings_m is None or isinstance(
         options.object_options.slice_spacings_m, (list, tuple)
     )
@@ -294,23 +308,40 @@ def test_initial_opr_mode_weights_passes_through_existing_weights() -> None:
 
 
 def test_far_field_propagation_flag_is_read_by_value() -> None:
-    """The far-field checkbox must select the propagation distance.
+    """The far-field checkbox must select the propagation mode.
 
     Regression test: the flag used to be read as a ``BooleanParameter`` object
     rather than via ``.get_value()``, so it was always truthy and the distance
     was pinned to infinity no matter what the user selected.
+
+    ``data_options`` now carries only the mode -- infinity for far field, NaN as
+    the near-field placeholder -- because the distance itself belongs to the
+    product. See ``test_near_field_distance_comes_from_the_product``.
     """
     library = _make_library()
-    metadata = _make_reconstruct_input().product.metadata
     common = _make_common(library)
 
     library.settings.use_far_field_propagation.set_value(True)
-    assert common.data_options(metadata).free_space_propagation_distance_m == numpy.inf
+    assert common.data_options().free_space_propagation_distance_m == numpy.inf
 
     library.settings.use_far_field_propagation.set_value(False)
-    assert common.data_options(metadata).free_space_propagation_distance_m == pytest.approx(
-        metadata.detector_distance_m
+    assert math.isnan(common.data_options().free_space_propagation_distance_m)
+
+
+def test_near_field_distance_comes_from_the_product() -> None:
+    """The near-field placeholder must be replaced by the product's detector distance."""
+    library = _make_library()
+    parameters = _make_reconstruct_input()
+
+    library.settings.use_far_field_propagation.set_value(False)
+    options = _make_algorithms(library)[0].build_task_options(parameters.product)
+    assert options.data_options.free_space_propagation_distance_m == pytest.approx(
+        parameters.product.metadata.detector_distance_m
     )
+
+    library.settings.use_far_field_propagation.set_value(True)
+    options = _make_algorithms(library)[0].build_task_options(parameters.product)
+    assert options.data_options.free_space_propagation_distance_m == numpy.inf
 
 
 def test_options_round_trip_through_the_wire_format() -> None:
@@ -417,3 +448,230 @@ def test_load_task_options_rejects_a_non_object_options_field() -> None:
         load_task_options(
             json.dumps({'reconstructor': Reconstructors.LSQML.value, 'options': [1, 2, 3]})
         )
+
+
+# --- align_task_options_with_product ---------------------------------------
+#
+# Each entry names one field the helper owns, so dropping any single write
+# fails a named parametrized case rather than a generic assertion. Nothing
+# outside this table may set these fields; see
+# ``test_common_kwargs_carry_no_product_derived_fields``.
+_PRODUCT_DERIVED_FIELDS = [
+    ('object_options.pixel_size_m', PIXEL_M),
+    ('object_options.pixel_size_aspect_ratio', 1.0),
+    ('object_options.slice_spacings_m', None),
+    (
+        'object_options.determine_position_origin_coords_by',
+        ObjectPosOriginCoordsMethods.SPECIFIED,
+    ),
+    ('object_options.position_origin_coords', [0.0, 0.0]),
+    ('data_options.wavelength_m', _make_reconstruct_input().product.metadata.probe_wavelength_m),
+    ('data_options.free_space_propagation_distance_m', numpy.inf),
+    ('probe_options.power_constraint.probe_power', PROBE_PHOTON_COUNT),
+]
+
+
+def _assert_field_equals(options, path: str, expected) -> None:
+    actual = operator.attrgetter(path)(options)
+
+    if isinstance(expected, (list, tuple)):
+        assert list(actual) == list(expected), path
+    elif isinstance(expected, float):
+        assert actual == pytest.approx(expected), path
+    else:
+        assert actual == expected, path
+
+
+@pytest.fixture(scope='module')
+def built_options_by_algorithm() -> list[tuple[str, object]]:
+    """Options for all eight algorithms, built once.
+
+    Module-scoped because ``_make_library`` spawns a device-probe subprocess
+    that dominates this file's runtime; the parametrized test below reads these
+    options without mutating settings, so one build serves every case.
+    """
+    library = _make_library()
+    product = _make_reconstruct_input().product
+    return [
+        (type(algorithm).__name__, algorithm.build_task_options(product))
+        for algorithm in _make_algorithms(library)
+    ]
+
+
+@pytest.mark.parametrize(('path', 'expected'), _PRODUCT_DERIVED_FIELDS, ids=lambda v: str(v)[:48])
+def test_every_product_derived_field_is_applied(
+    path: str, expected, built_options_by_algorithm
+) -> None:
+    """Built options must agree with the product on every field the helper owns.
+
+    Checked across all eight algorithms: only that proves each algorithm's own
+    ``*ObjectOptions`` / ``*ProbeOptions`` subclass accepts the assignment,
+    which the type system does not check.
+    """
+    for algorithm_name, options in built_options_by_algorithm:
+        try:
+            _assert_field_equals(options, path, expected)
+        except AssertionError as exc:
+            pytest.fail(f'{algorithm_name}: {exc}')
+
+
+def test_align_repairs_hand_built_options() -> None:
+    """Bare options built by hand must come back fully described by the product.
+
+    This is the shape ``scripts/lamni_reconstruct.py`` constructs. Before the
+    helper existed it ran with pty-chi's defaults: a SUPPORT position origin
+    that displaced every probe position by half the object canvas, plus a
+    1e-9 m wavelength and a 1.0 m object pixel.
+    """
+    parameters = _make_reconstruct_input()
+    options = LSQMLOptions()
+
+    aligned = align_task_options_with_product(options, parameters.product)
+
+    for path, expected in _PRODUCT_DERIVED_FIELDS:
+        _assert_field_equals(aligned, path, expected)
+
+    aligned.check()
+
+
+def test_align_does_not_mutate_its_argument() -> None:
+    """The caller keeps the original so it can diff before against after."""
+    parameters = _make_reconstruct_input()
+    options = LSQMLOptions()
+    before = dump_task_options(options)
+
+    aligned = align_task_options_with_product(options, parameters.product)
+
+    assert aligned is not options
+    assert aligned.object_options is not options.object_options
+    assert dump_task_options(options) == before
+    assert dump_task_options(aligned) != before
+
+
+def test_align_is_idempotent(caplog) -> None:
+    """Re-aligning against the same product changes nothing and warns about nothing.
+
+    ``scripts/ptychodus_reconstruct.py`` re-aligns child-side over options its
+    launcher already aligned; that second pass must be silent.
+    """
+    parameters = _make_reconstruct_input()
+    once = align_task_options_with_product(LSQMLOptions(), parameters.product)
+
+    with caplog.at_level(logging.WARNING, logger='ptychodus.model.ptychi.task'):
+        twice = align_task_options_with_product(once, parameters.product)
+
+    assert dump_task_options(twice) == dump_task_options(once)
+    assert caplog.records == []
+
+
+def test_align_warns_only_when_it_overrides_a_caller_value(caplog) -> None:
+    """A non-default incoming value that disagrees is a warning; a default is not."""
+    parameters = _make_reconstruct_input()
+
+    options = LSQMLOptions()
+    options.object_options.pixel_size_m = 5.0e-9
+
+    with caplog.at_level(logging.WARNING, logger='ptychodus.model.ptychi.task'):
+        aligned = align_task_options_with_product(options, parameters.product)
+
+    assert aligned.object_options.pixel_size_m == pytest.approx(PIXEL_M)
+    warnings = [record for record in caplog.records if 'pixel_size_m' in record.getMessage()]
+    assert len(warnings) == 1
+
+    # The same field left at pty-chi's default is overwritten silently.
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger='ptychodus.model.ptychi.task'):
+        align_task_options_with_product(LSQMLOptions(), parameters.product)
+
+    assert caplog.records == []
+
+
+def test_align_preserves_a_far_field_propagation_distance() -> None:
+    """An infinite incoming distance is the caller's far-field choice, not a placeholder."""
+    parameters = _make_reconstruct_input()
+    options = LSQMLOptions()
+    assert options.data_options.free_space_propagation_distance_m == numpy.inf
+
+    aligned = align_task_options_with_product(options, parameters.product)
+
+    assert aligned.data_options.free_space_propagation_distance_m == numpy.inf
+
+
+def test_align_replaces_the_near_field_placeholder() -> None:
+    parameters = _make_reconstruct_input()
+    options = LSQMLOptions()
+    options.data_options.free_space_propagation_distance_m = math.nan
+
+    aligned = align_task_options_with_product(options, parameters.product)
+
+    assert aligned.data_options.free_space_propagation_distance_m == pytest.approx(
+        DETECTOR_DISTANCE_M
+    )
+
+
+def test_align_reads_a_non_square_object_pixel_aspect_ratio() -> None:
+    """The shared fixture is square, so aspect ratio needs its own witness.
+
+    A square object gives 1.0, which is also pty-chi's default -- an assertion
+    on it would pass even if the helper stopped writing the field.
+    """
+    parameters = _make_reconstruct_input()
+    obj = parameters.product.object_
+    wide = Object(
+        array=obj.get_array(),
+        pixel_geometry=PixelGeometry(width_m=2.0 * PIXEL_M, height_m=PIXEL_M),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
+        layer_spacing_m=[],
+    )
+    product = dataclasses.replace(parameters.product, object_=wide)
+
+    aligned = align_task_options_with_product(LSQMLOptions(), product)
+
+    assert aligned.object_options.pixel_size_m == pytest.approx(2.0 * PIXEL_M)
+    assert aligned.object_options.pixel_size_aspect_ratio == pytest.approx(2.0)
+
+
+def test_slice_spacings_from_an_ndarray_product_are_lists() -> None:
+    """A multislice product read back from HDF5 carries an ndarray, not a list."""
+    parameters = _make_reconstruct_input()
+    rng = numpy.random.default_rng(1)
+    multislice = Object(
+        array=(
+            rng.standard_normal((2, OBJ_HEIGHT_PX, OBJ_WIDTH_PX))
+            + 1j * rng.standard_normal((2, OBJ_HEIGHT_PX, OBJ_WIDTH_PX))
+        ).astype(numpy.complex128),
+        pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=PIXEL_M),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
+        layer_spacing_m=numpy.array([3.0e-8]),
+    )
+    product = dataclasses.replace(parameters.product, object_=multislice)
+
+    aligned = align_task_options_with_product(LSQMLOptions(), product)
+
+    assert isinstance(aligned.object_options.slice_spacings_m, list)
+    assert aligned.object_options.slice_spacings_m == pytest.approx([3.0e-8])
+
+
+def test_common_kwargs_carry_no_product_derived_fields() -> None:
+    """PtyChiCommon must not re-acquire an owner for anything the helper writes.
+
+    A second writer would make the helper's override warning fire on every
+    reconstruction.
+    """
+    library = _make_library()
+    common = _make_common(library)
+
+    object_keys = set(common.object_kwargs())
+    probe_keys = set(common.probe_kwargs())
+    data_options = common.data_options()
+
+    assert not object_keys & {
+        'pixel_size_m',
+        'pixel_size_aspect_ratio',
+        'slice_spacings_m',
+        'determine_position_origin_coords_by',
+        'position_origin_coords',
+    }
+    assert 'probe_power' not in probe_keys
+    assert data_options.wavelength_m == PtychographyDataOptions().wavelength_m
+    assert not math.isfinite(data_options.free_space_propagation_distance_m)
