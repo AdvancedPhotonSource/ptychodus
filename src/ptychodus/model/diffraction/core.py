@@ -60,7 +60,10 @@ class DiffractionCore(Observer):
             self.file_reader_parameter,
         )
         self.summary_service = DiffractionSummaryService(
-            task_manager, self.diffraction_api, self.detector_settings
+            task_manager,
+            self.diffraction_api,
+            self.detector_settings,
+            self.diffraction_settings,
         )
 
         # Deliberately unbound: the writer shares file_type with the reader above, so

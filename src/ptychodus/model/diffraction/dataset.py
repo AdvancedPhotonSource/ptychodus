@@ -112,10 +112,24 @@ class AssembledDiffractionArray(DiffractionArray):
         return self._total_counts[index]
 
     def get_mean_total_counts(self) -> float:
-        return numpy.mean(self._total_counts).item()
+        """Mean per-pattern total counts, or zero when the array holds no patterns."""
+        if self._total_counts.size == 0:
+            return 0.0
+
+        return float(numpy.mean(self._total_counts))
 
     def get_max_total_counts(self) -> int:
-        return self._total_counts.max().item()
+        """Largest per-pattern total counts, or zero when the array holds no patterns.
+
+        Both reductions are guarded because a null array and (before the filter
+        learned to skip them) an array the total-counts filter emptied are legal
+        zero-pattern blocks, and `numpy.mean`/`ndarray.max` answer those with a
+        NaN and a `ValueError` respectively.
+        """
+        if self._total_counts.size == 0:
+            return 0
+
+        return int(self._total_counts.max())
 
     def get_mean_pattern(self) -> DiffractionPattern:
         return self._mean_pattern
@@ -305,6 +319,11 @@ class AssembledDiffractionDataset(DiffractionDataset):
             [array.get_num_patterns() for array in self._array_list], dtype=numpy.float64
         )
         means = numpy.stack([array.get_mean_pattern() for array in self._array_list])
+
+        if weights.sum() <= 0.0:
+            # Every array is empty, so numpy.average cannot normalize the weights.
+            return numpy.zeros(means.shape[1:], dtype=numpy.float64)
+
         return numpy.average(means, axis=0, weights=weights)
 
     @overload
@@ -428,7 +447,16 @@ class AssembledDiffractionDataset(DiffractionDataset):
         The list insert is bounced to the foreground queue so the bisect stays
         single-threaded; arrays may complete out of order and are sorted there by
         their monotonic array_index.
+
+        An array the total-counts filter emptied is dropped rather than published:
+        it contributes no patterns to the reconstruction, and a zero-pattern row in
+        the tree carries no counts, no frames, and no mean pattern to show. Its
+        slots in the buffer keep their sentinel indexes and stay elided.
         """
+        if view.get_patterns_shape()[0] == 0:
+            logger.warning(f"Skipping '{label}'; no patterns survived preprocessing.")
+            return
+
         assembled_array = AssembledDiffractionArray(
             array_index=array_index,
             label=label,

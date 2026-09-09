@@ -408,11 +408,14 @@ class ValueFilterViewController:
 class RobustStatisticsDialog(QDialog):
     """Modal helper for computing and applying robust bounds on total_counts.
 
-    Freshly computes ``compute_robust_statistics(summary.total_counts)`` each
-    time :meth:`exec_` is called so the median / MAD reflect whichever summary
-    the service is currently holding. Apply Bounds writes to the total-counts
-    settings and stays open so the user can tweak ``k`` and re-apply; Close
-    dismisses.
+    Reads the service's post-crop, post-pipeline counts rather than the summary's
+    raw full-detector ones, because those are what the filter compares its bounds
+    against; deriving bounds from raw counts under an active crop puts them an
+    order of magnitude too high and drops every pattern. Freshly recomputes
+    ``compute_robust_statistics`` each time :meth:`exec_` is called so the median /
+    MAD reflect whichever counts pass the service is currently holding. Apply
+    Bounds writes to the total-counts settings and stays open so the user can
+    tweak ``k`` and re-apply; Close dismisses.
     """
 
     def __init__(
@@ -461,15 +464,15 @@ class RobustStatisticsDialog(QDialog):
         return super().exec_()
 
     def _recompute_stats(self) -> None:
-        summary = self._summary_service.get_last_summary()
-        if summary is None or summary.total_counts.size == 0:
+        measured = self._summary_service.get_last_total_counts()
+        if measured is None or measured.total_counts.size == 0:
             self._stats = None
             self._median_label.setText('—')
             self._mad_label.setText('—')
             self._apply_button.setEnabled(False)
             return
 
-        counts = numpy.asarray(summary.total_counts, dtype=numpy.float64)
+        counts = numpy.asarray(measured.total_counts, dtype=numpy.float64)
         try:
             stats = compute_robust_statistics(counts)
         except Exception as exc:
@@ -503,15 +506,27 @@ class TotalCountsFilterViewController(Observer):
     """Drop patterns whose good-pixel total counts fall outside [lower_bound, upper_bound]
     (inclusive). Runs after the prep pipeline, so counts reflect the same patterns the
     reconstructor sees (i.e. after any pixel-value zeroing, crop, binning, and padding).
+
+    Because the bounds are compared against processed counts, they cannot be chosen
+    from the summary, whose ``total_counts`` sum the raw full detector. Refresh
+    Counts runs :meth:`DiffractionSummaryService.compute_total_counts`, a second
+    streaming pass that measures exactly what the filter will see -- cheaper than
+    the summarize, since it reads only the crop rectangle and accumulates no
+    frame-shaped statistics. Robust Statistics stays disabled until that pass has
+    run, and the status line calls out counts that a later settings edit has made
+    stale.
     """
 
     def __init__(
         self,
         settings: DiffractionSettings,
         summary_service: DiffractionSummaryService,
+        get_pending_dataset_index: Callable[[], int],
     ) -> None:
         super().__init__()
+        self._settings = settings
         self._summary_service = summary_service
+        self._get_pending_dataset_index = get_pending_dataset_index
         self._lower_bound_enabled_view_controller = CheckBoxParameterViewController(
             settings.total_counts_lower_bound_enabled, 'Total Counts Lower Bound:'
         )
@@ -524,16 +539,24 @@ class TotalCountsFilterViewController(Observer):
         self._upper_bound_view_controller = SpinBoxParameterViewController(
             settings.total_counts_upper_bound
         )
+        self._status_label = QLabel()
+        self._status_label.setWordWrap(True)
+        self._refresh_counts_button = QPushButton('Refresh Counts')
+        self._refresh_counts_button.setToolTip(
+            'Measure per-pattern total counts with the current crop and pipeline applied.'
+        )
+        self._refresh_counts_button.clicked.connect(self._on_refresh_counts_clicked)
         self._robust_stats_button = QPushButton('Robust Statistics…')
         self._robust_stats_button.clicked.connect(self._on_robust_stats_clicked)
-        self._robust_stats_button.setEnabled(False)
 
         layout = QGridLayout()
         layout.addWidget(self._lower_bound_enabled_view_controller.get_widget(), 0, 0)
         layout.addWidget(self._lower_bound_view_controller.get_widget(), 0, 1)
         layout.addWidget(self._upper_bound_enabled_view_controller.get_widget(), 1, 0)
         layout.addWidget(self._upper_bound_view_controller.get_widget(), 1, 1)
-        layout.addWidget(self._robust_stats_button, 2, 0, 1, 2)
+        layout.addWidget(self._status_label, 2, 0, 1, 2)
+        layout.addWidget(self._refresh_counts_button, 3, 0)
+        layout.addWidget(self._robust_stats_button, 3, 1)
         layout.setColumnStretch(1, 1)
 
         self._widget = QGroupBox('Total Counts Filter')
@@ -542,6 +565,9 @@ class TotalCountsFilterViewController(Observer):
         self._dialog = RobustStatisticsDialog(settings, summary_service, parent=self._widget)
 
         summary_service.task_monitor.add_observer(self)
+        # Crop, binning, and the value filter all move the counts distribution, so
+        # any of them can strand a measured pass.
+        settings.add_observer(self)
         self._sync_button_state()
 
     def get_widget(self) -> QWidget:
@@ -549,14 +575,37 @@ class TotalCountsFilterViewController(Observer):
 
     def _sync_button_state(self) -> None:
         monitor = self._summary_service.task_monitor
-        has_summary = self._summary_service.get_last_summary() is not None
-        self._robust_stats_button.setEnabled(has_summary and not monitor.is_processing)
+        is_processing = monitor.is_processing
+        measured = self._summary_service.get_last_total_counts()
+        dataset_index = self._get_pending_dataset_index()
+
+        self._refresh_counts_button.setEnabled(not is_processing)
+        self._robust_stats_button.setEnabled(measured is not None and not is_processing)
+
+        if measured is None:
+            self._status_label.setText('Counts not measured yet; press Refresh Counts.')
+        elif self._summary_service.is_total_counts_stale(dataset_index):
+            self._status_label.setText(
+                f'{measured.total_counts.size} patterns measured under different'
+                ' processing settings; press Refresh Counts.'
+            )
+        else:
+            self._status_label.setText(f'{measured.total_counts.size} patterns measured.')
+
+    def _on_refresh_counts_clicked(self) -> None:
+        try:
+            self._summary_service.compute_total_counts(
+                self._get_pending_dataset_index(), force=True
+            )
+        except Exception as exc:
+            logger.exception(exc)
+            ExceptionDialog.show_exception('Refresh Counts', exc)
 
     def _on_robust_stats_clicked(self) -> None:
         self._dialog.exec_()
 
     def _update(self, observable: Observable) -> None:
-        if observable is self._summary_service.task_monitor:
+        if observable is self._summary_service.task_monitor or observable is self._settings:
             self._sync_button_state()
 
 
@@ -591,10 +640,17 @@ class TransformViewController:
 
 class OpenDatasetWizardProcessingViewController(ParameterViewController):
     """Processing wizard page. Split horizontally: preprocess-pipeline groups on
-    the left (in :class:`DiffractionPrepPipeline` execution order), summary
-    viewer + Crop + Total Counts Filter on the right so the user can tune
-    those two groups against a rendered mean_pattern and a plot of per-pattern
-    total counts.
+    the left (in :class:`DiffractionPrepPipeline` execution order), collapsible
+    summary viewer on the right so the user can tune Crop and Total Counts
+    Filter against a rendered mean_pattern and a plot of per-pattern total
+    counts.
+
+    The summary pane starts hidden and is revealed by the toggle button that
+    sits below the left column's scroll area -- outside it, so it stays put once
+    the pipeline groups overflow and start scrolling. While the pane is
+    collapsed the pipeline groups own the full page width. Expanding never
+    squeezes them: both panes carry a minimum width equal to their preferred
+    width, so the wizard widens instead.
 
     Storage (memory map) and Bad Pixels are load-time concerns rather than
     pipeline steps; the horizontal separator marks that boundary visually.
@@ -620,7 +676,7 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
         )
         self._value_filter_view_controller = ValueFilterViewController(diffraction_settings)
         self._total_counts_filter_view_controller = TotalCountsFilterViewController(
-            diffraction_settings, summary_service
+            diffraction_settings, summary_service, get_pending_dataset_index
         )
         self._crop_view_controller = CropViewController(
             diffraction_settings, extent_source, summary_service
@@ -633,6 +689,7 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
             diffraction_settings,
             summary_service,
             summary_visualization_engine,
+            extent_source,
             status_bar,
             file_dialog_factory,
             get_pending_dataset_index,
@@ -666,15 +723,43 @@ class OpenDatasetWizardProcessingViewController(ParameterViewController):
         # summary pane absorbs any extra window width.
         left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         left_scroll.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        # The summary toggle sits below the scroll area rather than inside it,
+        # so it stays visible once the pipeline column overflows. The explicit
+        # 1/0 stretch hands every leftover pixel of height to the scroll area,
+        # in both pane states -- otherwise the collapsed page leaves a dead band
+        # under the column.
+        left_container_layout = QVBoxLayout()
+        left_container_layout.setContentsMargins(0, 0, 0, 0)
+        left_container_layout.addWidget(left_scroll, 1)
+        left_container_layout.addWidget(self._summary_view_controller.get_toggle_widget(), 0)
+
+        left_container = QWidget()
+        left_container.setLayout(left_container_layout)
+        left_container.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+
+        # Floor the column at its preferred width so expanding the summary pane
+        # cannot clip the group boxes. The vertical scroll bar is on-demand and
+        # the horizontal one is off, so its width has to be budgeted here too.
+        # The container inherits the floor from the scroll area.
+        left_layout.activate()
+        left_container_layout.activate()
+        left_scroll.setMinimumWidth(
+            left_content.sizeHint().width()
+            + left_scroll.verticalScrollBar().sizeHint().width()
+            + 2 * left_scroll.frameWidth()
+        )
 
         # Right pane — summary panel placed directly in the splitter. Its own
-        # QSplitter(Vertical) governs the image/plot/controls proportions, so a
-        # QScrollArea here would steal that stretch.
+        # QSplitter(Vertical) governs the image/plot proportions, so a
+        # QScrollArea here would steal that stretch. It starts hidden and
+        # contributes no width until the left column's toggle reveals it.
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(left_scroll)
+        splitter.addWidget(left_container)
         splitter.addWidget(self._summary_view_controller.get_widget())
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
+        splitter.setCollapsible(0, False)
+        splitter.setCollapsible(1, False)
 
         outer_layout = QHBoxLayout()
         outer_layout.setContentsMargins(0, 0, 0, 0)

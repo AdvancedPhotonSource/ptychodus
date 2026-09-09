@@ -37,10 +37,12 @@ logger = logging.getLogger(__name__)
 __all__ = [
     'AssembledDiffractionData',
     'DiffractionSummary',
+    'DiffractionTotalCounts',
     'allocate_assembled_data',
     'assemble_dataset',
     'compute_array_offsets',
     'compute_assembled_patterns_shape',
+    'compute_dataset_total_counts',
     'compute_probe_photon_counts_by_index',
     'preprocess_array',
     'summarize_dataset',
@@ -236,7 +238,17 @@ class AssembledDiffractionData:
         return int(counts.max()) if counts.size > 0 else 0
 
     def get_mean_pattern(self) -> DiffractionPattern:
+        """Mean over the assembled patterns, or a zero frame when none are assembled.
+
+        The empty case is reachable whenever the total-counts filter drops every
+        pattern of an array; `numpy.mean` would return an all-NaN frame there and
+        poison every downstream display and weighted average.
+        """
         assembled_patterns = self.get_patterns()
+
+        if assembled_patterns.shape[0] == 0:
+            return numpy.zeros(assembled_patterns.shape[-2:], dtype=numpy.float64)
+
         return numpy.mean(assembled_patterns, axis=0)
 
     @property
@@ -473,12 +485,24 @@ def preprocess_array(
             keep &= counts <= upper
 
         n_dropped = int((~keep).sum())
+        n_kept = int(keep.sum())
 
         if n_dropped:
-            logger.info(
+            message = (
                 f'Total counts filter dropped {n_dropped}/{len(counts)} patterns '
-                f"from '{label}' (kept {int(keep.sum())})."
+                f"from '{label}' (kept {n_kept})."
             )
+
+            if n_kept == 0:
+                # Bounds are compared against post-crop, post-pipeline counts; bounds
+                # picked from raw full-detector statistics can sit an order of
+                # magnitude above the real distribution and empty the array.
+                logger.warning(
+                    f'{message} Check TotalCountsLowerBound/TotalCountsUpperBound'
+                    ' against the cropped, preprocessed counts.'
+                )
+            else:
+                logger.info(message)
             indexes = indexes[keep]
             patterns = patterns[keep]
             if probe_photon_counts is not None:
@@ -822,4 +846,118 @@ def summarize_dataset(
         maximum_pattern=inpaint_bad_pixels(maximum_frame, raw_bad_pixels),
         indexes=indexes[summarized],
         total_counts=total_counts[summarized],
+    )
+
+
+@dataclass(frozen=True)
+class DiffractionTotalCounts:
+    """Per-pattern good-pixel totals measured under a specific prep plan.
+
+    Distinct from the ``total_counts`` field of :class:`DiffractionSummary`, which
+    sums the raw full detector: these are summed over exactly the patterns the
+    assembler produces, after the load-time crop and after the pipeline. They are
+    therefore the numbers the total-counts filter actually compares its bounds
+    against, and the ones robust statistics should be derived from.
+    """
+
+    indexes: DiffractionIndexes
+    total_counts: DiffractionPatternCounts
+
+
+def compute_dataset_total_counts(
+    dataset: DiffractionDataset,
+    pipeline: DiffractionPrepPipeline | None = None,
+    *,
+    bad_pixels: BadPixels | None = None,
+    read_region: CropRegion | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
+    on_array_error: Callable[[int, str, Exception], None] | None = None,
+    should_stop: Callable[[], bool] | None = None,
+    max_workers: int | None = None,
+) -> DiffractionTotalCounts:
+    """Measure per-pattern total counts as the assembler would see them.
+
+    Runs the same :func:`preprocess_array` path :func:`assemble_dataset` runs --
+    same load-time crop, same pipeline, same processed bad-pixel mask -- but keeps
+    only the per-pattern totals and never applies the total-counts filter, since
+    the point is to measure the distribution the filter bounds will be chosen
+    from. No frame-shaped statistics are accumulated and no assembled buffer is
+    allocated, and when ``read_region`` is set a reader with partial-read support
+    fetches only the crop rectangle, so this is markedly cheaper than
+    :func:`summarize_dataset` over the same dataset.
+
+    Per-pattern results are written at the offsets metadata reserves and then
+    compacted, so they come back in array order whatever the completion order,
+    with the slots of skipped and under-filling arrays elided.
+    """
+    metadata = dataset.get_metadata()
+    num_patterns_per_array = metadata.num_patterns_per_array
+    num_arrays = len(dataset)
+
+    if num_arrays > len(num_patterns_per_array):
+        raise ValueError(
+            'Dataset has more arrays than metadata accounts for! '
+            f'(actual={num_arrays} expected at most {len(num_patterns_per_array)})'
+        )
+
+    raw_bad_pixels, processed_bad_pixels = _resolve_bad_pixels(
+        dataset, pipeline, bad_pixels, read_region
+    )
+
+    num_patterns_total = sum(num_patterns_per_array)
+    indexes = -numpy.ones(num_patterns_total, dtype=numpy.intp)
+    total_counts = numpy.zeros(num_patterns_total, dtype=numpy.float64)
+
+    # preprocess_array needs the raw geometry; nothing downstream of here reads
+    # the geometry off the returned block, so the pipeline fold is skipped.
+    block_pixel_geometry = _resolve_pixel_geometry(metadata, None, None)
+    offsets = compute_array_offsets(metadata)
+
+    def count_array(array_index: int, array: DiffractionArray) -> None:
+        block = preprocess_array(
+            array,
+            pipeline,
+            raw_bad_pixels=raw_bad_pixels,
+            processed_bad_pixels=processed_bad_pixels,
+            raw_pixel_geometry=block_pixel_geometry,
+            exposure_time_s=metadata.exposure_time_s,
+            read_region=read_region,
+        )
+        array_indexes = block.get_indexes()
+        num_patterns = len(array_indexes)
+
+        if num_patterns == 0:
+            return
+
+        capacity = num_patterns_per_array[array_index]
+
+        if num_patterns > capacity:
+            raise ValueError(
+                f'Array "{array.get_label()}" yielded more patterns than metadata '
+                f'reserves for it! (actual={num_patterns} expected at most {capacity})'
+            )
+
+        # Reduce before publishing anything, so a read that fails partway leaves
+        # this array's slots untouched rather than half-filled.
+        array_total_counts = block.get_total_counts()
+
+        offset = offsets[array_index]
+        stop = offset + num_patterns
+        indexes[offset:stop] = array_indexes
+        total_counts[offset:stop] = array_total_counts
+
+    _map_arrays(
+        dataset,
+        count_array,
+        on_progress=on_progress,
+        on_array_error=on_array_error,
+        should_stop=should_stop,
+        max_workers=max_workers,
+    )
+
+    counted = indexes >= 0
+
+    return DiffractionTotalCounts(
+        indexes=indexes[counted],
+        total_counts=total_counts[counted],
     )

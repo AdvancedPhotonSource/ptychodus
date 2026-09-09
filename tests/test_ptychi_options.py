@@ -518,7 +518,7 @@ def test_every_product_derived_field_is_applied(
 def test_align_repairs_hand_built_options() -> None:
     """Bare options built by hand must come back fully described by the product.
 
-    This is the shape ``scripts/lamni_reconstruct.py`` constructs. Before the
+    This is the shape ``scripts/reconstruct_lamni.py`` constructs. Before the
     helper existed it ran with pty-chi's defaults: a SUPPORT position origin
     that displaced every probe position by half the object canvas, plus a
     1e-9 m wavelength and a 1.0 m object pixel.

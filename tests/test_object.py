@@ -61,12 +61,8 @@ def test_align_objects_identity_returns_unchanged_array_and_center() -> None:
 
     assert cropped_reference.get_array().shape == array.shape
     numpy.testing.assert_allclose(cropped_reference.get_array(), array, atol=1.0e-15)
-    numpy.testing.assert_allclose(
-        aligned.get_center().x_m, center.x_m, atol=1.0e-15
-    )
-    numpy.testing.assert_allclose(
-        aligned.get_center().y_m, center.y_m, atol=1.0e-15
-    )
+    numpy.testing.assert_allclose(aligned.get_center().x_m, center.x_m, atol=1.0e-15)
+    numpy.testing.assert_allclose(aligned.get_center().y_m, center.y_m, atol=1.0e-15)
     numpy.testing.assert_allclose(aligned.get_array(), array, atol=1.0e-10)
 
 
@@ -133,12 +129,8 @@ def test_align_objects_subpixel_shift_recovered_within_upsample_tolerance() -> N
     expected_y_m = -(-1.5) * pixel_geom.height_m
     expected_x_m = -(0.75) * pixel_geom.width_m
     tolerance_m = pixel_geom.width_m / upsample_factor
-    numpy.testing.assert_allclose(
-        aligned.get_center().y_m, expected_y_m, atol=tolerance_m
-    )
-    numpy.testing.assert_allclose(
-        aligned.get_center().x_m, expected_x_m, atol=tolerance_m
-    )
+    numpy.testing.assert_allclose(aligned.get_center().y_m, expected_y_m, atol=tolerance_m)
+    numpy.testing.assert_allclose(aligned.get_center().x_m, expected_x_m, atol=tolerance_m)
 
 
 def test_align_objects_probe_position_consistency_world_coordinate_invariant() -> None:
@@ -164,16 +156,10 @@ def test_align_objects_probe_position_consistency_world_coordinate_invariant() -
     # World coord of the moving feature, by moving's own coordinate frame:
     rx_px = (moving.width_px - 1) / 2
     ry_px = (moving.height_px - 1) / 2
-    feature_world_x = (
-        moving_center.x_m + (moving_feature_yx[1] - rx_px) * pixel_geom.width_m
-    )
-    feature_world_y = (
-        moving_center.y_m + (moving_feature_yx[0] - ry_px) * pixel_geom.height_m
-    )
+    feature_world_x = moving_center.x_m + (moving_feature_yx[1] - rx_px) * pixel_geom.width_m
+    feature_world_y = moving_center.y_m + (moving_feature_yx[0] - ry_px) * pixel_geom.height_m
 
-    probe_at_feature = ProbePosition(
-        index=0, x_m=feature_world_x, y_m=feature_world_y
-    )
+    probe_at_feature = ProbePosition(index=0, x_m=feature_world_x, y_m=feature_world_y)
 
     # Sanity check: in moving's frame, this probe maps to the feature pixel.
     pre_align_pos = moving_geometry.map_coordinates_probe_to_object(probe_at_feature)
@@ -186,12 +172,8 @@ def test_align_objects_probe_position_consistency_world_coordinate_invariant() -
 
     # The aligned array now has the feature at the reference's pixel location; the same probe
     # (in world coordinates) must map to that new pixel location.
-    numpy.testing.assert_allclose(
-        post_align_pos.y_px, reference_feature_yx[0], atol=1e-9
-    )
-    numpy.testing.assert_allclose(
-        post_align_pos.x_px, reference_feature_yx[1], atol=1e-9
-    )
+    numpy.testing.assert_allclose(post_align_pos.y_px, reference_feature_yx[0], atol=1e-9)
+    numpy.testing.assert_allclose(post_align_pos.x_px, reference_feature_yx[1], atol=1e-9)
 
     # And the aligned-array amplitude at that pixel should be near the peak of the moving feature
     # (i.e. the probe still "sees" the same physical content).
@@ -417,10 +399,7 @@ def test_align_objects_subpixel_alignment_survives_trimming() -> None:
 
 
 def _make_positions(*coords_xy_m: tuple[float, float]) -> list[ProbePosition]:
-    return [
-        ProbePosition(index=i, x_m=x, y_m=y)
-        for i, (x, y) in enumerate(coords_xy_m)
-    ]
+    return [ProbePosition(index=i, x_m=x, y_m=y) for i, (x, y) in enumerate(coords_xy_m)]
 
 
 def _make_probe_geometry(width_px: int = 64, pixel_m: float = 1.0e-8) -> ProbeGeometry:

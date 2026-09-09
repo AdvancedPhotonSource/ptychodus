@@ -58,9 +58,7 @@ class TestIterPositionProbes:
         This is the bug fix: previously ``len(probes) == 1`` caused
         ``zip(positions, probes)`` to truncate after the first position.
         """
-        positions = [
-            ProbePosition(index=i, x_m=float(i), y_m=0.0) for i in range(3)
-        ]
+        positions = [ProbePosition(index=i, x_m=float(i), y_m=0.0) for i in range(3)]
         probe = numpy.ones((4, 4), dtype=complex)
         product = _make_product(positions=positions, probe_array=probe)
 
@@ -72,9 +70,7 @@ class TestIterPositionProbes:
 
     def test_yields_all_positions_with_opr(self) -> None:
         """OPR-equipped products are unchanged: same length, OPR-weighted per index."""
-        positions = [
-            ProbePosition(index=i, x_m=float(i), y_m=0.0) for i in range(3)
-        ]
+        positions = [ProbePosition(index=i, x_m=float(i), y_m=0.0) for i in range(3)]
         # 2 coherent modes, 1 incoherent mode, 4x4 spatial. OPR mixes them per position.
         probe = numpy.stack(
             [numpy.full((1, 4, 4), 1.0), numpy.full((1, 4, 4), 2.0)],

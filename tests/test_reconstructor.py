@@ -116,12 +116,8 @@ def _exit_waves(product: Product) -> list[numpy.ndarray]:
     half_h = PROBE_HEIGHT_PX // 2
 
     for position in product.probe_positions:
-        cx_px = int(
-            round(obj_center_x_px + (position.x_m - obj_center.x_m) / PIXEL_M)
-        )
-        cy_px = int(
-            round(obj_center_y_px + (position.y_m - obj_center.y_m) / PIXEL_M)
-        )
+        cx_px = int(round(obj_center_x_px + (position.x_m - obj_center.x_m) / PIXEL_M))
+        cy_px = int(round(obj_center_y_px + (position.y_m - obj_center.y_m) / PIXEL_M))
         window = obj_total[
             cy_px - half_h : cy_px - half_h + PROBE_HEIGHT_PX,
             cx_px - half_w : cx_px - half_w + PROBE_WIDTH_PX,

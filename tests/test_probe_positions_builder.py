@@ -51,10 +51,7 @@ def _make_rng() -> numpy.random.Generator:
 def _make_line(num_points: int) -> ProbePositionSequence:
     """A horizontal line of positions whose index equals its ordinal."""
     return ProbePositionSequence(
-        [
-            ProbePosition(index=idx, x_m=float(idx), y_m=0.0)
-            for idx in range(num_points)
-        ]
+        [ProbePosition(index=idx, x_m=float(idx), y_m=0.0) for idx in range(num_points)]
     )
 
 

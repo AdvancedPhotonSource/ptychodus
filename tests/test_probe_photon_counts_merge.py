@@ -71,10 +71,7 @@ def _make_product(specs: list[tuple[int, float, float, float | None]]) -> Produc
 
     Uses a minimally-sized probe/object; the tests only exercise position wiring, not physics.
     """
-    points = [
-        ProbePosition(index=i, x_m=x, y_m=y, probe_photon_count=c)
-        for i, x, y, c in specs
-    ]
+    points = [ProbePosition(index=i, x_m=x, y_m=y, probe_photon_count=c) for i, x, y, c in specs]
     positions = ProbePositionSequence(points)
 
     probe_array = numpy.zeros((1, 1, 4, 4), dtype=numpy.complex128)

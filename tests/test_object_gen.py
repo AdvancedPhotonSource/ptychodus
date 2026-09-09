@@ -156,9 +156,7 @@ def _make_probe_positions_grid(
     index = 0
     for y in ys:
         for x in xs:
-            positions.append(
-                ProbePosition(index=index, x_m=float(x), y_m=float(y))
-            )
+            positions.append(ProbePosition(index=index, x_m=float(x), y_m=float(y)))
             index += 1
     return positions
 
@@ -739,8 +737,7 @@ class TestStxmObject:
         geometry = _make_geometry(64, 64)
         positions = _make_probe_positions_grid(geometry, (5, 5))
         counts = [
-            int(1000 + 5000 * (p.x_m - geometry.minimum_x_m) / geometry.width_m)
-            for p in positions
+            int(1000 + 5000 * (p.x_m - geometry.minimum_x_m) / geometry.width_m) for p in positions
         ]
         data = _make_assembled_data(counts)
         obj = generate_stxm_object(geometry, data, positions)
