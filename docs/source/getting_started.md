@@ -65,7 +65,7 @@ $ python -m pip install ptychodus[globus,gui,ptychi]
 
 ## Container image variants
 
-The repository ships one Dockerfile per accelerator family under [containers/](../../containers/). Pick the variant that matches your hardware and select an explicit file with `-f`:
+The repository ships one Dockerfile per accelerator family under `containers/`. Pick the variant that matches your hardware and select an explicit file with `-f`:
 
 | Dockerfile | Use it for |
 | --- | --- |

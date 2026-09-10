@@ -5,8 +5,8 @@ Zero torch imports. All GPU work runs inside a spawned child; see
 
 PtychoFM's own ``config.yaml`` is a nested dict of scalars, so ``_build_config``
 produces a plain :class:`dict` from the ptychodus settings groups -- pickleable
-without pulling any ptycho_vit module in. The child feeds that dict directly
-into ``PtychoViT(config)`` and the training loop.
+without pulling any ptycho_fm module in. The child feeds that dict directly
+into ``PtychoFM(config)`` and the training loop.
 """
 
 from __future__ import annotations
@@ -44,9 +44,9 @@ def _build_config(
     training_settings: PtychoFMTrainingSettings,
     inference_settings: PtychoFMInferenceSettings,
 ) -> dict[str, Any]:
-    """Translate ptychodus settings into a nested ``ptycho_vit`` config dict.
+    """Translate ptychodus settings into a nested ``ptycho_fm`` config dict.
 
-    Mirrors the top-level shape of ``ptycho_vit/config.yaml``: ``data``,
+    Mirrors the top-level shape of ``ptycho_fm/config.yaml``: ``data``,
     ``model`` (with ``encoder`` / ``decoder`` / ``init`` sub-sections),
     ``training`` (with ``weighted_loss`` sub-section), and ``inference``. The
     child fills in any missing paths (``data_path`` / model save path) from
@@ -158,7 +158,7 @@ def build_reconstructor(
         )
 
     def export_training_data(file_path: Path, parameters: ReconstructInput) -> None:
-        # ptycho_vit.CombinedDataset expects one directory per scan holding
+        # ptycho_fm.CombinedDataset expects one directory per scan holding
         # two HDF5 files sharing a common stem:
         #     <stem>_dp.hdf5    dataset 'dp'    (N, H, W) float
         #     <stem>_para.hdf5  dataset 'object'              (1, H, W) complex
