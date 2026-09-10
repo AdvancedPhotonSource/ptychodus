@@ -79,6 +79,7 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
         inference_config.model.N,
         K=payload.n_nearest_neighbors,
         nsamples=payload.n_samples,
+        gridsize=inference_config.model.gridsize,
     )
     test_data_container = ptycho.loader.load(
         lambda: test_dataset, test_raw_data.probeGuess, which=None, create_split=False
