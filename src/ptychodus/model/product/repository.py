@@ -1,9 +1,8 @@
 from collections.abc import Sequence
 from typing import overload
 import logging
-import sys
 
-from ptychodus.api.constants import BYTES_PER_MEGABYTE
+from ptychodus.api.constants import format_bytes
 
 from .item import ProductRepositoryItem, ProductRepositoryItemObserver, ProductRepositoryObserver
 
@@ -69,8 +68,8 @@ class ProductRepository(Sequence[ProductRepositoryItem], ProductRepositoryItemOb
             observer.handle_item_removed(index, item)
 
     def get_info_text(self) -> str:
-        size_MB = sum(sys.getsizeof(prod) for prod in self._item_list) / BYTES_PER_MEGABYTE  # noqa: N806
-        return f'Total: {len(self)} [{size_MB:.2f}MB]'
+        nbytes = sum(item.get_product().nbytes for item in self._item_list if not item.is_pending())
+        return f'Products: {len(self)} [{format_bytes(nbytes)}]'
 
     def add_observer(self, observer: ProductRepositoryObserver) -> None:
         if observer not in self._observer_list:

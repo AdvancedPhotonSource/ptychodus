@@ -13,14 +13,15 @@ from ...model.ptychi import (
     PtyChiLSQMLSettings,
     PtyChiObjectSettings,
     PtyChiPIESettings,
+    PtyChiRAARSettings,
 )
-from ..parametric import (
+from ..parameters import (
     CheckBoxParameterViewController,
     CheckableGroupBoxParameterViewController,
     ComboBoxParameterViewController,
     DecimalLineEditParameterViewController,
     DecimalSliderParameterViewController,
-    LengthWidgetParameterViewController,
+    LengthParameterViewController,
     SpinBoxParameterViewController,
 )
 from .optimizer import PtyChiOptimizationPlanViewController, PtyChiOptimizerParameterViewController
@@ -204,10 +205,10 @@ class PtyChiRemoveGridArtifactsViewController(CheckableGroupBoxParameterViewCont
         self._plan_view_controller = PtyChiOptimizationPlanViewController(
             start, stop, stride, num_epochs
         )
-        self._period_x_view_controller = LengthWidgetParameterViewController(
+        self._period_x_view_controller = LengthParameterViewController(
             period_x_m, tool_tip='Horizontal period of grid artifacts in meters'
         )
-        self._period_y_view_controller = LengthWidgetParameterViewController(
+        self._period_y_view_controller = LengthParameterViewController(
             period_y_m, tool_tip='Vertical period of grid artifacts in meters'
         )
         self._window_size_view_controller = SpinBoxParameterViewController(
@@ -366,6 +367,7 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
         dm_settings: PtyChiDMSettings | None,
         lsqml_settings: PtyChiLSQMLSettings | None,
         pie_settings: PtyChiPIESettings | None,
+        raar_settings: PtyChiRAARSettings | None,
         num_epochs: IntegerParameter,
         enumerators: PtyChiEnumerators,
     ) -> None:
@@ -506,6 +508,8 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
         layout.addRow(self._build_preconditioner_with_all_modes_view_controller.get_widget())
         layout.addRow(self._constrain_hard_limits_view_controller.get_widget())
 
+        # At most one of dm_settings / raar_settings is ever set; the caller
+        # dispatches on the reconstructor name.
         if dm_settings is not None:
             self._amplitude_clamp_limit_view_controller = DecimalLineEditParameterViewController(
                 dm_settings.object_amplitude_clamp_limit,
@@ -517,6 +521,20 @@ class PtyChiObjectViewController(CheckableGroupBoxParameterViewController):
 
             self._inertia_view_controller = DecimalLineEditParameterViewController(
                 dm_settings.object_inertia,
+                tool_tip='Inertia of the object update; should be between 0 and 1.',
+            )
+            layout.addRow('Inertia:', self._inertia_view_controller.get_widget())
+        elif raar_settings is not None:
+            self._amplitude_clamp_limit_view_controller = DecimalLineEditParameterViewController(
+                raar_settings.object_amplitude_clamp_limit,
+                tool_tip='Maximum object amplitude; larger values are clamped to this limit.',
+            )
+            layout.addRow(
+                'Amplitude Clamp Limit:', self._amplitude_clamp_limit_view_controller.get_widget()
+            )
+
+            self._inertia_view_controller = DecimalLineEditParameterViewController(
+                raar_settings.object_inertia,
                 tool_tip='Inertia of the object update; should be between 0 and 1.',
             )
             layout.addRow('Inertia:', self._inertia_view_controller.get_widget())

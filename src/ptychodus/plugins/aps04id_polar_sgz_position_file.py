@@ -5,7 +5,7 @@ import logging
 import h5py
 import numpy
 
-from ptychodus.api.constants import ONE_NANOMETER_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class PolarSoftGlueZynqPositionFileReader(ProbePositionFileReader):
-    """Reader for APS 4-ID Polar softGlueZynq position-stream files.
+    """Reader for APS 4-ID-B,G,H POLAR softGlueZynq position-stream files.
 
     The pos_stream is oversampled relative to the detector: many raw
     samples share a single trigger index. This reader aggregates by
@@ -84,10 +84,11 @@ class PolarSoftGlueZynqPositionFileReader(ProbePositionFileReader):
         point_list = [
             ProbePosition(
                 int(trigger_index),
-                float(x) * ONE_NANOMETER_M,
-                float(y) * ONE_NANOMETER_M,
+                LengthUnit.NANOMETER.to_meters(float(x)),
+                LengthUnit.NANOMETER.to_meters(float(y)),
+                probe_photon_count=float(i0),
             )
-            for trigger_index, x, y in zip(trigger_indexes, xs, ys)
+            for trigger_index, x, y, i0 in zip(trigger_indexes, xs, ys, i0s)
         ]
         return ProbePositionSequence(point_list)
 
@@ -96,5 +97,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         PolarSoftGlueZynqPositionFileReader(),
         simple_name='APS_Polar_SGZ',
-        display_name='APS 4-ID Polar softGlueZynq Files (*.h5)',
+        display_name='APS 4-ID-B,G,H POLAR softGlueZynq Files (*.h5)',
     )

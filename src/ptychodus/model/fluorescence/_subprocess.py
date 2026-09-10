@@ -44,9 +44,6 @@ def run_vspi_enhancement(payload: PtychozoonPayload, result_queue: Queue[Any]) -
             (
                 'result',
                 int(iteration),
-                [
-                    (emap.name, numpy.asarray(emap.counts_per_second))
-                    for emap in enhanced_dataset.element_maps
-                ],
+                [(emap.name, numpy.asarray(emap.counts_per_second)) for emap in enhanced_dataset],
             )
         )

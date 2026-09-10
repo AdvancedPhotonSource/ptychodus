@@ -36,8 +36,12 @@ def load_tokens(file_path: Path) -> Sequence[GenesisAccessTokens]:
 
 def save_tokens(file_path: Path, access_tokens: Sequence[GenesisAccessTokens]) -> None:
     data = [token.model_dump(mode='json') for token in access_tokens]
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(file_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    file_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    # O_NOFOLLOW refuses a pre-planted symlink at the token path. The mode argument to os.open
+    # applies only when the file is created, so fchmod below also tightens a file that already
+    # exists with looser permissions — otherwise load_tokens would later reject our own write.
+    fd = os.open(file_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
 
     with open(fd, 'w') as f:
+        os.fchmod(f.fileno(), 0o600)
         json.dump(data, f, indent=2)

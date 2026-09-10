@@ -3,11 +3,11 @@ from pathlib import Path
 import logging
 
 
-from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import (
-    AssembledDiffractionData,
+    BadPixels,
     BadPixelsFileReader,
-    CropCenter,
+    CropRegion,
     DiffractionArray,
     DiffractionDatasetLayoutNode,
     DiffractionFileReader,
@@ -87,8 +87,7 @@ class DiffractionAPI:
         file_path: Path,
         *,
         file_type: str | None = None,
-        crop_center: CropCenter | None = None,
-        crop_extent: ImageExtent | None = None,
+        crop_region: CropRegion | None = None,
         bad_pixels_file_path: Path | None = None,
         bad_pixels_file_type: str | None = None,
         process_patterns: bool = True,
@@ -98,13 +97,11 @@ class DiffractionAPI:
             logger.warning(f'Refusing to read invalid file path {file_path}')
             return -1
 
-        if crop_center is not None:
-            self._diffraction_settings.crop_center_x_px.set_value(crop_center.position_x_px)
-            self._diffraction_settings.crop_center_y_px.set_value(crop_center.position_y_px)
-
-        if crop_extent is not None:
-            self._diffraction_settings.crop_width_px.set_value(crop_extent.width_px)
-            self._diffraction_settings.crop_height_px.set_value(crop_extent.height_px)
+        if crop_region is not None:
+            self._diffraction_settings.beam_center_x_px.set_value(crop_region.center_x_px)
+            self._diffraction_settings.beam_center_y_px.set_value(crop_region.center_y_px)
+            self._diffraction_settings.crop_width_px.set_value(crop_region.width_px)
+            self._diffraction_settings.crop_height_px.set_value(crop_region.height_px)
 
         if file_type is not None:
             self._file_reader_chooser.set_current_plugin(file_type)
@@ -129,30 +126,33 @@ class DiffractionAPI:
 
         return dataset_index
 
-    def _apply_bad_pixels_from_file(
-        self,
-        dataset: AssembledDiffractionDataset,
-        file_path: Path,
-        file_type: str | None,
-    ) -> None:
+    def load_bad_pixels(self, file_path: Path, file_type: str | None = None) -> BadPixels:
+        """Load a bad-pixel mask from disk without applying it to any dataset.
+
+        The wizard's Summary panel needs the mask before Finish so it can pass
+        it to `summarize_dataset` (whose inpainting keeps the mean pattern
+        smooth for `estimate_beam_center`) without mutating a dataset that
+        hasn't been loaded yet.
+        """
         if not file_path.is_file():
-            logger.warning(f'Refusing to read invalid bad pixels file path {file_path}')
-            return
+            raise FileNotFoundError(f'Invalid bad pixels file path "{file_path}"')
 
         if file_type is not None:
             self._bad_pixels_file_reader_chooser.set_current_plugin(file_type)
         bad_pixels_plugin = self._bad_pixels_file_reader_chooser.get_current_plugin()
         logger.debug(f'Reading "{file_path}" as "{bad_pixels_plugin.simple_name}"')
         try:
-            bad_pixels = bad_pixels_plugin.strategy.read(file_path)
-        except Exception:
-            logger.warning(f'Failed to load bad pixels from "{file_path}"')
-            return
+            return bad_pixels_plugin.strategy.read(file_path)
+        except Exception as exc:
+            raise RuntimeError(f'Failed to load bad pixels from "{file_path}"') from exc
 
-        try:
-            dataset.set_bad_pixels(bad_pixels)
-        except ValueError as exc:
-            logger.warning(f'Ignoring bad pixels from "{file_path}": {exc}')
+    def _apply_bad_pixels_from_file(
+        self,
+        dataset: AssembledDiffractionDataset,
+        file_path: Path,
+        file_type: str | None,
+    ) -> None:
+        dataset.set_bad_pixels(self.load_bad_pixels(file_path, file_type))
 
     def apply_bad_pixels(
         self,

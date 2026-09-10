@@ -20,7 +20,7 @@ from ..model.automation import (
     AutomationPresenter,
     AutomationSettings,
 )
-from .parametric import ParameterViewBuilder, ParameterViewController
+from .parameters import ParameterViewBuilder, ParameterViewController
 from .data import FileDialogFactory
 
 

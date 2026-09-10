@@ -29,7 +29,7 @@ class ObjectRepositoryItemFactory:
 
         An object supplied in memory comes from reconstruction output or a product
         loaded from file, so its layer structure and canvas size are already what
-        the reconstructor solved for. Batch mode reads product-in.h5 through this
+        the reconstructor solved for. Batch mode reads product.h5 through this
         path, where a user who sets a layer spacing in settings.ini would
         otherwise see it silently do nothing. Set it on the run that produces the
         object instead -- the from-file builder does apply the layer spacing.

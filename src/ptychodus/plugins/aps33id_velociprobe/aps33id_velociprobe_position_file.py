@@ -5,7 +5,7 @@ import csv
 
 import numpy
 
-from ptychodus.api.constants import ONE_NANOMETER_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
     ProbePositionFileReader,
@@ -47,15 +47,15 @@ class VelociprobePositionFileReader(ProbePositionFileReader):
         stage_rotation_rad = numpy.deg2rad(self._diffraction_reader.stage_rotation_deg)
         stage_rotation_cos = numpy.cos(stage_rotation_rad)
 
-        x_mean = sum(p.coordinate_x_m for p in positions) / len(positions)
-        y_mean = sum(p.coordinate_y_m for p in positions) / len(positions)
+        x_mean = sum(p.x_m for p in positions) / len(positions)
+        y_mean = sum(p.y_m for p in positions) / len(positions)
         point_list: list[ProbePosition] = list()
 
         for untransformed_point in positions:
             point = ProbePosition(
                 untransformed_point.index,
-                (untransformed_point.coordinate_x_m - x_mean) * stage_rotation_cos,
-                (untransformed_point.coordinate_y_m - y_mean),
+                (untransformed_point.x_m - x_mean) * stage_rotation_cos,
+                (untransformed_point.y_m - y_mean),
             )
             point_list.append(point)
 
@@ -84,8 +84,8 @@ class VelociprobePositionFileReader(ProbePositionFileReader):
 
                 point = ProbePosition(
                     trigger,
-                    x_nm * ONE_NANOMETER_M,
-                    y_nm * ONE_NANOMETER_M,
+                    x_nm * LengthUnit.NANOMETER.meters_per_unit,
+                    y_nm * LengthUnit.NANOMETER.meters_per_unit,
                 )
                 point_list.append(point)
 

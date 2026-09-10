@@ -160,10 +160,10 @@ def introspect_fluorescence(path: Path) -> dict[str, Any]:
     except (OSError, KeyError, ValueError) as exc:
         raise IntrospectionError(f'{path}: {exc}') from exc
 
-    element_names = [emap.name for emap in dataset.element_maps]
+    element_names = [emap.name for emap in dataset]
     map_shape: tuple[int, int] | None = None
-    if dataset.element_maps:
-        cps = dataset.element_maps[0].counts_per_second
+    if len(dataset):
+        cps = dataset[0].counts_per_second
         if cps.ndim == 2:
             map_shape = (int(cps.shape[0]), int(cps.shape[1]))
 

@@ -57,8 +57,8 @@ def _export_training_data(
     for index, scan_point in enumerate(parameters.product.probe_positions):
         object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
         patch = interpolator.get_patch(
-            object_point.coordinate_x_px,
-            object_point.coordinate_y_px,
+            object_point.x_px,
+            object_point.y_px,
             probe_extent.width_px,
             probe_extent.height_px,
         )

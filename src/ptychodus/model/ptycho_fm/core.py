@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 
 
 def _ptycho_fm_available() -> bool:
-    """Return True iff ptycho_vit and torch are importable, without importing them."""
-    return all(find_spec(mod) is not None for mod in ('ptycho_vit', 'torch'))
+    """Return True iff ptycho_fm and torch are importable, without importing them."""
+    return all(find_spec(mod) is not None for mod in ('ptycho_fm', 'torch'))
 
 
 class PtychoFMReconstructorLibrary(ReconstructorLibrary):
@@ -41,7 +41,7 @@ class PtychoFMReconstructorLibrary(ReconstructorLibrary):
         self._reconstructors: list[TrainableReconstructor] = list()
 
         if not _ptycho_fm_available():
-            logger.info('PtychoFM (ptycho-vit) not found.')
+            logger.info('PtychoFM (ptycho-fm) not found.')
 
             if is_developer_mode_enabled:
                 for reconstructor in ('Unsupervised', 'Supervised'):
@@ -49,13 +49,13 @@ class PtychoFMReconstructorLibrary(ReconstructorLibrary):
             return
 
         try:
-            ptycho_fm_version = version('ptycho-vit')
+            ptycho_fm_version = version('ptycho-fm')
         except PackageNotFoundError:
             ptycho_fm_version = 'unknown'
-        logger.info(f'PtychoFM (ptycho-vit) {ptycho_fm_version}')
+        logger.info(f'PtychoFM (ptycho-fm) {ptycho_fm_version}')
 
         # Lazy import: keeps this module's cost small in headless mode and
-        # ensures the parent never pulls torch in just because ptycho-vit is
+        # ensures the parent never pulls torch in just because ptycho-fm is
         # installed.
         from .reconstructor import build_reconstructor
 

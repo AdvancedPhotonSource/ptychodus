@@ -469,8 +469,8 @@ class MDAPositionFileReader(ProbePositionFileReader):
             for x in xarray:
                 point = ProbePosition(
                     index=len(point_list),
-                    coordinate_x_m=float(x) * self._scale_to_meters,
-                    coordinate_y_m=float(y) * self._scale_to_meters,
+                    x_m=float(x) * self._scale_to_meters,
+                    y_m=float(y) * self._scale_to_meters,
                 )
                 point_list.append(point)
 
@@ -491,8 +491,8 @@ class MDAFlatScanPositionFileReader(ProbePositionFileReader):
         for idx, (x, y) in enumerate(zip(xarray, yarray)):
             point = ProbePosition(
                 index=idx,
-                coordinate_x_m=float(x) * self._scale_to_meters,
-                coordinate_y_m=float(y) * self._scale_to_meters,
+                x_m=float(x) * self._scale_to_meters,
+                y_m=float(y) * self._scale_to_meters,
             )
             point_list.append(point)
 
@@ -523,12 +523,12 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         MDAFlatScanPositionFileReader(scale_to_meters=1.0e-3),
         simple_name='APS_ISN_MDA',
-        display_name='APS 19-ID In-Situ Nanoprobe Files (*.mda)',
+        display_name='APS 19-ID-E In-situ Nanoprobe Files (*.mda)',
     )
     registry.probe_position_file_readers.register_plugin(
         MDAFlatScanPositionFileReader(scale_to_meters=1.0e-6),
         simple_name='CNM_APS_HXN',
-        display_name='CNM/APS 26-ID Hard X-ray Nanoprobe Files (*.mda)',
+        display_name='CNM/APS 26-ID-C Hard X-ray Nanoprobe Files (*.mda)',
     )
 
 

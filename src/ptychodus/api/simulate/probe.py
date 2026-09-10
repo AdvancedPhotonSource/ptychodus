@@ -9,7 +9,7 @@ import scipy.linalg
 
 from ..constants import TWO_PI_J
 from ..typing import ComplexArrayType, RealArrayType
-from ..geometry import HermiteMode, PixelGeometry, ZernikeMode
+from ..geometry import HermiteMode, ImageExtent, PixelGeometry, ZernikeMode
 from ..probe import Probe, ProbeGeometry, ProbeSequence
 from ..propagate import (
     AngularSpectrumPropagator,
@@ -17,7 +17,7 @@ from ..propagate import (
     PropagatorParameters,
     intensity,
 )
-from ..diffraction import AssembledDiffractionData
+from ..assemble import AssembledDiffractionData
 
 
 logger = logging.getLogger(__name__)
@@ -88,8 +88,8 @@ def generate_rectangular_probe(
     """Generate a binary rectangular aperture probe with the given physical dimensions."""
     coords = geometry.get_transverse_coordinates()
     is_inside = numpy.logical_and(
-        numpy.fabs(coords.position_x_m) < 0.5 * width_m,
-        numpy.fabs(coords.position_y_m) < 0.5 * height_m,
+        numpy.fabs(coords.x_m) < 0.5 * width_m,
+        numpy.fabs(coords.y_m) < 0.5 * height_m,
     )
     return Probe(
         array=numpy.where(is_inside, 1, 0) + 0j,
@@ -139,21 +139,20 @@ def generate_average_pattern_probe(
         )
 
     detector_pixel_geometry = assembled_data.get_pixel_geometry()
-    implied_pixel_width_m = (
-        probe_wavelength_m * abs(detector_distance_m) / (width_px * detector_pixel_geometry.width_m)
-    )
-    implied_pixel_height_m = (
-        probe_wavelength_m
-        * abs(detector_distance_m)
-        / (height_px * detector_pixel_geometry.height_m)
+    implied_geometry = ProbeGeometry.from_far_field(
+        detector_pixel_geometry,
+        ImageExtent(width_px=width_px, height_px=height_px),
+        wavelength_m=probe_wavelength_m,
+        distance_m=detector_distance_m,
     )
 
-    if not numpy.isclose(implied_pixel_width_m, geometry.pixel_width_m, rtol=rtol) or not (
-        numpy.isclose(implied_pixel_height_m, geometry.pixel_height_m, rtol=rtol)
-    ):
+    if not numpy.isclose(
+        implied_geometry.pixel_width_m, geometry.pixel_width_m, rtol=rtol
+    ) or not numpy.isclose(implied_geometry.pixel_height_m, geometry.pixel_height_m, rtol=rtol):
         raise ValueError(
             'Fresnel-transform output pixel size '
-            f'({implied_pixel_width_m:.3e} x {implied_pixel_height_m:.3e} m) does not match '
+            f'({implied_geometry.pixel_width_m:.3e} x '
+            f'{implied_geometry.pixel_height_m:.3e} m) does not match '
             f'probe geometry ({geometry.pixel_width_m:.3e} x {geometry.pixel_height_m:.3e} m) '
             f'within rtol={rtol}.'
         )
@@ -267,8 +266,8 @@ def generate_hermite_probe(
 ) -> Probe:
     """Generate a probe as a superposition of 2D Hermite polynomial modes with characteristic widths *width_m* (x) and *height_m* (y)."""
     coords = geometry.get_transverse_coordinates()
-    x = coords.position_x_m / width_m
-    y = coords.position_y_m / height_m
+    x = coords.x_m / width_m
+    y = coords.y_m / height_m
     array = numpy.zeros_like(x, dtype=complex)
 
     for mode in polynomial:

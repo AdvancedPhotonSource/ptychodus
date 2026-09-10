@@ -61,6 +61,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         # TODO figure out good fix when saving NPY file without suffix (numpy adds suffix)
         repository.add_observer(self)
+        self._update_info_text()
 
         builder_list_model = QStringListModel()
         builder_list_model.setStringList([name for name in api.builder_names()])
@@ -261,13 +262,18 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         return node.row()
 
+    def _update_info_text(self) -> None:
+        self._view.info_label.setText(self._repository.get_info_text())
+
     def handle_item_inserted(self, index: int, item: ProbeRepositoryItem) -> None:
+        self._update_info_text()
         self._tree_model.insert_item(index, item)
 
         if not self._view.tree_view.currentIndex().isValid():
             self._view.tree_view.setCurrentIndex(self._tree_model.index(index, 0))
 
     def handle_item_changed(self, index: int, item: ProbeRepositoryItem) -> None:
+        self._update_info_text()
         self._tree_model.update_item(index, item)
 
         if index == self._get_current_item_index():
@@ -275,6 +281,7 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             self._update_view(current_index, current_index)
 
     def handle_item_removed(self, index: int, item: ProbeRepositoryItem) -> None:
+        self._update_info_text()
         was_current = self._top_level_row(self._view.tree_view.currentIndex()) == index
         self._tree_model.remove_item(index, item)
 

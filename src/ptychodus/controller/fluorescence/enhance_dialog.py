@@ -19,7 +19,7 @@ from ...view.fluorescence import (
     FluorescenceStatusView,
 )
 from ...view.widgets import ExceptionDialog
-from ..parametric import ComboBoxParameterViewController, ParameterViewBuilder
+from ..parameters import ComboBoxParameterViewController, ParameterViewBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +173,7 @@ class FluorescenceEnhanceDialogController(Observer):
             return
         product_name = item.get_product().get_name()
         self._dialog.setWindowTitle(
-            f'Enhance Fluorescence "{item.get_label()}" against "{product_name}"'
+            f'Enhance Fluorescence "{item.get_name()}" against "{product_name}"'
         )
         self._sync_run_button_enabled()
         self._dialog.open()

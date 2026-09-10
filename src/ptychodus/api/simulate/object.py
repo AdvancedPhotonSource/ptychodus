@@ -1,4 +1,4 @@
-"""Object (transmission function) generation functions: STXM, random fields, simplex/fractal noise, and dead-leaves models."""
+"""Object (transmission function) generation functions: STXM, random fields, simplex/fractal noise, dead-leaves models, and Siemens star resolution targets."""
 
 from collections.abc import Iterable, Sequence
 from typing import Final
@@ -12,7 +12,7 @@ import numpy
 from ._phase_unwrap import PhaseUnwrapper
 from ..constants import TWO_PI_J
 from ..interpolate import lerp
-from ..diffraction import AssembledDiffractionData
+from ..assemble import AssembledDiffractionData
 from ..object import Object, ObjectGeometry
 from ..probe_positions import ProbePosition
 from ..typing import IntegerArrayType, RealArrayType
@@ -30,18 +30,18 @@ def generate_stxm_object(
     values: list[float] = list()
 
     assembled_indexes = assembled_data.get_indexes().tolist()
-    assembled_pattern_counts = assembled_data.get_pattern_counts().tolist()
-    pattern_counts_lut = dict(zip(assembled_indexes, assembled_pattern_counts))
+    assembled_total_counts = assembled_data.get_total_counts().tolist()
+    total_counts_lut = dict(zip(assembled_indexes, assembled_total_counts))
 
     for scan_point in probe_positions:
         try:
-            value = pattern_counts_lut[scan_point.index]
+            value = total_counts_lut[scan_point.index]
         except KeyError:
             logger.debug(f'Skipping missing scan point index={scan_point.index}!')
         else:
             object_point = geometry.map_coordinates_probe_to_object(scan_point)
-            coordinates_px.append(object_point.coordinate_y_px)
-            coordinates_px.append(object_point.coordinate_x_px)
+            coordinates_px.append(object_point.y_px)
+            coordinates_px.append(object_point.x_px)
             values.append(value)
 
     points = numpy.reshape(coordinates_px, (-1, 2))
@@ -438,6 +438,71 @@ def generate_dead_leaves_object(
 
     return Object(
         array=array.astype('complex'),
+        pixel_geometry=geometry.get_pixel_geometry(),
+        center=geometry.get_center(),
+    )
+
+
+def generate_siemens_star_object(
+    geometry: ObjectGeometry,
+    *,
+    num_spokes: int,
+    outer_radius_fraction: float,
+    spoke_amplitude: float,
+    background_amplitude: float,
+    spoke_phase_tr: float,
+    background_phase_tr: float,
+) -> Object:
+    """Generate a Siemens star resolution target with alternating angular wedges.
+
+    ``2 * num_spokes`` wedges alternate between the spoke and background
+    values inside a disk of radius
+    ``outer_radius_fraction * min(width_px, height_px) / 2`` centered on the
+    canvas; pixels outside the disk take the background values. Amplitude and
+    phase are averaged over a 4-point sub-pixel pattern to soften wedge edges
+    and the singular center.
+    """
+    if num_spokes < 2:
+        raise ValueError('num_spokes must be at least 2!')
+
+    if outer_radius_fraction <= 0.0:
+        raise ValueError('outer_radius_fraction must be strictly positive!')
+
+    _sample_positions = [
+        (1.0 / 3, 1.0 / 3),
+        (1.0 / 3, 2.0 / 3),
+        (2.0 / 3, 1.0 / 3),
+        (2.0 / 3, 2.0 / 3),
+    ]
+
+    height_px = geometry.height_px
+    width_px = geometry.width_px
+    outer_radius_px = outer_radius_fraction * min(width_px, height_px) / 2.0
+    center_y_px = height_px / 2.0
+    center_x_px = width_px / 2.0
+
+    position_y_px, position_x_px = numpy.indices((height_px, width_px)).astype(float)
+    amplitude = numpy.zeros((height_px, width_px), dtype=float)
+    phase_tr = numpy.zeros((height_px, width_px), dtype=float)
+
+    for u_y, u_x in _sample_positions:
+        dy = position_y_px + u_y - center_y_px
+        dx = position_x_px + u_x - center_x_px
+        radius_px = numpy.hypot(dy, dx)
+        angle = numpy.mod(numpy.arctan2(dy, dx), 2.0 * numpy.pi)
+        wedge_index = numpy.floor(angle * num_spokes / numpy.pi).astype(int)
+        is_spoke = (radius_px <= outer_radius_px) & (wedge_index % 2 == 0)
+        amplitude += numpy.where(is_spoke, spoke_amplitude, background_amplitude)
+        phase_tr += numpy.where(is_spoke, spoke_phase_tr, background_phase_tr)
+
+    num_samples = len(_sample_positions)
+    amplitude /= num_samples
+    phase_tr /= num_samples
+
+    array = amplitude * numpy.exp(TWO_PI_J * phase_tr)
+
+    return Object(
+        array=array[numpy.newaxis, :, :].astype('complex'),
         pixel_geometry=geometry.get_pixel_geometry(),
         center=geometry.get_center(),
     )

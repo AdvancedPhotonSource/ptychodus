@@ -26,7 +26,7 @@ from ...model.agent import (
     ModelCatalog,
 )
 from ...view.agent import AgentChatView, AgentInputView, AgentView
-from ..parametric import (
+from ..parameters import (
     DecimalSliderParameterViewController,
     LineEditParameterViewController,
     ParameterViewController,

@@ -11,7 +11,8 @@ import numpy
 import scipy.ndimage
 from scipy.fft import fft2
 
-from .geometry import PixelGeometry
+from .constants import format_length
+from .geometry import ImageExtent, PixelGeometry
 from .preprocess.noise import estimate_noise_floor
 from .propagate import intensity
 from .typing import ComplexArrayType, RealArrayType
@@ -145,7 +146,7 @@ def estimate_probe_size(
 
     1. **Pre-filter and noise floor.** The input is passed through a 3x3
        median filter to suppress hot pixels and other isolated outliers
-       (matching :func:`ptychodus.api.diffraction.estimate_crop_center`).
+       (matching :func:`ptychodus.api.preprocess.diffraction.estimate_beam_center`).
        Background and noise scale are then estimated via
        :func:`ptychodus.api.preprocess.noise.estimate_noise_floor`, which uses Otsu's
        method on the filtered image to identify the background class when
@@ -227,8 +228,8 @@ def estimate_probe_size(
             filtered[1:-1, -1].ravel(),
         ]
     )
-    noise_floor = estimate_noise_floor(filtered, fallback_values=border)
-    threshold = noise_floor.get_significance_threshold(mad_threshold)
+    robust_statistics = estimate_noise_floor(filtered, fallback_values=border)
+    threshold = robust_statistics.get_significance_threshold(mad_threshold)
 
     cleaned = numpy.clip(filtered - threshold, 0.0, None)
     total_power = cleaned.sum()
@@ -314,16 +315,32 @@ def estimate_probe_size(
 class ProbeTransverseCoordinates:
     """2D Cartesian coordinate arrays for the transverse plane of the probe, in meters."""
 
-    position_x_m: RealArrayType
-    position_y_m: RealArrayType
+    x_m: RealArrayType
+    y_m: RealArrayType
 
     @property
     def position_r_m(self) -> RealArrayType:
-        return numpy.hypot(self.position_y_m, self.position_x_m)
+        return numpy.hypot(self.y_m, self.x_m)
 
     @property
     def angle_rad(self) -> RealArrayType:
-        return numpy.arctan2(self.position_y_m, self.position_x_m)
+        return numpy.arctan2(self.y_m, self.x_m)
+
+
+@dataclass(frozen=True)
+class PatchBounds:
+    """Indexing bounds and sub-pixel offset for a probe-sized patch anchored at a float object-pixel center.
+
+    ``x_slice`` and ``y_slice`` are numpy slices that select a
+    ``height_px x width_px`` region from an object canvas at the integer
+    lower-left corner. ``dx`` and ``dy`` are the residual sub-pixel offsets
+    that a Fourier shift must apply to the probe.
+    """
+
+    x_slice: slice
+    y_slice: slice
+    dx: float
+    dy: float
 
 
 @dataclass(frozen=True)
@@ -334,6 +351,26 @@ class ProbeGeometry:
     height_px: int
     pixel_width_m: float
     pixel_height_m: float
+
+    @classmethod
+    def from_far_field(
+        cls,
+        detector_pixel_geometry: PixelGeometry,
+        image_extent: ImageExtent,
+        *,
+        wavelength_m: float,
+        distance_m: float,
+    ) -> ProbeGeometry:
+        """Sample-plane probe geometry from the Fraunhofer relation ``dx_sample = lambda * |z| / (N * dx_detector)``."""
+        width_px = image_extent.width_px
+        height_px = image_extent.height_px
+        numerator_m2 = wavelength_m * abs(distance_m)
+        return cls(
+            width_px=width_px,
+            height_px=height_px,
+            pixel_width_m=numerator_m2 / (detector_pixel_geometry.width_m * width_px),
+            pixel_height_m=numerator_m2 / (detector_pixel_geometry.height_m * height_px),
+        )
 
     @property
     def width_m(self) -> float:
@@ -351,16 +388,46 @@ class ProbeGeometry:
 
     def get_transverse_coordinates(self) -> ProbeTransverseCoordinates:
         Y, X = numpy.mgrid[: self.height_px, : self.width_px]  # noqa: N806
-        position_x_px = X - (self.width_px - 1) / 2
-        position_y_px = Y - (self.height_px - 1) / 2
-
-        position_x_m = position_x_px * self.pixel_width_m
-        position_y_m = position_y_px * self.pixel_height_m
-
+        x_px = X - (self.width_px - 1) / 2
+        y_px = Y - (self.height_px - 1) / 2
         return ProbeTransverseCoordinates(
-            position_x_m=position_x_m,
-            position_y_m=position_y_m,
+            x_m=x_px * self.pixel_width_m, y_m=y_px * self.pixel_height_m
         )
+
+    def resolve_patch_bounds(self, cx: float, cy: float) -> PatchBounds:
+        """Locate a ``height_px x width_px`` patch anchored at object-pixel center ``(cx, cy)``.
+
+        Under the (N-1)/2 centered-pixel convention shared with
+        ``get_transverse_coordinates``, returns the numpy slices for the
+        integer lower-left corner and the residual sub-pixel offset that a
+        Fourier shift must apply.
+
+        The integer split uses Python ``int()`` (truncate toward zero), which
+        equals ``math.floor`` when ``cx - (width_px - 1) / 2`` and
+        ``cy - (height_px - 1) / 2`` are non-negative — the standard case for
+        object-canvas coordinates. Behavior differs for negative arguments.
+        """
+        rx_px = (self.width_px - 1) / 2
+        ry_px = (self.height_px - 1) / 2
+        x_lower = int(cx - rx_px)
+        y_lower = int(cy - ry_px)
+        return PatchBounds(
+            x_slice=slice(x_lower, x_lower + self.width_px),
+            y_slice=slice(y_lower, y_lower + self.height_px),
+            dx=cx - (x_lower + rx_px),
+            dy=cy - (y_lower + ry_px),
+        )
+
+    def __str__(self) -> str:
+        pixel_geometry = self.get_pixel_geometry()
+        width_label = format_length(self.pixel_width_m)
+
+        if pixel_geometry.is_square:
+            pitch = f'{width_label}/px'
+        else:
+            pitch = f'{width_label} x {format_length(self.pixel_height_m)}/px'
+
+        return f'{self.width_px} x {self.height_px} px @ {pitch}'
 
 
 class ProbeGeometryProvider(ABC):
@@ -426,6 +493,10 @@ class Probe:
             power /= powersum
 
         self._mode_relative_power = power.tolist()
+
+    @property
+    def nbytes(self) -> int:
+        return self._array.nbytes
 
     def copy(self) -> Probe:
         return Probe(
@@ -543,6 +614,15 @@ class ProbeSequence(Sequence[Probe]):
             raise TypeError('opr_weights must be a floating-point ndarray')
 
         self._pixel_geometry = pixel_geometry
+
+    @classmethod
+    def from_probe(cls, probe: Probe) -> ProbeSequence:
+        """Wrap a single :class:`Probe` as a length-1 sequence with no OPR basis."""
+        return cls(
+            array=probe.get_array(),
+            opr_weights=None,
+            pixel_geometry=probe.get_pixel_geometry(),
+        )
 
     def copy(self) -> ProbeSequence:
         return ProbeSequence(

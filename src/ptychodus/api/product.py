@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from sys import getsizeof
 
-from .constants import ELECTRON_VOLT_J, PLANCK_CONSTANT_J_PER_HZ, LIGHT_SPEED_M_PER_S
+from .constants import ELECTRON_VOLT_J, energy_eV_to_wavelength_m
 from .diffraction import Polarization
 from .object import Object
 from .probe import Probe, ProbeSequence
@@ -34,12 +34,7 @@ class ProductMetadata:
 
     @property
     def probe_wavelength_m(self) -> float:
-        hc_Jm = PLANCK_CONSTANT_J_PER_HZ * LIGHT_SPEED_M_PER_S  # noqa: N806
-
-        try:
-            return hc_Jm / self.probe_energy_J
-        except ZeroDivisionError:
-            return 0.0
+        return energy_eV_to_wavelength_m(self.probe_energy_eV)
 
     @property
     def nbytes(self) -> int:

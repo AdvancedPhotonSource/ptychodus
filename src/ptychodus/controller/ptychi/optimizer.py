@@ -4,7 +4,7 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parameters import IntegerParameter, StringParameter
 
 from ...model.ptychi import PtyChiEnumerators
-from ..parametric import (
+from ..parameters import (
     ComboBoxParameterViewController,
     SpinBoxParameterViewController,
     ParameterViewController,

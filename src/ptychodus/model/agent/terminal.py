@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 from datetime import datetime
 
 from pydantic_ai import Agent
@@ -8,6 +7,7 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.settings import ModelSettings
 
+from .endpoint import get_api_key_for_base_url
 from .models import ChatMessage, ChatRole
 from .repository import ConversationRepository
 from .settings import AgentSettings
@@ -39,9 +39,10 @@ class ChatTerminal:
         # The Argo OpenAPI spec instead declares ?authorization= as a query param;
         # if the live endpoint rejects the Bearer header, pass a custom
         # httpx.AsyncClient(params={'authorization': key}) to OpenAIProvider.
+        base_url = self._settings.base_url.get_value()
         provider = OpenAIProvider(
-            base_url=self._settings.base_url.get_value(),
-            api_key=os.environ.get('OPENAI_API_KEY', ''),
+            base_url=base_url,
+            api_key=get_api_key_for_base_url(base_url),
         )
         model = OpenAIChatModel(self._settings.model.get_value(), provider=provider)
         model_settings = ModelSettings(

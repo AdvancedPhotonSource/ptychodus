@@ -28,7 +28,7 @@ class ProbePositionsRepositoryItemFactory:
 
         Positions supplied in memory come from reconstruction output or a product
         loaded from file, so they are already conditioned. Batch mode reads
-        product-in.h5 through this path, where a user who sets a trim in
+        product.h5 through this path, where a user who sets a trim in
         settings.ini would otherwise see it silently do nothing. Trim at ingest
         instead -- ptychodus-bdp reads raw probe positions through the from-file
         builder, which does condition them.

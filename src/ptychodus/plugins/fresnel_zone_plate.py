@@ -5,21 +5,26 @@ from ptychodus.api.plugins import PluginRegistry
 def register_plugins(registry: PluginRegistry) -> None:
     registry.fresnel_zone_plates.register_plugin(
         FresnelZonePlate(160e-6, 70e-9, 60e-6),
-        display_name='2-ID-D',
+        simple_name='APS_2IDD',
+        display_name='APS 2-ID-D',
     )
     registry.fresnel_zone_plates.register_plugin(
         FresnelZonePlate(160e-6, 30e-9, 80e-6),
-        display_name='HXN',
+        simple_name='CNM_APS_HXN',
+        display_name='CNM/APS 26-ID-C Hard X-ray Nanoprobe',
     )
     registry.fresnel_zone_plates.register_plugin(
         FresnelZonePlate(114.8e-6, 60e-9, 40e-6),
-        display_name='LYNX',
+        simple_name='APS_LamNI',
+        display_name='APS 31-ID-E LamNI',
     )
     registry.fresnel_zone_plates.register_plugin(
         FresnelZonePlate(180e-6, 15e-9, 15e-6),
-        display_name='PtychoProbe',
+        simple_name='APS_PtychoProbe',
+        display_name='APS 33-ID-C PtychoProbe',
     )
     registry.fresnel_zone_plates.register_plugin(
         FresnelZonePlate(180e-6, 50e-9, 60e-6),
-        display_name='Velociprobe',
+        simple_name='APS_Velociprobe',
+        display_name='APS 33-ID-C VelociProbe',
     )

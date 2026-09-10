@@ -50,8 +50,8 @@ class DelimitedPositionFileWriter(ProbePositionFileWriter):
     def write(self, file_path: Path, positions: ProbePositionSequence) -> None:
         with file_path.open(mode='wt') as csv_file:
             for point in positions:
-                x = point.coordinate_x_m
-                y = point.coordinate_y_m
+                x = point.x_m
+                y = point.y_m
                 line = (
                     f'{y}{self._delimiter}{x}\n' if self._swap_xy else f'{x}{self._delimiter}{y}\n'
                 )

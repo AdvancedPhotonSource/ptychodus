@@ -8,6 +8,7 @@ from .item_factory import ObjectRepositoryItemFactory
 from .paganin import PaganinObjectBuilder
 from .random import RandomObjectBuilder
 from .settings import ObjectSettings
+from .siemens_star import SiemensStarObjectBuilder
 from .stxm import STXMObjectBuilder
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     'PaganinObjectBuilder',
     'RandomObjectBuilder',
     'STXMObjectBuilder',
+    'SiemensStarObjectBuilder',
 ]

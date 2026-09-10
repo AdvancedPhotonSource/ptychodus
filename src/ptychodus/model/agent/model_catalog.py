@@ -1,8 +1,8 @@
 import logging
-import os
 
 import httpx
 
+from .endpoint import get_api_key_for_base_url
 from .settings import AgentSettings
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ class ModelCatalog:
 
     def refresh(self) -> list[str]:
         base_url = self._settings.base_url.get_value().rstrip('/')
-        api_key = os.environ.get('OPENAI_API_KEY', '')
+        api_key = get_api_key_for_base_url(base_url)
         headers = {'Authorization': f'Bearer {api_key}'} if api_key else {}
         try:
             response = httpx.get(f'{base_url}/models', timeout=10.0, headers=headers)

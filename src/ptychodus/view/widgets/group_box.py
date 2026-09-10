@@ -2,7 +2,6 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QFrame,
     QGridLayout,
-    QGroupBox,
     QLabel,
     QMenu,
     QSizePolicy,
@@ -41,13 +40,3 @@ class GroupBoxWithPresets(QWidget):
         layout.addWidget(self._frame, 1, 0, 1, 2)
         layout.setColumnStretch(1, 1)
         self.setLayout(layout)
-
-
-class BottomTitledGroupBox(QGroupBox):
-    def __init__(self, title: str, parent: QWidget | None = None) -> None:
-        super().__init__(title, parent)
-        self.setStyleSheet("""
-            QGroupBox::title {
-                subcontrol-origin: padding;
-                subcontrol-position: bottom center;
-            }""")

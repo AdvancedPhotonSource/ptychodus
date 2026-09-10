@@ -4,11 +4,14 @@ from __future__ import annotations
 from enum import StrEnum
 from pathlib import Path
 import logging
+import re
 
 import h5py
 import numpy
 
-from .diffraction import AssembledDiffractionData, Polarization, zero_bad_pixels
+from .assemble import AssembledDiffractionData
+from .diffraction import Polarization
+from .preprocess.diffraction import zero_bad_pixels
 from .fluorescence import ElementMap, FluorescenceDataset
 from .geometry import PixelGeometry
 from .object import Object, ObjectCenter
@@ -27,9 +30,41 @@ __all__ = [
     'save_fluorescence_data',
     'save_product',
     'save_ptychopinn_training_data',
+    'sanitize_path_component',
+    'resolve_external_link_path',
 ]
 
 logger = logging.getLogger(__name__)
+
+_UNSAFE_PATH_CHARS = re.compile(r'[^A-Za-z0-9._-]')
+_MAX_PATH_COMPONENT_LENGTH = 128
+
+
+def sanitize_path_component(name: str, *, fallback: str = 'unnamed') -> str:
+    """Reduce an untrusted name to a single safe path component.
+
+    Product names are read verbatim from user-supplied files, so they must never reach a
+    filesystem join or a remote shell command unfiltered. Separators, shell metacharacters,
+    and leading dots are replaced so the result cannot traverse directories, expand in a
+    shell, or create a hidden entry.
+    """
+    cleaned = _UNSAFE_PATH_CHARS.sub('_', name).strip(' .')
+    return cleaned[:_MAX_PATH_COMPONENT_LENGTH] or fallback
+
+
+def resolve_external_link_path(base_directory: Path, filename: str) -> Path:
+    """Resolve an HDF5 external-link target against the directory holding the master file.
+
+    The target is chosen by whoever wrote the master file, so an absolute path or a parent
+    traversal would let a crafted dataset pull in any HDF5 file the user can read. Symlinks
+    are deliberately not resolved: beamline data directories legitimately contain them.
+    """
+    link_path = Path(filename)
+
+    if link_path.is_absolute() or '..' in link_path.parts:
+        raise ValueError(f'Refusing external link outside the data directory: {filename!r}')
+
+    return base_directory / link_path
 
 
 class StandardFileLayout(StrEnum):
@@ -37,15 +72,23 @@ class StandardFileLayout(StrEnum):
 
     DIFFRACTION = 'diffraction.h5'
     FLUORESCENCE = 'fluorescence.h5'
-    FLUORESCENCE_IN = 'fluorescence-in.h5'
-    FLUORESCENCE_OUT = 'fluorescence-out.h5'
     # Stem only; the per-backend extension comes from
     # TrainableReconstructor.get_model_file_extension(). The full path is
     # f'{input_directory}/{MODEL_BASENAME}{ext}'.
     MODEL_BASENAME = 'model'
-    PRODUCT_IN = 'product-in.h5'
-    PRODUCT_OUT = 'product-out.h5'
+    PRODUCT = 'product.h5'
     SETTINGS = 'settings.ini'
+
+    def path(self, directory: Path) -> Path:
+        return directory / self.value
+
+    def checkpoint_path(self, directory: Path, epoch: int) -> Path:
+        # Convention shared by scripts/ptychodus_reconstruct.py and
+        # model/processing/monitor.py::ReconstructBackgroundTask, which write
+        # per-epoch snapshots beside the final artifact during streaming
+        # reconstructions.
+        p = Path(self.value)
+        return directory / f'{p.stem}.{epoch:06d}{p.suffix}'
 
 
 class DiffractionFileKeys(StrEnum):
@@ -56,13 +99,23 @@ class DiffractionFileKeys(StrEnum):
     DETECTOR_PIXEL_WIDTH = 'detector_pixel_width_m'
     INDEXES = 'indexes'
     BAD_PIXELS = 'bad_pixels'
+    PROBE_PHOTON_COUNTS = 'probe_photon_counts'
 
 
-def load_diffraction_data(file: Path, *, mmap_file: Path | None = None) -> AssembledDiffractionData:
-    """Load assembled diffraction data from an HDF5 file written by :func:`save_diffraction_data`."""
-    if mmap_file is not None:
-        raise NotImplementedError('Load to memory map not implemented yet!')
+def load_diffraction_data(
+    file: Path,
+    *,
+    mmap_file: Path | None = None,
+    mmap_chunk_frames: int = 1024,
+) -> AssembledDiffractionData:
+    """Load assembled diffraction data from an HDF5 file written by :func:`save_diffraction_data`.
 
+    When ``mmap_file`` is given, the patterns are staged into a read-only ``numpy.memmap``
+    backed by that path rather than held in RAM; indexes and bad pixels are small and load
+    normally. The caller owns ``mmap_file`` — it is overwritten if present and never removed.
+    ``mmap_chunk_frames`` sets how many frames are copied from HDF5 into the memory map
+    per read.
+    """
     with h5py.File(file, 'r') as h5_file:
         h5_indexes = h5_file[DiffractionFileKeys.INDEXES]
 
@@ -84,11 +137,35 @@ def load_diffraction_data(file: Path, *, mmap_file: Path | None = None) -> Assem
         if not isinstance(h5_bad_pixels, h5py.Dataset):
             raise ValueError('Bad pixels are not a dataset!')
 
+        if mmap_file is None:
+            patterns = h5_patterns[()]
+        else:
+            # HDF5 cannot be memory mapped directly, so stage patterns block by block into
+            # mmap_file, then reopen read-only so nothing downstream can dirty the caller's
+            # scratch file.
+            staging = numpy.memmap(
+                mmap_file, dtype=h5_patterns.dtype, mode='w+', shape=h5_patterns.shape
+            )
+            for lo in range(0, h5_patterns.shape[0], mmap_chunk_frames):
+                hi = lo + mmap_chunk_frames
+                staging[lo:hi] = h5_patterns[lo:hi]
+            staging.flush()
+            del staging
+            patterns = numpy.memmap(
+                mmap_file, dtype=h5_patterns.dtype, mode='r', shape=h5_patterns.shape
+            )
+
+        probe_photon_counts = None
+        h5_probe_photon_counts = h5_file.get(DiffractionFileKeys.PROBE_PHOTON_COUNTS)
+        if isinstance(h5_probe_photon_counts, h5py.Dataset):
+            probe_photon_counts = h5_probe_photon_counts[()]
+
         return AssembledDiffractionData(
             h5_indexes[()],
-            h5_patterns[()],
+            patterns,
             detector_pixel_geometry,
             h5_bad_pixels[()],
+            probe_photon_counts=probe_photon_counts,
         )
 
 
@@ -113,6 +190,13 @@ def save_diffraction_data(
         h5_file.create_dataset(
             DiffractionFileKeys.BAD_PIXELS, data=data._bad_pixels, compression=compression
         )
+        if data.has_measured_probe_photon_counts():
+            assert data._probe_photon_counts is not None
+            h5_file.create_dataset(
+                DiffractionFileKeys.PROBE_PHOTON_COUNTS,
+                data=data._probe_photon_counts,
+                compression=compression,
+            )
 
 
 class ProductFileKeys(StrEnum):
@@ -135,6 +219,7 @@ class ProductFileKeys(StrEnum):
     PROBE_POSITION_INDEXES = 'probe_position_indexes'
     PROBE_POSITION_X = 'probe_position_x_m'
     PROBE_POSITION_Y = 'probe_position_y_m'
+    PROBE_PHOTON_COUNTS = 'probe_photon_counts'
     OBJECT_ARRAY = 'object'
     OBJECT_CENTER_X = 'center_x_m'
     OBJECT_CENTER_Y = 'center_y_m'
@@ -195,8 +280,8 @@ def load_product(file: Path) -> Product:
             height_m=float(h5_object.attrs[ProductFileKeys.OBJECT_PIXEL_HEIGHT]),
         )
         object_center = ObjectCenter(
-            coordinate_x_m=float(h5_object.attrs[ProductFileKeys.OBJECT_CENTER_X]),
-            coordinate_y_m=float(h5_object.attrs[ProductFileKeys.OBJECT_CENTER_Y]),
+            x_m=float(h5_object.attrs[ProductFileKeys.OBJECT_CENTER_X]),
+            y_m=float(h5_object.attrs[ProductFileKeys.OBJECT_CENTER_Y]),
         )
 
         try:
@@ -265,8 +350,24 @@ def load_product(file: Path) -> Product:
         if not isinstance(h5_position_y, h5py.Dataset):
             raise ValueError('Probe position Y is not a dataset!')
 
-        for idx, x_m, y_m in zip(h5_position_indexes[()], h5_position_x[()], h5_position_y[()]):
-            point = ProbePosition(idx, x_m, y_m)
+        # The all-or-nothing invariant on ProbePositionSequence means save_product only
+        # writes probe_photon_counts when every position had a count; a present
+        # dataset therefore aligns 1:1 with probe_position_indexes and needs no dict.
+        position_photon_counts_array: numpy.ndarray | None = None
+        h5_position_photon_counts = h5_file.get(ProductFileKeys.PROBE_PHOTON_COUNTS)
+        if isinstance(h5_position_photon_counts, h5py.Dataset):
+            position_photon_counts_array = h5_position_photon_counts[()]
+
+        indexes = h5_position_indexes[()]
+        xs = h5_position_x[()]
+        ys = h5_position_y[()]
+        for i, (idx, x_m, y_m) in enumerate(zip(indexes, xs, ys)):
+            photon_count = (
+                None
+                if position_photon_counts_array is None
+                else float(position_photon_counts_array[i])
+            )
+            point = ProbePosition(idx, x_m, y_m, probe_photon_count=photon_count)
             point_list.append(point)
 
         losses: list[LossValue] = []
@@ -304,8 +405,10 @@ def save_product(file: Path, product: Product) -> None:
 
     for point in product.probe_positions:
         scan_indexes.append(point.index)
-        scan_x_m.append(point.coordinate_x_m)
-        scan_y_m.append(point.coordinate_y_m)
+        scan_x_m.append(point.x_m)
+        scan_y_m.append(point.y_m)
+
+    position_photon_counts = product.probe_positions.get_probe_photon_counts()
 
     with h5py.File(file, 'w') as h5_file:
         metadata = product.metadata
@@ -324,6 +427,11 @@ def save_product(file: Path, product: Product) -> None:
         h5_file.create_dataset(ProductFileKeys.PROBE_POSITION_INDEXES, data=scan_indexes)
         h5_file.create_dataset(ProductFileKeys.PROBE_POSITION_X, data=scan_x_m)
         h5_file.create_dataset(ProductFileKeys.PROBE_POSITION_Y, data=scan_y_m)
+        if position_photon_counts is not None:
+            h5_file.create_dataset(
+                ProductFileKeys.PROBE_PHOTON_COUNTS,
+                data=position_photon_counts,
+            )
 
         probe = product.probes
         h5_probe = h5_file.create_dataset(ProductFileKeys.PROBE_ARRAY, data=probe.get_array())
@@ -418,7 +526,7 @@ def load_fluorescence_data(file: Path) -> FluorescenceDataset:
         channel_names_path = h5_channel_names.name
 
     return FluorescenceDataset(
-        element_maps=element_maps,
+        _element_maps=element_maps,
         counts_per_second_path=counts_per_second_path,
         channel_names_path=channel_names_path,
     )
@@ -429,8 +537,8 @@ def save_fluorescence_data(file: Path, dataset: FluorescenceDataset) -> None:
     counts_group_path, counts_ds_name = _split_h5_path(dataset.counts_per_second_path)
     names_group_path, names_ds_name = _split_h5_path(dataset.channel_names_path)
 
-    channel_names = [emap.name for emap in dataset.element_maps]
-    counts_per_second = [emap.counts_per_second for emap in dataset.element_maps]
+    channel_names = [emap.name for emap in dataset]
+    counts_per_second = [emap.counts_per_second for emap in dataset]
 
     with h5py.File(file, 'w') as h5_file:
         counts_group = h5_file.require_group(counts_group_path)
@@ -459,8 +567,8 @@ def save_ptychopinn_training_data(
 
     for scan_point in parameters.product.probe_positions:
         object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        position_x_px.append(object_point.coordinate_x_px)
-        position_y_px.append(object_point.coordinate_y_px)
+        position_x_px.append(object_point.x_px)
+        position_y_px.append(object_point.y_px)
 
     xcoords = numpy.array(position_x_px)
     ycoords = numpy.array(position_y_px)

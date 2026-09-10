@@ -24,7 +24,7 @@ from ...view.processing import ProcessingActionsView, ProcessingStatusView
 from ...view.widgets import ExceptionDialog
 from ..data import FileDialogFactory
 from ..helpers import connect_triggered_signal
-from ..parametric import ComboBoxParameterViewController
+from ..parameters import ComboBoxParameterViewController
 from ..product.core import ProductRepositoryTableModel
 from .parameters import (
     ProcessingStatusController,

@@ -43,6 +43,14 @@ def create_facility_adapters(settings: GenesisSettings) -> Mapping[str, IRIFacil
     except FileNotFoundError:
         logger.info(f'IRI tokens file not found: {tokens_file}')
         return adapters
+    except PermissionError:
+        # GenesisCore is constructed unconditionally, so an insecure token file must disable the
+        # facility adapters rather than abort application startup.
+        logger.error(
+            f'Refusing to load {tokens_file}; fix with "chmod 600 {tokens_file}". '
+            'Genesis facilities are disabled.'
+        )
+        return adapters
 
     for token in access_tokens:
         facility = token.facility.casefold()

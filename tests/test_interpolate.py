@@ -26,8 +26,8 @@ def test_barycentric_get_patch_matches_analytic_bilinear_on_plane() -> None:
     # The patch samples correspond to integer pixel positions relative to the
     # top-left of the (whole) support slice. Reconstruct the expected values
     # analytically by knowing where each pixel lands in world coordinates.
-    x_lower = 6.3 - 2.0  # center_x - width/2
-    y_lower = 5.7 - 2.0
+    x_lower = 6.3 - 1.5  # center_x - (width - 1) / 2
+    y_lower = 5.7 - 1.5
     # The gather is over an (n+1)x(n+1) support and produces an nxn patch
     # whose samples are at whole indices x_lower_wh + xmin_fr + i for i in 0..n-1.
     # For a plane, sampling at fractional (x_lower + i, y_lower + j) is exact.
@@ -42,7 +42,7 @@ def test_barycentric_add_patch_scatters_full_intensity_at_integer_center() -> No
     interp = BarycentricArrayInterpolator(array)
 
     patch = numpy.ones((3, 3), dtype=float)
-    # width/2 = 1.5; pick center so that x_lower and y_lower are exact half-integers,
+    # (width - 1) / 2 = 1.0; pick center so that x_lower and y_lower are exact half-integers,
     # yielding x_frac = y_frac = 0.5 (weights all 0.25).
     interp.add_patch(center_x=4.5, center_y=4.5, patch=patch)
 

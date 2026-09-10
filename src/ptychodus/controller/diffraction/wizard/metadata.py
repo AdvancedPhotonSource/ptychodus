@@ -5,12 +5,15 @@ from typing import Any
 from PyQt5.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt
 from PyQt5.QtWidgets import QHeaderView, QWizardPage
 
-from ptychodus.api.constants import ONE_MICRON_M
-from ptychodus.api.diffraction import DiffractionMetadata
+from ptychodus.api.constants import LengthUnit
+from ptychodus.api.diffraction import BeamCenter, CropRegion, DiffractionMetadata
+from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.parameters import RealParameter
 
 from ....model.diffraction import DetectorSettings, DiffractionSettings
 from ....model.product import ProductSettings
 from ....view.diffraction import OpenDatasetWizardMetadataPage
+from ...parameters import LengthParameterViewController
 
 
 @dataclass(frozen=True)
@@ -97,6 +100,43 @@ class MetadataTableModel(QAbstractTableModel):
         return len(self._HEADER)
 
 
+def _format_detector_distance(metadata: DiffractionMetadata) -> str:
+    distance_m = metadata.detector_distance_m
+    return '—' if distance_m is None else f'{distance_m:.3f} m'
+
+
+def _format_beam_center(metadata: DiffractionMetadata) -> str:
+    beam_center = metadata.beam_center
+    if beam_center is not None:
+        return f'({beam_center.x_px}, {beam_center.y_px}) px'
+    extent = metadata.detector_extent
+    if extent is not None:
+        return f'({int(extent.width_px) // 2}, {int(extent.height_px) // 2}) px'
+    return '—'
+
+
+def _format_crop_extent(metadata: DiffractionMetadata) -> str:
+    extent = metadata.detector_extent
+    if extent is None:
+        return '—'
+    return f'{int(extent.width_px)} × {int(extent.height_px)} px'
+
+
+def _format_probe_energy(metadata: DiffractionMetadata) -> str:
+    energy_eV = metadata.probe_energy_eV  # noqa: N806
+    return '—' if energy_eV is None else f'{energy_eV:.3f} eV'
+
+
+def _format_probe_photon_count(metadata: DiffractionMetadata) -> str:
+    count = metadata.probe_photon_count
+    return '—' if count is None else f'{count:g}'
+
+
+def _format_exposure_time(metadata: DiffractionMetadata) -> str:
+    exposure_time_s = metadata.exposure_time_s
+    return '—' if exposure_time_s is None else f'{exposure_time_s * 1e3:.3f} ms'
+
+
 class OpenDatasetWizardMetadataViewController:
     def __init__(
         self,
@@ -112,6 +152,26 @@ class OpenDatasetWizardMetadataViewController:
         self._page = OpenDatasetWizardMetadataPage()
         self._table_model = MetadataTableModel()
         self._all_rows: tuple[_MetadataRow, ...] = self._build_rows()
+
+        # Scratch parameters isolate wizard edits from DetectorSettings until the user
+        # accepts (settings are written in import_metadata). Bound only to the two
+        # LengthParameterViewController widgets; nothing else observes them.
+        self._pixel_width_param = RealParameter(
+            detector_settings.pixel_width_m.get_value(), parent=None, minimum=0.0
+        )
+        self._pixel_height_param = RealParameter(
+            detector_settings.pixel_height_m.get_value(), parent=None, minimum=0.0
+        )
+        self._pixel_width_view_controller = LengthParameterViewController(
+            self._pixel_width_param, default_unit=LengthUnit.MICROMETER
+        )
+        self._pixel_height_view_controller = LengthParameterViewController(
+            self._pixel_height_param, default_unit=LengthUnit.MICROMETER
+        )
+        self._page.pixel_size_form.addRow('Width:', self._pixel_width_view_controller.get_widget())
+        self._page.pixel_size_form.addRow(
+            'Height:', self._pixel_height_view_controller.get_widget()
+        )
 
         self._page.table_view.setModel(self._table_model)
 
@@ -130,45 +190,39 @@ class OpenDatasetWizardMetadataViewController:
     def _build_rows(self) -> tuple[_MetadataRow, ...]:
         return (
             _MetadataRow(
-                name='Detector Pixel Size',
-                is_present=lambda m: m.detector_pixel_geometry is not None,
-                format_value=self._format_pixel_size,
-                apply=self._apply_pixel_size,
-            ),
-            _MetadataRow(
                 name='Detector Distance',
                 is_present=lambda m: m.detector_distance_m is not None,
-                format_value=self._format_detector_distance,
+                format_value=_format_detector_distance,
                 apply=self._apply_detector_distance,
             ),
             _MetadataRow(
-                name='Pattern Crop Center',
-                is_present=lambda m: m.crop_center is not None or m.detector_extent is not None,
-                format_value=self._format_crop_center,
-                apply=self._apply_crop_center,
+                name='Beam Center',
+                is_present=lambda m: m.beam_center is not None or m.detector_extent is not None,
+                format_value=_format_beam_center,
+                apply=self._apply_beam_center,
             ),
             _MetadataRow(
                 name='Pattern Crop Extent',
                 is_present=lambda m: m.detector_extent is not None,
-                format_value=self._format_crop_extent,
+                format_value=_format_crop_extent,
                 apply=self._apply_crop_extent,
             ),
             _MetadataRow(
                 name='Probe Energy',
                 is_present=lambda m: m.probe_energy_eV is not None,
-                format_value=self._format_probe_energy,
+                format_value=_format_probe_energy,
                 apply=self._apply_probe_energy,
             ),
             _MetadataRow(
                 name='Probe Photon Count',
                 is_present=lambda m: m.probe_photon_count is not None,
-                format_value=self._format_probe_photon_count,
+                format_value=_format_probe_photon_count,
                 apply=self._apply_probe_photon_count,
             ),
             _MetadataRow(
                 name='Exposure Time',
                 is_present=lambda m: m.exposure_time_s is not None,
-                format_value=self._format_exposure_time,
+                format_value=_format_exposure_time,
                 apply=self._apply_exposure_time,
             ),
         )
@@ -179,103 +233,75 @@ class OpenDatasetWizardMetadataViewController:
         for row in self._table_model.checked_rows():
             row.apply(metadata)
 
+        if self._page.sync_pixel_size_check_box.isChecked():
+            self._detector_settings.pixel_width_m.set_value(self._pixel_width_param.get_value())
+            self._detector_settings.pixel_height_m.set_value(self._pixel_height_param.get_value())
+
     def refresh(self) -> None:
         metadata = self._get_metadata()
         visible = [row for row in self._all_rows if row.is_present(metadata)]
         self._table_model.set_rows(visible, metadata)
 
+        # Seed the pixel-size widgets: metadata wins when the reader supplied a value,
+        # otherwise fall back to current DetectorSettings. The sync checkbox reflects
+        # the same choice so an untouched wizard behaves like the old table row (write
+        # metadata into settings on accept; leave settings alone when metadata is
+        # absent).
+        pixel_geometry = metadata.detector_pixel_geometry
+        if pixel_geometry is not None:
+            self._pixel_width_param.set_value(pixel_geometry.width_m)
+            self._pixel_height_param.set_value(pixel_geometry.height_m)
+            self._page.sync_pixel_size_check_box.setChecked(True)
+        else:
+            self._pixel_width_param.set_value(self._detector_settings.pixel_width_m.get_value())
+            self._pixel_height_param.set_value(self._detector_settings.pixel_height_m.get_value())
+            self._page.sync_pixel_size_check_box.setChecked(False)
+
     def get_widget(self) -> QWizardPage:
         return self._page
 
-    # --- Detector pixel size ---
-
-    @staticmethod
-    def _format_pixel_size(metadata: DiffractionMetadata) -> str:
-        pixel_geometry = metadata.detector_pixel_geometry
-        if pixel_geometry is None:
-            return '—'
-        return f'{pixel_geometry.width_m / ONE_MICRON_M:.3f} × {pixel_geometry.height_m / ONE_MICRON_M:.3f} µm'
-
-    def _apply_pixel_size(self, metadata: DiffractionMetadata) -> None:
-        pixel_geometry = metadata.detector_pixel_geometry
-        if pixel_geometry is not None:
-            self._detector_settings.pixel_width_m.set_value(pixel_geometry.width_m)
-            self._detector_settings.pixel_height_m.set_value(pixel_geometry.height_m)
-
     # --- Detector distance ---
-
-    @staticmethod
-    def _format_detector_distance(metadata: DiffractionMetadata) -> str:
-        distance_m = metadata.detector_distance_m
-        return '—' if distance_m is None else f'{distance_m:.3f} m'
 
     def _apply_detector_distance(self, metadata: DiffractionMetadata) -> None:
         distance_m = metadata.detector_distance_m
         if distance_m:
             self._product_settings.detector_distance_m.set_value(distance_m)
 
-    # --- Crop center ---
+    # --- Beam center ---
 
-    @staticmethod
-    def _format_crop_center(metadata: DiffractionMetadata) -> str:
-        crop_center = metadata.crop_center
-        if crop_center is not None:
-            return f'({crop_center.position_x_px}, {crop_center.position_y_px}) px'
-        extent = metadata.detector_extent
-        if extent is not None:
-            return f'({int(extent.width_px) // 2}, {int(extent.height_px) // 2}) px'
-        return '—'
-
-    def _apply_crop_center(self, metadata: DiffractionMetadata) -> None:
-        crop_center = metadata.crop_center
-        if crop_center is not None:
-            self._diffraction_settings.crop_center_x_px.set_value(crop_center.position_x_px)
-            self._diffraction_settings.crop_center_y_px.set_value(crop_center.position_y_px)
+    def _apply_beam_center(self, metadata: DiffractionMetadata) -> None:
+        beam_center = metadata.beam_center
+        if beam_center is not None:
+            self._diffraction_settings.beam_center_x_px.set_value(beam_center.x_px)
+            self._diffraction_settings.beam_center_y_px.set_value(beam_center.y_px)
         elif metadata.detector_extent is not None:
-            self._diffraction_settings.crop_center_x_px.set_value(
+            self._diffraction_settings.beam_center_x_px.set_value(
                 int(metadata.detector_extent.width_px) // 2
             )
-            self._diffraction_settings.crop_center_y_px.set_value(
+            self._diffraction_settings.beam_center_y_px.set_value(
                 int(metadata.detector_extent.height_px) // 2
             )
 
     # --- Crop extent ---
-
-    @staticmethod
-    def _format_crop_extent(metadata: DiffractionMetadata) -> str:
-        extent = metadata.detector_extent
-        if extent is None:
-            return '—'
-        return f'{int(extent.width_px)} × {int(extent.height_px)} px'
 
     def _apply_crop_extent(self, metadata: DiffractionMetadata) -> None:
         extent = metadata.detector_extent
         if extent is None:
             return
 
-        center_x = self._diffraction_settings.crop_center_x_px.get_value()
-        center_y = self._diffraction_settings.crop_center_y_px.get_value()
-
-        extent_x = int(extent.width_px)
-        extent_y = int(extent.height_px)
-
-        max_radius_x = min(center_x, extent_x - center_x)
-        max_radius_y = min(center_y, extent_y - center_y)
-        max_radius = min(max_radius_x, max_radius_y)
-        crop_diameter = 1
-
-        while crop_diameter < max_radius:
-            crop_diameter <<= 1
-
-        self._diffraction_settings.crop_width_px.set_value(crop_diameter)
-        self._diffraction_settings.crop_height_px.set_value(crop_diameter)
+        center = BeamCenter(
+            x_px=self._diffraction_settings.beam_center_x_px.get_value(),
+            y_px=self._diffraction_settings.beam_center_y_px.get_value(),
+        )
+        detector_extent = ImageExtent(
+            width_px=int(extent.width_px),
+            height_px=int(extent.height_px),
+        )
+        region = CropRegion.from_largest_pow2(center, detector_extent)
+        self._diffraction_settings.crop_width_px.set_value(region.width_px)
+        self._diffraction_settings.crop_height_px.set_value(region.height_px)
 
     # --- Probe energy ---
-
-    @staticmethod
-    def _format_probe_energy(metadata: DiffractionMetadata) -> str:
-        energy_eV = metadata.probe_energy_eV  # noqa: N806
-        return '—' if energy_eV is None else f'{energy_eV:.3f} eV'
 
     def _apply_probe_energy(self, metadata: DiffractionMetadata) -> None:
         energy_eV = metadata.probe_energy_eV  # noqa: N806
@@ -284,22 +310,12 @@ class OpenDatasetWizardMetadataViewController:
 
     # --- Probe photon count ---
 
-    @staticmethod
-    def _format_probe_photon_count(metadata: DiffractionMetadata) -> str:
-        count = metadata.probe_photon_count
-        return '—' if count is None else f'{count:g}'
-
     def _apply_probe_photon_count(self, metadata: DiffractionMetadata) -> None:
         count = metadata.probe_photon_count
         if count:
             self._product_settings.probe_photon_count.set_value(count)
 
     # --- Exposure time ---
-
-    @staticmethod
-    def _format_exposure_time(metadata: DiffractionMetadata) -> str:
-        exposure_time_s = metadata.exposure_time_s
-        return '—' if exposure_time_s is None else f'{exposure_time_s * 1e3:.3f} ms'
 
     def _apply_exposure_time(self, metadata: DiffractionMetadata) -> None:
         exposure_time_s = metadata.exposure_time_s

@@ -1,37 +1,45 @@
 from __future__ import annotations
 import logging
-from typing import Any, overload
+from typing import Any, Final, cast, overload
 
 import numpy
 
-from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex, QObject
+from PyQt5.QtCore import Qt, QAbstractItemModel, QAbstractListModel, QModelIndex, QObject
+from PyQt5.QtGui import QBrush, QFont
 
-from ptychodus.api.constants import BYTES_PER_MEGABYTE, ONE_MICRON_M
+from ptychodus.api.constants import LengthUnit, format_bytes
 from ptychodus.api.diffraction import DiffractionPattern
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 
 from ptychodus.model.diffraction import (
     AssembledDiffractionArray,
     AssembledDiffractionDataset,
+    DiffractionDatasetObserver,
     DiffractionDatasetRepository,
-    PatternSizer,
+    DiffractionDatasetRepositoryObserver,
+    DiffractionDatasetState,
 )
 
-__all__ = ['DatasetTreeModel']
+__all__ = [
+    'UNBOUND_DATASET',
+    'DiffractionDatasetComboModel',
+    'DiffractionTreeModel',
+]
 
 logger = logging.getLogger(__name__)
 
-_COL_LABEL = 0
+UNBOUND_DATASET: Final[str] = '(unbound)'
+"""Label for the sentinel entry meaning "no diffraction dataset"."""
+
+_COL_NAME = 0
 _COL_COUNTS = 1
 _COL_FRAMES = 2
-_COL_SIZE_MB = 3
-_COL_WIDTH_PX = 4
-_COL_HEIGHT_PX = 5
-_COL_PHYSICAL_PIXEL_WIDTH_UM = 6
-_COL_PHYSICAL_PIXEL_HEIGHT_UM = 7
-_COL_PROCESSED_PIXEL_WIDTH_UM = 8
-_COL_PROCESSED_PIXEL_HEIGHT_UM = 9
-_COL_NUM_BAD_PIXELS = 10
+_COL_WIDTH_PX = 3
+_COL_HEIGHT_PX = 4
+_COL_PHYSICAL_PIXEL_WIDTH_UM = 5
+_COL_PHYSICAL_PIXEL_HEIGHT_UM = 6
+_COL_NUM_BAD_PIXELS = 9
+_COL_SIZE = 10
 
 
 class _TreeNode:
@@ -77,7 +85,7 @@ class _DatasetTreeNode(_TreeNode):
         return sum(child.get_counts() for child in self.child_nodes) // len(self.child_nodes)
 
     def get_data(self) -> DiffractionPattern | None:
-        return self._dataset.get_average_pattern()
+        return self._dataset.get_mean_pattern()
 
     def get_detector_extent(self) -> ImageExtent:
         return self._dataset.get_metadata().detector_extent
@@ -85,11 +93,17 @@ class _DatasetTreeNode(_TreeNode):
     def get_raw_pixel_geometry(self) -> PixelGeometry:
         return self._dataset.get_raw_pixel_geometry()
 
-    def get_processed_pixel_geometry(self, sizer: PatternSizer) -> PixelGeometry:
-        return sizer.get_processed_pixel_geometry(self._dataset.get_raw_pixel_geometry())
+    def get_processed_pixel_geometry(self) -> PixelGeometry:
+        return self._dataset.get_processed_pixel_geometry()
 
     def get_num_bad_pixels(self) -> int:
         return int(numpy.count_nonzero(self._dataset.get_bad_pixels()))
+
+    def get_nbytes(self) -> int:
+        # The dataset's own total, not the sum of its arrays: the arrays are views into
+        # one patterns buffer, and the shared index array and bad-pixel mask belong to
+        # no single array. This keeps the column summing to the panel's info label.
+        return self._dataset.get_nbytes()
 
 
 class _ArrayTreeNode(_TreeNode):
@@ -103,10 +117,10 @@ class _ArrayTreeNode(_TreeNode):
         return self._array.get_label()
 
     def get_counts(self) -> int:
-        return int(self._array.get_mean_pattern_counts())
+        return int(self._array.get_mean_total_counts())
 
     def get_max_counts(self) -> int:
-        return int(self._array.get_max_pattern_counts())
+        return int(self._array.get_max_total_counts())
 
     def get_nframes(self) -> int:
         return len(self.child_nodes)
@@ -115,7 +129,7 @@ class _ArrayTreeNode(_TreeNode):
         return self._array.get_patterns().nbytes
 
     def get_data(self) -> DiffractionPattern:
-        return self._array.get_average_pattern()
+        return self._array.get_mean_pattern()
 
 
 class _FrameTreeNode(_TreeNode):
@@ -133,7 +147,7 @@ class _FrameTreeNode(_TreeNode):
         return f'Frame {self._frame_index}'
 
     def get_counts(self) -> int:
-        return int(self._array.get_pattern_counts(self._frame_index))
+        return int(self._array.get_total_counts(self._frame_index))
 
     def get_nframes(self) -> int:
         return 1
@@ -143,6 +157,17 @@ class _FrameTreeNode(_TreeNode):
 
     def get_data(self) -> DiffractionPattern:
         return self._array.get_pattern(self._frame_index)
+
+
+def _state_font(state: DiffractionDatasetState) -> QFont | None:
+    """Italic while loading, struck through on failure — matching the Products table."""
+    if state is DiffractionDatasetState.READY:
+        return None
+
+    font = QFont()
+    font.setItalic(state is DiffractionDatasetState.PENDING)
+    font.setStrikeOut(state is DiffractionDatasetState.FAILED)
+    return font
 
 
 def _find_containing_dataset_row(node: _TreeNode) -> int | None:
@@ -155,25 +180,23 @@ def _find_containing_dataset_row(node: _TreeNode) -> int | None:
     return None
 
 
-class DatasetTreeModel(QAbstractItemModel):
+class DiffractionTreeModel(QAbstractItemModel):
     """Three-level tree: root → dataset → array → frame."""
 
     def __init__(
         self,
-        sizer: PatternSizer,
         repository: DiffractionDatasetRepository,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
-        self._sizer = sizer
         self._repository = repository
         self._root = _TreeNode(None)
         self._max_counts = 1
+        self._row_observers: dict[int, _DatasetRowObserver] = {}
         self._header = [
-            'Label',
+            'Name',
             'Counts',
             'Frames',
-            'Size [MB]',
             'Width\n[px]',
             'Height\n[px]',
             'Physical Pixel\nWidth [µm]',
@@ -181,7 +204,14 @@ class DatasetTreeModel(QAbstractItemModel):
             'Processed Pixel\nWidth [µm]',
             'Processed Pixel\nHeight [µm]',
             'Num Bad\nPixels',
+            'Size',
         ]
+
+        for dataset_row, dataset in enumerate(repository):
+            self._attach_dataset(dataset_row, dataset)
+
+        # Duck-typed; see class docstring on the ABC / sip metaclass conflict.
+        repository.add_observer(cast(DiffractionDatasetRepositoryObserver, self))
 
     def clear(self) -> None:
         self.beginResetModel()
@@ -202,6 +232,58 @@ class DatasetTreeModel(QAbstractItemModel):
         del self._root.child_nodes[row]
         self.endRemoveRows()
 
+    def _attach_dataset(self, dataset_row: int, dataset: AssembledDiffractionDataset) -> None:
+        """Build the dataset's rows and start watching it for row-level changes."""
+        self.insert_dataset(dataset_row, dataset)
+
+        for array_row in range(len(dataset)):
+            self.insert_array(dataset_row, array_row, dataset[array_row])
+
+        observer = _DatasetRowObserver(self, dataset)
+        dataset.add_observer(observer)
+        self._row_observers[id(dataset)] = observer
+
+    def handle_dataset_inserted(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        self._attach_dataset(index, dataset)
+
+    def handle_dataset_removed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        observer = self._row_observers.pop(id(dataset), None)
+
+        if observer is not None:
+            dataset.remove_observer(observer)
+
+        self.remove_dataset(index)
+
+    def handle_metadata_changed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        self.refresh_dataset(index)
+
+    def handle_state_changed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        self.refresh_dataset(index)
+
+    def _row_of(self, dataset: AssembledDiffractionDataset) -> int | None:
+        try:
+            return list(self._repository).index(dataset)
+        except ValueError:
+            return None
+
+    def _on_array_inserted(self, dataset: AssembledDiffractionDataset, array_row: int) -> None:
+        dataset_row = self._row_of(dataset)
+
+        if dataset_row is not None:
+            self.insert_array(dataset_row, array_row, dataset[array_row])
+
+    def _on_array_changed(self, dataset: AssembledDiffractionDataset, array_row: int) -> None:
+        dataset_row = self._row_of(dataset)
+
+        if dataset_row is not None:
+            self.refresh_array(dataset_row, array_row)
+
+    def _on_dataset_refreshed(self, dataset: AssembledDiffractionDataset) -> None:
+        dataset_row = self._row_of(dataset)
+
+        if dataset_row is not None:
+            self.refresh_dataset(dataset_row)
+
     def _dataset_node(self, dataset_row: int) -> _DatasetTreeNode | None:
         if not 0 <= dataset_row < len(self._root.child_nodes):
             return None
@@ -216,7 +298,7 @@ class DatasetTreeModel(QAbstractItemModel):
         if dataset_node is None:
             return
 
-        max_counts = int(array.get_max_pattern_counts())
+        max_counts = int(array.get_max_total_counts())
         if self._max_counts < max_counts:
             self._max_counts = max_counts
             self._rebroadcast_counts()
@@ -333,41 +415,68 @@ class DatasetTreeModel(QAbstractItemModel):
                     return str(node.get_counts())
                 case 2:
                     return node.get_nframes()
-                case 3:
-                    return f'{node.get_nbytes() / BYTES_PER_MEGABYTE:.2f}'
+                case 10:
+                    return format_bytes(node.get_nbytes())
                 case _:
                     return self._dataset_column_display(node, column)
         elif role == Qt.ItemDataRole.EditRole:
-            if column == _COL_LABEL and isinstance(node, _DatasetTreeNode):
+            if column == _COL_NAME and isinstance(node, _DatasetTreeNode):
                 return node.get_label()
         elif role == Qt.ItemDataRole.UserRole:
             if column == _COL_COUNTS:
                 return int(100 * node.get_counts()) // int(self._max_counts)
+        elif role == Qt.ItemDataRole.FontRole:
+            return _state_font(self._state_of(node))
+        elif role == Qt.ItemDataRole.ForegroundRole:
+            if self._state_of(node) is not DiffractionDatasetState.READY:
+                return QBrush(Qt.GlobalColor.gray)
+        elif role == Qt.ItemDataRole.ToolTipRole:
+            match self._state_of(node):
+                case DiffractionDatasetState.PENDING:
+                    return 'Loading…'
+                case DiffractionDatasetState.FAILED:
+                    return 'Load failed'
+                case DiffractionDatasetState.READY:
+                    return None
         return None
 
+    def _state_of(self, node: _TreeNode) -> DiffractionDatasetState:
+        """Load state of the dataset a node belongs to.
+
+        Array and frame rows inherit their dataset's state, so a whole subtree greys
+        out together while its patterns are still streaming in.
+        """
+        dataset_row = _find_containing_dataset_row(node)
+
+        if dataset_row is None:
+            return DiffractionDatasetState.READY
+
+        try:
+            return self._repository[dataset_row].get_state()
+        except IndexError:
+            return DiffractionDatasetState.READY
+
     def _dataset_column_display(self, node: _TreeNode, column: int) -> Any:
-        # Columns 4..10 apply only to dataset rows; array/frame nodes render blank.
+        # Columns 3..9 apply only to dataset rows; array/frame nodes render blank.
         if not isinstance(node, _DatasetTreeNode):
             return None
 
         match column:
-            case 4:
+            case 3:
                 return node.get_detector_extent().width_px
-            case 5:
+            case 4:
                 return node.get_detector_extent().height_px
+            case 5:
+                return f'{LengthUnit.MICROMETER.convert(node.get_raw_pixel_geometry().width_m):.4g}'
             case 6:
-                return f'{node.get_raw_pixel_geometry().width_m / ONE_MICRON_M:.4g}'
+                return (
+                    f'{LengthUnit.MICROMETER.convert(node.get_raw_pixel_geometry().height_m):.4g}'
+                )
             case 7:
-                return f'{node.get_raw_pixel_geometry().height_m / ONE_MICRON_M:.4g}'
+                return f'{LengthUnit.MICROMETER.convert(node.get_processed_pixel_geometry().width_m):.4g}'
             case 8:
-                return (
-                    f'{node.get_processed_pixel_geometry(self._sizer).width_m / ONE_MICRON_M:.4g}'
-                )
+                return f'{LengthUnit.MICROMETER.convert(node.get_processed_pixel_geometry().height_m):.4g}'
             case 9:
-                return (
-                    f'{node.get_processed_pixel_geometry(self._sizer).height_m / ONE_MICRON_M:.4g}'
-                )
-            case 10:
                 return node.get_num_bad_pixels()
         return None
 
@@ -375,7 +484,7 @@ class DatasetTreeModel(QAbstractItemModel):
         base = super().flags(index)
         if not index.isValid():
             return base
-        if index.column() != _COL_LABEL:
+        if index.column() != _COL_NAME:
             return base
         node = index.internalPointer()
         if not isinstance(node, _DatasetTreeNode):
@@ -390,7 +499,7 @@ class DatasetTreeModel(QAbstractItemModel):
     ) -> bool:
         if role != Qt.ItemDataRole.EditRole or not index.isValid():
             return False
-        if index.column() != _COL_LABEL:
+        if index.column() != _COL_NAME:
             return False
         node = index.internalPointer()
         if not isinstance(node, _DatasetTreeNode):
@@ -406,25 +515,11 @@ class DatasetTreeModel(QAbstractItemModel):
 
         unique_name = self._repository.create_unique_name(new_name)
         dataset.set_name(unique_name)
-        row = node.get_row()
-        top_left = self.index(row, _COL_LABEL)
-        self.dataChanged.emit(top_left, top_left, [Qt.ItemDataRole.DisplayRole])
+        # set_name notifies nobody on its own, and this is the only rename path, so
+        # announce it through the repository: dataset-name consumers elsewhere (the
+        # combo model, the product editor) have no other way to learn about it.
+        self._repository.handle_metadata_changed(dataset)
         return True
-
-    def refresh_processed_columns(self) -> None:
-        """Emit dataChanged for the processed pixel-size columns of every dataset row.
-
-        Called when the PatternSizer notifies (binning / transpose toggled or bin
-        size edited) — since the processed columns are derived from the sizer
-        transforms applied to each dataset's raw geometry, they all need to refresh
-        even though no dataset itself changed.
-        """
-        num_rows = self.rowCount()
-        if num_rows == 0:
-            return
-        top_left = self.index(0, _COL_PROCESSED_PIXEL_WIDTH_UM)
-        bottom_right = self.index(num_rows - 1, _COL_PROCESSED_PIXEL_HEIGHT_UM)
-        self.dataChanged.emit(top_left, bottom_right)
 
     def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
         if self.hasIndex(row, column, parent):
@@ -442,3 +537,107 @@ class DatasetTreeModel(QAbstractItemModel):
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return len(self._header)
+
+
+class _DatasetRowObserver(DiffractionDatasetObserver):
+    """Feeds one dataset's row-level changes into the tree model.
+
+    Captures the dataset reference at registration, since the callbacks carry only an
+    array index. Its lifetime is owned by DiffractionTreeModel, which attaches one per
+    dataset on insert and detaches it on removal.
+    """
+
+    def __init__(
+        self, tree_model: DiffractionTreeModel, dataset: AssembledDiffractionDataset
+    ) -> None:
+        super().__init__()
+        self._tree_model = tree_model
+        self._dataset = dataset
+
+    def handle_array_inserted(self, index: int) -> None:
+        self._tree_model._on_array_inserted(self._dataset, index)
+
+    def handle_array_changed(self, index: int) -> None:
+        self._tree_model._on_array_changed(self._dataset, index)
+
+    def handle_dataset_reloaded(self) -> None:
+        self._tree_model._on_dataset_refreshed(self._dataset)
+
+
+class DiffractionDatasetComboModel(QAbstractListModel):
+    """Single-column list of dataset names for a QComboBox, with an optional unbound entry.
+
+    Observes DiffractionDatasetRepository so combos stay live as datasets are inserted,
+    removed, or renamed -- the guarantee ProductRepositoryComboProxyModel already gives
+    product combos. Duck-typed against the observer ABC; inheriting it would clash with
+    sip's wrappertype metaclass on QAbstractListModel.
+
+    The model keeps its own ordered list rather than indexing the repository directly:
+    the repository has already mutated by the time an observer callback runs, and Qt
+    requires rowCount() to still report the pre-change value inside beginInsertRows /
+    beginRemoveRows.
+    """
+
+    def __init__(
+        self,
+        repository: DiffractionDatasetRepository,
+        *,
+        unbound_label: str | None = None,
+        parent: QObject | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._unbound_label = unbound_label
+        self._datasets: list[AssembledDiffractionDataset] = list(repository)
+        repository.add_observer(cast(DiffractionDatasetRepositoryObserver, self))
+
+    @property
+    def _offset(self) -> int:
+        """Rows occupied by the unbound sentinel ahead of the first real dataset."""
+        return 0 if self._unbound_label is None else 1
+
+    def dataset_at(self, row: int) -> AssembledDiffractionDataset | None:
+        """Dataset shown in a row, or None for the unbound sentinel or an invalid row."""
+        dataset_row = row - self._offset
+
+        if 0 <= dataset_row < len(self._datasets):
+            return self._datasets[dataset_row]
+
+        return None
+
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
+        return len(self._datasets) + self._offset
+
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+        if not index.isValid():
+            return None
+
+        if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
+            dataset = self.dataset_at(index.row())
+            # Read the name live so a rename only needs a dataChanged, not a rebuild.
+            return self._unbound_label if dataset is None else dataset.get_name()
+
+        return None
+
+    def handle_dataset_inserted(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        row = index + self._offset
+        self.beginInsertRows(QModelIndex(), row, row)
+        self._datasets.insert(index, dataset)
+        self.endInsertRows()
+
+    def handle_dataset_removed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        if not 0 <= index < len(self._datasets):
+            return
+
+        row = index + self._offset
+        self.beginRemoveRows(QModelIndex(), row, row)
+        del self._datasets[index]
+        self.endRemoveRows()
+
+    def handle_metadata_changed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        model_index = self.index(index + self._offset, 0)
+
+        if model_index.isValid():
+            self.dataChanged.emit(model_index, model_index)
+
+    def handle_state_changed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        pass

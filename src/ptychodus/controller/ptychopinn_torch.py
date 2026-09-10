@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QWidget
 
 from ..model.ptychopinn_torch.core import PtychoPINNTorchReconstructorLibrary
 from .data import FileDialogFactory
-from .parametric import ParameterViewBuilder
+from .parameters import ParameterViewBuilder
 from .processing import ReconstructorViewControllerFactory
 
 

@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QHBoxLayout,
+    QLabel,
     QMenu,
     QPushButton,
     QTableView,
@@ -14,6 +15,34 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+
+class InsertSaveEditRemoveButtonBox(QWidget):
+    """Insert / Save / Edit / Remove strip shared by the repository-style panels.
+
+    Insert and Save carry menus that each panel's controller populates; the menu
+    *contents* are per-domain, the widget is not.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.insert_menu = QMenu()
+        self.insert_button = QPushButton('Insert')
+        self.save_menu = QMenu()
+        self.save_button = QPushButton('Save')
+        self.edit_button = QPushButton('Edit')
+        self.remove_button = QPushButton('Remove')
+
+        self.insert_button.setMenu(self.insert_menu)
+        self.save_button.setMenu(self.save_menu)
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.insert_button)
+        layout.addWidget(self.save_button)
+        layout.addWidget(self.edit_button)
+        layout.addWidget(self.remove_button)
+        self.setLayout(layout)
 
 
 class RepositoryButtonBox(QWidget):
@@ -63,11 +92,13 @@ class RepositoryTableView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.table_view = QTableView()
+        self.info_label = QLabel()
         self.button_box = RepositoryButtonBox()
         self.copier_dialog = RepositoryItemCopierDialog()
 
         layout = QVBoxLayout()
         layout.addWidget(self.table_view)
+        layout.addWidget(self.info_label)
         layout.addWidget(self.button_box)
         self.setLayout(layout)
 
@@ -76,6 +107,7 @@ class RepositoryTreeView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.tree_view = QTreeView()
+        self.info_label = QLabel()
         self.button_box = RepositoryButtonBox()
         self.copier_dialog = RepositoryItemCopierDialog()
 
@@ -86,5 +118,6 @@ class RepositoryTreeView(QWidget):
 
         layout = QVBoxLayout()
         layout.addWidget(self.tree_view)
+        layout.addWidget(self.info_label)
         layout.addWidget(self.button_box)
         self.setLayout(layout)

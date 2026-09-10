@@ -8,7 +8,7 @@ import argparse
 import logging
 import sys
 
-from ptychodus.api.diffraction import CropCenter
+from ptychodus.api.diffraction import BeamCenter, CropRegion
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.cli import DirectoryType
@@ -19,8 +19,9 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> int:
-    crop_center: CropCenter | None = None
+    crop_center: BeamCenter | None = None
     crop_extent: ImageExtent | None = None
+    crop_region: CropRegion | None = None
 
     prog = Path(__file__).stem.lower()
     parser = argparse.ArgumentParser(
@@ -148,9 +149,9 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.crop_center_x_px is not None and args.crop_center_y_px is not None:
-        crop_center = CropCenter(
-            position_x_px=args.crop_center_x_px,
-            position_y_px=args.crop_center_y_px,
+        crop_center = BeamCenter(
+            x_px=args.crop_center_x_px,
+            y_px=args.crop_center_y_px,
         )
     elif bool(args.crop_center_x_px) ^ bool(args.crop_center_y_px):
         parser.error('--crop-center-x-px and --crop-center-y-px must be given together.')
@@ -163,6 +164,13 @@ def main() -> int:
     elif bool(args.crop_width_px) ^ bool(args.crop_height_px):
         parser.error('--crop-width-px and --crop-height-px must be given together.')
 
+    if crop_center is not None and crop_extent is not None:
+        crop_region = CropRegion.from_center_extent(crop_center, crop_extent)
+    elif crop_center is not None or crop_extent is not None:
+        parser.error(
+            'Provide either both crop center and crop extent, or neither, to define a crop region.'
+        )
+
     if args.defocus_distance_m is not None:
         logger.warning('Defocus distance is not implemented yet!')  # TODO
 
@@ -173,8 +181,7 @@ def main() -> int:
     with ModelCore(Path(args.settings.name), log_level=args.log_level) as model:
         workflow_diffraction_api = model.workflow_api.load_diffraction_data(
             Path(args.diffraction_input.name),
-            crop_center=crop_center,
-            crop_extent=crop_extent,
+            crop_region=crop_region,
             bad_pixels_file_path=bad_pixels_path,
             block=True,
         )
@@ -196,7 +203,7 @@ def main() -> int:
         staging_dir.mkdir(parents=True, exist_ok=True)
         workflow_diffraction_api.save_assembled_data(staging_dir / StandardFileLayout.DIFFRACTION)
         workflow_product_api.save_product(
-            staging_dir / StandardFileLayout.PRODUCT_IN, file_type='HDF5'
+            staging_dir / StandardFileLayout.PRODUCT, file_type='HDF5'
         )
         model.workflow_api.save_settings(staging_dir / StandardFileLayout.SETTINGS)
 

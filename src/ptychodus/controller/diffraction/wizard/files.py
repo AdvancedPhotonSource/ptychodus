@@ -28,7 +28,7 @@ from ....view.diffraction import OpenDatasetWizardPage
 from ....view.widgets import ExceptionDialog
 from ...data import FileDialogFactory
 from ...helpers import connect_current_changed_signal
-from ...parametric import ComboBoxParameterViewController
+from ...parameters import ComboBoxParameterViewController
 
 logger = logging.getLogger(__name__)
 

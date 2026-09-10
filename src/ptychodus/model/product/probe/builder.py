@@ -110,11 +110,7 @@ class ProbeSequenceBuilder(ParameterGroup):
         product of probe and object, not either one alone.
         """
         rescaled = rescale_probe_intensity(probe, geometry_provider.probe_photon_count)
-        return ProbeSequence(
-            array=rescaled.get_array(),
-            opr_weights=None,
-            pixel_geometry=rescaled.get_pixel_geometry(),
-        )
+        return ProbeSequence.from_probe(rescaled)
 
     def _get_imode_weights(self) -> Sequence[float]:
         imode_decay_ratio = self.incoherent_mode_decay_ratio.get_value()
@@ -192,11 +188,7 @@ class ProbeSequenceBuilder(ParameterGroup):
                 num_diffraction_patterns=geometry_provider.num_scan_points,
             )
         else:
-            probe_seq = ProbeSequence(
-                array=probe.get_array(),
-                opr_weights=None,
-                pixel_geometry=probe.get_pixel_geometry(),
-            )
+            probe_seq = ProbeSequence.from_probe(probe)
 
         logger.debug(f'Conditioned probe {probe_seq.get_array().shape=}')
         return probe_seq

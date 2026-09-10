@@ -312,8 +312,8 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
             position_indexes = numpy.empty(len(product.probe_positions), dtype=numpy.int64)
             for i, point in enumerate(product.probe_positions):
                 position_indexes[i] = point.index
-                positions_xyz[i, 0] = point.coordinate_x_m
-                positions_xyz[i, 1] = point.coordinate_y_m
+                positions_xyz[i, 0] = point.x_m
+                positions_xyz[i, 1] = point.y_m
 
             sample_geometry = sample.create_group('geometry_1')
             sample_geometry.create_dataset('translation', data=positions_xyz)
@@ -460,7 +460,7 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
         cx = _read_scalar(h5_file, _P.PT_OBJECT_CENTER_X)
         cy = _read_scalar(h5_file, _P.PT_OBJECT_CENTER_Y)
         if cx is not None and cy is not None:
-            center = ObjectCenter(coordinate_x_m=float(cx), coordinate_y_m=float(cy))
+            center = ObjectCenter(x_m=float(cx), y_m=float(cy))
 
         layer_spacing_m: list[float] = []
         if _P.PT_OBJECT_LAYER_SPACING in h5_file:

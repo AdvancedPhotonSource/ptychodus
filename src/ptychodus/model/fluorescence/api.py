@@ -89,10 +89,10 @@ class FluorescenceAPI:
 
         self._settings.file_path.set_value(file_path)
 
-        label = self._repository.create_unique_name(file_path.stem)
+        name = self._repository.create_unique_name(file_path.stem)
         item = FluorescenceRepositoryItem(
             self._repository,
-            label=label,
+            name=name,
             product=product_item,
             measured=dataset,
             source_path=file_path,
@@ -102,6 +102,26 @@ class FluorescenceAPI:
 
     def remove_item(self, item_index: int) -> None:
         self._repository.remove_item(item_index)
+
+    def sync_to_settings(self, item_index: int) -> None:
+        """Point the fluorescence settings at this item's source file."""
+        try:
+            item = self._repository[item_index]
+        except IndexError:
+            logger.warning(f'Failed to look up fluorescence item {item_index}!')
+            return
+
+        source_path = item.get_source_path()
+
+        if source_path is None:
+            logger.warning(f'Item "{item.get_name()}" has no source path to sync!')
+            return
+
+        self._settings.file_path.set_value(source_path)
+        source_file_type = item.get_source_file_type()
+
+        if source_file_type is not None:
+            self._settings.file_type.set_value(source_file_type)
 
     def save_enhanced_dataset(
         self, item_index: int, file_path: Path, *, file_type: str | None = None
@@ -113,7 +133,7 @@ class FluorescenceAPI:
 
         dataset = item.get_enhanced()
         if dataset is None:
-            raise ValueError(f'Item "{item.get_label()}" has no enhanced dataset to save')
+            raise ValueError(f'Item "{item.get_name()}" has no enhanced dataset to save')
 
         if file_type is not None:
             self._file_writer_chooser.set_current_plugin(file_type)
@@ -139,7 +159,7 @@ class FluorescenceAPI:
 
         if item.get_state() is FluorescenceItemState.ORPHANED:
             raise RuntimeError(
-                f'Cannot enhance item "{item.get_label()}": target product was removed'
+                f'Cannot enhance item "{item.get_name()}": target product was removed'
             )
 
         if self._task_monitor.is_processing:

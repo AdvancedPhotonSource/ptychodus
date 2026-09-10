@@ -4,7 +4,7 @@ import logging
 
 import h5py
 
-from ptychodus.api.constants import ONE_MICRON_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class ISNPositionFileReader(ProbePositionFileReader):
-    """Reader for APS 19-ID In-Situ Nanoprobe processed position files.
+    """Reader for APS 19-ID-E In-situ Nanoprobe processed position files.
 
     The position file stores one sample position per detector trigger in
     ``/entry/data/{X_Position,Y_Position}`` (micrometers). Positions are
@@ -45,8 +45,8 @@ class ISNPositionFileReader(ProbePositionFileReader):
             point_list.append(
                 ProbePosition(
                     idx,
-                    float(x) * ONE_MICRON_M,
-                    float(y) * ONE_MICRON_M,
+                    LengthUnit.MICROMETER.to_meters(float(x)),
+                    LengthUnit.MICROMETER.to_meters(float(y)),
                 )
             )
 
@@ -57,5 +57,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         ISNPositionFileReader(),
         simple_name='APS_ISN',
-        display_name='APS 19-ID In-Situ Nanoprobe Files (*.h5 *.hdf5)',
+        display_name='APS 19-ID-E In-situ Nanoprobe Files (*.h5 *.hdf5)',
     )

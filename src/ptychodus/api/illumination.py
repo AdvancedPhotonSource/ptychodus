@@ -2,6 +2,7 @@
 from a ptychography product by summing subpixel-shifted probe intensities."""
 
 from __future__ import annotations
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -68,36 +69,48 @@ class IlluminationMap:
             dose_rate_Gy_s=self.dose_rate_Gy_s,
             pixel_height_m=self.pixel_geometry.height_m,
             pixel_width_m=self.pixel_geometry.width_m,
-            center_x_m=self.center.coordinate_x_m,
-            center_y_m=self.center.coordinate_y_m,
+            center_x_m=self.center.x_m,
+            center_y_m=self.center.y_m,
         )
 
 
-def compute_illumination_map(product: Product) -> IlluminationMap:
+def compute_illumination_map(
+    product: Product,
+    *,
+    probe_photon_counts_by_index: Mapping[int, float] | None = None,
+) -> IlluminationMap:
     """Build a per-object-pixel photon-count canvas by summing the subpixel-shifted
     probe intensities at every scan position, packaged with the metadata needed to
-    derive fluence, dose, and intensity quantities."""
+    derive fluence, dose, and intensity quantities.
+
+    Pass ``probe_photon_counts_by_index`` (per-scan-index photon counts) to weight
+    each scan-point contribution by its true exposure. Weights are normalized to
+    the mean of the provided counts so the total photon budget across the canvas
+    matches the uniform-weight case; a scan index missing from the mapping gets
+    the unit weight. Without a mapping the accumulation is uniform, matching the
+    prior behavior.
+    """
     object_geometry = product.object_.get_geometry()
     probe_geometry = product.probes.get_geometry()
     canvas = numpy.zeros((object_geometry.height_px, object_geometry.width_px))
 
+    mean_counts: float | None = None
+    if probe_photon_counts_by_index:
+        mean_counts = float(numpy.mean(list(probe_photon_counts_by_index.values())))
+
     for scan_point, probe in product.iter_position_probes():
         object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        cx = object_point.coordinate_x_px
-        cy = object_point.coordinate_y_px
+        bounds = probe_geometry.resolve_patch_bounds(object_point.x_px, object_point.y_px)
 
-        x_lower = int(cx - probe_geometry.width_px / 2)
-        y_lower = int(cy - probe_geometry.height_px / 2)
-
-        dx = cx - (x_lower + probe_geometry.width_px / 2)
-        dy = cy - (y_lower + probe_geometry.height_px / 2)
-
-        shifted_modes = fourier_shift_2d(probe.get_array(), dx=dx, dy=dy)
+        shifted_modes = fourier_shift_2d(probe.get_array(), dx=bounds.dx, dy=bounds.dy)
         patch = numpy.sum(numpy.abs(shifted_modes) ** 2, axis=0)
-        canvas[
-            y_lower : y_lower + probe_geometry.height_px,
-            x_lower : x_lower + probe_geometry.width_px,
-        ] += patch
+
+        if mean_counts is not None and mean_counts > 0.0:
+            assert probe_photon_counts_by_index is not None
+            counts = probe_photon_counts_by_index.get(scan_point.index, mean_counts)
+            patch = patch * (counts / mean_counts)
+
+        canvas[bounds.y_slice, bounds.x_slice] += patch
 
     exposure_time_s = product.metadata.exposure_time_s
     photon_flux_Hz = float('nan')  # noqa: N806

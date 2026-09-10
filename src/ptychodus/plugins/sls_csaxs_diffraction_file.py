@@ -4,7 +4,7 @@ import logging
 import h5py
 import numpy
 
-from ptychodus.api.constants import ONE_KILOELECTRONVOLT_EV, ONE_MICRON_M, ONE_MILLIMETER_M
+from ptychodus.api.constants import LengthUnit, ONE_KILOELECTRONVOLT_EV
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     DiffractionDataset,
@@ -39,11 +39,12 @@ class CSAXSDiffractionFileReader(DiffractionFileReader):
                 metadata = DiffractionMetadata(
                     num_patterns_per_array=[num_patterns],
                     pattern_dtype=data.dtype,
-                    detector_distance_m=abs(float(distance_mm[()])) * ONE_MILLIMETER_M,
+                    detector_distance_m=abs(float(distance_mm[()]))
+                    * LengthUnit.MILLIMETER.meters_per_unit,
                     detector_extent=ImageExtent(detector_width, detector_height),
                     detector_pixel_geometry=PixelGeometry(
-                        width_m=float(x_pixel_size_um[()]) * ONE_MICRON_M,
-                        height_m=float(y_pixel_size_um[()]) * ONE_MICRON_M,
+                        width_m=LengthUnit.MICROMETER.to_meters(float(x_pixel_size_um[()])),
+                        height_m=LengthUnit.MICROMETER.to_meters(float(y_pixel_size_um[()])),
                     ),
                     probe_energy_eV=ONE_KILOELECTRONVOLT_EV * float(energy_keV[()]),
                     file_path=file_path,
@@ -65,5 +66,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         CSAXSDiffractionFileReader(),
         simple_name='SLS_cSAXS',
-        display_name='SLS cSAXS Files (*.h5 *.hdf5)',
+        display_name='SLS X12SA cSAXS Files (*.h5 *.hdf5)',
     )

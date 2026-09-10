@@ -14,7 +14,7 @@ from .api import DiffractionAPI
 from .monitor import DiffractionTaskMonitor
 from .repository import DiffractionDatasetRepository, build_default_factory
 from .settings import DetectorSettings, DiffractionSettings
-from .sizer import PatternSizer
+from .summary import DiffractionSummaryService
 
 logger = logging.getLogger(__name__)
 
@@ -32,12 +32,10 @@ class DiffractionCore(Observer):
         super().__init__()
         self.detector_settings = DetectorSettings(settings_registry)
         self.diffraction_settings = DiffractionSettings(settings_registry)
-        self.pattern_sizer = PatternSizer(self.diffraction_settings)
         self.task_monitor = DiffractionTaskMonitor(task_manager)
         self.repository = DiffractionDatasetRepository(
             factory=build_default_factory(
                 self.diffraction_settings,
-                self.pattern_sizer,
                 self.detector_settings,
                 task_manager,
                 self.task_monitor,
@@ -61,6 +59,12 @@ class DiffractionCore(Observer):
             self.bad_pixels_file_reader_parameter,
             self.file_reader_parameter,
         )
+        self.summary_service = DiffractionSummaryService(
+            task_manager,
+            self.diffraction_api,
+            self.detector_settings,
+            self.diffraction_settings,
+        )
 
         # Deliberately unbound: the writer shares file_type with the reader above, so
         # binding both would make them fight over the same parameter.
@@ -71,10 +75,18 @@ class DiffractionCore(Observer):
 
     def _update(self, observable: Observable) -> None:
         if observable is self._reinit_observable:
+            # BadPixelsFilePath defaults to a placeholder, so honoring the enable
+            # flag here is what keeps a settings file that never opted in from
+            # failing the load outright. The GUI wizard gates on the same flag.
+            bad_pixels_file_path = (
+                self.detector_settings.bad_pixels_file_path.get_value()
+                if self.detector_settings.bad_pixels_enabled.get_value()
+                else None
+            )
             dataset_index = self.diffraction_api.open_patterns(
                 file_path=self.diffraction_settings.file_path.get_value(),
                 file_type=self.diffraction_settings.file_type.get_value(),
-                bad_pixels_file_path=self.detector_settings.bad_pixels_file_path.get_value(),
+                bad_pixels_file_path=bad_pixels_file_path,
                 bad_pixels_file_type=self.detector_settings.bad_pixels_file_type.get_value(),
             )
 

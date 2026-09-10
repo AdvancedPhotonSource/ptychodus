@@ -66,8 +66,8 @@ class XMCDResult:
             magnetic_object=self.magnetic_object.get_array(),
             pixel_height_m=pixel_geometry.height_m,
             pixel_width_m=pixel_geometry.width_m,
-            center_x_m=center.coordinate_x_m,
-            center_y_m=center.coordinate_y_m,
+            center_x_m=center.x_m,
+            center_y_m=center.y_m,
         )
 
 
@@ -80,10 +80,15 @@ def estimate_xmcd(
     (see module docstring). Both inputs must share array shape and pixel
     geometry; multi-layer objects are flattened layer-wise (per-layer
     decomposition is not implemented). Callers are responsible for warning users
-    about the flattening when relevant.
+    about the flattening when relevant. Shape parity is guaranteed by
+    :func:`ptychodus.api.object.align_objects`, which trims mismatched RCP/LCP
+    reconstructions to their common shape.
 
     Args:
-        rcp_object: Right-circularly-polarized reconstruction (``O_+``).
+        rcp_object: Right-circularly-polarized reconstruction (``O_+``). Should
+            be the cropped RCP returned by
+            :func:`ptychodus.api.object.align_objects` when the input pair had
+            mismatched shapes.
         lcp_object_aligned: Left-circularly-polarized reconstruction (``O_-``),
             already spatially aligned to ``rcp_object`` (see
             :func:`ptychodus.api.object.align_objects`).

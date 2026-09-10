@@ -1,30 +1,56 @@
+from collections.abc import Callable
+import logging
+
+import numpy
+
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
+    QDialog,
+    QDoubleSpinBox,
     QFormLayout,
     QFrame,
     QGridLayout,
     QGroupBox,
+    QHBoxLayout,
     QLabel,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
     QSpinBox,
+    QSplitter,
+    QStatusBar,
     QVBoxLayout,
     QWidget,
     QWizardPage,
 )
 
 from ptychodus.api.geometry import Interval
-from ptychodus.api.observer import Observable
+from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.preprocess.diffraction import estimate_beam_center
+from ptychodus.api.preprocess.noise import RobustStatistics, compute_robust_statistics
 
-from ....model.diffraction import DiffractionSettings
+from ....model.diffraction import (
+    DetectorSettings,
+    DiffractionAPI,
+    DiffractionSettings,
+    DiffractionSummaryService,
+)
+from ....model.visualization import VisualizationEngine
 from ....view.diffraction import OpenDatasetWizardPage
+from ....view.widgets import ExceptionDialog
 
 from ...data import FileDialogFactory
 from ..detector_extent import DetectorExtentSource
-from ...parametric import (
+from ...parameters import (
     CheckBoxParameterViewController,
     CheckableGroupBoxParameterViewController,
     ParameterViewController,
     PathParameterViewController,
     SpinBoxParameterViewController,
 )
+from .summary import SummaryPanelViewController
+
+logger = logging.getLogger(__name__)
 
 
 def _crop_size_limits(det_size_px: int) -> Interval[int]:
@@ -66,20 +92,58 @@ class StorageViewController(CheckableGroupBoxParameterViewController):
         self.get_widget().setLayout(layout)
 
 
+class BadPixelsViewController(CheckableGroupBoxParameterViewController):
+    def __init__(
+        self,
+        detector_settings: DetectorSettings,
+        api: DiffractionAPI,
+        file_dialog_factory: FileDialogFactory,
+    ) -> None:
+        super().__init__(detector_settings.bad_pixels_enabled, 'Apply Bad Pixels Mask')
+        self._file_reader_parameter = api.get_bad_pixels_file_reader_parameter()
+        self._file_path_view_controller = PathParameterViewController.create_file_opener(
+            detector_settings.bad_pixels_file_path,
+            file_dialog_factory,
+            caption='Open Bad Pixels File',
+            name_filters=list(self._file_reader_parameter.choices()),
+            selected_name_filter=self._file_reader_parameter.get_value(),
+            on_filter_selected=self._file_reader_parameter.set_value,
+        )
+
+        layout = QFormLayout()
+        layout.addRow('File:', self._file_path_view_controller.get_widget())
+        self.get_widget().setLayout(layout)
+
+        self._file_reader_parameter.add_observer(self)
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._file_reader_parameter:
+            self._file_path_view_controller.set_selected_name_filter(
+                self._file_reader_parameter.get_value()
+            )
+        else:
+            super()._update(observable)
+
+
 class CropViewController(CheckableGroupBoxParameterViewController):
     def __init__(
         self,
         diffraction_settings: DiffractionSettings,
         extent_source: DetectorExtentSource,
+        summary_service: DiffractionSummaryService,
     ) -> None:
         super().__init__(diffraction_settings.crop_enabled, 'Crop')
         self._diffraction_settings = diffraction_settings
         self._extent_source = extent_source
+        self._summary_service = summary_service
 
         self._center_x_spin_box = QSpinBox()
         self._center_y_spin_box = QSpinBox()
         self._width_spin_box = QSpinBox()
         self._height_spin_box = QSpinBox()
+        self._estimate_button = QPushButton('Estimate Beam Center')
+        self._estimate_button.clicked.connect(self._on_estimate_clicked)
+        self._estimate_button.setEnabled(False)
 
         layout = QGridLayout()
         layout.addWidget(QLabel('Center:'), 0, 0)
@@ -88,24 +152,26 @@ class CropViewController(CheckableGroupBoxParameterViewController):
         layout.addWidget(QLabel('Extent:'), 1, 0)
         layout.addWidget(self._width_spin_box, 1, 1)
         layout.addWidget(self._height_spin_box, 1, 2)
+        layout.addWidget(self._estimate_button, 2, 0, 1, 3)
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
         self.get_widget().setLayout(layout)
 
         self._observed = (
-            diffraction_settings.crop_center_x_px,
-            diffraction_settings.crop_center_y_px,
+            diffraction_settings.beam_center_x_px,
+            diffraction_settings.beam_center_y_px,
             diffraction_settings.crop_width_px,
             diffraction_settings.crop_height_px,
         )
 
         self._sync_model_to_view()
+        self._sync_estimate_button_state()
 
         self._center_x_spin_box.valueChanged.connect(
-            diffraction_settings.crop_center_x_px.set_value
+            diffraction_settings.beam_center_x_px.set_value
         )
         self._center_y_spin_box.valueChanged.connect(
-            diffraction_settings.crop_center_y_px.set_value
+            diffraction_settings.beam_center_y_px.set_value
         )
         self._width_spin_box.valueChanged.connect(diffraction_settings.crop_width_px.set_value)
         self._height_spin_box.valueChanged.connect(diffraction_settings.crop_height_px.set_value)
@@ -113,6 +179,7 @@ class CropViewController(CheckableGroupBoxParameterViewController):
         for parameter in self._observed:
             parameter.add_observer(self)
         extent_source.add_observer(self)
+        summary_service.task_monitor.add_observer(self)
 
     def _sync_model_to_view(self) -> None:
         extent = self._extent_source.get_extent()
@@ -138,14 +205,14 @@ class CropViewController(CheckableGroupBoxParameterViewController):
             self._center_x_spin_box,
             _crop_center_limits(det_w),
             _crop_center_limits(det_w).clamp(
-                self._diffraction_settings.crop_center_x_px.get_value()
+                self._diffraction_settings.beam_center_x_px.get_value()
             ),
         )
         _set_spin_box(
             self._center_y_spin_box,
             _crop_center_limits(det_h),
             _crop_center_limits(det_h).clamp(
-                self._diffraction_settings.crop_center_y_px.get_value()
+                self._diffraction_settings.beam_center_y_px.get_value()
             ),
         )
         _set_spin_box(
@@ -159,8 +226,28 @@ class CropViewController(CheckableGroupBoxParameterViewController):
             _crop_size_limits(det_h).clamp(self._diffraction_settings.crop_height_px.get_value()),
         )
 
+    def _sync_estimate_button_state(self) -> None:
+        monitor = self._summary_service.task_monitor
+        has_summary = self._summary_service.get_last_summary() is not None
+        self._estimate_button.setEnabled(has_summary and not monitor.is_processing)
+
+    def _on_estimate_clicked(self) -> None:
+        summary = self._summary_service.get_last_summary()
+        if summary is None:
+            return
+        try:
+            center = estimate_beam_center(summary.mean_pattern)
+        except Exception as exc:
+            logger.exception(exc)
+            ExceptionDialog.show_exception('Estimate Beam Center', exc)
+            return
+        self._diffraction_settings.beam_center_x_px.set_value(int(center.x_px))
+        self._diffraction_settings.beam_center_y_px.set_value(int(center.y_px))
+
     def _update(self, observable: Observable) -> None:
-        if observable in self._observed or observable is self._extent_source:
+        if observable is self._summary_service.task_monitor:
+            self._sync_estimate_button_state()
+        elif observable in self._observed or observable is self._extent_source:
             self._sync_model_to_view()
         else:
             super()._update(observable)
@@ -256,6 +343,22 @@ class BinningViewController(CheckableGroupBoxParameterViewController):
             super()._update(observable)
 
 
+class UpsampleViewController(CheckableGroupBoxParameterViewController):
+    """UpsampleStep — FFT zero-pad upsampling by an isotropic integer factor."""
+
+    def __init__(self, diffraction_settings: DiffractionSettings) -> None:
+        super().__init__(diffraction_settings.upsample_enabled, 'Upsample')
+        self._factor_view_controller = SpinBoxParameterViewController(
+            diffraction_settings.upsample_factor
+        )
+
+        layout = QGridLayout()
+        layout.addWidget(QLabel('Factor:'), 0, 0)
+        layout.addWidget(self._factor_view_controller.get_widget(), 0, 1)
+        layout.setColumnStretch(1, 1)
+        self.get_widget().setLayout(layout)
+
+
 class PaddingViewController(CheckableGroupBoxParameterViewController):
     def __init__(self, diffraction_settings: DiffractionSettings) -> None:
         super().__init__(diffraction_settings.padding_enabled, 'Pad')
@@ -302,6 +405,210 @@ class ValueFilterViewController:
         return self._widget
 
 
+class RobustStatisticsDialog(QDialog):
+    """Modal helper for computing and applying robust bounds on total_counts.
+
+    Reads the service's post-crop, post-pipeline counts rather than the summary's
+    raw full-detector ones, because those are what the filter compares its bounds
+    against; deriving bounds from raw counts under an active crop puts them an
+    order of magnitude too high and drops every pattern. Freshly recomputes
+    ``compute_robust_statistics`` each time :meth:`exec_` is called so the median /
+    MAD reflect whichever counts pass the service is currently holding. Apply
+    Bounds writes to the total-counts settings and stays open so the user can
+    tweak ``k`` and re-apply; Close dismisses.
+    """
+
+    def __init__(
+        self,
+        diffraction_settings: DiffractionSettings,
+        summary_service: DiffractionSummaryService,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle('Total-Counts Robust Statistics')
+        self.setModal(True)
+        self._diffraction_settings = diffraction_settings
+        self._summary_service = summary_service
+        self._stats: RobustStatistics | None = None
+
+        self._median_label = QLabel('—')
+        self._mad_label = QLabel('—')
+        self._k_spin_box = QDoubleSpinBox()
+        self._k_spin_box.setRange(0.5, 20.0)
+        self._k_spin_box.setSingleStep(0.5)
+        self._k_spin_box.setDecimals(2)
+        self._k_spin_box.setValue(3.0)
+
+        self._apply_button = QPushButton('Apply Bounds')
+        self._apply_button.clicked.connect(self._on_apply_clicked)
+        self._close_button = QPushButton('Close')
+        self._close_button.clicked.connect(self.accept)
+
+        form_layout = QFormLayout()
+        form_layout.addRow('Median:', self._median_label)
+        form_layout.addRow('MAD:', self._mad_label)
+        form_layout.addRow('k:', self._k_spin_box)
+
+        button_row = QHBoxLayout()
+        button_row.addStretch()
+        button_row.addWidget(self._apply_button)
+        button_row.addWidget(self._close_button)
+
+        layout = QVBoxLayout()
+        layout.addLayout(form_layout)
+        layout.addLayout(button_row)
+        self.setLayout(layout)
+
+    def exec_(self) -> int:
+        self._recompute_stats()
+        return super().exec_()
+
+    def _recompute_stats(self) -> None:
+        measured = self._summary_service.get_last_total_counts()
+        if measured is None or measured.total_counts.size == 0:
+            self._stats = None
+            self._median_label.setText('—')
+            self._mad_label.setText('—')
+            self._apply_button.setEnabled(False)
+            return
+
+        counts = numpy.asarray(measured.total_counts, dtype=numpy.float64)
+        try:
+            stats = compute_robust_statistics(counts)
+        except Exception as exc:
+            logger.exception(exc)
+            ExceptionDialog.show_exception('Compute Robust Statistics', exc)
+            self._stats = None
+            self._apply_button.setEnabled(False)
+            return
+
+        self._stats = stats
+        self._median_label.setText(f'{stats.median:.6g}')
+        self._mad_label.setText(f'{stats.median_absolute_deviation:.6g}')
+        self._apply_button.setEnabled(True)
+
+    def _on_apply_clicked(self) -> None:
+        stats = self._stats
+        if stats is None:
+            return
+
+        bounds = stats.get_bounds(k=float(self._k_spin_box.value()), require_positive=True)
+        lower_int = max(0, int(numpy.floor(bounds.lower)))
+        upper_int = max(lower_int + 1, int(numpy.ceil(bounds.upper)))
+
+        self._diffraction_settings.total_counts_lower_bound.set_value(lower_int)
+        self._diffraction_settings.total_counts_upper_bound.set_value(upper_int)
+        self._diffraction_settings.total_counts_lower_bound_enabled.set_value(True)
+        self._diffraction_settings.total_counts_upper_bound_enabled.set_value(True)
+
+
+class TotalCountsFilterViewController(Observer):
+    """Drop patterns whose good-pixel total counts fall outside [lower_bound, upper_bound]
+    (inclusive). Runs after the prep pipeline, so counts reflect the same patterns the
+    reconstructor sees (i.e. after any pixel-value zeroing, crop, binning, and padding).
+
+    Because the bounds are compared against processed counts, they cannot be chosen
+    from the summary, whose ``total_counts`` sum the raw full detector. Refresh
+    Counts runs :meth:`DiffractionSummaryService.compute_total_counts`, a second
+    streaming pass that measures exactly what the filter will see -- cheaper than
+    the summarize, since it reads only the crop rectangle and accumulates no
+    frame-shaped statistics. Robust Statistics stays disabled until that pass has
+    run, and the status line calls out counts that a later settings edit has made
+    stale.
+    """
+
+    def __init__(
+        self,
+        settings: DiffractionSettings,
+        summary_service: DiffractionSummaryService,
+        get_pending_dataset_index: Callable[[], int],
+    ) -> None:
+        super().__init__()
+        self._settings = settings
+        self._summary_service = summary_service
+        self._get_pending_dataset_index = get_pending_dataset_index
+        self._lower_bound_enabled_view_controller = CheckBoxParameterViewController(
+            settings.total_counts_lower_bound_enabled, 'Total Counts Lower Bound:'
+        )
+        self._lower_bound_view_controller = SpinBoxParameterViewController(
+            settings.total_counts_lower_bound
+        )
+        self._upper_bound_enabled_view_controller = CheckBoxParameterViewController(
+            settings.total_counts_upper_bound_enabled, 'Total Counts Upper Bound:'
+        )
+        self._upper_bound_view_controller = SpinBoxParameterViewController(
+            settings.total_counts_upper_bound
+        )
+        self._status_label = QLabel()
+        self._status_label.setWordWrap(True)
+        self._refresh_counts_button = QPushButton('Refresh Counts')
+        self._refresh_counts_button.setToolTip(
+            'Measure per-pattern total counts with the current crop and pipeline applied.'
+        )
+        self._refresh_counts_button.clicked.connect(self._on_refresh_counts_clicked)
+        self._robust_stats_button = QPushButton('Robust Statistics…')
+        self._robust_stats_button.clicked.connect(self._on_robust_stats_clicked)
+
+        layout = QGridLayout()
+        layout.addWidget(self._lower_bound_enabled_view_controller.get_widget(), 0, 0)
+        layout.addWidget(self._lower_bound_view_controller.get_widget(), 0, 1)
+        layout.addWidget(self._upper_bound_enabled_view_controller.get_widget(), 1, 0)
+        layout.addWidget(self._upper_bound_view_controller.get_widget(), 1, 1)
+        layout.addWidget(self._status_label, 2, 0, 1, 2)
+        layout.addWidget(self._refresh_counts_button, 3, 0)
+        layout.addWidget(self._robust_stats_button, 3, 1)
+        layout.setColumnStretch(1, 1)
+
+        self._widget = QGroupBox('Total Counts Filter')
+        self._widget.setLayout(layout)
+
+        self._dialog = RobustStatisticsDialog(settings, summary_service, parent=self._widget)
+
+        summary_service.task_monitor.add_observer(self)
+        # Crop, binning, and the value filter all move the counts distribution, so
+        # any of them can strand a measured pass.
+        settings.add_observer(self)
+        self._sync_button_state()
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+    def _sync_button_state(self) -> None:
+        monitor = self._summary_service.task_monitor
+        is_processing = monitor.is_processing
+        measured = self._summary_service.get_last_total_counts()
+        dataset_index = self._get_pending_dataset_index()
+
+        self._refresh_counts_button.setEnabled(not is_processing)
+        self._robust_stats_button.setEnabled(measured is not None and not is_processing)
+
+        if measured is None:
+            self._status_label.setText('Counts not measured yet; press Refresh Counts.')
+        elif self._summary_service.is_total_counts_stale(dataset_index):
+            self._status_label.setText(
+                f'{measured.total_counts.size} patterns measured under different'
+                ' processing settings; press Refresh Counts.'
+            )
+        else:
+            self._status_label.setText(f'{measured.total_counts.size} patterns measured.')
+
+    def _on_refresh_counts_clicked(self) -> None:
+        try:
+            self._summary_service.compute_total_counts(
+                self._get_pending_dataset_index(), force=True
+            )
+        except Exception as exc:
+            logger.exception(exc)
+            ExceptionDialog.show_exception('Refresh Counts', exc)
+
+    def _on_robust_stats_clicked(self) -> None:
+        self._dialog.exec_()
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._summary_service.task_monitor or observable is self._settings:
+            self._sync_button_state()
+
+
 class TransformViewController:
     """HorizontalFlipStep + VerticalFlipStep + TransposeStep."""
 
@@ -332,47 +639,136 @@ class TransformViewController:
 
 
 class OpenDatasetWizardProcessingViewController(ParameterViewController):
-    """Processing wizard page. Groups are laid out top-to-bottom in the
-    DiffractionPrepPipeline execution order (see api/diffraction_prep.py):
-    filter → crop → binning → padding → transform (hflip → vflip → transpose).
-    Storage (memory map) is not part of the pipeline but is retained here as a
-    load-time concern; the horizontal separator between it and Value Filter
-    marks that boundary visually.
+    """Processing wizard page. Split horizontally: preprocess-pipeline groups on
+    the left (in :class:`DiffractionPrepPipeline` execution order), collapsible
+    summary viewer on the right so the user can tune Crop and Total Counts
+    Filter against a rendered mean_pattern and a plot of per-pattern total
+    counts.
+
+    The summary pane starts hidden and is revealed by the toggle button that
+    sits below the left column's scroll area -- outside it, so it stays put once
+    the pipeline groups overflow and start scrolling. While the pane is
+    collapsed the pipeline groups own the full page width. Expanding never
+    squeezes them: both panes carry a minimum width equal to their preferred
+    width, so the wizard widens instead.
+
+    Storage (memory map) and Bad Pixels are load-time concerns rather than
+    pipeline steps; the horizontal separator marks that boundary visually.
     """
 
     def __init__(
         self,
         diffraction_settings: DiffractionSettings,
+        detector_settings: DetectorSettings,
         extent_source: DetectorExtentSource,
+        api: DiffractionAPI,
+        summary_service: DiffractionSummaryService,
+        summary_visualization_engine: VisualizationEngine,
+        status_bar: QStatusBar,
         file_dialog_factory: FileDialogFactory,
+        get_pending_dataset_index: Callable[[], int],
     ) -> None:
         self._storage_view_controller = StorageViewController(
             diffraction_settings, file_dialog_factory
         )
+        self._bad_pixels_view_controller = BadPixelsViewController(
+            detector_settings, api, file_dialog_factory
+        )
         self._value_filter_view_controller = ValueFilterViewController(diffraction_settings)
-        self._crop_view_controller = CropViewController(diffraction_settings, extent_source)
+        self._total_counts_filter_view_controller = TotalCountsFilterViewController(
+            diffraction_settings, summary_service, get_pending_dataset_index
+        )
+        self._crop_view_controller = CropViewController(
+            diffraction_settings, extent_source, summary_service
+        )
         self._binning_view_controller = BinningViewController(diffraction_settings, extent_source)
+        self._upsample_view_controller = UpsampleViewController(diffraction_settings)
         self._padding_view_controller = PaddingViewController(diffraction_settings)
         self._transform_view_controller = TransformViewController(diffraction_settings)
+        self._summary_view_controller = SummaryPanelViewController(
+            diffraction_settings,
+            summary_service,
+            summary_visualization_engine,
+            extent_source,
+            status_bar,
+            file_dialog_factory,
+            get_pending_dataset_index,
+        )
 
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
         separator.setFrameShadow(QFrame.Shadow.Sunken)
 
-        layout = QVBoxLayout()
-        layout.addWidget(self._storage_view_controller.get_widget())
-        layout.addWidget(separator)
-        layout.addWidget(self._value_filter_view_controller.get_widget())
-        layout.addWidget(self._crop_view_controller.get_widget())
-        layout.addWidget(self._binning_view_controller.get_widget())
-        layout.addWidget(self._padding_view_controller.get_widget())
-        layout.addWidget(self._transform_view_controller.get_widget())
-        layout.addStretch()
+        # Left pane — full preprocess-pipeline column, in DiffractionPrepPipeline order.
+        # No trailing addStretch(): the layout fills the scroll viewport top-to-bottom.
+        left_layout = QVBoxLayout()
+        left_layout.addWidget(self._storage_view_controller.get_widget())
+        left_layout.addWidget(self._bad_pixels_view_controller.get_widget())
+        left_layout.addWidget(separator)
+        left_layout.addWidget(self._value_filter_view_controller.get_widget())
+        left_layout.addWidget(self._total_counts_filter_view_controller.get_widget())
+        left_layout.addWidget(self._crop_view_controller.get_widget())
+        left_layout.addWidget(self._binning_view_controller.get_widget())
+        left_layout.addWidget(self._upsample_view_controller.get_widget())
+        left_layout.addWidget(self._padding_view_controller.get_widget())
+        left_layout.addWidget(self._transform_view_controller.get_widget())
+
+        left_content = QWidget()
+        left_content.setLayout(left_layout)
+        left_scroll = QScrollArea()
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setWidget(left_content)
+        # No horizontal scroll bar; horizontal size follows the content's
+        # preferred width so groups render at their natural width and the
+        # summary pane absorbs any extra window width.
+        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        left_scroll.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        # The summary toggle sits below the scroll area rather than inside it,
+        # so it stays visible once the pipeline column overflows. The explicit
+        # 1/0 stretch hands every leftover pixel of height to the scroll area,
+        # in both pane states -- otherwise the collapsed page leaves a dead band
+        # under the column.
+        left_container_layout = QVBoxLayout()
+        left_container_layout.setContentsMargins(0, 0, 0, 0)
+        left_container_layout.addWidget(left_scroll, 1)
+        left_container_layout.addWidget(self._summary_view_controller.get_toggle_widget(), 0)
+
+        left_container = QWidget()
+        left_container.setLayout(left_container_layout)
+        left_container.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+
+        # Floor the column at its preferred width so expanding the summary pane
+        # cannot clip the group boxes. The vertical scroll bar is on-demand and
+        # the horizontal one is off, so its width has to be budgeted here too.
+        # The container inherits the floor from the scroll area.
+        left_layout.activate()
+        left_container_layout.activate()
+        left_scroll.setMinimumWidth(
+            left_content.sizeHint().width()
+            + left_scroll.verticalScrollBar().sizeHint().width()
+            + 2 * left_scroll.frameWidth()
+        )
+
+        # Right pane — summary panel placed directly in the splitter. Its own
+        # QSplitter(Vertical) governs the image/plot proportions, so a
+        # QScrollArea here would steal that stretch. It starts hidden and
+        # contributes no width until the left column's toggle reveals it.
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.addWidget(left_container)
+        splitter.addWidget(self._summary_view_controller.get_widget())
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setCollapsible(0, False)
+        splitter.setCollapsible(1, False)
+
+        outer_layout = QHBoxLayout()
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.addWidget(splitter)
 
         self._page = OpenDatasetWizardPage()
         self._page.setTitle('Processing')
         self._page._set_complete(True)
-        self._page.setLayout(layout)
+        self._page.setLayout(outer_layout)
 
     def get_widget(self) -> QWizardPage:
         return self._page

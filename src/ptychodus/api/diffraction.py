@@ -5,15 +5,13 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
+from sys import getsizeof
 from pathlib import Path
 from typing import overload, Any, TypeAlias
 
 import numpy
-from scipy import ndimage
 
-from .constants import BYTES_PER_MEGABYTE
 from .geometry import ImageExtent, PixelGeometry
-from .preprocess.noise import estimate_noise_floor
 
 BadPixels: TypeAlias = numpy.ndarray[tuple[int, int], numpy.dtype[numpy.bool_]]
 DiffractionPatternDType: TypeAlias = numpy.dtype[numpy.integer[Any] | numpy.floating[Any]]
@@ -21,141 +19,118 @@ DiffractionPatternCounts: TypeAlias = numpy.ndarray[tuple[int], DiffractionPatte
 DiffractionPattern: TypeAlias = numpy.ndarray[tuple[int, int], DiffractionPatternDType]
 DiffractionPatterns: TypeAlias = numpy.ndarray[tuple[int, int, int], DiffractionPatternDType]
 DiffractionIndexes: TypeAlias = numpy.ndarray[tuple[int], numpy.dtype[numpy.integer[Any]]]
-
-
-def estimate_probe_photon_count(
-    patterns: DiffractionPatterns, bad_pixels: BadPixels | None = None
-) -> int:
-    """Estimate the per-snapshot probe photon count from diffraction patterns.
-
-    Heuristic: total counts of the brightest pattern over good pixels. The
-    brightest pattern bounds the photons reaching the detector when the probe
-    is least obstructed by the sample.
-    """
-    if bad_pixels is None:
-        per_pattern = numpy.sum(patterns, axis=(-2, -1))
-    else:
-        per_pattern = numpy.sum(patterns[:, numpy.logical_not(bad_pixels)], axis=-1)
-
-    return int(per_pattern.max())
-
-
-def zero_bad_pixels(
-    patterns: DiffractionPatterns, bad_pixels: BadPixels | None
-) -> DiffractionPatterns:
-    """Return a copy of `patterns` with bad pixels zeroed.
-
-    Zero is a neutral choice (no photons measured) but does mildly bias any
-    consumer toward predicting low intensity at those locations. Returns the
-    input unchanged when `bad_pixels` is None or all-False to avoid a copy.
-    """
-    if bad_pixels is None or not numpy.any(bad_pixels):
-        return patterns
-
-    cleaned = patterns.copy()
-    cleaned[:, bad_pixels] = 0
-    return cleaned
+DiffractionPatternPhotonFluxes: TypeAlias = numpy.ndarray[
+    tuple[int], numpy.dtype[numpy.floating[Any]]
+]
 
 
 @dataclass(frozen=True)
-class CropCenter:
-    """Pixel coordinates of the center used when cropping diffraction patterns."""
+class BeamCenter:
+    """Pixel coordinates of the direct-beam center on a detector."""
 
-    position_x_px: int
-    position_y_px: int
+    x_px: int
+    y_px: int
 
 
-def estimate_crop_center(
-    pattern: DiffractionPattern,
-    bad_pixels: BadPixels | None = None,
-    *,
-    mad_threshold: float = 4.5,
-) -> CropCenter:
-    """Estimate the pixel centroid of a diffraction pattern.
+@dataclass(frozen=True)
+class CropRegion:
+    """Rectangular half-open crop window on a detector, stored as slice ranges.
 
-    Two passes: pass 1 takes the global intensity-weighted center; pass 2
-    re-centroids inside a window around the pass-1 estimate so bright
-    asymmetric peaks outside the central region cannot bias the result.
-
-    Falls back to the geometric center if all pixels are masked or rejected.
+    Fields hold half-open ``(start, stop)`` intervals that index the detector's last
+    two axes directly: `x_range` selects columns ``[x_range[0], x_range[1])`` and
+    `y_range` selects rows ``[y_range[0], y_range[1])`` (matching Python slice
+    semantics). Derived properties expose the equivalent slice / width / height /
+    center forms without duplicating storage.
     """
-    height, width = pattern.shape[-2:]
-    geometric_center = CropCenter(position_x_px=width // 2, position_y_px=height // 2)
 
-    # Median-filter a float copy with bad pixels zeroed.
-    working_pattern = pattern.astype(numpy.float64, copy=True)
+    x_range: tuple[int, int]
+    y_range: tuple[int, int]
 
-    if bad_pixels is not None and numpy.any(bad_pixels):
-        good_pixel_mask = numpy.logical_not(bad_pixels)
-        working_pattern[bad_pixels] = 0.0
-    else:
-        good_pixel_mask = numpy.ones(pattern.shape[-2:], dtype=bool)
+    @property
+    def x_slice(self) -> slice:
+        return slice(*self.x_range)
 
-    filtered_pattern = ndimage.median_filter(working_pattern, size=3)
+    @property
+    def y_slice(self) -> slice:
+        return slice(*self.y_range)
 
-    # Convert intensities to non-negative weights by subtracting the background
-    # and rejecting pixels below background + mad_threshold * MAD. Otsu's
-    # threshold is used to identify the background pool when the histogram is
-    # bimodal; for unimodal noise-only inputs the helper falls back to
-    # median/MAD over all good pixels.
-    good_pixel_intensities = filtered_pattern[good_pixel_mask]
+    @property
+    def width_px(self) -> int:
+        return self.x_range[1] - self.x_range[0]
 
-    if good_pixel_intensities.size == 0:
-        return geometric_center
+    @property
+    def height_px(self) -> int:
+        return self.y_range[1] - self.y_range[0]
 
-    noise_floor = estimate_noise_floor(good_pixel_intensities)
-    background_intensity = noise_floor.background_value
-    significance_threshold = noise_floor.get_significance_threshold(mad_threshold)
-    centroid_weights = filtered_pattern - background_intensity
-    centroid_weights[~good_pixel_mask] = 0.0
-    centroid_weights[filtered_pattern < significance_threshold] = 0.0
-    numpy.clip(centroid_weights, 0.0, None, out=centroid_weights)
+    @property
+    def center_x_px(self) -> int:
+        return (self.x_range[0] + self.x_range[1]) // 2
 
-    # Pixel-coordinate axes centered on the array midpoint, so symmetric weight
-    # distributions sum to ~0 rather than relying on catastrophic cancellation.
-    midpoint_y = (height - 1) / 2.0
-    midpoint_x = (width - 1) / 2.0
-    centered_y_axis = numpy.arange(height, dtype=numpy.float64).reshape(-1, 1) - midpoint_y
-    centered_x_axis = numpy.arange(width, dtype=numpy.float64).reshape(1, -1) - midpoint_x
+    @property
+    def center_y_px(self) -> int:
+        return (self.y_range[0] + self.y_range[1]) // 2
 
-    # Pass 1: global intensity-weighted centroid.
-    coarse_total_weight = float(centroid_weights.sum())
+    @classmethod
+    def from_center_extent(cls, center: BeamCenter, extent: ImageExtent) -> CropRegion:
+        """Build a half-open region from a center pixel and (width, height).
 
-    if coarse_total_weight <= 0.0:
-        return geometric_center
-
-    coarse_center_y = midpoint_y + float(
-        (centroid_weights * centered_y_axis).sum() / coarse_total_weight
-    )
-    coarse_center_x = midpoint_x + float(
-        (centroid_weights * centered_x_axis).sum() / coarse_total_weight
-    )
-
-    # Pass 2: re-centroid inside a square window around the pass-1 estimate.
-    half_window_size = min(height, width) // 4
-    pixel_y = numpy.arange(height).reshape(-1, 1)
-    pixel_x = numpy.arange(width).reshape(1, -1)
-    in_central_window = (numpy.abs(pixel_y - coarse_center_y) <= half_window_size) & (
-        numpy.abs(pixel_x - coarse_center_x) <= half_window_size
-    )
-    windowed_weights = centroid_weights * in_central_window
-    refined_total_weight = float(windowed_weights.sum())
-
-    if refined_total_weight > 0.0:
-        refined_center_y = midpoint_y + float(
-            (windowed_weights * centered_y_axis).sum() / refined_total_weight
+        For odd width or height the window is biased one pixel toward the origin
+        (start = center - size // 2, stop = start + size), preserving the requested
+        size exactly rather than silently truncating by one.
+        """
+        x_start = center.x_px - extent.width_px // 2
+        y_start = center.y_px - extent.height_px // 2
+        return cls(
+            x_range=(x_start, x_start + extent.width_px),
+            y_range=(y_start, y_start + extent.height_px),
         )
-        refined_center_x = midpoint_x + float(
-            (windowed_weights * centered_x_axis).sum() / refined_total_weight
-        )
-    else:
-        refined_center_y = coarse_center_y
-        refined_center_x = coarse_center_x
 
-    return CropCenter(
-        position_x_px=int(round(refined_center_x)),
-        position_y_px=int(round(refined_center_y)),
-    )
+    @classmethod
+    def from_largest_pow2(cls, center: BeamCenter, detector_extent: ImageExtent) -> CropRegion:
+        """Largest power-of-two square region centered at `center` fitting in `detector_extent`.
+
+        Returns a zero-size region when `center` lies on the detector boundary or outside it
+        (no positive-radius square exists).
+        """
+        max_radius = min(
+            center.x_px,
+            detector_extent.width_px - center.x_px,
+            center.y_px,
+            detector_extent.height_px - center.y_px,
+        )
+        if max_radius < 1:
+            return cls(
+                x_range=(center.x_px, center.x_px),
+                y_range=(center.y_px, center.y_px),
+            )
+        # Largest s = 2^k satisfying s <= 2 * max_radius. bit_length() gives floor(log2)+1.
+        size = 1 << ((2 * max_radius).bit_length() - 1)
+        return cls.from_center_extent(center, ImageExtent(width_px=size, height_px=size))
+
+    def clamp_to_detector_extent(self, detector_extent: ImageExtent) -> CropRegion:
+        """Return a new region shrunk and shifted so its window fits inside `detector_extent`.
+
+        Width and height are capped at the detector's (floored at 1); each range is then
+        shifted (preserving size) so the half-open ``[start, stop)`` lies entirely inside
+        ``[0, detector)``.
+        """
+        width = max(1, min(self.width_px, detector_extent.width_px))
+        height = max(1, min(self.height_px, detector_extent.height_px))
+        # Preserve the requested center where the shrunk size allows, then clip the
+        # start into [0, detector - size] so [start, start + size) fits.
+        preferred_x_start = self.center_x_px - width // 2
+        preferred_y_start = self.center_y_px - height // 2
+        x_start = max(0, min(detector_extent.width_px - width, preferred_x_start))
+        y_start = max(0, min(detector_extent.height_px - height, preferred_y_start))
+        return CropRegion(
+            x_range=(x_start, x_start + width),
+            y_range=(y_start, y_start + height),
+        )
+
+    def apply_to(self, data: numpy.ndarray) -> numpy.ndarray:
+        """Slice the last two axes of `data` to this region; leading axes pass through."""
+        leading = (slice(None),) * (data.ndim - 2)
+        return data[(*leading, self.y_slice, self.x_slice)]
 
 
 class DiffractionArray(ABC):
@@ -170,11 +145,26 @@ class DiffractionArray(ABC):
         pass
 
     @abstractmethod
-    def get_patterns(self) -> DiffractionPatterns:
-        pass
+    def get_patterns(self, *, read_region: CropRegion | None = None) -> DiffractionPatterns:
+        """Return the patterns for this array.
+
+        When `read_region` is set, subclasses that can slice at load time (e.g.
+        HDF5 partial reads) do so; others fall back to loading the full frames and
+        cropping with :meth:`CropRegion.apply_to`.
+        """
 
     def get_num_patterns(self) -> int:
         return self.get_patterns().shape[0]
+
+    def get_probe_photon_flux_Hz(self) -> DiffractionPatternPhotonFluxes | None:  # noqa: N802
+        """Per-pattern incident probe photon flux (photons per second).
+
+        Beamline readers with hardware flux measurements (ion chamber, BPM,
+        ring-current-normalized upstream reading) override this. The default
+        returns None to signal no measurement is available, and downstream
+        assembly falls back to per-pattern detector totals.
+        """
+        return None
 
 
 class SimpleDiffractionArray(DiffractionArray):
@@ -185,11 +175,13 @@ class SimpleDiffractionArray(DiffractionArray):
         label: str,
         indexes: DiffractionIndexes,
         patterns: DiffractionPatterns,
+        probe_photon_flux_Hz: DiffractionPatternPhotonFluxes | None = None,  # noqa: N803
     ) -> None:
         super().__init__()
         self._label = label
         self._indexes = indexes
         self._patterns = patterns
+        self._probe_photon_flux_Hz = probe_photon_flux_Hz
 
     def get_label(self) -> str:
         return self._label
@@ -197,8 +189,20 @@ class SimpleDiffractionArray(DiffractionArray):
     def get_indexes(self) -> DiffractionIndexes:
         return self._indexes
 
-    def get_patterns(self) -> DiffractionPatterns:
-        return self._patterns
+    def get_patterns(self, *, read_region: CropRegion | None = None) -> DiffractionPatterns:
+        if read_region is None:
+            return self._patterns
+        return read_region.apply_to(self._patterns)
+
+    def get_probe_photon_flux_Hz(self) -> DiffractionPatternPhotonFluxes | None:  # noqa: N802
+        return self._probe_photon_flux_Hz
+
+    @property
+    def nbytes(self) -> int:
+        sz = self._indexes.nbytes + self._patterns.nbytes
+        if self._probe_photon_flux_Hz is not None:
+            sz += self._probe_photon_flux_Hz.nbytes
+        return sz
 
 
 class Polarization(StrEnum):
@@ -220,7 +224,7 @@ class DiffractionMetadata:
     detector_extent: ImageExtent
     detector_distance_m: float | None = None
     detector_pixel_geometry: PixelGeometry | None = None
-    crop_center: CropCenter | None = None
+    beam_center: BeamCenter | None = None
     probe_energy_eV: float | None = None  # noqa: N815
     probe_photon_count: int | None = None
     exposure_time_s: float | None = None
@@ -228,6 +232,23 @@ class DiffractionMetadata:
     tilt_angle_deg: float | None = None
     polarization: Polarization | None = None
     file_path: Path | None = None
+
+    @property
+    def nbytes(self) -> int:
+        sz = getsizeof(self.num_patterns_per_array)
+        sz += getsizeof(self.pattern_dtype)
+        sz += getsizeof(self.detector_extent)
+        sz += getsizeof(self.detector_distance_m)
+        sz += getsizeof(self.detector_pixel_geometry)
+        sz += getsizeof(self.beam_center)
+        sz += getsizeof(self.probe_energy_eV)
+        sz += getsizeof(self.probe_photon_count)
+        sz += getsizeof(self.exposure_time_s)
+        sz += getsizeof(self.tomography_angle_deg)
+        sz += getsizeof(self.tilt_angle_deg)
+        sz += getsizeof(self.polarization)
+        sz += getsizeof(self.file_path)
+        return sz
 
     @classmethod
     def create_null(cls, file_path: Path | None = None) -> DiffractionMetadata:
@@ -378,113 +399,3 @@ class BadPixelsFileReader(ABC):
     def read(self, file_path: Path) -> BadPixels:
         """Read a bad-pixel mask from file."""
         pass
-
-
-class AssembledDiffractionData:
-    """In-memory store for a complete set of indexed diffraction patterns and their bad-pixel mask."""
-
-    def __init__(
-        self,
-        indexes: DiffractionIndexes,
-        patterns: DiffractionPatterns,
-        pixel_geometry: PixelGeometry,
-        bad_pixels: BadPixels,
-    ) -> None:
-        self._indexes = indexes
-        self._patterns = patterns
-        self._pixel_geometry = pixel_geometry
-        self._bad_pixels = bad_pixels
-
-        if indexes.ndim != 1:
-            raise ValueError(
-                f'Unexpected number of dimensions for indexes! (actual={indexes.ndim} expected=1)'
-            )
-
-        if patterns.ndim != 3:
-            raise ValueError(
-                f'Unexpected number of dimensions for patterns! (actual={patterns.ndim} expected=3)'
-            )
-
-        if bad_pixels.ndim != 2:
-            raise ValueError(
-                f'Unexpected number of dimensions for bad pixels! (actual={bad_pixels.ndim} expected=2)'
-            )
-
-        if indexes.shape[0] != patterns.shape[0]:
-            raise ValueError('Number of indexes does not match number of patterns!')
-
-        if patterns.shape[1:] != bad_pixels.shape:
-            raise ValueError(
-                'Patterns shape does not match bad pixels shape! '
-                f'(actual={patterns.shape[1:]} expected={bad_pixels.shape})'
-            )
-
-    @classmethod
-    def create_null(cls) -> AssembledDiffractionData:
-        return cls(
-            indexes=numpy.zeros(1, dtype=numpy.intp),
-            patterns=numpy.zeros((1, 1, 1), dtype=numpy.intp),
-            pixel_geometry=PixelGeometry(0, 0),
-            bad_pixels=numpy.zeros((1, 1), dtype=numpy.bool_),
-        )
-
-    def get_patterns_shape(self) -> tuple[int, int, int]:
-        return self._patterns.shape
-
-    def get_patterns_dtype(self) -> DiffractionPatternDType:
-        return self._patterns.dtype
-
-    def get_pattern(self, index: int) -> DiffractionPattern:
-        return self._patterns[index]
-
-    def get_pixel_geometry(self) -> PixelGeometry:
-        return self._pixel_geometry
-
-    def set_pixel_geometry(self, pixel_geometry: PixelGeometry) -> None:
-        # Views produced by assemble() keep their creation-time snapshot; they are
-        # only used for per-array display (average pattern, counts) and not by
-        # reconstruction, so leaving them stale is acceptable.
-        self._pixel_geometry = pixel_geometry
-
-    def get_bad_pixels(self) -> BadPixels:
-        return self._bad_pixels
-
-    def assemble(self, data: AssembledDiffractionData, offset: int) -> AssembledDiffractionData:
-        assembled_indexes = slice(offset, offset + len(data._indexes))
-
-        self._indexes[assembled_indexes] = data._indexes
-        indexes_view = self._indexes[assembled_indexes]
-        indexes_view.flags.writeable = False
-
-        self._patterns[assembled_indexes, :, :] = data._patterns
-        patterns_view = self._patterns[assembled_indexes, :, :]
-        patterns_view.flags.writeable = False
-
-        return AssembledDiffractionData(
-            indexes=indexes_view,
-            patterns=patterns_view,
-            pixel_geometry=self._pixel_geometry,
-            bad_pixels=data._bad_pixels,
-        )
-
-    def get_indexes(self) -> DiffractionIndexes:
-        return self._indexes[self._indexes >= 0]
-
-    def get_patterns(self) -> DiffractionPatterns:
-        return self._patterns[self._indexes >= 0]
-
-    def get_pattern_counts(self) -> DiffractionPatternCounts:
-        good_pixels = numpy.logical_not(self._bad_pixels)
-        assembled_patterns = self.get_patterns()
-        pattern_counts = numpy.sum(assembled_patterns[:, good_pixels], axis=-1)
-        return pattern_counts
-
-    def get_average_pattern(self) -> DiffractionPattern:
-        assembled_patterns = self.get_patterns()
-        return numpy.mean(assembled_patterns, axis=0)
-
-    def __str__(self) -> str:
-        number, height, width = self._patterns.shape
-        dtype = str(self._patterns.dtype)
-        size_MB = self._patterns.nbytes / BYTES_PER_MEGABYTE  # noqa: N806
-        return f'{number} x {height}H x {width}W {dtype} [{size_MB:.2f}MB]'

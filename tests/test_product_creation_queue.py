@@ -8,27 +8,36 @@ from unittest.mock import MagicMock
 import pytest
 
 from ptychodus.model.product.api import ProductAPI
+from ptychodus.model.product.monitor import ProductTaskMonitor
 from ptychodus.model.product.item import ProductState
 
 
 class _StubTaskManager:
-    """Minimal TaskManager stand-in: records enqueued background tasks and
-    exposes the standard is_stopping / WAIT_TIME_S attributes ProductAPI reads."""
+    """Minimal TaskManager stand-in: records enqueued tasks and exposes the standard
+    is_stopping / WAIT_TIME_S attributes ProductAPI reads.
+
+    Foreground tasks are recorded rather than run: ProductTaskMonitor posts observer
+    notifications through this on every enter/exit of the queued finalize."""
 
     is_stopping = False
     WAIT_TIME_S = 0.01
 
     def __init__(self) -> None:
         self.background_tasks: list = []
+        self.foreground_tasks: list = []
 
     def put_background_task(self, task) -> None:  # noqa: ANN001
         self.background_tasks.append(task)
+
+    def put_foreground_task(self, task) -> None:  # noqa: ANN001
+        self.foreground_tasks.append(task)
 
 
 def _make_api(
     task_manager: _StubTaskManager,
     stub_item: MagicMock,
     real_item: MagicMock,
+    monitor: ProductTaskMonitor | None = None,
 ) -> tuple[ProductAPI, MagicMock, MagicMock]:
     repository = MagicMock()
     inserted: list = []
@@ -52,6 +61,9 @@ def _make_api(
         file_reader_chooser=MagicMock(),
         file_writer_chooser=MagicMock(),
         task_manager=task_manager,  # type: ignore[arg-type]
+        # A real monitor, not a mock: _insert_via_queue uses it as a context manager
+        # and reads is_stopping, so the queue path depends on its actual behavior.
+        task_monitor=monitor or ProductTaskMonitor(task_manager),  # type: ignore[arg-type]
     )
     return api, repository, item_factory
 
@@ -179,3 +191,59 @@ def test_blocking_call_returns_index_after_wait() -> None:
     factory.create_from_values.assert_called_once()
     repo.insert_product.assert_called_once_with(real)
     assert tm.background_tasks == []
+
+
+def test_monitor_is_busy_from_enqueue_until_finalize() -> None:
+    tm = _StubTaskManager()
+    monitor = ProductTaskMonitor(tm)  # type: ignore[arg-type]
+    stub, real = MagicMock(), MagicMock()
+    api, _repo, _factory = _make_api(tm, stub, real, monitor=monitor)
+
+    assert not monitor.is_processing
+
+    api.insert_new_product(dataset=_dataset(in_progress=True), block=False)
+
+    # Busy from the moment the stub is queued: that is the window Stop must reach.
+    assert monitor.is_processing
+    assert (monitor.get_progress(), monitor.get_progress_goal()) == (0, 1)
+
+    tm.background_tasks[0]()()
+
+    assert not monitor.is_processing
+
+
+def test_a_burst_of_queued_products_nests() -> None:
+    tm = _StubTaskManager()
+    monitor = ProductTaskMonitor(tm)  # type: ignore[arg-type]
+    api, _repo, _factory = _make_api(tm, MagicMock(), MagicMock(), monitor=monitor)
+
+    dataset = _dataset(in_progress=True)
+    api.insert_new_product(dataset=dataset, block=False)
+    api.insert_new_product(dataset=dataset, block=False)
+
+    assert (monitor.get_progress(), monitor.get_progress_goal()) == (0, 2)
+
+    tm.background_tasks[0]()()
+
+    # Still busy: the burst is not drained until every queued product finalizes.
+    assert monitor.is_processing
+    assert (monitor.get_progress(), monitor.get_progress_goal()) == (1, 2)
+
+    tm.background_tasks[1]()()
+
+    assert not monitor.is_processing
+
+
+def test_stop_cancels_a_queued_product() -> None:
+    tm = _StubTaskManager()
+    monitor = ProductTaskMonitor(tm)  # type: ignore[arg-type]
+    stub = MagicMock()
+    api, _repo, factory = _make_api(tm, stub, MagicMock(), monitor=monitor)
+
+    api.insert_new_product(dataset=_dataset(in_progress=True), block=False)
+    monitor.stop_processing()
+    tm.background_tasks[0]()()
+
+    stub.set_state.assert_called_with(ProductState.FAILED)
+    factory.create_from_values.assert_not_called()
+    assert not monitor.is_processing

@@ -17,6 +17,7 @@ class DetectorSettings(Observable, Observer):
             'PixelHeightInMeters', 75e-6, minimum=0.0
         )
 
+        self.bad_pixels_enabled = self._group.create_boolean_parameter('BadPixelsEnabled', False)
         self.bad_pixels_file_type = self._group.create_string_parameter(
             'BadPixelsFileType', 'NPY_Bad_Pixels'
         )
@@ -43,11 +44,11 @@ class DiffractionSettings(Observable, Observer):
         )
 
         self.crop_enabled = self._group.create_boolean_parameter('CropEnabled', True)
-        self.crop_center_x_px = self._group.create_integer_parameter(
-            'CropCenterXInPixels', 32, minimum=0
+        self.beam_center_x_px = self._group.create_integer_parameter(
+            'BeamCenterXInPixels', 32, minimum=0
         )
-        self.crop_center_y_px = self._group.create_integer_parameter(
-            'CropCenterYInPixels', 32, minimum=0
+        self.beam_center_y_px = self._group.create_integer_parameter(
+            'BeamCenterYInPixels', 32, minimum=0
         )
         self.crop_width_px = self._group.create_integer_parameter(
             'CropWidthInPixels', 64, minimum=1
@@ -59,6 +60,9 @@ class DiffractionSettings(Observable, Observer):
         self.binning_enabled = self._group.create_boolean_parameter('BinningEnabled', False)
         self.bin_size_x = self._group.create_integer_parameter('BinSizeX', 1, minimum=1)
         self.bin_size_y = self._group.create_integer_parameter('BinSizeY', 1, minimum=1)
+
+        self.upsample_enabled = self._group.create_boolean_parameter('UpsampleEnabled', False)
+        self.upsample_factor = self._group.create_integer_parameter('UpsampleFactor', 1, minimum=1)
 
         self.padding_enabled = self._group.create_boolean_parameter('PaddingEnabled', False)
         self.pad_x = self._group.create_integer_parameter('PadX', 0, minimum=0)
@@ -79,6 +83,19 @@ class DiffractionSettings(Observable, Observer):
         )
         self.value_upper_bound = self._group.create_integer_parameter(
             'ValueUpperBound', 65535, minimum=0
+        )
+
+        self.total_counts_lower_bound_enabled = self._group.create_boolean_parameter(
+            'TotalCountsLowerBoundEnabled', False
+        )
+        self.total_counts_lower_bound = self._group.create_integer_parameter(
+            'TotalCountsLowerBound', 0, minimum=0
+        )
+        self.total_counts_upper_bound_enabled = self._group.create_boolean_parameter(
+            'TotalCountsUpperBoundEnabled', False
+        )
+        self.total_counts_upper_bound = self._group.create_integer_parameter(
+            'TotalCountsUpperBound', 1_000_000_000, minimum=0
         )
 
     def _update(self, observable: Observable) -> None:

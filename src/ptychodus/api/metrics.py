@@ -162,8 +162,8 @@ def estimate_reconstruction_ambiguities(
         weights=weights_arr,
         pixel_width_m=pixel_geometry.width_m,
         pixel_height_m=pixel_geometry.height_m,
-        position_x_m=coords.position_x_m,
-        position_y_m=coords.position_y_m,
+        position_x_m=coords.x_m,
+        position_y_m=coords.y_m,
     )
 
     if ref_layer_zero is None:
@@ -171,7 +171,7 @@ def estimate_reconstruction_ambiguities(
     else:
         # Weighted-LS solution for s in product ≈ s * exp(i(phi + k·r)) * ref:
         # s = Re(sum w * signal * exp(-i(phi + ramp))) / sum(w * |ref|^2).
-        ramp = k_x * coords.position_x_m + k_y * coords.position_y_m
+        ramp = k_x * coords.x_m + k_y * coords.y_m
         correction = numpy.exp(-1j * (phi + ramp))
         ref_intensity = numpy.square(numpy.abs(ref_layer_zero))
 
@@ -211,39 +211,24 @@ class ObjectComparison:
     reflects ambiguity noise rather than real reconstruction error. This dataclass
     holds the result of removing those degrees of freedom so the same prepared
     pair can be fed to every metric.
-
-    Construct via :func:`compute_object_comparison`, which:
-
-    1. Sub-pixel registers the test object onto the reference (:func:`align_objects`).
-    2. Estimates the four ambiguity scalars and standardizes the test product
-       (:class:`ReconstructionAmbiguities`).
-    3. Flattens multi-layer objects via :meth:`Object.get_layers_flattened`.
-    4. Promotes both arrays to a common complex dtype.
-
     """
 
     reference_complex: ComplexArrayType
-    """2D complex array, the reference object's flattened layers, promoted to the common dtype."""
+    """2D complex array, the reference object's flattened layers."""
     test_complex: ComplexArrayType
-    """2D complex array, the standardized + aligned test object's flattened layers.
-
-    Same shape and dtype as ``reference_complex``.
-    """
+    """2D complex array, standardized + aligned. Same shape and dtype as ``reference_complex``."""
     pixel_geometry: PixelGeometry
-    """Shared pixel geometry of both reconstructions (validated equal by the upstream
-    primitives)."""
     ambiguities: ReconstructionAmbiguities
-    """The ambiguities removed from the test side, useful as provenance (e.g. for reporting
-    "how much ramp/scale was removed" alongside the metric value)."""
+    """The ambiguities removed from the test side."""
 
     @property
     def reference_amplitude(self) -> RealArrayType:
-        """``|reference|`` — real-valued amplitude image for metrics like SSIM/PSNR."""
+        """``|reference|``."""
         return numpy.absolute(self.reference_complex)
 
     @property
     def test_amplitude(self) -> RealArrayType:
-        """``|test|`` — real-valued amplitude image for metrics like SSIM/PSNR."""
+        """``|test|``."""
         return numpy.absolute(self.test_complex)
 
     @property
@@ -253,8 +238,7 @@ class ObjectComparison:
 
     @property
     def test_phase(self) -> RealArrayType:
-        """``arg(test)`` in radians, wrapped to ``(-pi, pi]``. Constant offset and
-        linear ramp have been removed by :class:`ReconstructionAmbiguities`."""
+        """``arg(test)`` in radians, wrapped to ``(-pi, pi]``."""
         return numpy.angle(self.test_complex)
 
 
@@ -271,32 +255,28 @@ def compute_object_comparison(
         reference: The reconstruction treated as ground truth. Defines the
             array indexing and ambiguity anchor.
         test: The reconstruction being evaluated against ``reference``.
-        upsample_factor: Sub-pixel precision for
-            :func:`skimage.registration.phase_cross_correlation`, forwarded
-            through :func:`align_objects`.
+        upsample_factor: Sub-pixel precision for the phase-cross-correlation
+            registration.
         weights: Optional non-negative per-pixel weights for the ambiguity
             estimate, shape ``(height_px, width_px)`` matching layer 0. Pass
             a 0/1 mask to restrict the estimate to a region of interest.
 
     Raises:
-        ValueError: If the two products' objects disagree on pixel geometry,
-            if their flattened or layer-0 shapes differ, or if the weighted
-            reference intensity is zero. These checks come from
-            :func:`align_objects` and
-            :func:`estimate_reconstruction_ambiguities`; this function does
-            not duplicate them.
+        ValueError: If the two products' objects disagree on pixel geometry or
+            if the weighted reference intensity is zero.
     """
-    aligned_test_object = align_objects(
+    cropped_reference_object, aligned_test_object = align_objects(
         reference.object_, test.object_, upsample_factor=upsample_factor
     )
+    cropped_reference = replace(reference, object_=cropped_reference_object)
     aligned_test = replace(test, object_=aligned_test_object)
 
     ambiguities = estimate_reconstruction_ambiguities(
-        aligned_test, reference=reference, weights=weights
+        aligned_test, reference=cropped_reference, weights=weights
     )
     standardized_test = ambiguities.standardize_product(aligned_test)
 
-    reference_array = reference.object_.get_layers_flattened()
+    reference_array = cropped_reference_object.get_layers_flattened()
     test_array = standardized_test.object_.get_layers_flattened()
 
     common_dtype = numpy.result_type(reference_array.dtype, test_array.dtype)
@@ -304,7 +284,7 @@ def compute_object_comparison(
     return ObjectComparison(
         reference_complex=reference_array.astype(common_dtype, copy=False),
         test_complex=test_array.astype(common_dtype, copy=False),
-        pixel_geometry=reference.object_.get_pixel_geometry().copy(),
+        pixel_geometry=cropped_reference_object.get_pixel_geometry().copy(),
         ambiguities=ambiguities,
     )
 
@@ -336,10 +316,7 @@ class FourierRingCorrelation:
     def get_bit_threshold_curve(self, bits: float = 0.5) -> RealArrayType:
         """Per-ring van Heel/Schatz b-bit FRC significance threshold.
 
-        Returns the per-ring threshold curve used by
-        :meth:`get_resolution_m_at_bit_threshold`. Bins with zero pixels yield
-        NaN. Useful for overlaying the threshold on an FRC plot without
-        re-deriving the formula.
+        Bins with zero pixels yield NaN.
         """
         sigma = 0.5 * (2.0**bits - 1.0)
         sqrt_sigma = numpy.sqrt(sigma)
@@ -590,13 +567,10 @@ def compute_peak_signal_to_noise_ratio(
 ) -> float:
     """Peak signal-to-noise ratio in dB via :func:`skimage.metrics.peak_signal_noise_ratio`.
 
-    Real-valued inputs only — project complex objects to amplitude
-    (:attr:`ObjectComparison.reference_amplitude`) or phase
-    (:attr:`ObjectComparison.reference_phase`) before calling.
-
-    When ``data_range`` is ``None``, infers ``reference.max() - reference.min()``
-    so floating-point inputs do not trigger scikit-image's data-range warning.
-    Returns ``+inf`` when the two arrays are identical.
+    Real-valued inputs only. When ``data_range`` is ``None``, infers
+    ``reference.max() - reference.min()`` so floating-point inputs do not
+    trigger scikit-image's data-range warning. Returns ``+inf`` when the two
+    arrays are identical.
     """
     if reference.shape != test.shape:
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
@@ -613,9 +587,9 @@ def compute_structural_similarity(
 ) -> float:
     """Structural similarity index via :func:`skimage.metrics.structural_similarity`.
 
-    Real-valued inputs only — see :func:`compute_peak_signal_to_noise_ratio`
-    for the rationale and the ``data_range`` convention. Returns a scalar in
-    ``[-1, 1]``; ``1.0`` for identical inputs.
+    Real-valued inputs only. When ``data_range`` is ``None``, infers
+    ``reference.max() - reference.min()``. Returns a scalar in ``[-1, 1]``;
+    ``1.0`` for identical inputs.
     """
     if reference.shape != test.shape:
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
@@ -632,16 +606,13 @@ def compute_normalized_mutual_information(
 ) -> float:
     """Normalized mutual information via :func:`skimage.metrics.normalized_mutual_information`.
 
-    Real-valued inputs only — project complex objects to amplitude
-    (:attr:`ObjectComparison.reference_amplitude`) or phase
-    (:attr:`ObjectComparison.reference_phase`) before calling.
-
-    Returns the Studholme NMI ``(H(reference) + H(test)) / H(reference, test)``,
-    which is ~1.0 for statistically independent inputs and 2.0 for identical
-    inputs. Unlike SSIM/PSNR, NMI is insensitive to monotonic intensity
-    remappings, so it scores residual amplitude scale ambiguity less harshly.
-    ``bins`` controls the joint-histogram resolution; the scikit-image default
-    of 100 is preserved.
+    Real-valued inputs only. Returns the Studholme NMI
+    ``(H(reference) + H(test)) / H(reference, test)``, which is ~1.0 for
+    statistically independent inputs and 2.0 for identical inputs. Unlike
+    SSIM/PSNR, NMI is insensitive to monotonic intensity remappings, so it
+    scores residual amplitude scale ambiguity less harshly. ``bins`` controls
+    the joint-histogram resolution; the scikit-image default of 100 is
+    preserved.
     """
     if reference.shape != test.shape:
         raise ValueError(f'Arrays must have same shape; got {reference.shape} vs {test.shape}!')
@@ -653,15 +624,13 @@ def compute_normalized_mutual_information(
 class ReconstructionResiduals:
     """Real- and reciprocal-space residual maps comparing measured to forward-simulated patterns.
 
-    Built by :func:`compute_reconstruction_residuals` from a reconstructed product and the
-    measured diffraction patterns it should reproduce. Both maps are dimensionless amplitude
-    R-factors (Crowther/Rosenthal): the fraction of detected amplitude the model fails to
-    explain, with both numerator and denominator scaling with local photon count so the ratio
-    decouples from sample thickness, probe brightness, and incident flux. A perfectly fitted
-    reconstruction yields zero everywhere; an uncorrelated model approaches ~1. The square-root
-    transform inside the metric is Poisson variance-stabilizing, so the shot-noise floor of
-    ``R_F`` is automatically tighter where photons are abundant and looser where they are
-    scarce — the eye-readable behavior.
+    Both maps are dimensionless amplitude R-factors (Crowther/Rosenthal): the fraction of
+    detected amplitude the model fails to explain, with both numerator and denominator scaling
+    with local photon count so the ratio decouples from sample thickness, probe brightness, and
+    incident flux. A perfectly fitted reconstruction yields zero everywhere; an uncorrelated
+    model approaches ~1. The square-root transform inside the metric is Poisson
+    variance-stabilizing, so the shot-noise floor of ``R_F`` is automatically tighter where
+    photons are abundant and looser where they are scarce — the eye-readable behavior.
 
     **What "amplitude" means here.** The metric compares **diffraction amplitudes** on the
     detector (``√I_meas``, ``√I_pred``), not **object amplitudes** (``|O|``). The reconstructed
@@ -674,30 +643,20 @@ class ReconstructionResiduals:
     """
 
     real_space_error_map: RealArrayType
-    """2D array on the object grid.
+    """2D amplitude R-factor on the object grid.
 
-    For each object pixel, the probe-footprint-weighted aggregation of per-frame amplitude
-    residuals over every frame whose probe touched that pixel, divided by the same
-    probe-weighted aggregation of measured amplitudes. Each frame's probe-intensity patch is
-    normalized to sum to 1 before splatting, so frames contribute equally regardless of probe
-    power (relevant for variable-probe reconstructions). Scan-density invariant: doubling the
-    number of frames covering a pixel doubles both splats, leaving the ratio unchanged. NaN
-    where no R-factor is defined: un-illuminated pixels (no frame contributed) and object
-    regions touched only by frames with zero measured signal (``Σ √I_meas = 0``).
+    NaN where the R-factor is undefined: un-illuminated pixels (no frame contributed) and
+    object regions touched only by frames with zero measured signal (``Σ √I_meas = 0``).
     """
     object_pixel_geometry: PixelGeometry
-    """Pixel geometry of ``real_space_error_map``."""
     object_center: ObjectCenter
-    """Real-space origin of ``real_space_error_map``."""
     reciprocal_space_error_map: RealArrayType
-    """2D array on the detector grid.
+    """2D amplitude R-factor on the detector grid.
 
     Each pixel is ``Σ_n |√I_meas,n − √I_pred,n| / Σ_n √I_meas,n``, summed across frames. NaN
-    where no R-factor is defined: bad pixels and detector pixels with no measured signal across
-    any frame.
+    at bad pixels and at detector pixels with no measured signal across any frame.
     """
     detector_pixel_geometry: PixelGeometry
-    """Pixel geometry of ``reciprocal_space_error_map`` (derived from the forward propagator)."""
 
 
 def compute_reconstruction_residuals(
@@ -792,23 +751,15 @@ def compute_reconstruction_residuals(
         per_frame_numerator, per_frame_denominator, product.iter_position_probes()
     ):
         object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        cx = object_point.coordinate_x_px
-        cy = object_point.coordinate_y_px
+        bounds = probe_geometry.resolve_patch_bounds(object_point.x_px, object_point.y_px)
 
-        x_lower = int(cx - probe_geometry.width_px / 2)
-        y_lower = int(cy - probe_geometry.height_px / 2)
-        dx = cx - (x_lower + probe_geometry.width_px / 2)
-        dy = cy - (y_lower + probe_geometry.height_px / 2)
-
-        shifted_modes = fourier_shift_2d(probe.get_array(), dx=dx, dy=dy)
+        shifted_modes = fourier_shift_2d(probe.get_array(), dx=bounds.dx, dy=bounds.dy)
         intensity = numpy.sum(numpy.abs(shifted_modes) ** 2, axis=0)
         total = intensity.sum()
         patch = intensity / total if total > 0.0 else intensity
 
-        ys = slice(y_lower, y_lower + probe_geometry.height_px)
-        xs = slice(x_lower, x_lower + probe_geometry.width_px)
-        numerator_splat[ys, xs] += num_i * patch
-        denominator_splat[ys, xs] += den_i * patch
+        numerator_splat[bounds.y_slice, bounds.x_slice] += num_i * patch
+        denominator_splat[bounds.y_slice, bounds.x_slice] += den_i * patch
 
     real_space_error_map = numpy.full_like(numerator_splat, numpy.nan)
     numpy.divide(

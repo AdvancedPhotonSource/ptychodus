@@ -91,7 +91,7 @@ def test_rebuild_fires_on_geometry_observer_notification() -> None:
     canned = Object(
         array=numpy.zeros((1, 4, 4), dtype=complex),
         pixel_geometry=PixelGeometry(width_m=1e-6, height_m=1e-6),
-        center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
     )
     builder = _RecordingObjectBuilder(settings, canned)
 

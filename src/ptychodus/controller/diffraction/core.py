@@ -5,9 +5,8 @@ from PyQt5.QtWidgets import (
     QAbstractItemView,
     QDialog,
     QMessageBox,
+    QStatusBar,
 )
-
-from ptychodus.api.observer import Observable, Observer
 
 from ...model.analysis import DiffractionSimulator, DiffractionSimulatorSettings
 from ...model.diffraction import (
@@ -18,65 +17,33 @@ from ...model.diffraction import (
     DiffractionDatasetRepository,
     DiffractionDatasetRepositoryObserver,
     DiffractionSettings,
+    DiffractionSummaryService,
     DiffractionTaskMonitor,
-    PatternSizer,
 )
 from .detector_extent import DetectorExtentSource
 from ...model.product import ProductRepository, ProductSettings
-from ...view.diffraction import DatasetsView, DiffractionStatusView
-from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate
+from ...model.visualization import VisualizationEngine
+from ...view.diffraction import DiffractionView
+from ...view.widgets import ExceptionDialog, ProgressBarItemDelegate, TaskStatusView
 from ..data import FileDialogFactory
 from ..helpers import connect_triggered_signal
 from ..image import ImageController
-from ..parametric import CheckBoxParameterViewController
+from ..parameters import CheckBoxParameterViewController
+from ..task_status import TaskStatusController
 from ..product.core import ProductRepositoryComboProxyModel, ProductRepositoryTableModel
-from .dataset import DatasetTreeModel
+from .dataset import DiffractionTreeModel
 from .dataset_editor import DatasetEditorViewController
 from .wizard import OpenDatasetWizardController
 
 logger = logging.getLogger(__name__)
 
 
-class DiffractionStatusController(Observer):
-    def __init__(
-        self,
-        monitor: DiffractionTaskMonitor,
-        view: DiffractionStatusView,
-    ) -> None:
-        super().__init__()
-        self._monitor = monitor
-        self._view = view
-
-        view.stop_button.clicked.connect(monitor.stop_processing)
-
-        self._sync_model_to_view()
-        monitor.add_observer(self)
-
-    def _sync_model_to_view(self) -> None:
-        progress_goal = self._monitor.get_progress_goal()
-        progress_bar = self._view.progress_bar
-
-        if self._monitor.is_processing and progress_goal > 0:
-            progress_bar.show()
-            progress_bar.setRange(0, progress_goal)
-            progress_bar.setValue(self._monitor.get_progress())
-            self._view.stop_button.show()
-        else:
-            progress_bar.hide()
-            self._view.stop_button.hide()
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._monitor:
-            self._sync_model_to_view()
-
-
-class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
+class DiffractionController(DiffractionDatasetRepositoryObserver):
     def __init__(
         self,
         detector_settings: DetectorSettings,
         diffraction_settings: DiffractionSettings,
         product_settings: ProductSettings,
-        pattern_sizer: PatternSizer,
         diffraction_api: DiffractionAPI,
         repository: DiffractionDatasetRepository,
         task_monitor: DiffractionTaskMonitor,
@@ -84,13 +51,15 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
         product_table_model: ProductRepositoryTableModel,
         diffraction_simulator: DiffractionSimulator,
         diffraction_simulator_settings: DiffractionSimulatorSettings,
-        view: DatasetsView,
-        status_view: DiffractionStatusView,
+        view: DiffractionView,
+        status_view: TaskStatusView,
         image_controller: ImageController,
+        summary_service: DiffractionSummaryService,
+        summary_visualization_engine: VisualizationEngine,
+        status_bar: QStatusBar,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         super().__init__()
-        self._pattern_sizer = pattern_sizer
         self._diffraction_api = diffraction_api
         self._repository = repository
         self._detector_extent_source = DetectorExtentSource()
@@ -110,14 +79,13 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
             self._detector_extent_source,
             diffraction_api,
             repository,
+            summary_service,
+            summary_visualization_engine,
+            status_bar,
             file_dialog_factory,
         )
-        self._status_controller = DiffractionStatusController(task_monitor, status_view)
-        self._tree_model = DatasetTreeModel(pattern_sizer, repository)
-
-        # Sizer changes (binning toggle / bin size / transpose) shift the processed
-        # pixel geometry for every dataset, so refresh those two columns on notify.
-        pattern_sizer.add_observer(self)
+        self._status_controller = TaskStatusController(task_monitor, status_view)
+        self._tree_model = DiffractionTreeModel(repository)
 
         view.tree_view.setModel(self._tree_model)
         view.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -142,8 +110,6 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
 
         save_file_action = view.button_box.save_menu.addAction('Save File...')
         connect_triggered_signal(save_file_action, self._save_dataset)
-        sync_to_settings_action = view.button_box.save_menu.addAction('Sync To Settings')
-        connect_triggered_signal(sync_to_settings_action, self._sync_current_to_settings)
 
         view.button_box.edit_button.clicked.connect(self._edit_current_dataset)
         view.button_box.remove_button.clicked.connect(self._remove_selected_dataset)
@@ -156,12 +122,13 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
         view.simulate_dialog.form_layout.insertRow(1, self._poisson_view_controller.get_widget())
         view.simulate_dialog.finished.connect(self._simulate_diffraction)
 
-        self._update_enabled_buttons(QModelIndex(), QModelIndex())
+        self._refresh_enabled_buttons()
         repository.add_observer(self)
 
-        # Populate the tree for datasets already present at construction time.
-        for index in range(len(repository)):
-            self._on_dataset_inserted(index, repository[index])
+        # The tree model builds its own rows for pre-existing datasets; the panel only
+        # needs its own observer on each.
+        for dataset in repository:
+            self._attach_panel_observer(dataset)
 
         self._update_info_text()
 
@@ -185,9 +152,7 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
                     else None
                 )
                 if dataset is not None:
-                    pixel_geometry = self._pattern_sizer.get_processed_pixel_geometry(
-                        dataset.get_raw_pixel_geometry()
-                    )
+                    pixel_geometry = dataset.get_processed_pixel_geometry()
                     self._image_controller.set_array(data, pixel_geometry)
                 else:
                     self._image_controller.clear_array()
@@ -226,11 +191,6 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
         if current is not None:
             DatasetEditorViewController.edit_dataset(current, self._view)
 
-    def _sync_current_to_settings(self) -> None:
-        current = self._current_dataset()
-        if current is not None:
-            current.sync_pixel_geometry_to_settings()
-
     def _choose_product_for_simulation(self) -> None:
         self._view.simulate_dialog.open()
 
@@ -261,8 +221,21 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
     def _update_info_text(self) -> None:
         self._view.info_label.setText(self._repository.get_info_text())
 
+    def _refresh_enabled_buttons(self) -> None:
+        """Re-run the button gating against whatever the tree currently has selected.
+
+        Used for programmatic refreshes; the currentChanged signal calls
+        _update_enabled_buttons directly with the new index.
+        """
+        self._update_enabled_buttons(self._view.tree_view.currentIndex(), QModelIndex())
+
     def _update_enabled_buttons(self, current: QModelIndex, previous: QModelIndex) -> None:
-        dataset = self._current_dataset()
+        dataset_row = self._tree_model.dataset_row_for_index(current)
+        dataset = (
+            self._repository[dataset_row]
+            if dataset_row is not None and 0 <= dataset_row < len(self._repository)
+            else None
+        )
         ready = dataset is not None and not dataset.is_load_in_progress()
 
         self._view.button_box.save_button.setEnabled(ready)
@@ -281,39 +254,56 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
                 selection_model.SelectionFlag.ClearAndSelect | selection_model.SelectionFlag.Rows,
             )
 
-    def _on_dataset_inserted(self, index: int, dataset: AssembledDiffractionDataset) -> None:
-        self._tree_model.insert_dataset(index, dataset)
-
+    def _attach_panel_observer(self, dataset: AssembledDiffractionDataset) -> None:
         observer = _PerDatasetObserver(self, dataset)
         dataset.add_observer(observer)
         self._per_dataset_observers[id(dataset)] = observer
 
-        # Populate any arrays already present on the dataset.
-        for array_index in range(len(dataset)):
-            self._tree_model.insert_array(index, array_index, dataset[array_index])
-
-        self._update_info_text()
-
     def handle_dataset_inserted(self, index: int, dataset: AssembledDiffractionDataset) -> None:
-        self._on_dataset_inserted(index, dataset)
+        # Row construction belongs to the tree model, which observes the repository too.
+        self._attach_panel_observer(dataset)
+        self._update_info_text()
         # Publish the newly-loaded detector extent to the wizard's crop/bin bounds.
         self._detector_extent_source.set_extent(dataset.get_metadata().detector_extent)
-        # Make a freshly loaded dataset the panel's current dataset.
-        self._select_dataset_row(index)
+
+        # Select the new dataset only when nothing is selected, matching the Products
+        # and Fluorescence panels; a load must not yank the selection out from under
+        # someone inspecting another dataset.
+        if not self._view.tree_view.currentIndex().isValid():
+            self._select_dataset_row(index)
 
     def handle_dataset_removed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
         observer = self._per_dataset_observers.pop(id(dataset), None)
+
         if observer is not None:
             dataset.remove_observer(observer)
-        self._tree_model.remove_dataset(index)
+
         self._update_info_text()
 
-        # Re-sync the panel's current dataset with the (possibly changed) tree selection.
+        # Pick a neighbour rather than leaving the panel with nothing selected, as the
+        # Products and Fluorescence panels do.
         selection_model = self._view.tree_view.selectionModel()
         current = selection_model.currentIndex() if selection_model is not None else QModelIndex()
+
+        if not current.isValid():
+            row_count = self._tree_model.rowCount()
+
+            if row_count > 0:
+                self._select_dataset_row(min(index, row_count - 1))
+                current = (
+                    selection_model.currentIndex() if selection_model is not None else QModelIndex()
+                )
+
         dataset_row = self._tree_model.dataset_row_for_index(current)
         self._set_current_dataset_index(dataset_row if dataset_row is not None else -1)
-        self._update_enabled_buttons(QModelIndex(), QModelIndex())
+        self._refresh_enabled_buttons()
+
+    def handle_metadata_changed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        self._update_info_text()
+
+    def handle_state_changed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        if index == self._current_dataset_index:
+            self._refresh_enabled_buttons()
 
     def _dataset_row(self, dataset: AssembledDiffractionDataset) -> int | None:
         try:
@@ -324,48 +314,27 @@ class DiffractionController(DiffractionDatasetRepositoryObserver, Observer):
     def _handle_array_inserted_for_dataset(
         self, dataset: AssembledDiffractionDataset, array_row: int
     ) -> None:
-        dataset_row = self._dataset_row(dataset)
-        if dataset_row is None:
-            return
-        self._tree_model.insert_array(dataset_row, array_row, dataset[array_row])
+        # The tree model inserts the row; the panel only updates its own summary and
+        # buttons, since a landing array can flip the current dataset out of the
+        # loading state and re-enable Save / Edit.
         self._update_info_text()
-        # A landing array may flip the current dataset out of the loading state,
-        # re-enabling Save / Edit.
-        if dataset_row == self._current_dataset_index:
-            self._update_enabled_buttons(QModelIndex(), QModelIndex())
 
-    def _handle_array_changed_for_dataset(
-        self, dataset: AssembledDiffractionDataset, array_row: int
-    ) -> None:
-        dataset_row = self._dataset_row(dataset)
-        if dataset_row is None:
-            return
-        self._tree_model.refresh_array(dataset_row, array_row)
+        if self._dataset_row(dataset) == self._current_dataset_index:
+            self._refresh_enabled_buttons()
 
     def _handle_dataset_reloaded_for_dataset(self, dataset: AssembledDiffractionDataset) -> None:
-        dataset_row = self._dataset_row(dataset)
-        if dataset_row is None:
-            return
-        self._tree_model.refresh_dataset(dataset_row)
         # Refresh the wizard's crop/bin bounds when a dataset is reloaded (e.g. via a
         # streaming context or a programmatic re-open with a different file).
         self._detector_extent_source.set_extent(dataset.get_metadata().detector_extent)
 
-    def _handle_pixel_geometry_changed_for_dataset(
-        self, dataset: AssembledDiffractionDataset
-    ) -> None:
-        dataset_row = self._dataset_row(dataset)
-        if dataset_row is None:
-            return
-        self._tree_model.refresh_dataset(dataset_row)
-
-    def _update(self, observable: Observable) -> None:
-        if observable is self._pattern_sizer:
-            self._tree_model.refresh_processed_columns()
-
 
 class _PerDatasetObserver(DiffractionDatasetObserver):
-    """Per-dataset observer wrapper that captures the dataset ref at registration."""
+    """Panel-level per-dataset observer.
+
+    Row updates are the tree model's job (it registers its own observer); this one
+    carries only the two reactions the panel owns — the summary label plus button
+    gating when an array lands, and the wizard's detector extent on reload.
+    """
 
     def __init__(
         self, controller: DiffractionController, dataset: AssembledDiffractionDataset
@@ -378,10 +347,7 @@ class _PerDatasetObserver(DiffractionDatasetObserver):
         self._controller._handle_array_inserted_for_dataset(self._dataset, index)
 
     def handle_array_changed(self, index: int) -> None:
-        self._controller._handle_array_changed_for_dataset(self._dataset, index)
+        pass
 
     def handle_dataset_reloaded(self) -> None:
         self._controller._handle_dataset_reloaded_for_dataset(self._dataset)
-
-    def handle_pixel_geometry_changed(self) -> None:
-        self._controller._handle_pixel_geometry_changed_for_dataset(self._dataset)

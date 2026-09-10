@@ -18,29 +18,27 @@ from ptychodus.api.diffraction import (
     SimpleDiffractionDataset,
 )
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.io import AssembledDiffractionData
+from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.diffraction.dataset import (
+    DiffractionDatasetState,
     AssembledDiffractionArray,
     AssembledDiffractionDataset,
 )
 from ptychodus.model.diffraction.repository import DiffractionDatasetRepository
 from ptychodus.model.diffraction.settings import DetectorSettings, DiffractionSettings
-from ptychodus.model.diffraction.sizer import PatternSizer
 
 
 def _make_repository() -> DiffractionDatasetRepository:
     registry = SettingsRegistry()
     detector_settings = DetectorSettings(registry)
     diffraction_settings = DiffractionSettings(registry)
-    sizer = PatternSizer(diffraction_settings)
     task_manager = MagicMock()
     task_monitor = MagicMock()
 
     def _factory(name: str) -> AssembledDiffractionDataset:
         return AssembledDiffractionDataset(
             diffraction_settings,
-            sizer,
             detector_settings,
             task_manager,
             task_monitor,
@@ -220,13 +218,50 @@ def test_dataset_average_pattern_is_weighted_mean_across_arrays() -> None:
     repo.insert_dataset(dataset)
 
     # No arrays yet -> no preview to show.
-    assert dataset.get_average_pattern() is None
+    assert dataset.get_mean_pattern() is None
 
     # Two arrays of different sizes with distinct uniform fills — the correct
     # weighted mean is (3*2 + 7*6) / (3 + 7) = 4.8 everywhere.
     dataset._insert_array(_make_array(0, 'a', 2.0, 3, (4, 4), index_offset=0))
     dataset._insert_array(_make_array(1, 'b', 6.0, 7, (4, 4), index_offset=3))
 
-    result = dataset.get_average_pattern()
+    result = dataset.get_mean_pattern()
     assert result is not None
     numpy.testing.assert_allclose(result, numpy.full((4, 4), 4.8))
+
+
+def test_a_freshly_built_dataset_is_ready() -> None:
+    dataset = _make_repository().create_dataset('a')
+
+    assert dataset.get_state() is DiffractionDatasetState.READY
+    assert not dataset.is_pending()
+    assert not dataset.is_failed()
+
+
+def test_state_is_pending_while_a_load_is_in_flight() -> None:
+    dataset = _make_repository().create_dataset('a')
+    loader = MagicMock()
+    loader.get_finished_event.return_value.is_set.return_value = False
+    dataset._last_array_loader = loader
+
+    assert dataset.is_pending()
+    assert dataset.get_state() is DiffractionDatasetState.PENDING
+
+
+def test_state_is_failed_when_the_last_load_raised() -> None:
+    dataset = _make_repository().create_dataset('a')
+    loader = MagicMock()
+    loader.get_finished_event.return_value.is_set.return_value = True
+    loader.get_error.return_value = RuntimeError('boom')
+    dataset._last_array_loader = loader
+
+    assert dataset.is_failed()
+    assert dataset.get_state() is DiffractionDatasetState.FAILED
+
+
+def test_get_nbytes_reports_the_assembled_data_size() -> None:
+    dataset = _make_repository().create_dataset('a')
+
+    # A fresh dataset holds the 1x1x1 null sentinel, not an empty array.
+    assert dataset.get_nbytes() == dataset.get_assembled_data().nbytes
+    assert dataset.get_nbytes() > 0

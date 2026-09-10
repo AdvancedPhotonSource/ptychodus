@@ -181,19 +181,32 @@ class ProductRepositoryItem(ParameterGroup):
             self._geometry.set_detector_pixel_geometry(None)
             return
 
-        self._geometry.set_detector_extent(dataset.get_metadata().detector_extent)
-        self._geometry.set_detector_pixel_geometry(dataset.get_raw_pixel_geometry())
+        self._geometry.set_detector_extent(dataset.get_processed_image_extent())
+        self._geometry.set_detector_pixel_geometry(dataset.get_processed_pixel_geometry())
 
         # Mirror future edits (pixel geometry, reload) from the dataset back into
         # the geometry so probe/object sizes stay in sync.
         self._dataset_observer = _BoundDatasetObserver(self)
         dataset.add_observer(self._dataset_observer)
 
+        self._auto_estimate_probe_photon_count()
+
+    def _auto_estimate_probe_photon_count(self) -> None:
+        # Guard on the default sentinel so a user- or file-supplied value is
+        # never overwritten. A real measurement never sums to exactly zero on
+        # the brightest pattern.
+        if self._dataset is None:
+            return
+        if self._metadata_item.probe_photon_count.get_value() != 0.0:
+            return
+        photon_count = self._dataset.get_assembled_data().get_probe_photon_count()
+        self._metadata_item.probe_photon_count.set_value(float(photon_count))
+
     def _sync_geometry_from_dataset(self) -> None:
         if self._dataset is None:
             return
-        self._geometry.set_detector_extent(self._dataset.get_metadata().detector_extent)
-        self._geometry.set_detector_pixel_geometry(self._dataset.get_raw_pixel_geometry())
+        self._geometry.set_detector_extent(self._dataset.get_processed_image_extent())
+        self._geometry.set_detector_pixel_geometry(self._dataset.get_processed_pixel_geometry())
 
     def get_state(self) -> ProductState:
         return self._state
@@ -297,6 +310,4 @@ class _BoundDatasetObserver(DiffractionDatasetObserver):
 
     def handle_dataset_reloaded(self) -> None:
         self._item._sync_geometry_from_dataset()
-
-    def handle_pixel_geometry_changed(self) -> None:
-        self._item._sync_geometry_from_dataset()
+        self._item._auto_estimate_probe_photon_count()

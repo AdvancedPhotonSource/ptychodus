@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from getpass import getpass
 import argparse
 import json
 import logging
@@ -17,7 +18,7 @@ def store_tokens() -> None:
     tokens_file = get_transfer_tokens_file()
     access_token = GenesisAccessTokens(
         facility='AmSC',
-        access_token=input('Enter the access token: ').strip(),
+        access_token=getpass('Enter the access token: ').strip(),
     )
     save_tokens(tokens_file, [access_token])
 

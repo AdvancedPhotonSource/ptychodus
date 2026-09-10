@@ -40,8 +40,8 @@ docs = ["myst-parser", "sphinx", "sphinx-copybutton", "sphinx-rtd-theme"]
 globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
 gui = ["PyQt5"]
 #ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
-ptycho-fm = ["ptycho-vit"]
-ptychi = ["ptychi==1.5.*"]
+ptycho-fm = ["ptycho-fm"]
+ptychi = ["ptychi==2.0.*"]
 ptychopinn = ["ptychopinn"]
 ptychozoon = ["ptychozoon"]
 store = [
@@ -50,9 +50,9 @@ store = [
     "uvicorn[standard]>=0.30",
     "sqlalchemy[asyncio]>=2.0",
     "aiosqlite>=0.20",
-    "pillow>=10",
+    "pillow>=10.3",
     "pydantic-settings>=2.5",
-    "python-multipart",
+    "python-multipart>=0.0.18",
 ]
 xraydb = ["xraydb>=4.5"]
 
@@ -60,7 +60,7 @@ xraydb = ["xraydb>=4.5"]
 #ptychi = { path = "../pty-chi", editable = true }
 ptychopinn = { path = "../PtychoPINN", editable = true }
 #ptychopinn = { git = "https://github.com/hoidn/PtychoPINN", branch = "main" }
-ptycho-vit = { path = "../ptycho-vit", editable = true }
+ptycho-fm = { path = "../ptycho-vit", editable = true }
 
 #[[tool.uv.index]]
 #name = "pytorch-cu132"
@@ -103,12 +103,13 @@ module = [
     "ptychi.*",
     "ptycho.*",
     "ptycho_torch.*",
-    "ptycho_vit.*",
+    "ptycho_fm.*",
     "ptychonn.*",
     "ptychozoon.*",
     "pvaccess",
     "pvapy.*",
     "scipy.*",
+    "tensorflow.*",
     "tifffile",
     "torch",
     "torch.*",
@@ -148,6 +149,7 @@ dev = [
     "pyqt5-stubs",
     "pytest",
     "pytest-asyncio",
+    "pytest-xdist",
     "ruff",
     "types-psutil",
     "types-pyyaml",

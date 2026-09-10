@@ -21,8 +21,8 @@ class GridDataUpscaling(UpscalingStrategy):
 
         for scan_point in product.probe_positions:
             object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-            scan_coords_px.append(object_point.coordinate_y_px)
-            scan_coords_px.append(object_point.coordinate_x_px)
+            scan_coords_px.append(object_point.y_px)
+            scan_coords_px.append(object_point.x_px)
 
         points = numpy.reshape(scan_coords_px, (-1, 2))
         values = emap.counts_per_second.flat
@@ -56,8 +56,8 @@ class RadialBasisFunctionUpscaling(UpscalingStrategy):
 
         for scan_point in product.probe_positions:
             object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-            scan_coords_px.append(object_point.coordinate_y_px)
-            scan_coords_px.append(object_point.coordinate_x_px)
+            scan_coords_px.append(object_point.y_px)
+            scan_coords_px.append(object_point.x_px)
 
         interpolator = RBFInterpolator(
             numpy.reshape(scan_coords_px, (-1, 2)),

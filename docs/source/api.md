@@ -1,5 +1,14 @@
 # API Reference
 
+## Assemble
+
+```{eval-rst}
+.. automodule:: ptychodus.api.assemble
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Constants
 
 ```{eval-rst}

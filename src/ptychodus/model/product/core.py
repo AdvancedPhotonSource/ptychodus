@@ -13,11 +13,11 @@ from ..diffraction import (
     AssembledDiffractionDataset,
     DiffractionAPI,
     DiffractionDatasetRepositoryObserver,
-    PatternSizer,
 )
 from ..task_manager import TaskManager
 from .api import ObjectAPI, ProbeAPI, ProductAPI, ProbePositionsAPI
 from .item_factory import ProductRepositoryItemFactory
+from .monitor import ProductTaskMonitor
 from .object import ObjectBuilderFactory, ObjectRepositoryItemFactory, ObjectSettings
 from .object_repository import ObjectRepository
 from .probe import ProbeBuilderFactory, ProbeRepositoryItemFactory, ProbeSettings
@@ -46,13 +46,18 @@ class _DatasetOrphanObserver(DiffractionDatasetRepositoryObserver):
             if item.get_dataset() is dataset:
                 item.unbind_dataset()
 
+    def handle_metadata_changed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        pass
+
+    def handle_state_changed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
+        pass
+
 
 class ProductCore(Observer):
     def __init__(
         self,
         rng: numpy.random.Generator,
         settings_registry: SettingsRegistry,
-        pattern_sizer: PatternSizer,
         diffraction_api: DiffractionAPI,
         scan_file_reader_chooser: PluginChooser[ProbePositionFileReader],
         scan_file_writer_chooser: PluginChooser[ProbePositionFileWriter],
@@ -103,13 +108,13 @@ class ProductCore(Observer):
         self.product_repository = ProductRepository()
         self._item_factory = ProductRepositoryItemFactory(
             self.settings,
-            pattern_sizer,
             self._scan_repository_item_factory,
             self._probe_repository_item_factory,
             self._object_repository_item_factory,
             self.product_repository,
             product_file_reader_chooser,
         )
+        self.task_monitor = ProductTaskMonitor(task_manager)
         self.product_api = ProductAPI(
             self.settings,
             self.product_repository,
@@ -117,6 +122,7 @@ class ProductCore(Observer):
             product_file_reader_chooser,
             product_file_writer_chooser,
             task_manager,
+            self.task_monitor,
         )
         self._diffraction_api = diffraction_api
         self._dataset_orphan_observer = _DatasetOrphanObserver(self.product_repository)

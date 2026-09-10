@@ -6,6 +6,7 @@ import numpy
 
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.diffraction import (
+    CropRegion,
     DiffractionArray,
     DiffractionDataset,
     DiffractionDatasetLayoutNode,
@@ -37,7 +38,7 @@ class H5DiffractionPatternArray(DiffractionArray):
     def get_indexes(self) -> DiffractionIndexes:
         return self._indexes
 
-    def get_patterns(self) -> DiffractionPatterns:
+    def get_patterns(self, *, read_region: CropRegion | None = None) -> DiffractionPatterns:
         with h5py.File(self._file_path, 'r') as h5_file:
             try:
                 item = h5_file[self._data_path]
@@ -82,7 +83,9 @@ class H5DiffractionPatternArray(DiffractionArray):
                         f'{item_ref} missing filters needed to read dataset: {error_msg}!'
                     )
 
-                return item[:]
+                if read_region is None:
+                    return item[:]
+                return item[:, read_region.y_slice, read_region.x_slice]
             else:
                 raise ValueError(f'Path {self._file_path}:{self._data_path} is not a dataset!')
 
@@ -229,12 +232,12 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(data_path='/exchange/data'),
         simple_name='APS_CSSI',
-        display_name='APS 9-ID CSSI Files (*.h5 *.hdf5)',
+        display_name='APS 9-ID-D CSSI Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(data_path='/entry/data/data'),
         simple_name='CNM_APS_HXN',
-        display_name='CNM/APS 26-ID Hard X-ray Nanoprobe Files (*.h5 *.hdf5)',
+        display_name='CNM/APS 26-ID-C Hard X-ray Nanoprobe Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_readers.register_plugin(
         H5DiffractionFileReader(data_path='/dp'),

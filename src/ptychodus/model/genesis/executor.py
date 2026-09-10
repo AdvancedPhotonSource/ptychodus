@@ -5,7 +5,7 @@ import logging
 import queue
 import threading
 
-from ptychodus.api.io import StandardFileLayout
+from ptychodus.api.io import StandardFileLayout, sanitize_path_component
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 
@@ -92,7 +92,8 @@ class GenesisExecutor:
             )
 
         local_dir_struct = WorkflowDirectoryStructure(
-            self._settings.local_collection_posix_path.get_value() / product_item.get_name()
+            self._settings.local_collection_posix_path.get_value()
+            / sanitize_path_component(product_item.get_name())
         )
 
         try:
@@ -109,7 +110,7 @@ class GenesisExecutor:
         )
         self._product_api.save_product(
             input_product_index,
-            local_dir_struct.input_directory / StandardFileLayout.PRODUCT_IN,
+            local_dir_struct.input_directory / StandardFileLayout.PRODUCT,
             file_type='HDF5',
         )
 
@@ -166,7 +167,7 @@ class GenesisExecutor:
 
         status_interval_s = self._settings.status_refresh_interval_s.get_value()
         load_product_path = (
-            local_dir_struct.output_directory / StandardFileLayout.PRODUCT_OUT
+            local_dir_struct.output_directory / StandardFileLayout.PRODUCT
             if ptychodus_action == 'reconstruct'
             else None
         )

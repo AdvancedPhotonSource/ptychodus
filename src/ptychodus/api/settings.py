@@ -1,7 +1,7 @@
 """Settings registry for reading and writing settings files."""
 
 from __future__ import annotations
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 import configparser
@@ -27,6 +27,33 @@ class PathPrefixChange:
 
     find_path_prefix: Path
     replacement_path_prefix: Path
+
+
+def _warn_unrecognized_keys(
+    group_name: str,
+    group: ParameterGroup,
+    group_config: Mapping[str, str],
+    defaults: Mapping[str, str],
+) -> None:
+    """Warn about keys in a settings-file section that match no registered parameter.
+
+    Renaming a parameter silently orphans the old key in every settings file that
+    still uses it, leaving the parameter at its default; this makes that visible.
+    configparser lowercases option names on iteration while still matching
+    case-insensitively on lookup, so keys are compared in lowercase and reported as
+    they come back from the parser. Keys inherited from the file's ``[DEFAULT]``
+    section are injected into every other section and are not reported.
+    """
+    known_names = {name.lower() for name in group.parameters()}
+
+    for key, value_string in group_config.items():
+        if key.lower() in known_names or key in defaults:
+            continue
+
+        logger.warning(
+            f'Ignoring unrecognized setting "{group_name}.{key}" = "{value_string}"!'
+            ' Check for a renamed or misspelled key.'
+        )
 
 
 class SettingsRegistry(Observable):
@@ -79,6 +106,8 @@ class SettingsRegistry(Observable):
                         pass
                     else:
                         parameter.set_value_from_string(value_string)
+
+                _warn_unrecognized_keys(group_name, group, group_config, config.defaults())
 
         self.notify_observers()
 

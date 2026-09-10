@@ -68,7 +68,7 @@ class PtychozoonFluorescenceEnhancer(FluorescenceEnhancer):
         object_geometry = product.object_.get_geometry()
 
         probe_positions_m = numpy.array(
-            [[p.coordinate_y_m, p.coordinate_x_m] for p in product.probe_positions],
+            [[p.y_m, p.x_m] for p in product.probe_positions],
             dtype=float,
         ).reshape((-1, 2))
 
@@ -86,7 +86,7 @@ class PtychozoonFluorescenceEnhancer(FluorescenceEnhancer):
         ptychozoon_dataset = PtychozoonFluorescenceDataset(
             element_maps=[
                 PtychozoonElementMap(name=emap.name, counts_per_second=emap.counts_per_second)
-                for emap in dataset.element_maps
+                for emap in dataset
             ]
         )
 
@@ -132,7 +132,7 @@ class PtychozoonFluorescenceEnhancer(FluorescenceEnhancer):
                 element_maps = [ElementMap(name, cps) for name, cps in enhanced_maps]
                 yield FluorescenceEnhancerOutput(
                     dataset=FluorescenceDataset(
-                        element_maps=element_maps,
+                        _element_maps=element_maps,
                         counts_per_second_path=dataset.counts_per_second_path,
                         channel_names_path=dataset.channel_names_path,
                     ),

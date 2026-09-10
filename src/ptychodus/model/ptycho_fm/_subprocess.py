@@ -1,20 +1,20 @@
-"""Child-side subprocess entry points for the PtychoFM (ptycho-vit) backend.
+"""Child-side subprocess entry points for the PtychoFM (ptycho-fm) backend.
 
 Runs INSIDE a spawned subprocess. This is the only ptychodus module allowed to
-import ``torch`` or ``ptycho_vit``. The parent never imports it -- it reaches
+import ``torch`` or ``ptycho_fm``. The parent never imports it -- it reaches
 only the payload dataclasses in :mod:`._payload` and the settings-to-dict
 translator in :mod:`.reconstructor`, neither of which touches torch.
 
 Two entry points are exposed:
 
 - :func:`run_reconstruct` -- load a ``.pth`` checkpoint, run one inference pass
-  over the diffraction stack (batched through :class:`PtychoViT`), stitch the
+  over the diffraction stack (batched through :class:`PtychoFM`), stitch the
   per-patch amplitude/phase outputs into a full-object array via
   ``place_patches_fourier_shift``, and stream back a single
   :class:`ReconstructOutput`.
 - :func:`run_train` -- run one single-device training session (no DDP, no
-  mlflow, no wandb) driven by :class:`ptycho_vit.model.model.PtychoViT` and a
-  minimal train/validate loop that mirrors ``ptycho_vit/train.py`` stripped of
+  mlflow, no wandb) driven by :class:`ptycho_fm.model.model.PtychoFM` and a
+  minimal train/validate loop that mirrors ``ptycho_fm/train.py`` stripped of
   its distributed machinery. Emits a :class:`TrainOutput` after each epoch and
   a final ``TAG_MODEL_SAVED`` with the path of the best checkpoint.
 """
@@ -31,7 +31,7 @@ from typing import Any
 
 import numpy
 
-from ptychodus.api.diffraction import zero_bad_pixels
+from ptychodus.api.preprocess.diffraction import zero_bad_pixels
 from ptychodus.api.object import Object
 from ptychodus.api.product import LossValue, Product
 from ptychodus.api.reconstruct import ReconstructOutput, TrainOutput
@@ -62,7 +62,7 @@ def _select_device() -> Any:
 def _pad_probe_to_modes(probe: numpy.ndarray, target_modes: int) -> numpy.ndarray:
     """Zero-pad a complex probe ``(N_modes, H, W)`` up to ``target_modes`` along axis 0.
 
-    Mirrors :meth:`ptycho_vit.data.PtychographyDataset._pad_probe` but operates
+    Mirrors :meth:`ptycho_fm.data.PtychographyDataset._pad_probe` but operates
     on the ``(N, H, W)`` layout ptychodus hands us (rather than the
     ``(1, N, H, W)`` layout the dataset uses internally).
     """
@@ -116,16 +116,16 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
     """Child entry point for one inference pass. Streams a single ReconstructOutput.
 
     Loads the ``.pth`` state dict with ``weights_only=True`` (safe: nothing to
-    execute is expected in a plain ptycho_vit checkpoint), rebuilds the model
+    execute is expected in a plain ptycho_fm checkpoint), rebuilds the model
     from the payload's config, then runs the same batch + stitch loop as
-    ``ptycho_vit/scripts/run_inference_and_stitch.py``.
+    ``ptycho_fm/scripts/run_inference_and_stitch.py``.
     """
     if payload.model_path is None:
         raise RuntimeError('Cannot reconstruct: no model checkpoint has been loaded.')
 
     import torch
-    from ptycho_vit.model.model import PtychoViT
-    from ptycho_vit.utils.ptychi_utils import place_patches_fourier_shift
+    from ptycho_fm.model.model import PtychoFM
+    from ptycho_fm.utils.ptychi_utils import place_patches_fourier_shift
 
     device = _select_device()
     config = payload.config
@@ -133,7 +133,7 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
     model_config = config['model']
     inference_config = config['inference']
 
-    model = PtychoViT(config=model_config)
+    model = PtychoFM(config=model_config)
     state = torch.load(payload.model_path, map_location=device, weights_only=True)
     model.load_state_dict(state)
     model.to(device)
@@ -165,7 +165,7 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
         raise ValueError(f'Expected probe with shape (N_modes, H, W); got {probe_array.shape}.')
     max_modes = int(data_config['max_probe_modes'])
     probe_padded = _pad_probe_to_modes(probe_array, max_modes)
-    # ptycho_vit expects the probe input as a real view with the mode-count
+    # ptycho_fm expects the probe input as a real view with the mode-count
     # index in the third position: (B, 1, N_modes, H, W, 2). We build a single
     # (1, 1, N_modes, H, W) complex tensor and broadcast per batch below.
     probe_complex = torch.from_numpy(numpy.ascontiguousarray(probe_padded)).to(
@@ -279,11 +279,11 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
 def _build_criterion(training_config: dict[str, Any]) -> Any:
     """Instantiate the loss module named in ``training_config['loss_function']``.
 
-    Mirrors the branch at ``ptycho_vit/train.py`` line ~728.
+    Mirrors the branch at ``ptycho_fm/train.py`` line ~728.
     """
     import torch.nn as nn
 
-    from ptycho_vit.custom_loss import WeightedLoss
+    from ptycho_fm.custom_loss import WeightedLoss
 
     name = training_config['loss_function']
     if name == 'smooth_l1':
@@ -305,8 +305,8 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
 
     Single-device, no DDP, no mlflow, no wandb. Builds a CombinedDataset over
     ``payload.input_path`` (a directory of paired ``*_dp.hdf5`` / ``*_para.hdf5``
-    files -- ptycho_vit's own training format) and runs a lightweight
-    train/validate loop directly against :class:`PtychoViT`, emitting one
+    files -- ptycho_fm's own training format) and runs a lightweight
+    train/validate loop directly against :class:`PtychoFM`, emitting one
     :class:`TrainOutput` per epoch. The best checkpoint by validation loss is
     written to ``payload.output_path/best.pth`` and its path streamed back via
     ``TAG_MODEL_SAVED``.
@@ -322,8 +322,8 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
     import torch.optim as optim
     from torch.utils.data import DataLoader, Subset, random_split
 
-    from ptycho_vit.data import CombinedDataset
-    from ptycho_vit.model.model import PtychoViT
+    from ptycho_fm.data import CombinedDataset
+    from ptycho_fm.model.model import PtychoFM
 
     device = _select_device()
     config = payload.config
@@ -335,7 +335,7 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
         raise FileNotFoundError(f'Training input directory does not exist: {payload.input_path}')
     if not payload.input_path.is_dir():
         raise NotADirectoryError(
-            'ptycho_vit training expects a directory of paired *_dp.hdf5 / '
+            'ptycho_fm training expects a directory of paired *_dp.hdf5 / '
             f'*_para.hdf5 files; got file: {payload.input_path}'
         )
 
@@ -383,7 +383,7 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
     train_loader = DataLoader(train_subset, shuffle=True, drop_last=False, **loader_kwargs)
     val_loader = DataLoader(val_subset, shuffle=False, drop_last=False, **loader_kwargs)
 
-    model = PtychoViT(config=model_config).to(device)
+    model = PtychoFM(config=model_config).to(device)
 
     lr = float(training_config['learning_rate'])
     param_groups = [
@@ -404,7 +404,7 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
         pred_diff, pred_amp, pred_ph = model(input_diff, input_probe, input_norm, input_scale)
         target_amp = amp_patch.to(device)
         target_ph = ph_patch.to(device)
-        # Compose an amplitude+phase loss. Matches ptycho_vit's default target
+        # Compose an amplitude+phase loss. Matches ptycho_fm's default target
         # (the model's amp/ph decoders drive the loss, not the reconstructed
         # diffraction), stripped of the wandb-driven auxiliary terms.
         amp_loss = criterion(pred_amp, target_amp)

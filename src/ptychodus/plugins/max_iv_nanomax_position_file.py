@@ -3,7 +3,7 @@ import logging
 
 import h5py
 
-from ptychodus.api.constants import ONE_MICRON_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -34,8 +34,8 @@ class NanoMAXPositionFileReader(ProbePositionFileReader):
                 for idx, (x, y) in enumerate(zip(position_x, position_y)):
                     point = ProbePosition(
                         idx,
-                        x * ONE_MICRON_M,
-                        y * ONE_MICRON_M,
+                        x * LengthUnit.MICROMETER.meters_per_unit,
+                        y * LengthUnit.MICROMETER.meters_per_unit,
                     )
                     point_list.append(point)
 
@@ -46,5 +46,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         NanoMAXPositionFileReader(),
         simple_name='MAX_IV_NanoMAX',
-        display_name='MAX IV NanoMAX Diffraction Endstation Files (*.h5 *.hdf5)',
+        display_name='MAX IV NanoMAX Files (*.h5 *.hdf5)',
     )

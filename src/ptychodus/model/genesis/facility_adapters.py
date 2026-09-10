@@ -6,6 +6,7 @@ from typing import Final
 from uuid import UUID
 import json
 import logging
+import shlex
 
 from .iri import IRIClient, JobAttributes, JobSpecification, ResourceSpecification, ResourceType
 from .settings import GenesisSettings
@@ -131,11 +132,18 @@ class IRIFacilityAdapter(ABC):
 
 
 def run_ptychodus_command(action: str, input_directory: Path, output_directory: Path) -> str:
-    return f'ptychodus -b {action} -i {input_directory} -o {output_directory}'
+    # Every interpolated value is shell-quoted: directories are derived from product names read
+    # out of user-supplied files and from settings that batch mode loads from its input
+    # directory, so an unquoted interpolation here is remote command execution on the facility.
+    return (
+        f'ptychodus -b {shlex.quote(action)}'
+        f' -i {shlex.quote(str(input_directory))}'
+        f' -o {shlex.quote(str(output_directory))}'
+    )
 
 
 def join_commands(command_seq: Sequence[str]) -> str:
-    return '; '.join(command.strip().replace('"', '\\"') for command in command_seq)
+    return '; '.join(command.strip() for command in command_seq)
 
 
 class ALCFFacilityAdapter(IRIFacilityAdapter):
@@ -286,7 +294,10 @@ class OLCFFacilityAdapter(IRIFacilityAdapter):
                 queue_name=self._settings.queue_name.get_value(),
                 account=account,
             ),
-            pre_launch=f'source /etc/bash.bashrc; module load miniforge3; conda activate {conda_env}',
+            pre_launch=(
+                'source /etc/bash.bashrc; module load miniforge3;'
+                f' conda activate {shlex.quote(conda_env)}'
+            ),
             post_launch='echo POST_LAUNCH',
             launcher='srun',
         )

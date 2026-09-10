@@ -29,10 +29,10 @@ from PyQt5.QtWidgets import (
 
 from . import resources  # noqa
 from .agent import AgentView, AgentChatView
-from .diffraction import DatasetsView, DiffractionImageView
+from .diffraction import DiffractionView, DiffractionImageView
 from .fluorescence import FluorescenceView
 from .image import ImageView
-from .product import ProductView, ProductVisualizationView
+from .product import ProductRightPanelView, ProductView, ProductVisualizationView
 from .processing import ProcessingStatusView
 from .repository import RepositoryTableView, RepositoryTreeView
 from .probe_positions import ProbePositionsPlotView
@@ -221,26 +221,28 @@ class ViewCore(QMainWindow):
             right=self.settings_table_view,
         )
 
-        self.datasets_view = DatasetsView()
+        self.diffraction_view = DiffractionView()
         self.diffraction_image_view = DiffractionImageView()
-        self.datasets_action = self.navigation.add_panel(
+        self.diffraction_action = self.navigation.add_panel(
             QIcon(':/icons/patterns'),
             'Diffraction',
-            left=self.datasets_view,
+            left=self.diffraction_view,
             right=self.diffraction_image_view,
         )
 
         self.product_view = ProductView()
+
         if is_developer_mode_enabled:
             self.product_visualization_view = ProductVisualizationView()
-            product_right: QWidget = self.product_visualization_view
+            self.product_right_view = ProductRightPanelView(self.product_visualization_view)
         else:
-            product_right = QWidget()
+            self.product_right_view = ProductRightPanelView()
+
         self.product_action = self.navigation.add_panel(
             QIcon(':/icons/products'),
             'Products',
             left=self.product_view,
-            right=product_right,
+            right=self.product_right_view,
         )
 
         self.probe_positions_view = RepositoryTableView()

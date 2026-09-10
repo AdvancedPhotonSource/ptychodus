@@ -2,17 +2,14 @@ from __future__ import annotations
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
     QGroupBox,
-    QHBoxLayout,
     QHeaderView,
     QLabel,
-    QMenu,
-    QProgressBar,
-    QPushButton,
     QTableView,
     QTreeView,
     QVBoxLayout,
@@ -21,28 +18,8 @@ from PyQt5.QtWidgets import (
 )
 
 from .image import ImageView
-
-
-class DatasetsButtonBox(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.insert_menu = QMenu()
-        self.insert_button = QPushButton('Insert')
-        self.save_menu = QMenu()
-        self.save_button = QPushButton('Save')
-        self.edit_button = QPushButton('Edit')
-        self.remove_button = QPushButton('Remove')
-
-        self.insert_button.setMenu(self.insert_menu)
-        self.save_button.setMenu(self.save_menu)
-
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.insert_button)
-        layout.addWidget(self.save_button)
-        layout.addWidget(self.edit_button)
-        layout.addWidget(self.remove_button)
-        self.setLayout(layout)
+from .repository import InsertSaveEditRemoveButtonBox
+from .widgets import TaskStatusView
 
 
 class OpenDatasetWizardPage(QWizardPage):
@@ -60,22 +37,27 @@ class OpenDatasetWizardPage(QWizardPage):
             self.completeChanged.emit()
 
 
-class OpenDatasetWizardBadPixelsPage(OpenDatasetWizardPage):
-    """Bad-pixels chooser page — always complete; layout populated by the controller."""
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self._set_complete(True)
-
-
 class OpenDatasetWizardMetadataPage(OpenDatasetWizardPage):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        # Slot for the controller to populate with two LengthParameterViewController
+        # widgets bound to scratch RealParameters. The sync checkbox mirrors the
+        # per-row Sync column in the table below: when checked, the widget values
+        # are written into DetectorSettings on wizard-accept.
+        self.pixel_size_form = QFormLayout()
+        self.sync_pixel_size_check_box = QCheckBox('Sync pixel size to detector settings')
+        self.pixel_size_group_box = QGroupBox('Detector Pixel Size')
+        pixel_size_layout = QVBoxLayout()
+        pixel_size_layout.addLayout(self.pixel_size_form)
+        pixel_size_layout.addWidget(self.sync_pixel_size_check_box)
+        self.pixel_size_group_box.setLayout(pixel_size_layout)
+
         self.table_view = QTableView()
 
         self.setTitle('Import Metadata')
 
         layout = QVBoxLayout()
+        layout.addWidget(self.pixel_size_group_box)
         layout.addWidget(self.table_view)
         self.setLayout(layout)
         self._set_complete(True)
@@ -97,42 +79,23 @@ class DatasetEditorLayoutView(QGroupBox):
         self.setLayout(layout)
 
 
-class DatasetEditorPropertiesView(QGroupBox):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__('Properties')
-        self.table_view = QTableView()
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.table_view)
-        self.setLayout(layout)
-
-
 class DatasetEditorDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.layout_view = DatasetEditorLayoutView()
-        self.properties_view = DatasetEditorPropertiesView()
         self.button_box = QDialogButtonBox()
 
         self.button_box.addButton(QDialogButtonBox.StandardButton.Ok)
         self.button_box.accepted.connect(self.accept)
 
-        top_layout = QHBoxLayout()
-        top_layout.addWidget(self.layout_view)
-        top_layout.addWidget(self.properties_view)
-
         layout = QVBoxLayout()
-        layout.addLayout(top_layout)
+        layout.addWidget(self.layout_view)
         layout.addWidget(self.button_box)
         self.setLayout(layout)
 
     @property
     def tree_view(self) -> QTreeView:
         return self.layout_view.tree_view
-
-    @property
-    def table_view(self) -> QTableView:
-        return self.properties_view.table_view
 
 
 class SimulateDiffractionDialog(QDialog):
@@ -154,25 +117,12 @@ class SimulateDiffractionDialog(QDialog):
         self.setWindowTitle('Simulate Diffraction Patterns')
 
 
-class DiffractionStatusView(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.progress_bar = QProgressBar()
-        self.stop_button = QPushButton('Stop')
-
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.progress_bar)
-        layout.addWidget(self.stop_button)
-        self.setLayout(layout)
-
-
-class DatasetsView(QWidget):
+class DiffractionView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.tree_view = QTreeView()
         self.info_label = QLabel()
-        self.button_box = DatasetsButtonBox()
+        self.button_box = InsertSaveEditRemoveButtonBox()
         self.simulate_dialog = SimulateDiffractionDialog(self)
 
         tree_view_header = self.tree_view.header()
@@ -191,7 +141,7 @@ class DiffractionImageView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.image_view = ImageView()
-        self.status_view = DiffractionStatusView()
+        self.status_view = TaskStatusView()
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)

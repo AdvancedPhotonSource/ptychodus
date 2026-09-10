@@ -1,6 +1,6 @@
 import logging
 
-from PyQt5.QtWidgets import QWizard
+from PyQt5.QtWidgets import QStatusBar, QWizard
 
 from ....api.diffraction import DiffractionMetadata
 from ....model.diffraction import (
@@ -8,13 +8,14 @@ from ....model.diffraction import (
     DiffractionAPI,
     DiffractionDatasetRepository,
     DiffractionSettings,
+    DiffractionSummaryService,
 )
 from ....model.product import ProductSettings
+from ....model.visualization import VisualizationEngine
 from ....view.widgets import ExceptionDialog
 
 from ...data import FileDialogFactory
 from ..detector_extent import DetectorExtentSource
-from .bad_pixels import OpenDatasetWizardBadPixelsViewController
 from .files import OpenDatasetWizardFilesViewController
 from .metadata import OpenDatasetWizardMetadataViewController
 from .processing import OpenDatasetWizardProcessingViewController
@@ -31,6 +32,9 @@ class OpenDatasetWizardController:
         extent_source: DetectorExtentSource,
         api: DiffractionAPI,
         repository: DiffractionDatasetRepository,
+        summary_service: DiffractionSummaryService,
+        summary_visualization_engine: VisualizationEngine,
+        status_bar: QStatusBar,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
         self._api = api
@@ -46,18 +50,22 @@ class OpenDatasetWizardController:
             product_settings,
             self._get_pending_metadata,
         )
-        self._bad_pixels_view_controller = OpenDatasetWizardBadPixelsViewController(
-            detector_settings, api, file_dialog_factory
-        )
         self._processing_view_controller = OpenDatasetWizardProcessingViewController(
-            settings, extent_source, file_dialog_factory
+            settings,
+            detector_settings,
+            extent_source,
+            api,
+            summary_service,
+            summary_visualization_engine,
+            status_bar,
+            file_dialog_factory,
+            self._get_pending_dataset_index,
         )
 
         self._wizard = QWizard()
         self._wizard.setWindowTitle('Open Dataset')
         self._wizard.addPage(self._file_view_controller.get_widget())
         self._wizard.addPage(self._metadata_view_controller.get_widget())
-        self._wizard.addPage(self._bad_pixels_view_controller.get_widget())
         self._wizard.addPage(self._processing_view_controller.get_widget())
 
         next_button = self._wizard.button(QWizard.WizardButton.NextButton)
@@ -79,6 +87,9 @@ class OpenDatasetWizardController:
             return DiffractionMetadata.create_null()
         return self._repository[self._pending_dataset_index].get_metadata()
 
+    def _get_pending_dataset_index(self) -> int:
+        return self._pending_dataset_index
+
     def _execute_next_button_action(self) -> None:
         # Handlers fire AFTER Qt has advanced the wizard, so currentPage() is the
         # page the user just arrived on. The branches below therefore describe
@@ -90,26 +101,21 @@ class OpenDatasetWizardController:
             # populate for the page that just became visible.
             self._pending_dataset_index = self._file_view_controller.open_dataset()
             self._metadata_view_controller.refresh()
-        elif page is self._bad_pixels_view_controller.get_widget():
-            # Metadata → Bad Pixels: apply the metadata-import selections. Seed
-            # the bad-pixels file browser to focus on the current settings path
-            # if it points to a valid file.
-            self._metadata_view_controller.import_metadata()
-            self._bad_pixels_view_controller.restart()
         elif page is self._processing_view_controller.get_widget():
-            # Bad Pixels → Processing: load and apply the bad-pixels mask (if
-            # any) to the pending dataset before the user configures processing.
-            if self._pending_dataset_index >= 0:
-                self._api.apply_bad_pixels(
-                    self._pending_dataset_index,
-                    self._detector_settings.bad_pixels_file_path.get_value(),
-                    self._detector_settings.bad_pixels_file_type.get_value(),
-                )
+            # Metadata → Processing: apply the metadata-import selections before
+            # the user configures processing.
+            self._metadata_view_controller.import_metadata()
 
     def _execute_finish_button_action(self) -> None:
         if self._pending_dataset_index < 0:
             return
         try:
+            if self._detector_settings.bad_pixels_enabled.get_value():
+                self._api.apply_bad_pixels(
+                    self._pending_dataset_index,
+                    self._detector_settings.bad_pixels_file_path.get_value(),
+                    self._detector_settings.bad_pixels_file_type.get_value(),
+                )
             self._api.load_all_arrays(dataset_index=self._pending_dataset_index)
         except Exception as exc:
             logger.exception(exc)

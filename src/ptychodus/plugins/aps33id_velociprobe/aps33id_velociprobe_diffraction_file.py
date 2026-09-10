@@ -9,9 +9,10 @@ import h5py
 import numpy
 
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
+from ptychodus.api.io import resolve_external_link_path
 from ptychodus.api.diffraction import (
     BadPixels,
-    CropCenter,
+    BeamCenter,
     DiffractionArray,
     DiffractionDataset,
     DiffractionDatasetLayoutNode,
@@ -41,7 +42,7 @@ class DataGroup:
                     label=name,
                     indexes=numpy.arange(num_patterns_per_array)
                     + len(array_list) * num_patterns_per_array,
-                    file_path=master_file_path.parent / h5_item.filename,
+                    file_path=resolve_external_link_path(master_file_path.parent, h5_item.filename),
                     data_path=str(h5_item.path),
                 )
                 array_list.append(array)
@@ -232,7 +233,7 @@ class VelociprobeDiffractionFileReader(DiffractionFileReader):
                 detector.x_pixel_size_m,
                 detector.y_pixel_size_m,
             )
-            crop_center = CropCenter(
+            beam_center = BeamCenter(
                 detector.beam_center_x_px,
                 detector.beam_center_y_px,
             )
@@ -250,7 +251,7 @@ class VelociprobeDiffractionFileReader(DiffractionFileReader):
                 detector_distance_m=detector.detector_distance_m,
                 detector_extent=detector_extent,
                 detector_pixel_geometry=detector_pixel_geometry,
-                crop_center=crop_center,
+                beam_center=beam_center,
                 probe_energy_eV=probe_energy_eV,
                 file_path=file_path,
             )

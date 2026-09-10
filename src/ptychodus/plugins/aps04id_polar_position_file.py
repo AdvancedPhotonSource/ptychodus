@@ -5,7 +5,8 @@ import logging
 import h5py
 import numpy
 
-from ptychodus.api.constants import ONE_MICRON_M
+from ptychodus.api.constants import LengthUnit
+from ptychodus.api.io import resolve_external_link_path
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -50,8 +51,8 @@ class PolarPositionFileReader(ProbePositionFileReader):
             point_list.append(
                 ProbePosition(
                     int(idx),
-                    float(x) * ONE_MICRON_M,
-                    float(y) * ONE_MICRON_M,
+                    LengthUnit.MICROMETER.to_meters(float(x)),
+                    LengthUnit.MICROMETER.to_meters(float(y)),
                 )
             )
 
@@ -98,7 +99,7 @@ class PolarPositionFileReader(ProbePositionFileReader):
         link = h5_file.get(self.EIGER_EXTERNAL_LINK, getlink=True)
         if not isinstance(link, h5py.ExternalLink):
             return None
-        target = file_path.parent / link.filename
+        target = resolve_external_link_path(file_path.parent, link.filename)
         try:
             with h5py.File(target, 'r') as ext:
                 return self._try_read_uid_here(ext, n_frames)
@@ -111,5 +112,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         PolarPositionFileReader(),
         simple_name='APS_Polar',
-        display_name='APS 4-ID Polar Files (*.hdf)',
+        display_name='APS 4-ID-B,G,H POLAR Files (*.hdf)',
     )

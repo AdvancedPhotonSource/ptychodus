@@ -1,0 +1,30 @@
+ARG ROCM_VERSION=7.2.4
+ARG UBUNTU_VERSION=24.04
+ARG PYTHON_VERSION=3.12
+ARG PYTORCH_VERSION=2.10.0
+FROM rocm/pytorch:rocm${ROCM_VERSION}_ubuntu${UBUNTU_VERSION}_py${PYTHON_VERSION}_pytorch_release_${PYTORCH_VERSION}
+
+ARG PTYCHODUS_VERSION
+ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PTYCHODUS=${PTYCHODUS_VERSION}
+
+WORKDIR /app
+COPY . /src
+
+# The base image already provides a venv at /opt/venv, first on its PATH, and
+# the ROCm-built torch lives inside it; pip therefore installs into that venv,
+# sees the torch requirement satisfied, and leaves it alone. There is no PEP
+# 668 marker in play here.
+#
+# Do NOT add a venv of our own. A venv created from inside another venv
+# resolves --system-site-packages against the base interpreter rather than the
+# parent venv, so the ROCm torch would drop off sys.path and pip would pull a
+# CUDA build from PyPI onto an AMD image.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libqt5gui5 && \
+    rm -rf /var/lib/apt/lists/* && \
+    python3 -m pip install --no-cache-dir --upgrade pip && \
+    python3 -m pip install --no-cache-dir \
+        /src[globus,gui,ptychi] && \
+    rm -rf /src
+
+CMD ["python3", "-m", "ptychodus"]

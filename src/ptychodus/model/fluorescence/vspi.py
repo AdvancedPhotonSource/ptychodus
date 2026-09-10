@@ -53,8 +53,8 @@ class VSPILinearOperator(LinearOperator):
             probe_intensity = probe.get_intensity()
             psf = probe_intensity / probe_intensity.sum()
             patch = interpolator.get_patch(
-                object_point.coordinate_x_px,
-                object_point.coordinate_y_px,
+                object_point.x_px,
+                object_point.y_px,
                 psf.shape[-1],
                 psf.shape[-2],
             )
@@ -72,8 +72,8 @@ class VSPILinearOperator(LinearOperator):
             probe_intensity = probe.get_intensity()
             psf = probe_intensity / probe_intensity.sum()
             interpolator.add_patch(
-                object_point.coordinate_x_px,
-                object_point.coordinate_y_px,
+                object_point.x_px,
+                object_point.y_px,
                 x[index] * psf,
             )
 
@@ -109,7 +109,7 @@ class VSPIFluorescenceEnhancer(FluorescenceEnhancer):
         element_maps: list[ElementMap] = list()
         A = VSPILinearOperator(product)  # noqa: N806
 
-        for emap in dataset.element_maps:
+        for emap in dataset:
             logger.info(f'Enhancing "{emap.name}"...')
             tic = time.perf_counter()
             m_cps = emap.counts_per_second
@@ -129,7 +129,7 @@ class VSPIFluorescenceEnhancer(FluorescenceEnhancer):
             element_maps.append(emap_enhanced)
             yield FluorescenceEnhancerOutput(
                 dataset=FluorescenceDataset(
-                    element_maps=list(element_maps),
+                    _element_maps=list(element_maps),
                     counts_per_second_path=dataset.counts_per_second_path,
                     channel_names_path=dataset.channel_names_path,
                 ),

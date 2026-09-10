@@ -1,13 +1,13 @@
-"""Payload dataclasses for the PtychoFM (ptycho-vit) subprocess entry points.
+"""Payload dataclasses for the PtychoFM (ptycho-fm) subprocess entry points.
 
-``ptycho_vit`` is an optional extra, so nothing in this module imports it. The
+``ptycho_fm`` is an optional extra, so nothing in this module imports it. The
 config the child needs is carried as a plain nested ``dict[str, Any]`` -- the
-same shape ptycho_vit's own ``config.yaml`` produces -- assembled parent-side
+same shape ptycho_fm's own ``config.yaml`` produces -- assembled parent-side
 by the factory. Dicts are picklable and pull in no framework, so the parent
 never touches torch just to build a payload.
 
 The training mode (``'Unsupervised'`` / ``'Supervised'``) is carried in the
-``name`` field, matching PtychoPINN's ``model_type`` convention. ptycho_vit
+``name`` field, matching PtychoPINN's ``model_type`` convention. ptycho_fm
 ``.pth`` files store a bare ``state_dict`` with no mode metadata, so no
 checkpoint-vs-reconstructor mode check is possible today.
 """
@@ -33,7 +33,7 @@ class ReconstructPayload:
     # 'Unsupervised' or 'Supervised' — the reconstructor's display name.
     name: str
 
-    # ptycho_vit config as a nested dict (data/model/training/inference sections),
+    # ptycho_fm config as a nested dict (data/model/training/inference sections),
     # matching config.yaml. Assembled parent-side from the settings groups.
     config: dict[str, Any]
 

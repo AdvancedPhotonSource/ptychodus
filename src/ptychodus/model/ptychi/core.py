@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 from collections.abc import Iterator
 from importlib.metadata import PackageNotFoundError, version
-from importlib.util import find_spec
 import logging
+from typing import TYPE_CHECKING, Any
 
+from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import (
     NullReconstructor,
     Reconstructor,
@@ -10,6 +13,7 @@ from ptychodus.api.reconstruct import (
 )
 from ptychodus.api.settings import SettingsRegistry
 
+from ._names import DISPLAY_NAMES
 from .device import PtyChiDeviceRepository
 from .enums import PtyChiEnumerators
 from .settings import (
@@ -22,15 +26,16 @@ from .settings import (
     PtyChiPIESettings,
     PtyChiProbePositionSettings,
     PtyChiProbeSettings,
+    PtyChiRAARSettings,
     PtyChiSettings,
 )
 
+if TYPE_CHECKING:
+    from ptychi.api.options.task import PtychographyTaskOptions
+
+    from .algorithms import PtyChiAlgorithm
+
 logger = logging.getLogger(__name__)
-
-
-def _ptychi_available() -> bool:
-    """Return True iff ``ptychi`` is importable, without importing it."""
-    return find_spec('ptychi') is not None
 
 
 class PtyChiReconstructorLibrary(ReconstructorLibrary):
@@ -49,6 +54,7 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
         self.pie_settings = PtyChiPIESettings(settings_registry)
         self.probe_position_settings = PtyChiProbePositionSettings(settings_registry)
         self.probe_settings = PtyChiProbeSettings(settings_registry)
+        self.raar_settings = PtyChiRAARSettings(settings_registry)
         self.settings = PtyChiSettings(settings_registry)
 
         self.enumerators = PtyChiEnumerators()
@@ -56,43 +62,61 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
             is_developer_mode_enabled=is_developer_mode_enabled
         )
         self.reconstructor_list: list[Reconstructor] = list()
+        self._algorithms: dict[str, PtyChiAlgorithm[Any]] | None = None
 
-        if not _ptychi_available():
-            logger.info('pty-chi not found.')
-
-            if is_developer_mode_enabled:
-                for reconstructor in ('DM', 'PIE', 'ePIE', 'rPIE', 'LSQML', 'Autodiff', 'BH'):
-                    self.reconstructor_list.append(NullReconstructor(reconstructor))
-            return
-
+        # One try/except/else: import the minimal pty-chi surface needed to
+        # construct the wrappers (ptychi.api pulls torch for type annotations
+        # only -- no CUDA context), then either build the real reconstructors
+        # or fall back to NullReconstructors.
         try:
-            ptychi_version = version('ptychi')
-        except PackageNotFoundError:
-            ptychi_version = 'unknown'
-        logger.info(f'Pty-Chi {ptychi_version}')
+            from .algorithms import PtyChiCommon, build_algorithms, wrap_as_subprocess_reconstructor
+        except ImportError:
+            logger.info('pty-chi not found.')
+            if is_developer_mode_enabled:
+                for display_name in DISPLAY_NAMES:
+                    self.reconstructor_list.append(NullReconstructor(display_name))
+        else:
+            try:
+                ptychi_version = version('ptychi')
+            except PackageNotFoundError:
+                ptychi_version = 'unknown'
+            logger.info(f'Pty-Chi {ptychi_version}')
 
-        # Parent-side factory. Imports ptychi.api transitively (via .helper and
-        # per-algorithm modules) — that pulls torch but does not acquire a GPU
-        # context; see the invariant note in _subprocess_protocol.py.
-        from .reconstructor import PtyChiSettingsBundle, build_reconstructor_list
-
-        bundle = PtyChiSettingsBundle(
-            dm=self.dm_settings,
-            pie=self.pie_settings,
-            lsqml=self.lsqml_settings,
-            autodiff=self.autodiff_settings,
-            bh=self.bh_settings,
-        )
-        self.reconstructor_list.extend(
-            build_reconstructor_list(
+            common = PtyChiCommon(
                 self.settings,
                 self.object_settings,
                 self.probe_settings,
                 self.probe_position_settings,
                 self.opr_settings,
-                bundle,
             )
-        )
+            self._algorithms = build_algorithms(
+                common,
+                dm_settings=self.dm_settings,
+                raar_settings=self.raar_settings,
+                pie_settings=self.pie_settings,
+                lsqml_settings=self.lsqml_settings,
+                autodiff_settings=self.autodiff_settings,
+                bh_settings=self.bh_settings,
+            )
+            self.reconstructor_list.extend(
+                wrap_as_subprocess_reconstructor(algorithm, common)
+                for algorithm in self._algorithms.values()
+            )
+
+    def build_task_options(self, algorithm_name: str, product: Product) -> PtychographyTaskOptions:
+        """Build a pty-chi ``PtychographyTaskOptions`` for the named algorithm.
+
+        Public entry point for out-of-process launchers (see
+        ``scripts/ptychodus_reconstruct_parent_demo.py``). Case-insensitive on
+        the display name, so 'rPIE' and 'rpie' both resolve.
+        """
+        if self._algorithms is None:
+            raise RuntimeError('pty-chi is not available; cannot build task options.')
+        try:
+            algorithm = self._algorithms[algorithm_name.casefold()]
+        except KeyError:
+            raise KeyError(f'Unknown pty-chi algorithm "{algorithm_name}"!') from None
+        return algorithm.build_task_options(product)
 
     @property
     def name(self) -> str:

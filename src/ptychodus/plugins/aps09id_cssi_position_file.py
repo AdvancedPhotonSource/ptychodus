@@ -3,7 +3,7 @@ import logging
 
 import h5py
 
-from ptychodus.api.constants import ONE_MILLIMETER_M
+from ptychodus.api.constants import LengthUnit
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
@@ -27,8 +27,8 @@ class CSSIPositionFileReader(ProbePositionFileReader):
                 for idx, row in enumerate(h5_positions):
                     point = ProbePosition(
                         idx,
-                        row[0] * ONE_MILLIMETER_M,
-                        row[1] * ONE_MILLIMETER_M,
+                        row[0] * LengthUnit.MILLIMETER.meters_per_unit,
+                        row[1] * LengthUnit.MILLIMETER.meters_per_unit,
                     )
                     point_list.append(point)
 
@@ -39,5 +39,5 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.probe_position_file_readers.register_plugin(
         CSSIPositionFileReader(),
         simple_name='APS_CSSI',
-        display_name='APS 9-ID CSSI Files (*.h5 *.hdf5)',
+        display_name='APS 9-ID-D CSSI Files (*.h5 *.hdf5)',
     )

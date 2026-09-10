@@ -9,7 +9,7 @@ from sqlalchemy import exists, select
 from ptychodus.api.diffraction import Polarization
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import load_diffraction_data
-from ptychodus.api.diffraction import AssembledDiffractionData
+from ptychodus.api.assemble import AssembledDiffractionData
 
 from ptychodus_store.db import repositories as repo
 from ptychodus_store.db.base import IngestState
@@ -113,9 +113,7 @@ async def get_diffraction_aggregate_image(
     params: RenderParamsDep,
 ) -> RenderedImage:
     data, pixel_geometry = await _load_diffraction_or_404(uuid, session, layout)
-    return render_real(
-        data.get_average_pattern(), pixel_geometry, params, value_label='Mean Counts'
-    )
+    return render_real(data.get_mean_pattern(), pixel_geometry, params, value_label='Mean Counts')
 
 
 @router.get('/{uuid}/patterns/{index}/image', response_model=RenderedImage)

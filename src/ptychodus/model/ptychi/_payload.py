@@ -22,10 +22,11 @@ class PtyChiPayload:
     :class:`PtychographyTaskOptions` (``DMOptions``, ``PIEOptions``,
     ``LSQMLOptions``, ...) that the parent built via the option-helper classes
     in :mod:`.helper` and the per-algorithm classes in :mod:`.dm`, :mod:`.pie`,
-    etc. It carries all diffraction data, positions, and initial guesses; the
-    child hands it straight to ``PtychographyTask``.
+    etc. It carries settings only: pty-chi takes the diffraction data,
+    positions, and initial guesses as ``PtychographyTask`` keyword arguments,
+    which the child derives from ``reconstruct_input``.
     """
 
+    reconstruct_input: ReconstructInput
     task_options: PtychographyTaskOptions
     num_sync_epochs: int
-    reconstruct_input: ReconstructInput
