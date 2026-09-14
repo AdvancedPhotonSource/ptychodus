@@ -19,6 +19,12 @@ IFS=$'\n\t'
 # tag is `ptychodus:<version>-<suffix>`; the newest matching versioned tag
 # in local podman storage is picked at runtime so a rebuild "just works"
 # without editing this file.
+#
+# The nvidia row is only a FALLBACK, used when the driver's CUDA ceiling
+# cannot be read. Normally the CUDA variant is sensed at runtime: the
+# candidates come from the `ptychodus:*-cuda<X.Y>` tags actually present in
+# podman storage, and the newest one the installed driver supports wins. See
+# choose_cuda_suffix below.
 declare -A BACKEND_FOR=(
     [nvidia]=cuda13.0
     [rocm]=rocm7.2.4
@@ -76,6 +82,37 @@ detect_gpu() {
     printf cpu
 }
 
+# Print the highest CUDA runtime the installed NVIDIA driver supports, as
+# `<major>.<minor>` (empty if it cannot be determined).
+#
+# This is a property of the DRIVER, not of any CUDA toolkit on the host -- a
+# beamline workstation running containers has no nvcc, and needs none. The
+# ceiling matters because a CUDA major version bump is not covered by minor
+# version compatibility: a cuda13.x image on an r570 driver (CUDA 12.8) leaves
+# torch.cuda.is_available() False, which surfaces much later as a mystifying
+# CPU-speed reconstruction rather than as a launch error.
+#
+# `nvidia-smi -q` is the machine-readable source ("CUDA Version : 12.8"); the
+# banner regex is the fallback for drivers whose -q output omits the field.
+detect_cuda_version() {
+    local version
+    version=$(nvidia-smi -q 2>/dev/null \
+        | sed -n 's/^ *CUDA Version *: *\([0-9][0-9.]*\).*/\1/p' \
+        | head -n1)
+    if [[ -z "$version" ]]; then
+        version=$(nvidia-smi 2>/dev/null \
+            | sed -n 's/.*CUDA Version: *\([0-9][0-9.]*\).*/\1/p' \
+            | head -n1)
+    fi
+    printf '%s' "$version"
+}
+
+# True when version $1 is no newer than version $2.
+version_le() {
+    [[ "$1" == "$2" ]] && return 0
+    [[ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
 add_gpu_flags() {
     local -n _args=$1
     local family=$2
@@ -118,12 +155,90 @@ done
 # --- Choose image ------------------------------------------------------------
 
 # Print the newest ptychodus:*-<suffix> tag in local storage (empty if none).
+#
+# podman reports a locally built image's repository fully qualified, as
+# `localhost/ptychodus`, so the name has to be compared against the last path
+# component rather than the whole field -- matching `$1 == "ptychodus"` finds
+# nothing at all. The full reference is what gets printed, since that is what
+# `podman run` wants.
 newest_image_for_suffix() {
     local suffix=$1
+    # The suffix is compared literally rather than as a regex: every backend
+    # name carrying a version has dots in it, and as a pattern `cuda13.0`
+    # would also match a `cuda1320` tag.
     podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
-        | awk -F: -v s="$suffix" '$1=="ptychodus" && $2 ~ ("-"s"$") {print}' \
+        | awk -F: -v s="$suffix" \
+            '{ repo = $1; sub(/.*\//, "", repo) }
+             repo == "ptychodus" && substr($2, length($2) - length(s)) == "-" s' \
         | sort -V \
         | tail -n1
+}
+
+# Print the CUDA versions that have a ptychodus image in local storage, newest
+# first, one `<major>.<minor>` per line.
+#
+# Reading the candidates out of podman storage rather than restating
+# scripts/podman/build's VARIANT_ARGS matrix here is deliberate: a new CUDA row
+# over there becomes selectable the moment it is built, and a row that was
+# never built is never chosen.
+available_cuda_versions() {
+    podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
+        | awk -F: '{ repo = $1; sub(/.*\//, "", repo) }
+                   repo == "ptychodus" && match($2, /-cuda[0-9]+\.[0-9]+$/) {
+                       print substr($2, RSTART + 5) }' \
+        | sort -Vru
+}
+
+# Set $1 to the backend suffix for an NVIDIA host: the newest built CUDA
+# variant the driver can actually run. $2 is the driver's CUDA ceiling,
+# possibly empty.
+#
+# This writes through a nameref rather than printing, because the
+# no-compatible-variant path below exits -- and an exit inside the `$(...)`
+# this would otherwise be called from only kills the subshell, leaving the
+# caller to carry on with an empty suffix.
+choose_cuda_suffix() {
+    local -n _suffix=$1
+    local host_cuda=$2
+
+    if [[ -z "$host_cuda" ]]; then
+        notice "cannot read the driver CUDA version from nvidia-smi; falling back to ${BACKEND_FOR[nvidia]}"
+        _suffix="${BACKEND_FOR[nvidia]}"
+        return
+    fi
+
+    local -a built
+    mapfile -t built < <(available_cuda_versions)
+
+    # Nothing built yet: hand back the fallback so the "no image found" branch
+    # below reports it with an actionable build command.
+    if (( ${#built[@]} == 0 )); then
+        _suffix="${BACKEND_FOR[nvidia]}"
+        return
+    fi
+
+    local version
+    for version in "${built[@]}"; do
+        if version_le "$version" "$host_cuda"; then
+            _suffix="cuda$version"
+            return
+        fi
+    done
+
+    # Every built variant is newer than the driver supports. Fail loudly
+    # instead of quietly dropping to the cpu image -- on a beamline a
+    # CPU-speed reconstruction reads as a hang, not as a misconfiguration.
+    {
+        printf 'ptychodus: host NVIDIA driver supports CUDA <= %s, but every ptychodus\n' "$host_cuda"
+        printf '  CUDA image in podman storage is newer:'
+        printf ' cuda%s' "${built[@]}"
+        printf '\n'
+        printf '  Build a variant no newer than CUDA %s from the repository root,\n' "$host_cuda"
+        printf '  choosing one from the matrix at the top of scripts/podman/build:\n'
+        printf '    scripts/podman/build cuda%s\n' "$host_cuda"
+        printf '  Or force an image with PTYCHODUS_IMAGE=<tag>.\n'
+    } >&2
+    exit 1
 }
 
 if [[ -n "${PTYCHODUS_IMAGE:-}" ]]; then
@@ -132,7 +247,16 @@ if [[ -n "${PTYCHODUS_IMAGE:-}" ]]; then
     notice "using image $IMAGE (override: PTYCHODUS_IMAGE)"
 else
     family=$(detect_gpu)
-    suffix="${BACKEND_FOR[$family]:-}"
+    detected="$family"
+    if [[ "$family" == nvidia ]]; then
+        host_cuda=$(detect_cuda_version)
+        choose_cuda_suffix suffix "$host_cuda"
+        if [[ -n "$host_cuda" ]]; then
+            detected="$family, driver CUDA $host_cuda"
+        fi
+    else
+        suffix="${BACKEND_FOR[$family]:-}"
+    fi
     [[ -n "$suffix" ]] || die "no backend mapped for family '$family'"
     IMAGE=$(newest_image_for_suffix "$suffix")
     if [[ -z "$IMAGE" ]]; then
@@ -140,7 +264,7 @@ else
         # can print an actionable build command.
         IMAGE="ptychodus:$suffix"
     fi
-    notice "using image $IMAGE (detected: $family)"
+    notice "using image $IMAGE (detected: $detected)"
 fi
 
 # --- Prerequisite checks -----------------------------------------------------
@@ -176,13 +300,34 @@ args=(
 
 [[ -t 0 && -t 1 ]] && args+=( -t )
 
-if [[ "$PWD" != "$HOME"* ]]; then
+# A symlinked home -- /home/beams/$USER -> /home/beams0/$USER on APS
+# workstations -- is reachable inside the container only at the literal $HOME
+# spelling: podman resolves the bind source but creates the destination
+# verbatim, so the real path is simply absent. Absolute paths that a previous
+# host-side run canonicalized (settings.ini entries, Qt file-dialog history,
+# -i/-o arguments typed as realpaths) all point at that absent spelling, so
+# mount it too.
+HOME_REAL=$(realpath -- "$HOME" 2>/dev/null) || HOME_REAL="$HOME"
+if [[ "$HOME_REAL" != "$HOME" ]]; then
+    args+=( -v "$HOME_REAL:$HOME_REAL" )
+fi
+
+# Containment tests below consider both spellings: with only the literal one,
+# a $PWD or beamline root under the real home is mounted a second time,
+# nested inside a mount that already covers it.
+is_under_home() {
+    local path=$1
+    [[ "$path" == "$HOME" || "$path" == "$HOME"/* ]] && return 0
+    [[ "$path" == "$HOME_REAL" || "$path" == "$HOME_REAL"/* ]]
+}
+
+if ! is_under_home "$PWD"; then
     args+=( -v "$PWD:$PWD" )
 fi
 
 for mount in "${BEAMLINE_MOUNTS[@]}"; do
     [[ -e "$mount" ]] || continue
-    [[ "$mount" == "$HOME"* ]] && continue
+    is_under_home "$mount" && continue
     [[ "$PWD" == "$mount"* ]] && continue
     args+=( -v "$mount:$mount" )
 done
