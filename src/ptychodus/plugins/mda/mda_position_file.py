@@ -13,16 +13,21 @@ try:
     # xdrlib removed from the standard library in Python 3.13
     import xdrlib  # type: ignore[import-not-found]
 except ModuleNotFoundError:
-    # use full module path to make this file usable as an entry point
-    from ptychodus.plugins._xdrlib import xdrlib  # type: ignore[no-redef]
+    # Full module path, not `from . import _xdrlib`, so this file stays usable as
+    # an entry point. On 3.13 this reaches back into the package that is still
+    # executing our own import; it resolves because the import machinery falls
+    # through to the submodule when the attribute is not bound yet. Only 3.13
+    # takes this branch, so tests/test_mda_position_file.py pins it in a
+    # subprocess with the stdlib module blocked.
+    from ptychodus.plugins.mda import _xdrlib as xdrlib  # type: ignore[no-redef]
 
 import numpy
 
 from ptychodus.api.typing import RealArrayType
-from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
     ProbePositionFileReader,
+    ProbePositionParseError,
     ProbePosition,
 )
 
@@ -304,8 +309,8 @@ class MDAScanInfo:
 
 @dataclass(frozen=True)
 class MDAScanData:
-    readback_array: RealArrayType  # double, shape: np x npts
-    detector_array: RealArrayType  # float, shape: nd x npts
+    readback_array: RealArrayType  # double, shape: np x current_point
+    detector_array: RealArrayType  # float, shape: nd x current_point
 
     @classmethod
     def read(
@@ -315,12 +320,23 @@ class MDAScanData:
         np = scan_info.num_positioners
         nd = scan_info.num_detectors
 
+        # A scan preallocates npts points but writes only current_point of them, so
+        # an aborted scan leaves zeros in the tail that would otherwise read back as
+        # real coordinates. Consume the full width to keep the stream aligned, then
+        # keep what was acquired. Trim each row rather than slicing the stacked array:
+        # with no detectors the array is 1-D and a two-axis slice would raise.
+        cpt = max(0, min(scan_header.current_point, npts))
+
         unpacker = xdrlib.Unpacker(fp.read(8 * np * npts))
-        readback_lol = [unpacker.unpack_farray(npts, unpacker.unpack_double) for p in range(np)]
+        readback_lol = [
+            unpacker.unpack_farray(npts, unpacker.unpack_double)[:cpt] for p in range(np)
+        ]
         readback_array = numpy.array(readback_lol)
 
         unpacker.reset(fp.read(4 * nd * npts))
-        detector_lol = [unpacker.unpack_farray(npts, unpacker.unpack_float) for d in range(nd)]
+        detector_lol = [
+            unpacker.unpack_farray(npts, unpacker.unpack_float)[:cpt] for d in range(nd)
+        ]
         detector_array = numpy.array(detector_lol)
 
         return cls(readback_array, detector_array)
@@ -346,7 +362,16 @@ class MDAScan:
         data = MDAScanData.read(fp, header, info)
         lower_scans: list[MDAScan] = list()
 
-        for offset in header.lower_scan_offsets:
+        # Rows at and past current_point were never written: their offsets are zero,
+        # and the row in progress when the scan stopped is short. Seeking to either
+        # reads the file header back as a scan header. Stop at the first hole rather
+        # than skipping it, since MDAPositionFileReader pairs lower scans with the
+        # outer readback by position and a gap would shift every y after it.
+        for offset in header.lower_scan_offsets[: header.current_point]:
+            if offset <= 0:
+                logger.warning(f'Lower scan {len(lower_scans)} is empty. Ignoring the rest.')
+                break
+
             fp.seek(offset)
             scan = MDAScan.read(fp)
             lower_scans.append(scan)
@@ -438,7 +463,18 @@ class MDAFile:
                     pv = cls._read_pv(unpacker)
                     extra_pvs.append(pv)
 
+        if scan.header.current_point < scan.header.num_requested_points:
+            logger.warning(
+                f'"{file_path}" is an aborted scan:'
+                f' {scan.header.current_point} of {scan.header.num_requested_points}'
+                ' points were acquired.'
+            )
+
         return cls(header, scan, extra_pvs)
+
+    @property
+    def is_aborted(self) -> bool:
+        return self.scan.header.current_point < self.scan.header.num_requested_points
 
     def to_mapping(self) -> Mapping[str, Any]:
         return {
@@ -451,6 +487,33 @@ class MDAFile:
         return yaml.safe_dump(self.to_mapping(), sort_keys=False)
 
 
+def _require_positioners(mda_file: MDAFile, count: int, file_path: Path) -> RealArrayType:
+    """Return the readback array, or explain why it cannot supply `count` axes."""
+    readback_array = mda_file.scan.data.readback_array
+
+    if readback_array.ndim != 2 or readback_array.shape[0] < count:
+        raise ProbePositionParseError(
+            f'"{file_path}" has {mda_file.scan.info.num_positioners} positioner(s);'
+            f' this reader needs {count}.'
+        )
+
+    return readback_array
+
+
+def _require_points(
+    point_list: list[ProbePosition], mda_file: MDAFile, file_path: Path
+) -> ProbePositionSequence:
+    """An aborted scan can leave nothing behind; say so rather than returning empty."""
+    if not point_list:
+        raise ProbePositionParseError(
+            f'No probe positions in "{file_path}":'
+            f' {mda_file.scan.header.current_point} of'
+            f' {mda_file.scan.header.num_requested_points} points were acquired.'
+        )
+
+    return ProbePositionSequence(point_list)
+
+
 class MDAPositionFileReader(ProbePositionFileReader):
     def __init__(self, scale_to_meters: float) -> None:
         self._scale_to_meters = scale_to_meters
@@ -461,7 +524,7 @@ class MDAPositionFileReader(ProbePositionFileReader):
         mda_file = MDAFile.read(file_path)
 
         yscan = mda_file.scan
-        yarray = yscan.data.readback_array[0, :]
+        yarray = _require_positioners(mda_file, 1, file_path)[0, :]
 
         for y, xscan in zip(yarray, yscan.lower_scans):
             xarray = xscan.data.readback_array[0, :]
@@ -474,7 +537,7 @@ class MDAPositionFileReader(ProbePositionFileReader):
                 )
                 point_list.append(point)
 
-        return ProbePositionSequence(point_list)
+        return _require_points(point_list, mda_file, file_path)
 
 
 class MDAFlatScanPositionFileReader(ProbePositionFileReader):
@@ -482,11 +545,12 @@ class MDAFlatScanPositionFileReader(ProbePositionFileReader):
         self._scale_to_meters = scale_to_meters
 
     def read(self, file_path: Path) -> ProbePositionSequence:
-        point_list = list()
+        point_list: list[ProbePosition] = list()
 
         mda_file = MDAFile.read(file_path)
-        xarray = mda_file.scan.data.readback_array[0, :]
-        yarray = mda_file.scan.data.readback_array[1, :]
+        readback_array = _require_positioners(mda_file, 2, file_path)
+        xarray = readback_array[0, :]
+        yarray = readback_array[1, :]
 
         for idx, (x, y) in enumerate(zip(xarray, yarray)):
             point = ProbePosition(
@@ -496,40 +560,7 @@ class MDAFlatScanPositionFileReader(ProbePositionFileReader):
             )
             point_list.append(point)
 
-        return ProbePositionSequence(point_list)
-
-
-def register_plugins(registry: PluginRegistry) -> None:
-    registry.probe_position_file_readers.register_plugin(
-        MDAPositionFileReader(scale_to_meters=1.0e-6),
-        simple_name='MDA',
-        display_name='EPICS MDA Files (*.mda)',
-    )
-    registry.probe_position_file_readers.register_plugin(
-        MDAPositionFileReader(scale_to_meters=1.0e-3),
-        simple_name='APS_2IDD',
-        display_name='APS 2-ID-D Microprobe Files (*.mda)',
-    )
-    registry.probe_position_file_readers.register_plugin(
-        MDAPositionFileReader(scale_to_meters=1.0e-3),
-        simple_name='APS_2IDE',
-        display_name='APS 2-ID-E Microprobe Files (*.mda)',
-    )
-    registry.probe_position_file_readers.register_plugin(
-        MDAPositionFileReader(scale_to_meters=1.0e-6),
-        simple_name='APS_BNP',
-        display_name='APS 2-ID-D Bionanoprobe Files (*.h5 *.hdf5)',
-    )
-    registry.probe_position_file_readers.register_plugin(
-        MDAFlatScanPositionFileReader(scale_to_meters=1.0e-3),
-        simple_name='APS_ISN_MDA',
-        display_name='APS 19-ID-E In-situ Nanoprobe Files (*.mda)',
-    )
-    registry.probe_position_file_readers.register_plugin(
-        MDAFlatScanPositionFileReader(scale_to_meters=1.0e-6),
-        simple_name='CNM_APS_HXN',
-        display_name='CNM/APS 26-ID-C Hard X-ray Nanoprobe Files (*.mda)',
-    )
+        return _require_points(point_list, mda_file, file_path)
 
 
 if __name__ == '__main__':

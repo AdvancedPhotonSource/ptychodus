@@ -26,13 +26,35 @@ COPY . /src
 #     first, but the shell has already resolved and hashed /usr/bin/python3
 #     for the `python3 -m venv` call, so a bare `python3` later in this same
 #     RUN would still reach the system interpreter and trip PEP 668 again.
+#
+# PtychoFM (distribution `ptycho-fm`, import package `ptycho_fm`) is published
+# on no index, so it cannot be named as an extra the way ptychi is. Instead
+# scripts/podman/build stages a prebuilt wheel into containers/wheels/, which
+# the `COPY . /src` above delivers to /src/containers/wheels/ and the trailing
+# `rm -rf /src` removes again. Three more details:
+#
+#   * The glob is optional on purpose. A non-matching glob expands to the
+#     literal pattern, which `[ -e ]` then rejects, so a plain `podman build
+#     -f containers/Dockerfile.cuda .` with nothing staged still produces a
+#     working image -- just without the PtychoFM backend.
+#   * The wheel and /src[...] go into a SINGLE pip invocation so one resolution
+#     pass reconciles ptychi's and ptycho-fm's constraints together. Installing
+#     them in sequence lets the second call quietly downgrade what the first
+#     pinned; ptycho-fm floors numpy, h5py and scipy well above ptychodus.
+#   * ptycho-fm asks for torch>=2.6.0, which the base image's CUDA build
+#     already satisfies through --system-site-packages, so this pulls no torch
+#     from PyPI. A `torch.__version__` without a +cuXXX suffix in the built
+#     image means that went wrong.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libqt5gui5 python3-venv && \
     rm -rf /var/lib/apt/lists/* && \
     python3 -m venv --system-site-packages "${VIRTUAL_ENV}" && \
     "${VIRTUAL_ENV}/bin/python" -m pip install --no-cache-dir --upgrade pip && \
-    "${VIRTUAL_ENV}/bin/python" -m pip install --no-cache-dir \
-        /src[globus,gui,ptychi] && \
+    set -- '/src[globus,gui,ptychi]' && \
+    for whl in /src/containers/wheels/*.whl; do \
+        if [ -e "$whl" ]; then set -- "$@" "$whl"; fi; \
+    done && \
+    "${VIRTUAL_ENV}/bin/python" -m pip install --no-cache-dir "$@" && \
     rm -rf /src
 
 CMD ["python3", "-m", "ptychodus"]

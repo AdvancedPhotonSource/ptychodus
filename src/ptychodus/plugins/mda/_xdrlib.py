@@ -1,3 +1,13 @@
+# Vendored verbatim from CPython 3.12's Lib/xdrlib.py, which PEP 594 removed from
+# the standard library in Python 3.13. MDA files are XDR encoded, so the reader in
+# mda_position_file.py falls back to this copy when the stdlib module is gone.
+#
+# Licensed under the PSF License Agreement; see xdrlib-PSF-LICENSE.txt beside this
+# file. Two deliberate deltas from upstream: the module-level
+# ``warnings._deprecated(__name__, remove=(3, 13))`` call is dropped, and the file
+# is ruff-formatted to house style. Both are cosmetic -- the parse tree is
+# otherwise identical to upstream. Re-verify with ``ast.dump`` if this is ever
+# refreshed, rather than diffing text.
 """Implements (a subset of) Sun XDR -- eXternal Data Representation.
 
 See: RFC 1014

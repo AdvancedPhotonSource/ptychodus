@@ -136,7 +136,7 @@ _REQUIRED_MODULES: dict[str, tuple[str, ...]] = {
     'ptychopinn': ('ptycho',),
     'ptychopinn_torch': ('ptycho_torch',),
     # ptycho_fm's _build_config is a pure-Python dict factory; it does not
-    # import ptycho_vit or torch, so this test can run everywhere.
+    # import ptycho_fm or torch, so this test can run everywhere.
     'ptycho_fm': (),
 }
 
