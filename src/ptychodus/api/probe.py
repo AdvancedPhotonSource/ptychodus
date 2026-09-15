@@ -14,7 +14,7 @@ from scipy.fft import fft2
 from .constants import format_length
 from .geometry import ImageExtent, PixelGeometry
 from .preprocess.noise import estimate_noise_floor
-from .propagate import intensity
+from .propagate import compute_far_field_pixel_geometry, intensity
 from .typing import ComplexArrayType, RealArrayType
 
 
@@ -362,14 +362,17 @@ class ProbeGeometry:
         distance_m: float,
     ) -> ProbeGeometry:
         """Sample-plane probe geometry from the Fraunhofer relation ``dx_sample = lambda * |z| / (N * dx_detector)``."""
-        width_px = image_extent.width_px
-        height_px = image_extent.height_px
-        numerator_m2 = wavelength_m * abs(distance_m)
+        pixel_geometry = compute_far_field_pixel_geometry(
+            detector_pixel_geometry,
+            image_extent,
+            wavelength_m=wavelength_m,
+            propagation_distance_m=distance_m,
+        )
         return cls(
-            width_px=width_px,
-            height_px=height_px,
-            pixel_width_m=numerator_m2 / (detector_pixel_geometry.width_m * width_px),
-            pixel_height_m=numerator_m2 / (detector_pixel_geometry.height_m * height_px),
+            width_px=image_extent.width_px,
+            height_px=image_extent.height_px,
+            pixel_width_m=pixel_geometry.width_m,
+            pixel_height_m=pixel_geometry.height_m,
         )
 
     @property

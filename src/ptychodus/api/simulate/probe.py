@@ -9,12 +9,13 @@ import scipy.linalg
 
 from ..constants import TWO_PI_J
 from ..typing import ComplexArrayType, RealArrayType
-from ..geometry import HermiteMode, ImageExtent, PixelGeometry, ZernikeMode
+from ..geometry import HermiteMode, ImageExtent, ZernikeMode
 from ..probe import Probe, ProbeGeometry, ProbeSequence
 from ..propagate import (
     AngularSpectrumPropagator,
     FresnelTransformPropagator,
     PropagatorParameters,
+    compute_far_field_pixel_geometry,
     intensity,
 )
 from ..assemble import AssembledDiffractionData
@@ -129,6 +130,12 @@ def generate_average_pattern_probe(
     propagator preserves array shape, and its output pitch is ``lambda * |z| / (N * dx_det)``;
     both must match what *geometry* declares for the returned Probe to be self-consistent.
     """
+    if detector_distance_m == 0.0:
+        raise ValueError(
+            'Detector distance must be nonzero to back-propagate the average pattern; '
+            'the Fresnel-transform output pixel size lambda*z/(N*dx_det) vanishes at z=0.'
+        )
+
     detector_intensity = numpy.mean(assembled_data.get_patterns(), axis=0)
     height_px, width_px = detector_intensity.shape[-2:]
 
@@ -157,21 +164,21 @@ def generate_average_pattern_probe(
             f'within rtol={rtol}.'
         )
 
+    # Backward propagation, so PropagatorParameters' pitch describes the *output*
+    # (upstream) plane -- the sample plane, not the detector.
+    probe_pixel_geometry = geometry.get_pixel_geometry()
     propagator_parameters = PropagatorParameters(
         wavelength_m=probe_wavelength_m,
         width_px=width_px,
         height_px=height_px,
-        pixel_width_m=detector_pixel_geometry.width_m,
-        pixel_height_m=detector_pixel_geometry.height_m,
+        pixel_width_m=probe_pixel_geometry.width_m,
+        pixel_height_m=probe_pixel_geometry.height_m,
         propagation_distance_m=-detector_distance_m,
     )
     propagator = FresnelTransformPropagator(propagator_parameters)
     array = propagator.propagate(numpy.sqrt(detector_intensity).astype(complex))
 
-    return Probe(
-        array=array,
-        pixel_geometry=geometry.get_pixel_geometry(),
-    )
+    return Probe(array=array, pixel_geometry=probe_pixel_geometry)
 
 
 @dataclass(frozen=True)
@@ -198,10 +205,18 @@ def generate_fresnel_zone_plate_probe(
     focal_length_m = zone_plate.get_focal_length_m(probe_wavelength_m)
     propagation_distance_m = focal_length_m + defocus_distance_m
 
-    fzp_plane_pixel_size_numerator = probe_wavelength_m * propagation_distance_m
-    fzp_pixel_geometry = PixelGeometry(
-        width_m=fzp_plane_pixel_size_numerator / geometry.width_m,
-        height_m=fzp_plane_pixel_size_numerator / geometry.height_m,
+    if propagation_distance_m == 0.0:
+        raise ValueError(
+            'Zone plate focal length plus defocus distance must be nonzero; the '
+            'Fresnel-transform pixel size lambda*z/(N*dx) vanishes at z=0.'
+        )
+
+    probe_pixel_geometry = geometry.get_pixel_geometry()
+    fzp_pixel_geometry = compute_far_field_pixel_geometry(
+        probe_pixel_geometry,
+        ImageExtent(width_px=geometry.width_px, height_px=geometry.height_px),
+        wavelength_m=probe_wavelength_m,
+        propagation_distance_m=propagation_distance_m,
     )
 
     # coordinate on FZP plane
@@ -223,19 +238,25 @@ def generate_fresnel_zone_plate_probe(
     H = RR_FZP >= zone_plate.central_beamstop_diameter_m / 2  # noqa: N806
     fzp_transmission_function = T * C * H
 
+    # PropagatorParameters' pitch describes the upstream plane: the zone plate when the
+    # probe plane lies downstream of it, and the probe plane itself when the distance is
+    # negative and the propagation runs backward.
+    upstream_pixel_geometry = (
+        fzp_pixel_geometry if propagation_distance_m > 0.0 else probe_pixel_geometry
+    )
     propagator_parameters = PropagatorParameters(
         wavelength_m=probe_wavelength_m,
         width_px=fzp_transmission_function.shape[-1],
         height_px=fzp_transmission_function.shape[-2],
-        pixel_width_m=fzp_pixel_geometry.width_m,
-        pixel_height_m=fzp_pixel_geometry.height_m,
+        pixel_width_m=upstream_pixel_geometry.width_m,
+        pixel_height_m=upstream_pixel_geometry.height_m,
         propagation_distance_m=propagation_distance_m,
     )
     propagator = FresnelTransformPropagator(propagator_parameters)
 
     return Probe(
         array=propagator.propagate(fzp_transmission_function),
-        pixel_geometry=geometry.get_pixel_geometry(),
+        pixel_geometry=probe_pixel_geometry,
     )
 
 

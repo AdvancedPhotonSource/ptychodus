@@ -166,10 +166,9 @@ class ProductPropertyTableModel(QAbstractTableModel):
                                 raw = metadata_item.polarization.get_value()
                                 return raw if raw else '(unset)'
                             case 12:
-                                try:
-                                    return f'{geometry.fresnel_number:.4g}'
-                                except ZeroDivisionError:
-                                    return 'inf'
+                                # ProductGeometry.fresnel_number already degrades to 0.0,
+                                # which is the correct object-plane limit as z -> 0.
+                                return f'{geometry.fresnel_number:.4g}'
                             case 13:
                                 try:
                                     return f'{geometry.detector_numerical_aperture:.4g}'

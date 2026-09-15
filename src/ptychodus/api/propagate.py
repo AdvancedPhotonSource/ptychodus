@@ -9,12 +9,40 @@ import numpy
 
 from .constants import TWO_PI_J
 from .typing import ComplexArrayType, RealArrayType
-from .geometry import PixelGeometry
+from .geometry import ImageExtent, PixelGeometry
 
 
 def intensity(wavefield: ComplexArrayType) -> RealArrayType:
     """Return the element-wise intensity (``|wavefield|²``) of a complex array."""
     return numpy.square(numpy.absolute(wavefield))
+
+
+def compute_far_field_pixel_geometry(
+    pixel_geometry: PixelGeometry,
+    extent: ImageExtent,
+    *,
+    wavelength_m: float,
+    propagation_distance_m: float,
+) -> PixelGeometry:
+    """Pixel geometry of the conjugate plane under the Fraunhofer relation
+    ``dx_out = lambda |z| / (N dx_in)``.
+
+    The single-FFT propagators (:class:`FresnelTransformPropagator`,
+    :class:`FraunhoferPropagator`) map a plane of pitch ``dx_in`` onto a plane of this
+    pitch. The relation is its own inverse: applying it twice returns *pixel_geometry*.
+
+    Raises:
+        ZeroDivisionError: when the input plane has zero extent along either axis.
+            Callers that must degrade gracefully catch it rather than receiving an
+            invented sentinel.
+    """
+    # Python-float arithmetic throughout: a numpy intermediate would yield inf instead
+    # of the ZeroDivisionError that callers such as ProductGeometry rely on.
+    numerator_m2 = wavelength_m * abs(propagation_distance_m)
+    return PixelGeometry(
+        width_m=numerator_m2 / (extent.width_px * pixel_geometry.width_m),
+        height_m=numerator_m2 / (extent.height_px * pixel_geometry.height_m),
+    )
 
 
 @dataclass(frozen=True)
@@ -28,11 +56,21 @@ class PropagatorParameters:
     height_px: int
     """Number of pixels in the y-direction."""
     pixel_width_m: float
-    """Source-plane pixel width in meters."""
+    """Upstream-plane pixel width in meters.
+
+    For the single-FFT propagators this is the plane at the smaller z: the *input*
+    plane when ``propagation_distance_m`` is positive, and the *output* plane when it
+    is negative. The opposite plane has pitch ``lambda |z| / (width_px * pixel_width_m)``
+    -- see :func:`compute_far_field_pixel_geometry`. Both grids are the same for the
+    pitch-preserving propagators (:class:`AngularSpectrumPropagator`,
+    :class:`FresnelTransferFunctionPropagator`), so the distinction is moot there.
+    """
     pixel_height_m: float
-    """Source-plane pixel height in meters."""
+    """Upstream-plane pixel height in meters; see :attr:`pixel_width_m`."""
     propagation_distance_m: float
-    """Propagation distance in meters."""
+    """Propagation distance in meters. Negative propagates backward, which for the
+    single-FFT propagators is the exact inverse of the forward operator built from the
+    same parameters."""
 
     @property
     def dx(self) -> float:
@@ -50,9 +88,19 @@ class PropagatorParameters:
         return self.propagation_distance_m / self.wavelength_m
 
     @property
-    def fresnel_number(self) -> float:
-        """Fresnel number."""
-        return numpy.square(self.dx) / numpy.absolute(self.z)
+    def pixel_fresnel_number(self) -> float:
+        """Signed per-pixel Fresnel number ``dx^2 / (lambda z)``.
+
+        Signed because the propagator phase terms must conjugate when the propagation
+        direction reverses; take :func:`numpy.absolute` where only the magnitude is
+        meant. Width-only because the propagator algebra carries the y-axis separately
+        through :attr:`pixel_aspect_ratio`.
+
+        Distinct from ``ProductGeometry.fresnel_number``, which is the full-aperture
+        number ``W H / (lambda z)``; the two differ by a factor of ``width_px *
+        height_px * (dy / dx)``.
+        """
+        return numpy.square(self.dx) / self.z
 
     def get_spatial_coordinates(self) -> tuple[RealArrayType, RealArrayType]:
         JJ, II = numpy.mgrid[: self.height_px, : self.width_px]  # noqa: N806
@@ -85,9 +133,10 @@ class AngularSpectrumPropagator(Propagator):
         FY, FX = parameters.get_frequency_coordinates()  # noqa: N806
         F2 = numpy.square(FX) + numpy.square(ar * FY)  # noqa: N806
         ratio = F2 / numpy.square(parameters.dx)
-        tf = numpy.exp(i2piz * numpy.sqrt(1 - ratio))
+        tf = numpy.exp(i2piz * numpy.sqrt(numpy.maximum(1 - ratio, 0.0)))
 
-        self._transfer_function = numpy.where(ratio < 1, tf, 0)
+        # ifftshift matches the centered frequency grid to the unshifted spectrum in propagate
+        self._transfer_function = ifftshift(numpy.where(ratio < 1, tf, 0))
 
     def propagate(self, wavefield: ComplexArrayType) -> ComplexArrayType:
         return fftshift(ifft2(self._transfer_function * fft2(ifftshift(wavefield))))
@@ -104,25 +153,49 @@ class FresnelTransferFunctionPropagator(Propagator):
         F2 = numpy.square(FX) + numpy.square(ar * FY)  # noqa: N806
         ratio = F2 / numpy.square(parameters.dx)
 
-        self._transfer_function = numpy.exp(i2piz * (1 - ratio / 2))
+        # ifftshift matches the centered frequency grid to the unshifted spectrum in propagate
+        self._transfer_function = ifftshift(numpy.exp(i2piz * (1 - ratio / 2)))
 
     def propagate(self, wavefield: ComplexArrayType) -> ComplexArrayType:
         return fftshift(ifft2(self._transfer_function * fft2(ifftshift(wavefield))))
 
 
 class FresnelTransformPropagator(Propagator):
-    """Fresnel propagator using the direct Fresnel transform; changes pixel size between planes."""
+    """Fresnel propagator using the direct Fresnel transform; changes pixel size between planes.
+
+    The output plane has pitch ``lambda |z| / (N dx)`` -- see
+    :func:`compute_far_field_pixel_geometry`. A negative propagation distance selects the
+    exact inverse of the forward operator built from the same parameters, in which case
+    :attr:`PropagatorParameters.pixel_width_m` describes the *output* plane.
+    Retains the input quadratic phase that :class:`FraunhoferPropagator` drops, so it
+    stays accurate outside the far field.
+
+    The dropped/retained quadratic phase spans ``X_max = N / 2``, so the controlling
+    quantity for far-field validity is ``N^2 * pixel_fresnel_number``, not the pixel
+    Fresnel number alone. For N=256 that makes the honest condition ``Fr << 1.5e-5``.
+    """
 
     def __init__(self, parameters: PropagatorParameters) -> None:
+        if parameters.propagation_distance_m == 0.0:
+            raise ValueError(
+                'FresnelTransformPropagator requires a nonzero propagation distance; '
+                'the output pixel size lambda*z/(N*dx) vanishes at z=0. Use '
+                'AngularSpectrumPropagator, which is the identity there.'
+            )
+
         ipi = 1j * numpy.pi
 
-        Fr = parameters.fresnel_number  # noqa: N806
+        # Signed: C2 and _B are pure phases that must conjugate when the direction
+        # reverses, which is what makes the backward branch the forward branch's inverse.
+        Fr = parameters.pixel_fresnel_number  # noqa: N806
         ar = parameters.pixel_aspect_ratio
         N = parameters.width_px  # noqa: N806
         M = parameters.height_px  # noqa: N806
         YY, XX = parameters.get_spatial_coordinates()  # noqa: N806
 
-        C0 = Fr / (1j * ar)  # noqa: N806
+        # Magnitude only: a signed amplitude prefactor would flip the sign of the
+        # recovered field on the backward branch.
+        C0 = numpy.absolute(Fr) / (1j * ar)  # noqa: N806
         C1 = numpy.exp(TWO_PI_J * parameters.z)  # noqa: N806
         C2 = numpy.exp((numpy.square(XX / N) + numpy.square(ar * YY / M)) * ipi / Fr)  # noqa: N806
         is_forward = parameters.propagation_distance_m >= 0.0
@@ -139,18 +212,34 @@ class FresnelTransformPropagator(Propagator):
 
 
 class FraunhoferPropagator(Propagator):
-    """Far-field (Fraunhofer) propagator; valid when the Fresnel number is much less than one."""
+    """Far-field (Fraunhofer) propagator: :class:`FresnelTransformPropagator` with the
+    input quadratic phase ``exp(i pi Fr (X^2 + Y^2))`` dropped.
+
+    The dropped/retained quadratic phase spans ``X_max = N / 2``, so the controlling
+    quantity for far-field validity is ``N^2 * pixel_fresnel_number``, not the pixel
+    Fresnel number alone. For N=256 that makes the honest condition ``Fr << 1.5e-5``.
+
+    Shares the pitch and direction conventions of :class:`FresnelTransformPropagator`.
+    """
 
     def __init__(self, parameters: PropagatorParameters) -> None:
+        if parameters.propagation_distance_m == 0.0:
+            raise ValueError(
+                'FraunhoferPropagator requires a nonzero propagation distance; '
+                'the output pixel size lambda*z/(N*dx) vanishes at z=0. Use '
+                'AngularSpectrumPropagator, which is the identity there.'
+            )
+
         ipi = 1j * numpy.pi
 
-        Fr = parameters.fresnel_number  # noqa: N806
+        # Signed phase, magnitude-only prefactor -- see FresnelTransformPropagator.
+        Fr = parameters.pixel_fresnel_number  # noqa: N806
         ar = parameters.pixel_aspect_ratio
         N = parameters.width_px  # noqa: N806
         M = parameters.height_px  # noqa: N806
         YY, XX = parameters.get_spatial_coordinates()  # noqa: N806
 
-        C0 = Fr / (1j * ar)  # noqa: N806
+        C0 = numpy.absolute(Fr) / (1j * ar)  # noqa: N806
         C1 = numpy.exp(TWO_PI_J * parameters.z)  # noqa: N806
         C2 = numpy.exp((numpy.square(XX / N) + numpy.square(ar * YY / M)) * ipi / Fr)  # noqa: N806
         is_forward = parameters.propagation_distance_m >= 0.0
@@ -163,6 +252,56 @@ class FraunhoferPropagator(Propagator):
             return self._A * fftshift(fft2(ifftshift(wavefield)))
         else:
             return fftshift(ifft2(ifftshift(wavefield * self._A)))
+
+
+def choose_propagator(parameters: PropagatorParameters) -> tuple[Propagator, PixelGeometry]:
+    """Select the correctly-sampled propagator and report the plane its output lives on.
+
+    The single-FFT and transfer-function families sample opposite regimes, and each
+    carries an implicit output grid, so the choice cannot be hidden inside either class:
+    swapping silently would return a field on a plane the caller did not ask for. The
+    returned :class:`PixelGeometry` is therefore part of the answer.
+
+    Selection is per-axis with the conservative outcome, so an anisotropic geometry is
+    never aliased on its narrow axis:
+
+    - far-field pitch <= source pitch on *both* axes -> :class:`AngularSpectrumPropagator`
+      on the source grid;
+    - otherwise -> :class:`FresnelTransformPropagator` on the far-field grid.
+
+    For square pixels this is the scalar condition ``|pixel_fresnel_number| <= 1 / N``.
+    The two methods are numerically interchangeable at that crossover (measured
+    agreement 2.5e-08); away from it they disagree by tens of percent, but that is grid
+    disagreement rather than physics.
+
+    At ``z = 0`` the far-field pitch is zero, so this selects angular spectrum on the
+    source grid -- the identity for any geometry without evanescent modes. Zero distance
+    is thus resolved by construction rather than by special case.
+
+    Two propagators are never selected. :class:`FraunhoferPropagator` is
+    :class:`FresnelTransformPropagator` with the input quadratic phase dropped, so the
+    latter is strictly more accurate for one extra multiply.
+    :class:`FresnelTransferFunctionPropagator` is the paraxial approximation of angular
+    spectrum over the same grid.
+    """
+    source_pixel_geometry = PixelGeometry(
+        width_m=parameters.pixel_width_m, height_m=parameters.pixel_height_m
+    )
+    extent = ImageExtent(width_px=parameters.width_px, height_px=parameters.height_px)
+    far_field_pixel_geometry = compute_far_field_pixel_geometry(
+        source_pixel_geometry,
+        extent,
+        wavelength_m=parameters.wavelength_m,
+        propagation_distance_m=parameters.propagation_distance_m,
+    )
+
+    if (
+        far_field_pixel_geometry.width_m <= source_pixel_geometry.width_m
+        and far_field_pixel_geometry.height_m <= source_pixel_geometry.height_m
+    ):
+        return AngularSpectrumPropagator(parameters), source_pixel_geometry
+
+    return FresnelTransformPropagator(parameters), far_field_pixel_geometry
 
 
 @dataclass(frozen=True)

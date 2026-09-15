@@ -7,6 +7,7 @@ from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider, compute_object_geometry
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider
+from ptychodus.api.propagate import compute_far_field_pixel_geometry
 from ptychodus.api.probe_positions import ProbePosition
 
 from .metadata import MetadataRepositoryItem
@@ -109,21 +110,35 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         return geometry
 
     def get_object_plane_pixel_geometry(self) -> PixelGeometry:
-        extent = self._get_detector_extent()
-        detector_pixel_geometry = self.get_detector_pixel_geometry()
-        lambda_z = self._lambda_z_m2
         try:
-            return PixelGeometry(
-                width_m=lambda_z / (extent.width_px * detector_pixel_geometry.width_m),
-                height_m=lambda_z / (extent.height_px * detector_pixel_geometry.height_m),
+            return compute_far_field_pixel_geometry(
+                self.get_detector_pixel_geometry(),
+                self._get_detector_extent(),
+                wavelength_m=self.probe_wavelength_m,
+                propagation_distance_m=self.detector_distance_m,
             )
         except ZeroDivisionError:
             return PixelGeometry(width_m=0.0, height_m=0.0)
 
     @property
     def fresnel_number(self) -> float:
+        """Full-aperture Fresnel number ``W H / (lambda z)`` at the **object** plane.
+
+        This is the propagation-regime indicator: much less than one is far field, near
+        one is transitional, much greater than one is near field. The detector-plane
+        aperture number is its reciprocal up to the pixel count -- ``Fr_detector *
+        Fr_object == width_px * height_px`` exactly -- so reporting the detector plane
+        would read large precisely when the geometry is deeply far field.
+
+        Distinct from ``PropagatorParameters.pixel_fresnel_number``, which is the
+        per-pixel quantity ``dx^2 / (lambda z)``.
+
+        Degrades to 0.0 when no dataset is bound or the detector distance is zero. That
+        is the correct limit at this plane: the object-plane width is ``lambda z / dx_d``,
+        so ``W^2 / (lambda z) = lambda z / dx_d^2 -> 0`` as z -> 0.
+        """
         extent = self._get_detector_extent()
-        pixel_geometry = self.get_detector_pixel_geometry()
+        pixel_geometry = self.get_object_plane_pixel_geometry()
         width_m = extent.width_px * pixel_geometry.width_m
         height_m = extent.height_px * pixel_geometry.height_m
         area_m2 = width_m * height_m

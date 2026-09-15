@@ -2,15 +2,25 @@
 
 import numpy
 import numpy.testing
+import pytest
 
-from ptychodus.api.geometry import HermiteMode, PixelGeometry
+from ptychodus.api.assemble import AssembledDiffractionData
+from ptychodus.api.geometry import HermiteMode, ImageExtent, PixelGeometry
 from ptychodus.api.probe import Probe, ProbeGeometry
 from ptychodus.api.simulate.probe import (
+    FresnelZonePlate,
+    generate_average_pattern_probe,
     generate_coherent_probe_modes,
+    generate_fresnel_zone_plate_probe,
     generate_hermite_probe,
     generate_incoherent_probe_modes,
 )
-from ptychodus.api.propagate import intensity
+from ptychodus.api.propagate import (
+    FresnelTransformPropagator,
+    compute_far_field_pixel_geometry,
+    PropagatorParameters,
+    intensity,
+)
 
 
 PIXEL_GEOMETRY = PixelGeometry(width_m=1e-8, height_m=1e-8)
@@ -218,3 +228,298 @@ class TestGenerateHermiteProbe:
         small = generate_hermite_probe(geometry, [mode_y], width_m=1e-7, height_m=1e-7).get_array()
         large = generate_hermite_probe(geometry, [mode_y], width_m=1e-7, height_m=2e-7).get_array()
         numpy.testing.assert_allclose(large, 0.5 * small, atol=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# generate_average_pattern_probe
+# ---------------------------------------------------------------------------
+
+_BACKPROP_NUM_PX = 64
+_BACKPROP_WAVELENGTH_M = 1.24e-10
+_BACKPROP_DISTANCE_M = 1.0
+_BACKPROP_DETECTOR_PITCH_M = 75e-6
+_BACKPROP_SAMPLE_PITCH_M = (
+    _BACKPROP_WAVELENGTH_M * _BACKPROP_DISTANCE_M / (_BACKPROP_NUM_PX * _BACKPROP_DETECTOR_PITCH_M)
+)
+
+
+def _assembled_data(patterns: numpy.ndarray) -> AssembledDiffractionData:
+    num_patterns, height_px, width_px = patterns.shape
+    return AssembledDiffractionData(
+        indexes=numpy.arange(num_patterns),
+        patterns=patterns,
+        pixel_geometry=PixelGeometry(
+            width_m=_BACKPROP_DETECTOR_PITCH_M, height_m=_BACKPROP_DETECTOR_PITCH_M
+        ),
+        bad_pixels=numpy.zeros((height_px, width_px), dtype=bool),
+    )
+
+
+def _sample_plane_geometry() -> ProbeGeometry:
+    return ProbeGeometry(
+        width_px=_BACKPROP_NUM_PX,
+        height_px=_BACKPROP_NUM_PX,
+        pixel_width_m=_BACKPROP_SAMPLE_PITCH_M,
+        pixel_height_m=_BACKPROP_SAMPLE_PITCH_M,
+    )
+
+
+class TestGenerateAveragePatternProbe:
+    def test_conserves_energy_between_the_two_planes(self) -> None:
+        """Power is invariant across the propagation once each plane is weighted by its
+        own pixel area: ``sum|out|^2 dx_sample^2 == sum|in|^2 dx_detector^2``.
+
+        This pins the upstream-plane pitch convention without needing phase, so it holds
+        for the sqrt-of-intensity input the estimator actually takes. The single-FFT
+        propagator's ``pixel_width_m`` names the plane at the smaller z, which for this
+        backward propagation is the *sample* plane. Parameterizing it with the detector
+        pitch instead scales the recovered power by ``(dx_sample / dx_detector)**4``
+        -- here a factor of about 1.4e-14.
+        """
+        geometry = _sample_plane_geometry()
+        rng = numpy.random.default_rng(0)
+        coord = numpy.arange(_BACKPROP_NUM_PX) - _BACKPROP_NUM_PX // 2
+        envelope = numpy.exp(-(coord[:, None] ** 2 + coord[None, :] ** 2) / 100)
+        patterns = (envelope * rng.uniform(0.5, 1.5, envelope.shape))[numpy.newaxis]
+
+        result = generate_average_pattern_probe(
+            geometry,
+            _assembled_data(patterns),
+            probe_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            detector_distance_m=_BACKPROP_DISTANCE_M,
+        )
+
+        detector_power = patterns[0].sum() * _BACKPROP_DETECTOR_PITCH_M**2
+        sample_power = intensity(result.get_array()[0]).sum() * _BACKPROP_SAMPLE_PITCH_M**2
+        assert sample_power == pytest.approx(detector_power, rel=1e-12)
+
+    def test_recovers_the_forward_models_amplitude_scale(self) -> None:
+        """Round-trip through the house forward model (sample -> detector at +z) and
+        back. Phase is lost to the sqrt-of-intensity step so the field itself cannot
+        return, but the recovered probe must carry the same total power as the original
+        -- which is false by four orders of magnitude on the wrong grid.
+        """
+        geometry = _sample_plane_geometry()
+        coord = numpy.arange(_BACKPROP_NUM_PX) - _BACKPROP_NUM_PX // 2
+        probe = numpy.exp(-(coord[:, None] ** 2 + coord[None, :] ** 2) / 50).astype(complex)
+
+        forward = FresnelTransformPropagator(
+            PropagatorParameters(
+                wavelength_m=_BACKPROP_WAVELENGTH_M,
+                width_px=_BACKPROP_NUM_PX,
+                height_px=_BACKPROP_NUM_PX,
+                pixel_width_m=_BACKPROP_SAMPLE_PITCH_M,
+                pixel_height_m=_BACKPROP_SAMPLE_PITCH_M,
+                propagation_distance_m=_BACKPROP_DISTANCE_M,
+            )
+        )
+        patterns = intensity(forward.propagate(probe))[numpy.newaxis]
+
+        result = generate_average_pattern_probe(
+            geometry,
+            _assembled_data(patterns),
+            probe_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            detector_distance_m=_BACKPROP_DISTANCE_M,
+        )
+
+        expected_power = intensity(probe).sum()
+        recovered_power = intensity(result.get_array()[0]).sum()
+        assert recovered_power == pytest.approx(expected_power, rel=1e-9)
+
+    def test_returns_the_declared_sample_plane_geometry(self) -> None:
+        geometry = _sample_plane_geometry()
+        patterns = numpy.ones((2, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
+        result = generate_average_pattern_probe(
+            geometry,
+            _assembled_data(patterns),
+            probe_wavelength_m=_BACKPROP_WAVELENGTH_M,
+            detector_distance_m=_BACKPROP_DISTANCE_M,
+        )
+        assert result.get_pixel_geometry() == geometry.get_pixel_geometry()
+        assert result.get_array().shape[-2:] == (_BACKPROP_NUM_PX, _BACKPROP_NUM_PX)
+
+    def test_zero_detector_distance_raises(self) -> None:
+        """Previously returned an all-NaN probe in silence: at z=0 the implied and
+        declared pitches are both 0, so the existing isclose() guard passed."""
+        patterns = numpy.ones((1, _BACKPROP_NUM_PX, _BACKPROP_NUM_PX))
+        with pytest.raises(ValueError, match='Detector distance must be nonzero'):
+            generate_average_pattern_probe(
+                _sample_plane_geometry(),
+                _assembled_data(patterns),
+                probe_wavelength_m=_BACKPROP_WAVELENGTH_M,
+                detector_distance_m=0.0,
+            )
+
+
+_FZP_NUM_PX = 64
+_FZP_WAVELENGTH_M = 1.24e-10
+_FZP_PROBE_PITCH_M = 8e-9
+_FZP_ZONE_PLATE = FresnelZonePlate(
+    zone_plate_diameter_m=180e-6,
+    outermost_zone_width_m=50e-9,
+    central_beamstop_diameter_m=60e-6,
+)
+_FZP_FOCAL_LENGTH_M = _FZP_ZONE_PLATE.get_focal_length_m(_FZP_WAVELENGTH_M)
+
+
+def _fzp_probe_geometry() -> ProbeGeometry:
+    return ProbeGeometry(
+        width_px=_FZP_NUM_PX,
+        height_px=_FZP_NUM_PX,
+        pixel_width_m=_FZP_PROBE_PITCH_M,
+        pixel_height_m=_FZP_PROBE_PITCH_M,
+    )
+
+
+def _fzp_plane_pixel_geometry() -> PixelGeometry:
+    """Pitch of the zone-plate plane, conjugate to the probe plane across ``|z| = f``.
+
+    Both the forward (``defocus = 0``) and backward (``defocus = -2f``) cases run over the
+    same ``|z| = f``, so they share this grid.
+    """
+    return compute_far_field_pixel_geometry(
+        PixelGeometry(width_m=_FZP_PROBE_PITCH_M, height_m=_FZP_PROBE_PITCH_M),
+        ImageExtent(width_px=_FZP_NUM_PX, height_px=_FZP_NUM_PX),
+        wavelength_m=_FZP_WAVELENGTH_M,
+        propagation_distance_m=_FZP_FOCAL_LENGTH_M,
+    )
+
+
+def _zone_plate_annulus() -> numpy.ndarray:
+    """Boolean mask of the zone plate's open area, sampled on the FZP-plane grid."""
+    fzp_pixel_geometry = _fzp_plane_pixel_geometry()
+    coord = numpy.arange(_FZP_NUM_PX) - _FZP_NUM_PX // 2
+    radius_m = numpy.hypot(
+        fzp_pixel_geometry.width_m * coord[numpy.newaxis, :],
+        fzp_pixel_geometry.height_m * coord[:, numpy.newaxis],
+    )
+    return (radius_m <= _FZP_ZONE_PLATE.zone_plate_diameter_m / 2) & (
+        radius_m >= _FZP_ZONE_PLATE.central_beamstop_diameter_m / 2
+    )
+
+
+def _invert_onto_the_zone_plate_plane(
+    probe_plane_array: numpy.ndarray, *, defocus_distance_m: float
+) -> numpy.ndarray:
+    """Undo the propagation the generator applied, returning the field to the FZP plane.
+
+    The generator applies ``P(z, dx_upstream)`` where ``z = f + defocus`` and the upstream
+    plane is the FZP for ``z > 0`` and the probe plane for ``z < 0``. The inverse of
+    ``P(z, dx)`` is ``P(-z, dx)`` -- same pitch, negated distance -- which is exactly the
+    direction semantics under test.
+    """
+    propagation_distance_m = _FZP_FOCAL_LENGTH_M + defocus_distance_m
+    upstream_pixel_geometry = (
+        _fzp_plane_pixel_geometry()
+        if propagation_distance_m > 0.0
+        else PixelGeometry(width_m=_FZP_PROBE_PITCH_M, height_m=_FZP_PROBE_PITCH_M)
+    )
+    propagator = FresnelTransformPropagator(
+        PropagatorParameters(
+            wavelength_m=_FZP_WAVELENGTH_M,
+            width_px=_FZP_NUM_PX,
+            height_px=_FZP_NUM_PX,
+            pixel_width_m=upstream_pixel_geometry.width_m,
+            pixel_height_m=upstream_pixel_geometry.height_m,
+            propagation_distance_m=-propagation_distance_m,
+        )
+    )
+    return propagator.propagate(probe_plane_array)
+
+
+class TestGenerateFresnelZonePlateProbe:
+    """The sign of ``focal_length + defocus`` selects the propagation direction.
+
+    ``defocus = 0`` puts the probe one focal length downstream of the zone plate (forward,
+    ``z = +f``); ``defocus = -2f`` puts it one focal length upstream (backward, ``z = -f``).
+    Both run over the same ``|z|``, so they share a zone-plate-plane grid and differ only
+    in direction -- which is what makes them comparable.
+    """
+
+    @pytest.mark.parametrize('defocus_distance_m', [0.0, -2 * _FZP_FOCAL_LENGTH_M])
+    def test_declares_the_probe_plane_geometry_in_both_directions(
+        self, defocus_distance_m: float
+    ) -> None:
+        geometry = _fzp_probe_geometry()
+
+        probe = generate_fresnel_zone_plate_probe(
+            geometry,
+            _FZP_ZONE_PLATE,
+            probe_wavelength_m=_FZP_WAVELENGTH_M,
+            defocus_distance_m=defocus_distance_m,
+        )
+
+        assert probe.get_array().shape == (1, _FZP_NUM_PX, _FZP_NUM_PX)
+        assert probe.get_pixel_geometry() == geometry.get_pixel_geometry()
+        assert numpy.all(numpy.isfinite(probe.get_array()))
+
+    def test_both_directions_invert_to_the_same_transmission_function(self) -> None:
+        """The end-to-end statement of the sign convention.
+
+        Forward and backward apply different operators to the *same* zone-plate
+        transmission function. Undoing each with its own inverse must therefore land on
+        one field -- the transmission function itself. On the shipped tree the backward
+        branch was parameterized with the zone-plate pitch (and an unsigned distance), so
+        its inverse lands somewhere else entirely.
+        """
+        geometry = _fzp_probe_geometry()
+        recovered = [
+            _invert_onto_the_zone_plate_plane(
+                generate_fresnel_zone_plate_probe(
+                    geometry,
+                    _FZP_ZONE_PLATE,
+                    probe_wavelength_m=_FZP_WAVELENGTH_M,
+                    defocus_distance_m=defocus_distance_m,
+                ).get_array()[0],
+                defocus_distance_m=defocus_distance_m,
+            )
+            for defocus_distance_m in (0.0, -2 * _FZP_FOCAL_LENGTH_M)
+        ]
+
+        numpy.testing.assert_allclose(recovered[1], recovered[0], atol=1e-12)
+
+        # Guard against both inversions agreeing on something that is not the zone plate:
+        # the recovered field must be a unit-modulus annulus on the FZP grid.
+        annulus = _zone_plate_annulus()
+        assert annulus.any() and not annulus.all(), 'Test precondition: grid straddles the optic'
+        numpy.testing.assert_allclose(numpy.abs(recovered[0][annulus]), 1.0, atol=1e-12)
+        numpy.testing.assert_allclose(numpy.abs(recovered[0][~annulus]), 0.0, atol=1e-12)
+
+    @pytest.mark.parametrize('defocus_distance_m', [0.0, -2 * _FZP_FOCAL_LENGTH_M])
+    def test_conserves_energy_between_the_zone_plate_and_probe_planes(
+        self, defocus_distance_m: float
+    ) -> None:
+        """Pins the grid each direction actually outputs on, independent of phase.
+
+        The zone plate's open area is fixed by the optic: the transmission function is
+        unit-modulus on the annulus and zero elsewhere, so its power is just that area.
+        The generator promises the probe plane's pitch in both directions, so the probe's
+        area-weighted power must equal it. Parameterizing the backward branch on the
+        zone-plate pitch instead puts the output on a grid coarser by
+        ``(dx_fzp / dx_probe)**2``, and the powers part company.
+        """
+        geometry = _fzp_probe_geometry()
+
+        probe = generate_fresnel_zone_plate_probe(
+            geometry,
+            _FZP_ZONE_PLATE,
+            probe_wavelength_m=_FZP_WAVELENGTH_M,
+            defocus_distance_m=defocus_distance_m,
+        )
+
+        fzp_pixel_geometry = _fzp_plane_pixel_geometry()
+        open_area_m2 = (
+            _zone_plate_annulus().sum() * fzp_pixel_geometry.width_m * fzp_pixel_geometry.height_m
+        )
+        probe_power = intensity(probe.get_array()[0]).sum() * _FZP_PROBE_PITCH_M**2
+        assert probe_power == pytest.approx(open_area_m2, rel=1e-9)
+
+    def test_zero_total_distance_raises(self) -> None:
+        """``defocus = -f`` collapses the conjugate grid; it must not return NaNs."""
+        with pytest.raises(ValueError, match='nonzero'):
+            generate_fresnel_zone_plate_probe(
+                _fzp_probe_geometry(),
+                _FZP_ZONE_PLATE,
+                probe_wavelength_m=_FZP_WAVELENGTH_M,
+                defocus_distance_m=-_FZP_FOCAL_LENGTH_M,
+            )
