@@ -526,6 +526,90 @@ class TestPropagatedProbe:
         for step in range(num_steps):
             numpy.testing.assert_allclose(zy[:, step], expected_col)
 
+    def test_get_xy_wavefield_equals_wavefield_slice(self) -> None:
+        result = _make_result(num_steps=3, num_modes=2)
+        for step in range(result.num_steps):
+            for mode in range(result.num_incoherent_modes):
+                numpy.testing.assert_array_equal(
+                    result.get_xy_wavefield(step, mode), result.wavefield[step, mode]
+                )
+
+    def test_get_xy_wavefield_is_complex(self) -> None:
+        assert _make_result().get_xy_wavefield(0, 0).dtype.kind == 'c'
+
+    def test_get_xy_wavefield_distinguishes_modes(self) -> None:
+        """Per-mode access must not collapse the mode axis the way `intensity` does."""
+        result = _make_result(num_modes=2)
+        mode0 = result.get_xy_wavefield(0, 0)
+        mode1 = result.get_xy_wavefield(0, 1)
+
+        assert not numpy.allclose(mode0, mode1)
+        numpy.testing.assert_allclose(
+            result.get_xy_projection(0), numpy.abs(mode0) ** 2 + numpy.abs(mode1) ** 2
+        )
+
+    def test_get_xy_wavefield_mode_out_of_bounds(self) -> None:
+        result = _make_result(num_modes=2)
+        with pytest.raises(IndexError):
+            result.get_xy_wavefield(0, 2)
+
+    def test_get_zx_wavefield_shape_and_average(self) -> None:
+        """Even height_px: the complex cut averages the two central phasors."""
+        num_steps, num_modes, h, w = 3, 2, 4, 5
+        wf = numpy.zeros((num_steps, num_modes, h, w), dtype=complex)
+        # central rows for h=4: (h-1)//2 = 1 and h//2 = 2.
+        wf[:, 1, 1, :] = 2.0 + 1.0j
+        wf[:, 1, 2, :] = 4.0 - 3.0j
+        result = PropagatedProbe(
+            wavefield=wf,
+            begin_coordinate_m=0.0,
+            end_coordinate_m=1e-3,
+            pixel_geometry=PixelGeometry(width_m=50e-6, height_m=50e-6),
+        )
+
+        zx = result.get_zx_wavefield(1)
+
+        assert zx.shape == (w, num_steps)  # transposed
+        assert zx.dtype.kind == 'c'
+        expected_col = numpy.full(w, ((2.0 + 1.0j) + (4.0 - 3.0j)) / 2)
+        for step in range(num_steps):
+            numpy.testing.assert_allclose(zx[:, step], expected_col)
+
+    def test_get_zy_wavefield_shape_and_average(self) -> None:
+        """Even width_px: the complex cut averages the two central phasors."""
+        num_steps, num_modes, h, w = 3, 2, 5, 4
+        wf = numpy.zeros((num_steps, num_modes, h, w), dtype=complex)
+        # central cols for w=4: (w-1)//2 = 1 and w//2 = 2.
+        wf[:, 1, :, 1] = 2.0 + 1.0j
+        wf[:, 1, :, 2] = 4.0 - 3.0j
+        result = PropagatedProbe(
+            wavefield=wf,
+            begin_coordinate_m=0.0,
+            end_coordinate_m=1e-3,
+            pixel_geometry=PixelGeometry(width_m=50e-6, height_m=50e-6),
+        )
+
+        zy = result.get_zy_wavefield(1)
+
+        assert zy.shape == (h, num_steps)  # transposed
+        assert zy.dtype.kind == 'c'
+        expected_col = numpy.full(h, ((2.0 + 1.0j) + (4.0 - 3.0j)) / 2)
+        for step in range(num_steps):
+            numpy.testing.assert_allclose(zy[:, step], expected_col)
+
+    def test_z_wavefield_shapes_match_projections(self) -> None:
+        result = _make_result(num_steps=3, num_modes=2, h=4, w=5)
+        assert result.get_zx_wavefield(0).shape == result.get_zx_projection().shape
+        assert result.get_zy_wavefield(0).shape == result.get_zy_projection().shape
+
+    def test_single_mode_z_wavefield_intensity_equals_projection(self) -> None:
+        """With one mode the incoherent sum is that mode, so |cut|^2 and the intensity
+        cut agree -- the two averaging orders coincide only in this case."""
+        result = _make_result(num_steps=3, num_modes=1, h=5, w=5)  # odd: no averaging
+        numpy.testing.assert_allclose(
+            numpy.abs(result.get_zx_wavefield(0)) ** 2, result.get_zx_projection()
+        )
+
     def test_frozen_assignment_raises(self) -> None:
         result = _make_result()
         with pytest.raises(FrozenInstanceError):

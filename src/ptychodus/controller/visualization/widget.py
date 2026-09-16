@@ -51,6 +51,10 @@ class VisualizationWidgetController:
     def get_item(self) -> ImageItem:
         return self._controller.get_item()
 
+    def link_to(self, other: VisualizationWidgetController) -> None:
+        """Synchronize panning and zooming between this widget and `other`."""
+        self._controller.link_to(other._controller)
+
     def _auto_display_range(self) -> None:
         self._controller.rerender_image(autoscale_color_axis=True)
 

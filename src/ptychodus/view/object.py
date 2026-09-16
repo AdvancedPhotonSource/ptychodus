@@ -1,4 +1,3 @@
-from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QComboBox,
     QDialog,
@@ -17,19 +16,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-from .image import ImageView
-
-
-def _box_widget(title: str, widget: QWidget) -> QWidget:
-    layout = QVBoxLayout()
-    layout.setContentsMargins(0, 0, 0, 0)
-    layout.addWidget(widget)
-
-    box = QGroupBox(title)
-    box.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-    box.setLayout(layout)
-
-    return box
+from .image import ImageView, box_image_view
 
 
 class FourierRingCorrelationDialog(QDialog):
@@ -82,8 +69,8 @@ class FourierAnalysisDialog(QDialog):
         self.reciprocal_space_view = ImageView()
         self.status_bar = QStatusBar()
 
-        real_space_box = _box_widget('Real Space', self.real_space_view)
-        reciprocal_space_box = _box_widget('Reciprocal Space', self.reciprocal_space_view)
+        real_space_box = box_image_view('Real Space', self.real_space_view)
+        reciprocal_space_box = box_image_view('Reciprocal Space', self.reciprocal_space_view)
 
         contents_layout = QHBoxLayout()
         contents_layout.addWidget(real_space_box)
@@ -118,8 +105,8 @@ class XMCDDialog(QDialog):
         self.parameters_view = XMCDParametersView()
         self.status_bar = QStatusBar()
 
-        structural_box = _box_widget('Structural', self.structural_view)
-        magnetic_box = _box_widget('Magnetic', self.magnetic_view)
+        structural_box = box_image_view('Structural', self.structural_view)
+        magnetic_box = box_image_view('Magnetic', self.magnetic_view)
 
         contents_layout = QHBoxLayout()
         contents_layout.addWidget(structural_box, stretch=1)

@@ -3,7 +3,8 @@ import logging
 
 import numpy
 
-from PyQt5.QtCore import Qt, QLineF, QRectF
+from PyQt5.QtCore import Qt, QLineF, QPointF, QRectF
+from PyQt5.QtGui import QTransform
 from PyQt5.QtWidgets import QGraphicsScene, QStatusBar
 
 from ptychodus.api.typing import NumberArrayType
@@ -42,10 +43,12 @@ class VisualizationController(Observer):
         self._file_dialog_factory = file_dialog_factory
         self._line_cut_dialog = LineCutDialog(view)
         self._histogram_dialog = HistogramDialog(view)
+        self._linked_controllers: list[VisualizationController] = []
 
         item_signals = ImageItemSignals()
         item_signals.line_cut_finished.connect(self._analyze_line_cut)
         item_signals.rectangle_finished.connect(self._analyze_region)
+        item_signals.moved.connect(self._publish_view_state)
 
         self._item = ImageItem(item_signals, status_bar)
         engine.add_observer(self)
@@ -56,9 +59,29 @@ class VisualizationController(Observer):
 
         view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        view.transform_changed.connect(self._publish_view_state)
 
     def get_item(self) -> ImageItem:
         return self._item
+
+    def link_to(self, other: VisualizationController) -> None:
+        """Mirror pan and zoom between this view and `other`, in both directions.
+
+        Panning moves the `ImageItem` within its scene while zooming changes the view
+        transform, so both pieces of state have to travel together.
+        """
+        self._linked_controllers.append(other)
+        other._linked_controllers.append(self)
+
+    def _publish_view_state(self) -> None:
+        for controller in self._linked_controllers:
+            controller._apply_view_state(self._view.transform(), self._item.pos())
+
+    def _apply_view_state(self, transform: QTransform, position: QPointF) -> None:
+        # Neither setter re-emits the signals that drive `_publish_view_state`, so a
+        # mirrored update cannot echo back to its origin.
+        self._view.setTransform(transform)
+        self._item.setPos(position)
 
     def set_array(
         self,
@@ -183,6 +206,14 @@ class VisualizationController(Observer):
         self._histogram_dialog.open()
 
     def zoom_to_fit(self) -> None:
+        # Mirror the action rather than the resulting transform: linked views may hold
+        # differently shaped arrays, and each should fit its own content.
+        self._fit_view_to_contents()
+
+        for controller in self._linked_controllers:
+            controller._fit_view_to_contents()
+
+    def _fit_view_to_contents(self) -> None:
         self._item.setPos(0, 0)
         scene = self._view.scene()
 

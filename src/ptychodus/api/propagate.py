@@ -3,18 +3,49 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, TypeVar
 
 from scipy.fft import fft2, fftfreq, fftshift, ifft2, ifftshift
 import numpy
+import numpy.typing
 
 from .constants import TWO_PI_J
 from .typing import ComplexArrayType, RealArrayType
 from .geometry import ImageExtent, PixelGeometry
 
+_InexactT = TypeVar('_InexactT', bound=numpy.inexact[Any])
+
 
 def intensity(wavefield: ComplexArrayType) -> RealArrayType:
     """Return the element-wise intensity (``|wavefield|²``) of a complex array."""
     return numpy.square(numpy.absolute(wavefield))
+
+
+def _cut_central_row(
+    array: numpy.typing.NDArray[_InexactT],
+) -> numpy.typing.NDArray[_InexactT]:
+    """Average the two central rows of a ``(num_steps, height, width)`` stack, then
+    transpose to ``(width, num_steps)``.
+
+    For an odd height the two indices coincide and nothing is averaged. The average is
+    taken on whatever was passed in, so an intensity stack averages powers while a
+    complex wavefield averages phasors.
+    """
+    size = array.shape[-2]
+    cut_lower = array[:, (size - 1) // 2, :]
+    cut_upper = array[:, size // 2, :]
+    return numpy.transpose(numpy.add(cut_lower, cut_upper) / 2)
+
+
+def _cut_central_column(
+    array: numpy.typing.NDArray[_InexactT],
+) -> numpy.typing.NDArray[_InexactT]:
+    """Average the two central columns of a ``(num_steps, height, width)`` stack, then
+    transpose to ``(height, num_steps)``. See :func:`_cut_central_row`."""
+    size = array.shape[-1]
+    cut_lower = array[:, :, (size - 1) // 2]
+    cut_upper = array[:, :, size // 2]
+    return numpy.transpose(numpy.add(cut_lower, cut_upper) / 2)
 
 
 def compute_far_field_pixel_geometry(
@@ -346,18 +377,28 @@ class PropagatedProbe:
         return self.intensity[step]
 
     def get_zx_projection(self) -> RealArrayType:
-        ints = self.intensity
-        sz = ints.shape[-2]
-        cut_l = ints[:, (sz - 1) // 2, :]
-        cut_r = ints[:, sz // 2, :]
-        return numpy.transpose(numpy.add(cut_l, cut_r) / 2)
+        return _cut_central_row(self.intensity)
 
     def get_zy_projection(self) -> RealArrayType:
-        ints = self.intensity
-        sz = ints.shape[-1]
-        cut_l = ints[:, :, (sz - 1) // 2]
-        cut_r = ints[:, :, sz // 2]
-        return numpy.transpose(numpy.add(cut_l, cut_r) / 2)
+        return _cut_central_column(self.intensity)
+
+    def get_xy_wavefield(self, step: int, mode: int) -> ComplexArrayType:
+        """Complex wavefield of a single incoherent mode at one propagation step,
+        shape ``(height_px, width_px)``.
+
+        The mode-summed counterpart is :meth:`get_xy_projection`. Summing over
+        mutually incoherent modes is only meaningful in intensity, so the per-mode
+        accessors are the only way to reach the phase.
+        """
+        return self.wavefield[step, mode]
+
+    def get_zx_wavefield(self, mode: int) -> ComplexArrayType:
+        """Complex ZX plane of a single incoherent mode, shape ``(width_px, num_steps)``."""
+        return _cut_central_row(self.wavefield[:, mode])
+
+    def get_zy_wavefield(self, mode: int) -> ComplexArrayType:
+        """Complex ZY plane of a single incoherent mode, shape ``(height_px, num_steps)``."""
+        return _cut_central_column(self.wavefield[:, mode])
 
     def save_npz(self, file_path: Path) -> None:
         numpy.savez_compressed(

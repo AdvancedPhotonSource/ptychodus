@@ -43,6 +43,7 @@ class ImageItemSignals(QObject):
     rectangle_finished = pyqtSignal(QRectF)
     line_cut_finished = pyqtSignal(QLineF)
     fourier_finished = pyqtSignal(QRectF)
+    moved = pyqtSignal()
 
 
 class ImageMouseTool(Enum):
@@ -227,6 +228,7 @@ class ImageItem(QGraphicsPixmapItem):
         match self._mouse_tool:
             case ImageMouseTool.MOVE_TOOL:
                 self.setPos(self.scenePos() + event.scenePos() - event.lastScenePos())
+                self._signals.moved.emit()
             case ImageMouseTool.RULER_TOOL:
                 origin = self._line_item.line().p1()
                 line = QLineF(origin, event.pos())
@@ -357,6 +359,8 @@ class HistogramDialog(QDialog):
 
 
 class VisualizationView(QGraphicsView):
+    transform_changed = pyqtSignal()
+
     def wheelEvent(self, event: QWheelEvent | None) -> None:  # noqa: N802
         if event is None:
             return
@@ -371,6 +375,8 @@ class VisualizationView(QGraphicsView):
 
         delta_position = new_position - old_position
         self.translate(delta_position.x(), delta_position.y())
+
+        self.transform_changed.emit()
 
 
 class VisualizationWidget(QGroupBox):

@@ -52,7 +52,11 @@ class AnalysisCore:
 
         self.probe_propagator_settings = ProbePropagatorSettings(settings_registry)
         self.probe_propagator = ProbePropagator(self.probe_propagator_settings, product_repository)
-        self.probe_propagator_visualization_engine = VisualizationEngine(is_complex=False)
+        # Complex so the propagation dialog can render a single incoherent mode's
+        # wavefield; Real up front because the dialog opens on the mode-summed
+        # intensity, for which the is_complex default of 'Complex' paints a flat hue.
+        self.probe_propagator_visualization_engine = VisualizationEngine(is_complex=True)
+        self.probe_propagator_visualization_engine.set_renderer('Real')
 
         self.residual_analyzer = ResidualAnalyzer(product_repository)
         self.residual_real_space_visualization_engine = VisualizationEngine(is_complex=False)

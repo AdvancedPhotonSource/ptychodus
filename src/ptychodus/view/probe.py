@@ -8,13 +8,13 @@ from PyQt5.QtWidgets import (
     QLabel,
     QPushButton,
     QRadioButton,
-    QScrollArea,
     QSlider,
     QStatusBar,
     QVBoxLayout,
     QWidget,
 )
 
+from .image import ImageView, box_image_view
 from .visualization import VisualizationParametersView, VisualizationWidget
 from .widgets import DecimalLineEdit
 
@@ -51,42 +51,30 @@ class ProbeMetricsView(QGroupBox):
         self.setLayout(layout)
 
 
-class ProbePropagationParametersView(QGroupBox):
-    def __init__(
-        self,
-        begin_coordinate_widget: QWidget,
-        end_coordinate_widget: QWidget,
-        num_steps_spin_box: QWidget,
-        parent: QWidget | None = None,
-    ) -> None:
-        super().__init__('Parameters', parent)
-        self.visualization_parameters_view = VisualizationParametersView()
-        self.metrics_view = ProbeMetricsView()
+class ProbeVisualizationView(QGroupBox):
+    """Chooses what the propagation dialog renders: the mode-summed intensity, or one
+    incoherent mode's complex wavefield.
 
-        propagation_layout = QFormLayout()
-        propagation_layout.addRow('Begin Coordinate:', begin_coordinate_widget)
-        propagation_layout.addRow('End Coordinate:', end_coordinate_widget)
-        propagation_layout.addRow('Number of Steps:', num_steps_spin_box)
+    Complex is the only branch that can select a mode -- summing mutually incoherent
+    modes is meaningful in intensity alone -- so the spin box follows the radio.
+    """
 
-        propagation_group_box = QGroupBox('Propagation')
-        propagation_group_box.setLayout(propagation_layout)
+    def __init__(self, mode_spin_box: QWidget, parent: QWidget | None = None) -> None:
+        super().__init__('Probe', parent)
+        self.intensity_button = QRadioButton('Intensity')
+        self.complex_button = QRadioButton('Complex')
 
-        scroll_widget = QWidget()
-        scroll_widget_layout = QVBoxLayout()
-        scroll_widget_layout.setContentsMargins(0, 0, 0, 0)
-        scroll_widget_layout.addWidget(self.metrics_view)
-        scroll_widget_layout.addWidget(propagation_group_box)
-        scroll_widget_layout.addWidget(self.visualization_parameters_view)
-        scroll_widget_layout.addStretch()
-        scroll_widget.setLayout(scroll_widget_layout)
+        self.intensity_button.setToolTip('Incoherent sum over all probe modes')
+        self.complex_button.setToolTip('Complex wavefield of a single probe mode')
 
-        scroll_area = QScrollArea()
-        scroll_area.setWidget(scroll_widget)
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        button_layout = QHBoxLayout()
+        button_layout.setContentsMargins(0, 0, 0, 0)
+        button_layout.addWidget(self.intensity_button)
+        button_layout.addWidget(self.complex_button)
 
-        layout = QVBoxLayout()
-        layout.addWidget(scroll_area)
+        layout = QFormLayout()
+        layout.addRow('Incoherent Mode:', mode_spin_box)
+        layout.addRow(button_layout)
         self.setLayout(layout)
 
 
@@ -96,14 +84,14 @@ class ProbePropagationDialog(QDialog):
         begin_coordinate_widget: QWidget,
         end_coordinate_widget: QWidget,
         num_steps_spin_box: QWidget,
+        mode_spin_box: QWidget,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.xy_view = VisualizationWidget('XY Plane')
+        self.xy_view = ImageView()
+        self.metrics_view = ProbeMetricsView()
+        self.probe_view = ProbeVisualizationView(mode_spin_box)
         self.zx_view = VisualizationWidget('ZX Plane')
-        self.parameters_view = ProbePropagationParametersView(
-            begin_coordinate_widget, end_coordinate_widget, num_steps_spin_box
-        )
         self.zy_view = VisualizationWidget('ZY Plane')
         self.propagate_button = QPushButton('Propagate')
         self.save_button = QPushButton('Save')
@@ -111,24 +99,46 @@ class ProbePropagationDialog(QDialog):
         self.coordinate_label = QLabel()
         self.status_bar = QStatusBar()
 
-        action_layout = QHBoxLayout()
-        action_layout.addWidget(self.propagate_button)
-        action_layout.addWidget(self.save_button)
+        self.coordinate_slider.setToolTip('Propagation Plane')
+
+        # The label text changes width as the coordinate crosses unit boundaries; reserve
+        # room for the widest reading so the control strip does not shift while dragging.
+        self.coordinate_label.setMinimumWidth(
+            self.coordinate_label.fontMetrics().horizontalAdvance('-000.000 mm')
+        )
+        self.coordinate_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # `ImageView` hangs its ribbon off `setMenuBar`, which keeps the ribbon out of the
+        # layout's width calculation. In this dialog the XY pane sits in the narrow column,
+        # so it has to carry the ribbon's width itself or the Data Range group is clipped.
+        self.xy_view.setMinimumWidth(self.xy_view.image_ribbon.minimumSizeHint().width())
+
+        xy_layout = QVBoxLayout()
+        xy_layout.setContentsMargins(0, 0, 0, 0)
+        xy_layout.addWidget(box_image_view('XY Plane', self.xy_view), 1)
+        xy_layout.addWidget(self.metrics_view)
+        xy_layout.addWidget(self.probe_view)
 
         coordinate_layout = QHBoxLayout()
         coordinate_layout.setContentsMargins(0, 0, 0, 0)
-        coordinate_layout.addWidget(self.coordinate_slider)
+        coordinate_layout.addWidget(begin_coordinate_widget)
+        coordinate_layout.addWidget(self.coordinate_slider, 1)
         coordinate_layout.addWidget(self.coordinate_label)
+        coordinate_layout.addWidget(end_coordinate_widget)
+        coordinate_layout.addWidget(num_steps_spin_box)
+        coordinate_layout.addWidget(self.propagate_button)
 
         contents_layout = QGridLayout()
-        contents_layout.addWidget(self.xy_view, 0, 0)
+        contents_layout.addLayout(xy_layout, 0, 0, 2, 1)
         contents_layout.addWidget(self.zx_view, 0, 1)
-        contents_layout.addWidget(self.parameters_view, 1, 0)
         contents_layout.addWidget(self.zy_view, 1, 1)
-        contents_layout.addLayout(action_layout, 2, 0)
+        contents_layout.addWidget(self.save_button, 2, 0)
         contents_layout.addLayout(coordinate_layout, 2, 1)
         contents_layout.setColumnStretch(0, 1)
         contents_layout.setColumnStretch(1, 2)
+        contents_layout.setRowStretch(0, 1)
+        contents_layout.setRowStretch(1, 1)
+        contents_layout.setRowStretch(2, 0)
 
         layout = QVBoxLayout()
         layout.addLayout(contents_layout)

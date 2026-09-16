@@ -171,12 +171,22 @@ class ImageDataRangeController(Observer):
         self._display_range_dialog.max_value_line_edit.set_value(max_value)
 
         selection = Interval[Decimal](min_value, max_value)
-        if self._display_range_is_locked:
-            self._view.display_range_slider.set_selection(selection)
-        else:
-            self._view.display_range_slider.set_selection_and_bounds(
-                selection, selection, block_signal=True
+        slider = self._view.display_range_slider
+        bounds = slider.get_bounds()
+        fits_within_bounds = selection.lower in bounds and selection.upper in bounds
+
+        if self._display_range_is_locked and fits_within_bounds:
+            slider.set_selection(selection)
+        elif self._display_range_is_locked:
+            # Something outside this controller moved the color axis past the slider's
+            # bounds, typically a peer view autoscaling a shared engine. Widen the bounds
+            # to fit; clamping would write the truncated range straight back to the engine.
+            widened = Interval[Decimal](
+                min(bounds.lower, selection.lower), max(bounds.upper, selection.upper)
             )
+            slider.set_selection_and_bounds(selection, widened, block_signal=True)
+        else:
+            slider.set_selection_and_bounds(selection, selection, block_signal=True)
 
         self._sync_color_legend_to_view()
 
