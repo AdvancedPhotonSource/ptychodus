@@ -111,7 +111,7 @@ def compute_xy_metrics(
     try:
         return estimate_probe_size(intensity, pixel_geometry)
     except Exception:
-        logger.exception('Failed to estimate probe size from XY projection!')
+        logger.exception('Failed to estimate probe size from XY intensity!')
         return None
 
 

@@ -474,17 +474,17 @@ class TestPropagatedProbe:
         result = _make_result()
         numpy.testing.assert_array_equal(result.intensity, result.intensity)
 
-    def test_get_xy_projection_equals_intensity_slice(self) -> None:
+    def test_get_xy_intensity_equals_intensity_slice(self) -> None:
         result = _make_result(num_steps=3)
         for step in range(result.num_steps):
-            numpy.testing.assert_array_equal(result.get_xy_projection(step), result.intensity[step])
+            numpy.testing.assert_array_equal(result.get_xy_intensity(step), result.intensity[step])
 
-    def test_get_xy_projection_out_of_bounds(self) -> None:
+    def test_get_xy_intensity_out_of_bounds(self) -> None:
         result = _make_result(num_steps=3)
         with pytest.raises(IndexError):
-            result.get_xy_projection(3)
+            result.get_xy_intensity(3)
 
-    def test_get_zx_projection_shape_and_average(self) -> None:
+    def test_get_zx_intensity_shape_and_average(self) -> None:
         """Even height_px: returned plane averages the two central rows, then transposes."""
         num_steps, num_modes, h, w = 3, 1, 4, 5
         wf = numpy.zeros((num_steps, num_modes, h, w), dtype=complex)
@@ -498,14 +498,14 @@ class TestPropagatedProbe:
             pixel_geometry=PixelGeometry(width_m=50e-6, height_m=50e-6),
         )
 
-        zx = result.get_zx_projection()
+        zx = result.get_zx_intensity()
 
         assert zx.shape == (w, num_steps)  # transposed
         expected_col = numpy.full(w, (4.0 + 16.0) / 2)  # row-average per step
         for step in range(num_steps):
             numpy.testing.assert_allclose(zx[:, step], expected_col)
 
-    def test_get_zy_projection_shape_and_average(self) -> None:
+    def test_get_zy_intensity_shape_and_average(self) -> None:
         """Even width_px: returned plane averages the two central columns, then transposes."""
         num_steps, num_modes, h, w = 3, 1, 5, 4
         wf = numpy.zeros((num_steps, num_modes, h, w), dtype=complex)
@@ -519,7 +519,7 @@ class TestPropagatedProbe:
             pixel_geometry=PixelGeometry(width_m=50e-6, height_m=50e-6),
         )
 
-        zy = result.get_zy_projection()
+        zy = result.get_zy_intensity()
 
         assert zy.shape == (h, num_steps)  # transposed
         expected_col = numpy.full(h, (4.0 + 16.0) / 2)
@@ -545,7 +545,7 @@ class TestPropagatedProbe:
 
         assert not numpy.allclose(mode0, mode1)
         numpy.testing.assert_allclose(
-            result.get_xy_projection(0), numpy.abs(mode0) ** 2 + numpy.abs(mode1) ** 2
+            result.get_xy_intensity(0), numpy.abs(mode0) ** 2 + numpy.abs(mode1) ** 2
         )
 
     def test_get_xy_wavefield_mode_out_of_bounds(self) -> None:
@@ -597,17 +597,17 @@ class TestPropagatedProbe:
         for step in range(num_steps):
             numpy.testing.assert_allclose(zy[:, step], expected_col)
 
-    def test_z_wavefield_shapes_match_projections(self) -> None:
+    def test_z_wavefield_shapes_match_intensities(self) -> None:
         result = _make_result(num_steps=3, num_modes=2, h=4, w=5)
-        assert result.get_zx_wavefield(0).shape == result.get_zx_projection().shape
-        assert result.get_zy_wavefield(0).shape == result.get_zy_projection().shape
+        assert result.get_zx_wavefield(0).shape == result.get_zx_intensity().shape
+        assert result.get_zy_wavefield(0).shape == result.get_zy_intensity().shape
 
-    def test_single_mode_z_wavefield_intensity_equals_projection(self) -> None:
+    def test_single_mode_z_wavefield_intensity_equals_intensity_plane(self) -> None:
         """With one mode the incoherent sum is that mode, so |cut|^2 and the intensity
         cut agree -- the two averaging orders coincide only in this case."""
         result = _make_result(num_steps=3, num_modes=1, h=5, w=5)  # odd: no averaging
         numpy.testing.assert_allclose(
-            numpy.abs(result.get_zx_wavefield(0)) ** 2, result.get_zx_projection()
+            numpy.abs(result.get_zx_wavefield(0)) ** 2, result.get_zx_intensity()
         )
 
     def test_frozen_assignment_raises(self) -> None:

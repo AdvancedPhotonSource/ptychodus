@@ -1,5 +1,7 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
+    QAbstractItemView,
+    QCheckBox,
     QDialog,
     QFormLayout,
     QGridLayout,
@@ -10,9 +12,14 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QSlider,
     QStatusBar,
+    QTableView,
     QVBoxLayout,
     QWidget,
 )
+
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.figure import Figure
 
 from .image import ImageView, box_image_view
 from .visualization import VisualizationParametersView, VisualizationWidget
@@ -94,6 +101,7 @@ class ProbePropagationDialog(QDialog):
         self.zx_view = VisualizationWidget('ZX Plane')
         self.zy_view = VisualizationWidget('ZY Plane')
         self.propagate_button = QPushButton('Propagate')
+        self.focus_button = QPushButton('Focus')
         self.save_button = QPushButton('Save')
         self.coordinate_slider = QSlider(Qt.Orientation.Horizontal)
         self.coordinate_label = QLabel()
@@ -128,11 +136,16 @@ class ProbePropagationDialog(QDialog):
         coordinate_layout.addWidget(num_steps_spin_box)
         coordinate_layout.addWidget(self.propagate_button)
 
+        action_layout = QHBoxLayout()
+        action_layout.setContentsMargins(0, 0, 0, 0)
+        action_layout.addWidget(self.focus_button)
+        action_layout.addWidget(self.save_button)
+
         contents_layout = QGridLayout()
         contents_layout.addLayout(xy_layout, 0, 0, 2, 1)
         contents_layout.addWidget(self.zx_view, 0, 1)
         contents_layout.addWidget(self.zy_view, 1, 1)
-        contents_layout.addWidget(self.save_button, 2, 0)
+        contents_layout.addLayout(action_layout, 2, 0)
         contents_layout.addLayout(coordinate_layout, 2, 1)
         contents_layout.setColumnStretch(0, 1)
         contents_layout.setColumnStretch(1, 2)
@@ -143,6 +156,70 @@ class ProbePropagationDialog(QDialog):
         layout = QVBoxLayout()
         layout.addLayout(contents_layout)
         layout.addWidget(self.status_bar)
+        self.setLayout(layout)
+
+
+class ProbeFocusDialog(QDialog):
+    """Metric-versus-z curves for a propagated probe, with the focal plane each metric
+    implies.
+
+    The table on the left is both the legend and the readout: checking a row plots that
+    curve, and selecting a row makes it the one the focus marker and **Go To Focus**
+    act on.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.metric_table_view = QTableView()
+        self.figure = Figure()
+        self.figure_canvas = FigureCanvasQTAgg(self.figure)
+        self.navigation_toolbar = NavigationToolbar(self.figure_canvas, self)
+        self.axes = self.figure.add_subplot(111)
+        self.normalize_check_box = QCheckBox('Normalize Curves')
+        self.focus_label = QLabel()
+        self.go_to_focus_button = QPushButton('Go To Focus')
+
+        self.normalize_check_box.setChecked(True)
+        self.normalize_check_box.setToolTip(
+            'Rescale each curve to [0, 1] so metrics in different units can be compared'
+        )
+        self.go_to_focus_button.setToolTip(
+            'Move the propagation plane to the focus of the selected metric'
+        )
+
+        # Rows are picked whole: the current row selects the primary metric, and
+        # individual cells are never edited -- the check box in column 0 is the only
+        # interactive part. Per-column resize modes are left to the controller, which
+        # sets them once a model exists; addressing a section before then is a crash.
+        self.metric_table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.metric_table_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.metric_table_view.verticalHeader().hide()
+
+        focus_layout = QFormLayout()
+        focus_layout.addRow('Selected Metric:', self.focus_label)
+        focus_layout.addRow(self.go_to_focus_button)
+        focus_group = QGroupBox('Focus')
+        focus_group.setLayout(focus_layout)
+
+        metrics_layout = QVBoxLayout()
+        metrics_layout.addWidget(self.metric_table_view)
+        metrics_group = QGroupBox('Metrics')
+        metrics_group.setLayout(metrics_layout)
+
+        left_layout = QVBoxLayout()
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.addWidget(metrics_group, 1)
+        left_layout.addWidget(focus_group)
+
+        right_layout = QVBoxLayout()
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.addWidget(self.navigation_toolbar)
+        right_layout.addWidget(self.figure_canvas, 1)
+        right_layout.addWidget(self.normalize_check_box)
+
+        layout = QHBoxLayout()
+        layout.addLayout(left_layout)
+        layout.addLayout(right_layout, 1)
         self.setLayout(layout)
 
 

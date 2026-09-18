@@ -342,7 +342,7 @@ class PropagatedProbe:
 
     Stores the complex wavefield as ``(num_steps, num_incoherent_modes, height_px,
     width_px)``. Per-step intensity (incoherent-mode sum of ``|wf|^2``) and the three
-    orthogonal projections used by the GUI are derived lazily.
+    orthogonal planes used by the GUI are derived lazily.
     """
 
     wavefield: ComplexArrayType
@@ -373,20 +373,20 @@ class PropagatedProbe:
         cache in a local if calling repeatedly in a hot loop."""
         return numpy.sum(intensity(self.wavefield), axis=1)
 
-    def get_xy_projection(self, step: int) -> RealArrayType:
+    def get_xy_intensity(self, step: int) -> RealArrayType:
         return self.intensity[step]
 
-    def get_zx_projection(self) -> RealArrayType:
+    def get_zx_intensity(self) -> RealArrayType:
         return _cut_central_row(self.intensity)
 
-    def get_zy_projection(self) -> RealArrayType:
+    def get_zy_intensity(self) -> RealArrayType:
         return _cut_central_column(self.intensity)
 
     def get_xy_wavefield(self, step: int, mode: int) -> ComplexArrayType:
         """Complex wavefield of a single incoherent mode at one propagation step,
         shape ``(height_px, width_px)``.
 
-        The mode-summed counterpart is :meth:`get_xy_projection`. Summing over
+        The mode-summed counterpart is :meth:`get_xy_intensity`. Summing over
         mutually incoherent modes is only meaningful in intensity, so the per-mode
         accessors are the only way to reach the phase.
         """

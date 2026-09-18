@@ -1,4 +1,4 @@
-"""Unit tests for ptychodus.api.probe.estimate_probe_size."""
+"""Unit tests for ptychodus.api.probe."""
 
 import numpy
 import numpy.testing
@@ -6,15 +6,24 @@ import pytest
 
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.probe import (
+    FocusPolarity,
     PatchBounds,
     Probe,
+    ProbeFocusCurves,
+    ProbeFocusMetric,
     ProbeGeometry,
     ProbeSequence,
     ProbeSizeMetrics,
+    compute_amplitude_deviation,
+    compute_phase_deviation_rad,
+    compute_probe_focus_curves,
+    compute_rms_contrast,
     compute_shannon_entropy,
+    estimate_focal_plane,
     estimate_probe_entropy,
     estimate_probe_size,
 )
+from ptychodus.api.propagate import PropagatedProbe
 
 
 PIXEL_M = 1e-9  # 1 nm per pixel — keeps lengths interpretable as "px == nm"
@@ -441,3 +450,288 @@ class TestProbeSequenceFromProbe:
         assert sequence.get_opr_weights_or_none() is None
         assert sequence.get_pixel_geometry() == pixel_geometry
         numpy.testing.assert_array_equal(sequence.get_probe_no_opr().get_array(), array)
+
+
+def _gaussian_caustic_stack(
+    coordinate_m: numpy.ndarray,
+    waist_m: float,
+    waist_coordinate_m: float,
+    rayleigh_range_m: float,
+    *,
+    size: int = 48,
+) -> numpy.ndarray:
+    """Build a ``(num_steps, 1, size, size)`` stack holding a Gaussian beam.
+
+    The width follows the caustic ``w(z) = w0 sqrt(1 + ((z - z0) / zR)^2)``, normalized
+    so total power is conserved along z, and each plane carries the matching spherical
+    phase ``-k r^2 / 2R(z)``. Curvature is written as ``1 / R = z / (z^2 + zR^2)``,
+    which stays finite at the waist, where it vanishes and leaves a flat wavefront.
+
+    The phase is what makes this a beam rather than a stack of blurred spots: without
+    it the wavefront metrics have nothing to measure and read zero at every plane.
+    """
+    y_idx, x_idx = numpy.mgrid[:size, :size]
+    dx = (x_idx - (size - 1) / 2.0) * PIXEL_M
+    dy = (y_idx - (size - 1) / 2.0) * PIXEL_M
+    r2 = numpy.square(dx) + numpy.square(dy)
+    # Implied by the waist and Rayleigh range via zR = pi w0^2 / lambda.
+    wavenumber = 2.0 * rayleigh_range_m / numpy.square(waist_m)
+
+    planes = []
+
+    for z_m in coordinate_m:
+        offset_m = z_m - waist_coordinate_m
+        scale = numpy.sqrt(1.0 + (offset_m / rayleigh_range_m) ** 2)
+        width_m = waist_m * scale
+        inverse_radius = offset_m / (numpy.square(offset_m) + numpy.square(rayleigh_range_m))
+        phase = -0.5 * wavenumber * r2 * inverse_radius
+        # Amplitude, not intensity: dividing by the width keeps sum(|psi|^2) constant.
+        envelope = numpy.exp(-r2 / numpy.square(width_m)) / width_m
+        planes.append(envelope * numpy.exp(1j * phase))
+
+    return numpy.asarray(planes, dtype=numpy.complex128)[:, numpy.newaxis]
+
+
+def _caustic_probe(
+    waist_coordinate_m: float,
+    *,
+    num_steps: int = 21,
+    begin_coordinate_m: float = -100.0 * PIXEL_M,
+    end_coordinate_m: float = 100.0 * PIXEL_M,
+) -> PropagatedProbe:
+    coordinate_m = numpy.linspace(begin_coordinate_m, end_coordinate_m, num_steps)
+    wavefield = _gaussian_caustic_stack(
+        coordinate_m,
+        waist_m=8.0 * PIXEL_M,
+        waist_coordinate_m=waist_coordinate_m,
+        rayleigh_range_m=40.0 * PIXEL_M,
+    )
+    return PropagatedProbe(
+        wavefield=wavefield,
+        begin_coordinate_m=begin_coordinate_m,
+        end_coordinate_m=end_coordinate_m,
+        pixel_geometry=PIXEL_GEOMETRY,
+    )
+
+
+class TestComputeRmsContrast:
+    def test_constant_image_has_no_contrast(self) -> None:
+        assert compute_rms_contrast(numpy.full((16, 16), 3.5)) == 0.0
+
+    def test_two_level_image_matches_closed_form(self) -> None:
+        """Half zeros and half 2a has mean a and standard deviation a, so a contrast of 1."""
+        image = numpy.concatenate([numpy.zeros(128), numpy.full(128, 7.0)])
+
+        numpy.testing.assert_allclose(compute_rms_contrast(image), 1.0, rtol=1e-12)
+
+    def test_zero_image_returns_zero_rather_than_dividing(self) -> None:
+        assert compute_rms_contrast(numpy.zeros((8, 8))) == 0.0
+
+    def test_invariant_under_rescaling(self) -> None:
+        rng = numpy.random.default_rng(3)
+        image = rng.random((32, 32))
+
+        numpy.testing.assert_allclose(
+            compute_rms_contrast(image), compute_rms_contrast(1e6 * image), rtol=1e-12
+        )
+
+
+class TestComputeAmplitudeDeviation:
+    def test_uniform_amplitude_has_no_deviation(self) -> None:
+        wavefield = numpy.exp(1j * numpy.linspace(0.0, 6.0, 64)).reshape(8, 8)
+
+        numpy.testing.assert_allclose(compute_amplitude_deviation(wavefield), 0.0, atol=1e-12)
+
+    def test_zero_wavefield_returns_zero_rather_than_dividing(self) -> None:
+        assert compute_amplitude_deviation(numpy.zeros((8, 8), dtype=numpy.complex128)) == 0.0
+
+    def test_invariant_under_rescaling(self) -> None:
+        rng = numpy.random.default_rng(4)
+        wavefield = rng.random((16, 16)) + 1j * rng.random((16, 16))
+
+        numpy.testing.assert_allclose(
+            compute_amplitude_deviation(wavefield),
+            compute_amplitude_deviation(1e6 * wavefield),
+            rtol=1e-12,
+        )
+
+
+class TestComputePhaseDeviation:
+    def test_flat_wavefront_has_no_deviation(self) -> None:
+        wavefield = numpy.full((16, 16), 2.0 + 0.0j)
+
+        numpy.testing.assert_allclose(compute_phase_deviation_rad(wavefield), 0.0, atol=1e-12)
+
+    def test_recovers_sigma_of_a_wrapped_normal_phase(self) -> None:
+        """For phase ~ N(0, sigma), the resultant is exp(-sigma^2/2), so sqrt(-2 ln R)
+        returns sigma itself."""
+        sigma = 0.3
+        rng = numpy.random.default_rng(5)
+        wavefield = numpy.exp(1j * rng.normal(0.0, sigma, size=1 << 16))
+
+        numpy.testing.assert_allclose(compute_phase_deviation_rad(wavefield), sigma, rtol=0.02)
+
+    def test_is_insensitive_to_the_branch_cut(self) -> None:
+        """Phase tightly clustered about pi straddles the +/-pi wrap. The circular
+        statistic must see a narrow distribution where a plain standard deviation of
+        the angle sees a maximally wide one."""
+        rng = numpy.random.default_rng(6)
+        phase = numpy.pi + rng.normal(0.0, 0.05, size=(64, 64))
+        wavefield = numpy.exp(1j * phase)
+
+        deviation = compute_phase_deviation_rad(wavefield)
+
+        numpy.testing.assert_allclose(deviation, 0.05, rtol=0.1)
+        assert numpy.std(numpy.angle(wavefield)) > 3.0  # what the naive approach reports
+
+    def test_is_dominated_by_the_bright_pixels(self) -> None:
+        """A bright coherent core plus a dim incoherent halo is a low-deviation
+        wavefield, because the weighting is by intensity."""
+        rng = numpy.random.default_rng(7)
+        wavefield = 1e-3 * numpy.exp(2j * numpy.pi * rng.random((32, 32)))
+        wavefield[12:20, 12:20] = 1.0
+
+        assert compute_phase_deviation_rad(wavefield) < 0.01
+
+    def test_scattered_phase_exceeds_clustered_phase(self) -> None:
+        rng = numpy.random.default_rng(8)
+        scattered = numpy.exp(2j * numpy.pi * rng.random((64, 64)))
+        clustered = numpy.exp(1j * rng.normal(0.0, 0.1, size=(64, 64)))
+
+        assert compute_phase_deviation_rad(scattered) > compute_phase_deviation_rad(clustered)
+
+    def test_zero_wavefield_returns_zero(self) -> None:
+        assert compute_phase_deviation_rad(numpy.zeros((8, 8), dtype=numpy.complex128)) == 0.0
+
+
+class TestEstimateFocalPlane:
+    def test_recovers_an_off_grid_parabola_vertex_exactly(self) -> None:
+        """Three-point parabolic interpolation is exact for a parabola, so a vertex
+        placed deliberately between samples comes back to machine precision."""
+        coordinate_m = numpy.linspace(-10.0, 10.0, 11)  # spacing 2.0
+        vertex_m = 1.3
+        value = 3.0 * numpy.square(coordinate_m - vertex_m) + 0.5
+
+        plane = estimate_focal_plane(coordinate_m, value, FocusPolarity.MINIMUM)
+
+        assert plane.is_refined
+        numpy.testing.assert_allclose(plane.coordinate_m, vertex_m, rtol=1e-12)
+        numpy.testing.assert_allclose(plane.value, 0.5, rtol=1e-12)
+        assert plane.step == 6  # the sample nearest 1.3
+
+    def test_maximum_polarity_mirrors_minimum(self) -> None:
+        coordinate_m = numpy.linspace(-10.0, 10.0, 11)
+        vertex_m = 1.3
+        value = 3.0 * numpy.square(coordinate_m - vertex_m) + 0.5
+
+        maximum = estimate_focal_plane(coordinate_m, -value, FocusPolarity.MAXIMUM)
+
+        assert maximum.is_refined
+        numpy.testing.assert_allclose(maximum.coordinate_m, vertex_m, rtol=1e-12)
+
+    def test_extremum_at_either_endpoint_is_not_refined(self) -> None:
+        coordinate_m = numpy.linspace(0.0, 10.0, 11)
+
+        rising = estimate_focal_plane(coordinate_m, coordinate_m, FocusPolarity.MINIMUM)
+        falling = estimate_focal_plane(coordinate_m, -coordinate_m, FocusPolarity.MINIMUM)
+
+        assert not rising.is_refined
+        assert rising.step == 0
+        assert not falling.is_refined
+        assert falling.step == 10
+
+    def test_flat_curve_falls_back_to_the_grid(self) -> None:
+        coordinate_m = numpy.linspace(0.0, 10.0, 11)
+
+        plane = estimate_focal_plane(coordinate_m, numpy.zeros(11), FocusPolarity.MINIMUM)
+
+        assert not plane.is_refined
+
+    def test_short_curves_return_the_extremal_sample(self) -> None:
+        single = estimate_focal_plane(numpy.array([4.0]), numpy.array([7.0]), FocusPolarity.MINIMUM)
+        pair = estimate_focal_plane(
+            numpy.array([0.0, 1.0]), numpy.array([5.0, 2.0]), FocusPolarity.MINIMUM
+        )
+
+        assert not single.is_refined
+        assert single.step == 0
+        numpy.testing.assert_allclose(single.coordinate_m, 4.0, rtol=1e-12)
+        numpy.testing.assert_allclose(single.value, 7.0, rtol=1e-12)
+        assert not pair.is_refined
+        assert pair.step == 1
+        numpy.testing.assert_allclose(pair.coordinate_m, 1.0, rtol=1e-12)
+
+    def test_mismatched_or_empty_inputs_raise(self) -> None:
+        with pytest.raises(ValueError):
+            estimate_focal_plane(numpy.zeros(4), numpy.zeros(5), FocusPolarity.MINIMUM)
+
+        with pytest.raises(ValueError):
+            estimate_focal_plane(numpy.zeros(0), numpy.zeros(0), FocusPolarity.MINIMUM)
+
+
+class TestComputeProbeFocusCurves:
+    def test_every_metric_locates_a_known_off_grid_waist(self) -> None:
+        """All ten metrics measure the same beam, so all ten should agree on where it
+        is narrowest, to within a fraction of the step size."""
+        waist_m = 13.0 * PIXEL_M  # off-grid: the samples are spaced 10 nm apart
+        curves = compute_probe_focus_curves(_caustic_probe(waist_m))
+
+        for series in curves.series:
+            plane = curves.get_focal_plane(series.metric)
+            assert abs(plane.coordinate_m - waist_m) < 10.0 * PIXEL_M, series.metric
+
+    def test_polarity_matches_how_each_metric_behaves_at_focus(self) -> None:
+        """Widths and entropy bottom out at the waist; peak intensity and contrast top
+        out there. A wrong polarity would send the search to the opposite end."""
+        curves = compute_probe_focus_curves(_caustic_probe(0.0))
+        focus_step = curves.series[0].value.argmin()
+
+        for series in curves.series:
+            if series.metric.polarity is FocusPolarity.MINIMUM:
+                assert series.value.argmin() == focus_step, series.metric
+            else:
+                assert series.value.argmax() == focus_step, series.metric
+
+    def test_series_cover_every_metric_and_span_the_requested_range(self) -> None:
+        curves = compute_probe_focus_curves(_caustic_probe(0.0, num_steps=21))
+
+        assert {series.metric for series in curves.series} == set(ProbeFocusMetric)
+        assert curves.coordinate_m.shape == (21,)
+        numpy.testing.assert_allclose(curves.coordinate_m[0], -100.0 * PIXEL_M)
+        numpy.testing.assert_allclose(curves.coordinate_m[-1], 100.0 * PIXEL_M)
+
+        for series in curves.series:
+            assert series.value.shape == (21,), series.metric
+
+    def test_lengths_are_reported_in_meters(self) -> None:
+        """The waist amplitude is exp(-r^2/w^2) with w = 8 px at 1 nm per pixel, so the
+        intensity has sigma = w/2 and the reported 2-sigma width is w itself, 8 nm --
+        a value only plausible if the series is in meters rather than pixels."""
+        curves = compute_probe_focus_curves(_caustic_probe(0.0))
+
+        plane = curves.get_focal_plane(ProbeFocusMetric.RMS_MAJOR)
+
+        assert ProbeFocusMetric.RMS_MAJOR.si_unit == 'm'
+        numpy.testing.assert_allclose(plane.value, 8.0 * PIXEL_M, rtol=0.05)
+
+    def test_get_series_and_get_focal_plane_reject_an_unsampled_metric(self) -> None:
+        curves = compute_probe_focus_curves(_caustic_probe(0.0))
+        pruned = ProbeFocusCurves(
+            coordinate_m=curves.coordinate_m,
+            series=[s for s in curves.series if s.metric is not ProbeFocusMetric.RMS_CONTRAST],
+        )
+
+        with pytest.raises(KeyError):
+            pruned.get_series(ProbeFocusMetric.RMS_CONTRAST)
+
+        with pytest.raises(KeyError):
+            pruned.get_focal_plane(ProbeFocusMetric.RMS_CONTRAST)
+
+    def test_out_of_range_mode_raises(self) -> None:
+        probe = _caustic_probe(0.0)
+
+        with pytest.raises(ValueError):
+            compute_probe_focus_curves(probe, mode=1)
+
+        with pytest.raises(ValueError):
+            compute_probe_focus_curves(probe, mode=-1)

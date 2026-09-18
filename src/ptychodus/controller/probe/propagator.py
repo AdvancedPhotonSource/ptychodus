@@ -20,6 +20,7 @@ from ..parameters import (
     SpinBoxParameterViewController,
 )
 from ..visualization import VisualizationWidgetController
+from .focus import ProbeFocusViewController
 from .metrics import compute_xy_metrics
 
 logger = logging.getLogger(__name__)
@@ -70,8 +71,13 @@ class ProbePropagationViewController:
             self._mode_spin_box,
         )
         self._dialog.propagate_button.clicked.connect(self._propagate)
+        self._dialog.focus_button.clicked.connect(self._analyze_focus)
         self._dialog.save_button.clicked.connect(self._save_propagated_probe)
         self._dialog.coordinate_slider.valueChanged.connect(self._update_current_coordinate)
+
+        # The focus dialog drives the propagation plane through a callback rather than a
+        # reference back to this controller, so the dependency stays one-way.
+        self._focus_view_controller = ProbeFocusViewController(self._go_to_step, self._dialog)
 
         probe_view = self._dialog.probe_view
         probe_view.intensity_button.setChecked(True)
@@ -79,7 +85,7 @@ class ProbePropagationViewController:
         self._mode_spin_box.valueChanged.connect(self._refresh_views)
 
         # All three views share one engine, so the XY ribbon's colorize and data-range
-        # controls drive the color axis for the Z projections too.
+        # controls drive the color axis for the Z planes too.
         self._xy_image_controller = ImageController(
             engine, self._dialog.xy_view, self._dialog.status_bar, file_dialog_factory
         )
@@ -146,8 +152,8 @@ class ProbePropagationViewController:
             wavefield = probe.get_xy_wavefield(step, self._get_selected_mode())
             return wavefield, intensity(wavefield)
 
-        projection = probe.get_xy_projection(step)
-        return projection, projection
+        xy_intensity = probe.get_xy_intensity(step)
+        return xy_intensity, xy_intensity
 
     def _update_metrics_view(self, metrics: ProbeSizeMetrics | None) -> None:
         view = self._dialog.metrics_view
@@ -243,6 +249,19 @@ class ProbePropagationViewController:
         else:
             self._sync_model_to_view()
 
+    def _go_to_step(self, step: int) -> None:
+        """Move the propagation plane; the slider's own signal re-renders everything."""
+        self._dialog.coordinate_slider.setValue(step)
+
+    def _analyze_focus(self) -> None:
+        probe = self._propagated_probe
+
+        if probe is None:
+            logger.warning('No propagated wavefield to analyze!')
+            return
+
+        self._focus_view_controller.analyze(probe, self._get_selected_mode())
+
     def launch(self, product_index: int) -> None:
         self._product_index = product_index
         self._propagated_probe = None
@@ -255,6 +274,7 @@ class ProbePropagationViewController:
             return
 
         self._dialog.setWindowTitle(f'Propagate Probe: {item_name}')
+        self._focus_view_controller.invalidate()
         self._sync_model_to_view()
         self._dialog.open()
 
@@ -303,10 +323,10 @@ class ProbePropagationViewController:
                 zx_array = probe.get_zx_wavefield(mode)
                 zy_array = probe.get_zy_wavefield(mode)
             else:
-                zx_array = probe.get_zx_projection()
-                zy_array = probe.get_zy_projection()
+                zx_array = probe.get_zx_intensity()
+                zy_array = probe.get_zy_intensity()
 
-            # vvv TODO display correct pixel geometry for projections vvv
+            # vvv TODO display correct pixel geometry for the Z planes vvv
             self._zx_visualization_widget_controller.set_array(zx_array, pixel_geometry)
             self._zy_visualization_widget_controller.set_array(zy_array, pixel_geometry)
         except Exception as err:
@@ -326,6 +346,7 @@ class ProbePropagationViewController:
             self._dialog.coordinate_slider.setRange(0, 1)
             self._dialog.coordinate_slider.setValue(0)
 
+        self._dialog.focus_button.setEnabled(self._propagated_probe is not None)
         self._sync_mode_spin_box()
         self._update_current_coordinate(self._dialog.coordinate_slider.value())
         self._update_z_planes()

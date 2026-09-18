@@ -4,6 +4,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import Enum, auto
 from pathlib import Path
 from typing import overload
 
@@ -14,7 +15,7 @@ from scipy.fft import fft2
 from .constants import format_length
 from .geometry import ImageExtent, PixelGeometry
 from .preprocess.noise import estimate_noise_floor
-from .propagate import compute_far_field_pixel_geometry, intensity
+from .propagate import PropagatedProbe, compute_far_field_pixel_geometry, intensity
 from .typing import ComplexArrayType, RealArrayType
 
 
@@ -53,6 +54,91 @@ def compute_shannon_entropy(distribution: RealArrayType, *, normalize: bool = Tr
         entropy /= numpy.log2(p.size)
 
     return float(entropy)
+
+
+def compute_rms_contrast(image: RealArrayType) -> float:
+    """Root-mean-square contrast ``std(I) / mean(I)`` of a non-negative image.
+
+    Dividing by the mean makes the value independent of the image's overall scaling,
+    so it is comparable between propagation planes and between probes. It attains a
+    maximum where a converging beam is most concentrated, which makes it a focus
+    indicator costing a single pass over the image rather than the median filter and
+    sort that :func:`estimate_probe_size` requires.
+
+    Returns:
+        The RMS contrast, or ``0.0`` when the mean is not positive.
+    """
+    values = numpy.asarray(image, dtype=numpy.float64)
+    mean = values.mean()
+
+    if mean <= 0.0:
+        return 0.0
+
+    return float(values.std() / mean)
+
+
+def compute_amplitude_deviation(wavefield: ComplexArrayType) -> float:
+    """Normalized amplitude dispersion ``std(|psi|) / mean(|psi|)`` of a complex wavefield.
+
+    The amplitude counterpart of :func:`compute_phase_deviation_rad`, normalized by the
+    mean for the same scale-invariance reason as :func:`compute_rms_contrast`.
+
+    Returns:
+        The normalized amplitude deviation, or ``0.0`` when the mean amplitude is not
+        positive.
+    """
+    amplitude = numpy.absolute(numpy.asarray(wavefield))
+    mean = amplitude.mean()
+
+    if mean <= 0.0:
+        return 0.0
+
+    return float(amplitude.std() / mean)
+
+
+def compute_phase_deviation_rad(wavefield: ComplexArrayType) -> float:
+    """Intensity-weighted circular standard deviation of a wavefield's phase, in radians.
+
+    With weights ``w = |psi|^2``, the normalized resultant of the phase distribution is
+    ``R = |sum(w exp(i phi))| / sum(w)``. That simplifies to
+    ``|sum(psi |psi|)| / sum(|psi|^2)``, so it is evaluated without ever taking an
+    angle, and the dispersion reported is ``sqrt(-2 ln R)`` -- the circular analogue of
+    a standard deviation, exactly recovering ``sigma`` for a wrapped-normal phase.
+
+    Being built from a complex weighted sum, the result does not depend on where the
+    branch cut of the phase happens to fall: a wavefield whose phase straddles
+    ``+/-pi`` is measured as tightly clustered, where a plain standard deviation of
+    :func:`numpy.angle` would report it as maximally dispersed. The same reasoning
+    underlies the phase handling in :mod:`ptychodus.api.metrics`.
+
+    Weighting by intensity means dim pixels, whose phase is the least trustworthy part
+    of a reconstruction, contribute in proportion to how much light they carry.
+
+    A flat wavefront gives ``0.0``. The value grows without bound as the phase spreads;
+    for a phase that is uniformly distributed over the circle the resultant is limited
+    only by the sample count, so the reported dispersion grows like ``sqrt(ln N)``.
+
+    Returns:
+        The circular standard deviation in radians; ``0.0`` when the wavefield carries
+        no power, and ``inf`` in the degenerate case of an exactly vanishing resultant.
+    """
+    values = numpy.asarray(wavefield)
+    amplitude = numpy.absolute(values)
+    total_power = numpy.square(amplitude).sum()
+
+    if total_power <= 0.0:
+        return 0.0
+
+    # sum(w exp(i phi)) == sum(|psi|^2 * psi / |psi|) == sum(psi |psi|), which also
+    # leaves zero-amplitude pixels contributing nothing instead of dividing by zero.
+    resultant = float(numpy.absolute(numpy.sum(values * amplitude)) / total_power)
+
+    if resultant <= 0.0:
+        return float('inf')
+
+    # Rounding can push a perfectly coherent sum a hair above one, where the log would
+    # return a small negative and the square root a NaN.
+    return float(numpy.sqrt(-2.0 * numpy.log(min(resultant, 1.0))))
 
 
 @dataclass(frozen=True)
@@ -308,6 +394,264 @@ def estimate_probe_size(
         rms_major_axis_length_m=float(rms_major_m),
         rms_minor_axis_length_m=float(rms_minor_m),
         encircled_energy_diameter_m=float(2.0 * encircled_radius),
+    )
+
+
+class FocusPolarity(Enum):
+    """Whether a focus metric is best at a minimum or a maximum of its z curve."""
+
+    MINIMUM = auto()
+    MAXIMUM = auto()
+
+
+class ProbeFocusMetric(Enum):
+    """Focus metrics sampled along a propagation axis.
+
+    Each member pairs a short display name with the direction in which the metric
+    improves and the SI unit its samples are stored in (``'m'``, ``'rad'``, or the
+    empty string when dimensionless). The name deliberately carries no unit -- callers
+    append one derived from :attr:`si_unit`, converting to whichever display unit suits
+    them, so that a script and a GUI describe the same quantity the same way.
+    """
+
+    FWHM_MAJOR = ('FWHM Major Axis', FocusPolarity.MINIMUM, 'm')
+    FWHM_MINOR = ('FWHM Minor Axis', FocusPolarity.MINIMUM, 'm')
+    RMS_MAJOR = ('RMS Major Axis', FocusPolarity.MINIMUM, 'm')
+    RMS_MINOR = ('RMS Minor Axis', FocusPolarity.MINIMUM, 'm')
+    ENCIRCLED_ENERGY_DIAMETER = ('Encircled Energy Diameter', FocusPolarity.MINIMUM, 'm')
+    PEAK_INTENSITY = ('Peak Intensity', FocusPolarity.MAXIMUM, '')
+    RMS_CONTRAST = ('RMS Contrast', FocusPolarity.MAXIMUM, '')
+    INTENSITY_ENTROPY = ('Intensity Entropy', FocusPolarity.MINIMUM, '')
+    AMPLITUDE_DEVIATION = ('Amplitude Deviation', FocusPolarity.MAXIMUM, '')
+    PHASE_DEVIATION = ('Phase Deviation', FocusPolarity.MINIMUM, 'rad')
+
+    def __init__(self, label: str, polarity: FocusPolarity, si_unit: str) -> None:
+        self.label = label
+        self.polarity = polarity
+        self.si_unit = si_unit
+
+
+@dataclass(frozen=True)
+class ProbeFocusSeries:
+    """One focus metric sampled at every plane of a propagated probe."""
+
+    metric: ProbeFocusMetric
+    """Which metric this curve measures, and how to interpret it."""
+
+    value: RealArrayType
+    """Samples in the SI unit named by ``metric.si_unit``, one per propagation step."""
+
+
+@dataclass(frozen=True)
+class FocalPlane:
+    """Best-focus plane estimated from a single metric curve."""
+
+    coordinate_m: float
+    """Propagation coordinate of the estimated focus, in meters."""
+
+    value: float
+    """The metric's value there, interpolated when :attr:`is_refined` is true."""
+
+    step: int
+    """Index of the sampled plane nearest the focus."""
+
+    is_refined: bool
+    """Whether sub-step interpolation succeeded. When false the estimate is the
+    extremal sample itself, so its precision is the sample spacing."""
+
+
+@dataclass(frozen=True)
+class ProbeFocusCurves:
+    """Focus metrics for a propagated probe, sampled along the propagation axis."""
+
+    coordinate_m: RealArrayType
+    """Propagation coordinates in meters, shape ``(num_steps,)``."""
+
+    series: Sequence[ProbeFocusSeries]
+    """One entry per sampled metric, each the same length as :attr:`coordinate_m`."""
+
+    def get_series(self, metric: ProbeFocusMetric) -> ProbeFocusSeries:
+        """Return the sampled curve for *metric*.
+
+        Raises:
+            KeyError: If *metric* was not sampled.
+        """
+        for series in self.series:
+            if series.metric is metric:
+                return series
+
+        raise KeyError(f'No focus series for {metric}!')
+
+    def get_focal_plane(self, metric: ProbeFocusMetric) -> FocalPlane:
+        """Best-focus plane according to *metric*, via :func:`estimate_focal_plane`.
+
+        Raises:
+            KeyError: If *metric* was not sampled.
+        """
+        series = self.get_series(metric)
+        return estimate_focal_plane(self.coordinate_m, series.value, metric.polarity)
+
+
+def estimate_focal_plane(
+    coordinate_m: RealArrayType, value: RealArrayType, polarity: FocusPolarity
+) -> FocalPlane:
+    """Locate the best-focus plane of a sampled metric curve by parabolic refinement.
+
+    The extremal sample is found according to *polarity*, a parabola is fitted through
+    it and its two neighbors, and the vertex is reported. This resolves the focus to a
+    fraction of the sample spacing, and is exact wherever the curve is locally
+    quadratic -- which these metrics are near their extremum.
+
+    The refinement is abandoned, and the extremal sample returned unchanged with
+    :attr:`FocalPlane.is_refined` false, whenever it cannot be trusted:
+
+    - there are fewer than three samples, or the extremum falls on either end of the
+      curve, so that it is not bracketed;
+    - the parabola is degenerate, meaning a flat or near-flat neighborhood in which the
+      vertex could land anywhere;
+    - the vertex leaves the bracketing interval.
+
+    Args:
+        coordinate_m: Propagation coordinates in meters, evenly spaced and increasing.
+        value: Metric samples, the same shape as *coordinate_m*.
+        polarity: Whether the metric is best at a minimum or a maximum.
+
+    Raises:
+        ValueError: If the two arrays differ in shape, or are empty.
+    """
+    coordinates = numpy.asarray(coordinate_m, dtype=numpy.float64)
+    values = numpy.asarray(value, dtype=numpy.float64)
+
+    if coordinates.shape != values.shape:
+        raise ValueError(
+            f'Coordinate and value arrays must have same shape; '
+            f'got {coordinates.shape} vs {values.shape}!'
+        )
+
+    if values.size == 0:
+        raise ValueError('Cannot locate a focal plane in an empty curve!')
+
+    if polarity is FocusPolarity.MAXIMUM:
+        index = int(numpy.argmax(values))
+    else:
+        index = int(numpy.argmin(values))
+
+    grid_plane = FocalPlane(
+        coordinate_m=float(coordinates[index]),
+        value=float(values[index]),
+        step=index,
+        is_refined=False,
+    )
+
+    if values.size < 3 or index == 0 or index == values.size - 1:
+        return grid_plane
+
+    y_left = values[index - 1]
+    y_here = values[index]
+    y_right = values[index + 1]
+    denominator = y_left - 2.0 * y_here + y_right
+
+    # Scale the flatness tolerance to the curve so that the test means the same thing
+    # whether the samples are nanometer-scale lengths or order-one dimensionless ratios.
+    tolerance = 1e-12 * max(float(numpy.absolute(values).max()), 1.0)
+
+    if numpy.absolute(denominator) <= tolerance:
+        return grid_plane
+
+    offset = 0.5 * (y_left - y_right) / denominator
+
+    if numpy.absolute(offset) > 1.0:
+        return grid_plane
+
+    # Half the span of the bracketing pair, so a locally uneven grid still gives the
+    # right step size without assuming the whole axis is uniform.
+    spacing_m = 0.5 * (coordinates[index + 1] - coordinates[index - 1])
+    focus_m = coordinates[index] + offset * spacing_m
+    # Vertex of the same parabola: y(x*) = y_here - (y_left - y_right) * x* / 4.
+    vertex = y_here - 0.25 * (y_left - y_right) * offset
+
+    return FocalPlane(
+        coordinate_m=float(focus_m),
+        value=float(vertex),
+        step=int(numpy.argmin(numpy.absolute(coordinates - focus_m))),
+        is_refined=True,
+    )
+
+
+def compute_probe_focus_curves(
+    propagated_probe: PropagatedProbe, *, mode: int = 0
+) -> ProbeFocusCurves:
+    """Sample every :class:`ProbeFocusMetric` at each plane of a propagated probe.
+
+    The result is the input to :func:`estimate_focal_plane`, and is what turns a stack
+    of propagated wavefields into a statement about where the probe comes to focus.
+
+    Two families are measured on different data. The size and intensity metrics use the
+    mode-summed intensity, since that is the physically observable quantity. The
+    amplitude and phase deviations are measured on a single incoherent mode selected by
+    *mode*, because phase is only defined per mode -- summing mutually incoherent modes
+    is meaningful in intensity alone.
+
+    Values are stored raw and in SI units, with no normalization applied, so that a
+    caller comparing curves on one axis controls that choice itself.
+
+    Cost is dominated by :func:`estimate_probe_size`, which median-filters, runs Otsu,
+    and sorts every pixel once per plane; expect this to scale linearly in the step
+    count and to run for seconds over a long sweep. The intensity stack is materialized
+    once here rather than per step, since :attr:`PropagatedProbe.intensity` rebuilds it
+    on every access and would otherwise make the sweep quadratic.
+
+    Args:
+        propagated_probe: The propagated wavefield stack to measure.
+        mode: Zero-based incoherent mode used for the wavefront metrics.
+
+    Raises:
+        ValueError: If *mode* is not a valid incoherent mode index.
+    """
+    num_modes = propagated_probe.num_incoherent_modes
+
+    if not 0 <= mode < num_modes:
+        raise ValueError(f'Mode index must be in [0, {num_modes}); got {mode}!')
+
+    # Hoisted deliberately -- see the note on cost above.
+    stack = propagated_probe.intensity
+    pixel_geometry = propagated_probe.pixel_geometry
+    num_steps = propagated_probe.num_steps
+
+    coordinate_m = numpy.linspace(
+        propagated_probe.begin_coordinate_m,
+        propagated_probe.end_coordinate_m,
+        num_steps,
+    )
+    samples: dict[ProbeFocusMetric, list[float]] = {metric: [] for metric in ProbeFocusMetric}
+
+    for step in range(num_steps):
+        plane = stack[step]
+        size = estimate_probe_size(plane, pixel_geometry)
+        wavefield = propagated_probe.get_xy_wavefield(step, mode)
+
+        step_values = {
+            ProbeFocusMetric.FWHM_MAJOR: size.fwhm_major_axis_length_m,
+            ProbeFocusMetric.FWHM_MINOR: size.fwhm_minor_axis_length_m,
+            ProbeFocusMetric.RMS_MAJOR: size.rms_major_axis_length_m,
+            ProbeFocusMetric.RMS_MINOR: size.rms_minor_axis_length_m,
+            ProbeFocusMetric.ENCIRCLED_ENERGY_DIAMETER: size.encircled_energy_diameter_m,
+            ProbeFocusMetric.PEAK_INTENSITY: float(plane.max()),
+            ProbeFocusMetric.RMS_CONTRAST: compute_rms_contrast(plane),
+            ProbeFocusMetric.INTENSITY_ENTROPY: compute_shannon_entropy(plane),
+            ProbeFocusMetric.AMPLITUDE_DEVIATION: compute_amplitude_deviation(wavefield),
+            ProbeFocusMetric.PHASE_DEVIATION: compute_phase_deviation_rad(wavefield),
+        }
+
+        for metric, metric_value in step_values.items():
+            samples[metric].append(metric_value)
+
+    return ProbeFocusCurves(
+        coordinate_m=coordinate_m,
+        series=tuple(
+            ProbeFocusSeries(metric=metric, value=numpy.array(values))
+            for metric, values in samples.items()
+        ),
     )
 
 
