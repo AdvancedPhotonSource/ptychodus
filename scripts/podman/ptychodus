@@ -290,6 +290,8 @@ fi
 
 args=(
     run --rm -i
+    --shm-size=1g
+    --ulimit host
     --userns=keep-id
     --security-opt label=type:container_runtime_t
     --network host
