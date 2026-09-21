@@ -3,8 +3,9 @@
 
 Shows the whole contract in one place: build a pty-chi options object from
 ptychodus settings exactly as the GUI would, serialize it, and hand the blob to
-the child on stdin. The envelope in :func:`dump_task_options` carries the
-reconstructor identity, so nothing algorithm-specific rides on argv.
+the child on stdin. The ``options_class_name`` that pty-chi stamps into the
+serialized dict carries the algorithm identity, so nothing algorithm-specific
+rides on argv.
 Optionally cancels the run part-way to exercise the signal path.
 
     python scripts/ptychodus_reconstruct_parent_demo.py \\

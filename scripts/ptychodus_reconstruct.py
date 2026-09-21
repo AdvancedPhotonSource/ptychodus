@@ -11,11 +11,11 @@ Protocol
 --------
 
 stdin
-    A JSON envelope ``{"reconstructor": "<enum-value>", "options": {...}}``
-    produced by :func:`ptychodus.model.ptychi.task.dump_task_options`, read to
-    EOF. The envelope carries the algorithm identity, so PIE/ePIE/rPIE cannot
-    silently swap for each other on the way through. Nothing else is read from
-    stdin, so the launcher should close it immediately.
+    A JSON options object produced by
+    :func:`ptychodus.model.ptychi.task.dump_task_options`, read to EOF. Its
+    ``options_class_name`` carries the algorithm identity, so PIE/ePIE/rPIE
+    cannot silently swap for each other on the way through. Nothing else is
+    read from stdin, so the launcher should close it immediately.
 
 stdout
     One JSON object per line: ``started``, ``epoch``, ``checkpoint``,

@@ -41,7 +41,7 @@ globus = ["globus-compute-sdk", "globus-sdk>=4.5.0"]
 gui = ["PyQt5"]
 #ptychonn = ["ptychonn==0.3.*,>=0.3.7"]
 ptycho-fm = ["ptycho-fm"]
-ptychi = ["ptychi==2.0.*"]
+ptychi = ["ptychi==2.1.*"]
 ptychopinn = ["ptychopinn"]
 ptychozoon = ["ptychozoon"]
 store = [

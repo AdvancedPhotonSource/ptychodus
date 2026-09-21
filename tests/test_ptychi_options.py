@@ -35,7 +35,12 @@ from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import ReconstructInput
 from ptychodus.api.settings import SettingsRegistry
-from ptychi.api import LSQMLOptions, ObjectPosOriginCoordsMethods, Reconstructors
+from ptychi.api import (
+    RECONSTRUCTOR_OPTIONS_MAP,
+    LSQMLOptions,
+    ObjectPosOriginCoordsMethods,
+    Reconstructors,
+)
 from ptychi.api.options.data import PtychographyDataOptions
 
 from ptychodus.model.ptychi.core import PtyChiReconstructorLibrary
@@ -411,43 +416,125 @@ def test_algorithm_task_options_class_matches_built_options() -> None:
         reconstructors_seen.add(expected_reconstructor)
 
 
-def test_wire_format_envelope_carries_reconstructor() -> None:
-    """The dumped JSON must be an envelope carrying the reconstructor token.
+def test_spec_option_classes_match_the_upstream_reconstructor_map() -> None:
+    """Each ``_Spec`` must name the option classes pty-chi maps to its reconstructor.
 
-    Locks in the new wire format so a future refactor cannot silently revert
-    to a bare-dict payload (which would let PIE/ePIE/rPIE alias each other).
+    ``algorithms.py`` hand-writes 48 option-class references and mypy cannot
+    check them -- ``ptychi.*`` is in ``ignore_missing_imports``. pty-chi 2.1.0
+    exports ``RECONSTRUCTOR_OPTIONS_MAP``, so the hand-written table can now be
+    checked against upstream instead of drifting silently.
+
+    The map covers only the five nested option classes; ``task_options_cls`` and
+    the display name stay ptychodus's own, which is why this guards the spec
+    rather than replacing it.
+    """
+    library = _make_library()
+
+    for algorithm in _make_algorithms(library):
+        spec = type(algorithm).spec
+        reconstructor = spec.reconstructor_options_cls().get_reconstructor_type()
+        expected = RECONSTRUCTOR_OPTIONS_MAP[reconstructor]
+
+        assert spec.object_options_cls is expected['object_options'], spec.display_name
+        assert spec.probe_options_cls is expected['probe_options'], spec.display_name
+        assert spec.probe_position_options_cls is expected['probe_position_options'], (
+            spec.display_name
+        )
+        assert spec.opr_options_cls is expected['opr_mode_weight_options'], spec.display_name
+        assert spec.reconstructor_options_cls is expected['reconstructor_options'], (
+            spec.display_name
+        )
+
+
+def test_wire_format_carries_the_options_class_name() -> None:
+    """The dumped JSON must be a bare options dict stamped with its class name.
+
+    Locks in the wire format so a future refactor cannot silently drop the stamp
+    (which would let PIE/ePIE/rPIE alias each other, since their dicts are
+    otherwise identical).
     """
     library = _make_library()
     algorithm = LSQMLAlgorithm(_make_common(library), library.lsqml_settings)
     task_options = algorithm.build_task_options(_make_reconstruct_input().product)
 
-    envelope = json.loads(dump_task_options(task_options))
+    options_dict = json.loads(dump_task_options(task_options))
 
-    assert set(envelope) == {'reconstructor', 'options'}
-    assert envelope['reconstructor'] == Reconstructors.LSQML.value
-    assert isinstance(envelope['options'], dict)
+    assert options_dict['options_class_name'] == 'LSQMLOptions'
+    assert 'reconstructor_options' in options_dict
+    # The old ptychodus envelope is gone; pty-chi's own stamp replaced it.
+    assert 'reconstructor' not in options_dict
+    assert 'options' not in options_dict
 
 
-def test_load_task_options_rejects_a_non_object_envelope() -> None:
+def test_wire_format_distinguishes_pie_variants() -> None:
+    """PIE, ePIE and rPIE must each carry a distinct stamp.
+
+    Their serialized field sets are identical, so the stamp is the only thing
+    keeping a dumped ePIE from reloading as PIE and running a different
+    algorithm. This is what the hand-rolled envelope used to guarantee.
+    """
+    library = _make_library()
+    common = _make_common(library)
+    product = _make_reconstruct_input().product
+
+    algorithms = [
+        PIEAlgorithm(common, library.pie_settings),
+        EPIEAlgorithm(common, library.pie_settings),
+        RPIEAlgorithm(common, library.pie_settings),
+    ]
+    stamps = set()
+
+    for algorithm in algorithms:
+        task_options = algorithm.build_task_options(product)
+        loaded = load_task_options(dump_task_options(task_options))
+
+        assert type(loaded) is type(task_options)
+        stamps.add(json.loads(dump_task_options(task_options))['options_class_name'])
+
+    assert stamps == {'PIEOptions', 'EPIEOptions', 'RPIEOptions'}
+
+
+def test_load_task_options_rejects_a_non_object_payload() -> None:
     with pytest.raises(ValueError):
         load_task_options('[1, 2, 3]')
 
 
-def test_load_task_options_rejects_an_unknown_reconstructor() -> None:
+@pytest.mark.parametrize(
+    'options_class_name',
+    [
+        'NotARealOptionsClass',
+        # Real ``ptychi.api`` attributes that are not task options. Resolution
+        # goes through the module, so the subclass test is the only thing
+        # stopping any of these from being instantiated and loaded into.
+        'Reconstructors',
+        'ObjectOptions',
+        'PtychographyTaskOptions',
+    ],
+)
+def test_load_task_options_rejects_a_name_that_is_not_a_task_options_class(
+    options_class_name: str,
+) -> None:
     with pytest.raises(ValueError):
-        load_task_options(json.dumps({'reconstructor': 'not-a-real-algorithm', 'options': {}}))
+        load_task_options(json.dumps({'options_class_name': options_class_name}))
 
 
-def test_load_task_options_rejects_a_missing_reconstructor_field() -> None:
+def test_load_task_options_rejects_a_missing_options_class_name() -> None:
     with pytest.raises(ValueError):
-        load_task_options(json.dumps({'options': {}}))
+        load_task_options(json.dumps({'reconstructor_options': {}}))
 
 
-def test_load_task_options_rejects_a_non_object_options_field() -> None:
+def test_load_task_options_rejects_a_mismatched_nested_options_class() -> None:
+    """A payload assembled from mismatched parts must not load quietly.
+
+    Only ``strict=True`` catches this: the top-level stamp still says
+    ``LSQMLOptions``, so class selection succeeds and it is the nested check
+    that has to fire.
+    """
+    options_dict = json.loads(dump_task_options(LSQMLOptions()))
+    options_dict['reconstructor_options']['options_class_name'] = 'DMReconstructorOptions'
+
     with pytest.raises(ValueError):
-        load_task_options(
-            json.dumps({'reconstructor': Reconstructors.LSQML.value, 'options': [1, 2, 3]})
-        )
+        load_task_options(json.dumps(options_dict))
 
 
 # --- align_task_options_with_product ---------------------------------------
@@ -468,6 +555,11 @@ _PRODUCT_DERIVED_FIELDS = [
     ('data_options.wavelength_m', _make_reconstruct_input().product.metadata.probe_wavelength_m),
     ('data_options.free_space_propagation_distance_m', numpy.inf),
     ('probe_options.power_constraint.probe_power', PROBE_PHOTON_COUNT),
+    # None means "inherit the object value": the test product's probe and object
+    # sampling agree, and writing None is what keeps pty-chi's no-resampling
+    # fast path. See test_align_reads_a_differing_probe_pixel_geometry.
+    ('probe_options.pixel_size_m', None),
+    ('probe_options.pixel_size_aspect_ratio', None),
 ]
 
 
@@ -631,6 +723,69 @@ def test_align_reads_a_non_square_object_pixel_aspect_ratio() -> None:
     assert aligned.object_options.pixel_size_aspect_ratio == pytest.approx(2.0)
 
 
+def test_align_reads_a_differing_probe_pixel_geometry() -> None:
+    """A probe sampled differently from the object must say so explicitly.
+
+    pty-chi resamples the object onto the probe grid when the two disagree, and
+    it only knows to do that if the probe fields are written. The shared fixture
+    has matching geometries, so this needs its own witness.
+    """
+    parameters = _make_reconstruct_input()
+    probes = parameters.product.probes
+    resampled = ProbeSequence(
+        array=probes.get_array(),
+        opr_weights=None,
+        pixel_geometry=PixelGeometry(width_m=2.0 * PIXEL_M, height_m=4.0 * PIXEL_M),
+    )
+    product = dataclasses.replace(parameters.product, probes=resampled)
+
+    aligned = align_task_options_with_product(LSQMLOptions(), product)
+
+    assert aligned.probe_options.pixel_size_m == pytest.approx(2.0 * PIXEL_M)
+    assert aligned.probe_options.pixel_size_aspect_ratio == pytest.approx(0.5)
+    # The object keeps its own sampling; only the probe fields move.
+    assert aligned.object_options.pixel_size_m == pytest.approx(PIXEL_M)
+    assert aligned.object_options.pixel_size_aspect_ratio == pytest.approx(1.0)
+
+
+def test_align_inherits_probe_pixel_width_when_only_the_aspect_ratio_differs() -> None:
+    """pty-chi inherits each omitted probe field independently, so we write them so."""
+    parameters = _make_reconstruct_input()
+    probes = parameters.product.probes
+    tall = ProbeSequence(
+        array=probes.get_array(),
+        opr_weights=None,
+        pixel_geometry=PixelGeometry(width_m=PIXEL_M, height_m=2.0 * PIXEL_M),
+    )
+    product = dataclasses.replace(parameters.product, probes=tall)
+
+    aligned = align_task_options_with_product(LSQMLOptions(), product)
+
+    assert aligned.probe_options.pixel_size_m is None
+    assert aligned.probe_options.pixel_size_aspect_ratio == pytest.approx(0.5)
+
+
+def test_align_tolerates_a_probe_without_pixel_geometry() -> None:
+    """A probe that cannot report its sampling must not make alignment raise.
+
+    ``ProbeSequence.get_pixel_geometry`` raises when unset, and such a product
+    reconstructed fine before the probe fields existed; it must still align.
+    """
+    parameters = _make_reconstruct_input()
+    probes = parameters.product.probes
+    ungeometried = ProbeSequence(
+        array=probes.get_array(),
+        opr_weights=None,
+        pixel_geometry=None,
+    )
+    product = dataclasses.replace(parameters.product, probes=ungeometried)
+
+    aligned = align_task_options_with_product(LSQMLOptions(), product)
+
+    assert aligned.probe_options.pixel_size_m is None
+    assert aligned.probe_options.pixel_size_aspect_ratio is None
+
+
 def test_slice_spacings_from_an_ndarray_product_are_lists() -> None:
     """A multislice product read back from HDF5 carries an ndarray, not a list."""
     parameters = _make_reconstruct_input()
@@ -672,6 +827,6 @@ def test_common_kwargs_carry_no_product_derived_fields() -> None:
         'determine_position_origin_coords_by',
         'position_origin_coords',
     }
-    assert 'probe_power' not in probe_keys
+    assert not probe_keys & {'probe_power', 'pixel_size_m', 'pixel_size_aspect_ratio'}
     assert data_options.wavelength_m == PtychographyDataOptions().wavelength_m
     assert not math.isfinite(data_options.free_space_propagation_distance_m)

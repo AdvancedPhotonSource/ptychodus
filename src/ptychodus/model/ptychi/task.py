@@ -10,21 +10,22 @@ class is deferred to call time so the module itself stays context-free.
 Wire format
 -----------
 
-:func:`dump_task_options` emits a JSON envelope::
-
-    {"reconstructor": "<enum-value>", "options": <options.get_dict()>}
-
-The ``reconstructor`` field carries the pty-chi ``Reconstructors`` enum value
-that :meth:`get_reconstructor_type` returns for these options. Envelope + token
-together let :func:`load_task_options` pick the right algorithm-specific
+:func:`dump_task_options` emits ``options.get_dict()`` as a bare JSON object.
+pty-chi >= 2.1.0 stamps every options dict -- the top-level one and each nested
+one -- with its own ``options_class_name``, so the payload names the class that
+wrote it and :func:`load_task_options` can pick the right algorithm-specific
 subclass (``DMOptions``, ``LSQMLOptions``, ...) without a side-channel argument.
 
-Without the envelope, PIE, ePIE and rPIE would serialize to identical
-dictionaries -- ``EPIEReconstructorOptions`` and ``RPIEReconstructorOptions``
-add no fields over ``PIEReconstructorOptions`` -- and could swap for each other
-silently, running a different algorithm. The envelope closes that hazard: the
-token is what selects the subclass, and it comes from the options object at
-serialization time.
+That stamp is what keeps PIE, ePIE and rPIE apart. Their dicts are otherwise
+identical -- ``EPIEReconstructorOptions`` and ``RPIEReconstructorOptions`` add
+no fields over ``PIEReconstructorOptions`` -- so before pty-chi 2.1.0 the three
+could swap for each other silently and run a different algorithm. Ptychodus
+carried its own ``{"reconstructor": ..., "options": ...}`` envelope to close
+that hazard; the upstream class name supersedes it.
+
+:meth:`load_from_dict` is called with ``strict=True``, which checks the stamp
+of every nested options object against the field it is being loaded into, so a
+payload assembled from mismatched parts raises instead of loading quietly.
 """
 
 from __future__ import annotations
@@ -38,20 +39,11 @@ from typing import Any
 
 import numpy
 
-from ptychi.api import (
-    AutodiffPtychographyOptions,
-    BHOptions,
-    DMOptions,
-    EPIEOptions,
-    LSQMLOptions,
-    ObjectPosOriginCoordsMethods,
-    PIEOptions,
-    RAAROptions,
-    RPIEOptions,
-    Reconstructors,
-)
+import ptychi.api
+from ptychi.api import ObjectPosOriginCoordsMethods
 from ptychi.api.options.task import PtychographyTaskOptions
 
+from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object, ObjectPosition
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
@@ -69,59 +61,47 @@ __all__ = [
 ]
 
 
-_TASK_OPTIONS_CLS_BY_RECONSTRUCTOR: dict[Reconstructors, type[PtychographyTaskOptions]] = {
-    Reconstructors.DM: DMOptions,
-    Reconstructors.RAAR: RAAROptions,
-    Reconstructors.PIE: PIEOptions,
-    Reconstructors.EPIE: EPIEOptions,
-    Reconstructors.RPIE: RPIEOptions,
-    Reconstructors.LSQML: LSQMLOptions,
-    Reconstructors.AD_PTYCHO: AutodiffPtychographyOptions,
-    Reconstructors.BH: BHOptions,
-}
-
-
 def dump_task_options(options: PtychographyTaskOptions) -> str:
     """Serialize a fully-built options object for transport to a child process.
 
-    The envelope carries the reconstructor token so PIE/ePIE/rPIE (which share
-    a serialized field set) survive the round-trip as the correct subclass.
+    ``get_dict`` stamps the dict with ``options_class_name``, which is what lets
+    PIE/ePIE/rPIE (which share a serialized field set) survive the round-trip as
+    the correct subclass.
     """
-    reconstructor = options.reconstructor_options.get_reconstructor_type()
-    return json.dumps({'reconstructor': reconstructor.value, 'options': options.get_dict()})
+    return json.dumps(options.get_dict())
 
 
 def load_task_options(text: str) -> PtychographyTaskOptions:
     """Rebuild the options object that :func:`dump_task_options` serialized.
 
-    The reconstructor token in the envelope selects the algorithm-specific
-    subclass; ``load_from_dict`` then resolves nested options through the
-    subclass's declared field annotations so no algorithm-specific field is
-    silently dropped.
+    ``options_class_name`` selects the algorithm-specific subclass.
+    ``load_from_dict`` then resolves nested options through that subclass's
+    declared field annotations, so no algorithm-specific field is silently
+    dropped, and ``strict=True`` rejects a payload whose nested stamps disagree
+    with the fields they are being loaded into.
     """
-    envelope = json.loads(text)
+    options_dict = json.loads(text)
 
-    if not isinstance(envelope, dict):
-        raise ValueError(f'Expected a JSON object envelope; got {type(envelope).__name__}!')
-
-    try:
-        reconstructor = Reconstructors(envelope['reconstructor'])
-    except KeyError as exc:
-        raise ValueError(f'Options envelope is missing "{exc.args[0]}"!') from None
-    except ValueError:
-        raise ValueError(f'Unknown pty-chi reconstructor "{envelope["reconstructor"]}"!') from None
-
-    try:
-        task_options_cls = _TASK_OPTIONS_CLS_BY_RECONSTRUCTOR[reconstructor]
-    except KeyError:
-        raise ValueError(f'Unknown pty-chi reconstructor "{reconstructor}"!') from None
-
-    options_dict = envelope.get('options')
     if not isinstance(options_dict, dict):
-        raise ValueError('Options envelope "options" field must be a JSON object!')
+        raise ValueError(f'Expected a JSON object; got {type(options_dict).__name__}!')
 
-    options = task_options_cls()
-    options.load_from_dict(options_dict)
+    try:
+        options_class_name = options_dict['options_class_name']
+    except KeyError:
+        raise ValueError('Options are missing "options_class_name"!') from None
+
+    # pty-chi stamps the class name but offers no dict-to-options factory of its
+    # own, so resolve it here. Going through ``ptychi.api``, which exports every
+    # ``PtychographyTaskOptions`` subclass, means a pty-chi release that adds an
+    # algorithm needs no change on this side, and the subclass test rejects both
+    # an unknown name and an arbitrary attribute that happens to match one.
+    options_cls = getattr(ptychi.api, options_class_name, None)
+
+    if not isinstance(options_cls, type) or not issubclass(options_cls, PtychographyTaskOptions):
+        raise ValueError(f'Unknown pty-chi options class "{options_class_name}"!')
+
+    options = options_cls()
+    options.load_from_dict(options_dict, strict=True)
     return options
 
 
@@ -189,6 +169,54 @@ def _overwrite(options: Any, name: str, value: Any, *, unset: bool = False) -> N
         )
 
 
+def _align_probe_pixel_geometry(
+    aligned: PtychographyTaskOptions,
+    product: Product,
+    object_geometry: PixelGeometry,
+    rel_tol: float = 1e-9,
+) -> None:
+    """Describe the product's probe sampling on `aligned.probe_options`.
+
+    pty-chi inherits the object value for each probe pixel field left at
+    ``None``, and it decides whether to resample by comparing pixel sizes rather
+    than by testing for ``None``. Writing ``None`` when the two agree therefore
+    both states the intent and keeps the no-resampling fast path.
+
+    Width and aspect ratio are inherited independently upstream, so they are
+    tested independently here.
+
+    Pixel sizes agreeing to within `rel_tol` name the same sampling. A product
+    round-tripped through HDF5 stores the probe and object geometries
+    independently, so an exact comparison would let float noise engage pty-chi's
+    Fourier resampling for what is physically an unresampled grid.
+    """
+    try:
+        probe_geometry = product.probes.get_pixel_geometry()
+    except ValueError:
+        logger.debug('Product carries no probe pixel geometry; probe sampling follows the object.')
+        return
+
+    probe_options = aligned.probe_options
+
+    probe_width_m = probe_geometry.width_m
+    _overwrite(
+        probe_options,
+        'pixel_size_m',
+        None
+        if math.isclose(probe_width_m, object_geometry.width_m, rel_tol=rel_tol)
+        else probe_width_m,
+    )
+
+    probe_aspect_ratio = probe_geometry.get_aspect_ratio()
+    _overwrite(
+        probe_options,
+        'pixel_size_aspect_ratio',
+        None
+        if math.isclose(probe_aspect_ratio, object_geometry.get_aspect_ratio(), rel_tol=rel_tol)
+        else probe_aspect_ratio,
+    )
+
+
 def align_task_options_with_product(
     task_options: PtychographyTaskOptions, product: Product
 ) -> PtychographyTaskOptions:
@@ -214,6 +242,11 @@ def align_task_options_with_product(
     and the product. An infinite incoming value means the caller chose far-field
     propagation and is left alone; anything else is near-field, and the product
     supplies the distance.
+
+    The probe pixel fields are written from the product's probe pixel geometry
+    by :func:`_align_probe_pixel_geometry`, which leaves them ``None`` -- pty-chi
+    then inherits the object values -- whenever the two samplings agree. A
+    product whose probe carries no pixel geometry leaves them untouched.
 
     Per-field pydantic validation runs on each assignment, so a degenerate
     product (`pixel_size_m` must be > 0, `probe_power` >= 0) raises
@@ -262,6 +295,8 @@ def align_task_options_with_product(
         )
 
     _overwrite(aligned.probe_options.power_constraint, 'probe_power', metadata.probe_photon_count)
+
+    _align_probe_pixel_geometry(aligned, product, object_geometry)
 
     return aligned
 
