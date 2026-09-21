@@ -1,7 +1,7 @@
 from .core import AnalysisCore
 from .diffraction import DiffractionSimulator
 from .fourier import FourierAnalysisResult, FourierAnalyzer
-from .frc import FourierRingCorrelator
+from .frc import FourierRingCorrelator, PowerSpectralDensity
 from .illumination import IlluminationMapper, IlluminationMap
 from .propagator import ProbePropagator
 from .residuals import ReconstructionResiduals, ResidualAnalyzer
@@ -17,6 +17,7 @@ __all__ = [
     'FourierRingCorrelator',
     'IlluminationMap',
     'IlluminationMapper',
+    'PowerSpectralDensity',
     'ProbePropagator',
     'ProbePropagatorSettings',
     'ReconstructionResiduals',

@@ -4,11 +4,13 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from enum import Enum, auto
 from pathlib import Path
 import logging
 import math
 
 import numpy
+from scipy.ndimage import gaussian_filter
 from skimage.registration import phase_cross_correlation
 
 from .typing import ComplexArrayType, RealArrayType
@@ -255,7 +257,186 @@ class Object:
         return f'{self._array.dtype}{self._array.shape}'
 
 
-def _center_crop_object(obj: Object, target_h: int, target_w: int) -> Object:
+class RegistrationQuantity(Enum):
+    """Quantity derived from a complex object array and handed to cross-correlation.
+
+    Each member records the two properties that decide when it is usable.
+    :attr:`is_shift_exact` marks a quantity that is a *linear* functional of the
+    object and therefore exactly shift-equivariant, so the recovered sub-pixel
+    shift is limited only by ``upsample_factor``; every pointwise-nonlinear
+    quantity distorts sub-pixel interpolation and biases the estimate a little.
+    :attr:`is_ramp_invariant` marks a quantity that does not change when a linear
+    phase ramp is applied to the object, which is what makes it usable to
+    bootstrap registration *before* the ramp ambiguity has been standardized
+    away.
+
+    Beyond those two flags: ``AMPLITUDE`` is the historical behavior and is nearly
+    blind for a phase-contrast sample, whose transmission modulus is almost flat.
+    ``PHASOR`` and ``PHASE`` discard amplitude contrast entirely and are undefined
+    where the object vanishes. ``VARIATION`` -- the magnitude of the mean-subtracted
+    complex logarithmic gradient -- buys its ramp invariance at the cost of a
+    sub-pixel bias of order 0.1 px from the rectifying magnitude.
+    """
+
+    COMPLEX = auto()
+    VARIATION = auto()
+    PHASOR = auto()
+    PHASE = auto()
+    AMPLITUDE = auto()
+
+    @property
+    def is_ramp_invariant(self) -> bool:
+        return self is RegistrationQuantity.VARIATION
+
+    @property
+    def is_shift_exact(self) -> bool:
+        return self is RegistrationQuantity.COMPLEX
+
+    def extract(self, array: ComplexArrayType) -> numpy.ndarray:
+        """Map a complex object array onto the quantity used for registration."""
+        values = numpy.asarray(array)
+
+        match self:
+            case RegistrationQuantity.COMPLEX:
+                return values
+            case RegistrationQuantity.AMPLITUDE:
+                return numpy.absolute(values)
+            case RegistrationQuantity.PHASE:
+                return numpy.angle(values)
+            case RegistrationQuantity.PHASOR:
+                magnitude = numpy.absolute(values)
+                return numpy.divide(
+                    values,
+                    magnitude,
+                    out=numpy.zeros_like(values, dtype=numpy.complex128),
+                    where=magnitude > 0.0,
+                )
+            case RegistrationQuantity.VARIATION:
+                gradient_y, gradient_x = _logarithmic_gradient(values)
+                return numpy.hypot(
+                    numpy.absolute(gradient_y - gradient_y.mean()),
+                    numpy.absolute(gradient_x - gradient_x.mean()),
+                )
+
+
+def _logarithmic_gradient(values: ComplexArrayType) -> tuple[numpy.ndarray, numpy.ndarray]:
+    """Forward differences of ``log(O)`` along each axis, computed wrap-free.
+
+    ``log(O[i + 1] / O[i])`` is the log-amplitude difference plus the phase
+    difference wrapped into ``(-pi, pi]`` per pair, so no unwrapping is needed.
+    A global complex scale cancels in the ratio; a linear phase ramp adds a
+    constant, which the caller removes by mean subtraction. The trailing
+    row/column is edge-replicated so both results keep the input shape.
+    """
+    magnitude = numpy.absolute(values)
+    floor = 1.0e-6 * (magnitude.mean() or 1.0)
+    safe = numpy.where(magnitude > floor, values, floor)
+
+    with numpy.errstate(divide='ignore', invalid='ignore'):
+        diff_x = numpy.log(safe[:, 1:] / safe[:, :-1])
+        diff_y = numpy.log(safe[1:, :] / safe[:-1, :])
+
+    gradient_x = numpy.concatenate([diff_x, diff_x[:, -1:]], axis=1)
+    gradient_y = numpy.concatenate([diff_y, diff_y[-1:, :]], axis=0)
+    return gradient_y, gradient_x
+
+
+def _remove_gaussian_background(image: numpy.ndarray, sigma_px: float) -> numpy.ndarray:
+    if sigma_px <= 0.0:
+        return image
+
+    if numpy.iscomplexobj(image):
+        background = gaussian_filter(image.real, sigma_px) + 1j * gaussian_filter(
+            image.imag, sigma_px
+        )
+    else:
+        background = gaussian_filter(image, sigma_px)
+
+    return image - background
+
+
+def estimate_object_alignment_shift(
+    reference_object: Object,
+    moving_object: Object,
+    *,
+    upsample_factor: int = 100,
+    registration_quantity: RegistrationQuantity = RegistrationQuantity.COMPLEX,
+    high_pass_sigma_px: float = 0.0,
+) -> tuple[float, float]:
+    """Estimate the sub-pixel shift ``(dy, dx)``, in pixels, that aligns moving to reference.
+
+    Both objects must already share a common ``(height, width)``; use
+    :func:`center_crop_object` first if they do not. Layers are collapsed with
+    :meth:`Object.get_layers_flattened` before registration.
+
+    Args:
+        reference_object: The object whose array indices define the target frame.
+        moving_object: The object to be registered onto ``reference_object``.
+        upsample_factor: Sub-pixel precision passed to
+            ``skimage.registration.phase_cross_correlation``.
+        registration_quantity: Which quantity derived from the complex object to
+            correlate. See :class:`RegistrationQuantity`.
+        high_pass_sigma_px: Sigma, in pixels, of a Gaussian background
+            subtracted from the quantity before correlation, to suppress a
+            slowly varying transmission or illumination envelope that differs
+            between the two reconstructions. Disabled (``0.0``) by default:
+            ``phase_cross_correlation`` normalizes the cross-power spectrum by
+            its own modulus, which already whitens the spectrum, and stacking a
+            small-sigma high-pass on top of that leaves only noise. Useful
+            values are a sizeable fraction of the array, not a few pixels.
+
+    Returns:
+        ``(shift_y_px, shift_x_px)``, the translation to apply to
+        ``moving_object`` so that it lands on ``reference_object``.
+    """
+    reference_flat = reference_object.get_layers_flattened()
+    moving_flat = moving_object.get_layers_flattened()
+
+    if reference_flat.shape != moving_flat.shape:
+        raise ValueError(
+            f'Arrays must have same shape; got {reference_flat.shape} vs {moving_flat.shape}!'
+        )
+
+    reference_image = _remove_gaussian_background(
+        registration_quantity.extract(reference_flat), high_pass_sigma_px
+    )
+    moving_image = _remove_gaussian_background(
+        registration_quantity.extract(moving_flat), high_pass_sigma_px
+    )
+
+    shift_yx, _, _ = phase_cross_correlation(
+        reference_image, moving_image, upsample_factor=upsample_factor
+    )
+
+    return float(shift_yx[0]), float(shift_yx[1])
+
+
+def shift_object(obj: Object, *, shift_y_px: float, shift_x_px: float) -> Object:
+    """Translate every layer of ``obj`` by ``(shift_y_px, shift_x_px)`` and update its center.
+
+    The translation is applied as a Fourier phase ramp so the complex phase
+    survives the interpolation, and the returned object's :class:`ObjectCenter`
+    is offset by ``-shift * pixel_size`` so world coordinates of the content are
+    preserved.
+    """
+    if shift_y_px == 0.0 and shift_x_px == 0.0:
+        return obj
+
+    pixel_geometry = obj.get_pixel_geometry()
+    old_center = obj.get_center()
+
+    return Object(
+        array=fourier_shift_2d(obj.get_array(), dx=shift_x_px, dy=shift_y_px),
+        pixel_geometry=pixel_geometry.copy(),
+        center=ObjectCenter(
+            x_m=old_center.x_m - shift_x_px * pixel_geometry.width_m,
+            y_m=old_center.y_m - shift_y_px * pixel_geometry.height_m,
+        ),
+        layer_spacing_m=list(obj.layer_spacing_m),
+    )
+
+
+def center_crop_object(obj: Object, target_h: int, target_w: int) -> Object:
     """Center-crop ``obj`` to ``(target_h, target_w)`` and update its center.
 
     Uses an asymmetric-toward-higher-index bias for odd differences
@@ -304,7 +485,12 @@ def _center_crop_object(obj: Object, target_h: int, target_w: int) -> Object:
 
 
 def align_objects(
-    reference_object: Object, moving_object: Object, *, upsample_factor: int = 100
+    reference_object: Object,
+    moving_object: Object,
+    *,
+    upsample_factor: int = 100,
+    registration_quantity: RegistrationQuantity = RegistrationQuantity.COMPLEX,
+    high_pass_sigma_px: float = 0.0,
 ) -> tuple[Object, Object]:
     """Sub-pixel align ``moving_object`` to ``reference_object`` on a common shape.
 
@@ -313,11 +499,10 @@ def align_objects(
     center is updated so the crop preserves world coordinates: even shape
     differences preserve the center exactly; odd differences shift it by half
     a pixel, absorbed into :class:`ObjectCenter`. A sub-pixel translation
-    between the cropped pair is then estimated with
-    ``skimage.registration.phase_cross_correlation`` on layer-flattened
-    amplitudes and applied to every layer of the complex moving array via a
-    Fourier phase ramp so the complex phase is preserved across the
-    interpolation.
+    between the cropped pair is then estimated by
+    :func:`estimate_object_alignment_shift` and applied to every layer of the
+    complex moving array via a Fourier phase ramp so the complex phase is
+    preserved across the interpolation.
 
     The returned aligned moving object's ``center`` is offset from the
     (cropped) moving center by ``-shift_yx * pixel_size`` (in meters). This
@@ -346,6 +531,12 @@ def align_objects(
         upsample_factor: Sub-pixel precision passed to
             ``phase_cross_correlation``. Higher values find finer shifts at
             roughly linear cost.
+        registration_quantity: Which quantity derived from the complex object to
+            correlate. The default is the only :class:`RegistrationQuantity` that is
+            shift-exact, and it avoids ``AMPLITUDE``, which is nearly
+            featureless for a phase-contrast sample.
+        high_pass_sigma_px: Gaussian-background sigma in pixels, ``0.0`` to
+            disable. See :func:`estimate_object_alignment_shift`.
 
     Returns:
         ``(cropped_reference, aligned_moving)``: both objects sharing the
@@ -362,35 +553,19 @@ def align_objects(
 
     common_h = min(reference_object.height_px, moving_object.height_px)
     common_w = min(reference_object.width_px, moving_object.width_px)
-    cropped_reference = _center_crop_object(reference_object, common_h, common_w)
-    cropped_moving = _center_crop_object(moving_object, common_h, common_w)
+    cropped_reference = center_crop_object(reference_object, common_h, common_w)
+    cropped_moving = center_crop_object(moving_object, common_h, common_w)
 
-    reference_flat = cropped_reference.get_layers_flattened()
-    moving_flat = cropped_moving.get_layers_flattened()
-
-    shift_yx, _, _ = phase_cross_correlation(
-        numpy.absolute(reference_flat),
-        numpy.absolute(moving_flat),
+    shift_y_px, shift_x_px = estimate_object_alignment_shift(
+        cropped_reference,
+        cropped_moving,
         upsample_factor=upsample_factor,
+        registration_quantity=registration_quantity,
+        high_pass_sigma_px=high_pass_sigma_px,
     )
-    logger.info(f'align_objects sub-pixel shift (y, x) = {tuple(shift_yx)} px')
+    logger.info(f'align_objects sub-pixel shift (y, x) = {(shift_y_px, shift_x_px)} px')
 
-    aligned_array = fourier_shift_2d(
-        cropped_moving.get_array(), dx=float(shift_yx[1]), dy=float(shift_yx[0])
-    )
-
-    cropped_moving_center = cropped_moving.get_center()
-    new_center = ObjectCenter(
-        x_m=cropped_moving_center.x_m - float(shift_yx[1]) * moving_pixel_geometry.width_m,
-        y_m=cropped_moving_center.y_m - float(shift_yx[0]) * moving_pixel_geometry.height_m,
-    )
-
-    aligned_moving = Object(
-        array=aligned_array,
-        pixel_geometry=moving_pixel_geometry.copy(),
-        center=new_center,
-        layer_spacing_m=list(cropped_moving.layer_spacing_m),
-    )
+    aligned_moving = shift_object(cropped_moving, shift_y_px=shift_y_px, shift_x_px=shift_x_px)
 
     return cropped_reference, aligned_moving
 

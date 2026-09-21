@@ -29,7 +29,7 @@ class FourierRingCorrelationDialog(QDialog):
         self.figure = Figure()
         self.figure_canvas = FigureCanvasQTAgg(self.figure)
         self.navigation_toolbar = NavigationToolbar(self.figure_canvas, self)
-        self.frc_axes, self.ssnr_axes = self.figure.subplots(2, 1, sharex=True)
+        self.frc_axes, self.ssnr_axes, self.psd_axes = self.figure.subplots(3, 1, sharex=True)
 
         self.auc_label = QLabel('—')
         self.average_ssnr_label = QLabel('—')

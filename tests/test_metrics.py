@@ -12,15 +12,18 @@ from ptychodus.api.diffraction import BadPixels, DiffractionPatterns
 from ptychodus.api.fourier import fourier_shift_2d
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.simulate.diffraction import generate_diffraction_data
-from ptychodus.api.illumination import compute_illumination_map
+from ptychodus.api.illumination import IlluminationMap, compute_illumination_map
 from ptychodus.api.metrics import (
+    ApodizationWindow,
     FourierRingCorrelation,
     ReconstructionResiduals,
     compute_fourier_ring_correlation,
+    compute_illumination_scoring_region,
     compute_mean_absolute_error,
     compute_normalized_mutual_information,
     compute_object_comparison,
     compute_peak_signal_to_noise_ratio,
+    compute_power_spectral_density,
     compute_r_factor,
     compute_reconstruction_residuals,
     compute_root_mean_square_error,
@@ -103,6 +106,17 @@ class TestComputeFourierRingCorrelation:
 
         frc = compute_fourier_ring_correlation(arr, arr, 1e-6, 1e-6)
 
+        # Ring 0 holds only the DC pixel, which the default mean subtraction
+        # drops; every ring that carries structure must still be populated.
+        assert frc.pixels_per_ring[0] == 0
+        assert numpy.all(frc.pixels_per_ring[1:] > 0)
+
+    def test_dc_ring_is_populated_without_mean_subtraction(self):
+        rng = numpy.random.default_rng(5)
+        arr = rng.standard_normal((32, 32)).astype(complex)
+
+        frc = compute_fourier_ring_correlation(arr, arr, 1e-6, 1e-6, subtract_mean=False)
+
         assert numpy.all(frc.pixels_per_ring > 0)
 
     def test_raises_on_shape_mismatch(self):
@@ -134,6 +148,259 @@ class TestComputeFourierRingCorrelation:
         numpy.testing.assert_allclose(
             frc_big.spatial_frequency_per_m, 0.5 * frc_small.spatial_frequency_per_m
         )
+
+    def test_uncorrelated_rings_fluctuate_about_zero(self):
+        # The signed-real-part numerator is the statistic the van Heel/Schatz
+        # threshold curve was derived for: on uncorrelated rings it is centred
+        # on zero with standard deviation 1/sqrt(2N).
+        rng = numpy.random.default_rng(11)
+        shape = (96, 96)
+        a = rng.standard_normal(shape) + 1j * rng.standard_normal(shape)
+        b = rng.standard_normal(shape) + 1j * rng.standard_normal(shape)
+
+        frc = compute_fourier_ring_correlation(
+            a, b, 1e-6, 1e-6, window=ApodizationWindow.NONE, subtract_mean=False
+        )
+
+        sampled = frc.pixels_per_ring >= 32
+        correlation = frc.correlation[sampled]
+        expected_std = 1.0 / numpy.sqrt(2.0 * frc.pixels_per_ring[sampled])
+
+        assert numpy.all(numpy.abs(correlation) < 6.0 * expected_std)
+        assert abs(correlation.mean()) < 3.0 * expected_std.mean() / numpy.sqrt(sampled.sum())
+
+    def test_modulus_numerator_would_be_positively_biased(self):
+        # Evidence that the signed numerator is a correction, not a taste: the
+        # modulus |sum F1 conj(F2)| of the same uncorrelated ring sits near
+        # 0.886 / sqrt(N) instead of zero, which reads as resolution.
+        num_realizations = 64
+        shape = (64, 64)
+        frequency = numpy.fft.fftfreq(shape[0])
+        radius = numpy.hypot(frequency[:, None], frequency[None, :])
+        ring = (radius >= 20.0 / shape[0]) & (radius < 21.0 / shape[0])
+        num_pixels = int(ring.sum())
+
+        signed = numpy.empty(num_realizations)
+        modulus = numpy.empty(num_realizations)
+
+        for realization in range(num_realizations):
+            rng = numpy.random.default_rng(realization)
+            fa = numpy.fft.fft2(rng.standard_normal(shape) + 1j * rng.standard_normal(shape))[ring]
+            fb = numpy.fft.fft2(rng.standard_normal(shape) + 1j * rng.standard_normal(shape))[ring]
+            cross = numpy.sum(fa * numpy.conj(fb))
+            denominator = numpy.sqrt(numpy.sum(numpy.abs(fa) ** 2) * numpy.sum(numpy.abs(fb) ** 2))
+            signed[realization] = cross.real / denominator
+            modulus[realization] = numpy.abs(cross) / denominator
+
+        null_bias = 0.886 / numpy.sqrt(num_pixels)
+        assert abs(signed.mean()) < 0.4 * null_bias
+        assert modulus.mean() == pytest.approx(null_bias, rel=0.25)
+
+    def test_apodization_suppresses_shared_edge_leakage(self):
+        # Both images carry the same linear gradient, which is discontinuous at
+        # the array wrap. Its leakage is shared, so it correlates the two images
+        # at every frequency until the taper removes the discontinuity.
+        rng = numpy.random.default_rng(13)
+        shape = (64, 64)
+        row, column = numpy.mgrid[0 : shape[0], 0 : shape[1]]
+        gradient = (column + 2.0 * row).astype(complex)
+        a = gradient + 20.0 * (rng.standard_normal(shape) + 1j * rng.standard_normal(shape))
+        b = gradient + 20.0 * (rng.standard_normal(shape) + 1j * rng.standard_normal(shape))
+
+        plain = compute_fourier_ring_correlation(a, b, 1e-6, 1e-6, window=ApodizationWindow.NONE)
+        tapered = compute_fourier_ring_correlation(a, b, 1e-6, 1e-6, taper_fraction=0.5)
+
+        high = plain.spatial_frequency_per_m > 0.5 * plain.spatial_frequency_per_m.max()
+        assert numpy.nanmean(tapered.correlation[high]) < numpy.nanmean(plain.correlation[high])
+
+    def test_anisotropic_pixels_stop_at_the_inscribed_nyquist(self):
+        rng = numpy.random.default_rng(14)
+        arr = rng.standard_normal((32, 32)).astype(complex)
+        pixel_width_m, pixel_height_m = 1e-6, 2e-6
+
+        frc = compute_fourier_ring_correlation(arr, arr, pixel_width_m, pixel_height_m)
+
+        inscribed_nyquist_per_m = min(0.5 / pixel_height_m, 0.5 / pixel_width_m)
+        assert frc.spatial_frequency_per_m[-1] == pytest.approx(inscribed_nyquist_per_m)
+
+    def test_num_bins_sets_the_ring_count(self):
+        rng = numpy.random.default_rng(15)
+        arr = rng.standard_normal((32, 32)).astype(complex)
+
+        frc = compute_fourier_ring_correlation(arr, arr, 1e-6, 1e-6, num_bins=10)
+
+        assert frc.correlation.size == 10
+        assert frc.spatial_frequency_per_m[-1] == pytest.approx(0.9 * 0.5 / 1e-6)
+
+    def test_correlation_stays_within_unit_interval(self):
+        rng = numpy.random.default_rng(16)
+        shape = (48, 48)
+        a = rng.standard_normal(shape) + 1j * rng.standard_normal(shape)
+        b = -a
+
+        frc = compute_fourier_ring_correlation(a, b, 1e-6, 1e-6)
+
+        finite = numpy.isfinite(frc.correlation)
+        assert numpy.all(frc.correlation[finite] >= -1.0)
+        assert numpy.all(frc.correlation[finite] <= 1.0)
+        numpy.testing.assert_allclose(frc.correlation[finite], -1.0, atol=1e-12)
+
+
+def _band_limited_image(shape: tuple[int, int], seed: int, cutoff: float) -> numpy.ndarray:
+    """A smooth periodic complex field whose spectrum vanishes outside ``cutoff``."""
+    rng = numpy.random.default_rng(seed)
+    ky = numpy.fft.fftfreq(shape[0])
+    kx = numpy.fft.fftfreq(shape[1])
+    radius = numpy.hypot(ky[:, None], kx[None, :])
+    spectrum = rng.standard_normal(shape) + 1j * rng.standard_normal(shape)
+    spectrum[radius > cutoff] = 0.0
+    spectrum[0, 0] = 0.0
+    return numpy.fft.ifft2(spectrum)
+
+
+class TestPowerSpectralDensity:
+    def test_parseval_round_trip_on_a_band_limited_image(self):
+        # Rings outside the inscribed Nyquist circle are dropped, so Parseval
+        # can only be checked on an image whose energy lies inside it.
+        shape = (64, 64)
+        pixel_m = 1e-6
+        image = _band_limited_image(shape, seed=21, cutoff=0.3)
+
+        psd = compute_power_spectral_density(image, pixel_m, pixel_m, window=ApodizationWindow.NONE)
+
+        populated = psd.pixels_per_ring > 0
+        integrated = numpy.sum(
+            psd.power_spectral_density_m2[populated] * psd.pixels_per_ring[populated]
+        )
+        expected = pixel_m * pixel_m * numpy.sum(numpy.abs(image - image.mean()) ** 2)
+        assert integrated == pytest.approx(expected, rel=1e-9)
+
+    def test_window_compensation_preserves_the_level(self):
+        shape = (64, 64)
+        pixel_m = 1e-6
+        image = _band_limited_image(shape, seed=22, cutoff=0.3)
+
+        plain = compute_power_spectral_density(
+            image, pixel_m, pixel_m, window=ApodizationWindow.NONE
+        )
+        tapered = compute_power_spectral_density(image, pixel_m, pixel_m, taper_fraction=0.25)
+
+        def integrate(psd):
+            populated = psd.pixels_per_ring > 0
+            return numpy.sum(
+                psd.power_spectral_density_m2[populated] * psd.pixels_per_ring[populated]
+            )
+
+        assert integrate(tapered) == pytest.approx(integrate(plain), rel=0.1)
+
+    def test_white_noise_spectrum_is_flat(self):
+        rng = numpy.random.default_rng(23)
+        shape = (128, 128)
+        noise = rng.standard_normal(shape) + 1j * rng.standard_normal(shape)
+
+        psd = compute_power_spectral_density(noise, 1e-6, 1e-6, window=ApodizationWindow.NONE)
+
+        interior = psd.power_spectral_density_m2[8:-8]
+        assert numpy.nanstd(interior) / numpy.nanmean(interior) < 0.2
+
+    def test_sinusoid_peaks_in_its_own_ring(self):
+        shape = (64, 64)
+        pixel_m = 1e-6
+        num_cycles = 8
+        column = numpy.arange(shape[1])
+        image = numpy.exp(2j * numpy.pi * num_cycles * column / shape[1]) * numpy.ones(
+            (shape[0], 1)
+        )
+
+        psd = compute_power_spectral_density(image, pixel_m, pixel_m, window=ApodizationWindow.NONE)
+
+        assert int(numpy.nanargmax(psd.power_spectral_density_m2)) == num_cycles
+
+
+def _make_illumination_map(photon_number: numpy.ndarray) -> IlluminationMap:
+    return IlluminationMap(
+        photon_number=photon_number,
+        photon_flux_Hz=1.0e9,
+        photon_energy_J=1.6e-15,
+        exposure_time_s=1.0,
+        mass_attenuation_m2_kg=1.0,
+        pixel_geometry=PixelGeometry(width_m=1e-6, height_m=1e-6),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
+    )
+
+
+class TestIlluminationScoringRegion:
+    def test_region_tracks_the_illuminated_rectangle(self):
+        photon_number = numpy.zeros((32, 40))
+        photon_number[6:26, 10:34] = 100.0
+
+        region = compute_illumination_scoring_region(
+            _make_illumination_map(photon_number), (32, 40)
+        )
+
+        assert (region.row_begin, region.row_end) == (6, 26)
+        assert (region.column_begin, region.column_end) == (10, 34)
+        assert region.weights.shape == (20, 24)
+
+    def test_erosion_pulls_the_boundary_inward(self):
+        photon_number = numpy.zeros((32, 32))
+        photon_number[4:28, 4:28] = 100.0
+
+        region = compute_illumination_scoring_region(
+            _make_illumination_map(photon_number), (32, 32), erosion_px=3
+        )
+
+        assert region.height_px == 24 - 2 * 3
+        assert region.width_px == 24 - 2 * 3
+
+    def test_crop_cuts_to_the_rectangle(self):
+        photon_number = numpy.zeros((16, 16))
+        photon_number[2:12, 3:13] = 50.0
+        region = compute_illumination_scoring_region(
+            _make_illumination_map(photon_number), (16, 16)
+        )
+        array = numpy.arange(256, dtype=float).reshape(16, 16)
+
+        numpy.testing.assert_array_equal(region.crop(array), array[2:12, 3:13])
+        assert region.weights.shape == (region.height_px, region.width_px)
+
+    def test_crop_rejects_a_mismatched_shape(self):
+        photon_number = numpy.zeros((16, 16))
+        photon_number[2:12, 3:13] = 50.0
+        region = compute_illumination_scoring_region(
+            _make_illumination_map(photon_number), (16, 16)
+        )
+
+        with pytest.raises(ValueError, match='same shape'):
+            region.crop(numpy.zeros((8, 8)))
+
+    def test_raises_when_erosion_consumes_the_mask(self):
+        photon_number = numpy.zeros((16, 16))
+        photon_number[6:10, 6:10] = 100.0
+
+        with pytest.raises(ValueError, match='degenerate'):
+            compute_illumination_scoring_region(
+                _make_illumination_map(photon_number), (16, 16), erosion_px=5
+            )
+
+    def test_raises_when_the_illuminated_patch_is_tiny(self):
+        photon_number = numpy.zeros((32, 32))
+        photon_number[10:14, 10:14] = 100.0
+
+        with pytest.raises(ValueError, match='degenerate'):
+            compute_illumination_scoring_region(_make_illumination_map(photon_number), (32, 32))
+
+    def test_raises_on_a_dark_illumination_map(self):
+        with pytest.raises(ValueError, match='no photons'):
+            compute_illumination_scoring_region(
+                _make_illumination_map(numpy.zeros((16, 16))), (16, 16)
+            )
+
+    def test_raises_when_the_map_is_smaller_than_the_object(self):
+        photon_number = numpy.ones((8, 8))
+
+        with pytest.raises(ValueError, match='smaller'):
+            compute_illumination_scoring_region(_make_illumination_map(photon_number), (16, 16))
 
 
 class TestFourierRingCorrelationResolution:

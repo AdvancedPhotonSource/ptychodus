@@ -12,11 +12,13 @@ import pytest
 
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import (
+    RegistrationQuantity,
     Object,
     ObjectCenter,
     ObjectGeometry,
     align_objects,
     compute_object_geometry,
+    estimate_object_alignment_shift,
 )
 from ptychodus.api.probe import ProbeGeometry
 from ptychodus.api.probe_positions import ProbePosition
@@ -396,6 +398,110 @@ def test_align_objects_subpixel_alignment_survives_trimming() -> None:
     support = numpy.abs(reference_layer) > 0.05
     residual = numpy.abs(aligned_moving.get_array()[0] - reference_layer)[support].max()
     assert residual < 5.0e-3
+
+
+def _phase_contrast_object(shape: tuple[int, int], seed: int) -> numpy.ndarray:
+    """A unit-modulus object: all of its contrast lives in the phase."""
+    rng = numpy.random.default_rng(seed)
+    ky = numpy.fft.fftfreq(shape[0])
+    kx = numpy.fft.fftfreq(shape[1])
+    radius = numpy.hypot(ky[:, None], kx[None, :])
+    spectrum = rng.standard_normal(shape) + 1j * rng.standard_normal(shape)
+    spectrum[radius > 0.12] = 0.0
+    phase = numpy.fft.ifft2(spectrum).real
+    phase *= 1.0 / numpy.abs(phase).max()
+    return numpy.exp(1j * phase)
+
+
+@pytest.mark.parametrize(
+    'quantity', [s for s in RegistrationQuantity if s is not RegistrationQuantity.AMPLITUDE]
+)
+def test_estimate_shift_on_a_phase_only_object(quantity: RegistrationQuantity) -> None:
+    """Amplitude is flat here, so a quantity that only sees it cannot register."""
+    shape = (64, 64)
+    reference_layer = _phase_contrast_object(shape, seed=3)
+    shift_yx = (-1.5, 0.75)
+    moving_layer = _fft_shift_2d(reference_layer, shift_yx=shift_yx)
+
+    pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=1.0e-9)
+    center = ObjectCenter(x_m=0.0, y_m=0.0)
+    reference = Object(
+        array=reference_layer[numpy.newaxis], pixel_geometry=pixel_geom, center=center
+    )
+    moving = Object(array=moving_layer[numpy.newaxis], pixel_geometry=pixel_geom, center=center)
+
+    estimated = estimate_object_alignment_shift(reference, moving, registration_quantity=quantity)
+
+    # align_objects shifts the moving object back onto the reference, so the
+    # estimate is the negative of the shift that produced it.
+    numpy.testing.assert_allclose(estimated, (-shift_yx[0], -shift_yx[1]), atol=0.2)
+
+
+def test_amplitude_quantity_cannot_register_a_phase_only_object() -> None:
+    shape = (64, 64)
+    reference_layer = _phase_contrast_object(shape, seed=3)
+    shift_yx = (-1.5, 0.75)
+    moving_layer = _fft_shift_2d(reference_layer, shift_yx=shift_yx)
+
+    pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=1.0e-9)
+    center = ObjectCenter(x_m=0.0, y_m=0.0)
+    reference = Object(
+        array=reference_layer[numpy.newaxis], pixel_geometry=pixel_geom, center=center
+    )
+    moving = Object(array=moving_layer[numpy.newaxis], pixel_geometry=pixel_geom, center=center)
+
+    estimated = estimate_object_alignment_shift(
+        reference, moving, registration_quantity=RegistrationQuantity.AMPLITUDE
+    )
+
+    assert numpy.hypot(*numpy.subtract(estimated, (-shift_yx[0], -shift_yx[1]))) > 0.2
+
+
+@pytest.mark.parametrize('quantity', [s for s in RegistrationQuantity if s.is_ramp_invariant])
+def test_ramp_invariant_quantity_does_not_see_a_phase_ramp(
+    quantity: RegistrationQuantity,
+) -> None:
+    """A quantity flagged is_ramp_invariant must not see the ambiguity it exists to ignore."""
+    shape = (64, 64)
+    reference_layer = _phase_contrast_object(shape, seed=5)
+    shift_yx = (2.0, -1.0)
+    moving_layer = _fft_shift_2d(reference_layer, shift_yx=shift_yx)
+
+    row, column = numpy.mgrid[0 : shape[0], 0 : shape[1]]
+    ramp = numpy.exp(2j * numpy.pi * (3.0 * column / shape[1] - 2.0 * row / shape[0]))
+
+    pixel_geom = PixelGeometry(width_m=1.0e-9, height_m=1.0e-9)
+    center = ObjectCenter(x_m=0.0, y_m=0.0)
+    reference = Object(
+        array=reference_layer[numpy.newaxis], pixel_geometry=pixel_geom, center=center
+    )
+    plain = Object(array=moving_layer[numpy.newaxis], pixel_geometry=pixel_geom, center=center)
+    ramped = Object(
+        array=(moving_layer * ramp * 2.5)[numpy.newaxis],
+        pixel_geometry=pixel_geom,
+        center=center,
+    )
+
+    without_ramp = estimate_object_alignment_shift(reference, plain, registration_quantity=quantity)
+    with_ramp = estimate_object_alignment_shift(reference, ramped, registration_quantity=quantity)
+
+    assert without_ramp == pytest.approx(with_ramp)
+
+
+def test_every_registration_quantity_is_a_distinct_member() -> None:
+    """Equal Enum values silently alias members together; nothing else would catch it."""
+    assert [s.name for s in RegistrationQuantity] == list(RegistrationQuantity.__members__)
+
+
+def test_exactly_one_registration_quantity_is_shift_exact() -> None:
+    """COMPLEX is the default because it alone is a linear functional of the object."""
+    exact = [s for s in RegistrationQuantity if s.is_shift_exact]
+    assert exact == [RegistrationQuantity.COMPLEX]
+
+
+def test_at_least_one_registration_quantity_is_ramp_invariant() -> None:
+    """compute_object_comparison bootstraps on one; without it the loop cannot start."""
+    assert RegistrationQuantity.VARIATION.is_ramp_invariant
 
 
 def _make_positions(*coords_xy_m: tuple[float, float]) -> list[ProbePosition]:
