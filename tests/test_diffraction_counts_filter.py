@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 import numpy
+import pytest
 
 from ptychodus.api.assemble import (
     AssembledDiffractionData,
@@ -23,6 +24,7 @@ from ptychodus.api.assemble import (
     compute_total_counts,
 )
 from ptychodus.api.diffraction import (
+    BadPixels,
     CropRegion,
     DiffractionDatasetLayoutNode,
     DiffractionMetadata,
@@ -37,6 +39,7 @@ from ptychodus.model.diffraction.dataset import (
     AssembledDiffractionDataset,
 )
 from ptychodus.model.diffraction.monitor import DiffractionTaskMonitor
+from ptychodus.model.diffraction.summary import DiffractionSummaryService
 from ptychodus.model.diffraction.settings import DetectorSettings, DiffractionSettings
 
 
@@ -167,8 +170,14 @@ def _load_with_bounds(
     return dataset.get_assembled_data()
 
 
-def _known_counts_dataset() -> SimpleDiffractionDataset:
-    """The four known-counts patterns as a 4x4 detector dataset, one array."""
+def _known_counts_dataset(
+    *, pixel_geometry: PixelGeometry | None = PixelGeometry(1.0, 1.0)
+) -> SimpleDiffractionDataset:
+    """The four known-counts patterns as a 4x4 detector dataset, one array.
+
+    Pass ``pixel_geometry=None`` for the shape most readers produce: metadata
+    that never had ``detector_pixel_geometry`` set.
+    """
     patterns = numpy.zeros((4, 4, 4), dtype=numpy.int32)
     # Center 2x2 carries the known counts; the outer ring carries 100 per pixel,
     # so a crop to the center changes every total by a fixed, large amount.
@@ -183,7 +192,7 @@ def _known_counts_dataset() -> SimpleDiffractionDataset:
         num_patterns_per_array=[4],
         pattern_dtype=numpy.dtype(numpy.int32),
         detector_extent=ImageExtent(width_px=4, height_px=4),
-        detector_pixel_geometry=PixelGeometry(1.0, 1.0),
+        detector_pixel_geometry=pixel_geometry,
     )
     return SimpleDiffractionDataset(metadata, DiffractionDatasetLayoutNode.create_root(), [array])
 
@@ -297,6 +306,19 @@ def test_dataset_total_counts_never_apply_the_filter() -> None:
     assert measured.total_counts.size == 4
 
 
+def test_dataset_total_counts_need_no_detector_pixel_geometry() -> None:
+    """Regression: the pass keeps only per-pattern totals, so a dataset whose
+    reader never set detector_pixel_geometry must still measure.
+
+    Refresh Counts used to raise ValueError here for every generic HDF5/NPZ/TIFF
+    file, while an actual load of the same dataset succeeded through the
+    DetectorSettings fallback.
+    """
+    measured = compute_dataset_total_counts(_known_counts_dataset(pixel_geometry=None))
+    assert measured.indexes.tolist() == [7, 8, 9, 10]
+    assert measured.total_counts.tolist() == [1204, 1210, 1220, 1240]
+
+
 def test_dataset_total_counts_report_progress_over_the_arrays() -> None:
     progress: list[tuple[int, int]] = []
     compute_dataset_total_counts(
@@ -319,3 +341,110 @@ def test_prep_pipeline_has_no_counts_filter_step() -> None:
     step_names = {getattr(cls, '__name__', '') for cls in DiffractionPrepStepUnion.__args__}  # type: ignore[attr-defined]
     forbidden = {'FilterCountsStep', 'CountsFilterStep', 'DropPatternsByCountsStep'}
     assert step_names.isdisjoint(forbidden)
+
+
+# ---------- DiffractionSummaryService ----------
+
+
+def _summary_service(
+    source: SimpleDiffractionDataset,
+) -> tuple[DiffractionSummaryService, DetectorSettings]:
+    """A service over a one-dataset repository, running its tasks inline."""
+    registry = SettingsRegistry()
+    detector_settings = DetectorSettings(registry)
+    diffraction_settings = DiffractionSettings(registry)
+    task_manager = _InlineTaskManager()
+
+    dataset = AssembledDiffractionDataset(
+        diffraction_settings,
+        detector_settings,
+        task_manager,  # type: ignore[arg-type]
+        DiffractionTaskMonitor(task_manager),  # type: ignore[arg-type]
+    )
+    dataset.reload(source)
+
+    class _FakeAPI:
+        """Only the two members DiffractionSummaryService reaches for."""
+
+        def get_repository(self) -> list[AssembledDiffractionDataset]:
+            return [dataset]
+
+        def load_bad_pixels(self, file_path: object, file_type: object = None) -> BadPixels:
+            raise FileNotFoundError(file_path)
+
+    service = DiffractionSummaryService(
+        task_manager,  # type: ignore[arg-type]
+        _FakeAPI(),  # type: ignore[arg-type]
+        detector_settings,
+        diffraction_settings,
+    )
+    return service, detector_settings
+
+
+def test_service_measures_counts_without_a_detector_pixel_geometry() -> None:
+    """Regression for the reported Refresh Counts failure.
+
+    The real load path resolves a missing metadata geometry through
+    DetectorSettings; the counts pass never saw that fallback, so it raised for
+    every dataset whose reader leaves detector_pixel_geometry unset.
+    """
+    service, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
+
+    assert service.compute_total_counts(0, force=True)
+
+    assert service.task_monitor.get_last_error() is None
+    measured = service.get_last_total_counts()
+    assert measured is not None
+    assert measured.total_counts.tolist() == [1204, 1210, 1220, 1240]
+
+
+def test_service_caches_counts_against_the_processing_settings() -> None:
+    service, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
+    assert service.compute_total_counts(0)
+    assert not service.compute_total_counts(0)
+    assert not service.is_total_counts_stale(0)
+
+
+# ---------- Error attribution ----------
+
+
+def test_counts_pass_labels_the_monitor_with_its_own_actor() -> None:
+    service, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
+    service.compute_total_counts(0, force=True)
+    assert service.task_monitor.actor == 'Refresh Counts'
+
+
+def test_summarize_pass_labels_the_monitor_with_its_own_actor() -> None:
+    service, _ = _summary_service(_known_counts_dataset(pixel_geometry=None))
+    service.compute_total_counts(0, force=True)
+    service.compute(0)
+    assert service.task_monitor.actor == 'Compute Summary'
+
+
+def test_a_failing_pass_leaves_the_error_and_the_actor_describing_it() -> None:
+    """The two passes share one monitor, so a stale label would misattribute.
+
+    The error here is raised inside the background task, which is the case that
+    misreported: the monitor captures it and an observer replays it later, long
+    after the ``except`` block that would have named the pass is gone.
+    """
+    # Metadata accounts for one array but the dataset holds two, so the counts
+    # pass raises after entering the monitor.
+    good = _known_counts_dataset(pixel_geometry=None)
+    source = SimpleDiffractionDataset(
+        good.get_metadata(),
+        DiffractionDatasetLayoutNode.create_root(),
+        [good[0], good[0]],
+    )
+    service, _ = _summary_service(source)
+
+    # The monitor's default label, and the one the dialog used to report for
+    # every failure regardless of which pass raised.
+    assert service.task_monitor.actor == 'Compute Summary'
+    assert service.task_monitor.get_last_error() is None
+
+    with pytest.raises(ValueError, match='more arrays than metadata'):
+        service.compute_total_counts(0, force=True)
+
+    assert service.task_monitor.actor == 'Refresh Counts'
+    assert isinstance(service.task_monitor.get_last_error(), ValueError)

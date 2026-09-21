@@ -276,8 +276,11 @@ class SummaryPanelViewController(Observer):
             # The monitor holds the last-run error until the next run enters,
             # and only fires this handler again at __enter__/update/__exit__.
             # __enter__ clears the error, so this reports at most once per run.
-            logger.exception(error)
-            ExceptionDialog.show_exception('Compute Summary', error)
+            # Both passes share this monitor, so the actor names which one failed;
+            # exc_info is explicit because logger.exception outside an except
+            # block logs no traceback at all.
+            logger.error(f'{monitor.actor} failed!', exc_info=error)
+            ExceptionDialog.show_exception(monitor.actor, error)
 
         run_id = self._summary_service.get_last_run_id()
         if run_id != self._last_rendered_run_id:
