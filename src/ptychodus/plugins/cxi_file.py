@@ -16,7 +16,7 @@ import h5py
 import numpy
 
 from ptychodus import __version__ as ptychodus_version
-from ptychodus.api.constants import ELECTRON_VOLT_J
+from ptychodus.api.constants import energy_eV_to_J, energy_J_to_eV
 from ptychodus.api.diffraction import (
     BadPixels,
     DiffractionDataset,
@@ -167,7 +167,7 @@ class CXIDiffractionFileReader(DiffractionFileReader):
             probe_energy_eV: float | None = None  # noqa: N806
             energy_J = _read_scalar(h5_file, _P.SOURCE_ENERGY)  # noqa: N806
             if energy_J is not None:
-                probe_energy_eV = float(energy_J) / ELECTRON_VOLT_J  # noqa: N806
+                probe_energy_eV = energy_J_to_eV(float(energy_J))  # noqa: N806
 
             probe_photon_count: int | None = None
             photon_count = _read_scalar(h5_file, _P.PT_PROBE_PHOTON_COUNT)
@@ -231,7 +231,7 @@ class CXIDiffractionFileWriter(DiffractionFileWriter):
             detector = instrument.create_group('detector_1')
 
             if metadata.probe_energy_eV is not None:
-                source.create_dataset('energy', data=metadata.probe_energy_eV * ELECTRON_VOLT_J)
+                source.create_dataset('energy', data=energy_eV_to_J(metadata.probe_energy_eV))
 
             if metadata.detector_distance_m is not None:
                 detector.create_dataset('distance', data=metadata.detector_distance_m)
@@ -362,7 +362,7 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
         probe_energy_eV = 0.0  # noqa: N806
         energy_J = _read_scalar(h5_file, _P.SOURCE_ENERGY)  # noqa: N806
         if energy_J is not None:
-            probe_energy_eV = float(energy_J) / ELECTRON_VOLT_J  # noqa: N806
+            probe_energy_eV = energy_J_to_eV(float(energy_J))  # noqa: N806
 
         probe_photon_count = 0.0
         photon_count = _read_scalar(h5_file, _P.PT_PROBE_PHOTON_COUNT)

@@ -2,7 +2,7 @@ from collections.abc import Sequence
 
 import numpy
 
-from ptychodus.api.constants import ELECTRON_VOLT_J, energy_eV_to_wavelength_m
+from ptychodus.api.constants import energy_eV_to_J, energy_eV_to_wavelength_m
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider, compute_object_geometry
 from ptychodus.api.observer import Observable, Observer
@@ -54,7 +54,7 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
 
     @property
     def probe_energy_J(self) -> float:  # noqa: N802
-        return self._metadata_item.probe_energy_eV.get_value() * ELECTRON_VOLT_J
+        return energy_eV_to_J(self._metadata_item.probe_energy_eV.get_value())
 
     @property
     def probe_wavelength_m(self) -> float:

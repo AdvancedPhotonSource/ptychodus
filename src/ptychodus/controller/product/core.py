@@ -16,8 +16,8 @@ from PyQt5.QtGui import QBrush, QFont
 from PyQt5.QtWidgets import QAbstractItemView, QAction, QInputDialog
 
 from ptychodus.api.constants import (
+    EnergyUnit,
     LengthUnit,
-    ONE_KILOELECTRONVOLT_EV,
     format_bytes,
 )
 from ptychodus.api.product import LossValue
@@ -156,7 +156,8 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                     case _Column.PROBE_ENERGY_KEV:
                         if pending or failed:
                             return '—'
-                        return f'{metadata_item.probe_energy_eV.get_value() / ONE_KILOELECTRONVOLT_EV:.4g}'
+                        energy_eV = metadata_item.probe_energy_eV.get_value()  # noqa: N806
+                        return f'{EnergyUnit.KILOELECTRONVOLT.convert(energy_eV):.4g}'
                     case _Column.PROBE_PHOTON_COUNT:
                         if pending or failed:
                             return '—'
@@ -243,7 +244,9 @@ class ProductRepositoryTableModel(QAbstractTableModel):
                 except ValueError:
                     return False
 
-                metadata_item.probe_energy_eV.set_value(energy_keV * ONE_KILOELECTRONVOLT_EV)
+                metadata_item.probe_energy_eV.set_value(
+                    EnergyUnit.KILOELECTRONVOLT.to_electronvolts(energy_keV)
+                )
                 return True
             elif index.column() == _Column.PROBE_PHOTON_COUNT:
                 try:

@@ -4,7 +4,7 @@ import logging
 import h5py
 import numpy
 
-from ptychodus.api.constants import ONE_KILOELECTRONVOLT_EV
+from ptychodus.api.constants import EnergyUnit
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     BeamCenter,
@@ -135,7 +135,9 @@ class LamNIDiffractionFileReader(DiffractionFileReader):
         else:
             beam_center = BeamCenter(center_x_px, center_y_px)
             detector_pixel_geometry = PixelGeometry(pixel_size, pixel_size)
-            probe_energy_eV = ONE_KILOELECTRONVOLT_EV * photon_energy_keV  # noqa: N806
+            probe_energy_eV = EnergyUnit.KILOELECTRONVOLT.to_electronvolts(  # noqa: N806
+                photon_energy_keV
+            )
 
         metadata = DiffractionMetadata(
             num_patterns_per_array=[num_patterns],

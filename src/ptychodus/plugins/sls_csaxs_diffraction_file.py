@@ -4,7 +4,7 @@ import logging
 import h5py
 import numpy
 
-from ptychodus.api.constants import LengthUnit, ONE_KILOELECTRONVOLT_EV
+from ptychodus.api.constants import EnergyUnit, LengthUnit
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     DiffractionDataset,
@@ -46,7 +46,9 @@ class CSAXSDiffractionFileReader(DiffractionFileReader):
                         width_m=LengthUnit.MICROMETER.to_meters(float(x_pixel_size_um[()])),
                         height_m=LengthUnit.MICROMETER.to_meters(float(y_pixel_size_um[()])),
                     ),
-                    probe_energy_eV=ONE_KILOELECTRONVOLT_EV * float(energy_keV[()]),
+                    probe_energy_eV=EnergyUnit.KILOELECTRONVOLT.to_electronvolts(
+                        float(energy_keV[()])
+                    ),
                     file_path=file_path,
                 )
                 contents_tree = self._tree_builder.build(h5_file)

@@ -5,7 +5,7 @@ import logging
 import h5py
 import numpy
 
-from ptychodus.api.constants import ONE_KILOELECTRONVOLT_EV, LengthUnit
+from ptychodus.api.constants import EnergyUnit, LengthUnit
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.diffraction import (
     BeamCenter,
@@ -68,7 +68,7 @@ class PolarDiffractionFileReader(DiffractionFileReader):
         except KeyError:
             return None
         else:
-            return energy_keV * ONE_KILOELECTRONVOLT_EV
+            return EnergyUnit.KILOELECTRONVOLT.to_electronvolts(energy_keV)
 
     def _read_detector_distance_m(self, h5_file: h5py.File) -> float | None:
         """Read the sample-detector distance from the Eiger per-frame attributes.

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from sys import getsizeof
 
-from .constants import ELECTRON_VOLT_J, energy_eV_to_wavelength_m
+from .constants import energy_eV_to_J, energy_eV_to_wavelength_m
 from .diffraction import Polarization
 from .object import Object
 from .probe import Probe, ProbeSequence
@@ -30,7 +30,7 @@ class ProductMetadata:
 
     @property
     def probe_energy_J(self) -> float:  # noqa: N802
-        return self.probe_energy_eV * ELECTRON_VOLT_J
+        return energy_eV_to_J(self.probe_energy_eV)
 
     @property
     def probe_wavelength_m(self) -> float:

@@ -3,7 +3,7 @@ from typing import Final, Sequence
 
 import h5py
 
-from ptychodus.api.constants import LengthUnit, ONE_KILOELECTRONVOLT_EV
+from ptychodus.api.constants import EnergyUnit, LengthUnit
 from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.object import Object
 from ptychodus.api.plugins import PluginRegistry
@@ -21,7 +21,9 @@ class NSLSIIProductFileReader(ProductFileReader):
 
         with h5py.File(file_path, 'r') as h5_file:
             detector_distance_m = LengthUnit.MICROMETER.to_meters(float(h5_file['det_dist'][()]))
-            probe_energy_eV = ONE_KILOELECTRONVOLT_EV * float(h5_file['energy'][()])  # noqa: N806
+            probe_energy_eV = EnergyUnit.KILOELECTRONVOLT.to_electronvolts(  # noqa: N806
+                float(h5_file['energy'][()])
+            )
 
             metadata = ProductMetadata(
                 name=file_path.stem,
