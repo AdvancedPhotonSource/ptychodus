@@ -1,11 +1,14 @@
 from pathlib import Path
+from typing import Final
 import logging
 
 import h5py
 import numpy
 
+from ptychodus.api.constants import ONE_KILOELECTRONVOLT_EV, LengthUnit
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.diffraction import (
+    BeamCenter,
     DiffractionDataset,
     DiffractionFileReader,
     DiffractionMetadata,
@@ -20,7 +23,13 @@ logger = logging.getLogger(__name__)
 
 
 class PolarDiffractionFileReader(DiffractionFileReader):
-    NDARRAY_UNIQUE_ID_PATH = '/entry/instrument/NDAttributes/NDArrayUniqueId'
+    NDARRAY_UNIQUE_ID_PATH: Final[str] = '/entry/instrument/NDAttributes/NDArrayUniqueId'
+    DETECTOR_DISTANCE_PATH: Final[str] = '/entry/instrument/NDAttributes/DetectorDistance'
+    BEAM_CENTER_X_PATH: Final[str] = '/entry/instrument/NDAttributes/BeamCenterX'
+    BEAM_CENTER_Y_PATH: Final[str] = '/entry/instrument/NDAttributes/BeamCenterY'
+    MONO_ENERGY_PATH: Final[str] = (
+        '/entry/instrument/bluesky/streams/baseline/mono_energy/value_start'
+    )
 
     def __init__(self) -> None:
         self._data_path = '/entry/externals/eiger'
@@ -29,11 +38,10 @@ class PolarDiffractionFileReader(DiffractionFileReader):
     def _read_pattern_indexes(self, h5_file: h5py.File, num_patterns: int) -> numpy.ndarray:
         """Return per-pattern indexes.
 
-        Uses the Eiger detector's NDArrayUniqueId when the file exposes
-        it (this reader already opens the external Eiger file where the
-        UID lives). Normalizes to per-scan 0-based, then shifts by +1 to
-        match the flyscan convention that the detector skips pos_stream
-        trigger 0 (see process_flyscan.plot_data).
+        Uses the Eiger detector's NDArrayUniqueId when the file exposes it (this reader
+        already opens the external Eiger file where the UID lives), normalized to
+        ``uid - uid[0] + 1``. The position reader documents how that 1-based convention
+        lines up with each of the two position layouts.
         """
         try:
             uid = h5_file[self.NDARRAY_UNIQUE_ID_PATH][()]
@@ -50,10 +58,50 @@ class PolarDiffractionFileReader(DiffractionFileReader):
             )
         return (uid - int(uid[0]) + 1).astype(numpy.int64)
 
+    def _read_probe_energy_eV(self, h5_file: h5py.File) -> float | None:  # noqa: N802
+        """Read the monochromator energy from the master's baseline stream.
+
+        Present in both the old and the new layout, unlike the detector attributes.
+        """
+        try:
+            energy_keV = float(h5_file[self.MONO_ENERGY_PATH][()])  # noqa: N806
+        except KeyError:
+            return None
+        else:
+            return energy_keV * ONE_KILOELECTRONVOLT_EV
+
+    def _read_detector_distance_m(self, h5_file: h5py.File) -> float | None:
+        """Read the sample-detector distance from the Eiger per-frame attributes.
+
+        The attribute is a per-frame array holding a single distinct value; take the
+        first. ``DistancePV`` duplicates it and is not read.
+        """
+        try:
+            distance_mm = float(h5_file[self.DETECTOR_DISTANCE_PATH][0])
+        except KeyError:
+            return None
+        else:
+            return LengthUnit.MILLIMETER.to_meters(distance_mm)
+
+    def _read_beam_center(self, h5_file: h5py.File) -> BeamCenter | None:
+        """Read the direct-beam center from the Eiger per-frame attributes.
+
+        ``BeamCenterPV`` is not read: the file describes it as
+        "Eiger pixel center - doesnt work", and it merely duplicates ``BeamCenterX``.
+        """
+        try:
+            center_x_px = float(h5_file[self.BEAM_CENTER_X_PATH][0])
+            center_y_px = float(h5_file[self.BEAM_CENTER_Y_PATH][0])
+        except KeyError:
+            return None
+        else:
+            return BeamCenter(int(round(center_x_px)), int(round(center_y_px)))
+
     def read(self, file_path: Path) -> DiffractionDataset:
         with h5py.File(file_path, 'r') as h5_file:
             contents_tree = self._tree_builder.build(h5_file)
             data_link = h5_file.get(self._data_path, getlink=True)
+            probe_energy_eV = self._read_probe_energy_eV(h5_file)  # noqa: N806
 
         if not isinstance(data_link, h5py.ExternalLink):
             raise ValueError(
@@ -67,7 +115,9 @@ class PolarDiffractionFileReader(DiffractionFileReader):
             data = h5_file[data_link.path]
 
             if isinstance(data, h5py.Group):
-                logger.warning('Link points to group; falling back to "/entry/data/data"')
+                # Both the old and the new master link to /entry/instrument, so this is
+                # the normal case rather than an anomaly.
+                logger.debug('Link points to group; falling back to "/entry/data/data"')
                 data = h5_file['/entry/data/data']
 
             if isinstance(data, h5py.Dataset):
@@ -76,7 +126,10 @@ class PolarDiffractionFileReader(DiffractionFileReader):
                 metadata = DiffractionMetadata(
                     num_patterns_per_array=[num_patterns],
                     pattern_dtype=data.dtype,
+                    detector_distance_m=self._read_detector_distance_m(h5_file),
                     detector_extent=ImageExtent(detector_width, detector_height),
+                    beam_center=self._read_beam_center(h5_file),
+                    probe_energy_eV=probe_energy_eV,
                     file_path=file_path,
                 )
 
