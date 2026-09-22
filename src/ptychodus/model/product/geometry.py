@@ -7,7 +7,7 @@ from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.object import ObjectGeometry, ObjectGeometryProvider, compute_object_geometry
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.probe import ProbeGeometry, ProbeGeometryProvider
-from ptychodus.api.propagate import compute_far_field_pixel_geometry
+from ptychodus.api.propagate import compute_far_field_pixel_geometry, compute_magnification
 from ptychodus.api.probe_positions import ProbePosition
 
 from .metadata import MetadataRepositoryItem
@@ -90,8 +90,31 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         return self._metadata_item.detector_distance_m.get_value()
 
     @property
+    def focus_object_distance_m(self) -> float:
+        return self._metadata_item.focus_object_distance_m.get_value()
+
+    @property
+    def magnification(self) -> float:
+        """See :func:`ptychodus.api.product.compute_magnification`."""
+        return compute_magnification(self.detector_distance_m, self.focus_object_distance_m)
+
+    @property
+    def object_plane_propagation_distance_m(self) -> float:
+        """Propagation distance of the equivalent parallel-beam geometry, ``z_d / M``.
+
+        A cone beam magnifying by ``M`` images like a parallel beam propagating this
+        much shorter distance onto pixels this much smaller, which is the pairing
+        :meth:`get_object_plane_pixel_geometry` applies. Equals the detector distance
+        whenever there is no focusing optic.
+        """
+        try:
+            return self.detector_distance_m / self.magnification
+        except ZeroDivisionError:
+            return 0.0
+
+    @property
     def _lambda_z_m2(self) -> float:
-        return self.probe_wavelength_m * self.detector_distance_m
+        return self.probe_wavelength_m * self.object_plane_propagation_distance_m
 
     def _get_detector_extent(self) -> ImageExtent:
         # No dataset bound yet: degrade to a zero-sized extent so downstream
@@ -110,6 +133,26 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         return geometry
 
     def get_object_plane_pixel_geometry(self) -> PixelGeometry:
+        """Sample-plane sampling implied by the detector and the illumination geometry.
+
+        With a focusing optic the cone beam projects the detector pixels onto the
+        sample demagnified by ``M``; without one the sampling is the far-field
+        reciprocal relation. Degrades to zero-sized on any degenerate geometry, as
+        the rest of this class does.
+        """
+        magnification = self.magnification
+
+        if magnification != 1.0:
+            detector_pixel_geometry = self.get_detector_pixel_geometry()
+
+            try:
+                return PixelGeometry(
+                    width_m=detector_pixel_geometry.width_m / magnification,
+                    height_m=detector_pixel_geometry.height_m / magnification,
+                )
+            except ZeroDivisionError:
+                return PixelGeometry(width_m=0.0, height_m=0.0)
+
         try:
             return compute_far_field_pixel_geometry(
                 self.get_detector_pixel_geometry(),
@@ -133,9 +176,15 @@ class ProductGeometry(ProbeGeometryProvider, ObjectGeometryProvider, Observable,
         Distinct from ``PropagatorParameters.pixel_fresnel_number``, which is the
         per-pixel quantity ``dx^2 / (lambda z)``.
 
-        Degrades to 0.0 when no dataset is bound or the detector distance is zero. That
-        is the correct limit at this plane: the object-plane width is ``lambda z / dx_d``,
-        so ``W^2 / (lambda z) = lambda z / dx_d^2 -> 0`` as z -> 0.
+        ``z`` is the equivalent parallel-beam distance
+        :attr:`object_plane_propagation_distance_m`, so the indicator stays meaningful
+        when a focusing optic magnifies the geometry.
+
+        Degrades to 0.0 when no dataset is bound or the distance is zero. Without a
+        focusing optic that is the correct limit at this plane: the object-plane width
+        is ``lambda z / dx_d``, so ``W^2 / (lambda z) = lambda z / dx_d^2 -> 0`` as
+        z -> 0. With one the object-plane width is fixed at ``N dx_d / M`` and the true
+        limit diverges, so the zero is a degenerate-input guard rather than a limit.
         """
         extent = self._get_detector_extent()
         pixel_geometry = self.get_object_plane_pixel_geometry()

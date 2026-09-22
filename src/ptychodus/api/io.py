@@ -205,6 +205,7 @@ class ProductFileKeys(StrEnum):
     NAME = 'name'
     COMMENTS = 'comments'
     DETECTOR_OBJECT_DISTANCE = 'detector_object_distance_m'
+    FOCUS_OBJECT_DISTANCE = 'focus_object_distance_m'
     PROBE_ENERGY = 'probe_energy_eV'
     PROBE_PHOTON_COUNT = 'probe_photon_count'
     EXPOSURE_TIME = 'exposure_time_s'
@@ -242,6 +243,9 @@ def load_product(file: Path) -> Product:
         mass_attenuation_m2_kg = float(h5_file.attrs.get(ProductFileKeys.MASS_ATTENUATION, 0.0))
         tomography_angle_deg = float(h5_file.attrs.get(ProductFileKeys.TOMOGRAPHY_ANGLE, 0.0))
         tilt_angle_deg = float(h5_file.attrs.get(ProductFileKeys.TILT_ANGLE, 0.0))
+        focus_object_distance_m = float(
+            h5_file.attrs.get(ProductFileKeys.FOCUS_OBJECT_DISTANCE, 0.0)
+        )
 
         polarization: Polarization | None = None
         if ProductFileKeys.POLARIZATION in h5_file.attrs:
@@ -266,6 +270,7 @@ def load_product(file: Path) -> Product:
             exposure_time_s=exposure_time_s,
             mass_attenuation_m2_kg=mass_attenuation_m2_kg,
             tomography_angle_deg=tomography_angle_deg,
+            focus_object_distance_m=focus_object_distance_m,
             tilt_angle_deg=tilt_angle_deg,
             polarization=polarization,
         )
@@ -420,6 +425,7 @@ def save_product(file: Path, product: Product) -> None:
         h5_file.attrs[ProductFileKeys.EXPOSURE_TIME] = metadata.exposure_time_s
         h5_file.attrs[ProductFileKeys.MASS_ATTENUATION] = metadata.mass_attenuation_m2_kg
         h5_file.attrs[ProductFileKeys.TOMOGRAPHY_ANGLE] = metadata.tomography_angle_deg
+        h5_file.attrs[ProductFileKeys.FOCUS_OBJECT_DISTANCE] = metadata.focus_object_distance_m
         h5_file.attrs[ProductFileKeys.TILT_ANGLE] = metadata.tilt_angle_deg
         if metadata.polarization is not None:
             h5_file.attrs[ProductFileKeys.POLARIZATION] = metadata.polarization.value

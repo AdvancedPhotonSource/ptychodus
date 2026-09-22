@@ -114,6 +114,7 @@ class Product(Base):
     name: Mapped[str | None] = mapped_column(String, nullable=True)
     comments: Mapped[str | None] = mapped_column(String, nullable=True)
     detector_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    focus_object_distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
     probe_energy_eV: Mapped[float | None] = mapped_column(Float, nullable=True)  # noqa: N815
     probe_photon_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     exposure_time_s: Mapped[float | None] = mapped_column(Float, nullable=True)

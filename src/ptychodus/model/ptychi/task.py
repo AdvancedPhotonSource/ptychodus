@@ -287,10 +287,13 @@ def align_task_options_with_product(
     propagation_distance_m = aligned.data_options.free_space_propagation_distance_m
 
     if not math.isinf(propagation_distance_m):
+        # Near field: pty-chi propagates in the equivalent parallel-beam geometry, so
+        # a cone beam contributes its demagnified distance. Without a focusing optic
+        # the magnification is 1 and this is the detector distance unchanged.
         _overwrite(
             aligned.data_options,
             'free_space_propagation_distance_m',
-            metadata.detector_distance_m,
+            metadata.detector_distance_m / metadata.magnification,
             unset=math.isnan(propagation_distance_m),
         )
 

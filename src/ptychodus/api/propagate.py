@@ -76,6 +76,30 @@ def compute_far_field_pixel_geometry(
     )
 
 
+def compute_magnification(detector_distance_m: float, focus_object_distance_m: float) -> float:
+    """Cone-beam magnification implied by the focus and detector positions.
+
+    `focus_object_distance_m` is a signed coordinate in the beamline frame --
+    downstream is +z with the origin at the object -- so its sign selects the
+    geometry. Negative puts the focus upstream and the object in a diverging beam,
+    giving ``(|z_f| + z_d) / |z_f|``; positive puts the focus downstream, so the
+    object sits in a converging beam that crosses over before the detector, giving
+    ``(z_d - z_f) / z_f``. Both reduce to ``|(z_d - z_f) / z_f|``.
+
+    Zero means no focusing optic and yields 1.0, leaving parallel-beam geometry
+    unchanged. The sentinel cannot collide with a real value: it would place the
+    focus in the object plane, where the magnification is undefined.
+
+    Sibling of :func:`compute_far_field_pixel_geometry`: both map detector-plane
+    sampling onto the object plane, that one through the far-field reciprocal
+    relation and this one through the geometric projection of a cone beam.
+    """
+    if focus_object_distance_m == 0.0:
+        return 1.0
+
+    return abs((detector_distance_m - focus_object_distance_m) / focus_object_distance_m)
+
+
 @dataclass(frozen=True)
 class PropagatorParameters:
     """Geometric parameters for a wavefield propagator: wavelength, extent, pixel size, and distance."""

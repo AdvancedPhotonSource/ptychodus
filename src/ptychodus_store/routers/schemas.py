@@ -68,6 +68,7 @@ class ProductRead(_RowBase):
     name: str | None
     comments: str | None
     detector_distance_m: float | None
+    focus_object_distance_m: float | None
     probe_energy_eV: float | None  # noqa: N815
     probe_photon_count: int | None
     exposure_time_s: float | None

@@ -62,6 +62,7 @@ class MetadataRepositoryItem(ParameterGroup):
         exposure_time_s: float | None = None,
         mass_attenuation_m2_kg: float | None = None,
         tomography_angle_deg: float | None = None,
+        focus_object_distance_m: float | None = None,
         tilt_angle_deg: float | None = None,
         polarization: Polarization | None = None,
     ) -> None:
@@ -79,6 +80,13 @@ class MetadataRepositoryItem(ParameterGroup):
             self.detector_distance_m.set_value(detector_distance_m)
 
         self._add_parameter('detector_distance_m', self.detector_distance_m)
+
+        self.focus_object_distance_m = settings.focus_object_distance_m.copy()
+
+        if focus_object_distance_m is not None:
+            self.focus_object_distance_m.set_value(focus_object_distance_m)
+
+        self._add_parameter('focus_object_distance_m', self.focus_object_distance_m)
 
         self.probe_energy_eV = settings.probe_energy_eV.copy()
 
@@ -140,6 +148,7 @@ class MetadataRepositoryItem(ParameterGroup):
         self.exposure_time_s.set_value(metadata.exposure_time_s)
         self.mass_attenuation_m2_kg.set_value(metadata.mass_attenuation_m2_kg)
         self.tomography_angle_deg.set_value(metadata.tomography_angle_deg)
+        self.focus_object_distance_m.set_value(metadata.focus_object_distance_m)
         self.tilt_angle_deg.set_value(metadata.tilt_angle_deg)
         self.polarization.set_value(
             metadata.polarization.value if metadata.polarization is not None else ''
@@ -159,6 +168,7 @@ class MetadataRepositoryItem(ParameterGroup):
             exposure_time_s=self.exposure_time_s.get_value(),
             mass_attenuation_m2_kg=self.mass_attenuation_m2_kg.get_value(),
             tomography_angle_deg=self.tomography_angle_deg.get_value(),
+            focus_object_distance_m=self.focus_object_distance_m.get_value(),
             tilt_angle_deg=self.tilt_angle_deg.get_value(),
             polarization=self._parse_polarization(self.polarization.get_value()),
         )

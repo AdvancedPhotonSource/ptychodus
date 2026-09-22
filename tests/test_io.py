@@ -396,6 +396,7 @@ class TestProductRoundTrip:
         assert a.exposure_time_s == pytest.approx(b.exposure_time_s)
         assert a.mass_attenuation_m2_kg == pytest.approx(b.mass_attenuation_m2_kg)
         assert a.tomography_angle_deg == pytest.approx(b.tomography_angle_deg)
+        assert a.focus_object_distance_m == pytest.approx(b.focus_object_distance_m)
         assert a.tilt_angle_deg == pytest.approx(b.tilt_angle_deg)
         assert a.polarization == b.polarization
 
@@ -689,3 +690,66 @@ class TestResolveExternalLinkPath:
     def test_escaping_target_is_rejected(self, filename: str) -> None:
         with pytest.raises(ValueError):
             resolve_external_link_path(Path('/data/scan'), filename)
+
+
+class TestFocusObjectDistanceRoundTrip:
+    """The focus coordinate is signed, and its sign is the whole geometry, so the
+    round-trip has to preserve it rather than merely preserve a magnitude.
+    """
+
+    def _round_trip(self, tmp_path: Path, distance_m: float) -> ProductMetadata:
+        product = _make_product()
+        product = Product(
+            metadata=replace(product.metadata, focus_object_distance_m=distance_m),
+            probe_positions=product.probe_positions,
+            probes=product.probes,
+            object_=product.object_,
+            losses=product.losses,
+        )
+        file = tmp_path / 'product.h5'
+        save_product(file, product)
+        return load_product(file).metadata
+
+    def test_converging_focus_survives(self, tmp_path: Path) -> None:
+        metadata = self._round_trip(tmp_path, 5e-3)
+
+        assert metadata.focus_object_distance_m == pytest.approx(5e-3)
+
+    def test_diverging_focus_keeps_its_sign(self, tmp_path: Path) -> None:
+        metadata = self._round_trip(tmp_path, -5e-3)
+
+        assert metadata.focus_object_distance_m == pytest.approx(-5e-3)
+
+    def test_file_without_the_attribute_still_loads(self, tmp_path: Path) -> None:
+        """Products written before this field existed must keep loading.
+
+        The fixture deletes the attribute from a freshly written file rather than
+        hard-coding an old layout, so it cannot drift away from what save_product
+        actually writes.
+        """
+        file = tmp_path / 'product.h5'
+        save_product(file, _make_product())
+
+        with h5py.File(file, 'r+') as h5_file:
+            del h5_file.attrs[ProductFileKeys.FOCUS_OBJECT_DISTANCE]
+
+        assert load_product(file).metadata.focus_object_distance_m == 0.0
+
+    def test_npz_round_trip(self, tmp_path: Path) -> None:
+        from ptychodus.plugins.npz_product_file import NPZProductFileIO
+
+        product = _make_product()
+        product = Product(
+            metadata=replace(product.metadata, focus_object_distance_m=-2.5e-3),
+            probe_positions=product.probe_positions,
+            probes=product.probes,
+            object_=product.object_,
+            losses=product.losses,
+        )
+        file = tmp_path / 'product.npz'
+        file_io = NPZProductFileIO()
+
+        file_io.write(file, product)
+        loaded = file_io.read(file)
+
+        assert loaded.metadata.focus_object_distance_m == pytest.approx(-2.5e-3)

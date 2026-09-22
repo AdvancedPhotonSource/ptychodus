@@ -53,6 +53,7 @@ class _Row(IntEnum):
     DETECTOR_NUMERICAL_APERTURE = 13
     DEPTH_OF_FIELD_NM = 14
     DIFFRACTION_DATASET = 15
+    FOCUS_OBJECT_DISTANCE_MM = 16
 
 
 class _Col(IntEnum):
@@ -74,6 +75,7 @@ _EDITABLE_ROWS = frozenset(
         _Row.TILT_ANGLE_DEG,
         _Row.POLARIZATION,
         _Row.DIFFRACTION_DATASET,
+        _Row.FOCUS_OBJECT_DISTANCE_MM,
     }
 )
 
@@ -108,6 +110,7 @@ class ProductPropertyTableModel(QAbstractTableModel):
             'Detector Numerical Aperture',
             'Depth of Field [nm]',
             'Diffraction Dataset',
+            'Focus-Object Distance [mm]',
         ]
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
@@ -182,6 +185,9 @@ class ProductPropertyTableModel(QAbstractTableModel):
                             case _Row.DIFFRACTION_DATASET:
                                 dataset = self._product_item.get_dataset()
                                 return UNBOUND_DATASET if dataset is None else dataset.get_name()
+                            case _Row.FOCUS_OBJECT_DISTANCE_MM:
+                                distance_m = metadata_item.focus_object_distance_m.get_value()
+                                return f'{LengthUnit.MILLIMETER.convert(distance_m):.4g}'
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if index.flags() & Qt.ItemFlag.ItemIsEditable:
                     return self._editable_item_brush
@@ -247,6 +253,17 @@ class ProductPropertyTableModel(QAbstractTableModel):
                             return True
 
                     return False
+                case _Row.FOCUS_OBJECT_DISTANCE_MM:
+                    # Signed: negative places the focus upstream of the object.
+                    try:
+                        distance_mm = float(value)
+                    except ValueError:
+                        return False
+
+                    metadata_item.focus_object_distance_m.set_value(
+                        LengthUnit.MILLIMETER.to_meters(distance_mm)
+                    )
+                    return True
 
         return False
 

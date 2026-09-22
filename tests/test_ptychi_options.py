@@ -701,6 +701,61 @@ def test_align_replaces_the_near_field_placeholder() -> None:
     )
 
 
+def _make_cone_beam_product(focus_object_distance_m: float) -> Product:
+    """The shared fixture declares no focusing optic; these need one."""
+    product = _make_reconstruct_input().product
+    return dataclasses.replace(
+        product,
+        metadata=dataclasses.replace(
+            product.metadata, focus_object_distance_m=focus_object_distance_m
+        ),
+    )
+
+
+def test_align_demagnifies_the_near_field_distance_for_a_cone_beam() -> None:
+    """pty-chi propagates in the equivalent parallel-beam geometry, so a magnifying
+    geometry contributes z_d / M rather than the raw detector distance.
+    """
+    focus_m = 5e-3
+    product = _make_cone_beam_product(focus_m)
+    options = LSQMLOptions()
+    options.data_options.free_space_propagation_distance_m = math.nan
+
+    aligned = align_task_options_with_product(options, product)
+
+    magnification = (DETECTOR_DISTANCE_M - focus_m) / focus_m
+    assert aligned.data_options.free_space_propagation_distance_m == pytest.approx(
+        DETECTOR_DISTANCE_M / magnification
+    )
+
+
+def test_align_distinguishes_converging_from_diverging_illumination() -> None:
+    """The sign of the focus coordinate is a real geometry choice, so it must reach
+    the propagation distance rather than being absorbed as a magnitude.
+    """
+    options = LSQMLOptions()
+    options.data_options.free_space_propagation_distance_m = math.nan
+
+    converging = align_task_options_with_product(options, _make_cone_beam_product(5e-3))
+    diverging = align_task_options_with_product(options, _make_cone_beam_product(-5e-3))
+
+    assert converging.data_options.free_space_propagation_distance_m != pytest.approx(
+        diverging.data_options.free_space_propagation_distance_m
+    )
+
+
+def test_align_without_a_focusing_optic_uses_the_raw_detector_distance() -> None:
+    """The parallel-beam path must be untouched by the cone-beam support."""
+    options = LSQMLOptions()
+    options.data_options.free_space_propagation_distance_m = math.nan
+
+    aligned = align_task_options_with_product(options, _make_cone_beam_product(0.0))
+
+    assert aligned.data_options.free_space_propagation_distance_m == pytest.approx(
+        DETECTOR_DISTANCE_M
+    )
+
+
 def test_align_reads_a_non_square_object_pixel_aspect_ratio() -> None:
     """The shared fixture is square, so aspect ratio needs its own witness.
 

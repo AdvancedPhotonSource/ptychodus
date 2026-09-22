@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy
 import numpy.testing
 
@@ -10,6 +12,7 @@ from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
+from ptychodus.api.propagate import compute_magnification
 
 
 def _make_metadata() -> ProductMetadata:
@@ -110,3 +113,17 @@ class TestIterPositionProbes:
         assert pairs[1][0].index == 1
         assert pairs[1][0].x_m == 3.5e-7
         assert pairs[1][0].y_m == +0.5e-7
+
+
+class TestMetadataMagnification:
+    """ProductMetadata exposes the geometry it records; the formula itself is
+    covered against :func:`compute_magnification` in tests/test_propagator.py.
+    """
+
+    def test_delegates_to_the_shared_formula(self) -> None:
+        metadata = replace(_make_metadata(), detector_distance_m=1.0, focus_object_distance_m=5e-3)
+
+        assert metadata.magnification == compute_magnification(1.0, 5e-3)
+
+    def test_defaults_to_no_focusing_optic(self) -> None:
+        assert _make_metadata().magnification == 1.0

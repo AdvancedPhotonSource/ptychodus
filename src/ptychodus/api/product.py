@@ -11,6 +11,7 @@ from .diffraction import Polarization
 from .object import Object
 from .probe import Probe, ProbeSequence
 from .probe_positions import ProbePosition, ProbePositionSequence
+from .propagate import compute_magnification
 
 
 @dataclass(frozen=True)
@@ -25,8 +26,14 @@ class ProductMetadata:
     exposure_time_s: float
     mass_attenuation_m2_kg: float
     tomography_angle_deg: float
+    focus_object_distance_m: float = 0.0
     tilt_angle_deg: float = 0.0
     polarization: Polarization | None = None
+
+    @property
+    def magnification(self) -> float:
+        """See :func:`ptychodus.api.propagate.compute_magnification`."""
+        return compute_magnification(self.detector_distance_m, self.focus_object_distance_m)
 
     @property
     def probe_energy_J(self) -> float:  # noqa: N802
@@ -46,6 +53,7 @@ class ProductMetadata:
         sz += getsizeof(self.exposure_time_s)
         sz += getsizeof(self.mass_attenuation_m2_kg)
         sz += getsizeof(self.tomography_angle_deg)
+        sz += getsizeof(self.focus_object_distance_m)
         sz += getsizeof(self.tilt_angle_deg)
         sz += getsizeof(self.polarization)
         return sz

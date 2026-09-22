@@ -33,12 +33,14 @@ class _NameFactory:
 def _make_geometry(
     *,
     detector_distance_m: float = _DETECTOR_DISTANCE_M,
+    focus_object_distance_m: float = 0.0,
     bind_detector: bool = True,
 ) -> ProductGeometry:
     metadata_item = MetadataRepositoryItem(
         ProductSettings(SettingsRegistry()),
         _NameFactory(),
         detector_distance_m=detector_distance_m,
+        focus_object_distance_m=focus_object_distance_m,
         probe_energy_eV=_PROBE_ENERGY_EV,
     )
     geometry = ProductGeometry(metadata_item, MagicMock())
@@ -121,3 +123,82 @@ class TestFresnelNumber:
         used to need an 'inf' branch here.
         """
         assert _make_geometry(detector_distance_m=0.0).fresnel_number == 0.0
+
+
+class TestConeBeamGeometry:
+    """A focusing optic switches the sample plane from the far-field reciprocal
+    relation to a geometric projection. The sign of the focus coordinate selects
+    which side of the object the focus sits on, and therefore which geometry.
+    """
+
+    # Focus 5 mm downstream of the object: the object sits in a converging beam that
+    # crosses over before the detector. M = (1.0 - 0.005) / 0.005 = 199.
+    _CONVERGING_FOCUS_M = 5e-3
+    _CONVERGING_MAGNIFICATION = 199.0
+
+    # Focus 5 mm upstream: the object sits in a diverging beam.
+    # M = (1.0 + 0.005) / 0.005 = 201.
+    _DIVERGING_FOCUS_M = -5e-3
+    _DIVERGING_MAGNIFICATION = 201.0
+
+    def test_no_focusing_optic_leaves_magnification_at_unity(self) -> None:
+        assert _make_geometry().magnification == 1.0
+
+    def test_converging_beam_magnification(self) -> None:
+        geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M)
+
+        assert geometry.magnification == pytest.approx(self._CONVERGING_MAGNIFICATION)
+
+    def test_diverging_beam_magnification(self) -> None:
+        geometry = _make_geometry(focus_object_distance_m=self._DIVERGING_FOCUS_M)
+
+        assert geometry.magnification == pytest.approx(self._DIVERGING_MAGNIFICATION)
+
+    def test_object_plane_pixel_is_the_demagnified_detector_pixel(self) -> None:
+        geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M)
+        expected_m = _DETECTOR_PITCH_M / self._CONVERGING_MAGNIFICATION
+
+        pixel_geometry = geometry.get_object_plane_pixel_geometry()
+
+        assert pixel_geometry.width_m == pytest.approx(expected_m)
+        assert pixel_geometry.height_m == pytest.approx(expected_m)
+
+    def test_object_plane_pixel_is_unchanged_without_a_focusing_optic(self) -> None:
+        """The far-field path must be bit-identical when no optic is declared."""
+        far_field = _make_geometry().get_object_plane_pixel_geometry()
+        explicit_parallel = _make_geometry(focus_object_distance_m=0.0)
+
+        assert explicit_parallel.get_object_plane_pixel_geometry() == far_field
+
+    def test_propagation_distance_is_reduced_by_the_magnification(self) -> None:
+        geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M)
+        expected_m = _DETECTOR_DISTANCE_M / self._CONVERGING_MAGNIFICATION
+
+        assert geometry.object_plane_propagation_distance_m == pytest.approx(expected_m)
+
+    def test_propagation_distance_is_the_detector_distance_without_an_optic(self) -> None:
+        assert _make_geometry().object_plane_propagation_distance_m == _DETECTOR_DISTANCE_M
+
+    def test_fresnel_number_uses_the_equivalent_parallel_beam_distance(self) -> None:
+        geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M)
+        magnification = self._CONVERGING_MAGNIFICATION
+        width_m = _NUM_PX * _DETECTOR_PITCH_M / magnification
+        expected = width_m**2 / (_WAVELENGTH_M * _DETECTOR_DISTANCE_M / magnification)
+
+        assert geometry.fresnel_number == pytest.approx(expected)
+
+    def test_fresnel_number_reports_near_field_for_a_magnifying_geometry(self) -> None:
+        """The indicator must actually flip regime, not merely change value."""
+        geometry = _make_geometry(focus_object_distance_m=self._CONVERGING_FOCUS_M)
+
+        assert _make_geometry().fresnel_number < 1.0
+        assert geometry.fresnel_number > 1.0
+
+    def test_detector_at_the_focus_degrades_rather_than_dividing_by_zero(self) -> None:
+        """M = 0 is degenerate; follow the class's degrade-to-zero convention."""
+        geometry = _make_geometry(focus_object_distance_m=_DETECTOR_DISTANCE_M)
+
+        assert geometry.magnification == 0.0
+        assert geometry.object_plane_propagation_distance_m == 0.0
+        assert geometry.get_object_plane_pixel_geometry() == PixelGeometry(0.0, 0.0)
+        assert geometry.fresnel_number == 0.0

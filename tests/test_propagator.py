@@ -18,6 +18,7 @@ from ptychodus.api.propagate import (
     PropagatorParameters,
     choose_propagator,
     compute_far_field_pixel_geometry,
+    compute_magnification,
     intensity,
     propagate_probe,
 )
@@ -1301,3 +1302,35 @@ class TestChoosePropagator:
         propagator, pixel_geometry = choose_propagator(params)
         assert isinstance(propagator, FresnelTransformPropagator)
         assert pixel_geometry == far_field
+
+
+class TestComputeMagnification:
+    """`focus_object_distance_m` is a signed beamline coordinate, not a distance:
+    its sign chooses between a diverging and a converging illumination, which are
+    different geometries rather than a sign flip on one answer.
+
+    Sibling of `compute_far_field_pixel_geometry`: this is the object-plane sampling
+    relation for a cone beam, that one for the parallel-beam limit.
+    """
+
+    def test_no_focusing_optic_is_unity(self) -> None:
+        assert compute_magnification(1.0, 0.0) == 1.0
+
+    def test_converging_beam(self) -> None:
+        """Focus 5 mm downstream: M = (1.0 - 0.005) / 0.005 = 199."""
+        assert compute_magnification(1.0, 5e-3) == pytest.approx(199.0)
+
+    def test_diverging_beam(self) -> None:
+        """Focus 5 mm upstream: M = (1.0 + 0.005) / 0.005 = 201."""
+        assert compute_magnification(1.0, -5e-3) == pytest.approx(201.0)
+
+    def test_the_two_geometries_are_not_a_sign_flip_of_each_other(self) -> None:
+        assert compute_magnification(1.0, 5e-3) != pytest.approx(compute_magnification(1.0, -5e-3))
+
+    def test_is_never_negative(self) -> None:
+        for focus_m in (-1e-3, -0.5, 0.5, 2.0):
+            assert compute_magnification(1.0, focus_m) >= 0.0
+
+    def test_detector_at_the_focus_is_zero(self) -> None:
+        """Degenerate rather than an error; callers degrade on it."""
+        assert compute_magnification(1.0, 1.0) == 0.0

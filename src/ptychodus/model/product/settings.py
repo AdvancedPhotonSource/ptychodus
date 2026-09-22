@@ -16,6 +16,11 @@ class ProductSettings(Observable, Observer):
         self.detector_distance_m = self._group.create_real_parameter(
             'DetectorDistanceInMeters', 1.0, minimum=0.0
         )
+        # Signed beamline coordinate, so deliberately unbounded below: a negative
+        # value places the focus upstream of the object. See compute_magnification.
+        self.focus_object_distance_m = self._group.create_real_parameter(
+            'FocusObjectDistanceInMeters', 0.0
+        )
         self.probe_energy_eV = self._group.create_real_parameter(
             'ProbeEnergyInElectronVolts', 10000.0, minimum=0.0
         )

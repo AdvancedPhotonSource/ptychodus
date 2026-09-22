@@ -103,6 +103,7 @@ def _values_for_product(
         'name': h5.get('name'),
         'comments': h5.get('comments'),
         'detector_distance_m': h5.get('detector_distance_m'),
+        'focus_object_distance_m': h5.get('focus_object_distance_m'),
         'probe_energy_eV': h5.get('probe_energy_eV'),
         'probe_photon_count': h5.get('probe_photon_count'),
         'exposure_time_s': h5.get('exposure_time_s'),

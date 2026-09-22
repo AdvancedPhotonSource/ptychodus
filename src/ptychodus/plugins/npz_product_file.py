@@ -27,6 +27,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
     NAME: Final[str] = 'name'
     COMMENTS: Final[str] = 'comments'
     DETECTOR_OBJECT_DISTANCE: Final[str] = 'detector_object_distance_m'
+    FOCUS_OBJECT_DISTANCE: Final[str] = 'focus_object_distance_m'
     PROBE_ENERGY: Final[str] = 'probe_energy_eV'
     PROBE_PHOTON_COUNT: Final[str] = 'probe_photon_count'
     EXPOSURE_TIME: Final[str] = 'exposure_time_s'
@@ -74,6 +75,13 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
             except KeyError:
                 logger.debug('Tomography angle not found.')
 
+            focus_object_distance_m = 0.0
+
+            try:
+                focus_object_distance_m = float(npz_file[self.FOCUS_OBJECT_DISTANCE])
+            except KeyError:
+                logger.debug('Focus-object distance not found.')
+
             metadata = ProductMetadata(
                 name=str(npz_file[self.NAME]),
                 comments=str(npz_file[self.COMMENTS]),
@@ -83,6 +91,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
                 exposure_time_s=float(npz_file[self.EXPOSURE_TIME]),
                 mass_attenuation_m2_kg=mass_attenuation_m2_kg,
                 tomography_angle_deg=tomography_angle_deg,
+                focus_object_distance_m=focus_object_distance_m,
             )
 
             scan_indexes = npz_file[self.PROBE_POSITION_INDEXES]
@@ -170,6 +179,7 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
         contents[self.PROBE_PHOTON_COUNT] = metadata.probe_photon_count
         contents[self.EXPOSURE_TIME] = metadata.exposure_time_s
         contents[self.MASS_ATTENUATION] = metadata.mass_attenuation_m2_kg
+        contents[self.FOCUS_OBJECT_DISTANCE] = metadata.focus_object_distance_m
 
         contents[self.PROBE_POSITION_INDEXES] = scan_indexes
         contents[self.PROBE_POSITION_X] = scan_x_m
