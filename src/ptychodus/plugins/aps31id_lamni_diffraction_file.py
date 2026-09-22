@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Final
 import logging
 
 import h5py
@@ -86,9 +87,28 @@ def _to_ev(value: float, egu: str) -> float:
         return value
 
 
+def _read_attr(attrs: h5py.AttributeManager, name: str) -> float | None:
+    """Read one scalar attribute, or None when the file omits it.
+
+    Read per field rather than as a group: these files carry the set only in part --
+    the 2023-1 production files carry none of it, and run_00053 carries Pixel_size and
+    Exposure_time but no beam center -- so an all-or-nothing read would discard values
+    that are present.
+    """
+    try:
+        raw = attrs[name]
+    except KeyError:
+        return None
+
+    return float(numpy.asarray(raw).flat[0])
+
+
 class LamNIDiffractionFileReader(DiffractionFileReader):
     _LEGACY_DATA_PATH = '/entry/data/eiger_4'
     _AD_DATA_PATH = '/entry/data/data'
+
+    # Stands in for Pixel_size when a file omits it; the Eiger pitch at this instrument.
+    DETECTOR_PIXEL_SIZE_M: Final[float] = 75e-6
 
     def __init__(self) -> None:
         self._tree_builder = H5DiffractionFileTreeBuilder()
@@ -118,26 +138,25 @@ class LamNIDiffractionFileReader(DiffractionFileReader):
         num_patterns, detector_height, detector_width = data.shape
 
         beam_center: BeamCenter | None = None
-        detector_distance_m: float | None = None
-        detector_pixel_geometry: PixelGeometry | None = None
-        exposure_time_s: float | None = None
         probe_energy_eV: float | None = None  # noqa: N806
 
-        try:
-            center_x_px: int = data.attrs['Center_x_pixel'].item()
-            center_y_px: int = data.attrs['Center_y_pixel'].item()
-            detector_distance_m = data.attrs['Detector_distance_m'].item()
-            exposure_time_s = data.attrs['Exposure_time'].item()
-            photon_energy_keV = data.attrs['Photon_energy_kev'].item()  # noqa: N806
-            pixel_size = data.attrs['Pixel_size'].item()
-        except KeyError:
-            pass
-        else:
-            beam_center = BeamCenter(center_x_px, center_y_px)
-            detector_pixel_geometry = PixelGeometry(pixel_size, pixel_size)
+        center_x_px = _read_attr(data.attrs, 'Center_x_pixel')
+        center_y_px = _read_attr(data.attrs, 'Center_y_pixel')
+
+        if center_x_px is not None and center_y_px is not None:
+            beam_center = BeamCenter(int(center_x_px), int(center_y_px))
+
+        detector_distance_m = _read_attr(data.attrs, 'Detector_distance_m')
+        exposure_time_s = _read_attr(data.attrs, 'Exposure_time')
+        photon_energy_keV = _read_attr(data.attrs, 'Photon_energy_kev')  # noqa: N806
+
+        if photon_energy_keV is not None:
             probe_energy_eV = EnergyUnit.KILOELECTRONVOLT.to_electronvolts(  # noqa: N806
                 photon_energy_keV
             )
+
+        pixel_size = _read_attr(data.attrs, 'Pixel_size') or self.DETECTOR_PIXEL_SIZE_M
+        detector_pixel_geometry = PixelGeometry(pixel_size, pixel_size)
 
         metadata = DiffractionMetadata(
             num_patterns_per_array=[num_patterns],
@@ -170,7 +189,9 @@ class LamNIDiffractionFileReader(DiffractionFileReader):
 
         beam_center: BeamCenter | None = None
         detector_distance_m: float | None = None
-        detector_pixel_geometry: PixelGeometry | None = None
+        detector_pixel_geometry = PixelGeometry(
+            self.DETECTOR_PIXEL_SIZE_M, self.DETECTOR_PIXEL_SIZE_M
+        )
         exposure_time_s: float | None = None
         probe_energy_eV: float | None = None  # noqa: N806
 

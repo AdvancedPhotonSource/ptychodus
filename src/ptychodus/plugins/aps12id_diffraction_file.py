@@ -6,7 +6,7 @@ import re
 import h5py
 import numpy
 
-from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     DiffractionDataset,
     DiffractionFileReader,
@@ -50,6 +50,9 @@ def _glob_h5_series(file_path: Path) -> tuple[dict[int, Path], str]:
 
 
 class APS12IDDiffractionFileReader(DiffractionFileReader):
+    # The NDAttributes group carries no detector geometry, so the Pilatus pitch at
+    # this instrument stands in for it.
+    DETECTOR_PIXEL_SIZE_M: Final[float] = 172e-6
     DATA_PATH: Final[str] = '/entry/data/data'
     ENERGY_PATH: Final[str] = '/entry/instrument/NDAttributes/monoE'
     EXPOSURE_PATH: Final[str] = '/entry/instrument/NDAttributes/ExposureTime'
@@ -80,6 +83,9 @@ class APS12IDDiffractionFileReader(DiffractionFileReader):
                 num_patterns_per_array=[num_patterns],
                 pattern_dtype=data_dtype,
                 detector_extent=ImageExtent(detector_width, detector_height),
+                detector_pixel_geometry=PixelGeometry(
+                    width_m=self.DETECTOR_PIXEL_SIZE_M, height_m=self.DETECTOR_PIXEL_SIZE_M
+                ),
                 probe_energy_eV=probe_energy_eV,
                 exposure_time_s=exposure_time_s,
                 file_path=file_path,
@@ -106,6 +112,9 @@ class APS12IDDiffractionFileReader(DiffractionFileReader):
                 num_patterns_per_array=[1] * len(array_list),
                 pattern_dtype=data_dtype,
                 detector_extent=ImageExtent(detector_width, detector_height),
+                detector_pixel_geometry=PixelGeometry(
+                    width_m=self.DETECTOR_PIXEL_SIZE_M, height_m=self.DETECTOR_PIXEL_SIZE_M
+                ),
                 probe_energy_eV=probe_energy_eV,
                 exposure_time_s=exposure_time_s,
                 file_path=file_path.parent / file_pattern,

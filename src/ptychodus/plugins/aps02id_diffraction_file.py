@@ -2,11 +2,12 @@ from collections.abc import Mapping
 from pathlib import Path
 import logging
 import re
+from typing import Final
 
 import h5py
 import numpy
 
-from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     DiffractionArray,
     DiffractionDataset,
@@ -23,6 +24,11 @@ logger = logging.getLogger(__name__)
 
 
 class APS2IDDiffractionFileReader(DiffractionFileReader):
+    # These files carry no detector metadata, so the pitch of the Eiger detectors on
+    # these instruments stands in for it. Override it from the metadata page when a
+    # different detector is in use.
+    DETECTOR_PIXEL_SIZE_M: Final[float] = 75e-6
+
     def _get_file_series(self, file_path: Path) -> tuple[Mapping[int, Path], str]:
         file_path_dict: dict[int, Path] = dict()
 
@@ -52,6 +58,10 @@ class APS2IDDiffractionFileReader(DiffractionFileReader):
                     num_patterns_per_array=[num_patterns_per_array] * len(file_path_mapping),
                     pattern_dtype=h5data.dtype,
                     detector_extent=ImageExtent(detector_width, detector_height),
+                    detector_pixel_geometry=PixelGeometry(
+                        width_m=self.DETECTOR_PIXEL_SIZE_M,
+                        height_m=self.DETECTOR_PIXEL_SIZE_M,
+                    ),
                     file_path=file_path.parent / file_pattern,
                 )
                 contents_tree = DiffractionDatasetLayoutNode.create_root()
