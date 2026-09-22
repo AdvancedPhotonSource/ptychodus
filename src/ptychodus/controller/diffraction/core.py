@@ -1,6 +1,6 @@
 import logging
 
-from PyQt5.QtCore import QModelIndex
+from PyQt5.QtCore import QItemSelection, QModelIndex
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QDialog,
@@ -98,8 +98,10 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         if selection_model is None:
             raise ValueError('selection_model is None!')
         else:
-            selection_model.currentChanged.connect(self._on_tree_selection_changed)
-            selection_model.currentChanged.connect(self._update_enabled_buttons)
+            selection_model.currentChanged.connect(self._on_current_changed)
+            # Deselecting a row leaves currentIndex() valid and emits no currentChanged,
+            # so the panel would otherwise keep showing a row nobody has selected.
+            selection_model.selectionChanged.connect(self._on_selection_changed)
 
         self._image_controller.clear_array()
 
@@ -139,31 +141,58 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
     def _set_current_dataset_index(self, index: int) -> None:
         self._current_dataset_index = index
 
-    def _on_tree_selection_changed(self, current: QModelIndex, previous: QModelIndex) -> None:
-        # Update the image preview based on the selected tree node.
-        if current.isValid():
-            node = current.internalPointer()
-            data = node.get_data()
-            if data is not None:
-                dataset_row = self._tree_model.dataset_row_for_index(current)
-                dataset = (
-                    self._repository[dataset_row]
-                    if dataset_row is not None and 0 <= dataset_row < len(self._repository)
-                    else None
-                )
-                if dataset is not None:
-                    pixel_geometry = dataset.get_processed_pixel_geometry()
-                    self._image_controller.set_array(data, pixel_geometry)
-                else:
-                    self._image_controller.clear_array()
-            else:
-                self._image_controller.clear_array()
-        else:
-            self._image_controller.clear_array()
+    def _selected_index(self) -> QModelIndex:
+        """The tree's current row, or an invalid index when nothing is selected."""
+        selection_model = self._view.tree_view.selectionModel()
+
+        if selection_model is None or not selection_model.hasSelection():
+            return QModelIndex()
+
+        return selection_model.currentIndex()
+
+    def _dataset_for_index(self, index: QModelIndex) -> AssembledDiffractionDataset | None:
+        """The dataset containing any tree row — dataset, frame group, or frame."""
+        dataset_row = self._tree_model.dataset_row_for_index(index)
+
+        if dataset_row is None or not 0 <= dataset_row < len(self._repository):
+            return None
+
+        return self._repository[dataset_row]
+
+    def _on_current_changed(self, current: QModelIndex, previous: QModelIndex) -> None:
+        self._sync_to_selection()
+
+    def _on_selection_changed(self, selected: QItemSelection, deselected: QItemSelection) -> None:
+        self._sync_to_selection()
+
+    def _sync_to_selection(self) -> None:
+        current = self._selected_index()
+        self._show_selected_pattern(current)
 
         # And track the containing dataset as the panel's current dataset.
         dataset_row = self._tree_model.dataset_row_for_index(current)
         self._set_current_dataset_index(dataset_row if dataset_row is not None else -1)
+        self._update_enabled_buttons(current)
+
+    def _show_selected_pattern(self, current: QModelIndex) -> None:
+        """Display the selected node's pattern.
+
+        Each level answers get_data() with what describes its own scope: the mean over
+        the whole dataset, the mean over one frame group, or a single frame.
+        """
+        dataset = self._dataset_for_index(current)
+
+        if dataset is None:
+            self._image_controller.clear_array()
+            return
+
+        data = current.internalPointer().get_data()
+
+        if data is None:
+            self._image_controller.clear_array()
+            return
+
+        self._image_controller.set_array(data, dataset.get_processed_pixel_geometry())
 
     def _save_dataset(self) -> None:
         dataset_index = self._current_dataset_index
@@ -222,20 +251,11 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
         self._view.info_label.setText(self._repository.get_info_text())
 
     def _refresh_enabled_buttons(self) -> None:
-        """Re-run the button gating against whatever the tree currently has selected.
+        """Re-run the button gating against whatever the tree currently has selected."""
+        self._update_enabled_buttons(self._selected_index())
 
-        Used for programmatic refreshes; the currentChanged signal calls
-        _update_enabled_buttons directly with the new index.
-        """
-        self._update_enabled_buttons(self._view.tree_view.currentIndex(), QModelIndex())
-
-    def _update_enabled_buttons(self, current: QModelIndex, previous: QModelIndex) -> None:
-        dataset_row = self._tree_model.dataset_row_for_index(current)
-        dataset = (
-            self._repository[dataset_row]
-            if dataset_row is not None and 0 <= dataset_row < len(self._repository)
-            else None
-        )
+    def _update_enabled_buttons(self, current: QModelIndex) -> None:
+        dataset = self._dataset_for_index(current)
         ready = dataset is not None and not dataset.is_load_in_progress()
 
         self._view.button_box.save_button.setEnabled(ready)
@@ -282,21 +302,13 @@ class DiffractionController(DiffractionDatasetRepositoryObserver):
 
         # Pick a neighbour rather than leaving the panel with nothing selected, as the
         # Products and Fluorescence panels do.
-        selection_model = self._view.tree_view.selectionModel()
-        current = selection_model.currentIndex() if selection_model is not None else QModelIndex()
-
-        if not current.isValid():
+        if not self._selected_index().isValid():
             row_count = self._tree_model.rowCount()
 
             if row_count > 0:
                 self._select_dataset_row(min(index, row_count - 1))
-                current = (
-                    selection_model.currentIndex() if selection_model is not None else QModelIndex()
-                )
 
-        dataset_row = self._tree_model.dataset_row_for_index(current)
-        self._set_current_dataset_index(dataset_row if dataset_row is not None else -1)
-        self._refresh_enabled_buttons()
+        self._sync_to_selection()
 
     def handle_metadata_changed(self, index: int, dataset: AssembledDiffractionDataset) -> None:
         self._update_info_text()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+from collections.abc import Callable, Iterable
 from typing import Any, Final, cast, overload
 
 import numpy
@@ -65,24 +66,99 @@ class _TreeNode:
         return None
 
     def get_row(self) -> int:
-        return 0 if self.parent_node is None else self.parent_node.child_nodes.index(self)
+        parent_node = self.parent_node
+
+        if parent_node is None:
+            return 0
+
+        try:
+            return parent_node.child_nodes.index(self)
+        except ValueError:
+            # Detached by a subtree rebuild. Qt can still ask while it tears the old
+            # rows down, and -1 reads back as an invalid index rather than a wrong row.
+            return -1
 
 
 class _DatasetTreeNode(_TreeNode):
+    """A dataset row, owning one array node per frame group.
+
+    ``_array_nodes`` is the canonical structure and always holds one node per
+    assembled array. ``child_nodes`` is the presentation, which hides the group
+    level for a dataset that has only one frame group, since that group's columns
+    and mean pattern would repeat its parent's exactly. Frame nodes are parented to
+    whichever node actually shows them, so row and parent lookups need no special
+    case for the collapsed shape.
+    """
+
     def __init__(self, parent_node: _TreeNode, dataset: AssembledDiffractionDataset) -> None:
         super().__init__(parent_node)
         self._dataset = dataset
+        self._array_nodes: list[_ArrayTreeNode] = []
 
     def get_dataset(self) -> AssembledDiffractionDataset:
         return self._dataset
+
+    def get_num_arrays(self) -> int:
+        return len(self._array_nodes)
+
+    def set_arrays_from_dataset(self) -> None:
+        """Re-read the array list, discarding nodes that view a replaced buffer."""
+        self._array_nodes = [_ArrayTreeNode(self, array) for array in self._dataset]
+
+    def add_array_node(self, array_row: int, array: AssembledDiffractionArray) -> _ArrayTreeNode:
+        array_node = _ArrayTreeNode(self, array)
+        self._array_nodes.insert(array_row, array_node)
+        return array_node
+
+    def create_children(self) -> list[_TreeNode]:
+        """Build the presented children without installing them.
+
+        The caller installs them inside the begin/end insert pair Qt requires, which
+        is why this returns the list rather than assigning ``child_nodes``.
+        """
+        if not self._array_nodes:
+            return []
+
+        if len(self._array_nodes) == 1:
+            array_node = self._array_nodes[0]
+            array_node.child_nodes = []
+            return _create_frame_nodes(array_node, self)
+
+        children: list[_TreeNode] = []
+
+        for array_node in self._array_nodes:
+            array_node.child_nodes = _create_frame_nodes(array_node, array_node)
+            children.append(array_node)
+
+        return children
+
+    def frame_offset_of(self, array_node: _ArrayTreeNode) -> int:
+        """Position of the array's first frame among the dataset's frames.
+
+        Recomputed on demand rather than cached: arrays are bisect-inserted by array
+        index, so one landing out of order shifts every later offset, and only the
+        handful of rows Qt is painting ever ask.
+        """
+        offset = 0
+
+        for node in self._array_nodes:
+            if node is array_node:
+                break
+
+            offset += node.get_nframes()
+
+        return offset
 
     def get_label(self) -> str:
         return self._dataset.get_name()
 
     def get_counts(self) -> int:
-        if not self.child_nodes:
-            return 0
-        return sum(child.get_counts() for child in self.child_nodes) // len(self.child_nodes)
+        return int(self._dataset.get_mean_total_counts())
+
+    def get_nframes(self) -> int:
+        # Summed over the array nodes rather than the presented children, so the
+        # answer is the same in both shapes and costs one term per frame group.
+        return sum(node.get_nframes() for node in self._array_nodes)
 
     def get_data(self) -> DiffractionPattern | None:
         return self._dataset.get_mean_pattern()
@@ -107,11 +183,23 @@ class _DatasetTreeNode(_TreeNode):
 
 
 class _ArrayTreeNode(_TreeNode):
-    def __init__(self, parent_node: _TreeNode, array: AssembledDiffractionArray) -> None:
-        super().__init__(parent_node)
+    """A frame group. Owned by its dataset node even when it is not presented."""
+
+    def __init__(self, dataset_node: _DatasetTreeNode, array: AssembledDiffractionArray) -> None:
+        super().__init__(dataset_node)
+        self._dataset_node = dataset_node
         self._array = array
-        for frame_index in range(array.get_num_patterns()):
-            self.child_nodes.append(_FrameTreeNode(self, array, frame_index))
+        # Snapshot both reductions: get_num_patterns() and get_patterns() each gather
+        # through the shared buffer's index mask, the latter returning a copy, and the
+        # Frames and Size columns ask on every repaint.
+        self._num_patterns = array.get_num_patterns()
+        self._nbytes = array.get_patterns().nbytes
+
+    def get_array(self) -> AssembledDiffractionArray:
+        return self._array
+
+    def get_frame_offset(self) -> int:
+        return self._dataset_node.frame_offset_of(self)
 
     def get_label(self) -> str:
         return self._array.get_label()
@@ -119,14 +207,11 @@ class _ArrayTreeNode(_TreeNode):
     def get_counts(self) -> int:
         return int(self._array.get_mean_total_counts())
 
-    def get_max_counts(self) -> int:
-        return int(self._array.get_max_total_counts())
-
     def get_nframes(self) -> int:
-        return len(self.child_nodes)
+        return self._num_patterns
 
     def get_nbytes(self) -> int:
-        return self._array.get_patterns().nbytes
+        return self._nbytes
 
     def get_data(self) -> DiffractionPattern:
         return self._array.get_mean_pattern()
@@ -136,27 +221,38 @@ class _FrameTreeNode(_TreeNode):
     def __init__(
         self,
         parent_node: _TreeNode,
-        array: AssembledDiffractionArray,
+        array_node: _ArrayTreeNode,
         frame_index: int,
     ) -> None:
         super().__init__(parent_node)
-        self._array = array
+        self._array_node = array_node
         self._frame_index = frame_index
 
     def get_label(self) -> str:
-        return f'Frame {self._frame_index}'
+        # Numbered across the whole dataset, so a frame keeps its name whether or not
+        # its group level is shown, and "Frame 3" names one frame rather than one per
+        # group.
+        return f'Frame {self._array_node.get_frame_offset() + self._frame_index}'
 
     def get_counts(self) -> int:
-        return int(self._array.get_total_counts(self._frame_index))
+        return int(self._array_node.get_array().get_total_counts(self._frame_index))
 
     def get_nframes(self) -> int:
         return 1
 
     def get_nbytes(self) -> int:
-        return self._array.get_pattern(self._frame_index).nbytes
+        return self._array_node.get_array().get_pattern(self._frame_index).nbytes
 
     def get_data(self) -> DiffractionPattern:
-        return self._array.get_pattern(self._frame_index)
+        return self._array_node.get_array().get_pattern(self._frame_index)
+
+
+def _create_frame_nodes(array_node: _ArrayTreeNode, parent_node: _TreeNode) -> list[_TreeNode]:
+    """One frame node per pattern, parented to whichever node presents them."""
+    return [
+        _FrameTreeNode(parent_node, array_node, frame_index)
+        for frame_index in range(array_node.get_nframes())
+    ]
 
 
 def _state_font(state: DiffractionDatasetState) -> QFont | None:
@@ -175,13 +271,19 @@ def _find_containing_dataset_row(node: _TreeNode) -> int | None:
     current: _TreeNode | None = node
     while current is not None:
         if isinstance(current, _DatasetTreeNode):
-            return current.get_row()
+            row = current.get_row()
+            return row if row >= 0 else None
         current = current.parent_node
     return None
 
 
 class DiffractionTreeModel(QAbstractItemModel):
-    """Three-level tree: root → dataset → array → frame."""
+    """Tree of root → dataset → frame group → frame.
+
+    The frame-group level is omitted for a dataset that holds a single group, whose
+    frames hang directly off the dataset row instead; see
+    :meth:`_DatasetTreeNode.create_children`.
+    """
 
     def __init__(
         self,
@@ -235,9 +337,8 @@ class DiffractionTreeModel(QAbstractItemModel):
     def _attach_dataset(self, dataset_row: int, dataset: AssembledDiffractionDataset) -> None:
         """Build the dataset's rows and start watching it for row-level changes."""
         self.insert_dataset(dataset_row, dataset)
-
-        for array_row in range(len(dataset)):
-            self.insert_array(dataset_row, array_row, dataset[array_row])
+        self._update_max_counts(iter(dataset))
+        self._replace_dataset_children(dataset_row, _DatasetTreeNode.set_arrays_from_dataset)
 
         observer = _DatasetRowObserver(self, dataset)
         dataset.add_observer(observer)
@@ -282,6 +383,10 @@ class DiffractionTreeModel(QAbstractItemModel):
         dataset_row = self._row_of(dataset)
 
         if dataset_row is not None:
+            # clear(), reload() and import_assembled_patterns() all replace the array
+            # list wholesale, so the existing subtree views a buffer that is gone.
+            self._update_max_counts(iter(dataset))
+            self._replace_dataset_children(dataset_row, _DatasetTreeNode.set_arrays_from_dataset)
             self.refresh_dataset(dataset_row)
 
     def _dataset_node(self, dataset_row: int) -> _DatasetTreeNode | None:
@@ -298,39 +403,104 @@ class DiffractionTreeModel(QAbstractItemModel):
         if dataset_node is None:
             return
 
-        max_counts = int(array.get_max_total_counts())
+        self._update_max_counts([array])
+
+        if dataset_node.get_num_arrays() < 2:
+            # Crossing 0→1 hides the group level and 1→2 reveals it, so the dataset's
+            # children are replaced wholesale. Cheap here: at most two groups of frames.
+            self._replace_dataset_children(
+                dataset_row, lambda node: node.add_array_node(array_row, array)
+            )
+            return
+
+        # Already grouped, so the new group is one more row among its siblings.
+        dataset_index = self.index(dataset_row, 0)
+        self.beginInsertRows(dataset_index, array_row, array_row)
+        array_node = dataset_node.add_array_node(array_row, array)
+        array_node.child_nodes = _create_frame_nodes(array_node, array_node)
+        dataset_node.child_nodes.insert(array_row, array_node)
+        self.endInsertRows()
+
+        # Frames are numbered across the dataset, so the later groups renumber.
+        self._refresh_frame_labels(dataset_index, array_row + 1)
+
+    def _replace_dataset_children(
+        self, dataset_row: int, mutate: Callable[[_DatasetTreeNode], Any]
+    ) -> None:
+        """Swap one dataset's whole subtree, announced as a removal then an insert.
+
+        Qt has no way to express a reparent, so every change that moves frames between
+        the dataset row and a group row — a reload, or an array landing that hides or
+        reveals the group level — goes through here.
+        """
+        dataset_node = self._dataset_node(dataset_row)
+        if dataset_node is None:
+            return
+
+        dataset_index = self.index(dataset_row, 0)
+        num_children = len(dataset_node.child_nodes)
+
+        if num_children > 0:
+            self.beginRemoveRows(dataset_index, 0, num_children - 1)
+            dataset_node.child_nodes = []
+            self.endRemoveRows()
+
+        mutate(dataset_node)
+        children = dataset_node.create_children()
+
+        if children:
+            self.beginInsertRows(dataset_index, 0, len(children) - 1)
+            dataset_node.child_nodes = children
+            self.endInsertRows()
+
+    def _update_max_counts(self, arrays: Iterable[AssembledDiffractionArray]) -> None:
+        """Raise the scale the counts bars are drawn against, restyling every row."""
+        max_counts = max((int(array.get_max_total_counts()) for array in arrays), default=0)
+
         if self._max_counts < max_counts:
             self._max_counts = max_counts
             self._rebroadcast_counts()
 
-        dataset_index = self.index(dataset_row, 0)
-        self.beginInsertRows(dataset_index, array_row, array_row)
-        array_node = _ArrayTreeNode(dataset_node, array)
-        dataset_node.child_nodes.insert(array_row, array_node)
-        self.endInsertRows()
+    def _refresh_frame_labels(self, dataset_index: QModelIndex, first_array_row: int) -> None:
+        """Renumber the frames of the groups an insert shifted."""
+        for array_row in range(first_array_row, self.rowCount(dataset_index)):
+            array_index = self.index(array_row, 0, dataset_index)
+            num_frames = self.rowCount(array_index)
 
-        # Also announce the frame grandchildren.
-        array_index = self.index(array_row, 0, dataset_index)
-        num_frames = len(array_node.child_nodes)
-        if num_frames > 0:
-            self.beginInsertRows(array_index, 0, num_frames - 1)
-            self.endInsertRows()
+            if num_frames > 0:
+                top_left = self.index(0, _COL_NAME, array_index)
+                bottom_right = self.index(num_frames - 1, _COL_NAME, array_index)
+                self.dataChanged.emit(top_left, bottom_right)
 
     def refresh_array(self, dataset_row: int, array_row: int) -> None:
+        dataset_node = self._dataset_node(dataset_row)
+        if dataset_node is None:
+            return
+
         dataset_index = self.index(dataset_row, 0)
         if not dataset_index.isValid():
+            return
+
+        if dataset_node.get_num_arrays() < 2:
+            # Collapsed: the group has no row of its own, so refresh the frames it
+            # contributed together with the dataset row that summarizes them.
+            self.refresh_dataset(dataset_row)
+            self._refresh_child_rows(dataset_index)
             return
 
         top_left = self.index(array_row, 0, dataset_index)
         bottom_right = self.index(array_row, self.columnCount() - 1, dataset_index)
         self.dataChanged.emit(top_left, bottom_right)
+        self._refresh_child_rows(top_left)
 
-        num_rows = self.rowCount(top_left)
-        num_cols = self.columnCount(top_left)
+    def _refresh_child_rows(self, parent: QModelIndex) -> None:
+        """Emit dataChanged across every direct child row of parent."""
+        num_rows = self.rowCount(parent)
+
         if num_rows > 0:
-            child_top_left = self.index(0, 0, top_left)
-            child_bottom_right = self.index(num_rows - 1, num_cols - 1, top_left)
-            self.dataChanged.emit(child_top_left, child_bottom_right)
+            top_left = self.index(0, 0, parent)
+            bottom_right = self.index(num_rows - 1, self.columnCount() - 1, parent)
+            self.dataChanged.emit(top_left, bottom_right)
 
     def refresh_dataset(self, dataset_row: int) -> None:
         dataset_index = self.index(dataset_row, 0)
@@ -339,31 +509,26 @@ class DiffractionTreeModel(QAbstractItemModel):
         bottom_right = self.index(dataset_row, self.columnCount() - 1)
         self.dataChanged.emit(dataset_index, bottom_right)
 
-    def _rebroadcast_counts(self) -> None:
-        num_rows = self.rowCount()
+    def _rebroadcast_counts(self, parent: QModelIndex = QModelIndex()) -> None:
+        """Re-emit the counts column at every level below parent.
+
+        The bars are percentages of _max_counts, so a brighter array landing restyles
+        every existing row. Only nodes that have children are descended into, to avoid
+        minting a QModelIndex per frame on a dataset that holds tens of thousands.
+        """
+        node = parent.internalPointer() if parent.isValid() else self._root
+        num_rows = len(node.child_nodes)
+
         if num_rows == 0:
             return
-        top_left = self.index(0, 1)
-        bottom_right = self.index(num_rows - 1, 1)
+
+        top_left = self.index(0, _COL_COUNTS, parent)
+        bottom_right = self.index(num_rows - 1, _COL_COUNTS, parent)
         self.dataChanged.emit(top_left, bottom_right)
 
-        for dataset_row in range(num_rows):
-            dataset_index = self.index(dataset_row, 0)
-            num_arrays = self.rowCount(dataset_index)
-            if num_arrays == 0:
-                continue
-            array_top_left = self.index(0, 1, dataset_index)
-            array_bottom_right = self.index(num_arrays - 1, 1, dataset_index)
-            self.dataChanged.emit(array_top_left, array_bottom_right)
-
-            for array_row in range(num_arrays):
-                array_index = self.index(array_row, 0, dataset_index)
-                num_frames = self.rowCount(array_index)
-                if num_frames == 0:
-                    continue
-                frame_top_left = self.index(0, 1, array_index)
-                frame_bottom_right = self.index(num_frames - 1, 1, array_index)
-                self.dataChanged.emit(frame_top_left, frame_bottom_right)
+        for row, child_node in enumerate(node.child_nodes):
+            if child_node.child_nodes:
+                self._rebroadcast_counts(self.index(row, 0, parent))
 
     def dataset_row_for_index(self, index: QModelIndex) -> int | None:
         """Return the dataset row that contains the given tree index, or None."""
@@ -532,6 +697,11 @@ class DiffractionTreeModel(QAbstractItemModel):
         return QModelIndex()
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
+        if parent.isValid() and parent.column() > 0:
+            # Children hang off column 0 alone. Answering for every column would make
+            # index(row, 0, parent) collide across the columns of one parent row.
+            return 0
+
         node = parent.internalPointer() if parent.isValid() else self._root
         return len(node.child_nodes)
 

@@ -271,6 +271,59 @@ def test_empty_array_counts_accessors_return_zero() -> None:
     assert array.get_mean_total_counts() == 0.0
 
 
+# ---------- Dataset mean total counts ----------
+
+
+def _load_unequal_arrays_dataset() -> AssembledDiffractionDataset:
+    """The four known-counts patterns split across two arrays, 1 frame then 3."""
+    registry = SettingsRegistry()
+    detector_settings = DetectorSettings(registry)
+    diffraction_settings = DiffractionSettings(registry)
+    task_manager = _InlineTaskManager()
+    dataset = AssembledDiffractionDataset(
+        diffraction_settings,
+        detector_settings,
+        task_manager,  # type: ignore[arg-type]
+        DiffractionTaskMonitor(task_manager),  # type: ignore[arg-type]
+    )
+    patterns = _known_counts_array().get_patterns()
+    arrays = [
+        SimpleDiffractionArray('one', numpy.array([10], dtype=numpy.intp), patterns[3:]),
+        SimpleDiffractionArray('three', numpy.array([7, 8, 9], dtype=numpy.intp), patterns[:3]),
+    ]
+    metadata = DiffractionMetadata(
+        num_patterns_per_array=[1, 3],
+        pattern_dtype=numpy.dtype(numpy.int32),
+        detector_extent=ImageExtent(width_px=2, height_px=2),
+    )
+    source = SimpleDiffractionDataset(metadata, DiffractionDatasetLayoutNode.create_root(), arrays)
+    dataset.reload(source)
+    dataset.load_all_arrays(process_patterns=True, block=True)
+    return dataset
+
+
+def test_dataset_mean_total_counts_weights_arrays_by_frame_count() -> None:
+    """Averaging the per-array means unweighted would answer 25.67 instead of 18.5."""
+    dataset = _load_unequal_arrays_dataset()
+    assert [array.get_num_patterns() for array in dataset] == [1, 3]
+    assert dataset[0].get_mean_total_counts() == pytest.approx(40.0)
+    assert dataset[1].get_mean_total_counts() == pytest.approx(34.0 / 3.0)
+    # (40 + 4 + 10 + 20) / 4
+    assert dataset.get_mean_total_counts() == pytest.approx(18.5)
+
+
+def test_dataset_mean_total_counts_ignores_how_frames_are_grouped() -> None:
+    """The same four frames in one array must answer the same as split across two."""
+    assert _load_dataset_with_bounds().get_mean_total_counts() == pytest.approx(18.5)
+
+
+def test_emptied_dataset_reports_zero_mean_total_counts() -> None:
+    """numpy would divide by a zero frame count; the accessor must not."""
+    dataset = _load_dataset_with_bounds(lower=1_000_000)
+    assert len(dataset) == 0
+    assert dataset.get_mean_total_counts() == 0.0
+
+
 # ---------- compute_dataset_total_counts ----------
 
 
