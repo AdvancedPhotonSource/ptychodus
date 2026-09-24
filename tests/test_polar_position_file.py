@@ -87,12 +87,59 @@ def test_fly_scan_master_delegates_to_the_position_stream(
 
     assert len(positions) == 5
     assert [point.index for point in positions] == [0, 1, 2, 3, 4]
-    assert positions[0].x_m == pytest.approx(100.0 * NANOMETER_M)
-    assert positions[4].y_m == pytest.approx(-250.0 * NANOMETER_M)
+    assert positions[0].x_m == pytest.approx(-100.0 * NANOMETER_M)
+    assert positions[4].y_m == pytest.approx(250.0 * NANOMETER_M)
 
     direct = PolarSoftGlueZynqPositionFileReader().read(tmp_path / 'pos_stream' / 'scan_000001.h5')
     assert [point.index for point in direct] == [point.index for point in positions]
     assert [point.x_m for point in direct] == [point.x_m for point in positions]
+
+
+def test_fly_scan_positions_negate_the_stage_readback(tmp_path: Path) -> None:
+    """Both axes are negated: the stream holds the stage readback, not probe coordinates.
+
+    The beamline's own ``4idd_data_preprocessing_flyscan_v2.py`` applies the same flip as
+    ``ppX = -xs[1:]``, ``ppY = -ys[1:]``. Pinned against the raw fixture values so a
+    reader that stopped negating cannot pass.
+    """
+    raw_x_nm = [100.0, 200.0, 300.0]
+    raw_y_nm = [-50.0, -60.0, -70.0]
+    stream_path = write_pos_stream(
+        tmp_path / 'pos_stream' / 'scan_000003.h5',
+        trigger_indexes=range(len(raw_x_nm)),
+        x_nm=raw_x_nm,
+        y_nm=raw_y_nm,
+    )
+
+    positions = PolarSoftGlueZynqPositionFileReader().read(stream_path)
+
+    assert [point.x_m for point in positions] == pytest.approx(
+        [-value * NANOMETER_M for value in raw_x_nm]
+    )
+    assert [point.y_m for point in positions] == pytest.approx(
+        [-value * NANOMETER_M for value in raw_y_nm]
+    )
+
+
+def test_step_scan_positions_negate_the_motor_readback(
+    reader: PolarPositionFileReader, tmp_path: Path
+) -> None:
+    """The step path negates too, so the two layouts agree on the coordinate frame."""
+    raw_x_um = [10.0, 11.0, 12.0, 13.0]
+    raw_y_um = [20.0, 21.0, 22.0, 23.0]
+    master_path = _write_step_scan(
+        tmp_path,
+        primary={'huber_hp_nanox': raw_x_um, 'huber_hp_nanoy': raw_y_um},
+    )
+
+    positions = reader.read(master_path)
+
+    assert [point.x_m for point in positions] == pytest.approx(
+        [-value * MICROMETER_M for value in raw_x_um]
+    )
+    assert [point.y_m for point in positions] == pytest.approx(
+        [-value * MICROMETER_M for value in raw_y_um]
+    )
 
 
 def test_step_scan_master_reads_the_primary_stream(
@@ -105,9 +152,9 @@ def test_step_scan_master_reads_the_primary_stream(
 
     assert len(positions) == 4
     assert [point.index for point in positions] == [1, 2, 3, 4]
-    assert positions[0].x_m == pytest.approx(10.0 * MICROMETER_M)
-    assert positions[0].y_m == pytest.approx(20.0 * MICROMETER_M)
-    assert positions[3].x_m == pytest.approx(13.0 * MICROMETER_M)
+    assert positions[0].x_m == pytest.approx(-10.0 * MICROMETER_M)
+    assert positions[0].y_m == pytest.approx(-20.0 * MICROMETER_M)
+    assert positions[3].x_m == pytest.approx(-13.0 * MICROMETER_M)
 
 
 def test_step_scan_accepts_the_tagged_tuple_motor_list(
@@ -125,8 +172,8 @@ def test_step_scan_accepts_the_tagged_tuple_motor_list(
 
     positions = reader.read(master_path)
 
-    assert positions[0].x_m == pytest.approx(1.0 * MICROMETER_M)
-    assert positions[0].y_m == pytest.approx(23.0 * MICROMETER_M)
+    assert positions[0].x_m == pytest.approx(-1.0 * MICROMETER_M)
+    assert positions[0].y_m == pytest.approx(-23.0 * MICROMETER_M)
 
 
 def test_step_scan_without_motors_metadata_falls_back(
@@ -136,7 +183,7 @@ def test_step_scan_without_motors_metadata_falls_back(
 
     positions = reader.read(master_path)
 
-    assert positions[0].x_m == pytest.approx(10.0 * MICROMETER_M)
+    assert positions[0].x_m == pytest.approx(-10.0 * MICROMETER_M)
 
 
 def test_step_scan_naming_an_absent_motor_raises(

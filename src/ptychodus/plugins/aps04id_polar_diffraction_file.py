@@ -6,7 +6,7 @@ import h5py
 import numpy
 
 from ptychodus.api.constants import EnergyUnit, LengthUnit
-from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     BeamCenter,
     DiffractionDataset,
@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 
 class PolarDiffractionFileReader(DiffractionFileReader):
+    # POLAR runs an Eiger; the files record no pitch, so supply the detector's own.
+    DETECTOR_PIXEL_SIZE_M: Final[float] = 75e-6
     NDARRAY_UNIQUE_ID_PATH: Final[str] = '/entry/instrument/NDAttributes/NDArrayUniqueId'
     DETECTOR_DISTANCE_PATH: Final[str] = '/entry/instrument/NDAttributes/DetectorDistance'
     BEAM_CENTER_X_PATH: Final[str] = '/entry/instrument/NDAttributes/BeamCenterX'
@@ -75,10 +77,14 @@ class PolarDiffractionFileReader(DiffractionFileReader):
 
         The attribute is a per-frame array holding a single distinct value; take the
         first. ``DistancePV`` duplicates it and is not read.
+
+        Only the newest layout writes it. The 2025-2 and 2026-2 layouts omit the
+        attribute entirely, so ``None`` is a normal result and the caller is expected to
+        supply the distance itself.
         """
         try:
             distance_mm = float(h5_file[self.DETECTOR_DISTANCE_PATH][0])
-        except KeyError:
+        except (KeyError, IndexError):
             return None
         else:
             return LengthUnit.MILLIMETER.to_meters(distance_mm)
@@ -88,11 +94,15 @@ class PolarDiffractionFileReader(DiffractionFileReader):
 
         ``BeamCenterPV`` is not read: the file describes it as
         "Eiger pixel center - doesnt work", and it merely duplicates ``BeamCenterX``.
+
+        Only the newest layout writes these. The 2025-2 and 2026-2 layouts omit them
+        entirely, so ``None`` is a normal result and the caller is expected to supply or
+        estimate the center itself.
         """
         try:
             center_x_px = float(h5_file[self.BEAM_CENTER_X_PATH][0])
             center_y_px = float(h5_file[self.BEAM_CENTER_Y_PATH][0])
-        except KeyError:
+        except (KeyError, IndexError):
             return None
         else:
             return BeamCenter(int(round(center_x_px)), int(round(center_y_px)))
@@ -128,6 +138,10 @@ class PolarDiffractionFileReader(DiffractionFileReader):
                     pattern_dtype=data.dtype,
                     detector_distance_m=self._read_detector_distance_m(h5_file),
                     detector_extent=ImageExtent(detector_width, detector_height),
+                    detector_pixel_geometry=PixelGeometry(
+                        width_m=self.DETECTOR_PIXEL_SIZE_M,
+                        height_m=self.DETECTOR_PIXEL_SIZE_M,
+                    ),
                     beam_center=self._read_beam_center(h5_file),
                     probe_energy_eV=probe_energy_eV,
                     file_path=file_path,

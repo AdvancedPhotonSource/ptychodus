@@ -57,6 +57,23 @@ def test_new_format_metadata_is_read(reader: PolarDiffractionFileReader, tmp_pat
     assert metadata.probe_energy_eV == pytest.approx(6204.927737383656)
 
 
+def test_detector_pixel_geometry_is_the_eiger_pitch(
+    reader: PolarDiffractionFileReader, tmp_path: Path
+) -> None:
+    """No POLAR layout records a pixel pitch, so the reader supplies the Eiger's own.
+
+    Without it ``metadata.detector_pixel_geometry`` is None and every api-only consumer
+    -- the scripts/reconstruct_*.py family included -- has to be told the pitch by hand.
+    """
+    master_path = _write_new_format(tmp_path)
+
+    pixel_geometry = reader.read(master_path).get_metadata().detector_pixel_geometry
+
+    assert pixel_geometry is not None
+    assert pixel_geometry.width_m == pytest.approx(75e-6)
+    assert pixel_geometry.height_m == pytest.approx(75e-6)
+
+
 def test_old_format_yields_energy_without_detector_attributes(
     reader: PolarDiffractionFileReader, tmp_path: Path
 ) -> None:
@@ -142,8 +159,10 @@ def test_fly_scan_patterns_pair_with_triggers_offset_by_one(tmp_path: Path) -> N
 
     by_index = {point.index: point for point in positions}
 
+    # Negated, because the readers report probe-relative coordinates rather than the
+    # stage readback the stream holds.
     for pattern_index in pattern_indexes:
-        assert by_index[pattern_index].x_m == pytest.approx(x_nm[pattern_index] * NANOMETER_M)
+        assert by_index[pattern_index].x_m == pytest.approx(-x_nm[pattern_index] * NANOMETER_M)
 
 
 def test_step_scan_patterns_pair_with_positions_one_to_one(tmp_path: Path) -> None:
@@ -173,7 +192,7 @@ def test_step_scan_patterns_pair_with_positions_one_to_one(tmp_path: Path) -> No
     by_index = {point.index: point for point in positions}
 
     for ordinal, pattern_index in enumerate(pattern_indexes):
-        assert by_index[pattern_index].x_m == pytest.approx(motor_x[ordinal] * 1e-6)
+        assert by_index[pattern_index].x_m == pytest.approx(-motor_x[ordinal] * 1e-6)
 
 
 def test_gapped_fly_scan_pairing_survives_dropped_frames(tmp_path: Path) -> None:
@@ -201,8 +220,10 @@ def test_gapped_fly_scan_pairing_survives_dropped_frames(tmp_path: Path) -> None
 
     assert pattern_indexes == [1, 2, 4, 5]
 
+    # Negated, because the readers report probe-relative coordinates rather than the
+    # stage readback the stream holds.
     for pattern_index in pattern_indexes:
-        assert by_index[pattern_index].x_m == pytest.approx(x_nm[pattern_index] * NANOMETER_M)
+        assert by_index[pattern_index].x_m == pytest.approx(-x_nm[pattern_index] * NANOMETER_M)
 
 
 def test_polar_diffraction_reader_registers() -> None:

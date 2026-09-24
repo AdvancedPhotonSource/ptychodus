@@ -19,6 +19,15 @@ cancels on both sides and frame ``k`` pairs with position ``k``: strict 1:1.
 The eiger ``NDAttributes/Xpos`` and ``Ypos`` arrays are deliberately **not** read. They
 are identically zero in every POLAR file available to us, and reading them yields a
 full-length scan sitting at the origin with no error raised.
+
+Both layouts negate x and y. These files record the stage readback, and moving the stage
+``+x`` moves the probe ``-x`` relative to the sample, so the flip converts to the
+probe-relative frame. The fly-scan sign is verified against the beamline's own
+``4idd_data_preprocessing_flyscan_v2.py`` (``ppX = -xs[1:]``, ``ppY = -ys[1:]``); the
+step-scan sign is **inferred** from it, since no reference script covers that path. It is
+the same physical stage recorded through bluesky rather than softGlueZynq, so the same
+convention should hold -- but a step scan that comes out mirrored is corrected with
+``[ProbePositions] Affine00 = Affine11 = -1`` rather than by editing this reader.
 """
 
 from pathlib import Path
@@ -162,8 +171,8 @@ class PolarPositionFileReader(ProbePositionFileReader):
             [
                 ProbePosition(
                     int(idx),
-                    LengthUnit.MICROMETER.to_meters(float(x)),
-                    LengthUnit.MICROMETER.to_meters(float(y)),
+                    -LengthUnit.MICROMETER.to_meters(float(x)),
+                    -LengthUnit.MICROMETER.to_meters(float(y)),
                 )
                 for idx, x, y in zip(indexes, position_x, position_y)
             ]

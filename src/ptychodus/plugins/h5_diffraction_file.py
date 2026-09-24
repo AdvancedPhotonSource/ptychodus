@@ -1,6 +1,16 @@
 from pathlib import Path
 import logging
 
+try:
+    # NOTE must import hdf5plugin before h5py. Detector vendors write their frames
+    # through HDF5 filter plugins -- bitshuffle/LZ4 (32008) on every APS Eiger -- and
+    # without this the read fails with an opaque OSError about /usr/local/lib/plugin.
+    # model/core.py does the same for the GUI and batch paths; repeating it here covers
+    # every api-only consumer, which is what the scripts/reconstruct_*.py family is.
+    import hdf5plugin  # noqa
+except ModuleNotFoundError:
+    pass
+
 import h5py
 import numpy
 

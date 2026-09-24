@@ -35,6 +35,12 @@ def read_position_stream(file_path: Path) -> ProbePositionSequence:
     zero, while the diffraction reader emits 1-based frame indexes. Frame ``k`` therefore
     pairs with trigger ``k + 1`` and trigger ``0`` is left over -- the offset
     ``process_flyscan.plot_data`` implements as ``x[1:]``. Do not shift here.
+
+    Both coordinates are negated. The stream records the stage readback, and moving the
+    stage ``+x`` moves the probe ``-x`` relative to the sample, so the sign flip converts
+    to the probe-relative frame every consumer expects. The beamline's own
+    ``4idd_data_preprocessing_flyscan_v2.py`` applies it as ``ppX = -xs[1:]``,
+    ``ppY = -ys[1:]``, and the LamNI reader negates both axes for the same reason.
     """
     with h5py.File(file_path, 'r') as h5_file:
         try:
@@ -111,8 +117,8 @@ def read_position_stream(file_path: Path) -> ProbePositionSequence:
     point_list = [
         ProbePosition(
             int(trigger_index),
-            LengthUnit.NANOMETER.to_meters(float(x)),
-            LengthUnit.NANOMETER.to_meters(float(y)),
+            -LengthUnit.NANOMETER.to_meters(float(x)),
+            -LengthUnit.NANOMETER.to_meters(float(y)),
             probe_photon_count=float(i0),
         )
         for trigger_index, x, y, i0 in zip(trigger_indexes, xs, ys, i0s)
