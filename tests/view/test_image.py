@@ -1,9 +1,10 @@
 from __future__ import annotations
+from collections.abc import Iterator
 from decimal import Decimal
 
 import pytest
 
-from PyQt5.QtCore import QPoint, Qt
+from PyQt5.QtCore import QEvent, QPoint, Qt
 from PyQt5.QtTest import QTest
 
 from ptychodus.api.geometry import Interval
@@ -15,12 +16,27 @@ def _iv(lower, upper) -> Interval[Decimal]:
 
 
 @pytest.fixture
-def slider(qapp) -> DecimalRangeSlider:
-    del qapp
+def slider(qapp) -> Iterator[DecimalRangeSlider]:  # type: ignore[no-untyped-def]
+    """A shown slider, torn down deterministically after the test.
+
+    The teardown is load-bearing, not tidiness. Showing a top-level widget queues a
+    window-system activation event holding a raw ``QWidget *``. If the widget is
+    garbage-collected while that event is still pending, the next ``show()`` flushes
+    the queue from inside ``QOffscreenWindow``'s constructor and dereferences the freed
+    widget (``QApplication::setActiveWindow`` -> ``QWidget::setFocus``), segfaulting the
+    whole session. Draining the queue while the widget is still alive and then deleting
+    it explicitly leaves no stale pointer for the next test to trip over.
+    """
     widget = DecimalRangeSlider.create_instance(Qt.Orientation.Horizontal)
     widget.resize(400, 40)
     widget.show()
-    return widget
+
+    yield widget
+
+    widget.close()
+    widget.deleteLater()
+    qapp.processEvents()
+    qapp.sendPostedEvents(None, QEvent.Type.DeferredDelete)
 
 
 def _capture(widget: DecimalRangeSlider) -> list[Interval]:
