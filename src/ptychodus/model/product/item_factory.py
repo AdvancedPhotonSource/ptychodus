@@ -99,12 +99,16 @@ class ProductRepositoryItemFactory:
         )
 
     def create_from_product(
-        self, product: Product, *, dataset: AssembledDiffractionDataset | None = None
+        self,
+        product: Product,
+        *,
+        name: str | None = None,
+        dataset: AssembledDiffractionDataset | None = None,
     ) -> ProductRepositoryItem:
         metadata_item = MetadataRepositoryItem(
             self._settings,
             self._repository,
-            name=product.metadata.name,
+            name=product.metadata.name if name is None else name,
             comments=product.metadata.comments,
             detector_distance_m=product.metadata.detector_distance_m,
             probe_energy_eV=product.metadata.probe_energy_eV,

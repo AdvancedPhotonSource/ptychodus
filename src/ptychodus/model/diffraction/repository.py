@@ -5,6 +5,7 @@ import logging
 
 from ptychodus.api.constants import format_bytes
 
+from ..naming import create_unique_name
 from ..task_manager import TaskManager
 from .dataset import AssembledDiffractionDataset
 from .monitor import DiffractionTaskMonitor
@@ -93,15 +94,9 @@ class DiffractionDatasetRepository(Sequence[AssembledDiffractionDataset]):
             pass
 
     def create_unique_name(self, candidate_name: str) -> str:
-        reserved_names = {dataset.get_name() for dataset in self._dataset_list}
-        name = candidate_name or 'Unnamed'
-        match = 0
-
-        while name in reserved_names:
-            match += 1
-            name = f'{candidate_name}-{match}'
-
-        return name
+        return create_unique_name(
+            candidate_name, {dataset.get_name() for dataset in self._dataset_list}
+        )
 
     def insert_dataset(self, dataset: AssembledDiffractionDataset) -> int:
         index = len(self._dataset_list)

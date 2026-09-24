@@ -16,6 +16,7 @@ from ptychodus.api.reconstruct import (
 from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parameters import Parameter, StringParameter
 
+from ..naming import split_name_counter
 from ..product import ProductAPI
 from ..task_manager import TaskManager
 from .monitor import (
@@ -25,6 +26,25 @@ from .monitor import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _build_output_product_name(input_name: str, algorithm: str, suffix: str) -> str:
+    """Name a reconstruction output after its input product.
+
+    The collision counter is stripped first so that continuing a reconstruction from an
+    earlier output recognizes the algorithm tag it already carries and lets the counter
+    advance, instead of appending the same tag again. The odd/even suffix is peeled and
+    re-applied for the same reason.
+    """
+    stem, _ = split_name_counter(input_name)
+
+    if suffix and stem.endswith(f'_{suffix}'):
+        stem = stem[: -len(suffix) - 1]
+
+    if not stem.endswith(f'_{algorithm}'):
+        stem += f'_{algorithm}'
+
+    return f'{stem}_{suffix}' if suffix else stem
 
 
 class ProcessingAlgorithmParameter(Parameter[str], Observer):
@@ -153,18 +173,17 @@ class ProcessingAPI:
     ) -> int:
         self.set_reconstructor_if_provided(algorithm)
         input_product_item = self._product_api.get_item(product_index)
+        output_product_name = _build_output_product_name(
+            input_product_item.get_name(),
+            self._algorithm_parameter.get_value(),
+            output_product_suffix,
+        )
         output_product_index = self._product_api.insert_product(
-            input_product_item.get_product(), dataset=input_product_item.get_dataset()
+            input_product_item.get_product(),
+            name=output_product_name,
+            dataset=input_product_item.get_dataset(),
         )
         output_product_item = self._product_api.get_item(output_product_index)
-        output_product_name = (
-            f'{input_product_item.get_name()}_{self._algorithm_parameter.get_value()}'
-        )
-
-        if output_product_suffix and not output_product_name.endswith(f'_{output_product_suffix}'):
-            output_product_name += f'_{output_product_suffix}'
-
-        output_product_item.set_name(output_product_name)
         reconstruct_input = self.get_reconstruct_input(
             product_index=output_product_index,
             index_filter=index_filter,

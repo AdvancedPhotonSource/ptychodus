@@ -25,13 +25,17 @@ def _make_dataset(num_maps: int, shape: tuple[int, int]) -> FluorescenceDataset:
     )
 
 
-def _make_item(measured: FluorescenceDataset) -> FluorescenceRepositoryItem:
+def _make_item(measured: FluorescenceDataset, *, name: str = 'item') -> FluorescenceRepositoryItem:
     return FluorescenceRepositoryItem(
         MagicMock(),
-        name='item',
+        name=name,
         product=MagicMock(),
         measured=measured,
     )
+
+
+def _make_named_item(name: str) -> FluorescenceRepositoryItem:
+    return _make_item(_make_dataset(1, (2, 2)), name=name)
 
 
 def test_item_nbytes_covers_the_measured_dataset() -> None:
@@ -81,3 +85,27 @@ def test_info_text_shrinks_after_removal() -> None:
     repo.remove_item(0)
 
     assert repo.get_info_text() == 'Datasets: 1 [4.00 kB]'
+
+
+def test_create_unique_name_returns_input_when_free() -> None:
+    assert FluorescenceRepository(MagicMock()).create_unique_name('foo') == 'foo'
+
+
+def test_create_unique_name_suffixes_collisions() -> None:
+    repo = FluorescenceRepository(MagicMock())
+    repo.insert_item(_make_named_item('foo'))
+    repo.insert_item(_make_named_item('foo-1'))
+
+    assert repo.create_unique_name('foo') == 'foo-2'
+
+
+def test_create_unique_name_increments_rather_than_nests() -> None:
+    repo = FluorescenceRepository(MagicMock())
+    repo.insert_item(_make_named_item('foo'))
+    repo.insert_item(_make_named_item('foo-1'))
+
+    assert repo.create_unique_name('foo-1') == 'foo-2'
+
+
+def test_create_unique_name_maps_empty_to_unnamed() -> None:
+    assert FluorescenceRepository(MagicMock()).create_unique_name('') == 'Unnamed'

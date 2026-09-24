@@ -1,4 +1,4 @@
-"""Unit tests for ProductRepository.get_info_text."""
+"""Unit tests for ProductRepository.get_info_text and create_unique_name."""
 
 from __future__ import annotations
 
@@ -11,6 +11,12 @@ def _make_item(nbytes: int, *, pending: bool = False) -> MagicMock:
     item = MagicMock()
     item.is_pending.return_value = pending
     item.get_product.return_value = MagicMock(nbytes=nbytes)
+    return item
+
+
+def _make_named_item(name: str) -> MagicMock:
+    item = MagicMock()
+    item.get_name.return_value = name
     return item
 
 
@@ -48,3 +54,27 @@ def test_info_text_shrinks_after_removal() -> None:
     repo.remove_product(0)
 
     assert repo.get_info_text() == 'Products: 1 [2.00 MB]'
+
+
+def test_create_unique_name_returns_input_when_free() -> None:
+    assert ProductRepository().create_unique_name('foo') == 'foo'
+
+
+def test_create_unique_name_suffixes_collisions() -> None:
+    repo = ProductRepository()
+    repo.insert_product(_make_named_item('foo'))
+    repo.insert_product(_make_named_item('foo-1'))
+
+    assert repo.create_unique_name('foo') == 'foo-2'
+
+
+def test_create_unique_name_increments_rather_than_nests() -> None:
+    repo = ProductRepository()
+    repo.insert_product(_make_named_item('foo'))
+    repo.insert_product(_make_named_item('foo-1'))
+
+    assert repo.create_unique_name('foo-1') == 'foo-2'
+
+
+def test_create_unique_name_maps_empty_to_unnamed() -> None:
+    assert ProductRepository().create_unique_name('') == 'Unnamed'

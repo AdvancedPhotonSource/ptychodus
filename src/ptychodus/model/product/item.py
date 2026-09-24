@@ -110,8 +110,14 @@ class ProductRepositoryItem(ParameterGroup):
         preserved (peripheral scan/probe/object repositories continue to observe
         the same subgroup instances they registered at insert time). The item's
         index in the ProductRepository never changes.
+
+        The stub's own name survives the assign. The stub already holds the name the
+        caller asked for, whereas source was built while the stub occupied that name and
+        so carries a counter suffix that exists only to avoid colliding with this stub.
         """
+        name = self.get_name()
         self._metadata_item.assign(source._metadata_item.get_metadata())
+        self.set_name(name)
         # Bind the dataset (and thus the detector extent on the geometry) BEFORE
         # rebuilding probe/object subgroups — their _rebuild() otherwise sees an
         # invalid pixel geometry and silently no-ops, leaving them empty.

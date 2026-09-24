@@ -553,13 +553,26 @@ class ProductAPI:
         self,
         product: Product,
         *,
+        name: str | None = None,
         dataset: AssembledDiffractionDataset | None = None,
         block: bool = True,
     ) -> int:
-        def build() -> ProductRepositoryItem:
-            return self._item_factory.create_from_product(product, dataset=dataset)
+        """Insert a copy of product, optionally overriding the name it carries.
 
-        return self._insert_via_queue(dataset, build, block=block, stub_name=product.metadata.name)
+        Passing name here rather than renaming the inserted item keeps the repository from
+        ever reserving the product's own name as a transient collision, which would push
+        the intended name onto a counter suffix.
+        """
+
+        def build() -> ProductRepositoryItem:
+            return self._item_factory.create_from_product(product, name=name, dataset=dataset)
+
+        return self._insert_via_queue(
+            dataset,
+            build,
+            block=block,
+            stub_name=product.metadata.name if name is None else name,
+        )
 
     def insert_product_from_settings(
         self,

@@ -32,12 +32,34 @@ class _Mocks:
     geometry: MagicMock
 
 
+def _make_metadata_item(name: str) -> MagicMock:
+    """A metadata mock whose name parameter stores what is written to it.
+
+    ``assign`` overwrites the name from the incoming metadata, the way the real
+    MetadataRepositoryItem does, so the test can tell whose name survives the copy.
+    """
+    metadata_item = MagicMock()
+    holder = [name]
+
+    def get_value() -> str:
+        return holder[0]
+
+    def set_value(value: str) -> None:
+        holder[0] = value
+
+    metadata_item.name.get_value.side_effect = get_value
+    metadata_item.name.set_value.side_effect = set_value
+    metadata_item.get_metadata.return_value.name = name
+    metadata_item.assign.side_effect = lambda metadata: set_value(metadata.name)
+    return metadata_item
+
+
 def _make_item(
-    *, losses: list[LossValue], dataset: MagicMock | None
+    *, losses: list[LossValue], dataset: MagicMock | None, name: str = 'item'
 ) -> tuple[ProductRepositoryItem, _Mocks]:
     mocks = _Mocks(
         parent=MagicMock(),
-        metadata_item=MagicMock(),
+        metadata_item=_make_metadata_item(name),
         probe_positions_item=MagicMock(),
         probe_item=MagicMock(),
         object_item=MagicMock(),
@@ -60,8 +82,12 @@ def _make_item(
 
 
 def _make_source_and_stub() -> tuple[ProductRepositoryItem, ProductRepositoryItem, _Mocks, _Mocks]:
-    source, source_mocks = _make_item(losses=[LossValue(epoch=1, value=0.5)], dataset=MagicMock())
-    stub, stub_mocks = _make_item(losses=[], dataset=None)
+    # The stub holds the name the caller asked for; the source was built while the stub
+    # already occupied it, so it carries the collision-avoidance counter.
+    source, source_mocks = _make_item(
+        losses=[LossValue(epoch=1, value=0.5)], dataset=MagicMock(), name='scan-1'
+    )
+    stub, stub_mocks = _make_item(losses=[], dataset=None, name='scan')
     return source, stub, source_mocks, stub_mocks
 
 
@@ -98,3 +124,13 @@ def test_copy_contents_from_copies_all_state() -> None:
     assert stub._losses == source._losses
     assert stub._dataset is source._dataset
     stub_mocks.parent.handle_losses_changed.assert_called_once_with(stub)
+
+
+def test_copy_contents_from_keeps_the_stub_name() -> None:
+    source, stub, _source_mocks, _stub_mocks = _make_source_and_stub()
+
+    stub.copy_contents_from(source)
+
+    # The source's 'scan-1' exists only because the stub was holding 'scan' while the
+    # source was built; letting it win would grow the name on every queued insert.
+    assert stub.get_name() == 'scan'
