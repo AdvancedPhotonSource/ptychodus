@@ -8,7 +8,7 @@ import h5py
 import numpy
 
 from ptychodus.api.constants import HC_EV_ANGSTROM
-from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     DiffractionArray,
     DiffractionDataset,
@@ -23,6 +23,10 @@ from .h5_diffraction_file import H5DiffractionPatternArray
 
 logger = logging.getLogger(__name__)
 
+# Splits a series member's stem into its fixed prefix and its trailing frame counter;
+# see the note in aps02id_diffraction_file.py.
+_SERIES_STEM: Final = re.compile(r'(?P<prefix>.*?)(?P<frame>\d+)(?P<tail>\D*)')
+
 
 class ISNDiffractionFileReader(DiffractionFileReader):
     """Reader for APS 19-ID-E In-situ Nanoprobe diffraction data.
@@ -35,23 +39,40 @@ class ISNDiffractionFileReader(DiffractionFileReader):
     supplied by the user via GUI settings. Frames are indexed by array order.
     """
 
+    # These files record no detector geometry, so the pitch of the Eiger in use at this
+    # instrument stands in for it, as it does for the other APS readers. A pitch found
+    # in the file would still win; none is written today.
+    DETECTOR_PIXEL_SIZE_M: Final[float] = 75e-6
     DATA_PATH: Final[str] = '/entry/data/data'
     WAVELENGTH_PATH: Final[str] = '/entry/instrument/NDAttributes/Wavelength'
     COUNT_TIME_PATH: Final[str] = '/entry/instrument/NDAttributes/CountTime'
 
     def _get_file_series(self, file_path: Path) -> tuple[Mapping[int, Path], str]:
+        """Collect the frames of one scan, keyed by frame number.
+
+        The counter is the last digit run in the stem, with every earlier digit field
+        pinned to its literal value. Both ISN namings need that rule: the newer
+        `scan_1307_00001.h5` would survive a longest-run heuristic, but the older
+        `19ide_0179_000.h5` has a four-digit scan number ahead of a three-digit
+        counter, so choosing by length would glob across scans instead of frames.
+        """
+        member = _SERIES_STEM.fullmatch(file_path.stem)
+
+        if member is None:
+            raise ValueError(f'File name "{file_path.name}" carries no frame number.')
+
+        prefix = member['prefix']
+        tail = member['tail'] + file_path.suffix
+        width = len(member['frame'])
+        file_pattern = f'{prefix}(\\d{{{width}}}){tail}'
+        series_regex = re.compile(f'{re.escape(prefix)}(?P<frame>\\d{{{width}}}){re.escape(tail)}')
         file_path_dict: dict[int, Path] = dict()
 
-        digits = re.findall(r'\d+', file_path.stem)
-        longest_digits = max(digits, key=len)
-        file_pattern = file_path.name.replace(longest_digits, f'(\\d{{{len(longest_digits)}}})')
-
         for fp in file_path.parent.iterdir():
-            z = re.match(file_pattern, fp.name)
+            z = series_regex.fullmatch(fp.name)
 
             if z:
-                index = int(z.group(1))
-                file_path_dict[index] = fp
+                file_path_dict[int(z['frame'])] = fp
 
         return file_path_dict, file_pattern
 
@@ -111,6 +132,10 @@ class ISNDiffractionFileReader(DiffractionFileReader):
             num_patterns_per_array=num_patterns_per_array,
             pattern_dtype=pattern_dtype,
             detector_extent=detector_extent,
+            detector_pixel_geometry=PixelGeometry(
+                width_m=self.DETECTOR_PIXEL_SIZE_M,
+                height_m=self.DETECTOR_PIXEL_SIZE_M,
+            ),
             probe_energy_eV=probe_energy_eV,
             exposure_time_s=exposure_time_s,
             file_path=file_path.parent / file_pattern,

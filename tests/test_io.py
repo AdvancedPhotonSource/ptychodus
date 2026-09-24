@@ -140,6 +140,9 @@ class TestStandardFileLayout:
     def test_model_basename(self) -> None:
         assert StandardFileLayout.MODEL_BASENAME == 'model'
 
+    def test_ptychi_options_filename(self) -> None:
+        assert StandardFileLayout.PTYCHI_OPTIONS == 'ptychi_options.json'
+
     def test_all_values_are_strings(self) -> None:
         for member in StandardFileLayout:
             assert isinstance(member.value, str)
@@ -148,6 +151,7 @@ class TestStandardFileLayout:
         assert StandardFileLayout.PRODUCT.path(Path('/x')) == Path('/x/product.h5')
         assert StandardFileLayout.FLUORESCENCE.path(Path('/x')) == Path('/x/fluorescence.h5')
         assert StandardFileLayout.SETTINGS.path(Path('/x')) == Path('/x/settings.ini')
+        assert StandardFileLayout.PTYCHI_OPTIONS.path(Path('/x')) == Path('/x/ptychi_options.json')
 
     def test_checkpoint_path_inserts_zero_padded_epoch(self) -> None:
         assert StandardFileLayout.PRODUCT.checkpoint_path(Path('/x'), 42) == Path(

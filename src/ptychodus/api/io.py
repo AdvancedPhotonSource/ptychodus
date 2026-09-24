@@ -77,16 +77,19 @@ class StandardFileLayout(StrEnum):
     # f'{input_directory}/{MODEL_BASENAME}{ext}'.
     MODEL_BASENAME = 'model'
     PRODUCT = 'product.h5'
+    # Serialized reconstructor options: the resolved task a run was launched with,
+    # after every value the product supplies has been folded in. Distinct from
+    # SETTINGS, which holds the application's own configuration rather than what the
+    # reconstruction backend received.
+    PTYCHI_OPTIONS = 'ptychi_options.json'
     SETTINGS = 'settings.ini'
 
     def path(self, directory: Path) -> Path:
         return directory / self.value
 
     def checkpoint_path(self, directory: Path, epoch: int) -> Path:
-        # Convention shared by scripts/ptychodus_reconstruct.py and
-        # model/processing/monitor.py::ReconstructBackgroundTask, which write
-        # per-epoch snapshots beside the final artifact during streaming
-        # reconstructions.
+        # Per-epoch snapshot beside the final artifact, for a streaming reconstruction
+        # that publishes intermediate results.
         p = Path(self.value)
         return directory / f'{p.stem}.{epoch:06d}{p.suffix}'
 

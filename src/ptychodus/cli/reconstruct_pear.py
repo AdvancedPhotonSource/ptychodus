@@ -9,9 +9,14 @@ stage below runs through ``ptychodus.api``; only the pty-chi task boundary comes
 Scope and limitations
 ---------------------
 
-- Output is a ptychodus product. The settings-encoding output directory convention is
-  preserved, so a run lands where it would have, but the per-iteration TIFF stacks,
-  plots, and per-epoch HDF5 of the original workflow are not written.
+- The settings-encoding output directory convention is preserved, so a run lands where
+  it would have. There is deliberately no output argument: the parameter file already
+  names the destination through ``recon_dir_base``, or through the per-instrument
+  convention derived from ``data_directory``, and an argument could only override it.
+- That directory is filled in the ptychodus standard layout -- ``diffraction.h5``,
+  ``ptychi_options.json``, per-epoch ``product.NNNNNN.h5`` checkpoints, and the final
+  ``product.h5``. The per-iteration TIFF stacks and plots of the original workflow are
+  still not written.
 - One reconstruction only: no batch queue, no multi-scan shared-object mode, no
   affine-calibration loop.
 - No GPU selection, ``CUDA_VISIBLE_DEVICES``, thread-count, or default-device side
@@ -61,7 +66,7 @@ from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import CropRegion
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.object import Object, compute_object_geometry
-from ptychodus.api.io import save_product
+from ptychodus.api.io import StandardFileLayout, save_diffraction_data, save_product
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import (
     DiffractionPrepPipeline,
@@ -87,6 +92,7 @@ from ptychodus.api.simulate.probe import (
 )
 from ptychodus.model.ptychi.task import (
     align_task_options_with_product,
+    dump_task_options,
     reconstruct_with_ptychi,
 )
 
@@ -108,6 +114,7 @@ _INSTRUMENT_READERS: Final[dict[str, _Readers]] = {
     'bnp': _Readers('APS_BNP', 'APS_BNP'),
     'bionanoprobe': _Readers('APS_BNP', 'APS_BNP'),
     '12idc': _Readers('APS_PtychoSAXS', 'APS_PtychoSAXS'),
+    'isn': _Readers('APS_ISN', 'APS_ISN_MDA'),
     'lynx': _Readers('APS_LamNI', 'APS_LamNI'),
     'lynx_v2': _Readers('APS_LamNI', 'APS_LamNI'),
     'velo': _Readers('APS_Velociprobe', 'APS_Velociprobe_PE'),
@@ -267,7 +274,7 @@ def _batch_size(params: PearParameters, num_patterns: int) -> int:
     return max(1, num_patterns // number_of_batches)
 
 
-def _output_directory(params: PearParameters, options: LSQMLOptions, num_patterns: int) -> Path:
+def _output_directory(params: PearParameters, options: LSQMLOptions, pattern_width_px: int) -> Path:
     """Build the settings-encoding output directory name.
 
     The name records the configuration that produced the run, so sibling directories
@@ -295,7 +302,10 @@ def _output_directory(params: PearParameters, options: LSQMLOptions, num_pattern
         BatchingModes.COMPACT: 'c',
     }.get(reconstructor_options.batching_mode, '')
 
-    name = f'Ndp{num_patterns}_LSQML_{batching_suffix}{reconstructor_options.batch_size}'
+    # Ndp is the pattern edge in pixels, matching pear_save_recon.py, which builds it
+    # from data.shape[1]. Naming it after the pattern count instead puts every run in
+    # a directory the original workflow would never have written.
+    name = f'Ndp{pattern_width_px}_LSQML_{batching_suffix}{reconstructor_options.batch_size}'
 
     momentum_gain = reconstructor_options.momentum_acceleration_gain or 0.0
 
@@ -393,8 +403,13 @@ def _resolve_inputs(params: PearParameters, readers: _Readers) -> tuple[Path, Pa
     instrument = params.instrument.lower()
 
     if instrument in ('2ide', '2xfm'):
-        diffraction = base / 'ptycho' / f'fly{scan:03d}_data_000001.h5'
+        # Three digits, not six: the beamline writes fly054_data_001.h5. The reader
+        # globs the remaining frames from whichever member it is handed.
+        diffraction = base / 'ptycho' / f'fly{scan:03d}_data_001.h5'
         positions = base / 'mda' / f'2xfm_{scan:04d}.mda'
+    elif instrument == 'isn':
+        diffraction = base / 'PTYCHO' / f'19ide_{scan:04d}_000.h5'
+        positions = base / 'mda' / f'19ide_{scan:04d}.mda'
     elif instrument in ('bnp', 'bionanoprobe'):
         diffraction = base / 'ptycho' / f'bnp_fly{scan:04d}_000000.h5'
         positions = base / 'mda' / f'bnp_fly{scan:04d}.mda'
@@ -410,7 +425,9 @@ def _resolve_inputs(params: PearParameters, readers: _Readers) -> tuple[Path, Pa
     elif instrument in ('velo', 'velociprobe'):
         diffraction = base / 'ptycho' / f'fly{scan:03d}' / f'fly{scan:03d}_master.h5'
         positions = base / 'positions' / f'fly{scan:03d}_0.txt'
-    else:  # 'simu' and anything else fold_slice-shaped
+    elif instrument == 'simu':
+        diffraction, positions = _resolve_fold_slice_pair(base, scan)
+    else:
         raise ValueError(
             f'No directory convention for instrument {instrument!r}; give explicit '
             '"path_to_diffraction_file" and "path_to_position_file" keys.'
@@ -425,6 +442,52 @@ def _resolve_inputs(params: PearParameters, readers: _Readers) -> tuple[Path, Pa
                 f'Resolved {role} path does not exist: {path}. Override it with '
                 f'"path_to_{role}_file" in the parameter file.'
             )
+
+    return diffraction, positions
+
+
+def _resolve_fold_slice_pair(base: Path, scan: int) -> tuple[Path, Path]:
+    """Locate the `data_roi*_dp.hdf5` / `_para.hdf5` pair for one scan.
+
+    Unlike the raw layouts, the file name embeds preprocessing choices -- the ROI, the
+    pattern size, the downsampling -- that the scan number does not determine, so the
+    directory is derived and the file within it is globbed. A scan preprocessed several
+    ways yields several candidates and is reported rather than guessed at.
+    """
+    candidates = [
+        base / 'results' / f'{scan:03d}',
+        base / 'results' / f'{scan}',
+        base / 'results' / 'ML_recon' / f'scan{scan:03d}',
+        base / 'results' / 'ML_recon' / f'scan{scan:06d}',
+        base / 'results' / 'ML_recon' / f'fly{scan:03d}',
+        base,
+    ]
+    found = [
+        match
+        for directory in candidates
+        if directory.is_dir()
+        for match in sorted(directory.glob('data_roi*_dp.hdf5'))
+    ]
+
+    if not found:
+        tried = ', '.join(str(directory) for directory in candidates)
+        raise FileNotFoundError(
+            f'No "data_roi*_dp.hdf5" found for scan {scan}. Looked in: {tried}. '
+            'Give explicit "path_to_diffraction_file" and "path_to_position_file" keys.'
+        )
+
+    if len(found) > 1:
+        names = ', '.join(str(match) for match in found)
+        raise ValueError(
+            f'Scan {scan} has several preprocessed pairs: {names}. Name the one you want '
+            'with "path_to_diffraction_file" and "path_to_position_file".'
+        )
+
+    diffraction = found[0]
+    positions = diffraction.with_name(diffraction.name.replace('_dp.hdf5', '_para.hdf5'))
+
+    if not positions.is_file():
+        raise FileNotFoundError(f'Found {diffraction} but no matching "{positions.name}".')
 
     return diffraction, positions
 
@@ -735,10 +798,9 @@ def main() -> int:
         help="Flat JSON parameter file, as written by PEAR's batch loop.",
     )
     parser.add_argument(
-        '--output-product',
-        type=Path,
-        default=None,
-        help='Destination for the product HDF5; the encoded output directory otherwise.',
+        '--no-save-diffraction',
+        action='store_true',
+        help='Skip diffraction.h5. The assembled patterns can run to several GB.',
     )
     parser.add_argument(
         '--num-sync-epochs',
@@ -804,14 +866,23 @@ def main() -> int:
         from ptychodus.api.diffraction import BeamCenter
 
         extent = raw_metadata.detector_extent
-        center = BeamCenter(
-            x_px=params.diff_pattern_center_x
-            if params.diff_pattern_center_x is not None
-            else extent.width_px // 2,
-            y_px=params.diff_pattern_center_y
-            if params.diff_pattern_center_y is not None
-            else extent.height_px // 2,
-        )
+
+        # Precedence: the parameter file, then whatever the instrument recorded, then
+        # the detector midpoint. The midpoint is a guess and is logged as one -- on a
+        # 1028x512 Eiger the real center sits nowhere near it.
+        if params.diff_pattern_center_x is not None and params.diff_pattern_center_y is not None:
+            center = BeamCenter(
+                x_px=params.diff_pattern_center_x, y_px=params.diff_pattern_center_y
+            )
+            center_source = 'the parameter file'
+        elif raw_metadata.beam_center is not None:
+            center = raw_metadata.beam_center
+            center_source = 'the diffraction file'
+        else:
+            center = BeamCenter(x_px=extent.width_px // 2, y_px=extent.height_px // 2)
+            center_source = 'the detector midpoint (no value given or recorded)'
+
+        logger.info('Beam center (%d, %d) from %s', center.x_px, center.y_px, center_source)
         region = CropRegion.from_center_extent(center, ImageExtent(crop_px, crop_px))
         read_region = region.clamp_to_detector_extent(raw_metadata.detector_extent)
 
@@ -861,8 +932,12 @@ def main() -> int:
     magnification = compute_magnification(detector_distance_m, focus_object_distance_m)
     image_extent = assembled_data.get_image_extent()
 
-    if magnification != 1.0:
-        # Cone beam: the detector pixels project onto the sample demagnified.
+    if params.near_field_ptycho:
+        # Near field: the detector pixels project onto the sample through the cone,
+        # demagnified by M. Keying this off `magnification != 1.0` instead would send
+        # the parallel-beam case -- no focusing optic, so M is exactly 1 and the object
+        # pixel equals the detector pixel -- down the far-field branch, which returns a
+        # completely different pixel size with nothing to signal the substitution.
         pixel_m = detector_pixel_geometry.width_m / magnification
         probe_geometry = ProbeGeometry(
             width_px=image_extent.width_px,
@@ -990,12 +1065,30 @@ def main() -> int:
     )
 
     options = _build_lsqml_options(params, probe_sequence, num_patterns)
-    output_product = args.output_product or (
-        _output_directory(params, options, num_patterns) / 'product.h5'
-    )
+
+    # The parameter file already names where a run belongs -- `recon_dir_base`, or the
+    # per-instrument convention derived from `data_directory` -- so there is no output
+    # argument to supersede it. That directory becomes the standard-layout root.
+    output_directory = _output_directory(params, options, image_extent.width_px)
+    diffraction_file = StandardFileLayout.DIFFRACTION.path(output_directory)
+    options_file = StandardFileLayout.PTYCHI_OPTIONS.path(output_directory)
+    product_file = StandardFileLayout.PRODUCT.path(output_directory)
+    num_sync_epochs = args.num_sync_epochs or params.save_freq_iterations
 
     if args.dry_run:
-        logger.info('Resolved output: %s', output_product)
+        logger.info('Resolved output directory: %s', output_directory)
+        logger.info('Would write %s', product_file)
+        logger.info(
+            'Would write checkpoints like %s',
+            StandardFileLayout.PRODUCT.checkpoint_path(output_directory, num_sync_epochs),
+        )
+
+        if not args.no_save_diffraction:
+            logger.info('Would write %s', diffraction_file)
+
+        # The options file records the ALIGNED options, which only exist past the call
+        # this dry run stops before, so it is the one artifact a dry run cannot preview.
+        logger.info('Would write %s once the options are aligned', options_file)
         logger.info(
             'Resolved options: %d epochs, batch %d (%s), %s noise, probe %s, object %s',
             options.reconstructor_options.num_epochs,
@@ -1005,15 +1098,30 @@ def main() -> int:
             probe_sequence.get_array().shape,
             object_.get_array().shape,
         )
-        logger.info('Dry run: stopping before the reconstruction.')
+        logger.info('Nothing written: stopping before the reconstruction.')
         return 0
+
+    output_directory.mkdir(parents=True, exist_ok=True)
+
+    # Ahead of the reconstruction, so an interrupted run still leaves the directory
+    # usable: the assembled patterns are the one artifact that cannot be rebuilt without
+    # the raw beamline files.
+    if args.no_save_diffraction:
+        logger.info('Skipping %s as requested', diffraction_file.name)
+    else:
+        logger.info('Writing %s', diffraction_file)
+        save_diffraction_data(diffraction_file, assembled_data)
 
     task_options = align_task_options_with_product(options, product)
     task_options.check()
 
+    # The aligned options are the ones that ran: they carry the object pixel size, the
+    # wavelength and the slice spacings the product supplied.
+    logger.info('Writing %s', options_file)
+    options_file.write_text(dump_task_options(task_options))
+
     reconstruct_input = prepare_reconstruct_input(assembled_data, product)
     num_epochs = int(task_options.reconstructor_options.num_epochs)
-    num_sync_epochs = args.num_sync_epochs or params.save_freq_iterations
 
     logger.info(
         'Starting reconstruction: %d patterns, %d epochs, sync every %d',
@@ -1030,14 +1138,18 @@ def main() -> int:
         losses = output.product.losses
         last_loss = losses[-1].value if losses else float('nan')
         logger.info('Epoch %d/%d: loss=%.6g', output.progress, num_epochs, last_loss)
+
+        checkpoint_file = StandardFileLayout.PRODUCT.checkpoint_path(
+            output_directory, output.progress
+        )
+        save_product(checkpoint_file, output.product)
         final_output = output
 
     if final_output is None:
         raise RuntimeError('Reconstruction produced no output.')
 
-    output_product.parent.mkdir(parents=True, exist_ok=True)
-    save_product(output_product, final_output.product)
-    logger.info('Saved the reconstructed product to %s', output_product)
+    save_product(product_file, final_output.product)
+    logger.info('Saved the reconstructed product to %s', product_file)
     return 0
 
 

@@ -563,6 +563,118 @@ class MDAFlatScanPositionFileReader(ProbePositionFileReader):
         return _require_points(point_list, mda_file, file_path)
 
 
+def _require_detectors(mda_file: MDAFile, count: int, file_path: Path) -> RealArrayType:
+    """Return the detector array, or explain why it cannot supply `count` channels."""
+    detector_array = mda_file.scan.data.detector_array
+
+    if detector_array.ndim != 2 or detector_array.shape[0] < count:
+        raise ProbePositionParseError(
+            f'"{file_path}" has {mda_file.scan.info.num_detectors} detector channel(s);'
+            f' this reader needs {count}.'
+        )
+
+    return detector_array
+
+
+def _select_channel(
+    mda_file: MDAFile,
+    description: str,
+    index_fallback: int,
+    axis: str,
+    file_path: Path,
+) -> int:
+    """Index of the detector channel holding one axis, by description then by position.
+
+    Matching the description survives a channel list that grows or is reordered, which
+    an index cannot. An ambiguous description is an error rather than a guess: picking
+    the first of several matches is how a reconstruction ends up silently built on the
+    wrong axis.
+    """
+    detectors = mda_file.scan.info.detector
+    wanted = description.casefold()
+    matches = [i for i, d in enumerate(detectors) if wanted in d.description.casefold()]
+
+    if len(matches) == 1:
+        return matches[0]
+
+    if len(matches) > 1:
+        named = ', '.join(f'd[{i}] {detectors[i].description!r}' for i in matches)
+        raise ProbePositionParseError(
+            f'"{file_path}" has {len(matches)} detector channels matching {description!r}'
+            f' for the {axis} axis: {named}. Cannot choose between them.'
+        )
+
+    if index_fallback < len(detectors):
+        logger.debug(
+            'No detector channel in "%s" describes %r; falling back to d[%d] %r for %s.',
+            file_path,
+            description,
+            index_fallback,
+            detectors[index_fallback].description,
+            axis,
+        )
+        return index_fallback
+
+    named = ', '.join(f'd[{i}] {d.description!r}' for i, d in enumerate(detectors))
+    raise ProbePositionParseError(
+        f'"{file_path}" has no detector channel describing {description!r} for the {axis}'
+        f' axis, and no d[{index_fallback}] to fall back to. Channels present: {named}.'
+    )
+
+
+class MDADetectorChannelPositionFileReader(ProbePositionFileReader):
+    """Read scan positions from MDA detector channels rather than from positioners.
+
+    A fly scan drives a single trajectory positioner and records each axis encoder as a
+    detector channel, so :class:`MDAFlatScanPositionFileReader`, which requires two
+    positioners, cannot read one. APS 19-ID-E In-situ Nanoprobe files have exactly that
+    shape: rank 1, one positioner (``19idAERO:m2.VAL``, the X setpoint) and 28 detector
+    channels, among them ``19idAERO:m2.RBV`` ("X Axis") and ``19idAERO:SM1.RBV``
+    ("Piezo Y (all)") -- the encoder readbacks the reconstruction needs.
+
+    The readbacks are preferred over the setpoint: a fly scan does not stop on the
+    demanded coordinate, so the setpoint describes the trajectory rather than where each
+    frame was taken.
+    """
+
+    def __init__(
+        self,
+        scale_to_meters: float,
+        *,
+        x_description: str,
+        y_description: str,
+        x_index_fallback: int,
+        y_index_fallback: int,
+    ) -> None:
+        self._scale_to_meters = scale_to_meters
+        self._x_description = x_description
+        self._y_description = y_description
+        self._x_index_fallback = x_index_fallback
+        self._y_index_fallback = y_index_fallback
+
+    def read(self, file_path: Path) -> ProbePositionSequence:
+        point_list: list[ProbePosition] = list()
+
+        mda_file = MDAFile.read(file_path)
+        x_index = _select_channel(
+            mda_file, self._x_description, self._x_index_fallback, 'x', file_path
+        )
+        y_index = _select_channel(
+            mda_file, self._y_description, self._y_index_fallback, 'y', file_path
+        )
+        detector_array = _require_detectors(mda_file, 1 + max(x_index, y_index), file_path)
+
+        for idx, (x, y) in enumerate(zip(detector_array[x_index, :], detector_array[y_index, :])):
+            point = ProbePosition(
+                index=idx,
+                x_m=float(x) * self._scale_to_meters,
+                y_m=float(y) * self._scale_to_meters,
+            )
+            point_list.append(point)
+
+        return _require_points(point_list, mda_file, file_path)
+
+
 if __name__ == '__main__':
     file_path = Path(sys.argv[1])
     mda_file = MDAFile.read(file_path)

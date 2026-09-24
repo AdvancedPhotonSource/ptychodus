@@ -32,6 +32,7 @@ from ptychodus.api.probe_positions import ProbePositionParseError
 from ptychodus.plugins.mda import _xdrlib, mda_position_file
 from ptychodus.plugins.mda.mda_position_file import (
     EpicsType,
+    MDADetectorChannelPositionFileReader,
     MDAFile,
     MDAFlatScanPositionFileReader,
     MDAPositionFileReader,
@@ -89,15 +90,25 @@ def _positioner(number: int, name: str) -> bytes:
     )
 
 
-def _detector(number: int, name: str) -> bytes:
-    return _int(number) + _string(name) + _string(f'{name} description') + _string('counts')
+def _detector(number: int, name: str, description: str | None = None) -> bytes:
+    return (
+        _int(number)
+        + _string(name)
+        + _string(f'{name} description' if description is None else description)
+        + _string('counts')
+    )
 
 
 def _trigger(number: int, name: str, command: float) -> bytes:
     return _int(number) + _string(name) + _float(command)
 
 
-def _scan_info(readbacks: list[list[float]], detectors: list[list[float]]) -> bytes:
+def _scan_info(
+    readbacks: list[list[float]],
+    detectors: list[list[float]],
+    detector_descriptions: list[str] | None = None,
+) -> bytes:
+    descriptions = detector_descriptions or [None] * len(detectors)  # type: ignore[list-item]
     return (
         _string('scan1')
         + _string('Jun 19, 2025 13:45:00.000000')
@@ -105,7 +116,7 @@ def _scan_info(readbacks: list[list[float]], detectors: list[list[float]]) -> by
         + _int(len(detectors))
         + _int(1)
         + b''.join(_positioner(i, f'positioner{i}') for i in range(len(readbacks)))
-        + b''.join(_detector(i, f'detector{i}') for i in range(len(detectors)))
+        + b''.join(_detector(i, f'detector{i}', descriptions[i]) for i in range(len(detectors)))
         + _trigger(0, 'trigger0', 1.0)
     )
 
@@ -123,6 +134,7 @@ def _scan(
     rank: int = 1,
     lower_offsets: list[int] | None = None,
     current_point: int | None = None,
+    detector_descriptions: list[str] | None = None,
 ) -> bytes:
     """Rows are always written full width; current_point says how many are real.
 
@@ -133,7 +145,11 @@ def _scan(
     cpt = npts if current_point is None else current_point
     offsets = lower_offsets or []
     header = _int(rank) + _int(npts) + _int(cpt) + b''.join(_int(o) for o in offsets)
-    return header + _scan_info(readbacks, detectors) + _scan_data(readbacks, detectors)
+    return (
+        header
+        + _scan_info(readbacks, detectors, detector_descriptions)
+        + _scan_data(readbacks, detectors)
+    )
 
 
 def _extra_pvs() -> bytes:
@@ -541,3 +557,133 @@ def test_every_mda_reader_registers() -> None:
     names = {plugin.simple_name for plugin in registry.probe_position_file_readers}
 
     assert MDA_READER_NAMES <= names
+
+
+# --- detector-channel positions (APS 19-ID-E In-situ Nanoprobe) ----------------------
+#
+# An ISN fly scan drives one trajectory positioner and records both axis encoders as
+# detector channels. The descriptions below are the ones real 19idAERO files carry.
+
+
+def _write_channel_mda(
+    path: Path,
+    *,
+    positioner: list[float],
+    channels: list[tuple[str, list[float]]],
+) -> Path:
+    """A rank-1 scan with a single positioner and the axes in detector channels."""
+    readbacks = [positioner]
+    detectors = [values for _, values in channels]
+    descriptions = [description for description, _ in channels]
+    header_len = len(_header(1, [len(positioner)], 0))
+    body = _scan(readbacks, detectors, detector_descriptions=descriptions)
+
+    path.write_bytes(_header(1, [len(positioner)], header_len + len(body)) + body + _extra_pvs())
+    return path
+
+
+def _isn_reader(**overrides: object) -> MDADetectorChannelPositionFileReader:
+    kwargs: dict[str, object] = {
+        'x_description': 'X Axis',
+        'y_description': 'Piezo Y',
+        'x_index_fallback': 1,
+        'y_index_fallback': 0,
+    }
+    kwargs.update(overrides)
+    return MDADetectorChannelPositionFileReader(MILLIMETER_M, **kwargs)  # type: ignore[arg-type]
+
+
+@pytest.fixture
+def isn_mda(tmp_path: Path) -> Path:
+    return _write_channel_mda(
+        tmp_path / 'isn.mda',
+        positioner=[1.0, 2.0, 3.0],
+        channels=[
+            ('Piezo Y (all)', [10.0, 20.0, 30.0]),
+            ('X Axis', [1.5, 2.5, 3.5]),
+            ('Z Axis', [-1.0, -1.0, -1.0]),
+        ],
+    )
+
+
+def test_channel_reader_selects_axes_by_description(isn_mda: Path) -> None:
+    positions = _isn_reader().read(isn_mda)
+
+    assert [point.index for point in positions] == [0, 1, 2]
+    assert [pytest.approx(point.x_m) for point in positions] == [
+        1.5 * MILLIMETER_M,
+        2.5 * MILLIMETER_M,
+        3.5 * MILLIMETER_M,
+    ]
+    assert [pytest.approx(point.y_m) for point in positions] == [
+        10.0 * MILLIMETER_M,
+        20.0 * MILLIMETER_M,
+        30.0 * MILLIMETER_M,
+    ]
+
+
+def test_channel_reader_prefers_the_description_over_the_index(tmp_path: Path) -> None:
+    """Reordered channels must still be read correctly; that is the point of matching."""
+    mda = _write_channel_mda(
+        tmp_path / 'reordered.mda',
+        positioner=[1.0, 2.0],
+        channels=[
+            ('Z Axis', [-1.0, -1.0]),
+            ('Piezo Y (all)', [10.0, 20.0]),
+            ('X Axis', [1.5, 2.5]),
+        ],
+    )
+    positions = _isn_reader().read(mda)
+
+    assert positions[0].x_m == pytest.approx(1.5 * MILLIMETER_M)
+    assert positions[0].y_m == pytest.approx(10.0 * MILLIMETER_M)
+
+
+def test_channel_reader_falls_back_to_indexes(tmp_path: Path) -> None:
+    """A file whose descriptions were changed still reads through the pinned indexes."""
+    mda = _write_channel_mda(
+        tmp_path / 'undescribed.mda',
+        positioner=[1.0, 2.0],
+        channels=[
+            ('unlabelled 0', [10.0, 20.0]),
+            ('unlabelled 1', [1.5, 2.5]),
+        ],
+    )
+    positions = _isn_reader().read(mda)
+
+    assert positions[0].x_m == pytest.approx(1.5 * MILLIMETER_M)
+    assert positions[0].y_m == pytest.approx(10.0 * MILLIMETER_M)
+
+
+def test_channel_reader_rejects_an_ambiguous_description(tmp_path: Path) -> None:
+    """Two plausible channels is an error: picking the first would be a silent guess."""
+    mda = _write_channel_mda(
+        tmp_path / 'ambiguous.mda',
+        positioner=[1.0, 2.0],
+        channels=[
+            ('Piezo Y (all)', [10.0, 20.0]),
+            ('X Axis', [1.5, 2.5]),
+            ('X Axis coarse', [9.0, 9.0]),
+        ],
+    )
+    with pytest.raises(ProbePositionParseError, match='Cannot choose between them'):
+        _isn_reader().read(mda)
+
+
+def test_channel_reader_names_the_channels_when_nothing_matches(tmp_path: Path) -> None:
+    mda = _write_channel_mda(
+        tmp_path / 'nomatch.mda',
+        positioner=[1.0, 2.0],
+        channels=[('unlabelled 0', [10.0, 20.0])],
+    )
+    with pytest.raises(ProbePositionParseError, match='unlabelled 0'):
+        _isn_reader(x_index_fallback=9, y_index_fallback=9).read(mda)
+
+
+def test_flat_reader_cannot_read_a_single_positioner_fly_scan(isn_mda: Path) -> None:
+    """Why the channel reader exists: the flat-scan reader needs two positioners.
+
+    Registering the flat reader for ISN made it raise on every real file.
+    """
+    with pytest.raises(ProbePositionParseError, match='this reader needs 2'):
+        MDAFlatScanPositionFileReader(MILLIMETER_M).read(isn_mda)

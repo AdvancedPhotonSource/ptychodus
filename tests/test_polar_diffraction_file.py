@@ -62,8 +62,8 @@ def test_detector_pixel_geometry_is_the_eiger_pitch(
 ) -> None:
     """No POLAR layout records a pixel pitch, so the reader supplies the Eiger's own.
 
-    Without it ``metadata.detector_pixel_geometry`` is None and every api-only consumer
-    -- the scripts/reconstruct_*.py family included -- has to be told the pitch by hand.
+    Without it ``metadata.detector_pixel_geometry`` is None, and a caller then has no
+    way to derive a probe geometry without being told the pitch by hand.
     """
     master_path = _write_new_format(tmp_path)
 

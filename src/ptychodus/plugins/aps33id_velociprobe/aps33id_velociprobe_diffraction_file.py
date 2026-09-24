@@ -34,18 +34,36 @@ class DataGroup:
         array_list: list[DiffractionArray] = list()
         master_file_path = Path(group.file.filename)
 
+        offset = 0
+
         for name, h5_item in sorted(group.items()):
             h5_item = group.get(name, getlink=True)
 
             if isinstance(h5_item, h5py.ExternalLink):
+                external_path = resolve_external_link_path(
+                    master_file_path.parent, h5_item.filename
+                )
+
+                # Each member is measured rather than assumed to hold
+                # `num_patterns_per_array`: a scan whose last file is short otherwise gets
+                # indexes that overrun it, and assembly drops the array with only a
+                # warning. A member that cannot be opened keeps the nominal length, so a
+                # missing file still fails where it is read rather than here.
+                try:
+                    with h5py.File(external_path, 'r') as external_file:
+                        num_patterns = external_file[str(h5_item.path)].shape[0]
+                except (OSError, KeyError):
+                    logger.warning('Cannot size "%s"; assuming nominal length.', external_path)
+                    num_patterns = num_patterns_per_array
+
                 array = H5DiffractionPatternArray(
                     label=name,
-                    indexes=numpy.arange(num_patterns_per_array)
-                    + len(array_list) * num_patterns_per_array,
-                    file_path=resolve_external_link_path(master_file_path.parent, h5_item.filename),
+                    indexes=numpy.arange(num_patterns) + offset,
+                    file_path=external_path,
                     data_path=str(h5_item.path),
                 )
                 array_list.append(array)
+                offset += num_patterns
 
         return cls(array_list)
 
@@ -243,10 +261,17 @@ class VelociprobeDiffractionFileReader(DiffractionFileReader):
                 detector_specific.y_pixels_in_detector,
             )
             probe_energy_eV = detector_specific.photon_energy_eV  # noqa: N806
-            num_arrays = detector_specific.num_patterns_total // num_patterns_per_array
+
+            # Taken from the arrays themselves. Dividing the declared total by the
+            # nominal per-array length undercounts whenever the two disagree -- a real
+            # fly720 master advertises ten members and a total that floors to nine, and
+            # the tenth then has no metadata entry at all.
+            num_patterns_per_array_list = [
+                len(array.get_indexes()) for array in entry.data.array_list
+            ]
 
             metadata = DiffractionMetadata(
-                num_patterns_per_array=[num_patterns_per_array] * num_arrays,
+                num_patterns_per_array=num_patterns_per_array_list,
                 pattern_dtype=pattern_dtype,
                 detector_distance_m=detector.detector_distance_m,
                 detector_extent=detector_extent,

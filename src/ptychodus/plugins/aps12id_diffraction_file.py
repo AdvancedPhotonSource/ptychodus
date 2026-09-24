@@ -32,21 +32,40 @@ def _read_ndattribute_scalar(h5_file: h5py.File, path: str) -> float | None:
     return float(array[0])
 
 
-def _glob_h5_series(file_path: Path) -> tuple[dict[int, Path], str]:
-    file_path_dict: dict[int, Path] = dict()
+# Raw 12-ID scans are written one file per scan point, named
+# <scan>_<line>_<point>.h5, so the series is indexed by TWO fields. Matching a single
+# digit run picks the line and pins the point to whatever the given file happened to
+# carry, collecting one point from each line and silently discarding the rest.
+_POINT_PATTERN: Final = re.compile(r'(?P<prefix>.+)_(?P<line>\d+)_(?P<point>\d+)')
 
-    digits = re.findall(r'\d+', file_path.stem)
-    longest_digits = max(digits, key=len)
-    file_pattern = file_path.name.replace(longest_digits, f'(\\d{{{len(longest_digits)}}})')
 
-    for fp in file_path.parent.iterdir():
-        z = re.match(file_pattern, fp.name)
+def _point_series(file_path: Path) -> tuple[list[tuple[int, int, Path]], str]:
+    """Every (line, point, path) of the series this file belongs to, in scan order.
 
-        if z:
-            index = int(z.group(1))
-            file_path_dict[index] = fp
+    Mirrors `_series` in aps12id_tiff_file.py, which reads the same layout written as
+    TIFF; the two stay deliberately parallel.
+    """
+    match = _POINT_PATTERN.fullmatch(file_path.stem)
 
-    return file_path_dict, file_pattern
+    if match is None:
+        raise ValueError(
+            f'"{file_path.name}" is not named <scan>_<line>_<point>{file_path.suffix}.'
+        )
+
+    prefix = match['prefix']
+    file_pattern = f'{prefix}_(\\d+)_(\\d+){file_path.suffix}'
+    found: list[tuple[int, int, Path]] = []
+
+    for candidate in file_path.parent.glob(f'{prefix}_*{file_path.suffix}'):
+        candidate_match = _POINT_PATTERN.fullmatch(candidate.stem)
+
+        if candidate_match is not None and candidate_match['prefix'] == prefix:
+            found.append((int(candidate_match['line']), int(candidate_match['point']), candidate))
+
+    if not found:
+        raise ValueError(f'No series members found beside "{file_path}".')
+
+    return sorted(found), file_pattern
 
 
 class APS12IDDiffractionFileReader(DiffractionFileReader):
@@ -100,10 +119,12 @@ class APS12IDDiffractionFileReader(DiffractionFileReader):
 
         if len(data_shape) == 2:
             detector_height, detector_width = data_shape
-            file_path_dict, file_pattern = _glob_h5_series(file_path)
+            series, file_pattern = _point_series(file_path)
             array_list: list[DiffractionArray] = list()
 
-            for idx, (_, fp) in enumerate(sorted(file_path_dict.items())):
+            # One pattern per file, ordered by (line, point) so the array order matches
+            # the scan order the position file reports.
+            for idx, (_line, _point, fp) in enumerate(series):
                 indexes = numpy.array([idx])
                 array = H5DiffractionPatternArray(fp.stem, indexes, fp, self.DATA_PATH)
                 array_list.append(array)

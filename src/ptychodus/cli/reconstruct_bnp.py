@@ -1,23 +1,9 @@
 #!/usr/bin/env python
-"""Reconstruct one APS 4-ID-B,G,H POLAR ptychography dataset through the ptychodus api.
+"""Reconstruct one APS 2-ID-D Bionanoprobe ptychography dataset through the ptychodus api.
 
-The POLAR master advertises both halves of a scan as external links under
-``/entry/externals``: the Eiger frames at ``eiger/scan_NNNNNN.h5`` and, for fly scans, the
-softGlueZynq position stream at ``pos_stream/scan_NNNNNN.h5``. Both readers therefore take
-the *same* master path, and ``--position-file`` is normally a repeat of
-``--diffraction-file``.
-
-How much geometry the file carries depends on when it was written. The newest layout
-records the detector distance, the beam center and the mono energy; older ones record only
-the energy, so the distance falls back to the built-in default below and the beam center
-must be given or estimated. No layout records the detector pixel pitch, which the reader
-supplies as the Eiger's 75 um.
-
-Fly scans index positions by the raw softGlueZynq trigger counter, which starts at 0, while
-the diffraction reader emits 1-based frame indexes -- so frame ``k`` pairs with trigger
-``k + 1`` and trigger 0 is left over. Step scans index both sides off the same Eiger unique
-id and pair 1:1. Neither offset is applied by hand: ``prepare_reconstruct_input`` pairs on
-the index, which is what makes both conventions work through one script.
+The Bionanoprobe writes one Eiger HDF5 per scan line beside an EPICS MDA file. Its positions
+are in micrometers, where the 2-ID-E microprobe uses millimeters, and its frames carry enough
+invalid-pixel markers that the beam center cannot be estimated without cutting them first.
 
 Scope and limitations
 ---------------------
@@ -31,39 +17,24 @@ Scope and limitations
   :func:`prepare_reconstruct_input` rather than by array order.
 - Geometry resolves in one order -- command line, then the file, then a built-in
   fallback -- and the source of each value is logged.
-- The beamline's ``4idd_data_preprocessing_flyscan_v2.py`` normalizes patterns by I0
-  (``dp / i0 * 1e5``); this script does not. Ptychodus carries the per-position I0 as
-  ``probe_photon_count``, which feeds the illumination map rather than the patterns.
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
-import math
 import sys
 from pathlib import Path
 
 import numpy
 
-from ptychi.api.options.lsqml import (
-    LSQMLObjectOptions,
-    LSQMLOPRModeWeightsOptions,
-    LSQMLProbeOptions,
-    LSQMLProbePositionOptions,
-    LSQMLReconstructorOptions,
-)
-from ptychi.api.options.task import PtychographyTaskOptions
+from ptychi.api import LSQMLOptions
 
-from ptychodus.api.assemble import (
-    AssembledDiffractionData,
-    assemble_dataset,
-    compute_dataset_total_counts,
-)
+from ptychodus.api.assemble import assemble_dataset
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import BadPixels, BeamCenter, CropRegion, DiffractionDataset
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.io import save_product
+from ptychodus.api.io import StandardFileLayout, save_diffraction_data, save_product
 from ptychodus.api.object import compute_object_geometry
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import (
@@ -75,9 +46,7 @@ from ptychodus.api.preprocess.diffraction import (
     VerticalFlipStep,
     estimate_beam_center,
 )
-from ptychodus.api.preprocess.noise import compute_robust_statistics
 from ptychodus.api.probe import Probe, ProbeGeometry
-from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import prepare_reconstruct_input
 from ptychodus.api.simulate.object import generate_random_object
@@ -87,23 +56,29 @@ from ptychodus.api.simulate.probe import (
     generate_fresnel_zone_plate_probe,
     generate_incoherent_probe_modes,
 )
+from ptychodus.cli import DirectoryType
 from ptychodus.model.ptychi.task import (
     align_task_options_with_product,
+    dump_task_options,
     reconstruct_with_ptychi,
 )
 
-logger = logging.getLogger('reconstruct_polar')
+logger = logging.getLogger('reconstruct_bnp')
 
-DIFFRACTION_READER = 'APS_Polar'
-POSITION_READER = 'APS_Polar'
+DIFFRACTION_READER = 'APS_BNP'
+POSITION_READER = 'APS_BNP'
 
 # Operating points observed across this instrument's batch scripts. They are a last
 # resort: a value the file records always wins, because the fixture can move between
 # run cycles and the file cannot be stale about itself.
-DEFAULT_DETECTOR_DISTANCE_M = 1.91
-# POLAR focuses with KB mirrors, so no zone-plate preset applies and the cold-start probe
-# is estimated from the data instead.
+DEFAULT_DETECTOR_DISTANCE_M = 2.06
 DEFAULT_FZP_PRESET = ''
+
+# Where the beam center comes from when neither the command line nor the file supplies
+# one. 'estimate' back-propagates nothing -- it centroids the mean of the first array --
+# and 'midpoint' takes the detector center, which is right only for a layout that was
+# already cropped about the beam by whatever wrote it.
+BEAM_CENTER_FALLBACK = 'estimate'
 
 
 def _positive_int(text: str) -> int:
@@ -163,10 +138,11 @@ def _invalid_count_threshold(dtype: numpy.dtype) -> int | None:
 
 # Reading one array uncropped just to locate the beam is cheap when an array is one
 # scan line, and ruinous when it is the whole scan: a LamNI acquisition is a single
-# 12201 x 1030 x 1614 array, 151 GiB once widened to float64. DiffractionArray exposes
-# no way to read a few frames -- get_patterns() crops in space, not in frame -- so the
-# estimate is offered only when the first array fits in this budget.
-_ESTIMATE_BUDGET_BYTES = 2 * 1024**3
+# 12201 x 1030 x 1614 array, 81 GiB in its native uint32. DiffractionArray exposes no way
+# to read a few frames -- get_patterns() crops in space, not in frame -- so the estimate
+# is offered only when the first array fits in this budget. Sized to admit a normal
+# single-array scan (a 1089-frame ISN scan is about 4.8 GiB) and refuse LamNI.
+_ESTIMATE_BUDGET_BYTES = 8 * 1024**3
 
 
 def _mean_pattern(dataset: DiffractionDataset, upper_bound: int | None) -> numpy.ndarray:
@@ -179,11 +155,12 @@ def _mean_pattern(dataset: DiffractionDataset, upper_bound: int | None) -> numpy
     """
     metadata = dataset.get_metadata()
     extent = metadata.detector_extent
+    # Measured in the stored dtype, which is what the read actually allocates.
     wanted_bytes = (
         metadata.num_patterns_per_array[0]
         * extent.width_px
         * extent.height_px
-        * numpy.dtype(numpy.float64).itemsize
+        * metadata.pattern_dtype.itemsize
     )
 
     if wanted_bytes > _ESTIMATE_BUDGET_BYTES:
@@ -194,17 +171,20 @@ def _mean_pattern(dataset: DiffractionDataset, upper_bound: int | None) -> numpy
             '--beam-center-y-px instead.'
         )
 
-    patterns = numpy.asarray(dataset[0].get_patterns(), dtype=numpy.float64)
+    patterns = dataset[0].get_patterns()
 
     # A layout that stores one frame per file hands back a bare 2-D pattern rather than
     # a length-1 stack; averaging over axis 0 would collapse it to a single row.
     if patterns.ndim == 2:
         patterns = patterns[numpy.newaxis]
 
+    # In place, and in the stored dtype: the array came fresh off the reader, so nothing
+    # else holds it, and widening the whole stack to float64 first would double the peak
+    # for no gain. The accumulator below is float64 regardless.
     if upper_bound is not None:
-        patterns = numpy.where(patterns >= upper_bound, 0.0, patterns)
+        patterns[patterns >= upper_bound] = 0
 
-    return patterns.mean(axis=0)
+    return patterns.mean(axis=0, dtype=numpy.float64)
 
 
 def _prep_pipeline(
@@ -227,195 +207,37 @@ def _prep_pipeline(
     return DiffractionPrepPipeline(steps=tuple(steps)) if steps else None
 
 
-def _mad_bounds(values: numpy.ndarray, k: float) -> tuple[float, float]:
-    """Symmetric MAD interval about the median, excluding non-positive values.
-
-    Reproduces the beamline script's ``_mad_mask(x, k, require_positive=True)``, zero-MAD
-    degenerate case included: ``get_bounds`` then returns an interval open on the upper
-    side, so a constant trace keeps every positive point instead of rejecting all of them.
-    """
-    interval = compute_robust_statistics(values).get_bounds(k, require_positive=True)
-    return interval.lower, interval.upper
-
-
-def _select_patterns(
-    assembled_data: AssembledDiffractionData, keep: numpy.ndarray, reason: str
-) -> AssembledDiffractionData:
-    """Return the patterns `keep` selects, as a new AssembledDiffractionData.
-
-    Patterns are dropped rather than positions. Dropping a position would not remove its
-    pattern: `prepare_reconstruct_input` interpolates a pattern index that falls inside the
-    position range but has no exact match, so the frame would come back with a made-up
-    coordinate instead of being discarded.
-    """
-    num_dropped = int((~keep).sum())
-
-    if num_dropped == 0:
-        logger.info('%s dropped no patterns.', reason)
-        return assembled_data
-
-    if not keep.any():
-        raise ValueError(f'{reason} dropped every pattern. Loosen or remove the option.')
-
-    logger.warning(
-        '%s dropped %d of %d patterns (kept %d).',
-        reason,
-        num_dropped,
-        keep.size,
-        int(keep.sum()),
-    )
-
-    photon_counts = (
-        assembled_data.get_probe_photon_counts()[keep]
-        if assembled_data.has_measured_probe_photon_counts()
-        else None
-    )
-
-    return AssembledDiffractionData(
-        indexes=assembled_data.get_indexes()[keep],
-        patterns=assembled_data.get_patterns()[keep],
-        pixel_geometry=assembled_data.get_pixel_geometry(),
-        bad_pixels=assembled_data.get_bad_pixels(),
-        probe_photon_counts=photon_counts,
-    )
-
-
-def _total_counts_bounds(
-    args: argparse.Namespace,
-    raw_dataset: DiffractionDataset,
-    pipeline: DiffractionPrepPipeline | None,
-    bad_pixels: BadPixels | None,
-    read_region: CropRegion | None,
-) -> tuple[int | None, int | None]:
-    """Resolve the total-counts window from --min-total-counts and --dp-mad-k.
-
-    The MAD bound needs the distribution before it can pick a threshold, so this makes a
-    measuring pass with `compute_dataset_total_counts` -- same crop, same pipeline, same
-    processed bad-pixel mask as the assembler, and no assembled buffer. Whichever of the
-    two options gives the tighter lower bound wins, so they compose rather than override.
-    """
-    lower = args.min_total_counts
-    upper: int | None = None
-
-    if args.dp_mad_k is None:
-        return lower, upper
-
-    logger.info('Measuring per-pattern total counts for the --dp-mad-k window')
-    measured = compute_dataset_total_counts(
-        raw_dataset, pipeline, bad_pixels=bad_pixels, read_region=read_region
-    )
-    mad_lower, mad_upper = _mad_bounds(measured.total_counts.astype(float), args.dp_mad_k)
-
-    # The filter compares integer counts inclusively, so widen each bound outward to the
-    # nearest integer; rounding inward would reject patterns the float interval admits.
-    if math.isfinite(mad_lower):
-        mad_lower_int = int(math.floor(mad_lower))
-        lower = mad_lower_int if lower is None else max(lower, mad_lower_int)
-
-    if math.isfinite(mad_upper):
-        upper = int(math.ceil(mad_upper))
-
-    logger.info(
-        'Total counts (median %.4g, MAD %.4g over %d patterns): keeping [%s, %s]',
-        float(numpy.median(measured.total_counts)),
-        float(numpy.median(numpy.abs(measured.total_counts - numpy.median(measured.total_counts)))),
-        measured.total_counts.size,
-        lower,
-        upper,
-    )
-    return lower, upper
-
-
-def _reject_i0_outliers(
-    assembled_data: AssembledDiffractionData,
-    positions: ProbePositionSequence,
-    mad_k: float,
-) -> AssembledDiffractionData:
-    """Drop patterns whose position-side I0 is a MAD outlier.
-
-    I0 is recorded per position, not per pattern, so the rejection is expressed as a set of
-    scan indexes and then applied to the patterns. Only fly scans carry it: the softGlueZynq
-    stream reduces the I0 counter over each trigger group, while step-scan motor readbacks
-    have no counter to reduce.
-    """
-    counts = positions.get_probe_photon_counts()
-
-    if counts is None:
-        logger.warning(
-            'Ignoring --i0-mad-k: these positions carry no I0. Only fly scans record it.'
-        )
-        return assembled_data
-
-    lower, upper = _mad_bounds(numpy.asarray(counts, dtype=float), mad_k)
-    rejected = {
-        int(position.index)
-        for position, count in zip(positions, counts)
-        if not lower <= float(count) <= upper
-    }
-    logger.info(
-        'I0 (%d positions): keeping [%.6g, %.6g]; %d positions rejected',
-        len(counts),
-        lower,
-        upper,
-        len(rejected),
-    )
-    keep = numpy.array(
-        [int(index) not in rejected for index in assembled_data.get_indexes()], dtype=bool
-    )
-    return _select_patterns(assembled_data, keep, 'The --i0-mad-k filter')
-
-
-def _trim_ends(
-    assembled_data: AssembledDiffractionData, num_leading: int, num_trailing: int
-) -> AssembledDiffractionData:
-    """Drop the first and last patterns of the trajectory.
-
-    The scanner takes a few stabilization frames as the stage comes up to speed, and may
-    take a shutter-close frame at the end. This runs after the MAD filters, so the counts
-    are of surviving patterns, matching the beamline script's ``_start_drop_mask`` applied
-    to the combined keep mask.
-    """
-    num_patterns = assembled_data.get_patterns().shape[0]
-
-    if num_leading + num_trailing >= num_patterns:
-        raise ValueError(
-            f'Trimming {num_leading} leading and {num_trailing} trailing patterns would '
-            f'consume all {num_patterns} of them.'
-        )
-
-    keep = numpy.ones(num_patterns, dtype=bool)
-
-    if num_leading > 0:
-        keep[:num_leading] = False
-
-    if num_trailing > 0:
-        keep[num_patterns - num_trailing :] = False
-
-    return _select_patterns(assembled_data, keep, 'The end trim')
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description='APS 4-ID-B,G,H POLAR ptychography reconstruction via the ptychodus api.',
+        description='APS 2-ID-D Bionanoprobe ptychography reconstruction via the ptychodus api.',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
         '--diffraction-file',
         required=True,
         type=Path,
-        help='POLAR master HDF5 file (scan_NNNNNN_master.hdf).',
+        help='Any member of the bnp_flyNNNN_NNNNNN.h5 series; the rest are globbed.',
     )
     parser.add_argument(
         '--position-file',
         required=True,
         type=Path,
-        help='POLAR master HDF5 file; normally the same path as --diffraction-file.',
+        help='EPICS MDA file, normally mda/bnp_flyNNNN.mda.',
     )
     parser.add_argument(
-        '--output-product',
-        type=Path,
-        default=None,
-        help='Destination for the reconstructed product HDF5. Required unless --dry-run.',
+        '--output-directory',
+        required=True,
+        type=DirectoryType(must_exist=False),
+        help=(
+            'Destination directory, written in the ptychodus standard layout: '
+            'diffraction.h5, ptychi_options.json, per-epoch product.NNNNNN.h5 '
+            'checkpoints, and the final product.h5.'
+        ),
+    )
+    parser.add_argument(
+        '--no-save-diffraction',
+        action='store_true',
+        help='Skip diffraction.h5. The assembled patterns can run to several GB.',
     )
     parser.add_argument(
         '--crop-extent-px',
@@ -458,36 +280,6 @@ def main() -> int:
         type=int,
         default=None,
         help='Drop patterns whose total counts fall below this, with their positions.',
-    )
-    parser.add_argument(
-        '--dp-mad-k',
-        type=float,
-        default=None,
-        help=(
-            'Drop patterns whose total counts are more than this many MADs from the median. '
-            'The beamline script uses 5.0. Omit to skip.'
-        ),
-    )
-    parser.add_argument(
-        '--i0-mad-k',
-        type=float,
-        default=None,
-        help=(
-            'Drop patterns whose position-side I0 is more than this many MADs from the median. '
-            'The beamline script uses 5.0. Fly scans only. Omit to skip.'
-        ),
-    )
-    parser.add_argument(
-        '--drop-leading-frames',
-        type=int,
-        default=0,
-        help='Drop this many patterns from the start of the trajectory, after the MAD filters.',
-    )
-    parser.add_argument(
-        '--drop-trailing-frames',
-        type=int,
-        default=0,
-        help='Drop this many patterns from the end of the trajectory, after the MAD filters.',
     )
     parser.add_argument(
         '--max-valid-count',
@@ -599,9 +391,6 @@ def main() -> int:
         format='%(asctime)s %(levelname)s %(name)s: %(message)s',
     )
 
-    if args.output_product is None and not args.dry_run:
-        parser.error('--output-product is required unless --dry-run is given.')
-
     registry = PluginRegistry.load_plugins()
     diffraction_reader = registry.diffraction_file_readers.get_strategy_by_name(DIFFRACTION_READER)
     position_reader = registry.probe_position_file_readers.get_strategy_by_name(POSITION_READER)
@@ -667,6 +456,12 @@ def main() -> int:
         elif metadata.beam_center is not None:
             beam_center = metadata.beam_center
             center_source = 'the diffraction file'
+        elif BEAM_CENTER_FALLBACK == 'midpoint':
+            beam_center = BeamCenter(
+                x_px=metadata.detector_extent.width_px // 2,
+                y_px=metadata.detector_extent.height_px // 2,
+            )
+            center_source = 'the detector midpoint, which this layout is already cropped about'
         else:
             beam_center = estimate_beam_center(_mean_pattern(raw_dataset, max_valid_count))
             center_source = 'an estimate from the first array'
@@ -704,20 +499,14 @@ def main() -> int:
         )
         bad_pixels = bad_pixels_reader.read(args.bad_pixels_file)
 
-    pipeline = _prep_pipeline(args, max_valid_count)
-    lower_counts, upper_counts = _total_counts_bounds(
-        args, raw_dataset, pipeline, bad_pixels, read_region
-    )
-
     logger.info('Assembling diffraction patterns')
     assembled_data = assemble_dataset(
         raw_dataset,
-        pipeline,
+        _prep_pipeline(args, max_valid_count),
         bad_pixels=bad_pixels,
         raw_pixel_geometry=raw_pixel_geometry,
         read_region=read_region,
-        total_counts_lower_bound=lower_counts,
-        total_counts_upper_bound=upper_counts,
+        total_counts_lower_bound=args.min_total_counts,
     )
     num_patterns = assembled_data.get_patterns().shape[0]
 
@@ -732,18 +521,6 @@ def main() -> int:
     logger.info('Reading probe positions from %s as %s', args.position_file, POSITION_READER)
     positions = position_reader.read(args.position_file)
     logger.info('Read %d probe positions', len(positions))
-
-    # I0 lives on the positions, so its filter has to wait until they are read. The end
-    # trim runs last so its counts are of patterns that survived both MAD filters.
-    if args.i0_mad_k is not None:
-        assembled_data = _reject_i0_outliers(assembled_data, positions, args.i0_mad_k)
-
-    if args.drop_leading_frames > 0 or args.drop_trailing_frames > 0:
-        assembled_data = _trim_ends(
-            assembled_data, args.drop_leading_frames, args.drop_trailing_frames
-        )
-
-    num_patterns = assembled_data.get_patterns().shape[0]
 
     probe_wavelength_m = energy_eV_to_wavelength_m(probe_energy_eV)
     probe_geometry = ProbeGeometry.from_far_field(
@@ -832,7 +609,7 @@ def main() -> int:
 
     product = Product(
         metadata=ProductMetadata(
-            name='polar-reconstruct',
+            name='bnp-reconstruct',
             comments=f'Reconstructed from {args.diffraction_file.name}',
             detector_distance_m=detector_distance_m,
             probe_energy_eV=probe_energy_eV,
@@ -850,32 +627,60 @@ def main() -> int:
     )
 
     # USER: customize pty-chi options here (edit fields on `options` before the loop).
-    options = PtychographyTaskOptions(
-        reconstructor_options=LSQMLReconstructorOptions(),
-        object_options=LSQMLObjectOptions(),
-        probe_options=LSQMLProbeOptions(),
-        probe_position_options=LSQMLProbePositionOptions(),
-        opr_mode_weight_options=LSQMLOPRModeWeightsOptions(),
-    )
+    options = LSQMLOptions()
 
     num_epochs = int(options.reconstructor_options.num_epochs)
+
+    output_directory = args.output_directory
+    diffraction_file = StandardFileLayout.DIFFRACTION.path(output_directory)
+    options_file = StandardFileLayout.PTYCHI_OPTIONS.path(output_directory)
+    product_file = StandardFileLayout.PRODUCT.path(output_directory)
 
     if args.dry_run:
         # Stops ahead of align_task_options_with_product, so a dry run exercises the
         # ptychodus side -- readers, geometry, probe, object -- without requiring a
         # pty-chi whose options match this build.
         logger.info(
-            'Dry run: %d patterns, %d epochs, probe %s, object %s. Stopping before the '
-            'pty-chi option alignment.',
+            'Dry run: %d patterns, %d epochs, probe %s, object %s.',
             num_patterns,
             num_epochs,
             probe_sequence.get_array().shape,
             object_.get_array().shape,
         )
+        logger.info('Would write %s', product_file)
+        logger.info(
+            'Would write checkpoints like %s',
+            StandardFileLayout.PRODUCT.checkpoint_path(output_directory, args.num_sync_epochs),
+        )
+
+        if not args.no_save_diffraction:
+            logger.info('Would write %s', diffraction_file)
+
+        # The options file records the ALIGNED options, which only exist past the call
+        # this dry run stops before, so it is the one artifact a dry run cannot preview.
+        logger.info('Would write %s once the options are aligned', options_file)
+        logger.info('Nothing written: stopping before the pty-chi option alignment.')
         return 0
 
-    options = align_task_options_with_product(options, product)
-    options.check()
+    output_directory.mkdir(parents=True, exist_ok=True)
+
+    # Ahead of the reconstruction, so an interrupted run still leaves the directory
+    # usable: the assembled patterns are the one artifact that cannot be rebuilt without
+    # the raw beamline files.
+    if args.no_save_diffraction:
+        logger.info('Skipping %s as requested', diffraction_file.name)
+    else:
+        logger.info('Writing %s', diffraction_file)
+        save_diffraction_data(diffraction_file, assembled_data)
+
+    task_options = align_task_options_with_product(options, product)
+    task_options.check()
+
+    # The aligned options are the ones that ran: they carry the object pixel size, the
+    # wavelength and the slice spacings the product supplied, which the unaligned object
+    # does not.
+    logger.info('Writing %s', options_file)
+    options_file.write_text(dump_task_options(task_options))
 
     reconstruct_input = prepare_reconstruct_input(assembled_data, product)
     logger.info(
@@ -888,19 +693,23 @@ def main() -> int:
     final_output = None
 
     for output in reconstruct_with_ptychi(
-        reconstruct_input, options, num_sync_epochs=args.num_sync_epochs
+        reconstruct_input, task_options, num_sync_epochs=args.num_sync_epochs
     ):
         losses = output.product.losses
         last_loss = losses[-1].value if losses else float('nan')
         logger.info('Epoch %d/%d: loss=%.6g', output.progress, num_epochs, last_loss)
+
+        checkpoint_file = StandardFileLayout.PRODUCT.checkpoint_path(
+            output_directory, output.progress
+        )
+        save_product(checkpoint_file, output.product)
         final_output = output
 
     if final_output is None:
         raise RuntimeError('Reconstruction produced no output.')
 
-    args.output_product.parent.mkdir(parents=True, exist_ok=True)
-    save_product(args.output_product, final_output.product)
-    logger.info('Saved reconstructed product to %s', args.output_product)
+    save_product(product_file, final_output.product)
+    logger.info('Saved reconstructed product to %s', product_file)
     return 0
 
 

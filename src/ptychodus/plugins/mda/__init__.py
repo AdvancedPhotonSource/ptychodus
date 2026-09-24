@@ -1,6 +1,10 @@
 from ptychodus.api.plugins import PluginRegistry
 
-from .mda_position_file import MDAFlatScanPositionFileReader, MDAPositionFileReader
+from .mda_position_file import (
+    MDADetectorChannelPositionFileReader,
+    MDAFlatScanPositionFileReader,
+    MDAPositionFileReader,
+)
 
 
 def register_plugins(registry: PluginRegistry) -> None:
@@ -27,8 +31,19 @@ def register_plugins(registry: PluginRegistry) -> None:
         simple_name='APS_BNP',
         display_name='APS 2-ID-D Bionanoprobe Files (*.mda)',
     )
+    # ISN fly scans expose one positioner -- the X setpoint -- and record both axis
+    # encoders as detector channels, so the flat-scan reader, which needs two
+    # positioners, raises on every one of these files. Descriptions observed on real
+    # 19idAERO files; the index fallbacks match them and are used only if the
+    # descriptions ever change.
     registry.probe_position_file_readers.register_plugin(
-        MDAFlatScanPositionFileReader(scale_to_meters=1.0e-3),
+        MDADetectorChannelPositionFileReader(
+            scale_to_meters=1.0e-3,
+            x_description='X Axis',
+            y_description='Piezo Y',
+            x_index_fallback=1,
+            y_index_fallback=0,
+        ),
         simple_name='APS_ISN_MDA',
         display_name='APS 19-ID-E In-situ Nanoprobe Files (*.mda)',
     )

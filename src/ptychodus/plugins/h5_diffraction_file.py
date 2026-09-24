@@ -5,8 +5,8 @@ try:
     # NOTE must import hdf5plugin before h5py. Detector vendors write their frames
     # through HDF5 filter plugins -- bitshuffle/LZ4 (32008) on every APS Eiger -- and
     # without this the read fails with an opaque OSError about /usr/local/lib/plugin.
-    # model/core.py does the same for the GUI and batch paths; repeating it here covers
-    # every api-only consumer, which is what the scripts/reconstruct_*.py family is.
+    # Registering the filters here covers any consumer that reaches a reader directly,
+    # without going through whatever else in the application may already have done it.
     import hdf5plugin  # noqa
 except ModuleNotFoundError:
     pass
@@ -14,7 +14,7 @@ except ModuleNotFoundError:
 import h5py
 import numpy
 
-from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.diffraction import (
     CropRegion,
     DiffractionArray,
@@ -92,6 +92,15 @@ class H5DiffractionPatternArray(DiffractionArray):
                     raise RuntimeError(
                         f'{item_ref} missing filters needed to read dataset: {error_msg}!'
                     )
+
+                # A layout that stores one frame per file has a 2-D dataset, but the
+                # array contract is always a stack: returned bare, such a pattern is
+                # rejected during assembly and the array is dropped with only a
+                # warning, and the region slice below would index a missing axis.
+                if item.ndim == 2:
+                    if read_region is None:
+                        return item[:][numpy.newaxis]
+                    return item[read_region.y_slice, read_region.x_slice][numpy.newaxis]
 
                 if read_region is None:
                     return item[:]
@@ -196,8 +205,16 @@ class H5DiffractionFileTreeBuilder:
 
 
 class H5DiffractionFileReader(DiffractionFileReader):
-    def __init__(self, data_path: str) -> None:
+    def __init__(self, data_path: str, detector_pixel_size_m: float | None = None) -> None:
+        """Read patterns from one HDF5 dataset.
+
+        `detector_pixel_size_m` stands in for a pitch the file does not record. These
+        layouts carry no geometry at all, and a dataset with no pitch cannot be turned
+        into a probe geometry downstream, so a registration aimed at a known instrument
+        supplies its detector's pitch here.
+        """
         self._data_path = data_path
+        self._detector_pixel_size_m = detector_pixel_size_m
         self._tree_builder = H5DiffractionFileTreeBuilder()
 
     def read(self, file_path: Path) -> DiffractionDataset:
@@ -208,10 +225,19 @@ class H5DiffractionFileReader(DiffractionFileReader):
             if isinstance(data, h5py.Dataset):
                 num_patterns, detector_height, detector_width = data.shape
 
+                pixel_geometry: PixelGeometry | None = None
+
+                if self._detector_pixel_size_m is not None:
+                    pixel_geometry = PixelGeometry(
+                        width_m=self._detector_pixel_size_m,
+                        height_m=self._detector_pixel_size_m,
+                    )
+
                 metadata = DiffractionMetadata(
                     num_patterns_per_array=[num_patterns],
                     pattern_dtype=data.dtype,
                     detector_extent=ImageExtent(detector_width, detector_height),
+                    detector_pixel_geometry=pixel_geometry,
                     file_path=file_path,
                 )
 
@@ -250,7 +276,9 @@ def register_plugins(registry: PluginRegistry) -> None:
         display_name='CNM/APS 26-ID-C Hard X-ray Nanoprobe Files (*.h5 *.hdf5)',
     )
     registry.diffraction_file_readers.register_plugin(
-        H5DiffractionFileReader(data_path='/dp'),
+        # Written by the preprocessing step at the Eiger instruments (VelociProbe, BNP,
+        # 2-ID-E, ISN, 9-ID-D), none of which records geometry in the file.
+        H5DiffractionFileReader(data_path='/dp', detector_pixel_size_m=75e-6),
         simple_name='fold_slice',
         display_name='fold_slice Files (*.h5 *.hdf5)',
     )

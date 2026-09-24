@@ -22,6 +22,15 @@ from .h5_diffraction_file import H5DiffractionPatternArray
 
 logger = logging.getLogger(__name__)
 
+# Splits a series member's stem into its fixed prefix and its frame counter. The
+# counter is the last digit run, which `tail` enforces by admitting no digits of its
+# own. Identifying it by length instead would break on these instruments: 2-ID-E
+# writes `fly054_data_001.h5`, whose scan and frame fields are both three digits, and
+# `max(..., key=len)` resolves that tie toward the scan number -- globbing one frame
+# from each of hundreds of unrelated scans. The extension is excluded from the match
+# because it has digits of its own: ".h5" would otherwise supply the last digit run.
+_SERIES_STEM: Final = re.compile(r'(?P<prefix>.*?)(?P<frame>\d+)(?P<tail>\D*)')
+
 
 class APS2IDDiffractionFileReader(DiffractionFileReader):
     # These files carry no detector metadata, so the pitch of the Eiger detectors on
@@ -30,18 +39,28 @@ class APS2IDDiffractionFileReader(DiffractionFileReader):
     DETECTOR_PIXEL_SIZE_M: Final[float] = 75e-6
 
     def _get_file_series(self, file_path: Path) -> tuple[Mapping[int, Path], str]:
+        """Collect the frames of one scan, keyed by frame number.
+
+        Every digit field ahead of the counter -- the scan number here -- is pinned to
+        its literal value from *file_path*, so siblings from other scans cannot match.
+        """
+        member = _SERIES_STEM.fullmatch(file_path.stem)
+
+        if member is None:
+            raise ValueError(f'File name "{file_path.name}" carries no frame number.')
+
+        prefix = member['prefix']
+        tail = member['tail'] + file_path.suffix
+        width = len(member['frame'])
+        file_pattern = f'{prefix}(\\d{{{width}}}){tail}'
+        series_regex = re.compile(f'{re.escape(prefix)}(?P<frame>\\d{{{width}}}){re.escape(tail)}')
         file_path_dict: dict[int, Path] = dict()
 
-        digits = re.findall(r'\d+', file_path.stem)
-        longest_digits = max(digits, key=len)
-        file_pattern = file_path.name.replace(longest_digits, f'(\\d{{{len(longest_digits)}}})')
-
         for fp in file_path.parent.iterdir():
-            z = re.match(file_pattern, fp.name)
+            z = series_regex.fullmatch(fp.name)
 
             if z:
-                index = int(z.group(1))
-                file_path_dict[index] = fp
+                file_path_dict[int(z['frame'])] = fp
 
         return file_path_dict, file_pattern
 
@@ -49,33 +68,50 @@ class APS2IDDiffractionFileReader(DiffractionFileReader):
         file_path_mapping, file_pattern = self._get_file_series(file_path)
         data_path = '/entry/data/data'
 
-        with h5py.File(file_path, 'r') as h5_file:
-            h5data = h5_file[data_path]
+        contents_tree = DiffractionDatasetLayoutNode.create_root()
+        array_list: list[DiffractionArray] = list()
+        num_patterns_per_array: list[int] = list()
+        detector_extent: ImageExtent | None = None
+        pattern_dtype = numpy.dtype(numpy.uint32)
+        offset = 0
 
-            if isinstance(h5data, h5py.Dataset):
-                num_patterns_per_array, detector_height, detector_width = h5data.shape
-                metadata = DiffractionMetadata(
-                    num_patterns_per_array=[num_patterns_per_array] * len(file_path_mapping),
-                    pattern_dtype=h5data.dtype,
-                    detector_extent=ImageExtent(detector_width, detector_height),
-                    detector_pixel_geometry=PixelGeometry(
-                        width_m=self.DETECTOR_PIXEL_SIZE_M,
-                        height_m=self.DETECTOR_PIXEL_SIZE_M,
-                    ),
-                    file_path=file_path.parent / file_pattern,
-                )
-                contents_tree = DiffractionDatasetLayoutNode.create_root()
-                array_list: list[DiffractionArray] = list()
+        # Each member declares its own frame count. A fly scan can cut a line short, and
+        # asserting the first file's count for the whole series makes every array that
+        # disagrees fail its length check and be dropped with only a warning.
+        for idx, fp in sorted(file_path_mapping.items()):
+            with h5py.File(fp, 'r') as h5_file:
+                h5data = h5_file[data_path]
 
-                for idx, fp in sorted(file_path_mapping.items()):
-                    indexes = numpy.arange(num_patterns_per_array) + idx * num_patterns_per_array
-                    array = H5DiffractionPatternArray(fp.stem, indexes, fp, data_path)
-                    contents_tree.add_child(array.get_label(), 'HDF5', str(idx))
-                    array_list.append(array)
+                if not isinstance(h5data, h5py.Dataset):
+                    raise ValueError(f'Expected dataset at "{fp}:{data_path}".')
 
-                return SimpleDiffractionDataset(metadata, contents_tree, array_list)
-            else:
-                raise ValueError(f'Expected dataset at "{data_path}"; found {type(h5data)}.')
+                num_patterns, detector_height, detector_width = h5data.shape
+
+                if detector_extent is None:
+                    pattern_dtype = h5data.dtype
+                    detector_extent = ImageExtent(detector_width, detector_height)
+
+            indexes = numpy.arange(num_patterns) + offset
+            array = H5DiffractionPatternArray(fp.stem, indexes, fp, data_path)
+            contents_tree.add_child(array.get_label(), 'HDF5', str(idx))
+            array_list.append(array)
+            num_patterns_per_array.append(num_patterns)
+            offset += num_patterns
+
+        if detector_extent is None:
+            raise ValueError(f'No diffraction files matched "{file_pattern}".')
+
+        metadata = DiffractionMetadata(
+            num_patterns_per_array=num_patterns_per_array,
+            pattern_dtype=pattern_dtype,
+            detector_extent=detector_extent,
+            detector_pixel_geometry=PixelGeometry(
+                width_m=self.DETECTOR_PIXEL_SIZE_M,
+                height_m=self.DETECTOR_PIXEL_SIZE_M,
+            ),
+            file_path=file_path.parent / file_pattern,
+        )
+        return SimpleDiffractionDataset(metadata, contents_tree, array_list)
 
 
 def register_plugins(registry: PluginRegistry) -> None:
