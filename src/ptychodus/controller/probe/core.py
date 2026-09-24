@@ -6,7 +6,12 @@ from PyQt5.QtWidgets import QAbstractItemView, QDialog
 
 from ptychodus.api.observer import SequenceObserver
 
-from ...model.analysis import IlluminationMapper, ProbePropagatorSettings, ProbePropagator
+from ...model.analysis import (
+    IlluminationMapper,
+    ProbeOverlapAnalyzer,
+    ProbePropagatorSettings,
+    ProbePropagator,
+)
 from ...model.product import ProbeAPI, ProbeRepository
 from ...model.product.probe import ProbeRepositoryItem
 from ...model.visualization import VisualizationEngine
@@ -21,6 +26,7 @@ from ..helpers import connect_triggered_signal, create_brush_for_editable_cell
 from ..image import ImageController
 from .editor_factory import ProbeEditorViewControllerFactory
 from .illumination import IlluminationViewController
+from .overlap import ProbeOverlapViewController
 from .propagator import ProbePropagationViewController
 from .tree_model import ProbeTreeModel, try_get_probe
 
@@ -38,6 +44,8 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         propagator_visualization_engine: VisualizationEngine,
         illumination_mapper: IlluminationMapper,
         illumination_visualization_engine: VisualizationEngine,
+        overlap_analyzer: ProbeOverlapAnalyzer,
+        overlap_visualization_engine: VisualizationEngine,
         view: RepositoryTreeView,
         file_dialog_factory: FileDialogFactory,
     ) -> None:
@@ -56,6 +64,11 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
         self._illumination_view_controller = IlluminationViewController(
             illumination_mapper,
             illumination_visualization_engine,
+            file_dialog_factory,
+        )
+        self._overlap_view_controller = ProbeOverlapViewController(
+            overlap_analyzer,
+            overlap_visualization_engine,
             file_dialog_factory,
         )
 
@@ -108,6 +121,9 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
 
         illumination_action = view.button_box.analyze_menu.addAction('Map Illumination...')
         connect_triggered_signal(illumination_action, self._map_illumination)
+
+        overlap_action = view.button_box.analyze_menu.addAction('Overlap Metrics...')
+        connect_triggered_signal(overlap_action, self._analyze_overlap)
 
     def _get_current_item_index(self) -> int:
         model_index = self._view.tree_view.currentIndex()
@@ -212,6 +228,14 @@ class ProbeController(SequenceObserver[ProbeRepositoryItem]):
             logger.warning('No current item!')
         else:
             self._illumination_view_controller.map(item_index)
+
+    def _analyze_overlap(self) -> None:
+        item_index = self._get_current_item_index()
+
+        if item_index < 0:
+            logger.warning('No current item!')
+        else:
+            self._overlap_view_controller.analyze(item_index)
 
     def _update_view(self, current: QModelIndex, previous: QModelIndex) -> None:
         enabled = current.isValid()

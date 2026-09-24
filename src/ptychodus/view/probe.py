@@ -286,3 +286,65 @@ class IlluminationDialog(QDialog):
         layout.addLayout(contents_layout)
         layout.addWidget(self.status_bar)
         self.setLayout(layout)
+
+
+class ProbeOverlapMetricsView(QGroupBox):
+    """How densely the scan's probe footprints tile the illuminated region.
+
+    Redundancy and the equivalent linear overlap answer "is this scan dense enough";
+    the pairwise rows answer "is any single position weakly constrained", which the
+    global figures average away.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__('Metrics', parent)
+        self.areal_redundancy_label = QLabel('—')
+        self.equivalent_linear_overlap_label = QLabel('—')
+        self.effective_probe_diameter_label = QLabel('—')
+        self.effective_step_size_label = QLabel('—')
+        self.mean_pairwise_overlap_label = QLabel('—')
+        self.median_pairwise_overlap_label = QLabel('—')
+        self.minimum_pairwise_overlap_label = QLabel('—')
+        self.maximum_pairwise_overlap_label = QLabel('—')
+        self.num_positions_label = QLabel('—')
+
+        self.minimum_pairwise_overlap_label.setToolTip(
+            'A value near zero marks a scan position that no neighbor overlaps'
+        )
+
+        layout = QFormLayout()
+        layout.addRow('Areal Redundancy:', self.areal_redundancy_label)
+        layout.addRow('Equivalent Linear Overlap [%]:', self.equivalent_linear_overlap_label)
+        layout.addRow('Effective Probe Diameter [nm]:', self.effective_probe_diameter_label)
+        layout.addRow('Effective Step Size [nm]:', self.effective_step_size_label)
+        layout.addRow('Pairwise Overlap Mean:', self.mean_pairwise_overlap_label)
+        layout.addRow('Pairwise Overlap Median:', self.median_pairwise_overlap_label)
+        layout.addRow('Pairwise Overlap Minimum:', self.minimum_pairwise_overlap_label)
+        layout.addRow('Pairwise Overlap Maximum:', self.maximum_pairwise_overlap_label)
+        layout.addRow('Number of Positions:', self.num_positions_label)
+        self.setLayout(layout)
+
+
+class ProbeOverlapDialog(QDialog):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.visualization_widget = VisualizationWidget('Redundancy')
+        self.metrics_view = ProbeOverlapMetricsView()
+        self.visualization_parameters_view = VisualizationParametersView()
+        self.save_button = QPushButton('Save')
+        self.status_bar = QStatusBar()
+
+        parameter_layout = QVBoxLayout()
+        parameter_layout.addWidget(self.metrics_view)
+        parameter_layout.addWidget(self.visualization_parameters_view)
+        parameter_layout.addWidget(self.save_button)
+        parameter_layout.addStretch()
+
+        contents_layout = QHBoxLayout()
+        contents_layout.addWidget(self.visualization_widget, 1)
+        contents_layout.addLayout(parameter_layout)
+
+        layout = QVBoxLayout()
+        layout.addLayout(contents_layout)
+        layout.addWidget(self.status_bar)
+        self.setLayout(layout)

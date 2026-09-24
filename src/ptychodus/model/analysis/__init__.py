@@ -3,6 +3,7 @@ from .diffraction import DiffractionSimulator
 from .fourier import FourierAnalysisResult, FourierAnalyzer
 from .frc import FourierRingCorrelator, PowerSpectralDensity
 from .illumination import IlluminationMapper, IlluminationMap
+from .overlap import ProbeOverlapAnalyzer, ProbeOverlapMetrics
 from .propagator import ProbePropagator
 from .residuals import ReconstructionResiduals, ResidualAnalyzer
 from .settings import DiffractionSimulatorSettings, ProbePropagatorSettings
@@ -18,6 +19,8 @@ __all__ = [
     'IlluminationMap',
     'IlluminationMapper',
     'PowerSpectralDensity',
+    'ProbeOverlapAnalyzer',
+    'ProbeOverlapMetrics',
     'ProbePropagator',
     'ProbePropagatorSettings',
     'ReconstructionResiduals',

@@ -10,6 +10,7 @@ from .diffraction import DiffractionSimulator
 from .fourier import FourierAnalyzer
 from .frc import FourierRingCorrelator
 from .illumination import IlluminationMapper
+from .overlap import ProbeOverlapAnalyzer
 from .propagator import ProbePropagator
 from .residuals import ResidualAnalyzer
 from .settings import (
@@ -49,6 +50,9 @@ class AnalysisCore:
 
         self.illumination_mapper = IlluminationMapper(product_repository)
         self.illumination_visualization_engine = VisualizationEngine(is_complex=False)
+
+        self.probe_overlap_analyzer = ProbeOverlapAnalyzer(product_repository)
+        self.probe_overlap_visualization_engine = VisualizationEngine(is_complex=False)
 
         self.probe_propagator_settings = ProbePropagatorSettings(settings_registry)
         self.probe_propagator = ProbePropagator(self.probe_propagator_settings, product_repository)
