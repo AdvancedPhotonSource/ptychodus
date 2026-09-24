@@ -1,4 +1,7 @@
 from collections.abc import Iterator, Sequence
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class PtyChiEnumerators:
@@ -20,7 +23,16 @@ class PtyChiEnumerators:
                 PositionCorrectionTypes,
                 ProbeSupportMethods,
             )
-        except ModuleNotFoundError:
+        except ImportError as err:
+            # ImportError, not ModuleNotFoundError: an installed but incompatible pty-chi
+            # resolves the module and fails on the names, which is not a subclass of
+            # ModuleNotFoundError and so used to escape and take the whole application
+            # down at startup. Missing pty-chi is routine and stays quiet -- the library
+            # logs it once and disables the backend -- but a version skew empties every
+            # enum dropdown, which is baffling in silence.
+            if not isinstance(err, ModuleNotFoundError):
+                logger.warning(f'Ignoring incompatible pty-chi: {err}')
+
             self._batching_modes: Sequence[str] = list()
             self._directions: Sequence[str] = list()
             self._forward_models: Sequence[str] = list()
