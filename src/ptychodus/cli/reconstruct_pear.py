@@ -75,7 +75,7 @@ from ptychodus.api.preprocess.diffraction import (
     TransposeStep,
     VerticalFlipStep,
 )
-from ptychodus.api.preprocess.probe_positions import AffineTransform, transform_probe_positions
+from ptychodus.api.affine import AffineTransform, transform_probe_positions
 from ptychodus.api.probe import Probe, ProbeGeometry, ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
@@ -922,9 +922,7 @@ def main() -> int:
             raise ValueError('init_position_affine_matrix must hold four values.')
 
         transform = AffineTransform(flat[0], flat[1], 0.0, flat[2], flat[3], 0.0)
-        positions = ProbePositionSequence(
-            [*transform_probe_positions(positions, transform, numpy.random.default_rng(0), 0.0)]
-        )
+        positions = ProbePositionSequence([*transform_probe_positions(positions, transform)])
 
     # --- geometry ---
     wavelength_m = energy_eV_to_wavelength_m(params.beam_energy_kev * 1.0e3)

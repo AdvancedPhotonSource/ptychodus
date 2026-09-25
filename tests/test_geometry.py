@@ -14,7 +14,7 @@ from ptychodus.api.geometry import (
     Point2D,
     ZernikeMode,
 )
-from ptychodus.api.preprocess.probe_positions import AffineTransform
+from ptychodus.api.affine import AffineTransform
 
 
 def test_str() -> None:

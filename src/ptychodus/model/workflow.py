@@ -6,7 +6,7 @@ import logging
 
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.diffraction import CropRegion, Polarization
-from ptychodus.api.preprocess.probe_positions import AffineTransform
+from ptychodus.api.affine import AffineTransform
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import ReconstructInput
 from ptychodus.api.settings import PathPrefixChange, SettingsRegistry
