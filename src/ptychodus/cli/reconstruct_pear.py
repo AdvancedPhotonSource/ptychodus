@@ -110,6 +110,7 @@ class _Readers:
 # Keyed by the parameter file's `instrument` value, lowercased.
 _INSTRUMENT_READERS: Final[dict[str, _Readers]] = {
     '2ide': _Readers('APS_2IDE', 'APS_2IDE'),
+    'atomic': _Readers('APS_Atomic', 'APS_Atomic'),
     '2xfm': _Readers('APS_2IDE', 'APS_2IDE'),
     'bnp': _Readers('APS_BNP', 'APS_BNP'),
     'bionanoprobe': _Readers('APS_BNP', 'APS_BNP'),

@@ -42,7 +42,7 @@ MICROMETER_M = 1e-6
 MILLIMETER_M = 1e-3
 
 MDA_READER_NAMES = frozenset(
-    {'MDA', 'APS_2IDD', 'APS_2IDE', 'APS_BNP', 'APS_ISN_MDA', 'CNM_APS_HXN'}
+    {'MDA', 'APS_2IDD', 'APS_2IDE', 'APS_Atomic', 'APS_BNP', 'APS_ISN_MDA', 'CNM_APS_HXN'}
 )
 
 
@@ -204,15 +204,21 @@ def _write_nested_mda(
     *,
     current_point: int | None = None,
     hole_at: int | None = None,
+    header_dimensions: list[int] | None = None,
 ) -> Path:
     """A rank-2 scan: the outer readback holds y, each lower scan holds x.
 
     Rows at and past ``current_point`` are written the way an aborted scan leaves
     them -- the offset slot stays zero and no lower scan is emitted for it.
+
+    ``header_dimensions`` overrides what the file header claims, so a caller can
+    present a deeper rank than the body carries. Nothing downstream of the header
+    is reached once the rank is refused, and the offsets stay consistent because
+    the same list sizes both the probe and the emitted header.
     """
-    dimensions = [len(ys), len(xs_per_row[0])]
+    dimensions = header_dimensions or [len(ys), len(xs_per_row[0])]
     written = len(xs_per_row) if current_point is None else current_point
-    header_len = len(_header(2, dimensions, 0))
+    header_len = len(_header(len(dimensions), dimensions, 0))
     # A real aborted file keeps the row that was in flight: its offset is a valid
     # one but the block behind it is short, so reading it raises EOFError. Only
     # current_point excludes it -- skipping zero offsets alone does not.
@@ -251,7 +257,7 @@ def _write_nested_mda(
     )
     body = outer + b''.join(inner_blocks)
 
-    path.write_bytes(_header(2, dimensions, cursor) + body + _extra_pvs())
+    path.write_bytes(_header(len(dimensions), dimensions, cursor) + body + _extra_pvs())
     return path
 
 
@@ -333,6 +339,25 @@ def test_nested_reader_walks_lower_scans(nested_mda: Path) -> None:
     assert positions[2].y_m == pytest.approx(100.0 * MICROMETER_M)
     assert positions[3].y_m == pytest.approx(200.0 * MICROMETER_M)
     assert positions[5].x_m == pytest.approx(6.0 * MICROMETER_M)
+
+
+def test_nested_reader_rejects_a_deeper_rank(tmp_path: Path) -> None:
+    """A rank-3 file nests a raster under each outer point, not a row.
+
+    Walked as rank 2, its lower scans pair one point apiece with the outer readback, so a
+    scan of thousands of frames returns a handful of positions -- along whichever axis the
+    outermost scan drove, in whatever units that stage reports. The fixture declares the
+    deeper rank in its header only, which is all the guard reads before refusing.
+    """
+    mda = _write_nested_mda(
+        tmp_path / 'rank3.mda',
+        ys=[100.0, 200.0],
+        xs_per_row=[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
+        header_dimensions=[2, 2, 3],
+    )
+
+    with pytest.raises(ProbePositionParseError, match='rank-3'):
+        MDAPositionFileReader(scale_to_meters=MICROMETER_M).read(mda)
 
 
 # --- aborted scans: current_point is the count of rows actually written

@@ -201,6 +201,44 @@ def test_tiff_series_is_scoped_and_counts_its_own_pages(tmp_path: Path) -> None:
     assert indexes.tolist() == list(range(6))
 
 
+def test_tiff_series_spans_an_unpadded_counter_rollover(tmp_path: Path) -> None:
+    """areaDetector pads the counter to three digits and then lets it grow.
+
+    A scan past 999 frames therefore holds both `_999` and `_1000`. Requiring the counter
+    width of the member that was opened splits that series in two, and the reader loads
+    whichever half it was pointed at without saying it dropped the other -- 999 frames of
+    1005, silently paired against 1005 positions.
+    """
+    data = numpy.zeros((_DETECTOR_H, _DETECTOR_W), dtype=numpy.uint16)
+
+    for scan in (15, 16):
+        for frame in range(1, 1006):
+            tifffile.imwrite(
+                tmp_path / f'Star_scan{scan}_9p5keV_{frame:03d}.tif', data, photometric='minisblack'
+            )
+
+    reader = TiffDiffractionFileReader()
+
+    # The entry point must not matter: three- and four-digit members name one series.
+    for member in ('Star_scan15_9p5keV_001.tif', 'Star_scan15_9p5keV_1005.tif'):
+        dataset = reader.read(tmp_path / member)
+        labels = [array.get_label() for array in dataset]
+
+        assert len(labels) == 1005
+        assert labels[0] == 'Star_scan15_9p5keV_001'
+        assert labels[-1] == 'Star_scan15_9p5keV_1005'
+
+        # Frames sort numerically, not lexicographically: 1000 follows 999, not 001.
+        assert labels[998:1001] == [
+            'Star_scan15_9p5keV_999',
+            'Star_scan15_9p5keV_1000',
+            'Star_scan15_9p5keV_1001',
+        ]
+
+        # Widening the counter must not widen the scope; scan 16 stays out.
+        assert not any('scan16' in label for label in labels)
+
+
 def test_h5_reader_supplies_a_pitch_only_when_given_one(tmp_path: Path) -> None:
     """The fold_slice registration passes a pitch; the bare reader still reports none."""
     path = _write_h5(tmp_path / 'data_roi0_Ndp4_dp.hdf5', 3, data_path='/dp')

@@ -515,6 +515,11 @@ def _require_points(
 
 
 class MDAPositionFileReader(ProbePositionFileReader):
+    """Read scan positions from a two-dimensional raster: one positioner per axis.
+
+    The outer scan supplies y and each of its lower scans supplies that row's x.
+    """
+
     def __init__(self, scale_to_meters: float) -> None:
         self._scale_to_meters = scale_to_meters
 
@@ -522,6 +527,17 @@ class MDAPositionFileReader(ProbePositionFileReader):
         point_list: list[ProbePosition] = list()
 
         mda_file = MDAFile.read(file_path)
+        data_rank = mda_file.header.data_rank
+
+        # A deeper file nests another scan under each row, so its lower scans hold
+        # rasters rather than rows. Pairing them with the outer readback would return one
+        # point per raster -- a handful of positions for a scan of thousands of frames,
+        # silently, and along whichever axis the outermost scan happened to drive.
+        if data_rank > 2:
+            raise ProbePositionParseError(
+                f'"{file_path}" is a rank-{data_rank} scan of {mda_file.header.dimensions};'
+                ' this reader needs a two-dimensional raster.'
+            )
 
         yscan = mda_file.scan
         yarray = _require_positioners(mda_file, 1, file_path)[0, :]

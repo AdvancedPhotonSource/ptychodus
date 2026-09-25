@@ -52,3 +52,13 @@ def register_plugins(registry: PluginRegistry) -> None:
         simple_name='CNM_APS_HXN',
         display_name='CNM/APS 26-ID-C Hard X-ray Nanoprobe Files (*.mda)',
     )
+    # Atomic scans the sample stage open loop: both positioners are piezo driver command
+    # voltages ("nano stage X/Y control", V DC) and neither axis records an encoder, so
+    # the scale below is the 10 um/V driver calibration rather than a unit conversion.
+    # It lives here because the file states the unit as volts and says nothing about what
+    # a volt moves. A stage or driver swap changes it.
+    registry.probe_position_file_readers.register_plugin(
+        MDAPositionFileReader(scale_to_meters=1.0e-5),
+        simple_name='APS_Atomic',
+        display_name='APS 34-ID Atomic Files (*.mda)',
+    )

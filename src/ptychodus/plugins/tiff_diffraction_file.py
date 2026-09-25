@@ -62,10 +62,17 @@ class TiffDiffractionFileReader(DiffractionFileReader):
     def _get_file_series(self, file_path: Path) -> tuple[Mapping[int, Path], str]:
         """Collect the members of one numbered TIFF series, keyed by frame number.
 
-        The counter is the last digit run in the stem, and every digit ahead of it is
-        pinned to its literal value, so a name whose leading field also varies -- a scan
-        number, say -- cannot pull in siblings from other scans. Choosing the longest
-        run instead picks the wrong field whenever the two are the same width.
+        The counter is the last digit run in the stem, and every character around it --
+        the prefix ahead of it and the tail behind it -- is pinned to its literal value,
+        so a name whose leading field also varies, a scan number say, cannot pull in
+        siblings from other scans. Choosing the longest run instead picks the wrong field
+        whenever the two are the same width.
+
+        The counter itself is matched at any width, because that pinned prefix and tail
+        are what scope the series; a sibling scan differs somewhere in them or it is not
+        a sibling. Requiring the width of the member that was opened instead splits a
+        series wherever the writer left the counter unpadded, and a detector that rolls
+        from `_999` to `_1000` mid-scan then loads its first 999 frames and no more.
         """
         member = _SERIES_STEM.fullmatch(file_path.stem)
 
@@ -74,9 +81,8 @@ class TiffDiffractionFileReader(DiffractionFileReader):
 
         prefix = member['prefix']
         tail = member['tail'] + file_path.suffix
-        width = len(member['frame'])
-        file_pattern = f'{prefix}(\\d{{{width}}}){tail}'
-        series_regex = re.compile(f'{re.escape(prefix)}(?P<frame>\\d{{{width}}}){re.escape(tail)}')
+        file_pattern = f'{prefix}(\\d+){tail}'
+        series_regex = re.compile(f'{re.escape(prefix)}(?P<frame>\\d+){re.escape(tail)}')
         file_path_dict: dict[int, Path] = dict()
 
         for fp in file_path.parent.iterdir():
@@ -147,7 +153,7 @@ def register_plugins(registry: PluginRegistry) -> None:
     registry.diffraction_file_readers.register_plugin(
         file_reader,
         simple_name='APS_Atomic',
-        display_name='APS 34-ID-F Atomic Files (*.tif *.tiff)',
+        display_name='APS 34-ID Atomic Files (*.tif *.tiff)',
     )
 
 
