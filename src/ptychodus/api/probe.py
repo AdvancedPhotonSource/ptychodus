@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
 from typing import overload
+import logging
+import math
 
 import numpy
 import scipy.ndimage
@@ -15,9 +17,12 @@ from scipy.fft import fft2
 from .constants import format_length
 from .fourier import fourier_shift_2d
 from .geometry import ImageExtent, PixelGeometry
+from .interpolate import resample_along_axis
 from .preprocess.noise import estimate_noise_floor
 from .propagate import PropagatedWavefield, compute_far_field_pixel_geometry, intensity
 from .typing import ComplexArrayType, RealArrayType
+
+logger = logging.getLogger(__name__)
 
 
 def compute_shannon_entropy(distribution: RealArrayType, *, normalize: bool = True) -> float:
@@ -1084,6 +1089,115 @@ class ProbeSequence(Sequence[Probe]):
 
     def __repr__(self) -> str:
         return f'{self._array.dtype}{self._array.shape}'
+
+
+def _centered_grid_indexes(
+    source_pixel_m: float, source_px: int, target_pixel_m: float, target_px: int
+) -> RealArrayType:
+    """Fractional source indexes sampled by each target pixel of a co-centered grid.
+
+    Centered-pixel convention: the center of a grid sits at index ``(N - 1) / 2``, so the
+    two grids share a center and differ only in pitch and extent.
+    """
+    offsets_px = numpy.arange(target_px) - (target_px - 1) / 2
+    return offsets_px * (target_pixel_m / source_pixel_m) + (source_px - 1) / 2
+
+
+def resample_probe_sequence(
+    probes: ProbeSequence, target_geometry: ProbeGeometry, *, rel_tol: float = 1.0e-9
+) -> ProbeSequence:
+    """Re-express ``probes`` on ``target_geometry``, preserving the integrated power.
+
+    A probe saved by a previous run samples the illumination at that run's pixel size,
+    which the photon energy and the detector distance fix. Reusing it against a different
+    geometry without resampling starts the reconstruction from an illumination of the
+    wrong physical size. This compares the two pitches and, when they disagree,
+    interpolates every coherent and incoherent mode onto the target grid.
+
+    A probe carries no world center, so both grids are centered on their own arrays and
+    the resampling separates into one monotone-cubic pass per axis. Content beyond the
+    source is zero: outside the frame there is no illumination, which is the answer, not
+    a filler. That is what distinguishes this from an object, where the same fill would
+    assert an opaque border.
+
+    Amplitudes scale by ``sqrt(target pixel area / source pixel area)`` so that
+    ``sum(abs(P)**2)`` -- the photon count the probe carries -- comes through unchanged
+    while the field it represents stays the same physical illumination.
+
+    Returns ``probes`` itself when there is nothing to do: no pixel geometry to compare
+    against, an axis too short to interpolate along, or pitches agreeing within
+    ``rel_tol``. Returning the input itself keeps this a true no-op for callers that
+    rebuild on every settings notification, which the interpolator by itself is not.
+
+    Args:
+        probes: Probe ensemble to re-express, typically an initial guess read from a file.
+        target_geometry: Grid implied by the run's detector and illumination geometry.
+        rel_tol: Largest relative pitch difference that still names the same sampling.
+    """
+    try:
+        pixel_geometry = probes.get_pixel_geometry()
+    except ValueError:
+        logger.debug('Probe records no pixel size; taking it to be at the run sampling.')
+        return probes
+
+    width_agrees = math.isclose(
+        pixel_geometry.width_m, target_geometry.pixel_width_m, rel_tol=rel_tol
+    )
+    height_agrees = math.isclose(
+        pixel_geometry.height_m, target_geometry.pixel_height_m, rel_tol=rel_tol
+    )
+
+    if width_agrees and height_agrees:
+        return probes
+
+    if probes.width_px < 2 or probes.height_px < 2:
+        logger.warning(
+            f'Probe is {probes.width_px} x {probes.height_px} px and cannot be resampled to '
+            'the run sampling; leaving it at its own pixel size.'
+        )
+        return probes
+
+    logger.info(
+        'Probe pixel size is %s x %s and the run samples at %s x %s; resampling from '
+        '%d x %d to %d x %d px.',
+        format_length(pixel_geometry.width_m),
+        format_length(pixel_geometry.height_m),
+        format_length(target_geometry.pixel_width_m),
+        format_length(target_geometry.pixel_height_m),
+        probes.width_px,
+        probes.height_px,
+        target_geometry.width_px,
+        target_geometry.height_px,
+    )
+
+    columns = _centered_grid_indexes(
+        pixel_geometry.width_m,
+        probes.width_px,
+        target_geometry.pixel_width_m,
+        target_geometry.width_px,
+    )
+    rows = _centered_grid_indexes(
+        pixel_geometry.height_m,
+        probes.height_px,
+        target_geometry.pixel_height_m,
+        target_geometry.height_px,
+    )
+
+    resampled = probes.get_array()
+
+    for indexes, axis in ((columns, -1), (rows, -2)):
+        real = resample_along_axis(resampled.real, indexes, axis=axis, fill_value=0.0)
+        imaginary = resample_along_axis(resampled.imag, indexes, axis=axis, fill_value=0.0)
+        resampled = real + 1j * imaginary
+
+    source_area_m2 = pixel_geometry.width_m * pixel_geometry.height_m
+    target_area_m2 = target_geometry.pixel_width_m * target_geometry.pixel_height_m
+
+    return ProbeSequence(
+        array=resampled * numpy.sqrt(target_area_m2 / source_area_m2),
+        opr_weights=probes.get_opr_weights_or_none(),
+        pixel_geometry=target_geometry.get_pixel_geometry(),
+    )
 
 
 class ProbeFileReader(ABC):

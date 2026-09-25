@@ -20,6 +20,7 @@ from .typing import ComplexArrayType, RealArrayType
 from .constants import format_length
 from .fourier import fourier_shift_2d
 from .geometry import PixelGeometry
+from .interpolate import resample_along_axis
 from .probe import ProbeGeometry
 from .probe_positions import ProbePosition, calculate_scan_geometry
 
@@ -488,6 +489,198 @@ def center_crop_object(obj: Object, target_h: int, target_w: int) -> Object:
         pixel_geometry=pixel_geometry.copy(),
         center=new_center,
         layer_spacing_m=list(obj.layer_spacing_m),
+    )
+
+
+def _resample_axis_indexes(
+    source_center_m: float,
+    source_pixel_m: float,
+    source_px: int,
+    target_center_m: float,
+    target_pixel_m: float,
+    target_px: int,
+) -> RealArrayType:
+    """Fractional source indexes sampled by each target pixel along one axis.
+
+    Centered-pixel convention throughout: the world center of a grid sits at index
+    ``(N - 1) / 2``, matching :meth:`ObjectGeometry.get_transverse_coordinates` and
+    :meth:`ObjectGeometry.map_coordinates_probe_to_object`.
+    """
+    offsets_m = (numpy.arange(target_px) - (target_px - 1) / 2) * target_pixel_m
+    world_m = target_center_m + offsets_m
+    return (world_m - source_center_m) / source_pixel_m + (source_px - 1) / 2
+
+
+def resample_object(
+    obj: Object, target_geometry: ObjectGeometry, *, fill_value: complex = 0.0
+) -> Object:
+    """Resample every layer of ``obj`` onto ``target_geometry``.
+
+    Source and target may differ in extent, pitch and center, and the two axes are
+    handled independently. Both grids are axis-aligned, so the target is a tensor product
+    of two 1-D grids and the resampling separates into one pass per axis over the whole
+    layer stack: four interpolator calls, counting the real and imaginary parts
+    separately, and no loop over layers. A general affine warp carries rotation and
+    shear, does not separate this way, and belongs to
+    :func:`ptychodus.api.affine.transform_product`.
+
+    Target pixels falling outside the source take ``fill_value``. Zero is what padding an
+    object does elsewhere; pass ``1.0`` for vacuum, the only fill that leaves a
+    transmission function's layer product unchanged.
+
+    Evaluating PCHIP at its own grid nodes is exact only to round-off, so a target that
+    repeats the source grid is not a bit-exact no-op. Callers that rebuild on every
+    settings notification must test for that themselves, as
+    :func:`resample_object_to_pixel_size` does.
+
+    A source carrying no center is taken to be centered where ``target_geometry`` is. The
+    result carries the target geometry's pixel size and center either way.
+
+    Raises:
+        ValueError: If the source is missing its pixel geometry, or has fewer than two
+            pixels on an axis, leaving nothing to interpolate along.
+    """
+    pixel_geometry = obj.get_pixel_geometry()
+
+    if obj.width_px < 2 or obj.height_px < 2:
+        raise ValueError(
+            f'Object is {obj.width_px} x {obj.height_px} px; resampling needs at least two '
+            'pixels on each axis.'
+        )
+
+    try:
+        source_center = obj.get_center()
+    except ValueError:
+        source_center = target_geometry.get_center()
+
+    columns = _resample_axis_indexes(
+        source_center.x_m,
+        pixel_geometry.width_m,
+        obj.width_px,
+        target_geometry.center_x_m,
+        target_geometry.pixel_width_m,
+        target_geometry.width_px,
+    )
+    rows = _resample_axis_indexes(
+        source_center.y_m,
+        pixel_geometry.height_m,
+        obj.height_px,
+        target_geometry.center_y_m,
+        target_geometry.pixel_height_m,
+        target_geometry.height_px,
+    )
+
+    resampled = obj.get_array()
+
+    for indexes, axis in ((columns, -1), (rows, -2)):
+        real = resample_along_axis(resampled.real, indexes, axis=axis, fill_value=fill_value.real)
+        imaginary = resample_along_axis(
+            resampled.imag, indexes, axis=axis, fill_value=fill_value.imag
+        )
+        resampled = real + 1j * imaginary
+
+    return Object(
+        array=resampled,
+        pixel_geometry=target_geometry.get_pixel_geometry(),
+        center=target_geometry.get_center(),
+        layer_spacing_m=list(obj.layer_spacing_m),
+    )
+
+
+def resample_object_to_pixel_size(
+    obj: Object, pixel_geometry: PixelGeometry, *, rel_tol: float = 1.0e-9
+) -> Object:
+    """Re-express ``obj`` at ``pixel_geometry``, preserving its physical extent and center.
+
+    An object saved by a previous run is sampled at that run's pixel size, which the
+    photon energy and the detector distance fix. Reusing it against a different geometry
+    without resampling starts the reconstruction from a misscaled initial guess, and
+    nothing downstream reveals the error. This compares the two pitches and, when they
+    disagree, zooms the array by the ratio: the extent and center in meters are unchanged
+    and the pixel count absorbs the difference.
+
+    The rounding of that pixel count can leave the target reaching a fraction of a pixel
+    beyond the source, which is filled with vacuum rather than the zero of an opaque
+    object.
+
+    Returns ``obj`` itself when there is nothing to do: no pixel geometry to compare
+    against, an axis too short to interpolate along, or pitches agreeing within
+    ``rel_tol``. Pitches that close name the same sampling, and a product round-tripped
+    through HDF5 stores its geometries as independent floats, so an exact comparison
+    would resample for float noise alone. Returning the input itself also keeps this a
+    true no-op for callers that rebuild on every settings notification, which the
+    interpolator by itself is not.
+
+    Args:
+        obj: Object to re-express, typically an initial guess read from a file.
+        pixel_geometry: Sampling implied by the run's geometry.
+        rel_tol: Largest relative pitch difference that still names the same sampling.
+    """
+    try:
+        source_pixel_geometry = obj.get_pixel_geometry()
+    except ValueError:
+        logger.debug('Object records no pixel size; taking it to be at the run sampling.')
+        return obj
+
+    width_agrees = math.isclose(
+        source_pixel_geometry.width_m, pixel_geometry.width_m, rel_tol=rel_tol
+    )
+    height_agrees = math.isclose(
+        source_pixel_geometry.height_m, pixel_geometry.height_m, rel_tol=rel_tol
+    )
+
+    if width_agrees and height_agrees:
+        return obj
+
+    if obj.width_px < 2 or obj.height_px < 2:
+        logger.warning(
+            f'Object is {obj.width_px} x {obj.height_px} px and cannot be resampled to the '
+            'run sampling; leaving it at its own pixel size.'
+        )
+        return obj
+
+    try:
+        center = obj.get_center()
+    except ValueError:
+        # A pitch-only change is center-invariant, so any center resamples identically;
+        # the result gives its own back rather than inventing world coordinates.
+        center = ObjectCenter(x_m=0.0, y_m=0.0)
+        has_center = False
+    else:
+        has_center = True
+
+    width_m = obj.width_px * source_pixel_geometry.width_m
+    height_m = obj.height_px * source_pixel_geometry.height_m
+    target_geometry = ObjectGeometry(
+        width_px=max(1, round(width_m / pixel_geometry.width_m)),
+        height_px=max(1, round(height_m / pixel_geometry.height_m)),
+        pixel_width_m=pixel_geometry.width_m,
+        pixel_height_m=pixel_geometry.height_m,
+        center_x_m=center.x_m,
+        center_y_m=center.y_m,
+    )
+    logger.info(
+        'Object pixel size is %s x %s and the run samples at %s x %s; resampling from '
+        '%d x %d to %d x %d px.',
+        format_length(source_pixel_geometry.width_m),
+        format_length(source_pixel_geometry.height_m),
+        format_length(pixel_geometry.width_m),
+        format_length(pixel_geometry.height_m),
+        obj.width_px,
+        obj.height_px,
+        target_geometry.width_px,
+        target_geometry.height_px,
+    )
+    resampled = resample_object(obj, target_geometry, fill_value=1.0)
+
+    if has_center:
+        return resampled
+
+    return Object(
+        array=resampled.get_array(),
+        pixel_geometry=resampled.get_pixel_geometry(),
+        center=None,
+        layer_spacing_m=list(resampled.layer_spacing_m),
     )
 
 

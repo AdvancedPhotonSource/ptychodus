@@ -25,6 +25,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import numpy
+import numpy.testing
 import pytest
 
 from ptychodus.api.geometry import PixelGeometry
@@ -271,3 +272,38 @@ def test_copy_preserves_padding_parameters(builder_name: str) -> None:
 
     assert duplicate.extra_padding_x.get_value() == 2
     assert duplicate.extra_padding_y.get_value() == 3
+
+
+def test_from_file_builder_resamples_an_object_sampled_at_another_pixel_size() -> None:
+    """A warm start saved by a run at a different pixel size is a misscaled initial
+    guess; reconstructing from it produces a silently wrong result."""
+    settings = _make_settings()
+    coarse = Object(
+        array=_make_object(1).get_array(),
+        pixel_geometry=PixelGeometry(width_m=2.0 * PIXEL_SIZE_M, height_m=2.0 * PIXEL_SIZE_M),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
+    )
+    builder = _make_from_file_builder(settings, coarse)
+
+    object_ = builder.build(_StubObjectGeometryProvider(), [])
+
+    # Half the pitch, twice the pixels, the same physical extent.
+    assert object_.get_pixel_geometry().width_m == pytest.approx(PIXEL_SIZE_M)
+    assert object_.width_px == 2 * EXTENT_PX
+    assert object_.height_px == 2 * EXTENT_PX
+    geometry = object_.get_geometry()
+    assert geometry.width_m == pytest.approx(2.0 * PIXEL_SIZE_M * EXTENT_PX)
+
+
+def test_from_file_builder_leaves_an_object_without_a_pixel_size_alone() -> None:
+    """Every registered object format records no pixel size, so the common path must
+    keep returning the array verbatim."""
+    settings = _make_settings()
+    source = _make_object(1)
+    bare = Object(array=source.get_array(), pixel_geometry=None, center=None)
+    builder = _make_from_file_builder(settings, bare)
+
+    object_ = builder.build(_StubObjectGeometryProvider(), [])
+
+    numpy.testing.assert_array_equal(object_.get_array(), source.get_array())
+    assert object_.get_pixel_geometry().width_m == pytest.approx(PIXEL_SIZE_M)

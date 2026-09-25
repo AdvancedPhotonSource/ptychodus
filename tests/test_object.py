@@ -2,6 +2,7 @@
 
 Currently covers:
   - align_objects: sub-pixel alignment with probe-position-consistent center adjustment.
+  - resample_object / resample_object_to_pixel_size: transverse regridding.
 """
 
 from __future__ import annotations
@@ -19,6 +20,8 @@ from ptychodus.api.object import (
     align_objects,
     compute_object_geometry,
     estimate_object_alignment_shift,
+    resample_object,
+    resample_object_to_pixel_size,
 )
 from ptychodus.api.probe import ProbeGeometry
 from ptychodus.api.probe_positions import ProbePosition
@@ -650,3 +653,162 @@ class TestObjectGeometryStr:
         rendered = str(geometry)
         assert rendered.startswith('1024 x 1024 px around ')
         assert 'µm' in rendered  # SI prefix selected by magnitude
+
+
+# ---------------------------------------------------------------------------
+# resample_object / resample_object_to_pixel_size
+# ---------------------------------------------------------------------------
+
+
+def _make_smooth_object(
+    pixel_m: float = 2.0e-8,
+    width_px: int = 64,
+    height_px: int = 64,
+    center: ObjectCenter | None = ObjectCenter(x_m=1.0e-6, y_m=-2.0e-6),
+) -> Object:
+    """A band-limited complex object, the content resampling is expected to preserve."""
+    y, x = numpy.mgrid[:height_px, :width_px]
+    amplitude = 1.0 - 0.1 * numpy.cos(2.0 * numpy.pi * x / 40.0)
+    phase = 0.01 * (x + y)
+    array = (amplitude * numpy.exp(1j * phase))[numpy.newaxis, ...]
+    return Object(
+        array=array.astype(numpy.complex128),
+        pixel_geometry=PixelGeometry(width_m=pixel_m, height_m=pixel_m),
+        center=center,
+    )
+
+
+def test_resample_to_the_same_pixel_size_returns_the_input_itself() -> None:
+    obj = _make_smooth_object()
+    same = resample_object_to_pixel_size(obj, PixelGeometry(width_m=2.0e-8, height_m=2.0e-8))
+    # Identity, not equality: PCHIP at its own nodes is exact only to round-off, so the
+    # tolerance guard is what makes a repeated rebuild non-destructive.
+    assert same is obj
+
+
+def test_resample_tolerates_float_noise_in_the_pixel_size() -> None:
+    obj = _make_smooth_object()
+    noisy = PixelGeometry(width_m=2.0e-8 * (1.0 + 1.0e-12), height_m=2.0e-8)
+    assert resample_object_to_pixel_size(obj, noisy) is obj
+
+
+def test_resample_preserves_extent_and_center_while_changing_the_pixel_count() -> None:
+    obj = _make_smooth_object()
+    resampled = resample_object_to_pixel_size(obj, PixelGeometry(width_m=1.0e-8, height_m=1.0e-8))
+
+    source = obj.get_geometry()
+    target = resampled.get_geometry()
+
+    assert (target.width_px, target.height_px) == (128, 128)
+    assert target.width_m == pytest.approx(source.width_m)
+    assert target.height_m == pytest.approx(source.height_m)
+    assert target.center_x_m == pytest.approx(source.center_x_m)
+    assert target.center_y_m == pytest.approx(source.center_y_m)
+
+
+def test_resample_round_trip_recovers_smooth_content() -> None:
+    obj = _make_smooth_object()
+    fine = resample_object_to_pixel_size(obj, PixelGeometry(width_m=1.0e-8, height_m=1.0e-8))
+    back = resample_object_to_pixel_size(fine, PixelGeometry(width_m=2.0e-8, height_m=2.0e-8))
+
+    assert back.get_array().shape == obj.get_array().shape
+    # The border samples the vacuum fill beyond the source, so compare the interior.
+    error = numpy.abs(back.get_array() - obj.get_array())[:, 2:-2, 2:-2]
+    assert error.max() < 1.0e-3
+
+
+def test_resample_of_a_monotone_ramp_does_not_overshoot() -> None:
+    """The property PCHIP is chosen for; an unconstrained cubic fails this."""
+    ramp = numpy.linspace(0.0, 1.0, 64)[None, :] * numpy.ones((64, 1))
+    obj = Object(
+        array=(ramp + 0j)[numpy.newaxis, ...],
+        pixel_geometry=PixelGeometry(width_m=2.0e-8, height_m=2.0e-8),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
+    )
+
+    resampled = resample_object_to_pixel_size(obj, PixelGeometry(width_m=1.3e-8, height_m=1.3e-8))
+    interior = resampled.get_array().real[:, 2:-2, 2:-2]
+
+    assert interior.min() >= 0.0
+    assert interior.max() <= 1.0
+
+
+def test_resample_passes_through_an_object_without_a_pixel_geometry() -> None:
+    obj = Object(array=_make_smooth_object().get_array(), pixel_geometry=None, center=None)
+    assert resample_object_to_pixel_size(obj, PixelGeometry(width_m=1.0e-8, height_m=1.0e-8)) is obj
+
+
+def test_resample_without_a_center_does_not_invent_one() -> None:
+    obj = _make_smooth_object(center=None)
+    resampled = resample_object_to_pixel_size(obj, PixelGeometry(width_m=1.0e-8, height_m=1.0e-8))
+
+    assert resampled.get_array().shape == (1, 128, 128)
+    assert resampled.get_pixel_geometry().width_m == pytest.approx(1.0e-8)
+
+    with pytest.raises(ValueError):
+        resampled.get_center()
+
+
+def test_resample_handles_a_two_pixel_axis() -> None:
+    array = numpy.ones((1, 2, 2), dtype=numpy.complex128)
+    obj = Object(
+        array=array,
+        pixel_geometry=PixelGeometry(width_m=2.0e-8, height_m=2.0e-8),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
+    )
+    resampled = resample_object_to_pixel_size(obj, PixelGeometry(width_m=1.0e-8, height_m=1.0e-8))
+    assert resampled.get_array().shape == (1, 4, 4)
+
+
+def test_resample_leaves_an_axis_too_short_to_interpolate_alone() -> None:
+    obj = Object(
+        array=numpy.ones((1, 1, 1), dtype=numpy.complex128),
+        pixel_geometry=PixelGeometry(width_m=2.0e-8, height_m=2.0e-8),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
+    )
+    assert resample_object_to_pixel_size(obj, PixelGeometry(width_m=1.0e-8, height_m=1.0e-8)) is obj
+
+
+def test_resample_object_carries_every_layer_and_its_spacing() -> None:
+    array = numpy.stack(
+        [_make_smooth_object().get_array()[0] * scale for scale in (1.0, 0.5, 0.25)]
+    )
+    obj = Object(
+        array=array,
+        pixel_geometry=PixelGeometry(width_m=2.0e-8, height_m=2.0e-8),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
+        layer_spacing_m=[1.0e-6, 2.0e-6],
+    )
+
+    resampled = resample_object_to_pixel_size(obj, PixelGeometry(width_m=1.0e-8, height_m=1.0e-8))
+
+    assert resampled.get_array().shape == (3, 128, 128)
+    assert list(resampled.layer_spacing_m) == [1.0e-6, 2.0e-6]
+    # The layers differ by a constant factor, which the resampling must not disturb.
+    # Only in the interior: the vacuum fill beyond the source is unit transmission in
+    # every layer, so it is deliberately not proportional to the entrance layer.
+    numpy.testing.assert_allclose(
+        resampled.get_array()[1, 1:-1, 1:-1],
+        resampled.get_array()[0, 1:-1, 1:-1] * 0.5,
+        rtol=1.0e-12,
+    )
+
+
+def test_resample_object_onto_a_shifted_grid_fills_outside_the_source() -> None:
+    obj = _make_smooth_object(center=ObjectCenter(x_m=0.0, y_m=0.0))
+    source = obj.get_geometry()
+    # Slide the target a full half-width to the right: its right half sees no source.
+    target = ObjectGeometry(
+        width_px=source.width_px,
+        height_px=source.height_px,
+        pixel_width_m=source.pixel_width_m,
+        pixel_height_m=source.pixel_height_m,
+        center_x_m=source.width_m,
+        center_y_m=0.0,
+    )
+
+    resampled = resample_object(obj, target, fill_value=1.0)
+    array = resampled.get_array()
+
+    assert resampled.get_geometry().center_x_m == pytest.approx(source.width_m)
+    numpy.testing.assert_allclose(array[0, :, -1], 1.0)

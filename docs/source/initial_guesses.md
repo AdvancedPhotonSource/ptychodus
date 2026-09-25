@@ -77,6 +77,18 @@ Object
 Probe positions
 : Each {py:class}`ptychodus.api.probe_positions.ProbePosition` stores an integer scan index and physical `x`/`y` coordinates in meters. Internally, `ProbePositionSequence` keeps the coordinate array in `(y, x)` order, but the public object properties are named `coordinate_x_m` and `coordinate_y_m`.
 
+## Pixel Size Of A File-Supplied Guess
+
+An object or probe is sampled at the pixel size its own run implied, which the photon energy and the detector distance fix. Reusing one as an initial guess for a run that samples differently means starting from a guess of the wrong physical scale, and nothing downstream reveals it: the reconstruction simply converges to the wrong answer.
+
+Ptychodus therefore reconciles a file-supplied guess to the run's sampling. {py:func}`ptychodus.api.object.resample_object_to_pixel_size` re-expresses an object at the run's pixel size, preserving its physical extent and center and letting the pixel count absorb the difference; {py:func}`ptychodus.api.probe.resample_probe_sequence` re-expresses every probe mode on the run's probe grid, scaling amplitudes so the photon count survives. Both interpolate with a monotone cubic, so no resampled amplitude or phase overshoots the source, and both return the input untouched when the two samplings already agree.
+
+```{note}
+This reconciliation only ever fires for a file format that records its pixel size. None of the registered object or probe formats do — NPY and CSV store a bare array — so a guess loaded from one of those is taken to be sampled the way the current run is, exactly as before.
+```
+
+A product opened from HDF5 or NPZ does carry its pixel size, and that path behaves differently on purpose. Such a product is a finished record rather than an initial guess, and the same path also carries live reconstruction output, so a disagreement is reported as a warning naming both samplings and the array is left alone. The disagreement arises when a product is rebound to another dataset, or when its photon energy or detector distance is edited after loading.
+
 ## Probe Position Generators
 
 Use `WorkflowProductAPI.generate_probe_positions(name, parameters)`.

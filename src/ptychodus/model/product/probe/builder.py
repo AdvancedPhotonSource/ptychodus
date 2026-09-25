@@ -17,6 +17,7 @@ from ptychodus.api.probe import (
     ProbeSequence,
     ProbeFileReader,
     ProbeGeometryProvider,
+    resample_probe_sequence,
 )
 
 from .settings import ProbeSettings
@@ -260,6 +261,11 @@ class FromFileProbeBuilder(ProbeSequenceBuilder):
     were silently ignored here. `_condition_probe` is expand-only, so a file that
     already carries more modes, or an OPR basis, keeps what it has.
 
+    A file that records its own pixel size is reconciled to the run's, since a
+    probe sampled by another geometry is an illumination of the wrong physical
+    size. None of the probe formats currently record one, so today this only ever
+    fires for a reader that supplies it.
+
     The photon-count rescale is deliberately not applied; see
     `ProbeSequenceBuilder._rescale_to_photon_count`.
     """
@@ -303,11 +309,15 @@ class FromFileProbeBuilder(ProbeSequenceBuilder):
         try:
             pixel_geometry = probe_from_file.get_pixel_geometry()
         except ValueError:
+            # The format records no pixel size, so there is nothing to reconcile and the
+            # array is taken to be sampled the way this run is.
             pixel_geometry = probe_geometry.get_pixel_geometry()
 
-        # TODO regrid probe as needed based on probe geometry from file/provider
-        return ProbeSequence(
-            probe_from_file.get_array(),
-            probe_from_file.get_opr_weights_or_none(),
-            pixel_geometry,
+        return resample_probe_sequence(
+            ProbeSequence(
+                probe_from_file.get_array(),
+                probe_from_file.get_opr_weights_or_none(),
+                pixel_geometry,
+            ),
+            probe_geometry,
         )

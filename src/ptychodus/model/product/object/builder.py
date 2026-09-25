@@ -4,7 +4,12 @@ from collections.abc import Sequence
 import logging
 
 
-from ptychodus.api.object import Object, ObjectFileReader, ObjectGeometryProvider
+from ptychodus.api.object import (
+    Object,
+    ObjectFileReader,
+    ObjectGeometryProvider,
+    resample_object_to_pixel_size,
+)
 from ptychodus.api.simulate.object import generate_layers, pad_object
 from ptychodus.api.parameters import ParameterGroup
 
@@ -178,6 +183,11 @@ class FromFileObjectBuilder(ObjectBuilder):
     silently ignored here. `_condition_object` keeps whatever layers the file
     already carries.
 
+    A file that records its own pixel size is reconciled to the run's, since an
+    object sampled by another geometry is a misscaled initial guess rather than a
+    warm start. None of the object formats currently record one, so today this
+    only ever fires for a reader that supplies it.
+
     The extra padding is deliberately not applied; see `ObjectBuilder._pad_object`.
     """
 
@@ -219,6 +229,8 @@ class FromFileObjectBuilder(ObjectBuilder):
         try:
             pixel_geometry = object_from_file.get_pixel_geometry()
         except ValueError:
+            # The format records no pixel size, so there is nothing to reconcile and the
+            # array is taken to be sampled the way this run is.
             pixel_geometry = object_geometry.get_pixel_geometry()
 
         try:
@@ -226,9 +238,12 @@ class FromFileObjectBuilder(ObjectBuilder):
         except ValueError:
             center = object_geometry.get_center()
 
-        return Object(
-            object_from_file.get_array(),
-            pixel_geometry,
-            center,
-            object_from_file.layer_spacing_m,
+        return resample_object_to_pixel_size(
+            Object(
+                object_from_file.get_array(),
+                pixel_geometry,
+                center,
+                object_from_file.layer_spacing_m,
+            ),
+            object_geometry.get_pixel_geometry(),
         )

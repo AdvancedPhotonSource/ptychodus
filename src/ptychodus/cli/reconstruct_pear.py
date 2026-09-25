@@ -81,6 +81,7 @@ from ptychodus.api.object import (
     compute_uniform_layer_spacing_m,
     homogenize_object_layers,
     resample_object_layers,
+    resample_object_to_pixel_size,
     resize_object_layers,
     scale_object_phase,
     select_object_layers,
@@ -956,12 +957,25 @@ def main() -> int:
             params.init_object_file_type
         )
         source = object_reader.read(object_file)
-        # The file supplies layer content only: the canvas is the one sized against this
-        # scan, and the depth grid is the one this run asked for.
+
+        # A file that records its own sampling and center keeps them, so the pixel size
+        # can be reconciled below; one that records neither -- which is every object
+        # format currently registered -- is taken to be sampled the way this scan is.
+        try:
+            source_pixel_geometry = source.get_pixel_geometry()
+        except ValueError:
+            source_pixel_geometry = object_geometry.get_pixel_geometry()
+
+        try:
+            source_center = source.get_center()
+        except ValueError:
+            source_center = object_geometry.get_center()
+
+        # The depth grid is the one this run asked for.
         object_ = Object(
             array=source.get_array(),
-            pixel_geometry=object_geometry.get_pixel_geometry(),
-            center=object_geometry.get_center(),
+            pixel_geometry=source_pixel_geometry,
+            center=source_center,
             layer_spacing_m=compute_uniform_layer_spacing_m(
                 params.object_thickness_m, source.num_layers
             ),
@@ -984,6 +998,10 @@ def main() -> int:
                 object_ = select_object_layers(object_, [0])
         elif preprocess == 'interp':
             object_ = resample_object_layers(object_, layer_spacing_m)
+
+        # After the layer selection and collapse, so a run that averages down to one
+        # layer interpolates one layer transversely rather than all of them.
+        object_ = resample_object_to_pixel_size(object_, object_geometry.get_pixel_geometry())
 
         scaling = params.init_layer_scaling_factor
 

@@ -324,3 +324,39 @@ def test_copy_preserves_mode_parameters(builder_name: str) -> None:
 
     probe_seq = duplicate.build(_StubProbeGeometryProvider())
     assert probe_seq.get_array().shape[:2] == (2, 3)
+
+
+def test_from_file_builder_resamples_a_probe_sampled_at_another_pixel_size() -> None:
+    """A probe saved by a run at a different pixel size is an illumination of the wrong
+    physical size; this is the regrid the builder's TODO used to defer."""
+    settings = _make_settings()
+    source = _make_probe_seq(1, 1)
+    coarse = ProbeSequence(
+        array=source.get_array(),
+        opr_weights=None,
+        pixel_geometry=PixelGeometry(width_m=2.0 * PIXEL_SIZE_M, height_m=2.0 * PIXEL_SIZE_M),
+    )
+    builder = _make_from_file_builder(settings, coarse)
+
+    probe_seq = builder.build(_StubProbeGeometryProvider())
+
+    assert probe_seq.get_pixel_geometry().width_m == pytest.approx(PIXEL_SIZE_M)
+    assert probe_seq.width_px == PROBE_EXTENT_PX
+    assert probe_seq.height_px == PROBE_EXTENT_PX
+    # Photon-count invariance is asserted in test_probe.py against a smooth probe. This
+    # fixture is white noise, whose power a resample legitimately smooths away: only
+    # content the source grid resolves can survive being re-expressed on another one.
+
+
+def test_from_file_builder_leaves_a_probe_without_a_pixel_size_alone() -> None:
+    """Every registered probe format records no pixel size, so the common path must keep
+    returning the array verbatim."""
+    settings = _make_settings()
+    source = _make_probe_seq(1, 1)
+    bare = ProbeSequence(array=source.get_array(), opr_weights=None, pixel_geometry=None)
+    builder = _make_from_file_builder(settings, bare)
+
+    probe_seq = builder.build(_StubProbeGeometryProvider())
+
+    numpy.testing.assert_array_equal(probe_seq.get_array(), source.get_array())
+    assert probe_seq.get_pixel_geometry().width_m == pytest.approx(PIXEL_SIZE_M)

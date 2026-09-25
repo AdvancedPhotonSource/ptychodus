@@ -22,6 +22,7 @@ from ptychodus.api.probe import (
     estimate_focal_plane,
     estimate_probe_entropy,
     estimate_probe_size,
+    resample_probe_sequence,
     shift_probe,
 )
 from ptychodus.api.propagate import PropagatedWavefield
@@ -801,3 +802,81 @@ class TestShiftProbe:
         shifted = shift_probe(self._probe(numpy.ones((1, 8, 8))), shift_y_px=1.0, shift_x_px=1.0)
 
         assert shifted.get_pixel_geometry().width_m == PIXEL_M
+
+
+# ---------------------------------------------------------------------------
+# resample_probe_sequence
+# ---------------------------------------------------------------------------
+
+
+def _make_gaussian_probe_sequence(
+    pixel_m: float = 2.0e-8, extent_px: int = 32, num_imodes: int = 2
+) -> ProbeSequence:
+    """A smooth, well-sampled illumination that resampling should carry intact."""
+    y, x = numpy.mgrid[:extent_px, :extent_px]
+    center = (extent_px - 1) / 2
+    envelope = numpy.exp(-(((x - center) ** 2 + (y - center) ** 2) / (2.0 * 4.0**2)))
+    mode = envelope * numpy.exp(1j * 0.05 * x)
+    array = numpy.stack([numpy.stack([mode * scale for scale in range(1, num_imodes + 1)])])
+    return ProbeSequence(
+        array=array.astype(complex),
+        opr_weights=None,
+        pixel_geometry=PixelGeometry(width_m=pixel_m, height_m=pixel_m),
+    )
+
+
+def test_resample_probe_sequence_at_the_same_pixel_size_returns_the_input_itself() -> None:
+    probes = _make_gaussian_probe_sequence()
+    target = ProbeGeometry(width_px=32, height_px=32, pixel_width_m=2.0e-8, pixel_height_m=2.0e-8)
+    assert resample_probe_sequence(probes, target) is probes
+
+
+def test_resample_probe_sequence_preserves_the_photon_count() -> None:
+    """The pixel area changes, so the amplitude must absorb it or the probe silently
+    gains or loses photons."""
+    probes = _make_gaussian_probe_sequence()
+    target = ProbeGeometry(width_px=64, height_px=64, pixel_width_m=1.0e-8, pixel_height_m=1.0e-8)
+
+    resampled = resample_probe_sequence(probes, target)
+
+    before = numpy.sum(numpy.abs(probes.get_array()) ** 2)
+    after = numpy.sum(numpy.abs(resampled.get_array()) ** 2)
+    assert after == pytest.approx(before, rel=1.0e-3)
+
+
+def test_resample_probe_sequence_lands_on_the_target_grid() -> None:
+    probes = _make_gaussian_probe_sequence()
+    target = ProbeGeometry(width_px=64, height_px=64, pixel_width_m=1.0e-8, pixel_height_m=1.0e-8)
+
+    resampled = resample_probe_sequence(probes, target)
+
+    assert resampled.get_array().shape == (1, 2, 64, 64)
+    assert resampled.get_pixel_geometry().width_m == pytest.approx(1.0e-8)
+    assert resampled.get_pixel_geometry().height_m == pytest.approx(1.0e-8)
+
+
+def test_resample_probe_sequence_carries_opr_weights_through() -> None:
+    probes = _make_gaussian_probe_sequence()
+    weights = numpy.ones((5, 1))
+    with_weights = ProbeSequence(
+        array=probes.get_array(),
+        opr_weights=weights,
+        pixel_geometry=probes.get_pixel_geometry(),
+    )
+    target = ProbeGeometry(width_px=64, height_px=64, pixel_width_m=1.0e-8, pixel_height_m=1.0e-8)
+
+    resampled = resample_probe_sequence(with_weights, target)
+    resampled_weights = resampled.get_opr_weights_or_none()
+
+    assert resampled_weights is not None
+    numpy.testing.assert_array_equal(resampled_weights, weights)
+
+
+def test_resample_probe_sequence_passes_through_without_a_pixel_geometry() -> None:
+    probes = ProbeSequence(
+        array=_make_gaussian_probe_sequence().get_array(),
+        opr_weights=None,
+        pixel_geometry=None,
+    )
+    target = ProbeGeometry(width_px=64, height_px=64, pixel_width_m=1.0e-8, pixel_height_m=1.0e-8)
+    assert resample_probe_sequence(probes, target) is probes
