@@ -5,6 +5,12 @@ The XFM instrument at 2-ID-E writes one Eiger HDF5 per scan line beside an EPICS
 holding the positions. Both the scan number and the line number are three digits wide, so the
 series is identified by the trailing field.
 
+The positioner is driven over more points per line than the detector records, so both readers
+number their output line-major -- `line * stride + column` -- rather than by running count.
+Pairing then falls out of the scan index: the surplus commanded points go unclaimed, a line the
+detector cut short claims fewer, and a detector line past the end of the positioner record has
+no position and is dropped.
+
 Scope and limitations
 ---------------------
 
@@ -683,6 +689,20 @@ def main() -> int:
     options_file.write_text(dump_task_options(task_options))
 
     reconstruct_input = prepare_reconstruct_input(assembled_data, product)
+    num_paired = reconstruct_input.diffraction_patterns.shape[0]
+
+    if num_paired < num_patterns:
+        # Ordinary on a scan that was stopped mid-raster: the detector keeps the line it
+        # was on, the MDA file truncates at its last completed line, and the patterns
+        # past that end have no position to pair with.
+        logger.warning(
+            'Paired %d of %d assembled patterns; %d had no probe position, which is'
+            ' expected when the detector recorded more scan lines than the MDA file.',
+            num_paired,
+            num_patterns,
+            num_patterns - num_paired,
+        )
+
     logger.info(
         'Starting reconstruction: %d patterns, %d epochs total, sync every %d',
         reconstruct_input.diffraction_patterns.shape[0],

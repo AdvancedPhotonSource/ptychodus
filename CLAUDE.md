@@ -40,6 +40,7 @@ Diffraction patterns and probe positions are paired by **integer scan index**, n
 - Producers: `DiffractionArray.get_indexes()` (`api/diffraction.py`); `ProbePosition.index` (`api/probe_positions.py`).
 - Matcher: `prepare_reconstruct_input(assembled_data, product, ...)` in `api/reconstruct.py` treats pattern indexes as authoritative — duplicate position indexes are averaged into anchors, pattern indexes inside the anchor range without an exact position are linearly interpolated, and pattern indexes outside the anchor range are dropped (no extrapolation).
 - Round-trip: HDF5 and NPZ product writers persist position indexes via `ProductFileKeys.PROBE_POSITION_INDEXES`.
+- Line-major indexes: an instrument whose positioner is driven over more points per scan line than its detector records cannot use a running count on either side — the pairing slides by the surplus, one line at a time, while every pattern still finds a match. Both readers instead number a point `line * RASTER_LINE_INDEX_STRIDE + column` (`plugins/mda/mda_position_file.py`), opted into per registration by the `line_index_stride` keyword on `MDAPositionFileReader` and `APS2IDDiffractionFileReader`. Surplus commanded points then go unclaimed, a short line claims fewer, and a detector line past the end of the positioner record is dropped — all by the matcher above, unchanged. Currently `APS_2IDE` only.
 
 ### Plugin system
 

@@ -17,6 +17,7 @@ import tifffile
 
 from ptychodus.api.diffraction import CropRegion
 from ptychodus.plugins.aps02id_diffraction_file import APS2IDDiffractionFileReader
+from ptychodus.plugins.mda.mda_position_file import RASTER_LINE_INDEX_STRIDE
 from ptychodus.plugins.aps12id_diffraction_file import APS12IDDiffractionFileReader
 from ptychodus.plugins.aps19id_isn_diffraction_file import ISNDiffractionFileReader
 from ptychodus.plugins.h5_diffraction_file import H5DiffractionFileReader
@@ -253,3 +254,168 @@ def test_h5_reader_supplies_a_pitch_only_when_given_one(tmp_path: Path) -> None:
     )
     assert with_pitch.detector_pixel_geometry is not None
     assert with_pitch.detector_pixel_geometry.height_m == pytest.approx(75e-6)
+
+
+# --- 2-ID-E line-major numbering
+#
+# The pairing these produce, against a real MDA raster, is covered in
+# tests/test_mda_position_file.py; these pin what the diffraction side contributes.
+
+
+def _indexes(reader, path: Path) -> list[int]:
+    return [int(i) for array in reader.read(path) for i in array.get_indexes()]
+
+
+def test_2id_reader_numbers_by_running_count_by_default(tmp_path: Path) -> None:
+    """2-ID-D and the Bionanoprobe keep the contiguous numbering, so the stride is opt-in."""
+    for frame in (1, 2, 3):
+        _write_h5(tmp_path / f'fly007_data_{frame:03d}.h5', 2)
+
+    reader = APS2IDDiffractionFileReader()
+
+    assert _indexes(reader, tmp_path / 'fly007_data_001.h5') == [0, 1, 2, 3, 4, 5]
+
+
+def test_2id_reader_numbers_line_major_when_given_a_stride(tmp_path: Path) -> None:
+    """A pattern is named by its line and column, so the line comes off the file counter."""
+    for frame in (1, 2, 3):
+        _write_h5(tmp_path / f'fly007_data_{frame:03d}.h5', 2)
+
+    reader = APS2IDDiffractionFileReader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
+
+    assert _indexes(reader, tmp_path / 'fly007_data_001.h5') == [
+        0,
+        1,
+        RASTER_LINE_INDEX_STRIDE,
+        RASTER_LINE_INDEX_STRIDE + 1,
+        2 * RASTER_LINE_INDEX_STRIDE,
+        2 * RASTER_LINE_INDEX_STRIDE + 1,
+    ]
+
+
+def test_2id_reader_keeps_line_numbers_across_a_missing_member(tmp_path: Path) -> None:
+    """Reading the line off the counter is what keeps a hole from shifting later lines."""
+    for frame in (1, 3):
+        _write_h5(tmp_path / f'fly007_data_{frame:03d}.h5', 2)
+
+    reader = APS2IDDiffractionFileReader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
+
+    assert _indexes(reader, tmp_path / 'fly007_data_001.h5') == [
+        0,
+        1,
+        2 * RASTER_LINE_INDEX_STRIDE,
+        2 * RASTER_LINE_INDEX_STRIDE + 1,
+    ]
+
+
+def test_2id_reader_rejects_a_line_that_reaches_the_stride(tmp_path: Path) -> None:
+    """A longer line would run into the next line's numbers, so it is refused."""
+    _write_h5(tmp_path / 'fly007_data_001.h5', 4)
+
+    reader = APS2IDDiffractionFileReader(line_index_stride=3)
+
+    with pytest.raises(ValueError, match='reaches the line-major'):
+        reader.read(tmp_path / 'fly007_data_001.h5')
+
+
+def test_2id_reader_rejects_a_series_numbered_from_zero(tmp_path: Path) -> None:
+    """Line zero is member one; a zero counter would make the first line negative."""
+    for frame in (0, 1):
+        _write_h5(tmp_path / f'fly007_data_{frame:03d}.h5', 2)
+
+    reader = APS2IDDiffractionFileReader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
+
+    with pytest.raises(ValueError, match='one-based counter'):
+        reader.read(tmp_path / 'fly007_data_000.h5')
+
+
+def test_2id_reader_skips_an_unreadable_member(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """An interrupted acquisition leaves a zero-length member; the rest is still a scan."""
+    for frame in (1, 2, 3):
+        _write_h5(tmp_path / f'fly007_data_{frame:03d}.h5', 2)
+
+    (tmp_path / 'fly007_data_002.h5').write_bytes(b'')
+
+    reader = APS2IDDiffractionFileReader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
+
+    with caplog.at_level('WARNING'):
+        indexes = _indexes(reader, tmp_path / 'fly007_data_001.h5')
+
+    # The survivors keep their own line numbers, so line two is still line two.
+    assert indexes == [0, 1, 2 * RASTER_LINE_INDEX_STRIDE, 2 * RASTER_LINE_INDEX_STRIDE + 1]
+    assert 'Skipping unreadable' in caplog.text
+
+
+def test_2id_reader_rejects_a_series_with_nothing_readable(tmp_path: Path) -> None:
+    (tmp_path / 'fly007_data_001.h5').write_bytes(b'')
+
+    reader = APS2IDDiffractionFileReader()
+
+    with pytest.raises(ValueError, match='No readable diffraction files'):
+        reader.read(tmp_path / 'fly007_data_001.h5')
+
+
+def test_2id_reader_widens_the_dtype_across_the_series(tmp_path: Path) -> None:
+    """A narrow first member must not size a buffer the rest of the series overflows."""
+    for frame, dtype in ((1, numpy.uint16), (2, numpy.uint32)):
+        path = tmp_path / f'fly007_data_{frame:03d}.h5'
+
+        with h5py.File(path, 'w') as h5_file:
+            h5_file.create_dataset(
+                _DATA_PATH, data=numpy.zeros((2, _DETECTOR_H, _DETECTOR_W), dtype=dtype)
+            )
+
+    metadata = APS2IDDiffractionFileReader().read(tmp_path / 'fly007_data_001.h5').get_metadata()
+
+    assert metadata.pattern_dtype == numpy.dtype(numpy.uint32)
+
+
+def test_2id_reader_rejects_a_member_of_a_different_size(tmp_path: Path) -> None:
+    _write_h5(tmp_path / 'fly007_data_001.h5', 2)
+
+    with h5py.File(tmp_path / 'fly007_data_002.h5', 'w') as h5_file:
+        h5_file.create_dataset(_DATA_PATH, data=numpy.zeros((2, _DETECTOR_H + 1, _DETECTOR_W)))
+
+    with pytest.raises(ValueError, match='but the series is'):
+        APS2IDDiffractionFileReader().read(tmp_path / 'fly007_data_001.h5')
+
+
+def test_2id_reader_warns_when_the_detector_dropped_frames(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A frame dropped mid-line shifts every column after it, and only the counter says so."""
+    path = _write_h5(tmp_path / 'fly007_data_001.h5', 4)
+
+    with h5py.File(path, 'a') as h5_file:
+        h5_file.create_dataset(
+            '/entry/instrument/NDAttributes/NDArrayUniqueId',
+            data=numpy.array([10, 11, 13, 14], dtype=numpy.int32),
+        )
+
+    reader = APS2IDDiffractionFileReader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
+
+    with caplog.at_level('WARNING'):
+        reader.read(path)
+
+    assert 'dropped frames' in caplog.text
+
+
+def test_2id_reader_is_quiet_when_the_frame_counter_is_consecutive(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    path = _write_h5(tmp_path / 'fly007_data_001.h5', 4)
+
+    with h5py.File(path, 'a') as h5_file:
+        h5_file.create_dataset(
+            '/entry/instrument/NDAttributes/NDArrayUniqueId',
+            data=numpy.array([10, 11, 12, 13], dtype=numpy.int32),
+        )
+
+    reader = APS2IDDiffractionFileReader(line_index_stride=RASTER_LINE_INDEX_STRIDE)
+
+    with caplog.at_level('WARNING'):
+        reader.read(path)
+
+    assert caplog.text == ''

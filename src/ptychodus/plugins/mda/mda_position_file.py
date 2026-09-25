@@ -3,7 +3,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import Any, Final, Generic, TypeVar
 import logging
 import sys
 import typing
@@ -34,6 +34,24 @@ from ptychodus.api.probe_positions import (
 T = TypeVar('T')
 
 logger = logging.getLogger(__name__)
+
+# Stride for line-major scan indexes: a point on scan line `line`, at column `column`
+# within that line, is numbered `line * RASTER_LINE_INDEX_STRIDE + column`.
+#
+# Flattening a raster by running count instead ties the numbering to how many points
+# each side of the pairing happens to hold. A fly scan drives the positioner over more
+# points per line than the detector records, so a running count numbers the same physical
+# point differently in the two files and the association slides by the surplus, one line's
+# worth at a time, without ever failing to find a match. Line-major numbering names the
+# point rather than counting arrivals, so the two agree by construction: surplus commanded
+# points simply go unclaimed, a short line claims fewer, and a detector line past the end
+# of the positioner record falls outside the position range.
+#
+# The stride bounds the points per line, and a scan line of a million points is not
+# reachable at any dwell time an instrument runs. Readers that adopt this numbering must
+# share this value and reject a line that reaches it, since a longer line would run into
+# the next line's numbers.
+RASTER_LINE_INDEX_STRIDE: Final = 1_000_000
 
 
 class EpicsType(IntEnum):
@@ -518,10 +536,17 @@ class MDAPositionFileReader(ProbePositionFileReader):
     """Read scan positions from a two-dimensional raster: one positioner per axis.
 
     The outer scan supplies y and each of its lower scans supplies that row's x.
+
+    `line_index_stride` selects how points are numbered. Left at None they are numbered
+    by running count over the whole raster. Set to RASTER_LINE_INDEX_STRIDE they are
+    numbered line-major, which is what an instrument needs whose detector records fewer
+    points per line than the positioner is driven over; see that constant. A line holding
+    at least the stride is rejected rather than allowed to collide with the next line.
     """
 
-    def __init__(self, scale_to_meters: float) -> None:
+    def __init__(self, scale_to_meters: float, *, line_index_stride: int | None = None) -> None:
         self._scale_to_meters = scale_to_meters
+        self._line_index_stride = line_index_stride
 
     def read(self, file_path: Path) -> ProbePositionSequence:
         point_list: list[ProbePosition] = list()
@@ -542,12 +567,21 @@ class MDAPositionFileReader(ProbePositionFileReader):
         yscan = mda_file.scan
         yarray = _require_positioners(mda_file, 1, file_path)[0, :]
 
-        for y, xscan in zip(yarray, yscan.lower_scans):
+        stride = self._line_index_stride
+
+        for line, (y, xscan) in enumerate(zip(yarray, yscan.lower_scans)):
             xarray = xscan.data.readback_array[0, :]
 
-            for x in xarray:
+            if stride is not None and len(xarray) >= stride:
+                raise ProbePositionParseError(
+                    f'Line {line} of "{file_path}" holds {len(xarray)} points, which reaches'
+                    f' the line-major index stride of {stride}; its numbering would collide'
+                    ' with the next line.'
+                )
+
+            for column, x in enumerate(xarray):
                 point = ProbePosition(
-                    index=len(point_list),
+                    index=len(point_list) if stride is None else line * stride + column,
                     x_m=float(x) * self._scale_to_meters,
                     y_m=float(y) * self._scale_to_meters,
                 )

@@ -24,13 +24,23 @@ import struct
 import subprocess
 import sys
 
+import h5py
+import numpy
 import pytest
 
 import ptychodus.plugins
+from ptychodus.api.assemble import AssembledDiffractionData
+from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.probe_positions import ProbePositionParseError
+from ptychodus.api.probe import ProbeSequence
+from ptychodus.api.probe_positions import ProbePositionParseError, ProbePositionSequence
+from ptychodus.api.product import Product, ProductMetadata
+from ptychodus.api.reconstruct import prepare_reconstruct_input
+from ptychodus.plugins.aps02id_diffraction_file import APS2IDDiffractionFileReader
 from ptychodus.plugins.mda import _xdrlib, mda_position_file
 from ptychodus.plugins.mda.mda_position_file import (
+    RASTER_LINE_INDEX_STRIDE,
     EpicsType,
     MDADetectorChannelPositionFileReader,
     MDAFile,
@@ -712,3 +722,193 @@ def test_flat_reader_cannot_read_a_single_positioner_fly_scan(isn_mda: Path) -> 
     """
     with pytest.raises(ProbePositionParseError, match='this reader needs 2'):
         MDAFlatScanPositionFileReader(MILLIMETER_M).read(isn_mda)
+
+
+# --- Line-major scan indexes
+#
+# The 2-ID-E fly scan drives the positioner over more points per line than the detector
+# records, so numbering either side by running count slides the pairing by the surplus,
+# one line at a time, while every pattern still finds a match. These pin the numbering
+# that makes the two agree, and the pairing that falls out of it.
+
+
+def test_nested_reader_numbers_by_running_count_by_default(nested_mda: Path) -> None:
+    """Every other instrument keeps the contiguous numbering, so the stride is opt-in."""
+    positions = MDAPositionFileReader(scale_to_meters=MICROMETER_M).read(nested_mda)
+
+    assert [point.index for point in positions] == [0, 1, 2, 3, 4, 5]
+
+
+def test_nested_reader_numbers_line_major_when_given_a_stride(nested_mda: Path) -> None:
+    """A point is named by its line and column, not by how many points preceded it."""
+    positions = MDAPositionFileReader(
+        scale_to_meters=MICROMETER_M,
+        line_index_stride=RASTER_LINE_INDEX_STRIDE,
+    ).read(nested_mda)
+
+    assert [point.index for point in positions] == [
+        0,
+        1,
+        2,
+        RASTER_LINE_INDEX_STRIDE,
+        RASTER_LINE_INDEX_STRIDE + 1,
+        RASTER_LINE_INDEX_STRIDE + 2,
+    ]
+
+    # The coordinates are untouched; only the numbering changed.
+    assert positions[3].y_m == pytest.approx(200.0 * MICROMETER_M)
+    assert positions[3].x_m == pytest.approx(4.0 * MICROMETER_M)
+
+
+def test_nested_reader_rejects_a_line_that_reaches_the_stride(nested_mda: Path) -> None:
+    """A longer line would run into the next line's numbers, so it is refused."""
+    reader = MDAPositionFileReader(scale_to_meters=MICROMETER_M, line_index_stride=3)
+
+    with pytest.raises(ProbePositionParseError, match='reaches the line-major index stride'):
+        reader.read(nested_mda)
+
+
+def test_aps_2ide_registration_numbers_line_major(nested_mda: Path) -> None:
+    """The stride is a property of the 2-ID-E registration, not of the reader class."""
+    registry = PluginRegistry.load_plugins()
+
+    line_major = registry.probe_position_file_readers.get_strategy_by_name('APS_2IDE')
+    contiguous = registry.probe_position_file_readers.get_strategy_by_name('APS_2IDD')
+
+    assert [point.index for point in line_major.read(nested_mda)][3] == RASTER_LINE_INDEX_STRIDE
+    assert [point.index for point in contiguous.read(nested_mda)] == [0, 1, 2, 3, 4, 5]
+
+
+# --- Pairing a line-major series with a line-major raster
+
+
+def _write_line_series(directory: Path, frames_per_line: list[int]) -> Path:
+    """One Eiger-style HDF5 per scan line, numbered from one as the instrument writes them."""
+    directory.mkdir(parents=True, exist_ok=True)
+
+    for line, num_frames in enumerate(frames_per_line):
+        path = directory / f'fly007_data_{line + 1:03d}.h5'
+
+        with h5py.File(path, 'w') as h5_file:
+            h5_file.create_dataset(
+                '/entry/data/data', data=numpy.zeros((num_frames, 2, 2), dtype=numpy.uint16)
+            )
+
+    return directory / 'fly007_data_001.h5'
+
+
+def _pair(mda_path: Path, series_path: Path) -> list[tuple[float, float]]:
+    """Read both sides the way 2-ID-E is registered and pair them by scan index."""
+    dataset = APS2IDDiffractionFileReader(line_index_stride=RASTER_LINE_INDEX_STRIDE).read(
+        series_path
+    )
+    indexes = numpy.concatenate([array.get_indexes() for array in dataset])
+    pixel_geometry = PixelGeometry(width_m=1e-6, height_m=1e-6)
+
+    assembled = AssembledDiffractionData(
+        indexes=indexes.astype(numpy.intp),
+        patterns=numpy.zeros((indexes.size, 2, 2), dtype=numpy.uint16),
+        pixel_geometry=pixel_geometry,
+        bad_pixels=numpy.zeros((2, 2), dtype=numpy.bool_),
+        probe_photon_counts=None,
+    )
+    positions = MDAPositionFileReader(
+        scale_to_meters=MICROMETER_M,
+        line_index_stride=RASTER_LINE_INDEX_STRIDE,
+    ).read(mda_path)
+    product = Product(
+        metadata=ProductMetadata(
+            name='test',
+            comments='',
+            detector_distance_m=1.0,
+            probe_energy_eV=10_000.0,
+            probe_photon_count=1,
+            exposure_time_s=1.0,
+            mass_attenuation_m2_kg=0.0,
+            tomography_angle_deg=0.0,
+        ),
+        probe_positions=ProbePositionSequence(list(positions)),
+        probes=ProbeSequence(
+            array=numpy.zeros((1, 1, 2, 2), dtype=numpy.complex128),
+            opr_weights=None,
+            pixel_geometry=pixel_geometry,
+        ),
+        object_=Object(
+            array=numpy.zeros((1, 8, 8), dtype=numpy.complex128),
+            pixel_geometry=pixel_geometry,
+            center=ObjectCenter(x_m=0.0, y_m=0.0),
+            layer_spacing_m=[],
+        ),
+        losses=[],
+    )
+    paired = prepare_reconstruct_input(assembled, product).product.probe_positions
+    return [(point.x_m / MICROMETER_M, point.y_m / MICROMETER_M) for point in paired]
+
+
+def test_surplus_commanded_points_go_unclaimed(tmp_path: Path) -> None:
+    """The positioner is driven over five points per line; the detector records three.
+
+    Every pattern must land on the column the detector actually exposed -- exactly, with
+    no interpolation -- and the two points the detector never reached simply have no
+    pattern. Numbering by running count instead would place line one's patterns two
+    columns along, and line two's four columns along.
+    """
+    mda = _write_nested_mda(
+        tmp_path / 'raster.mda',
+        ys=[10.0, 20.0, 30.0],
+        xs_per_row=[[1.0, 2.0, 3.0, 4.0, 5.0]] * 3,
+    )
+    series = _write_line_series(tmp_path / 'ptycho', [3, 3, 3])
+
+    assert _pair(mda, series) == [
+        (1.0, 10.0),
+        (2.0, 10.0),
+        (3.0, 10.0),
+        (1.0, 20.0),
+        (2.0, 20.0),
+        (3.0, 20.0),
+        (1.0, 30.0),
+        (2.0, 30.0),
+        (3.0, 30.0),
+    ]
+
+
+def test_a_line_the_detector_cut_short_claims_fewer_points(tmp_path: Path) -> None:
+    """A short line must not shift the lines after it, which a running count would."""
+    mda = _write_nested_mda(
+        tmp_path / 'raster.mda',
+        ys=[10.0, 20.0, 30.0],
+        xs_per_row=[[1.0, 2.0, 3.0, 4.0, 5.0]] * 3,
+    )
+    series = _write_line_series(tmp_path / 'ptycho', [3, 1, 3])
+
+    assert _pair(mda, series) == [
+        (1.0, 10.0),
+        (2.0, 10.0),
+        (3.0, 10.0),
+        (1.0, 20.0),
+        (1.0, 30.0),
+        (2.0, 30.0),
+        (3.0, 30.0),
+    ]
+
+
+def test_a_detector_line_past_the_raster_is_dropped(tmp_path: Path) -> None:
+    """An aborted scan keeps the line the detector was on; the MDA file truncates before it."""
+    mda = _write_nested_mda(
+        tmp_path / 'raster.mda',
+        ys=[10.0, 20.0, 30.0],
+        xs_per_row=[[1.0, 2.0, 3.0, 4.0, 5.0]] * 3,
+        current_point=2,
+    )
+    series = _write_line_series(tmp_path / 'ptycho', [3, 3, 3])
+
+    # The MDA file kept two lines, so the third line's three patterns have no position.
+    assert _pair(mda, series) == [
+        (1.0, 10.0),
+        (2.0, 10.0),
+        (3.0, 10.0),
+        (1.0, 20.0),
+        (2.0, 20.0),
+        (3.0, 20.0),
+    ]

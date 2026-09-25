@@ -1,6 +1,7 @@
 from ptychodus.api.plugins import PluginRegistry
 
 from .mda_position_file import (
+    RASTER_LINE_INDEX_STRIDE,
     MDADetectorChannelPositionFileReader,
     MDAFlatScanPositionFileReader,
     MDAPositionFileReader,
@@ -18,8 +19,16 @@ def register_plugins(registry: PluginRegistry) -> None:
         simple_name='APS_2IDD',
         display_name='APS 2-ID-D Microprobe Files (*.mda)',
     )
+    # The XFM fly scan drives the positioner over two more points per line than the Eiger
+    # records, so numbering positions by running count places them two further along with
+    # every line. The count is not stated anywhere in the file -- the MCS scalers stop a
+    # point earlier still -- so the positions are numbered line-major and the surplus is
+    # left unclaimed by whatever per-line frame count the detector turns out to have.
     registry.probe_position_file_readers.register_plugin(
-        MDAPositionFileReader(scale_to_meters=1.0e-3),
+        MDAPositionFileReader(
+            scale_to_meters=1.0e-3,
+            line_index_stride=RASTER_LINE_INDEX_STRIDE,
+        ),
         simple_name='APS_2IDE',
         display_name='APS 2-ID-E Microprobe Files (*.mda)',
     )
