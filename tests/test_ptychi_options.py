@@ -42,8 +42,10 @@ from ptychi.api import (
     Reconstructors,
 )
 from ptychi.api.options.data import PtychographyDataOptions
+import torch
 
 from ptychodus.model.ptychi.core import PtyChiReconstructorLibrary
+from ptychodus.model.ptychi.task import _recover_layer_spacing_m
 
 # Deliberately imported at module scope: this file already does
 # ``pytest.importorskip('ptychi')`` above.
@@ -885,3 +887,78 @@ def test_common_kwargs_carry_no_product_derived_fields() -> None:
     assert not probe_keys & {'probe_power', 'pixel_size_m', 'pixel_size_aspect_ratio'}
     assert data_options.wavelength_m == PtychographyDataOptions().wavelength_m
     assert not math.isfinite(data_options.free_space_propagation_distance_m)
+
+
+# ---------------------------------------------------------------------------
+# Slice-spacing recovery
+# ---------------------------------------------------------------------------
+
+
+class _StubSliceSpacings:
+    def __init__(self, values_m: list[float]) -> None:
+        self.data = torch.tensor(values_m)
+
+
+class _StubTaskObject:
+    def __init__(self, values_m: list[float]) -> None:
+        self.slice_spacings = _StubSliceSpacings(values_m)
+
+
+class _StubTask:
+    def __init__(self, task_object: object) -> None:
+        self.object = task_object
+
+
+def _make_layered_object(num_layers: int, spacing_m: float) -> Object:
+    return Object(
+        array=numpy.ones((num_layers, 4, 4), dtype=complex),
+        pixel_geometry=PixelGeometry(width_m=1.0e-9, height_m=1.0e-9),
+        center=ObjectCenter(x_m=0.0, y_m=0.0),
+        layer_spacing_m=[spacing_m] * (num_layers - 1),
+    )
+
+
+def test_recover_layer_spacing_prefers_the_optimized_values() -> None:
+    """pty-chi can optimize slice spacings, so the output must carry what it ended with."""
+    object_in = _make_layered_object(3, 1.0e-6)
+    task = _StubTask(_StubTaskObject([2.0e-6, 3.0e-6]))
+
+    recovered = _recover_layer_spacing_m(task, object_in)
+
+    numpy.testing.assert_allclose(recovered, [2.0e-6, 3.0e-6], atol=1.0e-15)
+
+
+def test_recover_layer_spacing_falls_back_when_the_attribute_is_missing(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The access path is pty-chi private structure, so a version that moves it must
+    degrade to the input spacing rather than crash the reconstruction."""
+    object_in = _make_layered_object(3, 1.0e-6)
+
+    with caplog.at_level(logging.WARNING):
+        recovered = _recover_layer_spacing_m(_StubTask(object()), object_in)
+
+    numpy.testing.assert_allclose(recovered, [1.0e-6, 1.0e-6], atol=1.0e-15)
+    assert 'Could not read slice spacings back' in caplog.text
+
+
+def test_recover_layer_spacing_falls_back_on_a_length_mismatch(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A wrong-length spacing would make the Object constructor raise, turning a cosmetic
+    loss into a crash."""
+    object_in = _make_layered_object(3, 1.0e-6)
+    task = _StubTask(_StubTaskObject([2.0e-6, 3.0e-6, 4.0e-6]))
+
+    with caplog.at_level(logging.WARNING):
+        recovered = _recover_layer_spacing_m(task, object_in)
+
+    numpy.testing.assert_allclose(recovered, [1.0e-6, 1.0e-6], atol=1.0e-15)
+    assert 'slice spacing(s) for a 3-layer object' in caplog.text
+
+
+def test_recover_layer_spacing_single_layer_needs_no_readback() -> None:
+    """A single-layer object has no gaps, and pty-chi stores a placeholder there."""
+    object_in = _make_layered_object(1, 0.0)
+
+    assert _recover_layer_spacing_m(_StubTask(_StubTaskObject([0.0])), object_in) == []

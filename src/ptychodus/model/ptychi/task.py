@@ -34,7 +34,7 @@ import copy
 import json
 import logging
 import math
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import Any
 
 import numpy
@@ -304,6 +304,43 @@ def align_task_options_with_product(
     return aligned
 
 
+def _recover_layer_spacing_m(task: Any, object_in: Object) -> Sequence[float]:
+    """Return the slice spacings the task ended with, falling back to the ones it started with.
+
+    pty-chi can optimize slice spacings, but its readback API covers only the object,
+    probe, positions and OPR weights, so the optimized values are reachable only through
+    the task's own object. That is private structure and has churned before, so every
+    failure here degrades to the input spacing rather than propagating: a stale thickness
+    is a cosmetic loss, whereas a wrong-length one would make the Object constructor
+    raise.
+    """
+    num_spacings = object_in.num_layers - 1
+
+    if num_spacings < 1:
+        return list(object_in.layer_spacing_m)
+
+    try:
+        spacing_m = [float(value) for value in task.object.slice_spacings.data.detach().cpu()]
+    except (AttributeError, TypeError, RuntimeError, ValueError) as exc:
+        logger.warning(
+            'Could not read slice spacings back from pty-chi (%s); keeping the input '
+            'spacing. Any slice-spacing optimization is not reflected in the output.',
+            exc,
+        )
+        return list(object_in.layer_spacing_m)
+
+    if len(spacing_m) != num_spacings:
+        logger.warning(
+            'pty-chi returned %d slice spacing(s) for a %d-layer object; keeping the input '
+            'spacing.',
+            len(spacing_m),
+            object_in.num_layers,
+        )
+        return list(object_in.layer_spacing_m)
+
+    return spacing_m
+
+
 def reconstruct_with_ptychi(
     parameters: ReconstructInput,
     task_options: PtychographyTaskOptions,
@@ -376,7 +413,7 @@ def reconstruct_with_ptychi(
 
             object_out = Object(
                 array=numpy.array(task.get_data_to_cpu('object', as_numpy=True)),
-                layer_spacing_m=object_in.layer_spacing_m,
+                layer_spacing_m=_recover_layer_spacing_m(task, object_in),
                 pixel_geometry=object_in.get_pixel_geometry(),
                 center=object_in.get_center(),
             )

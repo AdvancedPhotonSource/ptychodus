@@ -4,7 +4,7 @@ import numpy
 
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
 from ptychodus.api.simulate.probe import (
-    defocus_probe,
+    propagate_probe,
     generate_rectangular_probe,
 )
 
@@ -37,14 +37,14 @@ class RectangularProbeBuilder(ProbeSequenceBuilder):
 
     def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
         return self._rescale_to_photon_count(
-            defocus_probe(
+            propagate_probe(
                 generate_rectangular_probe(
                     geometry_provider.get_probe_geometry(),
                     width_m=self.width_m.get_value(),
                     height_m=self.height_m.get_value(),
                 ),
                 probe_wavelength_m=geometry_provider.probe_wavelength_m,
-                defocus_distance_m=self.defocus_distance_m.get_value(),
+                propagation_distance_m=self.defocus_distance_m.get_value(),
             ),
             geometry_provider,
         )

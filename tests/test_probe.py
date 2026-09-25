@@ -22,8 +22,9 @@ from ptychodus.api.probe import (
     estimate_focal_plane,
     estimate_probe_entropy,
     estimate_probe_size,
+    shift_probe,
 )
-from ptychodus.api.propagate import PropagatedProbe
+from ptychodus.api.propagate import PropagatedWavefield
 
 
 PIXEL_M = 1e-9  # 1 nm per pixel — keeps lengths interpretable as "px == nm"
@@ -498,7 +499,7 @@ def _caustic_probe(
     num_steps: int = 21,
     begin_coordinate_m: float = -100.0 * PIXEL_M,
     end_coordinate_m: float = 100.0 * PIXEL_M,
-) -> PropagatedProbe:
+) -> PropagatedWavefield:
     coordinate_m = numpy.linspace(begin_coordinate_m, end_coordinate_m, num_steps)
     wavefield = _gaussian_caustic_stack(
         coordinate_m,
@@ -506,7 +507,7 @@ def _caustic_probe(
         waist_coordinate_m=waist_coordinate_m,
         rayleigh_range_m=40.0 * PIXEL_M,
     )
-    return PropagatedProbe(
+    return PropagatedWavefield(
         wavefield=wavefield,
         begin_coordinate_m=begin_coordinate_m,
         end_coordinate_m=end_coordinate_m,
@@ -735,3 +736,68 @@ class TestComputeProbeFocusCurves:
 
         with pytest.raises(ValueError):
             compute_probe_focus_curves(probe, mode=-1)
+
+
+class TestShiftProbe:
+    """shift_probe mirrors shift_object: a Fourier phase ramp over the last two axes."""
+
+    @staticmethod
+    def _probe(array: numpy.ndarray) -> Probe:
+        return Probe(array=array.astype(complex), pixel_geometry=PIXEL_GEOMETRY)
+
+    def test_zero_shift_returns_the_same_object(self) -> None:
+        probe = self._probe(numpy.ones((2, 8, 8)))
+
+        assert shift_probe(probe, shift_y_px=0.0, shift_x_px=0.0) is probe
+
+    def test_integer_shift_rolls_the_array(self) -> None:
+        array = numpy.zeros((1, 8, 8), dtype=complex)
+        array[0, 2, 3] = 1.0
+        shifted = shift_probe(self._probe(array), shift_y_px=1.0, shift_x_px=2.0)
+
+        numpy.testing.assert_allclose(
+            shifted.get_array(), numpy.roll(array, (1, 2), axis=(-2, -1)), atol=1e-10
+        )
+
+    def test_subpixel_shift_is_exact_for_a_bandlimited_signal(self) -> None:
+        """The reason for a phase ramp rather than bilinear interpolation."""
+        n = 16
+        x = numpy.arange(n)
+        array = numpy.exp(2j * numpy.pi * x / n)[None, None, :] * numpy.ones((1, n, 1))
+        shifted = shift_probe(self._probe(array), shift_y_px=0.0, shift_x_px=0.5)
+        expected = numpy.exp(2j * numpy.pi * (x - 0.5) / n)[None, None, :] * numpy.ones((1, n, 1))
+
+        numpy.testing.assert_allclose(shifted.get_array(), expected, atol=1e-10)
+
+    def test_every_incoherent_mode_is_shifted(self) -> None:
+        array = numpy.zeros((3, 8, 8), dtype=complex)
+        array[:, 4, 4] = [1.0, 2.0, 3.0]
+        shifted = shift_probe(self._probe(array), shift_y_px=1.0, shift_x_px=2.0)
+
+        numpy.testing.assert_allclose(
+            numpy.abs(shifted.get_array()[:, 5, 6]), [1.0, 2.0, 3.0], atol=1e-10
+        )
+
+    def test_total_intensity_is_conserved(self) -> None:
+        rng = numpy.random.default_rng(4)
+        array = rng.normal(size=(2, 8, 8)) + 1j * rng.normal(size=(2, 8, 8))
+        shifted = shift_probe(self._probe(array), shift_y_px=1.7, shift_x_px=-0.4)
+
+        numpy.testing.assert_allclose(
+            numpy.sum(numpy.abs(shifted.get_array()) ** 2),
+            numpy.sum(numpy.abs(array) ** 2),
+            rtol=1e-10,
+        )
+
+    def test_the_shift_wraps_around(self) -> None:
+        """Documented departure from scipy.ndimage.shift's edge extension."""
+        array = numpy.zeros((1, 8, 8), dtype=complex)
+        array[0, 0, 0] = 1.0
+        shifted = shift_probe(self._probe(array), shift_y_px=-1.0, shift_x_px=0.0)
+
+        numpy.testing.assert_allclose(numpy.abs(shifted.get_array()[0, 7, 0]), 1.0, atol=1e-10)
+
+    def test_pixel_geometry_is_preserved(self) -> None:
+        shifted = shift_probe(self._probe(numpy.ones((1, 8, 8))), shift_y_px=1.0, shift_x_px=1.0)
+
+        assert shifted.get_pixel_geometry().width_m == PIXEL_M

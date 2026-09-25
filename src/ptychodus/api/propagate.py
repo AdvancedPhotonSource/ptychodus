@@ -360,9 +360,9 @@ def choose_propagator(parameters: PropagatorParameters) -> tuple[Propagator, Pix
 
 
 @dataclass(frozen=True)
-class PropagatedProbe:
-    """Stack of probe wavefields at evenly-spaced free-space propagation distances,
-    produced by :func:`propagate_probe`.
+class PropagatedWavefield:
+    """Stack of wavefields at evenly-spaced free-space propagation distances,
+    produced by :func:`propagate_wavefield`.
 
     Stores the complex wavefield as ``(num_steps, num_incoherent_modes, height_px,
     width_px)``. Per-step intensity (incoherent-mode sum of ``|wf|^2``) and the three
@@ -437,7 +437,7 @@ class PropagatedProbe:
         )
 
 
-def propagate_probe(
+def propagate_wavefield(
     wavefield: ComplexArrayType,
     *,
     pixel_geometry: PixelGeometry,
@@ -445,15 +445,15 @@ def propagate_probe(
     begin_coordinate_m: float,
     end_coordinate_m: float,
     num_steps: int,
-) -> PropagatedProbe:
-    """Propagate a multi-mode probe through a slab of free space using the
+) -> PropagatedWavefield:
+    """Propagate a multi-mode wavefield through a slab of free space using the
     angular-spectrum propagator at ``num_steps`` evenly-spaced distances in
     ``[begin_coordinate_m, end_coordinate_m]``.
 
     Args:
-        wavefield: Complex source-plane wavefield, shape ``(num_incoherent_modes,
-            height_px, width_px)``. Each incoherent mode is propagated independently
-            and the result preserves the mode axis.
+        wavefield: Complex source-plane wavefield, shape ``(num_modes, height_px,
+            width_px)``. Each mode is propagated independently and the result preserves
+            the mode axis.
         pixel_geometry: Source-plane pixel geometry (assumed constant across modes
             and propagation distances).
         wavelength_m: Illumination wavelength in meters.
@@ -484,7 +484,7 @@ def propagate_probe(
         for mode in range(num_modes):
             propagated[idx, mode, :, :] = propagator.propagate(wavefield[mode, :, :])
 
-    return PropagatedProbe(
+    return PropagatedWavefield(
         wavefield=propagated,
         begin_coordinate_m=begin_coordinate_m,
         end_coordinate_m=end_coordinate_m,

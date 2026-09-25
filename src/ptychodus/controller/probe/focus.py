@@ -18,7 +18,7 @@ from ptychodus.api.probe import (
     ProbeFocusSeries,
     compute_probe_focus_curves,
 )
-from ptychodus.api.propagate import PropagatedProbe
+from ptychodus.api.propagate import PropagatedWavefield
 from ptychodus.api.typing import RealArrayType
 
 from ...view.probe import ProbeFocusDialog
@@ -75,7 +75,7 @@ def _display_scale(metric: ProbeFocusMetric) -> float:
     return 1.0
 
 
-def compute_focus_curves(propagated_probe: PropagatedProbe, mode: int) -> ProbeFocusCurves:
+def compute_focus_curves(propagated_probe: PropagatedWavefield, mode: int) -> ProbeFocusCurves:
     """Sweep the focus metrics, logging how long the sweep took.
 
     Timing is worth recording because the sweep is the one expensive thing this dialog
@@ -213,7 +213,7 @@ class ProbeFocusViewController:
     def __init__(self, go_to_step: Callable[[int], None], parent: QWidget) -> None:
         super().__init__()
         self._go_to_step = go_to_step
-        self._propagated_probe: PropagatedProbe | None = None
+        self._propagated_probe: PropagatedWavefield | None = None
         self._curves: ProbeFocusCurves | None = None
         self._mode = -1
 
@@ -238,10 +238,10 @@ class ProbeFocusViewController:
         if selection_model is not None:
             selection_model.currentRowChanged.connect(self._redraw_plot)
 
-    def analyze(self, propagated_probe: PropagatedProbe, mode: int) -> None:
+    def analyze(self, propagated_probe: PropagatedWavefield, mode: int) -> None:
         """Show the focus curves for *propagated_probe*, sweeping only when needed.
 
-        The cached propagation is compared by identity: `PropagatedProbe` is a frozen
+        The cached propagation is compared by identity: `PropagatedWavefield` is a frozen
         dataclass of numpy arrays, so `==` would compare elementwise and then raise on
         the ambiguous truth value.
         """

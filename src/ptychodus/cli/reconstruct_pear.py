@@ -31,6 +31,15 @@ Scope and limitations
   than reconstructed at the photon wavelength.
 - Detector pixel pitch comes from the diffraction reader, which supplies its
   instrument's default when the file itself carries none.
+- ``object_thickness_m`` spans the whole stack. The layers are phase screens at depths
+  zero through the thickness, so ``number_of_slices`` layers leave ``number_of_slices -
+  1`` gaps of ``object_thickness_m / (number_of_slices - 1)`` and a reconstruction
+  propagates the full thickness. PEAR divided by the slice count instead, spanning only
+  ``(N-1)/N`` of it -- half the requested distance at two slices -- so a multislice run
+  here does not reproduce a PEAR one.
+- ``init_layer_append_mode`` of ``avg`` inserts the geometric-mean layer, the slab whose
+  repetition reproduces the object. PEAR inserted the arithmetic mean of the layers,
+  which lets opposing phases cancel and can turn transparent material absorbing.
 """
 
 from __future__ import annotations
@@ -64,8 +73,18 @@ from ptychi.api import (
 from ptychodus.api.assemble import assemble_dataset
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import CropRegion
-from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.object import Object, compute_object_geometry
+from ptychodus.api.geometry import ImageExtent
+from ptychodus.api.object import (
+    LayerFillMode,
+    Object,
+    compute_object_geometry,
+    compute_uniform_layer_spacing_m,
+    homogenize_object_layers,
+    resample_object_layers,
+    resize_object_layers,
+    scale_object_phase,
+    select_object_layers,
+)
 from ptychodus.api.io import StandardFileLayout, save_diffraction_data, save_product
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import (
@@ -76,12 +95,10 @@ from ptychodus.api.preprocess.diffraction import (
     VerticalFlipStep,
 )
 from ptychodus.api.affine import AffineTransform, transform_probe_positions
-from ptychodus.api.probe import Probe, ProbeGeometry, ProbeSequence
+from ptychodus.api.probe import Probe, ProbeGeometry, ProbeSequence, shift_probe
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.propagate import (
-    AngularSpectrumPropagator,
-    PropagatorParameters,
     compute_magnification,
 )
 from ptychodus.api.reconstruct import prepare_reconstruct_input
@@ -89,6 +106,7 @@ from ptychodus.api.simulate.object import generate_random_object
 from ptychodus.api.simulate.probe import (
     generate_coherent_probe_modes,
     generate_fresnel_zone_plate_probe,
+    propagate_probe,
 )
 from ptychodus.model.ptychi.task import (
     align_task_options_with_product,
@@ -248,12 +266,10 @@ class PearParameters(BaseModel):
         return parameters
 
 
-def _slice_spacings_m(object_thickness_m: float, number_of_slices: int) -> list[float]:
-    """Uniform slice spacing: the thickness split evenly across the slices."""
-    if number_of_slices <= 1 or object_thickness_m <= 0.0:
-        return []
-
-    return [object_thickness_m / number_of_slices] * (number_of_slices - 1)
+_LAYER_FILL_MODES: Final[dict[str, LayerFillMode]] = {
+    'avg': LayerFillMode.GEOMETRIC_MEAN,
+    'edge': LayerFillMode.EDGE,
+}
 
 
 def _batch_size(params: PearParameters, num_patterns: int) -> int:
@@ -555,100 +571,6 @@ def _set_num_incoherent_modes(array: numpy.ndarray, num_modes: int) -> numpy.nda
 
     padding = numpy.repeat(array[-1:], num_modes - array.shape[0], axis=0)
     return numpy.concatenate((array, padding), axis=0)
-
-
-def _shift_probe(array: numpy.ndarray, shift_px: tuple[float, float]) -> numpy.ndarray:
-    """Shift every incoherent mode by (y, x) pixels."""
-    import scipy.ndimage
-
-    shifted = numpy.empty_like(array)
-
-    for index, mode in enumerate(array):
-        shifted[index] = scipy.ndimage.shift(
-            mode, shift=shift_px, mode='nearest', order=1, prefilter=True
-        )
-
-    return shifted
-
-
-def _propagate_probe(
-    array: numpy.ndarray, *, distance_m: float, wavelength_m: float, pixel_geometry: PixelGeometry
-) -> numpy.ndarray:
-    """Propagate every incoherent mode by *distance_m* through the angular spectrum."""
-    parameters = PropagatorParameters(
-        wavelength_m=wavelength_m,
-        width_px=array.shape[-1],
-        height_px=array.shape[-2],
-        pixel_width_m=pixel_geometry.width_m,
-        pixel_height_m=pixel_geometry.height_m,
-        propagation_distance_m=distance_m,
-    )
-    propagator = AngularSpectrumPropagator(parameters)
-
-    return numpy.stack([propagator.propagate(mode) for mode in array])
-
-
-def _select_layers(array: numpy.ndarray, params: PearParameters) -> numpy.ndarray:
-    """Apply the layer selection and collapse modes to a multislice initial object."""
-    selection = [int(index) for index in params.init_layer_select]
-    selection = [index for index in selection if 0 <= index < array.shape[0]]
-
-    if selection:
-        logger.info('Selecting object layers %s', selection)
-        array = array[selection]
-
-    preprocess = params.init_layer_preprocess
-
-    if preprocess in ('avg', 'avg1'):
-        # The layers compose multiplicatively, so their product is the whole object;
-        # dividing the phase evenly redistributes it across the requested slices.
-        combined = numpy.prod(array, axis=0)
-        num_layers = array.shape[0]
-        phase = numpy.angle(combined) / num_layers
-        averaged = numpy.abs(combined) ** (1.0 / num_layers) * numpy.exp(1j * phase)
-        array = (
-            averaged[numpy.newaxis]
-            if preprocess == 'avg1'
-            else numpy.repeat(averaged[numpy.newaxis], num_layers, axis=0)
-        )
-
-    scaling = params.init_layer_scaling_factor
-
-    if scaling != 1.0:
-        logger.info('Scaling initial object phase by %g', scaling)
-        array = numpy.abs(array) * numpy.exp(1j * numpy.angle(array) * scaling)
-
-    return array
-
-
-def _fit_layer_count(array: numpy.ndarray, num_slices: int, append_mode: str) -> numpy.ndarray:
-    """Grow or shrink the layer stack to *num_slices*, padding alternately front and back."""
-    if array.shape[0] == num_slices:
-        return array
-
-    if array.shape[0] > num_slices:
-        if num_slices == 1:
-            return numpy.prod(array, axis=0)[numpy.newaxis]
-
-        start = (array.shape[0] - num_slices) // 2
-        return array[start : start + num_slices]
-
-    if append_mode == 'avg':
-        filler = numpy.mean(array, axis=0)
-    elif append_mode == 'edge':
-        filler = array[-1]
-    else:  # vacuum
-        filler = numpy.ones_like(array[0])
-
-    for index in range(num_slices - array.shape[0]):
-        block = filler[numpy.newaxis]
-        array = (
-            numpy.concatenate((array, block), axis=0)
-            if index % 2 == 0
-            else numpy.concatenate((block, array), axis=0)
-        )
-
-    return array
 
 
 def _build_lsqml_options(
@@ -978,34 +900,34 @@ def main() -> int:
         probe_array = probe_reader.read(probe_file)[0].get_array()
 
     probe_array = _set_num_incoherent_modes(probe_array, num_incoherent_modes)
+    probe = Probe(array=probe_array, pixel_geometry=probe_geometry.get_pixel_geometry())
 
     shifts = params.init_probe_shifts_pix
 
     if shifts and any(shifts):
         logger.info('Shifting the initial probe by %s px', shifts)
-        probe_array = _shift_probe(probe_array, (float(shifts[0]), float(shifts[1])))
+        probe = shift_probe(probe, shift_y_px=float(shifts[0]), shift_x_px=float(shifts[1]))
 
     propagation_mm = params.init_probe_propagation_distance_mm
 
     if propagation_mm != 0.0:
         logger.info('Propagating the initial probe by %g mm', propagation_mm)
-        probe_array = _propagate_probe(
-            probe_array,
-            distance_m=propagation_mm * 1e-3,
-            wavelength_m=wavelength_m,
-            pixel_geometry=probe_geometry.get_pixel_geometry(),
+        probe = propagate_probe(
+            probe,
+            probe_wavelength_m=wavelength_m,
+            propagation_distance_m=propagation_mm * 1e-3,
         )
 
     probe_sequence = generate_coherent_probe_modes(
         rng,
-        Probe(array=probe_array, pixel_geometry=probe_geometry.get_pixel_geometry()),
+        probe,
         num_cmodes=max(1, params.number_opr_modes + 1),
         num_diffraction_patterns=num_patterns,
     )
 
     # --- initial object ---
     number_of_slices = max(1, params.number_of_slices)
-    layer_spacing_m = _slice_spacings_m(params.object_thickness_m, number_of_slices)
+    layer_spacing_m = compute_uniform_layer_spacing_m(params.object_thickness_m, number_of_slices)
     padding_px = round(params.obj_pad_size_m / probe_geometry.pixel_width_m)
     object_geometry = compute_object_geometry(positions, probe_geometry, padding_px=padding_px)
     object_file = params.path_to_init_object
@@ -1022,10 +944,10 @@ def main() -> int:
         )
 
         if number_of_slices > 1:
-            object_ = Object(
-                array=numpy.repeat(object_.get_array()[:1], number_of_slices, axis=0),
-                pixel_geometry=object_.get_pixel_geometry(),
-                center=object_.get_center(),
+            object_ = resize_object_layers(
+                object_,
+                number_of_slices,
+                fill_mode=LayerFillMode.EDGE,
                 layer_spacing_m=layer_spacing_m,
             )
     else:
@@ -1033,13 +955,46 @@ def main() -> int:
         object_reader = registry.object_file_readers.get_strategy_by_name(
             params.init_object_file_type
         )
-        array = object_reader.read(object_file).get_array()
-        array = _select_layers(array, params)
-        array = _fit_layer_count(array, number_of_slices, params.init_layer_append_mode)
+        source = object_reader.read(object_file)
+        # The file supplies layer content only: the canvas is the one sized against this
+        # scan, and the depth grid is the one this run asked for.
         object_ = Object(
-            array=array,
+            array=source.get_array(),
             pixel_geometry=object_geometry.get_pixel_geometry(),
             center=object_geometry.get_center(),
+            layer_spacing_m=compute_uniform_layer_spacing_m(
+                params.object_thickness_m, source.num_layers
+            ),
+        )
+
+        selection = params.init_layer_select
+
+        if selection:
+            logger.info('Selecting object layers %s', selection)
+            object_ = select_object_layers(object_, selection, drop_out_of_range=True)
+
+        preprocess = params.init_layer_preprocess
+
+        if preprocess in ('avg', 'avg1'):
+            # Divides the total by the layer count it arrived with; 'avg1' then keeps one
+            # of those fractional layers rather than the whole object.
+            object_ = homogenize_object_layers(object_)
+
+            if preprocess == 'avg1':
+                object_ = select_object_layers(object_, [0])
+        elif preprocess == 'interp':
+            object_ = resample_object_layers(object_, layer_spacing_m)
+
+        scaling = params.init_layer_scaling_factor
+
+        if scaling != 1.0:
+            logger.info('Scaling initial object phase by %g', scaling)
+            object_ = scale_object_phase(object_, scaling)
+
+        object_ = resize_object_layers(
+            object_,
+            number_of_slices,
+            fill_mode=_LAYER_FILL_MODES.get(params.init_layer_append_mode, LayerFillMode.VACUUM),
             layer_spacing_m=layer_spacing_m,
         )
 

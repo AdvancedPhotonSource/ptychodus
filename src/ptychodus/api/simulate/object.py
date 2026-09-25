@@ -9,11 +9,10 @@ from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 import numpy
 
-from ._phase_unwrap import PhaseUnwrapper
 from ..constants import TWO_PI_J
 from ..interpolate import lerp
 from ..assemble import AssembledDiffractionData
-from ..object import Object, ObjectGeometry
+from ..object import Object, ObjectGeometry, resample_object_layers
 from ..probe_positions import ProbePosition
 from ..typing import IntegerArrayType, RealArrayType
 
@@ -509,33 +508,16 @@ def generate_siemens_star_object(
 
 
 def generate_layers(object_: Object, layer_spacing_m: Sequence[float]) -> Object:
-    """Create an object from an existing object with a potentially
-    different number of slices.
+    """Reslice an object onto the depth grid given by *layer_spacing_m*.
 
-    The new slice count is ``1 + len(layer_spacing_m)``. If it is greater
-    than the existing slice count, the first layer is split as
-    ``abs(o) ** (1 / nSlices) * exp(i * unwrapPhase(o) / nSlices)`` and
-    repeated. If it is less, the existing layers are truncated to the new
-    count. If equal, the array is reused as is.
+    The new slice count is ``1 + len(layer_spacing_m)``. Every layer of the input
+    contributes: :func:`resample_object_layers` interpolates the cumulative optical path
+    and preserves the layer product, so growing no longer discards all but the first
+    layer and shrinking no longer drops the trailing ones. An object with a single layer
+    still has its transmission spread evenly over the requested slices, which is the one
+    behaviour the previous implementation got right.
     """
-    num_slices = 1 + len(layer_spacing_m)
-    array = object_.get_array()
-
-    if num_slices < array.shape[0]:
-        array = array[:num_slices]
-    elif num_slices > array.shape[0]:
-        amplitude = numpy.absolute(array[:1]) ** (1.0 / num_slices)
-        amplitude = amplitude.repeat(num_slices, axis=0)
-        phase = PhaseUnwrapper().unwrap(array[0])[numpy.newaxis, ...] / num_slices
-        phase = phase.repeat(num_slices, axis=0)
-        array = amplitude * numpy.exp(1j * phase)
-
-    return Object(
-        array=array.astype('complex'),
-        pixel_geometry=object_.get_pixel_geometry(),
-        center=object_.get_center(),
-        layer_spacing_m=layer_spacing_m,
-    )
+    return resample_object_layers(object_, layer_spacing_m)
 
 
 def pad_object(object_: Object, pad_x: int, pad_y: int) -> Object:

@@ -6,12 +6,15 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
+from typing import Final
 import logging
 import math
 
 import numpy
+from scipy.interpolate import PchipInterpolator
 from scipy.ndimage import gaussian_filter
 from skimage.registration import phase_cross_correlation
+from skimage.restoration import unwrap_phase
 
 from .typing import ComplexArrayType, RealArrayType
 from .constants import format_length
@@ -21,6 +24,10 @@ from .probe import ProbeGeometry
 from .probe_positions import ProbePosition, calculate_scan_geometry
 
 logger = logging.getLogger(__name__)
+
+# A true 2-pi wrap draws a contour of large adjacent-pixel jumps across a layer, while
+# ordinary high-contrast structure produces only scattered ones.
+_WRAPPED_PHASE_JUMP_FRACTION: Final[float] = 0.002
 
 
 @dataclass(frozen=True)
@@ -482,6 +489,432 @@ def center_crop_object(obj: Object, target_h: int, target_w: int) -> Object:
         center=new_center,
         layer_spacing_m=list(obj.layer_spacing_m),
     )
+
+
+def _with_layers(obj: Object, array: ComplexArrayType, layer_spacing_m: Sequence[float]) -> Object:
+    """Rebuild *obj* around a new layer stack, carrying its spatial metadata through.
+
+    Mirrors :meth:`Object.copy` in tolerating absent pixel geometry and center, so the
+    layer transforms work on an object straight out of a file reader.
+    """
+    return Object(
+        array=array,
+        pixel_geometry=None if obj._pixel_geometry is None else obj._pixel_geometry.copy(),
+        center=None if obj._center is None else obj._center.copy(),
+        layer_spacing_m=list(layer_spacing_m),
+    )
+
+
+def _layer_depths_m(layer_spacing_m: Sequence[float]) -> RealArrayType:
+    """Depth of each layer, measured from the entrance layer at zero."""
+    return numpy.concatenate(([0.0], numpy.cumsum(numpy.asarray(layer_spacing_m, dtype=float))))
+
+
+def _warn_if_phase_appears_wrapped(phase_rad: RealArrayType) -> None:
+    """Warn when a layer's phase looks wrapped, which invalidates its principal logarithm.
+
+    A true 2-pi wrap draws a contour of adjacent-pixel jumps larger than pi across the
+    layer, so the fraction of such jumps separates wrapping from ordinary high-contrast
+    structure, which produces only scattered ones.
+    """
+    for index, layer in enumerate(phase_rad):
+        jumps = 0
+        total = 0
+
+        for axis in (-2, -1):
+            difference = numpy.diff(layer, axis=axis)
+            jumps += int(numpy.count_nonzero(numpy.abs(difference) > numpy.pi))
+            total += difference.size
+
+        if total > 0 and jumps / total > _WRAPPED_PHASE_JUMP_FRACTION:
+            logger.warning(
+                'Layer %d looks phase-wrapped (%.1f%% of neighboring pixels jump by more than '
+                'pi); its principal logarithm is not the true optical path. Pass '
+                'unwrap_phase_rad=True to unwrap it first.',
+                index,
+                100.0 * jumps / total,
+            )
+
+
+def _layer_log_transmission(
+    array: ComplexArrayType, *, unwrap_phase_rad: bool, amplitude_floor: float
+) -> ComplexArrayType:
+    """Per-layer complex logarithm, the additive form of the layer product.
+
+    Layers compose multiplicatively, so summing this over the layer axis gives the total
+    optical path. Doing it per layer is what keeps the total free of phase wrapping: each
+    layer's own phase lies in ``(-pi, pi]`` whenever the multislice decomposition is
+    valid, and the sum then accumulates past ``+/-pi`` without ever being wrapped.
+    Unwrapping is needed only for a single layer thick enough to wrap by itself.
+
+    Args:
+        array: Complex layer stack, shape ``(layers, height, width)``.
+        unwrap_phase_rad: Unwrap each layer's phase spatially before taking its logarithm.
+        amplitude_floor: Smallest magnitude used in the logarithm. A padded object carries
+            a zero-amplitude border, whose logarithm would otherwise be ``-inf`` and would
+            poison any later difference of cumulative sums.
+    """
+    magnitude = numpy.maximum(numpy.abs(array), amplitude_floor)
+
+    if unwrap_phase_rad:
+        phase_rad = numpy.stack([unwrap_phase(numpy.angle(layer)) for layer in array])
+    else:
+        phase_rad = numpy.angle(array)
+        _warn_if_phase_appears_wrapped(phase_rad)
+
+    return numpy.log(magnitude) + 1j * phase_rad
+
+
+def compute_uniform_layer_spacing_m(total_thickness_m: float, num_layers: int) -> list[float]:
+    """Spacing that distributes ``num_layers`` layers evenly over ``total_thickness_m``.
+
+    The layers are phase screens at depths ``0`` through ``total_thickness_m``, so there
+    are ``num_layers - 1`` gaps of ``total_thickness_m / (num_layers - 1)`` and the
+    returned list sums to ``total_thickness_m`` exactly. This is the convention
+    :meth:`Object.get_total_thickness_m` reports and the one the reconstruction backends
+    propagate: they step between consecutive screens and traverse the whole stack.
+
+    A non-positive thickness yields the right number of zero gaps rather than an empty
+    list, so the result always satisfies the layer-count invariant of :class:`Object`.
+
+    Raises:
+        ValueError: If ``num_layers`` is less than one.
+    """
+    if num_layers < 1:
+        raise ValueError(f'Need at least one layer; got {num_layers}.')
+
+    if num_layers == 1:
+        return []
+
+    if total_thickness_m <= 0.0:
+        return [0.0] * (num_layers - 1)
+
+    return [total_thickness_m / (num_layers - 1)] * (num_layers - 1)
+
+
+class LayerFillMode(Enum):
+    """Content of a layer inserted by :func:`resize_object_layers`."""
+
+    GEOMETRIC_MEAN = auto()
+    """The slab whose repetition reproduces the whole object; thickens by one slab."""
+
+    EDGE = auto()
+    """A copy of the exit layer; thickens by one slab."""
+
+    VACUUM = auto()
+    """Unit transmission, the only fill that leaves the layer product unchanged."""
+
+
+def select_object_layers(
+    obj: Object, indexes: Sequence[int], *, drop_out_of_range: bool = False
+) -> Object:
+    """Keep only the layers named by ``indexes``.
+
+    The output spacing is read off the input depth grid, so a non-contiguous selection
+    still records the true distance between the layers it kept.
+
+    Args:
+        obj: Source object.
+        indexes: Strictly increasing layer indexes to keep.
+        drop_out_of_range: Silently discard indexes outside the layer stack instead of
+            raising. An entirely out-of-range selection still raises, because an object
+            must keep at least one layer.
+
+    Raises:
+        ValueError: If ``indexes`` is empty, or is not strictly increasing.
+        IndexError: If an index falls outside the stack and ``drop_out_of_range`` is off.
+    """
+    num_layers = obj.num_layers
+    selection = [int(index) for index in indexes]
+
+    if drop_out_of_range:
+        selection = [index for index in selection if 0 <= index < num_layers]
+    else:
+        for index in selection:
+            if not 0 <= index < num_layers:
+                raise IndexError(f'Layer {index} is outside a stack of {num_layers} layer(s).')
+
+    if not selection:
+        raise ValueError('Layer selection is empty; an object must keep at least one layer.')
+
+    if any(later <= earlier for earlier, later in zip(selection, selection[1:])):
+        raise ValueError(f'Layer selection must be strictly increasing; got {selection}.')
+
+    depths_m = _layer_depths_m(obj.layer_spacing_m)
+    spacing_m = [
+        float(depths_m[later] - depths_m[earlier])
+        for earlier, later in zip(selection, selection[1:])
+    ]
+
+    return _with_layers(obj, obj.get_array()[selection], spacing_m)
+
+
+def homogenize_object_layers(
+    obj: Object,
+    *,
+    num_layers: int | None = None,
+    layer_spacing_m: Sequence[float] | None = None,
+    unwrap_phase_rad: bool = False,
+    amplitude_floor: float = 1.0e-12,
+) -> Object:
+    """Spread the object's whole transmission evenly over ``num_layers`` identical layers.
+
+    Each output layer is the ``num_layers``-th root of the layer product, so
+    :meth:`Object.get_layers_flattened` is invariant and the result is the homogeneous
+    slab stack with the same projected transmission. The root is taken through the
+    summed per-layer logarithm rather than through the phase of the product, which is
+    what keeps a total phase outside ``(-pi, pi]`` correct.
+
+    Args:
+        obj: Source object.
+        num_layers: Output layer count. Defaults to the input count.
+        layer_spacing_m: Output spacing. Required when the layer count changes and the
+            result has more than one layer, because the output depth grid does not follow
+            from the input one.
+        unwrap_phase_rad: Unwrap each input layer's phase before summing. Needed only when
+            a single layer is itself thick enough to wrap.
+        amplitude_floor: Smallest magnitude used in the logarithm.
+
+    Raises:
+        ValueError: If ``num_layers`` is less than one, if the layer count changes without
+            an explicit ``layer_spacing_m``, or if that spacing has the wrong length.
+    """
+    count = obj.num_layers if num_layers is None else int(num_layers)
+
+    if count < 1:
+        raise ValueError(f'Need at least one layer; got {count}.')
+
+    if layer_spacing_m is not None:
+        spacing_m: Sequence[float] = layer_spacing_m
+    elif count == obj.num_layers:
+        spacing_m = obj.layer_spacing_m
+    elif count == 1:
+        spacing_m = []
+    else:
+        raise ValueError(
+            f'Homogenizing {obj.num_layers} layer(s) into {count} needs an explicit '
+            'layer_spacing_m; the output depth grid does not follow from the input one.'
+        )
+
+    if len(spacing_m) != count - 1:
+        raise ValueError(f'Expected {count - 1} layer spacing(s) for {count} layers.')
+
+    log_transmission = _layer_log_transmission(
+        obj.get_array(), unwrap_phase_rad=unwrap_phase_rad, amplitude_floor=amplitude_floor
+    ).sum(axis=0)
+    layer = numpy.exp(log_transmission / count)
+
+    return _with_layers(obj, numpy.repeat(layer[numpy.newaxis], count, axis=0), spacing_m)
+
+
+def scale_object_phase(
+    obj: Object, scaling: float, *, unwrap_phase_rad: bool | None = None
+) -> Object:
+    """Multiply the phase of every layer by ``scaling``, leaving the amplitude alone.
+
+    Args:
+        obj: Source object.
+        scaling: Factor applied to the phase.
+        unwrap_phase_rad: Whether to unwrap each layer's phase first. The default decides
+            from ``scaling``: an integer factor needs no unwrapping, because the wrapped
+            and true phases differ by ``2 pi k`` and an integer multiple of that is again
+            a whole number of turns, so it cancels. A fractional factor does not cancel
+            and is unwrapped. Pass a bool to force the choice.
+    """
+    if scaling == 1.0:
+        return obj
+
+    if unwrap_phase_rad is None:
+        unwrap_phase_rad = not float(scaling).is_integer()
+
+    array = obj.get_array()
+
+    if unwrap_phase_rad:
+        phase_rad = numpy.stack([unwrap_phase(numpy.angle(layer)) for layer in array])
+    else:
+        phase_rad = numpy.angle(array)
+
+    scaled = numpy.abs(array) * numpy.exp(1j * phase_rad * scaling)
+
+    return _with_layers(obj, scaled, obj.layer_spacing_m)
+
+
+def resize_object_layers(
+    obj: Object,
+    num_layers: int,
+    *,
+    fill_mode: LayerFillMode = LayerFillMode.VACUUM,
+    layer_spacing_m: Sequence[float] | None = None,
+) -> Object:
+    """Grow or shrink the layer stack to ``num_layers`` without interpolating.
+
+    Shrinking to one layer takes the layer product, so the whole transmission survives;
+    shrinking to more than one center-crops the stack and discards the outermost layers.
+    Growing inserts ``fill_mode`` layers alternately after and before the existing stack.
+    Only :attr:`LayerFillMode.VACUUM` leaves the layer product unchanged; the other fills
+    thicken the object by one slab each. Use :func:`resample_object_layers` to change the
+    layer count at a fixed thickness.
+
+    Args:
+        obj: Source object.
+        num_layers: Output layer count.
+        fill_mode: Content of each inserted layer.
+        layer_spacing_m: Output spacing. Defaults to slicing the input spacing when
+            shrinking and to repeating the adjacent gap when growing.
+
+    Raises:
+        ValueError: If ``num_layers`` is less than one, or ``layer_spacing_m`` has the
+            wrong length.
+    """
+    if num_layers < 1:
+        raise ValueError(f'Need at least one layer; got {num_layers}.')
+
+    array = obj.get_array()
+    count = obj.num_layers
+
+    if num_layers == count:
+        if layer_spacing_m is None or list(layer_spacing_m) == list(obj.layer_spacing_m):
+            return obj
+
+        resized = array
+        spacing_m: Sequence[float] = layer_spacing_m
+    elif num_layers == 1:
+        resized = obj.get_layers_flattened()[numpy.newaxis]
+        spacing_m = [] if layer_spacing_m is None else layer_spacing_m
+    elif num_layers < count:
+        start = (count - num_layers) // 2
+        resized = array[start : start + num_layers]
+        spacing_m = (
+            list(obj.layer_spacing_m)[start : start + num_layers - 1]
+            if layer_spacing_m is None
+            else layer_spacing_m
+        )
+    else:
+        match fill_mode:
+            case LayerFillMode.GEOMETRIC_MEAN:
+                filler = numpy.exp(
+                    _layer_log_transmission(
+                        array, unwrap_phase_rad=False, amplitude_floor=1.0e-12
+                    ).mean(axis=0)
+                )
+            case LayerFillMode.EDGE:
+                filler = array[-1]
+            case LayerFillMode.VACUUM:
+                filler = numpy.ones_like(array[0])
+
+        layers = list(array)
+        gaps = list(obj.layer_spacing_m)
+        back_gap_m = gaps[-1] if gaps else 0.0
+        front_gap_m = gaps[0] if gaps else 0.0
+
+        for index in range(num_layers - count):
+            if index % 2 == 0:
+                layers.append(filler)
+                gaps.append(back_gap_m)
+            else:
+                layers.insert(0, filler)
+                gaps.insert(0, front_gap_m)
+
+        resized = numpy.stack(layers)
+        spacing_m = gaps if layer_spacing_m is None else layer_spacing_m
+
+    if len(spacing_m) != num_layers - 1:
+        raise ValueError(f'Expected {num_layers - 1} layer spacing(s) for {num_layers} layers.')
+
+    return _with_layers(obj, resized, spacing_m)
+
+
+def _voronoi_boundaries_m(depths_m: RealArrayType) -> RealArrayType:
+    """Slab boundaries around a set of layer depths.
+
+    Each interior layer owns the interval between its midpoints with its two neighbors;
+    the entrance and exit layers own half-slabs, because they sit on the ends of the
+    stack rather than at the center of one. The boundaries therefore span exactly the
+    same range as the depths and there is one more of them than there are layers.
+    """
+    return numpy.concatenate(([depths_m[0]], (depths_m[:-1] + depths_m[1:]) / 2.0, [depths_m[-1]]))
+
+
+def resample_object_layers(
+    obj: Object,
+    layer_spacing_m: Sequence[float],
+    *,
+    preserve_total_transmission: bool = True,
+    unwrap_phase_rad: bool = False,
+    amplitude_floor: float = 1.0e-12,
+) -> Object:
+    """Resample the layer stack onto the depth grid implied by ``layer_spacing_m``.
+
+    The output has ``1 + len(layer_spacing_m)`` layers. Resampling runs on the cumulative
+    complex optical path sampled at slab boundaries, and each output layer is a
+    difference of the interpolated path, so the layers still compose multiplicatively and
+    no layer's phase is ever wrapped. Because those differences telescope, the layer
+    product is preserved exactly whenever the output grid spans the input one -- to
+    floating-point round-off, with no renormalization step.
+
+    Interpolation is monotone cubic (PCHIP) on that cumulative path. Monotonicity is the
+    property that matters: it prevents the difference from handing a layer a phase step
+    that runs against the local trend, or an amplitude above the material's own.
+
+    Args:
+        obj: Source object.
+        layer_spacing_m: Output spacing, one entry per gap.
+        preserve_total_transmission: Stretch the output depth grid onto the input span
+            before evaluating, making the layer product exactly invariant. Disable to
+            evaluate the output boundaries at their own physical depths, letting the
+            transmission follow the change in thickness.
+        unwrap_phase_rad: Unwrap each input layer's phase before accumulating. Needed only
+            when a single layer is itself thick enough to wrap.
+        amplitude_floor: Smallest magnitude used in the logarithm.
+    """
+    # An unchanged depth grid must be a bit-exact no-op: callers rebuild objects on every
+    # settings notification, and a round trip through log and exp would drift each time.
+    if list(layer_spacing_m) == list(obj.layer_spacing_m):
+        return obj
+
+    num_layers = 1 + len(layer_spacing_m)
+    source_depths_m = _layer_depths_m(obj.layer_spacing_m)
+    source_span_m = float(source_depths_m[-1])
+    target_depths_m = _layer_depths_m(layer_spacing_m)
+    target_span_m = float(target_depths_m[-1])
+
+    # A single source layer, a stack with no thickness, or a single output layer leaves no
+    # depth axis to resample along; spreading the transmission evenly is the whole of it.
+    degenerate = obj.num_layers == 1 or source_span_m <= 0.0 or num_layers == 1
+
+    if degenerate or (preserve_total_transmission and target_span_m <= 0.0):
+        return homogenize_object_layers(
+            obj,
+            num_layers=num_layers,
+            layer_spacing_m=layer_spacing_m,
+            unwrap_phase_rad=unwrap_phase_rad,
+            amplitude_floor=amplitude_floor,
+        )
+
+    if preserve_total_transmission:
+        target_depths_m = target_depths_m * (source_span_m / target_span_m)
+
+    source_boundaries_m = _voronoi_boundaries_m(source_depths_m)
+    target_boundaries_m = _voronoi_boundaries_m(target_depths_m)
+
+    log_transmission = _layer_log_transmission(
+        obj.get_array(), unwrap_phase_rad=unwrap_phase_rad, amplitude_floor=amplitude_floor
+    )
+    cumulative = numpy.concatenate(
+        (
+            numpy.zeros((1, *log_transmission.shape[1:]), dtype=log_transmission.dtype),
+            numpy.cumsum(log_transmission, axis=0),
+        )
+    )
+
+    # PchipInterpolator takes real data only, and the real and imaginary parts of the
+    # cumulative path are both smooth, so interpolating them separately is exact.
+    real = PchipInterpolator(source_boundaries_m, cumulative.real, axis=0)(target_boundaries_m)
+    imaginary = PchipInterpolator(source_boundaries_m, cumulative.imag, axis=0)(target_boundaries_m)
+
+    resampled = numpy.exp(numpy.diff(real + 1j * imaginary, axis=0))
+
+    return _with_layers(obj, resampled, layer_spacing_m)
 
 
 def align_objects(

@@ -138,9 +138,9 @@ def test_from_file_builder_generates_layers() -> None:
 
 
 def test_from_file_builder_keeps_existing_layers(caplog: pytest.LogCaptureFixture) -> None:
-    """The destructive case: generate_layers truncates when asked for fewer layers
-    than it is given, so the default empty spacing would collapse a converged
-    four-layer warm start to one layer."""
+    """An empty spacing is the unset default, not a request for one layer, so it must not
+    collapse a converged four-layer warm start. Reslicing itself is non-destructive now;
+    this guards the ambiguity in the setting, not the arithmetic."""
     settings = _make_settings()
     from_file = _make_object(4)
     builder = _make_from_file_builder(settings, from_file)
@@ -149,7 +149,23 @@ def test_from_file_builder_keeps_existing_layers(caplog: pytest.LogCaptureFixtur
         object_ = builder.build(_StubObjectGeometryProvider(), [])
 
     assert object_.num_layers == 4
-    assert 'keeping them rather than re-slicing to 1' in caplog.text
+    assert 'keeping them rather than collapsing to one' in caplog.text
+
+
+def test_from_file_builder_reslices_a_multislice_object_without_losing_it() -> None:
+    """Reslicing used to be refused because generate_layers kept only layer zero when
+    growing and truncated when shrinking. It now resamples, so an explicit spacing is
+    honored and the projected object survives it."""
+    settings = _make_settings()
+    from_file = _make_object(4)
+    builder = _make_from_file_builder(settings, from_file)
+
+    object_ = builder.build(_StubObjectGeometryProvider(), [LAYER_SPACING_M] * 6)
+
+    assert object_.num_layers == 7
+    numpy.testing.assert_allclose(
+        object_.get_layers_flattened(), from_file.get_layers_flattened(), atol=1.0e-12
+    )
 
 
 def test_from_file_builder_does_not_pad() -> None:

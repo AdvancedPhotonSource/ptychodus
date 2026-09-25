@@ -13,9 +13,10 @@ import scipy.ndimage
 from scipy.fft import fft2
 
 from .constants import format_length
+from .fourier import fourier_shift_2d
 from .geometry import ImageExtent, PixelGeometry
 from .preprocess.noise import estimate_noise_floor
-from .propagate import PropagatedProbe, compute_far_field_pixel_geometry, intensity
+from .propagate import PropagatedWavefield, compute_far_field_pixel_geometry, intensity
 from .typing import ComplexArrayType, RealArrayType
 
 
@@ -579,7 +580,7 @@ def estimate_focal_plane(
 
 
 def compute_probe_focus_curves(
-    propagated_probe: PropagatedProbe, *, mode: int = 0
+    propagated_probe: PropagatedWavefield, *, mode: int = 0
 ) -> ProbeFocusCurves:
     """Sample every :class:`ProbeFocusMetric` at each plane of a propagated probe.
 
@@ -598,7 +599,7 @@ def compute_probe_focus_curves(
     Cost is dominated by :func:`estimate_probe_size`, which median-filters, runs Otsu,
     and sorts every pixel once per plane; expect this to scale linearly in the step
     count and to run for seconds over a long sweep. The intensity stack is materialized
-    once here rather than per step, since :attr:`PropagatedProbe.intensity` rebuilds it
+    once here rather than per step, since :attr:`PropagatedWavefield.intensity` rebuilds it
     on every access and would otherwise make the sweep quadratic.
 
     Args:
@@ -908,6 +909,24 @@ def estimate_probe_entropy(probe: Probe) -> ProbeEntropyMetrics:
     return ProbeEntropyMetrics(
         real_space_intensity_entropy=compute_shannon_entropy(probe.get_intensity()),
         spectral_entropy=compute_shannon_entropy(probe.get_power_spectrum()),
+    )
+
+
+def shift_probe(probe: Probe, *, shift_y_px: float, shift_x_px: float) -> Probe:
+    """Translate every incoherent mode of ``probe`` by ``(shift_y_px, shift_x_px)``.
+
+    The translation is applied as a Fourier phase ramp, matching :func:`shift_object`, so
+    the complex phase survives and the shift is exact for a bandlimited wavefield at
+    subpixel offsets. It is circular: content pushed past one edge reappears at the
+    opposite one, which is inert for a probe whose support sits well inside the frame.
+    A probe carries no world-coordinate center, so no metadata is adjusted.
+    """
+    if shift_y_px == 0.0 and shift_x_px == 0.0:
+        return probe
+
+    return Probe(
+        array=fourier_shift_2d(probe.get_array(), dx=shift_x_px, dy=shift_y_px),
+        pixel_geometry=probe.get_pixel_geometry().copy(),
     )
 
 

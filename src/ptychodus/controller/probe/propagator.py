@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QSpinBox
 
 from ptychodus.api.constants import LengthUnit, format_length
 from ptychodus.api.probe import ProbeSizeMetrics
-from ptychodus.api.propagate import PropagatedProbe, intensity
+from ptychodus.api.propagate import PropagatedWavefield, intensity
 from ptychodus.api.typing import NumberArrayType, RealArrayType
 
 from ...model.analysis import ProbePropagatorSettings, ProbePropagator
@@ -42,7 +42,7 @@ class ProbePropagationViewController:
         self._file_dialog_factory = file_dialog_factory
 
         self._product_index = -1
-        self._propagated_probe: PropagatedProbe | None = None
+        self._propagated_probe: PropagatedWavefield | None = None
 
         # The propagation controls share a strip with the depth slider and carry no form
         # labels of their own, so each needs a tool tip to stay self-describing.

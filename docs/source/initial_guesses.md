@@ -344,10 +344,13 @@ Use `WorkflowProductAPI.generate_object(name, parameters)`. Object geometry is d
 
 ### Multislice Objects
 
-Object builders call `generate_layers` after creating a single-slice object. If `object_layer_spacing_m` is empty, the object remains single-slice. If spacings are supplied, the requested number of slices is `len(object_layer_spacing_m) + 1`. When expanding from one slice to several, Ptychodus distributes the amplitude and unwrapped phase across slices as:
+Object builders call `generate_layers` after creating an object. If `object_layer_spacing_m` is empty, the object keeps the slices it already has -- an unset spacing expresses no preference, so it never collapses a multislice warm start. If spacings are supplied, the requested number of slices is `len(object_layer_spacing_m) + 1` and the object is resliced onto that depth grid.
 
-- amplitude: `abs(object) ** (1 / n_slices)`;
-- phase: `unwrap_phase(object) / n_slices`.
+Reslicing is non-destructive. {py:func}`ptychodus.api.object.resample_object_layers` interpolates the cumulative complex optical path -- the running sum of each layer's complex logarithm -- and takes differences of it, so every input layer contributes, the layers still compose multiplicatively, and `get_layers_flattened()` is preserved to round-off whichever slice count is requested. Working in the logarithm is also what keeps a total phase outside `(-pi, pi]` correct: each layer's own phase is small enough not to wrap, and the sum accumulates past `pi` without ever passing through `numpy.angle`.
+
+Expanding a single slice into several is the degenerate case, since there is no depth axis to resample along. It falls back to {py:func}`ptychodus.api.object.homogenize_object_layers`, which spreads the whole transmission evenly so that each of the `n_slices` layers is the `n_slices`-th root of the original.
+
+The layers are phase screens at depths `0` through the total thickness, so `n_slices` layers leave `n_slices - 1` gaps and `Object.get_total_thickness_m()` -- the sum of those gaps -- is the full thickness. {py:func}`ptychodus.api.object.compute_uniform_layer_spacing_m` builds an even grid on that convention.
 
 ## Low-Level Generator API
 

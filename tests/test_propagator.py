@@ -14,13 +14,13 @@ from ptychodus.api.propagate import (
     FraunhoferPropagator,
     FresnelTransferFunctionPropagator,
     FresnelTransformPropagator,
-    PropagatedProbe,
+    PropagatedWavefield,
     PropagatorParameters,
     choose_propagator,
     compute_far_field_pixel_geometry,
     compute_magnification,
     intensity,
-    propagate_probe,
+    propagate_wavefield,
 )
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.probe import ProbeGeometry
@@ -421,7 +421,7 @@ class TestFraunhoferPropagator:
 
 
 # ---------------------------------------------------------------------------
-# PropagatedProbe (dataclass)
+# PropagatedWavefield (dataclass)
 # ---------------------------------------------------------------------------
 
 
@@ -436,13 +436,13 @@ def _make_result(
     pixel_width_m: float = 50e-6,
     pixel_height_m: float = 50e-6,
     seed: int = 0,
-) -> PropagatedProbe:
+) -> PropagatedWavefield:
     rng = numpy.random.default_rng(seed)
     wf = (
         rng.standard_normal((num_steps, num_modes, h, w))
         + 1j * rng.standard_normal((num_steps, num_modes, h, w))
     ).astype(complex)
-    return PropagatedProbe(
+    return PropagatedWavefield(
         wavefield=wf,
         begin_coordinate_m=begin_m,
         end_coordinate_m=end_m,
@@ -492,7 +492,7 @@ class TestPropagatedProbe:
         # central rows for h=4: (h-1)//2 = 1 and h//2 = 2.
         wf[:, 0, 1, :] = 2.0  # |2|^2 = 4
         wf[:, 0, 2, :] = 4.0  # |4|^2 = 16
-        result = PropagatedProbe(
+        result = PropagatedWavefield(
             wavefield=wf,
             begin_coordinate_m=0.0,
             end_coordinate_m=1e-3,
@@ -513,7 +513,7 @@ class TestPropagatedProbe:
         # central cols for w=4: (w-1)//2 = 1 and w//2 = 2.
         wf[:, 0, :, 1] = 2.0  # |2|^2 = 4
         wf[:, 0, :, 2] = 4.0  # |4|^2 = 16
-        result = PropagatedProbe(
+        result = PropagatedWavefield(
             wavefield=wf,
             begin_coordinate_m=0.0,
             end_coordinate_m=1e-3,
@@ -561,7 +561,7 @@ class TestPropagatedProbe:
         # central rows for h=4: (h-1)//2 = 1 and h//2 = 2.
         wf[:, 1, 1, :] = 2.0 + 1.0j
         wf[:, 1, 2, :] = 4.0 - 3.0j
-        result = PropagatedProbe(
+        result = PropagatedWavefield(
             wavefield=wf,
             begin_coordinate_m=0.0,
             end_coordinate_m=1e-3,
@@ -583,7 +583,7 @@ class TestPropagatedProbe:
         # central cols for w=4: (w-1)//2 = 1 and w//2 = 2.
         wf[:, 1, :, 1] = 2.0 + 1.0j
         wf[:, 1, :, 2] = 4.0 - 3.0j
-        result = PropagatedProbe(
+        result = PropagatedWavefield(
             wavefield=wf,
             begin_coordinate_m=0.0,
             end_coordinate_m=1e-3,
@@ -642,7 +642,7 @@ class TestPropagatedProbe:
 
 
 # ---------------------------------------------------------------------------
-# propagate_probe (factory)
+# propagate_wavefield (factory)
 # ---------------------------------------------------------------------------
 
 
@@ -661,7 +661,7 @@ def _source_wavefield(num_modes: int, h: int, w: int, *, seed: int = 0) -> numpy
 class TestPropagateProbe:
     def test_returns_propagated_probe(self) -> None:
         wf = _source_wavefield(1, 8, 8)
-        result = propagate_probe(
+        result = propagate_wavefield(
             wf,
             pixel_geometry=_flat_pixel_geometry(),
             wavelength_m=500e-9,
@@ -669,11 +669,11 @@ class TestPropagateProbe:
             end_coordinate_m=1e-3,
             num_steps=3,
         )
-        assert isinstance(result, PropagatedProbe)
+        assert isinstance(result, PropagatedWavefield)
 
     def test_output_wavefield_shape(self) -> None:
         wf = _source_wavefield(num_modes=2, h=8, w=10)
-        result = propagate_probe(
+        result = propagate_wavefield(
             wf,
             pixel_geometry=_flat_pixel_geometry(),
             wavelength_m=500e-9,
@@ -685,7 +685,7 @@ class TestPropagateProbe:
 
     def test_dtype_preserved(self) -> None:
         wf = _source_wavefield(1, 8, 8).astype(numpy.complex64)
-        result = propagate_probe(
+        result = propagate_wavefield(
             wf,
             pixel_geometry=_flat_pixel_geometry(),
             wavelength_m=500e-9,
@@ -697,7 +697,7 @@ class TestPropagateProbe:
 
     def test_metadata_round_trip(self) -> None:
         pg = PixelGeometry(width_m=70e-6, height_m=40e-6)
-        result = propagate_probe(
+        result = propagate_wavefield(
             _source_wavefield(1, 8, 8),
             pixel_geometry=pg,
             wavelength_m=500e-9,
@@ -711,7 +711,7 @@ class TestPropagateProbe:
 
     def test_num_steps_one(self) -> None:
         wf = _source_wavefield(1, 8, 8)
-        result = propagate_probe(
+        result = propagate_wavefield(
             wf,
             pixel_geometry=_flat_pixel_geometry(),
             wavelength_m=500e-9,
@@ -724,7 +724,7 @@ class TestPropagateProbe:
     def test_zero_distance_identity(self) -> None:
         """begin=end=0 → every step is the identity (matches AngularSpectrumPropagator z=0)."""
         wf = _source_wavefield(2, 8, 8)
-        result = propagate_probe(
+        result = propagate_wavefield(
             wf,
             pixel_geometry=_flat_pixel_geometry(),
             wavelength_m=500e-9,
@@ -739,7 +739,7 @@ class TestPropagateProbe:
         """First step uses begin_coordinate_m; last step uses end_coordinate_m."""
         wf = _source_wavefield(1, 16, 16)
         pg = _flat_pixel_geometry()
-        result = propagate_probe(
+        result = propagate_wavefield(
             wf,
             pixel_geometry=pg,
             wavelength_m=500e-9,
@@ -762,7 +762,7 @@ class TestPropagateProbe:
 
     def test_invalid_2d_wavefield_raises(self) -> None:
         with pytest.raises(ValueError, match='3-dimensional'):
-            propagate_probe(
+            propagate_wavefield(
                 numpy.zeros((8, 8), dtype=complex),
                 pixel_geometry=_flat_pixel_geometry(),
                 wavelength_m=500e-9,
@@ -773,7 +773,7 @@ class TestPropagateProbe:
 
     def test_invalid_4d_wavefield_raises(self) -> None:
         with pytest.raises(ValueError, match='3-dimensional'):
-            propagate_probe(
+            propagate_wavefield(
                 numpy.zeros((1, 1, 8, 8), dtype=complex),
                 pixel_geometry=_flat_pixel_geometry(),
                 wavelength_m=500e-9,
@@ -792,7 +792,7 @@ class TestPropagateProbe:
         mode1 = mode1 * numpy.exp(1j * 0.5)
         wf = numpy.stack([mode0, mode1], axis=0)
 
-        result = propagate_probe(
+        result = propagate_wavefield(
             wf,
             pixel_geometry=PixelGeometry(width_m=50e-6, height_m=50e-6),
             wavelength_m=500e-9,
@@ -822,7 +822,7 @@ class TestPropagateProbe:
         wf = numpy.stack([mode0, mode1], axis=0)
         source_total = float(numpy.sum(numpy.abs(wf) ** 2))
 
-        result = propagate_probe(
+        result = propagate_wavefield(
             wf,
             pixel_geometry=PixelGeometry(width_m=50e-6, height_m=50e-6),
             wavelength_m=500e-9,
@@ -845,7 +845,7 @@ class TestPropagateProbe:
         wf = mode[numpy.newaxis, :, :]
         pg = PixelGeometry(width_m=50e-6, height_m=50e-6)
 
-        forward = propagate_probe(
+        forward = propagate_wavefield(
             wf,
             pixel_geometry=pg,
             wavelength_m=500e-9,
@@ -853,7 +853,7 @@ class TestPropagateProbe:
             end_coordinate_m=z_m,
             num_steps=1,
         )
-        backward = propagate_probe(
+        backward = propagate_wavefield(
             forward.wavefield[0],
             pixel_geometry=pg,
             wavelength_m=500e-9,

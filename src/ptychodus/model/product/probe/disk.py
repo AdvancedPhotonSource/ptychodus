@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy
 
 from ptychodus.api.probe import ProbeSequence, ProbeGeometryProvider
-from ptychodus.api.simulate.probe import defocus_probe, generate_disk_probe
+from ptychodus.api.simulate.probe import propagate_probe, generate_disk_probe
 
 from .builder import ProbeSequenceBuilder
 from .settings import ProbeSettings
@@ -31,13 +31,13 @@ class DiskProbeBuilder(ProbeSequenceBuilder):
 
     def _build_raw(self, geometry_provider: ProbeGeometryProvider) -> ProbeSequence:
         return self._rescale_to_photon_count(
-            defocus_probe(
+            propagate_probe(
                 generate_disk_probe(
                     geometry_provider.get_probe_geometry(),
                     radius_m=self.diameter_m.get_value() / 2.0,
                 ),
                 probe_wavelength_m=geometry_provider.probe_wavelength_m,
-                defocus_distance_m=self.defocus_distance_m.get_value(),
+                propagation_distance_m=self.defocus_distance_m.get_value(),
             ),
             geometry_provider,
         )

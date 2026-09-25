@@ -44,13 +44,18 @@ def rescale_probe_intensity(probe: Probe, new_intensity: float) -> Probe:
     return probe
 
 
-def defocus_probe(
+def propagate_probe(
     probe: Probe,
     *,
     probe_wavelength_m: float,
-    defocus_distance_m: float,
+    propagation_distance_m: float,
 ) -> Probe:
-    """Propagate a probe by *defocus_distance_m* using the angular-spectrum method."""
+    """Propagate every incoherent mode of a probe by *propagation_distance_m*.
+
+    Uses the angular-spectrum method, which is exact for all Fresnel numbers. The
+    propagator acts on the last two axes, so the mode axis rides through untouched and
+    every mode sees the same transfer function.
+    """
     pixel_geometry = probe.get_pixel_geometry()
     propagator_parameters = PropagatorParameters(
         wavelength_m=probe_wavelength_m,
@@ -58,7 +63,7 @@ def defocus_probe(
         height_px=probe.height_px,
         pixel_width_m=pixel_geometry.width_m,
         pixel_height_m=pixel_geometry.height_m,
-        propagation_distance_m=defocus_distance_m,
+        propagation_distance_m=propagation_distance_m,
     )
     propagator = AngularSpectrumPropagator(propagator_parameters)
     return Probe(

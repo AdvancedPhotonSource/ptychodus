@@ -3,7 +3,7 @@ import logging
 import time
 
 from ptychodus.api.geometry import PixelGeometry
-from ptychodus.api.propagate import PropagatedProbe, propagate_probe
+from ptychodus.api.propagate import PropagatedWavefield, propagate_wavefield
 
 from ..product import ProductRepository
 from .settings import ProbePropagatorSettings
@@ -27,7 +27,7 @@ class ProbePropagator:
 
         return item.get_probe_item().get_probes().get_pixel_geometry()
 
-    def propagate(self, product_index: int) -> PropagatedProbe:
+    def propagate(self, product_index: int) -> PropagatedWavefield:
         item = self._repository[product_index]
         probes = item.get_probe_item().get_probes()
         wavelength_m = item.get_geometry().probe_wavelength_m
@@ -45,7 +45,7 @@ class ProbePropagator:
 
         logger.info('Computing probe propagation...')
         tic = time.perf_counter()
-        result = propagate_probe(
+        result = propagate_wavefield(
             probe.get_array(),
             pixel_geometry=probe.get_pixel_geometry(),
             wavelength_m=wavelength_m,

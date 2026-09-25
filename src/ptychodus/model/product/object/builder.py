@@ -66,30 +66,28 @@ class ObjectBuilder(ParameterGroup):
         object_: Object,
         layer_spacing_m: Sequence[float],
     ) -> Object:
-        """Slice the object into the requested number of layers, never destroying
-        layers it already has.
+        """Slice the object onto the requested depth grid.
 
-        `generate_layers` is only non-destructive when the object has a single
-        layer. Given fewer layers than the input it truncates; given more it keeps
-        layer zero and throws the rest away before splitting. So a multi-layer
-        input whose layer count does not already match the request is left alone
-        -- otherwise a converged multislice result loaded from file would collapse
-        to one layer under the default empty spacing.
+        `generate_layers` resamples the whole stack and preserves the layer product, so
+        reslicing a multislice object is no longer destructive and is done whenever a
+        spacing is asked for.
+
+        An empty spacing is the exception. It is the unset default, and it means one
+        layer, so honoring it literally would collapse a multislice result loaded from
+        file the moment nobody had configured a spacing. Absent a spacing this keeps
+        whatever layers the object arrived with, which also makes one layer
+        unrequestable for an object that has more -- the data model cannot tell "one
+        layer" from "unspecified".
 
         Note the padding is applied earlier, in `_build_raw`, so the order here is
         pad-then-layers rather than the layers-then-pad of the original
-        `_create_object`. The two do not commute, because `generate_layers`
-        unwraps the phase of layer zero and a zero-amplitude border changes that
-        unwrapping. Only generated multislice objects can tell the difference; for
-        the single-layer default `generate_layers` is a no-op.
+        `_create_object`. The two do not commute, because a zero-amplitude border
+        changes the resampled result near the edges.
         """
-        num_layers_requested = 1 + len(layer_spacing_m)
-        num_layers_actual = object_.num_layers
-
-        if num_layers_actual > 1 and num_layers_actual != num_layers_requested:
+        if not layer_spacing_m and object_.num_layers > 1:
             logger.info(
-                f'Object already has {num_layers_actual} layer(s);'
-                f' keeping them rather than re-slicing to {num_layers_requested}.'
+                f'Object has {object_.num_layers} layer(s) and no layer spacing is set;'
+                ' keeping them rather than collapsing to one.'
             )
             return object_
 

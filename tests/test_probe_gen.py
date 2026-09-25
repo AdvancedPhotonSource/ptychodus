@@ -8,6 +8,7 @@ from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import HermiteMode, ImageExtent, PixelGeometry
 from ptychodus.api.probe import Probe, ProbeGeometry
 from ptychodus.api.simulate.probe import (
+    propagate_probe,
     FresnelZonePlate,
     generate_average_pattern_probe,
     generate_coherent_probe_modes,
@@ -523,3 +524,52 @@ class TestGenerateFresnelZonePlateProbe:
                 probe_wavelength_m=_FZP_WAVELENGTH_M,
                 defocus_distance_m=-_FZP_FOCAL_LENGTH_M,
             )
+
+
+class TestPropagateProbe:
+    """propagate_probe (renamed from defocus_probe) over the angular spectrum."""
+
+    @staticmethod
+    def _probe(num_modes: int) -> Probe:
+        rng = numpy.random.default_rng(11)
+        y, x = numpy.mgrid[0:32, 0:32] - 16
+        envelope = numpy.exp(-(x**2 + y**2) / 60.0)
+        array = numpy.stack(
+            [envelope * numpy.exp(1j * rng.uniform(0.0, 0.2, (32, 32))) for _ in range(num_modes)]
+        )
+        return Probe(
+            array=array.astype(complex),
+            pixel_geometry=PixelGeometry(width_m=1e-8, height_m=1e-8),
+        )
+
+    def test_zero_distance_is_an_identity(self) -> None:
+        probe = self._probe(1)
+        propagated = propagate_probe(probe, probe_wavelength_m=1e-10, propagation_distance_m=0.0)
+
+        numpy.testing.assert_allclose(propagated.get_array(), probe.get_array(), atol=1e-12)
+
+    def test_every_mode_propagates_independently(self) -> None:
+        """The propagator ffts the last two axes, so the mode axis must ride through
+        untouched -- propagating a stack must equal propagating each mode alone."""
+        probe = self._probe(3)
+        together = propagate_probe(
+            probe, probe_wavelength_m=1e-10, propagation_distance_m=5e-5
+        ).get_array()
+
+        for index in range(3):
+            alone = propagate_probe(
+                Probe(
+                    array=probe.get_array()[index : index + 1],
+                    pixel_geometry=probe.get_pixel_geometry(),
+                ),
+                probe_wavelength_m=1e-10,
+                propagation_distance_m=5e-5,
+            ).get_array()
+            numpy.testing.assert_allclose(together[index], alone[0], atol=1e-12)
+
+    def test_propagation_is_reversible(self) -> None:
+        probe = self._probe(2)
+        forward = propagate_probe(probe, probe_wavelength_m=1e-10, propagation_distance_m=5e-5)
+        back = propagate_probe(forward, probe_wavelength_m=1e-10, propagation_distance_m=-5e-5)
+
+        numpy.testing.assert_allclose(back.get_array(), probe.get_array(), atol=1e-9)

@@ -130,7 +130,14 @@ class SLACProductFileReader(ProductFileReader):
             metadata=metadata,
             probe_positions=ProbePositionSequence(point_list),
             probes=ProbeSequence(array=probe_array, opr_weights=None, pixel_geometry=None),
-            object_=Object(array=object_array, pixel_geometry=None, center=None),
+            object_=Object(
+                array=object_array,
+                pixel_geometry=None,
+                center=None,
+                layer_spacing_m=[0.0] * (object_array.shape[0] - 1)
+                if object_array.ndim == 3
+                else [],
+            ),
             losses=loss,
         )
 
