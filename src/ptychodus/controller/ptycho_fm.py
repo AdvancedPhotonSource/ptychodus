@@ -50,8 +50,15 @@ class PtychoFMViewControllerFactory(ReconstructorViewControllerFactory):
             group=data_group,
         )
         builder.add_integer_line_edit(
-            data_settings.target_size,
-            'Target Pattern Size:',
+            data_settings.max_opr_modes,
+            'Max OPR Modes:',
+            tool_tip='Probes are zero-padded to this many orthogonal probe relaxation modes.',
+            group=data_group,
+        )
+        builder.add_integer_line_edit(
+            data_settings.cache_memory_budget_mb,
+            'Array Cache Budget (MiB):',
+            tool_tip='Per-worker budget for cached object and probe arrays; 0 disables caching.',
             group=data_group,
         )
         builder.add_decimal_slider(

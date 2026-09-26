@@ -7,16 +7,20 @@ translator in :mod:`.reconstructor`, neither of which touches torch.
 
 Two entry points are exposed:
 
-- :func:`run_reconstruct` -- load a ``.pth`` checkpoint, run one inference pass
-  over the diffraction stack (batched through :class:`PtychoFM`), stitch the
-  per-patch amplitude/phase outputs into a full-object array via
-  ``place_patches_fourier_shift``, and stream back a single
-  :class:`ReconstructOutput`.
+- :func:`run_reconstruct` -- load a ``.pth`` checkpoint into the model chosen by
+  ``ptycho_fm.utils.inference.resolve_inference_model``, run one inference pass
+  over the diffraction stack, stitch the per-patch amplitude/phase outputs into
+  a full-object array via ``place_patches_fourier_shift``, and stream back a
+  single :class:`ReconstructOutput`.
 - :func:`run_train` -- run one single-device training session (no DDP, no
   mlflow, no wandb) driven by :class:`ptycho_fm.model.model.PtychoFM` and a
   minimal train/validate loop that mirrors ``ptycho_fm/train.py`` stripped of
   its distributed machinery. Emits a :class:`TrainOutput` after each epoch and
   a final ``TAG_MODEL_SAVED`` with the path of the best checkpoint.
+
+Stitching is done here rather than reused: ptycho_fm's own
+``run_inference_and_stitch`` lives in its ``scripts/`` tree, which is excluded
+from the wheel and so cannot be imported from an installed ptycho-fm.
 """
 
 from __future__ import annotations
@@ -62,9 +66,10 @@ def _select_device() -> Any:
 def _pad_probe_to_modes(probe: numpy.ndarray, target_modes: int) -> numpy.ndarray:
     """Zero-pad a complex probe ``(N_modes, H, W)`` up to ``target_modes`` along axis 0.
 
-    Mirrors :meth:`ptycho_fm.data.PtychographyDataset._pad_probe` but operates
-    on the ``(N, H, W)`` layout ptychodus hands us (rather than the
-    ``(1, N, H, W)`` layout the dataset uses internally).
+    ptycho_fm pads the incoherent-mode axis of a 4D ``(OPR, N_modes, H, W)``
+    probe and never truncates it or touches the spatial dimensions; this is the
+    same rule applied to the 3D layout ptychodus holds, with the OPR axis added
+    by the caller.
     """
     current_modes = probe.shape[0]
     if current_modes >= target_modes:
@@ -107,37 +112,80 @@ def _build_positions_top_left(parameters: Any) -> numpy.ndarray:
     coords: list[float] = []
     for position in parameters.product.probe_positions:
         object_point = object_geometry.map_coordinates_probe_to_object(position)
-        coords.append(object_point.coordinate_y_px)
-        coords.append(object_point.coordinate_x_px)
+        coords.append(object_point.y_px)
+        coords.append(object_point.x_px)
     return numpy.asarray(coords, dtype=numpy.float32).reshape(-1, 2)
+
+
+def _make_inference_dataset(
+    diffraction_amplitude: Any,
+    probe: Any,
+    positions: Any,
+    normalization: float,
+    scale: float,
+) -> Any:
+    """Wrap in-memory arrays as a Dataset yielding ptycho_fm's 7-tuple sample.
+
+    ``predict_object_patches`` destructures every sample as ``(diffraction,
+    amplitude, phase, probe, position, normalization, scale)``. Only the
+    diffraction is read for an inference-only model, so the amplitude and phase
+    slots carry empty tensors; the probe is real and is consumed by the models
+    that run the forward physics.
+
+    The class is defined here so ``torch`` stays a child-side import.
+    """
+    import torch
+    from torch.utils.data import Dataset
+
+    empty = torch.empty(0)
+
+    class _InMemoryPatternDataset(Dataset):  # type: ignore[type-arg]
+        def __len__(self) -> int:
+            return int(diffraction_amplitude.shape[0])
+
+        def __getitem__(self, index: int) -> tuple[Any, ...]:
+            return (
+                diffraction_amplitude[index],
+                empty,
+                empty,
+                probe,
+                positions[index],
+                normalization,
+                scale,
+            )
+
+    return _InMemoryPatternDataset()
 
 
 def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
     """Child entry point for one inference pass. Streams a single ReconstructOutput.
 
-    Loads the ``.pth`` state dict with ``weights_only=True`` (safe: nothing to
-    execute is expected in a plain ptycho_fm checkpoint), rebuilds the model
-    from the payload's config, then runs the same batch + stitch loop as
-    ``ptycho_fm/scripts/run_inference_and_stitch.py``.
+    ``resolve_inference_model`` picks the model class from the config and
+    returns the encoder input size alongside it; ``load_checkpoint`` reads the
+    ``.pth`` state dict with ``weights_only=True`` (safe: nothing to execute is
+    expected in a plain ptycho_fm checkpoint). Patch prediction is delegated to
+    ``iter_object_patch_predictions``; only the stitch is ours.
     """
     if payload.model_path is None:
         raise RuntimeError('Cannot reconstruct: no model checkpoint has been loaded.')
 
     import torch
-    from ptycho_fm.model.model import PtychoFM
-    from ptycho_fm.utils.ptychi_utils import place_patches_fourier_shift
+    from ptychi.image_proc import place_patches_fourier_shift
+    from ptycho_fm.utils.inference import (
+        crop_patch_borders,
+        iter_object_patch_predictions,
+        load_checkpoint,
+        make_inference_dataloader,
+        resolve_inference_model,
+    )
 
     device = _select_device()
     config = payload.config
     data_config = config['data']
-    model_config = config['model']
     inference_config = config['inference']
 
-    model = PtychoFM(config=model_config)
-    state = torch.load(payload.model_path, map_location=device, weights_only=True)
-    model.load_state_dict(state)
-    model.to(device)
-    model.eval()
+    model, image_size = resolve_inference_model(config)
+    load_checkpoint(model, payload.model_path, device)
 
     parameters = payload.reconstruct_input
 
@@ -156,22 +204,20 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
         raise ValueError('Diffraction stack max is non-positive; cannot normalise for inference.')
     diff_amp = numpy.sqrt(diff_intensity / normalization_value * scale_value)
 
-    target_size = int(data_config['target_size'])
-    if diff_amp.shape[-1] != target_size or diff_amp.shape[-2] != target_size:
-        diff_amp = numpy.stack([_zero_pad_2d_to(p, target_size) for p in diff_amp], axis=0)
+    # The encoder's position embedding is sized for exactly image_size**2
+    # patches, so anything smaller is centred on a zero canvas.
+    if diff_amp.shape[-1] != image_size or diff_amp.shape[-2] != image_size:
+        diff_amp = numpy.stack([_zero_pad_2d_to(p, image_size) for p in diff_amp], axis=0)
 
     probe_array = parameters.product.probes.get_probe_no_opr().get_array()
     if probe_array.ndim != 3:
         raise ValueError(f'Expected probe with shape (N_modes, H, W); got {probe_array.shape}.')
     max_modes = int(data_config['max_probe_modes'])
     probe_padded = _pad_probe_to_modes(probe_array, max_modes)
-    # ptycho_fm expects the probe input as a real view with the mode-count
-    # index in the third position: (B, 1, N_modes, H, W, 2). We build a single
-    # (1, 1, N_modes, H, W) complex tensor and broadcast per batch below.
-    probe_complex = torch.from_numpy(numpy.ascontiguousarray(probe_padded)).to(
-        dtype=torch.complex64, device=device
-    )
-    probe_real_view = torch.view_as_real(probe_complex).unsqueeze(0).unsqueeze(0)
+    # Samples carry the probe with an OPR axis in front: (OPR, N_modes, H, W).
+    probe_sample = torch.from_numpy(numpy.ascontiguousarray(probe_padded)).to(
+        dtype=torch.complex64
+    )[None]
 
     positions_np = _build_positions_top_left(parameters)
     positions = torch.from_numpy(positions_np)
@@ -188,59 +234,54 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
     pad = int(inference_config['pad'])
     batch_size = max(1, int(inference_config['batch_size']))
 
-    diff_amp_tensor = torch.from_numpy(diff_amp).unsqueeze(1)  # (N, 1, H, W)
-    n_patterns = diff_amp_tensor.shape[0]
+    dataset = _make_inference_dataset(
+        diffraction_amplitude=torch.from_numpy(diff_amp).unsqueeze(1),
+        probe=probe_sample,
+        positions=positions,
+        normalization=normalization_value,
+        scale=scale_value,
+    )
+    dataloader = make_inference_dataloader(dataset, batch_size)
 
-    with torch.no_grad():
-        for start in range(0, n_patterns, batch_size):
-            end = min(start + batch_size, n_patterns)
-            actual_bs = end - start
+    # make_inference_dataloader pins shuffle=False, so batches arrive in
+    # dataset order and a running offset indexes back into positions.
+    scan_index = 0
 
-            input_diff = diff_amp_tensor[start:end].to(device)
-            input_probe = probe_real_view.expand(actual_bs, -1, -1, -1, -1, -1)
-            input_norm = torch.full(
-                (actual_bs, 1), normalization_value, dtype=torch.float32, device=device
-            )
-            input_scale = torch.full(
-                (actual_bs, 1), scale_value, dtype=torch.float32, device=device
-            )
+    for output_amp, output_ph in iter_object_patch_predictions(model, dataloader, device):
+        amp_patches = crop_patch_borders(output_amp, central_crop)
+        ph_patches = crop_patch_borders(output_ph, central_crop)
+        batch_positions = positions[scan_index : scan_index + amp_patches.shape[0]]
+        scan_index += amp_patches.shape[0]
 
-            _pred_diff, output_amp, output_ph = model(
-                input_diff, input_probe, input_norm, input_scale
-            )
+        pred_amp_object = place_patches_fourier_shift(
+            pred_amp_object,
+            batch_positions,
+            amp_patches,
+            op='add',
+            adjoint_mode=False,
+            pad=pad,
+        )
+        pred_ph_object = place_patches_fourier_shift(
+            pred_ph_object,
+            batch_positions,
+            ph_patches,
+            op='add',
+            adjoint_mode=False,
+            pad=pad,
+        )
+        buffer = place_patches_fourier_shift(
+            buffer,
+            batch_positions,
+            torch.ones_like(ph_patches),
+            op='add',
+            adjoint_mode=False,
+            pad=pad,
+        )
 
-            output_amp = output_amp.squeeze(1).detach().cpu()
-            output_ph = output_ph.squeeze(1).detach().cpu()
-
-            amp_patches = output_amp[:, central_crop:-central_crop, central_crop:-central_crop]
-            ph_patches = output_ph[:, central_crop:-central_crop, central_crop:-central_crop]
-
-            batch_positions = positions[start:end]
-
-            pred_amp_object = place_patches_fourier_shift(
-                pred_amp_object,
-                batch_positions,
-                amp_patches,
-                op='add',
-                adjoint_mode=False,
-                pad=pad,
-            )
-            pred_ph_object = place_patches_fourier_shift(
-                pred_ph_object,
-                batch_positions,
-                ph_patches,
-                op='add',
-                adjoint_mode=False,
-                pad=pad,
-            )
-            buffer = place_patches_fourier_shift(
-                buffer,
-                batch_positions,
-                torch.ones_like(ph_patches),
-                op='add',
-                adjoint_mode=False,
-                pad=pad,
-            )
+    if scan_index != positions.shape[0]:
+        raise RuntimeError(
+            f'Stitched {scan_index} patches but hold {positions.shape[0]} probe positions.'
+        )
 
     divisor = torch.clip(buffer, min=1.0)
     pred_amp_object = pred_amp_object / divisor
@@ -351,7 +392,8 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
         apply_noise=False,
         cache_object=data_config['cache_object'],
         max_probe_modes=data_config['max_probe_modes'],
-        target_size=data_config['target_size'],
+        max_OPR_modes=data_config['max_OPR_modes'],
+        cache_memory_budget_mb=data_config['cache_memory_budget_mb'],
         max_files=data_config['max_files'],
         debug=False,
     )
@@ -394,22 +436,44 @@ def run_train(payload: TrainPayload, queue: Queue[Any]) -> None:
     optimizer = optim.Adam(param_groups)
 
     criterion = _build_criterion(training_config)
+    is_supervised = training_config['mode'] == 'supervised'
+    image_size = int(model_config['encoder']['img_size'])
+    checked_pattern_size = False
 
     def _forward(batch: tuple[Any, ...]) -> Any:
+        nonlocal checked_pattern_size
         diff_amp, amp_patch, ph_patch, probe, _probe_pos, norm, scale = batch
+
+        if not checked_pattern_size:
+            height, width = diff_amp.shape[-2:]
+            if (height, width) != (image_size, image_size):
+                raise ValueError(
+                    f'Training patterns are {height}x{width}, but PtychoFM requires '
+                    f'{image_size}x{image_size} to match the encoder input. Re-export the '
+                    'training data or change the model image size.'
+                )
+            checked_pattern_size = True
+
         input_diff = diff_amp.to(device)
         input_probe = torch.view_as_real(probe.clone().detach()).to(device)
-        input_norm = norm.to(device)
-        input_scale = scale.to(device)
+        # Samples carry normalization and scale as Python floats, which collate
+        # to float64. Left alone they promote the modelled diffraction to
+        # float64 and the unsupervised loss then disagrees with its float32
+        # target; the decoded amplitude and phase never touch them.
+        input_norm = norm.to(device=device, dtype=torch.float32)
+        input_scale = scale.to(device=device, dtype=torch.float32)
         pred_diff, pred_amp, pred_ph = model(input_diff, input_probe, input_norm, input_scale)
-        target_amp = amp_patch.to(device)
-        target_ph = ph_patch.to(device)
-        # Compose an amplitude+phase loss. Matches ptycho_fm's default target
-        # (the model's amp/ph decoders drive the loss, not the reconstructed
-        # diffraction), stripped of the wandb-driven auxiliary terms.
-        amp_loss = criterion(pred_amp, target_amp)
-        ph_loss = criterion(pred_ph, target_ph)
-        return amp_loss + ph_loss
+
+        # Supervised compares the decoded object patch against the ground truth
+        # the dataset carries; unsupervised compares the modelled diffraction
+        # against the measurement and needs no object at all. Same split as
+        # ptycho_fm's own trainer, minus its wandb-driven auxiliary terms.
+        if is_supervised:
+            amp_loss = criterion(pred_amp, amp_patch.to(device))
+            ph_loss = criterion(pred_ph, ph_patch.to(device))
+            return amp_loss + ph_loss
+
+        return criterion(pred_diff, input_diff)
 
     training_losses: list[LossValue] = []
     validation_losses: list[LossValue] = []

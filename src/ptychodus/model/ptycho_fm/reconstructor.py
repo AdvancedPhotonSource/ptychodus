@@ -5,8 +5,8 @@ Zero torch imports. All GPU work runs inside a spawned child; see
 
 PtychoFM's own ``config.yaml`` is a nested dict of scalars, so ``_build_config``
 produces a plain :class:`dict` from the ptychodus settings groups -- pickleable
-without pulling any ptycho_fm module in. The child feeds that dict directly
-into ``PtychoFM(config)`` and the training loop.
+without pulling any ptycho_fm module in. The child feeds that dict to
+``resolve_inference_model`` and to the training loop.
 """
 
 from __future__ import annotations
@@ -39,6 +39,7 @@ _TRAIN_ENTRY = 'ptychodus.model.ptycho_fm._subprocess:run_train'
 
 
 def _build_config(
+    name: str,
     data_settings: PtychoFMDataSettings,
     model_settings: PtychoFMModelSettings,
     training_settings: PtychoFMTrainingSettings,
@@ -47,10 +48,18 @@ def _build_config(
     """Translate ptychodus settings into a nested ``ptycho_fm`` config dict.
 
     Mirrors the top-level shape of ``ptycho_fm/config.yaml``: ``data``,
-    ``model`` (with ``encoder`` / ``decoder`` / ``init`` sub-sections),
-    ``training`` (with ``weighted_loss`` sub-section), and ``inference``. The
-    child fills in any missing paths (``data_path`` / model save path) from
-    the training payload at call time.
+    ``model`` (with ``encoder`` / ``decoder`` / ``init`` sub-sections) and
+    ``training`` (with ``weighted_loss`` sub-section). The child fills in any
+    missing paths (``data_path`` / model save path) from the training payload
+    at call time.
+
+    The ``inference`` section is ptychodus-local: ``ptycho_fm``'s own YAML has
+    no such section, and ``pad`` has no home in it at all. Only ``model`` is
+    read back by ptycho_fm itself (via ``resolve_inference_model``).
+
+    ``name`` selects the training objective: 'Supervised' compares the decoded
+    amplitude and phase against the object patch, anything else compares the
+    modelled diffraction against the measurement.
     """
     max_files = data_settings.max_files.get_value()
     data_config: dict[str, Any] = {
@@ -58,7 +67,8 @@ def _build_config(
         'default_normalization': data_settings.default_normalization.get_value(),
         'cache_object': data_settings.cache_object.get_value(),
         'max_probe_modes': data_settings.max_probe_modes.get_value(),
-        'target_size': data_settings.target_size.get_value(),
+        'max_OPR_modes': data_settings.max_opr_modes.get_value(),
+        'cache_memory_budget_mb': data_settings.cache_memory_budget_mb.get_value(),
         'train_split': data_settings.train_split.get_value(),
         'random_seed': data_settings.random_seed.get_value(),
         # 0 in settings means "no cap" (null in the YAML).
@@ -96,6 +106,7 @@ def _build_config(
     }
 
     training_config: dict[str, Any] = {
+        'mode': 'supervised' if name == 'Supervised' else 'unsupervised',
         'batch_size': training_settings.batch_size.get_value(),
         'learning_rate': training_settings.learning_rate.get_value(),
         'epochs': training_settings.epochs.get_value(),
@@ -122,6 +133,16 @@ def _build_config(
     }
 
 
+def _verify_spatial_size(shape: tuple[int, ...], img_size: int, what: str) -> None:
+    """Raise unless a trailing ``(height, width)`` is exactly ``img_size`` square."""
+    if tuple(shape) != (img_size, img_size):
+        height, width = shape
+        raise ValueError(
+            f'{what} are {height}x{width}, but PtychoFM requires {img_size}x{img_size} '
+            'to match the encoder input. Adjust the pattern crop or the model image size.'
+        )
+
+
 def build_reconstructor(
     name: str,
     data_settings: PtychoFMDataSettings,
@@ -141,7 +162,7 @@ def build_reconstructor(
         return ReconstructPayload(
             name=name,
             config=_build_config(
-                data_settings, model_settings, training_settings, inference_settings
+                name, data_settings, model_settings, training_settings, inference_settings
             ),
             model_path=loaded_model_path,
             reconstruct_input=parameters,
@@ -151,7 +172,7 @@ def build_reconstructor(
         return TrainPayload(
             name=name,
             config=_build_config(
-                data_settings, model_settings, training_settings, inference_settings
+                name, data_settings, model_settings, training_settings, inference_settings
             ),
             input_path=input_path,
             output_path=output_path,
@@ -167,6 +188,9 @@ def build_reconstructor(
         #                                       'probe_position_y_m'   (N,) float64
         #                       'object' carries a 'pixel_height_m' attr; the
         #                       loader auto-detects meters vs pixels from range.
+        # Patterns and probes are stored at their native spatial size and the
+        # object patch is extracted at the pattern size, so both must already
+        # match the encoder input; nothing downstream resizes them.
         # file_path is treated as a stem, so the picked filename itself is
         # never created; the two derived files land next to it.
         stem = file_path.stem
@@ -178,6 +202,10 @@ def build_reconstructor(
         object_layer = obj.get_layer(0)
         pixel_geometry = obj.get_pixel_geometry()
         probe_array = parameters.product.probes.get_probe_no_opr().get_array()
+
+        img_size = model_settings.img_size.get_value()
+        _verify_spatial_size(dp.shape[-2:], img_size, 'Diffraction patterns')
+        _verify_spatial_size(probe_array.shape[-2:], img_size, 'Probe')
 
         pos_x_m: list[float] = []
         pos_y_m: list[float] = []

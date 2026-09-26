@@ -16,7 +16,10 @@ class PtychoFMDataSettings(Observable, Observer):
         self.max_probe_modes = self._group.create_integer_parameter(
             'max_probe_modes', 10, minimum=1
         )
-        self.target_size = self._group.create_integer_parameter('target_size', 256, minimum=32)
+        self.max_opr_modes = self._group.create_integer_parameter('max_OPR_modes', 1, minimum=1)
+        self.cache_memory_budget_mb = self._group.create_integer_parameter(
+            'cache_memory_budget_mb', 512, minimum=0
+        )
         self.train_split = self._group.create_real_parameter(
             'train_split', 0.80, minimum=0.0, maximum=1.0
         )
