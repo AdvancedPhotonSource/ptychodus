@@ -101,18 +101,19 @@ def run_reconstruct(payload: ReconstructPayload, queue: Queue[Any]) -> None:
 
     parameters = payload.reconstruct_input
     object_geometry = parameters.product.object_.get_geometry()
-    positions_px: list[float] = list()
-
-    for position in parameters.product.probe_positions:
-        object_point = object_geometry.map_coordinates_probe_to_object(position)
-        positions_px.append(object_point.y_px)
-        positions_px.append(object_point.x_px)
+    probe_positions = parameters.product.probe_positions
+    positions_px = numpy.column_stack(
+        (
+            object_geometry.map_probe_positions_to_object_y_px(probe_positions),
+            object_geometry.map_probe_positions_to_object_x_px(probe_positions),
+        )
+    )
 
     diff_patterns = zero_bad_pixels(parameters.diffraction_patterns, parameters.bad_pixels)
     data_loader = PtychoDataLoader.from_np(
         diff_patterns=diff_patterns,
         probe=parameters.product.probes.get_probe_no_opr().get_array(),
-        positions=numpy.reshape(positions_px, (-1, 2)),
+        positions=positions_px,
         config_manager=config_manager,
     )
     object_out_array = numpy.asarray(inference_engine.predict_and_stitch(data_loader))

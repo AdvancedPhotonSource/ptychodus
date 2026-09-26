@@ -309,11 +309,9 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
                 sample.create_dataset('name', data=metadata.name)
 
             positions_xyz = numpy.zeros((len(product.probe_positions), 3), dtype=numpy.float64)
-            position_indexes = numpy.empty(len(product.probe_positions), dtype=numpy.int64)
-            for i, point in enumerate(product.probe_positions):
-                position_indexes[i] = point.index
-                positions_xyz[i, 0] = point.x_m
-                positions_xyz[i, 1] = point.y_m
+            positions_xyz[:, 0] = product.probe_positions.get_coordinates_x_m()
+            positions_xyz[:, 1] = product.probe_positions.get_coordinates_y_m()
+            position_indexes = product.probe_positions.get_indexes().astype(numpy.int64)
 
             sample_geometry = sample.create_group('geometry_1')
             sample_geometry.create_dataset('translation', data=positions_xyz)

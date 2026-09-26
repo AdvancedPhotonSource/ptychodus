@@ -407,15 +407,9 @@ def load_product(file: Path) -> Product:
 
 def save_product(file: Path, product: Product) -> None:
     """Write a data product to an HDF5 file."""
-    scan_indexes: list[int] = []
-    scan_x_m: list[float] = []
-    scan_y_m: list[float] = []
-
-    for point in product.probe_positions:
-        scan_indexes.append(point.index)
-        scan_x_m.append(point.x_m)
-        scan_y_m.append(point.y_m)
-
+    scan_indexes = product.probe_positions.get_indexes()
+    scan_x_m = product.probe_positions.get_coordinates_x_m()
+    scan_y_m = product.probe_positions.get_coordinates_y_m()
     position_photon_counts = product.probe_positions.get_probe_photon_counts()
 
     with h5py.File(file, 'w') as h5_file:
@@ -571,16 +565,9 @@ def save_ptychopinn_training_data(
     assumption).
     """
     object_geometry = parameters.product.object_.get_geometry()
-    position_x_px: list[float] = list()
-    position_y_px: list[float] = list()
-
-    for scan_point in parameters.product.probe_positions:
-        object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        position_x_px.append(object_point.x_px)
-        position_y_px.append(object_point.y_px)
-
-    xcoords = numpy.array(position_x_px)
-    ycoords = numpy.array(position_y_px)
+    positions = parameters.product.probe_positions
+    xcoords = object_geometry.map_probe_positions_to_object_x_px(positions)
+    ycoords = object_geometry.map_probe_positions_to_object_y_px(positions)
     diff3d = zero_bad_pixels(parameters.diffraction_patterns, parameters.bad_pixels)
 
     probe = parameters.product.probes.get_probe_no_opr()

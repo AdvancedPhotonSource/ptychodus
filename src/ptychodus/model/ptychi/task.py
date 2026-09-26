@@ -369,13 +369,8 @@ def reconstruct_with_ptychi(
 
     # pty-chi stores probe positions in object pixel units; ptychodus stores
     # them in meters. The output path below applies the inverse mapping.
-    position_x_px: list[float] = list()
-    position_y_px: list[float] = list()
-
-    for scan_point in product_in.probe_positions:
-        object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        position_x_px.append(object_point.x_px)
-        position_y_px.append(object_point.y_px)
+    position_x_px = object_geometry.map_probe_positions_to_object_x_px(product_in.probe_positions)
+    position_y_px = object_geometry.map_probe_positions_to_object_y_px(product_in.probe_positions)
 
     # Task data goes in as keyword arguments; passing it through the *Options
     # objects still works but is deprecated and warns per field.
@@ -384,8 +379,8 @@ def reconstruct_with_ptychi(
         diffraction_data=parameters.diffraction_patterns,
         object_data=object_in.get_array(),
         probe_data=product_in.probes.get_array(),
-        probe_position_x_px=numpy.array(position_x_px),
-        probe_position_y_px=numpy.array(position_y_px),
+        probe_position_x_px=position_x_px,
+        probe_position_y_px=position_y_px,
         opr_mode_weights_data=_initial_opr_mode_weights(product_in.probes),
         valid_pixel_mask=numpy.logical_not(parameters.bad_pixels),
     )

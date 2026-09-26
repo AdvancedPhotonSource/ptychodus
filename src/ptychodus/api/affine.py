@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, replace
-from typing import overload
 import logging
 import math
 
@@ -176,21 +175,26 @@ class AffineTransform:
             shear_rad=math.atan(tan_shear),
         )
 
-    @overload
-    def __call__(self, arg: ProbePosition) -> ProbePosition: ...
-    @overload
-    def __call__(self, arg: RealArrayType) -> RealArrayType: ...
-    def __call__(self, arg: ProbePosition | RealArrayType) -> ProbePosition | RealArrayType:
-        if isinstance(arg, ProbePosition):
-            return ProbePosition(
-                index=arg.index,
-                x_m=self.a00 * arg.x_m + self.a01 * arg.y_m + self.a02,
-                y_m=self.a10 * arg.x_m + self.a11 * arg.y_m + self.a12,
-                probe_photon_count=arg.probe_photon_count,
-            )
-        linear = numpy.array([[self.a00, self.a01], [self.a10, self.a11]])
-        translation = numpy.array([self.a02, self.a12])
-        return arg @ linear.T + translation
+    def __call__(self, position: ProbePosition) -> ProbePosition:
+        return ProbePosition(
+            index=position.index,
+            x_m=self.a00 * position.x_m + self.a01 * position.y_m + self.a02,
+            y_m=self.a10 * position.x_m + self.a11 * position.y_m + self.a12,
+            probe_photon_count=position.probe_photon_count,
+        )
+
+    def transform_coordinates(
+        self, x_m: RealArrayType, y_m: RealArrayType
+    ) -> tuple[RealArrayType, RealArrayType]:
+        """Apply the transform to whole coordinate arrays, returning ``(x_m, y_m)``.
+
+        One array per axis rather than a packed array, so there is no column order to
+        agree on; the transform mixes the two axes, so it cannot be one call per axis.
+        """
+        return (
+            self.a00 * x_m + self.a01 * y_m + self.a02,
+            self.a10 * x_m + self.a11 * y_m + self.a12,
+        )
 
 
 def transform_probe_positions(
@@ -321,15 +325,10 @@ def _extract_indexed_coordinates(
     positions: ProbePositionSequence,
 ) -> tuple[IntegerArrayType, RealArrayType]:
     """Split a position sequence into its scan-index array and an (N, 2) (x, y) array."""
-    indexes: list[int] = []
-    coordinates: list[float] = []
-
-    for point in positions:
-        indexes.append(int(point.index))
-        coordinates.append(point.x_m)
-        coordinates.append(point.y_m)
-
-    return numpy.array(indexes, dtype=int), numpy.reshape(coordinates, (-1, 2))
+    return (
+        positions.get_indexes(),
+        numpy.column_stack((positions.get_coordinates_x_m(), positions.get_coordinates_y_m())),
+    )
 
 
 def _match_pair(

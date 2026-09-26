@@ -109,12 +109,13 @@ def _build_positions_top_left(parameters: Any) -> numpy.ndarray:
     what ``place_patches_fourier_shift`` expects.
     """
     object_geometry = parameters.product.object_.get_geometry()
-    coords: list[float] = []
-    for position in parameters.product.probe_positions:
-        object_point = object_geometry.map_coordinates_probe_to_object(position)
-        coords.append(object_point.y_px)
-        coords.append(object_point.x_px)
-    return numpy.asarray(coords, dtype=numpy.float32).reshape(-1, 2)
+    positions = parameters.product.probe_positions
+    return numpy.column_stack(
+        (
+            object_geometry.map_probe_positions_to_object_y_px(positions),
+            object_geometry.map_probe_positions_to_object_x_px(positions),
+        )
+    ).astype(numpy.float32)
 
 
 def _make_inference_dataset(

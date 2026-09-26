@@ -22,7 +22,7 @@ from .fourier import fourier_shift_2d
 from .geometry import PixelGeometry
 from .interpolate import resample_along_axis
 from .probe import ProbeGeometry
-from .probe_positions import ProbePosition, calculate_scan_geometry
+from .probe_positions import ProbePosition, ProbePositionSequence, calculate_scan_geometry
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +132,26 @@ class ObjectGeometry:
         y_px = (position.y_m - self.center_y_m) / dy_m + ry_px
 
         return ObjectPosition(position.index, x_px, y_px)
+
+    def map_probe_positions_to_object_x_px(self, positions: ProbePositionSequence) -> RealArrayType:
+        """Return every position's object-pixel x, row-aligned with ``positions``.
+
+        Vectorized counterpart of :meth:`map_coordinates_probe_to_object`. Scan indexes
+        are not carried; pair the result with ``positions.get_indexes()`` when they are
+        needed.
+        """
+        rx_px = (self.width_px - 1) / 2
+        return (positions.get_coordinates_x_m() - self.center_x_m) / self.pixel_width_m + rx_px
+
+    def map_probe_positions_to_object_y_px(self, positions: ProbePositionSequence) -> RealArrayType:
+        """Return every position's object-pixel y, row-aligned with ``positions``.
+
+        Vectorized counterpart of :meth:`map_coordinates_probe_to_object`. Scan indexes
+        are not carried; pair the result with ``positions.get_indexes()`` when they are
+        needed.
+        """
+        ry_px = (self.height_px - 1) / 2
+        return (positions.get_coordinates_y_m() - self.center_y_m) / self.pixel_height_m + ry_px
 
     def contains(self, geometry: ObjectGeometry) -> bool:
         dx = self.center_x_m - geometry.center_x_m

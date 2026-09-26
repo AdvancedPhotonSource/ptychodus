@@ -39,17 +39,11 @@ def _create_raw_data(parameters: Any) -> Any:
     from ptycho.raw_data import RawData
 
     object_geometry = parameters.product.object_.get_geometry()
-    position_x_px: list[float] = list()
-    position_y_px: list[float] = list()
-
-    for scan_point in parameters.product.probe_positions:
-        object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        position_x_px.append(object_point.x_px)
-        position_y_px.append(object_point.y_px)
+    positions = parameters.product.probe_positions
 
     return RawData.from_coords_without_pc(
-        xcoords=numpy.array(position_x_px),
-        ycoords=numpy.array(position_y_px),
+        xcoords=object_geometry.map_probe_positions_to_object_x_px(positions),
+        ycoords=object_geometry.map_probe_positions_to_object_y_px(positions),
         diff3d=parameters.diffraction_patterns,
         probeGuess=parameters.product.probes.get_probe_no_opr().get_incoherent_mode(0),
         scan_index=numpy.zeros(len(parameters.product.probe_positions), dtype=int),

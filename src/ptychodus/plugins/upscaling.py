@@ -17,14 +17,12 @@ class GridDataUpscaling(UpscalingStrategy):
 
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
         object_geometry = product.object_.get_geometry()
-        scan_coords_px: list[float] = list()
-
-        for scan_point in product.probe_positions:
-            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-            scan_coords_px.append(object_point.y_px)
-            scan_coords_px.append(object_point.x_px)
-
-        points = numpy.reshape(scan_coords_px, (-1, 2))
+        points = numpy.column_stack(
+            (
+                object_geometry.map_probe_positions_to_object_y_px(product.probe_positions),
+                object_geometry.map_probe_positions_to_object_x_px(product.probe_positions),
+            )
+        )
         values = emap.counts_per_second.flat
         shape = (object_geometry.height_px, object_geometry.width_px)
         query_points = numpy.indices(shape).reshape(2, -1).T
@@ -52,15 +50,15 @@ class RadialBasisFunctionUpscaling(UpscalingStrategy):
 
     def __call__(self, emap: ElementMap, product: Product) -> ElementMap:
         object_geometry = product.object_.get_geometry()
-        scan_coords_px: list[float] = list()
-
-        for scan_point in product.probe_positions:
-            object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-            scan_coords_px.append(object_point.y_px)
-            scan_coords_px.append(object_point.x_px)
+        scan_coords_px = numpy.column_stack(
+            (
+                object_geometry.map_probe_positions_to_object_y_px(product.probe_positions),
+                object_geometry.map_probe_positions_to_object_x_px(product.probe_positions),
+            )
+        )
 
         interpolator = RBFInterpolator(
-            numpy.reshape(scan_coords_px, (-1, 2)),
+            scan_coords_px,
             emap.counts_per_second.flat,
             kernel=self._kernel,
             neighbors=self._neighbors,

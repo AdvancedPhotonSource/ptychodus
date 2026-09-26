@@ -15,6 +15,7 @@ from ptychodus.api.geometry import (
     ZernikeMode,
 )
 from ptychodus.api.affine import AffineTransform
+from ptychodus.api.probe_positions import ProbePosition
 
 
 def test_str() -> None:
@@ -413,24 +414,27 @@ def test_interval_repr() -> None:
 
 def test_affine_transform_identity() -> None:
     identity = AffineTransform(1.0, 0.0, 0.0, 0.0, 1.0, 0.0)
-    points = numpy.array([[2.0, 3.0], [-1.5, 4.7]])
-    numpy.testing.assert_allclose(identity(points), points)
+    x_m = numpy.array([2.0, -1.5])
+    y_m = numpy.array([3.0, 4.7])
+    out_x, out_y = identity.transform_coordinates(x_m, y_m)
+    numpy.testing.assert_allclose(out_x, x_m)
+    numpy.testing.assert_allclose(out_y, y_m)
 
 
 def test_affine_transform_pure_translation() -> None:
     """a02, a12 contribute the translation."""
     translate = AffineTransform(1.0, 0.0, 4.0, 0.0, 1.0, -2.0)
-    points = numpy.array([[0.0, 0.0], [1.0, 1.0]])
-    expected = numpy.array([[4.0, -2.0], [5.0, -1.0]])
-    numpy.testing.assert_allclose(translate(points), expected)
+    out_x, out_y = translate.transform_coordinates(numpy.array([0.0, 1.0]), numpy.array([0.0, 1.0]))
+    numpy.testing.assert_allclose(out_x, [4.0, 5.0])
+    numpy.testing.assert_allclose(out_y, [-2.0, -1.0])
 
 
 def test_affine_transform_pure_scaling() -> None:
     """Diagonal entries scale x and y independently."""
     scale = AffineTransform(2.0, 0.0, 0.0, 0.0, 3.0, 0.0)
-    points = numpy.array([[1.0, 1.0], [-2.0, 5.0]])
-    expected = numpy.array([[2.0, 3.0], [-4.0, 15.0]])
-    numpy.testing.assert_allclose(scale(points), expected)
+    out_x, out_y = scale.transform_coordinates(numpy.array([1.0, -2.0]), numpy.array([1.0, 5.0]))
+    numpy.testing.assert_allclose(out_x, [2.0, -4.0])
+    numpy.testing.assert_allclose(out_y, [3.0, 15.0])
 
 
 def test_affine_transform_pure_rotation() -> None:
@@ -438,19 +442,39 @@ def test_affine_transform_pure_rotation() -> None:
     cos90 = numpy.cos(numpy.pi / 2)
     sin90 = numpy.sin(numpy.pi / 2)
     rotate = AffineTransform(cos90, -sin90, 0.0, sin90, cos90, 0.0)
-    points = numpy.array([[1.0, 0.0], [0.0, 1.0]])
-    expected = numpy.array([[0.0, 1.0], [-1.0, 0.0]])
-    numpy.testing.assert_allclose(rotate(points), expected, atol=1e-12)
+    out_x, out_y = rotate.transform_coordinates(numpy.array([1.0, 0.0]), numpy.array([0.0, 1.0]))
+    numpy.testing.assert_allclose(out_x, [0.0, -1.0], atol=1e-12)
+    numpy.testing.assert_allclose(out_y, [1.0, 0.0], atol=1e-12)
 
 
 def test_affine_transform_combined_scale_then_translate() -> None:
     """The convention is x' = a00*x + a01*y + a02; verify with a non-trivial mix."""
     transform = AffineTransform(2.0, 0.5, 1.0, -0.5, 3.0, -2.0)
-    # x' = 2*x + 0.5*y + 1
-    # y' = -0.5*x + 3*y - 2
-    points = numpy.array([[4.0, 6.0]])
-    expected = numpy.array([[2 * 4.0 + 0.5 * 6.0 + 1.0, -0.5 * 4.0 + 3.0 * 6.0 - 2.0]])
-    numpy.testing.assert_allclose(transform(points), expected)
+    out_x, out_y = transform.transform_coordinates(numpy.array([4.0]), numpy.array([6.0]))
+    numpy.testing.assert_allclose(out_x, [2 * 4.0 + 0.5 * 6.0 + 1.0])
+    numpy.testing.assert_allclose(out_y, [-0.5 * 4.0 + 3.0 * 6.0 - 2.0])
+
+
+def test_affine_transform_coordinates_matches_scalar_branch() -> None:
+    """The array and scalar paths must agree exactly, not merely to a tolerance."""
+    transform = AffineTransform(2.0, 0.5, 1.0, -0.5, 3.0, -2.0)
+    rng = numpy.random.default_rng(0)
+    x_m = rng.normal(size=16)
+    y_m = rng.normal(size=16)
+
+    out_x, out_y = transform.transform_coordinates(x_m, y_m)
+    scalar = [
+        transform(ProbePosition(index=i, x_m=x, y_m=y)) for i, (x, y) in enumerate(zip(x_m, y_m))
+    ]
+
+    numpy.testing.assert_array_equal(out_x, [p.x_m for p in scalar])
+    numpy.testing.assert_array_equal(out_y, [p.y_m for p in scalar])
+
+
+def test_affine_transform_coordinates_accepts_empty() -> None:
+    transform = AffineTransform(2.0, 0.5, 1.0, -0.5, 3.0, -2.0)
+    out_x, out_y = transform.transform_coordinates(numpy.empty(0), numpy.empty(0))
+    assert out_x.shape == (0,) and out_y.shape == (0,)
 
 
 # ---------------------------------------------------------------------------

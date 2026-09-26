@@ -231,13 +231,9 @@ def prepare_reconstruct_input(
     filtered_pattern_offsets = numpy.flatnonzero(pattern_keep)
 
     n_positions = len(product.probe_positions)
-    pos_indexes_all = numpy.empty(n_positions, dtype=numpy.intp)
-    pos_x_all = numpy.empty(n_positions, dtype=numpy.float64)
-    pos_y_all = numpy.empty(n_positions, dtype=numpy.float64)
-    for k, position in enumerate(product.probe_positions):
-        pos_indexes_all[k] = position.index
-        pos_x_all[k] = position.x_m
-        pos_y_all[k] = position.y_m
+    pos_indexes_all = product.probe_positions.get_indexes()
+    pos_x_all = product.probe_positions.get_coordinates_x_m()
+    pos_y_all = product.probe_positions.get_coordinates_y_m()
 
     src_photon_counts = product.probe_positions.get_probe_photon_counts()
 

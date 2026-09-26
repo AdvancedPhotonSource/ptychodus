@@ -162,14 +162,9 @@ class NPZProductFileIO(ProductFileReader, ProductFileWriter):
 
     def write(self, file_path: Path, product: Product) -> None:
         contents: dict[str, Any] = dict()
-        scan_indexes: list[int] = []
-        scan_x_m: list[float] = []
-        scan_y_m: list[float] = []
-
-        for point in product.probe_positions:
-            scan_indexes.append(point.index)
-            scan_x_m.append(point.x_m)
-            scan_y_m.append(point.y_m)
+        scan_indexes = product.probe_positions.get_indexes()
+        scan_x_m = product.probe_positions.get_coordinates_x_m()
+        scan_y_m = product.probe_positions.get_coordinates_y_m()
 
         metadata = product.metadata
         contents[self.NAME] = metadata.name

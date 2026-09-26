@@ -27,6 +27,12 @@ def _params(t: AffineTransform) -> tuple[float, float, float, float, float, floa
     return (t.a00, t.a01, t.a02, t.a10, t.a11, t.a12)
 
 
+def _transform_xy(transform: AffineTransform, arr: numpy.ndarray) -> numpy.ndarray:
+    """Apply ``transform`` to an (N, 2) array packed (x, y), returning the same packing."""
+    x_m, y_m = transform.transform_coordinates(arr[:, 0], arr[:, 1])
+    return numpy.column_stack((x_m, y_m))
+
+
 def _sequence_from_xy(arr: numpy.ndarray) -> ProbePositionSequence:
     """Build a ProbePositionSequence from an (N, 2) array packed (x, y)."""
     return ProbePositionSequence(
@@ -49,7 +55,7 @@ def test_coarse_pass_recovers_transform_with_outliers() -> None:
     truth = AffineTransform(1.05, 0.02, 1e-5, -0.03, 0.98, -2e-5)
 
     measured = rng.uniform(-1e-4, 1e-4, size=(n, 2))
-    corrected = truth(measured)
+    corrected = _transform_xy(truth, measured)
 
     n_outliers = 20
     outlier_idx = rng.choice(n, size=n_outliers, replace=False)
@@ -88,8 +94,8 @@ def test_coarse_pass_runs_per_pair() -> None:
 
     result = estimate_affine_transform(
         [
-            (_sequence_from_xy(measured_a), _sequence_from_xy(truth(measured_a))),
-            (_sequence_from_xy(measured_b), _sequence_from_xy(truth(measured_b))),
+            (_sequence_from_xy(measured_a), _sequence_from_xy(_transform_xy(truth, measured_a))),
+            (_sequence_from_xy(measured_b), _sequence_from_xy(_transform_xy(truth, measured_b))),
         ],
         num_iterations=100,
         inlier_threshold_m=1e-6,
@@ -145,7 +151,7 @@ def test_coarse_pass_default_rng_runs() -> None:
     measured = rng.uniform(-1.0, 1.0, size=(30, 2))
 
     result = estimate_affine_transform(
-        [(_sequence_from_xy(measured), _sequence_from_xy(truth(measured)))],
+        [(_sequence_from_xy(measured), _sequence_from_xy(_transform_xy(truth, measured)))],
         num_iterations=50,
         inlier_threshold_m=1e-6,
         min_inliers=10,
@@ -161,7 +167,7 @@ def test_coarse_pass_recovers_transform_from_clean_data() -> None:
     measured = rng.uniform(-1e-4, 1e-4, size=(40, 2))
 
     result = estimate_affine_transform(
-        [(_sequence_from_xy(measured), _sequence_from_xy(truth(measured)))],
+        [(_sequence_from_xy(measured), _sequence_from_xy(_transform_xy(truth, measured)))],
         num_iterations=100,
         inlier_threshold_m=1e-9,
         min_inliers=10,
@@ -193,7 +199,7 @@ def test_coarse_pass_is_scale_free(half_extent_m: float) -> None:
     measured = rng.uniform(-half_extent_m, half_extent_m, size=(40, 2))
 
     result = estimate_affine_transform(
-        [(_sequence_from_xy(measured), _sequence_from_xy(truth(measured)))],
+        [(_sequence_from_xy(measured), _sequence_from_xy(_transform_xy(truth, measured)))],
         num_iterations=100,
         inlier_threshold_m=half_extent_m * 1.0e-3,
         min_inliers=10,
@@ -275,7 +281,7 @@ def test_coarse_pass_honors_min_inliers() -> None:
 
     with pytest.raises(RuntimeError, match='at least 50 inlier'):
         estimate_affine_transform(
-            [(_sequence_from_xy(measured), _sequence_from_xy(truth(measured)))],
+            [(_sequence_from_xy(measured), _sequence_from_xy(_transform_xy(truth, measured)))],
             num_iterations=50,
             inlier_threshold_m=1e-9,
             min_inliers=50,
@@ -333,7 +339,7 @@ def test_estimator_delegates_to_api() -> None:
     rng = numpy.random.default_rng(0)
     truth = AffineTransform(1.0, 0.0, 0.0, 0.0, 1.0, 0.0)
     measured = rng.uniform(-1.0, 1.0, size=(30, 2))
-    corrected = truth(measured)
+    corrected = _transform_xy(truth, measured)
 
     repo = _make_repo(
         {0: _sequence_from_xy(measured), 1: _sequence_from_xy(corrected)},
