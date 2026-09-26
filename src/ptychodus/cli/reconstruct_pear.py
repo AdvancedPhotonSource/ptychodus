@@ -292,7 +292,9 @@ def _batch_size(params: PearParameters, num_patterns: int) -> int:
     return max(1, num_patterns // number_of_batches)
 
 
-def _output_directory(params: PearParameters, options: LSQMLOptions, pattern_width_px: int) -> Path:
+def _output_directory(
+    params: PearParameters, options: LSQMLOptions, probe: ProbeSequence, pattern_width_px: int
+) -> Path:
     """Build the settings-encoding output directory name.
 
     The name records the configuration that produced the run, so sibling directories
@@ -335,14 +337,14 @@ def _output_directory(params: PearParameters, options: LSQMLOptions, pattern_wid
     if params.near_field_ptycho:
         name += f'_nf_fsd{params.focal_sample_dist_m / 1e-3:.2f}mm'
 
-    name += f'_p{options.probe_options.initial_guess.shape[1]}'
+    name += f'_p{probe.num_incoherent_modes}'
 
     if options.probe_options.center_constraint.enabled:
         name += '_cp'
     if options.object_options.multimodal_update:
         name += '_mm'
     if options.opr_mode_weight_options.optimizable:
-        name += f'_opr{options.probe_options.initial_guess.shape[0] - 1}'
+        name += f'_opr{probe.num_coherent_modes - 1}'
     if options.opr_mode_weight_options.optimize_intensity_variation:
         name += '_ic'
 
@@ -574,9 +576,7 @@ def _set_num_incoherent_modes(array: numpy.ndarray, num_modes: int) -> numpy.nda
     return numpy.concatenate((array, padding), axis=0)
 
 
-def _build_lsqml_options(
-    params: PearParameters, probe: ProbeSequence, num_patterns: int
-) -> LSQMLOptions:
+def _build_lsqml_options(params: PearParameters, num_patterns: int) -> LSQMLOptions:
     """Translate the parameter file into pty-chi LSQML options.
 
     Product-derived fields are left alone for `align_task_options_with_product`: the
@@ -628,8 +628,11 @@ def _build_lsqml_options(
         )
 
     # --- probe ---
+    # No initial guess here: pty-chi takes reconstruction data as PtychographyTask
+    # keyword arguments, and reconstruct_with_ptychi supplies the probe from the
+    # product. Setting probe_options.initial_guess would be ignored in favour of
+    # that, and warns.
     probe_options = options.probe_options
-    probe_options.initial_guess = probe.get_array()
     probe_options.optimizable = True
     probe_options.optimizer = Optimizers.SGD
     probe_options.step_size = 1
@@ -652,8 +655,11 @@ def _build_lsqml_options(
         params.position_correction_gradient_method
     ]
 
+    # The parameter file spells "no limit" as 0; pty-chi spells it None and rejects
+    # anything that is not positive.
+    update_limit = params.position_correction_update_limit
     position_options.correction_options.update_magnitude_limit = (
-        params.position_correction_update_limit
+        update_limit if update_limit > 0 else None
     )
     # Always on so the affine matrix is measured even when it is not applied.
     position_options.affine_transform_constraint.enabled = True
@@ -1036,12 +1042,12 @@ def main() -> int:
         losses=[],
     )
 
-    options = _build_lsqml_options(params, probe_sequence, num_patterns)
+    options = _build_lsqml_options(params, num_patterns)
 
     # The parameter file already names where a run belongs -- `recon_dir_base`, or the
     # per-instrument convention derived from `data_directory` -- so there is no output
     # argument to supersede it. That directory becomes the standard-layout root.
-    output_directory = _output_directory(params, options, image_extent.width_px)
+    output_directory = _output_directory(params, options, probe_sequence, image_extent.width_px)
     diffraction_file = StandardFileLayout.DIFFRACTION.path(output_directory)
     options_file = StandardFileLayout.PTYCHI_OPTIONS.path(output_directory)
     product_file = StandardFileLayout.PRODUCT.path(output_directory)
