@@ -44,8 +44,8 @@ def _create_raw_data(parameters: Any) -> Any:
 
     for scan_point in parameters.product.probe_positions:
         object_point = object_geometry.map_coordinates_probe_to_object(scan_point)
-        position_x_px.append(object_point.coordinate_x_px)
-        position_y_px.append(object_point.coordinate_y_px)
+        position_x_px.append(object_point.x_px)
+        position_y_px.append(object_point.y_px)
 
     return RawData.from_coords_without_pc(
         xcoords=numpy.array(position_x_px),

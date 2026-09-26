@@ -781,7 +781,7 @@ def _product_with_position_indexes(indexes: list[int]) -> Product:
 
 
 def _product_with_position_specs(specs: list[tuple[int, float, float]]) -> Product:
-    """Build a Product from (index, coordinate_x_m, coordinate_y_m) tuples."""
+    """Build a Product from (index, x_m, y_m) tuples."""
     points = [ProbePosition(index=i, x_m=x, y_m=y) for i, x, y in specs]
     return Product(
         metadata=_metadata(),
