@@ -241,7 +241,7 @@ def load_product(file: Path) -> Product:
     with h5py.File(file, 'r') as h5_file:
         name = str(h5_file.attrs.get(ProductFileKeys.NAME, 'Unnamed'))
         comments = str(h5_file.attrs.get(ProductFileKeys.COMMENTS, ''))
-        probe_photon_count = int(h5_file.attrs.get(ProductFileKeys.PROBE_PHOTON_COUNT, 0))
+        probe_photon_count = float(h5_file.attrs.get(ProductFileKeys.PROBE_PHOTON_COUNT, 0.0))
         exposure_time_s = float(h5_file.attrs.get(ProductFileKeys.EXPOSURE_TIME, 0.0))
         mass_attenuation_m2_kg = float(h5_file.attrs.get(ProductFileKeys.MASS_ATTENUATION, 0.0))
         tomography_angle_deg = float(h5_file.attrs.get(ProductFileKeys.TOMOGRAPHY_ANGLE, 0.0))

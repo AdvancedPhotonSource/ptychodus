@@ -15,9 +15,11 @@ from ptychodus.api.diffraction import (
     DiffractionMetadata,
     SimpleDiffractionDataset,
 )
-from ptychodus.api.plugins import PluginRegistry
 
-from .h5_diffraction_file import H5DiffractionPatternArray, H5DiffractionFileTreeBuilder
+from ptychodus.plugins.h5_diffraction_file import (
+    H5DiffractionPatternArray,
+    H5DiffractionFileTreeBuilder,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -237,11 +239,3 @@ class LamNIDiffractionFileReader(DiffractionFileReader):
             data_path=self._AD_DATA_PATH,
         )
         return SimpleDiffractionDataset(metadata, contents_tree, [array])
-
-
-def register_plugins(registry: PluginRegistry) -> None:
-    registry.diffraction_file_readers.register_plugin(
-        LamNIDiffractionFileReader(),
-        simple_name='APS_LamNI',
-        display_name='APS 31-ID-E LamNI Files (*.h5 *.hdf5)',
-    )

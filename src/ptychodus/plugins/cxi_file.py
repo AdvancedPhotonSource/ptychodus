@@ -609,8 +609,7 @@ class CXIProductFileIO(ProductFileReader, ProductFileWriter):
             h5_file.create_dataset(_P.PT_EXPOSURE_TIME, data=metadata.exposure_time_s)
         if metadata.mass_attenuation_m2_kg:
             h5_file.create_dataset(_P.PT_MASS_ATTENUATION, data=metadata.mass_attenuation_m2_kg)
-        if metadata.tomography_angle_deg:
-            h5_file.create_dataset(_P.PT_TOMOGRAPHY_ANGLE, data=metadata.tomography_angle_deg)
+        h5_file.create_dataset(_P.PT_TOMOGRAPHY_ANGLE, data=metadata.tomography_angle_deg)
 
         loss_epochs = [loss.epoch for loss in losses]
         loss_values = [loss.value for loss in losses]

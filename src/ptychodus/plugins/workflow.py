@@ -1,11 +1,10 @@
-from dataclasses import dataclass
 from pathlib import Path
-import csv
 import logging
 import re
 
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.workflow import FileBasedWorkflow, WorkflowAPI
+from ptychodus.plugins.aps31id_lamni._scan_table import read_aps31ide_scan_table
 
 logger = logging.getLogger(__name__)
 
@@ -73,27 +72,6 @@ class APS26IDFileBasedWorkflow(FileBasedWorkflow):
                 product_api.reconstruct_remote()
 
 
-@dataclass(frozen=True)
-class APS31IDEMetadata:
-    scan_no: int
-    golden_angle: str
-    encoder_angle: str
-    measurement_id: str
-    subtomo_no: str
-    detector_position: str
-    label: str
-
-    def __str__(self) -> str:
-        return f"""scan_no={self.scan_no}
-        golden_angle={self.golden_angle}
-        encoder_angle={self.encoder_angle}
-        measurement_id={self.measurement_id}
-        subtomo_no={self.subtomo_no}
-        detector_position={self.detector_position}
-        label={self.label}
-        """
-
-
 class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
     @property
     def is_watch_recursive(self) -> bool:
@@ -103,59 +81,42 @@ class APS31IDEFileBasedWorkflow(FileBasedWorkflow):
         return '*.h5'
 
     def execute(self, api: WorkflowAPI, file_path: Path) -> None:
-        if file_path.parents[1].name != 'eiger_4' or '_master_' in file_path.name:
+        # eiger_4/<block>/S<NNNNN>/<stem>.h5, so the detector directory is three levels up
+        # and the data directory four. The master file indexes the series rather than
+        # holding it.
+        if file_path.parents[2].name != 'eiger_4' or '_master_' in file_path.name:
             return
 
-        experiment_dir = file_path.parents[3]
+        data_dir = file_path.parents[3]
         scan_num = int(re.findall(r'\d+', file_path.stem)[0])
-        scan_file = experiment_dir / 'scan_positions' / f'scan_{scan_num:05d}.dat'
-        scan_numbers_file = experiment_dir / 'dat-files' / 'tomography_scannumbers.txt'
-        metadata: APS31IDEMetadata | None = None
+        scan_file = data_dir / 'scan_positions' / f'scan_{scan_num:05d}.dat'
+        scan_numbers_file = data_dir / 'dat-files' / 'tomography_scannumbers.txt'
 
-        with scan_numbers_file.open(newline='') as csv_file:
-            csv_reader = csv.reader(csv_file, delimiter=' ')
+        record = next(
+            (r for r in read_aps31ide_scan_table(scan_numbers_file) if r.scan_no == scan_num),
+            None,
+        )
 
-            for row in csv_reader:
-                if row[0].startswith('#'):
-                    continue
-
-                if len(row) != 7:
-                    logger.warning('Unexpected row in tomography_scannumbers.txt!')
-                    logger.debug(row)
-                    continue
-
-                try:
-                    row_no = int(row[0])
-                except ValueError:
-                    logger.warning('Failed to parse row ID in tomography_scannumbers.txt!')
-                    logger.debug(row[0])
-                else:
-                    if row_no == scan_num:
-                        metadata = APS31IDEMetadata(
-                            scan_no=scan_num,
-                            golden_angle=str(row[1]),
-                            encoder_angle=str(row[2]),
-                            measurement_id=str(row[3]),
-                            subtomo_no=str(row[4]),
-                            detector_position=str(row[5]),
-                            label=str(row[6]),
-                        )
-                        break
-
-        if metadata is None:
+        if record is None:
             logger.warning(f'Failed to locate metadata for {scan_num}!')
         else:
-            product_name = f'scan{scan_num:05d}_' + metadata.label
+            product_name = f'scan{scan_num:05d}_' + record.label
             diffraction_api = api.load_diffraction_data(file_path)
             input_product_api = api.create_product(
-                product_name, comments=str(metadata), diffraction=diffraction_api
+                product_name,
+                comments=str(record),
+                tomography_angle_deg=record.encoder_angle_deg,
+                diffraction=diffraction_api,
             )
             input_product_api.load_probe_positions(scan_file)
             input_product_api.generate_probe()
             input_product_api.generate_object()
             # TODO would prefer to write instructions and submit to queue
-            output_product_file = experiment_dir / 'ptychodus' / f'{product_name}.h5'
-            input_product_api.reconstruct_local(output_product_file=output_product_file)
+            output_dir = (
+                data_dir.parent / 'analysis' / 'ptychodus' / record.label / f'S{scan_num:05d}'
+            )
+            output_dir.mkdir(parents=True, exist_ok=True)
+            input_product_api.reconstruct_local(output_product_file=output_dir / 'product.h5')
 
 
 def register_plugins(registry: PluginRegistry) -> None:

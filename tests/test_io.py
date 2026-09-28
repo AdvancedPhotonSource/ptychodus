@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import fields, replace
 from pathlib import Path
+from typing import Any, Final
 
 import h5py
 import numpy
@@ -61,22 +62,33 @@ def _make_product(
     with_opr: bool = False,
     with_layer_spacing: bool = False,
     with_losses: bool = False,
+    with_position_photon_counts: bool = False,
+    metadata: ProductMetadata | None = None,
 ) -> Product:
     rng = numpy.random.default_rng(1)
 
-    metadata = ProductMetadata(
-        name='test',
-        comments='unit test product',
-        detector_distance_m=1.5,
-        probe_energy_eV=10_000.0,
-        probe_photon_count=1_000,
-        exposure_time_s=0.1,
-        mass_attenuation_m2_kg=0.0,
-        tomography_angle_deg=0.0,
-    )
+    if metadata is None:
+        metadata = ProductMetadata(
+            name='test',
+            comments='unit test product',
+            detector_distance_m=1.5,
+            probe_energy_eV=10_000.0,
+            probe_photon_count=1_000,
+            exposure_time_s=0.1,
+            mass_attenuation_m2_kg=0.0,
+            tomography_angle_deg=0.0,
+        )
 
     positions = ProbePositionSequence(
-        [ProbePosition(i, i * 1e-6, i * 2e-6) for i in range(num_positions)]
+        [
+            ProbePosition(
+                i,
+                i * 1e-6,
+                i * 2e-6,
+                probe_photon_count=(100.0 + i if with_position_photon_counts else None),
+            )
+            for i in range(num_positions)
+        ]
     )
 
     # Probe: shape (coherent=1 or 2, incoherent=1, height, width)
@@ -757,3 +769,324 @@ class TestFocusObjectDistanceRoundTrip:
         loaded = file_io.read(file)
 
         assert loaded.metadata.focus_object_distance_m == pytest.approx(-2.5e-3)
+
+
+class TestTomographyAngleRoundTrip:
+    """The angle identifies which projection a product is, so every writer must keep it.
+
+    A tomographic solver reads a stack of products and needs each one's rotation angle;
+    a writer that drops it turns the stack into an unordered pile. The canonical HDF5
+    writer always kept it, but the NPZ writer omitted the very key its own reader looks
+    for, and the CXI writer skipped it whenever it was zero.
+    """
+
+    ANGLE_DEG = -90.0461
+
+    def _product(self, tomography_angle_deg: float) -> Product:
+        product = _make_product()
+        return Product(
+            metadata=replace(product.metadata, tomography_angle_deg=tomography_angle_deg),
+            probe_positions=product.probe_positions,
+            probes=product.probes,
+            object_=product.object_,
+            losses=product.losses,
+        )
+
+    def test_hdf5_round_trip(self, tmp_path: Path) -> None:
+        file = tmp_path / 'product.h5'
+        save_product(file, self._product(self.ANGLE_DEG))
+
+        assert load_product(file).metadata.tomography_angle_deg == pytest.approx(self.ANGLE_DEG)
+
+    def test_npz_round_trip(self, tmp_path: Path) -> None:
+        from ptychodus.plugins.npz_product_file import NPZProductFileIO
+
+        file = tmp_path / 'product.npz'
+        file_io = NPZProductFileIO()
+        file_io.write(file, self._product(self.ANGLE_DEG))
+
+        assert file_io.read(file).metadata.tomography_angle_deg == pytest.approx(self.ANGLE_DEG)
+
+    def test_npz_keeps_a_zero_angle_distinguishable_from_a_missing_one(
+        self, tmp_path: Path
+    ) -> None:
+        """Zero is a real angle -- the first projection of a tomogram -- not an absence."""
+        from ptychodus.plugins.npz_product_file import NPZProductFileIO
+
+        file = tmp_path / 'product.npz'
+        file_io = NPZProductFileIO()
+        file_io.write(file, self._product(0.0))
+
+        with numpy.load(file) as npz_file:
+            assert NPZProductFileIO.TOMOGRAPHY_ANGLE in npz_file
+
+
+# ---------------------------------------------------------------------------
+# Cross-format product round-trip
+#
+# Every format that both reads and writes a Product must preserve all of it.
+# The metadata half is checked by introspecting the dataclass, so a field added
+# to ProductMetadata fails here until each writer learns to persist it; the rest
+# is checked explicitly below, since introspection does not reach it.
+# ---------------------------------------------------------------------------
+
+
+def _product_file_io() -> list[Any]:
+    """The registered read+write product formats, imported lazily to keep this module light."""
+    from ptychodus.plugins.h5_product_file import H5ProductFileIO
+    from ptychodus.plugins.npz_product_file import NPZProductFileIO
+
+    return [
+        pytest.param(H5ProductFileIO(), '.h5', id='hdf5'),
+        pytest.param(NPZProductFileIO(), '.npz', id='npz'),
+    ]
+
+
+PRODUCT_FILE_IO: Final = _product_file_io()
+
+# One distinctive, non-default value per ProductMetadata field. Defaults are useless here:
+# a writer that drops a field still round-trips its default, so every value must differ
+# from what the dataclass would supply on its own.
+DISTINCTIVE_METADATA: Final[dict[str, Any]] = {
+    'name': 'round-trip product',
+    'comments': 'every field set away from its default',
+    'detector_distance_m': 2.25,
+    'probe_energy_eV': 8551.0,
+    # Fractional, and deliberately small: an int() cast anywhere in the path truncates
+    # it. A realistic count like 1.3e8 would hide the same truncation, because dropping
+    # 0.5 from it is a 4e-9 relative change and pytest.approx tolerates 1e-6 by default.
+    'probe_photon_count': 1234.5,
+    'exposure_time_s': 0.05,
+    'mass_attenuation_m2_kg': 3.75,
+    'tomography_angle_deg': -90.0461,
+    'focus_object_distance_m': -2.5e-3,
+    'tilt_angle_deg': 61.0,
+    'polarization': Polarization.RIGHT_CIRCULAR,
+}
+
+
+def _round_trip_product(file_io: Any, path: Path, product: Product) -> Product:
+    file_io.write(path, product)
+    return file_io.read(path)
+
+
+def test_distinctive_metadata_covers_every_field() -> None:
+    """A field added to ProductMetadata must fail here until the writers persist it.
+
+    Without this, a new field silently sits at its default on both sides of every
+    round-trip test and nothing notices that no writer ever stored it.
+    """
+    assert set(DISTINCTIVE_METADATA) == {field.name for field in fields(ProductMetadata)}
+
+
+@pytest.mark.parametrize(('file_io', 'suffix'), PRODUCT_FILE_IO)
+@pytest.mark.parametrize('field_name', sorted(DISTINCTIVE_METADATA))
+def test_metadata_field_round_trips(
+    tmp_path: Path, file_io: Any, suffix: str, field_name: str
+) -> None:
+    metadata = ProductMetadata(**DISTINCTIVE_METADATA)
+    product = _make_product(metadata=metadata)
+
+    loaded = _round_trip_product(file_io, tmp_path / f'product{suffix}', product)
+    actual = getattr(loaded.metadata, field_name)
+    expected = DISTINCTIVE_METADATA[field_name]
+
+    if isinstance(expected, float):
+        assert actual == pytest.approx(expected), field_name
+    else:
+        assert actual == expected, field_name
+
+
+@pytest.mark.parametrize(('file_io', 'suffix'), PRODUCT_FILE_IO)
+def test_unpolarized_round_trips_as_none(tmp_path: Path, file_io: Any, suffix: str) -> None:
+    """None is a real state, not a missing value, and must not come back as a default enum."""
+    metadata = ProductMetadata(**{**DISTINCTIVE_METADATA, 'polarization': None})
+    product = _make_product(metadata=metadata)
+
+    loaded = _round_trip_product(file_io, tmp_path / f'product{suffix}', product)
+
+    assert loaded.metadata.polarization is None
+
+
+@pytest.mark.parametrize(('file_io', 'suffix'), PRODUCT_FILE_IO)
+def test_position_photon_counts_round_trip(tmp_path: Path, file_io: Any, suffix: str) -> None:
+    product = _make_product(num_positions=4, with_position_photon_counts=True)
+
+    loaded = _round_trip_product(file_io, tmp_path / f'product{suffix}', product)
+    counts = loaded.probe_positions.get_probe_photon_counts()
+
+    assert counts is not None
+    numpy.testing.assert_allclose(counts, product.probe_positions.get_probe_photon_counts())
+
+
+@pytest.mark.parametrize(('file_io', 'suffix'), PRODUCT_FILE_IO)
+def test_absent_position_photon_counts_stay_absent(
+    tmp_path: Path, file_io: Any, suffix: str
+) -> None:
+    """Unmeasured counts must come back as None, not as a column of zeros."""
+    product = _make_product(with_position_photon_counts=False)
+
+    loaded = _round_trip_product(file_io, tmp_path / f'product{suffix}', product)
+
+    assert loaded.probe_positions.get_probe_photon_counts() is None
+
+    for point in loaded.probe_positions:
+        assert point.probe_photon_count is None
+
+
+@pytest.mark.parametrize(('file_io', 'suffix'), PRODUCT_FILE_IO)
+def test_probe_positions_round_trip(tmp_path: Path, file_io: Any, suffix: str) -> None:
+    product = _make_product(num_positions=4)
+
+    loaded = _round_trip_product(file_io, tmp_path / f'product{suffix}', product)
+
+    numpy.testing.assert_array_equal(
+        loaded.probe_positions.get_indexes(), product.probe_positions.get_indexes()
+    )
+    numpy.testing.assert_allclose(
+        loaded.probe_positions.get_coordinates_x_m(),
+        product.probe_positions.get_coordinates_x_m(),
+    )
+    numpy.testing.assert_allclose(
+        loaded.probe_positions.get_coordinates_y_m(),
+        product.probe_positions.get_coordinates_y_m(),
+    )
+
+
+@pytest.mark.parametrize(('file_io', 'suffix'), PRODUCT_FILE_IO)
+def test_probe_round_trips(tmp_path: Path, file_io: Any, suffix: str) -> None:
+    product = _make_product(with_opr=True)
+
+    loaded = _round_trip_product(file_io, tmp_path / f'product{suffix}', product)
+
+    numpy.testing.assert_allclose(loaded.probes.get_array(), product.probes.get_array())
+    assert loaded.probes.num_coherent_modes == product.probes.num_coherent_modes
+    assert loaded.probes.num_incoherent_modes == product.probes.num_incoherent_modes
+
+    # Compared against the source, not a literal: a writer that stores the object's pixel
+    # size for the probe would satisfy a hardcoded assertion whenever the two agree.
+    expected_geometry = product.probes.get_pixel_geometry()
+    loaded_geometry = loaded.probes.get_pixel_geometry()
+    assert loaded_geometry.width_m == pytest.approx(expected_geometry.width_m)
+    assert loaded_geometry.height_m == pytest.approx(expected_geometry.height_m)
+
+    numpy.testing.assert_allclose(loaded.probes.get_opr_weights(), product.probes.get_opr_weights())
+
+
+@pytest.mark.parametrize(('file_io', 'suffix'), PRODUCT_FILE_IO)
+def test_absent_opr_weights_stay_absent(tmp_path: Path, file_io: Any, suffix: str) -> None:
+    product = _make_product(with_opr=False)
+
+    loaded = _round_trip_product(file_io, tmp_path / f'product{suffix}', product)
+
+    assert loaded.probes.get_opr_weights_or_none() is None
+
+
+@pytest.mark.parametrize(('file_io', 'suffix'), PRODUCT_FILE_IO)
+def test_object_round_trips(tmp_path: Path, file_io: Any, suffix: str) -> None:
+    product = _make_product(with_layer_spacing=True)
+
+    loaded = _round_trip_product(file_io, tmp_path / f'product{suffix}', product)
+
+    numpy.testing.assert_allclose(loaded.object_.get_array(), product.object_.get_array())
+    assert loaded.object_.num_layers == product.object_.num_layers
+    numpy.testing.assert_allclose(loaded.object_.layer_spacing_m, product.object_.layer_spacing_m)
+
+    expected_geometry = product.object_.get_geometry()
+    loaded_geometry = loaded.object_.get_geometry()
+    assert loaded_geometry.pixel_width_m == pytest.approx(expected_geometry.pixel_width_m)
+    assert loaded_geometry.pixel_height_m == pytest.approx(expected_geometry.pixel_height_m)
+    assert loaded_geometry.center_x_m == pytest.approx(expected_geometry.center_x_m)
+    assert loaded_geometry.center_y_m == pytest.approx(expected_geometry.center_y_m)
+
+
+@pytest.mark.parametrize(('file_io', 'suffix'), PRODUCT_FILE_IO)
+def test_losses_round_trip(tmp_path: Path, file_io: Any, suffix: str) -> None:
+    product = _make_product(with_losses=True)
+
+    loaded = _round_trip_product(file_io, tmp_path / f'product{suffix}', product)
+
+    assert [loss.epoch for loss in loaded.losses] == [loss.epoch for loss in product.losses]
+    assert [loss.value for loss in loaded.losses] == pytest.approx(
+        [loss.value for loss in product.losses]
+    )
+
+
+@pytest.mark.parametrize(('file_io', 'suffix'), PRODUCT_FILE_IO)
+def test_no_losses_round_trips_empty(tmp_path: Path, file_io: Any, suffix: str) -> None:
+    product = _make_product(with_losses=False)
+
+    loaded = _round_trip_product(file_io, tmp_path / f'product{suffix}', product)
+
+    assert list(loaded.losses) == []
+
+
+def test_formats_agree_with_each_other(tmp_path: Path) -> None:
+    """The point of the alignment: one product, two formats, one result."""
+    from ptychodus.plugins.h5_product_file import H5ProductFileIO
+    from ptychodus.plugins.npz_product_file import NPZProductFileIO
+
+    product = _make_product(
+        metadata=ProductMetadata(**DISTINCTIVE_METADATA),
+        with_opr=True,
+        with_layer_spacing=True,
+        with_losses=True,
+        with_position_photon_counts=True,
+    )
+
+    from_h5 = _round_trip_product(H5ProductFileIO(), tmp_path / 'p.h5', product)
+    from_npz = _round_trip_product(NPZProductFileIO(), tmp_path / 'p.npz', product)
+
+    assert from_h5.metadata == from_npz.metadata
+    numpy.testing.assert_allclose(
+        from_h5.probe_positions.get_coordinates_x_m(),
+        from_npz.probe_positions.get_coordinates_x_m(),
+    )
+    h5_counts = from_h5.probe_positions.get_probe_photon_counts()
+    npz_counts = from_npz.probe_positions.get_probe_photon_counts()
+    assert h5_counts is not None and npz_counts is not None
+    numpy.testing.assert_allclose(h5_counts, npz_counts)
+    numpy.testing.assert_allclose(from_h5.probes.get_array(), from_npz.probes.get_array())
+    numpy.testing.assert_allclose(from_h5.object_.get_array(), from_npz.object_.get_array())
+
+
+def test_legacy_npz_without_the_new_keys_still_loads(tmp_path: Path) -> None:
+    """An archive written before tilt, polarization and per-position counts existed.
+
+    Built key-by-key rather than by deleting from a fresh file, because an .npz is a zip
+    and cannot have entries removed in place.
+    """
+    from ptychodus.plugins.npz_product_file import NPZProductFileIO
+
+    file_io = NPZProductFileIO()
+    file = tmp_path / 'legacy.npz'
+    numpy.savez(
+        file,
+        **{
+            NPZProductFileIO.DETECTOR_OBJECT_DISTANCE: 1.5,
+            NPZProductFileIO.PROBE_ENERGY: 10_000.0,
+            NPZProductFileIO.PROBE_POSITION_INDEXES: numpy.arange(2),
+            NPZProductFileIO.PROBE_POSITION_X: numpy.zeros(2),
+            NPZProductFileIO.PROBE_POSITION_Y: numpy.zeros(2),
+            NPZProductFileIO.PROBE_ARRAY: numpy.zeros((1, 1, 4, 4), dtype=complex),
+            NPZProductFileIO.OBJECT_ARRAY: numpy.zeros((1, 8, 8), dtype=complex),
+            NPZProductFileIO.OBJECT_CENTER_X: 0.0,
+            NPZProductFileIO.OBJECT_CENTER_Y: 0.0,
+            NPZProductFileIO.OBJECT_PIXEL_WIDTH: 10e-9,
+            NPZProductFileIO.OBJECT_PIXEL_HEIGHT: 10e-9,
+        },
+    )
+
+    loaded = file_io.read(file)
+
+    # Absent optional keys take the same defaults the HDF5 reader uses.
+    assert loaded.metadata.name == 'Unnamed'
+    assert loaded.metadata.comments == ''
+    assert loaded.metadata.exposure_time_s == 0.0
+    assert loaded.metadata.tilt_angle_deg == 0.0
+    assert loaded.metadata.polarization is None
+    assert loaded.probe_positions.get_probe_photon_counts() is None
+    assert list(loaded.object_.layer_spacing_m) == []
+    assert list(loaded.losses) == []
+    # A probe with no pixel size of its own inherits the object's.
+    assert loaded.probes.get_pixel_geometry().width_m == pytest.approx(10e-9)

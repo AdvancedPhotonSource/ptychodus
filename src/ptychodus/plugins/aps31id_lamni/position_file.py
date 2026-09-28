@@ -36,7 +36,6 @@ import csv
 import logging
 
 from ptychodus.api.constants import LengthUnit
-from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.probe_positions import (
     ProbePositionSequence,
     ProbePositionFileReader,
@@ -181,11 +180,3 @@ class LamNIPositionFileReader(ProbePositionFileReader):
                 point_list.append(point)
 
         return ProbePositionSequence(point_list)
-
-
-def register_plugins(registry: PluginRegistry) -> None:
-    registry.probe_position_file_readers.register_plugin(
-        LamNIPositionFileReader(),
-        simple_name=LamNIPositionFileReader.SIMPLE_NAME,
-        display_name=LamNIPositionFileReader.DISPLAY_NAME,
-    )

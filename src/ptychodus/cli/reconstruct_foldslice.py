@@ -35,7 +35,7 @@ from ptychodus.api.assemble import assemble_dataset
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import BadPixels, BeamCenter, CropRegion, DiffractionDataset
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.io import StandardFileLayout, save_diffraction_data, save_product
+from ptychodus.api.io import StandardFileLayout, save_diffraction_data
 from ptychodus.api.object import compute_object_geometry
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import (
@@ -58,11 +58,7 @@ from ptychodus.api.simulate.probe import (
     generate_incoherent_probe_modes,
 )
 from ptychodus.cli import DirectoryType
-from ptychodus.model.ptychi.task import (
-    align_task_options_with_product,
-    dump_task_options,
-    reconstruct_with_ptychi,
-)
+from ptychodus.cli._reconstruct_common import run_reconstruction
 
 logger = logging.getLogger('reconstruct_foldslice')
 
@@ -674,43 +670,14 @@ def main() -> int:
         logger.info('Writing %s', diffraction_file)
         save_diffraction_data(diffraction_file, assembled_data)
 
-    task_options = align_task_options_with_product(options, product)
-    task_options.check()
-
-    # The aligned options are the ones that ran: they carry the object pixel size, the
-    # wavelength and the slice spacings the product supplied, which the unaligned object
-    # does not.
-    logger.info('Writing %s', options_file)
-    options_file.write_text(dump_task_options(task_options))
-
     reconstruct_input = prepare_reconstruct_input(assembled_data, product)
-    logger.info(
-        'Starting reconstruction: %d patterns, %d epochs total, sync every %d',
-        reconstruct_input.diffraction_patterns.shape[0],
-        num_epochs,
-        args.num_sync_epochs,
+    run_reconstruction(
+        logger,
+        reconstruct_input,
+        options,
+        output_directory,
+        num_sync_epochs=args.num_sync_epochs,
     )
-
-    final_output = None
-
-    for output in reconstruct_with_ptychi(
-        reconstruct_input, task_options, num_sync_epochs=args.num_sync_epochs
-    ):
-        losses = output.product.losses
-        last_loss = losses[-1].value if losses else float('nan')
-        logger.info('Epoch %d/%d: loss=%.6g', output.progress, num_epochs, last_loss)
-
-        checkpoint_file = StandardFileLayout.PRODUCT.checkpoint_path(
-            output_directory, output.progress
-        )
-        save_product(checkpoint_file, output.product)
-        final_output = output
-
-    if final_output is None:
-        raise RuntimeError('Reconstruction produced no output.')
-
-    save_product(product_file, final_output.product)
-    logger.info('Saved reconstructed product to %s', product_file)
     return 0
 
 

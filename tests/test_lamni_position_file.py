@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from ptychodus.api.probe_positions import ProbePositionParseError
-from ptychodus.plugins.aps31id_lamni_position_file import LamNIPositionFileReader
+from ptychodus.plugins.aps31id_lamni.position_file import LamNIPositionFileReader
 
 DATA_DIR = Path(__file__).parent / 'data' / 'lamni'
 
