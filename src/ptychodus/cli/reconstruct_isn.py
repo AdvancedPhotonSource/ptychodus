@@ -2,8 +2,9 @@
 """Reconstruct one APS 19-ID-E In-situ Nanoprobe ptychography dataset through the ptychodus api.
 
 The In-situ Nanoprobe focuses with KB mirrors. Its fly scans expose a single trajectory
-positioner and record both axis encoders as MDA detector channels, so the positions come from
-the channel reader rather than the flat-scan one.
+positioner; its per-trigger X/Y readback is averaged downstream into a companion
+``Processed/SOCKETSERVER/Scan_NNNN_position.h5`` file alongside the
+``Raw/Scan_NNNN/PTYCHO/`` diffraction series, read by the ``APS_ISN`` position reader.
 
 Scope and limitations
 ---------------------
@@ -62,12 +63,14 @@ from ptychodus.cli._reconstruct_common import run_reconstruction
 logger = logging.getLogger('reconstruct_isn')
 
 DIFFRACTION_READER = 'APS_ISN'
-POSITION_READER = 'APS_ISN_MDA'
+POSITION_READER = 'APS_ISN'
 
 # Operating points observed across this instrument's batch scripts. They are a last
 # resort: a value the file records always wins, because the fixture can move between
-# run cycles and the file cannot be stale about itself.
-DEFAULT_DETECTOR_DISTANCE_M = 6.156
+# run cycles and the file cannot be stale about itself. The distance below is never
+# recorded in the file and can drift between run cycles -- it is the current-cycle
+# value observed in the beamline's own preprocessing scripts, not a fixed constant.
+DEFAULT_DETECTOR_DISTANCE_M = 6.16
 DEFAULT_FZP_PRESET = ''
 
 # Where the beam center comes from when neither the command line nor the file supplies
@@ -214,13 +217,16 @@ def main() -> int:
         '--diffraction-file',
         required=True,
         type=Path,
-        help='Any member of the PTYCHO/19ide_NNNN_NNN.h5 series; the rest are globbed.',
+        help=(
+            'Any member of the PTYCHO/scan_NNNN_FFFFF.h5 (or older 19ide_NNNN_NNN.h5) '
+            'series; the rest are globbed.'
+        ),
     )
     parser.add_argument(
         '--position-file',
         required=True,
         type=Path,
-        help='EPICS MDA file, normally mda/19ide_NNNN.mda.',
+        help='HDF5 file, normally Processed/SOCKETSERVER/Scan_NNNN_position.h5.',
     )
     parser.add_argument(
         '--output-directory',

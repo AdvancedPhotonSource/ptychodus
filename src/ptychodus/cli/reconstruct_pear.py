@@ -130,7 +130,7 @@ _INSTRUMENT_READERS: Final[dict[str, _Readers]] = {
     'bnp': _Readers('APS_BNP', 'APS_BNP'),
     'bionanoprobe': _Readers('APS_BNP', 'APS_BNP'),
     '12idc': _Readers('APS_PtychoSAXS', 'APS_PtychoSAXS'),
-    'isn': _Readers('APS_ISN', 'APS_ISN_MDA'),
+    'isn': _Readers('APS_ISN', 'APS_ISN'),
     'lynx': _Readers('APS_LamNI', 'APS_LamNI'),
     'lynx_v2': _Readers('APS_LamNI', 'APS_LamNI'),
     'velo': _Readers('APS_Velociprobe', 'APS_Velociprobe_PE'),
@@ -424,8 +424,8 @@ def _resolve_inputs(params: PearParameters, readers: _Readers) -> tuple[Path, Pa
         diffraction = base / 'ptycho' / f'fly{scan:03d}_data_001.h5'
         positions = base / 'mda' / f'2xfm_{scan:04d}.mda'
     elif instrument == 'isn':
-        diffraction = base / 'PTYCHO' / f'19ide_{scan:04d}_000.h5'
-        positions = base / 'mda' / f'19ide_{scan:04d}.mda'
+        diffraction = base / 'Raw' / f'Scan_{scan:04d}' / 'PTYCHO' / f'scan_{scan:04d}_00001.h5'
+        positions = base / 'Processed' / 'SOCKETSERVER' / f'Scan_{scan:04d}_position.h5'
     elif instrument in ('bnp', 'bionanoprobe'):
         diffraction = base / 'ptycho' / f'bnp_fly{scan:04d}_000000.h5'
         positions = base / 'mda' / f'bnp_fly{scan:04d}.mda'
