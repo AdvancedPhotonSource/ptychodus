@@ -46,8 +46,6 @@ from ptychodus.model.ptychi.task import (
 )
 
 __all__ = [
-    'EXIT_CANCELLED',
-    'STDIN_ARGUMENT',
     'CancellationToken',
     'add_ptychi_options_argument',
     'install_signal_handlers',
@@ -58,13 +56,9 @@ __all__ = [
     'save_assembled_diffraction',
 ]
 
-# Exit status for a run that stopped because it was asked to, by the shell convention of
-# 128 + SIGINT. Defined once so eleven drivers can return it without each spelling out why.
-EXIT_CANCELLED = 130
-
 # The conventional "read it from stdin instead" filename, as argparse hands it over once a
 # bare ``-`` has been through ``type=Path``.
-STDIN_ARGUMENT = Path('-')
+_STDIN_ARGUMENT = Path('-')
 
 # Environment variables that report this process's rank, in the order they are consulted.
 # `torchrun` and `torch.distributed.launch` export RANK; plain `srun` exports SLURM_PROCID
@@ -245,7 +239,7 @@ def load_ptychi_options(options_file: Path | None) -> PtychographyTaskOptions:
     if options_file is None:
         return LSQMLOptions()
 
-    if options_file == STDIN_ARGUMENT:
+    if options_file == _STDIN_ARGUMENT:
         return load_task_options(sys.stdin.read())
 
     return load_task_options(options_file.read_text())

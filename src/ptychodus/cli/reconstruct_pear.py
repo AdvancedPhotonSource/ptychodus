@@ -78,6 +78,7 @@ from ptychi.api import (
 from ptychodus.api.assemble import assemble_dataset
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import CropRegion
+from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.object import (
     LayerFillMode,
@@ -115,7 +116,6 @@ from ptychodus.api.simulate.probe import (
     propagate_probe,
 )
 from ptychodus.cli._reconstruct_common import (
-    EXIT_CANCELLED,
     install_signal_handlers,
     run_reconstruction,
     save_assembled_diffraction,
@@ -722,7 +722,7 @@ def _build_lsqml_options(params: PearParameters, num_patterns: int) -> LSQMLOpti
     return options
 
 
-def main() -> int:
+def main() -> ExitCode:
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1087,7 +1087,7 @@ def main() -> int:
             object_.get_array().shape,
         )
         logger.info('Nothing written: stopping before the reconstruction.')
-        return 0
+        return ExitCode.SUCCESS
 
     save_assembled_diffraction(
         logger, output_directory, assembled_data, skip=args.no_save_diffraction
@@ -1102,7 +1102,7 @@ def main() -> int:
         num_sync_epochs=num_sync_epochs,
         cancellation=cancellation,
     )
-    return EXIT_CANCELLED if cancellation.is_cancelled else 0
+    return ExitCode.CANCELLED if cancellation.is_cancelled else ExitCode.SUCCESS
 
 
 if __name__ == '__main__':

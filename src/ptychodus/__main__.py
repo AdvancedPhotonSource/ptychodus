@@ -6,6 +6,7 @@ import logging
 import sys
 
 from ptychodus.api.observer import Observable, Observer
+from ptychodus.api.exit_codes import ExitCode
 from ptychodus.cli import DirectoryType, verify_all_arguments_parsed
 from ptychodus.model import ModelCore
 from ptychodus.model.diffraction import DiffractionTaskMonitor
@@ -82,7 +83,7 @@ def main() -> int:
 
             if parsed_args.input_directory is None or parsed_args.output_directory is None:
                 parser.error('Batch mode requires input and output arguments!')
-                return -1
+                return ExitCode.USAGE
 
             _DiffractionProgressLogger(model.diffraction_core.task_monitor)
             return model.batch_mode_execute(
@@ -93,7 +94,7 @@ def main() -> int:
             from PyQt5.QtWidgets import QApplication
         except ModuleNotFoundError:
             logger.warning('PyQt5 not found.')
-            return 0
+            return ExitCode.FAILURE
 
         # QApplication expects the first argument to be the program name
         app = QApplication(sys.argv[:1] + unparsed_args)

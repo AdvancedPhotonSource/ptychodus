@@ -54,6 +54,7 @@ from ptychodus.api.assemble import (
 )
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import BadPixels, BeamCenter, CropRegion, DiffractionDataset
+from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.object import compute_object_geometry
@@ -77,7 +78,6 @@ from ptychodus.api.simulate.probe import (
 )
 from ptychodus.cli import DirectoryType
 from ptychodus.cli._reconstruct_common import (
-    EXIT_CANCELLED,
     add_ptychi_options_argument,
     install_signal_handlers,
     load_ptychi_options,
@@ -321,7 +321,7 @@ def _trim_ends(
     return _select_patterns(assembled_data, keep, 'The end trim')
 
 
-def main() -> int:
+def main() -> ExitCode:
     parser = argparse.ArgumentParser(
         description='APS 4-ID-B,G,H POLAR ptychography reconstruction via the ptychodus api.',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -813,7 +813,7 @@ def main() -> int:
         # this dry run stops before, so it is the one artifact a dry run cannot preview.
         logger.info('Would write %s once the options are aligned', options_file)
         logger.info('Nothing written: stopping before the pty-chi option alignment.')
-        return 0
+        return ExitCode.SUCCESS
 
     save_assembled_diffraction(
         logger, output_directory, assembled_data, skip=args.no_save_diffraction
@@ -828,7 +828,7 @@ def main() -> int:
         num_sync_epochs=args.num_sync_epochs,
         cancellation=cancellation,
     )
-    return EXIT_CANCELLED if cancellation.is_cancelled else 0
+    return ExitCode.CANCELLED if cancellation.is_cancelled else ExitCode.SUCCESS
 
 
 if __name__ == '__main__':

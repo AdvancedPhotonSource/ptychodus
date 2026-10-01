@@ -214,7 +214,7 @@ def test_a_completed_run_reports_success(monkeypatch: pytest.MonkeyPatch, tmp_pa
         stream, reconstruct_subprocess.CancellationToken(), _args(tmp_path), None
     )
 
-    assert code is ExitCode.OK
+    assert code is ExitCode.SUCCESS
     events = _events(buffer)
     assert [event['event'] for event in events] == ['started', 'finished']
     assert events[-1]['cancelled'] is False

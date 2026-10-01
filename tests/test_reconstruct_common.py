@@ -621,6 +621,6 @@ def test_load_ptychi_options_reads_stdin_for_a_dash(
     options.reconstructor_options.num_epochs = 5
     monkeypatch.setattr('sys.stdin', io.StringIO(_reconstruct_common.dump_task_options(options)))
 
-    loaded = load_ptychi_options(_reconstruct_common.STDIN_ARGUMENT)
+    loaded = load_ptychi_options(_reconstruct_common._STDIN_ARGUMENT)
 
     assert loaded.reconstructor_options.num_epochs == 5

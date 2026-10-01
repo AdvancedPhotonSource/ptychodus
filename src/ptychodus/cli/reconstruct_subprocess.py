@@ -61,11 +61,11 @@ import os
 import sys
 import time
 import traceback
-from enum import IntEnum
 from pathlib import Path
 from typing import IO, Any
 
 import ptychodus
+from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.io import StandardFileLayout, load_diffraction_data, load_product
 from ptychodus.api.reconstruct import (
     PositionIndexFilter,
@@ -85,13 +85,6 @@ from ptychodus.cli._reconstruct_common import (
 logger = logging.getLogger('reconstruct_subprocess')
 
 LOG_BASENAME = 'reconstruct'
-
-
-class ExitCode(IntEnum):
-    OK = 0
-    FAILED = 1
-    USAGE = 2
-    CANCELLED = 130
 
 
 class EventStream:
@@ -274,7 +267,7 @@ def _reconstruct(
         path=str(product_file),
         elapsed_s=stream.elapsed_s(),
     )
-    return ExitCode.CANCELLED if is_cancelled else ExitCode.OK
+    return ExitCode.CANCELLED if is_cancelled else ExitCode.SUCCESS
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -360,7 +353,7 @@ def _open_event_stream(event_file: Path | None) -> IO[str]:
     return os.fdopen(os.dup(1), 'w', buffering=1)
 
 
-def main() -> int:
+def main() -> ExitCode:
     args = _build_parser().parse_args()
 
     output_directory: Path = args.output_directory
@@ -397,11 +390,11 @@ def main() -> int:
     )
 
     try:
-        return int(_reconstruct(stream, cancellation, args, log_path))
+        return _reconstruct(stream, cancellation, args, log_path)
     except Exception as exc:
         stream.emit_exception(exc)
         logger.exception('Reconstruction failed.')
-        return int(ExitCode.FAILED)
+        return ExitCode.FAILURE
 
 
 if __name__ == '__main__':

@@ -6,6 +6,7 @@ import sys
 
 import httpx
 
+from ptychodus.api.exit_codes import ExitCode
 from ptychodus.model.genesis.iri.client import get_iri_tokens_file
 from ptychodus.model.genesis.tokens import create_headers, load_tokens
 
@@ -24,7 +25,7 @@ def main() -> None:
 
     if olcf_token is None:
         logger.error('No OLCF token found in %s', tokens_file)
-        sys.exit(1)
+        sys.exit(ExitCode.FAILURE)
 
     headers = create_headers(olcf_token)
 

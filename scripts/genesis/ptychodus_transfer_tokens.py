@@ -7,6 +7,9 @@ import logging
 
 import httpx
 
+import sys
+
+from ptychodus.api.exit_codes import ExitCode
 from ptychodus.model.genesis.core import create_globus_transfer_providers
 from ptychodus.model.genesis.tokens import GenesisAccessTokens, save_tokens
 from ptychodus.model.genesis.transfer import get_transfer_tokens_file
@@ -46,7 +49,8 @@ def print_spec(provider: str) -> None:
         client = providers[provider]
     except KeyError:
         known = ', '.join(sorted(providers))
-        raise SystemExit(f'Unknown provider "{provider}". Known providers: {known}')
+        print(f'Unknown provider "{provider}". Known providers: {known}', file=sys.stderr)
+        sys.exit(ExitCode.USAGE)
 
     client.print_openapi_specification()
 

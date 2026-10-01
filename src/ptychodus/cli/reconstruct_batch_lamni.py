@@ -64,6 +64,7 @@ from ptychodus.api.affine import (
 from ptychodus.api.assemble import assemble_dataset, summarize_dataset
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import BadPixels, BeamCenter, CropRegion, DiffractionDataset
+from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.object import compute_object_geometry
@@ -85,7 +86,6 @@ from ptychodus.api.simulate.probe import (
 )
 from ptychodus.cli import DirectoryType
 from ptychodus.cli._reconstruct_common import (
-    EXIT_CANCELLED,
     CancellationToken,
     add_ptychi_options_argument,
     install_signal_handlers,
@@ -781,7 +781,7 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> int:
+def main() -> ExitCode:
     args = _build_parser().parse_args()
 
     logging.basicConfig(
@@ -808,7 +808,7 @@ def main() -> int:
 
     if not selected:
         logger.error('No scans matched the requested projection range.')
-        return 1
+        return ExitCode.FAILURE
 
     logger.info(
         'Selected %d scan(s): %d..%d',
@@ -844,7 +844,7 @@ def main() -> int:
             )
 
         logger.info('Dry run: %d scan(s) planned. Nothing read, nothing written.', len(selected))
-        return 0
+        return ExitCode.SUCCESS
 
     registry = PluginRegistry.load_plugins()
 
@@ -859,7 +859,7 @@ def main() -> int:
                 'calibration scans, but the supplied options disable it. The fit would see '
                 'unrefined positions and return the identity transform.'
             )
-            return 1
+            return ExitCode.FAILURE
 
     bad_pixels: BadPixels | None = None
 
@@ -1018,9 +1018,9 @@ def main() -> int:
         # Reported ahead of the failures: the run was stopped, and whichever scans had
         # already failed is a detail of how far it got, not why it ended.
         logger.warning('Cancelled after %d of %d selected scan(s).', cancelled_after, len(selected))
-        return EXIT_CANCELLED
+        return ExitCode.CANCELLED
 
-    return 1 if failed else 0
+    return ExitCode.FAILURE if failed else ExitCode.SUCCESS
 
 
 if __name__ == '__main__':

@@ -36,6 +36,15 @@
    :show-inheritance:
 ```
 
+## Exit Codes
+
+```{eval-rst}
+.. automodule:: ptychodus.api.exit_codes
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Fluorescence
 
 ```{eval-rst}

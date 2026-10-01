@@ -17,6 +17,7 @@ import h5py
 import numpy
 
 from ptychodus.api.diffraction import DiffractionMetadata, DiffractionArray
+from ptychodus.api.exit_codes import ExitCode
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.settings import SettingsRegistry
@@ -253,14 +254,14 @@ class ModelCore:
         self.globus_core.run_foreground_tasks()
         self.genesis_core.run_foreground_tasks()
 
-    def _batch_mode_reconstruct(self, input_directory: Path, output_directory: Path) -> int:
+    def _batch_mode_reconstruct(self, input_directory: Path, output_directory: Path) -> ExitCode:
         diffraction_path = input_directory / StandardFileLayout.DIFFRACTION
 
         if diffraction_path.is_file():
             diffraction_handle = self.workflow_api.load_assembled_diffraction_data(diffraction_path)
         else:
             logger.error('Diffraction data is not a file!')
-            return -1
+            return ExitCode.USAGE
 
         processing_api = self.processing_core.processing_api
 
@@ -294,10 +295,10 @@ class ModelCore:
                 )
             except Exception as exc:
                 logger.error(f'Reconstruction failed: {type(exc).__name__}: {exc}')
-                return 1
+                return ExitCode.FAILURE
         else:
             logger.error('Input product is not a file!')
-            return -1
+            return ExitCode.USAGE
 
         input_fluorescence_path = input_directory / StandardFileLayout.FLUORESCENCE
 
@@ -317,16 +318,16 @@ class ModelCore:
         else:
             logger.info('No fluorescence data to enhance.')
 
-        return 0
+        return ExitCode.SUCCESS
 
-    def _batch_mode_train(self, input_directory: Path, output_directory: Path) -> int:
+    def _batch_mode_train(self, input_directory: Path, output_directory: Path) -> ExitCode:
         diffraction_path = input_directory / StandardFileLayout.DIFFRACTION
 
         if diffraction_path.is_file():
             diffraction_handle = self.workflow_api.load_assembled_diffraction_data(diffraction_path)
         else:
             logger.error('Diffraction data is not a file!')
-            return -1
+            return ExitCode.USAGE
 
         input_product_path = input_directory / StandardFileLayout.PRODUCT
 
@@ -340,13 +341,15 @@ class ModelCore:
                 )
             except Exception as exc:
                 logger.error(f'Training failed: {type(exc).__name__}: {exc}')
-                return 1
-            return 0
+                return ExitCode.FAILURE
+            return ExitCode.SUCCESS
         else:
             logger.error('Input product is not a file!')
-            return -1
+            return ExitCode.USAGE
 
-    def batch_mode_execute(self, action: str, input_directory: Path, output_directory: Path) -> int:
+    def batch_mode_execute(
+        self, action: str, input_directory: Path, output_directory: Path
+    ) -> ExitCode:
         if not input_directory.is_dir():
             raise ValueError('Input path is not a directory!')
 
@@ -366,7 +369,7 @@ class ModelCore:
                 return self._batch_mode_train(input_directory, output_directory)
 
         logger.error(f'Unknown batch mode action "{action}"!')
-        return -1
+        return ExitCode.USAGE
 
     @property
     def is_developer_mode_enabled(self) -> bool:
