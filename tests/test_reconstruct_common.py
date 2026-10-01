@@ -27,7 +27,9 @@ import pytest
 pytest.importorskip('ptychi')
 
 from ptychodus.api.assemble import AssembledDiffractionData
-from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.diffraction import BeamCenter, CropRegion
+from ptychodus.api.geometry import ImageExtent, PixelGeometry
+from ptychodus.api.preprocess.diffraction import FilterValuesStep
 from ptychodus.api.object import Object, ObjectCenter
 from ptychodus.api.probe import ProbeSequence
 from ptychodus.api.probe_positions import ProbePosition, ProbePositionSequence
@@ -38,6 +40,7 @@ from ptychi.api import LSQMLOptions
 # Deliberately imported at module scope: this file already does
 # ``pytest.importorskip('ptychi')`` above.
 from ptychodus.cli import _reconstruct_common  # noqa: E402
+from ptychodus.cli._reconstruct_common import resolve_crop_region  # noqa: E402
 from ptychodus.cli._reconstruct_common import (  # noqa: E402
     CancellationToken,
     install_signal_handlers,
@@ -624,3 +627,148 @@ def test_load_ptychi_options_reads_stdin_for_a_dash(
     loaded = load_ptychi_options(_reconstruct_common._STDIN_ARGUMENT)
 
     assert loaded.reconstructor_options.num_epochs == 5
+
+
+# --- resolve_crop_region ---------------------------------------------------------------
+#
+# Shared between the standard pipeline and the batch-LamNI loop, which previously carried
+# byte-identical copies. The two differ only in what they are summarizing, which `subject`
+# supplies, so that wording is pinned alongside the arithmetic.
+
+
+class _FakeSummary:
+    """Just the mean pattern, which is all the estimate branch reads."""
+
+    def __init__(self) -> None:
+        self.mean_pattern = numpy.array([[1, 9], [3, 4]], dtype=numpy.uint16)
+
+
+class _FakeMetadata:
+    def __init__(self, extent: ImageExtent, beam_center: BeamCenter | None) -> None:
+        self.detector_extent = extent
+        self.beam_center = beam_center
+
+
+class _FakeDataset:
+    """Only what resolve_crop_region touches: metadata, and the patterns it may summarize."""
+
+    def __init__(self, extent: ImageExtent, beam_center: BeamCenter | None = None) -> None:
+        self._metadata = _FakeMetadata(extent, beam_center)
+
+    def get_metadata(self) -> _FakeMetadata:
+        return self._metadata
+
+
+def _resolve(dataset: _FakeDataset, **kwargs: object) -> CropRegion | None:
+    defaults: dict[str, object] = {
+        'crop_extent_px': None,
+        'beam_center_x_px': None,
+        'beam_center_y_px': None,
+        'bad_pixels': None,
+        'value_filter': None,
+    }
+    defaults.update(kwargs)
+    return resolve_crop_region(logging.getLogger('test'), dataset, **defaults)  # type: ignore[arg-type]
+
+
+def test_no_crop_requested_reads_the_whole_frame() -> None:
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512))
+    assert _resolve(dataset) is None
+
+
+def test_a_crop_matching_the_detector_reads_the_whole_frame() -> None:
+    dataset = _FakeDataset(ImageExtent(width_px=256, height_px=256), BeamCenter(x_px=128, y_px=128))
+    assert _resolve(dataset, crop_extent_px=256) is None
+
+
+def test_the_command_line_beam_center_wins_over_the_file() -> None:
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=100, y_px=100))
+    region = _resolve(dataset, crop_extent_px=64, beam_center_x_px=256, beam_center_y_px=256)
+
+    assert region is not None
+    assert region == CropRegion.from_center_extent(
+        BeamCenter(x_px=256, y_px=256), ImageExtent(width_px=64, height_px=64)
+    )
+
+
+def test_the_file_beam_center_is_used_when_no_flag_is_given() -> None:
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=200, y_px=300))
+    region = _resolve(dataset, crop_extent_px=32)
+
+    assert region is not None
+    assert region == CropRegion.from_center_extent(
+        BeamCenter(x_px=200, y_px=300), ImageExtent(width_px=32, height_px=32)
+    )
+
+
+def test_an_overhanging_crop_is_an_error_rather_than_a_silent_clamp() -> None:
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), BeamCenter(x_px=4, y_px=4))
+
+    with pytest.raises(ValueError, match='runs off the'):
+        _resolve(dataset, crop_extent_px=256)
+
+
+def test_subject_names_what_the_beam_center_was_estimated_over(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The only wording the two callers differ on, so it is the only thing parameterized.
+
+    Reaching the estimate branch at all requires no center from either the flag or the
+    file; the summarize/estimate pair is stubbed because what is under test is the
+    reporting, not the estimator.
+    """
+    monkeypatch.setattr(
+        _reconstruct_common, 'summarize_dataset', lambda dataset, bad_pixels=None: _FakeSummary()
+    )
+    monkeypatch.setattr(
+        _reconstruct_common, 'estimate_beam_center', lambda pattern: BeamCenter(x_px=256, y_px=256)
+    )
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), beam_center=None)
+
+    with caplog.at_level(logging.INFO):
+        _resolve(dataset, crop_extent_px=64, subject='first scan')
+
+    assert 'Summarizing the first scan to estimate the beam center' in caplog.text
+    assert 'an estimate over the whole first scan' in caplog.text
+
+
+def test_subject_defaults_to_the_whole_dataset(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(
+        _reconstruct_common, 'summarize_dataset', lambda dataset, bad_pixels=None: _FakeSummary()
+    )
+    monkeypatch.setattr(
+        _reconstruct_common, 'estimate_beam_center', lambda pattern: BeamCenter(x_px=256, y_px=256)
+    )
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), beam_center=None)
+
+    with caplog.at_level(logging.INFO):
+        _resolve(dataset, crop_extent_px=64)
+
+    assert 'Summarizing the dataset to estimate the beam center' in caplog.text
+    assert 'an estimate over the whole dataset' in caplog.text
+
+
+def test_the_value_filter_is_applied_to_the_mean_pattern_before_estimating(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The cut used for the estimate must match the cut used for the assembled patterns."""
+    seen: list[numpy.ndarray] = []
+
+    monkeypatch.setattr(
+        _reconstruct_common, 'summarize_dataset', lambda dataset, bad_pixels=None: _FakeSummary()
+    )
+    monkeypatch.setattr(
+        _reconstruct_common,
+        'estimate_beam_center',
+        lambda pattern: (seen.append(pattern), BeamCenter(x_px=256, y_px=256))[1],
+    )
+    value_filter = FilterValuesStep(lower_bound=0, upper_bound=5)
+    dataset = _FakeDataset(ImageExtent(width_px=512, height_px=512), beam_center=None)
+
+    _resolve(dataset, crop_extent_px=64, value_filter=value_filter)
+
+    assert len(seen) == 1
+    # The fake mean pattern holds a 9, which the filter's upper bound of 5 zeroes.
+    assert seen[0].max() <= 5

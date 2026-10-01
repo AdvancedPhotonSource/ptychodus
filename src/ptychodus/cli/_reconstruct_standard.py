@@ -29,32 +29,29 @@ from ptychodus.api.assemble import (
     AssembledDiffractionData,
     assemble_dataset,
     compute_dataset_total_counts,
-    summarize_dataset,
 )
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import (
     BadPixels,
-    BeamCenter,
     CropRegion,
     DiffractionDataset,
     DiffractionMetadata,
 )
 from ptychodus.api.exit_codes import ExitCode
-from ptychodus.api.geometry import ImageExtent, PixelGeometry
+from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.object import compute_object_geometry
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import (
     DiffractionPrepPipeline,
     FilterValuesStep,
-    estimate_beam_center,
 )
 from ptychodus.api.preprocess.noise import compute_robust_statistics
 from ptychodus.api.probe import Probe, ProbeGeometry, ProbeSequence
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import prepare_reconstruct_input
-from ptychodus.api.simulate.object import generate_random_object
+from ptychodus.api.simulate.object import generate_uniform_object
 from ptychodus.api.simulate.probe import (
     generate_average_pattern_probe,
     generate_coherent_probe_modes,
@@ -72,6 +69,7 @@ from ptychodus.cli._reconstruct_common import (
     install_signal_handlers,
     invalid_count_threshold,
     load_ptychi_options,
+    resolve_crop_region,
     resolve_quantity,
     run_reconstruction,
     save_assembled_diffraction,
@@ -539,67 +537,6 @@ def _resolve_detector_pixel_size(
     return from_file
 
 
-def _resolve_crop_region(
-    logger: logging.Logger,
-    args: argparse.Namespace,
-    raw_dataset: DiffractionDataset,
-    metadata: DiffractionMetadata,
-    bad_pixels: BadPixels | None,
-    value_filter: FilterValuesStep | None,
-) -> CropRegion | None:
-    """The detector region to read, or None to read the whole frame."""
-    if args.crop_extent_px is None:
-        return None
-
-    detector_extent = metadata.detector_extent
-
-    # Beam center precedence: command line, then the file, then an estimate from the
-    # data. The estimate is logged as such -- a wrong center crops the wrong part of
-    # the detector, and nothing downstream would reveal it.
-    if args.beam_center_x_px is not None and args.beam_center_y_px is not None:
-        beam_center = BeamCenter(x_px=args.beam_center_x_px, y_px=args.beam_center_y_px)
-        center_source = '--beam-center-{x,y}-px'
-    elif metadata.beam_center is not None:
-        beam_center = metadata.beam_center
-        center_source = 'the diffraction file'
-    else:
-        # Reads every pattern in the dataset, so it is reached only when no center was
-        # supplied by flag or file. summarize_dataset inpaints the bad pixels that
-        # estimate_beam_center requires the caller to have handled.
-        logger.info('Summarizing the dataset to estimate the beam center')
-        summary = summarize_dataset(raw_dataset, bad_pixels=bad_pixels)
-        mean_pattern = (
-            summary.mean_pattern
-            if value_filter is None
-            else value_filter.apply(summary.mean_pattern)
-        )
-        beam_center = estimate_beam_center(mean_pattern)
-        center_source = 'an estimate over the whole dataset'
-
-    logger.info('Beam center: (%d, %d) from %s', beam_center.x_px, beam_center.y_px, center_source)
-
-    extent = ImageExtent(width_px=args.crop_extent_px, height_px=args.crop_extent_px)
-
-    if extent == detector_extent:
-        return None
-
-    region = CropRegion.from_center_extent(beam_center, extent)
-
-    # from_center_extent does not clip. Silently clamping would quietly reconstruct
-    # a different region than asked for, so an overhanging crop is an error.
-    if region.clamp_to_detector_extent(detector_extent) != region:
-        raise ValueError(
-            f'A {args.crop_extent_px}px crop about ({beam_center.x_px}, '
-            f'{beam_center.y_px}) runs off the '
-            f'{detector_extent.width_px}x{detector_extent.height_px} detector '
-            f'(x={region.x_range} y={region.y_range}). '
-            'Give a smaller --crop-extent-px or an explicit beam center.'
-        )
-
-    logger.info('Cropping to x=%s y=%s', region.x_range, region.y_range)
-    return region
-
-
 def _build_initial_probe(
     logger: logging.Logger,
     args: argparse.Namespace,
@@ -744,8 +681,14 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
             )
             bad_pixels = bad_pixels_reader.read(args.bad_pixels_file)
 
-        read_region = _resolve_crop_region(
-            logger, args, raw_dataset, metadata, bad_pixels, value_filter
+        read_region = resolve_crop_region(
+            logger,
+            raw_dataset,
+            crop_extent_px=args.crop_extent_px,
+            beam_center_x_px=args.beam_center_x_px,
+            beam_center_y_px=args.beam_center_y_px,
+            bad_pixels=bad_pixels,
+            value_filter=value_filter,
         )
         lower_counts, upper_counts = _total_counts_bounds(
             logger, args, raw_dataset, pipeline, bad_pixels, read_region
@@ -835,15 +778,7 @@ def run_standard_reconstruction(profile: InstrumentProfile) -> ExitCode:
     logger.info('Object geometry: %s', object_geometry)
 
     # Deviations = 0 gives a flat unit-amplitude, zero-phase field.
-    object_ = generate_random_object(
-        rng,
-        object_geometry,
-        amplitude_mean=1.0,
-        amplitude_deviation=0.0,
-        phase_mean=0.0,
-        phase_deviation_tr=0.0,
-        blur_deviation_px=0.0,
-    )
+    object_ = generate_uniform_object(object_geometry)
 
     probe_photon_count_override = getattr(args, 'probe_photon_count', None)
     probe_photon_count = (

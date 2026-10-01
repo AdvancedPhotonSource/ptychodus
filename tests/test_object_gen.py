@@ -53,8 +53,10 @@ from ptychodus.api.simulate.object import (
     _map_simplex_to_cartesian,
     generate_gaussian_random_field_object,
     generate_paganin_object,
+    generate_random_object,
     generate_siemens_star_object,
     generate_stxm_object,
+    generate_uniform_object,
 )
 from ptychodus.api.probe_positions import ProbePosition
 from ptychodus.api.assemble import AssembledDiffractionData
@@ -1109,3 +1111,55 @@ class TestSiemensStarValidation:
             generate_siemens_star_object(
                 _make_geometry(), **_default_star_kwargs(outer_radius_fraction=-0.5)
             )
+
+
+class TestGenerateUniformObject:
+    """The transparent starting guess.
+
+    It replaced four call sites that reached for ``generate_random_object`` with every
+    deviation set to zero, so the equivalence to that call is pinned here: it is what
+    makes the substitution a refactor rather than a change.
+    """
+
+    def test_output_shape_and_dtype(self) -> None:
+        geometry = _make_geometry(width_px=12, height_px=7)
+        array = generate_uniform_object(geometry).get_array()
+
+        assert array.shape == (1, 7, 12)
+        assert numpy.iscomplexobj(array)
+
+    def test_unit_amplitude_and_zero_phase_everywhere(self) -> None:
+        array = generate_uniform_object(_make_geometry()).get_array()
+
+        assert numpy.allclose(numpy.abs(array), 1.0)
+        assert numpy.allclose(numpy.angle(array), 0.0)
+
+    def test_matches_the_random_generator_with_zero_deviations(self) -> None:
+        geometry = _make_geometry(width_px=9, height_px=5)
+        equivalent = generate_random_object(
+            _rng(),
+            geometry,
+            amplitude_mean=1.0,
+            amplitude_deviation=0.0,
+            phase_mean=0.0,
+            phase_deviation_tr=0.0,
+            blur_deviation_px=0.0,
+        )
+
+        assert numpy.array_equal(
+            generate_uniform_object(geometry).get_array(), equivalent.get_array()
+        )
+
+    def test_geometry_metadata_is_preserved(self) -> None:
+        geometry = _make_geometry(
+            width_px=16,
+            height_px=8,
+            pixel_width_m=3e-9,
+            pixel_height_m=5e-9,
+            center_x_m=1e-6,
+            center_y_m=-2e-6,
+        )
+        object_ = generate_uniform_object(geometry)
+
+        assert object_.get_pixel_geometry() == geometry.get_pixel_geometry()
+        assert object_.get_center() == geometry.get_center()

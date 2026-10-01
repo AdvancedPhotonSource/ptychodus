@@ -61,24 +61,23 @@ from ptychodus.api.affine import (
     estimate_affine_transform,
     transform_probe_positions,
 )
-from ptychodus.api.assemble import assemble_dataset, summarize_dataset
+from ptychodus.api.assemble import assemble_dataset
 from ptychodus.api.constants import energy_eV_to_wavelength_m
-from ptychodus.api.diffraction import BadPixels, BeamCenter, CropRegion, DiffractionDataset
+from ptychodus.api.diffraction import BadPixels, CropRegion
 from ptychodus.api.exit_codes import ExitCode
-from ptychodus.api.geometry import ImageExtent, PixelGeometry
+from ptychodus.api.geometry import PixelGeometry
 from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.object import compute_object_geometry
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import (
     DiffractionPrepPipeline,
     FilterValuesStep,
-    estimate_beam_center,
 )
 from ptychodus.api.probe import Probe, ProbeGeometry, ProbeSequence
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import prepare_reconstruct_input
-from ptychodus.api.simulate.object import generate_random_object
+from ptychodus.api.simulate.object import generate_uniform_object
 from ptychodus.api.simulate.probe import (
     generate_coherent_probe_modes,
     generate_fresnel_zone_plate_probe,
@@ -92,6 +91,7 @@ from ptychodus.cli._reconstruct_common import (
     invalid_count_threshold,
     is_main_process,
     load_ptychi_options,
+    resolve_crop_region,
     resolve_quantity,
     run_reconstruction,
     save_assembled_diffraction,
@@ -256,67 +256,6 @@ def _write_affine_fit(file_path: Path, result: AffineFitResult) -> None:
     file_path.write_text(json.dumps(payload, indent=2))
 
 
-def _resolve_crop_region(
-    args: argparse.Namespace,
-    raw_dataset: DiffractionDataset,
-    value_filter: FilterValuesStep | None,
-    bad_pixels: BadPixels | None,
-) -> CropRegion | None:
-    """Resolve one crop region for the whole run, from the first selected scan.
-
-    Every projection must land on the same grid: the warm-start probe is carried from one
-    scan to the next, and a stack of projections reconstructed on differing grids cannot be
-    combined. So the beam center is settled once here rather than per scan.
-    """
-    if args.crop_extent_px is None:
-        return None
-
-    metadata = raw_dataset.get_metadata()
-
-    if args.beam_center_x_px is not None and args.beam_center_y_px is not None:
-        beam_center = BeamCenter(x_px=args.beam_center_x_px, y_px=args.beam_center_y_px)
-        center_source = '--beam-center-{x,y}-px'
-    elif metadata.beam_center is not None:
-        beam_center = metadata.beam_center
-        center_source = 'the diffraction file'
-    else:
-        # Reads every pattern of this scan, so it is reached only when no center was
-        # supplied by flag or file. summarize_dataset inpaints the bad pixels that
-        # estimate_beam_center requires the caller to have handled.
-        logger.info('Summarizing the first scan to estimate the beam center')
-        summary = summarize_dataset(raw_dataset, bad_pixels=bad_pixels)
-        mean_pattern = (
-            summary.mean_pattern
-            if value_filter is None
-            else value_filter.apply(summary.mean_pattern)
-        )
-        beam_center = estimate_beam_center(mean_pattern)
-        center_source = 'an estimate over the whole scan'
-
-    logger.info('Beam center: (%d, %d) from %s', beam_center.x_px, beam_center.y_px, center_source)
-
-    extent = ImageExtent(width_px=args.crop_extent_px, height_px=args.crop_extent_px)
-
-    if extent == metadata.detector_extent:
-        return None
-
-    region = CropRegion.from_center_extent(beam_center, extent)
-
-    # from_center_extent does not clip. Silently clamping would quietly reconstruct a
-    # different region than asked for, so an overhanging crop is an error.
-    if region.clamp_to_detector_extent(metadata.detector_extent) != region:
-        raise ValueError(
-            f'A {args.crop_extent_px}px crop about ({beam_center.x_px}, '
-            f'{beam_center.y_px}) runs off the '
-            f'{metadata.detector_extent.width_px}x{metadata.detector_extent.height_px} '
-            f'detector (x={region.x_range} y={region.y_range}). '
-            'Give a smaller --crop-extent-px or an explicit beam center.'
-        )
-
-    logger.info('Cropping to x=%s y=%s', region.x_range, region.y_range)
-    return region
-
-
 @dataclass(frozen=True)
 class _ScanResult:
     """What one reconstructed projection contributes to the rest of the run."""
@@ -477,15 +416,7 @@ def _reconstruct_one_scan(
     )
 
     # Deviations = 0 gives a flat unit-amplitude, zero-phase field.
-    object_ = generate_random_object(
-        rng,
-        object_geometry,
-        amplitude_mean=1.0,
-        amplitude_deviation=0.0,
-        phase_mean=0.0,
-        phase_deviation_tr=0.0,
-        blur_deviation_px=0.0,
-    )
+    object_ = generate_uniform_object(object_geometry)
 
     probe_photon_count = float(assembled_data.get_probe_photon_count())
 
@@ -840,7 +771,16 @@ def main() -> ExitCode:
         logger.info('Zeroing pixels at or above %d as invalid', max_valid_count)
         value_filter = FilterValuesStep(lower_bound=0, upper_bound=max_valid_count)
 
-    read_region = _resolve_crop_region(args, first_dataset, value_filter, bad_pixels)
+    read_region = resolve_crop_region(
+        logger,
+        first_dataset,
+        crop_extent_px=args.crop_extent_px,
+        beam_center_x_px=args.beam_center_x_px,
+        beam_center_y_px=args.beam_center_y_px,
+        bad_pixels=bad_pixels,
+        value_filter=value_filter,
+        subject='first scan',
+    )
     del first_dataset
 
     warm_start_probe: Probe | None = None

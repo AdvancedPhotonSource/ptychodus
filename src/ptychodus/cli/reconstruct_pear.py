@@ -109,7 +109,7 @@ from ptychodus.api.propagate import (
     compute_magnification,
 )
 from ptychodus.api.reconstruct import prepare_reconstruct_input
-from ptychodus.api.simulate.object import generate_random_object
+from ptychodus.api.simulate.object import generate_uniform_object
 from ptychodus.api.simulate.probe import (
     generate_coherent_probe_modes,
     generate_fresnel_zone_plate_probe,
@@ -950,15 +950,7 @@ def main() -> ExitCode:
     object_file = params.path_to_init_object
 
     if object_file is None:
-        object_ = generate_random_object(
-            rng,
-            object_geometry,
-            amplitude_mean=1.0,
-            amplitude_deviation=0.0,
-            phase_mean=0.0,
-            phase_deviation_tr=0.0,
-            blur_deviation_px=0.0,
-        )
+        object_ = generate_uniform_object(object_geometry)
 
         if number_of_slices > 1:
             object_ = resize_object_layers(

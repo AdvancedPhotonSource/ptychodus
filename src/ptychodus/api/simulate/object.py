@@ -114,6 +114,22 @@ def generate_paganin_object(
     )
 
 
+def generate_uniform_object(geometry: ObjectGeometry) -> Object:
+    """Generate a transparent object: unit amplitude and zero phase everywhere.
+
+    The starting guess for a reconstruction that asserts nothing about the sample, as
+    distinct from :func:`generate_random_object` with its deviations set to zero -- which
+    computes the same array, but reads as though the result were random.
+    """
+    array = numpy.ones((1, geometry.height_px, geometry.width_px), dtype=complex)
+
+    return Object(
+        array=array,
+        pixel_geometry=geometry.get_pixel_geometry(),
+        center=geometry.get_center(),
+    )
+
+
 def generate_random_object(
     rng: numpy.random.Generator,
     geometry: ObjectGeometry,

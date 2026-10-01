@@ -35,8 +35,16 @@ import numpy
 from ptychi.api import LSQMLOptions
 from ptychi.api.options.task import PtychographyTaskOptions
 
-from ptychodus.api.assemble import AssembledDiffractionData
+from ptychodus.api.assemble import AssembledDiffractionData, summarize_dataset
+from ptychodus.api.diffraction import (
+    BadPixels,
+    BeamCenter,
+    CropRegion,
+    DiffractionDataset,
+)
+from ptychodus.api.geometry import ImageExtent
 from ptychodus.api.io import StandardFileLayout, save_diffraction_data, save_product
+from ptychodus.api.preprocess.diffraction import FilterValuesStep, estimate_beam_center
 from ptychodus.api.product import Product
 from ptychodus.api.reconstruct import ReconstructInput, ReconstructOutput
 from ptychodus.model.ptychi.task import (
@@ -54,6 +62,7 @@ __all__ = [
     'is_main_process',
     'load_ptychi_options',
     'process_rank',
+    'resolve_crop_region',
     'resolve_quantity',
     'run_reconstruction',
     'save_assembled_diffraction',
@@ -252,6 +261,75 @@ def resolve_quantity(
         return fallback
 
     raise ValueError(f'{quantity} is not in the file and has no default; pass {flag}.')
+
+
+def resolve_crop_region(
+    logger: logging.Logger,
+    raw_dataset: DiffractionDataset,
+    *,
+    crop_extent_px: int | None,
+    beam_center_x_px: int | None,
+    beam_center_y_px: int | None,
+    bad_pixels: BadPixels | None,
+    value_filter: FilterValuesStep | None,
+    subject: str = 'dataset',
+) -> CropRegion | None:
+    """The detector region to read, or None to read the whole frame.
+
+    `subject` names what the beam center is estimated over, for the two log lines that say
+    so: a caller that settles one region for a whole run of scans is not summarizing the
+    same thing as a caller handling a single dataset.
+    """
+    if crop_extent_px is None:
+        return None
+
+    metadata = raw_dataset.get_metadata()
+
+    # Beam center precedence: command line, then the file, then an estimate from the data.
+    # The estimate is logged as such -- a wrong center crops the wrong part of the
+    # detector, and nothing downstream would reveal it.
+    if beam_center_x_px is not None and beam_center_y_px is not None:
+        beam_center = BeamCenter(x_px=beam_center_x_px, y_px=beam_center_y_px)
+        center_source = '--beam-center-{x,y}-px'
+    elif metadata.beam_center is not None:
+        beam_center = metadata.beam_center
+        center_source = 'the diffraction file'
+    else:
+        # Reads every pattern, so it is reached only when no center was supplied by flag or
+        # file. summarize_dataset inpaints the bad pixels that estimate_beam_center requires
+        # the caller to have handled.
+        logger.info('Summarizing the %s to estimate the beam center', subject)
+        summary = summarize_dataset(raw_dataset, bad_pixels=bad_pixels)
+        mean_pattern = (
+            summary.mean_pattern
+            if value_filter is None
+            else value_filter.apply(summary.mean_pattern)
+        )
+        beam_center = estimate_beam_center(mean_pattern)
+        center_source = f'an estimate over the whole {subject}'
+
+    logger.info('Beam center: (%d, %d) from %s', beam_center.x_px, beam_center.y_px, center_source)
+
+    extent = ImageExtent(width_px=crop_extent_px, height_px=crop_extent_px)
+
+    if extent == metadata.detector_extent:
+        return None
+
+    region = CropRegion.from_center_extent(beam_center, extent)
+
+    # from_center_extent does not clip. Silently clamping would quietly reconstruct a
+    # different region than asked for, so an overhanging crop is an error.
+    if region.clamp_to_detector_extent(metadata.detector_extent) != region:
+        raise ValueError(
+            f'A {crop_extent_px}px crop about ({beam_center.x_px}, '
+            f'{beam_center.y_px}) runs off the '
+            f'{metadata.detector_extent.width_px}x{metadata.detector_extent.height_px} '
+            f'detector (x={region.x_range} y={region.y_range}). '
+            'Give a smaller --crop-extent-px or an explicit beam center.'
+        )
+
+    logger.info('Cropping to x=%s y=%s', region.x_range, region.y_range)
+    return region
 
 
 def invalid_count_threshold(dtype: numpy.dtype) -> int | None:

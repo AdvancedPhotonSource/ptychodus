@@ -59,7 +59,7 @@ from ptychodus.api.probe import Probe, ProbeGeometry, ProbeSequence
 from ptychodus.api.probe_positions import ProbePositionSequence
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.propagate import compute_far_field_propagation_distance
-from ptychodus.api.simulate.object import generate_random_object
+from ptychodus.api.simulate.object import generate_uniform_object
 from ptychodus.api.simulate.probe import (
     generate_average_pattern_probe,
     generate_coherent_probe_modes,
@@ -433,15 +433,7 @@ def _build_object(
         )
 
     # Deviations of zero give a flat unit-amplitude, zero-phase field.
-    return generate_random_object(
-        numpy.random.default_rng(args.seed),
-        object_geometry,
-        amplitude_mean=1.0,
-        amplitude_deviation=0.0,
-        phase_mean=0.0,
-        phase_deviation_tr=0.0,
-        blur_deviation_px=0.0,
-    )
+    return generate_uniform_object(object_geometry)
 
 
 def _build_product(
