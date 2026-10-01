@@ -66,6 +66,7 @@ from ptychodus.api.simulate.probe import (
     generate_fresnel_zone_plate_probe,
     generate_incoherent_probe_modes,
 )
+from ptychodus.cli import positive_int
 
 # Imported directly rather than through the registry because no plugin interface carries
 # either one: a ProbePositionFileReader returns coordinates, so the rest of what the
@@ -84,15 +85,6 @@ logger = logging.getLogger(__name__)
 # files is the format's own, so it lives with the format in `plugins.fold_slice`.
 FOLD_SLICE_DIFFRACTION_READER = 'fold_slice'
 FOLD_SLICE_POSITION_READER = 'fold_slice'
-
-
-def _positive_int(text: str) -> int:
-    value = int(text)
-
-    if value < 1:
-        raise argparse.ArgumentTypeError(f'"{text}" must be at least 1!')
-
-    return value
 
 
 def _resolve_raw_pixel_geometry(
@@ -779,13 +771,13 @@ def _create_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         '--num-probe-modes',
-        type=_positive_int,
+        type=positive_int,
         default=1,
         help='Incoherent probe modes in a generated probe.',
     )
     parser.add_argument(
         '--num-opr-modes',
-        type=_positive_int,
+        type=positive_int,
         default=1,
         help='Coherent (OPR) probe modes in a generated probe; 1 disables OPR.',
     )

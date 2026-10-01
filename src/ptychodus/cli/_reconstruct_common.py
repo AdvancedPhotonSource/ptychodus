@@ -31,6 +31,7 @@ from collections.abc import Callable
 from pathlib import Path
 from types import FrameType
 
+import numpy
 from ptychi.api import LSQMLOptions
 from ptychi.api.options.task import PtychographyTaskOptions
 
@@ -49,9 +50,11 @@ __all__ = [
     'CancellationToken',
     'add_ptychi_options_argument',
     'install_signal_handlers',
+    'invalid_count_threshold',
     'is_main_process',
     'load_ptychi_options',
     'process_rank',
+    'resolve_quantity',
     'run_reconstruction',
     'save_assembled_diffraction',
 ]
@@ -210,6 +213,59 @@ def _agree_on_cancellation(token: CancellationToken | None) -> bool:
     flag = torch.tensor([int(is_cancelled)], dtype=torch.int32, device=device)
     dist.all_reduce(flag, op=dist.ReduceOp.MAX)
     return bool(flag[0])
+
+
+def resolve_quantity(
+    logger: logging.Logger,
+    quantity: str,
+    override: float | None,
+    from_file: float | None,
+    fallback: float | None,
+    flag: str,
+    *,
+    level: int = logging.INFO,
+) -> float:
+    """Pick a geometry value from the command line, the file, or a fallback, and say which.
+
+    Reporting the source is the point: a run that silently substituted a built-in default
+    for a value the instrument actually recorded would be indistinguishable from one that
+    read it. Lower `level` where the provenance would otherwise be repeated per scan across
+    a long batch; the fallback warning is unaffected, since a guessed value is worth saying
+    out loud however many times it happens.
+    """
+    if override is not None:
+        logger.log(level, '%s: %g (from %s)', quantity, override, flag)
+        return override
+
+    if from_file is not None:
+        logger.log(level, '%s: %g (from the diffraction file)', quantity, from_file)
+        return from_file
+
+    if fallback is not None:
+        logger.warning(
+            '%s: %g (built-in default for this instrument; the file recorded none). '
+            'Pass %s if this scan differs.',
+            quantity,
+            fallback,
+            flag,
+        )
+        return fallback
+
+    raise ValueError(f'{quantity} is not in the file and has no default; pass {flag}.')
+
+
+def invalid_count_threshold(dtype: numpy.dtype) -> int | None:
+    """Count at and above which a pixel is invalid rather than merely bright.
+
+    Dectris detectors flag dead, masked and saturated pixels with the maximum value the
+    pattern dtype can hold -- 4294967295 on a uint32 Eiger. Left in place those markers
+    dominate every statistic computed from the frame: the beam-center estimator rejects
+    the real beam as noise and silently returns the detector midpoint instead.
+    """
+    if numpy.issubdtype(dtype, numpy.integer):
+        return int(numpy.iinfo(dtype).max)
+
+    return None
 
 
 _PTYCHI_OPTIONS_HELP = (

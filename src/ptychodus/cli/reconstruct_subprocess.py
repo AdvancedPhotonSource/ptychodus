@@ -72,7 +72,7 @@ from ptychodus.api.reconstruct import (
     ReconstructOutput,
     prepare_reconstruct_input,
 )
-from ptychodus.cli import DirectoryType
+from ptychodus.cli import DirectoryType, positive_int
 from ptychodus.cli._reconstruct_common import (
     CancellationToken,
     add_ptychi_options_argument,
@@ -125,15 +125,6 @@ class EventStream:
             message=str(exc),
             traceback=traceback.format_exc(),
         )
-
-
-def _positive_int(text: str) -> int:
-    value = int(text)
-
-    if value < 1:
-        raise argparse.ArgumentTypeError(f'"{text}" must be at least 1!')
-
-    return value
 
 
 def log_file(output_directory: Path, rank: int) -> Path:
@@ -307,7 +298,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         '--num-sync-epochs',
         default=1,
-        type=_positive_int,
+        type=positive_int,
         help='Epochs between progress events, checkpoints, and cancellation checks.',
     )
     parser.add_argument(

@@ -84,13 +84,15 @@ from ptychodus.api.simulate.probe import (
     generate_fresnel_zone_plate_probe,
     generate_incoherent_probe_modes,
 )
-from ptychodus.cli import DirectoryType
+from ptychodus.cli import DirectoryType, positive_int
 from ptychodus.cli._reconstruct_common import (
     CancellationToken,
     add_ptychi_options_argument,
     install_signal_handlers,
+    invalid_count_threshold,
     is_main_process,
     load_ptychi_options,
+    resolve_quantity,
     run_reconstruction,
     save_assembled_diffraction,
 )
@@ -108,61 +110,6 @@ DEFAULT_FZP_PRESET = 'APS_LamNI'
 
 # Scans live under eiger_4 in blocks of a thousand.
 _SCAN_BLOCK_SIZE = 1000
-
-
-def _positive_int(text: str) -> int:
-    value = int(text)
-    if value < 1:
-        raise argparse.ArgumentTypeError(f'"{text}" must be at least 1!')
-    return value
-
-
-def _resolve(
-    quantity: str,
-    override: float | None,
-    from_file: float | None,
-    fallback: float | None,
-    flag: str,
-) -> float:
-    """Pick a geometry value from the command line, the file, or a fallback, and say which.
-
-    Reporting the source is the point: a run that silently substituted a built-in
-    default for a value the instrument actually recorded would be indistinguishable
-    from one that read it.
-    """
-    if override is not None:
-        logger.debug('%s: %g (from %s)', quantity, override, flag)
-        return override
-
-    if from_file is not None:
-        logger.debug('%s: %g (from the diffraction file)', quantity, from_file)
-        return from_file
-
-    if fallback is not None:
-        logger.warning(
-            '%s: %g (built-in default for this instrument; the file recorded none). '
-            'Pass %s if this scan differs.',
-            quantity,
-            fallback,
-            flag,
-        )
-        return fallback
-
-    raise ValueError(f'{quantity} is not in the file and has no default; pass {flag}.')
-
-
-def _invalid_count_threshold(dtype: numpy.dtype) -> int | None:
-    """Count at and above which a pixel is invalid rather than merely bright.
-
-    Dectris detectors flag dead, masked and saturated pixels with the maximum value the
-    pattern dtype can hold -- 4294967295 on a uint32 Eiger. Left in place those markers
-    dominate every statistic computed from the frame: the beam-center estimator rejects
-    the real beam as noise and silently returns the detector midpoint instead.
-    """
-    if numpy.issubdtype(dtype, numpy.integer):
-        return int(numpy.iinfo(dtype).max)
-
-    return None
 
 
 @dataclass(frozen=True)
@@ -407,19 +354,23 @@ def _reconstruct_one_scan(
     raw_dataset = diffraction_reader.read(diffraction_file_path)
     metadata = raw_dataset.get_metadata()
 
-    detector_distance_m = _resolve(
+    detector_distance_m = resolve_quantity(
+        logger,
         'Detector distance (m)',
         args.detector_distance_m,
         metadata.detector_distance_m,
         None,
         '--detector-distance-m',
+        level=logging.DEBUG,
     )
-    probe_energy_eV = _resolve(  # noqa: N806
+    probe_energy_eV = resolve_quantity(  # noqa: N806
+        logger,
         'Probe energy (eV)',
         args.probe_energy_eV,
         metadata.probe_energy_eV,
         None,
         '--probe-energy-eV',
+        level=logging.DEBUG,
     )
     if metadata.detector_pixel_geometry is None:
         raise ValueError('The diffraction file records no detector pixel size!')
@@ -431,7 +382,7 @@ def _reconstruct_one_scan(
     )
 
     max_valid_count = (
-        _invalid_count_threshold(metadata.pattern_dtype)
+        invalid_count_threshold(metadata.pattern_dtype)
         if args.max_valid_count is None
         else args.max_valid_count
     )
@@ -630,14 +581,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         '--projection-stride',
-        type=_positive_int,
+        type=positive_int,
         default=1,
         help='Reconstruct every Nth distinct projection index.',
     )
     add_ptychi_options_argument(parser)
     parser.add_argument(
         '--affine-transform-after',
-        type=_positive_int,
+        type=positive_int,
         default=None,
         help=(
             'Fit one shared affine transform from the first N reconstructions, then disable '
@@ -666,7 +617,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         '--crop-extent-px',
-        type=_positive_int,
+        type=positive_int,
         default=None,
         help='Square crop side in raw detector pixels, about the beam center. Omit to skip.',
     )
@@ -744,13 +695,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         '--num-probe-modes',
-        type=_positive_int,
+        type=positive_int,
         default=1,
         help='Incoherent probe modes.',
     )
     parser.add_argument(
         '--num-opr-modes',
-        type=_positive_int,
+        type=positive_int,
         default=1,
         help='Coherent (OPR) probe modes; 1 disables OPR.',
     )
@@ -763,7 +714,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument('--seed', type=int, default=0, help='RNG seed for the initial guesses.')
     parser.add_argument(
         '--num-sync-epochs',
-        type=_positive_int,
+        type=positive_int,
         default=100,
         help='Epochs between reconstructor sync points and progress logs.',
     )
@@ -876,7 +827,7 @@ def main() -> ExitCode:
     )
     first_metadata = first_dataset.get_metadata()
     max_valid_count = (
-        _invalid_count_threshold(first_metadata.pattern_dtype)
+        invalid_count_threshold(first_metadata.pattern_dtype)
         if args.max_valid_count is None
         else args.max_valid_count
     )
