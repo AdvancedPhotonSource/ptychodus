@@ -5,7 +5,9 @@ step, and the threaded fan-out over a whole dataset. No ptychodus.model import -
 pipelines are built by hand rather than derived from PrepPipelineBuilder.
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+import concurrent.futures
+import os
 import threading
 import time
 
@@ -18,6 +20,7 @@ from ptychodus.api.assemble import (
     assemble_dataset,
     compute_array_offsets,
     compute_assembled_patterns_shape,
+    default_max_workers,
     preprocess_array,
 )
 from ptychodus.api.diffraction import (
@@ -615,8 +618,10 @@ def test_assemble_into_a_memmap_yields_read_only_views_over_a_writable_base(tmp_
     buffer.flush()
 
     numpy.testing.assert_array_equal(out.get_patterns()[:, 0, 0], [1, 1, 2, 2, 2, 3])
-    # get_patterns() boolean-masks, so it copies; the raw per-slot view is the read-only one.
     assert all(not v.get_pattern(0).flags.writeable for v in views)
+    # Handing out read-only views must not downgrade the buffer they are taken over, or
+    # the next scatter into it would fail.
+    assert not out.get_patterns().flags.writeable
     assert buffer.flags.writeable
 
 
@@ -856,3 +861,152 @@ class TestGetImageExtent:
         extent = data.get_image_extent()
 
         assert extent == ImageExtent(width_px=7, height_px=5)
+
+
+# ---------- read-only accessors and the pattern count ----------
+
+
+def _fully_assembled() -> AssembledDiffractionData:
+    """A buffer whose every slot holds a pattern."""
+    return assemble_dataset(_three_arrays())
+
+
+def _partly_assembled() -> AssembledDiffractionData:
+    """A buffer with one array's slots left unfilled, so the getters have to gather."""
+    dataset = _make_dataset(
+        [_array('a', 0, 2, 1), _FailingArray('b', OSError('unreadable'), num_patterns=3)],
+        (4, 4),
+    )
+    return assemble_dataset(dataset, on_array_error=lambda *_: None)
+
+
+@pytest.mark.parametrize('assembled', [_fully_assembled, _partly_assembled])
+def test_the_getters_never_return_a_writable_array(
+    assembled: Callable[[], AssembledDiffractionData],
+) -> None:
+    # The contract must not depend on how full the buffer happens to be, or a caller that
+    # works on a complete scan corrupts the shared buffer on a partial one.
+    data = assembled()
+
+    assert not data.get_patterns().flags.writeable
+    assert not data.get_indexes().flags.writeable
+
+
+def test_a_fully_assembled_buffer_is_returned_without_copying() -> None:
+    data = _fully_assembled()
+
+    # get_pattern() is a handle on the backing store, so sharing memory with it is the
+    # observable form of "this did not copy the whole buffer".
+    assert numpy.shares_memory(data.get_patterns(), data.get_pattern(0))
+
+
+def test_a_partly_assembled_buffer_gathers_into_a_copy() -> None:
+    data = _partly_assembled()
+
+    assert not numpy.shares_memory(data.get_patterns(), data.get_pattern(0))
+
+
+def test_taking_a_read_only_handle_leaves_the_buffer_fillable() -> None:
+    dataset = _three_arrays()
+    out = allocate_assembled_data(dataset)
+
+    # Downgrading a view must not downgrade its base, or the next scatter would fail.
+    out.get_patterns()
+    out.get_indexes()
+    assemble_dataset(dataset, out=out)
+
+    numpy.testing.assert_array_equal(out.get_patterns()[:, 0, 0], [1, 1, 2, 2, 2, 3])
+
+
+@pytest.mark.parametrize('assembled', [_fully_assembled, _partly_assembled])
+def test_the_pattern_count_matches_what_the_getter_returns(
+    assembled: Callable[[], AssembledDiffractionData],
+) -> None:
+    data = assembled()
+
+    assert data.get_num_patterns() == data.get_patterns().shape[0]
+
+
+def test_the_pattern_count_is_below_the_buffer_capacity_when_a_slot_went_unfilled() -> None:
+    data = _partly_assembled()
+
+    assert data.get_num_patterns() < data.get_patterns_shape()[0]
+
+
+# ---------- how many arrays the fan-out holds in flight ----------
+
+
+def _record_pool_sizes(monkeypatch: pytest.MonkeyPatch) -> list[int | None]:
+    """Capture the `max_workers` every ThreadPoolExecutor in the fan-out is built with."""
+    sizes: list[int | None] = []
+    real = concurrent.futures.ThreadPoolExecutor
+
+    class _Recorder(real):  # type: ignore[valid-type,misc]
+        def __init__(self, max_workers: int | None = None, **kwargs: object) -> None:
+            sizes.append(max_workers)
+            super().__init__(max_workers=max_workers, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(concurrent.futures, 'ThreadPoolExecutor', _Recorder)
+    return sizes
+
+
+def test_the_fan_out_is_bounded_when_the_caller_names_no_worker_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Each worker holds a whole array block resident, so an unbounded pool is a memory
+    # multiplier. ThreadPoolExecutor's own default would be min(32, cpu_count + 4).
+    monkeypatch.delenv('LOCAL_WORLD_SIZE', raising=False)
+    sizes = _record_pool_sizes(monkeypatch)
+
+    assemble_dataset(_three_arrays())
+
+    assert len(sizes) == 1
+    assert sizes[0] is not None and 1 <= sizes[0] <= 8
+
+
+def test_processes_sharing_a_node_each_take_a_share_of_the_budget() -> None:
+    # One process per local GPU would otherwise each size itself as though it had the
+    # node to itself. A world this large pins the expected answer on any host.
+    assert default_max_workers(local_world_size=64) == 1
+
+
+def test_the_ceiling_bounds_the_pool_below_the_core_count() -> None:
+    # The ceiling is what a caller raises to trade peak memory for throughput; a value
+    # above the core count cannot, which is the whole point of taking the minimum.
+    assert default_max_workers(max_arrays_in_flight=1, local_world_size=1) == 1
+    assert default_max_workers(max_arrays_in_flight=1000, local_world_size=1) == (
+        os.cpu_count() or 1
+    )
+
+
+def test_a_world_larger_than_the_budget_still_leaves_one_worker() -> None:
+    # Integer division would otherwise hand back a pool of zero, which
+    # ThreadPoolExecutor rejects outright.
+    assert default_max_workers(max_arrays_in_flight=2, local_world_size=1000) == 1
+
+
+def test_an_unreadable_local_world_size_is_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv('LOCAL_WORLD_SIZE', 'oops')
+    sizes = _record_pool_sizes(monkeypatch)
+
+    data = assemble_dataset(_three_arrays())
+
+    assert sizes[0] is not None and 1 <= sizes[0] <= 8
+    numpy.testing.assert_array_equal(data.get_patterns()[:, 0, 0], [1, 1, 2, 2, 2, 3])
+
+
+def test_the_launcher_supplies_the_divisor_when_the_caller_does_not(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv('LOCAL_WORLD_SIZE', '64')
+
+    assert default_max_workers() == 1
+
+
+def test_an_explicit_worker_count_is_passed_through(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv('LOCAL_WORLD_SIZE', '64')
+    sizes = _record_pool_sizes(monkeypatch)
+
+    assemble_dataset(_three_arrays(), max_workers=3)
+
+    assert sizes == [3]

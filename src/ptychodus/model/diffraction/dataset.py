@@ -105,6 +105,10 @@ class AssembledDiffractionArray(DiffractionArray):
             return patterns
         return read_region.apply_to(patterns)
 
+    def get_num_patterns(self) -> int:
+        # The inherited default counts by reading every pattern; the buffer already knows.
+        return self._data.get_num_patterns()
+
     def get_pattern(self, index: int) -> DiffractionPattern:
         return self._data.get_pattern(index)
 

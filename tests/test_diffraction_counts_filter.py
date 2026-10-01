@@ -501,3 +501,31 @@ def test_a_failing_pass_leaves_the_error_and_the_actor_describing_it() -> None:
 
     assert service.task_monitor.actor == 'Refresh Counts'
     assert isinstance(service.task_monitor.get_last_error(), ValueError)
+
+
+@pytest.mark.parametrize(
+    'dtype', [numpy.uint8, numpy.uint16, numpy.int32, numpy.float32, numpy.float64]
+)
+def test_compute_total_counts_matches_the_masked_form_when_nothing_is_masked(dtype) -> None:  # type: ignore[no-untyped-def]
+    # Nothing masked takes a reduction over the frame axes instead of a boolean fancy
+    # index. The two must agree in value and dtype, or a total-counts bound would admit
+    # different patterns depending on whether a bad-pixel mask happened to be empty.
+    patterns = numpy.arange(4 * 3 * 2, dtype=dtype).reshape(4, 3, 2)
+    none_bad = numpy.zeros((3, 2), dtype=bool)
+    expected = numpy.sum(patterns[:, numpy.logical_not(none_bad)], axis=-1)
+
+    counts = compute_total_counts(patterns, none_bad)
+
+    assert counts.dtype == expected.dtype
+    numpy.testing.assert_array_equal(counts, expected)
+
+
+def test_compute_total_counts_of_an_empty_stack_keeps_the_masked_form_shape() -> None:
+    patterns = numpy.zeros((0, 3, 2), dtype=numpy.uint16)
+    none_bad = numpy.zeros((3, 2), dtype=bool)
+    expected = numpy.sum(patterns[:, numpy.logical_not(none_bad)], axis=-1)
+
+    counts = compute_total_counts(patterns, none_bad)
+
+    assert counts.shape == expected.shape == (0,)
+    assert counts.dtype == expected.dtype

@@ -227,6 +227,83 @@ def test_homogenize_object_layers_survives_a_total_phase_beyond_pi() -> None:
     numpy.testing.assert_allclose(numpy.angle(homogenized.get_array()), 2.0, atol=1.0e-12)
 
 
+def _make_wrapped_phase_object() -> Object:
+    """One layer whose phase ramps past 2 pi, so numpy.angle wraps it into (-pi, pi].
+
+    Every wrap draws one contour of adjacent-pixel jumps larger than pi, so a ramp of
+    several turns leaves a fraction of jumps well above the default threshold.
+    """
+    ramp = numpy.linspace(0.0, 12.0 * numpy.pi, EXTENT_PX * EXTENT_PX)
+    layer = numpy.exp(1j * ramp).reshape(1, EXTENT_PX, EXTENT_PX)
+
+    return _make_object(layer)
+
+
+def test_homogenize_object_layers_warns_about_a_wrapped_layer(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # The principal logarithm of a wrapped layer is not its optical path, and nothing
+    # downstream reveals that, so the warning is the only signal the caller gets.
+    with caplog.at_level('WARNING', logger='ptychodus.api.object'):
+        homogenize_object_layers(_make_wrapped_phase_object())
+
+    assert 'looks phase-wrapped' in caplog.text
+
+
+def test_a_raised_jump_fraction_accepts_a_finely_textured_layer(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # What the knob is for: an object whose own structure jumps by more than pi between
+    # neighboring pixels is not wrapped, and should not be reported as though it were.
+    with caplog.at_level('WARNING', logger='ptychodus.api.object'):
+        homogenize_object_layers(_make_wrapped_phase_object(), wrapped_phase_jump_fraction=1.0)
+
+    assert caplog.text == ''
+
+
+def test_unwrapping_silences_the_warning_whatever_the_fraction(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # The fraction gates a report about unwrapped phase, so it has nothing to say once
+    # the phase has been unwrapped -- even at a threshold that would flag anything.
+    with caplog.at_level('WARNING', logger='ptychodus.api.object'):
+        homogenize_object_layers(
+            _make_wrapped_phase_object(),
+            unwrap_phase_rad=True,
+            wrapped_phase_jump_fraction=0.0,
+        )
+
+    assert caplog.text == ''
+
+
+def test_resample_object_layers_forwards_the_jump_fraction(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    obj = _make_object(
+        numpy.repeat(_make_wrapped_phase_object().get_array(), 2, axis=0),
+    )
+
+    with caplog.at_level('WARNING', logger='ptychodus.api.object'):
+        resample_object_layers(obj, [THICKNESS_M / 2.0] * 2, wrapped_phase_jump_fraction=1.0)
+
+    assert caplog.text == ''
+
+
+def test_resize_object_layers_forwards_the_jump_fraction(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Only the geometric-mean fill takes a logarithm, so it is the one path here that
+    # can report a wrap at all.
+    obj = _make_wrapped_phase_object()
+
+    with caplog.at_level('WARNING', logger='ptychodus.api.object'):
+        resize_object_layers(
+            obj, 3, fill_mode=LayerFillMode.GEOMETRIC_MEAN, wrapped_phase_jump_fraction=1.0
+        )
+
+    assert caplog.text == ''
+
+
 def test_homogenize_object_layers_single_layer_input_is_unchanged() -> None:
     obj = _make_layered_object(1)
 

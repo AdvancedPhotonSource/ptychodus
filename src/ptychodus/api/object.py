@@ -6,7 +6,6 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
-from typing import Final
 import logging
 import math
 
@@ -25,10 +24,6 @@ from .probe import ProbeGeometry
 from .probe_positions import ProbePosition, ProbePositionSequence, calculate_scan_geometry
 
 logger = logging.getLogger(__name__)
-
-# A true 2-pi wrap draws a contour of large adjacent-pixel jumps across a layer, while
-# ordinary high-contrast structure produces only scattered ones.
-_WRAPPED_PHASE_JUMP_FRACTION: Final[float] = 0.002
 
 
 @dataclass(frozen=True)
@@ -723,12 +718,14 @@ def _layer_depths_m(layer_spacing_m: Sequence[float]) -> RealArrayType:
     return numpy.concatenate(([0.0], numpy.cumsum(numpy.asarray(layer_spacing_m, dtype=float))))
 
 
-def _warn_if_phase_appears_wrapped(phase_rad: RealArrayType) -> None:
+def _warn_if_phase_appears_wrapped(phase_rad: RealArrayType, *, jump_fraction: float) -> None:
     """Warn when a layer's phase looks wrapped, which invalidates its principal logarithm.
 
     A true 2-pi wrap draws a contour of adjacent-pixel jumps larger than pi across the
     layer, so the fraction of such jumps separates wrapping from ordinary high-contrast
-    structure, which produces only scattered ones.
+    structure, which produces only scattered ones. Raising `jump_fraction` quiets the
+    warning for an object whose own structure is that finely textured; lowering it
+    reports a wrap that covers only part of a layer.
     """
     for index, layer in enumerate(phase_rad):
         jumps = 0
@@ -739,7 +736,7 @@ def _warn_if_phase_appears_wrapped(phase_rad: RealArrayType) -> None:
             jumps += int(numpy.count_nonzero(numpy.abs(difference) > numpy.pi))
             total += difference.size
 
-        if total > 0 and jumps / total > _WRAPPED_PHASE_JUMP_FRACTION:
+        if total > 0 and jumps / total > jump_fraction:
             logger.warning(
                 'Layer %d looks phase-wrapped (%.1f%% of neighboring pixels jump by more than '
                 'pi); its principal logarithm is not the true optical path. Pass '
@@ -750,7 +747,11 @@ def _warn_if_phase_appears_wrapped(phase_rad: RealArrayType) -> None:
 
 
 def _layer_log_transmission(
-    array: ComplexArrayType, *, unwrap_phase_rad: bool, amplitude_floor: float
+    array: ComplexArrayType,
+    *,
+    unwrap_phase_rad: bool,
+    amplitude_floor: float,
+    wrapped_phase_jump_fraction: float,
 ) -> ComplexArrayType:
     """Per-layer complex logarithm, the additive form of the layer product.
 
@@ -766,6 +767,9 @@ def _layer_log_transmission(
         amplitude_floor: Smallest magnitude used in the logarithm. A padded object carries
             a zero-amplitude border, whose logarithm would otherwise be ``-inf`` and would
             poison any later difference of cumulative sums.
+        wrapped_phase_jump_fraction: Fraction of adjacent-pixel phase jumps above pi at
+            which a layer is reported as wrapped. Unused when unwrapping is on, since
+            nothing is then left to warn about.
     """
     magnitude = numpy.maximum(numpy.abs(array), amplitude_floor)
 
@@ -773,7 +777,7 @@ def _layer_log_transmission(
         phase_rad = numpy.stack([unwrap_phase(numpy.angle(layer)) for layer in array])
     else:
         phase_rad = numpy.angle(array)
-        _warn_if_phase_appears_wrapped(phase_rad)
+        _warn_if_phase_appears_wrapped(phase_rad, jump_fraction=wrapped_phase_jump_fraction)
 
     return numpy.log(magnitude) + 1j * phase_rad
 
@@ -869,6 +873,7 @@ def homogenize_object_layers(
     layer_spacing_m: Sequence[float] | None = None,
     unwrap_phase_rad: bool = False,
     amplitude_floor: float = 1.0e-12,
+    wrapped_phase_jump_fraction: float = 0.002,
 ) -> Object:
     """Spread the object's whole transmission evenly over ``num_layers`` identical layers.
 
@@ -887,6 +892,9 @@ def homogenize_object_layers(
         unwrap_phase_rad: Unwrap each input layer's phase before summing. Needed only when
             a single layer is itself thick enough to wrap.
         amplitude_floor: Smallest magnitude used in the logarithm.
+        wrapped_phase_jump_fraction: Fraction of adjacent-pixel phase jumps above pi at
+            which a layer is reported as wrapped. Raise it to quiet the warning for a
+            finely textured object; it has no effect when ``unwrap_phase_rad`` is set.
 
     Raises:
         ValueError: If ``num_layers`` is less than one, if the layer count changes without
@@ -913,7 +921,10 @@ def homogenize_object_layers(
         raise ValueError(f'Expected {count - 1} layer spacing(s) for {count} layers.')
 
     log_transmission = _layer_log_transmission(
-        obj.get_array(), unwrap_phase_rad=unwrap_phase_rad, amplitude_floor=amplitude_floor
+        obj.get_array(),
+        unwrap_phase_rad=unwrap_phase_rad,
+        amplitude_floor=amplitude_floor,
+        wrapped_phase_jump_fraction=wrapped_phase_jump_fraction,
     ).sum(axis=0)
     layer = numpy.exp(log_transmission / count)
 
@@ -958,6 +969,8 @@ def resize_object_layers(
     *,
     fill_mode: LayerFillMode = LayerFillMode.VACUUM,
     layer_spacing_m: Sequence[float] | None = None,
+    amplitude_floor: float = 1.0e-12,
+    wrapped_phase_jump_fraction: float = 0.002,
 ) -> Object:
     """Grow or shrink the layer stack to ``num_layers`` without interpolating.
 
@@ -974,6 +987,11 @@ def resize_object_layers(
         fill_mode: Content of each inserted layer.
         layer_spacing_m: Output spacing. Defaults to slicing the input spacing when
             shrinking and to repeating the adjacent gap when growing.
+        amplitude_floor: Smallest magnitude used in the logarithm the geometric-mean fill
+            is taken through. Unused by the other fill modes.
+        wrapped_phase_jump_fraction: Fraction of adjacent-pixel phase jumps above pi at
+            which a layer is reported as wrapped while that fill is computed. Raise it to
+            quiet the warning for a finely textured object.
 
     Raises:
         ValueError: If ``num_layers`` is less than one, or ``layer_spacing_m`` has the
@@ -1007,7 +1025,10 @@ def resize_object_layers(
             case LayerFillMode.GEOMETRIC_MEAN:
                 filler = numpy.exp(
                     _layer_log_transmission(
-                        array, unwrap_phase_rad=False, amplitude_floor=1.0e-12
+                        array,
+                        unwrap_phase_rad=False,
+                        amplitude_floor=amplitude_floor,
+                        wrapped_phase_jump_fraction=wrapped_phase_jump_fraction,
                     ).mean(axis=0)
                 )
             case LayerFillMode.EDGE:
@@ -1055,6 +1076,7 @@ def resample_object_layers(
     preserve_total_transmission: bool = True,
     unwrap_phase_rad: bool = False,
     amplitude_floor: float = 1.0e-12,
+    wrapped_phase_jump_fraction: float = 0.002,
 ) -> Object:
     """Resample the layer stack onto the depth grid implied by ``layer_spacing_m``.
 
@@ -1079,6 +1101,9 @@ def resample_object_layers(
         unwrap_phase_rad: Unwrap each input layer's phase before accumulating. Needed only
             when a single layer is itself thick enough to wrap.
         amplitude_floor: Smallest magnitude used in the logarithm.
+        wrapped_phase_jump_fraction: Fraction of adjacent-pixel phase jumps above pi at
+            which a layer is reported as wrapped. Raise it to quiet the warning for a
+            finely textured object; it has no effect when ``unwrap_phase_rad`` is set.
     """
     # An unchanged depth grid must be a bit-exact no-op: callers rebuild objects on every
     # settings notification, and a round trip through log and exp would drift each time.
@@ -1102,6 +1127,7 @@ def resample_object_layers(
             layer_spacing_m=layer_spacing_m,
             unwrap_phase_rad=unwrap_phase_rad,
             amplitude_floor=amplitude_floor,
+            wrapped_phase_jump_fraction=wrapped_phase_jump_fraction,
         )
 
     if preserve_total_transmission:
@@ -1111,7 +1137,10 @@ def resample_object_layers(
     target_boundaries_m = _voronoi_boundaries_m(target_depths_m)
 
     log_transmission = _layer_log_transmission(
-        obj.get_array(), unwrap_phase_rad=unwrap_phase_rad, amplitude_floor=amplitude_floor
+        obj.get_array(),
+        unwrap_phase_rad=unwrap_phase_rad,
+        amplitude_floor=amplitude_floor,
+        wrapped_phase_jump_fraction=wrapped_phase_jump_fraction,
     )
     cumulative = numpy.concatenate(
         (

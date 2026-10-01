@@ -189,9 +189,8 @@ class _ArrayTreeNode(_TreeNode):
         super().__init__(dataset_node)
         self._dataset_node = dataset_node
         self._array = array
-        # Snapshot both reductions: get_num_patterns() and get_patterns() each gather
-        # through the shared buffer's index mask, the latter returning a copy, and the
-        # Frames and Size columns ask on every repaint.
+        # Snapshot both reductions: each gathers through the shared buffer's index mask,
+        # and the Frames and Size columns ask on every repaint.
         self._num_patterns = array.get_num_patterns()
         self._nbytes = array.get_patterns().nbytes
 
