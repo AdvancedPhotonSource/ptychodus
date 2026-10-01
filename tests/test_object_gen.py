@@ -1141,7 +1141,7 @@ class TestGenerateUniformObject:
             geometry,
             amplitude_mean=1.0,
             amplitude_deviation=0.0,
-            phase_mean=0.0,
+            phase_mean_tr=0.0,
             phase_deviation_tr=0.0,
             blur_deviation_px=0.0,
         )
@@ -1163,3 +1163,37 @@ class TestGenerateUniformObject:
 
         assert object_.get_pixel_geometry() == geometry.get_pixel_geometry()
         assert object_.get_center() == geometry.get_center()
+
+
+class TestRandomObjectPhaseMean:
+    """``phase_mean_tr`` was accepted and ignored until it was wired up.
+
+    Every caller in the tree passed 0.0, so the omission was invisible; these pin the
+    behavior so it stays wired, and pin the units the ``_tr`` suffix claims.
+    """
+
+    @staticmethod
+    def _generate(phase_mean_tr: float, seed: int = 11) -> numpy.ndarray:
+        return generate_random_object(
+            _rng(seed),
+            _make_geometry(width_px=24, height_px=16),
+            amplitude_mean=1.0,
+            amplitude_deviation=0.1,
+            phase_mean_tr=phase_mean_tr,
+            phase_deviation_tr=0.05,
+            blur_deviation_px=0.0,
+        ).get_array()
+
+    def test_a_nonzero_mean_shifts_the_phase(self) -> None:
+        assert not numpy.allclose(self._generate(0.25), self._generate(0.0))
+
+    def test_the_shift_is_exactly_the_requested_number_of_turns(self) -> None:
+        """The array is amplitude * exp(2*pi*j * phase), so a mean of 0.25 is a quarter turn."""
+        ratio = self._generate(0.25) / self._generate(0.0)
+        assert numpy.allclose(ratio, numpy.exp(2.0j * numpy.pi * 0.25))
+
+    def test_a_full_turn_is_indistinguishable_from_none(self) -> None:
+        assert numpy.allclose(self._generate(1.0), self._generate(0.0))
+
+    def test_the_phase_mean_leaves_the_amplitude_alone(self) -> None:
+        assert numpy.allclose(numpy.abs(self._generate(0.3)), numpy.abs(self._generate(0.0)))

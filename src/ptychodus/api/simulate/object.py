@@ -136,11 +136,15 @@ def generate_random_object(
     *,
     amplitude_mean: float,
     amplitude_deviation: float,
-    phase_mean: float,
+    phase_mean_tr: float,
     phase_deviation_tr: float,
     blur_deviation_px: float,
 ) -> Object:
-    """Generate a random complex object from Gaussian amplitude and phase distributions, with optional Gaussian blur."""
+    """Generate a random complex object from Gaussian amplitude and phase distributions, with optional Gaussian blur.
+
+    Phase is in turns, as the ``_tr`` suffixes say: the array is
+    ``amplitude * exp(2*pi*j * phase)``, so a `phase_mean_tr` of 0.5 is half a turn.
+    """
     object_shape = (1, geometry.height_px, geometry.width_px)
 
     amplitude = rng.normal(
@@ -149,7 +153,7 @@ def generate_random_object(
         object_shape,
     )
     phase = rng.normal(
-        0.0,
+        phase_mean_tr,
         phase_deviation_tr,
         object_shape,
     )

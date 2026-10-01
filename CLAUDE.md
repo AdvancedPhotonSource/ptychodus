@@ -93,3 +93,5 @@ Both providers are optional-dep gated but constructed by `ModelCore` even when d
 ## Repository
 
 CI targets `main`; local dev branches (e.g. `amsc`, `webservice`) are active — confirm the intended target before opening PRs.
+
+**Never commit without being asked.** Finish the work, run the gate, and leave the changes in the working tree — staged if asked, unstaged otherwise. This holds even when a commit seems obviously wanted: an approved plan that describes commits is a plan for the code, not permission to write history; a clean gate is not permission either; and neither is a long task with natural checkpoints. Say what is ready and let the commit be a separate instruction. The same goes, more so, for `git push`, `git commit --amend`, `git reset`, force-pushing, and opening or updating PRs.
