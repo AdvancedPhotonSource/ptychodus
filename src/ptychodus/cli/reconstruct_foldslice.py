@@ -3,8 +3,13 @@
 
 Reads the cropped-and-centered pair the fold_slice preprocessing step writes, which is how
 most batch reconstructions at these beamlines are actually fed. The files record no geometry
-at all, so --detector-distance-m and --probe-energy-eV are effectively required and the beam
-center is already applied.
+at all, so --detector-distance-m, --probe-energy-eV and --detector-pixel-size-m are
+effectively required.
+
+The patterns arrive already prepared, so this driver conditions them no further: it applies
+no crop, no beam-center search, no value filter, no bad-pixel override and no flip or
+transpose. Whatever fold_slice wrote is what gets reconstructed. Any of those belongs in the
+preprocessing step that produced the file.
 
 Scope and limitations
 ---------------------
@@ -18,6 +23,8 @@ Scope and limitations
   :func:`prepare_reconstruct_input` rather than by array order.
 - Geometry resolves in one order -- command line, then the file, then a built-in
   fallback -- and the source of each value is logged.
+- The detector bad-pixel mask the reader itself supplies is still honored; only the
+  ``--bad-pixels-file`` override is absent.
 """
 
 from __future__ import annotations
@@ -29,24 +36,12 @@ from pathlib import Path
 
 import numpy
 
-from ptychi.api import LSQMLOptions
-
 from ptychodus.api.assemble import assemble_dataset
 from ptychodus.api.constants import energy_eV_to_wavelength_m
-from ptychodus.api.diffraction import BadPixels, BeamCenter, CropRegion, DiffractionDataset
-from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.io import StandardFileLayout, save_diffraction_data
+from ptychodus.api.geometry import PixelGeometry
+from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.object import compute_object_geometry
 from ptychodus.api.plugins import PluginRegistry
-from ptychodus.api.preprocess.diffraction import (
-    DiffractionPrepPipeline,
-    DiffractionPrepStepUnion,
-    FilterValuesStep,
-    HorizontalFlipStep,
-    TransposeStep,
-    VerticalFlipStep,
-    estimate_beam_center,
-)
 from ptychodus.api.probe import Probe, ProbeGeometry
 from ptychodus.api.product import Product, ProductMetadata
 from ptychodus.api.reconstruct import prepare_reconstruct_input
@@ -58,7 +53,14 @@ from ptychodus.api.simulate.probe import (
     generate_incoherent_probe_modes,
 )
 from ptychodus.cli import DirectoryType
-from ptychodus.cli._reconstruct_common import run_reconstruction
+from ptychodus.cli._reconstruct_common import (
+    EXIT_CANCELLED,
+    add_ptychi_options_argument,
+    install_signal_handlers,
+    load_ptychi_options,
+    run_reconstruction,
+    save_assembled_diffraction,
+)
 
 logger = logging.getLogger('reconstruct_foldslice')
 
@@ -70,12 +72,6 @@ POSITION_READER = 'fold_slice'
 # run cycles and the file cannot be stale about itself.
 DEFAULT_DETECTOR_DISTANCE_M = None
 DEFAULT_FZP_PRESET = ''
-
-# Where the beam center comes from when neither the command line nor the file supplies
-# one. 'estimate' back-propagates nothing -- it centroids the mean of the first array --
-# and 'midpoint' takes the detector center, which is right only for a layout that was
-# already cropped about the beam by whatever wrote it.
-BEAM_CENTER_FALLBACK = 'midpoint'
 
 
 def _positive_int(text: str) -> int:
@@ -119,91 +115,6 @@ def _resolve(
     raise ValueError(f'{quantity} is not in the file and has no default; pass {flag}.')
 
 
-def _invalid_count_threshold(dtype: numpy.dtype) -> int | None:
-    """Count at and above which a pixel is invalid rather than merely bright.
-
-    Dectris detectors flag dead, masked and saturated pixels with the maximum value the
-    pattern dtype can hold -- 4294967295 on a uint32 Eiger. Left in place those markers
-    dominate every statistic computed from the frame: the beam-center estimator rejects
-    the real beam as noise and silently returns the detector midpoint instead.
-    """
-    if numpy.issubdtype(dtype, numpy.integer):
-        return int(numpy.iinfo(dtype).max)
-
-    return None
-
-
-# Reading one array uncropped just to locate the beam is cheap when an array is one
-# scan line, and ruinous when it is the whole scan: a LamNI acquisition is a single
-# 12201 x 1030 x 1614 array, 81 GiB in its native uint32. DiffractionArray exposes no way
-# to read a few frames -- get_patterns() crops in space, not in frame -- so the estimate
-# is offered only when the first array fits in this budget. Sized to admit a normal
-# single-array scan (a 1089-frame ISN scan is about 4.8 GiB) and refuse LamNI.
-_ESTIMATE_BUDGET_BYTES = 8 * 1024**3
-
-
-def _mean_pattern(dataset: DiffractionDataset, upper_bound: int | None) -> numpy.ndarray:
-    """Mean over the first array's patterns, for locating the direct beam.
-
-    One array is enough to find the beam and costs one file read; averaging the whole
-    scan would mean reading every uncropped frame just to decide where to crop. The same
-    invalid-pixel cut the pipeline applies is applied here, so the center is estimated
-    from the frame that will actually be reconstructed.
-    """
-    metadata = dataset.get_metadata()
-    extent = metadata.detector_extent
-    # Measured in the stored dtype, which is what the read actually allocates.
-    wanted_bytes = (
-        metadata.num_patterns_per_array[0]
-        * extent.width_px
-        * extent.height_px
-        * metadata.pattern_dtype.itemsize
-    )
-
-    if wanted_bytes > _ESTIMATE_BUDGET_BYTES:
-        raise ValueError(
-            f'Estimating the beam center would read {wanted_bytes / 1024**3:.1f} GiB: this '
-            f"dataset's first array holds {metadata.num_patterns_per_array[0]} uncropped "
-            f'{extent.width_px}x{extent.height_px} frames. Pass --beam-center-x-px and '
-            '--beam-center-y-px instead.'
-        )
-
-    patterns = dataset[0].get_patterns()
-
-    # A layout that stores one frame per file hands back a bare 2-D pattern rather than
-    # a length-1 stack; averaging over axis 0 would collapse it to a single row.
-    if patterns.ndim == 2:
-        patterns = patterns[numpy.newaxis]
-
-    # In place, and in the stored dtype: the array came fresh off the reader, so nothing
-    # else holds it, and widening the whole stack to float64 first would double the peak
-    # for no gain. The accumulator below is float64 regardless.
-    if upper_bound is not None:
-        patterns[patterns >= upper_bound] = 0
-
-    return patterns.mean(axis=0, dtype=numpy.float64)
-
-
-def _prep_pipeline(
-    args: argparse.Namespace, upper_bound: int | None
-) -> DiffractionPrepPipeline | None:
-    steps: list[DiffractionPrepStepUnion] = []
-
-    # Invalid-pixel markers and negatives first: every later step, and the assembled
-    # photon counts, would otherwise carry them.
-    if upper_bound is not None:
-        steps.append(FilterValuesStep(lower_bound=0, upper_bound=upper_bound))
-
-    if args.flip_up_down:
-        steps.append(VerticalFlipStep())
-    if args.flip_left_right:
-        steps.append(HorizontalFlipStep())
-    if args.transpose:
-        steps.append(TransposeStep())
-
-    return DiffractionPrepPipeline(steps=tuple(steps)) if steps else None
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
         description='fold_slice preprocessed ptychography reconstruction via the ptychodus api.',
@@ -237,24 +148,6 @@ def main() -> int:
         help='Skip diffraction.h5. The assembled patterns can run to several GB.',
     )
     parser.add_argument(
-        '--crop-extent-px',
-        type=_positive_int,
-        default=None,
-        help='Square crop side in raw detector pixels, about the beam center. Omit to skip.',
-    )
-    parser.add_argument(
-        '--beam-center-x-px',
-        type=int,
-        default=None,
-        help='Beam center column. File value, then an estimate from the data, otherwise.',
-    )
-    parser.add_argument(
-        '--beam-center-y-px',
-        type=int,
-        default=None,
-        help='Beam center row. File value, then an estimate from the data, otherwise.',
-    )
-    parser.add_argument(
         '--detector-distance-m',
         type=float,
         default=None,
@@ -271,37 +164,6 @@ def main() -> int:
         type=float,
         default=None,
         help='Detector pixel pitch, both axes. Overrides the file.',
-    )
-    parser.add_argument(
-        '--min-total-counts',
-        type=int,
-        default=None,
-        help='Drop patterns whose total counts fall below this, with their positions.',
-    )
-    parser.add_argument(
-        '--max-valid-count',
-        type=int,
-        default=None,
-        help=(
-            'Zero pixels at or above this count. Defaults to the pattern dtype maximum, '
-            'which is how Dectris detectors mark invalid pixels.'
-        ),
-    )
-    parser.add_argument('--flip-up-down', action='store_true', help='Flip patterns vertically.')
-    parser.add_argument(
-        '--flip-left-right', action='store_true', help='Flip patterns horizontally.'
-    )
-    parser.add_argument('--transpose', action='store_true', help='Transpose patterns.')
-    parser.add_argument(
-        '--bad-pixels-file',
-        type=Path,
-        default=None,
-        help='Bad-pixel mask covering the full, uncropped detector.',
-    )
-    parser.add_argument(
-        '--bad-pixels-file-type',
-        default='NPY_Bad_Pixels',
-        help='Name of the bad-pixel file reader plugin.',
     )
     parser.add_argument(
         '--probe-file',
@@ -369,6 +231,7 @@ def main() -> int:
         default=None,
         help='Override the tomography angle in degrees.',
     )
+    add_ptychi_options_argument(parser)
     parser.add_argument(
         '--dry-run',
         action='store_true',
@@ -387,6 +250,10 @@ def main() -> int:
         stream=sys.stderr,
         format='%(asctime)s %(levelname)s %(name)s: %(message)s',
     )
+
+    # Installed before the first long operation, so a cancel during the file reads is
+    # already honored. Nothing earlier than this is interruptible.
+    cancellation = install_signal_handlers()
 
     registry = PluginRegistry.load_plugins()
     diffraction_reader = registry.diffraction_file_readers.get_strategy_by_name(DIFFRACTION_READER)
@@ -432,80 +299,9 @@ def main() -> int:
         width_m=detector_pixel_size_m, height_m=detector_pixel_size_m
     )
 
-    max_valid_count = (
-        _invalid_count_threshold(metadata.pattern_dtype)
-        if args.max_valid_count is None
-        else args.max_valid_count
-    )
-
-    if max_valid_count is not None:
-        logger.info('Zeroing pixels at or above %d as invalid', max_valid_count)
-
-    read_region: CropRegion | None = None
-
-    if args.crop_extent_px is not None:
-        # Beam center precedence: command line, then the file, then an estimate from the
-        # data. The estimate is logged as such -- a wrong center crops the wrong part of
-        # the detector, and nothing downstream would reveal it.
-        if args.beam_center_x_px is not None and args.beam_center_y_px is not None:
-            beam_center = BeamCenter(x_px=args.beam_center_x_px, y_px=args.beam_center_y_px)
-            center_source = '--beam-center-{x,y}-px'
-        elif metadata.beam_center is not None:
-            beam_center = metadata.beam_center
-            center_source = 'the diffraction file'
-        elif BEAM_CENTER_FALLBACK == 'midpoint':
-            beam_center = BeamCenter(
-                x_px=metadata.detector_extent.width_px // 2,
-                y_px=metadata.detector_extent.height_px // 2,
-            )
-            center_source = 'the detector midpoint, which this layout is already cropped about'
-        else:
-            beam_center = estimate_beam_center(_mean_pattern(raw_dataset, max_valid_count))
-            center_source = 'an estimate from the first array'
-
-        logger.info(
-            'Beam center: (%d, %d) from %s', beam_center.x_px, beam_center.y_px, center_source
-        )
-
-        extent = ImageExtent(width_px=args.crop_extent_px, height_px=args.crop_extent_px)
-
-        if extent != metadata.detector_extent:
-            region = CropRegion.from_center_extent(beam_center, extent)
-
-            # from_center_extent does not clip. Silently clamping would quietly reconstruct
-            # a different region than asked for, so an overhanging crop is an error.
-            if region.clamp_to_detector_extent(metadata.detector_extent) != region:
-                raise ValueError(
-                    f'A {args.crop_extent_px}px crop about ({beam_center.x_px}, '
-                    f'{beam_center.y_px}) runs off the '
-                    f'{metadata.detector_extent.width_px}x'
-                    f'{metadata.detector_extent.height_px} detector '
-                    f'(x={region.x_range} y={region.y_range}). '
-                    'Give a smaller --crop-extent-px or an explicit beam center.'
-                )
-
-            logger.info('Cropping to x=%s y=%s', region.x_range, region.y_range)
-            read_region = region
-
-    bad_pixels: BadPixels | None = None
-
-    if args.bad_pixels_file is not None:
-        logger.info('Reading bad pixels from %s', args.bad_pixels_file)
-        bad_pixels_reader = registry.bad_pixels_file_readers.get_strategy_by_name(
-            args.bad_pixels_file_type
-        )
-        bad_pixels = bad_pixels_reader.read(args.bad_pixels_file)
-
     logger.info('Assembling diffraction patterns')
-    assembled_data = assemble_dataset(
-        raw_dataset,
-        _prep_pipeline(args, max_valid_count),
-        bad_pixels=bad_pixels,
-        raw_pixel_geometry=raw_pixel_geometry,
-        read_region=read_region,
-        total_counts_lower_bound=args.min_total_counts,
-    )
-    num_patterns = assembled_data.get_patterns().shape[0]
+    assembled_data = assemble_dataset(raw_dataset, raw_pixel_geometry=raw_pixel_geometry)
+    num_patterns = assembled_data.get_num_patterns()
 
     if num_patterns != num_raw_patterns:
         logger.warning(
@@ -537,12 +333,12 @@ def main() -> int:
         array = probe_from_file.get_probe_no_opr().get_array()
 
         # The warm-start probe must sit on the same grid as the patterns it will be
-        # refined against; a mismatch means the crop changed since it was written.
+        # refined against; a mismatch means the two were prepared differently.
         if array.shape[-2:] != (probe_geometry.height_px, probe_geometry.width_px):
             raise ValueError(
                 f'Probe file extent {array.shape[-2]}x{array.shape[-1]} does not match the '
                 f'patterns {probe_geometry.height_px}x{probe_geometry.width_px}. '
-                'Reconstruct with the same --crop-extent-px that produced it.'
+                'Use a probe written from a dataset prepared the same way as this one.'
             )
 
         probe = Probe(array=array, pixel_geometry=probe_geometry.get_pixel_geometry())
@@ -623,8 +419,9 @@ def main() -> int:
         losses=[],
     )
 
-    # USER: customize pty-chi options here (edit fields on `options` before the loop).
-    options = LSQMLOptions()
+    # USER: customize pty-chi options here (edit fields on `options` before the loop), or
+    # pass a JSON file written by an earlier run with --ptychi-options-file.
+    options = load_ptychi_options(args.ptychi_options_file)
 
     num_epochs = int(options.reconstructor_options.num_epochs)
 
@@ -659,16 +456,9 @@ def main() -> int:
         logger.info('Nothing written: stopping before the pty-chi option alignment.')
         return 0
 
-    output_directory.mkdir(parents=True, exist_ok=True)
-
-    # Ahead of the reconstruction, so an interrupted run still leaves the directory
-    # usable: the assembled patterns are the one artifact that cannot be rebuilt without
-    # the raw beamline files.
-    if args.no_save_diffraction:
-        logger.info('Skipping %s as requested', diffraction_file.name)
-    else:
-        logger.info('Writing %s', diffraction_file)
-        save_diffraction_data(diffraction_file, assembled_data)
+    save_assembled_diffraction(
+        logger, output_directory, assembled_data, skip=args.no_save_diffraction
+    )
 
     reconstruct_input = prepare_reconstruct_input(assembled_data, product)
     run_reconstruction(
@@ -677,8 +467,9 @@ def main() -> int:
         options,
         output_directory,
         num_sync_epochs=args.num_sync_epochs,
+        cancellation=cancellation,
     )
-    return 0
+    return EXIT_CANCELLED if cancellation.is_cancelled else 0
 
 
 if __name__ == '__main__':

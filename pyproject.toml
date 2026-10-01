@@ -31,7 +31,7 @@ dynamic = ["version"]
 [project.scripts]
 convert-to-ptychodus = "ptychodus.cli.convert_to_ptychodus:main"
 ptychodus = "ptychodus.__main__:main"
-ptychodus-bdp = "ptychodus.cli.ptychodus_bdp:main"
+ptychodus-bdp = "ptychodus.cli.bdp:main"
 ptychodus-reconstruct-12ide = "ptychodus.cli.reconstruct_12ide:main"
 ptychodus-reconstruct-2ide = "ptychodus.cli.reconstruct_2ide:main"
 ptychodus-reconstruct-atomic = "ptychodus.cli.reconstruct_atomic:main"
@@ -42,8 +42,9 @@ ptychodus-reconstruct-isn = "ptychodus.cli.reconstruct_isn:main"
 ptychodus-reconstruct-lamni = "ptychodus.cli.reconstruct_lamni:main"
 ptychodus-reconstruct-pear = "ptychodus.cli.reconstruct_pear:main"
 ptychodus-reconstruct-polar = "ptychodus.cli.reconstruct_polar:main"
+ptychodus-reconstruct-subprocess = "ptychodus.cli.reconstruct_subprocess:main"
 ptychodus-reconstruct-velociprobe = "ptychodus.cli.reconstruct_velociprobe:main"
-ptychodus-system-check = "ptychodus.cli.ptychodus_system_check:main"
+ptychodus-system-check = "ptychodus.cli.system_check:main"
 ptychodus-store = "ptychodus_store.cli:main"
 
 [project.optional-dependencies]

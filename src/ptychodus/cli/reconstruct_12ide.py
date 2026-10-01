@@ -28,22 +28,16 @@ from pathlib import Path
 
 import numpy
 
-from ptychi.api import LSQMLOptions
-
-from ptychodus.api.assemble import assemble_dataset
+from ptychodus.api.assemble import assemble_dataset, summarize_dataset
 from ptychodus.api.constants import energy_eV_to_wavelength_m
-from ptychodus.api.diffraction import BadPixels, BeamCenter, CropRegion, DiffractionDataset
+from ptychodus.api.diffraction import BadPixels, BeamCenter, CropRegion
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.io import StandardFileLayout, save_diffraction_data
+from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.object import compute_object_geometry
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import (
     DiffractionPrepPipeline,
-    DiffractionPrepStepUnion,
     FilterValuesStep,
-    HorizontalFlipStep,
-    TransposeStep,
-    VerticalFlipStep,
     estimate_beam_center,
 )
 from ptychodus.api.probe import Probe, ProbeGeometry
@@ -57,7 +51,14 @@ from ptychodus.api.simulate.probe import (
     generate_incoherent_probe_modes,
 )
 from ptychodus.cli import DirectoryType
-from ptychodus.cli._reconstruct_common import run_reconstruction
+from ptychodus.cli._reconstruct_common import (
+    EXIT_CANCELLED,
+    add_ptychi_options_argument,
+    install_signal_handlers,
+    load_ptychi_options,
+    run_reconstruction,
+    save_assembled_diffraction,
+)
 
 logger = logging.getLogger('reconstruct_12ide')
 
@@ -69,12 +70,6 @@ POSITION_READER = 'APS_PtychoSAXS'
 # run cycles and the file cannot be stale about itself.
 DEFAULT_DETECTOR_DISTANCE_M = 10.2
 DEFAULT_FZP_PRESET = ''
-
-# Where the beam center comes from when neither the command line nor the file supplies
-# one. 'estimate' back-propagates nothing -- it centroids the mean of the first array --
-# and 'midpoint' takes the detector center, which is right only for a layout that was
-# already cropped about the beam by whatever wrote it.
-BEAM_CENTER_FALLBACK = 'estimate'
 
 
 def _positive_int(text: str) -> int:
@@ -130,77 +125,6 @@ def _invalid_count_threshold(dtype: numpy.dtype) -> int | None:
         return int(numpy.iinfo(dtype).max)
 
     return None
-
-
-# Reading one array uncropped just to locate the beam is cheap when an array is one
-# scan line, and ruinous when it is the whole scan: a LamNI acquisition is a single
-# 12201 x 1030 x 1614 array, 81 GiB in its native uint32. DiffractionArray exposes no way
-# to read a few frames -- get_patterns() crops in space, not in frame -- so the estimate
-# is offered only when the first array fits in this budget. Sized to admit a normal
-# single-array scan (a 1089-frame ISN scan is about 4.8 GiB) and refuse LamNI.
-_ESTIMATE_BUDGET_BYTES = 8 * 1024**3
-
-
-def _mean_pattern(dataset: DiffractionDataset, upper_bound: int | None) -> numpy.ndarray:
-    """Mean over the first array's patterns, for locating the direct beam.
-
-    One array is enough to find the beam and costs one file read; averaging the whole
-    scan would mean reading every uncropped frame just to decide where to crop. The same
-    invalid-pixel cut the pipeline applies is applied here, so the center is estimated
-    from the frame that will actually be reconstructed.
-    """
-    metadata = dataset.get_metadata()
-    extent = metadata.detector_extent
-    # Measured in the stored dtype, which is what the read actually allocates.
-    wanted_bytes = (
-        metadata.num_patterns_per_array[0]
-        * extent.width_px
-        * extent.height_px
-        * metadata.pattern_dtype.itemsize
-    )
-
-    if wanted_bytes > _ESTIMATE_BUDGET_BYTES:
-        raise ValueError(
-            f'Estimating the beam center would read {wanted_bytes / 1024**3:.1f} GiB: this '
-            f"dataset's first array holds {metadata.num_patterns_per_array[0]} uncropped "
-            f'{extent.width_px}x{extent.height_px} frames. Pass --beam-center-x-px and '
-            '--beam-center-y-px instead.'
-        )
-
-    patterns = dataset[0].get_patterns()
-
-    # A layout that stores one frame per file hands back a bare 2-D pattern rather than
-    # a length-1 stack; averaging over axis 0 would collapse it to a single row.
-    if patterns.ndim == 2:
-        patterns = patterns[numpy.newaxis]
-
-    # In place, and in the stored dtype: the array came fresh off the reader, so nothing
-    # else holds it, and widening the whole stack to float64 first would double the peak
-    # for no gain. The accumulator below is float64 regardless.
-    if upper_bound is not None:
-        patterns[patterns >= upper_bound] = 0
-
-    return patterns.mean(axis=0, dtype=numpy.float64)
-
-
-def _prep_pipeline(
-    args: argparse.Namespace, upper_bound: int | None
-) -> DiffractionPrepPipeline | None:
-    steps: list[DiffractionPrepStepUnion] = []
-
-    # Invalid-pixel markers and negatives first: every later step, and the assembled
-    # photon counts, would otherwise carry them.
-    if upper_bound is not None:
-        steps.append(FilterValuesStep(lower_bound=0, upper_bound=upper_bound))
-
-    if args.flip_up_down:
-        steps.append(VerticalFlipStep())
-    if args.flip_left_right:
-        steps.append(HorizontalFlipStep())
-    if args.transpose:
-        steps.append(TransposeStep())
-
-    return DiffractionPrepPipeline(steps=tuple(steps)) if steps else None
 
 
 def main() -> int:
@@ -266,12 +190,6 @@ def main() -> int:
         help='Probe energy in electron volts. Overrides the file.',
     )
     parser.add_argument(
-        '--detector-pixel-size-m',
-        type=float,
-        default=None,
-        help='Detector pixel pitch, both axes. Overrides the file.',
-    )
-    parser.add_argument(
         '--min-total-counts',
         type=int,
         default=None,
@@ -286,11 +204,6 @@ def main() -> int:
             'which is how Dectris detectors mark invalid pixels.'
         ),
     )
-    parser.add_argument('--flip-up-down', action='store_true', help='Flip patterns vertically.')
-    parser.add_argument(
-        '--flip-left-right', action='store_true', help='Flip patterns horizontally.'
-    )
-    parser.add_argument('--transpose', action='store_true', help='Transpose patterns.')
     parser.add_argument(
         '--bad-pixels-file',
         type=Path,
@@ -357,17 +270,12 @@ def main() -> int:
         help='Epochs between reconstructor sync points and progress logs.',
     )
     parser.add_argument(
-        '--probe-photon-count',
-        type=float,
-        default=None,
-        help='Override the per-snapshot probe photon count.',
-    )
-    parser.add_argument(
         '--tomography-angle-deg',
         type=float,
         default=None,
         help='Override the tomography angle in degrees.',
     )
+    add_ptychi_options_argument(parser)
     parser.add_argument(
         '--dry-run',
         action='store_true',
@@ -386,6 +294,10 @@ def main() -> int:
         stream=sys.stderr,
         format='%(asctime)s %(levelname)s %(name)s: %(message)s',
     )
+
+    # Installed before the first long operation, so a cancel during the file reads is
+    # already honored. Nothing earlier than this is interruptible.
+    cancellation = install_signal_handlers()
 
     registry = PluginRegistry.load_plugins()
     diffraction_reader = registry.diffraction_file_readers.get_strategy_by_name(DIFFRACTION_READER)
@@ -418,15 +330,11 @@ def main() -> int:
         None,
         '--probe-energy-eV',
     )
-    detector_pixel_size_m = _resolve(
-        'Detector pixel size (m)',
-        args.detector_pixel_size_m,
-        None
-        if metadata.detector_pixel_geometry is None
-        else metadata.detector_pixel_geometry.width_m,
-        None,
-        '--detector-pixel-size-m',
-    )
+    if metadata.detector_pixel_geometry is None:
+        raise ValueError('The diffraction file records no detector pixel size!')
+
+    detector_pixel_size_m = metadata.detector_pixel_geometry.width_m
+    logger.info('Detector pixel size (m): %g (from the diffraction file)', detector_pixel_size_m)
     raw_pixel_geometry = PixelGeometry(
         width_m=detector_pixel_size_m, height_m=detector_pixel_size_m
     )
@@ -437,8 +345,24 @@ def main() -> int:
         else args.max_valid_count
     )
 
+    # One step, two consumers: the assembled patterns below and the mean frame the beam
+    # center is estimated from. Sharing the object is what keeps those two cuts identical.
+    value_filter: FilterValuesStep | None = None
+
     if max_valid_count is not None:
         logger.info('Zeroing pixels at or above %d as invalid', max_valid_count)
+        value_filter = FilterValuesStep(lower_bound=0, upper_bound=max_valid_count)
+
+    pipeline = None if value_filter is None else DiffractionPrepPipeline(steps=(value_filter,))
+
+    bad_pixels: BadPixels | None = None
+
+    if args.bad_pixels_file is not None:
+        logger.info('Reading bad pixels from %s', args.bad_pixels_file)
+        bad_pixels_reader = registry.bad_pixels_file_readers.get_strategy_by_name(
+            args.bad_pixels_file_type
+        )
+        bad_pixels = bad_pixels_reader.read(args.bad_pixels_file)
 
     read_region: CropRegion | None = None
 
@@ -452,15 +376,19 @@ def main() -> int:
         elif metadata.beam_center is not None:
             beam_center = metadata.beam_center
             center_source = 'the diffraction file'
-        elif BEAM_CENTER_FALLBACK == 'midpoint':
-            beam_center = BeamCenter(
-                x_px=metadata.detector_extent.width_px // 2,
-                y_px=metadata.detector_extent.height_px // 2,
-            )
-            center_source = 'the detector midpoint, which this layout is already cropped about'
         else:
-            beam_center = estimate_beam_center(_mean_pattern(raw_dataset, max_valid_count))
-            center_source = 'an estimate from the first array'
+            # Reads every pattern in the dataset, so it is reached only when no center was
+            # supplied by flag or file. summarize_dataset inpaints the bad pixels that
+            # estimate_beam_center requires the caller to have handled.
+            logger.info('Summarizing the dataset to estimate the beam center')
+            summary = summarize_dataset(raw_dataset, bad_pixels=bad_pixels)
+            mean_pattern = (
+                summary.mean_pattern
+                if value_filter is None
+                else value_filter.apply(summary.mean_pattern)
+            )
+            beam_center = estimate_beam_center(mean_pattern)
+            center_source = 'an estimate over the whole dataset'
 
         logger.info(
             'Beam center: (%d, %d) from %s', beam_center.x_px, beam_center.y_px, center_source
@@ -486,25 +414,16 @@ def main() -> int:
             logger.info('Cropping to x=%s y=%s', region.x_range, region.y_range)
             read_region = region
 
-    bad_pixels: BadPixels | None = None
-
-    if args.bad_pixels_file is not None:
-        logger.info('Reading bad pixels from %s', args.bad_pixels_file)
-        bad_pixels_reader = registry.bad_pixels_file_readers.get_strategy_by_name(
-            args.bad_pixels_file_type
-        )
-        bad_pixels = bad_pixels_reader.read(args.bad_pixels_file)
-
     logger.info('Assembling diffraction patterns')
     assembled_data = assemble_dataset(
         raw_dataset,
-        _prep_pipeline(args, max_valid_count),
+        pipeline,
         bad_pixels=bad_pixels,
         raw_pixel_geometry=raw_pixel_geometry,
         read_region=read_region,
         total_counts_lower_bound=args.min_total_counts,
     )
-    num_patterns = assembled_data.get_patterns().shape[0]
+    num_patterns = assembled_data.get_num_patterns()
 
     if num_patterns != num_raw_patterns:
         logger.warning(
@@ -597,11 +516,7 @@ def main() -> int:
         blur_deviation_px=0.0,
     )
 
-    probe_photon_count = (
-        float(assembled_data.get_probe_photon_count())
-        if args.probe_photon_count is None
-        else float(args.probe_photon_count)
-    )
+    probe_photon_count = float(assembled_data.get_probe_photon_count())
 
     product = Product(
         metadata=ProductMetadata(
@@ -622,8 +537,9 @@ def main() -> int:
         losses=[],
     )
 
-    # USER: customize pty-chi options here (edit fields on `options` before the loop).
-    options = LSQMLOptions()
+    # USER: customize pty-chi options here (edit fields on `options` before the loop), or
+    # pass a JSON file written by an earlier run with --ptychi-options-file.
+    options = load_ptychi_options(args.ptychi_options_file)
 
     num_epochs = int(options.reconstructor_options.num_epochs)
 
@@ -658,16 +574,9 @@ def main() -> int:
         logger.info('Nothing written: stopping before the pty-chi option alignment.')
         return 0
 
-    output_directory.mkdir(parents=True, exist_ok=True)
-
-    # Ahead of the reconstruction, so an interrupted run still leaves the directory
-    # usable: the assembled patterns are the one artifact that cannot be rebuilt without
-    # the raw beamline files.
-    if args.no_save_diffraction:
-        logger.info('Skipping %s as requested', diffraction_file.name)
-    else:
-        logger.info('Writing %s', diffraction_file)
-        save_diffraction_data(diffraction_file, assembled_data)
+    save_assembled_diffraction(
+        logger, output_directory, assembled_data, skip=args.no_save_diffraction
+    )
 
     reconstruct_input = prepare_reconstruct_input(assembled_data, product)
     run_reconstruction(
@@ -676,8 +585,9 @@ def main() -> int:
         options,
         output_directory,
         num_sync_epochs=args.num_sync_epochs,
+        cancellation=cancellation,
     )
-    return 0
+    return EXIT_CANCELLED if cancellation.is_cancelled else 0
 
 
 if __name__ == '__main__':

@@ -23,10 +23,8 @@ def main() -> int:
     crop_extent: ImageExtent | None = None
     crop_region: CropRegion | None = None
 
-    prog = Path(__file__).stem.lower()
     parser = argparse.ArgumentParser(
-        prog=prog,
-        description=f'{prog} prepares experiment data for use in beamline data pipelines',
+        description='ptychodus-bdp prepares experiment data for use in beamline data pipelines.',
     )
     parser.add_argument(
         '--crop-center-x-px',

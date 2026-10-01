@@ -54,8 +54,6 @@ from pathlib import Path
 
 import numpy
 
-from ptychi.api import LSQMLOptions
-from ptychi.api.options.task import PtychographyTaskOptions
 
 from ptychodus.api.affine import (
     AffineFitResult,
@@ -63,20 +61,16 @@ from ptychodus.api.affine import (
     estimate_affine_transform,
     transform_probe_positions,
 )
-from ptychodus.api.assemble import assemble_dataset
+from ptychodus.api.assemble import assemble_dataset, summarize_dataset
 from ptychodus.api.constants import energy_eV_to_wavelength_m
 from ptychodus.api.diffraction import BadPixels, BeamCenter, CropRegion, DiffractionDataset
 from ptychodus.api.geometry import ImageExtent, PixelGeometry
-from ptychodus.api.io import StandardFileLayout, save_diffraction_data
+from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.object import compute_object_geometry
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import (
     DiffractionPrepPipeline,
-    DiffractionPrepStepUnion,
     FilterValuesStep,
-    HorizontalFlipStep,
-    TransposeStep,
-    VerticalFlipStep,
     estimate_beam_center,
 )
 from ptychodus.api.probe import Probe, ProbeGeometry, ProbeSequence
@@ -90,8 +84,16 @@ from ptychodus.api.simulate.probe import (
     generate_incoherent_probe_modes,
 )
 from ptychodus.cli import DirectoryType
-from ptychodus.cli._reconstruct_common import run_reconstruction
-from ptychodus.model.ptychi.task import load_task_options
+from ptychodus.cli._reconstruct_common import (
+    EXIT_CANCELLED,
+    CancellationToken,
+    add_ptychi_options_argument,
+    install_signal_handlers,
+    is_main_process,
+    load_ptychi_options,
+    run_reconstruction,
+    save_assembled_diffraction,
+)
 from ptychodus.plugins.aps31id_lamni._scan_table import (
     APS31IDEScanRecord,
     read_aps31ide_scan_table,
@@ -103,12 +105,6 @@ DIFFRACTION_READER = 'APS_LamNI'
 POSITION_READER = 'APS_LamNI'
 
 DEFAULT_FZP_PRESET = 'APS_LamNI'
-
-# Where the beam center comes from when neither the command line nor the file supplies
-# one. 'estimate' back-propagates nothing -- it centroids the mean of the first array --
-# and 'midpoint' takes the detector center, which is right only for a layout that was
-# already cropped about the beam by whatever wrote it.
-BEAM_CENTER_FALLBACK = 'estimate'
 
 # Scans live under eiger_4 in blocks of a thousand.
 _SCAN_BLOCK_SIZE = 1000
@@ -167,65 +163,6 @@ def _invalid_count_threshold(dtype: numpy.dtype) -> int | None:
         return int(numpy.iinfo(dtype).max)
 
     return None
-
-
-# Reading one array uncropped just to locate the beam is cheap when an array is one
-# scan line, and ruinous when it is the whole scan: a LamNI acquisition is a single
-# 12201 x 1030 x 1614 array, 81 GiB in its native uint32. DiffractionArray exposes no way
-# to read a few frames -- get_patterns() crops in space, not in frame -- so the estimate
-# is offered only when the first array fits in this budget.
-_ESTIMATE_BUDGET_BYTES = 8 * 1024**3
-
-
-def _mean_pattern(dataset: DiffractionDataset, upper_bound: int | None) -> numpy.ndarray:
-    """Mean over the first array's patterns, for locating the direct beam."""
-    metadata = dataset.get_metadata()
-    extent = metadata.detector_extent
-    # Measured in the stored dtype, which is what the read actually allocates.
-    wanted_bytes = (
-        metadata.num_patterns_per_array[0]
-        * extent.width_px
-        * extent.height_px
-        * metadata.pattern_dtype.itemsize
-    )
-
-    if wanted_bytes > _ESTIMATE_BUDGET_BYTES:
-        raise ValueError(
-            f'Estimating the beam center would read {wanted_bytes / 1024**3:.1f} GiB: this '
-            f"dataset's first array holds {metadata.num_patterns_per_array[0]} uncropped "
-            f'{extent.width_px}x{extent.height_px} frames. Pass --beam-center-x-px and '
-            '--beam-center-y-px instead.'
-        )
-
-    patterns = dataset[0].get_patterns()
-
-    if patterns.ndim == 2:
-        patterns = patterns[numpy.newaxis]
-
-    if upper_bound is not None:
-        patterns[patterns >= upper_bound] = 0
-
-    return patterns.mean(axis=0, dtype=numpy.float64)
-
-
-def _prep_pipeline(
-    args: argparse.Namespace, upper_bound: int | None
-) -> DiffractionPrepPipeline | None:
-    steps: list[DiffractionPrepStepUnion] = []
-
-    # Invalid-pixel markers and negatives first: every later step, and the assembled
-    # photon counts, would otherwise carry them.
-    if upper_bound is not None:
-        steps.append(FilterValuesStep(lower_bound=0, upper_bound=upper_bound))
-
-    if args.flip_up_down:
-        steps.append(VerticalFlipStep())
-    if args.flip_left_right:
-        steps.append(HorizontalFlipStep())
-    if args.transpose:
-        steps.append(TransposeStep())
-
-    return DiffractionPrepPipeline(steps=tuple(steps)) if steps else None
 
 
 @dataclass(frozen=True)
@@ -343,14 +280,6 @@ def _select_records(
     return selected
 
 
-def _load_options(options_file: Path | None) -> PtychographyTaskOptions:
-    """Build a fresh options object, so per-scan edits never leak into the next scan."""
-    if options_file is None:
-        return LSQMLOptions()
-
-    return load_task_options(options_file.read_text())
-
-
 def _write_affine_fit(file_path: Path, result: AffineFitResult) -> None:
     """Record the fitted transform beside the tomogram it was fitted from."""
     components = result.components
@@ -383,7 +312,8 @@ def _write_affine_fit(file_path: Path, result: AffineFitResult) -> None:
 def _resolve_crop_region(
     args: argparse.Namespace,
     raw_dataset: DiffractionDataset,
-    max_valid_count: int | None,
+    value_filter: FilterValuesStep | None,
+    bad_pixels: BadPixels | None,
 ) -> CropRegion | None:
     """Resolve one crop region for the whole run, from the first selected scan.
 
@@ -402,15 +332,19 @@ def _resolve_crop_region(
     elif metadata.beam_center is not None:
         beam_center = metadata.beam_center
         center_source = 'the diffraction file'
-    elif BEAM_CENTER_FALLBACK == 'midpoint':
-        beam_center = BeamCenter(
-            x_px=metadata.detector_extent.width_px // 2,
-            y_px=metadata.detector_extent.height_px // 2,
-        )
-        center_source = 'the detector midpoint, which this layout is already cropped about'
     else:
-        beam_center = estimate_beam_center(_mean_pattern(raw_dataset, max_valid_count))
-        center_source = 'an estimate from the first array'
+        # Reads every pattern of this scan, so it is reached only when no center was
+        # supplied by flag or file. summarize_dataset inpaints the bad pixels that
+        # estimate_beam_center requires the caller to have handled.
+        logger.info('Summarizing the first scan to estimate the beam center')
+        summary = summarize_dataset(raw_dataset, bad_pixels=bad_pixels)
+        mean_pattern = (
+            summary.mean_pattern
+            if value_filter is None
+            else value_filter.apply(summary.mean_pattern)
+        )
+        beam_center = estimate_beam_center(mean_pattern)
+        center_source = 'an estimate over the whole scan'
 
     logger.info('Beam center: (%d, %d) from %s', beam_center.x_px, beam_center.y_px, center_source)
 
@@ -456,8 +390,13 @@ def _reconstruct_one_scan(
     bad_pixels: BadPixels | None,
     warm_start_probe: Probe | None,
     transform: AffineTransform | None,
-) -> _ScanResult:
-    """Reconstruct one projection into its own standard-layout directory."""
+    cancellation: CancellationToken,
+) -> _ScanResult | None:
+    """Reconstruct one projection into its own standard-layout directory.
+
+    Returns `None` for a scan cancelled before it produced anything, which contributes
+    neither a probe to chain forward nor a position pair to the affine fit.
+    """
     diffraction_file_path = layout.diffraction_file(record.scan_no)
     position_file_path = layout.position_file(record.scan_no)
 
@@ -482,15 +421,11 @@ def _reconstruct_one_scan(
         None,
         '--probe-energy-eV',
     )
-    detector_pixel_size_m = _resolve(
-        'Detector pixel size (m)',
-        args.detector_pixel_size_m,
-        None
-        if metadata.detector_pixel_geometry is None
-        else metadata.detector_pixel_geometry.width_m,
-        None,
-        '--detector-pixel-size-m',
-    )
+    if metadata.detector_pixel_geometry is None:
+        raise ValueError('The diffraction file records no detector pixel size!')
+
+    detector_pixel_size_m = metadata.detector_pixel_geometry.width_m
+    logger.debug('Detector pixel size (m): %g (from the diffraction file)', detector_pixel_size_m)
     raw_pixel_geometry = PixelGeometry(
         width_m=detector_pixel_size_m, height_m=detector_pixel_size_m
     )
@@ -500,16 +435,23 @@ def _reconstruct_one_scan(
         if args.max_valid_count is None
         else args.max_valid_count
     )
+    pipeline = (
+        None
+        if max_valid_count is None
+        else DiffractionPrepPipeline(
+            steps=(FilterValuesStep(lower_bound=0, upper_bound=max_valid_count),)
+        )
+    )
 
     assembled_data = assemble_dataset(
         raw_dataset,
-        _prep_pipeline(args, max_valid_count),
+        pipeline,
         bad_pixels=bad_pixels,
         raw_pixel_geometry=raw_pixel_geometry,
         read_region=read_region,
         total_counts_lower_bound=args.min_total_counts,
     )
-    num_patterns = assembled_data.get_patterns().shape[0]
+    num_patterns = assembled_data.get_num_patterns()
     num_raw_patterns = sum(metadata.num_patterns_per_array)
 
     if num_patterns != num_raw_patterns:
@@ -520,17 +462,9 @@ def _reconstruct_one_scan(
             num_raw_patterns - num_patterns,
         )
 
-    output_directory.mkdir(parents=True, exist_ok=True)
-    diffraction_file = StandardFileLayout.DIFFRACTION.path(output_directory)
-
-    # Ahead of the reconstruction, so an interrupted run still leaves the directory
-    # usable: the assembled patterns are the one artifact that cannot be rebuilt without
-    # the raw beamline files.
-    if args.no_save_diffraction:
-        logger.debug('Skipping %s as requested', diffraction_file.name)
-    else:
-        logger.info('Writing %s', diffraction_file)
-        save_diffraction_data(diffraction_file, assembled_data)
+    save_assembled_diffraction(
+        logger, output_directory, assembled_data, skip=args.no_save_diffraction
+    )
 
     measured_positions = position_reader.read(position_file_path)
     logger.info('Read %d probe positions from %s', len(measured_positions), position_file_path)
@@ -602,11 +536,7 @@ def _reconstruct_one_scan(
         blur_deviation_px=0.0,
     )
 
-    probe_photon_count = (
-        float(assembled_data.get_probe_photon_count())
-        if args.probe_photon_count is None
-        else float(args.probe_photon_count)
-    )
+    probe_photon_count = float(assembled_data.get_probe_photon_count())
 
     product = Product(
         metadata=ProductMetadata(
@@ -625,7 +555,7 @@ def _reconstruct_one_scan(
         losses=[],
     )
 
-    options = _load_options(args.ptychi_options_file)
+    options = load_ptychi_options(args.ptychi_options_file)
 
     if transform is not None:
         # The transform now supplies the correction that per-scan refinement was measuring.
@@ -638,7 +568,11 @@ def _reconstruct_one_scan(
         options,
         output_directory,
         num_sync_epochs=args.num_sync_epochs,
+        cancellation=cancellation,
     )
+
+    if final_product is None:
+        return None
 
     return _ScanResult(
         # The measured positions as the reconstruction actually saw them: pattern-paired,
@@ -700,15 +634,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=1,
         help='Reconstruct every Nth distinct projection index.',
     )
-    parser.add_argument(
-        '--ptychi-options-file',
-        type=Path,
-        default=None,
-        help=(
-            'pty-chi options JSON, as written to ptychi_options.json by any ptychodus run. '
-            'Its algorithm stamp selects the reconstructor. Defaults to stock LSQML.'
-        ),
-    )
+    add_ptychi_options_argument(parser)
     parser.add_argument(
         '--affine-transform-after',
         type=_positive_int,
@@ -769,12 +695,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help='Probe energy in electron volts. Overrides the file.',
     )
     parser.add_argument(
-        '--detector-pixel-size-m',
-        type=float,
-        default=None,
-        help='Detector pixel pitch, both axes. Overrides the file.',
-    )
-    parser.add_argument(
         '--min-total-counts',
         type=int,
         default=None,
@@ -789,11 +709,6 @@ def _build_parser() -> argparse.ArgumentParser:
             'which is how Dectris detectors mark invalid pixels.'
         ),
     )
-    parser.add_argument('--flip-up-down', action='store_true', help='Flip patterns vertically.')
-    parser.add_argument(
-        '--flip-left-right', action='store_true', help='Flip patterns horizontally.'
-    )
-    parser.add_argument('--transpose', action='store_true', help='Transpose patterns.')
     parser.add_argument(
         '--bad-pixels-file',
         type=Path,
@@ -853,12 +768,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help='Epochs between reconstructor sync points and progress logs.',
     )
     parser.add_argument(
-        '--probe-photon-count',
-        type=float,
-        default=None,
-        help='Override the per-snapshot probe photon count.',
-    )
-    parser.add_argument(
         '--dry-run',
         action='store_true',
         help='Report the resolved scan plan and stop without reading or reconstructing data.',
@@ -880,6 +789,10 @@ def main() -> int:
         stream=sys.stderr,
         format='%(asctime)s %(levelname)s %(name)s: %(message)s',
     )
+
+    # Installed before the first long operation, so a cancel during the file reads is
+    # already honored. Nothing earlier than this is interruptible.
+    cancellation = install_signal_handlers()
 
     layout = _Layout.from_argument(args.experiment_directory)
     output_root = (
@@ -938,7 +851,7 @@ def main() -> int:
     if args.affine_transform_after is not None:
         # A fit against positions that were never refined returns the identity, which would
         # look like a successful calibration while correcting nothing.
-        probe_options = _load_options(args.ptychi_options_file).probe_position_options
+        probe_options = load_ptychi_options(args.ptychi_options_file).probe_position_options
 
         if not probe_options.optimizable:
             logger.error(
@@ -968,10 +881,15 @@ def main() -> int:
         else args.max_valid_count
     )
 
+    # The same cut each scan's pipeline applies below, so the frame the beam center is
+    # estimated from matches the frames that will be reconstructed.
+    value_filter: FilterValuesStep | None = None
+
     if max_valid_count is not None:
         logger.info('Zeroing pixels at or above %d as invalid', max_valid_count)
+        value_filter = FilterValuesStep(lower_bound=0, upper_bound=max_valid_count)
 
-    read_region = _resolve_crop_region(args, first_dataset, max_valid_count)
+    read_region = _resolve_crop_region(args, first_dataset, value_filter, bad_pixels)
     del first_dataset
 
     warm_start_probe: Probe | None = None
@@ -988,7 +906,19 @@ def main() -> int:
     skipped: list[int] = []
     failed: list[int] = []
 
+    cancelled_after: int | None = None
+
     for scan_index, record in enumerate(selected, start=1):
+        if cancellation.is_cancelled:
+            cancelled_after = scan_index - 1
+            logger.warning(
+                'Cancelled: stopping before scan %05d, with %d of %d selected scan(s) done.',
+                record.scan_no,
+                scan_index - 1,
+                len(selected),
+            )
+            break
+
         output_directory = layout.output_directory(output_root, record)
 
         if args.skip_existing and StandardFileLayout.PRODUCT.path(output_directory).is_file():
@@ -1023,6 +953,7 @@ def main() -> int:
                 bad_pixels=bad_pixels,
                 warm_start_probe=warm_start_probe,
                 transform=transform,
+                cancellation=cancellation,
             )
         except Exception:
             if not args.continue_on_error:
@@ -1031,6 +962,12 @@ def main() -> int:
             logger.exception('Scan %05d failed; continuing.', record.scan_no)
             failed.append(record.scan_no)
             continue
+
+        if result is None:
+            # Cancelled before this scan produced anything. It is neither a success nor a
+            # failure, and the loop guard above ends the run on the next pass.
+            cancelled_after = scan_index - 1
+            break
 
         num_succeeded += 1
 
@@ -1050,9 +987,13 @@ def main() -> int:
                 )
                 logger.info('%s', fit)
 
-                affine_fit_file = output_root / label / 'affine_fit.json'
-                _write_affine_fit(affine_fit_file, fit)
-                logger.info('Wrote %s', affine_fit_file)
+                # Every rank fits the same transform from the same pairs and carries the
+                # linear part forward below, so only the record of it is confined to one
+                # process.
+                if is_main_process():
+                    affine_fit_file = output_root / label / 'affine_fit.json'
+                    _write_affine_fit(affine_fit_file, fit)
+                    logger.info('Wrote %s', affine_fit_file)
 
                 # Only the linear part carries over. Each scan has its own stage origin, so
                 # the per-pair translations the fit reports describe those scans alone.
@@ -1072,9 +1013,14 @@ def main() -> int:
 
     if failed:
         logger.error('Failed scans: %s', ', '.join(f'{scan_no:05d}' for scan_no in failed))
-        return 1
 
-    return 0
+    if cancelled_after is not None:
+        # Reported ahead of the failures: the run was stopped, and whichever scans had
+        # already failed is a detail of how far it got, not why it ended.
+        logger.warning('Cancelled after %d of %d selected scan(s).', cancelled_after, len(selected))
+        return EXIT_CANCELLED
+
+    return 1 if failed else 0
 
 
 if __name__ == '__main__':

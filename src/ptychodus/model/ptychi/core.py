@@ -106,9 +106,8 @@ class PtyChiReconstructorLibrary(ReconstructorLibrary):
     def build_task_options(self, algorithm_name: str, product: Product) -> PtychographyTaskOptions:
         """Build a pty-chi ``PtychographyTaskOptions`` for the named algorithm.
 
-        Public entry point for out-of-process launchers (see
-        ``scripts/ptychodus_reconstruct_parent_demo.py``). Case-insensitive on
-        the display name, so 'rPIE' and 'rpie' both resolve.
+        Public so that a launcher can build the options a child process will run.
+        Case-insensitive on the display name, so 'rPIE' and 'rpie' both resolve.
         """
         if self._algorithms is None:
             raise RuntimeError('pty-chi is not available; cannot build task options.')

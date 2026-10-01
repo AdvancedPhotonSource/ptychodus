@@ -645,8 +645,8 @@ def test_align_does_not_mutate_its_argument() -> None:
 def test_align_is_idempotent(caplog) -> None:
     """Re-aligning against the same product changes nothing and warns about nothing.
 
-    ``scripts/ptychodus_reconstruct.py`` re-aligns child-side over options its
-    launcher already aligned; that second pass must be silent.
+    A child process re-aligns over options its launcher already aligned; that second
+    pass must be silent.
     """
     parameters = _make_reconstruct_input()
     once = align_task_options_with_product(LSQMLOptions(), parameters.product)

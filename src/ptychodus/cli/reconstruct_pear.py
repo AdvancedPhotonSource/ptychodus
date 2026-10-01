@@ -40,6 +40,11 @@ Scope and limitations
 - ``init_layer_append_mode`` of ``avg`` inserts the geometric-mean layer, the slab whose
   repetition reproduces the object. PEAR inserted the arithmetic mean of the layers,
   which lets opposing phases cancel and can turn transparent material absorbing.
+- There is deliberately no ``--ptychi-options-file``, which the other drivers accept. The
+  options here are a translation of the parameter file -- near-field propagation, slice
+  count, regularization weights and the rest -- so a supplied file would have to either
+  lose to those fields or silently discard them, and the parameter file is the input this
+  driver exists to honor.
 """
 
 from __future__ import annotations
@@ -86,7 +91,7 @@ from ptychodus.api.object import (
     scale_object_phase,
     select_object_layers,
 )
-from ptychodus.api.io import StandardFileLayout, save_diffraction_data
+from ptychodus.api.io import StandardFileLayout
 from ptychodus.api.plugins import PluginRegistry
 from ptychodus.api.preprocess.diffraction import (
     DiffractionPrepPipeline,
@@ -109,7 +114,12 @@ from ptychodus.api.simulate.probe import (
     generate_fresnel_zone_plate_probe,
     propagate_probe,
 )
-from ptychodus.cli._reconstruct_common import run_reconstruction
+from ptychodus.cli._reconstruct_common import (
+    EXIT_CANCELLED,
+    install_signal_handlers,
+    run_reconstruction,
+    save_assembled_diffraction,
+)
 
 logger = logging.getLogger('reconstruct_pear')
 
@@ -748,6 +758,10 @@ def main() -> int:
         format='%(asctime)s %(levelname)s %(name)s: %(message)s',
     )
 
+    # Installed before the first long operation, so a cancel during the file reads is
+    # already honored. Nothing earlier than this is interruptible.
+    cancellation = install_signal_handlers()
+
     params = PearParameters.from_file(args.params)
     instrument = params.instrument.lower()
 
@@ -827,7 +841,7 @@ def main() -> int:
         total_counts_lower_bound=lower_counts,
         total_counts_upper_bound=upper_counts,
     )
-    num_patterns = assembled_data.get_patterns().shape[0]
+    num_patterns = assembled_data.get_num_patterns()
 
     minimum_patterns = params.minimal_num_of_diff_pattern
 
@@ -1075,16 +1089,9 @@ def main() -> int:
         logger.info('Nothing written: stopping before the reconstruction.')
         return 0
 
-    output_directory.mkdir(parents=True, exist_ok=True)
-
-    # Ahead of the reconstruction, so an interrupted run still leaves the directory
-    # usable: the assembled patterns are the one artifact that cannot be rebuilt without
-    # the raw beamline files.
-    if args.no_save_diffraction:
-        logger.info('Skipping %s as requested', diffraction_file.name)
-    else:
-        logger.info('Writing %s', diffraction_file)
-        save_diffraction_data(diffraction_file, assembled_data)
+    save_assembled_diffraction(
+        logger, output_directory, assembled_data, skip=args.no_save_diffraction
+    )
 
     reconstruct_input = prepare_reconstruct_input(assembled_data, product)
     run_reconstruction(
@@ -1093,8 +1100,9 @@ def main() -> int:
         options,
         output_directory,
         num_sync_epochs=num_sync_epochs,
+        cancellation=cancellation,
     )
-    return 0
+    return EXIT_CANCELLED if cancellation.is_cancelled else 0
 
 
 if __name__ == '__main__':

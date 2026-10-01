@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Reference launcher for ``scripts/ptychodus_reconstruct.py``.
+"""Reference launcher for the ``ptychodus-reconstruct-subprocess`` command.
 
 Shows the whole contract in one place: build a pty-chi options object from
 ptychodus settings exactly as the GUI would, serialize it, and hand the blob to
@@ -9,31 +9,48 @@ rides on argv.
 Optionally cancels the run part-way to exercise the signal path.
 
     python scripts/ptychodus_reconstruct_parent_demo.py \\
-        --diffraction-input staging/diffraction.h5 \\
-        --product-input     staging/product.h5 \\
-        --settings          staging/settings.ini \\
-        --product-output    out/product.h5 \\
+        -i staging/ -o out/ \\
+        --settings staging/settings.ini \\
         --num-epochs 6 [--cancel-after-s 10]
+
+The input directory is the ptychodus standard layout, so it is whatever an
+earlier run or staging step wrote: ``diffraction.h5`` and ``product.h5``.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 import threading
 import time
 from pathlib import Path
 
-from ptychodus.api.io import load_product
+from ptychodus.api.io import StandardFileLayout, load_product
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.processing.api import ProcessingAlgorithmParameter
 from ptychodus.model.processing.settings import ProcessingSettings
 from ptychodus.model.ptychi.core import PtyChiReconstructorLibrary
 from ptychodus.model.ptychi.task import dump_task_options
 
-CHILD = Path(__file__).parent / 'ptychodus_reconstruct.py'
+COMMAND_NAME = 'ptychodus-reconstruct-subprocess'
+
+
+def _child_command() -> list[str]:
+    """How to start the child, installed or not.
+
+    The console script is the supported entry point, but a checkout that has not been
+    installed has no such executable on PATH, and running the module directly is the
+    same code by another name.
+    """
+    executable = shutil.which(COMMAND_NAME)
+
+    if executable is not None:
+        return [executable]
+
+    return [sys.executable, '-m', 'ptychodus.cli.reconstruct_subprocess']
 
 
 def main() -> int:
@@ -42,14 +59,16 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        '--diffraction-input',
-        metavar='DIFFRACTION_INPUT_FILE',
+        '-i',
+        '--input-directory',
+        metavar='INPUT_DIR',
         required=True,
         type=Path,
     )
     parser.add_argument(
-        '--product-input',
-        metavar='PRODUCT_INPUT_FILE',
+        '-o',
+        '--output-directory',
+        metavar='OUTPUT_DIR',
         required=True,
         type=Path,
     )
@@ -57,12 +76,6 @@ def main() -> int:
         '-s',
         '--settings',
         metavar='SETTINGS_FILE',
-        required=True,
-        type=Path,
-    )
-    parser.add_argument(
-        '--product-output',
-        metavar='PRODUCT_OUTPUT_FILE',
         required=True,
         type=Path,
     )
@@ -89,20 +102,22 @@ def main() -> int:
         processing_settings.algorithm.get_value()
     )
 
-    task_options = library.build_task_options(algorithm, load_product(args.product_input))
+    product_file = StandardFileLayout.PRODUCT.path(args.input_directory)
+    task_options = library.build_task_options(algorithm, load_product(product_file))
 
     if args.num_epochs is not None:
         task_options.reconstructor_options.num_epochs = args.num_epochs
 
     command = [
-        sys.executable,
-        str(CHILD),
-        '--diffraction-input',
-        str(args.diffraction_input),
-        '--product-input',
-        str(args.product_input),
-        '--product-output',
-        str(args.product_output),
+        *_child_command(),
+        '-i',
+        str(args.input_directory),
+        '-o',
+        str(args.output_directory),
+        # The options were built in memory here, so there is no file to point at. Saying
+        # so explicitly keeps the handoff visible rather than implied by an empty flag.
+        '--ptychi-options-file',
+        '-',
         '--num-sync-epochs',
         str(args.num_sync_epochs),
     ]
