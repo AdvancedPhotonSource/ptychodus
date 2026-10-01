@@ -275,15 +275,3 @@ def register_plugins(registry: PluginRegistry) -> None:
         simple_name='CNM_APS_HXN',
         display_name='CNM/APS 26-ID-C Hard X-ray Nanoprobe Files (*.h5 *.hdf5)',
     )
-    registry.diffraction_file_readers.register_plugin(
-        # Written by the preprocessing step at the Eiger instruments (VelociProbe, BNP,
-        # 2-ID-E, ISN, 9-ID-D), none of which records geometry in the file.
-        H5DiffractionFileReader(data_path='/dp', detector_pixel_size_m=75e-6),
-        simple_name='fold_slice',
-        display_name='fold_slice Files (*.h5 *.hdf5)',
-    )
-    registry.diffraction_file_writers.register_plugin(
-        H5DiffractionFileWriter(data_path='/dp'),
-        simple_name='fold_slice',
-        display_name='fold_slice Files (*.h5 *.hdf5)',
-    )

@@ -18,6 +18,7 @@ from ptychodus.api.propagate import (
     PropagatorParameters,
     choose_propagator,
     compute_far_field_pixel_geometry,
+    compute_far_field_propagation_distance,
     compute_magnification,
     intensity,
     propagate_wavefield,
@@ -1043,6 +1044,60 @@ class TestPropagatorOperatorAlgebra:
 # ---------------------------------------------------------------------------
 # Reciprocal-plane pixel geometry
 # ---------------------------------------------------------------------------
+
+
+class TestComputeFarFieldPropagationDistance:
+    """The inverse of the far-field relation, for a format that records the pitch not the distance."""
+
+    def test_matches_closed_form(self) -> None:
+        distance_m = compute_far_field_propagation_distance(
+            PixelGeometry(width_m=75e-6, height_m=50e-6),
+            ImageExtent(width_px=256, height_px=192),
+            wavelength_m=1.24e-10,
+            conjugate_pixel_width_m=1.0e-8,
+        )
+        assert distance_m == pytest.approx(1.0e-8 * 256 * 75e-6 / 1.24e-10)
+
+    def test_round_trips_through_the_forward_relation(self) -> None:
+        # The property that matters: a distance recovered from a recorded sample pixel
+        # size has to reproduce that pixel size, or the object is sampled at a scale
+        # nothing else in ptychodus agrees with.
+        detector = PixelGeometry(width_m=75e-6, height_m=75e-6)
+        extent = ImageExtent(width_px=256, height_px=256)
+        conjugate_pixel_width_m = 1.884786e-08
+
+        distance_m = compute_far_field_propagation_distance(
+            detector,
+            extent,
+            wavelength_m=1.549802e-10,
+            conjugate_pixel_width_m=conjugate_pixel_width_m,
+        )
+        forward = compute_far_field_pixel_geometry(
+            detector, extent, wavelength_m=1.549802e-10, propagation_distance_m=distance_m
+        )
+
+        assert forward.width_m == pytest.approx(conjugate_pixel_width_m)
+
+    def test_recovers_the_velociprobe_operating_point(self) -> None:
+        # The numbers the fold_slice preprocessing step recorded for the NXSchool IC_1
+        # scan: 8 keV on a 256 x 256 Eiger crop, which was taken at 2.335 m.
+        distance_m = compute_far_field_propagation_distance(
+            PixelGeometry(width_m=75e-6, height_m=75e-6),
+            ImageExtent(width_px=256, height_px=256),
+            wavelength_m=1.549802e-10,
+            conjugate_pixel_width_m=1.884786e-08,
+        )
+
+        assert distance_m == pytest.approx(2.335, rel=1e-5)
+
+    def test_a_zero_wavelength_raises(self) -> None:
+        with pytest.raises(ZeroDivisionError):
+            compute_far_field_propagation_distance(
+                PixelGeometry(width_m=75e-6, height_m=75e-6),
+                ImageExtent(width_px=256, height_px=256),
+                wavelength_m=0.0,
+                conjugate_pixel_width_m=1.0e-8,
+            )
 
 
 class TestComputeFarFieldPixelGeometry:

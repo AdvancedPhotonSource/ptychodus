@@ -76,6 +76,33 @@ def compute_far_field_pixel_geometry(
     )
 
 
+def compute_far_field_propagation_distance(
+    pixel_geometry: PixelGeometry,
+    extent: ImageExtent,
+    *,
+    wavelength_m: float,
+    conjugate_pixel_width_m: float,
+) -> float:
+    """Propagation distance implied by a known conjugate-plane pitch.
+
+    Solves ``dx_out = lambda |z| / (N dx_in)`` for ``|z|``, inverting
+    :func:`compute_far_field_pixel_geometry` along the width axis. A format that
+    records the sample-plane pixel size but not the sample-to-detector distance --
+    which is how the fold_slice preprocessing step stores its geometry -- pins the
+    distance this way, and the result reproduces `conjugate_pixel_width_m` when fed
+    back through the forward relation.
+
+    The width axis alone: the conjugate pitch is one number, so an anisotropic
+    detector could not satisfy both axes at once, and the two agree wherever the
+    detector is square.
+
+    Raises:
+        ZeroDivisionError: when the wavelength is zero, since every distance then
+            maps to the same conjugate pitch and the inverse is undefined.
+    """
+    return conjugate_pixel_width_m * extent.width_px * pixel_geometry.width_m / wavelength_m
+
+
 def compute_magnification(detector_distance_m: float, focus_object_distance_m: float) -> float:
     """Cone-beam magnification implied by the focus and detector positions.
 
