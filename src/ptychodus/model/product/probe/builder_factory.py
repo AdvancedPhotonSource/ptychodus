@@ -6,7 +6,7 @@ import numpy
 
 from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.probe import ProbeFileReader, ProbeFileWriter, ProbeSequence
-from ptychodus.api.simulate.probe import FresnelZonePlate
+from ptychodus.api.simulate.probe import FresnelZonePlate, KirkpatrickBaezMirrorPair
 
 from ...diffraction import AssembledDiffractionDataset
 from .average_pattern import AveragePatternProbeBuilder
@@ -14,6 +14,7 @@ from .builder import FromFileProbeBuilder, ProbeSequenceBuilder
 from .disk import DiskProbeBuilder
 from .fzp import FresnelZonePlateProbeBuilder
 from .hermite import HermiteProbeBuilder
+from .kb_mirror import KBMirrorProbeBuilder
 from .rect import RectangularProbeBuilder
 from .settings import ProbeSettings
 from .super_gaussian import SuperGaussianProbeBuilder
@@ -28,6 +29,7 @@ class ProbeBuilderFactory(Iterable[str]):
         rng: numpy.random.Generator,
         settings: ProbeSettings,
         fresnel_zone_plate_chooser: PluginChooser[FresnelZonePlate],
+        kb_mirror_chooser: PluginChooser[KirkpatrickBaezMirrorPair],
         file_reader_chooser: PluginChooser[ProbeFileReader],
         file_writer_chooser: PluginChooser[ProbeFileWriter],
     ) -> None:
@@ -35,12 +37,14 @@ class ProbeBuilderFactory(Iterable[str]):
         self._rng = rng
         self._settings = settings
         self._fresnel_zone_plate_chooser = fresnel_zone_plate_chooser
+        self._kb_mirror_chooser = kb_mirror_chooser
         self._file_reader_chooser = file_reader_chooser
         self._file_writer_chooser = file_writer_chooser
         self._non_diffraction_builders: Mapping[str, Callable[[], ProbeSequenceBuilder]] = {
             'disk': lambda: DiskProbeBuilder(rng, settings),
             'fresnel_zone_plate': self._create_fresnel_zone_plate_builder,
             'hermite': lambda: HermiteProbeBuilder(rng, settings),
+            'kb_mirror': self._create_kb_mirror_builder,
             'rectangular': lambda: RectangularProbeBuilder(rng, settings),
             'super_gaussian': lambda: SuperGaussianProbeBuilder(rng, settings),
             'zernike': lambda: ZernikeProbeBuilder(rng, settings),
@@ -93,6 +97,9 @@ class ProbeBuilderFactory(Iterable[str]):
         return FresnelZonePlateProbeBuilder(
             self._rng, self._settings, self._fresnel_zone_plate_chooser
         )
+
+    def _create_kb_mirror_builder(self) -> ProbeSequenceBuilder:
+        return KBMirrorProbeBuilder(self._rng, self._settings, self._kb_mirror_chooser)
 
     def get_open_file_filters(self) -> Iterator[str]:
         for plugin in self._file_reader_chooser:

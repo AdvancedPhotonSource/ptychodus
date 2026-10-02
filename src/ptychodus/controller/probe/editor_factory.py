@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
     QLabel,
     QRadioButton,
     QSpinBox,
+    QStackedWidget,
     QTableView,
     QVBoxLayout,
     QWidget,
@@ -17,11 +18,13 @@ from ptychodus.api.observer import Observable, Observer
 from ptychodus.api.parameters import StringParameter
 
 from ...model.product.probe import (
+    INCOHERENT_MODE_STRATEGY_NAMES,
     AveragePatternProbeBuilder,
     DiskProbeBuilder,
     FresnelZonePlateProbeBuilder,
     FromFileProbeBuilder,
     HermiteProbeBuilder,
+    KBMirrorProbeBuilder,
     ProbeModeDecayType,
     ProbeRepositoryItem,
     ProbeSequenceBuilder,
@@ -31,6 +34,8 @@ from ...model.product.probe import (
 )
 from ...view.widgets import GroupBoxWithPresets
 from ..parameters import (
+    DecimalLineEditParameterViewController,
+    DecimalSliderParameterViewController,
     LengthParameterViewController,
     ParameterViewBuilder,
     ParameterViewController,
@@ -83,6 +88,78 @@ class FresnelZonePlateViewController(ParameterViewController):
             'Central Beamstop Diameter:',
             self._central_beamstop_diameter_view_controller.get_widget(),
         )
+        layout.addRow('Defocus Distance:', self._defocus_distance_view_controller.get_widget())
+        self._widget.contents.setLayout(layout)
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+
+class KBMirrorViewController(ParameterViewController):
+    def __init__(self, title: str, probe_builder: KBMirrorProbeBuilder) -> None:
+        super().__init__()
+        self._widget = GroupBoxWithPresets(title)
+
+        for label in probe_builder.labels_for_presets():
+            action = self._widget.presets_menu.addAction(label)
+
+            if action is None:
+                raise ValueError('action is None!')
+            else:
+                action.triggered.connect(lambda _, label=label: probe_builder.apply_presets(label))
+
+        self._horizontal_acceptance_length_view_controller = LengthParameterViewController(
+            probe_builder.horizontal_acceptance_length_m, default_unit=LengthUnit.MILLIMETER
+        )
+        self._horizontal_grazing_angle_view_controller = DecimalLineEditParameterViewController(
+            probe_builder.horizontal_grazing_angle_rad
+        )
+        self._horizontal_focus_distance_view_controller = LengthParameterViewController(
+            probe_builder.horizontal_focus_distance_m, default_unit=LengthUnit.MILLIMETER
+        )
+        self._vertical_acceptance_length_view_controller = LengthParameterViewController(
+            probe_builder.vertical_acceptance_length_m, default_unit=LengthUnit.MILLIMETER
+        )
+        self._vertical_grazing_angle_view_controller = DecimalLineEditParameterViewController(
+            probe_builder.vertical_grazing_angle_rad
+        )
+        self._vertical_focus_distance_view_controller = LengthParameterViewController(
+            probe_builder.vertical_focus_distance_m, default_unit=LengthUnit.MILLIMETER
+        )
+        self._astigmatism_view_controller = LengthParameterViewController(
+            probe_builder.astigmatism_m, is_signed=True, default_unit=LengthUnit.MICROMETER
+        )
+        self._defocus_distance_view_controller = LengthParameterViewController(
+            probe_builder.defocus_distance_m, default_unit=LengthUnit.MICROMETER
+        )
+
+        layout = QFormLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addRow(
+            'Horizontal Acceptance Length:',
+            self._horizontal_acceptance_length_view_controller.get_widget(),
+        )
+        layout.addRow(
+            'Horizontal Grazing Angle [rad]:',
+            self._horizontal_grazing_angle_view_controller.get_widget(),
+        )
+        layout.addRow(
+            'Horizontal Focus Distance:',
+            self._horizontal_focus_distance_view_controller.get_widget(),
+        )
+        layout.addRow(
+            'Vertical Acceptance Length:',
+            self._vertical_acceptance_length_view_controller.get_widget(),
+        )
+        layout.addRow(
+            'Vertical Grazing Angle [rad]:',
+            self._vertical_grazing_angle_view_controller.get_widget(),
+        )
+        layout.addRow(
+            'Vertical Focus Distance:',
+            self._vertical_focus_distance_view_controller.get_widget(),
+        )
+        layout.addRow('Astigmatism:', self._astigmatism_view_controller.get_widget())
         layout.addRow('Defocus Distance:', self._defocus_distance_view_controller.get_widget())
         self._widget.contents.setLayout(layout)
 
@@ -229,6 +306,121 @@ class DecayTypeParameterViewController(ParameterViewController, Observer):
             self._sync_model_to_view()
 
 
+class IncoherentModeStrategyViewController(ParameterViewController, Observer):
+    """Show only the parameters the selected incoherent-mode strategy actually reads.
+
+    The decay profile is on the pages rather than beside the selector because the
+    Gaussian-Schell model predicts its own mode spectrum from the source coherence and
+    never consults a decay profile, so leaving those controls up under it would offer a
+    knob that does nothing.
+    """
+
+    def __init__(self, probe_builder: ProbeSequenceBuilder) -> None:
+        super().__init__()
+        self._strategy = probe_builder.incoherent_mode_strategy
+        self._widget = QStackedWidget()
+        # The view controllers own their widgets, so the pages keep them alive.
+        self._view_controllers: list[ParameterViewController] = []
+
+        decay_rows: list[tuple[str, ParameterViewController]] = [
+            (
+                'Decay Type:',
+                DecayTypeParameterViewController(probe_builder.incoherent_mode_decay_type),
+            ),
+            (
+                'Decay Ratio:',
+                DecimalSliderParameterViewController(probe_builder.incoherent_mode_decay_ratio),
+            ),
+        ]
+        # A widget belongs to one page only, so each page binds its own controllers to
+        # the shared parameters; they observe it and stay in step.
+        more_decay_rows: list[tuple[str, ParameterViewController]] = [
+            (
+                'Decay Type:',
+                DecayTypeParameterViewController(probe_builder.incoherent_mode_decay_type),
+            ),
+            (
+                'Decay Ratio:',
+                DecimalSliderParameterViewController(probe_builder.incoherent_mode_decay_ratio),
+            ),
+        ]
+
+        self._pages: dict[str, QWidget] = {
+            'MomentPolynomial': self._build_page(
+                [
+                    *decay_rows,
+                    (
+                        'Damping Width:',
+                        DecimalLineEditParameterViewController(
+                            probe_builder.moment_polynomial_damping_width
+                        ),
+                    ),
+                ]
+            ),
+            'RandomPhaseRamp': self._build_page(more_decay_rows),
+            'GaussianSchell': self._build_page(
+                [
+                    (
+                        'Beam Width:',
+                        LengthParameterViewController(probe_builder.gaussian_schell_beam_width_m),
+                    ),
+                    (
+                        'Beam Height:',
+                        LengthParameterViewController(probe_builder.gaussian_schell_beam_height_m),
+                    ),
+                    (
+                        'Coherence Width:',
+                        LengthParameterViewController(
+                            probe_builder.gaussian_schell_coherence_width_m
+                        ),
+                    ),
+                    (
+                        'Coherence Height:',
+                        LengthParameterViewController(
+                            probe_builder.gaussian_schell_coherence_height_m
+                        ),
+                    ),
+                ]
+            ),
+        }
+
+        for page in self._pages.values():
+            self._widget.addWidget(page)
+
+        self._strategy.add_observer(self)
+        self._sync_strategy_page()
+
+    def _build_page(self, rows: list[tuple[str, ParameterViewController]]) -> QWidget:
+        layout = QFormLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        for label, view_controller in rows:
+            layout.addRow(label, view_controller.get_widget())
+            self._view_controllers.append(view_controller)
+
+        page = QWidget()
+        page.setLayout(layout)
+        return page
+
+    def _sync_strategy_page(self) -> None:
+        namecf = self._strategy.get_value().casefold()
+
+        for name, page in self._pages.items():
+            if name.casefold() == namecf:
+                self._widget.setCurrentWidget(page)
+                return
+
+        # An unrecognized name builds the first strategy, so show what will be built.
+        self._widget.setCurrentWidget(self._pages[INCOHERENT_MODE_STRATEGY_NAMES[0]])
+
+    def get_widget(self) -> QWidget:
+        return self._widget
+
+    def _update(self, observable: Observable) -> None:
+        if observable is self._strategy:
+            self._sync_strategy_page()
+
+
 class LabelViewController(ParameterViewController):
     def __init__(self, text: str) -> None:
         super().__init__()
@@ -305,6 +497,11 @@ class ProbeEditorViewControllerFactory:
                 FresnelZonePlateViewController(primary_mode_group, probe_builder)
             )
             return True
+        elif isinstance(probe_builder, KBMirrorProbeBuilder):
+            dialog_builder.add_view_controller_to_top(
+                KBMirrorViewController(primary_mode_group, probe_builder)
+            )
+            return True
         elif isinstance(probe_builder, HermiteProbeBuilder):
             dialog_builder.add_view_controller_to_top(
                 HermiteViewController(primary_mode_group, probe_builder)
@@ -376,14 +573,15 @@ class ProbeEditorViewControllerFactory:
             'Orthogonalize Modes:',
             group=incoherent_modes_group,
         )
-        dialog_builder.add_view_controller(
-            DecayTypeParameterViewController(probe_builder.incoherent_mode_decay_type),
-            'Decay Type:',
+        dialog_builder.add_combo_box(
+            probe_builder.incoherent_mode_strategy,
+            INCOHERENT_MODE_STRATEGY_NAMES,
+            'Strategy:',
             group=incoherent_modes_group,
         )
-        dialog_builder.add_decimal_slider(
-            probe_builder.incoherent_mode_decay_ratio,
-            'Decay Ratio:',
+        dialog_builder.add_view_controller(
+            IncoherentModeStrategyViewController(probe_builder),
+            '',
             group=incoherent_modes_group,
         )
 

@@ -1190,9 +1190,9 @@ def align_objects(
     can be applied directly.
 
     The geometric-center crop assumes the two arrays' array-centers correspond
-    to approximately the same physical point (the regime of pty-chi
-    probe-position rounding and padding mismatches, which are on the order of
-    one to a few pixels). Systematic integer-pixel offsets larger than
+    to approximately the same physical point (the regime of probe-position
+    rounding and array-padding mismatches, which are on the order of one to a
+    few pixels). Systematic integer-pixel offsets larger than
     ``ceil(delta / 2)`` in either axis are outside the recovery envelope of
     this scheme because the geometric crop discards the very content the
     correlator would need to see.

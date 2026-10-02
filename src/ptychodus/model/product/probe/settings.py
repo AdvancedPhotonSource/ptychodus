@@ -26,6 +26,24 @@ class ProbeSettings(Observable, Observer):
         self.incoherent_mode_decay_ratio = self._group.create_real_parameter(
             'IncoherentModeDecayRatio', 1.0, minimum=0.0, maximum=1.0
         )
+        self.incoherent_mode_strategy = self._group.create_string_parameter(
+            'IncoherentModeStrategy', 'MomentPolynomial'
+        )
+        self.moment_polynomial_damping_width = self._group.create_real_parameter(
+            'MomentPolynomialDampingWidth', 1.0, minimum=0.0
+        )
+        self.gaussian_schell_beam_width_m = self._group.create_real_parameter(
+            'GaussianSchellBeamWidthInMeters', 1e-6, minimum=0.0
+        )
+        self.gaussian_schell_beam_height_m = self._group.create_real_parameter(
+            'GaussianSchellBeamHeightInMeters', 1e-6, minimum=0.0
+        )
+        self.gaussian_schell_coherence_width_m = self._group.create_real_parameter(
+            'GaussianSchellCoherenceWidthInMeters', 1e-6, minimum=0.0
+        )
+        self.gaussian_schell_coherence_height_m = self._group.create_real_parameter(
+            'GaussianSchellCoherenceHeightInMeters', 1e-6, minimum=0.0
+        )
         self.num_coherent_modes = self._group.create_integer_parameter(
             'NumberOfCoherentModes', 1, minimum=1
         )
@@ -63,6 +81,26 @@ class ProbeSettings(Observable, Observer):
             'CentralBeamstopDiameterInMeters', 60e-6, minimum=0.0
         )
         self.defocus_distance_m = self._group.create_real_parameter('DefocusDistanceInMeters', 0.0)
+
+        self.kb_horizontal_acceptance_length_m = self._group.create_real_parameter(
+            'KBHorizontalAcceptanceLengthInMeters', 0.1, minimum=0.0
+        )
+        self.kb_horizontal_grazing_angle_rad = self._group.create_real_parameter(
+            'KBHorizontalGrazingAngleInRadians', 3e-3, minimum=0.0
+        )
+        self.kb_horizontal_focus_distance_m = self._group.create_real_parameter(
+            'KBHorizontalFocusDistanceInMeters', 50e-3, minimum=0.0
+        )
+        self.kb_vertical_acceptance_length_m = self._group.create_real_parameter(
+            'KBVerticalAcceptanceLengthInMeters', 0.1, minimum=0.0
+        )
+        self.kb_vertical_grazing_angle_rad = self._group.create_real_parameter(
+            'KBVerticalGrazingAngleInRadians', 3e-3, minimum=0.0
+        )
+        self.kb_vertical_focus_distance_m = self._group.create_real_parameter(
+            'KBVerticalFocusDistanceInMeters', 50e-3, minimum=0.0
+        )
+        self.kb_astigmatism_m = self._group.create_real_parameter('KBAstigmatismInMeters', 0.0)
 
     def _update(self, observable: Observable) -> None:
         if observable is self._group:

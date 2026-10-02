@@ -120,6 +120,7 @@ class ModelCore:
             self.plugin_registry.probe_position_file_readers,
             self.plugin_registry.probe_position_file_writers,
             self.plugin_registry.fresnel_zone_plates,
+            self.plugin_registry.kb_mirrors,
             self.plugin_registry.probe_file_readers,
             self.plugin_registry.probe_file_writers,
             self.plugin_registry.object_file_readers,

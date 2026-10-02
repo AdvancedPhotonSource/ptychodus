@@ -11,6 +11,7 @@ import math
 
 import numpy
 import numpy.polynomial.legendre
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ..constants import TWO_PI, TWO_PI_J
 from ..typing import ComplexArrayType, RealArrayType
@@ -191,13 +192,30 @@ def generate_average_pattern_probe(
     return Probe(array=array, pixel_geometry=probe_pixel_geometry)
 
 
-@dataclass(frozen=True)
-class FresnelZonePlate:
+class FresnelZonePlate(BaseModel):
     """Physical parameters of a Fresnel zone plate optic."""
 
-    zone_plate_diameter_m: float
-    outermost_zone_width_m: float
-    central_beamstop_diameter_m: float
+    model_config = ConfigDict(frozen=True, extra='forbid', allow_inf_nan=False)
+
+    zone_plate_diameter_m: float = Field(gt=0.0)
+    """Diameter of the outermost zone."""
+    outermost_zone_width_m: float = Field(gt=0.0)
+    """Width of the outermost zone, which sets the diffraction-limited resolution."""
+    central_beamstop_diameter_m: float = Field(ge=0.0)
+    """Diameter of the central stop; zero means the zone plate has none."""
+
+    @model_validator(mode='after')
+    def _validate_beamstop_fits(self) -> FresnelZonePlate:
+        # The pupil is the annulus between the stop and the outer zone, so a stop that
+        # reaches the rim leaves nothing to illuminate with.
+        if self.central_beamstop_diameter_m >= self.zone_plate_diameter_m:
+            raise ValueError(
+                f'Central beamstop diameter ({self.central_beamstop_diameter_m}) must be '
+                f'smaller than the zone plate diameter ({self.zone_plate_diameter_m}); '
+                'otherwise the zone plate passes no light at all.'
+            )
+
+        return self
 
     def get_focal_length_m(self, central_wavelength_m: float) -> float:
         """Return the zone plate focal length at *central_wavelength_m* (thin-lens formula)."""
@@ -276,17 +294,23 @@ def generate_fresnel_zone_plate_probe(
 _SINC_FWHM_FACTOR = 0.886
 
 
-@dataclass(frozen=True)
-class KirkpatrickBaezMirror:
+class KirkpatrickBaezMirror(BaseModel):
     """Physical parameters of one grazing-incidence focusing mirror of a KB pair."""
 
-    acceptance_length_m: float
+    model_config = ConfigDict(frozen=True, extra='forbid', allow_inf_nan=False)
+
+    acceptance_length_m: float = Field(gt=0.0)
     """Illuminated length along the mirror surface."""
-    grazing_angle_rad: float
-    """Angle between the incident beam and the mirror surface."""
-    focus_distance_m: float
+    grazing_angle_rad: float = Field(gt=0.0, lt=0.5 * numpy.pi)
+    """Angle between the incident beam and the mirror surface.
+
+    Bounded below normal incidence, which keeps ``sin(theta)`` positive so the projected
+    and numerical apertures stay positive; past that it is not a grazing-incidence
+    mirror. Real values are milliradians.
+    """
+    focus_distance_m: float = Field(gt=0.0)
     """Distance from the mirror center to the nominal focus."""
-    source_distance_m: float = 0.0
+    source_distance_m: float = Field(default=0.0, ge=0.0)
     """Distance from the source to the mirror center. Zero means a collimated input."""
 
     @classmethod
@@ -336,9 +360,10 @@ class KirkpatrickBaezMirror:
         )
 
 
-@dataclass(frozen=True)
-class KirkpatrickBaezMirrorPair:
+class KirkpatrickBaezMirrorPair(BaseModel):
     """A Kirkpatrick-Baez pair: one mirror focusing in x, one focusing in y."""
+
+    model_config = ConfigDict(frozen=True, extra='forbid', allow_inf_nan=False)
 
     horizontal: KirkpatrickBaezMirror
     """Mirror that focuses in the x-direction."""
@@ -545,7 +570,8 @@ def generate_kb_mirror_probe(
             f'Projected aperture ({2 * half_aperture_x_m:.3e} x '
             f'{2 * half_aperture_y_m:.3e} m) does not fit the pupil window '
             f'({pupil_width_m:.3e} x {pupil_height_m:.3e} m); the numerical aperture '
-            'would be clipped. Use a coarser probe pixel size or a smaller array.'
+            'would be clipped. The window is lambda*z/dx_probe, so use a finer probe '
+            'pixel size; the array size does not enter.'
         )
 
     _warn_about_kb_sampling(

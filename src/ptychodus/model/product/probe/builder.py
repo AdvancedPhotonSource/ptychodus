@@ -1,13 +1,17 @@
 from __future__ import annotations
 from abc import abstractmethod
+from collections.abc import Callable, Mapping
 import logging
 
 import numpy
 
 from ptychodus.api.parameters import ParameterGroup
 from ptychodus.api.simulate.probe import (
+    GaussianSchellStrategy,
+    IncoherentModeStrategy,
     ProbeMomentPolynomialStrategy,
     ProbeModeDecayType,
+    RandomPhaseRampStrategy,
     generate_coherent_probe_modes,
     generate_incoherent_probe_modes,
     rescale_probe_intensity,
@@ -45,6 +49,28 @@ class ProbeSequenceBuilder(ParameterGroup):
 
         self.incoherent_mode_decay_ratio = settings.incoherent_mode_decay_ratio.copy()
         self._add_parameter('incoherent_mode_decay_ratio', self.incoherent_mode_decay_ratio)
+
+        self.incoherent_mode_strategy = settings.incoherent_mode_strategy.copy()
+        self._add_parameter('incoherent_mode_strategy', self.incoherent_mode_strategy)
+
+        self.moment_polynomial_damping_width = settings.moment_polynomial_damping_width.copy()
+        self._add_parameter('moment_polynomial_damping_width', self.moment_polynomial_damping_width)
+
+        self.gaussian_schell_beam_width_m = settings.gaussian_schell_beam_width_m.copy()
+        self._add_parameter('gaussian_schell_beam_width_m', self.gaussian_schell_beam_width_m)
+
+        self.gaussian_schell_beam_height_m = settings.gaussian_schell_beam_height_m.copy()
+        self._add_parameter('gaussian_schell_beam_height_m', self.gaussian_schell_beam_height_m)
+
+        self.gaussian_schell_coherence_width_m = settings.gaussian_schell_coherence_width_m.copy()
+        self._add_parameter(
+            'gaussian_schell_coherence_width_m', self.gaussian_schell_coherence_width_m
+        )
+
+        self.gaussian_schell_coherence_height_m = settings.gaussian_schell_coherence_height_m.copy()
+        self._add_parameter(
+            'gaussian_schell_coherence_height_m', self.gaussian_schell_coherence_height_m
+        )
 
         self.num_coherent_modes = settings.num_coherent_modes.copy()
         self._add_parameter('num_coherent_modes', self.num_coherent_modes)
@@ -115,6 +141,55 @@ class ProbeSequenceBuilder(ParameterGroup):
 
         return imode_decay_type, imode_decay_ratio
 
+    def _create_moment_polynomial_strategy(self) -> IncoherentModeStrategy:
+        decay_type, decay_ratio = self._get_imode_decay()
+        return ProbeMomentPolynomialStrategy(
+            decay_type=decay_type,
+            decay_ratio=decay_ratio,
+            damping_width=self.moment_polynomial_damping_width.get_value(),
+        )
+
+    def _create_random_phase_ramp_strategy(self) -> IncoherentModeStrategy:
+        decay_type, decay_ratio = self._get_imode_decay()
+        return RandomPhaseRampStrategy(self._rng, decay_type=decay_type, decay_ratio=decay_ratio)
+
+    def _create_gaussian_schell_strategy(self) -> IncoherentModeStrategy:
+        beam_size_x_m = self.gaussian_schell_beam_width_m.get_value()
+        coherence_length_x_m = self.gaussian_schell_coherence_width_m.get_value()
+        beam_size_y_m = self.gaussian_schell_beam_height_m.get_value()
+        coherence_length_y_m = self.gaussian_schell_coherence_height_m.get_value()
+        widths = (beam_size_x_m, coherence_length_x_m, beam_size_y_m, coherence_length_y_m)
+
+        # The settings permit zero where the model requires a positive width, and a
+        # source of no size describes nothing to build modes from.
+        if any(width <= 0.0 for width in widths):
+            logger.debug('Gaussian-Schell source has a non-positive width')
+            return self._create_moment_polynomial_strategy()
+
+        return GaussianSchellStrategy(
+            beam_size_x_m=beam_size_x_m,
+            coherence_length_x_m=coherence_length_x_m,
+            beam_size_y_m=beam_size_y_m,
+            coherence_length_y_m=coherence_length_y_m,
+        )
+
+    def _create_imode_strategy(self) -> IncoherentModeStrategy:
+        """Build the strategy the settings name, falling back on anything unrecognized.
+
+        The settings are deliberately looser than the api strategies: the names are free
+        strings and the decay ratio may be zero, both of which the strategies reject. A
+        stored value they would refuse should leave a usable probe, not stop the build.
+        """
+        name = self.incoherent_mode_strategy.get_value()
+        namecf = name.casefold()
+
+        for candidate, factory in _IMODE_STRATEGY_FACTORIES.items():
+            if candidate.casefold() == namecf:
+                return factory(self)
+
+        logger.debug(f'Unknown incoherent mode strategy "{name}"')
+        return next(iter(_IMODE_STRATEGY_FACTORIES.values()))(self)
+
     def _condition_probe(
         self, probe_seq: ProbeSequence, geometry_provider: ProbeGeometryProvider
     ) -> ProbeSequence:
@@ -157,13 +232,10 @@ class ProbeSequenceBuilder(ParameterGroup):
         num_imodes_actual = probe.num_incoherent_modes
 
         if num_imodes_actual < num_imodes_requested:
-            decay_type, decay_ratio = self._get_imode_decay()
             probe = generate_incoherent_probe_modes(
                 probe,
                 num_imodes_requested,
-                strategy=ProbeMomentPolynomialStrategy(
-                    decay_type=decay_type, decay_ratio=decay_ratio
-                ),
+                strategy=self._create_imode_strategy(),
                 orthogonalize=self.orthogonalize_incoherent_modes.get_value(),
             )
         elif num_imodes_actual > num_imodes_requested:
@@ -184,6 +256,24 @@ class ProbeSequenceBuilder(ParameterGroup):
 
         logger.debug(f'Conditioned probe {probe_seq.get_array().shape=}')
         return probe_seq
+
+
+# The single source of truth for the selectable strategies. A chooser offers these keys
+# and the builder resolves against this same mapping, so a name can never be offered
+# without a way to build it, nor a strategy be buildable but never offered.
+_IMODE_STRATEGY_FACTORIES: Mapping[
+    str, Callable[[ProbeSequenceBuilder], IncoherentModeStrategy]
+] = {
+    'MomentPolynomial': ProbeSequenceBuilder._create_moment_polynomial_strategy,
+    'RandomPhaseRamp': ProbeSequenceBuilder._create_random_phase_ramp_strategy,
+    'GaussianSchell': ProbeSequenceBuilder._create_gaussian_schell_strategy,
+}
+
+INCOHERENT_MODE_STRATEGY_NAMES = tuple(_IMODE_STRATEGY_FACTORIES)
+"""Selectable incoherent-mode strategies, in the order a chooser should offer them.
+
+The first entry is what an unrecognized stored name falls back to.
+"""
 
 
 class FromMemoryProbeBuilder(ProbeSequenceBuilder):

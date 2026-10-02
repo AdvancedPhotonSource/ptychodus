@@ -151,11 +151,18 @@ Use `WorkflowProductAPI.generate_probe(name, parameters)`. All generated probe b
 `fresnel_zone_plate`
 : Simulates a Fresnel zone plate optic and propagates it to the sample plane with the Fresnel-transform propagator. Parameters are `zone_plate_diameter_m`, `outermost_zone_width_m`, `central_beamstop_diameter_m`, and `defocus_distance_m`. The central beamstop creates the donut-like zone-plate aperture. The focal length is computed as `zone_plate_diameter_m * outermost_zone_width_m / probe_wavelength_m` and the propagation distance is `focal_length_m + defocus_distance_m`.
 
+`kb_mirror`
+: Simulates a Kirkpatrick-Baez mirror pair and propagates it to the sample plane. Each mirror takes an `acceptance_length_m`, a `grazing_angle_rad` and a `focus_distance_m`, from which the projected aperture `L sin(theta)` and the numerical aperture follow; `astigmatism_m` separates the two axis foci along the beam and `defocus_distance_m` moves the sample off the focal plane. Grazing angles are stored in radians rather than the turns the GUI uses elsewhere, because that is the number an optics log records. The pupil window is `probe_wavelength_m * z / probe_pixel_size_m`, so a high-aperture optic needs a fine probe pixel size; an aperture that does not fit is refused rather than silently clipped, since clipping would quietly change the optic.
+
 `average_pattern`
 : Estimates a probe from diffraction data by taking the square root of the mean assembled diffraction pattern and back-propagating it by `detector_distance_m` with the Fresnel-transform propagator. This requires assembled diffraction data to already be available in the model.
 
 `zernike`
 : Generates a probe as a superposition of Zernike polynomial modes inside a disk with parameter `diameter_m`. Through the builder object, callers can set the Zernike order and individual coefficients before rebuilding. The workflow parameter mapping covers the common builder parameters, but coefficient-level editing is done on the `ZernikeProbeBuilder` object.
+
+### Mirror Presets
+
+Kirkpatrick-Baez mirror pairs register the same way zone plates do, through `registry.kb_mirrors`. None ship yet: a preset states an instrument's measured optics, and those numbers reach a reconstruction, so the presets menu stays empty until real measurements are available and the builder works from its own settings in the meantime.
 
 ### Zone Plate Presets
 
@@ -203,6 +210,8 @@ What the routine guarantees, whatever strategy is in play:
 - Preserved modes keep the share of the power they arrived with; the new modes divide the share the strategy's profile assigns to their indices. A 90/10 two-mode probe expanded to four at a decay ratio of 0.5 comes out `[0.727, 0.073, 0.133, 0.067]`, so the 9:1 ratio survives.
 - **Total power is unchanged**, expanding or truncating, and a mode dropped as linearly dependent passes its share to the modes that survive rather than leaving the probe dimmer. The number of modes used to represent a beam is a modeling choice; the illumination is not, and a probe read from file is never rescaled afterward.
 - Orthogonalization is modified Gram-Schmidt in mode order, which is what keeps mode `n` paired with mode `n`. `mode_dependence_floor` sets how much of its own length a mode's orthogonal part must retain to be kept.
+
+Which strategy runs is the `IncoherentModeStrategy` setting, one of `MomentPolynomial`, `RandomPhaseRamp` or `GaussianSchell`; an unrecognized value falls back to the first. In the GUI it is a combo box, and the parameters below it change with the selection so that only the ones the chosen strategy reads are shown — the decay profile for the first two, the source size and coherence length for Gaussian-Schell, which predicts its own spectrum and never consults a decay profile.
 
 `ProbeMomentPolynomialStrategy` is the default, and needs no physical parameters at all. It measures the intensity-weighted centroid and variance of the probe it is given — from the incoherent sum of its modes, which is the footprint the illumination actually covers — and uses that width as its own length scale, so one call suits any illumination without being told how the probe was formed. A new mode is the dominant mode times `u**m * v**n`, with `u` and `v` the transverse coordinates centered on the probe and measured in units of its rms width, damped by a Gaussian of that same width so the polynomial does not push the higher orders into the tails. Orders are graded by total degree and skip the constant term. Weights come from `ProbeModeDecayType` and depend on a mode's index rather than its order.
 

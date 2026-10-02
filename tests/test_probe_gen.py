@@ -1,8 +1,11 @@
 """Unit tests for probe generation functions in ptychodus.api.simulate.probe."""
 
+import math
+
 import numpy
 import numpy.testing
 import pytest
+from pydantic import ValidationError
 
 from ptychodus.api.assemble import AssembledDiffractionData
 from ptychodus.api.geometry import HermiteMode, ImageExtent, LegendreMode, PixelGeometry
@@ -127,8 +130,8 @@ class TestGenerateCoherentProbeModes:
         """Regression test: eigenmodes must fill every incoherent mode.
 
         Before the fix only incoherent slot 0 of each eigenmode was populated,
-        leaving zero-power slots that trigger a 0/0 -> NaN in pty-chi's
-        Gram-Schmidt orthogonalization (segfault/abort on the CUDA backend).
+        leaving zero-power slots that trigger a 0/0 -> NaN in a downstream
+        Gram-Schmidt orthogonalization (segfault/abort on a GPU backend).
         """
         rng = numpy.random.default_rng(11)
         num_imodes = 5
@@ -446,6 +449,55 @@ def _invert_onto_the_zone_plate_plane(
     return propagator.propagate(probe_plane_array)
 
 
+class TestFresnelZonePlate:
+    """The zone plate carried no validation at all before it became a model."""
+
+    def _sound(self) -> dict:
+        return dict(
+            zone_plate_diameter_m=180e-6,
+            outermost_zone_width_m=50e-9,
+            central_beamstop_diameter_m=60e-6,
+        )
+
+    @pytest.mark.parametrize(
+        'override',
+        [
+            {'zone_plate_diameter_m': 0.0},
+            {'zone_plate_diameter_m': -1e-6},
+            {'zone_plate_diameter_m': math.inf},
+            {'outermost_zone_width_m': 0.0},
+            {'outermost_zone_width_m': -1e-9},
+            {'central_beamstop_diameter_m': -1e-6},
+        ],
+    )
+    def test_rejects_a_size_that_is_not_a_size(self, override: dict) -> None:
+        kwargs = self._sound()
+        kwargs.update(override)
+
+        with pytest.raises(ValidationError, match=next(iter(override))):
+            FresnelZonePlate(**kwargs)
+
+    def test_a_zero_beamstop_means_no_central_stop(self) -> None:
+        """Zero is a legitimate value: the pupil is then the full disk."""
+        zone_plate = FresnelZonePlate(**{**self._sound(), 'central_beamstop_diameter_m': 0.0})
+
+        assert zone_plate.central_beamstop_diameter_m == 0.0
+
+    @pytest.mark.parametrize('beamstop_m', [180e-6, 200e-6])
+    def test_rejects_a_beamstop_that_swallows_the_aperture(self, beamstop_m: float) -> None:
+        """The pupil is the annulus between stop and rim, so a stop that reaches the rim
+        leaves nothing; that used to produce a silently black probe."""
+        kwargs = {**self._sound(), 'central_beamstop_diameter_m': beamstop_m}
+
+        with pytest.raises(ValidationError, match='smaller than the zone plate diameter'):
+            FresnelZonePlate(**kwargs)
+
+    def test_rejects_an_unknown_field(self) -> None:
+        """A preset is a bare literal call, so a misspelled field must not pass silently."""
+        with pytest.raises(ValidationError, match='zoneplate_diameter_m'):
+            FresnelZonePlate(**self._sound(), zoneplate_diameter_m=1.0)
+
+
 class TestGenerateFresnelZonePlateProbe:
     """The sign of ``focal_length + defocus`` selects the propagation direction.
 
@@ -716,6 +768,55 @@ class TestKirkpatrickBaezMirror:
         )
 
         assert mirror.get_focal_length_m() == pytest.approx(45.0 * 0.05 / 45.05, rel=1e-12)
+
+    @pytest.mark.parametrize(
+        'override',
+        [
+            {'acceptance_length_m': 0.0},
+            {'acceptance_length_m': -0.1},
+            {'acceptance_length_m': math.inf},
+            {'grazing_angle_rad': 0.0},
+            {'grazing_angle_rad': 0.5 * math.pi},
+            {'grazing_angle_rad': 2.0},
+            {'focus_distance_m': 0.0},
+            {'focus_distance_m': math.nan},
+            {'focus_distance_m': math.inf},
+            {'source_distance_m': -1.0},
+        ],
+    )
+    def test_rejects_geometry_that_is_not_a_mirror(self, override: dict) -> None:
+        """Rejected at construction, and the error names the field that is wrong.
+
+        A zero focus distance would otherwise surface as a ZeroDivisionError from inside
+        the numerical-aperture accessor, several frames from the value that caused it.
+        Infinity needs saying separately: a bare positivity constraint admits it, since
+        ``inf > 0`` holds.
+        """
+        kwargs = dict(acceptance_length_m=0.1, grazing_angle_rad=3e-3, focus_distance_m=0.05)
+        kwargs.update(override)
+        offending_field = next(iter(override))
+
+        with pytest.raises(ValidationError, match=offending_field):
+            KirkpatrickBaezMirror(**kwargs)
+
+    def test_rejects_an_unknown_field(self) -> None:
+        """A preset is a bare literal call, so a misspelled field must not pass silently."""
+        with pytest.raises(ValidationError, match='grazing_angle'):
+            KirkpatrickBaezMirror(
+                acceptance_length_m=0.1,
+                grazing_angle=3e-3,
+                focus_distance_m=0.05,
+            )
+
+    def test_a_pair_reports_which_mirror_is_wrong(self) -> None:
+        """A nested mirror is validated as part of the pair, and the error locates it."""
+        sound = dict(acceptance_length_m=0.1, grazing_angle_rad=3e-3, focus_distance_m=0.05)
+
+        with pytest.raises(ValidationError, match='horizontal'):
+            KirkpatrickBaezMirrorPair(
+                horizontal={**sound, 'focus_distance_m': 0.0},
+                vertical=sound,
+            )
 
     def test_reference_distance_is_the_mean_of_the_two_mirrors(self) -> None:
         pair = KirkpatrickBaezMirrorPair(

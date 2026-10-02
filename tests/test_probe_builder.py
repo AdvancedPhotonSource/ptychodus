@@ -35,13 +35,16 @@ from ptychodus.api.probe import (
     ProbeGeometryProvider,
     ProbeSequence,
 )
+from ptychodus.api.plugins import PluginChooser
 from ptychodus.api.settings import SettingsRegistry
 from ptychodus.model.product.probe.builder import (
     FromFileProbeBuilder,
     FromMemoryProbeBuilder,
     ProbeSequenceBuilder,
 )
+from ptychodus.model.product.probe import INCOHERENT_MODE_STRATEGY_NAMES
 from ptychodus.model.product.probe.disk import DiskProbeBuilder
+from ptychodus.model.product.probe.kb_mirror import KBMirrorProbeBuilder
 from ptychodus.model.product.probe.settings import ProbeSettings
 
 NUM_SCAN_POINTS = 7
@@ -50,6 +53,9 @@ PROBE_PHOTON_COUNT = 1.0e6
 # pixel size the generated probe is empty and rescale_probe_intensity bails.
 PIXEL_SIZE_M = 1.0e-7
 PROBE_EXTENT_PX = 64
+# The default KB optic has NA 3e-3, whose focus a 100 nm grid cannot hold: the pupil
+# window is lambda*z/dx_probe, so the aperture only fits on a much finer grid.
+KB_PIXEL_SIZE_M = 5.0e-9
 
 
 def _make_settings() -> ProbeSettings:
@@ -63,8 +69,14 @@ def _make_rng() -> numpy.random.Generator:
 class _StubProbeGeometryProvider(ProbeGeometryProvider):
     """A ready geometry provider, so the builders never hit the not-yet-bound guard."""
 
-    def __init__(self, *, probe_photon_count: float = PROBE_PHOTON_COUNT) -> None:
+    def __init__(
+        self,
+        *,
+        probe_photon_count: float = PROBE_PHOTON_COUNT,
+        pixel_size_m: float = PIXEL_SIZE_M,
+    ) -> None:
         self._probe_photon_count = probe_photon_count
+        self._pixel_size_m = pixel_size_m
 
     @property
     def detector_distance_m(self) -> float:
@@ -93,8 +105,8 @@ class _StubProbeGeometryProvider(ProbeGeometryProvider):
         return ProbeGeometry(
             width_px=PROBE_EXTENT_PX,
             height_px=PROBE_EXTENT_PX,
-            pixel_width_m=PIXEL_SIZE_M,
-            pixel_height_m=PIXEL_SIZE_M,
+            pixel_width_m=self._pixel_size_m,
+            pixel_height_m=self._pixel_size_m,
         )
 
 
@@ -302,7 +314,7 @@ def test_repeated_from_memory_builds_are_idempotent() -> None:
     assert numpy.array_equal(probe_seq.get_opr_weights(), expected.get_opr_weights())
 
 
-@pytest.mark.parametrize('builder_name', ['disk', 'from_file'])
+@pytest.mark.parametrize('builder_name', ['disk', 'from_file', 'kb_mirror'])
 def test_copy_preserves_mode_parameters(builder_name: str) -> None:
     """copy() iterates parameters() generically and now also has to carry the rng
     hoisted into the base, so the copy must still build."""
@@ -311,6 +323,8 @@ def test_copy_preserves_mode_parameters(builder_name: str) -> None:
 
     if builder_name == 'disk':
         builder = DiskProbeBuilder(_make_rng(), settings)
+    elif builder_name == 'kb_mirror':
+        builder = KBMirrorProbeBuilder(_make_rng(), settings, PluginChooser())
     else:
         builder = _make_from_file_builder(settings, _make_probe_seq(1, 1))
 
@@ -322,7 +336,7 @@ def test_copy_preserves_mode_parameters(builder_name: str) -> None:
     assert duplicate.num_incoherent_modes.get_value() == 3
     assert duplicate.num_coherent_modes.get_value() == 2
 
-    probe_seq = duplicate.build(_StubProbeGeometryProvider())
+    probe_seq = duplicate.build(_StubProbeGeometryProvider(pixel_size_m=KB_PIXEL_SIZE_M))
     assert probe_seq.get_array().shape[:2] == (2, 3)
 
 
@@ -418,3 +432,120 @@ class TestIncoherentModeDecaySettings:
             total = numpy.square(numpy.abs(probe_seq.get_array())).sum()
 
             assert total == pytest.approx(PROBE_PHOTON_COUNT, rel=1e-9)
+
+
+class TestKBMirrorProbeBuilder:
+    def _build(self, settings: ProbeSettings) -> ProbeSequence:
+        builder = KBMirrorProbeBuilder(_make_rng(), settings, PluginChooser())
+        return builder.build(_StubProbeGeometryProvider(pixel_size_m=KB_PIXEL_SIZE_M))
+
+    def test_builds_a_probe_at_the_requested_photon_count(self) -> None:
+        settings = _make_settings()
+        settings.num_incoherent_modes.set_value(3)
+
+        probe_seq = self._build(settings)
+
+        assert probe_seq.num_incoherent_modes == 3
+        assert probe_seq.num_coherent_modes == 1
+        assert _total_intensity(probe_seq) == pytest.approx(PROBE_PHOTON_COUNT)
+
+    def test_focus_narrows_as_the_numerical_aperture_grows(self) -> None:
+        """A longer mirror subtends more angle, so it focuses tighter.
+
+        This is the end-to-end check that the settings reach the optic rather than
+        merely producing some probe.
+        """
+
+        def fwhm_px(acceptance_length_m: float) -> int:
+            settings = _make_settings()
+            settings.kb_horizontal_acceptance_length_m.set_value(acceptance_length_m)
+            settings.kb_vertical_acceptance_length_m.set_value(acceptance_length_m)
+            array = self._build(settings).get_probe_no_opr().get_array()
+            cut = numpy.square(numpy.abs(array[0]))[PROBE_EXTENT_PX // 2, :]
+            return int(numpy.count_nonzero(cut >= 0.5 * cut.max()))
+
+        assert fwhm_px(0.2) < fwhm_px(0.05)
+
+    def test_an_aperture_too_large_for_the_grid_is_refused(self) -> None:
+        """The pupil window is lambda*z/dx_probe, so a coarse probe grid cannot hold a
+        high-aperture optic; clipping it silently would quietly change the optic."""
+        builder = KBMirrorProbeBuilder(_make_rng(), _make_settings(), PluginChooser())
+
+        with pytest.raises(ValueError, match='does not fit the pupil window'):
+            builder.build(_StubProbeGeometryProvider())
+
+    def test_presets_are_empty_until_optics_are_registered(self) -> None:
+        builder = KBMirrorProbeBuilder(_make_rng(), _make_settings(), PluginChooser())
+
+        assert list(builder.labels_for_presets()) == []
+
+
+class TestIncoherentModeStrategySettings:
+    def _mode_powers(self, strategy: str, num_imodes: int = 3) -> numpy.ndarray:
+        settings = _make_settings()
+        settings.num_incoherent_modes.set_value(num_imodes)
+        settings.incoherent_mode_strategy.set_value(strategy)
+        settings.incoherent_mode_decay_type.set_value('Exponential')
+        settings.incoherent_mode_decay_ratio.set_value(0.5)
+
+        probe_seq = DiskProbeBuilder(_make_rng(), settings).build(_StubProbeGeometryProvider())
+        array = probe_seq.get_probe_no_opr().get_array()
+        powers = numpy.array([numpy.square(numpy.abs(mode)).sum() for mode in array])
+        return powers / powers.sum()
+
+    def test_every_selectable_name_resolves_to_its_own_strategy(self) -> None:
+        """The offered names and the factories are one mapping, so they cannot drift.
+
+        A name that is offered but unbuildable would silently fall back to the default,
+        leaving a GUI option that quietly does something else.
+        """
+        settings = _make_settings()
+        resolved = []
+
+        for name in INCOHERENT_MODE_STRATEGY_NAMES:
+            settings.incoherent_mode_strategy.set_value(name)
+            builder = DiskProbeBuilder(_make_rng(), settings)
+            resolved.append(type(builder._create_imode_strategy()))
+
+        assert len(set(resolved)) == len(INCOHERENT_MODE_STRATEGY_NAMES)
+
+    @pytest.mark.parametrize('strategy', INCOHERENT_MODE_STRATEGY_NAMES)
+    def test_every_selectable_strategy_builds(self, strategy: str) -> None:
+        powers = self._mode_powers(strategy)
+
+        assert len(powers) == 3
+        assert numpy.all(numpy.isfinite(powers))
+
+    def test_the_decay_driven_strategies_follow_the_decay_settings(self) -> None:
+        """Both read the decay profile, so both land on the same weights."""
+        expected = [4 / 7, 2 / 7, 1 / 7]
+
+        numpy.testing.assert_allclose(self._mode_powers('MomentPolynomial'), expected, rtol=1e-9)
+        numpy.testing.assert_allclose(self._mode_powers('RandomPhaseRamp'), expected, rtol=1e-9)
+
+    def test_gaussian_schell_predicts_its_own_spectrum(self) -> None:
+        """It ignores the decay profile, so its weights must differ from the others."""
+        powers = self._mode_powers('GaussianSchell')
+
+        assert not numpy.allclose(powers, [4 / 7, 2 / 7, 1 / 7], rtol=1e-3)
+
+    def test_an_unrecognized_strategy_falls_back_to_the_first(self) -> None:
+        """The settings accept any string while the api strategies do not, so a stored
+        value they would refuse has to leave a usable probe."""
+        numpy.testing.assert_allclose(
+            self._mode_powers('NotAStrategy'),
+            self._mode_powers(INCOHERENT_MODE_STRATEGY_NAMES[0]),
+            rtol=1e-9,
+        )
+
+    def test_a_gaussian_schell_source_of_no_size_falls_back(self) -> None:
+        """The settings permit a zero width where the model requires a positive one."""
+        settings = _make_settings()
+        settings.num_incoherent_modes.set_value(3)
+        settings.incoherent_mode_strategy.set_value('GaussianSchell')
+        settings.gaussian_schell_beam_width_m.set_value(0.0)
+
+        probe_seq = DiskProbeBuilder(_make_rng(), settings).build(_StubProbeGeometryProvider())
+
+        assert probe_seq.num_incoherent_modes == 3
+        assert _total_intensity(probe_seq) == pytest.approx(PROBE_PHOTON_COUNT)
